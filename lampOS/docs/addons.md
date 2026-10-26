@@ -612,6 +612,54 @@ shipping rows, off by default, unless the owner says it is for this
 release, and it rides the same route (the lamp's own Harness daemon,
 [openharness#1654](https://github.com/autonomous-ai/openharness/issues/1654)).
 
+### As built (devin-0-P3, the owner, 26 Oct)
+
+The lamp side of openharness#1717, pulled into the release by the owner,
+off unless `LAMP_MACHINE_ADDONS=on` (or `lamp-addons machine --enable`).
+It is the trusted tier's route with the partner tier's reads: the full
+stream, long says and notes over 300 bytes wait on #1654's questions 5
+and 6.
+
+- **The route.** `lamp-addons machine` runs as the same user as the lamp's
+  Harness daemon and calls its loopback (`127.0.0.1`, `PORT` or 18473)
+  with the daemon's hook credential (`ADAPTER_DATA_DIR`, else
+  `~/.harness/cli/data`, `hook-credential`: this user's own regular file,
+  mode 0600, never through a link). It says `hello` at start, takes
+  proposals with `machine-addon/proposals` (10 s a take), and on `reset`
+  says `hello` and publishes again. Proposals already in the inbox when
+  it starts are not its own and are not taken.
+- **The yes.** `/var/lib/lampOS/addons/machine-yes.json`,
+  `{"machines":["<machine id>", …]}`: the computers the person said are
+  their own. A file missing, unreadable or with one id not as Harness
+  names one is no yes. How the person says it is still open; nothing
+  writes the file yet. Without a yes nothing is published, and every
+  proposal is answered `dropped`, "no yes for this computer". When the
+  yes is withdrawn, a `hello` clears what Harness held.
+- **What it publishes.** `voice/state`, `room/presence`, `mood/state`,
+  `light/state` and `ears/classes`, each as the lamp's own part says it,
+  only while that part publishes, at most one batch a second, `at` the
+  lamp's wall clock. A value over 4,096 bytes is withheld (`too_big`).
+  `clock/local` is not published: no part of the lamp puts it on the bus,
+  and the computer keeps its own clock.
+- **What a proposal becomes.** `light` or `say` only
+  (`not_for_remote`), `why` one of `ADDON_WHYS`, `holdsMs` 1 s to 30 s,
+  a light's `params` as `AddonLight`, a say's `note` one line of at most
+  300 bytes (`note_not_one_line`, never rewritten), no `params.part`
+  (`not_for_partner`). One past Harness's `expiresAt` by the lamp's clock
+  is dropped. It is written on `addon/proposal` from the bus source
+  `machine_addons`, named `own-` and the first 12 hex digits of the
+  SHA-256 of `from.machineId`, version `1.0.0`. At most four wait for the
+  judge; a fifth is answered `busy`.
+- **The judge.** `lamp-addons serve` takes proposals from `skills` and,
+  now, from `machine_addons` (`runtime::writer_may`): `skills` never
+  under an `own-` or `remote-` name, `machine_addons` only under `own-`.
+  Every other rule and rate is the same as for an add-on on the lamp,
+  keyed by the `own-` name; the trusted tier's own rates wait for a lamp.
+  Its decision, and only one written by `addons`, goes back as
+  `machine-addon/decision` with its reason.
+- **Not yet:** the reasons `messages` and `news` (a schema change in
+  `crates/msgs`), a deploy unit, and a run on a lamp.
+
 ### Two tiers of remote add-on
 
 | | Partner (above) | The person's own computer (this) |

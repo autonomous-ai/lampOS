@@ -212,10 +212,11 @@ pub fn serve(config: Config, stop: Arc<AtomicBool>) -> io::Result<Report> {
                 continue;
             }
         };
-        // Only lamp-skills writes proposals, stamping who made them.
-        if message.header.source != "skills" || proposal.check().is_err() {
+        // Only lamp-skills and the own-computer service write proposals,
+        // each stamping who made them.
+        if !writer_may(&message.header.source, &proposal.addon) || proposal.check().is_err() {
             eprintln!(
-                "lamp-addons: dropped a proposal from {:?}: not lamp-skills', or not well formed",
+                "lamp-addons: dropped a proposal from {:?}: not a proposal writer's, or not well formed",
                 message.header.source
             );
             report.dropped += 1;
@@ -276,6 +277,19 @@ pub fn serve(config: Config, stop: Arc<AtomicBool>) -> io::Result<Report> {
         write(&mut decisions, &proposal, verdict, "rule", &why, now_us);
     }
     Ok(report)
+}
+
+/// Whether `source` may write a proposal named `addon`: `lamp-skills` for
+/// an add-on on the lamp, never under a computer's stamp, and the
+/// own-computer service ([`crate::machine`]) only under its `own-` stamp
+/// (`docs/addons.md`, "The judge takes a third writer, never as `skills`").
+pub fn writer_may(source: &str, addon: &str) -> bool {
+    let computer = addon.starts_with(crate::machine::OWN) || addon.starts_with("remote-");
+    match source {
+        "skills" => !computer,
+        crate::machine::SOURCE => addon.starts_with(crate::machine::OWN),
+        _ => false,
+    }
 }
 
 /// One verdict said on `addon/decision`, `by` the rules or the policy.
@@ -443,6 +457,18 @@ fn take(watcher: &mut Watcher, message: &Message, now_us: u64) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn each_writer_writes_only_under_its_own_names() {
+        assert!(writer_may("skills", "evening-glow"));
+        assert!(!writer_may("skills", "own-0123456789ab"));
+        assert!(!writer_may("skills", "remote-0123456789ab"));
+        assert!(writer_may("machine_addons", "own-0123456789ab"));
+        assert!(!writer_may("machine_addons", "evening-glow"));
+        assert!(!writer_may("machine_addons", "remote-0123456789ab"));
+        assert!(!writer_may("voice", "evening-glow"));
+        assert!(!writer_may("voice", "own-0123456789ab"));
+    }
 
     #[test]
     fn the_product_waits_three_seconds_for_a_mute_never_said() {

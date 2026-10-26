@@ -10,6 +10,8 @@ lamp-bus = { path = "../bus" }
 lamp-ipc = { path = "../ipc" }
 lamp-msgs = { path = "../msgs" }
 serde_json.workspace = true
+sha2.workspace = true
+rustix = { version = "=1.1.5", features = ["fs", "process"] }
 signal-hook = "0.4"
 
 [dev-dependencies]
