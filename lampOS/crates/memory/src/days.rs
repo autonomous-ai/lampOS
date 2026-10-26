@@ -866,13 +866,21 @@ impl Days {
     /// [`Self::recall`], with a span of days and the second version's
     /// rules ([`Wider`], #2176).
     pub fn recall_wider(&self, person: &Person, ask: &Ask<'_>, wider: Wider) -> Result<Vec<Entry>> {
-        let mut entries: Vec<Entry> = self
-            .find(person, ask, false, false, wider)?
-            .into_iter()
-            .filter_map(|r| r.legacy())
-            .collect();
+        Ok(self.recall_wider_more(person, ask, wider)?.0)
+    }
+
+    /// [`Self::recall_wider`], and whether there was more than it gives
+    /// ([`Self::find_more`]).
+    pub fn recall_wider_more(
+        &self,
+        person: &Person,
+        ask: &Ask<'_>,
+        wider: Wider,
+    ) -> Result<(Vec<Entry>, bool)> {
+        let (records, more) = self.find_more(person, ask, false, false, wider)?;
+        let mut entries: Vec<Entry> = records.into_iter().filter_map(|r| r.legacy()).collect();
         entries.sort_by_key(|r| (r.at_unix_ms(), r.id()));
-        Ok(entries)
+        Ok((entries, more))
     }
 
     /// Ranked data, never an answer. No overlap means no memory. A caller must
@@ -890,13 +898,25 @@ impl Days {
         history: bool,
         wider: Wider,
     ) -> Result<Vec<Record>> {
+        Ok(self.search_wider_more(person, ask, history, wider)?.0)
+    }
+
+    /// [`Self::search_wider`], and whether there was more than it gives
+    /// ([`Self::find_more`]).
+    pub fn search_wider_more(
+        &mut self,
+        person: &Person,
+        ask: &Ask<'_>,
+        history: bool,
+        wider: Wider,
+    ) -> Result<(Vec<Record>, bool)> {
         if ask
             .query
             .is_none_or(|query| search::query_with(query, wider.second).is_none())
         {
-            return Ok(Vec::new());
+            return Ok((Vec::new(), false));
         }
-        let records = self.find(person, ask, true, history, wider)?;
+        let (records, more) = self.find_more(person, ask, true, history, wider)?;
         let tx = self.db.transaction()?;
         for record in &records {
             if record.kind == "observation" {
@@ -904,7 +924,7 @@ impl Days {
             }
         }
         tx.commit()?;
-        Ok(records)
+        Ok((records, more))
     }
 
     /// The event day attached to this person's record, if one was kept.
@@ -932,18 +952,21 @@ impl Days {
         })?;
         Ok(rows.collect::<std::result::Result<_, _>>()?)
     }
-    fn find(
+    /// The records a search or recall gives, and whether more matched than
+    /// it gives: one record past `limit`, or one that `max_bytes` left out
+    /// (#3627: a voice tells a span's answer partial only when it is).
+    fn find_more(
         &self,
         person: &Person,
         ask: &Ask<'_>,
         observations: bool,
         history: bool,
         wider: Wider,
-    ) -> Result<Vec<Record>> {
+    ) -> Result<(Vec<Record>, bool)> {
         let query = ask.query.filter(|q| !q.trim().is_empty());
         let expression = query.and_then(|query| search::query_with(query, wider.second));
         if query.is_some() && expression.is_none() {
-            return Ok(vec![]);
+            return Ok((vec![], false));
         }
         let day = ask.day.map(|d| d.to_string());
         // One day is a span from it to itself; `day_to` without a first day
@@ -952,7 +975,7 @@ impl Days {
         let sql = if expression.is_some() {
             "SELECT e.id FROM search JOIN entries e ON e.rid=search.rowid WHERE search MATCH ?1 AND e.person=?2 AND (?3 IS NULL OR ((e.kind='exchange' OR (?8 AND e.kind='kept')) AND e.day BETWEEN ?3 AND ?7)) AND (?4 OR e.kind!='observation') AND (?5 OR e.active=1) ORDER BY search.rank,e.at_unix_ms DESC,e.id DESC LIMIT ?6"
         } else {
-            "SELECT e.id FROM entries e WHERE ?1 IS NULL AND e.person=?2 AND (?3 IS NULL OR e.day BETWEEN ?3 AND ?7) AND ((?4 AND e.kind!='kept') OR e.kind='exchange' OR (?8 AND ?3 IS NOT NULL AND e.kind='kept')) AND (?5 OR e.active=1) ORDER BY e.at_unix_ms DESC,e.id DESC LIMIT ?6"
+            "SELECT e.id FROM entries e WHERE ?1 IS NULL AND e.person=?2 AND (?3 IS NULL OR e.day BETWEEN ?3 AND ?7) AND ((?4 AND e.kind!='kept') OR e.kind='exchange' OR (?8 AND ?3 IS NOT NULL AND e.kind='kept')) AND (?5 OR e.active=1) ORDER BY CASE WHEN ?8 AND ?3 IS NOT NULL AND e.kind='kept' THEN 0 ELSE 1 END,e.at_unix_ms DESC,e.id DESC LIMIT ?6"
         };
         let mut statement = self.db.prepare(sql)?;
         let ids = statement
@@ -963,26 +986,29 @@ impl Days {
                     day,
                     observations,
                     history,
-                    ask.limit.min(50),
+                    ask.limit.min(50) + 1,
                     last,
                     wider.second
                 ],
                 |r| r.get::<_, u64>(0),
             )?
             .collect::<rusqlite::Result<Vec<_>>>()?;
+        let limit = ask.limit.min(50);
+        let mut more = ids.len() > limit;
         let mut result = vec![];
         let mut room = ask.max_bytes.min(16384);
-        for id in ids {
+        for id in ids.into_iter().take(limit) {
             let entry = self
                 .record(person, id)?
                 .ok_or_else(|| bad("a search record is missing"))?;
             if entry.bytes() > room {
+                more = true;
                 break;
             }
             room -= entry.bytes();
             result.push(entry);
         }
-        Ok(result)
+        Ok((result, more))
     }
 
     pub fn record(&self, person: &Person, id: u64) -> Result<Option<Record>> {

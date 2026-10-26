@@ -403,6 +403,20 @@ The old request and response shapes remain accepted. `recall` now selects
 by FTS5 rank and still returns the selected raw entries in chronological
 order; it does not return observations. New operations are:
 
+For a `recall_v2` day or span without a query, current kept facts receive
+bounded result slots before recent exchanges. A voice span result the
+store says has `more` (one past its count, or one its bytes left out;
+theirs or the room's), or, from an older memory with no `more`, whose
+entries and the room's together fill the six-entry cap, carries
+`partial:true` (#3627), as does a known person's whose answer used the
+whole budget so the room's was never asked, with a note telling the model not to
+claim that other days in the span were empty (lamp-06c1, 26 Oct: F39 said a
+broad week had no earlier memory, F55 showed six recent exchanges filling the
+cap; F56 on this rule told an Oct 21 allergy and said it was partial). A
+broad request can still need a narrower topic or day for a complete answer. The content-free voice log
+`recall shape query=... day=... span=... history=...` records which form was
+sent without recording words or dates.
+
 ```json
 {"op":"search","person":"everyone","query":"cà phê","limit":8,"max_bytes":4096,"history":false}
 {"op":"append_linked","at_unix_ms":1791892800000,"heard":"My coffee?","said":"Black.","source_ids":[2]}

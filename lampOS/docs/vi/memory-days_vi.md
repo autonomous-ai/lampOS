@@ -86,3 +86,18 @@ như vẫn còn, và lệnh kết thúc bị từ chối). Một id người đ�
 `next_id` của họ, lệnh quên không bao giờ hạ nó) mà nay không còn là đã bị quên;
 một id chưa từng được cấp cho họ, kể cả id của người khác, vẫn bị từ chối
 (`bad_request`).
+
+## Truy xuất theo khoảng ngày
+
+Khi `recall_v2` hỏi một ngày hay một khoảng ngày mà không có từ khóa, các ghi
+chú đang giữ được ưu tiên chiếm chỗ trong số kết quả có hạn trước các lượt hội
+thoại mới hơn, để một ngày bận không che hết các ghi chú cũ (lamp-06c1, 26/10:
+một dị ứng ghi ngày 21/10 bị sáu lượt mới che mất). Kết quả vẫn trả theo thứ tự
+thời gian.
+
+Với một khoảng ngày (`day_from`), câu trả lời có thêm `more` (#3627); mọi câu trả lời khác giữ nguyên từng byte như trước: `true` khi còn bản ghi khớp vượt quá
+`limit`, hoặc `max_bytes` đã bỏ bớt một bản ghi; trình đọc cũ bỏ qua trường này.
+Voice báo câu trả lời là `partial` (chưa đủ) khi phần của người đó hoặc của căn
+phòng có `more`; với memory cũ không có `more`, khi hai phần cộng lại đủ sáu kết
+quả; và khi phần của căn phòng không được hỏi vì phần của người đó đã dùng hết
+hạn mức. Khi đó mô hình không được nói những ngày còn lại không có gì.
