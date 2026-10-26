@@ -323,6 +323,127 @@ fn queued_completion_survives_privacy_cycle_state_dropping_without_new_admission
     assert!(test.parent.active.is_none());
 }
 
+#[test]
+fn interrupted_receipt_retires_before_or_after_audio_without_claiming_completion() {
+    for audio in [false, true] {
+        let (turn, privacy) = owner(1);
+        let (mut receipt, probe) = receipt_for_test(turn, privacy, 7);
+        if audio {
+            receipt.audio();
+        }
+        // This is the receipt boundary, not a claim that a speaker was
+        // fenced here. The coordinator tests exercise that publication.
+        receipt.interrupted_after_owner_fenced();
+        let Some(ToWorker::Retire { token, proof }) = probe.settlement() else {
+            panic!("known interruption did not retire (audio={audio})");
+        };
+        assert_eq!(proof.correlation, token.correlation);
+        assert_eq!(proof.retired_by_session, token.correlation.consumer_session);
+        assert_eq!(
+            proof.basis,
+            RetirementBasis::OwnerFenced {
+                owner_boot: turn.boot().bytes(),
+                turn: turn.turn(),
+                microphone_generation: privacy,
+            }
+        );
+        assert!(!receipt.eligible_for_completion());
+        receipt.audio();
+        receipt.retired(2, 2, 480);
+        receipt.completed();
+        receipt.interrupted_after_owner_fenced();
+        assert!(!receipt.completion_recorded());
+        drop(receipt);
+        assert!(
+            matches!(probe.settlement(), Some(ToWorker::Retire { token: kept, proof: kept_proof })
+            if kept == token && kept_proof == proof)
+        );
+    }
+}
+
+#[test]
+fn interrupted_receipt_with_own_retirement_stays_held_even_with_later_audio() {
+    for later_audio in [false, true] {
+        let (turn, privacy) = owner(1);
+        let (mut receipt, probe) = receipt_for_test(turn, privacy, 7);
+        receipt.audio();
+        receipt.retired(1, 2, 240);
+        if later_audio {
+            receipt.audio();
+        }
+        assert!(receipt.eligible_for_completion());
+        receipt.interrupted_after_owner_fenced();
+        assert!(probe.settlement().is_none());
+        assert!(!receipt.completion_recorded());
+        drop(receipt);
+        assert!(matches!(probe.settlement(), Some(ToWorker::Abandon { .. })));
+    }
+}
+
+#[test]
+fn interrupted_receipt_preserves_completed_and_invalidated_outcomes() {
+    let (turn, privacy) = owner(1);
+    let (mut receipt, probe) = receipt_for_test(turn, privacy, 7);
+    receipt.audio();
+    receipt.retired(1, 2, 240);
+    receipt.completed();
+    let Some(ToWorker::Complete { token, proof }) = probe.settlement() else {
+        panic!("completion missing");
+    };
+    receipt.interrupted_after_owner_fenced();
+    drop(receipt);
+    assert!(
+        matches!(probe.settlement(), Some(ToWorker::Complete { token: kept, proof: kept_proof })
+        if kept == token && kept_proof == proof)
+    );
+
+    for invalidated in [false, true] {
+        let (mut receipt, probe) = receipt_for_test(turn, privacy, 7);
+        receipt.audio();
+        receipt.retired(1, 2, 240);
+        if invalidated {
+            receipt.invalidate();
+            receipt.interrupted_after_owner_fenced();
+            assert!(probe.settlement().is_none());
+        }
+        // An unexplained drop and a reset-invalidated interruption both
+        // remain uncertain, even after one generation was retired.
+        drop(receipt);
+        assert!(matches!(probe.settlement(), Some(ToWorker::Abandon { .. })));
+    }
+}
+
+#[test]
+fn interrupted_receipt_waits_for_drop_and_exact_consumer_settlement() {
+    let mut test = Test::new();
+    let offered = offer();
+    test.offer(offered.clone(), AT);
+    let (turn, privacy) = owner(1);
+    let mut receipt = test.parent.admitted(offered.clone(), turn, privacy, 7);
+    receipt.audio();
+    receipt.interrupted_after_owner_fenced();
+    test.parent.poll(AT);
+    assert!(test.command().is_none(), "a live receipt cannot be settled");
+    drop(receipt);
+    test.parent.poll(AT);
+    assert!(
+        matches!(test.command(), Some(ToWorker::Retire { token, .. }) if token == offered.token)
+    );
+    assert!(test.parent.offer(AT).is_none());
+    let mut wrong = offered.token.clone();
+    wrong.attempt += 1;
+    test.send(FromWorker::Settled { token: wrong }, AT);
+    assert!(test.parent.active.is_some());
+    test.send(
+        FromWorker::Settled {
+            token: offered.token,
+        },
+        AT,
+    );
+    assert!(test.parent.active.is_none());
+    assert!(test.command().is_none(), "one settlement per attempt");
+}
+
 /// #939, (c): `skill` turns Schedule speech on as `on` does; the due
 /// reminder then also waits for a skill's ask. Nothing else turns it on.
 #[test]
