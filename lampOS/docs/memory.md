@@ -336,8 +336,10 @@ result, or `"ok":false`, an `"error"` (`bad_json`, `bad_request`, `unknown_op`,
   or by the end-of-talk pass as an observation, so it goes with its
   follow-up, offer and event rows. The lamp's ask and the person's reply,
   journalled before the forget, cite the follow-up the session was shown,
-  so the store's walk takes them too and the end-of-talk pass is given
-  none of them. Reading the slot waits for the voice's context rather
+  so the store's targeted walk takes those that carry the named fact's
+  words; a turn only shown it stays ([memory-days.md](memory-days.md),
+  the targeted forget). The evidence exchange goes, and the end-of-talk
+  pass is given none of what went. Reading the slot waits for the voice's context rather
   than failing on a busy one. The voice logs the id only, never the
   words. Before the `forget`, #3113's older-memory probe (the
   `kept` listing with `observations`) is sent: an older lamp-memory, which

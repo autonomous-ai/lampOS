@@ -1382,7 +1382,8 @@ fn protocol_round_trip_records_links_prepares_and_applies_a_job_then_verifies_fo
     );
     assert_eq!(opened["snapshot"]["invalidated"], false);
     // The fact and the exchange it was taken from go; the earlier exchange
-    // that one was only shown stays (one step back, #2003).
+    // that one was only shown stays (one step back, #2003). A forget with
+    // no `selective` (an older voice's) is as before #3613.
     let (forgotten, _) = request(&mut store, json!({"op":"forget","id":fact}), NOW);
     assert_eq!(forgotten, json!({"ok":true,"removed":2}));
     let (search, _) = request(&mut store, json!({"op":"search","query":"coffee"}), NOW);
@@ -2967,15 +2968,22 @@ fn a_kept_thing_goes_with_the_conversation_it_came_up_in_and_nothing_else() {
     }
     assert!(store.record(&mai, theirs).unwrap().is_some());
 
-    // Kept without its conversation, it is as before: that stays.
+    // Kept without its conversation, an exchange that is a copy of it goes
+    // all the same, by its words (the first builder's condition on #3504:
+    // a copy left behind is the failure that matters); one with other
+    // words stays.
     let plain_said = store
         .append(&room, NOW, "the bins go out Friday", "OK", &[])
+        .unwrap();
+    let other = store
+        .append(&room, NOW, "the bins are green", "OK", &[])
         .unwrap();
     let bins = store
         .remember(&room, NOW, "the bins go out on Friday")
         .unwrap();
     store.forget(&room, bins).unwrap();
-    assert!(store.record(&room, plain_said).unwrap().is_some());
+    assert!(store.record(&room, plain_said).unwrap().is_none());
+    assert!(store.record(&room, other).unwrap().is_some());
 }
 
 /// #2176: a kept thing remembered with its conversation outlives that

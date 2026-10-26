@@ -715,7 +715,7 @@ fn a_follow_up_forget_preserves_an_unrelated_keep_with_shared_evidence() {
     assert_eq!(listed["ok"], true, "{listed}");
     assert_eq!(
         fixture.next("forget").0,
-        json!({"op":"forget","person":id.as_str(),"id":noticed})
+        json!({"op":"forget","person":id.as_str(),"id":noticed,"selective":true})
     );
     let db = Connection::open_with_flags(
         fixture.root.join("store").join(DATABASE),
@@ -910,7 +910,7 @@ fn a_refused_follow_up_forget_survives_the_next_turn_note_refresh() {
     let first = fixture.next("forget");
     assert_eq!(
         first.0,
-        json!({"op":"forget","person":id.as_str(),"id":noticed})
+        json!({"op":"forget","person":id.as_str(),"id":noticed,"selective":true})
     );
     assert_eq!(first.1, json!({"ok":false,"error":"io"}));
     client.mark_if_asked("Sorry, I could not forget that.", Some(&id));
@@ -960,7 +960,7 @@ fn a_refused_follow_up_forget_survives_the_next_turn_note_refresh() {
     assert_eq!(forgets.len(), 1, "the retry sends one forget: {forgets:?}");
     assert_eq!(
         forgets[0].0,
-        json!({"op":"forget","person":id.as_str(),"id":noticed}),
+        json!({"op":"forget","person":id.as_str(),"id":noticed,"selective":true}),
         "the retry forgets the same id"
     );
     assert!(retry.1 && retry.0["forgotten"] == true, "retry: {retry:?}");
