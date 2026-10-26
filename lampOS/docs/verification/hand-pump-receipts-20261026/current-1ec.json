@@ -1,0 +1,25 @@
+{
+  "head": "95e6b5ab9c34ae4b9137489f62dbef018cc4639e",
+  "tree": "e6196a07cdf473d54280dba1abb10493388180db",
+  "main_head": "1ec33957c78e6dc39bd7ca0b3b8f7c74543f6b35",
+  "actual_native_session_id": 78891,
+  "actual_native_exit": 0,
+  "actual_native_chunk": "fc083d",
+  "source_stable": true,
+  "all_owned_sessions_groups_closed": true,
+  "target_release_permitted": true,
+  "voice": {
+    "passed": 4090,
+    "failed": 0,
+    "ignored": 21
+  },
+  "update": {
+    "passed": 222,
+    "failed": 0,
+    "ignored": 2
+  },
+  "leaks": 0,
+  "timeouts": 0,
+  "release_sha256": "ecc8477177784eff339a932dc4db282a70def69a7d3f98f80ccede0d009420f1",
+  "scope": "Frozen 1ec base only; later Main needs fresh qualification. Privacy reader HOLD retained."
+}

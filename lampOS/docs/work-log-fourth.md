@@ -1,3 +1,13 @@
+## 2026-10-26 15:42 — Qualified parent pushed; current carry and profile repair
+
+Ready for lamp-voice: no
+
+Pushed 95e6b5ab9 to #3544 with the exact prior-head lease after its frozen 1ec gate passed: Voice 4,090/0/21, Update 222/0/2, zero leaks/timeouts, both doc harnesses clean. Formatting, strict workspace Clippy and workspace build passed. Native exit 0 and source/process closure are retained in [the compact receipt](verification/hand-pump-receipts-20261026/current-1ec.json). The privacy-reader HOLD remains; the PR stays draft.
+
+Main advanced through attention and scorecard changes. The equal single-commit carry is b333d4759 on 1cad670df; its formatting and strict workspace Clippy passed, workspace build and fresh full Voice qualification continue. Update's unit test embeds attention.md, so that target and its docs also need fresh checks. Historical Update counts are not called current. The incremental-only cleanup preserved all witnesses and drivers; its 8 GiB goal was not reached, while the unchanged 5 GiB per-stage admission remains satisfied.
+
+The separate #3530 profile-forgetting repair is implemented but UNRUN. It reserves an Eyes enrollment across the existing Memory deletion, uses one bounded deadline, refuses changed targets and reports partial results. Source review is addressing immediate known-file/cache invalidation and old provider-context continuation before qualification. No device, acoustic latency, physical acceptance or forensic erasure is claimed. Common and its dependent pieces remain separately prepared, not current-qualified.
+
 ## 2026-10-26 13:34 — Current-base qualification after Main advanced
 
 Ready for lamp-voice: no
