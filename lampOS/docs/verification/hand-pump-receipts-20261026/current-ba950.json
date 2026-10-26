@@ -1,0 +1,36 @@
+{
+  "actual_native_session_id": 7877,
+  "actual_native_exit": 0,
+  "actual_native_chunk": "9eba55",
+  "source_stable": true,
+  "all_owned_sessions_groups_closed": true,
+  "head": "c97dae33396a45657641c719794d162ca2d9c581",
+  "tree": "b5fe21b13217b1690ae24576574e0a9a82da979a",
+  "base": "ba950f289b4e0d4fd072d080ea3a1b54e7bce03f",
+  "hand_controls": {
+    "passed": 61,
+    "failed": 0,
+    "ignored": 1
+  },
+  "transport": {
+    "passed": 28,
+    "failed": 0,
+    "ignored": 0
+  },
+  "update": {
+    "passed": 222,
+    "failed": 0,
+    "ignored": 2
+  },
+  "docs": "Voice and Update each pass with zero cases",
+  "linux_only_speaker_cases_on_mac": 0,
+  "original_census_controller_exit": 125,
+  "census_correction": "Linux-only speaker module is absent on macOS; zero Mac coverage explicitly retained",
+  "compiler_or_runtime_replays": 0,
+  "full_voice_qualified": false,
+  "leaks": 0,
+  "timeouts": 0,
+  "retained_witnesses": 22,
+  "release_sha256": "199757a92141c4893ea22ffed601399b9ee4cddfe0863070e007d1c970fd9444",
+  "native_composition": "40309109196 / 40309109081 submitted at6dc test exactly this tree; current c97 submissions remain separate"
+}

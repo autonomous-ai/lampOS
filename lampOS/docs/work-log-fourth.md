@@ -1,3 +1,11 @@
+## 2026-10-26 18:18 — Current hand-control carry pushed; diagnostic gate next
+
+Ready for lamp-voice: no
+
+Pushed c97dae3339 to #3544 with exact 6dc lease, current on Main ba950f289 and the same tree already qualified by the original native preview. [Current Mac receipt](verification/hand-pump-receipts-20261026/current-ba950.json): hand-controls 61/0/1, transport 28/0/0, Update 222/0/2, docs pass with zero cases each, and fmt/strict workspace Clippy/build pass. The census-only 125 remains; the only-unrun continuation exited 0 without replay. All four executed target artifacts were freshly compiled from primary source, and source, witnesses, debug inputs and all owned processes were verified at closure. Linux-only speaker cases had zero Mac coverage and passed in the separately audited native preview. The privacy HOLD and historical failures remain; requested reader disposition is pending.
+
+The canonical checkout now holds the diagnostic source 2cc71e720 on c97 under fourth/diagnostic-qualified-20261026. Its fresh gate will run the changed sequence-acknowledgement case once and the rest of the entire integration target, with compiler checks and docs. Parent counts transfer only with actual unchanged artifact and input evidence; no whole-Voice claim. Common and Callback composed sources remain prepared separately and UNRUN. No lamp, installation, activation or score increase.
+
 ## 2026-10-26 18:04 — Current composed tree passes native gates
 
 Ready for lamp-voice: no
