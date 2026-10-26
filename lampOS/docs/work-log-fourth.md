@@ -1,3 +1,11 @@
+## 2026-10-27 00:31 — Public boundary names and new review repairs
+
+Ready for lamp-voice: no
+
+Published the [33 named boundary ledgers](verification/common-boundary-ledgers-20261027/full-d9.json), with separate [e672 delta](verification/common-boundary-ledgers-20261027/delta-e672.json) and [original failed native preview](verification/common-boundary-ledgers-20261027/original-native-db11.json) identities/outcomes. These enumerate existing evidence and add no runtime credit or acceptance waiver.
+
+The current 008 thin carry passed formatting, strict workspace/all-target Clippy, workspace build and test discovery; its union runtime remains active. A first controller stopped after sandbox denied process inspection; exact owned-session/group closure was subsequently verified and the unverified gates restarted with process access. No compiler/runtime result came from the refused attempt. Separate source repairs address HTTP permission after declaration/serialization and a fixed public acknowledgement for a narrow successful ordinary face forget. The HTTP regression control is being strengthened against the old dispatch behavior before qualification. The callback receipt now follows accounting and held-response installation. Later review source is uncompiled/unrun; remember/partial outcomes, explicit-close, independent privacy and physical holds remain. No device action.
+
 ## 2026-10-26 23:59 — Common native failures and current carry
 
 Ready for lamp-voice: no
