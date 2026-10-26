@@ -15,3 +15,15 @@ The raw local packet is
 `/private/tmp/fourth-hand-pump-combined-gates-20261026`. The local per-case
 watchdog is not a new CI configuration; native CI keeps its existing job
 containment. No lamp, throughput or thermal result is claimed.
+
+## Native qualification
+
+Head `55eb90cf4` and CI preview `d49bc2de6` have the same tree. ARM64
+40275772806 passed 7,493 unique selected cases with 53 reported skips, no
+failures, leaks, timeouts or selected cases left unrun. Both changed cases
+passed once. Runtime selection covered twelve affected/dependent/file-reader
+crates; it was not the whole workspace. Separate workspace doctests passed
+four cases, the process harness passed thirteen, and the relay succeeded.
+Linux Clippy 40275772853 passed. The native receipt records the log hashes
+and excludes final-output echoes and nested summaries from the case census.
+Existing Cargo example-name collision warnings remain.

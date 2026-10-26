@@ -1,3 +1,11 @@
+## 2026-10-26 13:04 — Hand-pump repair ready with native gates
+
+Ready for lamp-voice: yes (#3544)
+
+Head 55eb90cf4 is marked ready after ARM64 40275772806 passed 7,493 unique cases, zero failures/leaks/timeouts/unrun and 53 reported skips; both changed cases passed once. The twelve-crate runtime selection is explicit. Separate workspace docs passed 4, process checks 13 and relay succeeded. Linux Clippy 40275772853 passed; preview d49bc2de6 and the authored head share tree 527c8f8dc. [Native receipt](verification/hand-pump-receipts-20261026/native-40275772806.json) preserves the actual census and log hashes. Existing Cargo example-name collision warnings are not hidden.
+
+Second posted current READ-OK with independent 2/0/0 checks. Tests found no source P1/P2 and its receipt P3 is reconciled without changing outcomes. Reviewer-two's read continues. The diagnostic fixture's runtime-only continuation is active on the published dependency after exact incremental-cache recovery; earlier completed checks were not replayed. No lamp, activation or physical-performance result is claimed.
+
 ## 2026-10-26 12:58 — Reconcile hand-pump control receipt status
 
 Ready for lamp-voice: no

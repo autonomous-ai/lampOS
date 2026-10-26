@@ -1,0 +1,194 @@
+{
+  "observed_at": "2026-10-26T06:02:04.599719+00:00",
+  "pr": 3544,
+  "head": "55eb90cf4859845c9daaa73a2e1949d4776b2957",
+  "base": "cced429433211e06790f23ed8f51e07be613972d",
+  "checkout_preview": "d49bc2de68f0111a6a0b21fe88ee7de26a7f65b9",
+  "head_and_preview_tree": "527c8f8dc3c213d07a5d432855b2725f299362b7",
+  "arm_run": {
+    "id": 40275772806,
+    "url": "https://github.com/autonomous-ai/lampOS/actions/runs/40275772806",
+    "conclusion": "success"
+  },
+  "linux_run": {
+    "id": 40275772853,
+    "url": "https://github.com/autonomous-ai/lampOS/actions/runs/40275772853",
+    "conclusion": "success"
+  },
+  "nextest": {
+    "selected": 7493,
+    "unique_terminal_identities": 7493,
+    "passed": 7493,
+    "failed": 0,
+    "leak": 0,
+    "timeout": 0,
+    "unrun_selected": 0,
+    "skipped_reported": 53,
+    "skipped_binaries_reported": 114,
+    "scope": "CI selected 12 affected/dependent/file-reader crates out of46; not a full-workspace runtime census",
+    "seconds": 156.753,
+    "changed_cases_once": [
+      {
+        "status": "PASS",
+        "duration": "2.030s",
+        "ordinal": 1264,
+        "binary": "lamp-voice",
+        "case": "hand_controls::tests::with_the_wait_an_idle_pump_wakes_five_times_a_second_and_stops_at_once"
+      },
+      {
+        "status": "PASS",
+        "duration": "0.027s",
+        "ordinal": 3901,
+        "binary": "lamp-voice",
+        "case": "hand_controls::tests::an_idle_pump_is_ready_only_after_its_first_subscribed_drain"
+      }
+    ],
+    "count_boundary": "Only initial terminals between Starting and Summary; final-output echoes and nested libtest summaries excluded"
+  },
+  "doctests": {
+    "targets": 46,
+    "passed": 4,
+    "failed": 0,
+    "ignored": 0,
+    "target_names": [
+      "lamp_actions",
+      "lamp_addons",
+      "lamp_air",
+      "lamp_audio",
+      "lamp_body",
+      "lamp_bus",
+      "lamp_camera",
+      "lamp_cloud",
+      "lamp_controls",
+      "lamp_ears",
+      "lamp_environment",
+      "lamp_expression",
+      "lamp_eyes",
+      "lamp_gemini",
+      "lamp_health",
+      "lamp_ipc",
+      "lamp_keeper",
+      "lamp_lean",
+      "lamp_local_time",
+      "lamp_memory",
+      "lamp_mood",
+      "lamp_msgs",
+      "lamp_name",
+      "lamp_near_call",
+      "lamp_observer",
+      "lamp_peek",
+      "lamp_policy",
+      "lamp_records",
+      "lamp_ring",
+      "lamp_same_voice",
+      "lamp_schedule",
+      "lamp_selftest",
+      "lamp_settings",
+      "lamp_setup",
+      "lamp_skills",
+      "lamp_sound_fixtures",
+      "lamp_station",
+      "lamp_surround",
+      "lamp_tasks",
+      "lamp_turn_end",
+      "lamp_turn_end_wire",
+      "lamp_turn_owner",
+      "lamp_update",
+      "lamp_voice",
+      "lamp_voice_eval",
+      "lamp_voice_processes"
+    ]
+  },
+  "separate_harnesses": {
+    "relay_signals": "ok, one harness result",
+    "turn_end_process": {
+      "passed": 13,
+      "failed": 0,
+      "named_terminals": [
+        {
+          "case": "an_idle_worker_stays_ready_across_a_long_quiet",
+          "status": "ok",
+          "ms": 2007
+        },
+        {
+          "case": "a_worker_reporting_another_model_is_refused_before_any_request",
+          "status": "ok",
+          "ms": 2
+        },
+        {
+          "case": "no_outcome_is_delivered_after_close_even_for_an_answer_on_its_way",
+          "status": "ok",
+          "ms": 4
+        },
+        {
+          "case": "verdict_carries_identity_and_one_request_at_a_time",
+          "status": "ok",
+          "ms": 56
+        },
+        {
+          "case": "missing_model_is_final_and_never_restarted",
+          "status": "ok",
+          "ms": 162
+        },
+        {
+          "case": "missing_executable_fails_at_once",
+          "status": "ok",
+          "ms": 2
+        },
+        {
+          "case": "spawn_returns_while_worker_startup_is_held",
+          "status": "ok",
+          "ms": 6
+        },
+        {
+          "case": "startup_failures_are_final",
+          "status": "ok",
+          "ms": 413
+        },
+        {
+          "case": "serving_failures_are_replaced_within_budget",
+          "status": "ok",
+          "ms": 514
+        },
+        {
+          "case": "protocol_violations_are_replaced",
+          "status": "ok",
+          "ms": 177
+        },
+        {
+          "case": "cancelled_answers_are_never_delivered",
+          "status": "ok",
+          "ms": 155
+        },
+        {
+          "case": "close_during_inference_never_waits",
+          "status": "ok",
+          "ms": 233
+        },
+        {
+          "case": "sustained_requests_stay_bounded",
+          "status": "ok",
+          "ms": 690
+        }
+      ]
+    }
+  },
+  "linux": "workspace/all-target strict Clippy successful",
+  "warnings": "ARM build/test emits output filename-collision warnings for replay_cost and progress_cost examples; not a warning-free Cargo claim",
+  "limitations": [
+    "No lamp/device validation",
+    "No artifact binary download or byte audit",
+    "No physical latency or thermal claim",
+    "Publish/promote jobs skipped for this PR run"
+  ],
+  "input_sha256": {
+    "initial-identity.json": "0485c474a8f715d4615cb839ed1a6f08bc5d96662b4a51a63e10fe2798d4af07",
+    "arm-final.json": "b28423a951a6cc96715152f7b43eeaae9edb884eb232b5854365262275434fbe",
+    "linux-final.json": "973031ab17e7fab0341da2e9003b7fad686de16639d021c35637a959a2ee47f6",
+    "arm.log": "548bb215f275a0c722fb3e9f8fc2accd30177e547670e6a8bf1ea175be5fcac5",
+    "linux.log": "1bceaff13c500d80c4936104c3fbf7c71efac82d0a13fb34348ba907de4fdcb2",
+    "head-commit.json": "72a5ba0bae517a5afd74eb1dfb5345b6797559234969f5aa9f480cab73763c10",
+    "preview-commit.json": "92938a629406faddbb1e99db160778f81155e9ef2b037a8f5b6bc7e831c7c22a",
+    "unique-nextest-terminals.json": "394d0d57946deb2cb1c37b77438985bd8ad371f0e511ddeefe11d96e8e8cd887"
+  }
+}
