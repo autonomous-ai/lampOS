@@ -617,8 +617,8 @@ release, and it rides the same route (the lamp's own Harness daemon,
 | | Partner (above) | The person's own computer (this) |
 |---|---|---|
 | Who | any agent or service on any computer | one computer signed in to the same Harness account as the lamp, which the person names in the app as their own |
-| Reads | the six summary topics (`ADDON_TOPICS`) | every topic on the bus, raw media by reference (below) |
-| Yes | one yes for the computer | one yes for "my computer: everything", separate from the partner yes, said in its own words |
+| Reads | the six summary topics (`ADDON_TOPICS`) | every topic on the bus, raw media by reference; another known person's own topics only with that person's yes (below) |
+| Yes | one yes for the computer | one yes for "my computer: everything", separate from the partner yes, said in its own words, and each other known person's own yes for theirs |
 | Writes | `light` and `say` proposals, through the judge | the same proposals, through the judge, with the trusted tier's rates (below) |
 | Stamp | `remote-<computer>` | `own-<computer>`, the same 12 hex digits |
 
@@ -639,6 +639,28 @@ who is there (`humans/*`, `room/*`, `attention/*`), memory events
 messages (`messages/out`), skills (`skills/events`), the Policy's
 decisions (`policy/decisions`), health and the rest. The service forwards
 each message unchanged, with its topic, header time and source.
+
+**Whose yes covers what** (reviewer-three's P2 on #3541, 26 Oct). One
+person's yes doesn't carry another known person's data. The voice keeps
+person-scoped memory and private context apart (`LAMP_PERSON_SCOPE_SEEN`,
+#3064), and this tier must not undo that:
+
+- **A known person's own topics:** a message that names a known person's
+  memory id (`person`, `p-` and 16 hex digits, as `memory/rules`,
+  `memory/forgot` and `skills/ask` carry it), and a heard, said or chat
+  line (`voice/heard`, `voice/said`, `voice/turn`, `chat/*`) whose speaker
+  the voice proved, as #3064 binds private context, along with that
+  person's name on `humans/*`. These go only with that person's own yes,
+  said by them at the lamp. The computer owner's yes covers their own.
+- **The room's:** everything else, including a line whose speaker the lamp
+  couldn't prove and a face it doesn't know, goes on the computer's yes,
+  like any room line.
+- **Withheld, not rewritten.** A known person's message without their yes
+  isn't forwarded. The service journals the topic and `no_yes_for_person`,
+  never the words. A lamp that knows only its owner forwards everything.
+- **Each yes is withdrawn on its own,** at once on the lamp, as "Withdrawing
+  the yes" above. The owner withdrawing stops the whole stream; a housemate
+  withdrawing stops only theirs.
 
 Raw media does not fit Harness's add-on contract (`addon.publish`: a value
 is at most 4,096 bytes, and the link takes about one batch a second):
@@ -737,8 +759,9 @@ tier's whole say is longer:
 ### Open for the trusted tier
 
 - How the person names their own computer in the app, and the consent
-  words for "everything", which must say that guests' words leave the lamp
-  too.
+  words for "everything", which must say that guests' words and the room's
+  unproved lines leave the lamp too. The same goes for the words a
+  housemate hears when asked for their own yes.
 - Whether Harness can prove the computer is on the person's own account
   (openharness#1654, question 3); until it can, the yes names one machine
   id, shown in the app.
