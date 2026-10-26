@@ -148,6 +148,8 @@ apt-get clean
 [ -e /lib/firmware/regulatory.db-upstream ] || { echo "no upstream regulatory.db" >&2; exit 1; }
 update-alternatives --set regulatory.db /lib/firmware/regulatory.db-upstream
 update-alternatives --set regulatory.db.p7s /lib/firmware/regulatory.db.p7s-upstream 2>/dev/null || true
+[ "\$(readlink /etc/alternatives/regulatory.db)" = /lib/firmware/regulatory.db-upstream ] \\
+  || { echo "regulatory.db is not the upstream one: the hotspot can hang in COUNTRY_UPDATE" >&2; exit 1; }
 
 # Disable IPv6, as V1's image does (STA drops).
 mkdir -p /etc/sysctl.d
@@ -509,8 +511,6 @@ done
 for unit in lamp-setup.service lampos-setup-done.path lamp-update.service; do
   [ -L "${MNT}/etc/systemd/system/multi-user.target.wants/${unit}" ] || err "${unit} is not enabled"
 done
-[ "$(readlink "${MNT}/etc/alternatives/regulatory.db")" = /lib/firmware/regulatory.db-upstream ] \
-  || err "regulatory.db is not the upstream one: the hotspot can hang in COUNTRY_UPDATE"
 for unit in hal os-server bootstrap openclaw hermes-gateway led-boot led-shutdown; do
   for dir in etc/systemd/system lib/systemd/system usr/lib/systemd/system; do
     [ ! -e "${MNT}/${dir}/${unit}.service" ] || err "V1's ${unit}.service is on the image (${dir})"
