@@ -457,12 +457,33 @@ async fn a_name_carries_only_on_a_sign_of_one_speaker() {
                     Some(&Message::user(asked_as)),
                     "{name} {said:?}: the name in the held line's place"
                 );
+                // It is told words came after it, never which, and asks.
+                assert!(
+                    asked[0].contains(&Message::system(
+                        crate::second_provider::worker::NAME_THEN_HELD
+                    )),
+                    "{name} {said:?}: told words came after the name"
+                );
+                assert!(
+                    !asked[0]
+                        .iter()
+                        .any(|message| format!("{message:?}").contains("gift for my sister")),
+                    "{name} {said:?}: the held words are never told"
+                );
             }
-            None => assert_eq!(
-                last_words(&asked[0]),
-                Some(&Message::user("Lamp. I need a gift for my sister.")),
-                "no sign of a second person, as the rule says it in a quiet room"
-            ),
+            None => {
+                assert_eq!(
+                    last_words(&asked[0]),
+                    Some(&Message::user("Lamp. I need a gift for my sister.")),
+                    "no sign of a second person, as the rule says it in a quiet room"
+                );
+                assert!(
+                    !asked[0].contains(&Message::system(
+                        crate::second_provider::worker::NAME_THEN_HELD
+                    )),
+                    "carried: nothing was held"
+                );
+            }
         }
     }
 }

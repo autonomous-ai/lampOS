@@ -5038,7 +5038,11 @@ async fn spoken(
             // The same person going on: its own words after them
             // (`LAMP_JOIN_CUT_WORDS`), so a request's second half held on
             // its own is not lost either.
-            let (words, said_by, parts) = if empty || name_refused(&shared, request, &carried) {
+            // The line after the name, held as not shown said by it: the name
+            // is answered in its place, and the model is told words came, never
+            // which (`worker::NAME_THEN_HELD`).
+            let refused = !empty && name_refused(&shared, request, &carried);
+            let (words, said_by, parts) = if empty || refused {
                 unsay_carried(&shared, request, &carried);
                 (carried.text(), carried.said_by, carried.parts.clone())
             } else {
@@ -5086,6 +5090,11 @@ async fn spoken(
                 },
             );
             let lease = scope.clone();
+            let notes = if refused {
+                vec![worker::NAME_THEN_HELD.to_owned()]
+            } else {
+                Vec::new()
+            };
             tokio::join!(
                 though_held,
                 answer(
@@ -5095,7 +5104,7 @@ async fn spoken(
                     Asker::Spoken,
                     None,
                     None,
-                    Vec::new(),
+                    notes,
                     times,
                     None,
                 )
