@@ -1,0 +1,106 @@
+{
+  "pr": 3523,
+  "offered_head": "4b45bbf0606c5d94213438cab3afb201a6a2fd92",
+  "offered_base": "1c884f16cf4de53a700bba7512c129c3ee01d72d",
+  "arm64_run": 40261928423,
+  "linux_clippy_run": 40261928413,
+  "arm64_attempt": 1,
+  "linux_clippy_attempt": 1,
+  "arm64_conclusion": "success",
+  "linux_clippy_conclusion": "success",
+  "previews": {
+    "linux-clippy": {
+      "executed_preview": "e5aa0242af573d38e67237b775b1a5da8b6cfc97",
+      "preview_parents": [
+        "1c884f16cf4de53a700bba7512c129c3ee01d72d",
+        "4b45bbf0606c5d94213438cab3afb201a6a2fd92"
+      ],
+      "preview_tree": "6e28487bafcdfdebfc2de38fa0313d0231ec82ab",
+      "offered_tree": "6e28487bafcdfdebfc2de38fa0313d0231ec82ab",
+      "preview_equals_offered_tree": true
+    },
+    "arm64": {
+      "executed_preview": "e5aa0242af573d38e67237b775b1a5da8b6cfc97",
+      "preview_parents": [
+        "1c884f16cf4de53a700bba7512c129c3ee01d72d",
+        "4b45bbf0606c5d94213438cab3afb201a6a2fd92"
+      ],
+      "preview_tree": "6e28487bafcdfdebfc2de38fa0313d0231ec82ab",
+      "offered_tree": "6e28487bafcdfdebfc2de38fa0313d0231ec82ab",
+      "preview_equals_offered_tree": true
+    }
+  },
+  "passed": 11354,
+  "failed": 0,
+  "leaks": 0,
+  "timeouts": 0,
+  "skipped": 106,
+  "unique_terminal_cases": 11354,
+  "repeated_equal_rows": 35,
+  "all_selected_ordinals_present": true,
+  "reported_selected_totals": [
+    11354
+  ],
+  "own_control_pass_counts": {
+    "lamp-voice coordinator::tests::reminders::an_interruption_after_reminder_retirement_stays_held_without_ack_or_retry": 1,
+    "lamp-voice reminders::tests::interrupted_receipt_with_own_retirement_stays_held_even_with_later_audio": 1,
+    "lamp-voice coordinator::tests::reminders::a_user_interrupted_reminder_is_retired_for_retry_after_successor_admission": 1,
+    "lamp-voice coordinator::tests::reminders::offline_user_interruption_retries_only_after_successful_authority_publication": 1,
+    "lamp-voice coordinator::tests::reminders::user_interruption_cannot_retry_a_failed_provider_with_unretired_audio": 1,
+    "lamp-voice reminders::tests::interrupted_receipt_retires_before_or_after_audio_without_claiming_completion": 1,
+    "lamp-voice reminders::tests::interrupted_receipt_preserves_completed_and_invalidated_outcomes": 1,
+    "lamp-voice reminders::tests::interrupted_receipt_waits_for_drop_and_exact_consumer_settlement": 1,
+    "lamp-voice reminders::consumer::tests::interrupted_owner_retry_keeps_old_proof_out_of_the_new_attempt_and_ack": 1
+  },
+  "terminal_findings": [],
+  "native_summary": "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-26T03:14:27.8523193Z      Summary [ 207.276s] 11354 tests run: 11354 passed, 106 skipped",
+  "all_pass_audit": true,
+  "raw_logs": {
+    "linux-clippy": {
+      "path": "/Users/d/code/autonomous-os/.claude/worktrees/third-reminder-evidence/native-40261928423/linux-clippy-40261928413.log",
+      "bytes": 90227,
+      "sha256": "c8e6981ee293a4d7ec34a886f5031dc7e9161395e4be6ed55dabf1b16b3bd5b2"
+    },
+    "arm64": {
+      "path": "/Users/d/code/autonomous-os/.claude/worktrees/third-reminder-evidence/native-40261928423/arm64-40261928423.log",
+      "bytes": 2726248,
+      "sha256": "818a284745eba2af2b1f4cbc3c5fa4e73e7c59a5e7d0d8bcce6dae6f82b197e0"
+    }
+  },
+  "controls_source": {
+    "path": "/Users/d/code/autonomous-os/.claude/worktrees/third-reminder-evidence/current-1c884/sealed.json",
+    "sha256": "18d1ddfc935868bac4b816900eff9d19987f6bbe126331f566d99e793009318f"
+  },
+  "turn_wire_custom_harness": {
+    "passed": 13,
+    "failed": 0,
+    "control_pass_counts": {
+      "an_idle_worker_stays_ready_across_a_long_quiet": 1,
+      "a_worker_reporting_another_model_is_refused_before_any_request": 1,
+      "no_outcome_is_delivered_after_close_even_for_an_answer_on_its_way": 1,
+      "verdict_carries_identity_and_one_request_at_a_time": 1,
+      "missing_model_is_final_and_never_restarted": 1,
+      "missing_executable_fails_at_once": 1,
+      "spawn_returns_while_worker_startup_is_held": 1,
+      "startup_failures_are_final": 1,
+      "serving_failures_are_replaced_within_budget": 1,
+      "protocol_violations_are_replaced": 1,
+      "cancelled_answers_are_never_delivered": 1,
+      "close_during_inference_never_waits": 1,
+      "sustained_requests_stay_bounded": 1
+    },
+    "summary": [
+      "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-26T03:14:41.6411417Z test result: 13 passed; 0 failed"
+    ],
+    "counts_separate_from_nextest": true,
+    "qualified": true
+  },
+  "prior_event": {
+    "head": "04253d6dfbf7e4f3752011e92b6b89567985601a",
+    "arm64_run": 40258980142,
+    "native_conclusion": "success",
+    "policy_review": "P2 closed on 04253; prior 0c1 composition remains separate"
+  },
+  "qualified": true,
+  "limits": "Current 4b45bbf06 reminder-retry carry event only, on 1c884. Prior 04253 native success remains bound to its original 0c1 event; older 61a green-native/P2-held history remains in prior receipts. Custom Turn-wire13 is outside nextest totals. No local tests, retries, device, provider or physical-latency claims."
+}

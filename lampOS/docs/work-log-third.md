@@ -7,6 +7,30 @@ machine is explicitly named. Third has no lamp access.
 
 
 
+## 2026-10-26 10:17 — Latest interruption carry passes native gates
+
+#3523 **4b45bbf06** contains **1c884f16c** with an equal authored patch.
+Fresh Mac fmt, strict Voice/Voice-eval Clippy, reminder **110/0/2** and
+workspace build pass. Original ARM64 **40261928423** and Linux Clippy
+**40261928413** pass: **11,354 unique PASS**, zero FAIL/LEAK/TIMEOUT,
+106 skipped; all nine controls once. Exact preview parents/tree are bound,
+with Turn-wire **13/0** separate.
+[Current carry](verification/reminder-interruption-retry-20261026/carry-1c884.json),
+[local gate](verification/reminder-interruption-retry-20261026/current-1c884.json),
+[native gate](verification/reminder-interruption-retry-20261026/native-40261928423.json).
+
+Reviewer-two's full **4,299 PASS / 28 ignored** remains its exact04253/0c1
+execution, not a relabelled carry run. First's build6963 replay still leaves
+both reminder ship faults open. A corrected-build interruption replay must
+identify whether any own generation had retired: that boundary deliberately
+stays held without Ack/replay. No physical closure is claimed.
+
+#3525's current-base intermediate full Skills **539/0/9** is sealed. Final
+parser restrictions additionally refuse selected/while path overlap and
+compound trigger comparisons. Their intended load-acceptance negatives are
+preserved separately; final qualification and actual-parser Update controls
+continue before the repaired head is offered.
+
 ## 2026-10-26 09:58 — Privacy correction delivered in train 154
 
 #3512 is closed as carried by **train 154 (#3531)** at **1c884f16c**.
