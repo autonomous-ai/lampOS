@@ -471,6 +471,16 @@ voice unit (`LAMP_MEMORY_SOCKET`, the provider worker's `--memory-socket`).
 Without it the voice knows nothing of this process. The following describes
 the unchanged legacy client, used unless the new Days client is selected.
 
+**"I don't remember", never "you never told me"** (lamp-06c1, 26 Oct, F58:
+after a forget, "what am I allergic to?" was answered "you haven't told me",
+which was false). Every memory note the model is given (the legacy note,
+the Days notes with one or two snapshots, the one when no note was
+available, the texts' note) and `recall`'s description say: if recall finds
+nothing, say you do not remember, and never that they did not tell you,
+since they may have asked the lamp to forget it. Prompt words, not a
+guarantee: F59 is one exact replay that passed. Tests: the notes' exact
+texts in `remember::tests`.
+
 - **Three functions the model may call** ([tools.md](tools.md)):
   `remember {text}`, `recall {about?, days_ago?}` and `forget {}`. Each is
   one request here, on a thread of its own, with a 1.5 s budget. With
