@@ -1,0 +1,74 @@
+{
+  "base": "2bf5122dc76999f970556bb7c78840ab6e107ce0",
+  "published_head": "a8a2aa9530e17221dea83f92a58efd4d3e6b0c81",
+  "published_tree": "eddaf594ab6d05f67094724035758e97cec2e15a",
+  "tested_head": "89715b5279f802e4c8c0dc22c649cff04462d596",
+  "tested_tree": "6a0261033e66ebcd3879f9bc81622970886679ea",
+  "tested_witness_branch": "fourth/common-2bf-tested-20261027",
+  "post_test_delta_paths": [
+    "lampOS/docs/verification/common-checking-20261023/README.md"
+  ],
+  "production_test_and_manifest_blobs_unchanged_after_test": true,
+  "host_stages": {
+    "format": 0,
+    "strict_workspace_all_targets_clippy": 0,
+    "workspace_build": 0,
+    "full_metadata": 0,
+    "discovery": 0,
+    "runtime": 0
+  },
+  "runtime": {
+    "selected": 60,
+    "clean_passed": 60,
+    "failed": 0,
+    "leaked": 0,
+    "timed_out": 0,
+    "retries": 0,
+    "declared_ignored_in_selected_scope": 0,
+    "common_and_fixture_controls": 42,
+    "name_carry_module": 15,
+    "changed_skills_fixtures": 3,
+    "whole_workspace_runtime": false
+  },
+  "metadata": {
+    "resolved_local_packages": 48,
+    "workspace_members": 46,
+    "normal_cache_reuse_allowed": true,
+    "all_local_packages_fresh_false_claimed": false
+  },
+  "prior_current_attempt": {
+    "controller_exit": 125,
+    "format_exit": 0,
+    "clippy_exit": 0,
+    "runtime_executions": 0,
+    "error": "Root bound workspace-only46 metadata; provenance required full48 local packages",
+    "offline_recovery_only": true,
+    "completed_stages_replayed": 0
+  },
+  "continuation": {
+    "actual_native_exit": 0,
+    "source_stable": true,
+    "protected_evidence_unchanged": true,
+    "fresh_owned_process_census_empty": true,
+    "release_sha256": "dcac042cd6339aa77fc245b548b5781ea1888ad94f71a4687d72992015a6670f"
+  },
+  "range_diff": {
+    "hand_parent": "equal",
+    "diagnostic_parent": "equal",
+    "common": "changed: folded review repairs and verification receipt"
+  },
+  "new_native": {
+    "arm64_run": 40397666310,
+    "linux_clippy_run": 40397665945,
+    "status_at_publication": "in_progress",
+    "no_new_green_claim": true
+  },
+  "holds": [
+    "reader disposition of current HTTP/face repairs",
+    "explicit close while Eyes publication is blocked",
+    "independent privacy",
+    "compatible Voice/Eyes pins",
+    "physical acceptance"
+  ],
+  "device_actions": 0
+}

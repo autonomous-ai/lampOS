@@ -1,3 +1,11 @@
+## 2026-10-27 03:41 — Current Common repairs pushed
+
+Ready for lamp-voice: no
+
+Pushed #3064 a8a2aa953 on Main 2bf5122dc with exact lease replacement of ef831cec9. [Current selected receipt](verification/common-current-2bf-20261027/receipt.json) and [all 60 named terminals](verification/common-current-2bf-20261027/required-controls.json): formatting, strict workspace/all-target Clippy, build, full metadata and discovery pass; the exact union is 60/0/0, zero leaks/timeouts/retries. Common/fixture controls 42, complete name-carry module 15 and changed Skills fixtures 3 each execute once. This is not a whole-workspace runtime gate. The original metadata-accounting controller125 remains; only unrun stages continued after offline Clippy provenance recovery. Actual continuation0, source/evidence and fresh process closure verified. Ordinary reused/rebuilt artifacts remain distinct.
+
+Tested897/tree6a026 is publicly retained on fourth/common-2bf-tested-20261027. Final a8/treeeddaf differs only in the verification README; all production/test/manifest blobs match. Both fixture parents retain equal range-diffs; Common folds the post-construction HTTP and deliberate face-operation repairs into its one commit. New ARM40397666310 and Linux Clippy40397665945 are running, not passed. Earlier full/native failures remain failed. Readers are asked to read the pushed repair; explicit-close integration, independent privacy, pins and physical holds remain. The standalone IPC witness gate is next, while the Eyes half is under construction. No device action.
+
 ## 2026-10-27 03:16 — Thin checkpoint terminal ordinals published
 
 Ready for lamp-voice: no
