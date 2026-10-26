@@ -5075,6 +5075,44 @@ fn content_words(text: &str) -> Vec<String> {
 /// than one kept thing it was shown ([`correction_candidates`]).
 const CORRECTS_MORE_THAN_ONE: &str = "I found more than one old thing this could correct, so I kept nothing new. Ask which one they mean.";
 
+/// Words that, just after "not", make it no denial of the old thing
+/// ([`correction_candidates`]): "not just", "not only", "not even", "not
+/// also", and a possessive, "not my brother", which names someone else.
+const NOT_A_DENIAL: &[&str] = &[
+    "just", "only", "even", "also", "simply", "merely", "my", "his", "her", "our", "their", "your",
+];
+
+/// People a denied clause may name, so that a correction about one
+/// person is never taken as one about another ([`correction_candidates`]).
+const SOMEONE: &[&str] = &[
+    "brother",
+    "sister",
+    "mother",
+    "mom",
+    "mum",
+    "father",
+    "dad",
+    "wife",
+    "husband",
+    "son",
+    "daughter",
+    "friend",
+    "boss",
+    "partner",
+    "aunt",
+    "uncle",
+    "cousin",
+    "grandma",
+    "grandpa",
+    "grandmother",
+    "grandfather",
+    "boyfriend",
+    "girlfriend",
+    "colleague",
+    "neighbour",
+    "neighbor",
+];
+
 /// The kept things of `person`'s this session was shown (`shown`) that
 /// `said` corrects, for a `remember` with no `replaces`: `said` has a
 /// change word ("now", "anymore", "no longer", "instead of") and, after its
@@ -5108,6 +5146,30 @@ fn correction_candidates(
         .split(['.', ',', ';', '?', '!'])
         .next()
         .unwrap_or_default();
+    // Not a denial of the old thing, so when unsure nothing is replaced
+    // (reviewer-three's P2 on #3616): "not just a cat", "not only coffee"
+    // keep it, and "not my brother" names someone else.
+    // Its words as the matcher reads them (Reviewer-two's P2 on #3624):
+    // quotes and other marks off, a possessive's `'s` and a plural's `s`
+    // off, small words kept, so "not \"just\" a cat" and "not the
+    // brothers" are read as "not just" and "brother".
+    let words: Vec<&str> = clause
+        .split(|character: char| !(character.is_alphanumeric() || character == '\''))
+        .map(|word| word.trim_matches('\''))
+        .filter(|word| !word.is_empty())
+        .map(|word| plural_off(word.strip_suffix("'s").unwrap_or(word)))
+        .collect();
+    if words
+        .first()
+        .is_some_and(|first| NOT_A_DENIAL.contains(first))
+        // The person words read the same way ("boss" is "bos" both
+        // sides, Reviewer-two's P2 at b71d2fece).
+        || words
+            .iter()
+            .any(|word| SOMEONE.iter().any(|someone| plural_off(someone) == *word))
+    {
+        return vec![];
+    }
     let mut denied = content_words(clause);
     denied.retain(|word| {
         !matches!(
@@ -9265,6 +9327,69 @@ mod tests {
         assert!(
             correction_candidates(&context, person, "I cannot get to the bakery now", &[26])
                 .is_empty()
+        );
+        // Reviewer-three's P2 on #3616: no denial of the shown thing.
+        context.shown_as(person, 30, "has a cat called Miso");
+        context.shown_as(person, 31, "brother lives in Da Nang");
+        context.shown_as(person, 32, "drinks coffee");
+        context.shown_as(person, 33, "is vegan");
+        for said in [
+            "Remember I have a dog now, not just a cat.",
+            "Remember my sister lives in Hanoi now, not my brother.",
+            "I drink tea now, not only coffee.",
+            "My sister lives in Hanoi now, not the brother.",
+            // Reviewer-two's P2 on #3624: a plural, a quoted modifier.
+            "Remember my sisters live in Hanoi now, not the brothers.",
+            "Remember I have a dog now, not \"just\" a cat.",
+            "Remember I have a dog now, not 'just' a cat.",
+            "My sister lives in Hanoi now, not my brother's.",
+            "Remember I report to Ana now, not my boss.",
+            "Remember I report to Ana now, not the boss.",
+        ] {
+            assert!(
+                correction_candidates(&context, person, said, &[30, 31, 32, 33]).is_empty(),
+                "{said}"
+            );
+        }
+        assert_eq!(
+            correction_candidates(
+                &context,
+                person,
+                "Remember I'm vegetarian now, not vegan.",
+                &[30, 31, 32, 33]
+            ),
+            vec![33]
+        );
+        // Words ending in "ss" that name no one still correct.
+        context.shown_as(person, 34, "drinks from a glass");
+        context.shown_as(person, 35, "takes a yoga class");
+        context.shown_as(person, 36, "boss is called Minh");
+        assert_eq!(
+            correction_candidates(
+                &context,
+                person,
+                "I drink from a cup now, not a glass.",
+                &[34]
+            ),
+            vec![34]
+        );
+        assert_eq!(
+            correction_candidates(
+                &context,
+                person,
+                "I take a dance course now, not the yoga class.",
+                &[35]
+            ),
+            vec![35]
+        );
+        assert!(
+            correction_candidates(
+                &context,
+                person,
+                "Remember I report to Ana now, not my boss.",
+                &[36]
+            )
+            .is_empty()
         );
         assert!(
             correction_candidates(
