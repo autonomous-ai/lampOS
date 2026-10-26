@@ -615,6 +615,32 @@ pub fn switch_replaces(on: bool) -> bool {
     *REPLACES.get_or_init(|| on)
 }
 
+/// Only the exact value `on`, with the Days client: `forget` is told that
+/// when nothing was forgotten its words may have been misheard, and to say
+/// nothing matched and ask about a kept thing close to them, forgetting it
+/// only when they ask again ([`FORGET_ASKS_DESCRIBED`]). On lamp-4ace on 26
+/// Oct, "forget what I told you about the plant" was heard as "slant" and
+/// "plan" in 3 of 4 rounds, forgot nothing, and the lamp said so and
+/// stopped, the plant still kept. Off, every function is as before.
+pub const FORGET_ASKS_ENVIRONMENT: &str = "LAMP_MEMORY_FORGET_ASKS";
+static FORGET_ASKS: OnceLock<bool> = OnceLock::new();
+
+/// Whether `forget` asks about a kept thing near misheard words
+/// ([`FORGET_ASKS_ENVIRONMENT`]).
+pub fn forget_asks_on() -> bool {
+    FORGET_ASKS.get() == Some(&true)
+}
+
+/// Set it once for this process, as [`start`] does from the environment;
+/// the first setting stands.
+pub fn switch_forget_asks(on: bool) -> bool {
+    *FORGET_ASKS.get_or_init(|| on)
+}
+
+/// What [`FORGET_ASKS_ENVIRONMENT`] adds to `forget`'s description: never
+/// forgetting anything else, as the description already says.
+pub const FORGET_ASKS_DESCRIBED: &str = " If nothing was forgotten and their words may have been misheard, a word close to something you were shown as kept, say nothing matched and ask whether they meant that one, such as 'Nothing about a bake. Did you mean the bike? Say forget the bike.'; forget it only when they ask for it again.";
+
 /// Only the exact value `on`, with the Days client: `forget` also takes what
 /// it is `about`, and forgets the kept things of whoever is at the lamp that
 /// have every one of those words (#2176). Off, the functions are as before.
@@ -1156,7 +1182,21 @@ pub fn tools_with(rules: bool) -> Vec<Tool> {
     } else {
         tools
     };
+    let tools = if forget_asks_on() {
+        forget_asks_described(tools)
+    } else {
+        tools
+    };
     dated(tools, events_on())
+}
+
+/// `forget` with [`FORGET_ASKS_DESCRIBED`] ([`FORGET_ASKS_ENVIRONMENT`]):
+/// the other functions as they are.
+fn forget_asks_described(mut tools: Vec<Tool>) -> Vec<Tool> {
+    for tool in tools.iter_mut().filter(|tool| tool.name == FORGET) {
+        tool.description.push_str(FORGET_ASKS_DESCRIBED);
+    }
+    tools
 }
 
 /// `remember` with `on`, the day a kept fact is about (#1693,
@@ -2303,6 +2343,9 @@ pub fn start(socket: PathBuf, known: Option<PathBuf>) {
         days && std::env::var(FORGET_ABOUT_ENVIRONMENT).ok().as_deref() == Some("on"),
     );
     switch_replaces(days && std::env::var(REPLACES_ENVIRONMENT).ok().as_deref() == Some("on"));
+    switch_forget_asks(
+        days && std::env::var(FORGET_ASKS_ENVIRONMENT).ok().as_deref() == Some("on"),
+    );
     switch_link_used(days && std::env::var(LINK_USED_ENVIRONMENT).ok().as_deref() == Some("on"));
     // Who said a room line (#2849): only from the face seen saying it.
     if switch_room_speaker(
@@ -9700,6 +9743,35 @@ mod tests {
     /// function it was, with `LAMP_MEMORY_FORGET_ALL` off or on, its words
     /// saying since #3113 that a named thing is forgotten by its name, and
     /// an `about` sent anyway is passed over for the last kept thing.
+    /// `LAMP_MEMORY_FORGET_ASKS`: `forget` alone gains the sentence that asks
+    /// about a kept thing near misheard words, after its own, which still
+    /// says never to forget something else; every other function is as it
+    /// was, with each forget switch off or on.
+    #[test]
+    fn asking_about_a_misheard_forget_adds_to_forget_alone() {
+        for (forget_all, forget_about) in [(false, false), (true, false), (true, true)] {
+            let before = tools_for(true, forget_all, forget_about);
+            let after = forget_asks_described(before.clone());
+            assert_eq!(before.len(), after.len());
+            for (was, now) in before.iter().zip(&after) {
+                if was.name == FORGET {
+                    assert_eq!(
+                        now.description,
+                        format!("{}{FORGET_ASKS_DESCRIBED}", was.description)
+                    );
+                    assert!(
+                        now.description
+                            .contains("never forget something else instead")
+                    );
+                    assert_eq!(now.parameters, was.parameters);
+                } else {
+                    assert_eq!(now, was, "{}", was.name);
+                }
+            }
+        }
+        assert!(!forget_asks_on(), "off unless set");
+    }
+
     #[test]
     fn without_the_about_switch_forget_is_as_before() {
         assert!(!forget_about_on());
