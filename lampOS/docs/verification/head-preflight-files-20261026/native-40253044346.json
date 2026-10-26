@@ -1,0 +1,79 @@
+{
+  "pr": 3513,
+  "offered_head": "48a0bc66c01c6dab114260bf3f90adafe753f96b",
+  "offered_base": "c5c7603a743690e291f85a664a7ee18624232581",
+  "arm64_run": 40253044346,
+  "linux_clippy_run": 40253044315,
+  "arm64_attempt": 1,
+  "linux_clippy_attempt": 1,
+  "arm64_conclusion": "success",
+  "linux_clippy_conclusion": "success",
+  "previews": {
+    "linux-clippy": {
+      "executed_preview": "094bf1312c507528f695075daf37ed83fa67bac7",
+      "preview_parents": [
+        "c5c7603a743690e291f85a664a7ee18624232581",
+        "48a0bc66c01c6dab114260bf3f90adafe753f96b"
+      ],
+      "preview_tree": "30a61cf909396ba08312edd449413da4c10c366d",
+      "offered_tree": "30a61cf909396ba08312edd449413da4c10c366d",
+      "preview_equals_offered_tree": true
+    },
+    "arm64": {
+      "executed_preview": "094bf1312c507528f695075daf37ed83fa67bac7",
+      "preview_parents": [
+        "c5c7603a743690e291f85a664a7ee18624232581",
+        "48a0bc66c01c6dab114260bf3f90adafe753f96b"
+      ],
+      "preview_tree": "30a61cf909396ba08312edd449413da4c10c366d",
+      "offered_tree": "30a61cf909396ba08312edd449413da4c10c366d",
+      "preview_equals_offered_tree": true
+    }
+  },
+  "passed": 11335,
+  "failed": 0,
+  "leaks": 0,
+  "timeouts": 0,
+  "skipped": 106,
+  "unique_terminal_cases": 11335,
+  "repeated_equal_rows": 35,
+  "all_selected_ordinals_present": true,
+  "reported_selected_totals": [
+    11335
+  ],
+  "own_control_pass_counts": {
+    "lamp-update::install head_touch_preflight_files::fifo_drop_in_is_refused_before_mutation": 1,
+    "lamp-update::install head_touch_preflight_files::fifo_without_a_writer_is_refused_before_mutation": 1,
+    "lamp-update::install head_touch_preflight_files::fifo_body_calibration_is_refused_before_mutation": 1,
+    "lamp-update::install head_touch_preflight_files::directory_drop_in_is_refused_before_mutation": 1,
+    "lamp-update::install head_touch_preflight_files::regular_benign_drop_in_is_preserved": 1,
+    "lamp-update::install head_touch_preflight_files::symlink_to_regular_drop_in_is_preserved": 1,
+    "lamp-update::install head_touch_preflight_files::missing_local_files_keep_install_compatibility": 1,
+    "lamp-update::install head_touch_preflight_files::dangling_drop_in_keeps_missing_file_compatibility": 1,
+    "lamp-update::install head_touch_preflight_files::dev_null_drop_in_mask_is_preserved": 1,
+    "lamp-update head_touch::tests::null_masks_do_not_admit_other_character_devices": 1
+  },
+  "terminal_findings": [],
+  "native_summary": "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-26T01:28:39.6324364Z      Summary [ 209.710s] 11335 tests run: 11335 passed, 106 skipped",
+  "all_pass_audit": true,
+  "raw_logs": {
+    "linux-clippy": {
+      "path": "linux-clippy-40253044315.log",
+      "bytes": 91734,
+      "sha256": "bbf4a58cdffa29f06e4fc13c611ac3a22c54bd7ba1cd046c188accd91945dc69"
+    },
+    "arm64": {
+      "path": "arm64-40253044346.log",
+      "bytes": 2725256,
+      "sha256": "662642793afee863f516e4fbb86e25fb48c7bd585dbd0722a7dd8120f3decb18"
+    }
+  },
+  "old_756_run": {
+    "id": 40252014652,
+    "head": "fcf5d36f6d8b82ff6126d2dac22ae6942d5a8268",
+    "conclusion": "cancelled",
+    "metadata_receipt": "old-756-run-40252014652.json"
+  },
+  "limits": "Exact offered c5 head native gates only. Earlier 756 success/cancellation preserved separately. No local tests, workflow retries, device, provider, physical latency or future-base qualification.",
+  "qualified": true
+}

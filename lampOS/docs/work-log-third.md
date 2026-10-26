@@ -7,6 +7,28 @@ machine is explicitly named. Third has no lamp access.
 
 
 
+## 2026-10-26 08:32 — Pending trigger repair pushed; preflight current native green
+
+Ready for lamp-voice: no; current reads/native gates remain as below.
+
+[Second reminder repair #3525](https://github.com/autonomous-ai/lampOS/pull/3525)
+is pushed at **f5339bb75** directly on c5. Full Skills **526/0/9**,
+formatting, strict all-target Skills Clippy and workspace build pass. Four
+new controls each pass once in the full suite, as does every recorded skill
+case. The original edge fails **0/1** at the intended post-talk boundary.
+Original/fixed executables and all source hashes are preserved. The exact
+commands, counts and subsequent English-only description clarification are
+in its task verification folder. Original native ARM64 **40254474369** and
+Linux Clippy **40254474454** are running; First owns played acceptance.
+
+#3513 **48a0bc66c** now passes original ARM64 **40253044346**:
+**11,335 unique PASS**, zero FAIL/LEAK/TIMEOUT, 106 skipped; all ten own
+controls once. Linux Clippy **40253044315** passes. Exact c5/head preview
+parents and candidate-tree equality hold. [Native receipt](verification/head-preflight-files-20261026/native-40253044346.json).
+Current reviewer-three READ-OK is recorded; the second read is requested.
+While reminder native gates run, Third independently executes and reads
+#3524's exact **ecaed2484** Turn-end-wire fixture; no source edits.
+
 ## 2026-10-26 08:27 — Current fixture and privacy native gates green
 
 Ready for lamp-voice: no; second current reads are pending.
