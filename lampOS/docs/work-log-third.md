@@ -13,6 +13,19 @@ machine is explicitly named. Third has no lamp access.
 
 
 
+## 2026-10-26 16:50 — Install fixture boundary reproduced
+
+Ready for lamp-voice: no (diagnosis only)
+
+Unchanged 1aa full install at 16 threads: **96/5/0**, 410.82 s.
+One diagnostic run with unchanged deadlines/assertions: **96/5/0**, 356.70 s.
+All five positive preflight cases reached ready and failed to return from
+install within 30 s, before assertions and cleanup. Source and executable
+hashes stayed fixed; children and driver were reaped. No exact blocking
+operation or causal load comparison is claimed.
+[Receipts and method](verification/install-preflight-parallel-20261026/README.md).
+A separate fixed-stage diagnostic is running; product durability stays intact.
+
 ## 2026-10-26 16:46 — Completed Setup restart selection offered
 
 Ready for lamp-voice: no (#3570, native gates and reads pending)

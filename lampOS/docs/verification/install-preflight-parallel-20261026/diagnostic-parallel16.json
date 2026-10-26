@@ -1,0 +1,19 @@
+{
+  "head": "1aa409fcbdd1f1c32ae3bb9ad6698f83453dde68",
+  "command": [
+    "<preserved-driver>/diagnostic-install",
+    "--test-threads=16",
+    "--nocapture"
+  ],
+  "returncode": 101,
+  "signal": null,
+  "timed_out": false,
+  "elapsed_seconds": 356.70418100000825,
+  "driver_sha256_before": "e25c83102132af1558c3d0388b855cef43846ea29c267b9bad4071e21509cca9",
+  "driver_sha256_after": "e25c83102132af1558c3d0388b855cef43846ea29c267b9bad4071e21509cca9",
+  "sources_unchanged": true,
+  "driver_reaped": true,
+  "process_group_absent": true,
+  "ambient_load": "Setup four-thread durable-runtime gate finished before this run; latest compiler gate may run concurrently",
+  "log_sha256": "574307ec9e760e65b65977f0b3d725359cacebc7749cf8d0a9e1f58bab0346c1"
+}

@@ -1,0 +1,75 @@
+{
+  "terminal_counts": {
+    "passed": 96,
+    "failed": 5,
+    "ignored": 0
+  },
+  "cases": [
+    {
+      "case": "DanglingSymlink",
+      "failure": "post-ready deadline inside install before return",
+      "finished": false,
+      "reaped": "SIGKILL",
+      "ready_elapsed_ms": 1060,
+      "parent_elapsed_ms": 31195,
+      "parent_post_ready_ms": 30113,
+      "last_phase": "ready",
+      "install_returned": false,
+      "assertions_finished": false,
+      "cleanup_started": false
+    },
+    {
+      "case": "NullMask",
+      "failure": "post-ready deadline inside install before return",
+      "finished": false,
+      "reaped": "SIGKILL",
+      "ready_elapsed_ms": 1054,
+      "parent_elapsed_ms": 31208,
+      "parent_post_ready_ms": 30111,
+      "last_phase": "ready",
+      "install_returned": false,
+      "assertions_finished": false,
+      "cleanup_started": false
+    },
+    {
+      "case": "Missing",
+      "failure": "post-ready deadline inside install before return",
+      "finished": false,
+      "reaped": "SIGKILL",
+      "ready_elapsed_ms": 1121,
+      "parent_elapsed_ms": 31280,
+      "parent_post_ready_ms": 30115,
+      "last_phase": "ready",
+      "install_returned": false,
+      "assertions_finished": false,
+      "cleanup_started": false
+    },
+    {
+      "case": "RegularSymlink",
+      "failure": "post-ready deadline inside install before return",
+      "finished": false,
+      "reaped": "SIGKILL",
+      "ready_elapsed_ms": 1310,
+      "parent_elapsed_ms": 31377,
+      "parent_post_ready_ms": 30026,
+      "last_phase": "ready",
+      "install_returned": false,
+      "assertions_finished": false,
+      "cleanup_started": false
+    },
+    {
+      "case": "Regular",
+      "failure": "post-ready deadline inside install before return",
+      "finished": false,
+      "reaped": "SIGKILL",
+      "ready_elapsed_ms": 1443,
+      "parent_elapsed_ms": 31507,
+      "parent_post_ready_ms": 30042,
+      "last_phase": "ready",
+      "install_returned": false,
+      "assertions_finished": false,
+      "cleanup_started": false
+    }
+  ],
+  "classification": "All five children were killed/reaped after install() failed to return within original30s. No post-install assertion or TempDir cleanup delay was observed. Blocking operation and cumulative-vs-single-call cause remain unidentified."
+}
