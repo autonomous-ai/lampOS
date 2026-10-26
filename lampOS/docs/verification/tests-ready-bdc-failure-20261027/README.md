@@ -1,0 +1,13 @@
+# Ready on bdc: failed full Mac command
+
+One full Expression command on local `eb617a785` / `bdc277e26` failed at **338 passed, 2 failed, 0 ignored**, exit 101; controller exit 1. Formatting, strict twelve-package Clippy and workspace build passed. The Ready fixture case passed once. Four drivers reported 27/0, 4/0, 281/0 and 26/2; doctests were not run after the final driver's failure.
+
+The failing existing service cases are `sleep_name::an_expired_sleeping_name_is_journaled_once_by_the_service` (journal fixture host watchdog) and `sleep_name::the_service_breathes_the_head_with_moods_breath_from_the_bus` (original amplitude assertion, observed -0.0377639613821684). No startup/asleep/name/journal phase or consumed Mood phase was retained, so no exact cause is claimed.
+
+All eight compiled executable hashes, including the runtime driver and normal service helper, are identical to the passing `32890d3d1` / `978cb0e98` command's copies. Source and index stayed unchanged; all 224 sealed witnesses and current executable guards passed, and owned groups closed. These facts do not waive the failed command. A one-shot unmodified-bdc runtime control and separate test-only fixture investigations were claimed before code. No fix result is credited in this packet, and the failed head was not pushed. The separate unmodified-base control is recorded below.
+
+The original [native results](https://github.com/autonomous-ai/lampOS/tree/2b0dfefb3/lampOS/docs/verification/tests-original-native-three-prs-20261027) retain their older offered heads/previews. `audit.json` contains sanitized driver counts, identities and receipt hashes; raw logs, local paths and process identities remain private.
+
+The corrected one-shot control on unmodified `bdc277e26` completed **28/0/0** for the runtime driver, exit zero. It compiled after Expression-only invalidation at the same path/target/profile/features; runtime and normal helper bytes both match the failed candidate exactly. The environment comparison differs only in the tool-call identifier. Source, all 224 earlier witnesses and two new frozen artifacts stayed unchanged; the candidate branch, bytes/modes/index/clean status were restored, with two checkout modification times changed. This is a completed runtime control, not a full Expression command or a waiver of 338/2.
+
+The first private control stopped before compilation/runtime on a metadata filename collision. Its zero-runtime INCONCLUSIVE receipt is retained; a separately recorded corrected controller performed the sole baseline runtime observation. No test was rerun by that correction. Test-only phase and sleeping-precondition repairs now have private control plans; no fix or new qualification is credited here.

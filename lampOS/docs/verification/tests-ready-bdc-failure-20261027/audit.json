@@ -1,0 +1,208 @@
+{
+  "scope": "One failed full Mac Expression command and a separate unmodified-base runtime control; no fix result or failure waiver",
+  "head": "eb617a785c3bb56752432dfc1482fd69d111dd4a",
+  "base": "bdc277e2667e11ab04daf60e25f8f9fcf8220dce",
+  "runtime_attempts": 1,
+  "command_exit": 101,
+  "controller_exit": 1,
+  "counts": {
+    "passed": 338,
+    "failed": 2,
+    "ignored": 0
+  },
+  "groups": [
+    {
+      "target": "lamp_expression-97b0d6d78b5cc498",
+      "counts": {
+        "passed": 27,
+        "failed": 0,
+        "ignored": 0
+      },
+      "failed": []
+    },
+    {
+      "target": "lamp_expression-7d5e7ac9619c42c0",
+      "counts": {
+        "passed": 4,
+        "failed": 0,
+        "ignored": 0
+      },
+      "failed": []
+    },
+    {
+      "target": "it-707453661fb429d2",
+      "counts": {
+        "passed": 281,
+        "failed": 0,
+        "ignored": 0
+      },
+      "failed": []
+    },
+    {
+      "target": "runtime-f9b92bb4002b831f",
+      "counts": {
+        "passed": 26,
+        "failed": 2,
+        "ignored": 0
+      },
+      "failed": [
+        "sleep_name::an_expired_sleeping_name_is_journaled_once_by_the_service",
+        "sleep_name::the_service_breathes_the_head_with_moods_breath_from_the_bus"
+      ]
+    }
+  ],
+  "affected_ready_case_passed_once": true,
+  "runtime_wall_seconds": 531.5948793760035,
+  "runtime_driver_wall_seconds": 453.1,
+  "source_unchanged": true,
+  "protected_count": 224,
+  "protected_witnesses_unchanged": true,
+  "actual_executable_guards_passed": true,
+  "all_owned_groups_closed": true,
+  "fmt_passed": true,
+  "strict_packages": [
+    "lamp-body",
+    "lamp-cloud",
+    "lamp-expression",
+    "lamp-keeper",
+    "lamp-lean",
+    "lamp-memory",
+    "lamp-peek",
+    "lamp-setup",
+    "lamp-skills",
+    "lamp-update",
+    "lamp-voice",
+    "lamp-voice-eval"
+  ],
+  "workspace_build": true,
+  "comparison_to_passing_parent": {
+    "head": "32890d3d11ff74950d58c745663f0850cb0bcd4e",
+    "base": "978cb0e983c095b03dfeca01a06ebadd50691edd",
+    "all_eight_executable_bytes_equal": true,
+    "executables": [
+      {
+        "name": "it-707453661fb429d2",
+        "sha256": "8c9ab590428612ba3b9118dda8da259b2dad8f509a922f5afd5aea3fb3b9d476",
+        "bytes": 12734440
+      },
+      {
+        "name": "lamp-expression",
+        "sha256": "bd9cc37c5c411f015089c9110e5eead6c1fe35b1a38f67d5ec511c69b5ad6292",
+        "bytes": 8268912
+      },
+      {
+        "name": "lamp_expression-7d5e7ac9619c42c0",
+        "sha256": "4ee0baf79a18aabbb9335054c5ad1f509c3d42832e39dd91ead9d9e977dc8e8a",
+        "bytes": 2299560
+      },
+      {
+        "name": "lamp_expression-97b0d6d78b5cc498",
+        "sha256": "550ea9c5c345743f75e6b28f34709ae1b83c2c515ebbe1415678fb0e660ac20c",
+        "bytes": 5785064
+      },
+      {
+        "name": "recent_playout_cost",
+        "sha256": "f12487c99d0c3def9c256d9c1bf01cc0379b735da087e4ca47fc290bab79a088",
+        "bytes": 3732328
+      },
+      {
+        "name": "replay_cost",
+        "sha256": "4da63ed06b4d107c628208b1a78686c0b144d71edc70e53c6d91535bd1f6a528",
+        "bytes": 3714712
+      },
+      {
+        "name": "rest_cost",
+        "sha256": "cfe173587b297236070e00b8407738b417562af69efa8f017f13f20a9451db21",
+        "bytes": 3737504
+      },
+      {
+        "name": "runtime-f9b92bb4002b831f",
+        "sha256": "870f0d2c8cbf1577b419bcf70080624c8b4f77f0bd2d2e032403b37ad02bb181",
+        "bytes": 6381528
+      }
+    ]
+  },
+  "raw_receipt_sha256": {
+    "terminal.json": "5d18af9764793ce2f18ba21e553ff521da1a05c11affe7584cdbdf32731678db",
+    "observed-census.json": "f6dde3a8665eacbf432c3fe46563b3557a61e8d54521fa262000623fa93ef3e1",
+    "tests-result.json": "22a7280b1ebb5536c9d495d95904c05a039aa89afd98a47ce8b677b85dce3aa6",
+    "tests.stdout": "4e60fc6bc95f8e53e80c7f9d15e10da4869f19d2989c2150411ae0a8d57fbccb",
+    "tests.stderr": "82ce61c6c454496d975935a5c6e86ef270de177a6f91daa7f6cc7c8893a728cd",
+    "source-before.json": "dfcadaa114f3a2e329faba0c1cde718353b9bebc60c80619afb8c0237dd8b3b3",
+    "source-after.json": "dfcadaa114f3a2e329faba0c1cde718353b9bebc60c80619afb8c0237dd8b3b3",
+    "new-frozen.json": "62899cfcf9a85148c5f08095929f4e2d834e7c870dca96330089a16bf54c2cee",
+    "protected-after.json": "8f9706b5060dfa6e79fbea1049063361a8ec0aa6574df8b209f2a22c347648c3"
+  },
+  "failure_details": [
+    {
+      "test": "sleep_name::an_expired_sleeping_name_is_journaled_once_by_the_service",
+      "location": "crates/expression/tests/runtime.rs:1035",
+      "observation": "journal fixture host watchdog; receipt does not identify startup/asleep/name/journal phase"
+    },
+    {
+      "test": "sleep_name::the_service_breathes_the_head_with_moods_breath_from_the_bus",
+      "location": "crates/expression/tests/runtime.rs:494",
+      "observed_value": -0.0377639613821684,
+      "observation": "Original amplitude assertion failed; no phase at consumption retained"
+    }
+  ],
+  "no_failure_waiver": true,
+  "no_cause_established": true,
+  "no_new_head_push": true,
+  "doc_tests_not_run_after_failed_driver": true,
+  "unmodified_base_control": {
+    "base": "bdc277e2667e11ab04daf60e25f8f9fcf8220dce",
+    "runtime_attempts": 1,
+    "counts": {
+      "passed": 28,
+      "failed": 0,
+      "ignored": 0
+    },
+    "exit": 0,
+    "scope": "Runtime driver only, not full Expression package",
+    "source_unchanged": true,
+    "old_224_witnesses_unchanged": true,
+    "candidate_restored": true,
+    "source_mtime_changes": 2,
+    "groups_closed": true,
+    "artifact_comparison": [
+      {
+        "target": "runtime",
+        "target_kind": [
+          "test"
+        ],
+        "sha256": "870f0d2c8cbf1577b419bcf70080624c8b4f77f0bd2d2e032403b37ad02bb181",
+        "byte_identical_to_failed_candidate": true,
+        "profile_features_paths_equal": true
+      },
+      {
+        "target": "lamp-expression",
+        "target_kind": [
+          "bin"
+        ],
+        "sha256": "bd9cc37c5c411f015089c9110e5eead6c1fe35b1a38f67d5ec511c69b5ad6292",
+        "byte_identical_to_failed_candidate": true,
+        "profile_features_paths_equal": true
+      }
+    ],
+    "environment_differences": [
+      "CODEX_TOOL_CALL_ID"
+    ],
+    "first_private_controller_stop": {
+      "status": "INCONCLUSIVE",
+      "runtime_attempts": 0,
+      "reason": "Metadata semantic output collided with command receipt; candidate restored before corrected controller ran"
+    },
+    "receipt_hashes": {
+      "terminal.json": "150c47742e6e2b6641e1b55bdccf30470c433b2fed4f18c97cfb4be89047318f",
+      "artifact-comparison.json": "bb41f98f83950952e526d566462e42d2178cd9119b019ef06f12dd116cdf84c2",
+      "census.json": "05c9b82c0566c1560983541f4a3988549602ba1818c50558f52ede83dcc0c347",
+      "runtime-control.json": "6f07c9b01f60ec9029ba43ec46cabbaf23e04e786c7f15082153d242f0f57519",
+      "baseline-source-before.json": "fc891cd3b3cf897ed15e9c82185edbec45f8cd44f05fd912c4caa0ca723a16e6",
+      "baseline-source-after.json": "fc891cd3b3cf897ed15e9c82185edbec45f8cd44f05fd912c4caa0ca723a16e6",
+      "restored-candidate-source.json": "dfcadaa114f3a2e329faba0c1cde718353b9bebc60c80619afb8c0237dd8b3b3",
+      "new-frozen-after.json": "c81c230aea9a2079f732bb8aab40e78e39424e8175a407610b4592b2d1f4d065"
+    },
+    "retained_first_stop_hash": "9cab532ea2238c55e85c0b45ea641a1d7a921ac5d7b7836d3e4a72f793dd6023"
+  }
+}
