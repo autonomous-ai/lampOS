@@ -1,3 +1,11 @@
+## 2026-10-26 11:51 — Common runtime closed with one fixture failure
+
+Ready for lamp-voice: no
+
+The retained train153 runtime packet reports 4,604 clean passes, one failure and 25 ignored cases, with all 4,605 selected cases terminal and zero leaks or nextest timeouts. The failure is the unchanged hand-pump off-mode comparison: 31 passes against its minimum 100; waiting-mode ceiling and wake checks had already passed. The three separate Memory observation readers and two switch readers each passed. Capacity admission stopped before the custom Update harnesses, turn-end process checks and four-package docs at 4,198,473,728 bytes free, below the unchanged 5 GiB reserve. The runner records exit 125 and closed owned process groups; the previous native handle is unavailable after resumption, so its tool exit is not claimed. A thirteenth failed driver is retained independently, and release/hash verification is in progress.
+
+Reviewer-two's final Queue ownership decision assigns the combined hand-pump fixture repair to Fourth, with Tests reading it. Preparation adds real first-pass readiness and cleanup on readiness failure, retains wake/stop/waiting bounds, and explicitly replaces the host-rate floor with the observed two-millisecond park argument plus bounded progress. Original failures remain failures; no physical heat claim follows. The separate diagnostic acknowledgement fixture is carried to train156 cced42943 with its exact two-file patch preserved; runtime gates remain unrun. Common's carry to that train must cover the newer Voice changes as well as Expression. No source repair has been presented as passing or pushed, and no lamp work occurred.
+
 ## 2026-10-26 10:13 — Taken: observe the hand pump's actual tick boundary
 
 Ready for lamp-voice: no
