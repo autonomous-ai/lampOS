@@ -1,3 +1,11 @@
+## 2026-10-26 10:13 — Taken: observe the hand pump's actual tick boundary
+
+Ready for lamp-voice: no
+
+Common's unchanged train153 runtime is still active and has reported the hand-pump comparison at 31 ticks versus its minimum 100. The waiting-mode count ceiling and wake-under-100-ms checks passed before that assertion. The two HandControls files are unchanged by Common. Merged #2286 and realtime-tests.md already retain the same unresolved assertion class at 26, 30 and 74 under combined load; that is not proof of this run's cause or a waiver.
+
+Taken separately on Queue #3504 after checking open and merged work: retain the real waiting, wake and bounded stop/join controls, observe the actual off-mode park boundary through an instance-local test-only hook, and require the unchanged two-millisecond tick plus bounded progress. The observed off-mode count stays diagnostic; this change cannot claim 100 host passes per second or physical heat. Wrong-tick and missing-observation controls are planned. Source preparation uses an isolated three-file scratch copy on own branch fourth/hand-pump-wait-boundary-20261026; no runtime, gate or device result yet. The current failed run remains frozen and continues without retries.
+
 ## 2026-10-26 09:30 — Taken: diagnostic sequence acknowledgement fixture
 
 Ready for lamp-voice: no
