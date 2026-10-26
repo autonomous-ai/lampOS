@@ -67,6 +67,10 @@ CONTROLS_BIN=${CONTROLS_BIN:-/opt/lampOS/controls/current/lamp-controls}
 SELFTEST_BIN=${SELFTEST_BIN:-/opt/lampOS/selftest/current/lamp-selftest}
 SYSTEMCTL=${SYSTEMCTL:-systemctl}
 KEEPER_BIN=${KEEPER_BIN:-/usr/local/bin/lamp-keeper}
+# The reset a passed step 4 runs, as the button's (setup.md, "The reset"):
+# setup's own reset-now on the lamp's plan, in a unit of its own.
+SETUP_BIN=${SETUP_BIN:-/opt/lampOS/setup/current/lamp-setup}
+SYSTEMD_RUN=${SYSTEMD_RUN:-/usr/bin/systemd-run}
 JQ=${JQ:-jq}
 UNIT_ID='' WRITE=0 KEY='' STORE_KEY='' FROM=1 TO=4
 DEVICE=/dev/ttyACM0 LOCKS=/run/lampos-locks/motor BODY_USER=lampos
@@ -591,6 +595,7 @@ stand_for_head() {
 # before it is packed; the reset keeps what steps 1 to 3 wrote (lamp.env, the
 # pins file, /etc/lampOS/update) and the self-test's own record.
 SETUP_DONE=$ROOT/var/lib/lampos-setup/done
+RESET_PLAN=$ROOT/etc/lampOS/setup/reset-plan.json
 step_selftest() {
   if [[ ! -e $SETUP_DONE ]]; then
     if [[ $WRITE != 1 ]]; then
@@ -612,14 +617,34 @@ step_selftest() {
   [[ $HEAD_STOOD == 1 ]] && say "the lamp folds by itself within 90 s of standing (lamp-body's --awake-seconds)"
   # Exit 3, a part not checked, counts as the unit's success (selftest.md).
   [[ $status == 0 || $status == 3 ]] || { fail "the self-test found a part that failed (exit $status)"; return 1; }
-  # Left as it is, an up voice wakes the lamp to anyone talking, and an awake
+  # Passed, the lamp is still set up as the bench left it: the factory's
+  # Wi-Fi, the factory account's link, and any face or name onboarding kept.
+  # Every one of those is on the reset plan's wipe list, but only a reset
+  # someone remembers wipes them (reviewer-three's P2 on `547d568f0`), so the
+  # step asks for it and runs it, as the button does: setup's reset-now on
+  # the lamp's plan, in a unit of its own, which reboots into setup. What
+  # steps 1 to 3 wrote is kept. The account's side is the app's: the lamp is
+  # removed from the factory account there (Backend2 on #3555).
+  if ASK_ANSWER=${ASK_RESET_ANSWER:-${ASK_ANSWER:-}} ask "the reset, now: the lamp forgets the bench's Wi-Fi, the factory account and any face or name it was given, keeps what steps 1 to 3 wrote, and reboots into setup, unset."; then
+    [[ -e $RESET_PLAN ]] || { fail "the self-test passed, but there is no reset plan at $RESET_PLAN: hold the button 5 s (the reset), then remove the lamp from the factory account in the app, then pack"; return 1; }
+    say "resetting: the lamp reboots into setup now. Then remove it from the factory account in the app, and pack it."
+    "$SYSTEMD_RUN" --no-block --collect --unit=lamp-setup-wipe --property=Type=oneshot \
+      "$SETUP_BIN" reset-now --plan "$RESET_PLAN" --enable \
+      || { fail "could not start the reset: hold the button 5 s (the reset), then remove the lamp from the factory account in the app, then pack"; return 1; }
+    return 0
+  fi
+  # Not reset: an up voice wakes the lamp to anyone talking, and an awake
   # lamp stands (#2818 on lamp-52e6, in a talking office; a factory is no
-  # quieter). The keeper's pause (keeper.md) makes every mood rest and drops
-  # calls, looks and Expression's requests, so the body folds once its awake
-  # time runs out and holds there; it lives in /run, so the lamp's next
-  # start is not paused.
-  "$KEEPER_BIN" pause || { fail "could not pause the lamp with $KEEPER_BIN, so it would wake to the room and stand: the steps passed, but the arm is not left at rest"; return 1; }
-  say "the lamp is paused until it is next started: it folds and stays at rest, taking no turn"
+  # quieter). The keeper's pause (keeper.md), where there is one, makes
+  # every mood rest and drops calls, looks and Expression's requests, so the
+  # body folds once its awake time runs out and holds there; it lives in
+  # /run. The product image has no keeper (lamp-52e6, 26 Oct).
+  if [[ -x $KEEPER_BIN ]]; then
+    "$KEEPER_BIN" pause || { fail "could not pause the lamp with $KEEPER_BIN, so it would wake to the room and stand: the steps passed, but the arm is not left at rest"; return 1; }
+    say "the lamp is paused until it is next started: it folds and stays at rest, taking no turn"
+  fi
+  fail "the self-test passed, but the lamp is NOT READY TO PACK: it is still set up with the bench's Wi-Fi, the factory account and any face or name. Hold the button 5 s (the reset), then remove the lamp from the factory account in the app, then pack"
+  return 1
 }
 
 say "lamp $UNIT_ID, $MODE, from step $FROM"
