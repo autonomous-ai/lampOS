@@ -13,6 +13,32 @@ machine is explicitly named. Third has no lamp access.
 
 
 
+## 2026-10-26 17:40 — Setup HOLD and cached-library mismatch preserved
+
+Ready for lamp-voice: no (#3570 HOLD; all current carries qualifying)
+
+Reviewers identified an unguarded mkfifo in the Setup fixture. Its local fix
+holds the existing forking guard only across status(), releasing it before
+lamp.round(). The independent reported 182/1 round result and isolated pass
+remain actual observations; the generic flock error does not establish cause.
+
+The first fix qualification failed before runtime: E0407 against a library
+Cargo marked fresh, despite the current source declaring the method.
+[Preserved diagnosis](verification/setup-completed-watch-20261026/cached-library-mismatch.json)
+shows that library's metadata came from the reminder checkout and omitted
+the Setup trait/module. A passing test or fixed checkout hash alone is not
+a dependency-source binding. Earlier outcomes are retained with that limit,
+not silently replaced or universally discarded. Independent CI remains scoped
+by its original checkout/tree receipts.
+
+Targets are now permanently per worktree. Exactly all 46 workspace packages
+and patched local tough/sonora are invalidated before fresh compiler JSON
+and runtime guards; registry dependencies remain cached. Setup with its guard,
+reminder and preflight fixture are qualifying on latest **6663ca655**.
+The fixture's earlier current carry again ran 101/0, but its clean rebuild
+produced different artifacts; that older run is not used to qualify this carry.
+All PRs remain draft while their current gates/read conditions are unresolved.
+
 ## 2026-10-26 17:15 — Preflight fixture native gates green
 
 Ready for lamp-voice: yes (#3574; train still requires its reader quorum)

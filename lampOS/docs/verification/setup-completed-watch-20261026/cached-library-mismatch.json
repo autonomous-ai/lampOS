@@ -1,0 +1,19 @@
+{
+  "attempt": "ef08682c4 plus scoped forking guard on aa7; no runtime executed",
+  "failure": "E0407: setup_unit_properties not a member of Systemd while current world.rs declares it",
+  "compiler_report": "Update library fresh=true",
+  "observed_artifact": {
+    "artifact": ".claude/worktrees/third-store-target/debug/deps/liblamp_update-048a72862fb5cb7f.rmeta",
+    "sha256": "e05d70e179cb65f8dda95fcbba4c2c65ae85dce9132720d61def8ba4962934e1",
+    "origins": [
+      "third-reminder-pending"
+    ],
+    "setup_trait": false,
+    "setup_module": false
+  },
+  "source_manifest_unchanged": true,
+  "finding": "Consumed metadata originated in third-reminder-pending and omitted Setup trait/module. Shared target reuse crossed worktree sources.",
+  "artifact_inventory_sha256": "679dfec72b3c9648bac9beb02e012304468f3057f115d0f691f2458e72f4d001",
+  "correction": "Permanent per-worktree target; cargo clean exact 46 workspace packages plus patched local tough/sonora, followed by fresh compiler JSON and preserved runtime bindings on latest6663. Registry dependency cache retained.",
+  "limits": "Earlier executions remain observed results; unchanged checkout and passing tests alone do not establish every cached dependency source. CI checkout receipts remain independent. R3 busy-lock cause remains unproven."
+}
