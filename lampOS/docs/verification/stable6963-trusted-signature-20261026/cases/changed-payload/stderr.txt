@@ -1,0 +1,1 @@
+lamp-update: check channel=lamp-voice url=file://SCRATCH/cases/changed-payload/channel/ lamp=release-check apply=off self=off key=54213f8d3aa2f241

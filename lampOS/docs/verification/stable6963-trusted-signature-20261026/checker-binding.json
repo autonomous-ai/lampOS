@@ -1,0 +1,10 @@
+{
+  "compiled_head": "46b5c220d72baf9a2b737cc93102fa73d6fe05a6",
+  "compiled_base": "88335bfbef7a964ff5918b0dec06892dc9a4ea4d",
+  "binary_sha256": "799a71ccd12590795d2b340662c6027fee26a69ac70888844c0ca34d980aff3b",
+  "prior_public_binding": "https://github.com/autonomous-ai/lampOS/blob/d74bcde148/lampOS/docs/verification/own-keys-product-carry-20261026/current-883/update-executables.json",
+  "copied_preserved_compiler_artifact": true,
+  "original_actual_path_and_preserved_hash_match": true,
+  "host": "Darwin arm64",
+  "flags": "Existing Rust 1.96.0 compiler artifact; no build or device execution for this check."
+}

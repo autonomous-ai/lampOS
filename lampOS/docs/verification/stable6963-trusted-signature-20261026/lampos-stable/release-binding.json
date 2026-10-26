@@ -1,0 +1,11 @@
+{
+  "tag": "lampos-stable",
+  "release_id": 423818012,
+  "asset_id": 676827279,
+  "url": "https://github.com/autonomous-ai/lampOS/releases/download/lampos-stable/lampos-manifest.json",
+  "updated_at": "2026-10-26T03:01:06Z",
+  "bytes": 13563,
+  "sha256": "f58811fa32e16d8e7e21cb67a1cd8a175c5f51e767ac026cc733de14010946da",
+  "asset_digest": "sha256:f58811fa32e16d8e7e21cb67a1cd8a175c5f51e767ac026cc733de14010946da",
+  "retrieved_at": "2026-10-26T07:57:10.249448+00:00"
+}

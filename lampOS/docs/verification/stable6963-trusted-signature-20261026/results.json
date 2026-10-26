@@ -1,0 +1,402 @@
+{
+  "checked_at": "2026-10-26T07:58:13.999765+00:00",
+  "passed": 5,
+  "failed": 0,
+  "sequence": 6963,
+  "commit": "41233c1b6954abc812186d7014a7adb19422e29e",
+  "cases": [
+    {
+      "case": "trusted-positive",
+      "command": [
+        "SCRATCH/lamp-update",
+        "check",
+        "--channel-url",
+        "file://SCRATCH/cases/trusted-positive/channel/",
+        "--channel",
+        "lamp-voice",
+        "--key-file",
+        "SCRATCH/trusted-public-key.pub",
+        "--root",
+        "SCRATCH/cases/trusted-positive/root",
+        "--lamp",
+        "release-check",
+        "--apply",
+        "off",
+        "--bus-root",
+        "SCRATCH/cases/trusted-positive/unused-bus"
+      ],
+      "exit_code": 0,
+      "expected_exit_code": 0,
+      "expected_message": "6963",
+      "message_present": true,
+      "elapsed_s": 0.7602139590017032,
+      "root_unchanged": true,
+      "root_before": {
+        ".": {
+          "mode": 493,
+          "kind": "dir"
+        },
+        "var": {
+          "mode": 493,
+          "kind": "dir"
+        },
+        "var/lib": {
+          "mode": 493,
+          "kind": "dir"
+        },
+        "var/lib/lampos-update": {
+          "mode": 493,
+          "kind": "dir"
+        },
+        "var/lib/lampos-update/state.json": {
+          "mode": 420,
+          "kind": "file",
+          "sha256": "9e355ddf2783f78d07fb21a8ed70d4a520c5b5ca89859014a527fb625c58a3d2"
+        }
+      },
+      "root_after": {
+        ".": {
+          "mode": 493,
+          "kind": "dir"
+        },
+        "var": {
+          "mode": 493,
+          "kind": "dir"
+        },
+        "var/lib": {
+          "mode": 493,
+          "kind": "dir"
+        },
+        "var/lib/lampos-update": {
+          "mode": 493,
+          "kind": "dir"
+        },
+        "var/lib/lampos-update/state.json": {
+          "mode": 420,
+          "kind": "file",
+          "sha256": "9e355ddf2783f78d07fb21a8ed70d4a520c5b5ca89859014a527fb625c58a3d2"
+        }
+      },
+      "envelope_sha256": "f58811fa32e16d8e7e21cb67a1cd8a175c5f51e767ac026cc733de14010946da",
+      "stdout_sha256": "5718a22105020985efaa16ea62834d5ba0c9551a52e9078e9086245520a49471",
+      "stderr_sha256": "8cbd19e0e6292bffcb37e9515289b87fe4fe5823281ea64bf744148f35e0e2cc",
+      "published_stdout_sha256": "5718a22105020985efaa16ea62834d5ba0c9551a52e9078e9086245520a49471",
+      "published_stderr_sha256": "987d6e1e3e8a11f465876992c19ed512cb9b4eb8d5e03a5268d6727e1a6187d2"
+    },
+    {
+      "case": "wrong-key",
+      "command": [
+        "SCRATCH/lamp-update",
+        "check",
+        "--channel-url",
+        "file://SCRATCH/cases/wrong-key/channel/",
+        "--channel",
+        "lamp-voice",
+        "--key-file",
+        "SCRATCH/wrong-public-key.pub",
+        "--root",
+        "SCRATCH/cases/wrong-key/root",
+        "--lamp",
+        "release-check",
+        "--apply",
+        "off",
+        "--bus-root",
+        "SCRATCH/cases/wrong-key/unused-bus"
+      ],
+      "exit_code": 1,
+      "expected_exit_code": 1,
+      "expected_message": "trusts key",
+      "message_present": true,
+      "elapsed_s": 0.0039817080105422065,
+      "root_unchanged": true,
+      "root_before": {
+        ".": {
+          "mode": 493,
+          "kind": "dir"
+        },
+        "var": {
+          "mode": 493,
+          "kind": "dir"
+        },
+        "var/lib": {
+          "mode": 493,
+          "kind": "dir"
+        },
+        "var/lib/lampos-update": {
+          "mode": 493,
+          "kind": "dir"
+        },
+        "var/lib/lampos-update/state.json": {
+          "mode": 420,
+          "kind": "file",
+          "sha256": "9e355ddf2783f78d07fb21a8ed70d4a520c5b5ca89859014a527fb625c58a3d2"
+        }
+      },
+      "root_after": {
+        ".": {
+          "mode": 493,
+          "kind": "dir"
+        },
+        "var": {
+          "mode": 493,
+          "kind": "dir"
+        },
+        "var/lib": {
+          "mode": 493,
+          "kind": "dir"
+        },
+        "var/lib/lampos-update": {
+          "mode": 493,
+          "kind": "dir"
+        },
+        "var/lib/lampos-update/state.json": {
+          "mode": 420,
+          "kind": "file",
+          "sha256": "9e355ddf2783f78d07fb21a8ed70d4a520c5b5ca89859014a527fb625c58a3d2"
+        }
+      },
+      "envelope_sha256": "f58811fa32e16d8e7e21cb67a1cd8a175c5f51e767ac026cc733de14010946da",
+      "stdout_sha256": "bff34e0fa0c0079ddd684402f12ac6ac956a9900d62551f604656bc5ae7a6043",
+      "stderr_sha256": "d3d3ee03ba8ce877edb7d25e44b9ae328f18e0c59284e5a3f7a03dc815a2aa5e",
+      "published_stdout_sha256": "bff34e0fa0c0079ddd684402f12ac6ac956a9900d62551f604656bc5ae7a6043",
+      "published_stderr_sha256": "118ba122c34a27ba74794364a60f609642ccf90ef55eb40fe8da3fae33aeaa97"
+    },
+    {
+      "case": "forged-key-label",
+      "command": [
+        "SCRATCH/lamp-update",
+        "check",
+        "--channel-url",
+        "file://SCRATCH/cases/forged-key-label/channel/",
+        "--channel",
+        "lamp-voice",
+        "--key-file",
+        "SCRATCH/wrong-public-key.pub",
+        "--root",
+        "SCRATCH/cases/forged-key-label/root",
+        "--lamp",
+        "release-check",
+        "--apply",
+        "off",
+        "--bus-root",
+        "SCRATCH/cases/forged-key-label/unused-bus"
+      ],
+      "exit_code": 1,
+      "expected_exit_code": 1,
+      "expected_message": "signature does not match",
+      "message_present": true,
+      "elapsed_s": 0.004259416004060768,
+      "root_unchanged": true,
+      "root_before": {
+        ".": {
+          "mode": 493,
+          "kind": "dir"
+        },
+        "var": {
+          "mode": 493,
+          "kind": "dir"
+        },
+        "var/lib": {
+          "mode": 493,
+          "kind": "dir"
+        },
+        "var/lib/lampos-update": {
+          "mode": 493,
+          "kind": "dir"
+        },
+        "var/lib/lampos-update/state.json": {
+          "mode": 420,
+          "kind": "file",
+          "sha256": "9e355ddf2783f78d07fb21a8ed70d4a520c5b5ca89859014a527fb625c58a3d2"
+        }
+      },
+      "root_after": {
+        ".": {
+          "mode": 493,
+          "kind": "dir"
+        },
+        "var": {
+          "mode": 493,
+          "kind": "dir"
+        },
+        "var/lib": {
+          "mode": 493,
+          "kind": "dir"
+        },
+        "var/lib/lampos-update": {
+          "mode": 493,
+          "kind": "dir"
+        },
+        "var/lib/lampos-update/state.json": {
+          "mode": 420,
+          "kind": "file",
+          "sha256": "9e355ddf2783f78d07fb21a8ed70d4a520c5b5ca89859014a527fb625c58a3d2"
+        }
+      },
+      "envelope_sha256": "23b75a63f6fc530ff19a9d04a62cb5411d1302e55035dfa40eac3975c5967b92",
+      "stdout_sha256": "c43e561941d8de953a44114ce29a3f741c2070a4ff98fde044dfe0a2f20f626c",
+      "stderr_sha256": "f1c3f64d77c31de98d4dbe47bff13fe5160085be948ea2d0e7c948e03c90ff35",
+      "published_stdout_sha256": "c43e561941d8de953a44114ce29a3f741c2070a4ff98fde044dfe0a2f20f626c",
+      "published_stderr_sha256": "0abb87c37d398171c4153dc41d7c273683643ae6587468ac6c712bee572ca9b8"
+    },
+    {
+      "case": "changed-payload",
+      "command": [
+        "SCRATCH/lamp-update",
+        "check",
+        "--channel-url",
+        "file://SCRATCH/cases/changed-payload/channel/",
+        "--channel",
+        "lamp-voice",
+        "--key-file",
+        "SCRATCH/trusted-public-key.pub",
+        "--root",
+        "SCRATCH/cases/changed-payload/root",
+        "--lamp",
+        "release-check",
+        "--apply",
+        "off",
+        "--bus-root",
+        "SCRATCH/cases/changed-payload/unused-bus"
+      ],
+      "exit_code": 1,
+      "expected_exit_code": 1,
+      "expected_message": "signature does not match",
+      "message_present": true,
+      "elapsed_s": 0.004007208000984974,
+      "root_unchanged": true,
+      "root_before": {
+        ".": {
+          "mode": 493,
+          "kind": "dir"
+        },
+        "var": {
+          "mode": 493,
+          "kind": "dir"
+        },
+        "var/lib": {
+          "mode": 493,
+          "kind": "dir"
+        },
+        "var/lib/lampos-update": {
+          "mode": 493,
+          "kind": "dir"
+        },
+        "var/lib/lampos-update/state.json": {
+          "mode": 420,
+          "kind": "file",
+          "sha256": "9e355ddf2783f78d07fb21a8ed70d4a520c5b5ca89859014a527fb625c58a3d2"
+        }
+      },
+      "root_after": {
+        ".": {
+          "mode": 493,
+          "kind": "dir"
+        },
+        "var": {
+          "mode": 493,
+          "kind": "dir"
+        },
+        "var/lib": {
+          "mode": 493,
+          "kind": "dir"
+        },
+        "var/lib/lampos-update": {
+          "mode": 493,
+          "kind": "dir"
+        },
+        "var/lib/lampos-update/state.json": {
+          "mode": 420,
+          "kind": "file",
+          "sha256": "9e355ddf2783f78d07fb21a8ed70d4a520c5b5ca89859014a527fb625c58a3d2"
+        }
+      },
+      "envelope_sha256": "06922d40163f8df27f4fea19f030966094f64c29b6aed81baa096573ac2f6537",
+      "stdout_sha256": "c43e561941d8de953a44114ce29a3f741c2070a4ff98fde044dfe0a2f20f626c",
+      "stderr_sha256": "c21aa23d4ef7329335aa0a3331da43941e4a5475b4e6e31baa35b61815366132",
+      "published_stdout_sha256": "c43e561941d8de953a44114ce29a3f741c2070a4ff98fde044dfe0a2f20f626c",
+      "published_stderr_sha256": "bd5a121e2e47b3ff6e3448b07ff55f0dd0b3f13c3b132bac1c94033f49a61db7"
+    },
+    {
+      "case": "changed-signature",
+      "command": [
+        "SCRATCH/lamp-update",
+        "check",
+        "--channel-url",
+        "file://SCRATCH/cases/changed-signature/channel/",
+        "--channel",
+        "lamp-voice",
+        "--key-file",
+        "SCRATCH/trusted-public-key.pub",
+        "--root",
+        "SCRATCH/cases/changed-signature/root",
+        "--lamp",
+        "release-check",
+        "--apply",
+        "off",
+        "--bus-root",
+        "SCRATCH/cases/changed-signature/unused-bus"
+      ],
+      "exit_code": 1,
+      "expected_exit_code": 1,
+      "expected_message": "signature does not match",
+      "message_present": true,
+      "elapsed_s": 0.003688791999593377,
+      "root_unchanged": true,
+      "root_before": {
+        ".": {
+          "mode": 493,
+          "kind": "dir"
+        },
+        "var": {
+          "mode": 493,
+          "kind": "dir"
+        },
+        "var/lib": {
+          "mode": 493,
+          "kind": "dir"
+        },
+        "var/lib/lampos-update": {
+          "mode": 493,
+          "kind": "dir"
+        },
+        "var/lib/lampos-update/state.json": {
+          "mode": 420,
+          "kind": "file",
+          "sha256": "9e355ddf2783f78d07fb21a8ed70d4a520c5b5ca89859014a527fb625c58a3d2"
+        }
+      },
+      "root_after": {
+        ".": {
+          "mode": 493,
+          "kind": "dir"
+        },
+        "var": {
+          "mode": 493,
+          "kind": "dir"
+        },
+        "var/lib": {
+          "mode": 493,
+          "kind": "dir"
+        },
+        "var/lib/lampos-update": {
+          "mode": 493,
+          "kind": "dir"
+        },
+        "var/lib/lampos-update/state.json": {
+          "mode": 420,
+          "kind": "file",
+          "sha256": "9e355ddf2783f78d07fb21a8ed70d4a520c5b5ca89859014a527fb625c58a3d2"
+        }
+      },
+      "envelope_sha256": "0eda628bdfdf259cf09ceec9ae5ff2fb9238b07a55c08c71bc616fd90df82680",
+      "stdout_sha256": "c43e561941d8de953a44114ce29a3f741c2070a4ff98fde044dfe0a2f20f626c",
+      "stderr_sha256": "29be8b25627c0f1d19d3a5180f862dc528cfbadb5fd1d4769893f7e416e422e9",
+      "published_stdout_sha256": "c43e561941d8de953a44114ce29a3f741c2070a4ff98fde044dfe0a2f20f626c",
+      "published_stderr_sha256": "463a1b0fea57af7aaf50d72901cfff5e6afdc08f687af0e6a8c9f7593fd75ce8"
+    }
+  ],
+  "final_checker_hash": "799a71ccd12590795d2b340662c6027fee26a69ac70888844c0ca34d980aff3b",
+  "private_signing_key_used": false,
+  "installed_or_published": false
+}

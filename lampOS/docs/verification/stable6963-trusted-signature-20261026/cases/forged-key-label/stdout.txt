@@ -1,0 +1,1 @@
+refused, nothing switched: the signature does not match the manifest

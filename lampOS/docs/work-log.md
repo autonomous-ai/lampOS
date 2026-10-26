@@ -1,3 +1,15 @@
+Ready for lamp-voice: #1812 host signature verification complete; attended acceptance pending. #3510 activation HOLD remains.
+
+## Current checkpoint: 2026-10-26 15:00 +07, trusted release-key blocker resolved
+
+The shipping checklist #3530 records the publishing environment public-key variable as configured. Read that PUBLIC value only, independently derived fingerprint `54213f8d3aa2f241`, and completed [stable 6963 signature checks](verification/stable6963-trusted-signature-20261026/README.md): **5 passed / 0 failed**. The real trusted signature passes; wrong key, forged key label, changed signed payload and changed signature refuse. Stable and immutable envelopes are byte-identical and both match asset API hashes. All scratch roots stayed unchanged.
+
+The executed Mac checker is the retained, hash-bound Update artifact compiled from `46b5c220d`/`88335bfbe`, with its public compiler receipt linked. No downloaded binary was run. Every command is check/apply-off/self-off on temporary local captures; no signing secret, setting change, installation, provider, release mutation or device action. This closes the missing-public-half host check, not #1812's attended switch/rollback/Body acceptance or #2810's physical unplug.
+
+Own-keys e953 remains current and software-green with two source reads and activation HOLD. New #3530 Voice stale-reference finding is under read-only ownership/source investigation; Third owns the separate planned Setup-exit rollback finding.
+
+---
+
 Ready for lamp-voice: #3510 software gates green; activation HOLD remains.
 
 ## Current checkpoint: 2026-10-26 14:50 +07, current own-keys native qualification complete
