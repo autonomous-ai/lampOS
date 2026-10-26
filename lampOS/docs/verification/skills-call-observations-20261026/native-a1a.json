@@ -1,0 +1,94 @@
+{
+  "pr": 3591,
+  "offered_head": "a1a905ef677f19f75049f3f96af7c8cbf740ee57",
+  "offered_base": "7d0017f08ec2a6c709012e6b3754bd414148cb48",
+  "arm64_run": 40350669035,
+  "linux_clippy_run": 40350668992,
+  "arm64_attempt": 1,
+  "linux_clippy_attempt": 1,
+  "arm64_conclusion": "success",
+  "linux_clippy_conclusion": "success",
+  "previews": {
+    "linux-clippy": {
+      "executed_preview": "0afe7977fb88a950f74947ad6252b527e9f82603",
+      "preview_parents": [
+        "7d0017f08ec2a6c709012e6b3754bd414148cb48",
+        "a1a905ef677f19f75049f3f96af7c8cbf740ee57"
+      ],
+      "preview_tree": "28a3b1ebb05b4cd1aacc05b5f59e24074cdfc059",
+      "offered_tree": "28a3b1ebb05b4cd1aacc05b5f59e24074cdfc059",
+      "preview_equals_offered_tree": true
+    },
+    "arm64": {
+      "executed_preview": "0afe7977fb88a950f74947ad6252b527e9f82603",
+      "preview_parents": [
+        "7d0017f08ec2a6c709012e6b3754bd414148cb48",
+        "a1a905ef677f19f75049f3f96af7c8cbf740ee57"
+      ],
+      "preview_tree": "28a3b1ebb05b4cd1aacc05b5f59e24074cdfc059",
+      "offered_tree": "28a3b1ebb05b4cd1aacc05b5f59e24074cdfc059",
+      "preview_equals_offered_tree": true
+    }
+  },
+  "passed": 7533,
+  "failed": 0,
+  "leaks": 0,
+  "timeouts": 0,
+  "skipped": 53,
+  "unique_terminal_cases": 7533,
+  "repeated_equal_rows": 34,
+  "all_selected_ordinals_present": true,
+  "reported_selected_totals": [
+    7533
+  ],
+  "own_control_pass_counts": {
+    "lamp-skills::it call_wait::a_tool_call_is_answered_while_the_program_listens_on_three_topics": 1
+  },
+  "terminal_findings": [],
+  "all_pass_audit": true,
+  "qualified": true,
+  "limits": "Exact original a1a/7d00 native qualification only. Host focused1/0 remains actual08a/e672, retained by unchanged actual integration driver and child; the changed unused c6f artifact is library-test, not main-test (a718 is binary-test). No new host runtime, readiness, device or latency measurement claim.",
+  "separate_harnesses": {
+    "turn_wire": {
+      "passed": 13,
+      "failed": 0,
+      "case_counts": {
+        "an_idle_worker_stays_ready_across_a_long_quiet": 1,
+        "a_worker_reporting_another_model_is_refused_before_any_request": 1,
+        "no_outcome_is_delivered_after_close_even_for_an_answer_on_its_way": 1,
+        "verdict_carries_identity_and_one_request_at_a_time": 1,
+        "missing_model_is_final_and_never_restarted": 1,
+        "missing_executable_fails_at_once": 1,
+        "spawn_returns_while_worker_startup_is_held": 1,
+        "startup_failures_are_final": 1,
+        "serving_failures_are_replaced_within_budget": 1,
+        "protocol_violations_are_replaced": 1,
+        "cancelled_answers_are_never_delivered": 1,
+        "close_during_inference_never_waits": 1,
+        "sustained_requests_stay_bounded": 1
+      }
+    },
+    "docs": {
+      "passed": 4,
+      "failed": 0
+    },
+    "relay_signals": true,
+    "export": true,
+    "artifact_uploaded": true
+  },
+  "selection": {
+    "selected_tests": 7533,
+    "selected_binaries": 70,
+    "skipped_tests": 53,
+    "skipped_binaries": 114
+  },
+  "timing_rows": {
+    "available": false,
+    "count": 0,
+    "rows": []
+  },
+  "raw_log_sha256": {
+    "linux-clippy": "dd7ee110f4658ca7cb0a3590034594c603a69c6b42510a35c82d29d698069e13",
+    "arm64": "cc858e67358745c9b70dae556b2366a9bde11770e09dcf91c5d8b2119eff369a"
+  }
+}

@@ -1,0 +1,8 @@
+test result: ok. 158 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.30s
+test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.32s
+thread '<unnamed>' (6794597) panicked at crates/skills/tests/it/skills.rs:3035:18:
+called `Result::unwrap()` on an `Err` value: Os { code: 32, kind: BrokenPipe, message: "Broken pipe" }
+test result: ok. 312 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 213.12s
+test result: ok. 2 passed; 0 failed; 8 ignored; 0 measured; 0 filtered out; finished in 0.11s
+test result: ok. 31 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.21s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s

@@ -1,3 +1,11 @@
+## 2026-10-26 22:46 — current diagnostic native green and full Routine host result
+
+Ready for lamp-voice: no (#3591; second current peer read pending)
+
+Current a1a905ef6/7d original ARM 40350669035 and Linux 40350668992 pass: 7,533 unique passes, zero failures/leaks/timeouts, 53 skips; changed case once, preview parents/tree verified, all inherited CI green. No native timing rows. [Receipt](verification/skills-call-observations-20261026/native-a1a.json). Reviewer-two closed its base HOLD at6420243407; reviewer-three current carry is still needed before author closure/readiness.
+
+Final Routine dd8e46d70/7d host command exits0: 523 passed, zero failed, nine ignored; all three clock-policy cases and the paired control occur once. Source and six executable hashes stayed stable, group absent without forced cleanup. [Full packet](verification/routine-request-expiry-20261026/full-dd8e-host.json). It preserves a detached mock-worker BrokenPipe panic in a separate integration case that still passed; reported to Tests on #1806, without a clean-background claim. A docs-only follow-up cbde1ee4a makes the header-age wording precise; its compiler/byte checks precede the push. No historical failure waiver or device claim.
+
 ## 2026-10-26 22:39 — diagnostic current carry and metadata correction
 
 Ready for lamp-voice: no (#3591)

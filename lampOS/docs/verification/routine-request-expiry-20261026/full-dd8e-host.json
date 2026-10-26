@@ -1,0 +1,147 @@
+{
+  "head": "dd8e46d7000ba3f35c0129f1a8a5876b938e0068",
+  "base": "7d0017f08ec2a6c709012e6b3754bd414148cb48",
+  "gates": {
+    "fmt": 0,
+    "clippy": 0,
+    "build": 0,
+    "test-compile": 0
+  },
+  "summaries_ordered_library_binary_integration_release_pair_requested_audio_docs": [
+    [
+      158,
+      0,
+      0
+    ],
+    [
+      20,
+      0,
+      0
+    ],
+    [
+      312,
+      0,
+      1
+    ],
+    [
+      2,
+      0,
+      8
+    ],
+    [
+      31,
+      0,
+      0
+    ],
+    [
+      0,
+      0,
+      0
+    ]
+  ],
+  "aggregate": {
+    "passed": 523,
+    "failed": 0,
+    "ignored": 9
+  },
+  "required_case_header_counts": {
+    "a_host_stall_expires_the_request_header_without_changing_the_manager_deadline": 1,
+    "a_delayed_wall_sample_cannot_renew_or_admit_after_its_window_ended": 1,
+    "a_delayed_sample_inside_the_window_keeps_its_original_deadline": 1,
+    "a_future_wall_sample_cannot_admit_work_or_extend_the_cached_window": 1
+  },
+  "terminal": {
+    "head": "dd8e46d7000ba3f35c0129f1a8a5876b938e0068",
+    "command": [
+      "cargo",
+      "+1.96.0",
+      "test",
+      "--offline",
+      "--locked",
+      "-p",
+      "lamp-skills",
+      "--",
+      "--nocapture",
+      "--test-threads=1"
+    ],
+    "returncode": 0,
+    "signal": null,
+    "deadline_seconds": 2400,
+    "timed_out": false,
+    "elapsed_seconds": 237.004922795,
+    "driver_reaped": true,
+    "process_group_absent": true,
+    "process_group_absent_before_cleanup": true,
+    "forced_cleanup": false,
+    "pid": 22559,
+    "source_unchanged": true,
+    "six_actual_and_preserved_executables_unchanged": true,
+    "log_sha256": "fd8c1e443e80e9daaa4308da0c3e3bf08376e1807bb769228cb30f5076854673"
+  },
+  "artifacts": {
+    "release_pair-88349d4c2302e5ab": {
+      "sha256": "057f200eacd7617d3fb818a0311d498cf96449d8bbc1004169d7a7f305a70198",
+      "role": {
+        "name": "release_pair",
+        "kind": [
+          "test"
+        ]
+      }
+    },
+    "lamp_skills-a718b2a0214b6903": {
+      "sha256": "c6eda8dede860c6ad38d567c594e9637601c341323405272a926436498c0bccf",
+      "role": {
+        "name": "lamp-skills",
+        "kind": [
+          "bin"
+        ]
+      }
+    },
+    "it-46363ab9699809b5": {
+      "sha256": "ed2aac0657ae73e0fe99407977fc21fd33e31960d5c22749876c7f728d4d217f",
+      "role": {
+        "name": "it",
+        "kind": [
+          "test"
+        ]
+      }
+    },
+    "requested_audio-019db324b83a9807": {
+      "sha256": "9d6411722da0033f7c093f72b6f20a4e8bafb7d487a49511ef2224a35a40d2b9",
+      "role": {
+        "name": "requested_audio",
+        "kind": [
+          "test"
+        ]
+      }
+    },
+    "lamp_skills-c6f44302f3b2c78f": {
+      "sha256": "c883d03d353f2994ba9fc0261fc3d7155e5bd6bdba733823265c31b3b8cd9351",
+      "role": {
+        "name": "lamp_skills",
+        "kind": [
+          "lib"
+        ]
+      }
+    },
+    "lamp-skills": {
+      "sha256": "334d68d3644fa06c335d095cbcce808d8b6b5cc321fc7a0d215445bf1e7c86dd",
+      "role": {
+        "name": "lamp-skills",
+        "kind": [
+          "product child"
+        ]
+      }
+    }
+  },
+  "background_panic": {
+    "observed": true,
+    "case": "skills::a_repeat_call_with_only_made_steps_is_refused_while_its_run_is_under_way",
+    "location": "crates/skills/tests/it/skills.rs:3035",
+    "error": "BrokenPipe on detached mock actions worker response write",
+    "case_passed": true,
+    "command_exit": 0,
+    "disposition": "Preserved separate fixture fault; not introduced by authored routine.rs test-only/doc changes. No clean-background or historical cause clearance."
+  },
+  "limits": "Actual dd8e/7d once-only full Skills qualification. Earlier538/4/9 and521/1/9 remain preserved; this does not establish their cause or any device/product latency. Nine declared ignores remain."
+}
