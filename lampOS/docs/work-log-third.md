@@ -7,6 +7,19 @@ machine is explicitly named. Third has no lamp access.
 
 
 
+## 2026-10-26 10:19 — Current interruption correction offered
+
+Ready for lamp-voice: yes (#3523)
+
+Kind: changes what every lamp does by default. Current **4b45bbf06** is
+non-draft with its native/local gates complete; current reader/train
+qualification and First's physical replay remain separate. The body records
+reviewer-lead's three nonblocking limitations: late retirement evidence can
+permit repetition, earlier own retirement keeps later interrupted generations
+held, and no additional per-occurrence retry cap is added. There is no
+exactly-once acoustic claim. #3525 remains draft while its final validation
+and actual-parser updater controls run.
+
 ## 2026-10-26 10:17 — Latest interruption carry passes native gates
 
 #3523 **4b45bbf06** contains **1c884f16c** with an equal authored patch.
