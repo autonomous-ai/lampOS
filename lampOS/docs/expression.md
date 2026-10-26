@@ -906,6 +906,16 @@ The name's two-second source window and 300 ms delivery grace, all 25 subsequent
 checks, the exact single journal line, child status check and the 15-second host
 watchdog starting after child spawn retain their original bounds and assertions.
 
+The held-Mood runtime fixture advances its injected clock by 250 ms per step,
+matching the service's Mood read period; other sleeping-service cases keep
+200 ms steps. It stamps Mood at the service's first clock sample, after the
+other inputs' publication-span adjustment. Later receive and tick samples
+include Mood's own publication work. Paired with the original wall sample,
+these clock reads preserve the other inputs' full wall ages while the fixed
+Mood phase is sampled at its source stamp. The plain-clock control still
+breathes. The original amplitude and oscillation assertions, Mood pace,
+service cache period and transport lifespans are unchanged.
+
 The following counts and cost measurements are the **original task 4
 gate**, not a new task 18 result. On Third's Intel i7-10700K x86_64 Mac
 (64 GiB, Darwin 25.6.0, Rust 1.96.0), the full dependent gate passed 1,701
