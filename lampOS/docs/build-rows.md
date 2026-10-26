@@ -1,8 +1,8 @@
 # Where V2 is: the build rows and the quality rows
 
-Written by the first builder from the team's review page at 2026-10-26 09:51 (+07). The lead asked for it on #1711 (20 Oct, 16:43), so anyone can read where V2 is without waiting for the hourly post. It's a copy, updated a few times a day. The hourly figures on #1722 are the live ones.
+Written by the first builder from the team's review page at 2026-10-26 11:49 (+07). The lead asked for it on #1711 (20 Oct, 16:43), so anyone can read where V2 is without waiting for the hourly post. It's a copy, updated a few times a day. The hourly figures on #1722 are the live ones.
 
-**Build 93.4% over 70 rows. Quality 67.5% over 16 rows.** Mood, for later: 58.5% over 2 rows, not in the build figure.
+**Build 93.8% over 70 rows. Quality 67.5% over 16 rows.** Mood, for later: 58.5% over 2 rows, not in the build figure.
 
 **How a build row is counted** (the lead's rule): 1.0 when its work is merged and tried on a lamp; less while parts are missing or untried. Build is the mean of the rows. Quality rows score how well a part works today, against a target; quality is the mean of the scores.
 
@@ -39,7 +39,7 @@ Written by the first builder from the team's review page at 2026-10-26 09:51 (+0
 | Everything is a skill, core and installable, no one-off code | 0.85 | #940 #938 #1667 #1696 #1698 #2643 #2654 #2674 #2822 #2823 #2824 #2825 #2826 | seventh, fourth, tests, fifth, thirteen, ten | 24 Oct 08:4x, up from 0.72: this row’s note was stale. |
 | An owner makes their own skill | 0.83 | #941 #1698 #2424 #2811 #2813 #2814 #2815 #2816 | sixth, ten, blue, fourteen, seventh | 23 Oct 16:1x, up from 0.8: a refused skill’s reason is logged, the brief asks for a time of day as a trigger window and says skill.toml has no name, and a task may be 2,000 bytes for a repair (#3225, #3227, #3239). |
 | A Skills Store to publish skills | 0.60 | #1698 #2801 #2802 | fourteen, mobile, backend3 | 22 Oct 22:0x, up from 0.55: an installed package keeps its sha256 and skills.list gives it beside the catalogue’s (Backend3, #3042 merged; |
-| Updates over the internet, by themselves | 0.80 | #737 #1812 | migrate, second | 26 Oct 08:0x, up from 0.75: product lamps follow the stable feed (#3518, train at 07:39), so a lamp in a home gets only a build promoted to it, never each lamp-voice publish, and the V2 image installs the promoted build. |
+| Updates over the internet, by themselves | 0.85 | #737 #1812 | migrate, second | 26 Oct 10:5x, up from 0.8: the first real promotion ran (09:59): lampos-stable holds 6963, signed with the lamps’ key 54213f8d3aa2f241, its 32 files the immutable lampos-lamp-voice-6963 release’s, so the first customer l… |
 | A voice cheaper than Gemini Live, as fast and as good | 1.00 | #754 #1686 #1712 #1973 #2135 #2136 | sixth, first, fourth, backend, third | 20 Oct 10:1x, built, by the lead’s rule (it works and it is fast enough are separate): on the main line since #1973, on lamp-4ace, and 32 of 32 answered for the lead on lamp-52e6. |
 | A person brings their own DeepSeek and Deepgram keys, in setup or the app | 0.90 | #2094 #2845 #2846 | el, fourteen | 22 Oct 18:0x, up from 0.8: setup’s own-keys step passed on a freshly reset lamp-06c1 (El, #2845 closed). |
 | Lamp 2 in the Autonomous app | 1.00 | #1396 | mobile, backend | 20 Oct 11:4x, built: the app's Skills page and name and time zone (ecm-sds-mobile#8, #9) merged into the app's v3 after their tries on lamp-0c89. |
@@ -78,7 +78,7 @@ Written by the first builder from the team's review page at 2026-10-26 09:51 (+0
 | Email, calendar and other connectors, through hand-overs | 0.70 | #751 #2740 #2820 #2821 | eighth, el | 22 Oct 18:0x, up from 0.6: an email ask handed over and told back, 6 of 6 on lamp-06c1 with the stand-in (El, #2820 closed), as the calendar was on 4ace. |
 | Guard mode, an installable skill | 0.85 | #2562 #2827 #2828 | jarvis, nine | 22 Oct 15:1x, up from 0.75: merged, each off unless set: it names only a known person who said yes to being named (LAMP_GUARD_NAMES, #2562, 645d2f554), and it reads a return or a thank-you as off (LAMP_GUARD_WORDS_V2, #2… |
 | “Was anyone here while I was out?”, an installable skill | 1.00 | #1989 #2019 | nine, tests | 20 Oct 10:1x, built by the lead’s rule (merged and tried on lamp-4ace at 03:3x); |
-| Music to relax, an installable skill | 0.45 | #1685 #2792 #2793 | second, sixth, first, nine | 22 Oct 11:35, up from 0.4: while requested music plays, the lamp shows it is busy, never resting (Second, #2879). |
+| Music to relax, an installable skill | 0.70 | #1685 #2792 #2793 | second, sixth, first, nine | 26 Oct 10:3x, up from 0.45: tried on lamp-4ace with 6963 (#2793 steps 1, 2 and 4 PASS): asked aloud, the lamp confirms and the 48 s piece starts 10 ms after its words end, “Lamp, stop.” stops it within about 0.1 s, it pl… |
 | Faces from a photo and “who is this?”, an installable skill | 0.90 | #2854 #2855 #2856 | mobile, ten, fourth | 24 Oct 00:3x, up from 0.88: the eyes’ photo yes counts only a frame dated strictly after it, by one tested conversion, and ends when the voice closes its connection (#3279, train 51). |
 | Light shows and effects, a core skill | 1.00 | #1730 #2028 | twelve, nine | Built and merged (#1730): party, music and calm, under a minute, no flashing, stopping within 0.2 s when someone speaks. |
 | “I’m unplugging you”: it folds safely first, a core skill | 1.00 | #1699 #2478 | fifth | 21 Oct 11:30, built: #1699 merged as #2478 after its rebase, and Prepare to unplug is in every lamp’s default skills. |
