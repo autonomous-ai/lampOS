@@ -1,5 +1,32 @@
 # Reuse decisions: V1, ROS 2 and existing Rust systems
 
+## Reuse one kernel socket witness for a camera hold (2026-10-27)
+
+V1's `hal/privacy.py` publishes camera/speaker gates before slow teardown and
+checks camera privacy again after capture. Keep that ordering and final-check
+intent, not its same-process shared globals: Eyes and provider workers are
+separate processes. A Voice-local Arc cannot observe an independent Eyes close.
+
+Reuse Unix stream shutdown and SCM_RIGHTS duplication, and the safe rustix
+OwnedFd ancillary handling already used by Voice's reminder transport. One
+pair per hold gives all observers the same kernel revocation boundary without
+a per-observer sweep or per-check request/reply. IPC's standalone primitive
+uses fixed storage, an exact versioned frame and original caller deadline;
+it neither installs a server nor changes any existing runtime path. No new
+dependency, unsafe ownership conversion, shared mmap or client shutdown is
+introduced. Normal IPC endpoints retain their existing same-user policy.
+
+Keep producer incarnation/hold, original source age, accepted-audio identity,
+request cancellation and privacy checks independent of an open socket. The
+owner must explicitly revoke before replacement even while an Arc is pinned;
+clients drop only their descriptor. Initial grants run off capture/stream polls,
+and each hot check performs one non-consuming nonblocking receive. Exact-frame,
+shared shutdown, client-drop, close-during-grant and malformed/extra/truncated
+FD cleanup controls are authored but UNRUN. Host/ARM64 timing and actual
+Eyes/Voice integration, cross-UID peer authentication and lamp checks remain
+pending; this source-only primitive does not release Common's explicit-close
+hold. Successful shutdown, not recv-return, is the proposed linearization.
+
 ## Bound the initial direct capture-ready handshake (2026-10-26)
 
 V1's `hal/drivers/voice/aec.py` `prepare_playback` retains the output rate
@@ -1849,3 +1876,99 @@ may already have played even without a provider terminal join. This also holds
 multi-generation output interrupted after an earlier generation retired;
 no whole-turn completion or Ack is inferred. The live same-pump final-retirement
 control stays held, while accepted/unretired audio still retries after fencing.
+
+## Darwin unnamed peers and bounded ancillary records (2026-10-27)
+
+The first real Mac IPC gate failed: valid unnamed socketpair tickets were
+refused, and excess rights reached rustix1.1.5's truncated-cmsg drain/drop panic.
+Those failed receipts remain failed; later qualification is scoped separately.
+
+Reuse successful native getpeername as connection evidence: cached rustix maps
+Darwin's connected AF_UNIX empty path to None. Still require SO_TYPE=STREAM,
+local AF_UNIX and a successful syscall; ENOTCONN is an error, not that None.
+INET, datagram, unconnected and missing-CLOEXEC observer checks remain. Validate
+the control socket's actual family/type too, not merely its Rust wrapper type.
+
+Use one shared IPC CONTROL_FD_CAPACITY constant:512 on Mac,2 elsewhere. Its
+cmsg_space covers Darwin's complete native UNIX control record, so every excess
+OwnedFd can be drained and dropped before rejection. Native UNIX send control
+is capped by MCLBYTES,2048 on supported x86/ARM; internalize requires one exact
+SCM_RIGHTS message; receive stops before the next control record. This avoids
+the known Darwin truncated-header parser path without unsafe/new dependencies,
+a guessed large allocation, ignored truncation or leaked rights. Proof pins:
+[sockargs](https://github.com/apple-oss-distributions/xnu/blob/f6217f891ac0bb64f3d375211650a4c1ff8ca1ea/bsd/kern/uipc_syscalls.c#L3105),
+[UNIX validation](https://github.com/apple-oss-distributions/xnu/blob/f6217f891ac0bb64f3d375211650a4c1ff8ca1ea/bsd/kern/uipc_usrreq.c#L2366),
+[receive boundary](https://github.com/apple-oss-distributions/xnu/blob/f6217f891ac0bb64f3d375211650a4c1ff8ca1ea/bsd/kern/uipc_socket.c#L3328),
+[x86 bound](https://github.com/apple-oss-distributions/xnu/blob/f6217f891ac0bb64f3d375211650a4c1ff8ca1ea/bsd/i386/param.h#L102),
+[ARM bound](https://github.com/apple-oss-distributions/xnu/blob/f6217f891ac0bb64f3d375211650a4c1ff8ca1ea/bsd/arm/param.h#L78).
+
+The IPC grant receiver uses that constant. The separately prepared Eyes request
+receiver consumes it in its own unqualified integration. The
+8-right production rejection/all-peer-EOF control stays; its low-level8/32
+repeated-right control checks Mac full receipt without CTRUNC and every copy
+closed, versus Linux actual CTRUNC and kernel/OwnedFd cleanup. No hundreds of
+FDs or global FD counts. All17 original test identities remain. The source
+repair requires current full IPC/native gates; earlier7passes are not replayed
+as qualification of this changed production source. Target/latency remains
+unmeasured, and Eyes/Voice integration holds remain.
+
+## Dedicated camera control nonblocking mode (2026-10-27)
+
+The corrected unnamed-peer epoch passed 42 IPC cases, but its backpressure case
+stalled in the filler send before creating its one-second deadline. The owned
+process stack and controlled stop are retained; the epoch remains unqualified.
+Pinned [XNU send-space handling](https://github.com/apple-oss-distributions/xnu/blob/f6217f891ac0bb64f3d375211650a4c1ff8ca1ea/bsd/kern/uipc_socket.c#L1960)
+checks the socket's nonblocking state for that wait; the per-call flag alone
+only covers an earlier lock wait. Reuse explicit nonblocking setup on each
+dedicated control endpoint, after original deadline and socket validation.
+Never change shared witness observer flags or use a private kernel flag value.
+
+The existing control test now fills in nonblocking mode, restores blocking mode
+before the first production grant poll, and keeps its one-second expiry and
+terminal assertions. A fixture-only three-second rescue owns only that control
+peer; cancellation and join run on normal exit and unwinding. It exposes an old
+blocking sender as a bounded assertion failure instead of a hung suite. This is
+not a hard scheduling or production latency guarantee. All 17 test identities
+remain. Each source epoch requires its own IPC/native qualification; previous
+passes, failures and the owner-stopped case keep their actual epochs.
+
+## Darwin full-control EMSGSIZE (2026-10-27)
+
+The dedicated-nonblocking epoch completed 42 IPC passes and one prompt OS40
+EMSGSIZE failure. The original failed driver and 21 actual debug backing files
+are retained; this result remains failed. Pinned XNU
+[UNIX send accounting](https://github.com/apple-oss-distributions/xnu/blob/f6217f891ac0bb64f3d375211650a4c1ff8ca1ea/bsd/kern/uipc_usrreq.c#L660)
+reduces the current send high-water mark as the peer queue fills.
+[sosendcheck](https://github.com/apple-oss-distributions/xnu/blob/f6217f891ac0bb64f3d375211650a4c1ff8ca1ea/bsd/kern/uipc_socket.c#L1939)
+returns EMSGSIZE when ancillary length exceeds that remaining mark, before its
+normal nonblocking branch. SO_SNDBUF reports the configured total after adding
+queued UNIX data back, so it cannot preflight the remaining space.
+
+Treat this result as pending only on Darwin for the first validated fixed
+48-byte, one-descriptor grant send. It accepts no data or rights, never reports
+Ready, and never renews the original deadline. Errors after partial transfer
+remain terminal. Preserve all 17 original controls and add one real
+drain-and-resume case to verify recovery without duplicate or changed authority.
+Fresh source gates remain required; Linux, composed Eyes/Voice and physical
+latency acceptance are separate.
+
+## Concurrent observer flag comparison (2026-10-27)
+
+The 90ca and b234 source epochs each pass the full Mac IPC census, 44/0/0,
+with relay 1/0 and doctest 1/0 plus workspace formatting, strict all-target
+Clippy and build. These observations do not erase the earlier failures.
+
+An independent review reports a Mac-only shared-binary flake in the added
+recovery control: concurrent descriptor garbage collection can set FMARK while
+rights are closed. Pinned XNU unp_gc clears and sets that internal mark; the
+numeric 0x1000 mapping and reproduced failure counts remain attributed to the
+reviewer. The new assertion checks only whether NONBLOCK changed, which is the
+property under test. It retains every original test, deadline, frame, rights
+and recovery assertion. Current correction qualification includes a separate
+default-thread camera binary run as well as the full IPC census; results are
+recorded on [#3632](https://github.com/autonomous-ai/lampOS/pull/3632).
+
+No production syscall, protocol or caller changes in this correction. The
+receiver still relies on caller peer authentication. Eyes/Voice integration,
+wrong-peer credential controls, Linux/current-head gates and device latency
+remain separate acceptance evidence.

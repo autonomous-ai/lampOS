@@ -413,6 +413,24 @@ freshness. This controller does not infer who someone addresses.
 rejection, finite kernel queues and nonblocking backpressure. Control and bulk
 PCM use separate endpoints. Timestamps use the same host monotonic clock across
 processes, with independent boot IDs to exclude data from an earlier process.
+`lamp-ipc::camera_authority` also supplies a standalone, currently unused
+single-hold socket witness. One owner shutdown revokes all SCM_RIGHTS duplicates
+of the same observer endpoint; clients only close their own descriptors, never
+shutdown or change shared file-status flags. A fixed 48-byte V3/token/nonce grant
+uses caller-owned connected control streams and deadlines, incremental
+nonblocking steps, exactly one owned FD and exact control EOF. The receiver
+checks liveness before exposing a ticket; final checks use one non-consuming
+`PEEK | DONTWAIT` receive (only WouldBlock permits, other outcomes latch loss).
+The primitive does not authenticate peers or prove camera permission freshness,
+a person's identity, captured-frame origin or request ownership. Callers must
+supply those independent checks and safe close/reopen ordering. It has no Eyes
+or Voice consumer, no enabled feature or new service, and does not resolve the
+Common explicit-close hold by itself. Revocation linearizes at successful owner
+shutdown, not datagram receipt or a later physical camera stop; a subsequent
+close cannot recall bytes already dispatched. There is no hidden connection,
+wait, readiness loop or deadline renewal. Target first/repeat grant and hot-check
+latency remains unmeasured; one syscall is a work bound, not a wall-time bound.
+
 The `lamp-ipc-probe` executable measures real parent/child control roundtrips
 while the bulk endpoint stays full; it has finite deadlines and child cleanup.
 It does not measure speech recognition, model time, audible output or visual cues.
@@ -458,3 +476,34 @@ not exclude legacy HAL or boot/shutdown services; cutover must ensure one writer
 its cooperative tick is 2 ms. Tests cover codec, cancellation, cross-channel
 ordering, stale feedback and fault paths. Physical light timing and brightness
 remain unmeasured. See [ring choreography](ring-choreography.md).
+
+The camera-ticket receiver uses a shared platform-bounded ancillary capacity
+(512FD storage on Darwin,2 elsewhere; still exactly1FD accepted). This covers
+the pinned native Darwin UNIX control-record bound so excess rights are safely
+owned/dropped before rejection, avoiding the cached library's truncated-control
+panic. The grant receiver uses it; the separately prepared Eyes request
+receiver consumes it in its own unqualified integration. A successful
+Darwin unnamed getpeername returns no address in rustix; that is distinct from
+an ENOTCONN syscall error. Family/type/connection/CLOEXEC checks remain required.
+Retained failures and subsequent source repairs are described in reuse-decisions.
+
+The grant sender explicitly sets its dedicated control stream nonblocking after
+checking the original deadline and socket. Darwin MSG_DONTWAIT alone does not
+exclude its full-buffer space wait. Observer flags are never changed. The
+backpressure fixture fills nonblocking, restores a blocking control sender, and
+checks the API under the original one-second deadline. A separate three-second
+control-peer rescue cancels and joins on normal exit or unwinding; it cannot
+revoke a camera witness. Current qualification is recorded on
+[the standalone IPC pull request](https://github.com/autonomous-ai/lampOS/pull/3632).
+
+On Darwin only, the validated first grant send can return EMSGSIZE when the
+UNIX peer has consumed the remaining send high-water mark. For the fixed
+48-byte frame with exactly one descriptor, this is pending under the original
+deadline; no bytes or rights were accepted. Continuation errors still fail. A
+new drain-and-resume control complements the unchanged expiry control.
+
+The recovery control compares the shared observer's NONBLOCK bit, the property
+that control setup must leave unchanged. Darwin descriptor garbage collection
+can change its internal FMARK bit while unrelated rights close, so whole-status
+flag equality is not an application invariant. The original seventeen controls,
+fixed deadlines and exact-once frame/descriptor assertions remain.
