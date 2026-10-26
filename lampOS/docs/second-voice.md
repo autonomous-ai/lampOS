@@ -3069,10 +3069,17 @@ after a take-over, but now for every turn:
     hearing that came in time and counted for its own line.
   - Kept as before: a line going on from the one before (`continues_from`),
     the line after one whose words called the lamp by name ("Lamp.", "Hey
-    Lamp, …"; `Attention::called_in_its_words`) or after a bare call, and a
-    hearing in the line's own window ("Lamp, is my phone dying?").
-  - Tests: `attention::tests::a_name_heard_inside_a_line_stays_with_it` and
-    `worker::tests::a_name_heard_in_the_line_before_does_not_play_the_next`,
+    Lamp, …"; `Attention::called_in_its_words`) or after a bare call, a
+    hearing at the line before's start (`attention::NAME_AT_THE_START_US`,
+    a call however its words were written: "Lamp." heard as "Ramp.", the
+    reviewer-lead's P2 on `da9a597de`), and a hearing in the line's own
+    window ("Lamp, is my phone dying?").
+  - A hearing that stays with its line is used up there: `began_at` lets go
+    of it, so no later line takes it within its 1.5 s either (reviewer-two's
+    P2 on `da9a597de`: a third line had it back).
+  - Tests: `attention::tests::a_name_heard_inside_a_line_stays_with_it`,
+    `worker::tests::a_name_heard_in_the_line_before_does_not_play_the_next`
+    and `worker::tests::a_call_at_a_lines_start_goes_on_and_a_kept_hearing_is_used_up`,
     with 4ace's times, the hearing late or in time, the switch off as a
     control.
 - **The name note** (`LAMP_NAME_NOTE`) is given as on the Live route
