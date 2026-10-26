@@ -8353,6 +8353,10 @@ fn unconnected() -> Option<UnixStream> {
 pub(crate) use tests::event_memory;
 
 #[cfg(test)]
+#[path = "remember_no_wait.rs"]
+mod no_wait;
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use std::{
@@ -11905,33 +11909,65 @@ mod tests {
 
     #[test]
     fn the_days_writer_submits_after_idle_without_waiting_for_a_model() {
-        let (socket, served) = memory("days-idle", 2, |request| match request["op"].as_str() {
-            Some("append_linked") => json!({"ok":true,"id":42}),
-            Some("conversation_end") => {
-                json!({"ok":true,"submitted":false,"reason":"model_unconfigured"})
-            }
-            _ => panic!("unexpected background request"),
-        });
-        let client = DaysClient::with_idle(socket.clone(), Duration::from_millis(25)).unwrap();
-        let started = Instant::now();
-        assert!(client.finished_exchange(NOW, "asked", "said"));
-        assert!(started.elapsed() < Duration::from_millis(25));
-        let read = served.join().unwrap();
-        assert_eq!(
-            read[0],
-            json!({"op":"append_linked","at_unix_ms":NOW,"heard":"asked","said":"said","source_ids":[]})
+        no_wait::run(
+            "remember::tests::the_days_writer_submits_after_idle_without_waiting_for_a_model",
+            |root| {
+                let socket = root.join("memory.sock");
+                let listener = UnixListener::bind(&socket).unwrap();
+                let (seen, received) = sync_channel(1);
+                let (release, held) = sync_channel(1);
+                let served = std::thread::spawn(move || {
+                    let mut read = Vec::new();
+                    for n in 0..2 {
+                        let (mut stream, _) = listener.accept().unwrap();
+                        let mut line = String::new();
+                        BufReader::new(stream.try_clone().unwrap())
+                            .read_line(&mut line)
+                            .unwrap();
+                        let request: Value = serde_json::from_str(&line).unwrap();
+                        let answer = match request["op"].as_str() {
+                            Some("append_linked") if n == 0 => {
+                                seen.send(()).unwrap();
+                                // Only the foreground return below releases
+                                // this real acknowledgement. The parent test
+                                // process bounds a broken scenario as a whole.
+                                held.recv().unwrap();
+                                json!({"ok":true,"id":42})
+                            }
+                            Some("conversation_end") if n == 1 => {
+                                json!({"ok":true,"submitted":false,"reason":"model_unconfigured"})
+                            }
+                            _ => panic!("unexpected background request"),
+                        };
+                        stream.write_all(format!("{answer}\n").as_bytes()).unwrap();
+                        read.push(request);
+                    }
+                    read
+                });
+                let client = DaysClient::with_idle(socket, Duration::from_millis(25)).unwrap();
+                let started = Instant::now();
+                assert!(client.finished_exchange(NOW, "asked", "said"));
+                received.recv_timeout(Duration::from_secs(5)).unwrap();
+                release.send(()).unwrap();
+                let read = served.join().unwrap();
+                assert_eq!(
+                    read[0],
+                    json!({"op":"append_linked","at_unix_ms":NOW,"heard":"asked","said":"said","source_ids":[]})
+                );
+                assert_eq!(read[1]["source_ids"], json!([42]));
+                assert_eq!(read[1]["submit"], true);
+                assert!(
+                    read[1]["conversation"]
+                        .as_str()
+                        .unwrap()
+                        .starts_with("voice-")
+                );
+                // The idle lower bound is part of the behavior, not a host
+                // responsiveness claim. Keep it unchanged.
+                assert!(started.elapsed() >= Duration::from_millis(25));
+                drop(client);
+            },
         );
-        assert_eq!(read[1]["source_ids"], json!([42]));
-        assert_eq!(read[1]["submit"], true);
-        assert!(
-            read[1]["conversation"]
-                .as_str()
-                .unwrap()
-                .starts_with("voice-")
-        );
-        assert!(started.elapsed() >= Duration::from_millis(25));
-        drop(client);
-        std::fs::remove_file(socket).unwrap();
     }
 
     #[test]
@@ -13176,41 +13212,45 @@ mod tests {
 
     #[test]
     fn a_held_background_write_cannot_block_or_grow_the_foreground_queue() {
-        let socket =
-            std::env::temp_dir().join(format!("lamp-days-queue-{}.sock", std::process::id()));
-        let listener = UnixListener::bind(&socket).unwrap();
-        let (seen, received) = sync_channel(1);
-        let (release, held) = sync_channel(1);
-        let peer = std::thread::spawn(move || {
-            for n in 0..=QUEUE {
-                let (mut stream, _) = listener.accept().unwrap();
-                let mut line = String::new();
-                BufReader::new(stream.try_clone().unwrap())
-                    .read_line(&mut line)
-                    .unwrap();
-                if n == 0 {
-                    seen.send(()).unwrap();
-                    held.recv_timeout(Duration::from_secs(3)).unwrap();
+        no_wait::run(
+            "remember::tests::a_held_background_write_cannot_block_or_grow_the_foreground_queue",
+            |root| {
+                let socket = root.join("memory.sock");
+                let listener = UnixListener::bind(&socket).unwrap();
+                let (seen, received) = sync_channel(1);
+                let (release, held) = sync_channel(1);
+                let peer = std::thread::spawn(move || {
+                    for n in 0..=QUEUE {
+                        let (mut stream, _) = listener.accept().unwrap();
+                        let mut line = String::new();
+                        BufReader::new(stream.try_clone().unwrap())
+                            .read_line(&mut line)
+                            .unwrap();
+                        if n == 0 {
+                            seen.send(()).unwrap();
+                            // Never release on a peer timer: every foreground
+                            // admission and the overflow refusal must return
+                            // while this acknowledgement is still held.
+                            held.recv().unwrap();
+                        }
+                        stream
+                            .write_all(format!("{{\"ok\":true,\"id\":{}}}\n", n + 1).as_bytes())
+                            .unwrap();
+                    }
+                });
+                let client = DaysClient::new(socket).unwrap();
+                assert!(client.finished_exchange(NOW, "first", "answer"));
+                received.recv_timeout(Duration::from_secs(5)).unwrap();
+                for _ in 0..QUEUE {
+                    assert!(client.finished_exchange(NOW, "queued", "answer"));
                 }
-                stream
-                    .write_all(format!("{{\"ok\":true,\"id\":{}}}\n", n + 1).as_bytes())
-                    .unwrap();
-            }
-        });
-        let client = DaysClient::new(socket.clone()).unwrap();
-        assert!(client.finished_exchange(NOW, "first", "answer"));
-        received.recv_timeout(Duration::from_secs(1)).unwrap();
-        let start = Instant::now();
-        for _ in 0..QUEUE {
-            assert!(client.finished_exchange(NOW, "queued", "answer"));
-        }
-        assert!(!client.finished_exchange(NOW, "overflow", "answer"));
-        assert_eq!(client.lost.load(Ordering::Relaxed), 1);
-        assert!(start.elapsed() < Duration::from_millis(100));
-        release.send(()).unwrap();
-        peer.join().unwrap();
-        drop(client);
-        std::fs::remove_file(socket).unwrap();
+                assert!(!client.finished_exchange(NOW, "overflow", "answer"));
+                assert_eq!(client.lost.load(Ordering::Relaxed), 1);
+                release.send(()).unwrap();
+                peer.join().unwrap();
+                drop(client);
+            },
+        );
     }
 
     #[test]

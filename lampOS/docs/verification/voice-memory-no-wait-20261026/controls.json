@@ -1,0 +1,306 @@
+{
+  "all_source_restored": true,
+  "bindings": {
+    "baseline": {
+      "child_binding": "The preserved libtest driver reexecutes itself through current_exe; no separate worker executable.",
+      "compiler_artifact_executable_equals_execution_source": true,
+      "executable_name": "lamp_voice-d0423b4e04fbfa63",
+      "features": [],
+      "fresh": false,
+      "frozen_file_hashes": {
+        "lampOS/crates/voice/src/remember.rs": "3a262a4d63d4fae50241db8c553181ec7c9fb45363a2017afc898697f7197664",
+        "lampOS/crates/voice/src/remember_no_wait.rs": "7df1d687c885797422cb7faf9427eac5be18adea712c2a46c7fd0d5cf8d31aa0",
+        "lampOS/docs/voice-test-fixtures.md": "65ee1a94a34c9cf28ff4f6b44dcc551fa8a8e22763f00f290b31a1e329edb67c"
+      },
+      "kind": [
+        "lib"
+      ],
+      "mode": 493,
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": true
+      },
+      "raw_binding_sha256": "53a1785e58aa9e4e3d0f93e145cfae8a7182a2931ae0b868fee19a3cc23a0ff5",
+      "sha256": "d0d2e2e090a84501fccbfc2a0c0d9c41ea6395641a4bad0512b851267ce9ae06",
+      "source_inventory_sha256": "1ed2c0b2d37815a3755b2746a8648378b23d35eca26934a049d03503e730734d",
+      "target": "lamp_voice"
+    },
+    "blocking-send": {
+      "child_binding": "The preserved libtest driver reexecutes itself through current_exe; no separate worker executable.",
+      "compiler_artifact_executable_equals_execution_source": true,
+      "executable_name": "lamp_voice-d0423b4e04fbfa63",
+      "features": [],
+      "fresh": false,
+      "frozen_file_hashes": {
+        "lampOS/crates/voice/src/remember.rs": "673a2b846e8389fdbfa48695908765b3cbfacc9e1a26e7cbe3016ee9d316b662",
+        "lampOS/crates/voice/src/remember_no_wait.rs": "7df1d687c885797422cb7faf9427eac5be18adea712c2a46c7fd0d5cf8d31aa0",
+        "lampOS/docs/voice-test-fixtures.md": "65ee1a94a34c9cf28ff4f6b44dcc551fa8a8e22763f00f290b31a1e329edb67c"
+      },
+      "kind": [
+        "lib"
+      ],
+      "mode": 493,
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": true
+      },
+      "raw_binding_sha256": "5019961ff4043786cda262b0e6ec1d72e813d149b8390ce3334a037cade0590c",
+      "sha256": "0b87cccf05166a4d5d662d5bdbe3388f9ad4f8d5e5ba01d99e7e08e450aefc39",
+      "source_inventory_sha256": "5de2c2ce316cd4f1a229fe7adcd93634ebb6c26fa71896ce428ec3524c215b14",
+      "target": "lamp_voice"
+    },
+    "candidate-stall": {
+      "child_binding": "The preserved libtest driver reexecutes itself through current_exe; no separate worker executable.",
+      "compiler_artifact_executable_equals_execution_source": true,
+      "executable_name": "lamp_voice-d0423b4e04fbfa63",
+      "features": [],
+      "fresh": false,
+      "frozen_file_hashes": {
+        "lampOS/crates/voice/src/remember.rs": "83ccc941f7a0ba4a2306d1a79dd1e9471b67419677253de4d5dabf1f8df88525",
+        "lampOS/crates/voice/src/remember_no_wait.rs": "7df1d687c885797422cb7faf9427eac5be18adea712c2a46c7fd0d5cf8d31aa0",
+        "lampOS/docs/voice-test-fixtures.md": "65ee1a94a34c9cf28ff4f6b44dcc551fa8a8e22763f00f290b31a1e329edb67c"
+      },
+      "kind": [
+        "lib"
+      ],
+      "mode": 493,
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": true
+      },
+      "raw_binding_sha256": "8fbe43993d45c13306b2afe9dc1ca9e5b793760087ce39e20601f991190c5eec",
+      "sha256": "f917a41a6e67f4843480b05c6d63d294d1e551e1e82f7ee085ecfe016f3c19f9",
+      "source_inventory_sha256": "a960d8acaccee3f8c50017314262e714a98399741ef40e1b5205ca86f609e56e",
+      "target": "lamp_voice"
+    },
+    "original-stall": {
+      "child_binding": "The preserved libtest driver reexecutes itself through current_exe; no separate worker executable.",
+      "compiler_artifact_executable_equals_execution_source": true,
+      "executable_name": "lamp_voice-d0423b4e04fbfa63",
+      "features": [],
+      "fresh": false,
+      "frozen_file_hashes": {
+        "lampOS/crates/voice/src/remember.rs": "c4a672c903ca6c215d22bd2f15d179724b91ae5a13f4a0d3cb25fd687f9e7fc0",
+        "lampOS/crates/voice/src/remember_no_wait.rs": "7df1d687c885797422cb7faf9427eac5be18adea712c2a46c7fd0d5cf8d31aa0",
+        "lampOS/docs/voice-test-fixtures.md": "65ee1a94a34c9cf28ff4f6b44dcc551fa8a8e22763f00f290b31a1e329edb67c"
+      },
+      "kind": [
+        "lib"
+      ],
+      "mode": 493,
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": true
+      },
+      "raw_binding_sha256": "a97f22e10a6fdc3b4c051fcbc68f65c0bb3e16b24924deeffeb3835f42dcb8ad",
+      "sha256": "a5b264664bae10b1cd7235b52718c8c4f3d4ffedfeaa513c404fee92ca48452b",
+      "source_inventory_sha256": "3b0d92d124c65679e649c8a22fce86624b07dd4828703d2195ae01c744023a94",
+      "target": "lamp_voice"
+    },
+    "restored": {
+      "child_binding": "The preserved libtest driver reexecutes itself through current_exe; no separate worker executable.",
+      "compiler_artifact_executable_equals_execution_source": true,
+      "executable_name": "lamp_voice-d0423b4e04fbfa63",
+      "features": [],
+      "fresh": false,
+      "frozen_file_hashes": {
+        "lampOS/crates/voice/src/remember.rs": "3a262a4d63d4fae50241db8c553181ec7c9fb45363a2017afc898697f7197664",
+        "lampOS/crates/voice/src/remember_no_wait.rs": "7df1d687c885797422cb7faf9427eac5be18adea712c2a46c7fd0d5cf8d31aa0",
+        "lampOS/docs/voice-test-fixtures.md": "65ee1a94a34c9cf28ff4f6b44dcc551fa8a8e22763f00f290b31a1e329edb67c"
+      },
+      "kind": [
+        "lib"
+      ],
+      "mode": 493,
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": true
+      },
+      "raw_binding_sha256": "459424f21e80320e15dabdbf95e2a87455a718f59742deccf742eff83f2bb228",
+      "sha256": "d0d2e2e090a84501fccbfc2a0c0d9c41ea6395641a4bad0512b851267ce9ae06",
+      "source_inventory_sha256": "1ed2c0b2d37815a3755b2746a8648378b23d35eca26934a049d03503e730734d",
+      "target": "lamp_voice"
+    }
+  },
+  "blocking_send_native_receipt": {
+    "elapsed_seconds": 4.052,
+    "error": null,
+    "exit_code": 101,
+    "log_sha256": "0bb55dafc5363010c03f34257bd3cbe25e825a3ea3fdf92b879ceb8ea2890e14",
+    "raw_receipt_sha256": "98efa820913e203dd09a8c0357ec5e1f18398e1aa853a0eb05f29f0c2128ec47",
+    "source_entries": 7200,
+    "source_unchanged": true
+  },
+  "compile_receipts": {
+    "blocking-send": {
+      "elapsed_seconds": 77.24,
+      "error": null,
+      "exit_code": 0,
+      "log_sha256": "b12ca6b3ee6073fc20ac233554bb8f3a9806139273f82561d127c8efffbd50d8",
+      "raw_receipt_sha256": "fbaaba6c48566e5c8377091f6d84a5c1bb4be1bba9c30c0cedf5dd1551741f97",
+      "source_entries": 7200,
+      "source_unchanged": true
+    },
+    "candidate-stall": {
+      "elapsed_seconds": 78.248,
+      "error": null,
+      "exit_code": 0,
+      "log_sha256": "6da84b2e2e5a3227456519092ebb63387e63cb4ae1c2f9390b7f6eb128a35f5f",
+      "raw_receipt_sha256": "1dd7331e2fc7b5e210df22f170ddd39f86b1da381e9b4816c70a7f6b2e010b2d",
+      "source_entries": 7200,
+      "source_unchanged": true
+    },
+    "original-stall": {
+      "elapsed_seconds": 78.331,
+      "error": null,
+      "exit_code": 0,
+      "log_sha256": "c211efd05fb49710326dc9ecdd5efc37fd670ca8f66cffdc3519ded2cd57d197",
+      "raw_receipt_sha256": "e522ca217bcba7724ad56de87831f31b3164d071e9aad07b56c3ae2bb5487400",
+      "source_entries": 7200,
+      "source_unchanged": true
+    },
+    "restored": {
+      "elapsed_seconds": 77.513,
+      "error": null,
+      "exit_code": 0,
+      "log_sha256": "c1c05ffc2ec160f360867e030d19a4342b4c3c7ac40ecaf123e9f02ea1678215",
+      "raw_receipt_sha256": "8384f528cea7d1b931642de865d0dfaf8611e12e07a7fd76a5bb1dbe8c701e44",
+      "source_entries": 7200,
+      "source_unchanged": true
+    }
+  },
+  "continuation": {
+    "complete": true,
+    "evidence": "continuation.json",
+    "fresh_restored": {
+      "failed": 0,
+      "passed": 2
+    },
+    "original_campaign_still_incomplete": true,
+    "previously_unrun_queued_wait": {
+      "boundary": "Named parent diagnostic watchdog",
+      "failed": 1,
+      "passed": 0
+    }
+  },
+  "original_complete": false,
+  "original_controller_sha256": "16b83ce289963f6be36cc6d5c5367b2d1b1db335f5d146a9b86698a818001eea",
+  "original_failure": {
+    "message": "missing or extra outer single-test summary",
+    "phase": "blocking-send",
+    "type": "RuntimeError"
+  },
+  "original_summary_sha256": "1950d23abda8d0075171917110a621a27a38bfde24f279d506194bfb5bca3ab1",
+  "preserved_artifacts_unchanged": true,
+  "restored": {
+    "binding_sha256": "459424f21e80320e15dabdbf95e2a87455a718f59742deccf742eff83f2bb228",
+    "cases": [
+      {
+        "exit_code": 0,
+        "expected_failure": null,
+        "failed": 0,
+        "name": "remember::tests::the_days_writer_submits_after_idle_without_waiting_for_a_model",
+        "passed": 1,
+        "raw_log_sha256": "9f1ef5ab92027a0e210625cbe63d3a0abf532d0cb5703433854fa4bf64f0e718",
+        "receipt_sha256": "caa7b5036358cb2e0c19c1adf0e5022b742e98bde5c5911eca36e2a71ed57499"
+      },
+      {
+        "exit_code": 0,
+        "expected_failure": null,
+        "failed": 0,
+        "name": "remember::tests::a_held_background_write_cannot_block_or_grow_the_foreground_queue",
+        "passed": 1,
+        "raw_log_sha256": "40788f1a3242762555811b37261aa9eea6fdc33f7ec44ddf5044bbfdb3784c1d",
+        "receipt_sha256": "526ce4e0a7a6327cba8e4ef47bb698d54826998ddb113a2d15498bab1eafbf5e"
+      }
+    ],
+    "failed": 0,
+    "label": "restored",
+    "passed": 2
+  },
+  "restored_library_comparison": {
+    "baseline": "d0d2e2e090a84501fccbfc2a0c0d9c41ea6395641a4bad0512b851267ce9ae06",
+    "equal": true,
+    "restored": "d0d2e2e090a84501fccbfc2a0c0d9c41ea6395641a4bad0512b851267ce9ae06",
+    "scope": "Recorded comparison, not an assumption of byte identity."
+  },
+  "schema": 1,
+  "source_modes_restored": true,
+  "stages": [
+    {
+      "binding_sha256": "a97f22e10a6fdc3b4c051fcbc68f65c0bb3e16b24924deeffeb3835f42dcb8ad",
+      "cases": [
+        {
+          "exit_code": 101,
+          "expected_failure": {
+            "file": "remember.rs",
+            "line": 11919,
+            "message": "assertion failed: started.elapsed() < Duration::from_millis(25)"
+          },
+          "failed": 1,
+          "name": "remember::tests::the_days_writer_submits_after_idle_without_waiting_for_a_model",
+          "passed": 0,
+          "raw_log_sha256": "a8ee3ef94043f886fa300b54b3a61bff42733c1bebd9225e9239ec5a657718f4",
+          "receipt_sha256": "49c000a31a2a4985ea54e7729500ccf4063c9737067d3a59f6dd2774caa21701"
+        },
+        {
+          "exit_code": 101,
+          "expected_failure": {
+            "file": "remember.rs",
+            "line": 13211,
+            "message": "assertion failed: start.elapsed() < Duration::from_millis(100)"
+          },
+          "failed": 1,
+          "name": "remember::tests::a_held_background_write_cannot_block_or_grow_the_foreground_queue",
+          "passed": 0,
+          "raw_log_sha256": "c3214832a2f492fe8ae4e6e99d4fb5d317454fef47554fa9321bdee9324dbf4f",
+          "receipt_sha256": "bf6175194cbbe6bbbd40af757ca1e4b05b80949484d9ae54f2e7e262db63f5e4"
+        }
+      ],
+      "failed": 2,
+      "label": "original-stall",
+      "passed": 0
+    },
+    {
+      "binding_sha256": "8fbe43993d45c13306b2afe9dc1ca9e5b793760087ce39e20601f991190c5eec",
+      "cases": [
+        {
+          "exit_code": 0,
+          "expected_failure": null,
+          "failed": 0,
+          "name": "remember::tests::the_days_writer_submits_after_idle_without_waiting_for_a_model",
+          "passed": 1,
+          "raw_log_sha256": "25e9478979c2687910ecc7f51ad9d9536f310d7b0533089672ad2797808e6f06",
+          "receipt_sha256": "7e99bb778c176a2f941f671e59004b492debdf2f80758f7159502c911790242c"
+        },
+        {
+          "exit_code": 0,
+          "expected_failure": null,
+          "failed": 0,
+          "name": "remember::tests::a_held_background_write_cannot_block_or_grow_the_foreground_queue",
+          "passed": 1,
+          "raw_log_sha256": "520cef2df369247cb7a7a362a39e2bae8044d717fc3207d2a60d5f5a61dde014",
+          "receipt_sha256": "543350a2ea4228c1bfe7de5c909ee5d2ca81d757ea9b96e3a206410e3bace20b"
+        }
+      ],
+      "failed": 0,
+      "label": "candidate-stall",
+      "passed": 2
+    }
+  ]
+}
