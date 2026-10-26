@@ -13,6 +13,21 @@ machine is explicitly named. Third has no lamp access.
 
 
 
+## 2026-10-26 13:26 — Reminder current-base gate and push
+
+Ready for lamp-voice: no (#3525)
+
+Pushed **b40c866ef** on **d5dc2e87f** with an exact old-head lease.
+One equal range-diff commit; all 32 authored blobs equal **7c9da509f**.
+Fresh formatting, strict Skills all-target Clippy, workspace build and full
+Skills pass **542/0/9 ignored**, all 21 controls once. All 7,257 tracked
+lampOS source hashes stayed unchanged; actual five test drivers and child
+are sealed before any later compiler invocation.
+[Gate](verification/reminder-pending-present-20261026/current-d5dc.json),
+[carry](verification/reminder-pending-present-20261026/carry-d5dc.json).
+Current native gates and carry reads are pending; old native, compatibility
+and device limitations retain their original identities. No device test.
+
 ## 2026-10-26 13:17 — Current-base factory carry
 
 Ready for lamp-voice: no (#3546)
