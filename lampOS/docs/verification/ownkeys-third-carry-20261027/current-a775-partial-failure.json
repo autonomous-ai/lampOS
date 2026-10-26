@@ -1,0 +1,123 @@
+{
+  "base": "a3b9c46814bb2b2452f0d6b6cc13bb3a16992c33",
+  "command": [
+    "cargo",
+    "+1.96.0",
+    "test",
+    "--offline",
+    "--locked",
+    "-p",
+    "lamp-body",
+    "-p",
+    "lamp-cloud",
+    "-p",
+    "lamp-controls",
+    "-p",
+    "lamp-expression",
+    "-p",
+    "lamp-keeper",
+    "-p",
+    "lamp-lean",
+    "-p",
+    "lamp-memory",
+    "-p",
+    "lamp-peek",
+    "-p",
+    "lamp-selftest",
+    "-p",
+    "lamp-setup",
+    "-p",
+    "lamp-skills",
+    "-p",
+    "lamp-update",
+    "-p",
+    "lamp-voice",
+    "-p",
+    "lamp-voice-eval",
+    "--",
+    "--nocapture",
+    "--test-threads=1"
+  ],
+  "counts": {
+    "doctest_cases": {
+      "failed": 0,
+      "ignored": 0,
+      "passed": 0
+    },
+    "doctest_headings": 0,
+    "nested_exclusions": [],
+    "nonoverlapping_top_level": {
+      "failed": 1,
+      "ignored": 7,
+      "passed": 1667
+    },
+    "per_package": {
+      "lamp-body": {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 616
+      },
+      "lamp-cloud": {
+        "failed": 0,
+        "ignored": 4,
+        "passed": 196
+      },
+      "lamp-controls": {
+        "failed": 0,
+        "ignored": 3,
+        "passed": 516
+      },
+      "lamp-expression": {
+        "failed": 1,
+        "ignored": 0,
+        "passed": 339
+      }
+    },
+    "raw_summary_rows": 20,
+    "raw_totals": {
+      "failed": 1,
+      "ignored": 7,
+      "passed": 1667
+    },
+    "top_level_drivers": 20
+  },
+  "first_failure": {
+    "existing_repair_pr": 3622,
+    "message": "journal fixture host watchdog",
+    "source": "crates/expression/tests/runtime.rs:1035",
+    "test": "sleep_name::an_expired_sleeping_name_is_journaled_once_by_the_service"
+  },
+  "head": "a775e1a9bd2b677c572ddfbcbed46486b8f5546f",
+  "integrity": {
+    "actual_and_saved_paths": 140,
+    "all_actual_and_saved_bytes_unchanged": true,
+    "inode_only_actual_changes": 33,
+    "metadata_guard_qualified": false,
+    "original_controller_errors": [
+      "artifact metadata changed during runtime; manual qualification hold",
+      "postflight source/artifact/raw-input/controller guard failed"
+    ],
+    "raw_input_inventory_content_links_and_metadata_unchanged": true,
+    "source_unchanged": true
+  },
+  "next": "No started/failed driver retry. Prepare exact57 unrun drivers and one separate full14 doc-only cohort; current journal repair/read gates and activation acceptance remain pending.",
+  "private_original_audit_limit": "This digest identifies the retained private original, not this public selected summary.",
+  "private_original_audit_sha256": "d63067277b49adc757349401dfb5d84a7888cffd0d9c1151915fa5f804fbcbbc",
+  "runtime": {
+    "driver_reaped": true,
+    "elapsed_seconds": 335.432955422,
+    "forced_cleanup": false,
+    "observed_driver_starts": 20,
+    "process_group": {
+      "state": "absent"
+    },
+    "qualified": false,
+    "returncode": 101,
+    "timed_out": false,
+    "unobserved_compiled_drivers": 57
+  },
+  "scope": "Actual stopped full fourteen-package command: partial evidence only, never a passing whole-cohort gate.",
+  "status": "MANUAL_HOLD",
+  "test_reruns": 0,
+  "tree": "1bcf3f2d95a767e1593da361b3548edd7f80c8d7"
+}

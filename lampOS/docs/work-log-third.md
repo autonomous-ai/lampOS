@@ -1,3 +1,11 @@
+## 2026-10-27 04:47 — own-keys partial runtime retains journal failure
+
+Ready for lamp-voice: no (current journal fixture failure and activation HOLD)
+
+The actual full fourteen-package command at a775/a3 exited 101 after 20 of 77 drivers: 1,667 passed, one failed and seven ignored; no docs ran and 57 drivers remain unrun. [Partial failure](verification/ownkeys-third-carry-20261027/current-a775-partial-failure.json): Expression runtime 27/1/0, the old sleeping-name journal watchdog at runtime.rs:1035. Reported on existing repair #3622 and Queue at 6428077955/6428078463. No failed/started driver is retried; unrun-only completion is being prepared while Tests completes its existing repair/read gates.
+
+Original controller metadata HOLD stays intact. [Separate read-only disposition](verification/ownkeys-third-carry-20261027/current-a775-inode-disposition.json) independently verifies 33 inode-only changes on 17 normal binaries and 16 examples, no compiled test-driver metadata change; all actual/saved bytes match. Source/raw-input guards pass, the owned group exited without forced cleanup. This explains the metadata observation only and does not make the failed command pass. Reminder b490 runtime continues; no product/device acceptance inferred.
+
 ## 2026-10-27 04:42 — own-keys current compiler gate and carry proof
 
 Ready for lamp-voice: no (own-keys activation acceptance and current software gates pending)
