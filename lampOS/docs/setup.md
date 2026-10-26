@@ -177,12 +177,15 @@ lamp-setup reset-now`). That unit, in this order:
 3. it runs the plan's stop command, the keeper's `lamp-keeper stop lamp`
    (#767): the voice pauses, `lampos.target` stops, the body folds the lamp.
    A plan's `systemctl stop` of a target is run with every part of the
-   target named too (its `ConsistsOf`, `reset::waited_stop`), so it returns
-   only once each part has stopped: the target alone returns as soon as its
-   own job is done (systemd 252: 0.04 s, a part's write on stop 3.1 s later),
-   and on lamp-29e7 on 26 Oct Voice's onboarding, written as it stopped,
-   outlived the wipe, so the customer got no first five minutes. Parts that
-   cannot be read are as a stop that fails;
+   target named too (its `ConsistsOf`, and theirs for a part that is a
+   target; `reset::stop_and_wait`), so it returns only once each part has
+   stopped: the target alone returns as soon as its own job is done
+   (systemd 252: 0.04 s, a part's write on stop 3.1 s later), and on
+   lamp-29e7 on 26 Oct Voice's onboarding, written as it stopped, outlived
+   the wipe, so the customer got no first five minutes. Then every part must
+   read `inactive` (or `failed`), and the parts read again must be the same.
+   Parts that cannot be read, a part not stopped, or one that joined during
+   the stop are as a stop that fails;
 4. it wipes each path in the plan: a file is removed, a directory keeps itself
    (systemd units name some of them and would not start without them) and
    loses everything in it. It walks by handle, one component at a time from

@@ -54,7 +54,7 @@ pub struct Plan {
     /// Run before the wipe: the lamp's parts stopped (`lamp-keeper stop
     /// lamp`, or `systemctl stop lampos.target` on a lamp put on by
     /// `lamp-update install`, which has no keeper, run with each part of
-    /// the target named: [`waited_stop`]). If it fails, the lamp reboots
+    /// the target named: [`stop_and_wait`]). If it fails, the lamp reboots
     /// without wiping, into setup, which finishes the wipe with nothing
     /// running.
     pub stop: Vec<String>,
@@ -243,7 +243,7 @@ pub fn accept(event: &TouchEvent, clock_id: &str, now_us: u64) -> Result<(), &'s
 pub trait Effects {
     fn run(&mut self, argv: &[String]) -> io::Result<()>;
     /// What a command that only reads printed: the parts of the lamp's
-    /// target ([`waited_stop`]).
+    /// target and whether they stopped ([`stop_and_wait`]).
     fn read(&mut self, argv: &[String]) -> io::Result<String>;
     fn sync(&mut self);
     /// The last resort when the reboot command fails: a lamp left dark with
@@ -393,42 +393,116 @@ pub fn wipe(path: &Path) -> io::Result<()> {
     Ok(())
 }
 
-/// The plan's stop, with every part of each target it stops named too, so
-/// that it returns only once each part has stopped. `systemctl stop
-/// lampos.target` alone returns as soon as the target's own job is done,
-/// before its parts have stopped (systemd 252 on lamp-4ace on 26 Oct: 0.04 s,
-/// and a part's write on stop 3.1 s later), so a part that writes as it stops
-/// wrote back into what the reset had just emptied: on lamp-29e7 that day,
-/// Voice's onboarding commit kept the factory session's steps through the
-/// reset, and the customer got no first five minutes. Named, each part's
-/// stop job is waited for. The parts are systemd's `ConsistsOf` of the
-/// target, every unit `PartOf` it. A stop that is not `systemctl stop`
-/// (`lamp-keeper stop lamp`) is the plan's as it is.
-pub fn waited_stop(stop: &[String], effects: &mut impl Effects) -> io::Result<Vec<String>> {
+/// Run the plan's stop and return once the lamp has stopped. A `systemctl
+/// stop` of a target is run with every part of the target named too, so it
+/// returns only once each part has stopped. `systemctl stop lampos.target`
+/// alone returns as soon as the target's own job is done, before its parts
+/// have stopped (systemd 252 on lamp-4ace on 26 Oct: 0.04 s, and a part's
+/// write on stop 3.1 s later; it waits only for the job it named, Third on
+/// #1711). So a part that writes as it stops wrote back into what the reset
+/// had just emptied: on lamp-29e7 that day, Voice's onboarding commit kept
+/// the factory session's steps through the reset, and the customer got no
+/// first five minutes. Named, each part's stop job is waited for. Then each
+/// part must read stopped (`inactive`, or `failed` once ended by force), and
+/// the parts read again must be the same, none joined during the stop
+/// (Third's checks): otherwise it is a stop that failed, and nothing is
+/// wiped. A stop that is not `systemctl stop` (`lamp-keeper stop lamp`) is
+/// the plan's as it is.
+pub fn stop_and_wait(stop: &[String], effects: &mut impl Effects) -> io::Result<()> {
     let systemctl = stop
         .first()
         .is_some_and(|program| Path::new(program).file_name() == Some("systemctl".as_ref()));
     if !systemctl || stop.get(1).map(String::as_str) != Some("stop") {
-        return Ok(stop.to_vec());
+        return effects.run(stop);
     }
+    let parts = parts_of(stop, effects)?;
     let mut argv = stop.to_vec();
-    for target in stop[2..].iter().filter(|unit| unit.ends_with(".target")) {
+    argv.extend(parts.iter().cloned());
+    effects.run(&argv)?;
+    if parts.is_empty() {
+        return Ok(());
+    }
+    let mut show = vec![
+        stop[0].clone(),
+        "show".into(),
+        "-p".into(),
+        "ActiveState".into(),
+        "--value".into(),
+    ];
+    show.extend(parts.iter().cloned());
+    let states = effects.read(&show)?;
+    let states: Vec<&str> = states
+        .lines()
+        .map(str::trim)
+        .filter(|state| !state.is_empty())
+        .collect();
+    if states.len() != parts.len()
+        || states
+            .iter()
+            .any(|state| !matches!(*state, "inactive" | "failed"))
+    {
+        return Err(io::Error::other(format!(
+            "not every part of the lamp stopped: {}",
+            parts
+                .iter()
+                .zip(states.iter().chain(std::iter::repeat(&"unread")))
+                .map(|(part, state)| format!("{part} {state}"))
+                .collect::<Vec<_>>()
+                .join(", ")
+        )));
+    }
+    if let Some(joined) = parts_of(stop, effects)?
+        .into_iter()
+        .find(|part| !parts.contains(part))
+    {
+        return Err(io::Error::other(format!(
+            "{joined} became part of the lamp during its stop"
+        )));
+    }
+    Ok(())
+}
+
+/// The units that are part of each target a `systemctl stop` names:
+/// systemd's `ConsistsOf` of it, every unit `PartOf` it, and theirs for a
+/// part that is a target itself. A printed word that reads as an option is
+/// never taken, and a unit already named is not named again.
+fn parts_of(stop: &[String], effects: &mut impl Effects) -> io::Result<Vec<String>> {
+    // More targets than any lamp has, nested: a loop in what systemd prints
+    // cannot keep the reset reading.
+    const MOST_TARGETS: usize = 64;
+    let mut parts: Vec<String> = Vec::new();
+    let mut targets: Vec<String> = stop[2..]
+        .iter()
+        .filter(|unit| unit.ends_with(".target"))
+        .cloned()
+        .collect();
+    let mut read = 0;
+    while let Some(target) = targets.pop() {
+        read += 1;
+        if read > MOST_TARGETS {
+            return Err(io::Error::other(format!(
+                "more than {MOST_TARGETS} targets in the lamp's stop"
+            )));
+        }
         let show = [
             stop[0].clone(),
             "show".into(),
             "-p".into(),
             "ConsistsOf".into(),
             "--value".into(),
-            target.clone(),
+            target,
         ];
         for part in effects.read(&show)?.split_whitespace() {
-            // A unit's name, never an option.
-            if !part.starts_with('-') && !argv.iter().any(|unit| unit == part) {
-                argv.push(part.to_owned());
+            if part.starts_with('-') || stop[2..].iter().chain(&parts).any(|unit| unit == part) {
+                continue;
             }
+            if part.ends_with(".target") {
+                targets.push(part.to_owned());
+            }
+            parts.push(part.to_owned());
         }
     }
-    Ok(argv)
+    Ok(parts)
 }
 
 /// Begin a reset: journal, remove the marker, stop the lamp, wipe, reboot.
@@ -443,12 +517,12 @@ pub fn reset(plan: &Plan, effects: &mut impl Effects) -> io::Result<Vec<Step>> {
         steps.push(Step::MarkerRemoved);
     }
     effects.sync();
-    // Parts that cannot be read are as a stop that fails: nothing is wiped
-    // while one may still be running.
-    if waited_stop(&plan.stop, effects)
-        .and_then(|stop| effects.run(&stop))
-        .is_err()
-    {
+    // Parts that cannot be read, or not all stopped, are as a stop that
+    // fails: nothing is wiped while one may still be running.
+    if let Err(error) = stop_and_wait(&plan.stop, effects) {
+        eprintln!(
+            "lamp-setup: reset: the lamp did not stop ({error}); rebooting into setup, which finishes the wipe at its start"
+        );
         reboot(plan, effects, &mut steps);
         return Ok(steps);
     }
