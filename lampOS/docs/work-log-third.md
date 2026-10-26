@@ -1,3 +1,9 @@
+## 2026-10-26 22:16 — diagnostic carry onto train176
+
+Ready for lamp-voice: no (#3591)
+
+Both patches compare equal at 88300511e on2d18e296c. Current fmt/strict Skills Clippy/workspace build/test compilation pass. The integration driver and Skills child match the actual08a/e672 focused1/0 bytes; synthetic runtime inputs consume none of the three changed unit/doc files. Retain that run at its actual source, with no rerun or current-source relabeling. One unused main-test binary changed and has no runtime credit. [Carry packet](verification/skills-call-observations-20261026/current-2d18-carry.json). Current original native gates/read carries still required; author HOLD retained.
+
 ## 2026-10-26 22:13 — original 08a native green, next base carry
 
 Ready for lamp-voice: no (#3591)

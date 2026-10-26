@@ -1,0 +1,74 @@
+{
+  "head": "88300511efab088393859e7ff18487cafc1a3f0d",
+  "base": "2d18e296c0a51ac0f6fb7c610c3c159cef9870c4",
+  "range_diff": "Both authored commits = versus08a/e672",
+  "gates": {
+    "fmt": 0,
+    "clippy": 0,
+    "build": 0,
+    "test-compile": 0
+  },
+  "source_delta_from_prior_base": [
+    "lampOS/deploy/product/lamp-voice.service",
+    "lampOS/docs/memory.md",
+    "lampOS/docs/switches.md"
+  ],
+  "artifact_comparison_to_actual_e672_host": {
+    "it-46363ab9699809b5": true,
+    "lamp_skills-a718b2a0214b6903": true,
+    "release_pair-88349d4c2302e5ab": true,
+    "requested_audio-019db324b83a9807": true,
+    "lamp_skills-c6f44302f3b2c78f": false,
+    "lamp-skills": true
+  },
+  "current_six_artifacts": {
+    "it-46363ab9699809b5": {
+      "path": "./.claude/worktrees/third-reminder-dedicated-target/debug/deps/it-46363ab9699809b5",
+      "sha256": "9c9b536a7fa9f656e55d6515b0df2b420b7fc3f41d1e49d2488fee9624429484",
+      "fresh": false
+    },
+    "lamp_skills-a718b2a0214b6903": {
+      "path": "./.claude/worktrees/third-reminder-dedicated-target/debug/deps/lamp_skills-a718b2a0214b6903",
+      "sha256": "e07bfd0eb6eddc016fb5fb3bf658a8f28db2af72e3c20eebceab60c69e449b91",
+      "fresh": false
+    },
+    "release_pair-88349d4c2302e5ab": {
+      "path": "./.claude/worktrees/third-reminder-dedicated-target/debug/deps/release_pair-88349d4c2302e5ab",
+      "sha256": "057f200eacd7617d3fb818a0311d498cf96449d8bbc1004169d7a7f305a70198",
+      "fresh": false
+    },
+    "requested_audio-019db324b83a9807": {
+      "path": "./.claude/worktrees/third-reminder-dedicated-target/debug/deps/requested_audio-019db324b83a9807",
+      "sha256": "527bf33ce8cab7385afd75b545284358b68d89301635e20f9a18b7a5706afc45",
+      "fresh": false
+    },
+    "lamp_skills-c6f44302f3b2c78f": {
+      "path": "./.claude/worktrees/third-reminder-dedicated-target/debug/deps/lamp_skills-c6f44302f3b2c78f",
+      "sha256": "c17f961cb946bc4acf700b10fc77bf46a00f77551e74eed91022e64f89c4497e",
+      "fresh": false
+    },
+    "lamp-skills": {
+      "path": "./.claude/worktrees/third-reminder-dedicated-target/debug/lamp-skills",
+      "sha256": "66f94450d96eb490b586940119f2065584c7da53c5616626b00e5ff026dca74e",
+      "scope": "actual child"
+    }
+  },
+  "fresh_flags": "Actual compiler JSON retained; cached carry is not claimed as a clean rebuild.",
+  "runtime_input_audit": "Focused integration case creates four synthetic skills in a fresh /tmp directory, runs the same saved Skills child against private bus/actions/mood/tools paths. It reads none of the changed product unit/memory/switch docs. Actual integration driver and child are byte-identical. One unused main-test binary changed; no runtime credit claimed for it.",
+  "retained_actual_host_result": {
+    "head": "08a7185c0ca646a025c5d61d89b4202ee07183f6",
+    "base": "e672ee214ae67eb05538d519a43d1f6ba2662ecb",
+    "focused": [
+      1,
+      0,
+      0
+    ],
+    "ten_complete_deferred_rows": true,
+    "catalog_ms": 860.452438,
+    "first_call_us": 458.679,
+    "median_us": 381.7,
+    "reused_by_byte_and_input_audit": true,
+    "rerun_on_current_head": false
+  },
+  "limits": "Current original ARM64/Linux gates and peer carry reads pending. No historical #3525 waiver, device or production latency claim."
+}
