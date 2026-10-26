@@ -1,0 +1,254 @@
+{
+  "state": "OFFLINE_RAW_FAILURE_ACCOUNTING_NO_RUNTIME_REPLAY",
+  "head": "a3b9c46814bb2b2452f0d6b6cc13bb3a16992c33",
+  "tree": "cfd6d52fe0b0b3c47d0004518333748d9a3ae90b",
+  "raw_input_sha256": {
+    "integration-discovery.json": "de80edeb66401feeda5c9843bf57abaeec3df5af604b3ff5ef518a9ac7d6d9b4",
+    "selected-discovery-view.json": "de80edeb66401feeda5c9843bf57abaeec3df5af604b3ff5ef518a9ac7d6d9b4",
+    "integration-run.stdout": "12b954a0662bf4b25b0aa7c8ed22ed7da25c2033cd509d96eb0224d009cbcaa5",
+    "integration-run.stderr": "f6cd7f4d4029935e6605432c8371db65eb14496dee0ad48a07818157777aee4f",
+    "integration-run-process.json": "3ce84007424fe4b276f6c98e62ed9644759a524f67b313bf03db5b2a72849f39",
+    "required-controls.json": "88595bab831c6af14b6afa1782697763547a711c4d894cf2212b5f0185cf5ea9",
+    "terminal.json": "a72cae10541686b970f932df5a774b13ae34924c1584637eb4c20c986f906ad2",
+    "error.json": "03631d773a2092cf7f33e03d594ec7655242e0c184162fe9e0d599739ae10975",
+    "accounting.py": "efaeee9a55187bf0202cb5f8f9bf2913ba4fd5e04eb732919d952ac630524f55"
+  },
+  "original_controller_exit": 125,
+  "actual_nextest_exit": 100,
+  "original_results_empty_preserved": true,
+  "source_qualification": "FAILED_UNQUALIFIED",
+  "full_IPC_counts": {
+    "selected": 43,
+    "ok": 33,
+    "failed": 10,
+    "SIGABRT_subset_of_failed": 1,
+    "LEAK": 0,
+    "TIMEOUT": 0,
+    "skipped": 0,
+    "all_selected_started_and_terminal_once": true,
+    "binaries": 7
+  },
+  "camera_required17": {
+    "ok": 7,
+    "failed": 10,
+    "required_once": 17
+  },
+  "other_IPC": {
+    "ok": 26,
+    "failed": 0
+  },
+  "diagnostic_categories": {
+    "InvalidData_ticket_FD_not_connected_private_Unix_stream": 9,
+    "rustix_1_1_5_Darwin_SCM_RIGHTS_truncation_underflow_then_destructor_abort": 1
+  },
+  "human_identity_deduplication": true,
+  "suite_events_not_extra_test_counts": 12,
+  "unrun": {
+    "relay_custom_harness": true,
+    "IPC_docs": true
+  },
+  "ordinal_definition": "One-based raw stdout physical line and one-based global type=test terminal-event position; started/suite/compiler records excluded.",
+  "cases": [
+    {
+      "binary": "lamp-ipc::camera_authority",
+      "test": "cancellation_drops_a_retained_partial_frame_fd",
+      "name": "lamp-ipc::camera_authority$cancellation_drops_a_retained_partial_frame_fd",
+      "event": "ok",
+      "display_status": "PASS",
+      "terminal_once": true,
+      "file_line_1based": 53,
+      "global_test_terminal_event_ordinal_1based": 8,
+      "failure_diagnostic_category": null
+    },
+    {
+      "binary": "lamp-ipc::camera_authority",
+      "test": "completed_frame_with_closed_or_nonsilent_observer_never_exposes_ready",
+      "name": "lamp-ipc::camera_authority$completed_frame_with_closed_or_nonsilent_observer_never_exposes_ready",
+      "event": "ok",
+      "display_status": "PASS",
+      "terminal_once": true,
+      "file_line_1based": 55,
+      "global_test_terminal_event_ordinal_1based": 9,
+      "failure_diagnostic_category": null
+    },
+    {
+      "binary": "lamp-ipc::camera_authority",
+      "test": "deadline_does_not_renew_while_waiting_for_reply",
+      "name": "lamp-ipc::camera_authority$deadline_does_not_renew_while_waiting_for_reply",
+      "event": "ok",
+      "display_status": "PASS",
+      "terminal_once": true,
+      "file_line_1based": 60,
+      "global_test_terminal_event_ordinal_1based": 11,
+      "failure_diagnostic_category": null
+    },
+    {
+      "binary": "lamp-ipc::camera_authority",
+      "test": "dropping_one_client_does_not_shutdown_the_shared_endpoint",
+      "name": "lamp-ipc::camera_authority$dropping_one_client_does_not_shutdown_the_shared_endpoint",
+      "event": "failed",
+      "display_status": "FAIL",
+      "terminal_once": true,
+      "file_line_1based": 62,
+      "global_test_terminal_event_ordinal_1based": 12,
+      "failure_diagnostic_category": "InvalidData_ticket_FD_not_connected_private_Unix_stream"
+    },
+    {
+      "binary": "lamp-ipc::camera_authority",
+      "test": "full_control_socket_keeps_grant_pending_until_its_original_deadline",
+      "name": "lamp-ipc::camera_authority$full_control_socket_keeps_grant_pending_until_its_original_deadline",
+      "event": "failed",
+      "display_status": "FAIL",
+      "terminal_once": true,
+      "file_line_1based": 64,
+      "global_test_terminal_event_ordinal_1based": 13,
+      "failure_diagnostic_category": "InvalidData_ticket_FD_not_connected_private_Unix_stream"
+    },
+    {
+      "binary": "lamp-ipc::camera_authority",
+      "test": "incremental_frame_retains_fd_until_exact_frame_and_control_eof",
+      "name": "lamp-ipc::camera_authority$incremental_frame_retains_fd_until_exact_frame_and_control_eof",
+      "event": "failed",
+      "display_status": "FAIL",
+      "terminal_once": true,
+      "file_line_1based": 66,
+      "global_test_terminal_event_ordinal_1based": 14,
+      "failure_diagnostic_category": "InvalidData_ticket_FD_not_connected_private_Unix_stream"
+    },
+    {
+      "binary": "lamp-ipc::camera_authority",
+      "test": "missing_extra_and_truncated_rights_refuse_without_leaking_descriptors",
+      "name": "lamp-ipc::camera_authority$missing_extra_and_truncated_rights_refuse_without_leaking_descriptors",
+      "event": "failed",
+      "display_status": "SIGABRT",
+      "terminal_once": true,
+      "file_line_1based": 70,
+      "global_test_terminal_event_ordinal_1based": 16,
+      "failure_diagnostic_category": "rustix_1_1_5_Darwin_SCM_RIGHTS_truncation_underflow_then_destructor_abort"
+    },
+    {
+      "binary": "lamp-ipc::camera_authority",
+      "test": "old_ticket_never_revives_with_a_new_hold",
+      "name": "lamp-ipc::camera_authority$old_ticket_never_revives_with_a_new_hold",
+      "event": "failed",
+      "display_status": "FAIL",
+      "terminal_once": true,
+      "file_line_1based": 68,
+      "global_test_terminal_event_ordinal_1based": 15,
+      "failure_diagnostic_category": "InvalidData_ticket_FD_not_connected_private_Unix_stream"
+    },
+    {
+      "binary": "lamp-ipc::camera_authority",
+      "test": "one_revocation_closes_two_independently_transferred_observers",
+      "name": "lamp-ipc::camera_authority$one_revocation_closes_two_independently_transferred_observers",
+      "event": "failed",
+      "display_status": "FAIL",
+      "terminal_once": true,
+      "file_line_1based": 72,
+      "global_test_terminal_event_ordinal_1based": 17,
+      "failure_diagnostic_category": "InvalidData_ticket_FD_not_connected_private_Unix_stream"
+    },
+    {
+      "binary": "lamp-ipc::camera_authority",
+      "test": "partial_receive_deadline_immediately_closes_retained_rights",
+      "name": "lamp-ipc::camera_authority$partial_receive_deadline_immediately_closes_retained_rights",
+      "event": "ok",
+      "display_status": "PASS",
+      "terminal_once": true,
+      "file_line_1based": 91,
+      "global_test_terminal_event_ordinal_1based": 26,
+      "failure_diagnostic_category": null
+    },
+    {
+      "binary": "lamp-ipc::camera_authority",
+      "test": "revoke_before_grant_refuses_and_pinned_arc_does_not_delay_explicit_revoke",
+      "name": "lamp-ipc::camera_authority$revoke_before_grant_refuses_and_pinned_arc_does_not_delay_explicit_revoke",
+      "event": "failed",
+      "display_status": "FAIL",
+      "terminal_once": true,
+      "file_line_1based": 74,
+      "global_test_terminal_event_ordinal_1based": 18,
+      "failure_diagnostic_category": "InvalidData_ticket_FD_not_connected_private_Unix_stream"
+    },
+    {
+      "binary": "lamp-ipc::camera_authority",
+      "test": "revoke_during_prepared_grant_transfers_only_a_terminal_observer",
+      "name": "lamp-ipc::camera_authority$revoke_during_prepared_grant_transfers_only_a_terminal_observer",
+      "event": "ok",
+      "display_status": "PASS",
+      "terminal_once": true,
+      "file_line_1based": 76,
+      "global_test_terminal_event_ordinal_1based": 19,
+      "failure_diagnostic_category": null
+    },
+    {
+      "binary": "lamp-ipc::camera_authority",
+      "test": "token_refuses_empty_incarnation_zero_hold_and_wraparound",
+      "name": "lamp-ipc::camera_authority$token_refuses_empty_incarnation_zero_hold_and_wraparound",
+      "event": "failed",
+      "display_status": "FAIL",
+      "terminal_once": true,
+      "file_line_1based": 78,
+      "global_test_terminal_event_ordinal_1based": 20,
+      "failure_diagnostic_category": "InvalidData_ticket_FD_not_connected_private_Unix_stream"
+    },
+    {
+      "binary": "lamp-ipc::camera_authority",
+      "test": "unexpected_data_never_disappears_between_observers",
+      "name": "lamp-ipc::camera_authority$unexpected_data_never_disappears_between_observers",
+      "event": "failed",
+      "display_status": "FAIL",
+      "terminal_once": true,
+      "file_line_1based": 80,
+      "global_test_terminal_event_ordinal_1based": 21,
+      "failure_diagnostic_category": "InvalidData_ticket_FD_not_connected_private_Unix_stream"
+    },
+    {
+      "binary": "lamp-ipc::camera_authority",
+      "test": "witness_drop_revokes_even_when_a_prepared_grant_keeps_an_observer",
+      "name": "lamp-ipc::camera_authority$witness_drop_revokes_even_when_a_prepared_grant_keeps_an_observer",
+      "event": "failed",
+      "display_status": "FAIL",
+      "terminal_once": true,
+      "file_line_1based": 82,
+      "global_test_terminal_event_ordinal_1based": 22,
+      "failure_diagnostic_category": "InvalidData_ticket_FD_not_connected_private_Unix_stream"
+    },
+    {
+      "binary": "lamp-ipc::camera_authority",
+      "test": "wrong_binding_magic_reserved_size_and_trailing_bytes_refuse_and_close_rights",
+      "name": "lamp-ipc::camera_authority$wrong_binding_magic_reserved_size_and_trailing_bytes_refuse_and_close_rights",
+      "event": "ok",
+      "display_status": "PASS",
+      "terminal_once": true,
+      "file_line_1based": 84,
+      "global_test_terminal_event_ordinal_1based": 23,
+      "failure_diagnostic_category": null
+    },
+    {
+      "binary": "lamp-ipc::camera_authority",
+      "test": "wrong_fd_kinds_and_unconnected_stream_refuse",
+      "name": "lamp-ipc::camera_authority$wrong_fd_kinds_and_unconnected_stream_refuse",
+      "event": "ok",
+      "display_status": "PASS",
+      "terminal_once": true,
+      "file_line_1based": 86,
+      "global_test_terminal_event_ordinal_1based": 24,
+      "failure_diagnostic_category": null
+    }
+  ],
+  "historical_disposition": "Retain original nextest100/controller125, 10 failed camera controls incl one SIGABRT. No earlier failures waived; later fixes require separate source/binary qualification.",
+  "retention": {
+    "actual_native_exit": 0,
+    "actual_debug_inputs_cloned": 15,
+    "guarded_private_witnesses": 25,
+    "guarded_prior_debug_manifest_counts": [
+      7492,
+      151,
+      151
+    ],
+    "fresh_owned_process_census_empty": true,
+    "source_stable": true,
+    "release_sha256": "d07dffc20d2b2d51b3ed9dcac61212c393c423b5ee35452d85d2fa045a820486"
+  }
+}

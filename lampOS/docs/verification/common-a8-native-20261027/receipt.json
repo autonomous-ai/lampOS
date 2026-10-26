@@ -1,0 +1,114 @@
+{
+  "head": "a8a2aa9530e17221dea83f92a58efd4d3e6b0c81",
+  "head_tree": "eddaf594ab6d05f67094724035758e97cec2e15a",
+  "actual_checkout": "dfa859e8dac9d502298450387f8059548d3f237b",
+  "actual_tree": "7ae4b834b61b958b1294fbf8a8417843388dab8f",
+  "ordered_parents": [
+    "16f3e976cc43890558ca83d69acda16a852c1702",
+    "a8a2aa9530e17221dea83f92a58efd4d3e6b0c81"
+  ],
+  "source_scope": "Original Common authored carry on pinned Main2bf; actual native merge adds Main16f3. Does not qualify later a3 IPC candidate or clock candidate.",
+  "Linux": {
+    "run": 40397665945,
+    "job": 121834906594,
+    "conclusion": "success",
+    "workspace_fmt_command": "cargo +1.96.0 fmt --all --check",
+    "workspace_strict_clippy_command": "cargo clippy --locked --workspace --all-targets -- -D warnings",
+    "actual_checkout": "dfa859e8dac9d502298450387f8059548d3f237b"
+  },
+  "artifact": {
+    "id": 12687698261,
+    "name": "lampos-arm64-a8a2aa9530e17221dea83f92a58efd4d3e6b0c81",
+    "zip_size_bytes": 116192550,
+    "zip_sha256_upload_log_and_API_match": "88b346ba147ca08894dfe8db01102f273ae708e08cb104f9c45bf1a66e5555be",
+    "archive_downloaded_or_independently_hashed": false,
+    "exported_workspace_binaries": 47,
+    "selected_examples": 2,
+    "uploaded_file_count": 50,
+    "SHA256SUMS_export_success_observed": true
+  },
+  "native_and_physical_limits": "No rerun, device action, physical acceptance, later-source result transfer or historical failure waiver.",
+  "raw_hashes": {
+    "arm-job-121834908462.log": "17ab4852263f048106373386bff8bd8d95b980173f1542f2a34d5d22c05f50ba",
+    "linux-job-121834906594.log": "1ec622f339d3d52d04f0e18efd4758e07b4ac2ed05bdfc9a1d66b9cf797e4f32",
+    "arm-run.json": "ac6a28b1f15576e178a740c898a7efce85e73e51731775be957660b8801ef106",
+    "linux-run.json": "cd090f816bc6658c72cacfa1a195dc9daa70edf46d84fea41c27e1ef23cf4954",
+    "arm-jobs.json": "bd827529e22799f5f5a87a1fdd47cd1648c2fcd27bb3f66668d257f0057cd678",
+    "linux-jobs.json": "cab730032dbafaa09c2f488d92ecf3362ff977902d2bb6e8398af6eaca59739c",
+    "arm-artifacts.json": "12d74a5807b8ee2d4fc24b63044b7c18a057f0843e4e2d1c6e634e542b177d79"
+  },
+  "ARM": {
+    "run": 40397666310,
+    "job": 121834908462,
+    "conclusion": "success",
+    "selected_unique": 11571,
+    "PASS": 11571,
+    "FAIL": 0,
+    "LEAK": 0,
+    "TIMEOUT": 0,
+    "ABORT_SIGABRT": 0,
+    "required60_once_PASS": true,
+    "duplicate_display_lines": 35,
+    "summary_only_skipped": 106,
+    "reported_skipped_binaries": 2,
+    "natural_ignored_exact": null,
+    "ignored_identity_limit": "Default-status raw log omits skipped identities/reasons; aggregate106 cannot be split into natural ignores versus filter exclusions.",
+    "docs_targets": 46,
+    "docs_cases_pass": 4,
+    "zero_case_doc_targets": 43,
+    "docs_failed": 0,
+    "process_tests_pass": 13,
+    "relay_harness_ok_receipts": 1,
+    "relay_harness_case_count_not_exposed": true,
+    "special_cases_in_runtime_union": [
+      {
+        "binary": "lamp-voice",
+        "test": "hand_controls::tests::with_the_wait_an_idle_pump_wakes_five_times_a_second_and_stops_at_once",
+        "status": "PASS",
+        "ordinal": 1340,
+        "included_in_11571_not_extra": true,
+        "display_lines": 2
+      },
+      {
+        "binary": "lamp-update::self-cli-exec",
+        "test": "actual_cli_exec_confirms_before_the_next_round",
+        "status": "PASS",
+        "ordinal": 6670,
+        "included_in_11571_not_extra": true,
+        "display_lines": 1
+      },
+      {
+        "binary": "lamp-update::self-process-cuts",
+        "test": "persisted_self_switches_survive_sigkill",
+        "status": "PASS",
+        "ordinal": 7083,
+        "included_in_11571_not_extra": true,
+        "display_lines": 1
+      },
+      {
+        "binary": "lamp-voice",
+        "test": "hand_controls::tests::an_idle_pump_is_ready_only_after_its_first_subscribed_drain",
+        "status": "PASS",
+        "ordinal": 7835,
+        "included_in_11571_not_extra": true,
+        "display_lines": 1
+      },
+      {
+        "binary": "lamp-voice",
+        "test": "hand_controls::tests::with_the_wait_a_mute_taken_through_the_owners_poll_is_said_at_once",
+        "status": "PASS",
+        "ordinal": 7871,
+        "included_in_11571_not_extra": true,
+        "display_lines": 1
+      },
+      {
+        "binary": "lamp-voice",
+        "test": "hand_controls::tests::with_the_wait_a_head_touch_is_read_as_it_arrives",
+        "status": "PASS",
+        "ordinal": 7872,
+        "included_in_11571_not_extra": true,
+        "display_lines": 1
+      }
+    ]
+  }
+}

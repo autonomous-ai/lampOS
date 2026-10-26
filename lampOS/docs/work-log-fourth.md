@@ -1,3 +1,13 @@
+## 2026-10-27 04:19 — Original Common native green and retained IPC failures
+
+Ready for lamp-voice: no
+
+[Original a8 native receipt](verification/common-a8-native-20261027/receipt.json): ARM40397666310 and Linux40397665945 pass at actual preview dfa859e8d / tree7ae4b834b, ordered parents16f3e976c and a8a2aa953. The preview adds three Main paths beyond the authored2bf carry and differs from the host tree. Complete ARM census is 11,571 unique passes, zero bad/unrun, [all60 required once](verification/common-a8-native-20261027/required-controls.json);35 duplicate displays add no cases. Aggregate106 skips lack identities, so no natural-ignore split is invented. Docs4/0, process13/0 and one relay-ok receipt pass. Four hand and two Update custom cases are inside11,571. Export47binaries+2examples succeeds; ZIP digest is API/upload-log bound, not independently downloaded. This does not qualify latera3, IPC or clock source, physical behavior, or waive historical failures.
+
+[Original IPC failure](verification/ipc-camera-original-failure-20261027/receipt.json) on a3/cfd6:43 selected,33pass/10fail/0skip, all started/terminal once. Existing26pass; camera17 gives7pass/10fail. Nine positives reject valid Darwin unnamed peers; one truncated-rights case aborts inside rustix. SIGABRT is one of the10failures. Actual nextest100 remains; controller125 came from the human-label parser, now reproduced offline without test replay. Exact failed driver and15debug inputs are retained; all25witnesses, prior snapshots and fresh process/source closure are verified. Fix source is being prepared, UNRUN. Relay/docs remain unrun. The prior capacity attempt executed zero commands. All old source worktrees remain intact.
+
+Common's object-only a3 carry is prepared separately, unqualified. Eyes' reviewed retirement/renewal repair preserves the original deadline and adds a fresh post-shutdown capture floor; tests remain unrun. HTTP/face reader disposition, explicit-close Voice wiring, independent privacy, pins and physical holds remain. No device action.
+
 ## 2026-10-27 03:41 — Current Common repairs pushed
 
 Ready for lamp-voice: no
