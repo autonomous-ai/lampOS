@@ -1,0 +1,280 @@
+{
+  "host": "development Mac x86_64-apple-darwin",
+  "tested_head": "612150807c24a324a4370fd3348b74bc97d31a45",
+  "tested_tree": "1f00fd28c6daf7b41ddd0eacfabf5fa20afe3192",
+  "base": "90ca725c514bbb1e4b36318d7b3ccbb14dfd05f1",
+  "authored_files": [
+    {
+      "path": "lampOS/crates/ipc/Cargo.toml",
+      "git_blob": "f68302724af898df670d0ec321fd59ed062804f0"
+    },
+    {
+      "path": "lampOS/crates/ipc/src/camera_authority.rs",
+      "git_blob": "57fe5944bc38b33321a848bdd4a21d79ac7810ba"
+    },
+    {
+      "path": "lampOS/crates/ipc/src/lib.rs",
+      "git_blob": "c2cf20910db1008017816af32c6cb871af4b253d"
+    },
+    {
+      "path": "lampOS/crates/ipc/tests/camera_authority.rs",
+      "git_blob": "67e79c3bac14c589d652dee872053b039cce438e"
+    },
+    {
+      "path": "lampOS/docs/architecture.md",
+      "git_blob": "df290e74a87378c2c9a5a32b3d46c20724fc8a7d"
+    },
+    {
+      "path": "lampOS/docs/reuse-decisions.md",
+      "git_blob": "992be5650c936eee1e44672f0d3b185a3e34caa7"
+    }
+  ],
+  "IPC": {
+    "selected": 44,
+    "passed": 44,
+    "failed": 0,
+    "ignored": 0,
+    "camera_controls": 18,
+    "original_camera_controls_preserved": 17,
+    "other_IPC": 26,
+    "retries": 0,
+    "leaks": 0,
+    "timeouts": 0
+  },
+  "relay_custom_control": {
+    "passed": 1,
+    "failed": 0
+  },
+  "IPC_doctests": {
+    "passed": 1,
+    "failed": 0
+  },
+  "compiler_scope": "strict workspace all-target Clippy and default workspace build",
+  "metadata": {
+    "resolved_local_packages": 48,
+    "workspace_members": 46
+  },
+  "compiler_policy": {
+    "jobs": 1,
+    "incremental": 0,
+    "normal_profiles": true,
+    "warm_cache_reuse_reported": true,
+    "all48_fresh_false_claimed": false
+  },
+  "combined_coverage": {
+    "same_source_fmt_metadata_retained": 2,
+    "unstarted_only_successful_continuation": 6,
+    "all_required_stages": 8,
+    "earlier_capacity_controller_exit125_remains_failed": true
+  },
+  "commands_from_lampOS": [
+    {
+      "stage": "fmt",
+      "argv": [
+        "cargo",
+        "+1.96.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit": 0
+    },
+    {
+      "stage": "metadata",
+      "argv": [
+        "cargo",
+        "+1.96.0",
+        "metadata",
+        "--offline",
+        "--locked",
+        "--format-version=1"
+      ],
+      "exit": 0
+    },
+    {
+      "stage": "clippy",
+      "argv": [
+        "cargo",
+        "+1.96.0",
+        "clippy",
+        "--offline",
+        "--locked",
+        "--jobs",
+        "1",
+        "--workspace",
+        "--all-targets",
+        "--message-format=json",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit": 0
+    },
+    {
+      "stage": "workspace-build",
+      "argv": [
+        "cargo",
+        "+1.96.0",
+        "build",
+        "--offline",
+        "--locked",
+        "--jobs",
+        "1",
+        "--workspace",
+        "--message-format=json"
+      ],
+      "exit": 0
+    },
+    {
+      "stage": "integration-list",
+      "argv": [
+        "cargo",
+        "+1.96.0",
+        "nextest",
+        "list",
+        "--offline",
+        "--locked",
+        "--build-jobs",
+        "1",
+        "-p",
+        "lamp-ipc",
+        "--lib",
+        "--bins",
+        "--test",
+        "camera_authority",
+        "--test",
+        "probe",
+        "--test",
+        "relay_exit",
+        "--test",
+        "relay_shared",
+        "--test",
+        "sockets",
+        "--profile",
+        "pr",
+        "--user-config-file",
+        "none",
+        "--color",
+        "never",
+        "--no-pager",
+        "--show-progress",
+        "none",
+        "--cargo-message-format",
+        "json",
+        "--message-format",
+        "json"
+      ],
+      "exit": 0
+    },
+    {
+      "stage": "integration-run",
+      "argv": [
+        "cargo",
+        "+1.96.0",
+        "nextest",
+        "run",
+        "--offline",
+        "--locked",
+        "--build-jobs",
+        "1",
+        "-p",
+        "lamp-ipc",
+        "--lib",
+        "--bins",
+        "--test",
+        "camera_authority",
+        "--test",
+        "probe",
+        "--test",
+        "relay_exit",
+        "--test",
+        "relay_shared",
+        "--test",
+        "sockets",
+        "--profile",
+        "pr",
+        "--user-config-file",
+        "none",
+        "--color",
+        "never",
+        "--no-pager",
+        "--show-progress",
+        "none",
+        "--cargo-message-format",
+        "json",
+        "--test-threads",
+        "2",
+        "--retries",
+        "0",
+        "--no-fail-fast",
+        "--no-tests",
+        "fail",
+        "--status-level",
+        "all",
+        "--final-status-level",
+        "all",
+        "--message-format",
+        "libtest-json-plus",
+        "--message-format-version",
+        "0.1"
+      ],
+      "exit": 0
+    },
+    {
+      "stage": "own-relay-signals",
+      "argv": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--offline",
+        "--locked",
+        "--jobs",
+        "1",
+        "-p",
+        "lamp-ipc",
+        "--test",
+        "relay_signals",
+        "--message-format=json"
+      ],
+      "exit": 0
+    },
+    {
+      "stage": "lamp-ipc-doctests",
+      "argv": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--offline",
+        "--locked",
+        "--jobs",
+        "1",
+        "-p",
+        "lamp-ipc",
+        "--doc",
+        "--message-format=json",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit": 0
+    }
+  ],
+  "private_actual_terminal_sha256": "e858e03df17b7f41b0d34d53e7087c5206cf5bf5047fb42a2b4e84196ee5a288",
+  "private_retained_metadata_sha256": "4eaee3df4007eeeafa8aff8a43d92726efcbc1fb3d1e92e03bebe90d27181a4f",
+  "executed_camera_driver_sha256": "8adbdc0b237f0ead43c5f42460983971093c2dc00e1441ee555fef7d3c700a0a",
+  "case_ledger_sha256": "b31375189db735eab8e6b848634ed1c3ef9c58d678743fec56eb8985a196aab7",
+  "all_owned_operation_sessions_closed": true,
+  "historical_failures_retained": [
+    "33 pass /10 fail including SIGABRT",
+    "42 pass /1 owner-stopped filler stall",
+    "42 pass /1 Darwin EMSGSIZE",
+    "missing-fs Clippy101 with zero runtime",
+    "current-base capacity125 before compiler"
+  ],
+  "scope_limits": [
+    "No full workspace runtime claim",
+    "No Linux ARM64 qualification on this new head yet",
+    "Newer Main carries need their own qualification",
+    "No Eyes/Voice integration or hardware latency/activation acceptance"
+  ],
+  "raw_logs_env_binaries_and_debug_snapshots": "private; no whole-packet public disclosure"
+}

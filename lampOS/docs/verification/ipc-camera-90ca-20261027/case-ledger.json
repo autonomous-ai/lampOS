@@ -1,0 +1,266 @@
+[
+  {
+    "binary": "lamp-ipc",
+    "test": "log_relay::tests::a_broken_journal_stream_ends_nothing",
+    "status": "PASS",
+    "executions": 1
+  },
+  {
+    "binary": "lamp-ipc",
+    "test": "log_relay::tests::a_full_blocking_pipe_or_socket_is_never_waited_on_nor_made_nonblocking",
+    "status": "PASS",
+    "executions": 1
+  },
+  {
+    "binary": "lamp-ipc",
+    "test": "log_relay::tests::a_journal_that_takes_nothing_never_holds_a_writer_and_the_loss_is_counted_then_said",
+    "status": "PASS",
+    "executions": 1
+  },
+  {
+    "binary": "lamp-ipc",
+    "test": "log_relay::tests::a_relay_into_a_full_blocking_pipe_goes_on_and_counts_what_it_drops",
+    "status": "PASS",
+    "executions": 1
+  },
+  {
+    "binary": "lamp-ipc",
+    "test": "log_relay::tests::finish_is_bounded_by_a_full_journal_and_freed_by_a_broken_one",
+    "status": "PASS",
+    "executions": 1
+  },
+  {
+    "binary": "lamp-ipc",
+    "test": "log_relay::tests::finish_waits_for_the_usage_line_held_after_the_error_line_went",
+    "status": "PASS",
+    "executions": 1
+  },
+  {
+    "binary": "lamp-ipc",
+    "test": "log_relay::tests::finish_waits_for_words_read_from_the_pipe_and_not_yet_written",
+    "status": "PASS",
+    "executions": 1
+  },
+  {
+    "binary": "lamp-ipc",
+    "test": "wait::tests::a_waiting_caller_ends_the_wait_and_nobody_lasts_the_timeout",
+    "status": "PASS",
+    "executions": 1
+  },
+  {
+    "binary": "lamp-ipc::camera_authority",
+    "test": "cancellation_drops_a_retained_partial_frame_fd",
+    "status": "PASS",
+    "executions": 1
+  },
+  {
+    "binary": "lamp-ipc::camera_authority",
+    "test": "completed_frame_with_closed_or_nonsilent_observer_never_exposes_ready",
+    "status": "PASS",
+    "executions": 1
+  },
+  {
+    "binary": "lamp-ipc::camera_authority",
+    "test": "deadline_does_not_renew_while_waiting_for_reply",
+    "status": "PASS",
+    "executions": 1
+  },
+  {
+    "binary": "lamp-ipc::camera_authority",
+    "test": "dropping_one_client_does_not_shutdown_the_shared_endpoint",
+    "status": "PASS",
+    "executions": 1
+  },
+  {
+    "binary": "lamp-ipc::camera_authority",
+    "test": "full_control_recovers_one_grant_after_exact_drain_without_renewing_deadline",
+    "status": "PASS",
+    "executions": 1
+  },
+  {
+    "binary": "lamp-ipc::camera_authority",
+    "test": "full_control_socket_keeps_grant_pending_until_its_original_deadline",
+    "status": "PASS",
+    "executions": 1
+  },
+  {
+    "binary": "lamp-ipc::camera_authority",
+    "test": "incremental_frame_retains_fd_until_exact_frame_and_control_eof",
+    "status": "PASS",
+    "executions": 1
+  },
+  {
+    "binary": "lamp-ipc::camera_authority",
+    "test": "missing_extra_and_truncated_rights_refuse_without_leaking_descriptors",
+    "status": "PASS",
+    "executions": 1
+  },
+  {
+    "binary": "lamp-ipc::camera_authority",
+    "test": "old_ticket_never_revives_with_a_new_hold",
+    "status": "PASS",
+    "executions": 1
+  },
+  {
+    "binary": "lamp-ipc::camera_authority",
+    "test": "one_revocation_closes_two_independently_transferred_observers",
+    "status": "PASS",
+    "executions": 1
+  },
+  {
+    "binary": "lamp-ipc::camera_authority",
+    "test": "partial_receive_deadline_immediately_closes_retained_rights",
+    "status": "PASS",
+    "executions": 1
+  },
+  {
+    "binary": "lamp-ipc::camera_authority",
+    "test": "revoke_before_grant_refuses_and_pinned_arc_does_not_delay_explicit_revoke",
+    "status": "PASS",
+    "executions": 1
+  },
+  {
+    "binary": "lamp-ipc::camera_authority",
+    "test": "revoke_during_prepared_grant_transfers_only_a_terminal_observer",
+    "status": "PASS",
+    "executions": 1
+  },
+  {
+    "binary": "lamp-ipc::camera_authority",
+    "test": "token_refuses_empty_incarnation_zero_hold_and_wraparound",
+    "status": "PASS",
+    "executions": 1
+  },
+  {
+    "binary": "lamp-ipc::camera_authority",
+    "test": "unexpected_data_never_disappears_between_observers",
+    "status": "PASS",
+    "executions": 1
+  },
+  {
+    "binary": "lamp-ipc::camera_authority",
+    "test": "witness_drop_revokes_even_when_a_prepared_grant_keeps_an_observer",
+    "status": "PASS",
+    "executions": 1
+  },
+  {
+    "binary": "lamp-ipc::camera_authority",
+    "test": "wrong_binding_magic_reserved_size_and_trailing_bytes_refuse_and_close_rights",
+    "status": "PASS",
+    "executions": 1
+  },
+  {
+    "binary": "lamp-ipc::camera_authority",
+    "test": "wrong_fd_kinds_and_unconnected_stream_refuse",
+    "status": "PASS",
+    "executions": 1
+  },
+  {
+    "binary": "lamp-ipc::probe",
+    "test": "control_roundtrips_survive_a_full_bulk_queue_in_another_process",
+    "status": "PASS",
+    "executions": 1
+  },
+  {
+    "binary": "lamp-ipc::probe",
+    "test": "invalid_sample_counts_fail_before_spawning_a_child",
+    "status": "PASS",
+    "executions": 1
+  },
+  {
+    "binary": "lamp-ipc::probe",
+    "test": "worker_rejects_invalid_control_and_removes_its_socket_paths",
+    "status": "PASS",
+    "executions": 1
+  },
+  {
+    "binary": "lamp-ipc::relay_exit",
+    "test": "a_part_that_ends_after_its_error_says_every_line",
+    "status": "PASS",
+    "executions": 1
+  },
+  {
+    "binary": "lamp-ipc::relay_shared",
+    "test": "a_worker_relay_leaves_its_parents_pipe_blocking",
+    "status": "PASS",
+    "executions": 1
+  },
+  {
+    "binary": "lamp-ipc::sockets",
+    "test": "a_closed_peer_is_not_reported_as_backpressure",
+    "status": "PASS",
+    "executions": 1
+  },
+  {
+    "binary": "lamp-ipc::sockets",
+    "test": "child_clock_report",
+    "status": "PASS",
+    "executions": 1
+  },
+  {
+    "binary": "lamp-ipc::sockets",
+    "test": "connected_endpoint_never_accepts_another_sender",
+    "status": "PASS",
+    "executions": 1
+  },
+  {
+    "binary": "lamp-ipc::sockets",
+    "test": "existing_paths_and_replacement_files_are_preserved",
+    "status": "PASS",
+    "executions": 1
+  },
+  {
+    "binary": "lamp-ipc::sockets",
+    "test": "failed_connection_can_be_retried",
+    "status": "PASS",
+    "executions": 1
+  },
+  {
+    "binary": "lamp-ipc::sockets",
+    "test": "freshness_rejects_future_and_stale_values_without_unsigned_underflow",
+    "status": "PASS",
+    "executions": 1
+  },
+  {
+    "binary": "lamp-ipc::sockets",
+    "test": "full_data_queue_surfaces_backpressure_without_blocking_control",
+    "status": "PASS",
+    "executions": 1
+  },
+  {
+    "binary": "lamp-ipc::sockets",
+    "test": "insecure_directory_or_peer_and_symlink_directory_are_rejected",
+    "status": "PASS",
+    "executions": 1
+  },
+  {
+    "binary": "lamp-ipc::sockets",
+    "test": "monotonic_origin_is_shared_with_a_fresh_child_process",
+    "status": "PASS",
+    "executions": 1
+  },
+  {
+    "binary": "lamp-ipc::sockets",
+    "test": "named_endpoints_are_private_and_require_one_connection",
+    "status": "PASS",
+    "executions": 1
+  },
+  {
+    "binary": "lamp-ipc::sockets",
+    "test": "oversized_and_truncated_raw_datagrams_are_consumed_and_rejected",
+    "status": "PASS",
+    "executions": 1
+  },
+  {
+    "binary": "lamp-ipc::sockets",
+    "test": "oversized_send_is_rejected_without_queueing_a_prefix",
+    "status": "PASS",
+    "executions": 1
+  },
+  {
+    "binary": "lamp-ipc::sockets",
+    "test": "pair_preserves_empty_and_maximum_payloads",
+    "status": "PASS",
+    "executions": 1
+  }
+]

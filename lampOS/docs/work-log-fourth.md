@@ -9324,3 +9324,7 @@ Taken on the forget/memory quality row: constrain forget_said replacement traver
 Ready for lamp-voice: no
 
 [Selected source-bound failure receipts](verification/ipc-camera-backpressure-failures-20261027/README.md) retain two full IPC epochs, each 42/1/0 (camera16/1, existing26/0). The first is the individually stopped filler stall before deadline creation; the next is prompt Darwin EMSGSIZE after explicit control nonblocking. Neither failure is waived or relabelled green. All seventeen original camera controls and the one-second deadline remain. Exact drivers and backing snapshots are private; no source directories were removed. The narrow Darwin backpressure repair and Voice ticket integration continue, including per-send TTS fallback authority. Current Common carry, privacy, native/pins and physical acceptance remain separate. No device action.
+
+## 27 October — memory plan handed to Friday
+
+First assigned the memory rows to Friday at Queue comment6423786977; Friday requested the plan at6428874956. Handed over the current0.65-to0.90 plan at ebf0a13d0 in6428948488. Friday owns its next edit and row updates. Fourth continues Common #3064 private authority, its dependent Name/callback/Photo work and source-bound gates; this handover changes no product score or acceptance.
