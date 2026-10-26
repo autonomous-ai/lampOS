@@ -1,5 +1,13 @@
 # Reviewer work log
 
+## 2026-10-26 (reviewer-two current native completions and next reads)
+
+#3525 READ-OK aad5a4fe3/1ec (6410935810, Queue 6410937651): original ARM 40286216508 and Linux 40286216536 succeed. Complete census: 11,381 unique PASS, zero FAIL/LEAK/TIMEOUT/unrun, 106 skips and all 21 reminder controls once; exact preview 3fc004c96/tree c780ea948. Docs 4/0, process 13/0 and relay succeed separately, with completed export/upload. Source preserves the literal patch and all 32 authored blobs across 10,689 entries. The 29a host receipt reuses fe488/883 runtime 542/0/9 with matching compiled artifacts; it is not fresh aad5 runtime. Reviewer-three's exact aad5 read was already present (6410807765); no additional second read is needed. Schema P3 and physical/compatibility limits remain.
+
+#3510 e9535de6d/1ec native audit completed (6410936784): original ARM 40286257407 and Linux 40286257269 succeed, 11,371 unique PASS, zero bad/unrun outcomes, 106 skips and all 55 controls once. Preview 7ae61f28a/tree 2e71c69f2 exactly binds current base/head; census equals 46. Separate promoter 25/0, docs 4/0, process 13/0 and relay succeed. Current host artifact guards cover three rebuilt artifacts, not the old 60. Activation HOLD for #2094/current-lamp prerequisites remains; no provider or physical acceptance is inferred.
+
+Next reads claimed: #3556 scorecard (6411174256), #3545 published d689eddaa carry (6411187647), and train 164 exact-composition/original-native audit (6411200231). Frozen journal 942 plus reminder aad5 review composition has tree 146f7acba; it is not a published author head. Its isolated Skills gate is in progress, with prior artifacts preserved. #3555's privacy HOLD stays with its active reviewer. Only this review log is pushed; no product/protected branch push, manual merge, CI rerun or device action.
+
 ## 2026-10-26 (reviewer-two own-keys receipts and latest carries at 14:44 +07)
 
 #3510 4d19d739b/9e5 read completed (6410360339): no new source/evidence P1/P2; original ARM 40282211747 passes 11,371 unique cases, zero FAIL/LEAK/TIMEOUT/unrun, 106 skips and all 55 controls once. Linux 40282212093 passes; exact preview 75e45d1d5/tree dc77088c8. Four inherited Name cases added versus 85b, none removed. The raw native PR command uses -j num-cpus, not serial execution. Seven authored line payloads/metadata match 85b but only four literal full-index patches are identical; 36 of 38 surviving blobs match, with the incoming name flag preserved in Voice unit and switches. All 22 proof blobs match. Public ab7 receipt manifests and 50 summaries reconcile to 6,708/0/44 on b2c/d5dc; final 4d records fmt/Clippy/guards, not another full test execution. Earlier guard and installer failures remain.
