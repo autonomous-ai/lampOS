@@ -267,6 +267,124 @@ pub fn validate_output(input: &Input, output: &Output) -> Result<(), ModelError>
     Ok(())
 }
 
+/// Words that say nothing of what a proposal is about, for
+/// [`said_by_the_person`].
+const PLAIN: &[&str] = &[
+    "the",
+    "and",
+    "but",
+    "for",
+    "with",
+    "from",
+    "about",
+    "are",
+    "was",
+    "were",
+    "been",
+    "they",
+    "them",
+    "their",
+    "theirs",
+    "she",
+    "her",
+    "his",
+    "him",
+    "you",
+    "your",
+    "yours",
+    "this",
+    "that",
+    "these",
+    "those",
+    "what",
+    "which",
+    "who",
+    "when",
+    "where",
+    "how",
+    "have",
+    "has",
+    "had",
+    "does",
+    "did",
+    "will",
+    "would",
+    "should",
+    "could",
+    "can",
+    "like",
+    "likes",
+    "liked",
+    "prefers",
+    "prefer",
+    "preferred",
+    "enjoys",
+    "enjoy",
+    "wants",
+    "want",
+    "person",
+    "user",
+    "they're",
+    "is",
+    "not",
+    "very",
+    "more",
+    "most",
+    "some",
+    "any",
+    "one",
+    "thing",
+    "things",
+    "sort",
+    "kind",
+    "của",
+    "là",
+    "và",
+    "có",
+    "không",
+    "này",
+    "đó",
+    "thì",
+    "mà",
+    "những",
+    "các",
+    "một",
+    "cho",
+    "với",
+    "được",
+    "thích",
+];
+
+/// A text's words that say what it is about: [`crate::search::text`]'s
+/// form, three characters or more, none of [`PLAIN`], a final `s` off.
+fn about_words(text: &str) -> BTreeSet<String> {
+    crate::search::text(text)
+        .split(|character: char| !character.is_alphanumeric())
+        .filter(|word| word.chars().count() >= 3 && !PLAIN.contains(word))
+        .map(|word| word.strip_suffix('s').unwrap_or(word).to_owned())
+        .collect()
+}
+
+/// Whether `proposal` rests on the person's own words: one of its words
+/// that say what it is about is in what was heard of a cited exchange, or
+/// in a cited kept thing (what they asked to keep), never only in what the
+/// lamp said (finding M on #3504: lamp-4ace and lamp-06c1, 27 Oct, the
+/// lamp's own "green tea's more my sort of thing" kept as a room fact and
+/// told back as the asker's). A proposal with no such word rests on
+/// nothing of theirs either.
+pub fn said_by_the_person(input: &Input, proposal: &Proposal) -> bool {
+    let about = about_words(&proposal.text);
+    input
+        .records
+        .iter()
+        .filter(|record| proposal.source_ids.contains(&record.id))
+        .map(|record| match record.kind.as_str() {
+            "exchange" => about_words(&record.heard),
+            _ => about_words(&record.text),
+        })
+        .any(|theirs| !theirs.is_disjoint(&about))
+}
+
 /// A nonblocking adapter, driven outside the memory server's socket loop.
 ///
 /// `start` may schedule work, `poll` may collect a finished result, and `cancel`
