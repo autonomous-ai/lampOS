@@ -1793,3 +1793,44 @@ the production finish bound is not extended. Another control retains refusal
 of an unsafe root mode, a real ACL and an escaped path. No production privacy
 validation, grant or rollback action, report policy or finish bound changes. These tests establish
 neither the cause of earlier CI failures nor physical-lamp acceptance.
+
+`replaced_record_never_changes_an_outside_sentinel` also enters that pinned
+fixture-root scope immediately after constructing its fixture. The guard stays
+alive through reader preparation, file creation, the record's replacement by
+a symlink, the original grant-refusal assertion and the unchanged sentinel
+check. This case exercises the replacement boundary below its owned root;
+host ancestry remains covered by the unscoped fixtures. No timing or error
+injection is added, and no historical failure cause is inferred.
+
+`only_the_new_session_is_shared_after_one_pinned_lookup` uses the same owned
+root boundary for its positive grant. It retains both iterations, the single
+lookup, the original acknowledged/non-degraded report assertion and its
+500 ms finish bound, new-session/event modes and groups, the unchanged old
+session and the private sentinel. It checks sharing below the fixture root;
+the real host's ancestor metadata is not an input to that focused assertion.
+This does not identify the cause of an earlier unavailable-reader report.
+
+The positive grant, failed-group lookup and unsupported-ACL final-data fixtures
+retain the report from the production-bounded finish, then observe the existing
+test-only writer-completion event before asserting final health and file modes.
+The event is sent only after the writer loop and file finish have returned.
+Their original health predicates remain, including writer-failure rejection;
+failures print both reports. The 500 ms production finish budget is unchanged,
+and the five-second completion observer is a test guard, not a fixed sleep.
+An unchanged-Main full run failed the failed-group health predicate without
+printing its report fields; this change does not infer which field caused it.
+
+`an_owned_fixture_root_ignores_only_changes_above_its_boundary` checks that
+scope deterministically. Inside a private top-level directory, it changes an
+owned ancestor's mode after preparation: a boundary including that ancestor
+refuses the grant, while the inner fixture boundary permits it. An invalid
+voice mode below the inner boundary still refuses the grant. Original private
+rollback/event modes, groups and sentinel checks remain, and RAII restores
+the controlled modes on unwind. No global ancestor, production check, retry,
+error allowance or finish deadline changes.
+
+`shared_session_writer_projects_every_segment_without_private_values` also
+keeps the owned fixture-root guard through preparation, projection and finish.
+All original positive projection assertions and the 500 ms finish bound remain
+unchanged. This isolates the focused sharing check from host ancestor metadata;
+it does not establish the cause of an earlier unavailable-reader report.

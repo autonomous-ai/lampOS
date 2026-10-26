@@ -8,7 +8,7 @@ thread_local! {
     };
 }
 
-/// Only the rollback boundary fixtures replace the filesystem root. The
+/// Only explicitly scoped reader fixtures replace the filesystem root. The
 /// original ancestor, owner, mode, ACL and component checks still run at and
 /// below this pinned private root. These cases do not test host `/` or `/tmp`
 /// ancestry; every unscoped security fixture still uses the original `/`.
@@ -127,8 +127,13 @@ fn group_lookup_failure_retains_private_logging_without_writer_failure() {
     let mut writer =
         crate::service_trace::ServiceTrace::start_with_reader(&dir.path, reader).unwrap();
     writer.submit(&serde_json::json!({"kind":"synthetic"}));
-    let report = writer.finish(crate::service_trace::FINISH_WAIT);
-    assert!(report.acknowledged && report.degraded && !report.writer_failed);
+    let bounded = writer.finish(crate::service_trace::FINISH_WAIT);
+    assert!(bounded.finish_attempted);
+    let report = writer.observe_completion_for_test(&bounded, std::time::Duration::from_secs(5));
+    assert!(
+        report.acknowledged && report.degraded && !report.writer_failed,
+        "bounded: {bounded:?}; completed: {report:?}"
+    );
     assert_private(&dir.path);
     stdfs::remove_dir_all(dir.path.join("metadata")).unwrap();
 }
@@ -164,8 +169,13 @@ fn unsupported_acl_verification_degrades_to_private_metadata() {
     assert!(reader.is_err());
     let mut writer =
         crate::service_trace::ServiceTrace::start_with_reader(&dir.path, reader).unwrap();
-    let report = writer.finish(crate::service_trace::FINISH_WAIT);
-    assert!(report.acknowledged && report.degraded && !report.writer_failed);
+    let bounded = writer.finish(crate::service_trace::FINISH_WAIT);
+    assert!(bounded.finish_attempted);
+    let report = writer.observe_completion_for_test(&bounded, std::time::Duration::from_secs(5));
+    assert!(
+        report.acknowledged && report.degraded && !report.writer_failed,
+        "bounded: {bounded:?}; completed: {report:?}"
+    );
     assert_private(&dir.path);
     stdfs::remove_dir_all(dir.path.join("metadata")).unwrap();
 }
@@ -186,7 +196,10 @@ mod linux {
     }
     impl Fixture {
         fn new() -> Self {
-            let root = std::env::temp_dir().canonicalize().unwrap().join(format!(
+            Self::under(&std::env::temp_dir().canonicalize().unwrap())
+        }
+        fn under(parent: &Path) -> Self {
+            let root = parent.join(format!(
                 "voice-session-reader-{}-{}",
                 std::process::id(),
                 NEXT.fetch_add(1, Ordering::Relaxed)
@@ -251,10 +264,34 @@ mod linux {
         }
     }
 
+    struct FixtureMode {
+        path: PathBuf,
+        original: Permissions,
+    }
+    impl FixtureMode {
+        fn change(path: &Path, mode: u32) -> Self {
+            let metadata = stdfs::symlink_metadata(path).unwrap();
+            assert!(metadata.is_dir());
+            let original = metadata.permissions();
+            stdfs::set_permissions(path, Permissions::from_mode(mode)).unwrap();
+            Self {
+                path: path.to_owned(),
+                original,
+            }
+        }
+    }
+    impl Drop for FixtureMode {
+        fn drop(&mut self) {
+            stdfs::set_permissions(&self.path, self.original.clone()).unwrap();
+        }
+    }
+
     #[test]
     fn only_the_new_session_is_shared_after_one_pinned_lookup() {
         for iteration in 0..2 {
             let fixture = Fixture::new();
+            // This case checks the new session below its owned root.
+            let _root = FixtureRoot::enter(&fixture.root);
             let old = fixture.sessions.join("old");
             stdfs::create_dir(&old).unwrap();
             stdfs::set_permissions(&old, Permissions::from_mode(0o700)).unwrap();
@@ -285,8 +322,14 @@ mod linux {
                 began.elapsed().as_micros()
             );
             writer.submit(&serde_json::json!({"kind":"synthetic"}));
-            let report = writer.finish(crate::service_trace::FINISH_WAIT);
-            assert!(report.acknowledged && !report.degraded);
+            let bounded = writer.finish(crate::service_trace::FINISH_WAIT);
+            assert!(bounded.finish_attempted);
+            let report =
+                writer.observe_completion_for_test(&bounded, std::time::Duration::from_secs(5));
+            assert!(
+                report.acknowledged && !report.degraded,
+                "bounded: {bounded:?}; completed: {report:?}"
+            );
             assert_eq!(lookups.get(), 1);
             for path in [&fixture.output, &fixture.output.join("metadata")] {
                 let meta = stdfs::metadata(path).unwrap();
@@ -312,6 +355,51 @@ mod linux {
                 (old_meta.ino(), old_meta.gid(), old_meta.mode())
             );
             fixture.sentinel();
+        }
+    }
+
+    #[test]
+    fn an_owned_fixture_root_ignores_only_changes_above_its_boundary() {
+        for (pin_fixture, change_voice, shared) in [
+            (false, false, false),
+            (true, false, true),
+            (true, true, false),
+        ] {
+            // Even while the controlled ancestor is writable, this top-level
+            // private directory keeps the whole experiment inaccessible.
+            let private = Fixture::new();
+            let ancestor = Fixture::under(&private.root);
+            let fixture = Fixture::under(&ancestor.root);
+            let boundary = if pin_fixture {
+                &fixture.root
+            } else {
+                &ancestor.root
+            };
+            let _root = FixtureRoot::enter(boundary);
+            let reader = fixture.prepare();
+            let (events, health) = fixture.files();
+            // Admission preceded this change. Only a boundary below this
+            // ancestor may exclude it from the grant's repeated checks.
+            let _ancestor_mode = FixtureMode::change(&ancestor.root, 0o777);
+            let _voice_mode = change_voice.then(|| FixtureMode::change(&fixture.voice, 0o700));
+            assert_eq!(
+                reader.grant(&fixture.output, &events, &health).unwrap(),
+                shared
+            );
+            for path in [&fixture.output, &fixture.output.join("metadata")] {
+                let metadata = stdfs::metadata(path).unwrap();
+                assert_eq!(metadata.mode() & 0o7777, if shared { 0o750 } else { 0o700 });
+                assert_eq!(metadata.gid(), fixture.gid);
+            }
+            for event in &events {
+                let metadata = event.metadata().unwrap();
+                assert_eq!(metadata.mode() & 0o7777, if shared { 0o640 } else { 0o600 });
+                assert_eq!(metadata.gid(), fixture.gid);
+            }
+            assert_eq!(health.metadata().unwrap().mode() & 0o7777, 0o600);
+            fixture.sentinel();
+            ancestor.sentinel();
+            private.sentinel();
         }
     }
 
@@ -741,6 +829,7 @@ if rm "$1" 2>/dev/null; then exit 14; fi
     #[test]
     fn replaced_record_never_changes_an_outside_sentinel() {
         let fixture = Fixture::new();
+        let _root = FixtureRoot::enter(&fixture.root);
         let reader = fixture.prepare();
         let (events, health) = fixture.files();
         let target = fixture.output.join("metadata/events-0.jsonl");
@@ -754,6 +843,7 @@ if rm "$1" 2>/dev/null; then exit 14; fi
         use serde_json::{Value, json};
         const SECRET: &str = "READER_SECRET_CANARY";
         let fixture = Fixture::new();
+        let _root = FixtureRoot::enter(&fixture.root);
         let reader = fixture.prepare();
         fixture.create();
         let mut state = crate::service_trace::small_segments(1024, || {
