@@ -1,3 +1,9 @@
+## 2026-10-27 01:34 — joined worker current carry qualified and pushed
+
+Ready for lamp-voice: no (#3604 current native/read carries pending)
+
+Pushed be8e4c9bc/bdc277e26 with both patches equal to 92f/e588. All current compiler gates pass; separate socket-capable whole Skills command passes 525/0/9, all three controls once and only the two intentional unwind hooks. Source/six actual and preserved executable hashes stay unchanged, group absent before cleanup. [Current host proof](verification/skills-actions-mock-20261026/current-be8-host.json). The restricted first library 138/20/0 is preserved with its Unix-bind permission failure; the separate run corrects the execution environment, without overwriting that attempt. Previous92f original native pass remains separately attributed. Reminder 094/bdc2 full-consumer compiler qualification continues. No device claim.
+
 ## 2026-10-27 01:32 — reminder consumer pass and worker native receipt
 
 Ready for lamp-voice: no (#3525 and #3604 latest-base gates pending)
