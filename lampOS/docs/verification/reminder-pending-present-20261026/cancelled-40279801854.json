@@ -1,0 +1,23 @@
+{
+  "pr": 3525,
+  "offered_head": "b40c866ef69976c120f9b4bab87dc51d67632350",
+  "offered_base": "d5dc2e87f9a64ae8d21992145d3960035582e6cc",
+  "arm64_run": 40279801854,
+  "arm64_attempt": 1,
+  "arm64_status": "completed",
+  "arm64_conclusion": "cancelled",
+  "linux_clippy_run": 40279801872,
+  "linux_clippy_conclusion": "success",
+  "qualified": false,
+  "raw_logs": {
+    "arm64-job-121430370053.log": {
+      "bytes": 2739127,
+      "sha256": "0cfb7fc99d4dcac754f2bd304cd56221478731b5f67025c877b0a7621b834573"
+    },
+    "linux-clippy-40279801872.log": {
+      "bytes": 93891,
+      "sha256": "541c72aa6584ff28bfeb464755ee96063033624642983cc603bc7f7f7fc3d342"
+    }
+  },
+  "limits": "ARM64 cancelled; no full-pass census or native qualification inferred. Cancellation cause unestablished. Combined log fetch failed on a cancelled publication job without a log; available build/test job preserved separately. Local current-d5dc 542/0/9 remains separate; latest ce75 CI is its own gate."
+}

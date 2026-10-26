@@ -13,6 +13,18 @@ machine is explicitly named. Third has no lamp access.
 
 
 
+## 2026-10-26 13:48 — Preserve superseded reminder cancellation
+
+Ready for lamp-voice: no (#3525)
+
+Older **b40c866ef/d5dc2e87f** ARM64 **40279801854** attempt 1 ended
+cancelled, not green; Linux **40279801872** passed. Available job logs and
+metadata are retained, without a full-pass census or inferred cancellation
+cause. [Receipt](verification/reminder-pending-present-20261026/cancelled-40279801854.json).
+Latest **ce75aa0a9/9e5d3b9c6** remains the qualification candidate with
+fresh local 542/0/9; current native gates continue. Factory latest carry
+source is cleared by Reviewer-two, Linux green, ARM audit pending.
+
 ## 2026-10-26 13:44 — Latest-base reminder pushed
 
 Ready for lamp-voice: no (#3525)
