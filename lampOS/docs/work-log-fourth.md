@@ -1,3 +1,15 @@
+## 2026-10-26 09:13 — Common producer controls pass; full runtime continues
+
+Ready for lamp-voice: no
+
+Common #3064 now also fences the actual face-observation publication after mesh work, so a frame whose camera hold expired cannot publish a second late observation. The captured hold and driver timestamp are checked under the existing permission mutex; slow inference stays outside it. The seven new producer regressions have each passed once in the running full Eyes/Voice suite. This is partial evidence only: full accounting, leak checks, installation and switch readers, doctests and terminal cleanup remain pending.
+
+Frozen tree 0f01bd160 is on c5c7603a7. Its imager syntax, workspace formatting, strict workspace/all-target Clippy, workspace build and test discovery pass. The preceding mesh attempt failed Clippy for an unnecessary test-only borrow; that was corrected before this gate. The earlier capacity admission stopped before runtime, with its exit 125 retained. Ten independently retained failure witnesses remain protected. No completed runtime case is replayed to replace a failure.
+
+The remaining old-Seen interval is explicit: accepted pre-expiry audio may first bind a private scope after the local hold expires while its earlier source observation is still fresh. This is not presented as synchronous revocation or physical qualification. Common remains draft pending current-source gates, independent privacy reads and First's lamp round.
+
+Main has advanced through 41233c1b6 to 0c1f6437e. Source-only composition is clean; the running source is unchanged. The current carry will retain Main's memory activation and require its own affected gates. Onboarding is prepared on 41233 with exactly one person-scope unit line and row, now inherited from Main; its new paired refusal/success socket assertion is still UNRUN. Carrying that preparation to 0c1f follows while Common owns the compiler. The intended-speaker enrollment/cancellation trial remains First's; no lamp or activation occurred.
+
 ## 2026-10-26 08:15 — Common fixes frozen; compile gates passed
 
 Ready for lamp-voice: no
