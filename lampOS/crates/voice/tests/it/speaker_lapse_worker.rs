@@ -396,3 +396,92 @@ fn a_stale_renewal_alone_or_a_stale_connect_reference_still_ends_the_speaker() {
         .expect("a stale ConnectReference ends the worker");
     assert!(ended.contains("stale"), "{ended}");
 }
+
+/// The first direct prepare in #3530 was 143402 us old. Reaching the
+/// speaker's own prime/privacy validation proves that the real loop took
+/// it, rather than failing transport freshness or silently dropping it.
+/// ALSA null cannot retain the prime's 480 frames, so InvalidPrime is the
+/// expected downstream witness, not a claim of playback or startup success.
+#[test]
+fn an_aged_first_reference_prepare_reaches_the_real_speakers_validation() {
+    for (wrong_privacy, expected) in [
+        (false, "reference InvalidPrime:"),
+        (true, "reference PrivacyMismatch:"),
+    ] {
+        // Queue these before the thread starts, so every later assertion is
+        // inside the cleanup boundary below, including connection failures.
+        let mut rig = Rig::start_queued(&[Queued::Authority(0), Queued::ConnectReference(0)]);
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            rig.connect();
+            rig.renew_leases();
+            let snapshot = rig.controller.snapshot(now()).unwrap();
+            rig.privacy = snapshot.microphone_generation();
+            rig.parent
+                .control
+                .send(Control::Authority { snapshot })
+                .unwrap();
+            rig.authority_at = Some(Instant::now());
+            let privacy_generation = if wrong_privacy { 0 } else { rig.privacy };
+            assert_ne!(rig.privacy, 0);
+            let sent_at = monotonic_us().checked_sub(143_402).unwrap();
+            rig.capture
+                .control
+                .send_with(
+                    ReferenceControl::CapturePrepared { privacy_generation },
+                    || sent_at,
+                )
+                .unwrap();
+            let deadline = Instant::now() + CONNECT_AT_MOST;
+            let mut send_error = None;
+            let ended = loop {
+                if rig.worker.as_ref().unwrap().is_finished() {
+                    break rig.worker.take().unwrap().join().unwrap();
+                }
+                assert!(
+                    Instant::now() < deadline,
+                    "the prepare was not consumed; authority send error: {send_error:?}"
+                );
+                // Preserve the ordinary 100 ms lease and 20 ms renewal.
+                // A send can race the expected worker exit: keep its error
+                // for diagnosis and wait for the worker's own final result.
+                if send_error.is_none()
+                    && rig
+                        .authority_at
+                        .is_none_or(|at| at.elapsed() >= Duration::from_millis(20))
+                {
+                    rig.renew_leases();
+                    let snapshot = rig.controller.snapshot(now()).unwrap();
+                    if let Err(error) = rig.parent.control.send(Control::Authority { snapshot }) {
+                        send_error = Some(error.to_string());
+                    }
+                    rig.authority_at = Some(Instant::now());
+                }
+                rig.take_events();
+                sleep(Duration::from_millis(2));
+            };
+            let error = ended.expect_err("null must not claim a completed prime");
+            assert!(
+                error.starts_with(expected),
+                "expected {expected}, got {error}"
+            );
+            assert!(!error.contains("stale"), "{error}");
+        }));
+        if let Some(worker) = rig.worker.as_ref() {
+            let _ = rig.parent.control.send(Control::Stop);
+            let deadline = Instant::now() + CONNECT_AT_MOST;
+            while !worker.is_finished() && Instant::now() < deadline {
+                sleep(Duration::from_millis(2));
+            }
+            if !worker.is_finished() {
+                // A Rust thread cannot be killed separately. Do not detach
+                // an unconfirmed audio worker after a fixture failure.
+                eprintln!("speaker reference fixture could not confirm worker shutdown");
+                std::process::abort();
+            }
+            let _ = rig.worker.take().unwrap().join();
+        }
+        if let Err(failure) = result {
+            std::panic::resume_unwind(failure);
+        }
+    }
+}
