@@ -1,3 +1,11 @@
+## 2026-10-27 00:32 — scoped worker original native green
+
+Ready for lamp-voice: no (#3604 independent reads pending)
+
+Current 7b5e99991/008e original ARM40366401143 and Linux40366401167 pass 7,536/0/53, all three required controls once; preview ordered parents/tree, complete ordinals and separate harnesses verified. [Receipt](verification/skills-actions-mock-20261026/native-7b5e.json). The first 3bc 523/1/9 remains failed, and actual 525/0/9 host remains distinct with only deliberate unwind hooks. Source/readiness author HOLD remains while two independent reads complete.
+
+#3525 current 06c/008e twelve-package run is active after all compiler gates. Capture completed 48 fresh local packages, 70 test drivers, 47 workspace children and 133 executable paths with independent preimages. Captured children are not thereby execution-proven; no pass is inferred from the active runtime. No device changes.
+
 ## 2026-10-27 00:20 — scoped worker pushed as #3604
 
 Ready for lamp-voice: no (#3604)
