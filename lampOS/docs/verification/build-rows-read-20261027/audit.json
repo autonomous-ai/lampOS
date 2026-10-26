@@ -1,0 +1,482 @@
+{
+  "head": "17a7d470ba247720262d34e37b7160ab9df68e13",
+  "base": "bdc277e2667e11ab04daf60e25f8f9fcf8220dce",
+  "file": "lampOS/docs/build-rows.md",
+  "git_blob_sha1": "07bc6518809c7da98ef5fc3349ebe195bfeba122",
+  "sha256": "9344ca7da9ff18e939e7b7bc5a81df2a3d26428dac853a7d7464563910a4c92a",
+  "counts_and_arithmetic": {
+    "build": {
+      "rows": 70,
+      "score_sum": "65.80",
+      "mean_percent": "94.00",
+      "one_decimal": "94.0"
+    },
+    "mood": {
+      "rows": 2,
+      "score_sum": "1.17",
+      "mean_percent": "58.500",
+      "one_decimal": "58.5"
+    },
+    "quality": {
+      "rows": 16,
+      "score_sum": "11.02",
+      "mean_percent": "68.87500",
+      "one_decimal": "68.9"
+    }
+  },
+  "rows": {
+    "build": [
+      {
+        "row": "The voice never dies (SD stalls, power cuts, midnight)",
+        "score": "1.00",
+        "columns": 5
+      },
+      {
+        "row": "Speed: tool turns and comma pauses",
+        "score": "1.00",
+        "columns": 5
+      },
+      {
+        "row": "Who is talking, and when not to answer",
+        "score": "1.00",
+        "columns": 5
+      },
+      {
+        "row": "Privacy switch closes both microphones",
+        "score": "1.00",
+        "columns": 5
+      },
+      {
+        "row": "Faces: remember, hello by name",
+        "score": "0.93",
+        "columns": 5
+      },
+      {
+        "row": "Hand work to Claude Code or Codex, and its news",
+        "score": "1.00",
+        "columns": 5
+      },
+      {
+        "row": "Backup voice when Gemini is down",
+        "score": "1.00",
+        "columns": 5
+      },
+      {
+        "row": "Gives way to a hand; wakes after power",
+        "score": "1.00",
+        "columns": 5
+      },
+      {
+        "row": "\u201cLamp, that was weird\u201d marks a moment",
+        "score": "1.00",
+        "columns": 5
+      },
+      {
+        "row": "The first five minutes",
+        "score": "0.95",
+        "columns": 5
+      },
+      {
+        "row": "Speaks first when it should (the Policy)",
+        "score": "1.00",
+        "columns": 5
+      },
+      {
+        "row": "Each person\u2019s memory kept apart",
+        "score": "1.00",
+        "columns": 5
+      },
+      {
+        "row": "Sleep, and waking on its name",
+        "score": "1.00",
+        "columns": 5
+      },
+      {
+        "row": "Reminders, timers, memory across days",
+        "score": "1.00",
+        "columns": 5
+      },
+      {
+        "row": "Setup for a home, 5 s reset",
+        "score": "0.95",
+        "columns": 5
+      },
+      {
+        "row": "Touch strip and head pads",
+        "score": "0.95",
+        "columns": 5
+      },
+      {
+        "row": "Two people at the lamp",
+        "score": "1.00",
+        "columns": 5
+      },
+      {
+        "row": "\u201cStop\u201d over its own voice",
+        "score": "1.00",
+        "columns": 5
+      },
+      {
+        "row": "Skills: say service, Reminders, Task news",
+        "score": "1.00",
+        "columns": 5
+      },
+      {
+        "row": "Skills: body and light shared between skills",
+        "score": "1.00",
+        "columns": 5
+      },
+      {
+        "row": "Skills: creator, Stretch break, Stuffy air, Desk tutor",
+        "score": "1.00",
+        "columns": 5
+      },
+      {
+        "row": "Two-minute self-test",
+        "score": "1.00",
+        "columns": 5
+      },
+      {
+        "row": "One install for a new lamp",
+        "score": "1.00",
+        "columns": 5
+      },
+      {
+        "row": "No internet at home",
+        "score": "1.00",
+        "columns": 5
+      },
+      {
+        "row": "Everything is a skill, core and installable, no one-off code",
+        "score": "0.85",
+        "columns": 5
+      },
+      {
+        "row": "An owner makes their own skill",
+        "score": "0.83",
+        "columns": 5
+      },
+      {
+        "row": "A Skills Store to publish skills",
+        "score": "0.60",
+        "columns": 5
+      },
+      {
+        "row": "Updates over the internet, by themselves",
+        "score": "0.85",
+        "columns": 5
+      },
+      {
+        "row": "A voice cheaper than Gemini Live, as fast and as good",
+        "score": "1.00",
+        "columns": 5
+      },
+      {
+        "row": "A person brings their own DeepSeek and Deepgram keys, in setup or the app",
+        "score": "0.90",
+        "columns": 5
+      },
+      {
+        "row": "Lamp 2 in the Autonomous app",
+        "score": "1.00",
+        "columns": 5
+      },
+      {
+        "row": "Talks with you naturally: turns, answers, web answers, the time",
+        "score": "0.92",
+        "columns": 5
+      },
+      {
+        "row": "Hears its name, a bare \u201cLamp\u201d too",
+        "score": "1.00",
+        "columns": 5
+      },
+      {
+        "row": "Eye contact: turns to you and to its name, looks away to think, nods",
+        "score": "1.00",
+        "columns": 5
+      },
+      {
+        "row": "Always alive: breathing, small drift, a glance at a bang",
+        "score": "1.00",
+        "columns": 5
+      },
+      {
+        "row": "Moves with its words while it speaks",
+        "score": "1.00",
+        "columns": 5
+      },
+      {
+        "row": "Never tips itself over",
+        "score": "1.00",
+        "columns": 5
+      },
+      {
+        "row": "Joys: sways to music, watches you leave, core skills",
+        "score": "0.80",
+        "columns": 5
+      },
+      {
+        "row": "Dance when asked",
+        "score": "1.00",
+        "columns": 5
+      },
+      {
+        "row": "Bedtime and Morning as a skill, with night caps on light and volume",
+        "score": "0.85",
+        "columns": 5
+      },
+      {
+        "row": "\u201cWhat do you see?\u201d and showing it a page",
+        "score": "1.00",
+        "columns": 5
+      },
+      {
+        "row": "Seeing someone speak (is the face it looks at talking?)",
+        "score": "0.94",
+        "columns": 5
+      },
+      {
+        "row": "The eye: looks toward you, blinks, a face for each state",
+        "score": "1.00",
+        "columns": 5
+      },
+      {
+        "row": "Its light by voice and in the app, kept across a restart",
+        "score": "1.00",
+        "columns": 5
+      },
+      {
+        "row": "Volume by voice and in the app",
+        "score": "1.00",
+        "columns": 5
+      },
+      {
+        "row": "A light for booting and a \u201cnot feeling well\u201d face for a failed part, built into the system",
+        "score": "0.95",
+        "columns": 5
+      },
+      {
+        "row": "Light scenes (\u201creading light\u201d) and pointing the head and light (\u201clight my book\u201d), core skills",
+        "score": "1.00",
+        "columns": 5
+      },
+      {
+        "row": "\u201cLook for my keys\u201d, an installable skill",
+        "score": "0.85",
+        "columns": 5
+      },
+      {
+        "row": "The light dims and goes out when nobody is there, a core skill",
+        "score": "1.00",
+        "columns": 5
+      },
+      {
+        "row": "What you teach it (\u201cdon\u2019t say hello in the morning\u201d) is kept and honoured",
+        "score": "1.00",
+        "columns": 5
+      },
+      {
+        "row": "Forgets on request: that, everything, my face, and everything it came from",
+        "score": "0.97",
+        "columns": 5
+      },
+      {
+        "row": "Remembers what matters without being asked (\u201chow was the wedding?\u201d)",
+        "score": "0.90",
+        "columns": 5
+      },
+      {
+        "row": "Keeps going when one part fails",
+        "score": "1.00",
+        "columns": 5
+      },
+      {
+        "row": "Change the Wi-Fi, name or time zone after setup, without a reset",
+        "score": "0.95",
+        "columns": 5
+      },
+      {
+        "row": "Hand-overs from a home lamp: Harness installed, the person signed in",
+        "score": "0.88",
+        "columns": 5
+      },
+      {
+        "row": "Updates cover the whole lamp, so V3, V4 and V5 update a shipped lamp in place: units, models, the updater itself, rollback, every part\u2019s saved data read across versions",
+        "score": "0.78",
+        "columns": 5
+      },
+      {
+        "row": "The company sees its lamps in homes: health, crash and support logs, opt-in",
+        "score": "0.95",
+        "columns": 5
+      },
+      {
+        "row": "The factory\u2019s per-lamp steps: body poses, touch pads, the update key",
+        "score": "0.95",
+        "columns": 5
+      },
+      {
+        "row": "Notices your activity and posture",
+        "score": "1.00",
+        "columns": 5
+      },
+      {
+        "row": "Habits and wellbeing nudges beyond Stretch break, as skills",
+        "score": "1.00",
+        "columns": 5
+      },
+      {
+        "row": "Text your lamp from your phone, in the Autonomous app",
+        "score": "0.70",
+        "columns": 5
+      },
+      {
+        "row": "Email, calendar and other connectors, through hand-overs",
+        "score": "0.70",
+        "columns": 5
+      },
+      {
+        "row": "Guard mode, an installable skill",
+        "score": "0.85",
+        "columns": 5
+      },
+      {
+        "row": "\u201cWas anyone here while I was out?\u201d, an installable skill",
+        "score": "1.00",
+        "columns": 5
+      },
+      {
+        "row": "Music to relax, an installable skill",
+        "score": "0.70",
+        "columns": 5
+      },
+      {
+        "row": "Faces from a photo and \u201cwho is this?\u201d, an installable skill",
+        "score": "0.90",
+        "columns": 5
+      },
+      {
+        "row": "Light shows and effects, a core skill",
+        "score": "1.00",
+        "columns": 5
+      },
+      {
+        "row": "\u201cI\u2019m unplugging you\u201d: it folds safely first, a core skill",
+        "score": "1.00",
+        "columns": 5
+      },
+      {
+        "row": "Smoke and bad-air alerts, a core skill",
+        "score": "1.00",
+        "columns": 5
+      },
+      {
+        "row": "Every lamp passes an approved hardware test before it ships: stations, records, a 3\u20135 lamp pilot",
+        "score": "0.45",
+        "columns": 5
+      }
+    ],
+    "mood": [
+      {
+        "row": "One inner state (mood) every behaviour reads, and familiarity *(mood, for later: not in the build figure)*",
+        "score": "0.72",
+        "columns": 5
+      },
+      {
+        "row": "Reads your mood from your face or voice *(mood, for later: not in the build figure)*",
+        "score": "0.45",
+        "columns": 5
+      }
+    ],
+    "quality": [
+      {
+        "row": "Fast answers",
+        "score": "0.75",
+        "columns": 4
+      },
+      {
+        "row": "Knows when you have finished",
+        "score": "0.70",
+        "columns": 4
+      },
+      {
+        "row": "Cutting in",
+        "score": "0.55",
+        "columns": 4
+      },
+      {
+        "row": "Stop words",
+        "score": "0.55",
+        "columns": 4
+      },
+      {
+        "row": "Its own echo",
+        "score": "0.65",
+        "columns": 4
+      },
+      {
+        "row": "Not spoken to",
+        "score": "0.70",
+        "columns": 4
+      },
+      {
+        "row": "Several people",
+        "score": "0.70",
+        "columns": 4
+      },
+      {
+        "row": "Sounds that are not speech",
+        "score": "0.80",
+        "columns": 4
+      },
+      {
+        "row": "Speaking up on its own",
+        "score": "0.82",
+        "columns": 4
+      },
+      {
+        "row": "Remembers you: your name and what you told it",
+        "score": "0.65",
+        "columns": 4
+      },
+      {
+        "row": "A good companion",
+        "score": "0.70",
+        "columns": 4
+      },
+      {
+        "row": "Both microphones",
+        "score": "0.65",
+        "columns": 4
+      },
+      {
+        "row": "Body",
+        "score": "0.70",
+        "columns": 4
+      },
+      {
+        "row": "Head and eye",
+        "score": "0.65",
+        "columns": 4
+      },
+      {
+        "row": "The cheaper voice (Deepgram + DeepSeek + ElevenLabs) as good as Live",
+        "score": "0.70",
+        "columns": 4
+      },
+      {
+        "row": "Light and all of it together",
+        "score": "0.75",
+        "columns": 4
+      }
+    ]
+  },
+  "build_table_unchanged": true,
+  "source_scope": "Only timestamp, headlinequality percentage, endpointnote and memoryqualityrow change; current product unit contains LAMP_MEMORY_FORGET_ASKS=on. Both noted trains are landed.",
+  "limits": [
+    "Independent source/arithmetic review only; scores remain Firsts assessment, no independent physical retest or shared review-page access.",
+    "No Cargo/product/device execution for one Markdown file.",
+    "Inherited historical Queue link#1722 is not current Queue#3504."
+  ]
+}

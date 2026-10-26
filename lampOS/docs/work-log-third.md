@@ -1,3 +1,9 @@
+## 2026-10-27 01:38 — build-row documentation read
+
+Ready for lamp-voice: no (own current native/consumer gates continue)
+
+Independent one-file read of #3612 17a7d470b: blob/API binding, unchanged 72-row build table and unique-name/score bounds checked. Excluding two mood rows yields build 65.80/70 = 94.0%; quality 11.02/16 = 68.875%, rounded 68.9%; mood 1.17/2 = 58.5%. [Exact arithmetic/source audit](verification/build-rows-read-20261027/audit.json). Current product unit has the stated forget-asks flag. Scores remain First's assessment; no shared review-page access, physical retest or Cargo/product execution. The inherited hourly-post link still points to historical Queue1722, noted as P3. Worker #3604 current native/read gates and reminder094 consumer compiler qualification remain active.
+
 ## 2026-10-27 01:34 — joined worker current carry qualified and pushed
 
 Ready for lamp-voice: no (#3604 current native/read carries pending)
