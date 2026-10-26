@@ -1,0 +1,14 @@
+{
+  "method": "Independent OpenSSL Ed25519 verification of exact decoded manifest bytes, public trust key from repository environment",
+  "openssl": "OpenSSL 3.6.5 29 Sep 2026 (Library: OpenSSL 3.6.5 29 Sep 2026)",
+  "exit_code": 0,
+  "stdout": "Signature Verified Successfully\n",
+  "fingerprint": "54213f8d3aa2f241",
+  "manifest_sha256": "071b644aca563897a187edd79630050aa34d8538e9b047b4aa1d91d3f6ba898c",
+  "setup": {
+    "name": "lamp-setup",
+    "sha256": "ad7d520467cd69190d3b8dc1fcf9bcd04c1761354a81038b7c36b5dae586c0d5",
+    "size": 7667856
+  },
+  "scope": "No updater execution, device access, private key or signing operation."
+}

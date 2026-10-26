@@ -1,0 +1,26 @@
+{
+  "original_run": {
+    "id": 40324653501,
+    "head_sha": "aa9ec9e27a788ee19d7b52a9c91296382208e490",
+    "event": "push",
+    "run_attempt": 1,
+    "status": "completed",
+    "conclusion": "success",
+    "html_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40324653501",
+    "run_number": 7071
+  },
+  "promotion_run": {
+    "id": 40331718198,
+    "head_sha": "830c384ae4050d895cfd5f764f9a00f9989b8388",
+    "event": "workflow_dispatch",
+    "run_attempt": 1,
+    "status": "completed",
+    "conclusion": "success",
+    "html_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40331718198"
+  },
+  "tag_object": {
+    "sha": "aa9ec9e27a788ee19d7b52a9c91296382208e490",
+    "type": "commit",
+    "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/commits/aa9ec9e27a788ee19d7b52a9c91296382208e490"
+  }
+}

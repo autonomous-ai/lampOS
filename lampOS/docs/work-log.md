@@ -1,3 +1,15 @@
+Ready for lamp-voice: #1812 published real-key install supported by combined evidence; attended Body remains open.
+
+## Current checkpoint: 2026-10-26 22:13 +07, real-signed 7071 release audit
+
+[7071 authentication and installed-report audit](verification/signed-release-7071-audit-20261026/README.md): stable and immutable manifests are byte-identical and match asset API sizes/digests. Trusted public-key fingerprint 54213f8d3aa2f241 independently verifies the exact decoded Ed25519 signature. Tag, signed commit aa9ec9e27, original successful publication run 40324653501 and Setup hash ad7d5204 agree. Public operator report describes installing that release on 52e6 and the subsequent reset/fresh setup; this is operator device evidence combined with independent host authentication, not a repeated independent device run.
+
+This supports #1812's published real-key internet installation requirement. Earlier disposable-key GOOD/BAD recovery remains a different experiment. Exact quiet-state-at-switch evidence and attended Body/arm acceptance are still not supplied by these packets. First's accepted reset erasure/fresh setup and tomorrow's first-face onboarding check are separate. No device, updater execution, provider, private key, signing or release operation by Second.
+
+The frozen own-keys 87af/e672 gate has passed fmt/strict nine-crate Clippy and compilation; four-crate runtime is active, with a later source-bound switch-doc target queued. Main's new product memory unit is assessed after that boundary, without interrupting this run or relabeling its results.
+
+---
+
 Ready for lamp-voice: #3510 7ae6 software CI qualified; new current-base carry underway, activation HOLD.
 
 ## Current checkpoint: 2026-10-26 22:01 +07, original 7ae6 native gates complete

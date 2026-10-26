@@ -1,0 +1,339 @@
+{
+  "schema": 1,
+  "channel": "lamp-voice",
+  "sequence": 7071,
+  "commit": "aa9ec9e27a788ee19d7b52a9c91296382208e490",
+  "files_url": "https://github.com/autonomous-ai/lampOS/releases/download/lampos-lamp-voice-7071/",
+  "files": [
+    {
+      "name": "lamp-actions",
+      "sha256": "215104dbd6a0c62319959b080b4d2a4d2cbc68780aaccb315bc98db6aa10ad8d",
+      "size": 4509696
+    },
+    {
+      "name": "lamp-addons",
+      "sha256": "092ffe373ab14e6040aaa4e5b12c86021d0169e94eea10d7a1e05ff9b7b8e618",
+      "size": 1145152
+    },
+    {
+      "name": "lamp-air",
+      "sha256": "7f58861b852a180385286f420c072ba65170363b57d3279e4831462502c275a4",
+      "size": 895152
+    },
+    {
+      "name": "lamp-body",
+      "sha256": "8dbf77ba83a1eb85df5bff606fd47499502a326996010ebae6902c134d3b463b",
+      "size": 1954032
+    },
+    {
+      "name": "lamp-body-measure",
+      "sha256": "be71cca3ef5173c9b15a63b27ffe9e5065382aa0cc4dac265e2925f03977c890",
+      "size": 1341424
+    },
+    {
+      "name": "lamp-body-mood",
+      "sha256": "bb7d3ec66f7c8957033d59290ff3cd3e3048d0d4a06cebe6faf37578446c315f",
+      "size": 477072
+    },
+    {
+      "name": "lamp-body-worker",
+      "sha256": "0d55a670a242b38e486850cc81e33126e8275aa0867dc496f190e8cc70dc7d35",
+      "size": 1177672
+    },
+    {
+      "name": "lamp-bus",
+      "sha256": "bca4b1dc589c3522daeb6b5ff42d124fc6878f82cd8c9fb1436d1b1f0deab5a7",
+      "size": 1106576
+    },
+    {
+      "name": "lamp-cloud",
+      "sha256": "32b77989b8e62f8c1fe1f7a32cbff76aa32af1decbc2521010143a8aa9fc1976",
+      "size": 10820664
+    },
+    {
+      "name": "lamp-controls",
+      "sha256": "c7ab8d0fd0bc23f7ad63ee96140a53a55d9ece7199e5fcb802be446c20a6abf3",
+      "size": 2468168
+    },
+    {
+      "name": "lamp-ears",
+      "sha256": "79ba8fa75329a82dab23e8d1024420e2bb4774c274b04cdda4df0a44e5d7836e",
+      "size": 24852424
+    },
+    {
+      "name": "lamp-expression",
+      "sha256": "514bc274652f041bbb724358e214e29526e74334c984210f0feb7cb83caeea2c",
+      "size": 4191064
+    },
+    {
+      "name": "lamp-eyes",
+      "sha256": "2ad4978f4c69ce03428bc2f279b1fa7413cda53c7240f47879924bea9f6c3755",
+      "size": 26403392
+    },
+    {
+      "name": "lamp-health",
+      "sha256": "e25b3921d17d1972bd62f0c772cf4399d53004539ed5a14b1b671558923f5f24",
+      "size": 1314304
+    },
+    {
+      "name": "lamp-keeper",
+      "sha256": "27fd282af5d41d229f2292b25ee7a68bf2a37bef0460b6147d9e7970d4769ec8",
+      "size": 3240152
+    },
+    {
+      "name": "lamp-memory",
+      "sha256": "7fbf1c549c35d1d9d6d0939a46069d67f383289a602a5594211595f23f489458",
+      "size": 4778928
+    },
+    {
+      "name": "lamp-mood",
+      "sha256": "64b8a64b153bda8f3c37725c0e63a9f6d1ef396bf3470ea6786011a0ddd5ef7c",
+      "size": 1975984
+    },
+    {
+      "name": "lamp-name",
+      "sha256": "71c22dac33c56eee2380d84aaabfbee03929c137b2d8ec31da7be22ffaf19b86",
+      "size": 24282880
+    },
+    {
+      "name": "lamp-peek",
+      "sha256": "cebea1721b2d9127332622de6e9fa5fa3724d5580ecbe59f2bb4ae5dcca08da4",
+      "size": 2714792
+    },
+    {
+      "name": "lamp-policy",
+      "sha256": "be850e6d84d7a8b9eb76d98c1a5a40c7e1aa0cde4a5afe40710a86199e5dd763",
+      "size": 5031688
+    },
+    {
+      "name": "lamp-product-skills",
+      "sha256": "13c6b263a9d290c3762af7833a4791099bf645a510394183d32765ebe8e8594b",
+      "size": 131932
+    },
+    {
+      "name": "lamp-records",
+      "sha256": "b18095bc74064e9949d9ed16c8f3c9a4c8c46e35892d3922800cf4aea8bb668f",
+      "size": 1406976
+    },
+    {
+      "name": "lamp-schedule",
+      "sha256": "6687b0281ab5ce0b05cffec8c829f8d80bb4872a17790897038d032ac181db06",
+      "size": 4493472
+    },
+    {
+      "name": "lamp-selftest",
+      "sha256": "bf151ecbd22de60a2f01234826bfd7c52dbba79ddddb0082c1fb0dcc97d569c7",
+      "size": 1554864
+    },
+    {
+      "name": "lamp-settings",
+      "sha256": "559410666aae9d415ff072fc9a8682a4f1f5837026e4ee535028f4f21fbc648c",
+      "size": 1529744
+    },
+    {
+      "name": "lamp-setup",
+      "sha256": "ad7d520467cd69190d3b8dc1fcf9bcd04c1761354a81038b7c36b5dae586c0d5",
+      "size": 7667856
+    },
+    {
+      "name": "lamp-skills",
+      "sha256": "4e5ef7ea582a971420d8779815c571badc2ee4fd234ba250d24e071f1cdb5da8",
+      "size": 8779904
+    },
+    {
+      "name": "lamp-surround",
+      "sha256": "c426b0fb19fa3dfe37961f7b4b5a88b3944f6e01528bc6425b456a9f29fa1c0b",
+      "size": 13871776
+    },
+    {
+      "name": "lamp-tasks",
+      "sha256": "ffe01ec2215a05a4add0d2e931764a188c9e303a6a342501702bbe0bd171b185",
+      "size": 4728312
+    },
+    {
+      "name": "lamp-turn-end",
+      "sha256": "5e9213c063af65d05290bbd120c41c709118e5e6c45e1d16a7a83e1eb2e495aa",
+      "size": 24796992
+    },
+    {
+      "name": "lamp-update",
+      "sha256": "e42c8d69422f4d222ce10c0259d7265a6ced5e84b60523fbcc5b2ec6d53697f6",
+      "size": 4806440
+    },
+    {
+      "name": "lamp-voice",
+      "sha256": "fde6fd0eb5696efe001949ab39a52ef3aa081438a9c75c1641beaeb03b60ef38",
+      "size": 28582200
+    }
+  ],
+  "units": [
+    {
+      "lamp": "lamp-4ace",
+      "unit": "lamp-actions.service",
+      "sha256": "5da81bcc0610cadaa364c2bfa14e0b6d55fb48ce32c6037dbbcd12cbc901ce06",
+      "size": 1541
+    },
+    {
+      "lamp": "lamp-4ace",
+      "unit": "lamp-air.service",
+      "sha256": "da75948c1e08054ca79b464a0322eb977e91ddf594325b9c6e84a70e77014c83",
+      "size": 813
+    },
+    {
+      "lamp": "lamp-4ace",
+      "unit": "lamp-body.service",
+      "sha256": "a362a08e4c2de1c1a3817404805b42a9c10a476b0f7ac6c6fd10ffc40bc8d461",
+      "size": 2781
+    },
+    {
+      "lamp": "lamp-4ace",
+      "unit": "lamp-controls.service",
+      "sha256": "a3286a3fe0b20781de2f215701c4d028cfe8afc45ed5c07bce96a74364cec94c",
+      "size": 1862
+    },
+    {
+      "lamp": "lamp-4ace",
+      "unit": "lamp-ears.service",
+      "sha256": "9507ec1c1c0792e16d055c515b73305e052bf1b7c4ecc6ff5e88a363a8387320",
+      "size": 980
+    },
+    {
+      "lamp": "lamp-4ace",
+      "unit": "lamp-expression.service",
+      "sha256": "7d0843ed63ea2d59d9b907893547f5e184da81957edd60ad048f56d6656ed45d",
+      "size": 1232
+    },
+    {
+      "lamp": "lamp-4ace",
+      "unit": "lamp-eyes.service",
+      "sha256": "f024fcbe5dfb1838905d13db0af003fc0ea95570afbdf7fabce1b14b1db8d21e",
+      "size": 2289
+    },
+    {
+      "lamp": "lamp-4ace",
+      "unit": "lamp-health.service",
+      "sha256": "c9616878b2ae990cb819c68263b89d99050dcc266f3f3e6d4acb13027297c676",
+      "size": 1277
+    },
+    {
+      "lamp": "lamp-4ace",
+      "unit": "lamp-memory.service",
+      "sha256": "bd96a07c00c29fc294f5d8c76de1edf8f4b8ac02694a4e4206fb96da03cccbb6",
+      "size": 1019
+    },
+    {
+      "lamp": "lamp-4ace",
+      "unit": "lamp-name.service",
+      "sha256": "4e8571f7f4e51e027a65e3f394c2c50da891a2943c53ce8661055872dc23b32d",
+      "size": 1154
+    },
+    {
+      "lamp": "lamp-4ace",
+      "unit": "lamp-policy.service",
+      "sha256": "60b4f971c07fa731f5a9bc207ccdd993eb34863d32eb9f111a60bc406cfd5149",
+      "size": 1743
+    },
+    {
+      "lamp": "lamp-4ace",
+      "unit": "lamp-schedule.service",
+      "sha256": "4ef351aabde2e3e1342e189db152b27ddaddf68d7c51a7b82080884d5b9d615d",
+      "size": 1279
+    },
+    {
+      "lamp": "lamp-4ace",
+      "unit": "lamp-selftest.service",
+      "sha256": "2f768e65cc19e271c0420f88350d9f556facb50f9e2712a76940783909dffc26",
+      "size": 1249
+    },
+    {
+      "lamp": "lamp-4ace",
+      "unit": "lamp-skills.service",
+      "sha256": "5d6bb2c078fb2f04c5504b8122737ae304075b7cf5de603fbd9bf072844e0f87",
+      "size": 1484
+    },
+    {
+      "lamp": "lamp-4ace",
+      "unit": "lamp-tasks.service",
+      "sha256": "54aa294c9cab288b558cc28f2438b11677db4146566d83f35773bdb8dd68d68c",
+      "size": 1273
+    },
+    {
+      "lamp": "lamp-4ace",
+      "unit": "lamp-voice.service",
+      "sha256": "32abc88efd626f3fc21bd943afc43d2dc569ab58630518efcca62630bdb797dc",
+      "size": 15322
+    },
+    {
+      "lamp": "lamp-52e6",
+      "unit": "lamp-actions.service",
+      "sha256": "9252efebc17d32535200fe00eead895006b62850c31d7be890a7660946c58d4c",
+      "size": 1106
+    },
+    {
+      "lamp": "lamp-52e6",
+      "unit": "lamp-air.service",
+      "sha256": "7b32818872b5f45b52fc0bf4ee41cad78771f5c4da6f3a99edf0e30969e0a073",
+      "size": 658
+    },
+    {
+      "lamp": "lamp-52e6",
+      "unit": "lamp-body.service",
+      "sha256": "b352bfdae9c2de2f19400ee5868e69abcc14f758a0e7600c4abfea6969c9458b",
+      "size": 2590
+    },
+    {
+      "lamp": "lamp-52e6",
+      "unit": "lamp-controls.service",
+      "sha256": "0888edee20d538eec7cd32d6adaa2581d2aeb61305200f233b7c34915e3cf382",
+      "size": 905
+    },
+    {
+      "lamp": "lamp-52e6",
+      "unit": "lamp-ears.service",
+      "sha256": "0d3f7f069cfacec40259869cb1d71ab466e9f34c627e19fd1c3395be5c895901",
+      "size": 701
+    },
+    {
+      "lamp": "lamp-52e6",
+      "unit": "lamp-expression.service",
+      "sha256": "784ac5b5628717c7753c2ac7c04b08d8f74abd1485604883f84646ccc60617df",
+      "size": 1002
+    },
+    {
+      "lamp": "lamp-52e6",
+      "unit": "lamp-eyes.service",
+      "sha256": "40d143b1befba5746509bca359a3f91fc00072340f364c193fd891568da72c3f",
+      "size": 1130
+    },
+    {
+      "lamp": "lamp-52e6",
+      "unit": "lamp-health.service",
+      "sha256": "4361e26f2186ade710b65cb1d9b761f27ce02178c72b1b1c933ecdd0271719fa",
+      "size": 1133
+    },
+    {
+      "lamp": "lamp-52e6",
+      "unit": "lamp-memory.service",
+      "sha256": "e7f062d09e12fb89dca690bb983508026ca051462efe688b4b1272873b4337c5",
+      "size": 909
+    },
+    {
+      "lamp": "lamp-52e6",
+      "unit": "lamp-name.service",
+      "sha256": "6dbe289b6d6270026233b5e22281d15f40c4b931e2a3a4d6da7cd06247de357f",
+      "size": 776
+    },
+    {
+      "lamp": "lamp-52e6",
+      "unit": "lamp-schedule.service",
+      "sha256": "fb6cfe0253ad9395391b4b5433da7a54ceb803c87a5046f0118cd8dd9d935dd0",
+      "size": 1027
+    },
+    {
+      "lamp": "lamp-52e6",
+      "unit": "lamp-voice.service",
+      "sha256": "2a533f91c15d5a17de2e3371a2ff7d71839d3cf3611d00cb33ce1755a7900d8a",
+      "size": 7895
+    }
+  ]
+}

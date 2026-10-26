@@ -1,0 +1,11 @@
+{
+  "tag": "lampos-lamp-voice-7071",
+  "release_id": 424262804,
+  "asset_id": 678199672,
+  "url": "https://github.com/autonomous-ai/lampOS/releases/download/lampos-lamp-voice-7071/lampos-manifest.json",
+  "updated_at": "2026-10-26T13:07:38Z",
+  "bytes": 13563,
+  "sha256": "668f9d6bd631cf4460b5c2ab9e7f0297b67235ff4e09bffd64861813e047dd34",
+  "asset_digest": "sha256:668f9d6bd631cf4460b5c2ab9e7f0297b67235ff4e09bffd64861813e047dd34",
+  "retrieved_at": "2026-10-26T15:04:27.604364+00:00"
+}

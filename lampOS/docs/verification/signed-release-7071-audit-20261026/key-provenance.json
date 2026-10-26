@@ -1,0 +1,9 @@
+{
+  "source": "repos/autonomous-ai/lampOS/environments/lampos-update-publish/variables/LAMPOS_UPDATE_PUBLIC_KEY",
+  "name": "LAMPOS_UPDATE_PUBLIC_KEY",
+  "value": "37n0Gidw/NXHyNa+PYB5yjGE3UaDR4zFWogoiE97rJU=",
+  "updated_at": "2026-10-26T02:27:41Z",
+  "retrieved_at": "2026-10-26T15:04:22.930922+00:00",
+  "fingerprint": "54213f8d3aa2f241",
+  "trust_basis": "Repository publishing environment configuration, corroborated by shipping checklist #3530; not the downloaded envelope."
+}
