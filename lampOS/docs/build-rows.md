@@ -1,8 +1,8 @@
 # Where V2 is: the build rows and the quality rows
 
-Written by the first builder from the team's review page at 2026-10-26 08:00 (+07). The lead asked for it on #1711 (20 Oct, 16:43), so anyone can read where V2 is without waiting for the hourly post. It's a copy, updated a few times a day. The hourly figures on #1722 are the live ones.
+Written by the first builder from the team's review page at 2026-10-26 09:51 (+07). The lead asked for it on #1711 (20 Oct, 16:43), so anyone can read where V2 is without waiting for the hourly post. It's a copy, updated a few times a day. The hourly figures on #1722 are the live ones.
 
-**Build 93.3% over 70 rows. Quality 67.2% over 16 rows.** Mood, for later: 58.5% over 2 rows, not in the build figure.
+**Build 93.4% over 70 rows. Quality 67.5% over 16 rows.** Mood, for later: 58.5% over 2 rows, not in the build figure.
 
 **How a build row is counted** (the lead's rule): 1.0 when its work is merged and tried on a lamp; less while parts are missing or untried. Build is the mean of the rows. Quality rows score how well a part works today, against a target; quality is the mean of the scores.
 
@@ -64,7 +64,7 @@ Written by the first builder from the team's review page at 2026-10-26 08:00 (+0
 | The light dims and goes out when nobody is there, a core skill | 1.00 | #1677 #1721 #1747 | nine | Built and tried on lamp-4ace 20 Oct 01:23 (trials.sh with Tests’ #1999 stages, lamp-skills at 782e6ef34): with nobody there the light-out skill asked the ring to fade the light over 30 s, held it while nobody was there, … |
 | What you teach it (“don’t say hello in the morning”) is kept and honoured | 1.00 | #813 | seventh | Built |
 | Forgets on request: that, everything, my face, and everything it came from | 0.97 | #1586 #1693 #2849 #2850 | fourth, twelve | 23 Oct 10:1x, up from 0.95: after “forget everything”, the room’s lines about that person are left out for their day (#3142, train 29). |
-| Remembers what matters without being asked (“how was the wedding?”) | 0.85 | #1693 #2648 #2680 #2805 #2806 #2807 #2808 | friday, twelve, thirteen | 23 Oct 11:2x, up from 0.8: a follow-up goes only to the person who told the lamp (#2807 closed, Thirteen’s lamp-c0a4 run with #3108). |
+| Remembers what matters without being asked (“how was the wedding?”) | 0.90 | #1693 #2648 #2680 #2805 #2806 #2807 #2808 | friday, twelve, thirteen | 26 Oct 09:5x, up from 0.85: the product keeps what matters without being asked, dated things and one open thread, for the person seen saying it only, and “forget everything about me” reaches it (#3450, merged 08:4x: OBSE… |
 | Keeps going when one part fails | 1.00 | — | — | Built: each part its own unit, restarted alone, health says how the lamp is |
 | Change the Wi-Fi, name or time zone after setup, without a reset | 0.95 | #1982 #1995 #2038 #2851 #2852 #2853 | fourteen, nine, mobile, migrate | 22 Oct 16:1x, up from 0.9: the settings and Wi-Fi helpers take a request only from lamp-cloud’s unit (#2696), and install puts their units on every product lamp (Sixth’s #2926, carried as #2955). |
 | Hand-overs from a home lamp: Harness installed, the person signed in | 0.88 | #751 #765 #798 #1854 #2702 #2838 #2839 #2840 #2841 #2842 | seventh, eighth, tests, blue | 23 Oct 16:1x, up from 0.85: a bare project name now takes every hand-over, not only the first (#3217), and each hand-over’s outcome is one journal line without the ask (#3234). |
@@ -98,7 +98,7 @@ Written by the first builder from the team's review page at 2026-10-26 08:00 (+0
 | Several people | 0.70 | 0.85 | 23 Oct 11:2x, up from 0.65: a follow-up is asked only of the person who told it. |
 | Sounds that are not speech | 0.80 | 0.80 | 18 Oct 17:48, the same 48 noises now judged from the lamp’s own state recorded during the run (the 17 Oct zeros came from an older recording, so they do not compare): answered 0 times, but 12 of 48 taken for a voice and … |
 | Speaking up on its own | 0.80 | 0.85 | 25 Oct 21:3x, unchanged: two reminder rounds on lamp-4ace (the ship build 6819 and #3477’s build, product unit, played lines, a conversation over the due minutes): each one set was said 6 to 13 s after it was due, at a p… |
-| Remembers you: your name and what you told it | 0.50 | 0.90 | 25 Oct 20:0x, up from 0.45: on the ship build (6819) with the exact product unit, the memory round went 6 of 6: a room fact kept, recalled in the same session and in a fresh one, forgotten on request, and a personal line… |
+| Remembers you: your name and what you told it | 0.55 | 0.90 | 26 Oct 09:5x, up from 0.5: on 6963 (the memory switches on in the product) a person nobody knows asking “how do I take my coffee?” got “I don’t actually know that one — you’ve never told me”, not the room’s latte (6919 a… |
 | A good companion | 0.70 | 0.90 | 25 Oct 14:4x, up from 0.55: two played rounds on lamp-4ace with the product’s hearing (ElevenLabs voices from the iMac, no person): 27 of 27 conversation lines answered without the name, in three back-and-forths of up to… |
 | Both microphones | 0.65 | 0.80 | 22 Oct 06:41, up from 0.6: step 4 passed on lamp-75c9 from the privacy test input (Nine, #694, the lead’s 05:5x ruling): after the switch closes, the room microphone stops within one 100 ms level period and gives nothing… |
 | Body | 0.70 | 0.80 | 25 Oct 17:0x, up from 0.65: the livelier postures and nods (#3387) are in the product since train 109 (04:25), and on the ship candidate (6786) lamp-4ace stood for a played question, turned and tilted its head a little b… |
