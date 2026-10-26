@@ -11,9 +11,12 @@ use lamp_turn_end_wire::{
     serve,
 };
 use std::{
+    fs,
     io::{self, Write},
+    os::unix::{fs::DirBuilderExt, process::CommandExt},
     panic,
-    process::ExitCode,
+    path::{Path, PathBuf},
+    process::{Child, Command, ExitCode, ExitStatus, Stdio},
     thread,
     time::{Duration, Instant},
 };
@@ -36,6 +39,14 @@ fn fake_worker(mode: &str) -> ExitCode {
         "missing" => {
             let _ = serve::startup_failed(&mut out, "model /m.onnx: No such file or directory");
             return ExitCode::from(2);
+        }
+        "held-startup" => {
+            let root = PathBuf::from(std::env::var_os(STARTUP_PROBE_ROOT).unwrap());
+            fs::write(root.join("startup-entered"), b"entered").unwrap();
+            // A watchdog failure never releases Ready or counts as a return.
+            until(Duration::from_secs(30), "startup release", || {
+                root.join("release").exists().then_some(())
+            });
         }
         "silent" => {
             thread::sleep(Duration::from_secs(60));
@@ -299,7 +310,6 @@ fn missing_model_is_final_and_never_restarted() {
 }
 
 fn missing_executable_fails_at_once() {
-    let started = Instant::now();
     let mut classifier = ProcessClassifier::spawn(
         WorkerCommand::smart_turn(
             "/nonexistent/lamp-turn-end".into(),
@@ -307,7 +317,6 @@ fn missing_executable_fails_at_once() {
         ),
         quick(),
     );
-    assert!(started.elapsed() < Duration::from_millis(20));
     let reason = until(Duration::from_secs(2), "failure", || {
         match classifier.availability() {
             Availability::Failed(reason) => Some(reason),
@@ -315,11 +324,178 @@ fn missing_executable_fails_at_once() {
         }
     });
     assert!(reason.contains("cannot start"), "{reason}");
-    assert_eq!(
-        submit(&mut classifier, token(1), &[0; 160]),
-        Submit::Unavailable
-    );
+    assert_eq!(classifier.submit(token(1), &[0; 160]), Submit::Unavailable);
     assert_eq!(classifier.report().spawned, 0);
+}
+
+const STARTUP_PROBE_ROOT: &str = "LAMP_ENDPOINT_STARTUP_PROBE_ROOT";
+const STARTUP_PROBE_TEST: &str = "spawn_returns_while_worker_startup_is_held";
+
+struct StartupProbe {
+    root: PathBuf,
+    child: Option<Child>,
+}
+
+impl StartupProbe {
+    fn exit_observation(&self) -> io::Result<Option<rustix::process::WaitIdStatus>> {
+        use rustix::process::{Pid, WaitId, WaitIdOptions, waitid};
+        let pid = Pid::from_raw(self.child.as_ref().unwrap().id() as i32).unwrap();
+        // Observe without reaping: this keeps the group leader's PID owned
+        // until group cleanup, so a recycled PID can never be signalled.
+        waitid(
+            WaitId::Pid(pid),
+            WaitIdOptions::EXITED | WaitIdOptions::NOHANG | WaitIdOptions::NOWAIT,
+        )
+        .map_err(Into::into)
+    }
+
+    fn reap(&mut self) -> io::Result<ExitStatus> {
+        let child = self.child.as_mut().unwrap();
+        let deadline = Instant::now() + Duration::from_secs(5);
+        loop {
+            if let Some(status) = child.try_wait()? {
+                self.child = None;
+                return Ok(status);
+            }
+            if Instant::now() >= deadline {
+                return Err(io::Error::new(
+                    io::ErrorKind::TimedOut,
+                    "startup probe reap",
+                ));
+            }
+            thread::sleep(Duration::from_millis(5));
+        }
+    }
+
+    fn stop(&mut self) -> io::Result<()> {
+        use rustix::process::{Pid, Signal, kill_process_group};
+        // The assertion has already failed. Release only for cleanup, giving
+        // the scenario a bounded chance to reap its worker before it exits.
+        let _ = fs::write(self.root.join("release"), b"cleanup");
+        let deadline = Instant::now() + Duration::from_secs(5);
+        loop {
+            let reaped = fs::read(self.root.join("worker-reaped")).ok();
+            if reaped.as_deref() == Some(b"reaped") && self.exit_observation()?.is_some() {
+                return self.reap().map(|_| ());
+            }
+            if Instant::now() >= deadline {
+                break;
+            }
+            thread::sleep(Duration::from_millis(5));
+        }
+        // Without the worker's teardown witness, kill the owned group before
+        // reaping its leader. NOWAIT has kept that PID from being recycled.
+        let pid = Pid::from_raw(self.child.as_ref().unwrap().id() as i32).unwrap();
+        match kill_process_group(pid, Signal::KILL) {
+            Ok(()) | Err(rustix::io::Errno::SRCH) => {}
+            Err(error) => return Err(error.into()),
+        }
+        self.reap().map(|_| ())
+    }
+}
+
+impl Drop for StartupProbe {
+    fn drop(&mut self) {
+        if self.child.is_some()
+            && let Err(error) = self.stop()
+        {
+            eprintln!(
+                "startup probe cleanup failed; scratch retained at {}: {error}",
+                self.root.display()
+            );
+            return;
+        }
+        let _ = fs::remove_dir_all(&self.root);
+    }
+}
+
+fn startup_probe_child(root: &Path) {
+    let mut classifier = fake_with(
+        "held-startup",
+        Limits {
+            startup: Duration::from_secs(60),
+            ..quick()
+        },
+        FAKE_MODEL,
+        vec![(STARTUP_PROBE_ROOT.into(), root.as_os_str().to_owned())],
+    );
+    // This is the return event, not a stopwatch. A host stall here is harmless
+    // while the worker remains behind the parent's startup barrier.
+    let observed = panic::catch_unwind(panic::AssertUnwindSafe(|| {
+        assert_eq!(classifier.availability(), Availability::Loading);
+        fs::write(root.join("spawn-returned"), b"returned").unwrap();
+        until(Duration::from_secs(20), "released worker Ready", || {
+            (classifier.availability() == Availability::Ready).then_some(())
+        });
+        let report = classifier.report();
+        assert_eq!((report.spawned, report.ready), (1, 1));
+    }));
+    classifier.close();
+    assert_eq!(
+        classifier.wait_finished(Duration::from_secs(5)),
+        Teardown::Reaped
+    );
+    fs::write(root.join("worker-reaped"), b"reaped").unwrap();
+    if let Err(error) = observed {
+        panic::resume_unwind(error);
+    }
+    fs::write(root.join("finished"), b"ready-and-reaped").unwrap();
+}
+
+fn spawn_returns_while_worker_startup_is_held() {
+    if let Some(root) = std::env::var_os(STARTUP_PROBE_ROOT) {
+        startup_probe_child(Path::new(&root));
+        return;
+    }
+    let root = std::env::temp_dir().join(format!(
+        "lamp-endpoint-startup-{}-{}",
+        std::process::id(),
+        monotonic_us()
+    ));
+    fs::DirBuilder::new().mode(0o700).create(&root).unwrap();
+    let mut probe = StartupProbe { root, child: None };
+    probe.child = Some(
+        Command::new(std::env::current_exe().unwrap())
+            .arg(STARTUP_PROBE_TEST)
+            .env(STARTUP_PROBE_ROOT, &probe.root)
+            .env_remove("LAMP_FAKE_ENDPOINT")
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::inherit())
+            .process_group(0)
+            .spawn()
+            .unwrap(),
+    );
+    // These long bounds diagnose a stuck fixture, not physical latency. The
+    // release stays absent until both independent events have been observed.
+    until(
+        Duration::from_secs(15),
+        "spawn return before startup release",
+        || {
+            assert!(
+                probe.exit_observation().unwrap().is_none(),
+                "startup probe exited before both events"
+            );
+            assert!(!probe.root.join("release").exists());
+            let entered = fs::read(probe.root.join("startup-entered")).ok();
+            let returned = fs::read(probe.root.join("spawn-returned")).ok();
+            (entered.as_deref() == Some(b"entered") && returned.as_deref() == Some(b"returned"))
+                .then_some(())
+        },
+    );
+    fs::write(probe.root.join("release"), b"release").unwrap();
+    let observed = until(Duration::from_secs(15), "startup probe completion", || {
+        probe.exit_observation().unwrap()
+    });
+    assert_eq!(observed.exit_status(), Some(0), "startup probe failed");
+    assert_eq!(
+        fs::read(probe.root.join("finished")).unwrap(),
+        b"ready-and-reaped"
+    );
+    // Successful exit plus this witness proves the worker was already reaped.
+    // Do not signal an exited group; simply reap our still-owned direct child.
+    let status = probe.reap().unwrap();
+    assert!(status.success(), "startup probe failed: {status}");
 }
 
 fn startup_failures_are_final() {
@@ -671,7 +847,7 @@ fn main() -> ExitCode {
         .skip(1)
         .filter(|argument| !argument.starts_with('-'))
         .collect();
-    let tests: [(&str, fn()); 12] = [
+    let tests: [(&str, fn()); 13] = [
         (
             "an_idle_worker_stays_ready_across_a_long_quiet",
             an_idle_worker_stays_ready_across_a_long_quiet,
@@ -695,6 +871,10 @@ fn main() -> ExitCode {
         (
             "missing_executable_fails_at_once",
             missing_executable_fails_at_once,
+        ),
+        (
+            STARTUP_PROBE_TEST,
+            spawn_returns_while_worker_startup_is_held,
         ),
         ("startup_failures_are_final", startup_failures_are_final),
         (
