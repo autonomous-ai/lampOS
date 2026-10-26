@@ -9,7 +9,33 @@ machine is explicitly named. Third has no lamp access.
 
 
 
-## 2026-10-26 12:04 — Interruption correction delivered and published
+
+## 2026-10-26 12:03 — Current reminder trigger carry passes local gates
+
+Ready for lamp-voice: no (#3525, native checks and carry reads next)
+
+**7c9da509f** on current **cced42943** passes Mac formatting, strict Skills
+all-target Clippy, workspace build and full Skills **542/0/9**. All twenty-one
+controls pass once; eighteen focused and two parser cases overlap the full
+suite and are not added. Source hashes remain unchanged and five actual test
+executables are sealed. The sandbox-denied first socket attempt remains in
+its own directory; both affected controls pass in the permitted run.
+[Gate](verification/reminder-pending-present-20261026/current-cced.json),
+[carry](verification/reminder-pending-present-20261026/carry-cced.json).
+
+Tests and both readers have closed the old 08ea source findings. Current-head
+reads and new Linux gates remain required. Bounded scalar validity does not
+validate Schedule's message schema: null, booleans or short strings can make
+a numeric predicate false. No product producer sending such wrong-schema
+values is established. The PR description retains that limit explicitly.
+
+Claimed the fresh-image Records startup diagnosis from #3530 after checking
+open/merged PRs and recent Queue claims. The error comes from directory trust
+checks; requested exact failing image/lamp ownership and modes before choosing
+a correction. No device command or weakening of cleanup checks is authorized
+or performed by Third. #3540 has Third's independent documentation READ-OK.
+
+## 2026-10-26 11:58 — Interruption correction delivered and published
 
 Ready for lamp-voice: delivered (#3523, train 155)
 
@@ -26,7 +52,7 @@ publication for a duplicate release tag. Attempt 2 now succeeds, including
 publication. Both original attempts are preserved separately. Publication is
 not proof of deployment, acoustic behavior or First's physical replay.
 
-## 2026-10-26 12:01 — Reminder trigger native result and current carry
+## 2026-10-26 11:57 — Reminder trigger native result and current carry
 
 Ready for lamp-voice: no (#3525)
 

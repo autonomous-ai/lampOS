@@ -1,0 +1,11 @@
+{
+  "old_head": "08ea155858cb77ad501f239697a8da0a94748ada",
+  "head": "7c9da509ffe7e1e89d5ddf76eed7e8b3a81f00b4",
+  "base": "cced429433211e06790f23ed8f51e07be613972d",
+  "changed_whole_blobs": [
+    "lampOS/docs/reuse-decisions.md",
+    "lampOS/docs/schedule.md"
+  ],
+  "note": "Only inherited schedule interruption prose and reuse notes differ. The rebase joins both independent reuse sections; Skills code, rules, recorded plans and historical proof blobs are byte-identical.",
+  "range_diff": "1:  08ea15585 ! 1:  7c9da509f lampOS: rearm reminder chances on changed work\n    @@ lampOS/crates/skills/tests/it/skills.rs: fn resting_a_budget_queue_and_a_while_w\n     +}\n     \n      ## lampOS/docs/reuse-decisions.md ##\n    -@@ lampOS/docs/reuse-decisions.md: not playing or ready, and may be refused. No new round trip, wait, timer\n    - or playback authority is added. Target: no additional I/O or scheduling\n    - on the confirmation path. Model wording and acoustic latency remain lamp\n    - acceptance, not established by prompt-context assertions.\n    +@@ lampOS/docs/reuse-decisions.md: may already have played even without a provider terminal join. This also holds\n    + multi-generation output interrupted after an earlier generation retired;\n    + no whole-turn completion or Ack is inferred. The live same-pump final-retirement\n    + control stays held, while accepted/unretired audio still retries after fencing.\n     +\n     +## Reminder skills offer another chance while work remains (26 October 2026)\n     +\n"
+}
