@@ -13,6 +13,21 @@ machine is explicitly named. Third has no lamp access.
 
 
 
+## 2026-10-26 14:30 — Documentation-only reminder carry
+
+Ready for lamp-voice: no (#3525)
+
+Pushed **aad5a4fe3** on **1ec33957c**. Complete head delta from fe488 is
+only addons.md's error-code wording; one equal task patch. Fresh formatting,
+strict Skills Clippy, workspace build and all Skills test compilation pass.
+All five test drivers and actual child match the sealed fe488 binaries;
+all tracked lampOS input hashes except that unconsumed doc match.
+[Equivalence](verification/reminder-pending-present-20261026/carry-1ec-equivalence.json).
+The 542/0/9 and 21 controls remain actual fe488/883 execution; no fresh
+runtime/rustdoc execution is claimed. New native gates qualify aad5 directly.
+The initial collector incorrectly required a runtime summary from --no-run;
+receipt parsing was corrected, with no product command failure or rerun.
+
 ## 2026-10-26 14:24 — Reminder current-base native qualification
 
 Ready for lamp-voice: no (#3525, final train disposition requested)
