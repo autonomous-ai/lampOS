@@ -1,3 +1,13 @@
+Ready for lamp-voice: #3510 current software CI pending; activation HOLD unchanged.
+
+## Current checkpoint: 2026-10-26 18:14 +07, current own-keys carry pushed
+
+#3510 is now **20bc7d626e** on latest Main **ba950f289b**. [Carry proof and Update gate](verification/own-keys-product-carry-20261026/current-20bc/README.md): seven equal patches, 37 unchanged authored files, with the shared install test file receiving exactly the inherited fixture repair; only install.rs and updates.md differ from d378. Fmt and strict Update all-target Clippy pass. Matching full Update library/install execution at 16 threads gives **122/0/2 + 108/0/0 = 230/0/2**, all 17 required controls once. Final guards cover 7,258 source entries, three executable pairs, 52 local compiler outputs and 765 depfiles. No test retries.
+
+The preceding exclusive Voice **4,093/0/21** stays attributed to d378/6663, whose exact source is published on `second/ownkeys-executed-d378-20261026`. Its complete input/artifact boundary was checked before intentional same-owned-target reuse. Historical six-crate and shared-target qualifications remain recorded. Original current CI must qualify the new head; f378 native green does not transfer automatically. Draft activation HOLD remains #2094 plus explicit current-lamp acceptance. No device, provider, signing or release action.
+
+---
+
 Ready for lamp-voice: startup delivered; own-keys software carry active, activation HOLD unchanged.
 
 ## Current checkpoint: 2026-10-26 18:08 +07, exclusive-target Voice qualification passed

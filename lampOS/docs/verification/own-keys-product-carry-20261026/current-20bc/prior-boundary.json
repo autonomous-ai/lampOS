@@ -1,0 +1,10 @@
+{
+  "actual_and_preserved_artifacts_rechecked_before_rebuild": true,
+  "complete_sha256": "5c3ee794b4bc6bfd76fbe893496bc05f51afd187624c96788188b006e6f9e251",
+  "previous_head": "d378a185031dd839e0e559aacc520391760e440e",
+  "scope": "Only this owned checkout has used the exclusive target. Previous Voice counts remain d378/6663.",
+  "source_changed_paths": [
+    "lampOS/crates/update/tests/install.rs",
+    "lampOS/docs/updates.md"
+  ]
+}

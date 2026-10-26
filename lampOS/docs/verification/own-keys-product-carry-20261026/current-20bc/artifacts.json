@@ -1,0 +1,113 @@
+[
+  {
+    "compiler_artifact": {
+      "executable": "<target>/debug/deps/install-08004915d5b421f7",
+      "features": [],
+      "filenames": [
+        "<target>/debug/deps/install-08004915d5b421f7"
+      ],
+      "fresh": false,
+      "manifest_path": "<source>/lampOS/crates/update/Cargo.toml",
+      "package_id": "path+file://<source>/lampOS/crates/update#lamp-update@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": true
+      },
+      "reason": "compiler-artifact",
+      "target": {
+        "crate_types": [
+          "bin"
+        ],
+        "doc": false,
+        "doctest": false,
+        "edition": "2024",
+        "kind": [
+          "test"
+        ],
+        "name": "install",
+        "src_path": "<source>/lampOS/crates/update/tests/install.rs",
+        "test": true
+      }
+    },
+    "path": "<target>/debug/deps/install-08004915d5b421f7",
+    "preserved_path": "<gate>/artifacts/0-install-08004915d5b421f7",
+    "sha256": "072b939287510ea15420e4690885e8ccab038d27eac1af737a673255067f324c"
+  },
+  {
+    "compiler_artifact": {
+      "executable": "<target>/debug/deps/lamp_update-e14d54c83f68ff7f",
+      "features": [],
+      "filenames": [
+        "<target>/debug/deps/lamp_update-e14d54c83f68ff7f"
+      ],
+      "fresh": false,
+      "manifest_path": "<source>/lampOS/crates/update/Cargo.toml",
+      "package_id": "path+file://<source>/lampOS/crates/update#lamp-update@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": true
+      },
+      "reason": "compiler-artifact",
+      "target": {
+        "crate_types": [
+          "lib"
+        ],
+        "doc": true,
+        "doctest": true,
+        "edition": "2024",
+        "kind": [
+          "lib"
+        ],
+        "name": "lamp_update",
+        "src_path": "<source>/lampOS/crates/update/src/lib.rs",
+        "test": true
+      }
+    },
+    "path": "<target>/debug/deps/lamp_update-e14d54c83f68ff7f",
+    "preserved_path": "<gate>/artifacts/1-lamp_update-e14d54c83f68ff7f",
+    "sha256": "609d339f9613dd9102e0d10e73b773efefa3e8a76db90b57a818eb261f2d0f71"
+  },
+  {
+    "compiler_artifact": {
+      "executable": "<target>/debug/lamp-update",
+      "features": [],
+      "filenames": [
+        "<target>/debug/lamp-update"
+      ],
+      "fresh": false,
+      "manifest_path": "<source>/lampOS/crates/update/Cargo.toml",
+      "package_id": "path+file://<source>/lampOS/crates/update#lamp-update@0.1.0",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "reason": "compiler-artifact",
+      "target": {
+        "crate_types": [
+          "bin"
+        ],
+        "doc": true,
+        "doctest": false,
+        "edition": "2024",
+        "kind": [
+          "bin"
+        ],
+        "name": "lamp-update",
+        "src_path": "<source>/lampOS/crates/update/src/main.rs",
+        "test": true
+      }
+    },
+    "path": "<target>/debug/lamp-update",
+    "preserved_path": "<gate>/artifacts/2-lamp-update",
+    "sha256": "0b6b2ff1e33878526d9ee71266a8e9883f882979c9ca07a78368601215d0a1e2"
+  }
+]

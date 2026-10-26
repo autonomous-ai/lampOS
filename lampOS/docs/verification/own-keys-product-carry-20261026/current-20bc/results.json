@@ -1,0 +1,109 @@
+{
+  "complete": {
+    "actual_and_preserved_artifacts": 3,
+    "artifacts_unchanged": true,
+    "base": "ba950f289b4e0d4fd072d080ea3a1b54e7bce03f",
+    "complete": true,
+    "head": "20bc7d626e7b53d4ea7e7e3a2b5018c93973c7f9",
+    "ignored": 2,
+    "passed": 230,
+    "source_entries": 7258,
+    "source_unchanged": true
+  },
+  "identity": {
+    "base": "ba950f289b4e0d4fd072d080ea3a1b54e7bce03f",
+    "controller_sha256": "d54d137b180460589b17dfab565852399fd5a6bf0cf0c0709d81aa9a62b6729d",
+    "head": "20bc7d626e7b53d4ea7e7e3a2b5018c93973c7f9",
+    "runner_sha256": "2e66404ac7e0a43bc84afc01b8ba599bd3c14724c3a29e9fce51c831eaf87183"
+  },
+  "receipts": {
+    "clippy": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "clippy",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-update",
+        "--all-targets",
+        "--message-format=short",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "disk_free_before": 95413325824,
+      "elapsed_seconds": 33.598,
+      "error": null,
+      "exit_code": 0,
+      "log_sha256": "26cd82e9984f4083e37be8fec9cf3b2f2f0f8f50295bf66bde832cd60a768b0a",
+      "source_entries": 7258,
+      "source_unchanged": true
+    },
+    "compile": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-update",
+        "--lib",
+        "--test",
+        "install",
+        "--no-run",
+        "--message-format=json"
+      ],
+      "disk_free_before": 95351508992,
+      "elapsed_seconds": 72.634,
+      "error": null,
+      "exit_code": 0,
+      "log_sha256": "8b6a63177ff8166c75c452c7118aa12a8edb95fa145ff81018f15dfd39dcd366",
+      "source_entries": 7258,
+      "source_unchanged": true
+    },
+    "fmt": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "disk_free_before": 95413391360,
+      "elapsed_seconds": 6.56,
+      "error": null,
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source_entries": 7258,
+      "source_unchanged": true
+    },
+    "runtime": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-update",
+        "--lib",
+        "--test",
+        "install",
+        "--no-fail-fast",
+        "--",
+        "--test-threads=16"
+      ],
+      "disk_free_before": 93936656384,
+      "elapsed_seconds": 117.561,
+      "error": null,
+      "exit_code": 0,
+      "log_sha256": "d56a3173cefad87ed91521ff91d9871b376e543aebf2aea80f8593922065ba77",
+      "source_entries": 7258,
+      "source_unchanged": true
+    }
+  },
+  "scope": "Current full Update library and install integration at sixteen threads; strict Update Clippy. Previous exclusive Voice remains d378/6663.",
+  "source_inventory_sha256": "c1356d8f6a07225091139a5d75ffb1bc93abaf560a5e188681be66aed7bf1c90"
+}
