@@ -1,5 +1,13 @@
 # Tests work log
 
+## 2026-10-27 05:58 — Current Sentinel pushed; Restart gate starts
+
+Ready for lamp-voice: no (remaining current-native/read gates pending)
+
+[Sentinel 0c/90ca host proof](verification/tests-sentinel-90ca-20261027/) passed the complete actual Mac Reader module **4/0/0 once**, formatting, strict twelve-package all-target Clippy, workspace and Voice-library compilation. The 3,826-case inventory includes 3,822 explicitly unrun cases; full Voice runtime is not claimed. Source/owner, actual module and all **237** strict sealed copies stayed exact, with native controller/wrapper exit zero and owned groups closed. Exact old57 lease push to `0c1d8bc14` succeeded. Original current ARM64 **40415967954** and Linux **40415967944** are active; peers have been asked to carry their current-source reads.
+
+Restart `29df1d71b/90ca` now runs on the released warm target after actual completed 0c parent receipts, 237 witnesses and canonical/official source equality were bound. Its complete 21-case module is the intended runtime scope, with no full Voice runtime claim. Carrier's remaining round observations continue, with docs/promoter compiler GO still absent. Mood `f4419f830` has full current host/native proof at `0ff49ea2e`/`d8e56175f`, awaiting combined-head peer clearances. No device action.
+
 ## 2026-10-27 05:52 — Composed Mood original native checks pass
 
 Ready for lamp-voice: no (#3623 combined-head peer reads pending)

@@ -1,0 +1,263 @@
+{
+  "status": "PASS",
+  "head": "0c1d8bc145c5e6c117f5b2666cea9c1133bf8b29",
+  "base": "90ca725c514bbb1e4b36318d7b3ccbb14dfd05f1",
+  "scope": "All actual Mac session_reader::tests:: cases once serial, expected four from unchanged Reader source and reconciled to newly compiled full Voice-library inventory. No full Voice runtime, changed Linux case, current native CI or device claim.",
+  "runtime_attempts": 1,
+  "test_threads": 1,
+  "counts": {
+    "passed": 4,
+    "failed": 0,
+    "ignored": 0
+  },
+  "cases": [
+    {
+      "identity": "session_reader::tests::finite_and_unset_service_never_resolve_a_reader_group",
+      "outcome": "ok"
+    },
+    {
+      "identity": "session_reader::tests::group_lookup_failure_retains_private_logging_without_writer_failure",
+      "outcome": "ok"
+    },
+    {
+      "identity": "session_reader::tests::local_session_reader_group_is_exact_unique_and_bounded",
+      "outcome": "ok"
+    },
+    {
+      "identity": "session_reader::tests::unsupported_acl_verification_degrades_to_private_metadata",
+      "outcome": "ok"
+    }
+  ],
+  "ordinary_filtered_out": 3822,
+  "Voice_library_inventory": 3826,
+  "Voice_library_runtime_claim": false,
+  "changed_Linux_case": {
+    "identity": "session_reader::tests::linux::replaced_record_never_changes_an_outside_sentinel",
+    "compiled_or_run_on_Mac": false
+  },
+  "native_or_Restart_qualification_claim": false,
+  "module_runtime_elapsed_s": 1.175208261993248,
+  "native_controller_elapsed_s": 568.222041911009,
+  "native_controller_exit": 0,
+  "native_wrapper_exit": 0,
+  "gates": {
+    "fmt": true,
+    "strict_all_targets_packages": [
+      "lamp-body",
+      "lamp-cloud",
+      "lamp-expression",
+      "lamp-keeper",
+      "lamp-lean",
+      "lamp-memory",
+      "lamp-peek",
+      "lamp-setup",
+      "lamp-skills",
+      "lamp-update",
+      "lamp-voice",
+      "lamp-voice-eval"
+    ],
+    "invalidated_Voice_artifacts_fresh_false": true,
+    "blanket_transitive_freshness_claim": false,
+    "workspace_before_library_test_compile": true,
+    "scoped_clean_only": [
+      "lamp-voice"
+    ]
+  },
+  "source": {
+    "tracked_files": 10674,
+    "before_after_prepared_equal": true,
+    "prepared_official_source_equal_except_alias_branch": true,
+    "index_head_status_and_all_files_exact": true,
+    "postgate_official_owner_tree_equality": "Separately verified by Root after gate closure; full qualified source binds the same0c committed tree.",
+    "authored_files": {
+      "lampOS/crates/voice/src/session_reader/tests.rs": {
+        "sha256": "5f47477a111d7f82da5fdeb3b3893718099eb67a0fe93b76b4f24ddc32adce73",
+        "bytes": 36597,
+        "mode": 420,
+        "kind": "file"
+      },
+      "lampOS/docs/realtime-tests.md": {
+        "sha256": "4b5481d7574ff3445db3d64fb502f4f3788e482fa2a560600fba31c57e53e1ca",
+        "bytes": 115505,
+        "mode": 420,
+        "kind": "file"
+      }
+    },
+    "base_transition_from_parent": [
+      "lampOS/crates/expression/tests/runtime.rs",
+      "lampOS/docs/expression.md"
+    ]
+  },
+  "actual_module": {
+    "artifact": "debug/deps/lamp_voice-6d619bbdd1df3a0d",
+    "source": "lampOS/crates/voice/src/lib.rs",
+    "target": "lamp_voice",
+    "kind": [
+      "lib"
+    ],
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "fresh": false,
+    "sha256": "5eaceef3c0bfde1376740fcb6ba6f26081bdd3fc203844a1d67e99b8e61e44d5",
+    "bytes": 115889560,
+    "mode": 493,
+    "all_attributes_strict": [
+      "sha256",
+      "bytes",
+      "mode",
+      "mtime_ns",
+      "device",
+      "inode"
+    ],
+    "independent_frozen_copy": true
+  },
+  "guards": {
+    "prior_sealed": 236,
+    "new_frozen": 1,
+    "final_sealed": 237,
+    "all_frozen_attributes_strict": [
+      "sha256",
+      "bytes",
+      "mode",
+      "mtime_ns",
+      "device",
+      "inode"
+    ],
+    "actual_module_unchanged": true,
+    "source_unchanged": true,
+    "protected_witnesses_unchanged": true,
+    "all11_owned_stages_closed": true,
+    "unresolved_owned_pids": [],
+    "lease_released": true,
+    "no_retry": true,
+    "no_reuse": true
+  },
+  "owned_stages": {
+    "fmt": {
+      "exit": 0,
+      "elapsed_s": 13.818731877021492,
+      "group_closed": true,
+      "stop_reason": null,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "metadata": {
+      "exit": 0,
+      "elapsed_s": 0.7344474029960111,
+      "group_closed": true,
+      "stop_reason": null,
+      "stdout_sha256": "2a523fb3426bd4b0d5e15bde66a3ff74a4b79d082c1af04f52368202ea194365",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "clean-Voice-only": {
+      "exit": 0,
+      "elapsed_s": 1.499599467992084,
+      "group_closed": true,
+      "stop_reason": null,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "f3e0df9acc24ff97d3bdd2521da3878c3fef995efc183d5828c5200f90cfcb16"
+    },
+    "strict": {
+      "exit": 0,
+      "elapsed_s": 188.20961957797408,
+      "group_closed": true,
+      "stop_reason": null,
+      "stdout_sha256": "976904bc13c256750526c78e1f958689a13ce4406fb63f2aed9471953e727d6b",
+      "stderr_sha256": "784394512731287fb5e03998938697b2302a896821e1b74bbbc961c3a6f5e6e9"
+    },
+    "workspace": {
+      "exit": 0,
+      "elapsed_s": 106.73980384197785,
+      "group_closed": true,
+      "stop_reason": null,
+      "stdout_sha256": "471076e03793111e2a204f816627f1dc17f870b5b9a2e17421e55664026deab1",
+      "stderr_sha256": "1a3747909c9c14b766c11c2863bcb3176c0fb59d0e557bc105c870faca0c387a"
+    },
+    "compile-Voice-lib": {
+      "exit": 0,
+      "elapsed_s": 141.8350289129885,
+      "group_closed": true,
+      "stop_reason": null,
+      "stdout_sha256": "98f42bea96a99e7bb9ad9e708e93b7d8211651a4e7f7088fccfe412745b797db",
+      "stderr_sha256": "3c5474272fcfd995ec0d9762c05d930d1bdfac09efcb74bf13d162a6588f0294"
+    },
+    "inventory-all": {
+      "exit": 0,
+      "elapsed_s": 11.442569296981674,
+      "group_closed": true,
+      "stop_reason": null,
+      "stdout_sha256": "c74fa0b5e7c23a7804259b4342de4f6c5138f9a93e58589432a809bfdf45e300",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "inventory-ignored": {
+      "exit": 0,
+      "elapsed_s": 0.6490045939863194,
+      "group_closed": true,
+      "stop_reason": null,
+      "stdout_sha256": "5460a54eff06379661a554db4840fe29e11c241e26db2b69cb181abaff998dcf",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "inventory-module": {
+      "exit": 0,
+      "elapsed_s": 0.6744079749914818,
+      "group_closed": true,
+      "stop_reason": null,
+      "stdout_sha256": "b0df7fff9caa0edf6d6754caeb7f3e43fec5112fadf0bd5d7a0499803ee65e0c",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "inventory-module_ignored": {
+      "exit": 0,
+      "elapsed_s": 0.5662441799941007,
+      "group_closed": true,
+      "stop_reason": null,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "module-runtime": {
+      "exit": 0,
+      "elapsed_s": 1.175208261993248,
+      "group_closed": true,
+      "stop_reason": null,
+      "stdout_sha256": "ce310609d3c1b02109456ea64731c8db711a1db141d94a75500eb8dbe91a9483",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "limits": [
+    "Four Mac Reader cases only; full3826 Voice inventory was not executed",
+    "Changed Linux case and ignored isolated-root DAC remain outside Mac runtime",
+    "Fresh exact-head native audit and independent reads remain separate",
+    "No future Restart qualification, device or performance claim"
+  ],
+  "private_receipt_sha256": {
+    "terminal.json": "4c9658a903a8e35e7f614e452b2184a5f9424d2e76fc97ec7587f40153aa7570",
+    "native-controller-result.json": "e76054bf94a1e524969fc742ad6a1820af0e668b22ff35f4170bd577b9d03362",
+    "observed-census.json": "eae540711d357ab7b00323ec00c589c9ae60464dcaba75e5822a21000c322e7f",
+    "inventory.json": "1a46bdf75effe5826aa76764ae6c595112164590912280fee6f803534ac3d0e6",
+    "actual-executable.json": "ed2887bed113b134bf0e564729e42ab81de7b377e389089f057073974ab64073",
+    "new-frozen.json": "bb6b3e23edd2eaeee7978617d1a1ef0a377a993e3f34b779896e7347d85cfed0",
+    "protected-before.json": "f1a510697be97c4148b85148e5ea852e97db0bd61846b9c9011b0065d81039bc",
+    "protected-after.json": "27b3ecaa58ac40fb2ec04a6b150d9f8b57ee16bad90951f2627f1ca7f68912da",
+    "source-before.json": "40899d555c52d1bdf4d2a990c143f1fcd7f660c11041792bede59af5d32d3f12",
+    "source-after.json": "40899d555c52d1bdf4d2a990c143f1fcd7f660c11041792bede59af5d32d3f12",
+    "prepared-source.json": "40899d555c52d1bdf4d2a990c143f1fcd7f660c11041792bede59af5d32d3f12",
+    "prepared-source-original-ownWT.json": "096e6daf6283429e59770b95831cadbcd08675403993a195bccec73d0c953025",
+    "root-alias-binding.json": "9486dde0ad9f9881b7be07a025d6d158cfeb167ff6689472651afdf024f47163",
+    "fmt-result.json": "35a88613af219749a6ce2bc3f6d14ecbf58eea52850cbfaa357b57065ee23dc6",
+    "metadata-result.json": "78a8607efc7249261e60918c9683795845a76af58f1b8577c57c4e786617248c",
+    "clean-Voice-only-result.json": "f26a5d8795f328896498dabc017e626eb473f6429f3e8d6e248492e99552141a",
+    "strict-result.json": "ec6a3dde93757c82c0dd3fb7227521a5f86e0a887da40bf2980ee6532425f320",
+    "workspace-result.json": "4a28ec040c34703618625efad7ea6ce18d49a225b65564415ba1d780cc24f873",
+    "compile-Voice-lib-result.json": "d7dddae4f88bc8a0d94e33d6eb5eaa3d86c50e9a7df79ba5811f67d793d1ec22",
+    "inventory-all-result.json": "73f6528c510249f6a7e5a2e8ed49eb09ad77409fc5d0a1a510f662e23f22b4bd",
+    "inventory-ignored-result.json": "d953922221e7aec3e9e289b1e5187b36368635dffbde7e131577f327bd05594d",
+    "inventory-module-result.json": "717e8e5568b80227335d71270eb4d5e88774d1f3f12d7b8a50f28563ef2122df",
+    "inventory-module_ignored-result.json": "014cfb08be5f06d156f3cc91882a46c70e96bd13a56ea404916fb0ae20e5909c",
+    "module-runtime-result.json": "82c6c33823b975f732f2313bb5c033d23f723ce1f6e094c8d83a3da37aab9873"
+  }
+}
