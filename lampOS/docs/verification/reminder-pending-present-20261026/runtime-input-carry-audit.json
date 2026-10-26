@@ -1,0 +1,2520 @@
+{
+  "binding": {
+    "artifact_sha256": "3ca27a610ce8865fa02bbee1d35b5b56e8c765b3b51ff97f3a90e7c570928d2a",
+    "artifact_source": "current-bdc2/actual-artifacts.json",
+    "binary_identity_across_future_carry": "not measured",
+    "compiled_test_drivers": 70,
+    "final_rebased_head": "not supplied or verified in this audit; filename 0961 is a planning label",
+    "frozen_base": "bdc277e2667e11ab04daf60e25f8f9fcf8220dce",
+    "frozen_head": "0945493814f494a49a0a23199ba35dc661bdc546",
+    "frozen_tree": "f5a9820ed450512953fd8e33f5eb34c9e4b3b7b5",
+    "metadata_sha256": "c71f8b402e42a2d4971c51f05bf179e0ba70efb914efa4cae4b46201b15c1e2b",
+    "metadata_source": "current-bdc2/capture.receipt.json",
+    "proposed_delta_base": "bdc277e2667e11ab04daf60e25f8f9fcf8220dce",
+    "proposed_inherited_carry_head": "47e3bcb9769fcf79daa9da5bab42c721af8ce7e9",
+    "runtime_status": "not read",
+    "selected_packages": [
+      "lamp-skills",
+      "lamp-cloud",
+      "lamp-body",
+      "lamp-expression",
+      "lamp-keeper",
+      "lamp-lean",
+      "lamp-memory",
+      "lamp-peek",
+      "lamp-setup",
+      "lamp-update",
+      "lamp-voice",
+      "lamp-voice-eval"
+    ],
+    "source_before_sha256_from_capture": "bf2d1db83afe91d10b3326e59c3526e48388f34171b26b340f330b4b0eee4a0c"
+  },
+  "compile_time_input_examples": [
+    {
+      "boundary": "File content is compiled into binaries; validate all consuming driver and product-child bytes, not just one library artifact.",
+      "input": "Embedded product skill files, plus include_str units/settings/reset plan elsewhere in install.rs",
+      "ref": {
+        "function": "skill_file macro",
+        "line": 447,
+        "path": "lampOS/crates/update/src/install.rs"
+      }
+    },
+    {
+      "boundary": "No runtime open of that source from this expression.",
+      "input": "crates/cloud/src/reports.rs through include_str",
+      "ref": {
+        "function": "embedded reports source",
+        "line": 505,
+        "path": "lampOS/crates/update/tests/install.rs"
+      }
+    },
+    {
+      "boundary": "Compile-time source text, separate from Voice library runtime censuses.",
+      "input": "crates/voice/src/main.rs through include_str",
+      "ref": {
+        "function": "embedded main source",
+        "line": 85,
+        "path": "lampOS/crates/voice/tests/it/process.rs"
+      }
+    },
+    {
+      "boundary": "Compile-time source text.",
+      "input": "crates/memory/src/search.rs through include_str",
+      "ref": {
+        "function": "embedded Memory search source",
+        "line": 13880,
+        "path": "lampOS/crates/voice/src/remember.rs"
+      }
+    },
+    {
+      "boundary": "Compile-time doc content; no direct read of changed voice-test-fixtures.md.",
+      "input": "docs/switches.md through include_str",
+      "ref": {
+        "function": "PAGE",
+        "line": 8,
+        "path": "lampOS/crates/voice-eval/tests/it/switches.rs"
+      }
+    },
+    {
+      "boundary": "The same file also passes live fixture paths to a child later; embedded uses must not hide that separate runtime dependency.",
+      "input": "JSONL fixtures through include_str",
+      "ref": {
+        "function": "RESUMED and other fixture constants",
+        "line": 23,
+        "path": "lampOS/crates/expression/tests/it/rest_replay.rs"
+      }
+    },
+    {
+      "boundary": "Compiled source expansion, not runtime fs access.",
+      "input": "Rust include! and #[path] module files",
+      "ref": {
+        "function": "include support/health_control.rs",
+        "line": 3,
+        "path": "lampOS/crates/memory/tests/health_control.rs"
+      }
+    }
+  ],
+  "conservative_future_requirements": [
+    "Wait for the original frozen run to terminate and qualify it independently, including first failures, selected cases, process cleanup, source identity and actual/saved artifact hashes. This audit has not inspected that result.",
+    "Compare the final rebased tree to frozen 094, not only bdc to 47. Confirm the approved patch is preserved and list every additional changed input. Compare compiler target/features and every actual driver/product-child/auxiliary executable against original preimages.",
+    "Execute the changed Skills it driver on its final source and artifacts. All newly added controls require new execution; a previous test count or same package version cannot cover them.",
+    "Execute the Update it source censuses and the six listed Voice library runtime readers on the final tree even if their driver bytes match. If driver or dependency bytes differ, run the broader affected driver according to the gate rather than assuming these filters suffice.",
+    "For other drivers, byte equality is only one condition. Bind all discovered runtime file roots, actual directory membership/symlinks, child executable identities and relevant host environment; rerun any driver with a changed or unresolved dependency.",
+    "Explicitly bind parent-repository workflows and robots/lamp image inputs, and ignored entries visible to recursive scans. Current lampOS-only content snapshots do not cover these by themselves.",
+    "Treat doctest checks separately: temporary rustdoc executables are not among the 70 captured drivers. The worker edit moves prose with no new code fence, but current-source doc qualification is still separate from retained driver-byte evidence.",
+    "Preserve manual native-only ignore status. No physical, acoustic, motor, native ARM64 or released-reader compatibility result follows from this static host audit."
+  ],
+  "created_utc": "2026-10-26T19:28:15.509339+00:00",
+  "direct_findings": [
+    {
+      "drivers": [
+        "lamp-skills::it"
+      ],
+      "effect": "The inherited carry replaces a detached mock with a joined one and adds two controls. Previous driver success cannot qualify this changed driver or the added controls. No claim about the future actual executable hash is made.",
+      "id": "changed-skills-it",
+      "inputs": [
+        "lampOS/crates/skills/tests/it/skills.rs"
+      ],
+      "kind": "changed_compiled_test_code",
+      "refs": [
+        {
+          "function": "mod skills",
+          "line": 11,
+          "path": "lampOS/crates/skills/tests/it/main.rs"
+        },
+        {
+          "function": "a_repeat_call_with_only_made_steps_is_refused_while_its_run_is_under_way",
+          "line": 3055,
+          "path": "lampOS/crates/skills/tests/it/skills.rs"
+        }
+      ],
+      "required": "Qualify the newly built lamp-skills integration driver on the actual final carry. Preserve both new controls and the original two-call case; unchanged binaries elsewhere do not cover them."
+    },
+    {
+      "drivers": [
+        "lamp-update::it"
+      ],
+      "effect": "At runtime recursively lists every crate Rust file and reads its text, then reads both workflow files. Parses quoted docs/builders path strings after removing line comments. The proposed doc-comment movement is ignored by that parser, but the driver still opens changed raw bytes. This is not a test of the documentation file contents.",
+      "id": "update-ci-paths",
+      "inputs": [
+        "lampOS/crates/**/*.rs",
+        ".github/workflows/lampos-arm64.yml",
+        ".github/workflows/lampos-clippy.yml"
+      ],
+      "intersects_delta": [
+        "lampOS/crates/skills/tests/it/skills.rs",
+        "lampOS/crates/voice/src/second_provider/worker.rs"
+      ],
+      "kind": "runtime_recursive_source_read",
+      "refs": [
+        {
+          "function": "mod ci_paths",
+          "line": 8,
+          "path": "lampOS/crates/update/tests/it/main.rs"
+        },
+        {
+          "function": "sources",
+          "line": 28,
+          "path": "lampOS/crates/update/tests/it/ci_paths.rs"
+        },
+        {
+          "function": "every_doc_a_crate_reads_is_named_back_in_the_workflows_pull_request_paths",
+          "line": 88,
+          "path": "lampOS/crates/update/tests/it/ci_paths.rs"
+        }
+      ],
+      "required": "Rerun the source census on the final source tree even if the Update it executable is byte-identical. Include workflow presence/content and GITHUB_ACTIONS in the input boundary."
+    },
+    {
+      "drivers": [
+        "lamp-update::it"
+      ],
+      "effect": "Reads actual Rust source strings and builds scratch-prefix inventories by driver grouping. Added test/helper source is a runtime input even when the scanner executable is unchanged.",
+      "id": "update-scratch-paths",
+      "inputs": [
+        "lampOS/crates/*/src/**/*.rs",
+        "lampOS/crates/*/tests/**/*.rs"
+      ],
+      "intersects_delta": [
+        "lampOS/crates/skills/tests/it/skills.rs",
+        "lampOS/crates/voice/src/second_provider/worker.rs"
+      ],
+      "kind": "runtime_recursive_source_read",
+      "refs": [
+        {
+          "function": "mod scratch_paths",
+          "line": 11,
+          "path": "lampOS/crates/update/tests/it/main.rs"
+        },
+        {
+          "function": "sources",
+          "line": 25,
+          "path": "lampOS/crates/update/tests/it/scratch_paths.rs"
+        },
+        {
+          "function": "no_two_files_of_a_test_binary_build_the_same_scratch_folder",
+          "line": 138,
+          "path": "lampOS/crates/update/tests/it/scratch_paths.rs"
+        }
+      ],
+      "required": "Rerun on the final tree; bind directory membership as well as file bytes."
+    },
+    {
+      "drivers": [
+        "lamp-voice::lamp_voice"
+      ],
+      "effect": "Reads Voice and Msgs source files at test time; worker.rs is explicitly in the worker-side traversal and coordinator-function checks. code() removes comment lines, so the moved doc comment does not establish a changed census result. Raw file content still changes and must not be justified by executable identity alone.",
+      "id": "voice-worker-census",
+      "inputs": [
+        "lampOS/crates/voice/src/**/*.rs",
+        "lampOS/crates/msgs/src/**/*.rs"
+      ],
+      "intersects_delta": [
+        "lampOS/crates/voice/src/second_provider/worker.rs"
+      ],
+      "kind": "runtime_recursive_source_read",
+      "refs": [
+        {
+          "function": "pub mod process",
+          "line": 101,
+          "path": "lampOS/crates/voice/src/lib.rs"
+        },
+        {
+          "function": "mod switch_census_tests",
+          "line": 2628,
+          "path": "lampOS/crates/voice/src/process.rs"
+        },
+        {
+          "function": "code",
+          "line": 168,
+          "path": "lampOS/crates/voice/src/process/switch_census_tests.rs"
+        },
+        {
+          "function": "rust_files",
+          "line": 196,
+          "path": "lampOS/crates/voice/src/process/switch_census_tests.rs"
+        },
+        {
+          "function": "census_leaving_out",
+          "line": 496,
+          "path": "lampOS/crates/voice/src/process/switch_census_tests.rs"
+        },
+        {
+          "function": "the_coordinators_functions_are_still_in_their_files",
+          "line": 858,
+          "path": "lampOS/crates/voice/src/process/switch_census_tests.rs"
+        }
+      ],
+      "required": "Rerun the runtime-reading census cases on final sources; the synthetic-only parser cases are separate."
+    },
+    {
+      "drivers": [
+        "lamp-voice::lamp_voice"
+      ],
+      "effect": "Recursively reads complete Rust text without comment stripping and searches for forbidden hello markers, then reads Welcome back TOML. The moved comment contains no new marker, but this conclusion is source inspection, not an executed final-source check.",
+      "id": "voice-hello-census",
+      "inputs": [
+        "lampOS/crates/voice/src/**/*.rs",
+        "lampOS/skills/welcome-back/skill.toml"
+      ],
+      "intersects_delta": [
+        "lampOS/crates/voice/src/second_provider/worker.rs"
+      ],
+      "kind": "runtime_recursive_source_read",
+      "refs": [
+        {
+          "function": "pub mod speak_up",
+          "line": 140,
+          "path": "lampOS/crates/voice/src/lib.rs"
+        },
+        {
+          "function": "only_welcome_back_says_hello_on_an_arrival",
+          "line": 200,
+          "path": "lampOS/crates/voice/src/speak_up.rs"
+        }
+      ],
+      "required": "Rerun this census on final sources even if Voice library test bytes match."
+    },
+    {
+      "drivers": [],
+      "effect": "Exact git grep for voice-test-fixtures across all lampOS/crates at the frozen head found no reference. The selected packages had no discovered recursive docs-directory reader. The inherited delta adds prose; this audit found no direct runtime consumer or include_str/include_bytes use for this file.",
+      "id": "changed-doc",
+      "inputs": [
+        "lampOS/docs/voice-test-fixtures.md"
+      ],
+      "kind": "no_runtime_reader_located",
+      "required": "Keep the changed documentation in the source delta. This lexical result is not a universal proof that arbitrary dynamic paths cannot read it."
+    }
+  ],
+  "driver_inventory": [
+    {
+      "captured_sha256": "119e94f10923ca3003170c91ce07acd7fa9d91a387e6ea32ffc22d6269950b2e",
+      "compiled_path": "./.claude/worktrees/third-reminder-dedicated-target/debug/deps/it-8bf4d1aea99732a6",
+      "compiler_fresh": false,
+      "compiler_stage": "test-compile",
+      "direct_delta_reasons": [],
+      "disposition": "no_direct_three_path_reader_located_not_reuse_clearance",
+      "driver": "lamp-body::it",
+      "features": [],
+      "other_runtime_input_groups": [],
+      "target_kind": [
+        "test"
+      ],
+      "target_source": "lampOS/crates/body/tests/it/main.rs"
+    },
+    {
+      "captured_sha256": "b27d8d1051b3114a42b4d1ddbd8f02fd5404b6cea34b0810bd4322acb83b3407",
+      "compiled_path": "./.claude/worktrees/third-reminder-dedicated-target/debug/deps/lamp_body-9ff199928743cc99",
+      "compiler_fresh": false,
+      "compiler_stage": "test-compile",
+      "direct_delta_reasons": [],
+      "disposition": "no_direct_three_path_reader_located_not_reuse_clearance",
+      "driver": "lamp-body::lamp-body",
+      "features": [],
+      "other_runtime_input_groups": [
+        "body-bin-deploy"
+      ],
+      "target_kind": [
+        "bin"
+      ],
+      "target_source": "lampOS/crates/body/src/bin/lamp-body.rs"
+    },
+    {
+      "captured_sha256": "d2c677e1993f56940d628dbbbafd3b12c6b3b294ff431c75d92c21ea8acaf527",
+      "compiled_path": "./.claude/worktrees/third-reminder-dedicated-target/debug/deps/lamp_body_inspect-637ece4159665738",
+      "compiler_fresh": false,
+      "compiler_stage": "test-compile",
+      "direct_delta_reasons": [],
+      "disposition": "no_direct_three_path_reader_located_not_reuse_clearance",
+      "driver": "lamp-body::lamp-body-inspect",
+      "features": [],
+      "other_runtime_input_groups": [],
+      "target_kind": [
+        "bin"
+      ],
+      "target_source": "lampOS/crates/body/src/bin/lamp-body-inspect.rs"
+    },
+    {
+      "captured_sha256": "4d885e07545c561788a714584bdd588d37a4cb7823937b0a00e5e24f96c68333",
+      "compiled_path": "./.claude/worktrees/third-reminder-dedicated-target/debug/deps/lamp_body_measure-7f0ba0e9571da263",
+      "compiler_fresh": false,
+      "compiler_stage": "test-compile",
+      "direct_delta_reasons": [],
+      "disposition": "no_direct_three_path_reader_located_not_reuse_clearance",
+      "driver": "lamp-body::lamp-body-measure",
+      "features": [],
+      "other_runtime_input_groups": [],
+      "target_kind": [
+        "bin"
+      ],
+      "target_source": "lampOS/crates/body/src/bin/lamp-body-measure.rs"
+    },
+    {
+      "captured_sha256": "354898a86425f2e971dfc9f487a6d8717caeaae2b59c9a3c0c97a0f2a8326801",
+      "compiled_path": "./.claude/worktrees/third-reminder-dedicated-target/debug/deps/lamp_body_mood-30267137783a16a9",
+      "compiler_fresh": false,
+      "compiler_stage": "test-compile",
+      "direct_delta_reasons": [],
+      "disposition": "no_direct_three_path_reader_located_not_reuse_clearance",
+      "driver": "lamp-body::lamp-body-mood",
+      "features": [],
+      "other_runtime_input_groups": [],
+      "target_kind": [
+        "bin"
+      ],
+      "target_source": "lampOS/crates/body/src/bin/lamp-body-mood.rs"
+    },
+    {
+      "captured_sha256": "fb5fbb733c539f9eccc40a115239986953d33de5ef00e9e1db4a4aecdb51bf7c",
+      "compiled_path": "./.claude/worktrees/third-reminder-dedicated-target/debug/deps/lamp_body_worker-29a1b45163b9be85",
+      "compiler_fresh": false,
+      "compiler_stage": "test-compile",
+      "direct_delta_reasons": [],
+      "disposition": "no_direct_three_path_reader_located_not_reuse_clearance",
+      "driver": "lamp-body::lamp-body-worker",
+      "features": [],
+      "other_runtime_input_groups": [],
+      "target_kind": [
+        "bin"
+      ],
+      "target_source": "lampOS/crates/body/src/bin/lamp-body-worker.rs"
+    },
+    {
+      "captured_sha256": "3d61b52448794beba3fcd2d0c8dedbb6ed2fd9de5e670b74f44d907ee4e56896",
+      "compiled_path": "./.claude/worktrees/third-reminder-dedicated-target/debug/deps/lamp_body-3bda0a619327d99b",
+      "compiler_fresh": false,
+      "compiler_stage": "test-compile",
+      "direct_delta_reasons": [],
+      "disposition": "no_direct_three_path_reader_located_not_reuse_clearance",
+      "driver": "lamp-body::lamp_body",
+      "features": [],
+      "other_runtime_input_groups": [],
+      "target_kind": [
+        "lib"
+      ],
+      "target_source": "lampOS/crates/body/src/lib.rs"
+    },
+    {
+      "captured_sha256": "fe03e56def2644ce7a5acff89bef85894ec0fed4f2cea6370f66f24c0eb436d6",
+      "compiled_path": "./.claude/worktrees/third-reminder-dedicated-target/debug/deps/it-f79cb3cb89d2ed6d",
+      "compiler_fresh": false,
+      "compiler_stage": "test-compile",
+      "direct_delta_reasons": [],
+      "disposition": "no_direct_three_path_reader_located_not_reuse_clearance",
+      "driver": "lamp-cloud::it",
+      "features": [],
+      "other_runtime_input_groups": [
+        "cloud-it-bundle"
+      ],
+      "target_kind": [
+        "test"
+      ],
+      "target_source": "lampOS/crates/cloud/tests/it/main.rs"
+    },
+    {
+      "captured_sha256": "124b7a69f9dcba35683ab5cad10c48c3bd8f203bde025e35fb6d2b52e86dddae",
+      "compiled_path": "./.claude/worktrees/third-reminder-dedicated-target/debug/deps/lamp_cloud-ec55a9cccd50d91b",
+      "compiler_fresh": false,
+      "compiler_stage": "test-compile",
+      "direct_delta_reasons": [],
+      "disposition": "no_direct_three_path_reader_located_not_reuse_clearance",
+      "driver": "lamp-cloud::lamp-cloud",
+      "features": [],
+      "other_runtime_input_groups": [],
+      "target_kind": [
+        "bin"
+      ],
+      "target_source": "lampOS/crates/cloud/src/main.rs"
+    },
+    {
+      "captured_sha256": "89617774a9fa950eb5d48cbb2982ec9ed7ec52c1dbf7b530f1d739c2a490ada9",
+      "compiled_path": "./.claude/worktrees/third-reminder-dedicated-target/debug/deps/lamp_cloud-9d3c31ca873cd5b8",
+      "compiler_fresh": false,
+      "compiler_stage": "test-compile",
+      "direct_delta_reasons": [],
+      "disposition": "no_direct_three_path_reader_located_not_reuse_clearance",
+      "driver": "lamp-cloud::lamp_cloud",
+      "features": [],
+      "other_runtime_input_groups": [
+        "cloud-library-inputs"
+      ],
+      "target_kind": [
+        "lib"
+      ],
+      "target_source": "lampOS/crates/cloud/src/lib.rs"
+    },
+    {
+      "captured_sha256": "86ae4ab7f4aa220672b3f0fe729b61b2515459b40a521e64f8059905aa06a861",
+      "compiled_path": "./.claude/worktrees/third-reminder-dedicated-target/debug/deps/release_pair-6932b5647255c739",
+      "compiler_fresh": false,
+      "compiler_stage": "test-compile",
+      "direct_delta_reasons": [],
+      "disposition": "no_direct_three_path_reader_located_not_reuse_clearance",
+      "driver": "lamp-cloud::release_pair",
+      "features": [],
+      "other_runtime_input_groups": [],
+      "target_kind": [
+        "test"
+      ],
+      "target_source": "lampOS/crates/cloud/tests/release_pair.rs"
+    },
+    {
+      "captured_sha256": "84ea922279fa7dbef891e02022db06a312cbb47e43cc28eb6ce8d3db3e4c6b8c",
+      "compiled_path": "./.claude/worktrees/third-reminder-dedicated-target/debug/deps/it-d30071be32c9fc43",
+      "compiler_fresh": false,
+      "compiler_stage": "test-compile",
+      "direct_delta_reasons": [],
+      "disposition": "no_direct_three_path_reader_located_not_reuse_clearance",
+      "driver": "lamp-expression::it",
+      "features": [],
+      "other_runtime_input_groups": [
+        "expression-it-inputs"
+      ],
+      "target_kind": [
+        "test"
+      ],
+      "target_source": "lampOS/crates/expression/tests/it/main.rs"
+    },
+    {
+      "captured_sha256": "9e766b68d94d6d2f1f46b085236f9dff836c549a6f71058caf0c1ee0e6abcbe6",
+      "compiled_path": "./.claude/worktrees/third-reminder-dedicated-target/debug/deps/lamp_expression-367629d2b98fd09c",
+      "compiler_fresh": false,
+      "compiler_stage": "test-compile",
+      "direct_delta_reasons": [],
+      "disposition": "no_direct_three_path_reader_located_not_reuse_clearance",
+      "driver": "lamp-expression::lamp-expression",
+      "features": [],
+      "other_runtime_input_groups": [],
+      "target_kind": [
+        "bin"
+      ],
+      "target_source": "lampOS/crates/expression/src/main.rs"
+    },
+    {
+      "captured_sha256": "82acd49896f22a32164c0b81369938225d4acf70d91a8802b09e7ca5ff701bcc",
+      "compiled_path": "./.claude/worktrees/third-reminder-dedicated-target/debug/deps/lamp_expression-9c5b6f2fc96ff8fb",
+      "compiler_fresh": false,
+      "compiler_stage": "test-compile",
+      "direct_delta_reasons": [],
+      "disposition": "no_direct_three_path_reader_located_not_reuse_clearance",
+      "driver": "lamp-expression::lamp_expression",
+      "features": [],
+      "other_runtime_input_groups": [],
+      "target_kind": [
+        "lib"
+      ],
+      "target_source": "lampOS/crates/expression/src/lib.rs"
+    },
+    {
+      "captured_sha256": "06f5594086f5be5713d72e245afb2c6bc3eceab309302773ef1a6c51cbb94be5",
+      "compiled_path": "./.claude/worktrees/third-reminder-dedicated-target/debug/deps/runtime-8ba534de81614d18",
+      "compiler_fresh": false,
+      "compiler_stage": "test-compile",
+      "direct_delta_reasons": [],
+      "disposition": "no_direct_three_path_reader_located_not_reuse_clearance",
+      "driver": "lamp-expression::runtime",
+      "features": [],
+      "other_runtime_input_groups": [],
+      "target_kind": [
+        "test"
+      ],
+      "target_source": "lampOS/crates/expression/tests/runtime.rs"
+    },
+    {
+      "captured_sha256": "3d9e0c41c857b0de4e4dfa154c0839b07d6678552baae89768a2bccb7b25dc87",
+      "compiled_path": "./.claude/worktrees/third-reminder-dedicated-target/debug/deps/lamp_keeper-a9f34008275109b0",
+      "compiler_fresh": false,
+      "compiler_stage": "test-compile",
+      "direct_delta_reasons": [],
+      "disposition": "no_direct_three_path_reader_located_not_reuse_clearance",
+      "driver": "lamp-keeper::lamp-keeper",
+      "features": [
+        "default",
+        "prepare"
+      ],
+      "other_runtime_input_groups": [],
+      "target_kind": [
+        "bin"
+      ],
+      "target_source": "lampOS/crates/keeper/src/main.rs"
+    },
+    {
+      "captured_sha256": "460693bb0a37253a9fb442fc1ee29de02e255e3436303ee7f6e6c457a78f6c87",
+      "compiled_path": "./.claude/worktrees/third-reminder-dedicated-target/debug/deps/lamp_keeper-d493629e7c7f7339",
+      "compiler_fresh": false,
+      "compiler_stage": "test-compile",
+      "direct_delta_reasons": [],
+      "disposition": "no_direct_three_path_reader_located_not_reuse_clearance",
+      "driver": "lamp-keeper::lamp_keeper",
+      "features": [
+        "default",
+        "prepare"
+      ],
+      "other_runtime_input_groups": [],
+      "target_kind": [
+        "lib"
+      ],
+      "target_source": "lampOS/crates/keeper/src/lib.rs"
+    },
+    {
+      "captured_sha256": "95ec2b90cc361e23de1a0544eb87f0b6a41b773e8906da80ed10b96d9d831a3f",
+      "compiled_path": "./.claude/worktrees/third-reminder-dedicated-target/debug/deps/it-71b3c4366a177b0c",
+      "compiler_fresh": false,
+      "compiler_stage": "test-compile",
+      "direct_delta_reasons": [],
+      "disposition": "no_direct_three_path_reader_located_not_reuse_clearance",
+      "driver": "lamp-lean::it",
+      "features": [],
+      "other_runtime_input_groups": [],
+      "target_kind": [
+        "test"
+      ],
+      "target_source": "lampOS/crates/lean/tests/it/main.rs"
+    },
+    {
+      "captured_sha256": "5c37dfdf0cda7a1b3a6c43e25a35dc52a6050ecd934b2c72dc5067837c3eecc2",
+      "compiled_path": "./.claude/worktrees/third-reminder-dedicated-target/debug/deps/lamp_lean-bf9e165f7a87ea41",
+      "compiler_fresh": false,
+      "compiler_stage": "test-compile",
+      "direct_delta_reasons": [],
+      "disposition": "no_direct_three_path_reader_located_not_reuse_clearance",
+      "driver": "lamp-lean::lamp_lean",
+      "features": [],
+      "other_runtime_input_groups": [],
+      "target_kind": [
+        "lib"
+      ],
+      "target_source": "lampOS/crates/lean/src/lib.rs"
+    },
+    {
+      "captured_sha256": "2f7c30d29dcfc343ef3d4699f374d67e2308e48d8515d4e89e932b7507a0e543",
+      "compiled_path": "./.claude/worktrees/third-reminder-dedicated-target/debug/deps/forget_person-48c3fe3ff9906b32",
+      "compiler_fresh": false,
+      "compiler_stage": "test-compile",
+      "direct_delta_reasons": [],
+      "disposition": "no_direct_three_path_reader_located_not_reuse_clearance",
+      "driver": "lamp-memory::forget_person",
+      "features": [],
+      "other_runtime_input_groups": [],
+      "target_kind": [
+        "test"
+      ],
+      "target_source": "lampOS/crates/memory/tests/forget_person.rs"
+    },
+    {
+      "captured_sha256": "ea57278c440adf42c9e78a7afc9025963db876a800b513aa5b7680d3e1aa426a",
+      "compiled_path": "./.claude/worktrees/third-reminder-dedicated-target/debug/deps/forget_shared_exchange-ec60dcd1d8a12661",
+      "compiler_fresh": false,
+      "compiler_stage": "test-compile",
+      "direct_delta_reasons": [],
+      "disposition": "no_direct_three_path_reader_located_not_reuse_clearance",
+      "driver": "lamp-memory::forget_shared_exchange",
+      "features": [],
+      "other_runtime_input_groups": [],
+      "target_kind": [
+        "test"
+      ],
+      "target_source": "lampOS/crates/memory/tests/forget_shared_exchange.rs"
+    },
+    {
+      "captured_sha256": "9738a2ccc57c5e9efa1f78ccad2587415c017635b204b2dd1e8099ab587b9c3d",
+      "compiled_path": "./.claude/worktrees/third-reminder-dedicated-target/debug/deps/forgot-c03399e1f88b611c",
+      "compiler_fresh": false,
+      "compiler_stage": "test-compile",
+      "direct_delta_reasons": [],
+      "disposition": "no_direct_three_path_reader_located_not_reuse_clearance",
+      "driver": "lamp-memory::forgot",
+      "features": [],
+      "other_runtime_input_groups": [],
+      "target_kind": [
+        "test"
+      ],
+      "target_source": "lampOS/crates/memory/tests/forgot.rs"
+    },
+    {
+      "captured_sha256": "53c18bae96c6a7c27230fcf7facab35197d65d66116ef3bfbf94599b0e54689c",
+      "compiled_path": "./.claude/worktrees/third-reminder-dedicated-target/debug/deps/health_control-b4454d213a3bb8e6",
+      "compiler_fresh": false,
+      "compiler_stage": "test-compile",
+      "direct_delta_reasons": [],
+      "disposition": "no_direct_three_path_reader_located_not_reuse_clearance",
+      "driver": "lamp-memory::health_control",
+      "features": [],
+      "other_runtime_input_groups": [],
+      "target_kind": [
+        "test"
+      ],
+      "target_source": "lampOS/crates/memory/tests/health_control.rs"
+    },
+    {
+      "captured_sha256": "f31b9b939a52b49e301294afbdae7e882ece5528a241d7a1131cb97a8994fa84",
+      "compiled_path": "./.claude/worktrees/third-reminder-dedicated-target/debug/deps/it-cb83294ccc4832ad",
+      "compiler_fresh": false,
+      "compiler_stage": "test-compile",
+      "direct_delta_reasons": [],
+      "disposition": "no_direct_three_path_reader_located_not_reuse_clearance",
+      "driver": "lamp-memory::it",
+      "features": [],
+      "other_runtime_input_groups": [],
+      "target_kind": [
+        "test"
+      ],
+      "target_source": "lampOS/crates/memory/tests/it/main.rs"
+    },
+    {
+      "captured_sha256": "d1a6e8dae321b809b9adcc1764d2881b9f1452fdf468a5840ec31c907e046227",
+      "compiled_path": "./.claude/worktrees/third-reminder-dedicated-target/debug/deps/lamp_memory-49555a3a077e26f6",
+      "compiler_fresh": false,
+      "compiler_stage": "test-compile",
+      "direct_delta_reasons": [],
+      "disposition": "no_direct_three_path_reader_located_not_reuse_clearance",
+      "driver": "lamp-memory::lamp-memory",
+      "features": [],
+      "other_runtime_input_groups": [],
+      "target_kind": [
+        "bin"
+      ],
+      "target_source": "lampOS/crates/memory/src/main.rs"
+    },
+    {
+      "captured_sha256": "a86c2516bedce7a7caf4aa88c81f1a7aec15e08548e2bb18d7c53ab58a5cdf0e",
+      "compiled_path": "./.claude/worktrees/third-reminder-dedicated-target/debug/deps/lamp_memory_eval-d99c5dad98adec59",
+      "compiler_fresh": false,
+      "compiler_stage": "test-compile",
+      "direct_delta_reasons": [],
+      "disposition": "no_direct_three_path_reader_located_not_reuse_clearance",
+      "driver": "lamp-memory::lamp-memory-eval",
+      "features": [],
+      "other_runtime_input_groups": [],
+      "target_kind": [
+        "bin"
+      ],
+      "target_source": "lampOS/crates/memory/src/bin/lamp-memory-eval.rs"
+    },
+    {
+      "captured_sha256": "5a5b57138aaaf14e94b4929feca92bfa3af5fc206de1cee1bc2496ff52602e73",
+      "compiled_path": "./.claude/worktrees/third-reminder-dedicated-target/debug/deps/lamp_memory-82fda6e861160c1c",
+      "compiler_fresh": false,
+      "compiler_stage": "test-compile",
+      "direct_delta_reasons": [],
+      "disposition": "no_direct_three_path_reader_located_not_reuse_clearance",
+      "driver": "lamp-memory::lamp_memory",
+      "features": [],
+      "other_runtime_input_groups": [],
+      "target_kind": [
+        "lib"
+      ],
+      "target_source": "lampOS/crates/memory/src/lib.rs"
+    },
+    {
+      "captured_sha256": "3e7fe3006f57c6ec18398e7070bc375fd15844bf297bd781a5910a29055515df",
+      "compiled_path": "./.claude/worktrees/third-reminder-dedicated-target/debug/deps/paraphrase_fixture-1ab158fe737ddfa1",
+      "compiler_fresh": false,
+      "compiler_stage": "test-compile",
+      "direct_delta_reasons": [],
+      "disposition": "no_direct_three_path_reader_located_not_reuse_clearance",
+      "driver": "lamp-memory::paraphrase_fixture",
+      "features": [],
+      "other_runtime_input_groups": [],
+      "target_kind": [
+        "test"
+      ],
+      "target_source": "lampOS/crates/memory/tests/paraphrase_fixture.rs"
+    },
+    {
+      "captured_sha256": "b979a9e80ffa2561c231e895e64d46de13c59915da292fe4526d15a3fdb5c84b",
+      "compiled_path": "./.claude/worktrees/third-reminder-dedicated-target/debug/deps/release_pair-98f8d7d4e78ca217",
+      "compiler_fresh": false,
+      "compiler_stage": "test-compile",
+      "direct_delta_reasons": [],
+      "disposition": "no_direct_three_path_reader_located_not_reuse_clearance",
+      "driver": "lamp-memory::release_pair",
+      "features": [],
+      "other_runtime_input_groups": [],
+      "target_kind": [
+        "test"
+      ],
+      "target_source": "lampOS/crates/memory/tests/release_pair.rs"
+    },
+    {
+      "captured_sha256": "2ea2ca1818a46c74b9ad94997254e301ab3dd4b1681d9df5a092b76b689306ae",
+      "compiled_path": "./.claude/worktrees/third-reminder-dedicated-target/debug/deps/voice_early_words-03a1719782c5bbcf",
+      "compiler_fresh": false,
+      "compiler_stage": "test-compile",
+      "direct_delta_reasons": [],
+      "disposition": "no_direct_three_path_reader_located_not_reuse_clearance",
+      "driver": "lamp-memory::voice_early_words",
+      "features": [],
+      "other_runtime_input_groups": [],
+      "target_kind": [
+        "test"
+      ],
+      "target_source": "lampOS/crates/memory/tests/voice_early_words.rs"
+    },
+    {
+      "captured_sha256": "906742a4754c6c56891ca31ed8aea2b3a3bf0cd2e8cfddc5741cb60ff826689b",
+      "compiled_path": "./.claude/worktrees/third-reminder-dedicated-target/debug/deps/voice_follows_face-60853cffd855bd29",
+      "compiler_fresh": false,
+      "compiler_stage": "test-compile",
+      "direct_delta_reasons": [],
+      "disposition": "no_direct_three_path_reader_located_not_reuse_clearance",
+      "driver": "lamp-memory::voice_follows_face",
+      "features": [],
+      "other_runtime_input_groups": [],
+      "target_kind": [
+        "test"
+      ],
+      "target_source": "lampOS/crates/memory/tests/voice_follows_face.rs"
+    },
+    {
+      "captured_sha256": "ade56b9890838e310efab875ffcdd53fdb697407d48f01e769feb8b796e73ada",
+      "compiled_path": "./.claude/worktrees/third-reminder-dedicated-target/debug/deps/voice_forget-2c647d569acd794e",
+      "compiler_fresh": false,
+      "compiler_stage": "test-compile",
+      "direct_delta_reasons": [],
+      "disposition": "no_direct_three_path_reader_located_not_reuse_clearance",
+      "driver": "lamp-memory::voice_forget",
+      "features": [],
+      "other_runtime_input_groups": [],
+      "target_kind": [
+        "test"
+      ],
+      "target_source": "lampOS/crates/memory/tests/voice_forget.rs"
+    },
+    {
+      "captured_sha256": "65e63d4511fc0956afb90a1f18284c652adfc5d0fae4a5c84b8e4289b06dcd0d",
+      "compiled_path": "./.claude/worktrees/third-reminder-dedicated-target/debug/deps/voice_forget_about-6b03356fa90a08a3",
+      "compiler_fresh": false,
+      "compiler_stage": "test-compile",
+      "direct_delta_reasons": [],
+      "disposition": "no_direct_three_path_reader_located_not_reuse_clearance",
+      "driver": "lamp-memory::voice_forget_about",
+      "features": [],
+      "other_runtime_input_groups": [],
+      "target_kind": [
+        "test"
+      ],
+      "target_source": "lampOS/crates/memory/tests/voice_forget_about.rs"
+    },
+    {
+      "captured_sha256": "c61ed54cdf694f32b3541c871690f6a162166589ed527a4f3937de28094cc05c",
+      "compiled_path": "./.claude/worktrees/third-reminder-dedicated-target/debug/deps/voice_forget_named-940b56ba6fb85449",
+      "compiler_fresh": false,
+      "compiler_stage": "test-compile",
+      "direct_delta_reasons": [],
+      "disposition": "no_direct_three_path_reader_located_not_reuse_clearance",
+      "driver": "lamp-memory::voice_forget_named",
+      "features": [],
+      "other_runtime_input_groups": [],
+      "target_kind": [
+        "test"
+      ],
+      "target_source": "lampOS/crates/memory/tests/voice_forget_named.rs"
+    },
+    {
+      "captured_sha256": "e9d4f9b10f61f705d58a43ba04ad0f9be1f43f9aaf1b5467b2316cb8aad65180",
+      "compiled_path": "./.claude/worktrees/third-reminder-dedicated-target/debug/deps/voice_link_used-04635e47dc2694ae",
+      "compiler_fresh": false,
+      "compiler_stage": "test-compile",
+      "direct_delta_reasons": [],
+      "disposition": "no_direct_three_path_reader_located_not_reuse_clearance",
+      "driver": "lamp-memory::voice_link_used",
+      "features": [],
+      "other_runtime_input_groups": [],
+      "target_kind": [
+        "test"
+      ],
+      "target_source": "lampOS/crates/memory/tests/voice_link_used.rs"
+    },
+    {
+      "captured_sha256": "7f88c6c6a820dce2da182dec777d8f4f57329f7227159ab6bda15d1e5e053362",
+      "compiled_path": "./.claude/worktrees/third-reminder-dedicated-target/debug/deps/voice_observe-0d58d8932b7b1e0c",
+      "compiler_fresh": false,
+      "compiler_stage": "test-compile",
+      "direct_delta_reasons": [],
+      "disposition": "no_direct_three_path_reader_located_not_reuse_clearance",
+      "driver": "lamp-memory::voice_observe",
+      "features": [],
+      "other_runtime_input_groups": [],
+      "target_kind": [
+        "test"
+      ],
+      "target_source": "lampOS/crates/memory/tests/voice_observe.rs"
+    },
+    {
+      "captured_sha256": "14e5eb115629b4c62c0b64ab62af0d4db51a4458479f6f28fbc60a760316c09b",
+      "compiled_path": "./.claude/worktrees/third-reminder-dedicated-target/debug/deps/voice_observe_forget-fcb39383d31bbc81",
+      "compiler_fresh": false,
+      "compiler_stage": "test-compile",
+      "direct_delta_reasons": [],
+      "disposition": "no_direct_three_path_reader_located_not_reuse_clearance",
+      "driver": "lamp-memory::voice_observe_forget",
+      "features": [],
+      "other_runtime_input_groups": [],
+      "target_kind": [
+        "test"
+      ],
+      "target_source": "lampOS/crates/memory/tests/voice_observe_forget.rs"
+    },
+    {
+      "captured_sha256": "d0b24d2961eadba187cec9c0781f65c18049105125947e8ddd9334d22dde9534",
+      "compiled_path": "./.claude/worktrees/third-reminder-dedicated-target/debug/deps/voice_observe_named_forget-6694b44535d6bf27",
+      "compiler_fresh": false,
+      "compiler_stage": "test-compile",
+      "direct_delta_reasons": [],
+      "disposition": "no_direct_three_path_reader_located_not_reuse_clearance",
+      "driver": "lamp-memory::voice_observe_named_forget",
+      "features": [],
+      "other_runtime_input_groups": [],
+      "target_kind": [
+        "test"
+      ],
+      "target_source": "lampOS/crates/memory/tests/voice_observe_named_forget.rs"
+    },
+    {
+      "captured_sha256": "f60b0fdcefe712c5b5a10a9ff31ba19e94dce8144ae543fe772e870025cb0990",
+      "compiled_path": "./.claude/worktrees/third-reminder-dedicated-target/debug/deps/voice_observe_room-2a5c62f5d02360a2",
+      "compiler_fresh": false,
+      "compiler_stage": "test-compile",
+      "direct_delta_reasons": [],
+      "disposition": "no_direct_three_path_reader_located_not_reuse_clearance",
+      "driver": "lamp-memory::voice_observe_room",
+      "features": [],
+      "other_runtime_input_groups": [],
+      "target_kind": [
+        "test"
+      ],
+      "target_source": "lampOS/crates/memory/tests/voice_observe_room.rs"
+    },
+    {
+      "captured_sha256": "ff0f2857a5388964702f37a64f3e29b5946c4af8c9a6333c5850b6c9e8ea39cc",
+      "compiled_path": "./.claude/worktrees/third-reminder-dedicated-target/debug/deps/voice_since_until-6f91fd9d551f6455",
+      "compiler_fresh": false,
+      "compiler_stage": "test-compile",
+      "direct_delta_reasons": [],
+      "disposition": "no_direct_three_path_reader_located_not_reuse_clearance",
+      "driver": "lamp-memory::voice_since_until",
+      "features": [],
+      "other_runtime_input_groups": [],
+      "target_kind": [
+        "test"
+      ],
+      "target_source": "lampOS/crates/memory/tests/voice_since_until.rs"
+    },
+    {
+      "captured_sha256": "f554f0090b8828375c12f3262ac20c7abaa08ec1b83d5c0af2ccc5d4541cbb3e",
+      "compiled_path": "./.claude/worktrees/third-reminder-dedicated-target/debug/deps/lamp_peek-85e82104b44dcbfe",
+      "compiler_fresh": false,
+      "compiler_stage": "test-compile",
+      "direct_delta_reasons": [],
+      "disposition": "no_direct_three_path_reader_located_not_reuse_clearance",
+      "driver": "lamp-peek::lamp-peek",
+      "features": [],
+      "other_runtime_input_groups": [],
+      "target_kind": [
+        "bin"
+      ],
+      "target_source": "lampOS/crates/peek/src/main.rs"
+    },
+    {
+      "captured_sha256": "87961aa3126f402393ce9c8dc66f26e9d0bd51f950d3bf638568bcc3b63164c0",
+      "compiled_path": "./.claude/worktrees/third-reminder-dedicated-target/debug/deps/lamp_peek-2ef69e5ef2913106",
+      "compiler_fresh": false,
+      "compiler_stage": "test-compile",
+      "direct_delta_reasons": [],
+      "disposition": "no_direct_three_path_reader_located_not_reuse_clearance",
+      "driver": "lamp-peek::lamp_peek",
+      "features": [],
+      "other_runtime_input_groups": [],
+      "target_kind": [
+        "lib"
+      ],
+      "target_source": "lampOS/crates/peek/src/lib.rs"
+    },
+    {
+      "captured_sha256": "5d00cf7af51a5793251f8d5a972050901685885393ba80fc5f34fd947f363fe3",
+      "compiled_path": "./.claude/worktrees/third-reminder-dedicated-target/debug/deps/peek-dd79617fbcee49da",
+      "compiler_fresh": false,
+      "compiler_stage": "test-compile",
+      "direct_delta_reasons": [],
+      "disposition": "no_direct_three_path_reader_located_not_reuse_clearance",
+      "driver": "lamp-peek::peek",
+      "features": [],
+      "other_runtime_input_groups": [],
+      "target_kind": [
+        "test"
+      ],
+      "target_source": "lampOS/crates/peek/tests/peek.rs"
+    },
+    {
+      "captured_sha256": "4877e62730e321f89648e3f22f2711982b6b1de5e0e9bc3b33e080fed95632a6",
+      "compiled_path": "./.claude/worktrees/third-reminder-dedicated-target/debug/deps/it-dd5d708f0033e1f2",
+      "compiler_fresh": false,
+      "compiler_stage": "test-compile",
+      "direct_delta_reasons": [],
+      "disposition": "no_direct_three_path_reader_located_not_reuse_clearance",
+      "driver": "lamp-setup::it",
+      "features": [],
+      "other_runtime_input_groups": [
+        "setup-it-plan"
+      ],
+      "target_kind": [
+        "test"
+      ],
+      "target_source": "lampOS/crates/setup/tests/it/main.rs"
+    },
+    {
+      "captured_sha256": "25e51005fce6d342b0b73e6186e68368cfd19b8711e2605dde8857381f5dce4f",
+      "compiled_path": "./.claude/worktrees/third-reminder-dedicated-target/debug/deps/lamp_setup-37b78ede12db928c",
+      "compiler_fresh": false,
+      "compiler_stage": "test-compile",
+      "direct_delta_reasons": [],
+      "disposition": "no_direct_three_path_reader_located_not_reuse_clearance",
+      "driver": "lamp-setup::lamp-setup",
+      "features": [],
+      "other_runtime_input_groups": [],
+      "target_kind": [
+        "bin"
+      ],
+      "target_source": "lampOS/crates/setup/src/main.rs"
+    },
+    {
+      "captured_sha256": "fc0398c164ef0621d2ef3fcb9eed0affefc36eebf86909ae71e0637f6a752b8e",
+      "compiled_path": "./.claude/worktrees/third-reminder-dedicated-target/debug/deps/lamp_setup-d3cdaa1c4f394e26",
+      "compiler_fresh": false,
+      "compiler_stage": "test-compile",
+      "direct_delta_reasons": [],
+      "disposition": "no_direct_three_path_reader_located_not_reuse_clearance",
+      "driver": "lamp-setup::lamp_setup",
+      "features": [],
+      "other_runtime_input_groups": [],
+      "target_kind": [
+        "lib"
+      ],
+      "target_source": "lampOS/crates/setup/src/lib.rs"
+    },
+    {
+      "captured_sha256": "a9b9ab5bddfc9ddc98839f57cf4b8e65522576aa47a3dd6024f65ce3bdc35180",
+      "compiled_path": "./.claude/worktrees/third-reminder-dedicated-target/debug/deps/wake-dabb3abe438bd29a",
+      "compiler_fresh": false,
+      "compiler_stage": "test-compile",
+      "direct_delta_reasons": [],
+      "disposition": "no_direct_three_path_reader_located_not_reuse_clearance",
+      "driver": "lamp-setup::wake",
+      "features": [],
+      "other_runtime_input_groups": [],
+      "target_kind": [
+        "test"
+      ],
+      "target_source": "lampOS/crates/setup/tests/wake.rs"
+    },
+    {
+      "captured_sha256": "d4b5db06fbe9f42676818e5d96c15861e92a35845936a87ca03462ef3c129a69",
+      "compiled_path": "./.claude/worktrees/third-reminder-dedicated-target/debug/deps/it-d234ff01061c9264",
+      "compiler_fresh": false,
+      "compiler_stage": "test-compile",
+      "direct_delta_reasons": [
+        "changed-skills-it"
+      ],
+      "disposition": "must_requalify_changed_driver",
+      "driver": "lamp-skills::it",
+      "features": [],
+      "other_runtime_input_groups": [
+        "skills-it-bundle"
+      ],
+      "target_kind": [
+        "test"
+      ],
+      "target_source": "lampOS/crates/skills/tests/it/main.rs"
+    },
+    {
+      "captured_sha256": "73c2b8fb3d0ebcfe695b6ade9ed261e3b418ce3fbd74f481b3141a13dffd9c75",
+      "compiled_path": "./.claude/worktrees/third-reminder-dedicated-target/debug/deps/lamp_skills-65aa47887fbec9c4",
+      "compiler_fresh": false,
+      "compiler_stage": "test-compile",
+      "direct_delta_reasons": [],
+      "disposition": "no_direct_three_path_reader_located_not_reuse_clearance",
+      "driver": "lamp-skills::lamp-skills",
+      "features": [],
+      "other_runtime_input_groups": [
+        "skills-bin-bundle"
+      ],
+      "target_kind": [
+        "bin"
+      ],
+      "target_source": "lampOS/crates/skills/src/main.rs"
+    },
+    {
+      "captured_sha256": "8d187a2bacf9fcd831f122b23af0031796c6e219b48723bb91a9767fd4d06039",
+      "compiled_path": "./.claude/worktrees/third-reminder-dedicated-target/debug/deps/lamp_skills-9340d957f69b21c9",
+      "compiler_fresh": false,
+      "compiler_stage": "test-compile",
+      "direct_delta_reasons": [],
+      "disposition": "no_direct_three_path_reader_located_not_reuse_clearance",
+      "driver": "lamp-skills::lamp_skills",
+      "features": [],
+      "other_runtime_input_groups": [
+        "skills-library-bundle"
+      ],
+      "target_kind": [
+        "lib"
+      ],
+      "target_source": "lampOS/crates/skills/src/lib.rs"
+    },
+    {
+      "captured_sha256": "38e07bddd71fc5bcf9549e9170b45952ab9e5a07163955dd3e7ad28c3fdb0f3f",
+      "compiled_path": "./.claude/worktrees/third-reminder-dedicated-target/debug/deps/release_pair-d292fac7dc749122",
+      "compiler_fresh": false,
+      "compiler_stage": "test-compile",
+      "direct_delta_reasons": [],
+      "disposition": "no_direct_three_path_reader_located_not_reuse_clearance",
+      "driver": "lamp-skills::release_pair",
+      "features": [],
+      "other_runtime_input_groups": [],
+      "target_kind": [
+        "test"
+      ],
+      "target_source": "lampOS/crates/skills/tests/release_pair.rs"
+    },
+    {
+      "captured_sha256": "3b055f45b555c8adf6926cf482a52469edebc590224e46d054e60acbbf83fd5f",
+      "compiled_path": "./.claude/worktrees/third-reminder-dedicated-target/debug/deps/requested_audio-4f27b5daa1cf4165",
+      "compiler_fresh": false,
+      "compiler_stage": "test-compile",
+      "direct_delta_reasons": [],
+      "disposition": "no_direct_three_path_reader_located_not_reuse_clearance",
+      "driver": "lamp-skills::requested_audio",
+      "features": [],
+      "other_runtime_input_groups": [],
+      "target_kind": [
+        "test"
+      ],
+      "target_source": "lampOS/crates/skills/tests/requested_audio.rs"
+    },
+    {
+      "captured_sha256": "f6c989121de8c8d3c4dc858aa7fce69a7eee8870de759d3790e1d36aec53c1c5",
+      "compiled_path": "./.claude/worktrees/third-reminder-dedicated-target/debug/deps/functions-5a0d370af5f450e7",
+      "compiler_fresh": false,
+      "compiler_stage": "test-compile",
+      "direct_delta_reasons": [],
+      "disposition": "no_direct_three_path_reader_located_not_reuse_clearance",
+      "driver": "lamp-update::functions",
+      "features": [],
+      "other_runtime_input_groups": [],
+      "target_kind": [
+        "test"
+      ],
+      "target_source": "lampOS/crates/update/tests/functions.rs"
+    },
+    {
+      "captured_sha256": "fbe93d2a653fd0cbc000b28d7c5737c4ac641b7919867c475cd35adac2936fe3",
+      "compiled_path": "./.claude/worktrees/third-reminder-dedicated-target/debug/deps/install-1ac5cd8688fb5552",
+      "compiler_fresh": false,
+      "compiler_stage": "test-compile",
+      "direct_delta_reasons": [],
+      "disposition": "no_direct_three_path_reader_located_not_reuse_clearance",
+      "driver": "lamp-update::install",
+      "features": [],
+      "other_runtime_input_groups": [
+        "update-install-trees"
+      ],
+      "target_kind": [
+        "test"
+      ],
+      "target_source": "lampOS/crates/update/tests/install.rs"
+    },
+    {
+      "captured_sha256": "a222483b0d4db5ce1023aef8f0db08063c6668dae3d97880ba6501e4257df28e",
+      "compiled_path": "./.claude/worktrees/third-reminder-dedicated-target/debug/deps/it-f14d800ac4c692fa",
+      "compiler_fresh": false,
+      "compiler_stage": "test-compile",
+      "direct_delta_reasons": [
+        "update-ci-paths",
+        "update-scratch-paths"
+      ],
+      "disposition": "must_recheck_changed_runtime_sources",
+      "driver": "lamp-update::it",
+      "features": [],
+      "other_runtime_input_groups": [
+        "update-it-image-tools"
+      ],
+      "target_kind": [
+        "test"
+      ],
+      "target_source": "lampOS/crates/update/tests/it/main.rs"
+    },
+    {
+      "captured_sha256": "52449cd8458196f8d27dbd27b1f884f08ada8ab821a1a36ce48ea6a96135b47f",
+      "compiled_path": "./.claude/worktrees/third-reminder-dedicated-target/debug/deps/lamp_update-8d23626e029fe965",
+      "compiler_fresh": false,
+      "compiler_stage": "test-compile",
+      "direct_delta_reasons": [],
+      "disposition": "no_direct_three_path_reader_located_not_reuse_clearance",
+      "driver": "lamp-update::lamp-update",
+      "features": [],
+      "other_runtime_input_groups": [],
+      "target_kind": [
+        "bin"
+      ],
+      "target_source": "lampOS/crates/update/src/main.rs"
+    },
+    {
+      "captured_sha256": "8a2b2a22db002d73906f9c476c95e67bafc0366cd29ad0b6eb860b6a897e6ce0",
+      "compiled_path": "./.claude/worktrees/third-reminder-dedicated-target/debug/deps/lamp_update-8cfde8964d02dd84",
+      "compiler_fresh": false,
+      "compiler_stage": "test-compile",
+      "direct_delta_reasons": [],
+      "disposition": "no_direct_three_path_reader_located_not_reuse_clearance",
+      "driver": "lamp-update::lamp_update",
+      "features": [],
+      "other_runtime_input_groups": [
+        "update-library-trees"
+      ],
+      "target_kind": [
+        "lib"
+      ],
+      "target_source": "lampOS/crates/update/src/lib.rs"
+    },
+    {
+      "captured_sha256": "1b298ac72ef5ae9280174f77b0da2677ea6686c708f25b6ca5876b102d50a74b",
+      "compiled_path": "./.claude/worktrees/third-reminder-dedicated-target/debug/deps/release_pair-a2eb61ad5583f4c3",
+      "compiler_fresh": false,
+      "compiler_stage": "test-compile",
+      "direct_delta_reasons": [],
+      "disposition": "no_direct_three_path_reader_located_not_reuse_clearance",
+      "driver": "lamp-update::release_pair",
+      "features": [],
+      "other_runtime_input_groups": [],
+      "target_kind": [
+        "test"
+      ],
+      "target_source": "lampOS/crates/update/tests/release_pair.rs"
+    },
+    {
+      "captured_sha256": "8418be030844d76e834257e411181086445388e5ad9c880be75c43b19bd6df18",
+      "compiled_path": "./.claude/worktrees/third-reminder-dedicated-target/debug/deps/round-b56855d52eb918f5",
+      "compiler_fresh": false,
+      "compiler_stage": "test-compile",
+      "direct_delta_reasons": [],
+      "disposition": "no_direct_three_path_reader_located_not_reuse_clearance",
+      "driver": "lamp-update::round",
+      "features": [],
+      "other_runtime_input_groups": [
+        "update-round-skills"
+      ],
+      "target_kind": [
+        "test"
+      ],
+      "target_source": "lampOS/crates/update/tests/round.rs"
+    },
+    {
+      "captured_sha256": "94955a5604dd076af1c9e57fb8b0bf3b6528d346830a5a385b3523a97e4c3ba8",
+      "compiled_path": "./.claude/worktrees/third-reminder-dedicated-target/debug/deps/self_cli_exec-a3a314412b3d0408",
+      "compiler_fresh": false,
+      "compiler_stage": "test-compile",
+      "direct_delta_reasons": [],
+      "disposition": "no_direct_three_path_reader_located_not_reuse_clearance",
+      "driver": "lamp-update::self-cli-exec",
+      "features": [],
+      "other_runtime_input_groups": [],
+      "target_kind": [
+        "test"
+      ],
+      "target_source": "lampOS/crates/update/tests/self_cli_exec.rs"
+    },
+    {
+      "captured_sha256": "8628f0e4ff9639287279fc7dd7ed1ee5c612024a74898d1589b58f99998a8f27",
+      "compiled_path": "./.claude/worktrees/third-reminder-dedicated-target/debug/deps/self_process_cuts-3d0129dfb728f659",
+      "compiler_fresh": false,
+      "compiler_stage": "test-compile",
+      "direct_delta_reasons": [],
+      "disposition": "no_direct_three_path_reader_located_not_reuse_clearance",
+      "driver": "lamp-update::self-process-cuts",
+      "features": [],
+      "other_runtime_input_groups": [],
+      "target_kind": [
+        "test"
+      ],
+      "target_source": "lampOS/crates/update/tests/self_process_cuts.rs"
+    },
+    {
+      "captured_sha256": "dad92299d3c7a6a23d0e36ef6dd1b85993f7566e62f38ab69626b617db080585",
+      "compiled_path": "./.claude/worktrees/third-reminder-dedicated-target/debug/deps/it-917370f90cac6422",
+      "compiler_fresh": false,
+      "compiler_stage": "test-compile",
+      "direct_delta_reasons": [],
+      "disposition": "no_direct_three_path_reader_located_not_reuse_clearance",
+      "driver": "lamp-voice-eval::it",
+      "features": [],
+      "other_runtime_input_groups": [
+        "voice-eval-it-fixtures"
+      ],
+      "target_kind": [
+        "test"
+      ],
+      "target_source": "lampOS/crates/voice-eval/tests/it/main.rs"
+    },
+    {
+      "captured_sha256": "2f6a769e70d171df558234a029363f0073f15e6f5e969e4defb9b4e49cfa4ee8",
+      "compiled_path": "./.claude/worktrees/third-reminder-dedicated-target/debug/deps/lamp_voice_eval-8f91f7c6d8f2bad9",
+      "compiler_fresh": false,
+      "compiler_stage": "test-compile",
+      "direct_delta_reasons": [],
+      "disposition": "no_direct_three_path_reader_located_not_reuse_clearance",
+      "driver": "lamp-voice-eval::lamp-voice-eval",
+      "features": [],
+      "other_runtime_input_groups": [],
+      "target_kind": [
+        "bin"
+      ],
+      "target_source": "lampOS/crates/voice-eval/src/main.rs"
+    },
+    {
+      "captured_sha256": "7b6cf203b46bbd9afd3fcc4d980ddfea2cc10eb608a57203bbf16040e700686a",
+      "compiled_path": "./.claude/worktrees/third-reminder-dedicated-target/debug/deps/lamp_voice_eval-950f5ab79bd5b913",
+      "compiler_fresh": false,
+      "compiler_stage": "test-compile",
+      "direct_delta_reasons": [],
+      "disposition": "no_direct_three_path_reader_located_not_reuse_clearance",
+      "driver": "lamp-voice-eval::lamp_voice_eval",
+      "features": [],
+      "other_runtime_input_groups": [
+        "voice-eval-library-trees"
+      ],
+      "target_kind": [
+        "lib"
+      ],
+      "target_source": "lampOS/crates/voice-eval/src/lib.rs"
+    },
+    {
+      "captured_sha256": "0583882699ab0b8896d20f48b06a582715dbff7a9e97a96ac89f6386a6955755",
+      "compiled_path": "./.claude/worktrees/third-reminder-dedicated-target/debug/deps/it-45a1046acddcb43e",
+      "compiler_fresh": false,
+      "compiler_stage": "test-compile",
+      "direct_delta_reasons": [],
+      "disposition": "no_direct_three_path_reader_located_not_reuse_clearance",
+      "driver": "lamp-voice::it",
+      "features": [],
+      "other_runtime_input_groups": [],
+      "target_kind": [
+        "test"
+      ],
+      "target_source": "lampOS/crates/voice/tests/it/main.rs"
+    },
+    {
+      "captured_sha256": "6f9e71fab933503a48b845aed2f09a9bda5bada1d3b445a921a94d9611e96d64",
+      "compiled_path": "./.claude/worktrees/third-reminder-dedicated-target/debug/deps/lamp_voice-7b478dca3b6d9aaf",
+      "compiler_fresh": false,
+      "compiler_stage": "test-compile",
+      "direct_delta_reasons": [],
+      "disposition": "no_direct_three_path_reader_located_not_reuse_clearance",
+      "driver": "lamp-voice::lamp-voice",
+      "features": [],
+      "other_runtime_input_groups": [],
+      "target_kind": [
+        "bin"
+      ],
+      "target_source": "lampOS/crates/voice/src/main.rs"
+    },
+    {
+      "captured_sha256": "aeda176661f5fcc9f968cff2cff5a1ff9ed5da3c46d99ed68b9e91fe429b4c36",
+      "compiled_path": "./.claude/worktrees/third-reminder-dedicated-target/debug/deps/lamp_voice-e58141fb20c66240",
+      "compiler_fresh": false,
+      "compiler_stage": "test-compile",
+      "direct_delta_reasons": [
+        "voice-worker-census",
+        "voice-hello-census"
+      ],
+      "disposition": "must_recheck_changed_runtime_sources",
+      "driver": "lamp-voice::lamp_voice",
+      "features": [],
+      "other_runtime_input_groups": [
+        "voice-library-skills"
+      ],
+      "target_kind": [
+        "lib"
+      ],
+      "target_source": "lampOS/crates/voice/src/lib.rs"
+    },
+    {
+      "captured_sha256": "cd566e7bd071e2433186331a19d7fbaf78f374ad1c89cf1c1e9a1e1cf2105718",
+      "compiled_path": "./.claude/worktrees/third-reminder-dedicated-target/debug/deps/release_pair-769c0ce370dedcf3",
+      "compiler_fresh": false,
+      "compiler_stage": "test-compile",
+      "direct_delta_reasons": [],
+      "disposition": "no_direct_three_path_reader_located_not_reuse_clearance",
+      "driver": "lamp-voice::release_pair",
+      "features": [],
+      "other_runtime_input_groups": [],
+      "target_kind": [
+        "test"
+      ],
+      "target_source": "lampOS/crates/voice/tests/release_pair.rs"
+    },
+    {
+      "captured_sha256": "ae66205fff9a4705fd142364b62727def397574de0f3c7a1d59f3ab78379211c",
+      "compiled_path": "./.claude/worktrees/third-reminder-dedicated-target/debug/examples/render_line_second-c5860a8fe305ff34",
+      "compiler_fresh": false,
+      "compiler_stage": "test-compile",
+      "direct_delta_reasons": [],
+      "disposition": "no_direct_three_path_reader_located_not_reuse_clearance",
+      "driver": "lamp-voice::render_line_second",
+      "features": [],
+      "other_runtime_input_groups": [],
+      "target_kind": [
+        "example"
+      ],
+      "target_source": "lampOS/crates/voice/examples/render_line_second.rs"
+    },
+    {
+      "captured_sha256": "cc3550c6151672253631a6b32702d8239dffdd3b467226458a7c314e57cf3487",
+      "compiled_path": "./.claude/worktrees/third-reminder-dedicated-target/debug/examples/stop_words_stt_replay-2d0e36e5d853a2d4",
+      "compiler_fresh": false,
+      "compiler_stage": "test-compile",
+      "direct_delta_reasons": [],
+      "disposition": "no_direct_three_path_reader_located_not_reuse_clearance",
+      "driver": "lamp-voice::stop_words_stt_replay",
+      "features": [],
+      "other_runtime_input_groups": [],
+      "target_kind": [
+        "example"
+      ],
+      "target_source": "lampOS/crates/voice/examples/stop_words_stt_replay.rs"
+    }
+  ],
+  "external_root_current_source_checks": [
+    {
+      "cases": [
+        "ci_paths::every_doc_a_crate_reads_is_named_back_in_the_workflows_pull_request_paths"
+      ],
+      "driver": "lamp-update::it",
+      "note": "Also scans every crate Rust source at runtime. Missing workflows can return without checking outside GITHUB_ACTIONS; preserve actual environment and missing-file status.",
+      "roots": [
+        ".github/workflows/lampos-arm64.yml",
+        ".github/workflows/lampos-clippy.yml"
+      ]
+    },
+    {
+      "cases": [
+        "image_journal::the_journal_is_kept_well_inside_the_ram_disk",
+        "image_journal::systemd_reads_it_last_beside_another_drop_in",
+        "image_ramlog::logrotate_runs_the_lamps_copy_back_in_place_of_the_bases",
+        "image_ramlog::the_copy_back_leaves_the_journal_alone",
+        "image_ramlog::the_defaults_keep_the_bases_settings",
+        "image_ramlog::ramlogs_copies_leave_the_journal_out",
+        "image_ramlog::ramlogs_stop_keeps_the_journal_before_its_own_stop",
+        "image_ramlog::the_last_two_boots_are_kept_at_shutdown_only",
+        "image_ramlog::a_failed_move_keeps_the_kept_boots_and_says_so"
+      ],
+      "driver": "lamp-update::it",
+      "note": "Exact script/config consumers. bash, rsync and systemd-analyze are external runtime tools; a test that internally returns for an unavailable tool is not execution of that platform check.",
+      "roots": [
+        "robots/lamp/rootfs/etc/systemd/journald.conf.d/zz-lamp-journal.conf",
+        "robots/lamp/rootfs/etc/systemd/system/logrotate.service.d/zz-lamp-ramlog.conf",
+        "robots/lamp/rootfs/usr/local/libexec/lamp-ramlog-postrotate",
+        "robots/lamp/rootfs/etc/default/orangepi-ramlog",
+        "robots/lamp/rootfs/etc/systemd/system/orangepi-ramlog.service.d/zz-lamp-journal-keep.conf",
+        "robots/lamp/rootfs/usr/local/libexec/lamp-journal-keep"
+      ]
+    },
+    {
+      "cases": [
+        "image::tests::every_image_file_of_every_variant_is_listed_as_shipped",
+        "image::tests::a_file_not_listed_as_shipped_is_refused",
+        "publish::tests::the_images_files_are_carried_with_the_updater_they_need"
+      ],
+      "driver": "lamp-update::lamp_update",
+      "note": "Enumerates variant names under overrides and reads manifest::IMAGE_FILES from each variant root or standard rootfs fallback. Bind existence/absence and override directory membership as well as known file bytes. The selectors are preparation only.",
+      "refs": [
+        {
+          "function": "from_tree",
+          "line": 142,
+          "path": "lampOS/crates/update/src/image.rs"
+        }
+      ],
+      "roots": [
+        "robots/lamp/rootfs",
+        "robots/lamp/overrides/*/rootfs"
+      ]
+    }
+  ],
+  "git_and_version_state": {
+    "comment_only_matches": [
+      {
+        "function": "historical reset-plan comment",
+        "line": 565,
+        "path": "lampOS/crates/update/src/install.rs"
+      },
+      {
+        "function": "tracked deployment comment",
+        "line": 165,
+        "path": "lampOS/crates/update/src/apply.rs"
+      }
+    ],
+    "compile_time_version_refs": [
+      {
+        "function": "firmware metadata",
+        "line": 457,
+        "path": "lampOS/crates/cloud/src/lamp.rs"
+      },
+      {
+        "function": "tool metadata",
+        "line": 954,
+        "path": "lampOS/crates/voice-eval/src/runner.rs"
+      }
+    ],
+    "proof_driver_git_state": "Private capture/run scripts use Git HEAD/tree/status and source hashes; these are qualification inputs and must be freshly rebound after rebase, not attributed to Rust test execution.",
+    "runtime_git_invocation_found": false,
+    "scope": "Literal Git command/state search across all crate sources; selected-package current_dir calls use fixture roots. This is lexical source evidence, not proof against an indirectly constructed command."
+  },
+  "historical_content_limit": {
+    "claim": "Original passes, counts and skips remain observations of their original run. No active result was inspected here. This audit does not retroactively add content guards or preimages to that run.",
+    "clean_status": "Whole-worktree git status --porcelain checks tracked and unignored worktree drift at its recorded times. It does not enumerate ignored files, prove their contents, or provide historical byte preimages for external runtime roots.",
+    "content_snapshot": "The existing per-file source hash snapshot is lampOS-scoped and excludes ignored files. Git tree identity describes committed content, not every actual runtime file or directory entry.",
+    "frozen_packets_modified": false,
+    "future_requirement": "Bind full inventories, contents and relevant symlink resolutions for the named runtime roots on the actual carry; rerun affected or unresolved readers. An inventory taken now is not evidence of what an earlier process read.",
+    "original_observed_passes_or_counts_retracted_or_recomputed": false
+  },
+  "inspected_source_hashes": {
+    "lampOS/crates/body/src/bin/lamp-body.rs": {
+      "git_blob": "c4a3bb0cda8143f065ecb248020cbced4352ee74",
+      "sha256": "e88f523d58e0ce999e95d8e2307964cac0c31e8eebc8427a5981f7907e772651"
+    },
+    "lampOS/crates/body/src/runtime/supervisor/tests.rs": {
+      "git_blob": "3afe05b57e14eb6053ec9afbc31a163757e41059",
+      "sha256": "b1b004332865ff2cdb781d6e5c431c4dca68da13250271bc2029bb608ad1c500"
+    },
+    "lampOS/crates/cloud/src/reports.rs": {
+      "git_blob": "83c683efcb77027a6568877b965d2f88f1cc0e13",
+      "sha256": "917e4e88103a5985bf48370c2adb8ccbe5d2e2620662e0b139469a2d3b41a87b"
+    },
+    "lampOS/crates/cloud/src/skills.rs": {
+      "git_blob": "6c4630d80bf203db244d8c3fb029890a8c119353",
+      "sha256": "4d0c91aeab3be13cb74804cdb10d91b00797e9a6ba1749e25e50add7ba2134b1"
+    },
+    "lampOS/crates/cloud/tests/it/skills_contract.rs": {
+      "git_blob": "2064cf30d0c19905f3a864e82afb55565f5eefda",
+      "sha256": "204f8540ce93791912324de07344d6aa1c36f5f392d1292ce5ab88f98135c2ad"
+    },
+    "lampOS/crates/cloud/tests/release_pair.rs": {
+      "git_blob": "77a2b112c3ca21617ea15c1d6d4b8ec2b9fd62a8",
+      "sha256": "1dcb9d5aa2e42b57f21bcfeb0f12ab5db6253b7625ef7cfdab0e729dbbb46418"
+    },
+    "lampOS/crates/expression/tests/it/rest_replay.rs": {
+      "git_blob": "bd18ee2f7ea20355d4006a62274f9d3753119e93",
+      "sha256": "58134fb8bc7f94cacc7054f1da64dc10ec3bd3e737d958fe4dfd3c3c5672901c"
+    },
+    "lampOS/crates/expression/tests/it/sudden_engine.rs": {
+      "git_blob": "008cb67a5878c137102e01bb1a9e457a1099a411",
+      "sha256": "d62bc622cfa679b12c074c61484bdb6bb7a686a89e5afbea249eaff5ed08c85f"
+    },
+    "lampOS/crates/memory/tests/health_control.rs": {
+      "git_blob": "bc0b003c39b5aac5aaf7cb44c353f13672e2c7e7",
+      "sha256": "e90c17dd703d4d9879732d4b2ead58d725d9e7f712f53fd2e56bd8198c771325"
+    },
+    "lampOS/crates/memory/tests/it/health.rs": {
+      "git_blob": "2b9bbd0b4150a72725264a6ec0b91150f007fa74",
+      "sha256": "71a4fce417a1d4fdac7770b8e31445185b5215b4a9045d529c2670379394db60"
+    },
+    "lampOS/crates/memory/tests/release_pair.rs": {
+      "git_blob": "1ce965094a309e829d7bba4e7e6746c97fff3b98",
+      "sha256": "1f551d5b71416047d609e6b65f6519084725877bc0bbb6b146454acf9339af6f"
+    },
+    "lampOS/crates/memory/tests/voice_observe_room.rs": {
+      "git_blob": "c978ecfb2479840e2d22da3a7119f70ddf89d824",
+      "sha256": "85134b7d9406591625a17415d98a78ffffe3e09d50ee2a27e4efafbe03a8b6ab"
+    },
+    "lampOS/crates/setup/tests/it/reset.rs": {
+      "git_blob": "5b5c916d8649e58bd93a87d63a11482f1c3a553d",
+      "sha256": "3994633df2683e4b1a82bd6aeebd22b3c4a21eb3513b2299b02234a2f8cc9743"
+    },
+    "lampOS/crates/skills/src/main.rs": {
+      "git_blob": "977fcec12d51b23cbeb76853d9bbadef963dcec7",
+      "sha256": "d43fedb99fa40c05ac32ceb413ede3b723a5ee2f992ebba103d9f9c343be486e"
+    },
+    "lampOS/crates/skills/src/visits.rs": {
+      "git_blob": "2d907376b172f95dd20614d4f205260ea089e902",
+      "sha256": "7aad8e5a6cbedcd790d46bc3563093fc434590bf2256285427f5a52a2012d44b"
+    },
+    "lampOS/crates/skills/src/watch.rs": {
+      "git_blob": "2517a9cbed8be4e2b39da477cfb28acdf9213d7d",
+      "sha256": "cb83df51c09174748928db5d709d868d81ae9a7c4bdbedfbe159ed966e674e4f"
+    },
+    "lampOS/crates/skills/tests/it/call_wait.rs": {
+      "git_blob": "da62b664ebf5d2425ac4c90c21b8b5b8e746fbc0",
+      "sha256": "53ece4468ce33a9348a7531e4e75c9f769711adbaaeb0194dec10376ae17196f"
+    },
+    "lampOS/crates/skills/tests/it/main.rs": {
+      "git_blob": "985fd26f001774ab6e0600bb9a26d5e5b5f6f359",
+      "sha256": "a501e8a910fa65091b055e273b89fb9510aa34b265881cc6510c00498ff7b13e"
+    },
+    "lampOS/crates/skills/tests/it/package.rs": {
+      "git_blob": "b84325694f2b9706cb474a31980e1cc663a574f7",
+      "sha256": "de93a329a4f4e4ffc455a8a4b38a29ab33277f905ca61468d631396690d060bc"
+    },
+    "lampOS/crates/skills/tests/it/skills.rs": {
+      "git_blob": "8944e5eb70e8530b7535ef399008d20826b1b0a9",
+      "sha256": "1f5460d9eb5e6106280819b5b87011637d7edc02cae7777fbe4d6c142d4b78e1"
+    },
+    "lampOS/crates/skills/tests/it/store.rs": {
+      "git_blob": "49c74e9fea014ce4826377a43665f27a4ab97e5d",
+      "sha256": "f7a3ae1f4ea3399dda7fd39ae4e81df9f01d9da904e454a644031d97471539c7"
+    },
+    "lampOS/crates/skills/tests/release_pair.rs": {
+      "git_blob": "cf9ce3a236d1fd8441f94d162844af4da2c7c12a",
+      "sha256": "a3203635e3f3275384da2340280cdf66020269ddddb039165f894eba64cfeed2"
+    },
+    "lampOS/crates/skills/tests/requested_audio.rs": {
+      "git_blob": "b4c6d6a852b5eb00988e671fd8265c1edfceffc4",
+      "sha256": "2d85663a8ecab38ed3df1e8beb4bcd05209ac3aa1bacd6d3d9bcd9ce3057ef36"
+    },
+    "lampOS/crates/update/src/image.rs": {
+      "git_blob": "7a07e19d22069fe05f380a4457dddea0783ec9f5",
+      "sha256": "638716079df7e1770cb9c778814ae857a7e242b23519ed8bf490fe1f99a5466c"
+    },
+    "lampOS/crates/update/src/install.rs": {
+      "git_blob": "75c7fad7f51162b0aad21a6ad0ea30c79b386c9f",
+      "sha256": "bd287e1a228d59561d64449270d0bd3cdb0c3410d8d5c4a7d5648c2009ce7899"
+    },
+    "lampOS/crates/update/src/product_skills.rs": {
+      "git_blob": "20691fdf63e924c0106de3b2d3b3f737e8bac655",
+      "sha256": "140bab39dd74570a3329210178d9c02db4da78e6417b7f0664891cfdf644bf1f"
+    },
+    "lampOS/crates/update/src/publish.rs": {
+      "git_blob": "b27475601b6882979f82ac3ca31b8c9ee3e4b48b",
+      "sha256": "90af8f48962c22d163b1f1cb19c1e1a32e307b2f1269c7715d3ed743a3e05ad6"
+    },
+    "lampOS/crates/update/src/unit.rs": {
+      "git_blob": "72f3b7fe50b4285cfe092a55cd8288bdccf88a7b",
+      "sha256": "02521360f0d1495ba9839a029287043f0798deb5cc82324fd441e8f2bbc11aa3"
+    },
+    "lampOS/crates/update/tests/functions.rs": {
+      "git_blob": "2ef3e92b3a14c14314c4a03c7608b608718e467d",
+      "sha256": "d9c21886db8f4325b7fa08438af249412e2f03eb8ca1d9283942f04a5b451bcb"
+    },
+    "lampOS/crates/update/tests/install.rs": {
+      "git_blob": "65a48de0ca9f82ad366a241e51f03ca4fc3a8e5b",
+      "sha256": "7dc7cbca62006922437a6d24f89bd0e211868971fae66a7e61f1dcf3055b3698"
+    },
+    "lampOS/crates/update/tests/it/ci_paths.rs": {
+      "git_blob": "a80a8e67b0a3f29afb4e2be266a25c09100584a7",
+      "sha256": "da2d09282d8c6ee4248f61bdfc904d21eb2b28f89e72d9639d88b8777c5e4725"
+    },
+    "lampOS/crates/update/tests/it/image_journal.rs": {
+      "git_blob": "59f0afd8f3aa463ee72988c3262c6cae136242ed",
+      "sha256": "415143feed902d28f9a88a8bb85c209efacc8babfd6c53f9f0f9492907688ea2"
+    },
+    "lampOS/crates/update/tests/it/image_ramlog.rs": {
+      "git_blob": "9729cc32e8499e1ba93fc910b09f9cbdeeff8118",
+      "sha256": "37ab4e2af82c460c01b35e496d0a1fbda98e9be672d50ad0259b4e00fc9a1d11"
+    },
+    "lampOS/crates/update/tests/it/main.rs": {
+      "git_blob": "1740dfd0932223d11aa9e5603c76deff2e57ec27",
+      "sha256": "7b486c660aa349e676019b3f55ae292947be9381241ae5436c7ee86225683535"
+    },
+    "lampOS/crates/update/tests/it/scratch_paths.rs": {
+      "git_blob": "46fb6547f53d7905beff5041655a923b9ac3754f",
+      "sha256": "40749f7cf74a1f5bcb11ebce3ba36866710fdf2d3ad13eb85fa1d75169b62554"
+    },
+    "lampOS/crates/update/tests/release_pair.rs": {
+      "git_blob": "ade76f20c5db1cc9467623b1a752d31de256a06b",
+      "sha256": "6ff8c240b6064654ab3640e6bee009ae0f9c5c13a8ef2d3569e17d79df7a1812"
+    },
+    "lampOS/crates/update/tests/round.rs": {
+      "git_blob": "562f7869ce6f7470fde28f9ed7125ef4cadb64b5",
+      "sha256": "f6d16870e7d7f0da9ab4d995d2af8f92af89a0cf19d1fdeff8b65ccafe62c2f3"
+    },
+    "lampOS/crates/voice-eval/src/export.rs": {
+      "git_blob": "996aa0235aa4b1b86658eeb8ecb43b3f7826e86d",
+      "sha256": "5c75e759c5b50e9d66bdf277bcc6ea193f325f4c19e3661a600db3c3f0c95874"
+    },
+    "lampOS/crates/voice-eval/src/physical/slow_transport_clock_tests.rs": {
+      "git_blob": "986ad4e2f0403f04869362a09489c20ecb593e9a",
+      "sha256": "7478dae0e6ca89f1cae6b1aee14c22f5aa0871e5151ea50681a480d48baa1dea"
+    },
+    "lampOS/crates/voice-eval/tests/it/cost.rs": {
+      "git_blob": "c394134ba645cc29ed6dff097cc34597a7ea54b4",
+      "sha256": "ef49e213bcbe840d1a46fbf96cebe4ae841c13bc33b19d8edf600d47ca4d766a"
+    },
+    "lampOS/crates/voice-eval/tests/it/serve_plan.rs": {
+      "git_blob": "ab82a5981ba49612446f486d3bda0925fc2ec25d",
+      "sha256": "ea9c9667a448f4ea6a2b22490c11d4927546da1ec50bf62ab8bc41ae87a3126e"
+    },
+    "lampOS/crates/voice-eval/tests/it/switches.rs": {
+      "git_blob": "aad146ed36900bdb26ab3933c668ab06af0378c9",
+      "sha256": "98c5a0378e40db9fd5a157909029989ddd53ff6a39391d8d87fc1b96bdbd9035"
+    },
+    "lampOS/crates/voice-eval/tests/it/waiting_cuts.rs": {
+      "git_blob": "6d7b5e9a4ab056bc8714b10173df23d5840f0e05",
+      "sha256": "81f46fd42c2096eeea158078cd07b504338aa72efc47f2686d259e025f0d0fc6"
+    },
+    "lampOS/crates/voice/src/lib.rs": {
+      "git_blob": "97bb12a8560eea027f19830c35b3daf4abf940d1",
+      "sha256": "44c8ee26790876fa0fccffccf4724c3ce423d1422ef77a98afd35d355f0d8453"
+    },
+    "lampOS/crates/voice/src/process.rs": {
+      "git_blob": "eb432d2483f3fdd08d8c3897e123b1f99244da1d",
+      "sha256": "aa9f89b36478833ef3af45cce874feaef2606f8a8fc00da320d86a7f587eb059"
+    },
+    "lampOS/crates/voice/src/process/switch_census_tests.rs": {
+      "git_blob": "dc71041a9cdc4de112ef523df8ccd1fda28166f0",
+      "sha256": "e596c3e13ee57afb14000b1f75bae78b4476a28c06c1f7c35aeaa324884d263c"
+    },
+    "lampOS/crates/voice/src/provider_worker/reminder_policy.rs": {
+      "git_blob": "5386db3e18ec4d70e2a42d6c3de7eaf83b6c1ad3",
+      "sha256": "38af8040983bb412c1f62d42d8abceb2c6d4805e90e3f88c0932f23d15237b62"
+    },
+    "lampOS/crates/voice/src/remember.rs": {
+      "git_blob": "6714cf470d4711964580418e00f7c4e3bc7d028a",
+      "sha256": "835ec5954c49ac6100b7552588b22d7b5660013b78b6dd0e1e14d0393280650c"
+    },
+    "lampOS/crates/voice/src/second_provider/worker.rs": {
+      "git_blob": "c3bdbf42743860fbfa579646b9de40c0228a9449",
+      "sha256": "7ec90b1ddcf38884e5b92df2ee800e2140500ab8aed109d19198d2f798b431d9"
+    },
+    "lampOS/crates/voice/src/skill_words.rs": {
+      "git_blob": "79d5b6bffba4d432db774749a97fbdbbeb5bfd79",
+      "sha256": "8d27772166de0e2dbe2990c87271a8f8a793f64487b8c5bdd9a6f20c6e811f61"
+    },
+    "lampOS/crates/voice/src/speak_up.rs": {
+      "git_blob": "2deb6a83f66fea66313bbe4d6adc819fdd15ac32",
+      "sha256": "50432cb4fdecb722318d9401c3183b30e3544159397bf856f02190b74ddc6153"
+    },
+    "lampOS/crates/voice/src/task_news.rs": {
+      "git_blob": "7861d06ac461eb6aa6ff529bf4fb9f199f2df681",
+      "sha256": "976bda631fd828868ed0816238fe5bffd74ec842f5af9c79836dfa8b23d2dba8"
+    },
+    "lampOS/crates/voice/tests/it/process.rs": {
+      "git_blob": "efb104f87228a02cce89fe2fd28285c32ca4d118",
+      "sha256": "227609b7ecff646bea0ebcb22071fb84728c29dec5cf7d0a56b7321c8d757c02"
+    },
+    "lampOS/crates/voice/tests/release_pair.rs": {
+      "git_blob": "e01453cbcf6a6ad991b913029d5f26489af44452",
+      "sha256": "40fdc2fe7bf92b7cee67bba5eb2c9c7aba45acfb82befb374c9f1f01952bcba9"
+    }
+  },
+  "method": {
+    "not_done": [
+      "No active runtime/progress log opened",
+      "No Cargo, rustc, test, product command or device action executed",
+      "No future binary/source equivalence measured",
+      "No exhaustive syscall trace or full variable-path dataflow graph",
+      "No GitHub read/post, source edit or readiness statement"
+    ],
+    "qualified_original_runtime_required_before_any_carry": true,
+    "reads": "Pinned Git diff and source reads plus frozen capture/artifact metadata; worktree head and clean status checked before source inspection and receipt creation.",
+    "searches": [
+      "CARGO_MANIFEST_DIR, recursive read_dir/walk helpers and direct source/docs path literals",
+      "exact changed-path references, include_str/include_bytes/include! and #[path] distinctions",
+      "Git command/state literals across all lampOS/crates; CARGO_PKG_VERSION/current_exe/CARGO_BIN_EXE usages",
+      "manual reading of scanner, repository-fixture and child-launch boundaries"
+    ],
+    "source_line_base": "0945493814f494a49a0a23199ba35dc661bdc546"
+  },
+  "minimum_named_current_source_checks": {
+    "lamp-skills::it": [
+      "skills::a_repeat_call_with_only_made_steps_is_refused_while_its_run_is_under_way",
+      "skills::the_one_action_reply_reports_an_ack_write_error",
+      "skills::the_one_action_reply_joins_on_unwind_before_connect_and_during_a_partial_request"
+    ],
+    "lamp-update::it": [
+      "ci_paths::every_doc_a_crate_reads_is_named_back_in_the_workflows_pull_request_paths",
+      "scratch_paths::no_two_files_of_a_test_binary_build_the_same_scratch_folder"
+    ],
+    "lamp-voice::lamp_voice": [
+      "process::switch_census_tests::session_read_access_is_owned_by_the_coordinator_and_never_given_to_a_worker",
+      "process::switch_census_tests::every_switch_the_workers_read_reaches_a_worker_or_says_why_not",
+      "process::switch_census_tests::the_census_follows_the_helpers_a_worker_calls_and_sees_their_switches",
+      "process::switch_census_tests::a_helper_left_out_loses_its_switches",
+      "process::switch_census_tests::the_coordinators_functions_are_still_in_their_files",
+      "speak_up::tests::only_welcome_back_says_hello_on_an_arrival"
+    ],
+    "limit": "Names are proposed future selection boundaries only. No command was run, no test is cleared, and changed-binary/full-gate requirements may be broader."
+  },
+  "other_runtime_inputs": [
+    {
+      "drivers": [
+        "lamp-skills::lamp_skills"
+      ],
+      "guard": "Require final carry path bytes, directory membership, symlink resolution and source location to match the qualified original inputs, or rerun this driver. Not permission to reuse the active run.",
+      "id": "skills-library-bundle",
+      "proposed_three_file_delta_intersection": "none",
+      "read": "Runtime skill loading, including TOML and referenced package files.",
+      "refs": [
+        {
+          "function": "guard_words",
+          "line": 1654,
+          "path": "lampOS/crates/skills/src/watch.rs"
+        },
+        {
+          "function": "guard-mode fixture load",
+          "line": 2288,
+          "path": "lampOS/crates/skills/src/watch.rs"
+        },
+        {
+          "function": "guard-mode fixture load",
+          "line": 2342,
+          "path": "lampOS/crates/skills/src/watch.rs"
+        },
+        {
+          "function": "own_words",
+          "line": 457,
+          "path": "lampOS/crates/skills/src/visits.rs"
+        }
+      ],
+      "roots": [
+        "lampOS/skills/guard-mode",
+        "lampOS/skills/who-was-here"
+      ]
+    },
+    {
+      "drivers": [
+        "lamp-skills::lamp-skills"
+      ],
+      "guard": "Require final carry path bytes, directory membership, symlink resolution and source location to match the qualified original inputs, or rerun this driver. Not permission to reuse the active run.",
+      "id": "skills-bin-bundle",
+      "proposed_three_file_delta_intersection": "none",
+      "read": "Runtime loading and direct read_to_string.",
+      "refs": [
+        {
+          "function": "unplug_lines",
+          "line": 4595,
+          "path": "lampOS/crates/skills/src/main.rs"
+        },
+        {
+          "function": "only_a_skill_given_who_has_its_note_told_who_is_at_the_lamp",
+          "line": 4970,
+          "path": "lampOS/crates/skills/src/main.rs"
+        }
+      ],
+      "roots": [
+        "lampOS/skills/prepare-unplug",
+        "lampOS/skills/welcome-back/skill.toml",
+        "lampOS/skills/guard-mode/skill.toml",
+        "lampOS/skills/who-was-here/skill.toml"
+      ]
+    },
+    {
+      "drivers": [
+        "lamp-skills::it"
+      ],
+      "guard": "Require final carry path bytes, directory membership, symlink resolution and source location to match the qualified original inputs, or rerun this driver. Not permission to reuse the active run.",
+      "id": "skills-it-bundle",
+      "proposed_three_file_delta_intersection": "none",
+      "read": "Enumerates all skill folders, loads definitions and recorded replay cases; recursively copies package files. Other it modules use the same tree for night-sleep, daily and welcome-back fixtures.",
+      "refs": [
+        {
+          "function": "skills_root",
+          "line": 159,
+          "path": "lampOS/crates/skills/tests/it/skills.rs"
+        },
+        {
+          "function": "copy",
+          "line": 163,
+          "path": "lampOS/crates/skills/tests/it/skills.rs"
+        },
+        {
+          "function": "every_skill_folder_passes_its_own_recorded_tests",
+          "line": 186,
+          "path": "lampOS/crates/skills/tests/it/skills.rs"
+        },
+        {
+          "function": "skills_root",
+          "line": 14,
+          "path": "lampOS/crates/skills/tests/it/package.rs"
+        },
+        {
+          "function": "product units read",
+          "line": 1488,
+          "path": "lampOS/crates/skills/tests/it/package.rs"
+        },
+        {
+          "function": "skills_root",
+          "line": 29,
+          "path": "lampOS/crates/skills/tests/it/store.rs"
+        }
+      ],
+      "roots": [
+        "lampOS/skills/**",
+        "lampOS/deploy/product/*"
+      ]
+    },
+    {
+      "drivers": [
+        "lamp-cloud::lamp_cloud"
+      ],
+      "guard": "Require final carry path bytes, directory membership, symlink resolution and source location to match the qualified original inputs, or rerun this driver. Not permission to reuse the active run.",
+      "id": "cloud-library-inputs",
+      "proposed_three_file_delta_intersection": "none",
+      "read": "Runtime unit directory membership and copied core skill files.",
+      "refs": [
+        {
+          "function": "the_lists_are_the_products",
+          "line": 3470,
+          "path": "lampOS/crates/cloud/src/reports.rs"
+        },
+        {
+          "function": "a_skill_is_turned_off_and_on_and_one_of_the_lamp_itself_is_refused",
+          "line": 1175,
+          "path": "lampOS/crates/cloud/src/skills.rs"
+        }
+      ],
+      "roots": [
+        "lampOS/deploy/product/*",
+        "lampOS/skills/night-sleep/skill.toml",
+        "lampOS/skills/night-sleep/SKILL.md"
+      ]
+    },
+    {
+      "drivers": [
+        "lamp-cloud::it"
+      ],
+      "guard": "Require final carry path bytes, directory membership, symlink resolution and source location to match the qualified original inputs, or rerun this driver. Not permission to reuse the active run.",
+      "id": "cloud-it-bundle",
+      "proposed_three_file_delta_intersection": "none",
+      "read": "Reads the installed-skills API from repository folders and recursively copies skill inputs.",
+      "refs": [
+        {
+          "function": "copied",
+          "line": 99,
+          "path": "lampOS/crates/cloud/tests/it/skills_contract.rs"
+        },
+        {
+          "function": "the_skills_page_reads_the_agreed_reply_and_its_refusal",
+          "line": 121,
+          "path": "lampOS/crates/cloud/tests/it/skills_contract.rs"
+        },
+        {
+          "function": "skills folder use",
+          "line": 246,
+          "path": "lampOS/crates/cloud/tests/it/skills_contract.rs"
+        },
+        {
+          "function": "skills folder use",
+          "line": 330,
+          "path": "lampOS/crates/cloud/tests/it/skills_contract.rs"
+        }
+      ],
+      "roots": [
+        "lampOS/skills/**"
+      ]
+    },
+    {
+      "drivers": [
+        "lamp-body::lamp-body"
+      ],
+      "guard": "Require final carry path bytes, directory membership, symlink resolution and source location to match the qualified original inputs, or rerun this driver. Not permission to reuse the active run.",
+      "id": "body-bin-deploy",
+      "proposed_three_file_delta_intersection": "none",
+      "read": "Recursively lists every deployment file, reads decodable text, checks service paths.",
+      "refs": [
+        {
+          "function": "nothing_deployed_passes_hold_from",
+          "line": 1871,
+          "path": "lampOS/crates/body/src/bin/lamp-body.rs"
+        }
+      ],
+      "roots": [
+        "lampOS/deploy/**"
+      ]
+    },
+    {
+      "drivers": [
+        "lamp-expression::it"
+      ],
+      "guard": "Require final carry path bytes, directory membership, symlink resolution and source location to match the qualified original inputs, or rerun this driver. Not permission to reuse the active run.",
+      "id": "expression-it-inputs",
+      "proposed_three_file_delta_intersection": "none",
+      "read": "Passes live source fixture paths to the built Expression child and calls startle::read on source TOML. Nearby include_str fixtures are a different, compile-time boundary.",
+      "refs": [
+        {
+          "function": "built_cli_uses_explicit_catalogue_and_default_shadow_for_the_new_fixtures",
+          "line": 726,
+          "path": "lampOS/crates/expression/tests/it/rest_replay.rs"
+        },
+        {
+          "function": "the_product_with_the_skills_startle_glances_as_before",
+          "line": 254,
+          "path": "lampOS/crates/expression/tests/it/sudden_engine.rs"
+        }
+      ],
+      "roots": [
+        "lampOS/crates/expression/fixtures/held-resumed.jsonl",
+        "lampOS/crates/expression/rest-behaviours.json",
+        "lampOS/skills/startle/skill.toml"
+      ]
+    },
+    {
+      "drivers": [
+        "lamp-setup::it"
+      ],
+      "guard": "Require final carry path bytes, directory membership, symlink resolution and source location to match the qualified original inputs, or rerun this driver. Not permission to reuse the active run.",
+      "id": "setup-it-plan",
+      "proposed_three_file_delta_intersection": "none",
+      "read": "Built Setup CLI reads the actual product-plan JSON path; most other setup fixture plans are embedded or written into scratch roots.",
+      "refs": [
+        {
+          "function": "check_reads_the_product_plan_install_places",
+          "line": 1434,
+          "path": "lampOS/crates/setup/tests/it/reset.rs"
+        }
+      ],
+      "roots": [
+        "lampOS/crates/setup/fixtures/reset-plan-product.json"
+      ]
+    },
+    {
+      "drivers": [
+        "lamp-update::lamp_update"
+      ],
+      "guard": "Require final carry path bytes, directory membership, symlink resolution and source location to match the qualified original inputs, or rerun this driver. Not permission to reuse the active run.",
+      "id": "update-library-trees",
+      "proposed_three_file_delta_intersection": "none",
+      "read": "Runtime product bundle generation, unit enumeration/comparison and image source reading. robots/lamp is outside lampOS source snapshot scope.",
+      "refs": [
+        {
+          "function": "the_bundle_of_the_repository_is_what_install_writes",
+          "line": 804,
+          "path": "lampOS/crates/update/src/product_skills.rs"
+        },
+        {
+          "function": "the_generic_package_sets_up_and_resets_as_the_product_does",
+          "line": 400,
+          "path": "lampOS/crates/update/src/unit.rs"
+        },
+        {
+          "function": "every_deploy_product_unit_is_installed_or_named_left_out",
+          "line": 2743,
+          "path": "lampOS/crates/update/src/install.rs"
+        },
+        {
+          "function": "runtime skill bundle input in publish tests",
+          "line": 239,
+          "path": "lampOS/crates/update/src/publish.rs"
+        },
+        {
+          "function": "the_images_files_are_carried_with_the_updater_they_need",
+          "line": 472,
+          "path": "lampOS/crates/update/src/publish.rs"
+        },
+        {
+          "function": "tree",
+          "line": 218,
+          "path": "lampOS/crates/update/src/image.rs"
+        },
+        {
+          "function": "every_image_file_of_every_variant_is_listed_as_shipped",
+          "line": 229,
+          "path": "lampOS/crates/update/src/image.rs"
+        }
+      ],
+      "roots": [
+        "lampOS/skills/**",
+        "lampOS/deploy/product/*",
+        "lampOS/deploy/units/*",
+        "robots/lamp/**"
+      ]
+    },
+    {
+      "drivers": [
+        "lamp-update::install"
+      ],
+      "guard": "Require final carry path bytes, directory membership, symlink resolution and source location to match the qualified original inputs, or rerun this driver. Not permission to reuse the active run.",
+      "id": "update-install-trees",
+      "proposed_three_file_delta_intersection": "none",
+      "read": "Lists/copies repository skill trees and unit lists; other fixtures write their own synthetic roots.",
+      "refs": [
+        {
+          "function": "product-unit directory input",
+          "line": 520,
+          "path": "lampOS/crates/update/tests/install.rs"
+        },
+        {
+          "function": "skills_root",
+          "line": 1307,
+          "path": "lampOS/crates/update/tests/install.rs"
+        },
+        {
+          "function": "skill_files",
+          "line": 1312,
+          "path": "lampOS/crates/update/tests/install.rs"
+        },
+        {
+          "function": "every_skill_folder_is_in_the_product_or_says_why_not",
+          "line": 1336,
+          "path": "lampOS/crates/update/tests/install.rs"
+        },
+        {
+          "function": "the_product_skills_are_exactly_the_core_skills",
+          "line": 1362,
+          "path": "lampOS/crates/update/tests/install.rs"
+        }
+      ],
+      "roots": [
+        "lampOS/skills/**",
+        "lampOS/deploy/product/*"
+      ]
+    },
+    {
+      "drivers": [
+        "lamp-update::round"
+      ],
+      "guard": "Require final carry path bytes, directory membership, symlink resolution and source location to match the qualified original inputs, or rerun this driver. Not permission to reuse the active run.",
+      "id": "update-round-skills",
+      "proposed_three_file_delta_intersection": "none",
+      "read": "Direct read_to_string of these live skill files before simulated update rounds.",
+      "refs": [
+        {
+          "function": "the_apps_off_and_on_hold_through_a_round_and_a_restart",
+          "line": 2149,
+          "path": "lampOS/crates/update/tests/round.rs"
+        }
+      ],
+      "roots": [
+        "lampOS/skills/dance/skill.toml",
+        "lampOS/skills/dance/SKILL.md",
+        "lampOS/skills/reminders/skill.toml",
+        "lampOS/skills/reminders/SKILL.md"
+      ]
+    },
+    {
+      "drivers": [
+        "lamp-update::it"
+      ],
+      "guard": "Require final carry path bytes, directory membership, symlink resolution and source location to match the qualified original inputs, or rerun this driver. Not permission to reuse the active run.",
+      "id": "update-it-image-tools",
+      "proposed_three_file_delta_intersection": "none",
+      "read": "Reads rootfs configuration and executes repository shell scripts with synthetic roots through bash; systemd-analyze and rsync availability/version also influence cases. This source tree is outside lampOS source snapshot scope.",
+      "refs": [
+        {
+          "function": "image_file",
+          "line": 11,
+          "path": "lampOS/crates/update/tests/it/image_journal.rs"
+        },
+        {
+          "function": "the_journal_is_kept_well_inside_the_ram_disk",
+          "line": 68,
+          "path": "lampOS/crates/update/tests/it/image_journal.rs"
+        },
+        {
+          "function": "rootfs",
+          "line": 7,
+          "path": "lampOS/crates/update/tests/it/image_ramlog.rs"
+        },
+        {
+          "function": "the_copy_back_leaves_the_journal_alone",
+          "line": 43,
+          "path": "lampOS/crates/update/tests/it/image_ramlog.rs"
+        },
+        {
+          "function": "ramlogs_copies_leave_the_journal_out",
+          "line": 153,
+          "path": "lampOS/crates/update/tests/it/image_ramlog.rs"
+        },
+        {
+          "function": "journal_keep",
+          "line": 255,
+          "path": "lampOS/crates/update/tests/it/image_ramlog.rs"
+        }
+      ],
+      "roots": [
+        "robots/lamp/rootfs/**"
+      ]
+    },
+    {
+      "drivers": [
+        "lamp-voice::lamp_voice"
+      ],
+      "guard": "Require final carry path bytes, directory membership, symlink resolution and source location to match the qualified original inputs, or rerun this driver. Not permission to reuse the active run.",
+      "id": "voice-library-skills",
+      "proposed_three_file_delta_intersection": "none",
+      "read": "Loads current skill wording from the repository; source scanners are listed separately.",
+      "refs": [
+        {
+          "function": "skills",
+          "line": 614,
+          "path": "lampOS/crates/voice/src/skill_words.rs"
+        },
+        {
+          "function": "the_skills_words_are_read_and_a_missing_or_broken_one_falls_back",
+          "line": 621,
+          "path": "lampOS/crates/voice/src/skill_words.rs"
+        },
+        {
+          "function": "own",
+          "line": 2093,
+          "path": "lampOS/crates/voice/src/task_news.rs"
+        },
+        {
+          "function": "words",
+          "line": 165,
+          "path": "lampOS/crates/voice/src/provider_worker/reminder_policy.rs"
+        }
+      ],
+      "roots": [
+        "lampOS/skills/task-news/skill.toml",
+        "lampOS/skills/reminders/skill.toml",
+        "lampOS/skills/welcome-back/skill.toml"
+      ]
+    },
+    {
+      "drivers": [
+        "lamp-voice-eval::lamp_voice_eval"
+      ],
+      "guard": "Require final carry path bytes, directory membership, symlink resolution and source location to match the qualified original inputs, or rerun this driver. Not permission to reuse the active run.",
+      "id": "voice-eval-library-trees",
+      "proposed_three_file_delta_intersection": "none",
+      "read": "Runtime unit directory/name/text census, Msgs source text topic census, and skill replay inputs. Msgs is scanned non-recursively by this test.",
+      "refs": [
+        {
+          "function": "the_parts_are_the_products_units",
+          "line": 1822,
+          "path": "lampOS/crates/voice-eval/src/export.rs"
+        },
+        {
+          "function": "the_bus_topics_hold_every_topic_the_messages_name",
+          "line": 2055,
+          "path": "lampOS/crates/voice-eval/src/export.rs"
+        },
+        {
+          "function": "stretch_breaks_cases_rebuilt_from_the_export_replay_the_same",
+          "line": 2082,
+          "path": "lampOS/crates/voice-eval/src/export.rs"
+        }
+      ],
+      "roots": [
+        "lampOS/deploy/product/*",
+        "lampOS/crates/msgs/src/*",
+        "lampOS/skills/stretch-break/**"
+      ]
+    },
+    {
+      "drivers": [
+        "lamp-voice-eval::it"
+      ],
+      "guard": "Require final carry path bytes, directory membership, symlink resolution and source location to match the qualified original inputs, or rerun this driver. Not permission to reuse the active run.",
+      "id": "voice-eval-it-fixtures",
+      "proposed_three_file_delta_intersection": "none",
+      "read": "Direct fixture reads and fixture paths passed to the built voice-eval CLI.",
+      "refs": [
+        {
+          "function": "FIXTURES",
+          "line": 5,
+          "path": "lampOS/crates/voice-eval/tests/it/cost.rs"
+        },
+        {
+          "function": "FIXTURES and dry_run",
+          "line": 86,
+          "path": "lampOS/crates/voice-eval/tests/it/serve_plan.rs"
+        },
+        {
+          "function": "data",
+          "line": 10,
+          "path": "lampOS/crates/voice-eval/tests/it/waiting_cuts.rs"
+        },
+        {
+          "function": "sessions",
+          "line": 16,
+          "path": "lampOS/crates/voice-eval/tests/it/waiting_cuts.rs"
+        },
+        {
+          "function": "journal",
+          "line": 30,
+          "path": "lampOS/crates/voice-eval/tests/it/waiting_cuts.rs"
+        }
+      ],
+      "roots": [
+        "lampOS/fixtures/voice-eval*.json",
+        "lampOS/crates/voice-eval/tests/data/waiting-cuts/**"
+      ]
+    }
+  ],
+  "proposed_delta": [
+    {
+      "base_blob": "ca5eeb7ba035405557e4fc740ca7a0d9529a4ed9",
+      "carry_blob": "bd572c76f354bee6ec9fada6692ccc7bd50496f9",
+      "kind": "joined test mock and two controls",
+      "path": "lampOS/crates/skills/tests/it/skills.rs"
+    },
+    {
+      "base_blob": "c3bdbf42743860fbfa579646b9de40c0228a9449",
+      "carry_blob": "a57466f8fa9e67d7890ba462fc9108ffd07ee09f",
+      "kind": "doc-comment relocation only",
+      "path": "lampOS/crates/voice/src/second_provider/worker.rs"
+    },
+    {
+      "base_blob": "2a045ecae3f2e38e40fe9ed311ccbfbe2ab623b9",
+      "carry_blob": "940cd3a7ba98276409d54ace0fbce3a7f0383eb0",
+      "kind": "fixture methodology prose",
+      "path": "lampOS/docs/voice-test-fixtures.md"
+    }
+  ],
+  "purpose": "Static runtime-input carry preparation only; no active-run audit, reuse authorization, readiness or execution claim.",
+  "schema": 1,
+  "unchanged_tracked_input_roots_in_proposed_delta": [
+    {
+      "base_tree": "7b9ce41fce206182e3e658091d97040ec3d45295",
+      "equal": true,
+      "inherited_carry_tree": "7b9ce41fce206182e3e658091d97040ec3d45295",
+      "limit": "Tracked tree comparison for bdc to 47 only; final Reminder rebase and live runtime inputs are not yet checked.",
+      "path": "lampOS/skills"
+    },
+    {
+      "base_tree": "474a082453549097a434bfd2d3bf7ad1d5b57193",
+      "equal": true,
+      "inherited_carry_tree": "474a082453549097a434bfd2d3bf7ad1d5b57193",
+      "limit": "Tracked tree comparison for bdc to 47 only; final Reminder rebase and live runtime inputs are not yet checked.",
+      "path": "lampOS/deploy"
+    },
+    {
+      "base_tree": "3c29eb4da510c9bc351b9c1b67cd1744df1a6d1c",
+      "equal": true,
+      "inherited_carry_tree": "3c29eb4da510c9bc351b9c1b67cd1744df1a6d1c",
+      "limit": "Tracked tree comparison for bdc to 47 only; final Reminder rebase and live runtime inputs are not yet checked.",
+      "path": "lampOS/fixtures"
+    },
+    {
+      "base_tree": "afcdc6510a205e6fed1596e433723ee905d45cbc",
+      "equal": true,
+      "inherited_carry_tree": "afcdc6510a205e6fed1596e433723ee905d45cbc",
+      "limit": "Tracked tree comparison for bdc to 47 only; final Reminder rebase and live runtime inputs are not yet checked.",
+      "path": "lampOS/crates/msgs/src"
+    },
+    {
+      "base_tree": "f68a6e75a26765809df976c894f2ec9ec4de62dc",
+      "equal": true,
+      "inherited_carry_tree": "f68a6e75a26765809df976c894f2ec9ec4de62dc",
+      "limit": "Tracked tree comparison for bdc to 47 only; final Reminder rebase and live runtime inputs are not yet checked.",
+      "path": "robots/lamp/rootfs"
+    },
+    {
+      "base_tree": "8599343b5f1a61ddaccb408e40ba974ba91ec2db",
+      "equal": true,
+      "inherited_carry_tree": "8599343b5f1a61ddaccb408e40ba974ba91ec2db",
+      "limit": "Tracked tree comparison for bdc to 47 only; final Reminder rebase and live runtime inputs are not yet checked.",
+      "path": ".github/workflows"
+    },
+    {
+      "base_tree": "3045934a8c868909b1245bf9cd6e33c1ec6ce6dc",
+      "equal": true,
+      "inherited_carry_tree": "3045934a8c868909b1245bf9cd6e33c1ec6ce6dc",
+      "limit": "Tracked tree comparison for bdc to 47 only; final Reminder rebase and live runtime inputs are not yet checked.",
+      "path": "lampOS/crates/voice-eval/tests/data"
+    },
+    {
+      "base_tree": "f45bce307889d900984e8813903c040d315e4997",
+      "equal": true,
+      "inherited_carry_tree": "f45bce307889d900984e8813903c040d315e4997",
+      "limit": "Tracked tree comparison for bdc to 47 only; final Reminder rebase and live runtime inputs are not yet checked.",
+      "path": "lampOS/crates/expression/fixtures"
+    },
+    {
+      "base_tree": "0439c311c6c4f5ed7bef7d46d1a0cc2768d52395",
+      "equal": true,
+      "inherited_carry_tree": "0439c311c6c4f5ed7bef7d46d1a0cc2768d52395",
+      "limit": "Tracked tree comparison for bdc to 47 only; final Reminder rebase and live runtime inputs are not yet checked.",
+      "path": "lampOS/crates/setup/fixtures"
+    },
+    {
+      "base_tree": "c340937d9de096e85bc03c8a0bbd9d30a07d4157",
+      "equal": true,
+      "inherited_carry_tree": "c340937d9de096e85bc03c8a0bbd9d30a07d4157",
+      "limit": "Tracked tree comparison for bdc to 47 only; final Reminder rebase and live runtime inputs are not yet checked.",
+      "path": "robots/lamp/overrides"
+    }
+  ],
+  "unresolved_runtime_boundaries": [
+    {
+      "drivers": "Any driver that launches a child; references below are witnessed examples, not an exhaustive call graph.",
+      "guard": "CARGO_BIN_EXE embeds a pathname, not the file bytes at execution time. Match every actual child/auxiliary executable to captured preimages and future artifact metadata; resolve path-selected or copied executables. If changed or unresolved, rerun affected drivers. Capturing 47 products does not prove which executed.",
+      "id": "child-executables",
+      "refs": [
+        {
+          "function": "Command::new CARGO_BIN_EXE_lamp-skills",
+          "line": 111,
+          "path": "lampOS/crates/skills/tests/it/call_wait.rs"
+        },
+        {
+          "function": "Service::with_limits child spawn",
+          "line": 1406,
+          "path": "lampOS/crates/skills/tests/requested_audio.rs"
+        },
+        {
+          "function": "BINARY and FIXTURE_BINARY",
+          "line": 26,
+          "path": "lampOS/crates/memory/tests/it/health.rs"
+        },
+        {
+          "function": "built expression CLI",
+          "line": 731,
+          "path": "lampOS/crates/expression/tests/it/rest_replay.rs"
+        },
+        {
+          "function": "built setup CLI",
+          "line": 1435,
+          "path": "lampOS/crates/setup/tests/it/reset.rs"
+        },
+        {
+          "function": "run",
+          "line": 25,
+          "path": "lampOS/crates/voice-eval/tests/it/cost.rs"
+        },
+        {
+          "function": "installed Skills executable",
+          "line": 1801,
+          "path": "lampOS/crates/update/tests/round.rs"
+        }
+      ]
+    },
+    {
+      "drivers": [
+        "lamp-body::lamp_body",
+        "lamp-memory::health_control",
+        "lamp-memory::voice_observe_room",
+        "lamp-update::functions",
+        "lamp-update::install",
+        "lamp-voice::lamp_voice",
+        "lamp-voice-eval::lamp_voice_eval"
+      ],
+      "guard": "Match self-executable bytes and environment/arguments. Nested self-invocations do not add independent top-level driver proof. Imported library code and include!/#[path] helpers are compiled inputs, but their runtime path arguments remain dynamic.",
+      "id": "self-spawns-and-shared-source",
+      "refs": [
+        {
+          "function": "current_exe child",
+          "line": 134,
+          "path": "lampOS/crates/body/src/runtime/supervisor/tests.rs"
+        },
+        {
+          "function": "with_the_switch_a_room_conversation_is_not_observed_and_a_known_persons_is",
+          "line": 135,
+          "path": "lampOS/crates/memory/tests/voice_observe_room.rs"
+        },
+        {
+          "function": "current_exe child",
+          "line": 148,
+          "path": "lampOS/crates/update/tests/functions.rs"
+        },
+        {
+          "function": "preflight child",
+          "line": 4931,
+          "path": "lampOS/crates/update/tests/install.rs"
+        },
+        {
+          "function": "current_exe test child",
+          "line": 15838,
+          "path": "lampOS/crates/voice/src/second_provider/worker.rs"
+        },
+        {
+          "function": "current_exe child",
+          "line": 123,
+          "path": "lampOS/crates/voice-eval/src/physical/slow_transport_clock_tests.rs"
+        }
+      ]
+    },
+    {
+      "drivers": [
+        "lamp-cloud::release_pair",
+        "lamp-memory::release_pair",
+        "lamp-skills::release_pair",
+        "lamp-update::release_pair",
+        "lamp-voice::release_pair"
+      ],
+      "guard": "Preserve ignore/selection status from the eventual terminal run. Their external release artifacts, Docker context or native environment are not proved by current compiled test-driver hashes; no manual execution is authorized or claimed.",
+      "id": "manual-release-pairs",
+      "refs": [
+        {
+          "function": "ignored native released-binary cases",
+          "line": 6,
+          "path": "lampOS/crates/cloud/tests/release_pair.rs"
+        },
+        {
+          "function": "Fixture::new environment-selected artifacts",
+          "line": 71,
+          "path": "lampOS/crates/memory/tests/release_pair.rs"
+        },
+        {
+          "function": "ignored native released-binary cases",
+          "line": 13,
+          "path": "lampOS/crates/skills/tests/release_pair.rs"
+        },
+        {
+          "function": "manual released-binary Docker cases",
+          "line": 1,
+          "path": "lampOS/crates/update/tests/release_pair.rs"
+        },
+        {
+          "function": "ignored native released-binary cases",
+          "line": 15,
+          "path": "lampOS/crates/voice/tests/release_pair.rs"
+        }
+      ]
+    },
+    {
+      "drivers": "All 70 drivers remain subject to their executed-path inputs.",
+      "guard": "This static audit is not a syscall trace or full dataflow proof for every variable File::open, library load or shell command. Bind relevant cwd, environment, host tools, timezone, OS feature gates and fixture roots; an unresolved path or changed input requires manual review or a rerun, not a no-read conclusion.",
+      "id": "host-and-dynamic-inputs",
+      "refs": [
+        {
+          "function": "rsync --version",
+          "line": 154,
+          "path": "lampOS/crates/update/tests/it/image_ramlog.rs"
+        },
+        {
+          "function": "shell-generated fixture output",
+          "line": 1140,
+          "path": "lampOS/crates/update/tests/round.rs"
+        },
+        {
+          "function": "local_time::offset_here",
+          "line": 73,
+          "path": "lampOS/crates/memory/tests/voice_observe_room.rs"
+        },
+        {
+          "function": "GITHUB_ACTIONS missing-workflow branch",
+          "line": 113,
+          "path": "lampOS/crates/update/tests/it/ci_paths.rs"
+        }
+      ]
+    },
+    {
+      "drivers": [
+        "lamp-update::it",
+        "lamp-update::lamp_update",
+        "lamp-voice::lamp_voice",
+        "lamp-body::lamp-body",
+        "lamp-voice-eval::lamp_voice_eval"
+      ],
+      "guard": "The 7,259-file snapshot is git ls-files -co --exclude-standard -- . under lampOS. It excludes parent .github/robots inputs and ignored files. Recursive readers do not apply gitignore. Whole-worktree clean status catches tracked/unignored drift at guard times but is not a content snapshot of every runtime tree. Bind external trees and actual enumerated membership/content explicitly or rerun readers; do not claim the existing snapshot alone covers them.",
+      "id": "out-of-snapshot-and-directory-membership",
+      "refs": [
+        {
+          "function": "sources",
+          "line": 77,
+          "path": ".claude/worktrees/third-reminder-pending-evidence/current-bdc2/capture.py"
+        },
+        {
+          "function": "sources",
+          "line": 28,
+          "path": "lampOS/crates/update/tests/it/ci_paths.rs"
+        },
+        {
+          "function": "sources",
+          "line": 25,
+          "path": "lampOS/crates/update/tests/it/scratch_paths.rs"
+        },
+        {
+          "function": "rust_files",
+          "line": 196,
+          "path": "lampOS/crates/voice/src/process/switch_census_tests.rs"
+        },
+        {
+          "function": "recursive read_dir",
+          "line": 212,
+          "path": "lampOS/crates/voice/src/speak_up.rs"
+        }
+      ]
+    }
+  ],
+  "private_original_sha256": "b35713d78e035d70c5656470082a307e01aa11044e92f8bdd5c93f4a31a56a04",
+  "root_source_hash_spotcheck_count": 0
+}
