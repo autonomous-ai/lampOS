@@ -1,3 +1,13 @@
+## 2026-10-27 02:38 — Original native pass and retained current fixture failure
+
+Ready for lamp-voice: no
+
+[Original ef831 native audit](verification/common-ef831-native-20261027/receipt.json) verifies actual preview 9762d55fa / tree 1ca5543e7, with parents 978cb0e98 and ef831cec9: 11,562 unique passes, no failures/leaks/timeouts/selected unrun, all 35 controls once. Four hand and two Update custom cases are already inside that count. Docs 4 cases, process 13 and relay pass; Linux strict Clippy passes. The 106 aggregate skips do not identify natural ignores. This preview differs from host tree724 and later review source; no historical waiver.
+
+[Current full-run failure](verification/common-face-consent-failure-20261027/receipt.json): e588/d498 completed 5,321 passes / one failure / 26 declared ignores in scope, all selected terminal, zero leaks/timeouts. The first remember row expected named consent without configuring Memory, which production intentionally requires. The original assertions remain and a real private Memory endpoint now supplies that prerequisite only for remember rows. One test file changed; production bytes are identical. Exact failed driver and 151 unique backing inputs are preserved alongside all prior witnesses/snapshots. Actual snapshot exit 0 and fresh process/source closure released the target; the original run remains failed.
+
+The focused continuation is active on 9bd: only the failed matrix once, then unrun IPC, process and documentation checks; no replay of 5,321 passed cases. The separate camera-ticket primitive has 17 authored unrun controls and a read of its source with no P1/P2; it remains unwired. All explicit-close, independent privacy, pins and physical holds remain. No device action.
+
 ## 2026-10-27 00:56 — Current Common checkpoint pushed
 
 Ready for lamp-voice: no

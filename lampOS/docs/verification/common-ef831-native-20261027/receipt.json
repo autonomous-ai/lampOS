@@ -1,0 +1,112 @@
+{
+  "head": "ef831cec9b0a2c3b21d8f3798a600c7dacc73f66",
+  "head_tree": "72468a28e895548bd13511462418af2000f122f3",
+  "actual_checkout": "9762d55fa314832e846be472f51ace3c77e3a33c",
+  "actual_tree": "1ca5543e71258c8a2f2c5a88d29a46c996de4e2a",
+  "ordered_parents": [
+    "978cb0e983c095b03dfeca01a06ebadd50691edd",
+    "ef831cec9b0a2c3b21d8f3798a600c7dacc73f66"
+  ],
+  "ARM": {
+    "run": 40372162227,
+    "PASS_unique": 11562,
+    "FAIL": 0,
+    "LEAK": 0,
+    "TIMEOUT": 0,
+    "selected_unrun": 0,
+    "duplicate_display_lines": 35,
+    "aggregate_skipped": 106,
+    "skipped_binaries": 2,
+    "natural_ignored_exact": null,
+    "skip_reason_detail": "Raw default-status logs omit skipped case identities/reasons; natural ignores cannot be split reliably from aggregate106. Two binaries explicitly excluded relay_signals/process and run separately.",
+    "required35_once_pass": true,
+    "docs_targets": 47,
+    "docs_cases_pass": 4,
+    "docs_zero_case_targets": 44,
+    "process_pass": 13,
+    "relay_harness": "ok; case census not exposed",
+    "special_cases_in_union": [
+      {
+        "binary": "lamp-voice",
+        "test": "hand_controls::tests::with_the_wait_an_idle_pump_wakes_five_times_a_second_and_stops_at_once",
+        "terminal": {
+          "status": "PASS",
+          "time": "2.031s",
+          "ordinal": 1339
+        },
+        "display_lines": 2
+      },
+      {
+        "binary": "lamp-update::self-cli-exec",
+        "test": "actual_cli_exec_confirms_before_the_next_round",
+        "terminal": {
+          "status": "PASS",
+          "time": "0.173s",
+          "ordinal": 6668
+        },
+        "display_lines": 1
+      },
+      {
+        "binary": "lamp-update::self-process-cuts",
+        "test": "persisted_self_switches_survive_sigkill",
+        "terminal": {
+          "status": "PASS",
+          "time": "4.381s",
+          "ordinal": 7077
+        },
+        "display_lines": 1
+      },
+      {
+        "binary": "lamp-voice",
+        "test": "hand_controls::tests::an_idle_pump_is_ready_only_after_its_first_subscribed_drain",
+        "terminal": {
+          "status": "PASS",
+          "time": "0.027s",
+          "ordinal": 7833
+        },
+        "display_lines": 1
+      },
+      {
+        "binary": "lamp-voice",
+        "test": "hand_controls::tests::with_the_wait_a_mute_taken_through_the_owners_poll_is_said_at_once",
+        "terminal": {
+          "status": "PASS",
+          "time": "0.039s",
+          "ordinal": 7869
+        },
+        "display_lines": 1
+      },
+      {
+        "binary": "lamp-voice",
+        "test": "hand_controls::tests::with_the_wait_a_head_touch_is_read_as_it_arrives",
+        "terminal": {
+          "status": "PASS",
+          "time": "0.046s",
+          "ordinal": 7871
+        },
+        "display_lines": 1
+      }
+    ]
+  },
+  "Linux": {
+    "run": 40372162211,
+    "conclusion": "success",
+    "runtime_cases": 0,
+    "checks": "workspace fmt and strict all-target clippy plus workflow infra checks"
+  },
+  "process_cases": [
+    "test an_idle_worker_stays_ready_across_a_long_quiet ... ok (2009 ms)",
+    "test a_worker_reporting_another_model_is_refused_before_any_request ... ok (2 ms)",
+    "test no_outcome_is_delivered_after_close_even_for_an_answer_on_its_way ... ok (4 ms)",
+    "test verdict_carries_identity_and_one_request_at_a_time ... ok (56 ms)",
+    "test missing_model_is_final_and_never_restarted ... ok (162 ms)",
+    "test missing_executable_fails_at_once ... ok (2 ms)",
+    "test spawn_returns_while_worker_startup_is_held ... ok (6 ms)",
+    "test startup_failures_are_final ... ok (411 ms)",
+    "test serving_failures_are_replaced_within_budget ... ok (514 ms)",
+    "test protocol_violations_are_replaced ... ok (177 ms)",
+    "test cancelled_answers_are_never_delivered ... ok (155 ms)",
+    "test close_during_inference_never_waits ... ok (233 ms)",
+    "test sustained_requests_stay_bounded ... ok (693 ms)"
+  ]
+}

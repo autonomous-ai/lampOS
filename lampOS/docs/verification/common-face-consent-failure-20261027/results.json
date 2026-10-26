@@ -1,0 +1,42 @@
+[
+  {
+    "label": "Eyes-Voice-VoiceEval-full-plus-Update-install",
+    "counts": {
+      "accounting_valid": true,
+      "all_selected_terminal": true,
+      "selected_cases": 5322,
+      "passed_including_LEAK": 5321,
+      "clean_passed": 5321,
+      "passed_but_LEAK": 0,
+      "failed": 1,
+      "ignored_discovery_and_human_SKIP": 26,
+      "ignored_JSON_terminals": 20,
+      "raw_nextest_exit": 100,
+      "failed_keys": [
+        [
+          "path+file:///Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/crates/voice#lamp-voice@0.1.0",
+          "lamp-voice",
+          "second_provider::tests::private_context::face_forget::proved_face_tools_retire_private_work_before_actual_scoped_mutation"
+        ]
+      ],
+      "leaky_keys": [],
+      "timeout_case_count": 0,
+      "suite_terminal_rows_retained": 34,
+      "suite_rows_not_independent_test_counts": true,
+      "three_full_packages": [
+        "lamp-eyes",
+        "lamp-voice",
+        "lamp-voice-eval"
+      ],
+      "Update_install_only": "lamp-update::install",
+      "other_Update_targets_excluded": true,
+      "no_repeated_cases_within_union": true,
+      "natural_ignored_in_scope": 26,
+      "natural_ignored_outside_scope": 6,
+      "natural_ignored": 32,
+      "filter_exclusions": 325,
+      "full_workspace_runtime": false,
+      "native_ARM64": false
+    }
+  }
+]

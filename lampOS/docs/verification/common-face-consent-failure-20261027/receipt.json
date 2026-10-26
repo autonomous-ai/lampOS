@@ -1,0 +1,46 @@
+{
+  "state": "ORIGINAL_FULL_RUN_FAILED_CORRECTED_FIXTURE_UNRUN_AT_RECORD",
+  "source_head": "2a2b413fbcf238b95ab2c45bc44ed16c5561c3e3",
+  "source_tree": "d498dc5783ecc90e2654b20d9d356f613981844e",
+  "base": "e5889ebb53e9222762d76ac463ec7ca4718174fa",
+  "runtime_nextest_exit": 100,
+  "controller_exit": 125,
+  "controller_stop_reason": "new failed debug inputs must be preserved before compiler reuse",
+  "all_selected_terminal": true,
+  "clean_passes": 5321,
+  "failures": 1,
+  "declared_ignored_in_scope": 26,
+  "filter_exclusions": 325,
+  "LEAK": 0,
+  "TIMEOUT": 0,
+  "failed_case": "second_provider::tests::private_context::face_forget::proved_face_tools_retire_private_work_before_actual_scoped_mutation",
+  "failed_assertion": "line.contains May I tell anyone who asks",
+  "source_cause": "fixturewho_visits true and Memory None; production intentionally requires both for named-visit consent",
+  "failed_driver_sha256": "1c3b402021edac79ad7d8f8431d98ce7f9dbb6d752eeb74868b7a792ce516ecb",
+  "retention": {
+    "driver_independent": true,
+    "debug_backing_clones": 151,
+    "prior_debug_clones": 7492,
+    "protected_witnesses": 23,
+    "passed_driver_clones": 4,
+    "snapshot_actual_exit": 0,
+    "no_hardlinks": true,
+    "source_stable": true,
+    "all_owned_processes_closed": true,
+    "release_sha256": "c78736427df5db2b30f3f0650019d6624f53aaed98136ac3a8daa31ec48cf62f"
+  },
+  "correction": {
+    "scope": "one test fixturefile only; production unchanged",
+    "file_sha256": "a8773d6ada525c897b9557c89e0bceac1d62ac6fc904f366f73cf7cdaf2e3e3b",
+    "next_source_tree": "9bd44e220356a95c82310f02d14e9ab5a5805ab3",
+    "original_consent_assertions_preserved": true,
+    "runtime": "UNRUN_AT_RECORD"
+  },
+  "unrun_stages": [
+    "IPC relay",
+    "turn-end process13",
+    "Eyes Voice Update documentation"
+  ],
+  "no_original_failure_waiver": true,
+  "no_device_or_privacy_acceptance": true
+}

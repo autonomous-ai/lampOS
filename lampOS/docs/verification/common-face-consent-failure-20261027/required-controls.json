@@ -1,0 +1,403 @@
+[
+  {
+    "binary": "lamp-eyes",
+    "test": "permit::tests::an_aged_received_permission_is_not_restamped_when_the_lock_becomes_free",
+    "terminal": {
+      "type": "test",
+      "event": "ok",
+      "name": "lamp-eyes::lamp_eyes$permit::tests::an_aged_received_permission_is_not_restamped_when_the_lock_becomes_free",
+      "exec_time": 0.035200317
+    }
+  },
+  {
+    "binary": "lamp-eyes",
+    "test": "permit::tests::expired_and_regranted_hold_discards_delayed_identity_until_a_fresh_frame",
+    "terminal": {
+      "type": "test",
+      "event": "ok",
+      "name": "lamp-eyes::lamp_eyes$permit::tests::expired_and_regranted_hold_discards_delayed_identity_until_a_fresh_frame",
+      "exec_time": 0.046547316
+    }
+  },
+  {
+    "binary": "lamp-eyes",
+    "test": "permit::tests::mesh_finished_after_permission_loss_cannot_publish_a_second_observation",
+    "terminal": {
+      "type": "test",
+      "event": "ok",
+      "name": "lamp-eyes::lamp_eyes$permit::tests::mesh_finished_after_permission_loss_cannot_publish_a_second_observation",
+      "exec_time": 0.057102345
+    }
+  },
+  {
+    "binary": "lamp-eyes",
+    "test": "permit::tests::permission_deadline_keeps_receipt_age_and_refuses_equality_and_overflow",
+    "terminal": {
+      "type": "test",
+      "event": "ok",
+      "name": "lamp-eyes::lamp_eyes$permit::tests::permission_deadline_keeps_receipt_age_and_refuses_equality_and_overflow",
+      "exec_time": 0.035475511
+    }
+  },
+  {
+    "binary": "lamp-eyes",
+    "test": "permit::tests::renewal_keeps_the_capture_hold_and_queued_old_frames_never_gain_a_new_one",
+    "terminal": {
+      "type": "test",
+      "event": "ok",
+      "name": "lamp-eyes::lamp_eyes$permit::tests::renewal_keeps_the_capture_hold_and_queued_old_frames_never_gain_a_new_one",
+      "exec_time": 0.037102932
+    }
+  },
+  {
+    "binary": "lamp-eyes",
+    "test": "who::tests::a_continuous_visible_identity_keeps_the_existing_recognition_cadence",
+    "terminal": {
+      "type": "test",
+      "event": "ok",
+      "name": "lamp-eyes::lamp_eyes$who::tests::a_continuous_visible_identity_keeps_the_existing_recognition_cadence",
+      "exec_time": 0.033888799
+    }
+  },
+  {
+    "binary": "lamp-eyes",
+    "test": "who::tests::a_short_raw_empty_look_withdraws_identity_before_a_same_id_return",
+    "terminal": {
+      "type": "test",
+      "event": "ok",
+      "name": "lamp-eyes::lamp_eyes$who::tests::a_short_raw_empty_look_withdraws_identity_before_a_same_id_return",
+      "exec_time": 0.174633369
+    }
+  },
+  {
+    "binary": "lamp-eyes",
+    "test": "who::tests::failed_authority_refresh_disables_without_borrowing_through_write",
+    "terminal": {
+      "type": "test",
+      "event": "ok",
+      "name": "lamp-eyes::lamp_eyes$who::tests::failed_authority_refresh_disables_without_borrowing_through_write",
+      "exec_time": 0.04067422
+    }
+  },
+  {
+    "binary": "lamp-eyes",
+    "test": "who::tests::fresh_empty_and_checking_captures_keep_original_age_and_epoch",
+    "terminal": {
+      "type": "test",
+      "event": "ok",
+      "name": "lamp-eyes::lamp_eyes$who::tests::fresh_empty_and_checking_captures_keep_original_age_and_epoch",
+      "exec_time": 0.060420797
+    }
+  },
+  {
+    "binary": "lamp-eyes",
+    "test": "who::tests::raw_look_permission_refresh_keeps_identity_age_and_never_revives_expiry",
+    "terminal": {
+      "type": "test",
+      "event": "ok",
+      "name": "lamp-eyes::lamp_eyes$who::tests::raw_look_permission_refresh_keeps_identity_age_and_never_revives_expiry",
+      "exec_time": 0.228759581
+    }
+  },
+  {
+    "binary": "lamp-eyes",
+    "test": "who::tests::skipped_failed_filtered_and_closed_looks_are_not_benign_absence",
+    "terminal": {
+      "type": "test",
+      "event": "ok",
+      "name": "lamp-eyes::lamp_eyes$who::tests::skipped_failed_filtered_and_closed_looks_are_not_benign_absence",
+      "exec_time": 0.053561386
+    }
+  },
+  {
+    "binary": "lamp-eyes",
+    "test": "who::tests::slow_recognition_keeps_capture_age_even_while_permission_is_renewed",
+    "terminal": {
+      "type": "test",
+      "event": "ok",
+      "name": "lamp-eyes::lamp_eyes$who::tests::slow_recognition_keeps_capture_age_even_while_permission_is_renewed",
+      "exec_time": 0.050288185
+    }
+  },
+  {
+    "binary": "lamp-eyes",
+    "test": "who::tests::stale_empty_and_checking_captures_revoke_before_publication",
+    "terminal": {
+      "type": "test",
+      "event": "ok",
+      "name": "lamp-eyes::lamp_eyes$who::tests::stale_empty_and_checking_captures_revoke_before_publication",
+      "exec_time": 0.188355593
+    }
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::services::tests::declaration_barrier_rechecks_permission_before_each_http_attempt",
+    "terminal": {
+      "type": "test",
+      "event": "ok",
+      "name": "lamp-voice::lamp_voice$second_provider::services::tests::declaration_barrier_rechecks_permission_before_each_http_attempt",
+      "exec_time": 0.191621556
+    }
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::services::tests::pending_after_declaration_keeps_one_prepared_http_request",
+    "terminal": {
+      "type": "test",
+      "event": "ok",
+      "name": "lamp-voice::lamp_voice$second_provider::services::tests::pending_after_declaration_keeps_one_prepared_http_request",
+      "exec_time": 0.082134899
+    }
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::face_forget::fixed_face_outcomes_keep_consent_and_partial_failure_without_raw_values",
+    "terminal": {
+      "type": "test",
+      "event": "ok",
+      "name": "lamp-voice::lamp_voice$second_provider::tests::private_context::face_forget::fixed_face_outcomes_keep_consent_and_partial_failure_without_raw_values",
+      "exec_time": 0.04393825
+    }
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::face_forget::fixed_face_receipt_never_mints_from_prior_loss_or_outlives_its_owner",
+    "terminal": {
+      "type": "test",
+      "event": "ok",
+      "name": "lamp-voice::lamp_voice$second_provider::tests::private_context::face_forget::fixed_face_receipt_never_mints_from_prior_loss_or_outlives_its_owner",
+      "exec_time": 0.050536067
+    }
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::face_forget::observed_disclosure_loss_wins_the_atomic_fixed_receipt_claim",
+    "terminal": {
+      "type": "test",
+      "event": "ok",
+      "name": "lamp-voice::lamp_voice$second_provider::tests::private_context::face_forget::observed_disclosure_loss_wins_the_atomic_fixed_receipt_claim",
+      "exec_time": 0.039909998
+    }
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::face_forget::proved_face_tools_retire_private_work_before_actual_scoped_mutation",
+    "terminal": {
+      "type": "test",
+      "event": "failed",
+      "name": "lamp-voice::lamp_voice$second_provider::tests::private_context::face_forget::proved_face_tools_retire_private_work_before_actual_scoped_mutation",
+      "exec_time": 0.543902481,
+      "stdout": "lamp-voice second: request 1: speech to text opened in 0 ms, 500 ms of the line's sound waiting\nlamp-voice second: request 1 heard 4 words, the last 0 ms after the line ended\nlamp-voice second: request 1 chat round 1 first event in 1 ms\nlamp-voice second: request 1 chat round 1 called forget_my_face\nlamp-voice second: request 1 asked for forget_my_face; the eyes answered in 15 ms; the answer was sent\nlamp-voice second: request 1: tools: remember_offered=? calls=forget_my_face:1 prepared=n\nlamp-voice second: request 1: speech to text opened in 0 ms, 500 ms of the line's sound waiting\nlamp-voice second: request 1 heard 4 words, the last 0 ms after the line ended\nlamp-voice second: request 1 chat round 1 first event in 1 ms\nlamp-voice second: request 1 chat round 1 called forget_my_face\nlamp-voice second: request 1 asked for forget_my_face; the eyes answered in 15 ms; the answer was sent\nlamp-voice second: request 1: tools: remember_offered=? calls=forget_my_face:1 prepared=n\nlamp-voice second: request 1: speech to text opened in 0 ms, 500 ms of the line's sound waiting\nlamp-voice second: request 1 heard 4 words, the last 0 ms after the line ended\nlamp-voice second: request 1 chat round 1 first event in 1 ms\nlamp-voice second: request 1 chat round 1 called forget_my_face\nlamp-voice second: request 1 asked for forget_my_face; the eyes answered in 16 ms; the answer was sent\nlamp-voice second: request 1: tools: remember_offered=? calls=forget_my_face:1 prepared=n\nlamp-voice second: request 1: speech to text opened in 0 ms, 500 ms of the line's sound waiting\nlamp-voice second: request 1 heard 4 words, the last 0 ms after the line ended\nlamp-voice second: request 1 chat round 1 first event in 1 ms\nlamp-voice second: request 1 chat round 1 called forget_my_face\nlamp-voice second: request 1 asked for forget_my_face; the eyes answered in 17 ms; the answer was sent\nlamp-voice second: request 1: tools: remember_offered=? calls=forget_my_face:1 prepared=n\nlamp-voice second: request 1: speech to text opened in 0 ms, 500 ms of the line's sound waiting\nlamp-voice second: request 1 heard 4 words, the last 0 ms after the line ended\nlamp-voice second: request 1 chat round 1 first event in 0 ms\nlamp-voice second: request 1 chat round 1 called forget_my_face\nlamp-voice second: request 1 asked for forget_my_face; the eyes answered in 34 ms; the answer was sent\nlamp-voice second: request 1: tools: remember_offered=? calls=forget_my_face:1 prepared=n\nlamp-voice second: request 1: speech to text opened in 0 ms, 500 ms of the line's sound waiting\nlamp-voice second: request 1 heard 6 words, the last 0 ms after the line ended\nlamp-voice second: request 1 chat round 1 first event in 0 ms\nlamp-voice second: request 1 chat round 1 called remember_my_face\nlamp-voice second: request 1 asked for remember_my_face; the eyes answered in 16 ms; the answer was sent\nlamp-voice second: request 1: tools: remember_offered=? calls=remember_my_face:1 prepared=n\n\nthread 'second_provider::tests::private_context::face_forget::proved_face_tools_retire_private_work_before_actual_scoped_mutation' (29856680) panicked at crates/voice/src/second_provider/tests/private_context/face_forget.rs:485:21:\nassertion failed: line.contains(\"May I tell anyone who asks\")\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n"
+    }
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::face_forget::queued_fixed_face_receipt_keeps_the_original_audio_expiry",
+    "terminal": {
+      "type": "test",
+      "event": "ok",
+      "name": "lamp-voice::lamp_voice$second_provider::tests::private_context::face_forget::queued_fixed_face_receipt_keeps_the_original_audio_expiry",
+      "exec_time": 2.03910471
+    }
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::lost_private_authority_cannot_resume_on_a_later_positive_read",
+    "terminal": {
+      "type": "test",
+      "event": "ok",
+      "name": "lamp-voice::lamp_voice$second_provider::tests::private_context::lost_private_authority_cannot_resume_on_a_later_positive_read",
+      "exec_time": 0.035935125
+    }
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::private_output_rechecks_authority_after_queue_backpressure",
+    "terminal": {
+      "type": "test",
+      "event": "ok",
+      "name": "lamp-voice::lamp_voice$second_provider::tests::private_context::private_output_rechecks_authority_after_queue_backpressure",
+      "exec_time": 0.039122413
+    }
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::private_pending_before_and_after_note_ready_keeps_the_original_response_ceiling",
+    "terminal": {
+      "type": "test",
+      "event": "ok",
+      "name": "lamp-voice::lamp_voice$second_provider::tests::private_context::private_pending_before_and_after_note_ready_keeps_the_original_response_ceiling",
+      "exec_time": 0.037867831
+    }
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::returned_private_event_pending_obeys_the_original_response_ceiling",
+    "terminal": {
+      "type": "test",
+      "event": "ok",
+      "name": "lamp-voice::lamp_voice$second_provider::tests::private_context::returned_private_event_pending_obeys_the_original_response_ceiling",
+      "exec_time": 0.037780529
+    }
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::lookaway_authority_tests::checking_return_holds_real_credited_ipc_until_completed_recognition",
+    "terminal": {
+      "type": "test",
+      "event": "ok",
+      "name": "lamp-voice::lamp_voice$second_provider::worker::lookaway_authority_tests::checking_return_holds_real_credited_ipc_until_completed_recognition",
+      "exec_time": 0.480532419
+    }
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::lookaway_authority_tests::checking_return_never_arms_and_only_same_subject_can_finish_the_wait",
+    "terminal": {
+      "type": "test",
+      "event": "ok",
+      "name": "lamp-voice::lamp_voice$second_provider::worker::lookaway_authority_tests::checking_return_never_arms_and_only_same_subject_can_finish_the_wait",
+      "exec_time": 0.192405736
+    }
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::lookaway_authority_tests::checking_wait_never_hides_terminal_source_or_identity_loss",
+    "terminal": {
+      "type": "test",
+      "event": "ok",
+      "name": "lamp-voice::lamp_voice$second_provider::worker::lookaway_authority_tests::checking_wait_never_hides_terminal_source_or_identity_loss",
+      "exec_time": 1.146496257
+    }
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::lookaway_authority_tests::explicit_absence_is_request_owned_and_never_grants_an_inherited_private_scope",
+    "terminal": {
+      "type": "test",
+      "event": "ok",
+      "name": "lamp-voice::lamp_voice$second_provider::worker::lookaway_authority_tests::explicit_absence_is_request_owned_and_never_grants_an_inherited_private_scope",
+      "exec_time": 0.152166339
+    }
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::lookaway_authority_tests::permission_expiry_blocks_first_private_grant_at_the_final_boundary",
+    "terminal": {
+      "type": "test",
+      "event": "ok",
+      "name": "lamp-voice::lamp_voice$second_provider::worker::lookaway_authority_tests::permission_expiry_blocks_first_private_grant_at_the_final_boundary",
+      "exec_time": 0.134106444
+    }
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::lookaway_authority_tests::permission_reader_checks_completion_and_all_nonterminal_states",
+    "terminal": {
+      "type": "test",
+      "event": "ok",
+      "name": "lamp-voice::lamp_voice$second_provider::worker::lookaway_authority_tests::permission_reader_checks_completion_and_all_nonterminal_states",
+      "exec_time": 0.189699295
+    }
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::lookaway_authority_tests::renewed_permission_cannot_refresh_an_old_absent_or_checking_observation",
+    "terminal": {
+      "type": "test",
+      "event": "ok",
+      "name": "lamp-voice::lamp_voice$second_provider::worker::lookaway_authority_tests::renewed_permission_cannot_refresh_an_old_absent_or_checking_observation",
+      "exec_time": 0.36924846
+    }
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::lookaway_authority_tests::returning_track_changed_epoch_checking_and_unmatched_cancel_only_the_old_proved_request",
+    "terminal": {
+      "type": "test",
+      "event": "ok",
+      "name": "lamp-voice::lamp_voice$second_provider::worker::lookaway_authority_tests::returning_track_changed_epoch_checking_and_unmatched_cancel_only_the_old_proved_request",
+      "exec_time": 0.253933983
+    }
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::lookaway_authority_tests::returning_track_checking_envelope_has_no_identity_and_cannot_arm_continuation",
+    "terminal": {
+      "type": "test",
+      "event": "ok",
+      "name": "lamp-voice::lamp_voice$second_provider::worker::lookaway_authority_tests::returning_track_checking_envelope_has_no_identity_and_cannot_arm_continuation",
+      "exec_time": 0.195762999
+    }
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::lookaway_authority_tests::returning_track_completed_recognition_keeps_original_grant_at_actual_http_fallback",
+    "terminal": {
+      "type": "test",
+      "event": "ok",
+      "name": "lamp-voice::lamp_voice$second_provider::worker::lookaway_authority_tests::returning_track_completed_recognition_keeps_original_grant_at_actual_http_fallback",
+      "exec_time": 0.683160418
+    }
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::lookaway_authority_tests::returning_track_same_name_never_erases_changed_stable_identity",
+    "terminal": {
+      "type": "test",
+      "event": "ok",
+      "name": "lamp-voice::lamp_voice$second_provider::worker::lookaway_authority_tests::returning_track_same_name_never_erases_changed_stable_identity",
+      "exec_time": 0.252151017
+    }
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::memory_note_retries::a_held_line_and_a_revoked_scope_never_get_another_scopes_note",
+    "terminal": {
+      "type": "test",
+      "event": "ok",
+      "name": "lamp-voice::lamp_voice$second_provider::worker::memory_note_retries::a_held_line_and_a_revoked_scope_never_get_another_scopes_note",
+      "exec_time": 0.250467254
+    }
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::memory_note_retries::authority_lost_during_a_note_read_discards_the_whole_context",
+    "terminal": {
+      "type": "test",
+      "event": "ok",
+      "name": "lamp-voice::lamp_voice$second_provider::worker::memory_note_retries::authority_lost_during_a_note_read_discards_the_whole_context",
+      "exec_time": 0.037317733
+    }
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::pending_context::permission_expiry_after_composition_sends_no_private_chat",
+    "terminal": {
+      "type": "test",
+      "event": "ok",
+      "name": "lamp-voice::lamp_voice$second_provider::worker::pending_context::permission_expiry_after_composition_sends_no_private_chat",
+      "exec_time": 0.116845373
+    }
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::private_output_tests::private_output_credit_stall_rechecks_proof_without_changing_microphone_owner",
+    "terminal": {
+      "type": "test",
+      "event": "ok",
+      "name": "lamp-voice::lamp_voice$second_provider::worker::private_output_tests::private_output_credit_stall_rechecks_proof_without_changing_microphone_owner",
+      "exec_time": 0.457237781
+    }
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::with_no_sign_of_a_second_person_a_line_let_out_joins_the_one_it_cut_short",
+    "terminal": {
+      "type": "test",
+      "event": "ok",
+      "name": "lamp-voice::lamp_voice$second_provider::worker::tests::with_no_sign_of_a_second_person_a_line_let_out_joins_the_one_it_cut_short",
+      "exec_time": 6.2368514
+    }
+  }
+]
