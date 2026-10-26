@@ -1,8 +1,8 @@
 # Where V2 is: the build rows and the quality rows
 
-Written by the first builder from the team's review page at 2026-10-26 14:48 (+07). The lead asked for it on #1711 (20 Oct, 16:43), so anyone can read where V2 is without waiting for the hourly post. It's a copy, updated a few times a day. The hourly figures on #1722 are the live ones.
+Written by the first builder from the team's review page at 2026-10-26 16:09 (+07). The lead asked for it on #1711 (20 Oct, 16:43), so anyone can read where V2 is without waiting for the hourly post. It's a copy, updated a few times a day. The hourly figures on #1722 are the live ones.
 
-**Build 93.8% over 70 rows. Quality 68.2% over 16 rows.** Mood, for later: 58.5% over 2 rows, not in the build figure.
+**Build 93.9% over 70 rows. Quality 68.2% over 16 rows.** Mood, for later: 58.5% over 2 rows, not in the build figure.
 
 **How a build row is counted** (the lead's rule): 1.0 when its work is merged and tried on a lamp; less while parts are missing or untried. Build is the mean of the rows. Quality rows score how well a part works today, against a target; quality is the mean of the scores.
 
@@ -70,7 +70,7 @@ Written by the first builder from the team's review page at 2026-10-26 14:48 (+0
 | Hand-overs from a home lamp: Harness installed, the person signed in | 0.88 | #751 #765 #798 #1854 #2702 #2838 #2839 #2840 #2841 #2842 | seventh, eighth, tests, blue | 23 Oct 16:1x, up from 0.85: a bare project name now takes every hand-over, not only the first (#3217), and each hand-over’s outcome is one journal line without the ask (#3234). |
 | Updates cover the whole lamp, so V3, V4 and V5 update a shipped lamp in place: units, models, the updater itself, rollback, every part’s saved data read across versions | 0.78 | #1369 #1505 #2700 #2809 #2810 | migrate, tests, second | 25 Oct 09:5x, up from 0.75: the updater itself is carried now (#3433); |
 | The company sees its lamps in homes: health, crash and support logs, opt-in | 0.95 | #1683 #1755 #2862 | jarvis, mobile, backend, tests | 22 Oct 12:46, up from 0.9: the health report lists the product parts that have failed, under the same consent (Second, #2764). |
-| The factory’s per-lamp steps: body poses, touch pads, the update key | 0.88 | #1682 #1717 #1744 #2817 #2818 | third, thirteen, mobile, fifth | 26 Oct 05:4x, up from 0.85: the V2 lamp image is built in the repo and boots straight into lampOS setup, with its bootstrap authenticated and pinned and the selected hardware profile kept (#3501, #3503, trains 144 and 14… |
+| The factory’s per-lamp steps: body poses, touch pads, the update key | 0.92 | #1682 #1717 #1744 #2817 #2818 | third, thirteen, mobile, fifth | 26 Oct 16:1x, up from 0.88: on the V2 image (lamp-52e6, the lead, r2 with 6963) steps 1 to 3 passed and the self-test passed set up from the app (ring, head, servos); |
 | Reads your mood from your face or voice *(mood, for later: not in the build figure)* | 0.45 | #2796 #2797 #2798 #2799 #2800 | ten, fourth, sixth, fifth | 23 Oct 02:1x, up from 0.35: the product units carry the face reader, Blendshape alone (#2953, #2799 closed), and onboarding’s one ask whether the lamp may notice how a face seems, keeping only a yes, is merged (#3082, tr… |
 | Notices your activity and posture | 1.00 | — | — | Built and tried on lamp-4ace 20 Oct 01:23: with LAMP_ACTIVITY on the eyes say what the person at the desk is doing on room/activity (away in an empty room); |
 | Habits and wellbeing nudges beyond Stretch break, as skills | 1.00 | — | — | 20 Oct 11:46, built: all four tried on lamp-52e6 with the lead (row 12: rest your eyes, a sip of water, stand up, wind down), each passed with its skill done. |
