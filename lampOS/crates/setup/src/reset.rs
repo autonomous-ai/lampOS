@@ -22,6 +22,8 @@ use std::{
     process::Command,
 };
 
+mod query;
+
 /// The product plan's journal, read by Wi-Fi's restore of an old network
 /// ([`wifi_restore_allowed`]).
 pub const PRODUCT_JOURNAL: &str = "/var/lib/lampos-setup/reset.json";
@@ -296,15 +298,7 @@ impl Effects for System {
         }
     }
     fn read(&mut self, argv: &[String]) -> io::Result<String> {
-        let output = Command::new(&argv[0]).args(&argv[1..]).output()?;
-        if output.status.success() {
-            Ok(String::from_utf8_lossy(&output.stdout).into_owned())
-        } else {
-            Err(io::Error::other(format!(
-                "{} ended with {}",
-                argv[0], output.status
-            )))
-        }
+        query::read(argv)
     }
     fn sync(&mut self) {
         rustix::fs::sync();
