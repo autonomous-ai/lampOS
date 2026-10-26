@@ -1,0 +1,11 @@
+{
+  "name": "every_default_request_written_in_the_document_is_read_and_done",
+  "observed": [
+    [
+      "protocol::tests::every_default_request_written_in_the_document_is_read_and_done",
+      "ok"
+    ]
+  ],
+  "platform_absent": false,
+  "scope": "Absent is unrun, never a pass."
+}

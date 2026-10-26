@@ -1,0 +1,11 @@
+{
+  "name": "the_product_unit_loads_the_own_keys_folder_the_names_here_read",
+  "observed": [
+    [
+      "second_config::tests::the_product_unit_loads_the_own_keys_folder_the_names_here_read",
+      "ok"
+    ]
+  ],
+  "platform_absent": false,
+  "scope": "Absent is unrun, never a pass."
+}

@@ -1,0 +1,11 @@
+{
+  "name": "a_round_keeping_second_json_still_reaches_deepseek_through_the_relay",
+  "observed": [
+    [
+      "a_round_keeping_second_json_still_reaches_deepseek_through_the_relay",
+      "ok"
+    ]
+  ],
+  "platform_absent": false,
+  "scope": "Absent is unrun, never a pass."
+}

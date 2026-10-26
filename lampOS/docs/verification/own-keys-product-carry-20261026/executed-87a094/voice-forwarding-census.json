@@ -1,0 +1,27 @@
+{
+  "cases": [
+    [
+      "process::tests::cleared_worker_environment_passes_only_the_exact_voice_route_opt_in",
+      "ok"
+    ]
+  ],
+  "note": "Literal summaries preserve nested child outputs separately; audit before aggregate counts.",
+  "runtime_bindings": [
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_voice-d0423b4e04fbfa63)",
+      "sha256": "5fa4d0ce8b0dd41374cb68f4dad9ab9ebcc9a9e64dbc9aa7878bcfdd72412180"
+    }
+  ],
+  "scope": "voice-forwarding",
+  "summaries": [
+    {
+      "failed": 0,
+      "filtered": 3821,
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_voice-d0423b4e04fbfa63)",
+      "ignored": 0,
+      "literal": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3821 filtered out; finished in 1.94s",
+      "passed": 1,
+      "status": "ok"
+    }
+  ]
+}

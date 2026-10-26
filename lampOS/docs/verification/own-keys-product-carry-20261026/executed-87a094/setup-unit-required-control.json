@@ -1,0 +1,11 @@
+{
+  "name": "the_product_voice_loads_its_recorded_lines_from_the_fixed_folder",
+  "observed": [
+    [
+      "wifi_change::the_product_voice_loads_its_recorded_lines_from_the_fixed_folder",
+      "ok"
+    ]
+  ],
+  "platform_absent": false,
+  "scope": "Absent is unrun, never a pass."
+}

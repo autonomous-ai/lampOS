@@ -1,0 +1,27 @@
+{
+  "cases": [
+    [
+      "package::tests::the_askers_cgroups_are_their_product_units_slices",
+      "ok"
+    ]
+  ],
+  "note": "Literal summaries preserve nested child outputs separately; audit before aggregate counts.",
+  "runtime_bindings": [
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_skills-6dbb59343968e119)",
+      "sha256": "d3d77e6abe7c7a2a3c127e15383d619efdaaa257f0a32cf1ba7974de170a4337"
+    }
+  ],
+  "scope": "skills-unit",
+  "summaries": [
+    {
+      "failed": 0,
+      "filtered": 156,
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_skills-6dbb59343968e119)",
+      "ignored": 0,
+      "literal": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 156 filtered out; finished in 0.00s",
+      "passed": 1,
+      "status": "ok"
+    }
+  ]
+}

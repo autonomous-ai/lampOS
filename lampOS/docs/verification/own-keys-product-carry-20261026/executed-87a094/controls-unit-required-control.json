@@ -1,0 +1,11 @@
+{
+  "name": "controls_runs_at_real_time_priority_above_the_voice",
+  "observed": [
+    [
+      "touch_runtime::controls_runs_at_real_time_priority_above_the_voice",
+      "ok"
+    ]
+  ],
+  "platform_absent": false,
+  "scope": "Absent is unrun, never a pass."
+}

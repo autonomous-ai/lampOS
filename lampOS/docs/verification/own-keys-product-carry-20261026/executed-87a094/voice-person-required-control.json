@@ -1,0 +1,11 @@
+{
+  "name": "with_the_switch_a_known_person_s_own_kept_name_is_still_theirs",
+  "observed": [
+    [
+      "remember::tests::with_the_switch_a_known_person_s_own_kept_name_is_still_theirs",
+      "ok"
+    ]
+  ],
+  "platform_absent": false,
+  "scope": "Absent is unrun, never a pass."
+}

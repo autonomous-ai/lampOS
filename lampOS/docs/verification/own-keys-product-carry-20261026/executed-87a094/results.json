@@ -1,0 +1,96 @@
+{
+  "complete": {
+    "base": "2d18e296c0a51ac0f6fb7c610c3c159cef9870c4",
+    "complete": true,
+    "head": "87a094d38e4efb8d9d4660e2e963850777184ba7",
+    "note": "Each scope closed artifact guards before subsequent compilation; only last scope current actual paths claimed at final completion.",
+    "scopes": [
+      "update-lib-install",
+      "update-functions",
+      "update-round",
+      "controls-unit",
+      "setup-unit",
+      "skills-unit",
+      "voice-relay",
+      "voice-ownkeys",
+      "voice-room",
+      "voice-person",
+      "voice-off",
+      "voice-forwarding",
+      "voice-started-worker",
+      "memory-opt-in",
+      "memory-default",
+      "voice-eval-switches"
+    ],
+    "source_entries": 7260,
+    "source_unchanged": true
+  },
+  "identity": {
+    "base": "2d18e296c0a51ac0f6fb7c610c3c159cef9870c4",
+    "controller_sha256": "14eed804ddc1ea5d2873a4048923d7d1be6a305aaeccb8b29cf6c706c4b0b1e5",
+    "head": "87a094d38e4efb8d9d4660e2e963850777184ba7",
+    "runner_sha256": "2e66404ac7e0a43bc84afc01b8ba599bd3c14724c3a29e9fce51c831eaf87183"
+  },
+  "receipts": {
+    "clippy": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "clippy",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-body",
+        "-p",
+        "lamp-setup",
+        "-p",
+        "lamp-update",
+        "-p",
+        "lamp-cloud",
+        "-p",
+        "lamp-expression",
+        "-p",
+        "lamp-keeper",
+        "-p",
+        "lamp-skills",
+        "-p",
+        "lamp-voice",
+        "-p",
+        "lamp-voice-eval",
+        "-p",
+        "lamp-controls",
+        "-p",
+        "lamp-memory",
+        "--all-targets",
+        "--message-format=short",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "disk_free_before": 85946552320,
+      "elapsed_seconds": 82.881,
+      "error": null,
+      "exit_code": 0,
+      "log_sha256": "e2fafc60c9c0f9ee3050153536eb3b04651f7651131fdfc0676b31d33180a56c",
+      "source_entries": 7260,
+      "source_unchanged": true
+    },
+    "fmt": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "disk_free_before": 85946503168,
+      "elapsed_seconds": 6.466,
+      "error": null,
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source_entries": 7260,
+      "source_unchanged": true
+    }
+  },
+  "source_inventory_sha256": "a21dc7d91cce56f8c6a7d602ba863f3f6a47a5da3f93663f69c3253b5a282855"
+}

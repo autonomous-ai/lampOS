@@ -1,0 +1,57 @@
+{
+  "closure": {
+    "actual_and_preserved_outputs_unchanged": true,
+    "depfile_count": 1044,
+    "executable_count": 1,
+    "exit_code": 0,
+    "local_output_count": 50,
+    "source_unchanged": true
+  },
+  "receipts": {
+    "compile": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "cleared_worker_environment_passes_only_the_exact_voice_route_opt_in",
+        "--no-run",
+        "--message-format=json"
+      ],
+      "disk_free_before": 81380913152,
+      "elapsed_seconds": 0.94,
+      "error": null,
+      "exit_code": 0,
+      "log_sha256": "541d4ab460f7ee460858650f125db8d4f2c747c5ccf91db4a40af0804bc9b677",
+      "source_entries": 7260,
+      "source_unchanged": true
+    },
+    "runtime": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "cleared_worker_environment_passes_only_the_exact_voice_route_opt_in",
+        "--no-fail-fast",
+        "--",
+        "--test-threads=16"
+      ],
+      "disk_free_before": 81018908672,
+      "elapsed_seconds": 2.899,
+      "error": null,
+      "exit_code": 0,
+      "log_sha256": "f8b3d6edf1afc16b87fad7984248a8e4a883d54c02611609f5208aa097d8bf77",
+      "source_entries": 7260,
+      "source_unchanged": true
+    }
+  }
+}

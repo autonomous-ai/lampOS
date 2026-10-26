@@ -1,0 +1,11 @@
+{
+  "name": "with_the_switch_a_room_kept_name_is_told_only_as_someone_in_the_room_s",
+  "observed": [
+    [
+      "remember::tests::with_the_switch_a_room_kept_name_is_told_only_as_someone_in_the_room_s",
+      "ok"
+    ]
+  ],
+  "platform_absent": false,
+  "scope": "Absent is unrun, never a pass."
+}

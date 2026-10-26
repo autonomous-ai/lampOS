@@ -1,0 +1,27 @@
+{
+  "cases": [
+    [
+      "a_round_keeping_second_json_still_reaches_deepseek_through_the_relay",
+      "ok"
+    ]
+  ],
+  "note": "Literal summaries preserve nested child outputs separately; audit before aggregate counts.",
+  "runtime_bindings": [
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "sha256": "bc7d86dbc81021d3fc00fdd2754c9f046d2c2abf924fca25ae496b1f3c90b166"
+    }
+  ],
+  "scope": "update-round",
+  "summaries": [
+    {
+      "failed": 0,
+      "filtered": 182,
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "ignored": 0,
+      "literal": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 182 filtered out; finished in 4.16s",
+      "passed": 1,
+      "status": "ok"
+    }
+  ]
+}

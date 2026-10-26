@@ -1,0 +1,27 @@
+{
+  "cases": [
+    [
+      "touch_runtime::controls_runs_at_real_time_priority_above_the_voice",
+      "ok"
+    ]
+  ],
+  "note": "Literal summaries preserve nested child outputs separately; audit before aggregate counts.",
+  "runtime_bindings": [
+    {
+      "header": "Running tests/it/main.rs (<target>/debug/deps/it-241a355e4dc94879)",
+      "sha256": "56a2d65b5ecc46c6f74183433b65e4f892f74738470daeca74b2d0bd15b02566"
+    }
+  ],
+  "scope": "controls-unit",
+  "summaries": [
+    {
+      "failed": 0,
+      "filtered": 470,
+      "header": "Running tests/it/main.rs (<target>/debug/deps/it-241a355e4dc94879)",
+      "ignored": 0,
+      "literal": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 470 filtered out; finished in 0.00s",
+      "passed": 1,
+      "status": "ok"
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "name": "a_started_worker_gets_its_roles_switches_and_nothing_else",
+  "observed": [
+    [
+      "process::tests::a_started_worker_gets_its_roles_switches_and_nothing_else",
+      "ok"
+    ]
+  ],
+  "platform_absent": false,
+  "scope": "Absent is unrun, never a pass."
+}

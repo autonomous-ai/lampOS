@@ -1,0 +1,57 @@
+{
+  "closure": {
+    "actual_and_preserved_outputs_unchanged": true,
+    "depfile_count": 1045,
+    "executable_count": 1,
+    "exit_code": 0,
+    "local_output_count": 42,
+    "source_unchanged": true
+  },
+  "receipts": {
+    "compile": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-memory",
+        "--lib",
+        "every_default_request_written_in_the_document_is_read_and_done",
+        "--no-run",
+        "--message-format=json"
+      ],
+      "disk_free_before": 80260055040,
+      "elapsed_seconds": 0.998,
+      "error": null,
+      "exit_code": 0,
+      "log_sha256": "7d602ebe6d64ce80395e541c3bbb70f00e65954e0304e4612198a3203c5c6323",
+      "source_entries": 7260,
+      "source_unchanged": true
+    },
+    "runtime": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-memory",
+        "--lib",
+        "every_default_request_written_in_the_document_is_read_and_done",
+        "--no-fail-fast",
+        "--",
+        "--test-threads=16"
+      ],
+      "disk_free_before": 79897047040,
+      "elapsed_seconds": 1.038,
+      "error": null,
+      "exit_code": 0,
+      "log_sha256": "b465b234a53a6fbcb0658d2c993f5a10d21734d8b9bf5804d554009f09f198e6",
+      "source_entries": 7260,
+      "source_unchanged": true
+    }
+  }
+}

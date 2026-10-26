@@ -1,0 +1,11 @@
+{
+  "carry_boundary_sha256": "c06947d8302a34e1c1e069b77528aad4820c58b2ada4298198ee1d03ca220517",
+  "carry_sha256": "20f84aaef45e41a05c881b78be067ba1890993537093b087514c587e76f33246",
+  "changed_paths": [
+    "lampOS/deploy/product/lamp-voice.service",
+    "lampOS/docs/memory.md",
+    "lampOS/docs/switches.md"
+  ],
+  "latest_actual_preserved_outputs_rechecked": true,
+  "previous_complete_sha256": "3179dfe32a1a432ab953ab5746485882f02c6bb06e5a5e742f767709f2eaad46"
+}

@@ -1,3 +1,13 @@
+Ready for lamp-voice: #3510 targeted product-reader scope passed; final current-base carry before push.
+
+## Current checkpoint: 2026-10-26 22:32 +07, product memory reader qualification complete
+
+[Executed 87a094/2d18 proof](verification/own-keys-product-carry-20261026/executed-87a094/README.md): fmt and strict eleven-crate all-target Clippy pass, then **252 passed / 0 failed / 2 ignored** across sixteen separately aligned scopes. Update lib **124/0/2**, install **108/0/0**, functions **5/0**, selected round reader **1/0**; Controls/Setup/Skills readers, seven Voice unit/room/person/off/forwarding controls and two Memory doc readers each pass once; Voice-eval switches **2/0**. All thirteen named single-case controls match exactly, no platform absence. Every source and actual/preserved local-output/depfile boundary closes before subsequent compile; no nested inflation or unrelated failed-suite waiver.
+
+Both own-keys and room-not-asker settings are preserved. The new Main 7d0017f08 delta is entirely outside lampOS; the final carry will compare the entire lampOS tree, reached inputs and preserved artifacts before using this execution as same-source evidence. No hardware script execution or product test result is inferred. The remaining install assertion is not landed yet and is tracked separately. Earlier 87af runtime and 7ae6 native results retain their original identities. Activation #2094/current-lamp own-keys acceptance remains HOLD. No device or release action.
+
+---
+
 Ready for lamp-voice: #2810 automated evidence refreshed; physical attended unplug remains open.
 
 ## Current checkpoint: 2026-10-26 22:20 +07, existing self-switch controls extracted

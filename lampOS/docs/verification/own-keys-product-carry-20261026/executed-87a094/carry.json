@@ -1,0 +1,20 @@
+{
+  "base": "2d18e296c0a51ac0f6fb7c610c3c159cef9870c4",
+  "both_product_switches_preserved": true,
+  "changed_paths": [
+    "lampOS/deploy/product/lamp-voice.service",
+    "lampOS/docs/memory.md",
+    "lampOS/docs/switches.md"
+  ],
+  "clean": true,
+  "head": "87a094d38e4efb8d9d4660e2e963850777184ba7",
+  "old_base": "e672ee214ae67eb05538d519a43d1f6ba2662ecb",
+  "old_head": "87afb0cb0e7a91c0f8377afde3a181edc99d55a2",
+  "range_diff": "1:  db55a49056 = 1:  dfc471dfa4 lampOS: the product units turn on LAMP_OWN_KEYS, so a person's own keys from setup or the app are used, for #2846\n2:  6d540ae159 = 2:  d9dd2c13b6 lampOS: preserve customized own-keys drop-ins\n3:  30f5a94bed = 3:  362d6537d2 lampOS: record current own-keys carry qualification\n4:  9796f63089 = 4:  125553f672 lampOS: clarify own-keys activation and per-unit overrides\n5:  671faa845e = 5:  f0686a3e24 lampOS: record own-keys qualification on the d21 base\n6:  f039640990 = 6:  4dc635dd4f lampOS: retain own-keys scheduling and product-reader checks\n7:  87afb0cb0e = 7:  87a094d38e lampOS: qualify own-keys carry with current product units",
+  "seven_equal_patches": true,
+  "shared_files_inherit_exact_upstream_patch": [
+    "lampOS/deploy/product/lamp-voice.service",
+    "lampOS/docs/switches.md"
+  ],
+  "unchanged_authored_files": 36
+}

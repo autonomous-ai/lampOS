@@ -1,0 +1,11 @@
+{
+  "name": "without_the_switch_the_note_is_byte_identical",
+  "observed": [
+    [
+      "remember::tests::without_the_switch_the_note_is_byte_identical",
+      "ok"
+    ]
+  ],
+  "platform_absent": false,
+  "scope": "Absent is unrun, never a pass."
+}

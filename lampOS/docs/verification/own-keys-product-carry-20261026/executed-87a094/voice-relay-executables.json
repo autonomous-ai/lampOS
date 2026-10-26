@@ -1,0 +1,22 @@
+[
+  {
+    "fresh": false,
+    "package_id": "path+file://<source>/lampOS/crates/voice#lamp-voice@0.1.0",
+    "path": "<target>/debug/deps/lamp_voice-d0423b4e04fbfa63",
+    "sha256": "5fa4d0ce8b0dd41374cb68f4dad9ab9ebcc9a9e64dbc9aa7878bcfdd72412180",
+    "target": {
+      "crate_types": [
+        "lib"
+      ],
+      "doc": true,
+      "doctest": true,
+      "edition": "2024",
+      "kind": [
+        "lib"
+      ],
+      "name": "lamp_voice",
+      "src_path": "<source>/lampOS/crates/voice/src/lib.rs",
+      "test": true
+    }
+  }
+]

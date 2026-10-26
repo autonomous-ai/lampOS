@@ -1,0 +1,22 @@
+[
+  {
+    "fresh": false,
+    "package_id": "path+file://<source>/lampOS/crates/memory#lamp-memory@0.1.0",
+    "path": "<target>/debug/deps/lamp_memory-96fb4a1e86a4b44a",
+    "sha256": "c624270afd3160889bdf6a28cf08058b57219f8bf816e76dc8f46133148b2e01",
+    "target": {
+      "crate_types": [
+        "lib"
+      ],
+      "doc": true,
+      "doctest": true,
+      "edition": "2024",
+      "kind": [
+        "lib"
+      ],
+      "name": "lamp_memory",
+      "src_path": "<source>/lampOS/crates/memory/src/lib.rs",
+      "test": true
+    }
+  }
+]

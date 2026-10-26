@@ -1,0 +1,11 @@
+{
+  "name": "every_opt_in_request_shape_in_the_document_parses",
+  "observed": [
+    [
+      "days_protocol::tests::every_opt_in_request_shape_in_the_document_parses",
+      "ok"
+    ]
+  ],
+  "platform_absent": false,
+  "scope": "Absent is unrun, never a pass."
+}

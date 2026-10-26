@@ -1,0 +1,11 @@
+{
+  "name": "cleared_worker_environment_passes_only_the_exact_voice_route_opt_in",
+  "observed": [
+    [
+      "process::tests::cleared_worker_environment_passes_only_the_exact_voice_route_opt_in",
+      "ok"
+    ]
+  ],
+  "platform_absent": false,
+  "scope": "Absent is unrun, never a pass."
+}

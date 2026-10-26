@@ -1,0 +1,43 @@
+{
+  "cases": [
+    [
+      "the_product_voice_s_functions_in_a_process_of_their_own",
+      "ok"
+    ],
+    [
+      "the_generic_voice_declares_the_clock_and_receives_time_and_session_context",
+      "ok"
+    ],
+    [
+      "a_product_chat_request_offers_dance_at_the_bound",
+      "ok"
+    ],
+    [
+      "with_reports_on_dance_stays_at_the_bound",
+      "ok"
+    ],
+    [
+      "a_product_lamp_declares_every_function_it_has_within_the_bound",
+      "ok"
+    ]
+  ],
+  "note": "Literal summaries preserve nested child outputs separately; audit before aggregate counts.",
+  "runtime_bindings": [
+    {
+      "header": "Running tests/functions.rs (<target>/debug/deps/functions-781cb61db13f0261)",
+      "sha256": "84c9812d5e1fe2d3fdf25590b3f064dd41a67e06bf9492818ce3a5ef0319d208"
+    }
+  ],
+  "scope": "update-functions",
+  "summaries": [
+    {
+      "failed": 0,
+      "filtered": 0,
+      "header": "Running tests/functions.rs (<target>/debug/deps/functions-781cb61db13f0261)",
+      "ignored": 0,
+      "literal": "test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s",
+      "passed": 5,
+      "status": "ok"
+    }
+  ]
+}

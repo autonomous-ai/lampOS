@@ -1,0 +1,9 @@
+# Own-keys product-memory carry: targeted reader qualification
+
+Frozen 87a094d38e4efb8d9d4660e2e963850777184ba7 on 2d18e296c0a51ac0f6fb7c610c3c159cef9870c4. Seven equal patches, 36 unchanged authored files; shared Voice unit and switches document inherit exact upstream change. Both LAMP_OWN_KEYS and LAMP_MEMORY_ROOM_NOT_ASKER are preserved. Prior 87af/e672 source and completed per-scope artifact boundaries were captured before carrying.
+
+Fmt and strict eleven-crate all-target Clippy cover Body/Setup/Update/Cloud/Expression/Keeper/Skills/Voice/Voice-eval/Controls/Memory. Runtime is full Update lib/install and functions, a single round product-unit reader, named Controls/Setup/Skills product readers, two Voice product readers, three room/person/default-off controls, two worker-forwarding controls, two Memory document readers and Voice-eval switches. Each invocation uses identical compile/runtime package/target/filter selection and sixteen threads. Named controls require exactly one positive matching case; platform absence is unrun, not a pass. Per-invocation runtime deadline is 870 seconds plus at most 15-second poll and 15-second cleanup. No automatic retries.
+
+Each scope closes exhaustive source and actual/preserved local compiler output/depfile guards before the next compilation. Earlier actual paths can rebuild later; preserved outputs retain their original identity. Last scope's actual outputs are rechecked at packet creation. Nested process-child summaries are preserved separately; do not blindly sum literals. Known unrelated failures are not waived by filtered passes.
+
+Earlier four-crate 1430/0/11 plus switches 2 remain 87af/e672; Voice 4093/0/21 remains d378/6663. No count is relabeled. Native Linux and installed activation/reset acceptance remain separate. No binaries or scripts are in this sanitized packet.

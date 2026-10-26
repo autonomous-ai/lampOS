@@ -1,0 +1,57 @@
+{
+  "closure": {
+    "actual_and_preserved_outputs_unchanged": true,
+    "depfile_count": 1044,
+    "executable_count": 1,
+    "exit_code": 0,
+    "local_output_count": 50,
+    "source_unchanged": true
+  },
+  "receipts": {
+    "compile": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "with_the_switch_a_room_kept_name_is_told_only_as_someone_in_the_room_s",
+        "--no-run",
+        "--message-format=json"
+      ],
+      "disk_free_before": 82468470784,
+      "elapsed_seconds": 0.942,
+      "error": null,
+      "exit_code": 0,
+      "log_sha256": "dce2d3dd9d77951fd96f5bfea83497580ea40b68540a8c103f6099f4bd55ddb6",
+      "source_entries": 7260,
+      "source_unchanged": true
+    },
+    "runtime": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "with_the_switch_a_room_kept_name_is_told_only_as_someone_in_the_room_s",
+        "--no-fail-fast",
+        "--",
+        "--test-threads=16"
+      ],
+      "disk_free_before": 82106003456,
+      "elapsed_seconds": 0.944,
+      "error": null,
+      "exit_code": 0,
+      "log_sha256": "43e45d3db3c23ac97f42433f09a33c2c1b742e724831c54c2ac446661a536a3b",
+      "source_entries": 7260,
+      "source_unchanged": true
+    }
+  }
+}

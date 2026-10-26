@@ -1,0 +1,27 @@
+{
+  "cases": [
+    [
+      "days_protocol::tests::every_opt_in_request_shape_in_the_document_parses",
+      "ok"
+    ]
+  ],
+  "note": "Literal summaries preserve nested child outputs separately; audit before aggregate counts.",
+  "runtime_bindings": [
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_memory-96fb4a1e86a4b44a)",
+      "sha256": "c624270afd3160889bdf6a28cf08058b57219f8bf816e76dc8f46133148b2e01"
+    }
+  ],
+  "scope": "memory-opt-in",
+  "summaries": [
+    {
+      "failed": 0,
+      "filtered": 96,
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_memory-96fb4a1e86a4b44a)",
+      "ignored": 0,
+      "literal": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 96 filtered out; finished in 0.00s",
+      "passed": 1,
+      "status": "ok"
+    }
+  ]
+}

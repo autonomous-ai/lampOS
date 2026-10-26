@@ -1,0 +1,31 @@
+{
+  "cases": [
+    [
+      "switches::every_switch_says_how_it_is_counted",
+      "ok"
+    ],
+    [
+      "switches::the_counts_by_table_and_in_all",
+      "ok"
+    ]
+  ],
+  "note": "Literal summaries preserve nested child outputs separately; audit before aggregate counts.",
+  "runtime_bindings": [
+    {
+      "header": "Running tests/it/main.rs (<target>/debug/deps/it-1253a8d74d54cde9)",
+      "sha256": "8db4a6a9d7a9d3f344cb5eeb79a9a19707418820cb21a7f483fa9f889be132ab"
+    }
+  ],
+  "scope": "voice-eval-switches",
+  "summaries": [
+    {
+      "failed": 0,
+      "filtered": 236,
+      "header": "Running tests/it/main.rs (<target>/debug/deps/it-1253a8d74d54cde9)",
+      "ignored": 0,
+      "literal": "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 236 filtered out; finished in 0.01s",
+      "passed": 2,
+      "status": "ok"
+    }
+  ]
+}

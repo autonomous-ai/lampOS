@@ -1,0 +1,42 @@
+[
+  {
+    "fresh": false,
+    "package_id": "path+file://<source>/lampOS/crates/setup#lamp-setup@0.1.0",
+    "path": "<target>/debug/deps/it-65d52f8a2a5968a2",
+    "sha256": "9521990bdf7a92f5073799792c69f7237a574df3127934be4e7fff17d7e3d100",
+    "target": {
+      "crate_types": [
+        "bin"
+      ],
+      "doc": false,
+      "doctest": false,
+      "edition": "2024",
+      "kind": [
+        "test"
+      ],
+      "name": "it",
+      "src_path": "<source>/lampOS/crates/setup/tests/it/main.rs",
+      "test": true
+    }
+  },
+  {
+    "fresh": false,
+    "package_id": "path+file://<source>/lampOS/crates/setup#lamp-setup@0.1.0",
+    "path": "<target>/debug/lamp-setup",
+    "sha256": "55ca3690ad1c0b5b8688392ac16ee9e57ebfaf8112406943cac9d49c21cfa3fc",
+    "target": {
+      "crate_types": [
+        "bin"
+      ],
+      "doc": true,
+      "doctest": false,
+      "edition": "2024",
+      "kind": [
+        "bin"
+      ],
+      "name": "lamp-setup",
+      "src_path": "<source>/lampOS/crates/setup/src/main.rs",
+      "test": true
+    }
+  }
+]

@@ -1,0 +1,11 @@
+{
+  "name": "the_askers_cgroups_are_their_product_units_slices",
+  "observed": [
+    [
+      "package::tests::the_askers_cgroups_are_their_product_units_slices",
+      "ok"
+    ]
+  ],
+  "platform_absent": false,
+  "scope": "Absent is unrun, never a pass."
+}

@@ -1,0 +1,22 @@
+[
+  {
+    "fresh": false,
+    "package_id": "path+file://<source>/lampOS/crates/skills#lamp-skills@0.1.0",
+    "path": "<target>/debug/deps/lamp_skills-6dbb59343968e119",
+    "sha256": "d3d77e6abe7c7a2a3c127e15383d619efdaaa257f0a32cf1ba7974de170a4337",
+    "target": {
+      "crate_types": [
+        "lib"
+      ],
+      "doc": true,
+      "doctest": true,
+      "edition": "2024",
+      "kind": [
+        "lib"
+      ],
+      "name": "lamp_skills",
+      "src_path": "<source>/lampOS/crates/skills/src/lib.rs",
+      "test": true
+    }
+  }
+]

@@ -1,0 +1,11 @@
+{
+  "name": "the_company_relay_reaches_deepseek_through_itself",
+  "observed": [
+    [
+      "second_config::tests::the_company_relay_reaches_deepseek_through_itself",
+      "ok"
+    ]
+  ],
+  "platform_absent": false,
+  "scope": "Absent is unrun, never a pass."
+}
