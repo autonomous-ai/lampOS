@@ -1,0 +1,11 @@
+{
+  "old": "942123c90d360bfb23a2c2739c229509691f3788",
+  "head": "d689eddaaadb65413c6096ce5416ce7ecd47fa09",
+  "base": "1ec33957c78e6dc39bd7ca0b3b8f7c74543f6b35",
+  "authored_blobs_equal": [
+    "lampOS/crates/skills/tests/it/addon.rs",
+    "lampOS/docs/skills.md"
+  ],
+  "range_diff": "1:  942123c90d = 1:  d689eddaaa lampOS: count completed addon judgements from new journal bytes\n",
+  "scope": "Source carry only. Prior independent 522/0/9 retains old head; no current runtime execution."
+}

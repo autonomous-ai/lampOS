@@ -13,6 +13,26 @@ machine is explicitly named. Third has no lamp access.
 
 
 
+## 2026-10-26 15:08 — Reminder ready; Setup evidence narrowed
+
+Ready for lamp-voice: yes (#3525 aad5a4fe3, awaiting train)
+
+Both exact-head READ-OKs are posted, Reviewer-two and Reviewer-three;
+NEXT TRAIN posted with current native gates and the preserved historical
+host/runtime boundaries. No physical acceptance is claimed.
+
+Migrate's #3530 comment 6411111159 distinguishes the Setup failure:
+the 600-second grace ended at 07:29:43 UTC, before two condition-rejected
+start attempts at 07:44:37 and 07:45:58. The fix must handle a stale initial
+active snapshot and interrupted recovery, not just the ordinary restart
+loop. Implementation and regression controls are in progress; no device
+access. The prior uncertainty remains recorded in its original entry.
+
+Source carry read for #3545 d689eddaa: both authored blobs and its one
+patch equal independently tested 942123c90. [Binding](verification/addon-journal-reader-20261026/carry-1ec.json).
+The earlier 522/0/9 is old-head execution; this is only a source carry.
+Current native and Reviewer-two's reminder composition remain separate.
+
 ## 2026-10-26 14:56 — Completed Setup lifecycle claimed
 
 Ready for lamp-voice: no (new #3530 follow-up)
