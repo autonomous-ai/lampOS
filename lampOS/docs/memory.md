@@ -989,6 +989,28 @@ texts in `remember::tests`.
     `i64::MAX`, not an integer) is not sent, so the text is kept as a plain
     remember. A resumed fresh session forgets the hits told by id before
     it, as it does its sources.
+  - **A correction in their words, with no id** (lamp-06c1, 26 Oct: the
+    model left `replaces` out, so "bakery" and "library" both stayed
+    current): a `remember` with no `replaces` whose line, as heard (or the
+    call's text when no heard line is at hand), has a change word ("now",
+    "anymore", "no longer", "instead of") and, after its last whole-word
+    "not", "no longer" or "instead of" up to the clause's end, words all of
+    which one kept thing of the same person's shown this session has ("I
+    work at a library now, not the bakery" against "works at a bakery") is
+    sent with that id as `replaces` and the same `shown` list, so the store
+    checks it as any correction (`remember::correction_candidates`). More
+    than one such thing keeps nothing and tells the model to ask which; none,
+    or a context busy just then, keeps it plainly. A model-given `replaces`
+    is as before. English only; "I don't like the bakery" (no change word)
+    and "I cannot get to the bakery now" (no whole-word "not") correct
+    nothing. Only with `LAMP_MEMORY_REPLACES=on`. With
+    `LAMP_MEMORY_KEEP_HEARD`, a heard line kept instead still drops the
+    model's `replaces`, but this may give it one again when the heard line
+    itself denies the old fact by its words (that P2's case, "it's green
+    now" with no subject, names none, so it replaces nothing); an STT line
+    that says "papers" for "bakery" denies nothing shown.
+    Tests: `remember::tests::an_explicit_correction_selects_only_one_shown_old_fact`
+    and `remember::tests::a_clear_correction_without_a_model_id_replaces_one_shown_fact`.
   - **With `LAMP_MEMORY_KEEP_HEARD`:** a heard line kept instead is sent
     without the call's `replaces`, so the old fact stays active and the
     heard line is kept beside it: "They said: it's green now" may lack the
