@@ -1,0 +1,5 @@
+1:  4bb741248 = 1:  6ffdcc5a7 lampOS: the product units turn on LAMP_OWN_KEYS, so a person's own keys from setup or the app are used, for #2846
+2:  220208cc3 = 2:  b3297f015 lampOS: preserve customized own-keys drop-ins
+3:  1ad392b4f = 3:  a092c3a06 lampOS: record current own-keys carry qualification
+4:  4fb4c1c04 = 4:  d2a760f48 lampOS: clarify own-keys activation and per-unit overrides
+5:  0b496997a = 5:  4a0f0cc42 lampOS: record own-keys qualification on the d21 base
