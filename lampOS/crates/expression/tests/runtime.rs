@@ -468,17 +468,18 @@ mod sleep_name {
     /// where the plain clock's breath goes on rising and falling.
     #[test]
     fn the_service_breathes_the_head_with_moods_breath_from_the_bus() {
+        const STEP_US: u64 = 250_000;
         let (mut plain, mut mood) = (SleepingService::new(), SleepingService::with_mood(0.5));
         // In, past the layer's blend and the breath's catch-up.
         for _ in 0..30 {
-            plain.step();
-            mood.step();
+            plain.step_by(STEP_US);
+            mood.step_by(STEP_US);
         }
         let (mut low, mut high) = (f64::MAX, f64::MIN);
         for _ in 0..30 {
-            let held = mood.pitch();
+            let held = mood.pitch_by(STEP_US);
             assert!((held - -0.03).abs() < 1e-3, "{held}");
-            let pitch = plain.pitch();
+            let pitch = plain.pitch_by(STEP_US);
             low = low.min(pitch);
             high = high.max(pitch);
         }
@@ -487,10 +488,10 @@ mod sleep_name {
         // breath 1.3 times as large (energy 1), held at the top.
         let mut lively = SleepingService::with_mood_energy(0.5, 0.7);
         for _ in 0..30 {
-            lively.step();
+            lively.step_by(STEP_US);
         }
         for _ in 0..30 {
-            let held = lively.pitch();
+            let held = lively.pitch_by(STEP_US);
             assert!((held - -0.039).abs() < 1e-3, "{held}");
         }
     }
@@ -707,29 +708,6 @@ mod sleep_name {
             timing.state = self.state;
             // No envelope published below is older than this.
             let publishing = runtime::unix_ms();
-            if let Some((mood, phase, energy)) = self.mood.as_mut() {
-                let state = lamp_msgs::MoodState {
-                    stamp: ClockStamp {
-                        clock_id: "test".into(),
-                        at_us: self.now_us,
-                        sequence: self.now_us,
-                    },
-                    session_id: "mood-session".into(),
-                    awake: 0.7,
-                    energy: *energy,
-                    warmth: 0.6,
-                    asleep: false,
-                    attention: None,
-                    familiarity: lamp_msgs::Familiarity::Unknown,
-                    familiar: None,
-                    felt: None,
-                    breath: Some(lamp_msgs::MoodBreath {
-                        phase: *phase,
-                        pace: lamp_msgs::mood_pace(0.7, *energy, false),
-                    }),
-                };
-                mood.publish_json(987_654_321, &state).unwrap();
-            }
             // Loosest limit first, strictest last (#912): the room (2 s),
             // the voice and the faces (500 ms), the joints (300 ms).
             self.room
@@ -762,22 +740,65 @@ mod sleep_name {
                     },
                 )
                 .unwrap();
-            // The wall clock just after publishing, as `populate` gives it.
+            // Anchor the ordinary inputs' final publication wall sample;
+            // the service's first injected clock sample is paired with it.
             let wall = runtime::unix_ms();
             // The service places each bus input at `now` less its wall age.
             // A host stall of more than a tick while publishing would place
             // this step's room before the last one's, refused as out of
             // order (#1196). Like a lamp's, this clock then keeps up with the wall.
             self.now_us += (wall.saturating_sub(publishing) * 1_000).saturating_sub(step_us);
-            let output = self.service.step(|| self.now_us, wall);
+            // Mood is sampled at the first clock read inside Service::step.
+            // Stamp it after the other publications' clock adjustment.
+            let began_us = self.now_us;
+            if let Some((mood, phase, energy)) = self.mood.as_mut() {
+                let state = lamp_msgs::MoodState {
+                    stamp: ClockStamp {
+                        clock_id: "test".into(),
+                        at_us: self.now_us,
+                        sequence: self.now_us,
+                    },
+                    session_id: "mood-session".into(),
+                    awake: 0.7,
+                    energy: *energy,
+                    warmth: 0.6,
+                    asleep: false,
+                    attention: None,
+                    familiarity: lamp_msgs::Familiarity::Unknown,
+                    familiar: None,
+                    felt: None,
+                    breath: Some(lamp_msgs::MoodBreath {
+                        phase: *phase,
+                        pace: lamp_msgs::mood_pace(0.7, *energy, false),
+                    }),
+                };
+                mood.publish_json(987_654_321, &state).unwrap();
+                self.now_us += runtime::unix_ms().saturating_sub(wall) * 1_000;
+            }
+            // Later receives and the planner tick include Mood's publication
+            // work. With `wall` paired to `began_us`, the service then maps
+            // every input's real wall age without moving Mood's read boundary.
+            let read_began = std::cell::Cell::new(false);
+            let output = self.service.step(
+                || {
+                    if read_began.replace(true) {
+                        self.now_us
+                    } else {
+                        began_us
+                    }
+                },
+                wall,
+            );
             assert_eq!(self.service.counts.refused, 0);
             assert_eq!(self.service.counts.input_errors, 0);
             output
         }
 
-        /// The head's pitch the service asks for at the next step.
-        fn pitch(&mut self) -> f64 {
-            self.step().body.map_or(0.0, |body| body.offsets.head_pitch)
+        /// The head's pitch at a step that admits a new Mood state.
+        fn pitch_by(&mut self, step_us: u64) -> f64 {
+            self.step_by(step_us)
+                .body
+                .map_or(0.0, |body| body.offsets.head_pitch)
         }
 
         fn sleep(&mut self) {
