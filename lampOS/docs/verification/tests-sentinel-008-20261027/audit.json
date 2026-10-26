@@ -1,0 +1,169 @@
+{
+  "recorded_at_utc": "2026-10-26T18:02:28.850222+00:00",
+  "pull_request": 3543,
+  "head": "7cafe341a62cda2db4095821db40436784d8ffd7",
+  "base": "008e7a9746e7ddd58e951f8ea919a7d8beebb5ef",
+  "status": "PASS",
+  "scope": "All actual Mac session_reader::tests:: cases once serial; no full Voice runtime or changed Linux case claim",
+  "command": "<Voice-lib executable> session_reader::tests:: --test-threads=1",
+  "runtime_attempts": 1,
+  "counts": {
+    "passed": 4,
+    "failed": 0,
+    "ignored": 0
+  },
+  "ordinary_filtered_out": 3818,
+  "module_cases": [
+    {
+      "name": "session_reader::tests::finite_and_unset_service_never_resolve_a_reader_group",
+      "outcome": "ok"
+    },
+    {
+      "name": "session_reader::tests::group_lookup_failure_retains_private_logging_without_writer_failure",
+      "outcome": "ok"
+    },
+    {
+      "name": "session_reader::tests::local_session_reader_group_is_exact_unique_and_bounded",
+      "outcome": "ok"
+    },
+    {
+      "name": "session_reader::tests::unsupported_acl_verification_degrades_to_private_metadata",
+      "outcome": "ok"
+    }
+  ],
+  "supervised_command_elapsed_s": 1.5829839290236123,
+  "libtest_reported_elapsed_s": 1.0,
+  "inventory": {
+    "Voice_lib_all": 3822,
+    "Voice_lib_ignored": 15,
+    "module_all": 4,
+    "module_ignored": 0
+  },
+  "changed_Linux_case": {
+    "name": "session_reader::tests::linux::replaced_record_never_changes_an_outside_sentinel",
+    "present_on_Mac": false,
+    "executed_on_Mac": false
+  },
+  "gates": {
+    "fmt": true,
+    "strict_all_targets": [
+      "lamp-body",
+      "lamp-cloud",
+      "lamp-expression",
+      "lamp-keeper",
+      "lamp-lean",
+      "lamp-memory",
+      "lamp-peek",
+      "lamp-setup",
+      "lamp-skills",
+      "lamp-update",
+      "lamp-voice",
+      "lamp-voice-eval"
+    ],
+    "strict_flags": "--offline --locked --all-targets --jobs 1 -- -D warnings",
+    "strict_Voice_artifact_rows": 17,
+    "invalidated_Voice_artifacts_fresh_false": true,
+    "whole_local_closure_freshness_claim": false,
+    "workspace_build_before_Voice_lib_compile": true,
+    "Voice_lib_compile": "cargo +1.96.0 test --offline --locked --jobs 1 -p lamp-voice --lib --no-run --message-format=json",
+    "jobs": 1,
+    "debug_info": 0,
+    "incremental": false,
+    "offline": true,
+    "locked": true,
+    "retries": 0
+  },
+  "source": {
+    "tracked_files": 10674,
+    "clean_before_and_after": true,
+    "tracked_bytes_modes_and_index_unchanged": true,
+    "index_sha256": "0b74a7792d056afa3c813037965505c352bd930d4ca65cd344e0a3ef5c31c924",
+    "canonical_alias_matches_preserved_original_source_except_branch_label": true,
+    "head_matches_official_pushed_PR": true,
+    "qualification_alias_pushed": false,
+    "range_diff": "1:  1f060d1053 = 1:  7cafe341a6 lampOS: isolate the reader sentinel fixture from host ancestry",
+    "authored_paths": {
+      "lampOS/crates/voice/src/session_reader/tests.rs": {
+        "sha256": "5f47477a111d7f82da5fdeb3b3893718099eb67a0fe93b76b4f24ddc32adce73",
+        "bytes": 36597,
+        "mode": 420,
+        "blob": "08f2fd1ca4c18ed01c5b3577d51248ed0e30e588"
+      },
+      "lampOS/docs/realtime-tests.md": {
+        "sha256": "4b5481d7574ff3445db3d64fb502f4f3788e482fa2a560600fba31c57e53e1ca",
+        "bytes": 115505,
+        "mode": 420,
+        "blob": "80ae29b16b4d298a263ad333ec9672b4eeafadd0"
+      }
+    }
+  },
+  "executable": {
+    "artifact": "debug/deps/lamp_voice-6d619bbdd1df3a0d",
+    "sha256": "fe665c9a99e2244a6f8b59321243c0a44b7cb5356f8834d53b9dcbb50f3dfe9c",
+    "bytes": 115818664,
+    "mode": "0755",
+    "frozen_mode": "0555",
+    "compiler_profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "fresh": false,
+    "actual_and_independent_frozen_copy_unchanged": true
+  },
+  "witnesses": {
+    "sealed_before": 207,
+    "new_independent_Voice_lib_copy": 1,
+    "sealed_final": 208,
+    "all_unchanged": true,
+    "actual_Voice_lib_guard_unchanged": true
+  },
+  "closure": {
+    "all_stage_exits": 0,
+    "all_owned_process_groups_closed": true,
+    "unresolved_owned_processes": 0,
+    "lease_released": true,
+    "scope": "Owned groups only; no detached-descendant claim"
+  },
+  "original_native_run_status_as_reported_pending_audit": {
+    "ARM64": {
+      "run": 40371123630,
+      "status": "running"
+    },
+    "Linux_Clippy": {
+      "run": 40371123472,
+      "status": "success"
+    },
+    "general_CI": {
+      "run": 40371114033,
+      "status": "success"
+    },
+    "preview_source_and_log_audit_complete": false,
+    "new_Linux_runtime_claim": false
+  },
+  "current_carry_scope": {
+    "head": "8edc8aa02e7b744041266acc4f51224ef2ac4071",
+    "base": "978cb0e983c095b03dfeca01a06ebadd50691edd",
+    "qualified_by_this_record": false,
+    "source_only": true
+  },
+  "historical_scope": "Earlier 6588 native/690 source receipts retain their actual heads and previews. This record does not relabel them or qualify current978.",
+  "private_receipt_sha256": {
+    "terminal.json": "9513e7d2f6b2a2fc375ed34caf808167b469d0addd16be66d5dfcd40e46c70ea",
+    "source-before.json": "b4c82a924d4d2fd05503fd2334de1ba9a136086d736ffe2378b545290065a145",
+    "source-after.json": "b4c82a924d4d2fd05503fd2334de1ba9a136086d736ffe2378b545290065a145",
+    "prepared-source-original-ownWT.json": "793d2ae53d74ab3c4f3b4c36990b9bf69f50b181747778c13370a8614c25be31",
+    "prepared-source.json": "b4c82a924d4d2fd05503fd2334de1ba9a136086d736ffe2378b545290065a145",
+    "protected-after.json": "8519a10265785c71304603d193d9d78f493983b5a21b2897e3e9213f328bfd65",
+    "actual-executable.json": "b3fda79f45121ab33ba88a8fb183dfb040e966532e31e03dbdf362dc0fc973b7",
+    "module-runtime-result.json": "50cd4b245819b02b376f309a1648640f097d976f2c738e1cfcdbd602984e76f7",
+    "module-runtime.stdout": "c295e2d793bcba6bef26242f6d5c8a2d9a735c47032b3f97987cbe1de32506dd",
+    "module-runtime.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "observed-census.json": "9a7eb3ae864ed2914096a0d53af9ce012fb3be363cf8355090d77ddb1caa5eba",
+    "strict-all-artifacts.json": "0b8d7bfbaa97b9e69efb07094fbd66a471e457bdca904866b2b38405947d03f3",
+    "task-source-carry.json": "b6584e7486aa545d6e1eb2b9f5d99a0e0c579b50bcebe1525b2a8d9d08ba94d3"
+  }
+}
