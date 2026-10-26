@@ -22,6 +22,36 @@ use std::{
     process::Command,
 };
 
+/// The product plan's journal, read by Wi-Fi's restore of an old network
+/// ([`wifi_restore_allowed`]).
+pub const PRODUCT_JOURNAL: &str = "/var/lib/lampos-setup/reset.json";
+
+/// The Wi-Fi file whose rollback and staging copies beside it are wiped with
+/// it, matched by name so that a plan installed before them wipes them too.
+const WIFI_FILE: &str = "wpa_supplicant-wlan0.conf";
+
+/// What Wi-Fi keeps beside its file: the old network a change may put back
+/// (`.conf.lamp-previous`, which the boot's `lamp-setup-wifi-restore.service`
+/// puts back), and setup's staging copies (Third on #3579).
+const WIFI_COPIES: [&str; 3] = [
+    "conf.lamp-previous",
+    "conf.lamp-setup",
+    "conf.lamp-setup-tmp",
+];
+
+/// Whether Wi-Fi may put an old network back (`lamp-setup wifi-restore`, at
+/// boot and after a change helper's stop): never while a reset is
+/// journalled, so a reset's wipe of the Wi-Fi cannot be undone from the
+/// rollback copy, which the reset wipes before it removes its journal
+/// (Third on #3579). A journal that cannot be read counts as there.
+pub fn wifi_restore_allowed(journal: &Path) -> io::Result<bool> {
+    match fs::symlink_metadata(journal) {
+        Ok(_) => Ok(false),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(true),
+        Err(error) => Err(error),
+    }
+}
+
 /// What is never wiped, whatever a plan says: the software, its update trust,
 /// and the system itself.
 const PROTECTED: [&str; 12] = [
@@ -645,6 +675,11 @@ pub fn resume(plan: &Plan, effects: &mut impl Effects) -> io::Result<Vec<Step>> 
 
 fn finish(plan: &Plan, effects: &mut impl Effects, steps: &mut Vec<Step>) -> io::Result<()> {
     for path in &plan.wipe {
+        if path.file_name() == Some(WIFI_FILE.as_ref()) {
+            for copy in WIFI_COPIES {
+                wipe(&path.with_extension(copy))?;
+            }
+        }
         wipe(path)?;
         steps.push(Step::Wiped(path.clone()));
     }
