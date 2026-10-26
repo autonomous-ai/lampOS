@@ -6845,7 +6845,10 @@ fn forgets_asked(said: &str) -> Vec<&'static str> {
         crate::known_faces::FORGET,
     ]
     .into_iter()
-    .filter(|name| crate::remember::names_forget(said, name))
+    .filter(|name| match *name {
+        crate::remember::FORGET_EVERYTHING => crate::remember::asks_to_forget_everything(said),
+        _ => crate::remember::names_forget(said, name),
+    })
     .collect()
 }
 
@@ -7334,6 +7337,13 @@ async fn answer(
     // One the same person asked for in words on their turn just before
     // runs at once ([`asked_just_before`]).
     let asks_now = crate::remember::asks_to_forget(&said);
+    // What these words, the request's own, say of forgetting everything
+    // ([`crate::remember::everything_asked`]): `Some(false)`, a refusal or
+    // a smaller ask such as "forget that", outweighs an ask just before and
+    // a held yes; `Some(true)` asks for it now.
+    let everything_now = heard
+        .then(|| crate::remember::everything_asked(&said))
+        .flatten();
     let asker = forget_asker(scope.as_ref());
     let asked_before = asked_just_before(
         shared,
@@ -7353,6 +7363,19 @@ async fn answer(
         (shared.clock)(),
     ) {
         Taken::Nothing => (None, None),
+        // Their yes to a held `forget_everything` does not run it when the
+        // same words say not to ("Yes. No, don't forget everything.").
+        Taken::Runs(call)
+            if call.name == crate::remember::FORGET_EVERYTHING
+                && everything_now == Some(false)
+                && !crate::remember::forget_unguarded() =>
+        {
+            eprintln!(
+                "lamp-voice second: request {request}: dropped a held forget ({}): their words say not to",
+                call.name
+            );
+            (None, None)
+        }
         Taken::Runs(call) => (Some(call), None),
         Taken::Unseen(name) => (None, Some(crate::remember::unseen_yes_told(&name))),
     };
@@ -7957,6 +7980,29 @@ async fn answer(
                 }
                 // Or one their turn just before asked for by name.
                 let asked_just_before = heard && asked_before.contains(&call.name.as_str());
+                // `forget_everything` runs on a spoken turn only for its own
+                // request's words asking for everything, their own ask just
+                // before, or their yes to one held (run before round 1),
+                // and never when these words refuse it or ask for something
+                // less, whatever came before (lamp-06c1, 26 Oct; the HOLDs
+                // on #3608). Called with no ask at all, it is held below.
+                if call.name == crate::remember::FORGET_EVERYTHING
+                    && heard
+                    && !crate::remember::forget_unguarded()
+                    && (everything_now == Some(false)
+                        || (everything_now.is_none() && asks_now && !asked_just_before))
+                {
+                    eprintln!(
+                        "lamp-voice second: request {request} chat round {round}: {} not run: their words ask for something else, or not to",
+                        call.name
+                    );
+                    messages.push(Message::tool(
+                        call.id.clone(),
+                        serde_json::json!({"error": crate::remember::NOT_ASKED_TO_FORGET_EVERYTHING})
+                            .to_string(),
+                    ));
+                    continue;
+                }
                 if crate::remember::is_forget(&call.name) && !forget_may_run && !asked_just_before {
                     let holding = match forget_asker(scope.as_ref()) {
                         _ if held_forget_ran => None,

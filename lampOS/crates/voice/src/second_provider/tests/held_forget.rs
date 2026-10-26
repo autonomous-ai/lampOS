@@ -390,6 +390,211 @@ async fn a_forget_asked_for_in_words_runs_at_once() {
     }
 }
 
+/// lamp-06c1, 26 Oct: a `forget_everything` called for words that ask to
+/// forget one thing ("forget that"), or say not to forget everything, is
+/// refused, never run and never held for the yes that follows; also after
+/// a follow-up the lamp offered (Reviewer-two's composed negative on
+/// #3564). Each case's positive stays: the explicit ask runs at once.
+#[tokio::test]
+async fn a_bare_forget_never_runs_or_holds_forget_everything() {
+    let follow_up = (
+        "A",
+        "How did the graduation go?",
+        Lamp::Says("Shall I ask you about it on Saturday?"),
+        0,
+    );
+    for said in [
+        "Forget that.",
+        "Delete that one.",
+        "Quên chuyện đó đi.",
+        "Don't forget everything, just that.",
+        "Đừng xóa tất cả, chỉ cái đó.",
+    ] {
+        for before in [None, Some(follow_up)] {
+            let mut turns: Vec<Turn> = before.into_iter().collect();
+            turns.push(("A", said, Lamp::Calls(EVERYTHING, "Which thing?"), 5));
+            turns.push(("A", "Yes.", Lamp::Says("Okay."), 5));
+            let ran = run(&turns).await;
+            assert!(ran.forgets.is_empty(), "{said}");
+            assert!(
+                ran.asked
+                    .iter()
+                    .any(|messages| messages.iter().any(|message| {
+                        format!("{message:?}").contains("not everything about them")
+                    })),
+                "{said}"
+            );
+        }
+    }
+    for said in ["Forget everything about me.", "Xóa tất cả về tôi."] {
+        let ran = run(&[follow_up, ("A", said, Lamp::Calls(EVERYTHING, "Done."), 5)]).await;
+        assert_eq!(
+            ran.forgets,
+            [(EVERYTHING.to_owned(), json!({"name": "A"}))],
+            "{said}"
+        );
+    }
+}
+
+/// What asks for everything, by its words alone, clause by clause, the
+/// last one deciding (Reviewer-two's HOLD on #3608).
+#[test]
+fn only_unnegated_words_ask_to_forget_everything() {
+    for said in [
+        "Forget everything about me.",
+        "Please erase everything you know about me",
+        "Don't keep anything, forget everything.",
+        "No, forget everything about me.",
+        "xóa tất cả về tôi",
+        "Quên tất cả đi",
+    ] {
+        assert!(crate::remember::asks_to_forget_everything(said), "{said}");
+    }
+    for said in [
+        "Forget that.",
+        "Don't forget everything.",
+        "Never delete everything I said.",
+        "Don't get rid of everything.",
+        "Forget everything. Actually, don't forget everything.",
+        "Forget everything. Actually, don't.",
+        "Don't forget everything; forget that one.",
+        "Forget everything but my name.",
+        "Forget everything, except my name.",
+        "Forget everything, but keep my name",
+        "Forget everything, apart from my name",
+        "Forget everything and don't forget everything.",
+        // Conservative, the lead's decision on #3608: "not just that"
+        // asks once too.
+        "Forget everything, not just that.",
+        "Xóa tất cả, trừ tên tôi.",
+        "Forget everything, keep only my birthday.",
+        "Forget everything except only my birthday.",
+        "Forget everything except just my birthday.",
+        "Xóa tất cả, chỉ giữ ngày sinh của tôi.",
+        "Xóa tất cả, không chỉ cái đó.",
+        "Forget everything, not just yet.",
+        "Forget everything about me, not just now.",
+        "Forget everything, not just like that, ask me first.",
+        "Erase everything, not just yet, maybe tomorrow.",
+        "Forget everything I told you. Not just now though.",
+        "Should I have you forget everything? Not just yet.",
+        "Forget everything. Cancel that.",
+        "Forget everything. Stop.",
+        "Forget everything. Hold on.",
+        "Forget everything. Hang on.",
+        "Everything is fine.",
+        "Đừng quên tất cả.",
+        "Không xóa tất cả.",
+        "Xóa tất cả. Thôi, đừng.",
+    ] {
+        assert!(!crate::remember::asks_to_forget_everything(said), "{said}");
+    }
+    assert_eq!(
+        crate::remember::everything_asked("Don't forget my keys."),
+        None
+    );
+    assert_eq!(crate::remember::everything_asked("What's the time?"), None);
+    assert_eq!(
+        crate::remember::everything_asked("Forget that."),
+        Some(false)
+    );
+}
+
+/// Their words now outweigh what came before: a prior "forget everything"
+/// then "don't forget everything", and a held `forget_everything` met with
+/// a refusal, then a yes, run nothing; the held yes alone still runs.
+#[tokio::test]
+async fn a_refusal_now_outweighs_an_ask_before_and_a_held_yes() {
+    let held = (
+        "A",
+        "Who am I?",
+        Lamp::Calls(EVERYTHING, "Shall I forget everything about you?"),
+        0,
+    );
+    let cases: &[(&[Turn], usize)] = &[
+        (
+            &[
+                (
+                    "A",
+                    "Forget everything about me.",
+                    Lamp::Says("Are you sure?"),
+                    0,
+                ),
+                (
+                    "A",
+                    "Don't forget everything.",
+                    Lamp::Calls(EVERYTHING, "Okay."),
+                    5,
+                ),
+            ],
+            0,
+        ),
+        (
+            &[
+                held,
+                ("A", "No, don't forget everything.", Lamp::Says("Okay."), 5),
+                ("A", "Yes.", Lamp::Says("Okay."), 5),
+            ],
+            0,
+        ),
+        (
+            &[
+                held,
+                (
+                    "A",
+                    "Yes. No wait, don't forget everything.",
+                    Lamp::Calls(EVERYTHING, "Okay."),
+                    5,
+                ),
+            ],
+            0,
+        ),
+        (&[held, ("A", "Yes.", Lamp::Says("Done."), 5)], 1),
+    ];
+    // Something kept back or taken back after "everything", in a later
+    // clause, with a wrong All and a yes after it (Reviewer-two, 01:59).
+    let saving: Vec<[Turn; 2]> = [
+        "Forget everything, except my name.",
+        "Forget everything, but keep my name",
+        "Forget everything, apart from my name",
+        "Forget everything and don't forget everything.",
+        "Forget everything, keep only my birthday.",
+        "Forget everything except only my birthday.",
+        "Forget everything except just my birthday.",
+        "Xóa tất cả, chỉ giữ ngày sinh của tôi.",
+        "Forget everything, not just that.",
+        "Forget everything, not just yet.",
+        "Forget everything about me, not just now.",
+        "Forget everything, not just like that, ask me first.",
+        "Erase everything, not just yet, maybe tomorrow.",
+        "Forget everything I told you. Not just now though.",
+        "Should I have you forget everything? Not just yet.",
+        "Forget everything. Cancel that.",
+    ]
+    .into_iter()
+    .map(|said| {
+        [
+            ("A", said, Lamp::Calls(EVERYTHING, "Okay."), 0),
+            ("A", "Yes.", Lamp::Says("Okay."), 5),
+        ]
+    })
+    .collect();
+    let cases: Vec<(&[Turn], usize)> = cases
+        .iter()
+        .copied()
+        .chain(saving.iter().map(|turns| (&turns[..], 0)))
+        .collect();
+    for (turns, runs) in cases {
+        let ran = run(turns).await;
+        assert_eq!(
+            ran.forgets.len(),
+            runs,
+            "{:?}",
+            turns.iter().map(|turn| turn.1).collect::<Vec<_>>()
+        );
+    }
+}
+
 /// The forget functions say what the engine does (the reviewer on #2334):
 /// one called unasked is held, the model asks once, and their yes runs it,
 /// with the model told it ran and not to call it again.
@@ -420,10 +625,11 @@ async fn the_forget_descriptions_and_the_hold_agree() {
             .ends_with(crate::remember::HELD_DESCRIBED)
     );
     assert!(
-        told[1]
+        !told[1]
             .description
-            .ends_with(crate::remember::HELD_DESCRIBED)
+            .contains(crate::remember::HELD_DESCRIBED)
     );
+    assert!(told[1].description.contains("only when the person asks"));
     assert!(!told[1].description.contains("a yes alone forgets nothing"));
     assert_eq!(told[2].description, "Keep it.");
     assert!(told.iter().all(|tool| tool.description.len() <= 1024));
