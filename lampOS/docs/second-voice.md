@@ -2755,7 +2755,25 @@ after a take-over, but now for every turn:
   short by it, are answered in its place`. If it is let out, it is answered
   itself and they are let go. On lamp-4ace on 19 Oct at 15:56 the weather
   and a race result were searched, then ended by the owner's next line,
-  which was held, and were never said. **Stopped words never come back**
+  which was held, and were never said. Words answered again may still be
+  searched again, but are written once (`WriteOwner`; lamp-06c1, 26 Oct,
+  build 6963: one "remember my favourite planet is Saturn" was kept three
+  times, by two empty held lines answering it again): the first request to
+  try `remember`, `forget` or `forget_everything` for a line's words owns
+  their writes, and a held line answering only those words again is told
+  `CARRIED_MEMORY_WRITE` instead, whether the first write was kept, cut
+  before its reply, or lost. A held line whose own new words join them
+  owns its writes afresh. The owner is claimed only by a write that is
+  sent: one `run_tool` refuses before sending (a line held only by a
+  face's gap, or scoped tools with no scope) claims nothing, so a later
+  answer to the same words may still write. A held forget their yes runs
+  claims it too (Reviewer-two and reviewer-three on #3614). A memory call
+  on a line held only by a gap is refused before either runner, the
+  requested-audio one included (Reviewer-two, 03:38). Test: `an
+  empty held line does not repeat a carried memory write` (a remember, a
+  forget their words asked for, a first remember refused on a gap, with
+  and without requested audio) and `a held forget their yes runs owns the
+  yes words writes`. **Stopped words never come back**
   (a reviewer's P2 on the join, 22 Oct: "Lamp, play some jazz", a hand
   stop, then "what time is it?" was asked as one line): a request ended
   with the authority holding no owner (a hand, head or spoken stop, the
