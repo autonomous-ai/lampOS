@@ -1,3 +1,9 @@
+## 2026-10-26 22:54 — taken: bounded Skills actions mock teardown
+
+Ready for lamp-voice: no
+
+Taken on third/skills-actions-mock-join for the exact detached worker in a_repeat_call_with_only_made_steps_is_refused_while_its_run_is_under_way. Original full dd8e/7d passed 523/0/9 but retained its BrokenPipe panic, reported on #1806 at 6420349822. Open/merged searches found only original feature #1036 and no lifecycle repair. Preserve the two-call cohort, original assertions and 3 s run; make completion/teardown bounded, joined, and truthful about ordinary I/O errors. A separate branch/PR from Routine #3598. Reuse the idle physical third-reset-onboarding worktree and its permanently bound target, with all 48 local packages cleaned before new source qualification; no cross-worktree artifact sharing. #3591 is ready with author closure 6420475546 and two current peer reads. No device work.
+
 ## 2026-10-26 22:51 — Routine fix pushed as #3598
 
 Ready for lamp-voice: no (#3598)
