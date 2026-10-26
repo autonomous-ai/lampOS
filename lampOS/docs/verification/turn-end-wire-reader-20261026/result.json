@@ -1,0 +1,46 @@
+{
+  "head": "ecaed2484b2df1b1723e222d90647825f3e65764",
+  "source_count": 7165,
+  "all_source_hashes_unchanged": true,
+  "clean_checkout": true,
+  "commands": {
+    "fmt": "cargo +1.96.0 fmt --all --check",
+    "clippy": "cargo +1.96.0 clippy -q --message-format=short --offline --locked -p lamp-turn-end-wire --all-targets -- -D warnings",
+    "test-wire": "cargo +1.96.0 test --offline --locked -p lamp-turn-end-wire -- --test-threads=1"
+  },
+  "exit": {
+    "fmt": 0,
+    "clippy": 0,
+    "test-wire": 0
+  },
+  "library_passed": 5,
+  "process_passed": 13,
+  "failed": 0,
+  "ignored": 0,
+  "process_cases": [
+    "an_idle_worker_stays_ready_across_a_long_quiet",
+    "a_worker_reporting_another_model_is_refused_before_any_request",
+    "no_outcome_is_delivered_after_close_even_for_an_answer_on_its_way",
+    "verdict_carries_identity_and_one_request_at_a_time",
+    "missing_model_is_final_and_never_restarted",
+    "missing_executable_fails_at_once",
+    "spawn_returns_while_worker_startup_is_held",
+    "startup_failures_are_final",
+    "serving_failures_are_replaced_within_budget",
+    "protocol_violations_are_replaced",
+    "cancelled_answers_are_never_delivered",
+    "close_during_inference_never_waits",
+    "sustained_requests_stay_bounded"
+  ],
+  "source_manifest_sha256": "3f953b3061210eac2de029336beaafdc1c944e34862750e2cfa661f9d637c7fb",
+  "executable_sha256": {
+    "lamp_turn_end_wire-8f6ab4d67a65c31e": "96375d9b23267c729d17ebce9b3a8c5a345156ca51ab34d6fdde21525908a5bf",
+    "process-131a5a235d5360b2": "887e97db832c9cb16bb024b1888effd20fd937d2f7ba3e9dc287febdffbf6c3b"
+  },
+  "log_sha256": {
+    "fmt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "clippy": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "test-wire": "06422ffa2ae8920ef5e64c3b077d85a3aea24450789b907dd632827944122d25"
+  },
+  "limits": "Independent native x86_64 Mac full crate run and source read. Author stall/fault controls were read, not rerun; native ARM64, device/model and acoustic acceptance are separate."
+}

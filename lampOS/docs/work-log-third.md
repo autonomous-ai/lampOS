@@ -7,6 +7,22 @@ machine is explicitly named. Third has no lamp access.
 
 
 
+## 2026-10-26 08:33 — Independent Turn-end-wire fixture read
+
+READ-OK **ecaed2484** (#3524): no P1/P2 in the test-only change.
+Exact clean source passes formatting, strict all-target Turn-end-wire Clippy
+and full crate **18/0/0**: five library and thirteen process cases. Every
+source hash stays fixed; actual executables and raw logs are retained.
+[Receipt](verification/turn-end-wire-reader-20261026/result.json).
+
+The companion requires both worker entry and spawn return before releasing
+Ready, then checks Ready, one spawn/ready, worker teardown, completion and
+native child exit zero. Failure cleanup preserves the leader's PID with
+NOWAIT before signalling its owned group. Missing-executable launch failure,
+unavailable submission and zero-spawn remain. The author's stall/fault
+observations were read, not independently repeated. No physical latency,
+model/device acceptance or native ARM64 qualification is inferred.
+
 ## 2026-10-26 08:32 — Pending trigger repair pushed; preflight current native green
 
 Ready for lamp-voice: no; current reads/native gates remain as below.
