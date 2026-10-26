@@ -1,3 +1,13 @@
+Current status: reset-query source pushed at 3f5; current-base carry precedes the PR.
+
+## Current checkpoint: 2026-10-27 06:03 +07, complete query host gates published as source
+
+Pushed `second/reset-query-bounds` at **3f5a89180/90ca725c5**. [Exact 3f5 proof](verification/reset-query-bounds-20261026/current-3f5/README.md): fmt, strict Setup/Cloud Clippy and full matching tests pass: Setup **192/0/1**, Cloud **196/0/4**, total **388/0/5**, seven query controls once; two zero-doc summaries separate. Source 7,239, ten actual executables, 63 actual/preserved local outputs and 445 depfiles stayed stable. Runtime 33.364 s. The compiler target began absent/empty. No failures or retries. Earlier [24071/a3b9 full gate](verification/reset-query-bounds-20261026/current-24071/README.md) is a separate actual 388/0/5 run, not added to this count.
+
+The original patch has equal range-diff through both carries. Main advanced to b2344a07d; its Voice runtime changes affect Cloud's direct dependency, so the next carry refreshes the compiler/runtime gate before opening the PR. Its closed, exclusively owned target may be reused only after actual/preserved output and depfile checks. Old counts remain bound to their original heads. Original Linux/ARM and two peer reads are still required. Third owns the stalled #3510 carry; Second will not duplicate it. No device or release action.
+
+---
+
 Ready for lamp-voice: reset query bounds await current-base qualification; Third carries #3510.
 
 ## Current checkpoint: 2026-10-27 04:37 +07, query regression and ownership reconciled
