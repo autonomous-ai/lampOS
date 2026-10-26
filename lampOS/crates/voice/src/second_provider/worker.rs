@@ -4332,10 +4332,11 @@ pub(crate) struct Heeding {
     /// last looks, so two faces make the room busy only when they stay.
     faces_held: Option<Arc<Mutex<FacesHeld>>>,
     /// `LAMP_NAME_STAYS_IN_ITS_LINE=on` ([`Self::keeping_the_name_in_its_line`]),
-    /// and the request last judged with its line's sound, and whether its
-    /// words called the lamp by name, a call whose hearing goes on.
+    /// and the last [`SAID_KEPT`] requests judged, newest last, each with its
+    /// line's sound and whether its words called the lamp by name, a call
+    /// whose hearing goes on.
     name_stays: bool,
-    last_said: Option<(u64, (u64, u64), bool)>,
+    said_lately: std::collections::VecDeque<(u64, (u64, u64), bool)>,
     /// The faces the eyes saw speaking each of the last lines judged, newest
     /// last, at most [`SPOKE_KEPT`] ([`Self::same_speaker`]).
     spoke: std::collections::VecDeque<(u64, crate::speaking_faces::Speakers)>,
@@ -4942,6 +4943,12 @@ pub(crate) struct Signs {
     pub continues_from: Option<u64>,
 }
 
+/// The lines judged lately whose sound a later-come hearing of the name is
+/// laid against (`LAMP_NAME_STAYS_IN_ITS_LINE`): a hearing counts for a
+/// line at most [`crate::attention::NAME_BEFORE_US`] before it begins, which
+/// three short lines can fill.
+const SAID_KEPT: usize = 4;
+
 /// Hearings of the name read in one turn's judgement; more wait for the next.
 const NAMES_READ: usize = 64;
 /// `LAMP_NAME_NEAR`: a near hearing counts for a line's first word from
@@ -5039,7 +5046,7 @@ impl Heeding {
             name_or_follow_up: false,
             faces_held: None,
             name_stays: false,
-            last_said: None,
+            said_lately: std::collections::VecDeque::new(),
             spoke: std::collections::VecDeque::new(),
             near: None,
             turned_near_speaks: false,
@@ -5186,7 +5193,7 @@ impl Heeding {
     }
 
     /// From now on, a hearing of the lamp's name that began inside the
-    /// sound of the line judged last, before the line in hand began, is that
+    /// sound of a line judged lately, before the line in hand began, is that
     /// line's, and is not among the line in hand's signs ([`Self::heed_signs`]):
     /// not its name heard, its name's note, nor its name said to a face. A
     /// line going on from the one before keeps it, so does the line after one
@@ -6379,7 +6386,11 @@ impl Heeding {
         self.keep_the_name_in_its_line(request, said, &mut signs);
         self.silence_turned(request, said, &mut signs);
         let verdict = self.judge(request, said, heard, signs.clone());
-        self.last_said = Some((request, said, self.attention.called_in_its_words()));
+        if self.said_lately.len() == SAID_KEPT {
+            self.said_lately.pop_front();
+        }
+        self.said_lately
+            .push_back((request, said, self.attention.called_in_its_words()));
         if self.noted.is_none_or(|(judged, _)| judged != request) {
             self.note_the_name(request, said, &signs);
         }
@@ -6387,25 +6398,41 @@ impl Heeding {
     }
 
     /// [`Self::keeping_the_name_in_its_line`]: the hearings that began in the
-    /// sound of the line judged last, past its start, before this one began,
-    /// left out of this one's signs, and said in the journal.
+    /// sound of a line judged lately ([`SAID_KEPT`]), past its start, before
+    /// this one began, left out of this one's signs, and said in the
+    /// journal. Not only the line just before: a hearing from the line two
+    /// back may come only now, after the one between was judged
+    /// (reviewer-two's P2 on `2110d04a9`).
     fn keep_the_name_in_its_line(&self, request: u64, said: (u64, u64), signs: &mut Signs) {
-        let Some((before, (began, ended), _)) = self.last_said.filter(|(before, _, call)| {
-            self.name_stays && *before != request && !call && signs.continues_from.is_none()
-        }) else {
+        if !self.name_stays || signs.continues_from.is_some() {
             return;
-        };
-        // Past the line before's start: one at its start is a call however
-        // its words were written ("Lamp." heard as "Ramp."), and goes on (the
-        // reviewer-lead's P2 on `da9a597de`).
-        let past_its_start = began.saturating_add(crate::attention::NAME_AT_THE_START_US);
+        }
         let all = signs.names.len();
-        signs
-            .names
-            .retain(|(at, _)| !(*at > past_its_start && *at <= ended && *at < said.0));
+        let mut theirs = Vec::new();
+        signs.names.retain(|(at, _)| {
+            // Past a line's start: one at its start is a call however its
+            // words were written ("Lamp." heard as "Ramp."), and goes on
+            // (the reviewer-lead's P2 on `da9a597de`).
+            let owner = self
+                .said_lately
+                .iter()
+                .rev()
+                .find(|(before, (began, ended), call)| {
+                    *before != request
+                        && !call
+                        && *at > began.saturating_add(crate::attention::NAME_AT_THE_START_US)
+                        && *at <= *ended
+                });
+            if let Some((before, ..)) = owner.filter(|_| *at < said.0) {
+                theirs.push(*before);
+                false
+            } else {
+                true
+            }
+        });
         if signs.names.len() < all {
             eprintln!(
-                "lamp-voice second: request {request}: {} hearing(s) of its name began in request {before}'s sound, before this line, and stay with that line (LAMP_NAME_STAYS_IN_ITS_LINE)",
+                "lamp-voice second: request {request}: {} hearing(s) of its name began in the sound of request(s) {theirs:?}, before this line, and stay with that line (LAMP_NAME_STAYS_IN_ITS_LINE)",
                 all - signs.names.len()
             );
         }
@@ -16690,6 +16717,36 @@ mod tests {
             ),
             None
         );
+    }
+
+    /// Reviewer-two's P2 on `2110d04a9`: a 0.999 hearing that began 2.9 s
+    /// into a first line (0 to 3.0 s), come only with the third (3.7 to
+    /// 4.8 s), after the short second (3.1 to 3.6 s) was judged, stays with
+    /// the first: the third line is held. Off, it is played on it.
+    #[test]
+    fn a_hearing_come_two_lines_late_stays_with_its_line() {
+        use crate::room_told::Room;
+        let signs = |names| room_name_signs(Room::Busy, false, None, false, names);
+        for stays in [false, true] {
+            let mut heeding = room_name_heeding(true);
+            if stays {
+                heeding.keeping_the_name_in_its_line();
+            }
+            heeding.heed_signs(
+                1,
+                (10_000_000, 13_000_000),
+                "I think the oven is still on, by the way.",
+                signs(Vec::new()),
+            );
+            heeding.heed_signs(2, (13_100_000, 13_600_000), "Yes.", signs(Vec::new()));
+            let third = heeding.heed_signs(
+                3,
+                (13_700_000, 14_800_000),
+                "What time is it?",
+                signs(vec![(12_900_000, 0.999)]),
+            );
+            assert_eq!(third.is_some(), stays, "the third line, stays {stays}");
+        }
     }
 
     /// The readers' P2s on `da9a597de`, through `heed_signs` with the
