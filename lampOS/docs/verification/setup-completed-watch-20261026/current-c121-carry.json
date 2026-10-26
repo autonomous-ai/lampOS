@@ -1,0 +1,32 @@
+{
+  "head": "cef3ea98895e6a60ebee1b097a691a230d1a3da3",
+  "base": "c121bc16eb9e6a7142bbc1110d4ed692481f1a82",
+  "source_delta_from830": [
+    "crates/body/src/bin/lamp-body.rs",
+    "crates/body/src/body.rs",
+    "crates/body/src/body/tests.rs",
+    "crates/body/src/poses.rs",
+    "docs/body.md",
+    "docs/switches.md"
+  ],
+  "all10_executables_equal_aa9_and830": true,
+  "sources_and_executables_stable": true,
+  "actual_current_runtime": [
+    13,
+    0,
+    0
+  ],
+  "retained_actual_aa9_runtime": [
+    412,
+    0,
+    6
+  ],
+  "complete_coverage": [
+    425,
+    0,
+    6
+  ],
+  "rationale": "Changed Body source is runtime input to it::ci_paths whole-crate source scanner, so complete it13 rerun once. Remaining drivers and child byte-identical, source/fixtures unchanged; Body source references elsewhere are comments. Prior aa9 runtime identity retained explicitly.",
+  "compiler_gates": "fresh fmt, strict five-package all-target Clippy, workspace build, Update testcompile passed",
+  "limits": "Original830 native7526 receipt preserved; current native still pending. No retries or device claims."
+}
