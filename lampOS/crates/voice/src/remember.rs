@@ -591,10 +591,11 @@ fn forget_everything_face_if(
     switches: crate::known_faces::FaceSwitches,
     lease: &crate::memory_scope::ScopeLease,
 ) -> (Value, bool) {
-    let Some(person) = lease
-        .scope()
-        .and_then(|scope| scope.person().map(str::to_owned))
-    else {
+    // Tried for the person the line was admitted as, and sent only while it
+    // is still theirs (`still_theirs`, below): a line revoked or narrowed to
+    // the room before this step says its face is kept, never everything gone
+    // (reviewer-three's P2 on #3564). A room's own line is as it was.
+    let Some(person) = lease.admitted_person().map(str::to_owned) else {
         return told;
     };
     let emptied =
@@ -609,25 +610,22 @@ fn forget_everything_face_if(
         name: crate::known_faces::FORGET.into(),
         args: json!({}),
     };
-    // The line must still be this person's as the eyes are asked: revoked,
-    // or narrowed to the room by later speaking evidence, sends nothing
-    // (Fourth's P2 on #3564).
-    let still_theirs = || {
-        lease.is_current()
-            && lease
-                .scope()
-                .is_some_and(|scope| scope.person() == Some(person.as_str()))
-    };
-    let (face, _) = crate::known_faces::run_for_fenced(
-        who,
-        &call,
-        switches,
-        Some(&person),
-        None,
-        &still_theirs,
-    );
+    let (face, _) =
+        crate::known_faces::run_for_fenced(who, &call, switches, Some(&person), None, &|| {
+            still_theirs(lease, &person)
+        });
     let setup_name = crate::person::from_environment().is_some();
     (memory_and_face(told.0, &face, setup_name), told.1)
+}
+
+/// Whether the line `lease` is still `person`'s as the eyes are asked to
+/// forget their face ([`forget_everything_face`]): current, and not narrowed
+/// to the room by later speaking evidence (Fourth's P2 on #3564).
+fn still_theirs(lease: &crate::memory_scope::ScopeLease, person: &str) -> bool {
+    lease.is_current()
+        && lease
+            .scope()
+            .is_some_and(|scope| scope.person() == Some(person))
 }
 
 /// What the model hears for a person's memory emptied (`memory`) and the
@@ -8714,6 +8712,20 @@ fn exchange_within(
 
 /// The same bounded transport with a request-local evidence fence, for
 /// face enrollment. Dropping the socket tells Eyes to cancel its capture.
+/// [`bounded_exchange_guarded`] for a request sent on an authority only its
+/// caller can read (`current`), with no lease of its own: forgetting a face
+/// on a person's line (`known_faces::run_for_fenced`). `current` is read
+/// before the connect, after it and before each write, and the connect never
+/// blocks (Fourth's P2 on #3564).
+pub(crate) fn bounded_exchange_fenced(
+    socket: &Path,
+    line: &Value,
+    budget: Duration,
+    current: &dyn Fn() -> bool,
+) -> Option<Value> {
+    exchange_guarded(socket, line, budget, None, ANSWER_BYTES, Some(current))
+}
+
 pub(crate) fn bounded_exchange_guarded(
     socket: &Path,
     line: &Value,
@@ -9116,17 +9128,65 @@ mod tests {
             listener.accept().is_err(),
             "a fenced forget reached the eyes"
         );
-        // A lease revoked before the eyes are asked: nothing reaches them.
+        // A lease revoked before the eyes are asked: nothing reaches them,
+        // and the face is said to be kept.
         let gone_ann = scoped_request(Some("Ann"), 3_558_003);
         let lease = gone_ann.lease();
         gone_ann.revoke();
-        assert_eq!(
-            forget_everything_face_if(true, emptied.clone(), &who, switches, &lease),
-            emptied
-        );
+        let (told, _) = forget_everything_face_if(true, emptied.clone(), &who, switches, &lease);
+        assert_eq!(told["face"], MEMORY_FACE_KEPT);
+        assert_eq!(told["everything"], false);
         assert!(
             listener.accept().is_err(),
             "a revoked line's forget reached the eyes"
+        );
+        // Reviewer-three's P2 on #3564: Ann's line narrowed to the room
+        // after her memory answered, before this step, with Ann in view. The
+        // fence (`still_theirs`) refuses the send, and the answer is partial.
+        let narrowed = scoped_request(Some("Ann"), 3_558_004);
+        let lease = narrowed.lease();
+        lease.narrow_to_room();
+        let (told, _) = forget_everything_face_if(true, emptied.clone(), &who, switches, &lease);
+        assert_eq!(told["face"], MEMORY_FACE_KEPT);
+        assert_eq!(told["everything"], false);
+        assert!(
+            listener.accept().is_err(),
+            "a narrowed line's forget reached the eyes"
+        );
+        // Fourth's control on #3564: Ann's line narrowed to the room once the
+        // eyes' socket is connected, before the forget is written. The
+        // guarded transport reads `still_theirs` again before the write, so
+        // the eyes receive no byte.
+        let during = scoped_request(Some("Ann"), 3_558_005);
+        let lease = during.lease();
+        assert!(still_theirs(&lease, &ann_id));
+        let connected = std::cell::RefCell::new(None);
+        let narrowing_once_connected = || {
+            if let Ok((stream, _)) = listener.accept() {
+                lease.narrow_to_room();
+                *connected.borrow_mut() = Some(stream);
+            }
+            still_theirs(&lease, &ann_id)
+        };
+        let (told, _) = crate::known_faces::run_for_fenced(
+            &who,
+            &forget,
+            switches,
+            Some(&ann_id),
+            None,
+            &narrowing_once_connected,
+        );
+        assert_ne!(told["ok"], true, "{told}");
+        let stream = connected.into_inner().expect("the forget connected");
+        // The forget has returned, so its end of the socket is closed: the
+        // read ends at once (macOS refuses a timeout on a closed socket).
+        stream.set_nonblocking(false).unwrap();
+        let mut sent = Vec::new();
+        (&stream).read_to_end(&mut sent).unwrap();
+        assert!(
+            sent.is_empty(),
+            "a forget narrowed once connected reached the eyes: {}",
+            String::from_utf8_lossy(&sent)
         );
         drop(listener);
         std::fs::remove_file(&who).unwrap();
