@@ -13,6 +13,21 @@ machine is explicitly named. Third has no lamp access.
 
 
 
+## 2026-10-26 14:56 — Completed Setup lifecycle claimed
+
+Ready for lamp-voice: no (new #3530 follow-up)
+
+Taken on **third/setup-completed-watch**, Queue 6411031569 and issue
+comment 6411031930. Update restarts active Setup, while its completed
+marker can reject a new start; the persistent-service watch then reports
+stopped, including fallback. The report does not distinguish natural expiry
+from updater-triggered restart/condition rejection. No matching open or
+merged fix found. Tests retains #3466's carrier ownership; round.rs overlap
+is declared. No device access or voice-crash fix is included.
+Target: no extra wait or grace-period interruption for completed product
+Setup; incomplete Setup, unrelated service failures and rollback remain
+bounded and checked. Source/V1 review and regression design precede code.
+
 ## 2026-10-26 14:49 — Latest reminder native event qualified
 
 Ready for lamp-voice: no (#3525, final reader disposition requested)
