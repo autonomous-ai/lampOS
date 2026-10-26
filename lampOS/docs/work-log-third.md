@@ -13,6 +13,17 @@ machine is explicitly named. Third has no lamp access.
 
 
 
+## 2026-10-26 13:41 — Latest-base factory pushed
+
+Ready for lamp-voice: no (#3546)
+
+Pushed **3c54671c0** on **9e5d3b9c6** after fresh exact-source factory
+86/0, syntax and diff checks. Only upstream addons.md changed; authored
+files and range-diff remain equal. [Gate](verification/factory-resume-refusal-20261026/current-9e5.json).
+New ARM64 **40281279737** and Linux **40281279763** are running. Current
+carry reads are requested. Reminder ce75aa0a9 full Skills is still running;
+formatting, strict Clippy, workspace build and first 179 tests pass.
+
 ## 2026-10-26 13:38 — Preserve native factory result across docs-base carry
 
 Ready for lamp-voice: no (#3546)

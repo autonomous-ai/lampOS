@@ -1,0 +1,13 @@
+{
+  "head": "3c54671c011ab5f49855fd0cfd719a99c6e80184",
+  "base": "9e5d3b9c689638719238c15ecd5c9d334405de97",
+  "passed": 86,
+  "failed": 0,
+  "exit": 0,
+  "syntax_and_diff_check": true,
+  "all_source_unchanged": true,
+  "authored_blobs_equal_prior_head": true,
+  "range_diff": "1:  0038db8cf = 1:  3c54671c0 lampOS: stop the factory head check when resume fails\n",
+  "log_sha256": "728190c9294561aaa040960f837c578c202d8b196b5c3eb85254fe5600b0fce9",
+  "limits": "Fresh Mac stand-in gate on docs-only carry, no lamp or real services."
+}
