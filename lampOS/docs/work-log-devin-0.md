@@ -24,7 +24,7 @@ the builder whose lamp it is, on the Queue issue.
 | id | proposal | state |
 | --- | --- | --- |
 | `devin-0-P1` | Add-ons from an agent on the paired computer, over the LAN with Harness: one new service, off by default, that publishes only the add-on allowlist to Harness (`addon.publish`, openharness#1485) with the person's yes, hands Harness's proposals to the judge, and returns kept or dropped (`addon.decision`). Posted on #3126 for discussion; nothing built. | asked |
-| `devin-0-P2` | The person's own computer is a trusted tier and reads everything on the bus, not the summaries (the owner, 26 Oct): every topic forwarded through the lamp's own Harness with its own yes, camera pictures on request, no mic audio; `light` and `say` stamped `own-<computer>`, still through the judge. Design in docs/addons.md, #3541; code after the 70 rows unless the owner pulls it in. | asked |
+| `devin-0-P2` | The person's own computer is a trusted tier and reads everything on the bus, not the summaries (the owner, 26 Oct): every topic forwarded through the lamp's own Harness with its own yes, camera pictures on request, no mic audio; `light` and `say` stamped `own-<computer>`, still through the judge. Design in docs/addons.md, #3541, with each known person's own yes, long says by reference and `too_big` outbound after reviewer-three's and Reviewer-two's holds; merged in train #3547 (lamp-voice `d5dc2e87f`). Code after the 70 rows unless the owner pulls it in. | done (design) |
 
 ## Questions
 
