@@ -113,6 +113,13 @@ struct Fake {
     writers_after: Option<String>,
     writer_reads: usize,
     writer: Option<String>,
+    /// The updater's way back with a self-switch pending: once
+    /// `lamp-update.service` is stopped by a stop that comes before any stop
+    /// of `lamp-update-back.service`, it restarts the updater, too late for
+    /// the final check, and the updater writes this file (at the next
+    /// command, the reboot).
+    back_worker: Option<PathBuf>,
+    back_stopped: bool,
     states: Option<String>,
     fail_read: bool,
     fail_stop: bool,
@@ -129,6 +136,16 @@ impl Effects for Fake {
         self.argvs.borrow_mut().push(argv.to_vec());
         if (self.fail_stop && argv[1] == "stop") || (self.fail_reboot && argv[1] == "reboot") {
             return Err(io::Error::other("refused"));
+        }
+        if argv[1] == "stop" {
+            let names = |unit: &str| argv.iter().any(|named| named == unit);
+            if !self.back_stopped
+                && names("lamp-update.service")
+                && let Some(file) = self.back_worker.take()
+            {
+                self.pending = Some(file);
+            }
+            self.back_stopped |= names("lamp-update-back.service");
         }
         if argv[1] == "stop"
             && let Some(file) = self.writes_on_stop.take()
@@ -392,6 +409,26 @@ fn a_reset_stops_the_writers_outside_the_target_after_what_starts_them() {
         .map(String::from),
         "the starters and the writers are read stopped"
     );
+}
+
+/// Reviewer-two's control on #3579: the updater's way back, a self-switch
+/// pending, restarts `lamp-update.service` once it is stopped, past the final
+/// check, and the updater writes the skills' state. The way back is stopped
+/// first, before the barrier, so it restarts nothing and the wipe is the
+/// last write.
+#[test]
+fn the_updaters_way_back_restarts_nothing_after_the_barrier() {
+    let root = Root::new();
+    let plan = lamp(&root);
+    let mut fake = Fake {
+        starters: "lamp-update-back.timer loaded active waiting Back\nlamp-update-back.service loaded active running Back\n".into(),
+        writers: "lamp-update.service loaded active running Update\n".into(),
+        back_worker: Some(root.path("memory/skills-state.json")),
+        ..Fake::default()
+    };
+    reset::reset(&plan, &mut fake).unwrap();
+    wiped(&root);
+    assert!(fake.back_stopped);
 }
 
 /// Third on #3579: Wi-Fi's rollback copy beside its file (`.lamp-previous`,
