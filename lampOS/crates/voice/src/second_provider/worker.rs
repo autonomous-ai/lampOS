@@ -4809,12 +4809,6 @@ type Levels = Arc<Mutex<std::collections::VecDeque<(u64, f32)>>>;
 /// The eyes' looks of the last 30 s ([`crate::addressed::Looks`]).
 type Looked = Arc<Mutex<crate::addressed::Looks>>;
 
-/// Told beside a line the rule let out only as the conversation going on
-/// (`attention::Attention::played_on_the_conversation_alone`), with
-/// `not_for_me` offered. Gemini Live hears who is talking to whom; this
-/// route's model reads one line of words, and on lamp-4ace on 19 Oct it
-/// answered colleagues' talk after a named request six times ("Sounds like
-/// a big saving."), where Live answered it once (#1712).
 /// Told beside the lamp's name when it is answered in the place of the line
 /// after it, held because nothing showed the one who said the name said it
 /// (`LAMP_SECOND_NAME_CARRIES`, `one_speaker`): that line's words are never
@@ -4824,6 +4818,12 @@ type Looked = Arc<Mutex<crate::addressed::Looks>>;
 /// quiet, got "Mm? I'm here.", and the request was lost with nothing asked.
 pub(crate) const NAME_THEN_HELD: &str = "(For you to know, not to answer: right after your name someone went on talking, but you could not tell it was the one who called you, so you did not take in what they said. Say, briefly, that you didn't catch it, and ask them to say it again.)";
 
+/// Told beside a line the rule let out only as the conversation going on
+/// (`attention::Attention::played_on_the_conversation_alone`), with
+/// `not_for_me` offered. Gemini Live hears who is talking to whom; this
+/// route's model reads one line of words, and on lamp-4ace on 19 Oct it
+/// answered colleagues' talk after a named request six times ("Sounds like
+/// a big saving."), where Live answered it once (#1712).
 pub(crate) const CONVERSATION_ALONE: &str = "(For you to know, not to answer: nobody said your name or turned to you. This reached you only because you were just talking with someone, and people near you may be talking to each other. If it is plainly said to someone else, or a remark to the room, call not_for_me and say nothing. A follow-up to what you were just talking about is for you.)";
 
 /// How the rule saw a line when it judged it, kept for a verdict given
