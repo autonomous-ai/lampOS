@@ -1995,7 +1995,14 @@ then use that person's scope:
   "forget my face" asks (`remember::forget_everything_face`). The model hears
   `face: "forgotten too"`, or that it could not be forgotten now: the eyes
   find the face only while they see it at the lamp, so one not in view is
-  kept, and said. A room's line asks the eyes nothing. On lamp-52e6 on 26 Oct
+  kept, and said. Anything kept makes the answer partial (`everything:
+  false`): a face kept, or old face records the eyes could not search, whose
+  note is passed on as `face_note`. The tool tells the model to say what is
+  gone and what is kept. The eyes are asked only while the line is still that
+  person's (`known_faces::run_for_fenced`, read right before the send): a
+  line revoked, or narrowed to the room by later speaking evidence, sends
+  nothing (Fourth's P2 on #3564). With a name typed at setup, the answer says
+  it stays (`setup_name`). A room's line asks the eyes nothing. On lamp-52e6 on 26 Oct
   (build 6963) the memory was forgotten, `people.json` kept the face and its
   name, and the lamp greeted the person by it when asked (the lead on #1711).
   The name typed at setup (`/etc/lampOS/person/name`) is the setup's, not the

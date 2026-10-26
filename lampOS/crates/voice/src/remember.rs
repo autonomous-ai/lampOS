@@ -147,7 +147,7 @@ pub const HELD_DESCRIBED: &str = " If they didn't ask in their own words, the la
 /// `forget_everything` for those turns: called at once, as the engine
 /// confirms it, never only after a yes the model asked for (the reviewer
 /// on #2334: that yes alone was refused).
-const FORGET_EVERYTHING_HELD: &str = "Call this only when the person asks to forget everything about them. A request to forget one thing, such as 'forget that', does not ask for this. If you are unsure whether they mean everything, ask without calling this function. It removes what they asked you to remember, their conversations and what you noticed. It works only for someone you know by face; otherwise say what it tells you. Then tell them plainly that it is all gone.";
+const FORGET_EVERYTHING_HELD: &str = "Call this only when the person asks to forget everything about them. A request to forget one thing, such as 'forget that', does not ask for this. If you are unsure whether they mean everything, ask without calling this function. It removes what they asked you to remember, their conversations and what you noticed. It works only for someone you know by face; otherwise say what it tells you. Then tell them plainly what is gone, and anything the answer says is kept.";
 
 /// The forget functions as told to the second route's spoken turns: with
 /// [`HELD_DESCRIBED`], unless `LAMP_FORGET_ASKED=off`, where they are as
@@ -609,26 +609,59 @@ fn forget_everything_face_if(
         name: crate::known_faces::FORGET.into(),
         args: json!({}),
     };
-    let (face, _) = crate::known_faces::run_for(who, &call, switches, Some(&person), None);
-    (memory_and_face(told.0, &face), told.1)
+    // The line must still be this person's as the eyes are asked: revoked,
+    // or narrowed to the room by later speaking evidence, sends nothing
+    // (Fourth's P2 on #3564).
+    let still_theirs = || {
+        lease.is_current()
+            && lease
+                .scope()
+                .is_some_and(|scope| scope.person() == Some(person.as_str()))
+    };
+    let (face, _) = crate::known_faces::run_for_fenced(
+        who,
+        &call,
+        switches,
+        Some(&person),
+        None,
+        &still_theirs,
+    );
+    let setup_name = crate::person::from_environment().is_some();
+    (memory_and_face(told.0, &face, setup_name), told.1)
 }
 
 /// What the model hears for a person's memory emptied (`memory`) and the
 /// eyes' answer to forgetting their face (`face`)
 /// ([`forget_everything_face`]): their face forgotten too, or kept and said
 /// so. The eyes find the face of the person whose line it is only while
-/// they see it at the lamp, so one not in view is kept, and said.
-pub(crate) fn memory_and_face(mut memory: Value, face: &Value) -> Value {
+/// they see it at the lamp, so one not in view is kept, and said. Anything
+/// kept makes the answer partial, `everything: false`, so the model has one
+/// reading (the reviewer-lead and Fourth on #3564): a face kept, or old
+/// face records the eyes could not search, whose note is passed on. With a
+/// name typed at setup (`setup_name`), the answer says that name stays.
+pub(crate) fn memory_and_face(mut memory: Value, face: &Value, setup_name: bool) -> Value {
     if face["ok"] == true {
         memory["face"] = json!("forgotten too");
+        if let Some(note) = face["note"].as_str() {
+            memory["everything"] = json!(false);
+            memory["face_note"] = json!(note);
+        }
     } else {
         eprintln!(
             "lamp-voice: a person's memory was emptied, but their face could not be forgotten now"
         );
+        memory["everything"] = json!(false);
         memory["face"] = json!(MEMORY_FACE_KEPT);
+    }
+    if setup_name {
+        memory["setup_name"] = json!(SETUP_NAME_KEPT);
     }
     memory
 }
+
+/// What the model is told of the name typed at setup when a person forgot
+/// everything ([`memory_and_face`]): it is the lamp's setup, not their face's.
+pub const SETUP_NAME_KEPT: &str = "The name given when the lamp was set up is kept until the lamp is reset; do not say it was forgotten.";
 
 /// What the model is told when the memory went but the person's face
 /// couldn't be forgotten ([`memory_and_face`]).
@@ -1586,7 +1619,7 @@ fn tools_for(rules: bool, forget_all: bool, forget_about: bool) -> Vec<Tool> {
                           it on that; a yes alone forgets nothing. It forgets \
                           all you keep of them: what they asked you to remember, your conversations and what you \
                           noticed. It works only for someone you know by face; otherwise say what it tells you. \
-                          Then tell them plainly that it is all gone."
+                          Then tell them plainly what is gone, and anything the answer says is kept."
                 .into(),
             parameters: None,
             silent: false,
@@ -9040,12 +9073,69 @@ mod tests {
         assert!(asked.contains("\"forget\":\"Ann\""), "{asked}");
         assert_eq!(told["face"], "forgotten too");
         assert_eq!(told["forgotten"], true);
+        assert_eq!(told["everything"], true, "nothing kept: all gone");
         assert!(answered);
-        // The eyes not answering: the face is said to be kept.
+        // Old face records the eyes could not search (Fourth's case on
+        // #3564): forgotten too, but partial, and their note passed on.
+        std::fs::remove_file(&who).unwrap();
+        let listener = UnixListener::bind(&who).unwrap();
+        let eyes = std::thread::spawn(move || {
+            let (stream, _) = listener.accept().unwrap();
+            let mut line = String::new();
+            BufReader::new(&stream).read_line(&mut line).unwrap();
+            (&stream)
+                .write_all(b"{\"forgot\":true,\"unsearched\":1}\n")
+                .unwrap();
+        });
+        let (told, _) =
+            forget_everything_face_if(true, emptied.clone(), &who, switches, &ann.lease());
+        eyes.join().unwrap();
+        assert_eq!(told["face"], "forgotten too");
+        assert_eq!(told["everything"], false);
+        assert_eq!(
+            told["face_note"],
+            crate::known_faces::FORGOTTEN_SOME_KEPT_APART
+        );
+        // The eyes not answering: the face is said to be kept, and the
+        // answer is partial.
         std::fs::remove_file(&who).unwrap();
         let (told, _) =
             forget_everything_face_if(true, emptied.clone(), &who, switches, &ann.lease());
         assert_eq!(told["face"], MEMORY_FACE_KEPT);
+        assert_eq!(told["everything"], false);
+        // Fourth's P2 on #3564: the send is fenced on the line's authority;
+        // refused there, the eyes are asked nothing.
+        let listener = UnixListener::bind(&who).unwrap();
+        listener.set_nonblocking(true).unwrap();
+        let forget = call(crate::known_faces::FORGET, json!({}));
+        let ann_id = crate::known_faces::memory_person("Ann");
+        let (refused, _) = crate::known_faces::run_for_fenced(
+            &who,
+            &forget,
+            switches,
+            Some(&ann_id),
+            None,
+            &|| false,
+        );
+        assert_eq!(refused["error"], crate::known_faces::AUTHORITY_GONE);
+        assert!(
+            listener.accept().is_err(),
+            "a fenced forget reached the eyes"
+        );
+        // A lease revoked before the eyes are asked: nothing reaches them.
+        let gone_ann = scoped_request(Some("Ann"), 3_558_003);
+        let lease = gone_ann.lease();
+        gone_ann.revoke();
+        assert_eq!(
+            forget_everything_face_if(true, emptied.clone(), &who, switches, &lease),
+            emptied
+        );
+        assert!(
+            listener.accept().is_err(),
+            "a revoked line's forget reached the eyes"
+        );
+        drop(listener);
+        std::fs::remove_file(&who).unwrap();
         // A room's line, a memory not emptied, the switch off: as it was.
         let room = scoped_request(None, 3_558_002);
         assert_eq!(
@@ -9062,6 +9152,18 @@ mod tests {
             emptied
         );
         std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// The reviewer-lead's P3 on #3564: with a name typed at setup, the
+    /// answer says it stays.
+    #[test]
+    fn forgetting_everything_says_the_setup_name_stays() {
+        let memory = json!({"forgotten": true, "everything": true});
+        let told = memory_and_face(memory.clone(), &json!({"ok": true}), true);
+        assert_eq!(told["setup_name"], SETUP_NAME_KEPT);
+        assert_eq!(told["everything"], true);
+        let told = memory_and_face(memory, &json!({"ok": true}), false);
+        assert!(told.get("setup_name").is_none());
     }
 
     /// #2850: "forget my face" with its person's memory emptied says so;
