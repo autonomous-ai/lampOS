@@ -1,0 +1,4664 @@
+{
+  "schema": 1,
+  "status": "FAIL: PARTIAL INFRASTRUCTURE RESERVE ABORT",
+  "head": "63a2a9579f1434ee9c4f323209c89073d918c614",
+  "base": "a3b9c46814bb2b2452f0d6b6cc13bb3a16992c33",
+  "original_controller_exit": 1,
+  "original_Cargo_exit": -15,
+  "termination": "Owned-group SIGTERM after disk reserve breach",
+  "test_threads": 1,
+  "runtime_attempts": 1,
+  "disk": {
+    "admission_free_bytes": 3921027072,
+    "required_admission_bytes": 3221225472,
+    "operational_reserve_bytes": 2214592512,
+    "minimum_observed_free_bytes": 2206986240,
+    "timeout": false
+  },
+  "scope": {
+    "actual_test_drivers": 9,
+    "actual_inventory_cases": 448,
+    "actual_declared_ignored": 6,
+    "three_fully_completed_driver_counts": {
+      "passed": 133,
+      "failed": 0,
+      "ignored": 2
+    },
+    "additional_completed_install_PASS": 9,
+    "all_observed_completed_case_counts": {
+      "passed": 142,
+      "failed": 0,
+      "ignored": 2
+    },
+    "interrupted_cases": 1,
+    "unstarted_cases": 303,
+    "no_completed_FAILED_case_row": true,
+    "incomplete_install_driver_not_passed": true
+  },
+  "drivers": [
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "classification": "COMPLETE_DRIVER",
+      "inventory_cases": 127,
+      "inventory_ignored": 2,
+      "unstarted_cases": [],
+      "completed_counts": {
+        "passed": 125,
+        "ignored": 2,
+        "failed": 0
+      },
+      "frozen_executable_sha256": "ce51484500e4d053d1f23e5b840fed70bc869c12115988ac6cfbc94cefba203b",
+      "frozen_bytes": 11411540,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": []
+    },
+    {
+      "target": "lamp-update",
+      "target_kind": [
+        "bin"
+      ],
+      "classification": "COMPLETE_DRIVER",
+      "inventory_cases": 3,
+      "inventory_ignored": 0,
+      "unstarted_cases": [],
+      "completed_counts": {
+        "passed": 3,
+        "ignored": 0,
+        "failed": 0
+      },
+      "frozen_executable_sha256": "33a513463794698385400ed74d91c898c99bda92af594e3fb122353c02a28080",
+      "frozen_bytes": 1184760,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": []
+    },
+    {
+      "target": "functions",
+      "target_kind": [
+        "test"
+      ],
+      "classification": "COMPLETE_DRIVER",
+      "inventory_cases": 5,
+      "inventory_ignored": 0,
+      "unstarted_cases": [],
+      "completed_counts": {
+        "passed": 5,
+        "ignored": 0,
+        "failed": 0
+      },
+      "frozen_executable_sha256": "e51dca4d43bb17d2ba12eaf7936c23e6dbe949e8a2c3e3a4f7cdfe3f016578d6",
+      "frozen_bytes": 18488328,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": []
+    },
+    {
+      "target": "install",
+      "target_kind": [
+        "test"
+      ],
+      "classification": "INTERRUPTED_DRIVER",
+      "inventory_cases": 101,
+      "inventory_ignored": 0,
+      "unstarted_cases": [
+        "a_file_left_beside_by_a_run_cut_off_does_not_lend_its_mode_to_the_key",
+        "a_file_that_does_not_match_installs_nothing_of_it",
+        "a_key_a_reset_removed_is_never_put_back_from_v1s_config",
+        "a_lamp_set_up_before_setup_wrote_zone_env_gets_its_saved_zone_at_the_next_install",
+        "a_lamps_own_pins_gain_the_privacy_section_and_keep_the_rest",
+        "a_lamps_own_pins_on_the_old_guess_get_every_head_line",
+        "a_missing_store_drop_in_is_repaired_and_failed_reload_is_retried",
+        "a_moved_lamp_is_given_the_product_voices_five_lines",
+        "a_newer_build_moves_each_link_and_keeps_the_old_folders",
+        "a_newer_default_replaces_only_a_setting_nobody_changed",
+        "a_product_lamp_without_a_link_says_so_once_and_never_drops_speech_in_silence",
+        "a_refused_service_install_records_nothing_and_keeps_the_drop_in",
+        "a_reset_then_prepare_does_not_restore_the_old_key",
+        "a_set_aside_holds_for_keys_there_and_after_a_mark_that_was_not_saved",
+        "a_setting_changed_on_the_lamp_is_kept_when_install_runs_again",
+        "a_setting_in_the_way_stops_the_install_before_any_is_written",
+        "a_setting_written_but_not_yet_recorded_is_still_installs",
+        "an_install_puts_a_core_skills_changed_file_back_and_says_so",
+        "an_install_stopped_after_writing_its_units_enables_at_the_next_run",
+        "an_install_whose_enable_failed_enables_at_the_next_run_and_keeps_its_settings_record",
+        "corrupt_records_are_set_aside_and_never_bring_back_a_key_a_reset_removed",
+        "every_part_of_the_brain_has_a_product_unit",
+        "every_part_of_the_lamp_waits_for_setups_marker_itself",
+        "every_skill_folder_is_in_the_product_or_says_why_not",
+        "harness_at_boot_gives_lamposs_manager_its_home_first",
+        "harness_is_set_to_start_at_boot_once_when_it_is_there",
+        "harness_off_after_a_first_install_leaves_no_linger",
+        "harness_off_runs_uninstall_stop_status_then_the_linger_then_pgrep",
+        "harness_on_installs_with_harnesss_own_installer_then_sets_it_at_boot",
+        "harness_on_keeps_a_harness_already_there",
+        "harness_on_stops_at_a_failing_step_and_leaves_no_link",
+        "harness_on_updates_its_own_older_harness_and_says_one_too_old",
+        "harness_versions_are_read_as_harness_prints_them",
+        "head_touch_comes_whole_and_never_beside_the_old_engines_head",
+        "head_touch_preflight_files::dangling_drop_in_keeps_missing_file_compatibility",
+        "head_touch_preflight_files::dev_null_drop_in_mask_is_preserved",
+        "head_touch_preflight_files::directory_drop_in_is_refused_before_mutation",
+        "head_touch_preflight_files::fifo_body_calibration_is_refused_before_mutation",
+        "head_touch_preflight_files::fifo_drop_in_is_refused_before_mutation",
+        "head_touch_preflight_files::fifo_without_a_writer_is_refused_before_mutation",
+        "head_touch_preflight_files::missing_local_files_keep_install_compatibility",
+        "head_touch_preflight_files::regular_benign_drop_in_is_preserved",
+        "head_touch_preflight_files::symlink_to_regular_drop_in_is_preserved",
+        "install_head_body_keeps_factory_calibration",
+        "install_head_body_refuses_calibration_environment_overrides_before_mutation",
+        "install_places_every_exit_note_hook_and_keeps_other_drop_ins",
+        "install_places_the_voices_recorded_lines_where_the_product_voice_reads_them",
+        "install_prepares_store_off_and_keeps_the_lamps_store_choice",
+        "install_records_the_tmpfiles_it_writes",
+        "install_review_head_pair_keeps_a_benign_drop_in",
+        "install_review_head_pair_refusal_precedes_state_and_host_mutation",
+        "install_review_head_pair_refuses_a_disabling_drop_in_before_mutation",
+        "install_review_head_pair_refuses_a_removed_mute_before_mutation",
+        "install_review_head_pair_retry_keeps_calibration_and_is_idempotent",
+        "install_setup_on_replaces_a_hand_placed_plan_and_keeps_the_old_in_the_records",
+        "lamp_update_back_waits_for_its_binary_rather_than_failing",
+        "missing_models_are_fetched_checked_and_placed_and_a_lamps_own_is_kept",
+        "music_sway_and_watch_you_leave_are_on_in_the_product",
+        "prepare_places_the_recorded_lines_a_moved_lamps_voice_reads",
+        "prepare_sets_corrupt_records_aside_and_leaves_unreadable_ones_alone",
+        "prepare_then_reset_then_install_does_not_restore_the_old_key",
+        "product_routine_state_is_private_persistent_and_keeps_new_switches_off",
+        "product_units_pass_only_options_an_older_binary_takes",
+        "run_twice_it_changes_nothing",
+        "second_review_body_head_off_refuses_before_bundle_mutation",
+        "settings_written_before_one_that_fails_are_still_installs",
+        "setup_settings_are_written_only_with_setup_on_and_kept_once_changed",
+        "the_builds_plan_already_there_is_no_change_and_no_backup",
+        "the_device_key_is_provisioned_private_and_only_where_missing",
+        "the_exit_note_allowlist_is_exactly_clouds_product_services",
+        "the_installed_bedtime_skill_is_disabled_and_absent_from_live_catalogs",
+        "the_parts_that_keep_local_time_read_the_zone_setup_saves",
+        "the_pinned_models_are_the_ones_their_parts_check",
+        "the_plans_install_shipped_are_listed",
+        "the_product_full_look_is_on_in_both_units_with_one_file",
+        "the_product_keeps_nothing_personal_while_nobody_is_known",
+        "the_product_sees_who_speaks",
+        "the_product_skills_are_exactly_the_core_skills",
+        "the_second_route_gets_its_services_on_the_voices_key_and_a_lamps_own_is_kept",
+        "the_skills_tools_are_in_their_own_folder_which_the_voice_reads",
+        "the_tasks_part_closes_the_harness_a_told_task_started",
+        "the_tasks_part_waits_for_harness_rather_than_failing",
+        "the_voice_gets_its_service_and_the_lamps_device_key_from_v1s_config",
+        "time_of_day_parts_wait_for_the_kernel_to_say_the_clock_is_set",
+        "tmpfiles_make_lock_folders_the_parts_accept_and_the_voices_sessions_folder",
+        "two_failed_runs_in_a_row_keep_a_written_setting_as_installs",
+        "unreadable_records_stop_install_rather_than_being_written_over",
+        "what_harness_service_status_still_has_is_read_from_its_json",
+        "what_harness_still_has_is_said_and_without_harness_the_record_is_kept",
+        "without_a_usable_key_nothing_is_written_and_the_key_is_never_said",
+        "without_setup_on_a_plan_there_follows_the_build_and_none_is_never_added"
+      ],
+      "completed_counts": {
+        "passed": 9,
+        "ignored": 0,
+        "failed": 0
+      },
+      "frozen_executable_sha256": "5f594b279f2cce5e42444a07a9b0b99ef16094d641412ee9f2e67900cad67505",
+      "frozen_bytes": 13918228,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": []
+    },
+    {
+      "target": "release_pair",
+      "target_kind": [
+        "test"
+      ],
+      "classification": "UNSTARTED_DRIVER",
+      "inventory_cases": 2,
+      "inventory_ignored": 2,
+      "unstarted_cases": [
+        "release_6408_recovers_a_cut_written_by_release_6449",
+        "release_6449_recovers_a_cut_written_by_release_6408"
+      ],
+      "completed_counts": {
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0
+      },
+      "frozen_executable_sha256": "af5db66da111e5b3750028d00ad0c076939dcf2ab5c58e137f9d26cb15bd49fc",
+      "frozen_bytes": 2820076,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": []
+    },
+    {
+      "target": "self-process-cuts",
+      "target_kind": [
+        "test"
+      ],
+      "classification": "UNSTARTED_DRIVER",
+      "inventory_cases": 1,
+      "inventory_ignored": 1,
+      "unstarted_cases": [
+        "persisted_self_switches_survive_sigkill"
+      ],
+      "completed_counts": {
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0
+      },
+      "frozen_executable_sha256": "bbec57611a6decf7fa05766ede1d1b7dc5ec9295a0e88e9cd4fd2d0a1e96aa61",
+      "frozen_bytes": 474016,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": []
+    },
+    {
+      "target": "self-cli-exec",
+      "target_kind": [
+        "test"
+      ],
+      "classification": "UNSTARTED_DRIVER",
+      "inventory_cases": 1,
+      "inventory_ignored": 1,
+      "unstarted_cases": [
+        "actual_cli_exec_confirms_before_the_next_round"
+      ],
+      "completed_counts": {
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0
+      },
+      "frozen_executable_sha256": "5ef45ffe216d697c28c2ad1ca3d4f2a96660b8782cd88baebc2f123256c4d581",
+      "frozen_bytes": 473952,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": []
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "classification": "UNSTARTED_DRIVER",
+      "inventory_cases": 195,
+      "inventory_ignored": 0,
+      "unstarted_cases": [
+        "a_bad_signature_or_a_bad_checksum_is_refused_with_nothing_installed",
+        "a_build_for_a_newer_updater_is_refused_and_taken_once_the_updater_can",
+        "a_build_of_only_new_product_skills_places_them_and_restarts_nothing",
+        "a_build_put_back_puts_its_settings_back_byte_for_byte",
+        "a_build_put_back_puts_the_images_files_back",
+        "a_build_put_back_puts_the_old_reset_plan_back",
+        "a_build_put_back_puts_the_product_skills_back",
+        "a_changed_model_is_fetched_checked_and_switched_with_its_part",
+        "a_command_is_read_within_its_bound_and_killed_after",
+        "a_core_skill_turned_on_stays_on_through_a_round",
+        "a_cut_inside_the_put_back_of_an_unreadable_self_json_never_turns_it_around",
+        "a_disk_too_full_for_a_second_copy_is_refused_before_anything_is_written",
+        "a_folder_made_two_builds_ago_is_removed_and_one_never_made_is_kept",
+        "a_hardware_profile_that_cannot_be_read_never_fails_the_round",
+        "a_lamp_short_of_room_for_the_models_refuses_before_fetching",
+        "a_lamp_update_back_from_before_the_plan_writes_the_rest_and_the_round_says_so",
+        "a_lamp_with_an_old_reset_plan_updated_by_a_round_ends_with_the_builds_and_a_backup",
+        "a_lamp_with_no_reset_plan_gets_none_from_a_round",
+        "a_lamp_without_lamp_update_apply_puts_the_build_back_with_nothing_written",
+        "a_lamps_own_asound_is_kept_and_the_voice_not_restarted_for_it",
+        "a_link_switch_cut_short_is_put_back_at_the_next_start",
+        "a_linked_part_keeps_its_build_and_the_one_before",
+        "a_linked_part_that_dies_is_put_back_by_its_link",
+        "a_model_fetch_cut_by_the_network_is_unreachable_not_refused",
+        "a_model_only_switch_cut_short_restarts_the_part_that_reads_it",
+        "a_model_switch_cut_short_is_put_back_at_the_next_start",
+        "a_model_switch_whose_part_dies_puts_the_model_back",
+        "a_model_that_cannot_be_put_back_leaves_the_others_put_back_and_the_journal_kept",
+        "a_model_that_does_not_match_its_sha_refuses_the_build_with_nothing_switched",
+        "a_new_build_is_installed_beside_the_old_and_switched",
+        "a_new_updater_not_confirmed_by_the_deadline_is_put_back",
+        "a_new_updater_that_confirms_keeps_its_switch",
+        "a_new_updater_that_exits_at_once_is_put_back",
+        "a_new_updater_that_refuses_every_manifest_is_put_back",
+        "a_new_worker_beside_an_unchanged_voice_gets_a_folder_named_by_its_list",
+        "a_part_put_back_says_its_restarts_and_last_line_in_the_outcome_only",
+        "a_part_that_dies_is_put_back_and_its_build_refused",
+        "a_part_that_says_it_is_in_error_is_put_back_after_its_minute",
+        "a_part_whose_folder_is_gone_is_installed_afresh",
+        "a_product_lamp_without_a_tmpfiles_record_takes_the_builds_tmpfiles",
+        "a_reset_plan_changed_on_the_lamp_is_replaced_by_a_round_never_kept",
+        "a_round_after_install_keeps_lamp_updates_own_folder",
+        "a_round_after_its_own_switch_keeps_the_old_binarys_folder",
+        "a_round_by_hand_keeps_the_folder_it_runs_from",
+        "a_round_does_not_switch_lamp_skills_onto_checks_its_old_folders_fail",
+        "a_round_keeping_second_json_still_reaches_deepseek_through_the_relay",
+        "a_round_places_second_json_before_a_voice_unit_that_needs_it",
+        "a_round_puts_a_core_skills_files_back_and_keeps_the_persons_own",
+        "a_round_that_cannot_place_second_json_writes_no_unit",
+        "a_round_that_sets_damaged_records_aside_keeps_the_keys_marked",
+        "a_round_with_nothing_to_change_only_checks",
+        "a_self_json_from_a_later_version_still_reads",
+        "a_self_json_the_disk_cannot_give_is_tried_again_next_round",
+        "a_skill_the_build_removes_leaves_the_turned_on_record_with_one_line",
+        "a_switch_cut_short_after_its_settings_puts_them_back_at_the_next_start",
+        "a_switch_cut_short_is_put_back_at_the_next_start",
+        "a_unit_the_build_carries_is_carried_with_the_build_written_in",
+        "a_voice_that_is_well_is_put_back_between_two_turns",
+        "an_old_updater_climbs_one_updater_a_round",
+        "an_older_build_is_not_taken",
+        "an_older_lamp_update_back_ignores_the_images_files_and_the_round_says_so",
+        "an_unchanged_model_is_not_fetched_and_its_file_stays",
+        "an_unreadable_journal_is_set_aside_and_the_round_goes_on",
+        "an_unreadable_self_json_with_both_builds_known_is_put_back",
+        "an_unreadable_self_json_with_the_builds_unknown_is_set_aside",
+        "an_updater_too_old_for_a_build_not_newer_than_installed_takes_nothing_it_carries",
+        "an_updater_too_old_for_a_build_takes_only_the_updater_it_carries_then_the_rest",
+        "an_updater_too_old_for_a_build_without_an_updater_is_refused_with_nothing_written",
+        "asound_waits_for_a_quiet_moment_within_the_bound_and_then_for_the_next_round",
+        "both_kinds_of_part_switch_in_one_round_each_its_own_way",
+        "head_touch::absent_unused_product_pins_do_not_block_active_build_pins_updates",
+        "head_touch::body_head_calibration_cannot_override_the_sleep_reader",
+        "head_touch::body_head_complete_bundle_preserves_literal_factory_calibration",
+        "head_touch::body_head_mode_and_bus_dropins_are_refused_before_writes",
+        "head_touch::body_head_on_an_isolated_bus_is_refused_before_writes",
+        "head_touch::body_head_repeated_exec_start_is_refused_before_writes",
+        "head_touch::body_head_requires_an_enabled_carried_or_installed_sleep_reader",
+        "head_touch::custom_active_pins_are_kept_and_checked_against_the_reader_pair",
+        "head_touch::custom_head_wiring_is_kept_or_the_reader_transition_is_refused",
+        "head_touch::cut_after_pins_apply_restarts_unchanged_controls_after_restoring_old_pins",
+        "head_touch::environment_only_head_bus_mismatch_is_refused_before_any_write",
+        "head_touch::expression_or_controls_bus_mismatch_is_refused_before_any_write",
+        "head_touch::failed_head_reader_candidate_restores_exact_old_pins_and_units",
+        "head_touch::head_bus_root_dropins_are_not_guessed_from_base_units",
+        "head_touch::head_pins_cannot_change_without_restarting_their_controls_reader",
+        "head_touch::head_reader_mode_overrides_are_not_guessed_from_base_units",
+        "head_touch::invalid_mute_path_and_unknown_reader_are_refused",
+        "head_touch::isolated_voice_controls_bus_is_refused_before_any_write",
+        "head_touch::malformed_environment_quotes_are_not_reader_evidence",
+        "head_touch::matching_explicit_or_default_head_bus_roots_allow_the_paired_transition",
+        "head_touch::mixed_head_readers_are_refused_before_settings_or_units_are_written",
+        "head_touch::old_apply_helper_pins_mismatch_is_put_back_before_readers_restart",
+        "head_touch::paired_head_bus_cannot_diverge_from_voices_enabled_privacy_bus",
+        "head_touch::paired_head_readers_disable_legacy_even_when_signed_pins_enable_it",
+        "head_touch::paired_head_readers_without_controls_mute_are_refused_before_writes",
+        "head_touch::pr2948_settings_off_preserves_the_old_head_reader",
+        "head_touch::pr2948_settings_on_keeps_a_head_reader_available",
+        "head_touch::repeated_projected_pins_keep_their_actual_hash_without_restarting_controls",
+        "head_touch::semantic_head_reader_paths_cannot_expand_invocation_variables",
+        "head_touch::settings_off_refuses_paired_head_readers_with_legacy_pins",
+        "head_touch::stale_unused_product_pins_do_not_block_active_build_pins_updates",
+        "head_touch::textually_equal_expanded_head_bus_roots_are_not_a_verified_pair",
+        "head_touch::third_review_binary_update_checks_active_build_local_head_pins",
+        "head_touch::third_review_paired_head_readers_on_different_buses_are_refused",
+        "install_writes_the_fallback_and_no_round_touches_it",
+        "lamp_update_back_puts_back_an_unreadable_self_json",
+        "no_line_is_asked_of_a_good_switch_and_none_is_said_when_there_is_none",
+        "no_line_is_asked_when_systemd_itself_cannot_be_asked",
+        "no_network_changes_nothing_and_says_so",
+        "no_second_round_begins_while_lamp_updates_own_switch_waits",
+        "only_a_skill_that_would_stop_loading_holds_lamp_skills_back",
+        "product_carrier::a_comment_only_product_unit_is_an_intended_noop",
+        "product_carrier::a_corrupt_product_unit_is_refused_before_any_write",
+        "product_carrier::a_managed_product_manifest_can_bootstrap_the_existing_settings_helper",
+        "product_carrier::a_product_template_cannot_change_a_parts_binary_or_build_folder",
+        "product_carrier::a_product_template_does_not_replace_a_pinned_lamps_unit",
+        "product_carrier::a_product_unit_switches_with_its_link_and_leaves_local_dropins_alone",
+        "product_carrier::a_same_binary_product_unit_records_good_only_after_climb_and_confirmation",
+        "product_carrier::an_older_updater_climbs_before_the_product_switch_and_fallback",
+        "product_carrier::an_unhealthy_product_build_restores_the_exact_unit_and_link",
+        "product_carrier::automatic_settings_do_not_change_an_older_non_product_manifest",
+        "product_carrier::explicit_off_and_an_unmanaged_updater_do_not_bootstrap_settings",
+        "product_carrier::the_lamps_specific_unit_wins_over_the_product_unit",
+        "product_skills_go_only_into_installs_folder_and_only_when_it_can_be_written",
+        "product_skills_written_by_a_switch_cut_short_are_put_back_at_the_next_start",
+        "prune_keeps_the_models_of_the_kept_builds",
+        "prune_keeps_what_a_model_path_links_to_when_the_state_was_set_aside",
+        "restart_order::a_cut_at_reload_saves_the_full_old_projection_before_recovery",
+        "restart_order::a_cycle_in_an_older_recovery_journal_is_retained_without_arbitrary_restarts",
+        "restart_order::a_cycle_in_either_candidate_or_rollback_plan_refuses_before_mutation",
+        "restart_order::a_legacy_journal_uses_saved_declarations_and_unchanged_transitive_dependencies",
+        "restart_order::after_and_before_order_the_forward_restarts_instead_of_unit_names",
+        "restart_order::empty_saved_order_recovers_files_and_keeps_live_builds_when_inventory_is_unreadable",
+        "restart_order::interrupted_recovery_orders_saved_units_despite_a_shuffled_partial_journal",
+        "restart_order::malformed_present_rollback_orders_retain_the_prefix_and_do_not_fetch",
+        "restart_order::ordering_does_not_start_inactive_or_restart_unchanged_dependencies",
+        "restart_order::rollback_uses_the_saved_old_dependencies_not_the_new_graph_or_its_reverse",
+        "restart_order::saved_rollback_order_keeps_transitive_edges_after_an_unchanged_unit_drifts",
+        "restart_order::saved_rollback_order_survives_a_newly_unreadable_installed_unit",
+        "restart_order::saved_rollback_order_survives_an_interrupted_put_back_and_keeps_inactive_units_off",
+        "restart_order::the_product_voices_declared_managed_prerequisites_restart_before_it",
+        "restart_quiet::continuous_speech_puts_prerequisites_back_without_restarting_voice",
+        "restart_quiet::queued_speech_during_a_prerequisite_is_heard_before_restarting_voice",
+        "self_cuts::cut_after_candidate_is_synced_keeps_old_runnable_and_reuses_candidate",
+        "self_cuts::cut_after_confirmation_clears_pending_keeps_new_runnable_on_restart",
+        "self_cuts::cut_after_current_moves_keeps_new_runnable_and_can_confirm_or_put_back",
+        "self_cuts::cut_after_pending_is_saved_keeps_old_runnable_and_recovers_before_next_round",
+        "self_cuts::interrupted_put_back_keeps_a_runnable_current_and_finishes_on_restart",
+        "self_cuts::runnable_events::controls::a_never_released_first_output_gate_hits_the_startup_watchdog",
+        "self_cuts::runnable_events::controls::a_partial_first_output_also_starts_the_finish_watchdog",
+        "self_cuts::runnable_events::controls::a_read_error_restores_flags_and_leaves_the_direct_child_owned",
+        "self_cuts::runnable_events::controls::an_exited_leader_does_not_make_a_held_output_descriptor_complete",
+        "self_cuts::runnable_events::controls::first_output_can_follow_a_gate_longer_than_the_old_spawn_watchdog",
+        "self_cuts::runnable_events::controls::full_output_without_exit_hits_the_absolute_finish_watchdog",
+        "self_cuts::runnable_events::controls::later_bytes_do_not_renew_the_first_byte_finish_deadline",
+        "self_cuts::runnable_events::controls::no_output_is_not_readiness",
+        "self_cuts::runnable_events::controls::output_beyond_the_previous_capture_limit_fails_explicitly",
+        "self_cuts::runnable_events::controls::wrong_payload_nonzero_status_and_non_utf8_cannot_satisfy_the_fixture",
+        "self_cuts::without_self_opt_in_parts_update_but_no_handover_prefix_is_written",
+        "self_recovery::an_absent_or_unrunnable_fallback_keeps_the_completed_parts_and_old_updater",
+        "self_recovery::an_unchanged_or_refused_updater_needs_no_recovery_query",
+        "self_recovery::missing_recovery_also_defers_an_updater_first_climb_without_touching_parts",
+        "self_recovery::unavailable_recovery_keeps_the_parts_and_can_be_retried_when_armed",
+        "setup_lifecycle::a_different_failed_part_still_rolls_back_without_restarting_completed_setup",
+        "setup_lifecycle::an_alias_outside_the_lamp_prefix_cannot_bypass_the_product_check",
+        "setup_lifecycle::chained_and_loaded_aliases_retain_normal_restart_even_without_alias_files",
+        "setup_lifecycle::completed_product_setup_keeps_serving_without_restart_or_false_rollback",
+        "setup_lifecycle::completion_after_the_activity_snapshot_is_rechecked_before_restart",
+        "setup_lifecycle::completion_removed_during_the_manager_query_is_not_used",
+        "setup_lifecycle::custom_base_units_and_candidate_changes_keep_normal_watch_rules",
+        "setup_lifecycle::incomplete_product_setup_still_restarts_and_is_watched",
+        "setup_lifecycle::recovery_keeps_the_true_active_journal_but_does_not_restart_completed_setup",
+        "setup_lifecycle::recovery_rechecks_effective_aliases_after_restoring_the_old_unit",
+        "setup_lifecycle::reset_removing_completion_before_recovery_restarts_the_old_setup",
+        "setup_lifecycle::reset_removing_completion_before_restart_retains_the_normal_watch",
+        "setup_lifecycle::the_exact_product_exit_note_and_merged_usr_layout_keep_the_exception",
+        "setup_lifecycle::uncertain_override_files_do_not_hang_or_grant_the_exception",
+        "setup_lifecycle::unknown_dropins_at_each_scope_keep_normal_watch_rules",
+        "setup_lifecycle::unknown_manager_identity_and_custom_loaded_paths_keep_normal_watch",
+        "the_apps_off_and_on_hold_through_a_round_and_a_restart",
+        "the_fallback_reads_a_self_json_written_by_a_later_updater",
+        "the_guard_still_refuses_a_persons_skill_the_new_lamp_skills_will_not_load",
+        "the_journal_line_is_the_units_own_last_cleaned_and_cut",
+        "the_old_build_not_well_either_says_the_first_unit_not_wells_line",
+        "the_voice_is_not_switched_while_someone_talks_to_the_lamp",
+        "with_apply_off_a_builds_settings_are_not_written_and_that_is_said",
+        "with_apply_on_a_builds_settings_are_written_at_the_switch_and_the_part_reading_one_restarted",
+        "with_image_off_the_images_files_are_not_written_and_that_is_said",
+        "with_image_on_the_images_files_are_written_and_asound_restarts_the_voice_at_a_quiet_moment",
+        "with_models_off_a_new_updater_confirms_and_the_build_waits_for_models",
+        "with_the_switch_off_a_build_with_other_models_is_refused",
+        "with_the_switch_off_a_lamps_own_model_is_kept_as_with_it_on",
+        "with_the_switch_off_an_updater_too_old_for_a_build_takes_nothing_it_carries",
+        "with_the_switch_off_lamp_update_never_switches_itself",
+        "without_apply_nothing_is_written_and_what_would_change_is_said"
+      ],
+      "completed_counts": {
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0
+      },
+      "frozen_executable_sha256": "91e79d93c062c6e642c26ebdcb3294fb967e5d990c2577803d5bdb246e266081",
+      "frozen_bytes": 16985188,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": []
+    },
+    {
+      "target": "it",
+      "target_kind": [
+        "test"
+      ],
+      "classification": "UNSTARTED_DRIVER",
+      "inventory_cases": 13,
+      "inventory_ignored": 0,
+      "unstarted_cases": [
+        "ci_paths::every_doc_a_crate_reads_is_named_back_in_the_workflows_pull_request_paths",
+        "ci_paths::the_scan_sees_paths_in_strings_and_not_in_comments_or_prose",
+        "image_journal::systemd_reads_it_last_beside_another_drop_in",
+        "image_journal::the_journal_is_kept_well_inside_the_ram_disk",
+        "image_ramlog::a_failed_move_keeps_the_kept_boots_and_says_so",
+        "image_ramlog::logrotate_runs_the_lamps_copy_back_in_place_of_the_bases",
+        "image_ramlog::ramlogs_copies_leave_the_journal_out",
+        "image_ramlog::ramlogs_stop_keeps_the_journal_before_its_own_stop",
+        "image_ramlog::the_copy_back_leaves_the_journal_alone",
+        "image_ramlog::the_defaults_keep_the_bases_settings",
+        "image_ramlog::the_last_two_boots_are_kept_at_shutdown_only",
+        "scratch_paths::no_two_files_of_a_test_binary_build_the_same_scratch_folder",
+        "scratch_paths::the_names_read_are_the_scratch_folders_only"
+      ],
+      "completed_counts": {
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0
+      },
+      "frozen_executable_sha256": "0e819852bb302b9d9f52156d135f18f4f573bea16e678f48fd188401d85b271b",
+      "frozen_bytes": 1648848,
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": []
+    }
+  ],
+  "exact_completed_PASS_IGNORE_case_ledger": [
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "apply::tests::a_new_skills_folder_is_removed_when_it_is_put_back_and_a_folder_in_use_stays",
+      "outcome": "PASS",
+      "stdout_line": 3
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "apply::tests::a_path_both_a_setting_and_an_image_file_is_refused_with_nothing_written",
+      "outcome": "PASS",
+      "stdout_line": 4
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "apply::tests::a_put_back_asked_again_after_being_cut_short_puts_every_record_back",
+      "outcome": "PASS",
+      "stdout_line": 5
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "apply::tests::a_reload_that_fails_fails_the_apply_and_a_speaker_that_fails_is_said",
+      "outcome": "PASS",
+      "stdout_line": 6
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "apply::tests::a_removed_setting_goes_only_where_it_is_still_the_builds",
+      "outcome": "PASS",
+      "stdout_line": 7
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "apply::tests::a_request_with_a_field_it_does_not_know_is_read",
+      "outcome": "PASS",
+      "stdout_line": 8
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "apply::tests::a_setting_still_the_builds_is_written_and_one_the_lamp_changed_is_kept",
+      "outcome": "PASS",
+      "stdout_line": 9
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "apply::tests::a_setting_the_lamp_removed_stays_removed_and_one_never_there_is_written",
+      "outcome": "PASS",
+      "stdout_line": 10
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "apply::tests::a_signed_image_file_outside_the_list_is_refused_with_nothing_written",
+      "outcome": "PASS",
+      "stdout_line": 11
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "apply::tests::a_unit_systemd_cannot_load_writes_nothing",
+      "outcome": "PASS",
+      "stdout_line": 12
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "apply::tests::an_envelope_signed_with_another_key_or_of_another_build_writes_nothing",
+      "outcome": "PASS",
+      "stdout_line": 13
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "apply::tests::put_back_keeps_a_file_changed_since_and_a_stale_back_file_is_not_used",
+      "outcome": "PASS",
+      "stdout_line": 14
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "apply::tests::put_back_restores_each_file_byte_for_byte_and_its_mode",
+      "outcome": "PASS",
+      "stdout_line": 15
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "apply::tests::put_back_restores_the_images_files_and_reloads_again",
+      "outcome": "PASS",
+      "stdout_line": 16
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "apply::tests::the_apply_path_never_restarts_or_signals_journald",
+      "outcome": "PASS",
+      "stdout_line": 17
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "apply::tests::the_apply_unit_can_write_every_carried_path_and_never_names_journald",
+      "outcome": "PASS",
+      "stdout_line": 18
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "apply::tests::the_images_files_are_written_where_the_lamp_has_one_the_image_shipped",
+      "outcome": "PASS",
+      "stdout_line": 19
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "apply::tests::the_tmpfiles_are_created_only_when_they_are_there",
+      "outcome": "PASS",
+      "stdout_line": 20
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "apply::tests::the_tmpfiles_install_writes_is_one_it_shipped",
+      "outcome": "PASS",
+      "stdout_line": 21
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "apply::tests::the_variants_file_is_written_and_none_of_another",
+      "outcome": "PASS",
+      "stdout_line": 22
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "apply::tests::unrecorded_tmpfiles_an_install_shipped_are_the_builds_and_others_the_lamps",
+      "outcome": "PASS",
+      "stdout_line": 23
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "apply::tests::without_a_request_nothing_is_done",
+      "outcome": "PASS",
+      "stdout_line": 24
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "apply::tests::without_the_image_asked_or_from_an_older_copy_none_is_written",
+      "outcome": "PASS",
+      "stdout_line": 25
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "check_units::tests::a_masked_unit_fails_an_implicit_slice_does_not_and_white_space_shows",
+      "outcome": "PASS",
+      "stdout_line": 26
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "check_units::tests::a_units_own_path_line_is_its_text_and_hides_nothing",
+      "outcome": "PASS",
+      "stdout_line": 27
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "check_units::tests::exactly_the_product_passes_and_a_unit_from_elsewhere_does_not",
+      "outcome": "PASS",
+      "stdout_line": 28
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "check_units::tests::same_changed_drop_in_extra_and_missing_are_each_said_and_fail_the_check",
+      "outcome": "PASS",
+      "stdout_line": 29
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "check_units::tests::systemctl_cat_is_read_file_by_file_and_a_comment_with_a_path_is_no_file",
+      "outcome": "PASS",
+      "stdout_line": 30
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "check_units::tests::the_images_unit_is_the_images_not_extra_and_compared_with_its_variant",
+      "outcome": "PASS",
+      "stdout_line": 31
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "check_units::tests::the_product_as_install_writes_it_passes",
+      "outcome": "PASS",
+      "stdout_line": 32
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "fetch::tests::a_chunked_file_and_one_to_the_end",
+      "outcome": "PASS",
+      "stdout_line": 33
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "fetch::tests::a_file_by_its_length_after_a_redirect",
+      "outcome": "PASS",
+      "stdout_line": 34
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "fetch::tests::a_folder_on_the_lamp",
+      "outcome": "PASS",
+      "stdout_line": 35
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "fetch::tests::a_name_lookup_that_hangs_is_given_up_and_no_round_starts_another_until_it_ends",
+      "outcome": "PASS",
+      "stdout_line": 36
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "fetch::tests::a_release_file_from_github",
+      "outcome": "IGNORE",
+      "stdout_line": 37
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "fetch::tests::an_answered_lookup_is_counted_out_before_its_answer_arrives",
+      "outcome": "PASS",
+      "stdout_line": 38
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "fetch::tests::missing_too_large_short_and_other_answers",
+      "outcome": "PASS",
+      "stdout_line": 39
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "fetch::tests::no_network_is_unreachable",
+      "outcome": "PASS",
+      "stdout_line": 40
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "fetch::tests::urls_and_redirects",
+      "outcome": "PASS",
+      "stdout_line": 41
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "head_touch::tests::null_masks_do_not_admit_other_character_devices",
+      "outcome": "PASS",
+      "stdout_line": 42
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "image::tests::a_file_not_listed_as_shipped_is_refused",
+      "outcome": "PASS",
+      "stdout_line": 43
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "image::tests::a_unit_reloads_systemd_a_rule_reloads_udev_and_asound_restarts_the_voice",
+      "outcome": "PASS",
+      "stdout_line": 44
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "image::tests::every_image_file_of_every_variant_is_listed_as_shipped",
+      "outcome": "PASS",
+      "stdout_line": 45
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "image::tests::journald_is_never_restarted_nor_signalled",
+      "outcome": "PASS",
+      "stdout_line": 46
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "image::tests::the_variant_is_the_images_and_none_is_standard",
+      "outcome": "PASS",
+      "stdout_line": 47
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "install::tests::a_timed_service_is_never_enabled_and_its_timer_is",
+      "outcome": "PASS",
+      "stdout_line": 48
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "install::tests::a_unit_through_current_is_read",
+      "outcome": "PASS",
+      "stdout_line": 49
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "install::tests::every_deploy_product_unit_is_installed_or_named_left_out",
+      "outcome": "PASS",
+      "stdout_line": 50
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "install::tests::every_product_part_starts_through_its_current_link",
+      "outcome": "PASS",
+      "stdout_line": 51
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "install::tests::every_tool_the_factory_steps_run_is_installed_where_they_look",
+      "outcome": "PASS",
+      "stdout_line": 52
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "install::tests::no_product_unit_names_a_lamp",
+      "outcome": "PASS",
+      "stdout_line": 53
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "install::tests::offsets_are_read",
+      "outcome": "PASS",
+      "stdout_line": 54
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "install::tests::the_cloud_is_enabled_with_the_lamp",
+      "outcome": "PASS",
+      "stdout_line": 55
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "install::tests::the_eyes_camera_helper_socket_is_enabled_and_names_the_eyes_camera",
+      "outcome": "PASS",
+      "stdout_line": 56
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "install::tests::the_skills_manage_socket_is_enabled_and_its_template_is_not",
+      "outcome": "PASS",
+      "stdout_line": 57
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "install::tests::the_wifi_helper_is_never_listed_without_its_restore_at_boot",
+      "outcome": "PASS",
+      "stdout_line": 58
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "judge::tests::a_part_that_stays_up_with_one_process_and_says_it_is_well_is_well",
+      "outcome": "PASS",
+      "stdout_line": 59
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "judge::tests::restarted_failed_or_another_process_is_not_well",
+      "outcome": "PASS",
+      "stdout_line": 60
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "judge::tests::the_part_s_own_word_counts_against_what_it_said_before",
+      "outcome": "PASS",
+      "stdout_line": 61
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "manifest::tests::a_build_for_a_newer_updater_is_refused_by_an_older_one_only",
+      "outcome": "PASS",
+      "stdout_line": 62
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "manifest::tests::a_key_made_by_openssl_signs_as_well",
+      "outcome": "PASS",
+      "stdout_line": 63
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "manifest::tests::a_manifest_without_min_updater_is_written_and_read_as_before",
+      "outcome": "PASS",
+      "stdout_line": 64
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "manifest::tests::a_newer_manifest_this_updater_cannot_read_is_refused_for_its_updater",
+      "outcome": "PASS",
+      "stdout_line": 65
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "manifest::tests::a_sealed_manifest_opens_with_its_key_and_gives_back_its_bytes",
+      "outcome": "PASS",
+      "stdout_line": 66
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "manifest::tests::a_setting_with_a_field_it_does_not_know_is_still_read",
+      "outcome": "PASS",
+      "stdout_line": 67
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "manifest::tests::an_image_file_outside_the_list_listed_twice_or_not_its_sha_is_refused",
+      "outcome": "PASS",
+      "stdout_line": 68
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "manifest::tests::another_key_a_changed_byte_or_a_changed_signature_is_refused",
+      "outcome": "PASS",
+      "stdout_line": 69
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "manifest::tests::min_updater_is_signed_with_the_rest",
+      "outcome": "PASS",
+      "stdout_line": 70
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "manifest::tests::min_updater_raised_under_the_same_signature_is_a_bad_signature",
+      "outcome": "PASS",
+      "stdout_line": 71
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "manifest::tests::models_are_read_only_with_the_updater_they_need_and_plain_paths",
+      "outcome": "PASS",
+      "stdout_line": 72
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "manifest::tests::names_are_plain",
+      "outcome": "PASS",
+      "stdout_line": 73
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "manifest::tests::nothing_but_a_plain_manifest_is_signed_or_taken",
+      "outcome": "PASS",
+      "stdout_line": 74
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "manifest::tests::product_units_require_the_signed_updater_level_before_older_readers_select_them",
+      "outcome": "PASS",
+      "stdout_line": 75
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "manifest::tests::settings_are_read_only_with_the_updater_they_need_and_their_own_paths",
+      "outcome": "PASS",
+      "stdout_line": 76
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "manifest::tests::the_reset_plan_is_read_only_with_its_updater_and_its_own_path",
+      "outcome": "PASS",
+      "stdout_line": 77
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "models::tests::a_link_into_the_store_is_relative_and_a_unit_reads_by_path_or_folder",
+      "outcome": "PASS",
+      "stdout_line": 78
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "product_skills::tests::a_link_in_place_of_a_core_file_is_put_back_and_never_read",
+      "outcome": "PASS",
+      "stdout_line": 79
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "product_skills::tests::each_file_is_one_of_three",
+      "outcome": "PASS",
+      "stdout_line": 80
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "product_skills::tests::only_plain_paths_in_the_skills_it_names_are_taken",
+      "outcome": "PASS",
+      "stdout_line": 81
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "product_skills::tests::the_bundle_of_the_repository_is_what_install_writes",
+      "outcome": "PASS",
+      "stdout_line": 82
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "product_skills::tests::what_is_written_is_put_back_and_a_file_changed_since_is_left",
+      "outcome": "PASS",
+      "stdout_line": 83
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "publish::tests::binaries_and_each_lamps_units_but_nothing_else",
+      "outcome": "PASS",
+      "stdout_line": 84
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "publish::tests::models_are_carried_with_the_updater_they_need",
+      "outcome": "PASS",
+      "stdout_line": 85
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "publish::tests::product_services_and_linked_lamp_overrides_are_carried_with_level_six",
+      "outcome": "PASS",
+      "stdout_line": 86
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "publish::tests::the_images_files_are_carried_with_the_updater_they_need",
+      "outcome": "PASS",
+      "stdout_line": 87
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "publish::tests::the_products_settings_are_carried_with_the_updater_they_need",
+      "outcome": "PASS",
+      "stdout_line": 88
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "quiet::tests::a_voice_that_says_nothing_is_never_quiet",
+      "outcome": "PASS",
+      "stdout_line": 89
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "quiet::tests::forty_five_seconds_of_nothing_after_the_last_word",
+      "outcome": "PASS",
+      "stdout_line": 90
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "quiet::tests::hearing_thinking_or_speaking_is_a_turn",
+      "outcome": "PASS",
+      "stdout_line": 91
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "quiet::tests::quiet_needs_as_long_a_watch",
+      "outcome": "PASS",
+      "stdout_line": 92
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "records::tests::a_link_left_beside_is_replaced_and_never_written_through",
+      "outcome": "PASS",
+      "stdout_line": 93
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "records::tests::a_state_from_a_later_build_keeps_its_fields_across_a_save",
+      "outcome": "PASS",
+      "stdout_line": 94
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "records::tests::a_state_from_before_the_settings_reads_and_writes_as_before",
+      "outcome": "PASS",
+      "stdout_line": 95
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "records::tests::a_state_that_cannot_be_read_is_kept_aside",
+      "outcome": "PASS",
+      "stdout_line": 96
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "records::tests::each_kept_state_and_journal_reads_as_saved",
+      "outcome": "PASS",
+      "stdout_line": 97
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "records::tests::one_at_a_time",
+      "outcome": "PASS",
+      "stdout_line": 98
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "records::tests::state_journal_and_previous_units_are_kept",
+      "outcome": "PASS",
+      "stdout_line": 99
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "records::tests::write_records_fixtures",
+      "outcome": "IGNORE",
+      "stdout_line": 100,
+      "ignore_reason": "writes records fixtures: run by hand with LAMP_UPDATE_RECORDS_FIXTURE set"
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "setup_lifecycle::tests::incomplete_duplicate_or_malformed_manager_records_are_unknown",
+      "outcome": "PASS",
+      "stdout_line": 101
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "setup_lifecycle::tests::manager_identity_requires_the_exact_loaded_product_with_known_dropins",
+      "outcome": "PASS",
+      "stdout_line": 102
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "status::tests::a_restart_keeps_the_last_result_each_end_is_said_and_it_is_said_again",
+      "outcome": "PASS",
+      "stdout_line": 103
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "status::tests::the_status_is_the_records_build_the_phase_and_the_last_end_without_its_reason",
+      "outcome": "PASS",
+      "stdout_line": 104
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "status::tests::the_value_lasts_three_periods_so_a_dead_updater_reads_stale",
+      "outcome": "PASS",
+      "stdout_line": 105
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "unit::restart_order::tests::a_declared_socket_precedes_its_service",
+      "outcome": "PASS",
+      "stdout_line": 106
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "unit::restart_order::tests::a_path_through_an_unchanged_unit_still_orders_its_ends",
+      "outcome": "PASS",
+      "stdout_line": 107
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "unit::restart_order::tests::cycles_including_self_edges_are_refused",
+      "outcome": "PASS",
+      "stdout_line": 108
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "unit::restart_order::tests::repeated_and_folded_declarations_keep_each_edge",
+      "outcome": "PASS",
+      "stdout_line": 109
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "unit::restart_order::tests::requirements_and_directives_in_other_sections_do_not_order_units",
+      "outcome": "PASS",
+      "stdout_line": 110
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "unit::restart_order::tests::the_shipped_managed_services_have_a_valid_startup_graph",
+      "outcome": "PASS",
+      "stdout_line": 111
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "unit::restart_order::tests::unsupported_ordering_cannot_silently_lose_a_dependency",
+      "outcome": "PASS",
+      "stdout_line": 112
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "unit::tests::a_new_build_is_written_everywhere_the_folder_is_named",
+      "outcome": "PASS",
+      "stdout_line": 113
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "unit::tests::comments_do_not_make_a_unit_another",
+      "outcome": "PASS",
+      "stdout_line": 114
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "unit::tests::lamp_4aces_own_units_are_read",
+      "outcome": "PASS",
+      "stdout_line": 115
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "unit::tests::only_a_part_installed_by_build_is_a_program",
+      "outcome": "PASS",
+      "stdout_line": 116
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "unit::tests::the_generic_package_sets_up_and_resets_as_the_product_does",
+      "outcome": "PASS",
+      "stdout_line": 117
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "unit::tests::the_generic_voice_answers_whom_the_product_does",
+      "outcome": "PASS",
+      "stdout_line": 118
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "unit::tests::the_generic_voice_has_the_product_clock_and_session_context",
+      "outcome": "PASS",
+      "stdout_line": 119
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "unit::tests::the_generic_voice_runs_the_ring_as_the_product_does",
+      "outcome": "PASS",
+      "stdout_line": 120
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "unit::tests::the_generic_voice_says_its_failures_as_the_product_does",
+      "outcome": "PASS",
+      "stdout_line": 121
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "world::tests::self_recovery_accepts_an_armed_timer_and_an_inactive_service",
+      "outcome": "PASS",
+      "stdout_line": 122
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "world::tests::self_recovery_refuses_a_timer_not_armed_persistently",
+      "outcome": "PASS",
+      "stdout_line": 123
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "world::tests::self_recovery_refuses_an_unloaded_masked_or_ephemeral_service",
+      "outcome": "PASS",
+      "stdout_line": 124
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "world::tests::self_recovery_refuses_malformed_or_unexpected_query_records",
+      "outcome": "PASS",
+      "stdout_line": 125
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "world::tests::self_recovery_requires_one_of_each_record_and_required_property",
+      "outcome": "PASS",
+      "stdout_line": 126
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "world::tests::systemctl_show_is_read_unit_by_unit",
+      "outcome": "PASS",
+      "stdout_line": 127
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "world::tests::the_bus_hears_the_voice_and_not_an_old_state",
+      "outcome": "PASS",
+      "stdout_line": 128
+    },
+    {
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ],
+      "case": "world::tests::the_real_disk_has_room",
+      "outcome": "PASS",
+      "stdout_line": 129
+    },
+    {
+      "target": "lamp-update",
+      "target_kind": [
+        "bin"
+      ],
+      "case": "product_settings_tests::an_unreadable_apply_value_is_present_and_never_enables_product_settings",
+      "outcome": "PASS",
+      "stdout_line": 135
+    },
+    {
+      "target": "lamp-update",
+      "target_kind": [
+        "bin"
+      ],
+      "case": "product_settings_tests::manifest_defaults_follow_the_product_tree_but_explicit_choices_win",
+      "outcome": "PASS",
+      "stdout_line": 136
+    },
+    {
+      "target": "lamp-update",
+      "target_kind": [
+        "bin"
+      ],
+      "case": "product_settings_tests::only_an_absent_apply_switch_and_self_switch_allow_the_product_default",
+      "outcome": "PASS",
+      "stdout_line": 137
+    },
+    {
+      "target": "functions",
+      "target_kind": [
+        "test"
+      ],
+      "case": "a_product_chat_request_offers_dance_at_the_bound",
+      "outcome": "PASS",
+      "stdout_line": 143
+    },
+    {
+      "target": "functions",
+      "target_kind": [
+        "test"
+      ],
+      "case": "a_product_lamp_declares_every_function_it_has_within_the_bound",
+      "outcome": "PASS",
+      "stdout_line": 144
+    },
+    {
+      "target": "functions",
+      "target_kind": [
+        "test"
+      ],
+      "case": "the_generic_voice_declares_the_clock_and_receives_time_and_session_context",
+      "outcome": "PASS",
+      "stdout_line": 145
+    },
+    {
+      "target": "functions",
+      "target_kind": [
+        "test"
+      ],
+      "case": "the_product_voice_s_functions_in_a_process_of_their_own",
+      "outcome": "PASS",
+      "stdout_line": 146
+    },
+    {
+      "target": "functions",
+      "target_kind": [
+        "test"
+      ],
+      "case": "with_reports_on_dance_stays_at_the_bound",
+      "outcome": "PASS",
+      "stdout_line": 147
+    },
+    {
+      "target": "install",
+      "target_kind": [
+        "test"
+      ],
+      "case": "a_blank_lamp_gets_every_part_its_units_and_nothing_started",
+      "outcome": "PASS",
+      "stdout_line": 153
+    },
+    {
+      "target": "install",
+      "target_kind": [
+        "test"
+      ],
+      "case": "a_blank_lamp_runs_every_product_skill_as_the_skill",
+      "outcome": "PASS",
+      "stdout_line": 154
+    },
+    {
+      "target": "install",
+      "target_kind": [
+        "test"
+      ],
+      "case": "a_build_without_a_part_is_refused_before_anything_is_written",
+      "outcome": "PASS",
+      "stdout_line": 155
+    },
+    {
+      "target": "install",
+      "target_kind": [
+        "test"
+      ],
+      "case": "a_build_without_the_bodys_factory_tools_still_installs",
+      "outcome": "PASS",
+      "stdout_line": 156
+    },
+    {
+      "target": "install",
+      "target_kind": [
+        "test"
+      ],
+      "case": "a_closed_etc_lampos_is_said_and_left_as_it_is",
+      "outcome": "PASS",
+      "stdout_line": 157
+    },
+    {
+      "target": "install",
+      "target_kind": [
+        "test"
+      ],
+      "case": "a_default_found_closed_is_opened_and_a_lamps_own_found_closed_is_said",
+      "outcome": "PASS",
+      "stdout_line": 158
+    },
+    {
+      "target": "install",
+      "target_kind": [
+        "test"
+      ],
+      "case": "a_device_key_found_open_is_narrowed_and_never_said",
+      "outcome": "PASS",
+      "stdout_line": 159
+    },
+    {
+      "target": "install",
+      "target_kind": [
+        "test"
+      ],
+      "case": "a_disabled_core_skill_turned_on_stays_on_through_an_install",
+      "outcome": "PASS",
+      "stdout_line": 160
+    },
+    {
+      "target": "install",
+      "target_kind": [
+        "test"
+      ],
+      "case": "a_failed_exit_note_write_keeps_reload_debt_for_the_next_install",
+      "outcome": "PASS",
+      "stdout_line": 161
+    }
+  ],
+  "interrupted_case": {
+    "target": "install",
+    "target_kind": [
+      "test"
+    ],
+    "case": "a_failing_step_keeps_the_record_and_a_later_run_finishes",
+    "outcome": "INTERRUPTED_INCONCLUSIVE",
+    "stdout_line": 162,
+    "evidence": "Unique unterminated final test line after complete serial prefix; no terminal outcome before owned-group SIGTERM"
+  },
+  "all_unstarted_cases": [
+    {
+      "target": "install",
+      "target_kind": [
+        "test"
+      ],
+      "case": "a_file_left_beside_by_a_run_cut_off_does_not_lend_its_mode_to_the_key",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_CASE"
+    },
+    {
+      "target": "install",
+      "target_kind": [
+        "test"
+      ],
+      "case": "a_file_that_does_not_match_installs_nothing_of_it",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_CASE"
+    },
+    {
+      "target": "install",
+      "target_kind": [
+        "test"
+      ],
+      "case": "a_key_a_reset_removed_is_never_put_back_from_v1s_config",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_CASE"
+    },
+    {
+      "target": "install",
+      "target_kind": [
+        "test"
+      ],
+      "case": "a_lamp_set_up_before_setup_wrote_zone_env_gets_its_saved_zone_at_the_next_install",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_CASE"
+    },
+    {
+      "target": "install",
+      "target_kind": [
+        "test"
+      ],
+      "case": "a_lamps_own_pins_gain_the_privacy_section_and_keep_the_rest",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_CASE"
+    },
+    {
+      "target": "install",
+      "target_kind": [
+        "test"
+      ],
+      "case": "a_lamps_own_pins_on_the_old_guess_get_every_head_line",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_CASE"
+    },
+    {
+      "target": "install",
+      "target_kind": [
+        "test"
+      ],
+      "case": "a_missing_store_drop_in_is_repaired_and_failed_reload_is_retried",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_CASE"
+    },
+    {
+      "target": "install",
+      "target_kind": [
+        "test"
+      ],
+      "case": "a_moved_lamp_is_given_the_product_voices_five_lines",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_CASE"
+    },
+    {
+      "target": "install",
+      "target_kind": [
+        "test"
+      ],
+      "case": "a_newer_build_moves_each_link_and_keeps_the_old_folders",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_CASE"
+    },
+    {
+      "target": "install",
+      "target_kind": [
+        "test"
+      ],
+      "case": "a_newer_default_replaces_only_a_setting_nobody_changed",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_CASE"
+    },
+    {
+      "target": "install",
+      "target_kind": [
+        "test"
+      ],
+      "case": "a_product_lamp_without_a_link_says_so_once_and_never_drops_speech_in_silence",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_CASE"
+    },
+    {
+      "target": "install",
+      "target_kind": [
+        "test"
+      ],
+      "case": "a_refused_service_install_records_nothing_and_keeps_the_drop_in",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_CASE"
+    },
+    {
+      "target": "install",
+      "target_kind": [
+        "test"
+      ],
+      "case": "a_reset_then_prepare_does_not_restore_the_old_key",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_CASE"
+    },
+    {
+      "target": "install",
+      "target_kind": [
+        "test"
+      ],
+      "case": "a_set_aside_holds_for_keys_there_and_after_a_mark_that_was_not_saved",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_CASE"
+    },
+    {
+      "target": "install",
+      "target_kind": [
+        "test"
+      ],
+      "case": "a_setting_changed_on_the_lamp_is_kept_when_install_runs_again",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_CASE"
+    },
+    {
+      "target": "install",
+      "target_kind": [
+        "test"
+      ],
+      "case": "a_setting_in_the_way_stops_the_install_before_any_is_written",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_CASE"
+    },
+    {
+      "target": "install",
+      "target_kind": [
+        "test"
+      ],
+      "case": "a_setting_written_but_not_yet_recorded_is_still_installs",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_CASE"
+    },
+    {
+      "target": "install",
+      "target_kind": [
+        "test"
+      ],
+      "case": "an_install_puts_a_core_skills_changed_file_back_and_says_so",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_CASE"
+    },
+    {
+      "target": "install",
+      "target_kind": [
+        "test"
+      ],
+      "case": "an_install_stopped_after_writing_its_units_enables_at_the_next_run",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_CASE"
+    },
+    {
+      "target": "install",
+      "target_kind": [
+        "test"
+      ],
+      "case": "an_install_whose_enable_failed_enables_at_the_next_run_and_keeps_its_settings_record",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_CASE"
+    },
+    {
+      "target": "install",
+      "target_kind": [
+        "test"
+      ],
+      "case": "corrupt_records_are_set_aside_and_never_bring_back_a_key_a_reset_removed",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_CASE"
+    },
+    {
+      "target": "install",
+      "target_kind": [
+        "test"
+      ],
+      "case": "every_part_of_the_brain_has_a_product_unit",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_CASE"
+    },
+    {
+      "target": "install",
+      "target_kind": [
+        "test"
+      ],
+      "case": "every_part_of_the_lamp_waits_for_setups_marker_itself",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_CASE"
+    },
+    {
+      "target": "install",
+      "target_kind": [
+        "test"
+      ],
+      "case": "every_skill_folder_is_in_the_product_or_says_why_not",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_CASE"
+    },
+    {
+      "target": "install",
+      "target_kind": [
+        "test"
+      ],
+      "case": "harness_at_boot_gives_lamposs_manager_its_home_first",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_CASE"
+    },
+    {
+      "target": "install",
+      "target_kind": [
+        "test"
+      ],
+      "case": "harness_is_set_to_start_at_boot_once_when_it_is_there",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_CASE"
+    },
+    {
+      "target": "install",
+      "target_kind": [
+        "test"
+      ],
+      "case": "harness_off_after_a_first_install_leaves_no_linger",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_CASE"
+    },
+    {
+      "target": "install",
+      "target_kind": [
+        "test"
+      ],
+      "case": "harness_off_runs_uninstall_stop_status_then_the_linger_then_pgrep",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_CASE"
+    },
+    {
+      "target": "install",
+      "target_kind": [
+        "test"
+      ],
+      "case": "harness_on_installs_with_harnesss_own_installer_then_sets_it_at_boot",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_CASE"
+    },
+    {
+      "target": "install",
+      "target_kind": [
+        "test"
+      ],
+      "case": "harness_on_keeps_a_harness_already_there",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_CASE"
+    },
+    {
+      "target": "install",
+      "target_kind": [
+        "test"
+      ],
+      "case": "harness_on_stops_at_a_failing_step_and_leaves_no_link",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_CASE"
+    },
+    {
+      "target": "install",
+      "target_kind": [
+        "test"
+      ],
+      "case": "harness_on_updates_its_own_older_harness_and_says_one_too_old",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_CASE"
+    },
+    {
+      "target": "install",
+      "target_kind": [
+        "test"
+      ],
+      "case": "harness_versions_are_read_as_harness_prints_them",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_CASE"
+    },
+    {
+      "target": "install",
+      "target_kind": [
+        "test"
+      ],
+      "case": "head_touch_comes_whole_and_never_beside_the_old_engines_head",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_CASE"
+    },
+    {
+      "target": "install",
+      "target_kind": [
+        "test"
+      ],
+      "case": "head_touch_preflight_files::dangling_drop_in_keeps_missing_file_compatibility",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_CASE"
+    },
+    {
+      "target": "install",
+      "target_kind": [
+        "test"
+      ],
+      "case": "head_touch_preflight_files::dev_null_drop_in_mask_is_preserved",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_CASE"
+    },
+    {
+      "target": "install",
+      "target_kind": [
+        "test"
+      ],
+      "case": "head_touch_preflight_files::directory_drop_in_is_refused_before_mutation",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_CASE"
+    },
+    {
+      "target": "install",
+      "target_kind": [
+        "test"
+      ],
+      "case": "head_touch_preflight_files::fifo_body_calibration_is_refused_before_mutation",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_CASE"
+    },
+    {
+      "target": "install",
+      "target_kind": [
+        "test"
+      ],
+      "case": "head_touch_preflight_files::fifo_drop_in_is_refused_before_mutation",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_CASE"
+    },
+    {
+      "target": "install",
+      "target_kind": [
+        "test"
+      ],
+      "case": "head_touch_preflight_files::fifo_without_a_writer_is_refused_before_mutation",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_CASE"
+    },
+    {
+      "target": "install",
+      "target_kind": [
+        "test"
+      ],
+      "case": "head_touch_preflight_files::missing_local_files_keep_install_compatibility",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_CASE"
+    },
+    {
+      "target": "install",
+      "target_kind": [
+        "test"
+      ],
+      "case": "head_touch_preflight_files::regular_benign_drop_in_is_preserved",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_CASE"
+    },
+    {
+      "target": "install",
+      "target_kind": [
+        "test"
+      ],
+      "case": "head_touch_preflight_files::symlink_to_regular_drop_in_is_preserved",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_CASE"
+    },
+    {
+      "target": "install",
+      "target_kind": [
+        "test"
+      ],
+      "case": "install_head_body_keeps_factory_calibration",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_CASE"
+    },
+    {
+      "target": "install",
+      "target_kind": [
+        "test"
+      ],
+      "case": "install_head_body_refuses_calibration_environment_overrides_before_mutation",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_CASE"
+    },
+    {
+      "target": "install",
+      "target_kind": [
+        "test"
+      ],
+      "case": "install_places_every_exit_note_hook_and_keeps_other_drop_ins",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_CASE"
+    },
+    {
+      "target": "install",
+      "target_kind": [
+        "test"
+      ],
+      "case": "install_places_the_voices_recorded_lines_where_the_product_voice_reads_them",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_CASE"
+    },
+    {
+      "target": "install",
+      "target_kind": [
+        "test"
+      ],
+      "case": "install_prepares_store_off_and_keeps_the_lamps_store_choice",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_CASE"
+    },
+    {
+      "target": "install",
+      "target_kind": [
+        "test"
+      ],
+      "case": "install_records_the_tmpfiles_it_writes",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_CASE"
+    },
+    {
+      "target": "install",
+      "target_kind": [
+        "test"
+      ],
+      "case": "install_review_head_pair_keeps_a_benign_drop_in",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_CASE"
+    },
+    {
+      "target": "install",
+      "target_kind": [
+        "test"
+      ],
+      "case": "install_review_head_pair_refusal_precedes_state_and_host_mutation",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_CASE"
+    },
+    {
+      "target": "install",
+      "target_kind": [
+        "test"
+      ],
+      "case": "install_review_head_pair_refuses_a_disabling_drop_in_before_mutation",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_CASE"
+    },
+    {
+      "target": "install",
+      "target_kind": [
+        "test"
+      ],
+      "case": "install_review_head_pair_refuses_a_removed_mute_before_mutation",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_CASE"
+    },
+    {
+      "target": "install",
+      "target_kind": [
+        "test"
+      ],
+      "case": "install_review_head_pair_retry_keeps_calibration_and_is_idempotent",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_CASE"
+    },
+    {
+      "target": "install",
+      "target_kind": [
+        "test"
+      ],
+      "case": "install_setup_on_replaces_a_hand_placed_plan_and_keeps_the_old_in_the_records",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_CASE"
+    },
+    {
+      "target": "install",
+      "target_kind": [
+        "test"
+      ],
+      "case": "lamp_update_back_waits_for_its_binary_rather_than_failing",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_CASE"
+    },
+    {
+      "target": "install",
+      "target_kind": [
+        "test"
+      ],
+      "case": "missing_models_are_fetched_checked_and_placed_and_a_lamps_own_is_kept",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_CASE"
+    },
+    {
+      "target": "install",
+      "target_kind": [
+        "test"
+      ],
+      "case": "music_sway_and_watch_you_leave_are_on_in_the_product",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_CASE"
+    },
+    {
+      "target": "install",
+      "target_kind": [
+        "test"
+      ],
+      "case": "prepare_places_the_recorded_lines_a_moved_lamps_voice_reads",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_CASE"
+    },
+    {
+      "target": "install",
+      "target_kind": [
+        "test"
+      ],
+      "case": "prepare_sets_corrupt_records_aside_and_leaves_unreadable_ones_alone",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_CASE"
+    },
+    {
+      "target": "install",
+      "target_kind": [
+        "test"
+      ],
+      "case": "prepare_then_reset_then_install_does_not_restore_the_old_key",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_CASE"
+    },
+    {
+      "target": "install",
+      "target_kind": [
+        "test"
+      ],
+      "case": "product_routine_state_is_private_persistent_and_keeps_new_switches_off",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_CASE"
+    },
+    {
+      "target": "install",
+      "target_kind": [
+        "test"
+      ],
+      "case": "product_units_pass_only_options_an_older_binary_takes",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_CASE"
+    },
+    {
+      "target": "install",
+      "target_kind": [
+        "test"
+      ],
+      "case": "run_twice_it_changes_nothing",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_CASE"
+    },
+    {
+      "target": "install",
+      "target_kind": [
+        "test"
+      ],
+      "case": "second_review_body_head_off_refuses_before_bundle_mutation",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_CASE"
+    },
+    {
+      "target": "install",
+      "target_kind": [
+        "test"
+      ],
+      "case": "settings_written_before_one_that_fails_are_still_installs",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_CASE"
+    },
+    {
+      "target": "install",
+      "target_kind": [
+        "test"
+      ],
+      "case": "setup_settings_are_written_only_with_setup_on_and_kept_once_changed",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_CASE"
+    },
+    {
+      "target": "install",
+      "target_kind": [
+        "test"
+      ],
+      "case": "the_builds_plan_already_there_is_no_change_and_no_backup",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_CASE"
+    },
+    {
+      "target": "install",
+      "target_kind": [
+        "test"
+      ],
+      "case": "the_device_key_is_provisioned_private_and_only_where_missing",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_CASE"
+    },
+    {
+      "target": "install",
+      "target_kind": [
+        "test"
+      ],
+      "case": "the_exit_note_allowlist_is_exactly_clouds_product_services",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_CASE"
+    },
+    {
+      "target": "install",
+      "target_kind": [
+        "test"
+      ],
+      "case": "the_installed_bedtime_skill_is_disabled_and_absent_from_live_catalogs",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_CASE"
+    },
+    {
+      "target": "install",
+      "target_kind": [
+        "test"
+      ],
+      "case": "the_parts_that_keep_local_time_read_the_zone_setup_saves",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_CASE"
+    },
+    {
+      "target": "install",
+      "target_kind": [
+        "test"
+      ],
+      "case": "the_pinned_models_are_the_ones_their_parts_check",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_CASE"
+    },
+    {
+      "target": "install",
+      "target_kind": [
+        "test"
+      ],
+      "case": "the_plans_install_shipped_are_listed",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_CASE"
+    },
+    {
+      "target": "install",
+      "target_kind": [
+        "test"
+      ],
+      "case": "the_product_full_look_is_on_in_both_units_with_one_file",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_CASE"
+    },
+    {
+      "target": "install",
+      "target_kind": [
+        "test"
+      ],
+      "case": "the_product_keeps_nothing_personal_while_nobody_is_known",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_CASE"
+    },
+    {
+      "target": "install",
+      "target_kind": [
+        "test"
+      ],
+      "case": "the_product_sees_who_speaks",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_CASE"
+    },
+    {
+      "target": "install",
+      "target_kind": [
+        "test"
+      ],
+      "case": "the_product_skills_are_exactly_the_core_skills",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_CASE"
+    },
+    {
+      "target": "install",
+      "target_kind": [
+        "test"
+      ],
+      "case": "the_second_route_gets_its_services_on_the_voices_key_and_a_lamps_own_is_kept",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_CASE"
+    },
+    {
+      "target": "install",
+      "target_kind": [
+        "test"
+      ],
+      "case": "the_skills_tools_are_in_their_own_folder_which_the_voice_reads",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_CASE"
+    },
+    {
+      "target": "install",
+      "target_kind": [
+        "test"
+      ],
+      "case": "the_tasks_part_closes_the_harness_a_told_task_started",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_CASE"
+    },
+    {
+      "target": "install",
+      "target_kind": [
+        "test"
+      ],
+      "case": "the_tasks_part_waits_for_harness_rather_than_failing",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_CASE"
+    },
+    {
+      "target": "install",
+      "target_kind": [
+        "test"
+      ],
+      "case": "the_voice_gets_its_service_and_the_lamps_device_key_from_v1s_config",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_CASE"
+    },
+    {
+      "target": "install",
+      "target_kind": [
+        "test"
+      ],
+      "case": "time_of_day_parts_wait_for_the_kernel_to_say_the_clock_is_set",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_CASE"
+    },
+    {
+      "target": "install",
+      "target_kind": [
+        "test"
+      ],
+      "case": "tmpfiles_make_lock_folders_the_parts_accept_and_the_voices_sessions_folder",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_CASE"
+    },
+    {
+      "target": "install",
+      "target_kind": [
+        "test"
+      ],
+      "case": "two_failed_runs_in_a_row_keep_a_written_setting_as_installs",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_CASE"
+    },
+    {
+      "target": "install",
+      "target_kind": [
+        "test"
+      ],
+      "case": "unreadable_records_stop_install_rather_than_being_written_over",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_CASE"
+    },
+    {
+      "target": "install",
+      "target_kind": [
+        "test"
+      ],
+      "case": "what_harness_service_status_still_has_is_read_from_its_json",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_CASE"
+    },
+    {
+      "target": "install",
+      "target_kind": [
+        "test"
+      ],
+      "case": "what_harness_still_has_is_said_and_without_harness_the_record_is_kept",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_CASE"
+    },
+    {
+      "target": "install",
+      "target_kind": [
+        "test"
+      ],
+      "case": "without_a_usable_key_nothing_is_written_and_the_key_is_never_said",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_CASE"
+    },
+    {
+      "target": "install",
+      "target_kind": [
+        "test"
+      ],
+      "case": "without_setup_on_a_plan_there_follows_the_build_and_none_is_never_added",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_CASE"
+    },
+    {
+      "target": "release_pair",
+      "target_kind": [
+        "test"
+      ],
+      "case": "release_6408_recovers_a_cut_written_by_release_6449",
+      "declared_ignored": true,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "release_pair",
+      "target_kind": [
+        "test"
+      ],
+      "case": "release_6449_recovers_a_cut_written_by_release_6408",
+      "declared_ignored": true,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "self-process-cuts",
+      "target_kind": [
+        "test"
+      ],
+      "case": "persisted_self_switches_survive_sigkill",
+      "declared_ignored": true,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "self-cli-exec",
+      "target_kind": [
+        "test"
+      ],
+      "case": "actual_cli_exec_confirms_before_the_next_round",
+      "declared_ignored": true,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "a_bad_signature_or_a_bad_checksum_is_refused_with_nothing_installed",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "a_build_for_a_newer_updater_is_refused_and_taken_once_the_updater_can",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "a_build_of_only_new_product_skills_places_them_and_restarts_nothing",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "a_build_put_back_puts_its_settings_back_byte_for_byte",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "a_build_put_back_puts_the_images_files_back",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "a_build_put_back_puts_the_old_reset_plan_back",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "a_build_put_back_puts_the_product_skills_back",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "a_changed_model_is_fetched_checked_and_switched_with_its_part",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "a_command_is_read_within_its_bound_and_killed_after",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "a_core_skill_turned_on_stays_on_through_a_round",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "a_cut_inside_the_put_back_of_an_unreadable_self_json_never_turns_it_around",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "a_disk_too_full_for_a_second_copy_is_refused_before_anything_is_written",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "a_folder_made_two_builds_ago_is_removed_and_one_never_made_is_kept",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "a_hardware_profile_that_cannot_be_read_never_fails_the_round",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "a_lamp_short_of_room_for_the_models_refuses_before_fetching",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "a_lamp_update_back_from_before_the_plan_writes_the_rest_and_the_round_says_so",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "a_lamp_with_an_old_reset_plan_updated_by_a_round_ends_with_the_builds_and_a_backup",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "a_lamp_with_no_reset_plan_gets_none_from_a_round",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "a_lamp_without_lamp_update_apply_puts_the_build_back_with_nothing_written",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "a_lamps_own_asound_is_kept_and_the_voice_not_restarted_for_it",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "a_link_switch_cut_short_is_put_back_at_the_next_start",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "a_linked_part_keeps_its_build_and_the_one_before",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "a_linked_part_that_dies_is_put_back_by_its_link",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "a_model_fetch_cut_by_the_network_is_unreachable_not_refused",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "a_model_only_switch_cut_short_restarts_the_part_that_reads_it",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "a_model_switch_cut_short_is_put_back_at_the_next_start",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "a_model_switch_whose_part_dies_puts_the_model_back",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "a_model_that_cannot_be_put_back_leaves_the_others_put_back_and_the_journal_kept",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "a_model_that_does_not_match_its_sha_refuses_the_build_with_nothing_switched",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "a_new_build_is_installed_beside_the_old_and_switched",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "a_new_updater_not_confirmed_by_the_deadline_is_put_back",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "a_new_updater_that_confirms_keeps_its_switch",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "a_new_updater_that_exits_at_once_is_put_back",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "a_new_updater_that_refuses_every_manifest_is_put_back",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "a_new_worker_beside_an_unchanged_voice_gets_a_folder_named_by_its_list",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "a_part_put_back_says_its_restarts_and_last_line_in_the_outcome_only",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "a_part_that_dies_is_put_back_and_its_build_refused",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "a_part_that_says_it_is_in_error_is_put_back_after_its_minute",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "a_part_whose_folder_is_gone_is_installed_afresh",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "a_product_lamp_without_a_tmpfiles_record_takes_the_builds_tmpfiles",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "a_reset_plan_changed_on_the_lamp_is_replaced_by_a_round_never_kept",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "a_round_after_install_keeps_lamp_updates_own_folder",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "a_round_after_its_own_switch_keeps_the_old_binarys_folder",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "a_round_by_hand_keeps_the_folder_it_runs_from",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "a_round_does_not_switch_lamp_skills_onto_checks_its_old_folders_fail",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "a_round_keeping_second_json_still_reaches_deepseek_through_the_relay",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "a_round_places_second_json_before_a_voice_unit_that_needs_it",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "a_round_puts_a_core_skills_files_back_and_keeps_the_persons_own",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "a_round_that_cannot_place_second_json_writes_no_unit",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "a_round_that_sets_damaged_records_aside_keeps_the_keys_marked",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "a_round_with_nothing_to_change_only_checks",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "a_self_json_from_a_later_version_still_reads",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "a_self_json_the_disk_cannot_give_is_tried_again_next_round",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "a_skill_the_build_removes_leaves_the_turned_on_record_with_one_line",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "a_switch_cut_short_after_its_settings_puts_them_back_at_the_next_start",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "a_switch_cut_short_is_put_back_at_the_next_start",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "a_unit_the_build_carries_is_carried_with_the_build_written_in",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "a_voice_that_is_well_is_put_back_between_two_turns",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "an_old_updater_climbs_one_updater_a_round",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "an_older_build_is_not_taken",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "an_older_lamp_update_back_ignores_the_images_files_and_the_round_says_so",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "an_unchanged_model_is_not_fetched_and_its_file_stays",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "an_unreadable_journal_is_set_aside_and_the_round_goes_on",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "an_unreadable_self_json_with_both_builds_known_is_put_back",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "an_unreadable_self_json_with_the_builds_unknown_is_set_aside",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "an_updater_too_old_for_a_build_not_newer_than_installed_takes_nothing_it_carries",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "an_updater_too_old_for_a_build_takes_only_the_updater_it_carries_then_the_rest",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "an_updater_too_old_for_a_build_without_an_updater_is_refused_with_nothing_written",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "asound_waits_for_a_quiet_moment_within_the_bound_and_then_for_the_next_round",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "both_kinds_of_part_switch_in_one_round_each_its_own_way",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "head_touch::absent_unused_product_pins_do_not_block_active_build_pins_updates",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "head_touch::body_head_calibration_cannot_override_the_sleep_reader",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "head_touch::body_head_complete_bundle_preserves_literal_factory_calibration",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "head_touch::body_head_mode_and_bus_dropins_are_refused_before_writes",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "head_touch::body_head_on_an_isolated_bus_is_refused_before_writes",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "head_touch::body_head_repeated_exec_start_is_refused_before_writes",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "head_touch::body_head_requires_an_enabled_carried_or_installed_sleep_reader",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "head_touch::custom_active_pins_are_kept_and_checked_against_the_reader_pair",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "head_touch::custom_head_wiring_is_kept_or_the_reader_transition_is_refused",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "head_touch::cut_after_pins_apply_restarts_unchanged_controls_after_restoring_old_pins",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "head_touch::environment_only_head_bus_mismatch_is_refused_before_any_write",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "head_touch::expression_or_controls_bus_mismatch_is_refused_before_any_write",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "head_touch::failed_head_reader_candidate_restores_exact_old_pins_and_units",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "head_touch::head_bus_root_dropins_are_not_guessed_from_base_units",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "head_touch::head_pins_cannot_change_without_restarting_their_controls_reader",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "head_touch::head_reader_mode_overrides_are_not_guessed_from_base_units",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "head_touch::invalid_mute_path_and_unknown_reader_are_refused",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "head_touch::isolated_voice_controls_bus_is_refused_before_any_write",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "head_touch::malformed_environment_quotes_are_not_reader_evidence",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "head_touch::matching_explicit_or_default_head_bus_roots_allow_the_paired_transition",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "head_touch::mixed_head_readers_are_refused_before_settings_or_units_are_written",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "head_touch::old_apply_helper_pins_mismatch_is_put_back_before_readers_restart",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "head_touch::paired_head_bus_cannot_diverge_from_voices_enabled_privacy_bus",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "head_touch::paired_head_readers_disable_legacy_even_when_signed_pins_enable_it",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "head_touch::paired_head_readers_without_controls_mute_are_refused_before_writes",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "head_touch::pr2948_settings_off_preserves_the_old_head_reader",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "head_touch::pr2948_settings_on_keeps_a_head_reader_available",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "head_touch::repeated_projected_pins_keep_their_actual_hash_without_restarting_controls",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "head_touch::semantic_head_reader_paths_cannot_expand_invocation_variables",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "head_touch::settings_off_refuses_paired_head_readers_with_legacy_pins",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "head_touch::stale_unused_product_pins_do_not_block_active_build_pins_updates",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "head_touch::textually_equal_expanded_head_bus_roots_are_not_a_verified_pair",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "head_touch::third_review_binary_update_checks_active_build_local_head_pins",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "head_touch::third_review_paired_head_readers_on_different_buses_are_refused",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "install_writes_the_fallback_and_no_round_touches_it",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "lamp_update_back_puts_back_an_unreadable_self_json",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "no_line_is_asked_of_a_good_switch_and_none_is_said_when_there_is_none",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "no_line_is_asked_when_systemd_itself_cannot_be_asked",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "no_network_changes_nothing_and_says_so",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "no_second_round_begins_while_lamp_updates_own_switch_waits",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "only_a_skill_that_would_stop_loading_holds_lamp_skills_back",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "product_carrier::a_comment_only_product_unit_is_an_intended_noop",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "product_carrier::a_corrupt_product_unit_is_refused_before_any_write",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "product_carrier::a_managed_product_manifest_can_bootstrap_the_existing_settings_helper",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "product_carrier::a_product_template_cannot_change_a_parts_binary_or_build_folder",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "product_carrier::a_product_template_does_not_replace_a_pinned_lamps_unit",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "product_carrier::a_product_unit_switches_with_its_link_and_leaves_local_dropins_alone",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "product_carrier::a_same_binary_product_unit_records_good_only_after_climb_and_confirmation",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "product_carrier::an_older_updater_climbs_before_the_product_switch_and_fallback",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "product_carrier::an_unhealthy_product_build_restores_the_exact_unit_and_link",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "product_carrier::automatic_settings_do_not_change_an_older_non_product_manifest",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "product_carrier::explicit_off_and_an_unmanaged_updater_do_not_bootstrap_settings",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "product_carrier::the_lamps_specific_unit_wins_over_the_product_unit",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "product_skills_go_only_into_installs_folder_and_only_when_it_can_be_written",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "product_skills_written_by_a_switch_cut_short_are_put_back_at_the_next_start",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "prune_keeps_the_models_of_the_kept_builds",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "prune_keeps_what_a_model_path_links_to_when_the_state_was_set_aside",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "restart_order::a_cut_at_reload_saves_the_full_old_projection_before_recovery",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "restart_order::a_cycle_in_an_older_recovery_journal_is_retained_without_arbitrary_restarts",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "restart_order::a_cycle_in_either_candidate_or_rollback_plan_refuses_before_mutation",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "restart_order::a_legacy_journal_uses_saved_declarations_and_unchanged_transitive_dependencies",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "restart_order::after_and_before_order_the_forward_restarts_instead_of_unit_names",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "restart_order::empty_saved_order_recovers_files_and_keeps_live_builds_when_inventory_is_unreadable",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "restart_order::interrupted_recovery_orders_saved_units_despite_a_shuffled_partial_journal",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "restart_order::malformed_present_rollback_orders_retain_the_prefix_and_do_not_fetch",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "restart_order::ordering_does_not_start_inactive_or_restart_unchanged_dependencies",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "restart_order::rollback_uses_the_saved_old_dependencies_not_the_new_graph_or_its_reverse",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "restart_order::saved_rollback_order_keeps_transitive_edges_after_an_unchanged_unit_drifts",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "restart_order::saved_rollback_order_survives_a_newly_unreadable_installed_unit",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "restart_order::saved_rollback_order_survives_an_interrupted_put_back_and_keeps_inactive_units_off",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "restart_order::the_product_voices_declared_managed_prerequisites_restart_before_it",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "restart_quiet::continuous_speech_puts_prerequisites_back_without_restarting_voice",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "restart_quiet::queued_speech_during_a_prerequisite_is_heard_before_restarting_voice",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "self_cuts::cut_after_candidate_is_synced_keeps_old_runnable_and_reuses_candidate",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "self_cuts::cut_after_confirmation_clears_pending_keeps_new_runnable_on_restart",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "self_cuts::cut_after_current_moves_keeps_new_runnable_and_can_confirm_or_put_back",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "self_cuts::cut_after_pending_is_saved_keeps_old_runnable_and_recovers_before_next_round",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "self_cuts::interrupted_put_back_keeps_a_runnable_current_and_finishes_on_restart",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "self_cuts::runnable_events::controls::a_never_released_first_output_gate_hits_the_startup_watchdog",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "self_cuts::runnable_events::controls::a_partial_first_output_also_starts_the_finish_watchdog",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "self_cuts::runnable_events::controls::a_read_error_restores_flags_and_leaves_the_direct_child_owned",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "self_cuts::runnable_events::controls::an_exited_leader_does_not_make_a_held_output_descriptor_complete",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "self_cuts::runnable_events::controls::first_output_can_follow_a_gate_longer_than_the_old_spawn_watchdog",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "self_cuts::runnable_events::controls::full_output_without_exit_hits_the_absolute_finish_watchdog",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "self_cuts::runnable_events::controls::later_bytes_do_not_renew_the_first_byte_finish_deadline",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "self_cuts::runnable_events::controls::no_output_is_not_readiness",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "self_cuts::runnable_events::controls::output_beyond_the_previous_capture_limit_fails_explicitly",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "self_cuts::runnable_events::controls::wrong_payload_nonzero_status_and_non_utf8_cannot_satisfy_the_fixture",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "self_cuts::without_self_opt_in_parts_update_but_no_handover_prefix_is_written",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "self_recovery::an_absent_or_unrunnable_fallback_keeps_the_completed_parts_and_old_updater",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "self_recovery::an_unchanged_or_refused_updater_needs_no_recovery_query",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "self_recovery::missing_recovery_also_defers_an_updater_first_climb_without_touching_parts",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "self_recovery::unavailable_recovery_keeps_the_parts_and_can_be_retried_when_armed",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "setup_lifecycle::a_different_failed_part_still_rolls_back_without_restarting_completed_setup",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "setup_lifecycle::an_alias_outside_the_lamp_prefix_cannot_bypass_the_product_check",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "setup_lifecycle::chained_and_loaded_aliases_retain_normal_restart_even_without_alias_files",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "setup_lifecycle::completed_product_setup_keeps_serving_without_restart_or_false_rollback",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "setup_lifecycle::completion_after_the_activity_snapshot_is_rechecked_before_restart",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "setup_lifecycle::completion_removed_during_the_manager_query_is_not_used",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "setup_lifecycle::custom_base_units_and_candidate_changes_keep_normal_watch_rules",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "setup_lifecycle::incomplete_product_setup_still_restarts_and_is_watched",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "setup_lifecycle::recovery_keeps_the_true_active_journal_but_does_not_restart_completed_setup",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "setup_lifecycle::recovery_rechecks_effective_aliases_after_restoring_the_old_unit",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "setup_lifecycle::reset_removing_completion_before_recovery_restarts_the_old_setup",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "setup_lifecycle::reset_removing_completion_before_restart_retains_the_normal_watch",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "setup_lifecycle::the_exact_product_exit_note_and_merged_usr_layout_keep_the_exception",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "setup_lifecycle::uncertain_override_files_do_not_hang_or_grant_the_exception",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "setup_lifecycle::unknown_dropins_at_each_scope_keep_normal_watch_rules",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "setup_lifecycle::unknown_manager_identity_and_custom_loaded_paths_keep_normal_watch",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "the_apps_off_and_on_hold_through_a_round_and_a_restart",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "the_fallback_reads_a_self_json_written_by_a_later_updater",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "the_guard_still_refuses_a_persons_skill_the_new_lamp_skills_will_not_load",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "the_journal_line_is_the_units_own_last_cleaned_and_cut",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "the_old_build_not_well_either_says_the_first_unit_not_wells_line",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "the_voice_is_not_switched_while_someone_talks_to_the_lamp",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "with_apply_off_a_builds_settings_are_not_written_and_that_is_said",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "with_apply_on_a_builds_settings_are_written_at_the_switch_and_the_part_reading_one_restarted",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "with_image_off_the_images_files_are_not_written_and_that_is_said",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "with_image_on_the_images_files_are_written_and_asound_restarts_the_voice_at_a_quiet_moment",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "with_models_off_a_new_updater_confirms_and_the_build_waits_for_models",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "with_the_switch_off_a_build_with_other_models_is_refused",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "with_the_switch_off_a_lamps_own_model_is_kept_as_with_it_on",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "with_the_switch_off_an_updater_too_old_for_a_build_takes_nothing_it_carries",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "with_the_switch_off_lamp_update_never_switches_itself",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "round",
+      "target_kind": [
+        "test"
+      ],
+      "case": "without_apply_nothing_is_written_and_what_would_change_is_said",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "it",
+      "target_kind": [
+        "test"
+      ],
+      "case": "ci_paths::every_doc_a_crate_reads_is_named_back_in_the_workflows_pull_request_paths",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "it",
+      "target_kind": [
+        "test"
+      ],
+      "case": "ci_paths::the_scan_sees_paths_in_strings_and_not_in_comments_or_prose",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "it",
+      "target_kind": [
+        "test"
+      ],
+      "case": "image_journal::systemd_reads_it_last_beside_another_drop_in",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "it",
+      "target_kind": [
+        "test"
+      ],
+      "case": "image_journal::the_journal_is_kept_well_inside_the_ram_disk",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "it",
+      "target_kind": [
+        "test"
+      ],
+      "case": "image_ramlog::a_failed_move_keeps_the_kept_boots_and_says_so",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "it",
+      "target_kind": [
+        "test"
+      ],
+      "case": "image_ramlog::logrotate_runs_the_lamps_copy_back_in_place_of_the_bases",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "it",
+      "target_kind": [
+        "test"
+      ],
+      "case": "image_ramlog::ramlogs_copies_leave_the_journal_out",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "it",
+      "target_kind": [
+        "test"
+      ],
+      "case": "image_ramlog::ramlogs_stop_keeps_the_journal_before_its_own_stop",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "it",
+      "target_kind": [
+        "test"
+      ],
+      "case": "image_ramlog::the_copy_back_leaves_the_journal_alone",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "it",
+      "target_kind": [
+        "test"
+      ],
+      "case": "image_ramlog::the_defaults_keep_the_bases_settings",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "it",
+      "target_kind": [
+        "test"
+      ],
+      "case": "image_ramlog::the_last_two_boots_are_kept_at_shutdown_only",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "it",
+      "target_kind": [
+        "test"
+      ],
+      "case": "scratch_paths::no_two_files_of_a_test_binary_build_the_same_scratch_folder",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    },
+    {
+      "target": "it",
+      "target_kind": [
+        "test"
+      ],
+      "case": "scratch_paths::the_names_read_are_the_scratch_folders_only",
+      "declared_ignored": false,
+      "classification": "UNSTARTED_DRIVER_CASE"
+    }
+  ],
+  "docs_scope": {
+    "status": "UNSTARTED",
+    "stderr_Doc_tests_markers": [],
+    "counts_not_observed": true
+  },
+  "promoter_scope": {
+    "status": "UNSTARTED",
+    "runtime_attempts": 0,
+    "compile_inventory_fmt_strict_commands_not_reached": true,
+    "no_old25_reuse": true
+  },
+  "recorded_original_guards": {
+    "source_unchanged": true,
+    "protected_witnesses_unchanged": true,
+    "protected_count": 258,
+    "current_executable_hashes_unchanged": true,
+    "owned_groups_closed": true,
+    "no_lease_held": true
+  },
+  "frozen_attribute_scope": "Every bound attribute unchanged as recorded. Legacy rows without device/inode fields do not gain retroactive inode proof.",
+  "receipt_hashes": {
+    "terminal.json": "150a4ab02569a5d720e1cab78e5a9be557c3e8c9f08ff7d6be8820ccb8c66dce",
+    "native-controller-result.json": "b34d94d3441822f7e381a305b81f18503e3d0730c186bf144c4dd928b1b8d600",
+    "update-tests.json": "c279c7db9b73162da6d8170289bbb43fedad3645a1093ce1f01dc476202dab38",
+    "update-tests.stdout.txt": "71eb09c8b0689dc61b9e363cd175ccf6b1e8caf2e9edd320dd0fe92f7ac00048",
+    "update-tests.stderr.txt": "98e8f3f0cb620ad6fbc5f447f78a588ee22df5d6303c567af6c0d09f9993c623",
+    "update-inventory.json": "ccff0823cae5fb408e045eafb79f56e548f7c515c3253b79f94411165aef7676",
+    "update-executables.json": "93359886eb63b1e6f891ba9ebdbf19b168c86b053e7a44d88145da4385b3f159",
+    "update-originals.json": "440b13f4e50fe5f6a349a45c455efc01bc8bbe4120286898b430aa9f27ceb616",
+    "update-frozen.json": "7312ef1abf4c71022f11b752bdb67c2d8cfd4c36b3dbe56baa916d34276e356b",
+    "protected-after.json": "535eef7920f9e65d84e40412cf3e9c980f89ae7c409aeadc41b2069bb909f7c5",
+    "source-after.json": "b345bd8e3eb69ada8756c3fad4348e5504a3a0aca75e73c9a053654b462a6b2a",
+    "exact_readonly_case_ledger_sha256": "ad7c7924ba97f78dd11a4dc07e715d552f081bab3bef28c24391557846a0abc7",
+    "disabled_continuation_plan_sha256": "8d205b27beeaa0326d25fc96978386d43763b01b4bf06db4ce7341c2eb85a2a4"
+  },
+  "continuation_status": {
+    "execution_ready": false,
+    "Root_review_required": true,
+    "completed_PASS_IGNORE_never_repeat": true,
+    "install_unstarted91_selected_exactly": true,
+    "unstarted_five_drivers_once_only_after_authorization": true,
+    "interrupted_case_recovery_authorized": false,
+    "interrupted_case_would_be_one_explicit_new_infra_recovery_observation": true,
+    "original_interrupted_outcome_remains_inconclusive": true,
+    "not_one_combined_full_Cargo_command": true
+  },
+  "limits": [
+    "This remains a partial failed63a/a3b observation; no current full Update/docs/promoter qualification exists.",
+    "The reserve guard stopped the owned group. No completed assertion reported FAILED, but the interrupted case has no verdict.",
+    "Old3be stable full/native442PASS results remain historical and are not reused for63a qualification.",
+    "No retry, source/target/code edit, cache cleanup, compiler command or CI write was performed by this read-only audit. Root decides any future recovery after disk safeguards."
+  ]
+}

@@ -1,5 +1,15 @@
 # Tests work log
 
+## 2026-10-27 05:15 — Journal ready; exact carrier interruption retained
+
+Ready for lamp-voice: yes (#3622 only)
+
+Journal `c2ab4426a` on `a3b9c4681` is now non-draft, with full host **340/0/0**, original ARM64 **40405108925** and Linux **40405108853** green, **7,541 unique native passes / 0 bad / 53 skips**, and two current peer READ-OKs. It is nominated for the train. Mood `fa67e6889` stays draft under an explicit author composition hold: retain both fixture repairs and one shared helper after journal lands, then qualify the composed current head.
+
+[The exact carrier reserve-abort ledger](verification/tests-carrier-a3b-reserve-failure-20261027/) supersedes the earlier complete-driver-only partial count: **142 PASS, 2 IGNORE, 1 interrupted case and 303 unstarted cases**, partitioning all 448 inventory identities. The original controller FAIL/Cargo -15 stays retained; no full-run pass is claimed. The interrupted install case has no verdict. A disabled continuation excludes all completed cases and separates any new infrastructure-recovery observation from that interruption. Disk recovery is limited to an audited unused Cargo-cache package; current targets and frozen evidence remain protected.
+
+Skills `b634b5544` is pushed after **525/0/9** host; fresh original native checks are being audited. Sentinel's clean `5ac039201` alias/source binding is complete, but its gate remains disabled and unallocated until disk admission recovers. Restart's future Reader handoff remains deferred. No device action.
+
 ## 2026-10-27 05:04 — Fixture native gates and peer reads clear; carrier reserve abort retained
 
 Ready for lamp-voice: no (journal ready publication is next; other carries remain active)
