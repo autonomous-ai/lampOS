@@ -1,3 +1,13 @@
+Ready for lamp-voice: own-keys current CI pending; separate reset query-bound piece taken.
+
+## Current checkpoint: 2026-10-26 23:32 +07, next bounded-query piece
+
+Taken on Queue 6421348764: `second/reset-query-bounds`, read-side follow-up of #3579/Setup row after open/merged ownership checks. Queries will use the existing five-second manager-query allowance and a 64 KiB stdout cap with owned nonblocking child/pipe cleanup. The delivered starter/writer/stop/wipe/journal policy and actual stop-command allowances stay intact; the audit rejects a universal 60 s stop bound. Existing Third runner mechanics are the reuse baseline, not its alternative reset policy.
+
+The implementation is isolated and unqualified until its own fmt, strict Setup/Cloud Clippy and full applicable tests pass. Runner success/failure/overflow/deadline/retained-pipe controls and reset failure recovery are required. No code test, hardware result or acceptance is claimed by this task-start entry. The evidence log rebase preserves all prior verification and work-log bytes before this entry. #3510 273c/521 original ARM64/Clippy audit continues independently; activation #2094/current-lamp acceptance remains HOLD.
+
+---
+
 Ready for lamp-voice: #3510 current 273c head pushed; original CI pending and activation HOLD.
 
 ## Current checkpoint: 2026-10-26 23:26 +07, test-only latest-base carry qualified
