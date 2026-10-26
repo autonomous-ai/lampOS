@@ -505,6 +505,45 @@ texts in `remember::tests`.
   text runs one only when the typed text asks; a typed yes confirms
   nothing. Not taken, so asked again: "never mind what I told you" and
   other words without one of these.
+  On the second spoken route, `forget_everything` runs only on a request
+  whose own words ask for everything, on the same person's such ask in
+  their turn just before, or on their yes to one the lamp held, and never
+  when the request's own words refuse it or ask for something less,
+  whatever came before. The words are read by `remember::everything_asked`,
+  clause by clause (split at `.`, `!`, `?`, `;`, `,`, `…`), the last clause
+  that says anything deciding: an unnegated forget word or phrase with
+  "everything" or "tất cả" in the same clause asks for everything, unless
+  a word that keeps something back, takes it back or narrows it ("but",
+  "except", "besides", "apart", "save", "keep", "don't", "not", "no",
+  "never", "wait", "without", "just", "only", "cancel", "stop", "hold",
+  "hang", "actually", "trừ", "ngoài", "giữ", "nhưng", "đừng", "không",
+  "chẳng", "chưa", "thôi", "chỉ") comes anywhere after "everything" in
+  the request, in any later clause. This is the lead's conservative rule
+  for #3608: "Forget everything, not just that." is refused too, and the
+  lamp asks once; a widening, if ever, comes in its own PR with played
+  lines; any
+  other forget ("forget that") asks for less; a forget word or phrase after
+  "don't", "do not", "not", "no", "never", "won't", "shouldn't", "đừng",
+  "không", "chẳng", "chưa" or "thôi" in its clause refuses; and a later
+  clause with "don't", "no", "never" or "wait", or one naming everything
+  with a negating word, takes an earlier ask back. So "Don't get rid of
+  everything.", "Forget everything. Actually, don't forget everything.",
+  "Don't forget everything; forget that one.", "Forget everything, except
+  my name.", "Forget everything, but keep my name" and "Forget everything
+  and don't forget everything." ask for nothing, and the model asks. A `forget_everything` call on
+  words that refuse it or ask for less, or on words that ask to forget
+  with nothing before, is refused (`NOT_ASKED_TO_FORGET_EVERYTHING`) and
+  not held for a yes; a held one their refusing words say yes to is
+  dropped; one called with no ask at all is held, as below (lamp-06c1,
+  26 Oct: a bare "forget that" could take all of a person; Reviewer-two's
+  HOLDs on #3608). `forget_everything`'s description there says to call it
+  only for an ask for everything and to ask without calling it when
+  unsure, and no longer carries the hold's sentence. `LAMP_FORGET_ASKED=off`
+  leaves it as before. Neither the Live route nor texts are changed (texts
+  know nobody by face, so their `forget_everything` empties nobody). Tests:
+  `held_forget::a_bare_forget_never_runs_or_holds_forget_everything`,
+  `held_forget::a_refusal_now_outweighs_an_ask_before_and_a_held_yes` and
+  `held_forget::only_unnegated_words_ask_to_forget_everything`.
 - **A forget the model calls unasked is held for a yes** (second route,
   spoken turns, same switch). Keying a yes on the words of the lamp's
   question leaked each time (#2324, #2326, #2331), since the model writes
