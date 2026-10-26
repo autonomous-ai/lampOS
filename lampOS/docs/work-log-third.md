@@ -7,6 +7,33 @@ machine is explicitly named. Third has no lamp access.
 
 
 
+## 2026-10-26 09:38 — Current privacy and interruption review corrections
+
+#3512 is pushed at **1c0f99559** on **0c1f6437e**. The carry retains both
+reuse-decision sections, with every authored code/test blob unchanged from
+3bcc. Fresh native Mac fmt, strict Expression all-target Clippy and full
+Expression **340/0/0** pass, with both controls once and actual executables
+retained. [Current gate](verification/privacy-read-error-20261026/current-0c1.json)
+and [carry](verification/privacy-read-error-20261026/carry-0c1.json).
+Reviewer-three has cleared this head. Fresh native ARM64 is still running;
+Linux Clippy passes. Historical c5 native results are not relabelled.
+
+#3523 is pushed at **04253d6df** on the same base. A qualified own-retirement
+cursor keeps the reminder held without Ack or retry, even before later
+unfinished audio. The new live negative fails **0/1** on the prior offered
+production. Corrected full Voice **4,080/0/21** and Schedule **214/0/7**
+pass on their frozen 41233 composition; current 0c1 fmt, strict Clippy,
+reminder **110/0/2** and workspace build pass. All nine controls pass once.
+Reviewer-three closes the P2 at this current head; native gates are running.
+The PR remains draft pending its gate and current reader disposition.
+
+#3525's held-item negative reproduces **60 chances versus one** across sixty
+heartbeats on current 0c1, with unchanged production and the actual binary
+preserved. The selected-change correction now passes strict Skills Clippy,
+twelve focused controls and its parser validation; full qualification and
+update-crossing checks continue. No physical latency or lamp acceptance is
+claimed for any of these host checks.
+
 ## 2026-10-26 09:10 — Preflight and search fixture delivered in train 153
 
 #3513 and #3520 are closed as carried by train **153 (#3529)**, landed at
