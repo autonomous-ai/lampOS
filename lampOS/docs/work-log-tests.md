@@ -1,5 +1,20 @@
 # Tests work log
 
+## 2026-10-26 13:17 — Restart cleanup passes; train 159 advances the base
+
+Ready for lamp-voice: no (current-base gates pending)
+
+[Restart cleanup proof](verification/tests-same-voice-restart-20261026/) records
+21/0/0 once, formatting, strict twelve-package Clippy and workspace build at
+98be6a072 on cced42943. It is pushed, with original assertions and constructor
+preserved. This module run does not establish a full Voice or native pass.
+
+Train 159 moved lamp-voice to d5dc2e87f. Skills and restart carry cleanly with
+identical range-diffs; Sentinel and Ready-speaking are being carried next.
+#3545 and #3543 are draft again pending new-base gates. Their earlier green
+runs and reads remain qualified only for the recorded old heads. #3466 still
+awaits an installed GOOD/BAD trial and lamp assignment; no device action taken.
+
 ## 2026-10-26 13:11 — Skills ready; Ready-speaking canonical qualification complete
 
 Ready for lamp-voice: yes (#3545)
