@@ -7,6 +7,26 @@ machine is explicitly named. Third has no lamp access.
 
 
 
+## 2026-10-26 08:22 — Interruption repair pushed; persistent-pending fault reproduced
+
+Ready for lamp-voice: no; fresh native gates and reads are pending.
+
+[Reminder repair #3523](https://github.com/autonomous-ai/lampOS/pull/3523)
+is pushed at **61a4e1774** on current c5 with the separate #3520 fixture
+commit as its first dependency. Full local Voice is **4,078/0/21** and
+Schedule **214/0/7**, with formatting, strict Voice/Voice-eval Clippy and
+workspace build passing. All seven new controls pass once. The proof folder
+on that task branch binds the source, actual executables and raw logs; the
+previous d21 full run remains failed and separate. Current native ARM64 is
+**40253749638**, Linux Clippy **40253749678**. First owns the played replay.
+
+The separate pending-trigger regression fails **0/1** against unchanged
+production on c5, exactly at the missing post-talk chance while pending stays
+positive. Its executable, patch and all 7,160 source hashes are retained.
+The fixed level trigger now runs formatting, strict Skills Clippy, four
+behavioral controls, workspace build and full Skills tests. Recorded calls
+are request opportunities, not delivered speech or permission to look.
+
 ## 2026-10-26 08:18 — Score-document-only carries on current lamp-voice
 
 Ready for lamp-voice: no; current native gates and current reads are pending.
