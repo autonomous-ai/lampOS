@@ -1,0 +1,1522 @@
+{
+  "head": "9d52154fa9f157d5763f3acfe4589901e80d1f35",
+  "base": "2bf5122dc76999f970556bb7c78840ab6e107ce0",
+  "scope": "Current selected exact drivers and separate docs; not a current whole12 Cargo command",
+  "per_command_summary_rows": {
+    "skills-lib": [
+      [
+        160,
+        0,
+        0
+      ]
+    ],
+    "skills-bin": [
+      [
+        20,
+        0,
+        0
+      ]
+    ],
+    "skills-it": [
+      [
+        332,
+        0,
+        1
+      ]
+    ],
+    "skills-release-pair": [
+      [
+        2,
+        0,
+        8
+      ]
+    ],
+    "skills-requested-audio": [
+      [
+        31,
+        0,
+        0
+      ]
+    ],
+    "update-lib": [
+      [
+        123,
+        0,
+        2
+      ]
+    ],
+    "update-it": [
+      [
+        13,
+        0,
+        0
+      ]
+    ],
+    "voice-switch-census": [
+      [
+        7,
+        0,
+        0
+      ]
+    ],
+    "voice-welcome-source": [
+      [
+        1,
+        0,
+        0
+      ]
+    ],
+    "doctests-12": [
+      [
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0
+      ]
+    ]
+  },
+  "all21_control_starts_once": {
+    "skills::reminder_pending::unchanged_held_reminder_has_one_chance_across_sixty_heartbeats": 1,
+    "skills::reminder_pending::core_reminders_can_request_again_after_talk_with_pending_still_positive": 1,
+    "skills::reminder_pending::core_reminders_keep_readiness_and_enablement_gates_on_repeated_chances": 1,
+    "skills::reminder_pending::core_reminders_coalesce_queue_changes_and_ignore_renewal_metadata": 1,
+    "skills::reminder_pending::core_reminders_notice_a_brief_talk_between_schedule_heartbeats": 1,
+    "skills::reminder_pending::core_reminders_rearm_after_source_or_condition_expiry": 1,
+    "skills::reminder_pending::core_reminders_keep_the_change_snapshot_across_unchanged_reload": 1,
+    "skills::reminder_pending::invalid_selected_values_do_not_replace_or_rearm_a_reminder_snapshot": 1,
+    "skills::reminder_pending::invalid_selected_trigger_values_do_not_rearm_a_reminder_snapshot": 1,
+    "skills::reminder_pending::a_valid_empty_schedule_rearms_after_an_invalid_selected_trigger_value": 1,
+    "skills::reminder_pending::a_talk_rearms_even_while_a_selected_trigger_value_is_invalid": 1,
+    "skills::reminder_pending::invalid_selected_choice_values_do_not_rearm_a_changes_snapshot": 1,
+    "skills::reminder_pending::a_changes_trigger_refuses_selected_while_path_overlap": 1,
+    "skills::reminder_pending::a_changes_trigger_keeps_independent_while_paths": 1,
+    "skills::reminder_pending::existing_trigger_modes_keep_their_heartbeat_behavior": 1,
+    "skills::reminder_pending::a_changes_trigger_reads_a_bounded_tuple_on_another_topic": 1,
+    "skills::reminder_pending::a_schedule_ask_only_moves_when_voice_begins_it": 1,
+    "skills::reminder_pending::repeated_schedule_chances_keep_one_waiting_runner_and_no_look": 1,
+    "tests::a_change_trigger_requires_bounded_paths_and_compatible_options": 1,
+    "tests::a_change_trigger_requires_a_scalar_comparison": 1,
+    "skills::every_skill_folder_passes_its_own_recorded_tests": 1
+  },
+  "successful_command_results_confirm_control_outcomes": true,
+  "panic_hooks": [
+    {
+      "command": "skills-it",
+      "line": "thread 'skills::the_one_action_reply_joins_on_unwind_before_connect_and_during_a_partial_request' (7615563) panicked at crates/skills/tests/it/skills.rs:3329:17:"
+    },
+    {
+      "command": "skills-it",
+      "line": "thread 'skills::the_one_action_reply_joins_on_unwind_before_connect_and_during_a_partial_request' (7615563) panicked at crates/skills/tests/it/skills.rs:3329:17:"
+    }
+  ],
+  "terminal": {
+    "all_actual_and_saved_133_unchanged": true,
+    "all_selected_commands_completed": true,
+    "all_started_children_reaped_and_groups_absent": true,
+    "any_forced_cleanup": false,
+    "at": "2026-10-26T20:20:14.055962+00:00",
+    "attempted_without_terminal_receipt": [],
+    "base": "2bf5122dc76999f970556bb7c78840ab6e107ce0",
+    "capture_sha256": "147e5e155ec48357e784d9567a7475ca7d9acc203d69b6e3836bf3940f03ab23",
+    "cleanup_budget_seconds": 15,
+    "commands_attempted": [
+      {
+        "argv": [
+          "./.claude/worktrees/third-reminder-dedicated-target/debug/deps/lamp_skills-9340d957f69b21c9",
+          "--nocapture",
+          "--test-threads=1"
+        ],
+        "artifact": "236753855dabb66373a91a41",
+        "cwd": "./.claude/worktrees/third-reminder-pending/lampOS/crates/skills",
+        "executable_sha256": "8d187a2bacf9fcd831f122b23af0031796c6e219b48723bb91a9767fd4d06039",
+        "expected_named_cases": [],
+        "filters": [],
+        "kind": "direct_captured_driver",
+        "label": "skills-lib",
+        "ordinal": 1,
+        "package": "lamp-skills",
+        "target": "lamp_skills"
+      },
+      {
+        "argv": [
+          "./.claude/worktrees/third-reminder-dedicated-target/debug/deps/lamp_skills-65aa47887fbec9c4",
+          "--nocapture",
+          "--test-threads=1"
+        ],
+        "artifact": "5267fb36e340a6ad180a7a44",
+        "cwd": "./.claude/worktrees/third-reminder-pending/lampOS/crates/skills",
+        "executable_sha256": "73c2b8fb3d0ebcfe695b6ade9ed261e3b418ce3fbd74f481b3141a13dffd9c75",
+        "expected_named_cases": [],
+        "filters": [],
+        "kind": "direct_captured_driver",
+        "label": "skills-bin",
+        "ordinal": 2,
+        "package": "lamp-skills",
+        "target": "lamp-skills"
+      },
+      {
+        "argv": [
+          "./.claude/worktrees/third-reminder-dedicated-target/debug/deps/it-d234ff01061c9264",
+          "--nocapture",
+          "--test-threads=1"
+        ],
+        "artifact": "9e470c682aaaa66ca79ea544",
+        "cwd": "./.claude/worktrees/third-reminder-pending/lampOS/crates/skills",
+        "executable_sha256": "26b4bd86e6390b8fd762c061540b49751c476498aebb071365bf8913a1f91b2e",
+        "expected_named_cases": [],
+        "filters": [],
+        "kind": "direct_captured_driver",
+        "label": "skills-it",
+        "ordinal": 3,
+        "package": "lamp-skills",
+        "target": "it"
+      },
+      {
+        "argv": [
+          "./.claude/worktrees/third-reminder-dedicated-target/debug/deps/release_pair-d292fac7dc749122",
+          "--nocapture",
+          "--test-threads=1"
+        ],
+        "artifact": "b7a79fceebc2474fb5d776be",
+        "cwd": "./.claude/worktrees/third-reminder-pending/lampOS/crates/skills",
+        "executable_sha256": "38e07bddd71fc5bcf9549e9170b45952ab9e5a07163955dd3e7ad28c3fdb0f3f",
+        "expected_named_cases": [],
+        "filters": [],
+        "kind": "direct_captured_driver",
+        "label": "skills-release-pair",
+        "ordinal": 4,
+        "package": "lamp-skills",
+        "target": "release_pair"
+      },
+      {
+        "argv": [
+          "./.claude/worktrees/third-reminder-dedicated-target/debug/deps/requested_audio-4f27b5daa1cf4165",
+          "--nocapture",
+          "--test-threads=1"
+        ],
+        "artifact": "4306e0ac8c1461f5df153d56",
+        "cwd": "./.claude/worktrees/third-reminder-pending/lampOS/crates/skills",
+        "executable_sha256": "3b055f45b555c8adf6926cf482a52469edebc590224e46d054e60acbbf83fd5f",
+        "expected_named_cases": [],
+        "filters": [],
+        "kind": "direct_captured_driver",
+        "label": "skills-requested-audio",
+        "ordinal": 5,
+        "package": "lamp-skills",
+        "target": "requested_audio"
+      },
+      {
+        "argv": [
+          "./.claude/worktrees/third-reminder-dedicated-target/debug/deps/lamp_update-8cfde8964d02dd84",
+          "--nocapture",
+          "--test-threads=1"
+        ],
+        "artifact": "9307c257132ba402a1f5f191",
+        "cwd": "./.claude/worktrees/third-reminder-pending/lampOS/crates/update",
+        "executable_sha256": "8a2b2a22db002d73906f9c476c95e67bafc0366cd29ad0b6eb860b6a897e6ce0",
+        "expected_named_cases": [],
+        "filters": [],
+        "kind": "direct_captured_driver",
+        "label": "update-lib",
+        "ordinal": 6,
+        "package": "lamp-update",
+        "target": "lamp_update"
+      },
+      {
+        "argv": [
+          "./.claude/worktrees/third-reminder-dedicated-target/debug/deps/it-f14d800ac4c692fa",
+          "--nocapture",
+          "--test-threads=1"
+        ],
+        "artifact": "565951b042fad6551a013329",
+        "cwd": "./.claude/worktrees/third-reminder-pending/lampOS/crates/update",
+        "executable_sha256": "a222483b0d4db5ce1023aef8f0db08063c6668dae3d97880ba6501e4257df28e",
+        "expected_named_cases": [],
+        "filters": [],
+        "kind": "direct_captured_driver",
+        "label": "update-it",
+        "ordinal": 7,
+        "package": "lamp-update",
+        "target": "it"
+      },
+      {
+        "argv": [
+          "./.claude/worktrees/third-reminder-dedicated-target/debug/deps/lamp_voice-e58141fb20c66240",
+          "process::switch_census_tests",
+          "--nocapture",
+          "--test-threads=1"
+        ],
+        "artifact": "8cea04ef29a982408d565007",
+        "cwd": "./.claude/worktrees/third-reminder-pending/lampOS/crates/voice",
+        "executable_sha256": "aeda176661f5fcc9f968cff2cff5a1ff9ed5da3c46d99ed68b9e91fe429b4c36",
+        "expected_named_cases": [
+          "process::switch_census_tests::session_read_access_is_owned_by_the_coordinator_and_never_given_to_a_worker",
+          "process::switch_census_tests::remember_speaker_arguments_survive_both_workers_cleared_environments",
+          "process::switch_census_tests::every_switch_the_workers_read_reaches_a_worker_or_says_why_not",
+          "process::switch_census_tests::the_census_follows_the_helpers_a_worker_calls_and_sees_their_switches",
+          "process::switch_census_tests::a_helper_left_out_loses_its_switches",
+          "process::switch_census_tests::a_helper_is_named_by_its_functions_not_by_its_types",
+          "process::switch_census_tests::the_coordinators_functions_are_still_in_their_files"
+        ],
+        "filters": [
+          "process::switch_census_tests"
+        ],
+        "kind": "direct_captured_driver",
+        "label": "voice-switch-census",
+        "ordinal": 8,
+        "package": "lamp-voice",
+        "target": "lamp_voice"
+      },
+      {
+        "argv": [
+          "./.claude/worktrees/third-reminder-dedicated-target/debug/deps/lamp_voice-e58141fb20c66240",
+          "--exact",
+          "speak_up::tests::only_welcome_back_says_hello_on_an_arrival",
+          "--nocapture",
+          "--test-threads=1"
+        ],
+        "artifact": "8cea04ef29a982408d565007",
+        "cwd": "./.claude/worktrees/third-reminder-pending/lampOS/crates/voice",
+        "executable_sha256": "aeda176661f5fcc9f968cff2cff5a1ff9ed5da3c46d99ed68b9e91fe429b4c36",
+        "expected_named_cases": [
+          "speak_up::tests::only_welcome_back_says_hello_on_an_arrival"
+        ],
+        "filters": [
+          "--exact",
+          "speak_up::tests::only_welcome_back_says_hello_on_an_arrival"
+        ],
+        "kind": "direct_captured_driver",
+        "label": "voice-welcome-source",
+        "ordinal": 9,
+        "package": "lamp-voice",
+        "target": "lamp_voice"
+      },
+      {
+        "argv": [
+          "cargo",
+          "+1.96.0",
+          "test",
+          "--offline",
+          "--locked",
+          "--doc",
+          "-p",
+          "lamp-skills",
+          "-p",
+          "lamp-cloud",
+          "-p",
+          "lamp-body",
+          "-p",
+          "lamp-expression",
+          "-p",
+          "lamp-keeper",
+          "-p",
+          "lamp-lean",
+          "-p",
+          "lamp-memory",
+          "-p",
+          "lamp-peek",
+          "-p",
+          "lamp-setup",
+          "-p",
+          "lamp-update",
+          "-p",
+          "lamp-voice",
+          "-p",
+          "lamp-voice-eval",
+          "--",
+          "--nocapture",
+          "--test-threads=1"
+        ],
+        "cwd": "./.claude/worktrees/third-reminder-pending/lampOS",
+        "expected_named_cases": [],
+        "kind": "cargo_doctests_only",
+        "label": "doctests-12",
+        "ordinal": 10,
+        "packages": [
+          "lamp-skills",
+          "lamp-cloud",
+          "lamp-body",
+          "lamp-expression",
+          "lamp-keeper",
+          "lamp-lean",
+          "lamp-memory",
+          "lamp-peek",
+          "lamp-setup",
+          "lamp-update",
+          "lamp-voice",
+          "lamp-voice-eval"
+        ]
+      }
+    ],
+    "commands_completed": [
+      {
+        "at": "2026-10-26T20:15:43.004087+00:00",
+        "before_cleanup": {
+          "at": "2026-10-26T20:15:43.002374+00:00",
+          "driver_reaped": true,
+          "process_group": {
+            "state": "absent"
+          },
+          "returncode": 0
+        },
+        "cleanup_actions": [],
+        "command": {
+          "argv": [
+            "./.claude/worktrees/third-reminder-dedicated-target/debug/deps/lamp_skills-9340d957f69b21c9",
+            "--nocapture",
+            "--test-threads=1"
+          ],
+          "artifact": "236753855dabb66373a91a41",
+          "cwd": "./.claude/worktrees/third-reminder-pending/lampOS/crates/skills",
+          "executable_sha256": "8d187a2bacf9fcd831f122b23af0031796c6e219b48723bb91a9767fd4d06039",
+          "expected_named_cases": [],
+          "filters": [],
+          "kind": "direct_captured_driver",
+          "label": "skills-lib",
+          "ordinal": 1,
+          "package": "lamp-skills",
+          "target": "lamp_skills"
+        },
+        "command_qualified": true,
+        "controller_error": null,
+        "driver_reaped": true,
+        "elapsed_seconds": 10.441756695,
+        "forced_cleanup": false,
+        "interruption": null,
+        "log_sha256": "92ef936c58e1fdd3a4cf28bc6b8e33f09471324091f6f9c278e2afbb14ee4a54",
+        "observations": {
+          "all_12_doc_headings_once": true,
+          "doc_headings": [],
+          "expected_named_cases": [],
+          "first_failure_summary": null,
+          "limits": [
+            "Summary rows are raw; no combined or nested-count claim is made.",
+            "Panic hooks remain in the full log for source-aware audit."
+          ],
+          "named_completions": [],
+          "named_selection_witnessed_once": true,
+          "summary_lines": [
+            {
+              "line": 429,
+              "text": "test result: ok. 160 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 9.49s"
+            }
+          ]
+        },
+        "pgid": 94114,
+        "pid": 94114,
+        "process_group": {
+          "state": "absent"
+        },
+        "returncode": 0,
+        "signals_received_during_spawn": [],
+        "timed_out": false
+      },
+      {
+        "at": "2026-10-26T20:15:51.131529+00:00",
+        "before_cleanup": {
+          "at": "2026-10-26T20:15:51.131011+00:00",
+          "driver_reaped": true,
+          "process_group": {
+            "state": "absent"
+          },
+          "returncode": 0
+        },
+        "cleanup_actions": [],
+        "command": {
+          "argv": [
+            "./.claude/worktrees/third-reminder-dedicated-target/debug/deps/lamp_skills-65aa47887fbec9c4",
+            "--nocapture",
+            "--test-threads=1"
+          ],
+          "artifact": "5267fb36e340a6ad180a7a44",
+          "cwd": "./.claude/worktrees/third-reminder-pending/lampOS/crates/skills",
+          "executable_sha256": "73c2b8fb3d0ebcfe695b6ade9ed261e3b418ce3fbd74f481b3141a13dffd9c75",
+          "expected_named_cases": [],
+          "filters": [],
+          "kind": "direct_captured_driver",
+          "label": "skills-bin",
+          "ordinal": 2,
+          "package": "lamp-skills",
+          "target": "lamp-skills"
+        },
+        "command_qualified": true,
+        "controller_error": null,
+        "driver_reaped": true,
+        "elapsed_seconds": 8.102451543,
+        "forced_cleanup": false,
+        "interruption": null,
+        "log_sha256": "b72b03e86932d122bb0d9ef110a6facecfd689baa7acb6c6bdd81874c4323c2e",
+        "observations": {
+          "all_12_doc_headings_once": true,
+          "doc_headings": [],
+          "expected_named_cases": [],
+          "first_failure_summary": null,
+          "limits": [
+            "Summary rows are raw; no combined or nested-count claim is made.",
+            "Panic hooks remain in the full log for source-aware audit."
+          ],
+          "named_completions": [],
+          "named_selection_witnessed_once": true,
+          "summary_lines": [
+            {
+              "line": 63,
+              "text": "test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.35s"
+            }
+          ]
+        },
+        "pgid": 94292,
+        "pid": 94292,
+        "process_group": {
+          "state": "absent"
+        },
+        "returncode": 0,
+        "signals_received_during_spawn": [],
+        "timed_out": false
+      },
+      {
+        "at": "2026-10-26T20:19:27.330581+00:00",
+        "before_cleanup": {
+          "at": "2026-10-26T20:19:27.327604+00:00",
+          "driver_reaped": true,
+          "process_group": {
+            "state": "absent"
+          },
+          "returncode": 0
+        },
+        "cleanup_actions": [],
+        "command": {
+          "argv": [
+            "./.claude/worktrees/third-reminder-dedicated-target/debug/deps/it-d234ff01061c9264",
+            "--nocapture",
+            "--test-threads=1"
+          ],
+          "artifact": "9e470c682aaaa66ca79ea544",
+          "cwd": "./.claude/worktrees/third-reminder-pending/lampOS/crates/skills",
+          "executable_sha256": "26b4bd86e6390b8fd762c061540b49751c476498aebb071365bf8913a1f91b2e",
+          "expected_named_cases": [],
+          "filters": [],
+          "kind": "direct_captured_driver",
+          "label": "skills-it",
+          "ordinal": 3,
+          "package": "lamp-skills",
+          "target": "it"
+        },
+        "command_qualified": true,
+        "controller_error": null,
+        "driver_reaped": true,
+        "elapsed_seconds": 216.192810411,
+        "forced_cleanup": false,
+        "interruption": null,
+        "log_sha256": "446f069baedc688f43636f4e98a75d0ecdf1ede8e278f1e8ee978e18bf4a23c9",
+        "observations": {
+          "all_12_doc_headings_once": true,
+          "doc_headings": [],
+          "expected_named_cases": [],
+          "first_failure_summary": null,
+          "limits": [
+            "Summary rows are raw; no combined or nested-count claim is made.",
+            "Panic hooks remain in the full log for source-aware audit."
+          ],
+          "named_completions": [],
+          "named_selection_witnessed_once": true,
+          "summary_lines": [
+            {
+              "line": 1056,
+              "text": "test result: ok. 332 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 215.36s"
+            }
+          ]
+        },
+        "pgid": 94406,
+        "pid": 94406,
+        "process_group": {
+          "state": "absent"
+        },
+        "returncode": 0,
+        "signals_received_during_spawn": [],
+        "timed_out": false
+      },
+      {
+        "at": "2026-10-26T20:19:28.213391+00:00",
+        "before_cleanup": {
+          "at": "2026-10-26T20:19:28.212996+00:00",
+          "driver_reaped": true,
+          "process_group": {
+            "state": "absent"
+          },
+          "returncode": 0
+        },
+        "cleanup_actions": [],
+        "command": {
+          "argv": [
+            "./.claude/worktrees/third-reminder-dedicated-target/debug/deps/release_pair-d292fac7dc749122",
+            "--nocapture",
+            "--test-threads=1"
+          ],
+          "artifact": "b7a79fceebc2474fb5d776be",
+          "cwd": "./.claude/worktrees/third-reminder-pending/lampOS/crates/skills",
+          "executable_sha256": "38e07bddd71fc5bcf9549e9170b45952ab9e5a07163955dd3e7ad28c3fdb0f3f",
+          "expected_named_cases": [],
+          "filters": [],
+          "kind": "direct_captured_driver",
+          "label": "skills-release-pair",
+          "ordinal": 4,
+          "package": "lamp-skills",
+          "target": "release_pair"
+        },
+        "command_qualified": true,
+        "controller_error": null,
+        "driver_reaped": true,
+        "elapsed_seconds": 0.8744857410000009,
+        "forced_cleanup": false,
+        "interruption": null,
+        "log_sha256": "59e11777a0a496c5ce21df48ba07f4af9b0df6c73b6f000f97333bfd9e9d7f19",
+        "observations": {
+          "all_12_doc_headings_once": true,
+          "doc_headings": [],
+          "expected_named_cases": [],
+          "first_failure_summary": null,
+          "limits": [
+            "Summary rows are raw; no combined or nested-count claim is made.",
+            "Panic hooks remain in the full log for source-aware audit."
+          ],
+          "named_completions": [],
+          "named_selection_witnessed_once": true,
+          "summary_lines": [
+            {
+              "line": 14,
+              "text": "test result: ok. 2 passed; 0 failed; 8 ignored; 0 measured; 0 filtered out; finished in 0.11s"
+            }
+          ]
+        },
+        "pgid": 98316,
+        "pid": 98316,
+        "process_group": {
+          "state": "absent"
+        },
+        "returncode": 0,
+        "signals_received_during_spawn": [],
+        "timed_out": false
+      },
+      {
+        "at": "2026-10-26T20:19:35.021919+00:00",
+        "before_cleanup": {
+          "at": "2026-10-26T20:19:35.021481+00:00",
+          "driver_reaped": true,
+          "process_group": {
+            "state": "absent"
+          },
+          "returncode": 0
+        },
+        "cleanup_actions": [],
+        "command": {
+          "argv": [
+            "./.claude/worktrees/third-reminder-dedicated-target/debug/deps/requested_audio-4f27b5daa1cf4165",
+            "--nocapture",
+            "--test-threads=1"
+          ],
+          "artifact": "4306e0ac8c1461f5df153d56",
+          "cwd": "./.claude/worktrees/third-reminder-pending/lampOS/crates/skills",
+          "executable_sha256": "3b055f45b555c8adf6926cf482a52469edebc590224e46d054e60acbbf83fd5f",
+          "expected_named_cases": [],
+          "filters": [],
+          "kind": "direct_captured_driver",
+          "label": "skills-requested-audio",
+          "ordinal": 5,
+          "package": "lamp-skills",
+          "target": "requested_audio"
+        },
+        "command_qualified": true,
+        "controller_error": null,
+        "driver_reaped": true,
+        "elapsed_seconds": 6.784026143999995,
+        "forced_cleanup": false,
+        "interruption": null,
+        "log_sha256": "db6723487a688369d77d084575b204d2127d28a6481d24e49f36f8181fd5d741",
+        "observations": {
+          "all_12_doc_headings_once": true,
+          "doc_headings": [],
+          "expected_named_cases": [],
+          "first_failure_summary": null,
+          "limits": [
+            "Summary rows are raw; no combined or nested-count claim is made.",
+            "Panic hooks remain in the full log for source-aware audit."
+          ],
+          "named_completions": [],
+          "named_selection_witnessed_once": true,
+          "summary_lines": [
+            {
+              "line": 38,
+              "text": "test result: ok. 31 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.10s"
+            }
+          ]
+        },
+        "pgid": 98321,
+        "pid": 98321,
+        "process_group": {
+          "state": "absent"
+        },
+        "returncode": 0,
+        "signals_received_during_spawn": [],
+        "timed_out": false
+      },
+      {
+        "at": "2026-10-26T20:19:44.968553+00:00",
+        "before_cleanup": {
+          "at": "2026-10-26T20:19:44.967872+00:00",
+          "driver_reaped": true,
+          "process_group": {
+            "state": "absent"
+          },
+          "returncode": 0
+        },
+        "cleanup_actions": [],
+        "command": {
+          "argv": [
+            "./.claude/worktrees/third-reminder-dedicated-target/debug/deps/lamp_update-8cfde8964d02dd84",
+            "--nocapture",
+            "--test-threads=1"
+          ],
+          "artifact": "9307c257132ba402a1f5f191",
+          "cwd": "./.claude/worktrees/third-reminder-pending/lampOS/crates/update",
+          "executable_sha256": "8a2b2a22db002d73906f9c476c95e67bafc0366cd29ad0b6eb860b6a897e6ce0",
+          "expected_named_cases": [],
+          "filters": [],
+          "kind": "direct_captured_driver",
+          "label": "update-lib",
+          "ordinal": 6,
+          "package": "lamp-update",
+          "target": "lamp_update"
+        },
+        "command_qualified": true,
+        "controller_error": null,
+        "driver_reaped": true,
+        "elapsed_seconds": 9.92522873499999,
+        "forced_cleanup": false,
+        "interruption": null,
+        "log_sha256": "86c949baf0e759ffcff3d59395003fc6398b22adb8d6cf0ecaf2a06426d39915",
+        "observations": {
+          "all_12_doc_headings_once": true,
+          "doc_headings": [],
+          "expected_named_cases": [],
+          "first_failure_summary": null,
+          "limits": [
+            "Summary rows are raw; no combined or nested-count claim is made.",
+            "Panic hooks remain in the full log for source-aware audit."
+          ],
+          "named_completions": [],
+          "named_selection_witnessed_once": true,
+          "summary_lines": [
+            {
+              "line": 129,
+              "text": "test result: ok. 123 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 9.21s"
+            }
+          ]
+        },
+        "pgid": 98395,
+        "pid": 98395,
+        "process_group": {
+          "state": "absent"
+        },
+        "returncode": 0,
+        "signals_received_during_spawn": [],
+        "timed_out": false
+      },
+      {
+        "at": "2026-10-26T20:19:47.886175+00:00",
+        "before_cleanup": {
+          "at": "2026-10-26T20:19:47.885767+00:00",
+          "driver_reaped": true,
+          "process_group": {
+            "state": "absent"
+          },
+          "returncode": 0
+        },
+        "cleanup_actions": [],
+        "command": {
+          "argv": [
+            "./.claude/worktrees/third-reminder-dedicated-target/debug/deps/it-f14d800ac4c692fa",
+            "--nocapture",
+            "--test-threads=1"
+          ],
+          "artifact": "565951b042fad6551a013329",
+          "cwd": "./.claude/worktrees/third-reminder-pending/lampOS/crates/update",
+          "executable_sha256": "a222483b0d4db5ce1023aef8f0db08063c6668dae3d97880ba6501e4257df28e",
+          "expected_named_cases": [],
+          "filters": [],
+          "kind": "direct_captured_driver",
+          "label": "update-it",
+          "ordinal": 7,
+          "package": "lamp-update",
+          "target": "it"
+        },
+        "command_qualified": true,
+        "controller_error": null,
+        "driver_reaped": true,
+        "elapsed_seconds": 2.91304881100001,
+        "forced_cleanup": false,
+        "interruption": null,
+        "log_sha256": "df290113a77a37beeea31b770d19bd742184246bdbe5a9c19f9a2707f8b55ff9",
+        "observations": {
+          "all_12_doc_headings_once": true,
+          "doc_headings": [],
+          "expected_named_cases": [],
+          "first_failure_summary": null,
+          "limits": [
+            "Summary rows are raw; no combined or nested-count claim is made.",
+            "Panic hooks remain in the full log for source-aware audit."
+          ],
+          "named_completions": [],
+          "named_selection_witnessed_once": true,
+          "summary_lines": [
+            {
+              "line": 19,
+              "text": "test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.88s"
+            }
+          ]
+        },
+        "pgid": 98547,
+        "pid": 98547,
+        "process_group": {
+          "state": "absent"
+        },
+        "returncode": 0,
+        "signals_received_during_spawn": [],
+        "timed_out": false
+      },
+      {
+        "at": "2026-10-26T20:19:57.617049+00:00",
+        "before_cleanup": {
+          "at": "2026-10-26T20:19:57.616633+00:00",
+          "driver_reaped": true,
+          "process_group": {
+            "state": "absent"
+          },
+          "returncode": 0
+        },
+        "cleanup_actions": [],
+        "command": {
+          "argv": [
+            "./.claude/worktrees/third-reminder-dedicated-target/debug/deps/lamp_voice-e58141fb20c66240",
+            "process::switch_census_tests",
+            "--nocapture",
+            "--test-threads=1"
+          ],
+          "artifact": "8cea04ef29a982408d565007",
+          "cwd": "./.claude/worktrees/third-reminder-pending/lampOS/crates/voice",
+          "executable_sha256": "aeda176661f5fcc9f968cff2cff5a1ff9ed5da3c46d99ed68b9e91fe429b4c36",
+          "expected_named_cases": [
+            "process::switch_census_tests::session_read_access_is_owned_by_the_coordinator_and_never_given_to_a_worker",
+            "process::switch_census_tests::remember_speaker_arguments_survive_both_workers_cleared_environments",
+            "process::switch_census_tests::every_switch_the_workers_read_reaches_a_worker_or_says_why_not",
+            "process::switch_census_tests::the_census_follows_the_helpers_a_worker_calls_and_sees_their_switches",
+            "process::switch_census_tests::a_helper_left_out_loses_its_switches",
+            "process::switch_census_tests::a_helper_is_named_by_its_functions_not_by_its_types",
+            "process::switch_census_tests::the_coordinators_functions_are_still_in_their_files"
+          ],
+          "filters": [
+            "process::switch_census_tests"
+          ],
+          "kind": "direct_captured_driver",
+          "label": "voice-switch-census",
+          "ordinal": 8,
+          "package": "lamp-voice",
+          "target": "lamp_voice"
+        },
+        "command_qualified": true,
+        "controller_error": null,
+        "driver_reaped": true,
+        "elapsed_seconds": 9.52497050400001,
+        "forced_cleanup": false,
+        "interruption": null,
+        "log_sha256": "e965b9e97807e0fc464c3ec7ed680689452edf015a78a2f90bee26bb470a6bfe",
+        "observations": {
+          "all_12_doc_headings_once": true,
+          "doc_headings": [],
+          "expected_named_cases": [
+            "process::switch_census_tests::session_read_access_is_owned_by_the_coordinator_and_never_given_to_a_worker",
+            "process::switch_census_tests::remember_speaker_arguments_survive_both_workers_cleared_environments",
+            "process::switch_census_tests::every_switch_the_workers_read_reaches_a_worker_or_says_why_not",
+            "process::switch_census_tests::the_census_follows_the_helpers_a_worker_calls_and_sees_their_switches",
+            "process::switch_census_tests::a_helper_left_out_loses_its_switches",
+            "process::switch_census_tests::a_helper_is_named_by_its_functions_not_by_its_types",
+            "process::switch_census_tests::the_coordinators_functions_are_still_in_their_files"
+          ],
+          "first_failure_summary": null,
+          "limits": [
+            "Summary rows are raw; no combined or nested-count claim is made.",
+            "Panic hooks remain in the full log for source-aware audit."
+          ],
+          "named_completions": [
+            {
+              "line": 3,
+              "name": "process::switch_census_tests::a_helper_is_named_by_its_functions_not_by_its_types",
+              "outcome": "ok"
+            },
+            {
+              "line": 4,
+              "name": "process::switch_census_tests::a_helper_left_out_loses_its_switches",
+              "outcome": "ok"
+            },
+            {
+              "line": 5,
+              "name": "process::switch_census_tests::every_switch_the_workers_read_reaches_a_worker_or_says_why_not",
+              "outcome": "ok"
+            },
+            {
+              "line": 6,
+              "name": "process::switch_census_tests::remember_speaker_arguments_survive_both_workers_cleared_environments",
+              "outcome": "ok"
+            },
+            {
+              "line": 7,
+              "name": "process::switch_census_tests::session_read_access_is_owned_by_the_coordinator_and_never_given_to_a_worker",
+              "outcome": "ok"
+            },
+            {
+              "line": 8,
+              "name": "process::switch_census_tests::the_census_follows_the_helpers_a_worker_calls_and_sees_their_switches",
+              "outcome": "ok"
+            },
+            {
+              "line": 9,
+              "name": "process::switch_census_tests::the_coordinators_functions_are_still_in_their_files",
+              "outcome": "ok"
+            }
+          ],
+          "named_selection_witnessed_once": true,
+          "summary_lines": [
+            {
+              "line": 11,
+              "text": "test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 3816 filtered out; finished in 7.58s"
+            }
+          ]
+        },
+        "pgid": 98862,
+        "pid": 98862,
+        "process_group": {
+          "state": "absent"
+        },
+        "returncode": 0,
+        "signals_received_during_spawn": [],
+        "timed_out": false
+      },
+      {
+        "at": "2026-10-26T20:19:58.092887+00:00",
+        "before_cleanup": {
+          "at": "2026-10-26T20:19:58.092516+00:00",
+          "driver_reaped": true,
+          "process_group": {
+            "state": "absent"
+          },
+          "returncode": 0
+        },
+        "cleanup_actions": [],
+        "command": {
+          "argv": [
+            "./.claude/worktrees/third-reminder-dedicated-target/debug/deps/lamp_voice-e58141fb20c66240",
+            "--exact",
+            "speak_up::tests::only_welcome_back_says_hello_on_an_arrival",
+            "--nocapture",
+            "--test-threads=1"
+          ],
+          "artifact": "8cea04ef29a982408d565007",
+          "cwd": "./.claude/worktrees/third-reminder-pending/lampOS/crates/voice",
+          "executable_sha256": "aeda176661f5fcc9f968cff2cff5a1ff9ed5da3c46d99ed68b9e91fe429b4c36",
+          "expected_named_cases": [
+            "speak_up::tests::only_welcome_back_says_hello_on_an_arrival"
+          ],
+          "filters": [
+            "--exact",
+            "speak_up::tests::only_welcome_back_says_hello_on_an_arrival"
+          ],
+          "kind": "direct_captured_driver",
+          "label": "voice-welcome-source",
+          "ordinal": 9,
+          "package": "lamp-voice",
+          "target": "lamp_voice"
+        },
+        "command_qualified": true,
+        "controller_error": null,
+        "driver_reaped": true,
+        "elapsed_seconds": 0.2703233999999952,
+        "forced_cleanup": false,
+        "interruption": null,
+        "log_sha256": "9733dc7b72be26d56a6bfb4a4375c80c70dc6411a8cdfeb51597da18bc8df26c",
+        "observations": {
+          "all_12_doc_headings_once": true,
+          "doc_headings": [],
+          "expected_named_cases": [
+            "speak_up::tests::only_welcome_back_says_hello_on_an_arrival"
+          ],
+          "first_failure_summary": null,
+          "limits": [
+            "Summary rows are raw; no combined or nested-count claim is made.",
+            "Panic hooks remain in the full log for source-aware audit."
+          ],
+          "named_completions": [
+            {
+              "line": 3,
+              "name": "speak_up::tests::only_welcome_back_says_hello_on_an_arrival",
+              "outcome": "ok"
+            }
+          ],
+          "named_selection_witnessed_once": true,
+          "summary_lines": [
+            {
+              "line": 5,
+              "text": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3822 filtered out; finished in 0.18s"
+            }
+          ]
+        },
+        "pgid": 98978,
+        "pid": 98978,
+        "process_group": {
+          "state": "absent"
+        },
+        "returncode": 0,
+        "signals_received_during_spawn": [],
+        "timed_out": false
+      },
+      {
+        "at": "2026-10-26T20:20:04.417596+00:00",
+        "before_cleanup": {
+          "at": "2026-10-26T20:20:04.417084+00:00",
+          "driver_reaped": true,
+          "process_group": {
+            "state": "absent"
+          },
+          "returncode": 0
+        },
+        "cleanup_actions": [],
+        "command": {
+          "argv": [
+            "cargo",
+            "+1.96.0",
+            "test",
+            "--offline",
+            "--locked",
+            "--doc",
+            "-p",
+            "lamp-skills",
+            "-p",
+            "lamp-cloud",
+            "-p",
+            "lamp-body",
+            "-p",
+            "lamp-expression",
+            "-p",
+            "lamp-keeper",
+            "-p",
+            "lamp-lean",
+            "-p",
+            "lamp-memory",
+            "-p",
+            "lamp-peek",
+            "-p",
+            "lamp-setup",
+            "-p",
+            "lamp-update",
+            "-p",
+            "lamp-voice",
+            "-p",
+            "lamp-voice-eval",
+            "--",
+            "--nocapture",
+            "--test-threads=1"
+          ],
+          "cwd": "./.claude/worktrees/third-reminder-pending/lampOS",
+          "expected_named_cases": [],
+          "kind": "cargo_doctests_only",
+          "label": "doctests-12",
+          "ordinal": 10,
+          "packages": [
+            "lamp-skills",
+            "lamp-cloud",
+            "lamp-body",
+            "lamp-expression",
+            "lamp-keeper",
+            "lamp-lean",
+            "lamp-memory",
+            "lamp-peek",
+            "lamp-setup",
+            "lamp-update",
+            "lamp-voice",
+            "lamp-voice-eval"
+          ]
+        },
+        "command_qualified": true,
+        "controller_error": null,
+        "driver_reaped": true,
+        "elapsed_seconds": 6.3241012880000085,
+        "forced_cleanup": false,
+        "interruption": null,
+        "log_sha256": "a132e702055cdb1c665ce0a83f5c7e264cea2c2516c29ba464112f886db04883",
+        "observations": {
+          "all_12_doc_headings_once": true,
+          "doc_headings": [
+            {
+              "line": 2,
+              "name": "lamp_body"
+            },
+            {
+              "line": 8,
+              "name": "lamp_cloud"
+            },
+            {
+              "line": 14,
+              "name": "lamp_expression"
+            },
+            {
+              "line": 20,
+              "name": "lamp_keeper"
+            },
+            {
+              "line": 26,
+              "name": "lamp_lean"
+            },
+            {
+              "line": 32,
+              "name": "lamp_memory"
+            },
+            {
+              "line": 38,
+              "name": "lamp_peek"
+            },
+            {
+              "line": 44,
+              "name": "lamp_setup"
+            },
+            {
+              "line": 50,
+              "name": "lamp_skills"
+            },
+            {
+              "line": 56,
+              "name": "lamp_update"
+            },
+            {
+              "line": 62,
+              "name": "lamp_voice"
+            },
+            {
+              "line": 68,
+              "name": "lamp_voice_eval"
+            }
+          ],
+          "expected_named_cases": [],
+          "first_failure_summary": null,
+          "limits": [
+            "Summary rows are raw; no combined or nested-count claim is made.",
+            "Panic hooks remain in the full log for source-aware audit."
+          ],
+          "named_completions": [],
+          "named_selection_witnessed_once": true,
+          "summary_lines": [
+            {
+              "line": 6,
+              "text": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+            },
+            {
+              "line": 12,
+              "text": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+            },
+            {
+              "line": 18,
+              "text": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+            },
+            {
+              "line": 24,
+              "text": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+            },
+            {
+              "line": 30,
+              "text": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+            },
+            {
+              "line": 36,
+              "text": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+            },
+            {
+              "line": 42,
+              "text": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+            },
+            {
+              "line": 48,
+              "text": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+            },
+            {
+              "line": 54,
+              "text": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+            },
+            {
+              "line": 60,
+              "text": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+            },
+            {
+              "line": 66,
+              "text": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+            },
+            {
+              "line": 72,
+              "text": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+            }
+          ]
+        },
+        "pgid": 98979,
+        "pid": 98979,
+        "process_group": {
+          "state": "absent"
+        },
+        "returncode": 0,
+        "signals_received_during_spawn": [],
+        "timed_out": false
+      }
+    ],
+    "commands_planned": [
+      {
+        "argv": [
+          "./.claude/worktrees/third-reminder-dedicated-target/debug/deps/lamp_skills-9340d957f69b21c9",
+          "--nocapture",
+          "--test-threads=1"
+        ],
+        "artifact": "236753855dabb66373a91a41",
+        "cwd": "./.claude/worktrees/third-reminder-pending/lampOS/crates/skills",
+        "executable_sha256": "8d187a2bacf9fcd831f122b23af0031796c6e219b48723bb91a9767fd4d06039",
+        "expected_named_cases": [],
+        "filters": [],
+        "kind": "direct_captured_driver",
+        "label": "skills-lib",
+        "ordinal": 1,
+        "package": "lamp-skills",
+        "target": "lamp_skills"
+      },
+      {
+        "argv": [
+          "./.claude/worktrees/third-reminder-dedicated-target/debug/deps/lamp_skills-65aa47887fbec9c4",
+          "--nocapture",
+          "--test-threads=1"
+        ],
+        "artifact": "5267fb36e340a6ad180a7a44",
+        "cwd": "./.claude/worktrees/third-reminder-pending/lampOS/crates/skills",
+        "executable_sha256": "73c2b8fb3d0ebcfe695b6ade9ed261e3b418ce3fbd74f481b3141a13dffd9c75",
+        "expected_named_cases": [],
+        "filters": [],
+        "kind": "direct_captured_driver",
+        "label": "skills-bin",
+        "ordinal": 2,
+        "package": "lamp-skills",
+        "target": "lamp-skills"
+      },
+      {
+        "argv": [
+          "./.claude/worktrees/third-reminder-dedicated-target/debug/deps/it-d234ff01061c9264",
+          "--nocapture",
+          "--test-threads=1"
+        ],
+        "artifact": "9e470c682aaaa66ca79ea544",
+        "cwd": "./.claude/worktrees/third-reminder-pending/lampOS/crates/skills",
+        "executable_sha256": "26b4bd86e6390b8fd762c061540b49751c476498aebb071365bf8913a1f91b2e",
+        "expected_named_cases": [],
+        "filters": [],
+        "kind": "direct_captured_driver",
+        "label": "skills-it",
+        "ordinal": 3,
+        "package": "lamp-skills",
+        "target": "it"
+      },
+      {
+        "argv": [
+          "./.claude/worktrees/third-reminder-dedicated-target/debug/deps/release_pair-d292fac7dc749122",
+          "--nocapture",
+          "--test-threads=1"
+        ],
+        "artifact": "b7a79fceebc2474fb5d776be",
+        "cwd": "./.claude/worktrees/third-reminder-pending/lampOS/crates/skills",
+        "executable_sha256": "38e07bddd71fc5bcf9549e9170b45952ab9e5a07163955dd3e7ad28c3fdb0f3f",
+        "expected_named_cases": [],
+        "filters": [],
+        "kind": "direct_captured_driver",
+        "label": "skills-release-pair",
+        "ordinal": 4,
+        "package": "lamp-skills",
+        "target": "release_pair"
+      },
+      {
+        "argv": [
+          "./.claude/worktrees/third-reminder-dedicated-target/debug/deps/requested_audio-4f27b5daa1cf4165",
+          "--nocapture",
+          "--test-threads=1"
+        ],
+        "artifact": "4306e0ac8c1461f5df153d56",
+        "cwd": "./.claude/worktrees/third-reminder-pending/lampOS/crates/skills",
+        "executable_sha256": "3b055f45b555c8adf6926cf482a52469edebc590224e46d054e60acbbf83fd5f",
+        "expected_named_cases": [],
+        "filters": [],
+        "kind": "direct_captured_driver",
+        "label": "skills-requested-audio",
+        "ordinal": 5,
+        "package": "lamp-skills",
+        "target": "requested_audio"
+      },
+      {
+        "argv": [
+          "./.claude/worktrees/third-reminder-dedicated-target/debug/deps/lamp_update-8cfde8964d02dd84",
+          "--nocapture",
+          "--test-threads=1"
+        ],
+        "artifact": "9307c257132ba402a1f5f191",
+        "cwd": "./.claude/worktrees/third-reminder-pending/lampOS/crates/update",
+        "executable_sha256": "8a2b2a22db002d73906f9c476c95e67bafc0366cd29ad0b6eb860b6a897e6ce0",
+        "expected_named_cases": [],
+        "filters": [],
+        "kind": "direct_captured_driver",
+        "label": "update-lib",
+        "ordinal": 6,
+        "package": "lamp-update",
+        "target": "lamp_update"
+      },
+      {
+        "argv": [
+          "./.claude/worktrees/third-reminder-dedicated-target/debug/deps/it-f14d800ac4c692fa",
+          "--nocapture",
+          "--test-threads=1"
+        ],
+        "artifact": "565951b042fad6551a013329",
+        "cwd": "./.claude/worktrees/third-reminder-pending/lampOS/crates/update",
+        "executable_sha256": "a222483b0d4db5ce1023aef8f0db08063c6668dae3d97880ba6501e4257df28e",
+        "expected_named_cases": [],
+        "filters": [],
+        "kind": "direct_captured_driver",
+        "label": "update-it",
+        "ordinal": 7,
+        "package": "lamp-update",
+        "target": "it"
+      },
+      {
+        "argv": [
+          "./.claude/worktrees/third-reminder-dedicated-target/debug/deps/lamp_voice-e58141fb20c66240",
+          "process::switch_census_tests",
+          "--nocapture",
+          "--test-threads=1"
+        ],
+        "artifact": "8cea04ef29a982408d565007",
+        "cwd": "./.claude/worktrees/third-reminder-pending/lampOS/crates/voice",
+        "executable_sha256": "aeda176661f5fcc9f968cff2cff5a1ff9ed5da3c46d99ed68b9e91fe429b4c36",
+        "expected_named_cases": [
+          "process::switch_census_tests::session_read_access_is_owned_by_the_coordinator_and_never_given_to_a_worker",
+          "process::switch_census_tests::remember_speaker_arguments_survive_both_workers_cleared_environments",
+          "process::switch_census_tests::every_switch_the_workers_read_reaches_a_worker_or_says_why_not",
+          "process::switch_census_tests::the_census_follows_the_helpers_a_worker_calls_and_sees_their_switches",
+          "process::switch_census_tests::a_helper_left_out_loses_its_switches",
+          "process::switch_census_tests::a_helper_is_named_by_its_functions_not_by_its_types",
+          "process::switch_census_tests::the_coordinators_functions_are_still_in_their_files"
+        ],
+        "filters": [
+          "process::switch_census_tests"
+        ],
+        "kind": "direct_captured_driver",
+        "label": "voice-switch-census",
+        "ordinal": 8,
+        "package": "lamp-voice",
+        "target": "lamp_voice"
+      },
+      {
+        "argv": [
+          "./.claude/worktrees/third-reminder-dedicated-target/debug/deps/lamp_voice-e58141fb20c66240",
+          "--exact",
+          "speak_up::tests::only_welcome_back_says_hello_on_an_arrival",
+          "--nocapture",
+          "--test-threads=1"
+        ],
+        "artifact": "8cea04ef29a982408d565007",
+        "cwd": "./.claude/worktrees/third-reminder-pending/lampOS/crates/voice",
+        "executable_sha256": "aeda176661f5fcc9f968cff2cff5a1ff9ed5da3c46d99ed68b9e91fe429b4c36",
+        "expected_named_cases": [
+          "speak_up::tests::only_welcome_back_says_hello_on_an_arrival"
+        ],
+        "filters": [
+          "--exact",
+          "speak_up::tests::only_welcome_back_says_hello_on_an_arrival"
+        ],
+        "kind": "direct_captured_driver",
+        "label": "voice-welcome-source",
+        "ordinal": 9,
+        "package": "lamp-voice",
+        "target": "lamp_voice"
+      },
+      {
+        "argv": [
+          "cargo",
+          "+1.96.0",
+          "test",
+          "--offline",
+          "--locked",
+          "--doc",
+          "-p",
+          "lamp-skills",
+          "-p",
+          "lamp-cloud",
+          "-p",
+          "lamp-body",
+          "-p",
+          "lamp-expression",
+          "-p",
+          "lamp-keeper",
+          "-p",
+          "lamp-lean",
+          "-p",
+          "lamp-memory",
+          "-p",
+          "lamp-peek",
+          "-p",
+          "lamp-setup",
+          "-p",
+          "lamp-update",
+          "-p",
+          "lamp-voice",
+          "-p",
+          "lamp-voice-eval",
+          "--",
+          "--nocapture",
+          "--test-threads=1"
+        ],
+        "cwd": "./.claude/worktrees/third-reminder-pending/lampOS",
+        "expected_named_cases": [],
+        "kind": "cargo_doctests_only",
+        "label": "doctests-12",
+        "ordinal": 10,
+        "packages": [
+          "lamp-skills",
+          "lamp-cloud",
+          "lamp-body",
+          "lamp-expression",
+          "lamp-keeper",
+          "lamp-lean",
+          "lamp-memory",
+          "lamp-peek",
+          "lamp-setup",
+          "lamp-update",
+          "lamp-voice",
+          "lamp-voice-eval"
+        ]
+      }
+    ],
+    "controller_and_capture_pins_unchanged": true,
+    "controller_errors": [],
+    "controller_sha256": "9d97a192e4fb377e5d0ba8039e77cfed90847b00aeb0a796643db4ea81f97913",
+    "deadline_seconds": 3600,
+    "elapsed_seconds": 292.529309636,
+    "first_failure": null,
+    "head": "9d52154fa9f157d5763f3acfe4589901e80d1f35",
+    "identity": {
+      "base": "2bf5122dc76999f970556bb7c78840ab6e107ce0",
+      "head": "9d52154fa9f157d5763f3acfe4589901e80d1f35",
+      "parents": [
+        "2bf5122dc76999f970556bb7c78840ab6e107ce0"
+      ],
+      "target": "./.claude/worktrees/third-reminder-dedicated-target",
+      "tree": "410eefb17c4aa62202468db8a69858c1093b40ca",
+      "worktree": "./.claude/worktrees/third-reminder-pending/lampOS"
+    },
+    "interruption": null,
+    "limits": [
+      "Not a current full-12 Cargo test command or reuse authorization.",
+      "The original 094 full scope retains its own attribution; current results replace only applicable selected scope.",
+      "No automatic retry or execution of unstarted commands.",
+      "Panic hooks require source-aware audit; no clean-stderr claim follows from exit 0.",
+      "Rustdoc executables are temporary and not among the captured 133 paths.",
+      "Process-group absence does not cover descendants deliberately creating another session.",
+      "SIGKILL or filesystem failure can prevent terminal receipt writing.",
+      "Current native gates and physical acceptance remain separate."
+    ],
+    "not_attempted_commands": [],
+    "postflight_guards_complete": true,
+    "preflight_guards_complete": true,
+    "raw_input_inventory_content_links_and_metadata_unchanged": true,
+    "received_interrupts": [],
+    "scope": "current selected direct binaries plus separate doctests only",
+    "selected_scope_qualified": true,
+    "source_before_sha256": "cf99ba73fbd93ca21ebf7025fa6c1463badf8c532eef56d81a41d5cab6bf36a4",
+    "source_unchanged": true,
+    "timed_out": false
+  },
+  "retained_actual094_full_scope": [
+    7480,
+    0,
+    52
+  ],
+  "artifact_comparison": {
+    "changed": [
+      {
+        "key": "9e470c682aaaa66ca79ea544",
+        "roles": [
+          "compiled_test_driver"
+        ],
+        "target": "it",
+        "package": "lamp-skills",
+        "path": "./.claude/worktrees/third-reminder-dedicated-target/debug/deps/it-d234ff01061c9264"
+      }
+    ],
+    "same": 132,
+    "total": 133
+  },
+  "limits": [
+    "Prior094 result remains at actual source; changed/current input readers ran fresh.",
+    "Only known runtime input roots are guarded, not a universal syscall/environment trace.",
+    "No historical failure waiver or physical acceptance claim."
+  ]
+}
