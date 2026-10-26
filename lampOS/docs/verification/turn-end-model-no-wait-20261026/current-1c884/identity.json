@@ -1,0 +1,51 @@
+{
+  "all_source_outside_base_delta_identical": true,
+  "base": "1c884f16cf4de53a700bba7512c129c3ee01d72d",
+  "base_changed_paths": [
+    "lampOS/crates/expression/src/runtime.rs",
+    "lampOS/crates/expression/tests/it/rest_requests.rs",
+    "lampOS/crates/expression/tests/runtime.rs",
+    "lampOS/docs/expression.md",
+    "lampOS/docs/reuse-decisions.md",
+    "lampOS/docs/verification/privacy-read-error-20261026/README.md",
+    "lampOS/docs/verification/privacy-read-error-20261026/current-3d972.json",
+    "lampOS/docs/verification/privacy-read-error-20261026/focused-fixed.json",
+    "lampOS/docs/verification/privacy-read-error-20261026/full-409.json",
+    "lampOS/docs/verification/privacy-read-error-20261026/negative-rest.json",
+    "lampOS/docs/verification/privacy-read-error-20261026/negative-tap.json",
+    "lampOS/docs/verification/privacy-read-error-20261026/negative-tests.json"
+  ],
+  "candidate": "Uncommitted four-file model FIFO fixture delta",
+  "candidate_patch_sha256": "2c02433c02dcec0348aff8aa38fb71773a5dfec9e999c8806c517127d199211a",
+  "carry_receipt_sha256": "c38ecfc88e18fc4b7b2170fa85653d77178d3d171fe081f744da963642693a17",
+  "complete_receipt_sha256": "9a8a1af2ba2f3babc1a3a4dd9f7b2649417c31d03fc682bbca93cee695b349dc",
+  "old_base": "0c1f6437ee57eae3416e3281d91b813d1c3bec1d",
+  "owned_sources": {
+    "lampOS/Cargo.lock": {
+      "mode": 420,
+      "sha256": "a1956e7445cc44bd721dd78c7fc29365d53d187234bec51e0122eafad1df1f03"
+    },
+    "lampOS/crates/turn-end/Cargo.toml": {
+      "mode": 420,
+      "sha256": "d0e6b9b8517a7d173e2c885f5fba17870148efdfedd1aa0148eeebfbb6d50f8e"
+    },
+    "lampOS/crates/turn-end/tests/it/parity.rs": {
+      "mode": 420,
+      "sha256": "04995f7beacb54144544da6457bf1721393478faccfc66c07c419bf2b9c5187c"
+    },
+    "lampOS/docs/endpoint-detection.md": {
+      "mode": 420,
+      "sha256": "5335434e2f549b5964a6c59140af793dc278a8ec86b0d8b2239812193516e9f0"
+    }
+  },
+  "patch_bytes_identical_to_frozen_0c1": true,
+  "schema": 1,
+  "scope": "Fresh Mac continuation only. Earlier controls and parser reconciliation remain bound to frozen 0c1; no new ARM64 or later-base qualification.",
+  "source_after_inventory_sha256": "fe6b297045f5190ed8c09f34501101aa0ba5f07c693225d2cf0e985613066733",
+  "source_before_inventory_sha256": "20457938fc235f3d187fff169426d5e284146c996f3142468b234885d9872843",
+  "source_inventory": {
+    "all_live_bytes_and_modes_verified": true,
+    "entries": 7199,
+    "sha256": "fe6b297045f5190ed8c09f34501101aa0ba5f07c693225d2cf0e985613066733"
+  }
+}

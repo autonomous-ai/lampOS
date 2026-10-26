@@ -156,6 +156,18 @@ readiness, confirmed teardown and a successful scenario-child exit. The
 parent owns the scenario's process group and private scratch directory;
 long watchdogs diagnose a stuck fixture rather than measure physical latency.
 
+The real-worker missing/wrong-model fixture keeps its failure, unavailable
+submission and confirmed-reaping assertions without a 100 ms stopwatch.
+`parity::spawn_returns_while_model_open_is_held` holds the real model open on
+a private FIFO until spawn has returned in Loading and submission is refused.
+Only then does a nonblocking writer rendezvous with the actual reader and
+release it to reject the FIFO's size. Success requires no Ready, no kill,
+confirmed worker reaping, completion witnesses and native scenario-child exit
+zero. The scenario owns its process group for failure cleanup. Its five-second
+diagnostic watchdog precedes the unchanged ten-second startup deadline;
+neither this ordering fixture nor its watchdog measures physical latency.
+No model asset is needed, and product timing limits are unchanged.
+
 The six in-process classifier scenarios explicitly use the stepped peer
 clock described in [Voice fixtures](voice-test-fixtures.md), including
 resumed speech, delayed verdicts, recovery and answer ordering. Their original

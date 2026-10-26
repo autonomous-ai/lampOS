@@ -2274,6 +2274,7 @@ version = "0.1.0"
 dependencies = [
  "hound",
  "lamp-turn-end-wire",
+ "nix 0.29.0",
  "ort",
  "prost",
  "rustfft",

@@ -1,0 +1,59 @@
+{
+  "explanation": "Inherited child stderr split the outer test header from its FAILED token. The original anchored line parser therefore matched zero rows, although native exit101, the single exact-case failure listing, one failed summary and the named parent watchdog identify the intended negative. Child output appears before the captured parent panic text; source ordering places its size refusal after failure cleanup opens the FIFO. It is not a second test failure.",
+  "original_procedure_complete": false,
+  "original_procedure_error": {
+    "message": "wrong, zero-selected, or extra test result",
+    "phase": "blocking-spawn",
+    "type": "RuntimeError"
+  },
+  "original_report_sha256": "4ab5888daf3ead358dc08000b2c46f5095ab7bea0747fd994ae20fa2eed5104a",
+  "reconciled_negative": {
+    "command": [
+      "preserved/blocking-spawn/it-it-23c9038e5d7c5e7e",
+      "parity::spawn_returns_while_model_open_is_held",
+      "--exact",
+      "--test-threads=1",
+      "--color=never"
+    ],
+    "elapsed_seconds": 6.557,
+    "exit_code": 101,
+    "expected_negative": true,
+    "failed": 1,
+    "log_sha256": "a1a9cd19fd94646dd7b961a973377261e511e0c2a7ba45853331f6151e89f78b",
+    "name": "parity::spawn_returns_while_model_open_is_held",
+    "passed": 0,
+    "receipt_sha256": "b3834dd26529b0f64a189da94a94635ac4f04754c6ea818563fc5a5257388d18",
+    "source_unchanged": true
+  },
+  "reconciliation_complete": true,
+  "restoration": {
+    "actual_artifacts_matched_restored_copies_at_prior_restoration_review": true,
+    "all_7192_source_bytes_and_modes_verified": true,
+    "all_preserved_artifact_copies_verified": true,
+    "failed": 0,
+    "original_and_restored_worker_sha256_equal": true,
+    "passed": 2
+  },
+  "schema": 1,
+  "selection_evidence": {
+    "cleanup_child_failure": {
+      "line": 285,
+      "message": "Failed(unexpected size) versus Loading after the parent failure releases the FIFO for cleanup",
+      "path": "lampOS/crates/turn-end/tests/it/parity.rs"
+    },
+    "exact_case": "parity::spawn_returns_while_model_open_is_held",
+    "failed": 1,
+    "failed_summary_count": 1,
+    "filtered_out": 13,
+    "ignored": 0,
+    "libtest_reported_seconds": 5.03,
+    "parent_failure": {
+      "line": 359,
+      "message": "spawn did not return before model release",
+      "path": "lampOS/crates/turn-end/tests/it/parity.rs"
+    },
+    "passed": 0,
+    "running_tests": 1
+  },
+  "type": "Additive read-only reconciliation; no rerun and no original receipt replacement"
+}

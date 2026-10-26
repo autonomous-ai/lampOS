@@ -1,0 +1,228 @@
+{
+  "artifact_receipt_sha256": "68683002070370fdee77f585afea1258192f5b76ee78abc124947ed4182decb8",
+  "artifact_scope": "Hashes and Cargo fresh/rebuilt flags are retained accurately. Actual files and privately preserved copies were independently hashed; no binary download or availability promise.",
+  "artifacts": [
+    {
+      "actual_and_preserved_hash_match": true,
+      "features": [],
+      "fresh": true,
+      "kind": [
+        "bin"
+      ],
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": false
+      },
+      "sha256": "8453b19fecc867a4af4e98351fabe61770a0041731aa0161eca024280671c916",
+      "source_path": "lampOS/crates/turn-end/src/main.rs",
+      "target": "lamp-turn-end",
+      "test_profile": false
+    },
+    {
+      "actual_and_preserved_hash_match": true,
+      "features": [],
+      "fresh": false,
+      "kind": [
+        "bin"
+      ],
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": true
+      },
+      "sha256": "1a7fef6f1973ad3188af76c0ec8a21bd3f7769670b7b453e7d3453f672bdb7d9",
+      "source_path": "lampOS/crates/turn-end/src/main.rs",
+      "target": "lamp-turn-end",
+      "test_profile": true
+    },
+    {
+      "actual_and_preserved_hash_match": true,
+      "features": [],
+      "fresh": true,
+      "kind": [
+        "test"
+      ],
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": true
+      },
+      "sha256": "5601d6354ffe5d212dad9453fcb414de70201e2977daa4336d3fb50f292cc13b",
+      "source_path": "lampOS/crates/turn-end/tests/it/main.rs",
+      "target": "it",
+      "test_profile": true
+    },
+    {
+      "actual_and_preserved_hash_match": true,
+      "features": [],
+      "fresh": false,
+      "kind": [
+        "lib"
+      ],
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 2,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": true
+      },
+      "sha256": "076002e64e79fa3c0f4383358225a8aaa9180a34bad8e373bdd91c6b1b74b8f3",
+      "source_path": "lampOS/crates/turn-end/src/lib.rs",
+      "target": "lamp_turn_end",
+      "test_profile": true
+    }
+  ],
+  "audit_scope": "Read-only receipt, source and artifact verification. No test or compiler executed during packaging.",
+  "base": "1c884f16cf4de53a700bba7512c129c3ee01d72d",
+  "focused": {
+    "failed": 0,
+    "integration_binary_sha256": "5601d6354ffe5d212dad9453fcb414de70201e2977daa4336d3fb50f292cc13b",
+    "passed": 2,
+    "scope": "Separate exact-filter observations, not added to full totals."
+  },
+  "full_crate": {
+    "failed": 0,
+    "groups": [
+      [
+        15,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        9,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        6,
+        0,
+        8,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    ],
+    "ignored": 8,
+    "passed": 30
+  },
+  "schema": 1,
+  "stages": {
+    "clippy": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "clippy",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-turn-end",
+        "--all-targets",
+        "--message-format=short",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "elapsed_seconds": 1.396,
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "receipt_sha256": "7e365d5d239f88ed0c4269a853a0cd10ad68ba0b856a6fa7fcac277225e3c781",
+      "source_unchanged": true
+    },
+    "compile": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-turn-end",
+        "--no-run",
+        "--message-format=json"
+      ],
+      "elapsed_seconds": 2.045,
+      "exit_code": 0,
+      "log_sha256": "664e3b52b06b81dbf08229a15ff777044e4eb416b17cd24d33097d5b5d922ffe",
+      "receipt_sha256": "515591695e1f01c3b3df6a123501fdeb75e191ab74759183ddaf9c9c9eacfaef",
+      "source_unchanged": true
+    },
+    "fmt": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "elapsed_seconds": 6.148,
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "receipt_sha256": "89a0d2db057b155dedf1e489f056901c8caf84d874379e0c0c54cda9272ed169",
+      "source_unchanged": true
+    },
+    "focused-1": {
+      "command": [
+        "target/debug/deps/it-23c9038e5d7c5e7e",
+        "parity::worker_process_refuses_missing_or_wrong_models_without_blocking",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "elapsed_seconds": 2.6,
+      "exit_code": 0,
+      "log_sha256": "dc56a761a24b4b97a4078d0832a68d5228a7a37e0f54b3cabea1f9cb43609065",
+      "receipt_sha256": "42f5c6ae1ff503d47e3beebea9e6a1bd3cc717c389945848169137b198b31392",
+      "source_unchanged": true
+    },
+    "focused-2": {
+      "command": [
+        "target/debug/deps/it-23c9038e5d7c5e7e",
+        "parity::spawn_returns_while_model_open_is_held",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "elapsed_seconds": 0.422,
+      "exit_code": 0,
+      "log_sha256": "23c687ede19abd8767c168000ae9dca94d259e24c421e88ee19333632f793418",
+      "receipt_sha256": "2e555ab1869803e27c317542ac7b6dad3607a624972958cf53bb232b45c80915",
+      "source_unchanged": true
+    },
+    "full": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-turn-end",
+        "--no-fail-fast",
+        "--",
+        "--test-threads=1"
+      ],
+      "elapsed_seconds": 5.468,
+      "exit_code": 0,
+      "log_sha256": "4716767cb35feb551deaefa2689f3bccc42bca6e3cd051d0c994225e0e03c094",
+      "receipt_sha256": "404ac33ff897be0fb9d100dac7261c1c2d25535c0bb05de4366ff377b390a912",
+      "source_unchanged": true
+    }
+  }
+}
