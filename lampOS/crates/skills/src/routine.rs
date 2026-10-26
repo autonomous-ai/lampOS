@@ -1229,6 +1229,17 @@ mod tests {
         now: u64,
     }
     impl Fixture {
+        fn clock_policy() -> Self {
+            let mut fixture = Self::new();
+            // These cases step policy time independently of the host. Keep
+            // their queued transport alive through a bounded host stall;
+            // the paired control below still exercises stock expiry.
+            fixture
+                .manager
+                .publisher
+                .expires_after(Some(Duration::from_secs(5)));
+            fixture
+        }
         fn new() -> Self {
             let root = tempfile::Builder::new()
                 .prefix("rest-")
@@ -1451,14 +1462,11 @@ mod tests {
         };
         let mut probes = Vec::with_capacity(2);
         for extended in [false, true] {
-            let mut f = Fixture::new();
-            // Only this positive control changes transport headers. The
-            // declaration, payload lease and every other fixture stay stock.
-            if extended {
-                f.manager
-                    .publisher
-                    .expires_after(Some(Duration::from_secs(5)));
-            }
+            let mut f = if extended {
+                Fixture::clock_policy()
+            } else {
+                Fixture::new()
+            };
             let mut requests = f.manager.bus.subscribe(Request::TOPIC, "stall").unwrap();
             let before = f.manager.publisher.totals();
             let now_us = f.now;
@@ -1836,7 +1844,7 @@ mod tests {
     #[test]
     fn a_delayed_wall_sample_cannot_renew_or_admit_after_its_window_ended() {
         for existing in [None, Some(Op::Rest), Some(Op::Wake)] {
-            let mut f = Fixture::new();
+            let mut f = Fixture::clock_policy();
             let mut requests = f.manager.bus.subscribe(Request::TOPIC, "delay").unwrap();
             let mut pending = None;
             if existing.is_some() {
@@ -1907,7 +1915,7 @@ mod tests {
     #[test]
     fn a_delayed_sample_inside_the_window_keeps_its_original_deadline() {
         for existing in [None, Some(Op::Rest), Some(Op::Wake)] {
-            let mut f = Fixture::new();
+            let mut f = Fixture::clock_policy();
             let mut requests = f.manager.bus.subscribe(Request::TOPIC, "delay").unwrap();
             let mut pending = None;
             if existing.is_some() {
@@ -1990,7 +1998,7 @@ mod tests {
     }
     #[test]
     fn a_future_wall_sample_cannot_admit_work_or_extend_the_cached_window() {
-        let mut f = Fixture::new();
+        let mut f = Fixture::clock_policy();
         let mut requests = f.manager.bus.subscribe(Request::TOPIC, "future").unwrap();
         let rest = f.ask(Op::Rest);
         f.tick_sample(f.now + 1, NIGHT);
