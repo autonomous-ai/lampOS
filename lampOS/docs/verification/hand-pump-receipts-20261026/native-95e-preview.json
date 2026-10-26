@@ -1,0 +1,51 @@
+{
+  "head": "95e6b5ab9c34ae4b9137489f62dbef018cc4639e",
+  "checkout": "a2353510c93205c797f5e4c59057814b6d0998a9",
+  "checkout_tree": "a7980d76155953404f946d4a1b0cfd5c1c68a885",
+  "changed_vs_head": [
+    "lampOS/crates/voice/src/attention.rs",
+    "lampOS/docs/attention.md",
+    "lampOS/docs/build-rows.md"
+  ],
+  "current_local_source_equivalence": {
+    "head": "b333d4759478216fcad858c30b16962345d57c2e",
+    "tree": "a7980d76155953404f946d4a1b0cfd5c1c68a885",
+    "equals_actual_ci_checkout_tree": true,
+    "ci_run_was_at_this_head": false
+  },
+  "arm_run": 40292815919,
+  "linux_run": 40292815906,
+  "arm": {
+    "unique_pass": 7497,
+    "selected": 7497,
+    "skip_reported": 53,
+    "skip_identities_exposed": false,
+    "fail_leak_timeout": 0,
+    "summary_repeat_records": 34,
+    "hand_cases": [
+      {
+        "line": 2191,
+        "status": "PASS",
+        "duration": "2.028s",
+        "binary": "lamp-voice",
+        "case": "hand_controls::tests::with_the_wait_an_idle_pump_wakes_five_times_a_second_and_stops_at_once"
+      },
+      {
+        "line": 4738,
+        "status": "PASS",
+        "duration": "0.025s",
+        "binary": "lamp-voice",
+        "case": "hand_controls::tests::an_idle_pump_is_ready_only_after_its_first_subscribed_drain"
+      }
+    ],
+    "doc_cases_passed": 4,
+    "relay_receipt": "relay_signals: ok (one harness receipt, no test-case census exposed)"
+  },
+  "process_cases_passed": 13,
+  "linux": {
+    "formatting": "success",
+    "strict_workspace_all_target_clippy": "success",
+    "runtime_cases": 0
+  },
+  "scope": "Actual PR merge-preview composition; equal to local b333 tree, not exact published95e tree and not a CI run submitted at b333."
+}

@@ -1,3 +1,13 @@
+## 2026-10-26 16:00 — Native preview audited; current runtime continues
+
+Ready for lamp-voice: no
+
+The published 95e PR's ARM64 run 40292815919 and Linux Clippy run 40292815906 succeeded. Their actual checkout is merge preview a2353510c, tree a7980d761: equal to the frozen local b333 carry on 1cad, not the published 95e tree. [The compact audit](verification/hand-pump-receipts-20261026/native-95e-preview.json) records 7,497 unique nextest passes, 53 reported skips, no failures/leaks/timeouts, both changed cases once, plus four doctests, 13 process cases and relay success. Thirty-four repeated summary records were excluded. This is composition evidence, not a claim that CI ran at b333.
+
+The local b333 compiler stages passed before the unchanged disk reserve stopped the first runtime stage. Exact incremental-only recovery left the reserve satisfied but missed its higher cleanup goal; both 125 outcomes remain. Only the unrun runtime stages resumed: the two exact cases passed and full Voice is running, followed by Update's changed documentation reader and docs. No completed stage was repeated.
+
+The separate forget-profile source now clears the second route's model messages and remaining tool batch after confirmed Memory deletion and keeps partial outcomes explicit. Independent review caught a late-completion gap on the same Live session; that fix and its controls are in progress. All new forgetting controls remain UNRUN. No readiness, device acceptance or score increase is claimed.
+
 ## 2026-10-26 15:42 — Qualified parent pushed; current carry and profile repair
 
 Ready for lamp-voice: no
