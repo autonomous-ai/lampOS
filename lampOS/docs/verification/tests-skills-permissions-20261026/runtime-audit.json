@@ -1,0 +1,29 @@
+{
+  "head": "5aa34f187ca0b11eae7a678f4f685898f9ebe1ca",
+  "base": "d5dc2e87f9a64ae8d21992145d3960035582e6cc",
+  "original_sandbox_run": {
+    "passed": 398,
+    "failed": 124,
+    "ignored": 9,
+    "exit": 101,
+    "unix_socket_eperm_observed": true,
+    "terminal_sha256": "c6afbf45f8422a347178e21420d283601964cb9b7efabd9d40ccd674b2ad1e7b",
+    "stdout_sha256": "ad090ba1b0e6e105e81812d09cad6258d8920978aae1ac2d6c547e9d84726850"
+  },
+  "permissions_correct_runtime": {
+    "counts": {
+      "passed": 522,
+      "failed": 0,
+      "ignored": 9
+    },
+    "exit": 0,
+    "affected_case": [
+      "ok"
+    ],
+    "exact_census": true,
+    "source_and_executable_hashes_equal": true,
+    "terminal_sha256": "1d0cde44949c9cee82decdbed0b9472f7df340862a2d053b2c36d2ed130ef9e7",
+    "stdout_sha256": "ee90aa19bbf27c6ec237e76c65b6d119d5f421e1ddc8416a3ae0326fcf429ede"
+  },
+  "limits": "Original failure retained. Different permission contexts; no source/product fix and no claim every original failure was solely EPERM. Latest-base compiler/input equivalence is pending."
+}

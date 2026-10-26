@@ -1,5 +1,20 @@
 # Tests work log
 
+## 2026-10-26 14:50 — Skills permissions result retained; current carry gate active
+
+Ready for lamp-voice: no (latest-base gates and native pending)
+
+[Permissions proof](verification/tests-skills-permissions-20261026/) retains
+398/124/9 from the sandboxed full Skills run, including local-socket EPERM,
+and the separate identical-source/binary permissions-correct 522/0/9 runtime.
+The latest d689eddaa carry on 1ec33957c has equal authored changes; fresh
+compiler gates and the two factory/doc include readers are running.
+
+The privacy failure assigned from #3544 is the existing #3315 row. Its prepared
+seven-file fixture-clock candidate is recovered onto current Main in an isolated
+Tests branch, with inherited docs retained; review and controls remain unrun.
+The installed #3466 GOOD/BAD round still needs a lamp/operator assignment.
+
 ## 2026-10-26 13:17 — Restart cleanup passes; train 159 advances the base
 
 Ready for lamp-voice: no (current-base gates pending)
