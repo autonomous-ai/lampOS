@@ -9318,3 +9318,9 @@ Taken on the forget/memory quality row: constrain forget_said replacement traver
 ## 25 October — room forget bug reproduced, correction awaiting gates
 
 [Selected protocol receipt](verification/room-forget-private-boundary-20261025/README.md): one old source-bound Memory executable, six valid RPCs, removed2 versus room-only1 and private kept1→0. Same Memory source as publicMain119; complete old workspace identity remains distinct. Process closed; no compiler/shared-cache write, raw/database/executable private. The four-file fix and3 protocol tests are written, standalone formatting clean, exactSQL5cases pass and independent source read found no P1/P2. Rust/new-binary/native gates remain UNRUN. CallbackMac positive gate now owns the actual single returned at6393924079; no extra job inferred.
+
+## 27 October, 05:26 ICT — IPC backpressure failures retained
+
+Ready for lamp-voice: no
+
+[Selected source-bound failure receipts](verification/ipc-camera-backpressure-failures-20261027/README.md) retain two full IPC epochs, each 42/1/0 (camera16/1, existing26/0). The first is the individually stopped filler stall before deadline creation; the next is prompt Darwin EMSGSIZE after explicit control nonblocking. Neither failure is waived or relabelled green. All seventeen original camera controls and the one-second deadline remain. Exact drivers and backing snapshots are private; no source directories were removed. The narrow Darwin backpressure repair and Voice ticket integration continue, including per-send TTS fallback authority. Current Common carry, privacy, native/pins and physical acceptance remain separate. No device action.

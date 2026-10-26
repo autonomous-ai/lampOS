@@ -1,0 +1,72 @@
+{
+  "host": "development Mac, x86_64-apple-darwin",
+  "epochs": [
+    {
+      "source_tree": "fd6523e9bebadc4940029387f241e1de81f33147",
+      "head": "a3b9c46814bb2b2452f0d6b6cc13bb3a16992c33",
+      "full_IPC": {
+        "selected": 43,
+        "passed": 42,
+        "failed": 1,
+        "ignored": 0
+      },
+      "camera_controls": {
+        "selected": 17,
+        "passed": 16,
+        "failed": 1
+      },
+      "preexisting_IPC": {
+        "passed": 26,
+        "failed": 0
+      },
+      "failed_case": "full_control_socket_keeps_grant_pending_until_its_original_deadline",
+      "failure": "owner-stopped SIGTERM after fixture filler stalled before original deadline creation",
+      "controller_exit": 125,
+      "nextest_exit": 100,
+      "failed_driver_sha256": "eb208f8329e69fceb359b71e26e5969b23d727ccef7826ac3cdc62daf1cb7ab9",
+      "actual_native_terminal_sha256": "4a53fa951fa2722ea3d61746bcd5d19d45810ef862542c2116e174c0ac683335",
+      "historical_failure_retained": true,
+      "source_stable": true,
+      "all_six_operation_sessions_closed": true
+    },
+    {
+      "source_tree": "f1fe9deb220ae9e31f15518ea93a83875bc5dff7",
+      "head": "a3b9c46814bb2b2452f0d6b6cc13bb3a16992c33",
+      "full_IPC": {
+        "selected": 43,
+        "passed": 42,
+        "failed": 1,
+        "ignored": 0
+      },
+      "camera_controls": {
+        "selected": 17,
+        "passed": 16,
+        "failed": 1
+      },
+      "preexisting_IPC": {
+        "passed": 26,
+        "failed": 0
+      },
+      "failed_case": "full_control_socket_keeps_grant_pending_until_its_original_deadline",
+      "failure": "Darwin OS40 EMSGSIZE on first grant poll",
+      "controller_exit": 125,
+      "nextest_exit": 100,
+      "failed_driver_sha256": "dbef10a8d55f6bf7c4cd5ae5e63d73d382401b81b10c7cab8cccd809695f425f",
+      "actual_native_terminal_sha256": "738300dfd3b9c01772ec9410e54923000b8dbb50a167ffc41e7e2498cf5e1db4",
+      "historical_failure_retained": true,
+      "source_stable": true,
+      "all_six_operation_sessions_closed": true
+    }
+  ],
+  "scope": "full lamp-ipc runtime only; package strict Clippy/build/fmt/metadata/discovery passed in each epoch",
+  "not_shown": [
+    "full host workspace compilation",
+    "relay continuation",
+    "documentation tests",
+    "native Linux ARM64",
+    "Eyes/Voice composed runtime",
+    "device latency or physical acceptance"
+  ],
+  "earlier_33_pass_10_fail_epoch_remains_failed": true,
+  "raw_logs_environment_binaries_and_private_debug_paths_not_published": true
+}
