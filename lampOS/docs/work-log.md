@@ -1,3 +1,13 @@
+Ready for lamp-voice: #3510 current CI pending; helper/activator source findings closed on reset cbc.
+
+## Current checkpoint: 2026-10-26 19:36 +07, corrected reset source read
+
+[Source closure](verification/reset-stop-order-source-20261026/README.md#source-closure-on-cbc89589b) closes Second's specific accepted-helper and activation-socket findings on #3579 cbc89589b. Starters finish stopping before instance discovery; accepted keys helpers are then stopped and checked before wipe. Source reread also covers updater-back ordering and retained Wi-Fi cleanup. No independent exact-head Setup runtime or installed acceptance is claimed; #3510 stays draft until delivered-base and existing acceptance requirements close.
+
+Current own-keys 7ae6/2a827 is pushed with its local gate evidence. Original ARM64 40323315453 and Linux Clippy 40323315473 are under audit. The next-base impact read is preparatory only; source remains frozen until actual delivery. No device, provider, key or release action.
+
+---
+
 Ready for lamp-voice: #3510 current carry locally qualified; publication pending.
 
 ## Current checkpoint: 2026-10-26 19:32 +07, own-keys factory-base carry qualified locally, push pending
