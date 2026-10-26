@@ -1,0 +1,10 @@
+{
+  "old": "3bccb4a5f544d70ecaa2000c61089ff3c064bf5e",
+  "new": "1c0f99559b5fb3a757413ad3eda5add251539ccc",
+  "base": "0c1f6437ee57eae3416e3281d91b813d1c3bec1d",
+  "changed_authored_paths": [
+    "lampOS/docs/reuse-decisions.md"
+  ],
+  "resolution": "Retained complete preflight and privacy sections before the factory-calibration section; no Rust change.",
+  "range_diff": "1:  3bccb4a5f ! 1:  1c0f99559 lampOS: refuse presentation requests when privacy reads fail\n    @@ lampOS/docs/expression.md: a retained Listening turn. The current Voice session/\n      \n     \n      ## lampOS/docs/reuse-decisions.md ##\n    -@@\n    - # Reuse decisions: V1, ROS 2 and existing Rust systems\n    +@@ lampOS/docs/reuse-decisions.md: implementation target is refusal without waiting for a FIFO writer. This\n    + does not establish a global filesystem deadline, pathname-race protection\n    + or physical touch latency; regular-file storage can still be slow.\n      \n     +## Preserve privacy refusal on a retained-read error (2026-10-26)\n     +\n    @@ lampOS/docs/reuse-decisions.md\n     +conservative refusal on an unreadable envelope is a deliberate correction,\n     +not a claim that V1 treats every unknown state as closed or proof of physical\n     +privacy or latency parity.\n    -+\n     +\n      ## Require observed rest before factory head calibration (2026-10-26)\n      \n"
+}

@@ -1,0 +1,60 @@
+{
+  "head": "1c0f99559b5fb3a757413ad3eda5add251539ccc",
+  "base": "0c1f6437ee57eae3416e3281d91b813d1c3bec1d",
+  "prior_head": "3bccb4a5f544d70ecaa2000c61089ff3c064bf5e",
+  "range_diff": "1:  3bccb4a5f ! 1:  1c0f99559 lampOS: refuse presentation requests when privacy reads fail\n    @@ lampOS/docs/expression.md: a retained Listening turn. The current Voice session/\n      \n     \n      ## lampOS/docs/reuse-decisions.md ##\n    -@@\n    - # Reuse decisions: V1, ROS 2 and existing Rust systems\n    +@@ lampOS/docs/reuse-decisions.md: implementation target is refusal without waiting for a FIFO writer. This\n    + does not establish a global filesystem deadline, pathname-race protection\n    + or physical touch latency; regular-file storage can still be slow.\n      \n     +## Preserve privacy refusal on a retained-read error (2026-10-26)\n     +\n    @@ lampOS/docs/reuse-decisions.md\n     +conservative refusal on an unreadable envelope is a deliberate correction,\n     +not a claim that V1 treats every unknown state as closed or proof of physical\n     +privacy or latency parity.\n    -+\n     +\n      ## Require observed rest before factory head calibration (2026-10-26)\n      \n",
+  "source_count": 7199,
+  "all_source_hashes_unchanged": true,
+  "source_manifest_sha256": "ed469a5eb25121d0efab6646cbfeb24989467dcdd1d11f22a719465de636a130",
+  "gates": {
+    "fmt": {
+      "command": "cargo +1.96.0 fmt --all --check",
+      "started": "2026-10-26T02:23:17Z",
+      "finished": "2026-10-26T02:23:29Z",
+      "exit": 0,
+      "harnesses": 0,
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "disk_error_lines": []
+    },
+    "clippy": {
+      "command": "cargo +1.96.0 clippy -q --message-format=short --offline --locked -p lamp-expression --all-targets -- -D warnings",
+      "started": "2026-10-26T02:23:29Z",
+      "finished": "2026-10-26T02:23:35Z",
+      "exit": 0,
+      "harnesses": 0,
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "disk_error_lines": []
+    },
+    "test-expression": {
+      "command": "cargo +1.96.0 test --offline --locked -p lamp-expression -- --test-threads=1",
+      "started": "2026-10-26T02:23:35Z",
+      "finished": "2026-10-26T02:24:24Z",
+      "exit": 0,
+      "harnesses": 5,
+      "passed": 340,
+      "failed": 0,
+      "ignored": 0,
+      "disk_error_lines": []
+    }
+  },
+  "own_control_pass_counts": {
+    "a_privacy_read_error_refuses_a_tap_until_a_valid_open_lease": 1,
+    "live_privacy_read_error_refuses_rest_until_a_valid_open_lease": 1
+  },
+  "executable_sha256": {
+    "lamp_expression-97b0d6d78b5cc498": "1efa30b6dcc4bfa8538885776df70a65ad6394143663d88db9d069de6b16dba1",
+    "lamp_expression-7d5e7ac9619c42c0": "45b4b10f8b13420ce70434e67cdc8d65de6800287d0e5dd132e60a1169f9955d",
+    "it-707453661fb429d2": "a9dac0f8a3abf8d8501f54983a5398721d58317c2206abc354e5ce0cd683bd9f",
+    "runtime-f9b92bb4002b831f": "ac43ebe7ed2c4651dd213d069c365d484db75266ad1ab85d29464165da526ed3"
+  },
+  "raw_log_sha256": {
+    "fmt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "clippy": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "test-expression": "79e74463f34f5884e3424b21c69e31be761dce2e4b1cf41876e6268440a1a75f"
+  },
+  "limits": "Native x86_64 Mac current-base gate. Earlier full and ARM64 results retain their original heads; no hardware or latency acceptance."
+}
