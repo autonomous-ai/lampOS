@@ -1,3 +1,17 @@
+Ready for lamp-voice: no; current carries await native gates and #3510 keeps its activation HOLD.
+
+## Current checkpoint: 2026-10-26 09:54 +07, IPC current again and model fixture published
+
+[#3528](https://github.com/autonomous-ai/lampOS/pull/3528) is pushed as `a8d6a4970` on latest `1c884f16c`. [Current host gate](verification/ipc-log-no-wait-20261026/current-1c884/README.md): fmt, strict all-target IPC Clippy, compilation, **26 ordinary passes + one doctest + relay success**. One equal patch preserves all seven authored files; only the twelve upstream Expression paths differ. Source and all eight actual executable hashes are bound. Original ARM64 **40260992363** and Clippy **40260992391** are active. [Prior 6e177 native](verification/ipc-log-no-wait-20261026/native-6e177/README.md) completed **11,343 unique PASS / zero FAIL, LEAK or TIMEOUT / 106 skipped**, changed IPC case once, separate process **13/0**, doctests **4/0**, relay success and helper **25/0**; its Clippy passes and exact preview tree/parents match. Three reader clears on 6e177 remain scoped to that source; current carry confirmation is requested. The base advanced before readiness, so that green result was not relabelled current.
+
+The model-loader fixture is committed and pushed at `76d9940ec` on 1c884, branch `second/turn-end-model-no-wait`. [Source proof](https://github.com/autonomous-ai/lampOS/tree/76d9940ec321d42c2d0d726a15b4115a6ba5fbdb/lampOS/docs/verification/turn-end-model-no-wait-20261026) keeps original 0c1 controls separate from the current 1c884 full gate: **30/0/8** and focused **2/0**, fmt/strict Clippy pass. Old stopwatch plus 400 ms pause fails **0/1**; corrected pauses pass **2/0**; actual blocking spawn fails **0/1** at the parent watchdog; exact restored tests pass **2/0**. Additive reconciliation verifies the expected failure after interleaved child stderr confused the original parser. The original procedure remains complete:false; no test was repeated or receipt replaced. Production code and deadlines are unchanged; the fixture requires actual FIFO reader rendezvous and confirmed worker reaping. Source/artifact identities and setup limitations are retained.
+
+Own-keys #3510 carries seven equal patches locally as `aca41e14d` on 1c884. Expression is a dependency of Voice, Skills and Voice-eval, so full tests of those three crates follow fresh nine-crate strict Clippy. This carry is not pushed while its gate runs. The published 3654/0c1 original native audit continues independently; its prior completed Mac evidence and parser continuation remain retained. Activation remains HOLD for #2094 and explicit current-lamp acceptance.
+
+This log rebase preserves **14,161** prior proof blobs and modes. No local full-workspace/ARM64 gate, model download, provider, key, lamp or release action ran.
+
+---
+
 Ready for lamp-voice: no; #3510 activation HOLD and #3528 current ARM64 pending.
 
 ## Current checkpoint: 2026-10-26 09:44 +07, own-keys current gate complete and pushed

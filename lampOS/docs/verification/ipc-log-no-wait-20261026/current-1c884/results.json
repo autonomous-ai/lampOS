@@ -1,0 +1,240 @@
+{
+  "artifact_scope": "Eight executable outputs, seven test-profile targets and one ordinary probe binary. All hashes verified after gate.",
+  "artifacts": [
+    {
+      "kind": [
+        "test"
+      ],
+      "sha256": "49859607ff921cddc97d31abcd2d73a7c80c77757a1ec6d9ed9cc67e17aaecc5",
+      "target": "relay_shared",
+      "test_profile": true
+    },
+    {
+      "kind": [
+        "bin"
+      ],
+      "sha256": "ebfaf00875ac855a372d2c7e46a82c4ac9dd970f40519d60fff5deed802f2fe9",
+      "target": "lamp-ipc-probe",
+      "test_profile": false
+    },
+    {
+      "kind": [
+        "test"
+      ],
+      "sha256": "88890f45d607af8d4fd5eb60fa8895263b7e937dd436d85e7d1436f5a213b18d",
+      "target": "sockets",
+      "test_profile": true
+    },
+    {
+      "kind": [
+        "bin"
+      ],
+      "sha256": "e796bbb35dfdd57a8937fe3ed410503e448722c213e4669fe49663697769cfc8",
+      "target": "lamp-ipc-probe",
+      "test_profile": true
+    },
+    {
+      "kind": [
+        "test"
+      ],
+      "sha256": "5cee78eab3c040cbb8046784fdd33caffbb259cac8b659e4d25f54e42446d616",
+      "target": "relay_exit",
+      "test_profile": true
+    },
+    {
+      "kind": [
+        "test"
+      ],
+      "sha256": "40070bbb6686e92fad2ebbd0cb1ab35bc88fedfd10054bf80448f4e5ec96c58a",
+      "target": "relay_signals",
+      "test_profile": true
+    },
+    {
+      "kind": [
+        "test"
+      ],
+      "sha256": "5d3818fa0db1825b01a32df4879f48673fafb2c95fd6b9260622534771a9abf7",
+      "target": "probe",
+      "test_profile": true
+    },
+    {
+      "kind": [
+        "lib"
+      ],
+      "sha256": "aaebadc42c77b6a3fd92d01afd24f733d379bac37f5a89045c74c5d58ff71c82",
+      "target": "lamp_ipc",
+      "test_profile": true
+    }
+  ],
+  "authored_files_unchanged": {
+    "lampOS/crates/ipc/src/log_relay.rs": {
+      "mode": 420,
+      "sha256": "45e32867938eb0c93cab3a8444451d70fe0ec1831b130f1d830922958d2ab44f"
+    },
+    "lampOS/docs/logging.md": {
+      "mode": 420,
+      "sha256": "69e92873cb28698813a09310a255ba714d25a078e37060cf09864a0a6953840a"
+    },
+    "lampOS/docs/verification/ipc-log-no-wait-20261026/README.md": {
+      "mode": 420,
+      "sha256": "ca122b5b206e2d5b07e121c263c8220d55291eb669580b29c1d5bd0e36d3866c"
+    },
+    "lampOS/docs/verification/ipc-log-no-wait-20261026/SHA256SUMS": {
+      "mode": 420,
+      "sha256": "de260396bd1aaf26c91b9a752e9d9ee4cc640e9374f61608bf3ebf39e01d3e96"
+    },
+    "lampOS/docs/verification/ipc-log-no-wait-20261026/inputs.sha256": {
+      "mode": 420,
+      "sha256": "c382342422e1fbb789959a53e5a19aea84a90f76d2cb777b33557c330014e871"
+    },
+    "lampOS/docs/verification/ipc-log-no-wait-20261026/results.json": {
+      "mode": 420,
+      "sha256": "a0b7f3122f7de0a0950ea039afb3e4a9f298c4f4b428c152c41a192683f4cd42"
+    },
+    "lampOS/docs/verification/ipc-log-no-wait-20261026/selected-results.txt": {
+      "mode": 420,
+      "sha256": "fa74e730b4c11b8191d15d039de885dd74893c8e7e46cb7d4eb9bcf05ffcf279"
+    }
+  },
+  "base": "1c884f16cf4de53a700bba7512c129c3ee01d72d",
+  "base_changed_paths": [
+    "lampOS/crates/expression/src/runtime.rs",
+    "lampOS/crates/expression/tests/it/rest_requests.rs",
+    "lampOS/crates/expression/tests/runtime.rs",
+    "lampOS/docs/expression.md",
+    "lampOS/docs/reuse-decisions.md",
+    "lampOS/docs/verification/privacy-read-error-20261026/README.md",
+    "lampOS/docs/verification/privacy-read-error-20261026/current-3d972.json",
+    "lampOS/docs/verification/privacy-read-error-20261026/focused-fixed.json",
+    "lampOS/docs/verification/privacy-read-error-20261026/full-409.json",
+    "lampOS/docs/verification/privacy-read-error-20261026/negative-rest.json",
+    "lampOS/docs/verification/privacy-read-error-20261026/negative-tap.json",
+    "lampOS/docs/verification/privacy-read-error-20261026/negative-tests.json"
+  ],
+  "counts": {
+    "doctests": 1,
+    "doctests_failed": 0,
+    "ordinary_failed": 0,
+    "ordinary_groups": [
+      8,
+      0,
+      3,
+      1,
+      1,
+      13
+    ],
+    "ordinary_tests": 26,
+    "relay_signals": "ok; custom harness does not emit numeric case count"
+  },
+  "gates": {
+    "clippy": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "clippy",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-ipc",
+        "--all-targets",
+        "--message-format=short",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "elapsed_seconds": 1.005,
+      "exit_code": 0,
+      "raw_log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "receipt_sha256": "ff4fc3d3c2fff5a472a87fa61af89204f6221ef3e18e12e4c95159b654c61702",
+      "source_entries": 7204,
+      "source_unchanged": true
+    },
+    "compile": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-ipc",
+        "--no-run",
+        "--message-format=json"
+      ],
+      "elapsed_seconds": 2.208,
+      "exit_code": 0,
+      "raw_log_sha256": "c9b79d24ccccc74dd9fe8aff8e16f79627475f96abc4204594008e86123a3b95",
+      "receipt_sha256": "9ab4fd284d1c671af33ee6734aedc5ae74ad2c91eb733ba9794e935474a542ea",
+      "source_entries": 7204,
+      "source_unchanged": true
+    },
+    "fmt": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "elapsed_seconds": 6.14,
+      "exit_code": 0,
+      "raw_log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "receipt_sha256": "0e4d40da78c3bdc57e4903b88c5a2d19605d1a6426980da66f4d92dcddc7829c",
+      "source_entries": 7204,
+      "source_unchanged": true
+    },
+    "full": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-ipc",
+        "--no-fail-fast",
+        "--",
+        "--test-threads=1"
+      ],
+      "elapsed_seconds": 8.678,
+      "exit_code": 0,
+      "raw_log_sha256": "6fa03327cea716bb9a88809913eca0080af41cd2be89f5b3b55202de4b6f3290",
+      "receipt_sha256": "1e27967e86bf2c143f8acd7fa560b8154524f13c8b863d6a379b0f154b3063dd",
+      "source_entries": 7204,
+      "source_unchanged": true
+    }
+  },
+  "head": "a8d6a4970dcf73a9007850703d9f27af24ea74e5",
+  "initial_carry_error": "Initial sandbox denied Git rebase metadata creation; no source/HEAD changed. Authorized escalated rebase succeeded. Both receipts retained privately.",
+  "old_base": "0c1f6437ee57eae3416e3281d91b813d1c3bec1d",
+  "old_head": "6e177dee0c40557fe7ceedc9b414734c26add031",
+  "one_equal_patch": true,
+  "patch_bytes_unchanged": true,
+  "prior_control_proof": "lampOS/docs/verification/ipc-log-no-wait-20261026; carried unchanged, not rerun or relabeled",
+  "production_prefix_unchanged": true,
+  "proof_script_sha256": "712d6156557612502912bc1192a99212f93349b3f4bdfa2311e421b20ad72d3a",
+  "retained_receipt_sha256": {
+    "authored-after.json": "afa481fdf592c53f02cd787f7de124b8e201c20b062ad2fc4c451ce32602cc4d",
+    "authored-before.json": "afa481fdf592c53f02cd787f7de124b8e201c20b062ad2fc4c451ce32602cc4d",
+    "base-changes.json": "6d8a703d893158f67d64377a78b94583e16d95472c2fbb6d47eecfa68efa7ed5",
+    "controller.json": "cedd5f6ec761985f65328fef9950046a2f273fe2f925cbd1a4591bb294aaf229",
+    "gate/artifacts.json": "fbf8a5549a997ef94ecf97795ac277974b1fd9f0ddfdea3aa1c873ff63432563",
+    "gate/complete.json": "20e02cafb5792d53ad6e40d8c67138bf401ebf67a0dbe7fc31d82433670db692",
+    "gate/identity.json": "e5af8dbc52aa5e269be5d6a41c2606b3e34d0dc5a6b0def1ab74e080743e9d61",
+    "gate/source.json": "17039d46b4b9ee93c9c1977c54f11ab3d21d0f0cf89ced5b125979cc99a4957c",
+    "identity.json": "e11d718d42a317b871486bfcf701053dc0bb9af72494738fcaff015389fd486e",
+    "initial-sandbox-error.json": "2798acf2a8add2f26f10e41c874c44542ee62ed93f943b49c525c0b646322937",
+    "patch-after.diff": "d73144cad2d94ca2554b31a27c1f2de710139f671d7bd33ac8d02529b346de43",
+    "patch-before.diff": "d73144cad2d94ca2554b31a27c1f2de710139f671d7bd33ac8d02529b346de43",
+    "range-diff.txt": "9006ef430f6bbbbb4ceaf72e989ea2a92b338be9faeedefa92becdcfba0752d7",
+    "rebase-escalated.log": "7f193f34730ea393fc12cc4beca8ea5f77f6d9be4f3aebc95f1104aba586d7dc",
+    "rebase.log": "ad320c711a5f17f6929ec4a2a9edd381874d0da841925b6fb5febaa965390318",
+    "source-after.json": "3750dcd8e4e980c0b50f04a9eb5711b7dfc882aee772d9caa4620320cdc5dc51",
+    "source-before.json": "70c6112059247b5347b744373f66374556624cb60f04da54934b15c22569b602"
+  },
+  "scope": "Mac host continuation only; original a8d6 Linux CI pending separately. No native fault campaign, device trial, persisted journal acceptance or physical latency claim. Polled-pipe other-writer race remains outside fixture.",
+  "source_inventory_entries": 7204,
+  "source_matches_gate_and_current_tree": true
+}

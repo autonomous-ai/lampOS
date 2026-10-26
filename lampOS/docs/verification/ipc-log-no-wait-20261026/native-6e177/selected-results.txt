@@ -1,0 +1,37 @@
+Authored: 6e177dee0c40557fe7ceedc9b414734c26add031
+Base: 0c1f6437ee57eae3416e3281d91b813d1c3bec1d
+Actual preview: 52eba79d15f2794feb814a4ca6d652f98b8fff6e
+Equal authored/preview tree: 41533c6ef7fba4703d1327f5706ada8193b759c2
+The whole workspace: `lampOS/crates/ipc/src/log_relay.rs` (crates/ipc, shared message types).
+Starting 11343 tests across 182 binaries (106 tests and 2 binaries skipped)
+Summary [ 209.725s] 11343 tests run: 11343 passed, 106 skipped
+Changed IPC case: PASS once in indexed terminal census: log_relay::tests::a_full_blocking_pipe_or_socket_is_never_waited_on_nor_made_nonblocking
+
+test an_idle_worker_stays_ready_across_a_long_quiet ... ok (2011 ms)
+test a_worker_reporting_another_model_is_refused_before_any_request ... ok (2 ms)
+test no_outcome_is_delivered_after_close_even_for_an_answer_on_its_way ... ok (4 ms)
+test verdict_carries_identity_and_one_request_at_a_time ... ok (56 ms)
+test missing_model_is_final_and_never_restarted ... ok (162 ms)
+test missing_executable_fails_at_once ... ok (2 ms)
+test spawn_returns_while_worker_startup_is_held ... ok (6 ms)
+test startup_failures_are_final ... ok (411 ms)
+test serving_failures_are_replaced_within_budget ... ok (514 ms)
+test protocol_violations_are_replaced ... ok (177 ms)
+test cancelled_answers_are_never_delivered ... ok (155 ms)
+test close_during_inference_never_waits ... ok (233 ms)
+test sustained_requests_stay_bounded ... ok (693 ms)
+test result: 13 passed; 0 failed
+relay_signals: ok
+Workspace doctests: 4 passed / 0 failed
+
+Promotion helper: cargo test --locked --manifest-path .github/tools/lampos-promote/Cargo.toml
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+Overall helper25/0; integration-only22/0; separate from nextest.
+
+cargo fmt --manifest-path .github/tools/lampos-promote/Cargo.toml --check
+cargo clippy --locked --manifest-path .github/tools/lampos-promote/Cargo.toml --all-targets -- -D warnings
+cargo clippy --locked --workspace --all-targets -- -D warnings
