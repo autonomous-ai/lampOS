@@ -1,3 +1,11 @@
+## 2026-10-27 02:41 — complete reminder consumer run sealed
+
+Ready for lamp-voice: no (#3525 latest-base qualification pending)
+
+Actual094549381/bdc2 full twelve-consumer run passes 7,480/0/52 across70 drivers, all21 controls once; raw7,481 includes one nested Memory pass and twelve doc sections add zero. Source/133 actual and saved hashes stable, driver reaped/group absent without forced cleanup. [Host proof](verification/reminder-pending-present-20261026/current-094-broad-host.json), [independent audit](verification/reminder-pending-present-20261026/current-094-independent-audit.json). The helper's one manual panic hold is retained: Update's identical intentional catch_unwind test moved2997 to2998 after an earlier product assertion; [source addendum](verification/reminder-pending-present-20261026/current-094-panic-addendum.json) resolves it.31 expected hooks and known detached mock BrokenPipe remain, not clean stderr.
+
+Observed counts do not qualify offered3fe or latest0961. External runtime input scope remains limited as published, and old784 failures remain failed. Current worker#3604 is ready for train with both current peer reads and original green gates; its delivery watch continues. Next is the reminder's actual current carry with compiler/artifact/input guards and affected reader execution. No device action.
+
 ## 2026-10-27 02:37 — joined mock ready for train
 
 Ready for lamp-voice: yes (#3604)

@@ -1,0 +1,22 @@
+{
+  "head": "0945493814f494a49a0a23199ba35dc661bdc546",
+  "resolved_manual_row": {
+    "classification": "manual_hold",
+    "log_line": 4260,
+    "panic_source": "crates/update/tests/install.rs:2998",
+    "reason": "new panic signature or excess occurrence",
+    "test": "an_install_stopped_after_writing_its_units_enables_at_the_next_run"
+  },
+  "classification": "caught_fault_injection",
+  "basis": "Exact test function is byte-identical to closed06c; inherited product flag assertion adds one earlier line, moving panic2997 to2998. catch_unwind encloses intentional stopped-here panic, is_err and debt/recovery assertions remain; raw case ends ok.",
+  "function_sha256": "0f1428e18fbf3524f38108a98ebdcac319b473e61d471dc0e58ac56e291862b9",
+  "old_source_sha256": "65ab081d687cc3275048edd4e7098a6cd10617608f71b394dd00ddcaa3cf4903",
+  "current_source_sha256": "7dc7cbca62006922437a6d24f89bd0e211868971fae66a7e61f1dcf3055b3698",
+  "source_delta": "diff --git a/lampOS/crates/update/tests/install.rs b/lampOS/crates/update/tests/install.rs\nindex b22de7091..65a48de0c 100644\n--- a/lampOS/crates/update/tests/install.rs\n+++ b/lampOS/crates/update/tests/install.rs\n@@ -934,6 +934,7 @@ fn the_product_keeps_nothing_personal_while_nobody_is_known() {\n         \"Environment=LAMP_MEMORY_SOCKET=/run/lampos-memory/memory.sock\",\n         \"Environment=LAMP_MEMORY_PERSONAL_NEEDS_FACE=on\",\n         \"Environment=LAMP_MEMORY_ROOM_NOT_ASKER=on\",\n+        \"Environment=LAMP_MEMORY_FORGET_ASKS=on\",\n     ] {\n         assert!(service.contains(&line), \"the voice lacks {line}\");\n     }\n",
+  "counts_after_manual_classification": {
+    "caught_fault_injection": 27,
+    "declared_should_panic": 4,
+    "unexpected_unjoined_worker": 1
+  },
+  "limits": "No test rerun, error suppression, clean-stderr claim or historical failure waiver. Helper MANUAL_HOLD output remains preserved."
+}

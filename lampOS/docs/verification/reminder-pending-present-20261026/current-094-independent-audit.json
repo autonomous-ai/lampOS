@@ -1,0 +1,2585 @@
+{
+  "audit_at": "2026-10-26T19:39:24.405493+00:00",
+  "base": "bdc277e2667e11ab04daf60e25f8f9fcf8220dce",
+  "controls": {
+    "canonical_file_sha256": "88090cfea09e9a484f1987ed8c74df9cd6cd1ec6b4e82eeb3bcbbec36591de00",
+    "canonical_values_reused": false,
+    "current_once_passed": 21,
+    "current_results": {
+      "skills::every_skill_folder_passes_its_own_recorded_tests": {
+        "completion_lines": [
+          3599
+        ],
+        "pass_count": 1,
+        "start_lines": [
+          3599
+        ]
+      },
+      "skills::reminder_pending::a_changes_trigger_keeps_independent_while_paths": {
+        "completion_lines": [
+          3711
+        ],
+        "pass_count": 1,
+        "start_lines": [
+          3711
+        ]
+      },
+      "skills::reminder_pending::a_changes_trigger_reads_a_bounded_tuple_on_another_topic": {
+        "completion_lines": [
+          3712
+        ],
+        "pass_count": 1,
+        "start_lines": [
+          3712
+        ]
+      },
+      "skills::reminder_pending::a_changes_trigger_refuses_selected_while_path_overlap": {
+        "completion_lines": [
+          3713
+        ],
+        "pass_count": 1,
+        "start_lines": [
+          3713
+        ]
+      },
+      "skills::reminder_pending::a_schedule_ask_only_moves_when_voice_begins_it": {
+        "completion_lines": [
+          3728
+        ],
+        "pass_count": 1,
+        "start_lines": [
+          3714
+        ]
+      },
+      "skills::reminder_pending::a_talk_rearms_even_while_a_selected_trigger_value_is_invalid": {
+        "completion_lines": [
+          3729
+        ],
+        "pass_count": 1,
+        "start_lines": [
+          3729
+        ]
+      },
+      "skills::reminder_pending::a_valid_empty_schedule_rearms_after_an_invalid_selected_trigger_value": {
+        "completion_lines": [
+          3730
+        ],
+        "pass_count": 1,
+        "start_lines": [
+          3730
+        ]
+      },
+      "skills::reminder_pending::core_reminders_can_request_again_after_talk_with_pending_still_positive": {
+        "completion_lines": [
+          3731
+        ],
+        "pass_count": 1,
+        "start_lines": [
+          3731
+        ]
+      },
+      "skills::reminder_pending::core_reminders_coalesce_queue_changes_and_ignore_renewal_metadata": {
+        "completion_lines": [
+          3732
+        ],
+        "pass_count": 1,
+        "start_lines": [
+          3732
+        ]
+      },
+      "skills::reminder_pending::core_reminders_keep_readiness_and_enablement_gates_on_repeated_chances": {
+        "completion_lines": [
+          3733
+        ],
+        "pass_count": 1,
+        "start_lines": [
+          3733
+        ]
+      },
+      "skills::reminder_pending::core_reminders_keep_the_change_snapshot_across_unchanged_reload": {
+        "completion_lines": [
+          3734
+        ],
+        "pass_count": 1,
+        "start_lines": [
+          3734
+        ]
+      },
+      "skills::reminder_pending::core_reminders_notice_a_brief_talk_between_schedule_heartbeats": {
+        "completion_lines": [
+          3735
+        ],
+        "pass_count": 1,
+        "start_lines": [
+          3735
+        ]
+      },
+      "skills::reminder_pending::core_reminders_rearm_after_source_or_condition_expiry": {
+        "completion_lines": [
+          3736
+        ],
+        "pass_count": 1,
+        "start_lines": [
+          3736
+        ]
+      },
+      "skills::reminder_pending::existing_trigger_modes_keep_their_heartbeat_behavior": {
+        "completion_lines": [
+          3737
+        ],
+        "pass_count": 1,
+        "start_lines": [
+          3737
+        ]
+      },
+      "skills::reminder_pending::invalid_selected_choice_values_do_not_rearm_a_changes_snapshot": {
+        "completion_lines": [
+          3738
+        ],
+        "pass_count": 1,
+        "start_lines": [
+          3738
+        ]
+      },
+      "skills::reminder_pending::invalid_selected_trigger_values_do_not_rearm_a_reminder_snapshot": {
+        "completion_lines": [
+          3739
+        ],
+        "pass_count": 1,
+        "start_lines": [
+          3739
+        ]
+      },
+      "skills::reminder_pending::invalid_selected_values_do_not_replace_or_rearm_a_reminder_snapshot": {
+        "completion_lines": [
+          3740
+        ],
+        "pass_count": 1,
+        "start_lines": [
+          3740
+        ]
+      },
+      "skills::reminder_pending::repeated_schedule_chances_keep_one_waiting_runner_and_no_look": {
+        "completion_lines": [
+          3756
+        ],
+        "pass_count": 1,
+        "start_lines": [
+          3741
+        ]
+      },
+      "skills::reminder_pending::unchanged_held_reminder_has_one_chance_across_sixty_heartbeats": {
+        "completion_lines": [
+          3757
+        ],
+        "pass_count": 1,
+        "start_lines": [
+          3757
+        ]
+      },
+      "tests::a_change_trigger_requires_a_scalar_comparison": {
+        "completion_lines": [
+          2846
+        ],
+        "pass_count": 1,
+        "start_lines": [
+          2846
+        ]
+      },
+      "tests::a_change_trigger_requires_bounded_paths_and_compatible_options": {
+        "completion_lines": [
+          2847
+        ],
+        "pass_count": 1,
+        "start_lines": [
+          2847
+        ]
+      }
+    }
+  },
+  "counts": {
+    "doctest_cases": {
+      "failed": 0,
+      "ignored": 0,
+      "passed": 0
+    },
+    "doctest_headings": 12,
+    "nested_exclusions": [
+      {
+        "excluded_child_summary": {
+          "failed": 0,
+          "finished_in_suffix": true,
+          "ignored": 0,
+          "line": 2173,
+          "passed": 1,
+          "status": "ok"
+        },
+        "package": "lamp-memory",
+        "retained_outer_summary": {
+          "failed": 0,
+          "finished_in_suffix": true,
+          "ignored": 0,
+          "line": 2177,
+          "passed": 1,
+          "status": "ok"
+        },
+        "source": "crates/memory/tests/voice_observe_room.rs:145",
+        "target": "voice_observe_room"
+      }
+    ],
+    "nonoverlapping_top_level": {
+      "failed": 0,
+      "ignored": 52,
+      "passed": 7480
+    },
+    "per_package": {
+      "lamp-body": {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 616
+      },
+      "lamp-cloud": {
+        "failed": 0,
+        "ignored": 4,
+        "passed": 196
+      },
+      "lamp-expression": {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 340
+      },
+      "lamp-keeper": {
+        "failed": 0,
+        "ignored": 1,
+        "passed": 41
+      },
+      "lamp-lean": {
+        "failed": 0,
+        "ignored": 2,
+        "passed": 61
+      },
+      "lamp-memory": {
+        "failed": 0,
+        "ignored": 8,
+        "passed": 330
+      },
+      "lamp-peek": {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 26
+      },
+      "lamp-setup": {
+        "failed": 0,
+        "ignored": 1,
+        "passed": 185
+      },
+      "lamp-skills": {
+        "failed": 0,
+        "ignored": 9,
+        "passed": 543
+      },
+      "lamp-update": {
+        "failed": 0,
+        "ignored": 6,
+        "passed": 425
+      },
+      "lamp-voice": {
+        "failed": 0,
+        "ignored": 21,
+        "passed": 4094
+      },
+      "lamp-voice-eval": {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 623
+      }
+    },
+    "raw_summary_rows": 83,
+    "raw_totals": {
+      "failed": 0,
+      "ignored": 52,
+      "passed": 7481
+    },
+    "top_level_drivers": 70
+  },
+  "doctest_summaries": [
+    {
+      "kind": "doc",
+      "package": "lamp_body",
+      "start_line": 22383,
+      "summaries": [
+        {
+          "failed": 0,
+          "finished_in_suffix": true,
+          "ignored": 0,
+          "line": 22387,
+          "passed": 0,
+          "status": "ok"
+        }
+      ]
+    },
+    {
+      "kind": "doc",
+      "package": "lamp_cloud",
+      "start_line": 22389,
+      "summaries": [
+        {
+          "failed": 0,
+          "finished_in_suffix": true,
+          "ignored": 0,
+          "line": 22393,
+          "passed": 0,
+          "status": "ok"
+        }
+      ]
+    },
+    {
+      "kind": "doc",
+      "package": "lamp_expression",
+      "start_line": 22395,
+      "summaries": [
+        {
+          "failed": 0,
+          "finished_in_suffix": true,
+          "ignored": 0,
+          "line": 22399,
+          "passed": 0,
+          "status": "ok"
+        }
+      ]
+    },
+    {
+      "kind": "doc",
+      "package": "lamp_keeper",
+      "start_line": 22401,
+      "summaries": [
+        {
+          "failed": 0,
+          "finished_in_suffix": true,
+          "ignored": 0,
+          "line": 22405,
+          "passed": 0,
+          "status": "ok"
+        }
+      ]
+    },
+    {
+      "kind": "doc",
+      "package": "lamp_lean",
+      "start_line": 22407,
+      "summaries": [
+        {
+          "failed": 0,
+          "finished_in_suffix": true,
+          "ignored": 0,
+          "line": 22411,
+          "passed": 0,
+          "status": "ok"
+        }
+      ]
+    },
+    {
+      "kind": "doc",
+      "package": "lamp_memory",
+      "start_line": 22413,
+      "summaries": [
+        {
+          "failed": 0,
+          "finished_in_suffix": true,
+          "ignored": 0,
+          "line": 22417,
+          "passed": 0,
+          "status": "ok"
+        }
+      ]
+    },
+    {
+      "kind": "doc",
+      "package": "lamp_peek",
+      "start_line": 22419,
+      "summaries": [
+        {
+          "failed": 0,
+          "finished_in_suffix": true,
+          "ignored": 0,
+          "line": 22423,
+          "passed": 0,
+          "status": "ok"
+        }
+      ]
+    },
+    {
+      "kind": "doc",
+      "package": "lamp_setup",
+      "start_line": 22425,
+      "summaries": [
+        {
+          "failed": 0,
+          "finished_in_suffix": true,
+          "ignored": 0,
+          "line": 22429,
+          "passed": 0,
+          "status": "ok"
+        }
+      ]
+    },
+    {
+      "kind": "doc",
+      "package": "lamp_skills",
+      "start_line": 22431,
+      "summaries": [
+        {
+          "failed": 0,
+          "finished_in_suffix": true,
+          "ignored": 0,
+          "line": 22435,
+          "passed": 0,
+          "status": "ok"
+        }
+      ]
+    },
+    {
+      "kind": "doc",
+      "package": "lamp_update",
+      "start_line": 22437,
+      "summaries": [
+        {
+          "failed": 0,
+          "finished_in_suffix": true,
+          "ignored": 0,
+          "line": 22441,
+          "passed": 0,
+          "status": "ok"
+        }
+      ]
+    },
+    {
+      "kind": "doc",
+      "package": "lamp_voice",
+      "start_line": 22443,
+      "summaries": [
+        {
+          "failed": 0,
+          "finished_in_suffix": true,
+          "ignored": 0,
+          "line": 22447,
+          "passed": 0,
+          "status": "ok"
+        }
+      ]
+    },
+    {
+      "kind": "doc",
+      "package": "lamp_voice_eval",
+      "start_line": 22449,
+      "summaries": [
+        {
+          "failed": 0,
+          "finished_in_suffix": true,
+          "ignored": 0,
+          "line": 22453,
+          "passed": 0,
+          "status": "ok"
+        }
+      ]
+    }
+  ],
+  "driver_summaries": [
+    {
+      "artifact": "85bab39cbb07ca56c5f2eb70",
+      "kind": "driver",
+      "package": "lamp-body",
+      "start_line": 2,
+      "summaries": [
+        {
+          "failed": 0,
+          "finished_in_suffix": true,
+          "ignored": 0,
+          "line": 499,
+          "passed": 448,
+          "status": "ok"
+        }
+      ],
+      "target": "lamp_body",
+      "target_kind": [
+        "lib"
+      ]
+    },
+    {
+      "artifact": "6e7f381449a5382be5efd248",
+      "kind": "driver",
+      "package": "lamp-body",
+      "start_line": 501,
+      "summaries": [
+        {
+          "failed": 0,
+          "finished_in_suffix": true,
+          "ignored": 0,
+          "line": 539,
+          "passed": 32,
+          "status": "ok"
+        }
+      ],
+      "target": "lamp-body",
+      "target_kind": [
+        "bin"
+      ]
+    },
+    {
+      "artifact": "5a807bf5bbb6e743521db6bc",
+      "kind": "driver",
+      "package": "lamp-body",
+      "start_line": 541,
+      "summaries": [
+        {
+          "failed": 0,
+          "finished_in_suffix": true,
+          "ignored": 0,
+          "line": 547,
+          "passed": 2,
+          "status": "ok"
+        }
+      ],
+      "target": "lamp-body-inspect",
+      "target_kind": [
+        "bin"
+      ]
+    },
+    {
+      "artifact": "c211b7e29e0ba2df6b128ab3",
+      "kind": "driver",
+      "package": "lamp-body",
+      "start_line": 549,
+      "summaries": [
+        {
+          "failed": 0,
+          "finished_in_suffix": true,
+          "ignored": 0,
+          "line": 558,
+          "passed": 5,
+          "status": "ok"
+        }
+      ],
+      "target": "lamp-body-measure",
+      "target_kind": [
+        "bin"
+      ]
+    },
+    {
+      "artifact": "c807077d1b5e75da70d43ae5",
+      "kind": "driver",
+      "package": "lamp-body",
+      "start_line": 560,
+      "summaries": [
+        {
+          "failed": 0,
+          "finished_in_suffix": true,
+          "ignored": 0,
+          "line": 567,
+          "passed": 3,
+          "status": "ok"
+        }
+      ],
+      "target": "lamp-body-mood",
+      "target_kind": [
+        "bin"
+      ]
+    },
+    {
+      "artifact": "b84667adc418de8c7e0c3219",
+      "kind": "driver",
+      "package": "lamp-body",
+      "start_line": 569,
+      "summaries": [
+        {
+          "failed": 0,
+          "finished_in_suffix": true,
+          "ignored": 0,
+          "line": 574,
+          "passed": 1,
+          "status": "ok"
+        }
+      ],
+      "target": "lamp-body-worker",
+      "target_kind": [
+        "bin"
+      ]
+    },
+    {
+      "artifact": "b37897676299880454d3de63",
+      "kind": "driver",
+      "package": "lamp-body",
+      "start_line": 576,
+      "summaries": [
+        {
+          "failed": 0,
+          "finished_in_suffix": true,
+          "ignored": 0,
+          "line": 707,
+          "passed": 125,
+          "status": "ok"
+        }
+      ],
+      "target": "it",
+      "target_kind": [
+        "test"
+      ]
+    },
+    {
+      "artifact": "51d317036ffb9072e00ad046",
+      "kind": "driver",
+      "package": "lamp-cloud",
+      "start_line": 709,
+      "summaries": [
+        {
+          "failed": 0,
+          "finished_in_suffix": true,
+          "ignored": 2,
+          "line": 955,
+          "passed": 166,
+          "status": "ok"
+        }
+      ],
+      "target": "lamp_cloud",
+      "target_kind": [
+        "lib"
+      ]
+    },
+    {
+      "artifact": "f566fe8a18325ce89ba3d46a",
+      "kind": "driver",
+      "package": "lamp-cloud",
+      "start_line": 957,
+      "summaries": [
+        {
+          "failed": 0,
+          "finished_in_suffix": true,
+          "ignored": 0,
+          "line": 961,
+          "passed": 0,
+          "status": "ok"
+        }
+      ],
+      "target": "lamp-cloud",
+      "target_kind": [
+        "bin"
+      ]
+    },
+    {
+      "artifact": "47f3146cef43fc73745a100b",
+      "kind": "driver",
+      "package": "lamp-cloud",
+      "start_line": 963,
+      "summaries": [
+        {
+          "failed": 0,
+          "finished_in_suffix": true,
+          "ignored": 0,
+          "line": 1000,
+          "passed": 30,
+          "status": "ok"
+        }
+      ],
+      "target": "it",
+      "target_kind": [
+        "test"
+      ]
+    },
+    {
+      "artifact": "8e53dcc1f076896b838e9d03",
+      "kind": "driver",
+      "package": "lamp-cloud",
+      "start_line": 1002,
+      "summaries": [
+        {
+          "failed": 0,
+          "finished_in_suffix": true,
+          "ignored": 2,
+          "line": 1008,
+          "passed": 0,
+          "status": "ok"
+        }
+      ],
+      "target": "release_pair",
+      "target_kind": [
+        "test"
+      ]
+    },
+    {
+      "artifact": "fbe20a69343815273e75cc5b",
+      "kind": "driver",
+      "package": "lamp-expression",
+      "start_line": 1010,
+      "summaries": [
+        {
+          "failed": 0,
+          "finished_in_suffix": true,
+          "ignored": 0,
+          "line": 1041,
+          "passed": 27,
+          "status": "ok"
+        }
+      ],
+      "target": "lamp_expression",
+      "target_kind": [
+        "lib"
+      ]
+    },
+    {
+      "artifact": "96e0aa18b02917b4fc682ed6",
+      "kind": "driver",
+      "package": "lamp-expression",
+      "start_line": 1043,
+      "summaries": [
+        {
+          "failed": 0,
+          "finished_in_suffix": true,
+          "ignored": 0,
+          "line": 1051,
+          "passed": 4,
+          "status": "ok"
+        }
+      ],
+      "target": "lamp-expression",
+      "target_kind": [
+        "bin"
+      ]
+    },
+    {
+      "artifact": "7be82120bfecdf3f04ae7f2e",
+      "kind": "driver",
+      "package": "lamp-expression",
+      "start_line": 1053,
+      "summaries": [
+        {
+          "failed": 0,
+          "finished_in_suffix": true,
+          "ignored": 0,
+          "line": 1360,
+          "passed": 281,
+          "status": "ok"
+        }
+      ],
+      "target": "it",
+      "target_kind": [
+        "test"
+      ]
+    },
+    {
+      "artifact": "1669d343fd344feb22ab63a0",
+      "kind": "driver",
+      "package": "lamp-expression",
+      "start_line": 1362,
+      "summaries": [
+        {
+          "failed": 0,
+          "finished_in_suffix": true,
+          "ignored": 0,
+          "line": 1405,
+          "passed": 28,
+          "status": "ok"
+        }
+      ],
+      "target": "runtime",
+      "target_kind": [
+        "test"
+      ]
+    },
+    {
+      "artifact": "daa60efd4adcdd524df356dc",
+      "kind": "driver",
+      "package": "lamp-keeper",
+      "start_line": 1407,
+      "summaries": [
+        {
+          "failed": 0,
+          "finished_in_suffix": true,
+          "ignored": 1,
+          "line": 1452,
+          "passed": 39,
+          "status": "ok"
+        }
+      ],
+      "target": "lamp_keeper",
+      "target_kind": [
+        "lib"
+      ]
+    },
+    {
+      "artifact": "8a000db354d16a645145e474",
+      "kind": "driver",
+      "package": "lamp-keeper",
+      "start_line": 1454,
+      "summaries": [
+        {
+          "failed": 0,
+          "finished_in_suffix": true,
+          "ignored": 0,
+          "line": 1460,
+          "passed": 2,
+          "status": "ok"
+        }
+      ],
+      "target": "lamp-keeper",
+      "target_kind": [
+        "bin"
+      ]
+    },
+    {
+      "artifact": "29240971811b7e3aa5b3e83b",
+      "kind": "driver",
+      "package": "lamp-lean",
+      "start_line": 1462,
+      "summaries": [
+        {
+          "failed": 0,
+          "finished_in_suffix": true,
+          "ignored": 0,
+          "line": 1476,
+          "passed": 10,
+          "status": "ok"
+        }
+      ],
+      "target": "lamp_lean",
+      "target_kind": [
+        "lib"
+      ]
+    },
+    {
+      "artifact": "70cc91d0ceea90b5f5acab67",
+      "kind": "driver",
+      "package": "lamp-lean",
+      "start_line": 1478,
+      "summaries": [
+        {
+          "failed": 0,
+          "finished_in_suffix": true,
+          "ignored": 2,
+          "line": 1535,
+          "passed": 51,
+          "status": "ok"
+        }
+      ],
+      "target": "it",
+      "target_kind": [
+        "test"
+      ]
+    },
+    {
+      "artifact": "f2e6ea51669f91358d79bdab",
+      "kind": "driver",
+      "package": "lamp-memory",
+      "start_line": 1537,
+      "summaries": [
+        {
+          "failed": 0,
+          "finished_in_suffix": true,
+          "ignored": 1,
+          "line": 1647,
+          "passed": 96,
+          "status": "ok"
+        }
+      ],
+      "target": "lamp_memory",
+      "target_kind": [
+        "lib"
+      ]
+    },
+    {
+      "artifact": "47d0609d8eae82bbc74ac574",
+      "kind": "driver",
+      "package": "lamp-memory",
+      "start_line": 1649,
+      "summaries": [
+        {
+          "failed": 0,
+          "finished_in_suffix": true,
+          "ignored": 0,
+          "line": 1665,
+          "passed": 8,
+          "status": "ok"
+        }
+      ],
+      "target": "lamp-memory",
+      "target_kind": [
+        "bin"
+      ]
+    },
+    {
+      "artifact": "02df1bebd98dc6d92c4db015",
+      "kind": "driver",
+      "package": "lamp-memory",
+      "start_line": 1667,
+      "summaries": [
+        {
+          "failed": 0,
+          "finished_in_suffix": true,
+          "ignored": 0,
+          "line": 1679,
+          "passed": 8,
+          "status": "ok"
+        }
+      ],
+      "target": "lamp-memory-eval",
+      "target_kind": [
+        "bin"
+      ]
+    },
+    {
+      "artifact": "47b519cdc408eaa3e8bf43e9",
+      "kind": "driver",
+      "package": "lamp-memory",
+      "start_line": 1681,
+      "summaries": [
+        {
+          "failed": 0,
+          "finished_in_suffix": true,
+          "ignored": 0,
+          "line": 1688,
+          "passed": 3,
+          "status": "ok"
+        }
+      ],
+      "target": "forget_person",
+      "target_kind": [
+        "test"
+      ]
+    },
+    {
+      "artifact": "3f136aad756c041f3df2805b",
+      "kind": "driver",
+      "package": "lamp-memory",
+      "start_line": 1690,
+      "summaries": [
+        {
+          "failed": 0,
+          "finished_in_suffix": true,
+          "ignored": 0,
+          "line": 1698,
+          "passed": 4,
+          "status": "ok"
+        }
+      ],
+      "target": "forget_shared_exchange",
+      "target_kind": [
+        "test"
+      ]
+    },
+    {
+      "artifact": "b7c5e640b467428284d92121",
+      "kind": "driver",
+      "package": "lamp-memory",
+      "start_line": 1700,
+      "summaries": [
+        {
+          "failed": 0,
+          "finished_in_suffix": true,
+          "ignored": 0,
+          "line": 1705,
+          "passed": 1,
+          "status": "ok"
+        }
+      ],
+      "target": "forgot",
+      "target_kind": [
+        "test"
+      ]
+    },
+    {
+      "artifact": "894a91bb32012eeb84a4fe34",
+      "kind": "driver",
+      "package": "lamp-memory",
+      "start_line": 1707,
+      "summaries": [
+        {
+          "failed": 0,
+          "finished_in_suffix": true,
+          "ignored": 0,
+          "line": 1734,
+          "passed": 23,
+          "status": "ok"
+        }
+      ],
+      "target": "health_control",
+      "target_kind": [
+        "test"
+      ]
+    },
+    {
+      "artifact": "08474a9f94606a48e23f36e9",
+      "kind": "driver",
+      "package": "lamp-memory",
+      "start_line": 1736,
+      "summaries": [
+        {
+          "failed": 0,
+          "finished_in_suffix": true,
+          "ignored": 5,
+          "line": 2016,
+          "passed": 167,
+          "status": "ok"
+        }
+      ],
+      "target": "it",
+      "target_kind": [
+        "test"
+      ]
+    },
+    {
+      "artifact": "150ba42e450b5682d9237225",
+      "kind": "driver",
+      "package": "lamp-memory",
+      "start_line": 2018,
+      "summaries": [
+        {
+          "failed": 0,
+          "finished_in_suffix": true,
+          "ignored": 0,
+          "line": 2023,
+          "passed": 1,
+          "status": "ok"
+        }
+      ],
+      "target": "paraphrase_fixture",
+      "target_kind": [
+        "test"
+      ]
+    },
+    {
+      "artifact": "26b142a7c125383f6401f769",
+      "kind": "driver",
+      "package": "lamp-memory",
+      "start_line": 2025,
+      "summaries": [
+        {
+          "failed": 0,
+          "finished_in_suffix": true,
+          "ignored": 2,
+          "line": 2031,
+          "passed": 0,
+          "status": "ok"
+        }
+      ],
+      "target": "release_pair",
+      "target_kind": [
+        "test"
+      ]
+    },
+    {
+      "artifact": "bc4cb5d74d1bd6b0f95d3360",
+      "kind": "driver",
+      "package": "lamp-memory",
+      "start_line": 2033,
+      "summaries": [
+        {
+          "failed": 0,
+          "finished_in_suffix": true,
+          "ignored": 0,
+          "line": 2046,
+          "passed": 1,
+          "status": "ok"
+        }
+      ],
+      "target": "voice_early_words",
+      "target_kind": [
+        "test"
+      ]
+    },
+    {
+      "artifact": "81b9085e7a2d40499a6f40d1",
+      "kind": "driver",
+      "package": "lamp-memory",
+      "start_line": 2048,
+      "summaries": [
+        {
+          "failed": 0,
+          "finished_in_suffix": true,
+          "ignored": 0,
+          "line": 2061,
+          "passed": 1,
+          "status": "ok"
+        }
+      ],
+      "target": "voice_follows_face",
+      "target_kind": [
+        "test"
+      ]
+    },
+    {
+      "artifact": "36d52deac42ff6b349d4588e",
+      "kind": "driver",
+      "package": "lamp-memory",
+      "start_line": 2063,
+      "summaries": [
+        {
+          "failed": 0,
+          "finished_in_suffix": true,
+          "ignored": 0,
+          "line": 2093,
+          "passed": 5,
+          "status": "ok"
+        }
+      ],
+      "target": "voice_forget",
+      "target_kind": [
+        "test"
+      ]
+    },
+    {
+      "artifact": "9bbbbcb8dc568d7314a83d49",
+      "kind": "driver",
+      "package": "lamp-memory",
+      "start_line": 2095,
+      "summaries": [
+        {
+          "failed": 0,
+          "finished_in_suffix": true,
+          "ignored": 0,
+          "line": 2103,
+          "passed": 2,
+          "status": "ok"
+        }
+      ],
+      "target": "voice_forget_about",
+      "target_kind": [
+        "test"
+      ]
+    },
+    {
+      "artifact": "2898f63c0b236568067344b1",
+      "kind": "driver",
+      "package": "lamp-memory",
+      "start_line": 2105,
+      "summaries": [
+        {
+          "failed": 0,
+          "finished_in_suffix": true,
+          "ignored": 0,
+          "line": 2113,
+          "passed": 2,
+          "status": "ok"
+        }
+      ],
+      "target": "voice_forget_named",
+      "target_kind": [
+        "test"
+      ]
+    },
+    {
+      "artifact": "bf0e81b124a7e5380da8a619",
+      "kind": "driver",
+      "package": "lamp-memory",
+      "start_line": 2115,
+      "summaries": [
+        {
+          "failed": 0,
+          "finished_in_suffix": true,
+          "ignored": 0,
+          "line": 2131,
+          "passed": 2,
+          "status": "ok"
+        }
+      ],
+      "target": "voice_link_used",
+      "target_kind": [
+        "test"
+      ]
+    },
+    {
+      "artifact": "4a64c801f2114748b71790b4",
+      "kind": "driver",
+      "package": "lamp-memory",
+      "start_line": 2133,
+      "summaries": [
+        {
+          "failed": 0,
+          "finished_in_suffix": true,
+          "ignored": 0,
+          "line": 2141,
+          "passed": 1,
+          "status": "ok"
+        }
+      ],
+      "target": "voice_observe",
+      "target_kind": [
+        "test"
+      ]
+    },
+    {
+      "artifact": "4fd04660d8bfd911c8fc8a8f",
+      "kind": "driver",
+      "package": "lamp-memory",
+      "start_line": 2143,
+      "summaries": [
+        {
+          "failed": 0,
+          "finished_in_suffix": true,
+          "ignored": 0,
+          "line": 2152,
+          "passed": 1,
+          "status": "ok"
+        }
+      ],
+      "target": "voice_observe_forget",
+      "target_kind": [
+        "test"
+      ]
+    },
+    {
+      "artifact": "d22cf1fb7a5b231741b03990",
+      "kind": "driver",
+      "package": "lamp-memory",
+      "start_line": 2154,
+      "summaries": [
+        {
+          "failed": 0,
+          "finished_in_suffix": true,
+          "ignored": 0,
+          "line": 2161,
+          "passed": 1,
+          "status": "ok"
+        }
+      ],
+      "target": "voice_observe_named_forget",
+      "target_kind": [
+        "test"
+      ]
+    },
+    {
+      "artifact": "74975cff9248d920f81bb2c0",
+      "kind": "driver",
+      "package": "lamp-memory",
+      "start_line": 2163,
+      "summaries": [
+        {
+          "failed": 0,
+          "finished_in_suffix": true,
+          "ignored": 0,
+          "line": 2173,
+          "passed": 1,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "finished_in_suffix": true,
+          "ignored": 0,
+          "line": 2177,
+          "passed": 1,
+          "status": "ok"
+        }
+      ],
+      "target": "voice_observe_room",
+      "target_kind": [
+        "test"
+      ]
+    },
+    {
+      "artifact": "ee578ecdc62503eda3f80af8",
+      "kind": "driver",
+      "package": "lamp-memory",
+      "start_line": 2179,
+      "summaries": [
+        {
+          "failed": 0,
+          "finished_in_suffix": true,
+          "ignored": 0,
+          "line": 2186,
+          "passed": 2,
+          "status": "ok"
+        }
+      ],
+      "target": "voice_since_until",
+      "target_kind": [
+        "test"
+      ]
+    },
+    {
+      "artifact": "2c9199f89bf321746f70a110",
+      "kind": "driver",
+      "package": "lamp-peek",
+      "start_line": 2188,
+      "summaries": [
+        {
+          "failed": 0,
+          "finished_in_suffix": true,
+          "ignored": 0,
+          "line": 2207,
+          "passed": 15,
+          "status": "ok"
+        }
+      ],
+      "target": "lamp_peek",
+      "target_kind": [
+        "lib"
+      ]
+    },
+    {
+      "artifact": "750f90a57252792ac4f96100",
+      "kind": "driver",
+      "package": "lamp-peek",
+      "start_line": 2209,
+      "summaries": [
+        {
+          "failed": 0,
+          "finished_in_suffix": true,
+          "ignored": 0,
+          "line": 2213,
+          "passed": 0,
+          "status": "ok"
+        }
+      ],
+      "target": "lamp-peek",
+      "target_kind": [
+        "bin"
+      ]
+    },
+    {
+      "artifact": "26408bd0f7d2d55dbb5b2c3d",
+      "kind": "driver",
+      "package": "lamp-peek",
+      "start_line": 2215,
+      "summaries": [
+        {
+          "failed": 0,
+          "finished_in_suffix": true,
+          "ignored": 0,
+          "line": 2234,
+          "passed": 11,
+          "status": "ok"
+        }
+      ],
+      "target": "peek",
+      "target_kind": [
+        "test"
+      ]
+    },
+    {
+      "artifact": "67c669fab2c030e1a47c7689",
+      "kind": "driver",
+      "package": "lamp-setup",
+      "start_line": 2236,
+      "summaries": [
+        {
+          "failed": 0,
+          "finished_in_suffix": true,
+          "ignored": 0,
+          "line": 2256,
+          "passed": 16,
+          "status": "ok"
+        }
+      ],
+      "target": "lamp_setup",
+      "target_kind": [
+        "lib"
+      ]
+    },
+    {
+      "artifact": "feb9d2f8ed60b5b7cc3d5d8a",
+      "kind": "driver",
+      "package": "lamp-setup",
+      "start_line": 2258,
+      "summaries": [
+        {
+          "failed": 0,
+          "finished_in_suffix": true,
+          "ignored": 0,
+          "line": 2262,
+          "passed": 0,
+          "status": "ok"
+        }
+      ],
+      "target": "lamp-setup",
+      "target_kind": [
+        "bin"
+      ]
+    },
+    {
+      "artifact": "1293c317007b2cccbd2cf759",
+      "kind": "driver",
+      "package": "lamp-setup",
+      "start_line": 2264,
+      "summaries": [
+        {
+          "failed": 0,
+          "finished_in_suffix": true,
+          "ignored": 1,
+          "line": 2458,
+          "passed": 163,
+          "status": "ok"
+        }
+      ],
+      "target": "it",
+      "target_kind": [
+        "test"
+      ]
+    },
+    {
+      "artifact": "6ccd9afddc6f55a6cc9a1b0f",
+      "kind": "driver",
+      "package": "lamp-setup",
+      "start_line": 2460,
+      "summaries": [
+        {
+          "failed": 0,
+          "finished_in_suffix": true,
+          "ignored": 0,
+          "line": 2472,
+          "passed": 6,
+          "status": "ok"
+        }
+      ],
+      "target": "wake",
+      "target_kind": [
+        "test"
+      ]
+    },
+    {
+      "artifact": "236753855dabb66373a91a41",
+      "kind": "driver",
+      "package": "lamp-skills",
+      "start_line": 2474,
+      "summaries": [
+        {
+          "failed": 0,
+          "finished_in_suffix": true,
+          "ignored": 0,
+          "line": 2903,
+          "passed": 160,
+          "status": "ok"
+        }
+      ],
+      "target": "lamp_skills",
+      "target_kind": [
+        "lib"
+      ]
+    },
+    {
+      "artifact": "5267fb36e340a6ad180a7a44",
+      "kind": "driver",
+      "package": "lamp-skills",
+      "start_line": 2905,
+      "summaries": [
+        {
+          "failed": 0,
+          "finished_in_suffix": true,
+          "ignored": 0,
+          "line": 2968,
+          "passed": 20,
+          "status": "ok"
+        }
+      ],
+      "target": "lamp-skills",
+      "target_kind": [
+        "bin"
+      ]
+    },
+    {
+      "artifact": "9e470c682aaaa66ca79ea544",
+      "kind": "driver",
+      "package": "lamp-skills",
+      "start_line": 2970,
+      "summaries": [
+        {
+          "failed": 0,
+          "finished_in_suffix": true,
+          "ignored": 1,
+          "line": 4021,
+          "passed": 330,
+          "status": "ok"
+        }
+      ],
+      "target": "it",
+      "target_kind": [
+        "test"
+      ]
+    },
+    {
+      "artifact": "b7a79fceebc2474fb5d776be",
+      "kind": "driver",
+      "package": "lamp-skills",
+      "start_line": 4023,
+      "summaries": [
+        {
+          "failed": 0,
+          "finished_in_suffix": true,
+          "ignored": 8,
+          "line": 4037,
+          "passed": 2,
+          "status": "ok"
+        }
+      ],
+      "target": "release_pair",
+      "target_kind": [
+        "test"
+      ]
+    },
+    {
+      "artifact": "4306e0ac8c1461f5df153d56",
+      "kind": "driver",
+      "package": "lamp-skills",
+      "start_line": 4039,
+      "summaries": [
+        {
+          "failed": 0,
+          "finished_in_suffix": true,
+          "ignored": 0,
+          "line": 4077,
+          "passed": 31,
+          "status": "ok"
+        }
+      ],
+      "target": "requested_audio",
+      "target_kind": [
+        "test"
+      ]
+    },
+    {
+      "artifact": "9307c257132ba402a1f5f191",
+      "kind": "driver",
+      "package": "lamp-update",
+      "start_line": 4079,
+      "summaries": [
+        {
+          "failed": 0,
+          "finished_in_suffix": true,
+          "ignored": 2,
+          "line": 4208,
+          "passed": 123,
+          "status": "ok"
+        }
+      ],
+      "target": "lamp_update",
+      "target_kind": [
+        "lib"
+      ]
+    },
+    {
+      "artifact": "991deffc08b5e6dc3e4dbe65",
+      "kind": "driver",
+      "package": "lamp-update",
+      "start_line": 4210,
+      "summaries": [
+        {
+          "failed": 0,
+          "finished_in_suffix": true,
+          "ignored": 0,
+          "line": 4214,
+          "passed": 0,
+          "status": "ok"
+        }
+      ],
+      "target": "lamp-update",
+      "target_kind": [
+        "bin"
+      ]
+    },
+    {
+      "artifact": "0fae276853fc57dec4b0c8d9",
+      "kind": "driver",
+      "package": "lamp-update",
+      "start_line": 4216,
+      "summaries": [
+        {
+          "failed": 0,
+          "finished_in_suffix": true,
+          "ignored": 0,
+          "line": 4226,
+          "passed": 5,
+          "status": "ok"
+        }
+      ],
+      "target": "functions",
+      "target_kind": [
+        "test"
+      ]
+    },
+    {
+      "artifact": "d452c8a393b5d8df1585920e",
+      "kind": "driver",
+      "package": "lamp-update",
+      "start_line": 4228,
+      "summaries": [
+        {
+          "failed": 0,
+          "finished_in_suffix": true,
+          "ignored": 0,
+          "line": 4341,
+          "passed": 101,
+          "status": "ok"
+        }
+      ],
+      "target": "install",
+      "target_kind": [
+        "test"
+      ]
+    },
+    {
+      "artifact": "565951b042fad6551a013329",
+      "kind": "driver",
+      "package": "lamp-update",
+      "start_line": 4343,
+      "summaries": [
+        {
+          "failed": 0,
+          "finished_in_suffix": true,
+          "ignored": 0,
+          "line": 4362,
+          "passed": 13,
+          "status": "ok"
+        }
+      ],
+      "target": "it",
+      "target_kind": [
+        "test"
+      ]
+    },
+    {
+      "artifact": "a62c02279dba7bee69f249d0",
+      "kind": "driver",
+      "package": "lamp-update",
+      "start_line": 4364,
+      "summaries": [
+        {
+          "failed": 0,
+          "finished_in_suffix": true,
+          "ignored": 2,
+          "line": 4370,
+          "passed": 0,
+          "status": "ok"
+        }
+      ],
+      "target": "release_pair",
+      "target_kind": [
+        "test"
+      ]
+    },
+    {
+      "artifact": "1e79827a89efed09040d5dc2",
+      "kind": "driver",
+      "package": "lamp-update",
+      "start_line": 4372,
+      "summaries": [
+        {
+          "failed": 0,
+          "finished_in_suffix": true,
+          "ignored": 0,
+          "line": 4626,
+          "passed": 183,
+          "status": "ok"
+        }
+      ],
+      "target": "round",
+      "target_kind": [
+        "test"
+      ]
+    },
+    {
+      "artifact": "c001a87b8d9a0ebe4db596bd",
+      "kind": "driver",
+      "package": "lamp-update",
+      "start_line": 4628,
+      "summaries": [
+        {
+          "failed": 0,
+          "finished_in_suffix": false,
+          "ignored": 1,
+          "line": 4632,
+          "passed": 0,
+          "status": "ok"
+        }
+      ],
+      "target": "self-cli-exec",
+      "target_kind": [
+        "test"
+      ]
+    },
+    {
+      "artifact": "6c3e3e61f5c8d03a9d683c16",
+      "kind": "driver",
+      "package": "lamp-update",
+      "start_line": 4633,
+      "summaries": [
+        {
+          "failed": 0,
+          "finished_in_suffix": false,
+          "ignored": 1,
+          "line": 4637,
+          "passed": 0,
+          "status": "ok"
+        }
+      ],
+      "target": "self-process-cuts",
+      "target_kind": [
+        "test"
+      ]
+    },
+    {
+      "artifact": "8cea04ef29a982408d565007",
+      "kind": "driver",
+      "package": "lamp-voice",
+      "start_line": 4638,
+      "summaries": [
+        {
+          "failed": 0,
+          "finished_in_suffix": true,
+          "ignored": 15,
+          "line": 21279,
+          "passed": 3808,
+          "status": "ok"
+        }
+      ],
+      "target": "lamp_voice",
+      "target_kind": [
+        "lib"
+      ]
+    },
+    {
+      "artifact": "07d6b42641d95724dafa28b7",
+      "kind": "driver",
+      "package": "lamp-voice",
+      "start_line": 21281,
+      "summaries": [
+        {
+          "failed": 0,
+          "finished_in_suffix": true,
+          "ignored": 0,
+          "line": 21286,
+          "passed": 1,
+          "status": "ok"
+        }
+      ],
+      "target": "lamp-voice",
+      "target_kind": [
+        "bin"
+      ]
+    },
+    {
+      "artifact": "6839078d9d2a6add131052be",
+      "kind": "driver",
+      "package": "lamp-voice",
+      "start_line": 21288,
+      "summaries": [
+        {
+          "failed": 0,
+          "finished_in_suffix": true,
+          "ignored": 0,
+          "line": 21638,
+          "passed": 275,
+          "status": "ok"
+        }
+      ],
+      "target": "it",
+      "target_kind": [
+        "test"
+      ]
+    },
+    {
+      "artifact": "57b1ee6ea8c9a77018a20973",
+      "kind": "driver",
+      "package": "lamp-voice",
+      "start_line": 21640,
+      "summaries": [
+        {
+          "failed": 0,
+          "finished_in_suffix": true,
+          "ignored": 6,
+          "line": 21650,
+          "passed": 0,
+          "status": "ok"
+        }
+      ],
+      "target": "release_pair",
+      "target_kind": [
+        "test"
+      ]
+    },
+    {
+      "artifact": "88ed510c4082b2bbc1869fb6",
+      "kind": "driver",
+      "package": "lamp-voice",
+      "start_line": 21652,
+      "summaries": [
+        {
+          "failed": 0,
+          "finished_in_suffix": true,
+          "ignored": 0,
+          "line": 21660,
+          "passed": 4,
+          "status": "ok"
+        }
+      ],
+      "target": "render_line_second",
+      "target_kind": [
+        "example"
+      ]
+    },
+    {
+      "artifact": "2766a207d7b690f4a12793dd",
+      "kind": "driver",
+      "package": "lamp-voice",
+      "start_line": 21662,
+      "summaries": [
+        {
+          "failed": 0,
+          "finished_in_suffix": true,
+          "ignored": 0,
+          "line": 21699,
+          "passed": 6,
+          "status": "ok"
+        }
+      ],
+      "target": "stop_words_stt_replay",
+      "target_kind": [
+        "example"
+      ]
+    },
+    {
+      "artifact": "46b8857cd85c51a95d315ae0",
+      "kind": "driver",
+      "package": "lamp-voice-eval",
+      "start_line": 21701,
+      "summaries": [
+        {
+          "failed": 0,
+          "finished_in_suffix": true,
+          "ignored": 0,
+          "line": 22092,
+          "passed": 378,
+          "status": "ok"
+        }
+      ],
+      "target": "lamp_voice_eval",
+      "target_kind": [
+        "lib"
+      ]
+    },
+    {
+      "artifact": "1af20483741b04a56122c145",
+      "kind": "driver",
+      "package": "lamp-voice-eval",
+      "start_line": 22094,
+      "summaries": [
+        {
+          "failed": 0,
+          "finished_in_suffix": true,
+          "ignored": 0,
+          "line": 22105,
+          "passed": 7,
+          "status": "ok"
+        }
+      ],
+      "target": "lamp-voice-eval",
+      "target_kind": [
+        "bin"
+      ]
+    },
+    {
+      "artifact": "785b6ffac230eb19bfe09268",
+      "kind": "driver",
+      "package": "lamp-voice-eval",
+      "start_line": 22107,
+      "summaries": [
+        {
+          "failed": 0,
+          "finished_in_suffix": true,
+          "ignored": 0,
+          "line": 22381,
+          "passed": 238,
+          "status": "ok"
+        }
+      ],
+      "target": "it",
+      "target_kind": [
+        "test"
+      ]
+    }
+  ],
+  "evidence_sha256": {
+    "actual-artifacts.json": "3ca27a610ce8865fa02bbee1d35b5b56e8c765b3b51ff97f3a90e7c570928d2a",
+    "artifacts-after-runtime.json": "d16c569d7873f93ad64156474304a76b600ec4ce2185458fb05aa400f63fbed1",
+    "artifacts-before-runtime.json": "726920f5fc538ec2fe1b7462ccd28782a15ab724978ff50ccd0c9587134aa05f",
+    "runtime.terminal.json": "0eb6aff4f4a1dfce35abce6860eeac3c7c12154393d10681a5c6863e1b3f927e",
+    "source-after-runtime.json": "bf2d1db83afe91d10b3326e59c3526e48388f34171b26b340f330b4b0eee4a0c",
+    "source-before.json": "bf2d1db83afe91d10b3326e59c3526e48388f34171b26b340f330b4b0eee4a0c"
+  },
+  "head": "0945493814f494a49a0a23199ba35dc661bdc546",
+  "helper_sha256": "c5694bdaa04fd334dcbbad5a814bd305a40a634f30eae6d9e70c812683f1cd1f",
+  "holds": [
+    "unknown or changed panic evidence requires manual source classification"
+  ],
+  "ignored_cases": [
+    {
+      "log_line": 717,
+      "package": "lamp-cloud",
+      "reason": "writes a fixture",
+      "target": "lamp_cloud",
+      "test": "account::tests::write_a_rotated_fixture"
+    },
+    {
+      "log_line": 872,
+      "package": "lamp-cloud",
+      "reason": "writes a reports fixture: run by hand with LAMP_CLOUD_REPORTS_FIXTURE set",
+      "target": "lamp_cloud",
+      "test": "reports::tests::write_a_reports_fixture"
+    },
+    {
+      "log_line": 1005,
+      "package": "lamp-cloud",
+      "reason": "requires pinned releases in a fresh isolated native ARM64 container",
+      "target": "release_pair",
+      "test": "release_6408_cloud_reads_6498_packages_and_6498_reads_the_replacement"
+    },
+    {
+      "log_line": 1006,
+      "package": "lamp-cloud",
+      "reason": "requires pinned releases in a fresh isolated native ARM64 container",
+      "target": "release_pair",
+      "test": "release_6498_cloud_reads_6408_packages_and_6408_reads_the_replacement"
+    },
+    {
+      "log_line": 1445,
+      "package": "lamp-keeper",
+      "reason": "writes a fixture",
+      "target": "lamp_keeper",
+      "test": "profile::tests::write_a_moved_pins_fixture"
+    },
+    {
+      "log_line": 1484,
+      "package": "lamp-lean",
+      "reason": "finite release timing; host measurements are not lamp measurements",
+      "target": "it",
+      "test": "cost::arithmetic_cost"
+    },
+    {
+      "log_line": 1485,
+      "package": "lamp-lean",
+      "reason": "finite worst-work release timing; host measurements are not lamp measurements",
+      "target": "it",
+      "test": "cost::inconclusive_cost"
+    },
+    {
+      "log_line": 1577,
+      "package": "lamp-memory",
+      "reason": "host timing measurement; run in release with --ignored --nocapture",
+      "target": "lamp_memory",
+      "test": "health::tests::measure_health_update_and_socket_with_a_held_publisher"
+    },
+    {
+      "log_line": 1853,
+      "package": "lamp-memory",
+      "reason": "local measurement; does not qualify a lamp",
+      "target": "it",
+      "test": "days_timing::file_and_ranked_reads_have_the_same_socket_boundary_and_corpus"
+    },
+    {
+      "log_line": 1875,
+      "package": "lamp-memory",
+      "reason": "release host measurement; does not qualify a lamp",
+      "target": "it",
+      "test": "health_timing::health_costs_and_socket_requests_with_identical_synthetic_stores"
+    },
+    {
+      "log_line": 1877,
+      "package": "lamp-memory",
+      "reason": "writes a store fixture: run by hand with LAMP_MEMORY_DAYS_FIXTURE set",
+      "target": "it",
+      "test": "kept::write_a_days_fixture"
+    },
+    {
+      "log_line": 1891,
+      "package": "lamp-memory",
+      "reason": "a measurement, not a check",
+      "target": "it",
+      "test": "timing::how_long_each_request_takes_with_a_month_of_talk_behind_it"
+    },
+    {
+      "log_line": 2014,
+      "package": "lamp-memory",
+      "reason": "release host measurement; run alone, not during builds",
+      "target": "it",
+      "test": "voice_timing::legacy_and_days_voice_requests_over_matched_synthetic_stores"
+    },
+    {
+      "log_line": 2028,
+      "package": "lamp-memory",
+      "reason": "manual actual ARM64 release inputs and exclusive Linux execution required",
+      "target": "release_pair",
+      "test": "current_reads_release_6408_days_and_forget_survives_release_6408_reopen"
+    },
+    {
+      "log_line": 2029,
+      "package": "lamp-memory",
+      "reason": "manual actual ARM64 release inputs and exclusive Linux execution required",
+      "target": "release_pair",
+      "test": "release_6408_reads_current_days_and_forget_survives_current_reopen"
+    },
+    {
+      "log_line": 2390,
+      "package": "lamp-setup",
+      "reason": "writes setup's reports answer as a fixture: run by hand with LAMP_SETUP_REPORTS_FIXTURE set",
+      "target": "it",
+      "test": "serve::write_a_reports_answer_fixture"
+    },
+    {
+      "log_line": 3949,
+      "package": "lamp-skills",
+      "reason": "writes a fixture",
+      "target": "it",
+      "test": "skills::write_an_off_fixture"
+    },
+    {
+      "log_line": 4028,
+      "package": "lamp-skills",
+      "reason": "requires pinned published executables on isolated native Linux ARM64",
+      "target": "release_pair",
+      "test": "release_6408_installs_6498_packages_and_6498_loads_the_replacement"
+    },
+    {
+      "log_line": 4029,
+      "package": "lamp-skills",
+      "reason": "requires pinned published executables on isolated native Linux ARM64",
+      "target": "release_pair",
+      "test": "release_6408_keeps_6498_daily_claims_and_6498_reads_them_back"
+    },
+    {
+      "log_line": 4030,
+      "package": "lamp-skills",
+      "reason": "requires pinned published executables on isolated native Linux ARM64",
+      "target": "release_pair",
+      "test": "release_6408_reads_6498_on_off_and_6498_reads_the_changes_back"
+    },
+    {
+      "log_line": 4031,
+      "package": "lamp-skills",
+      "reason": "requires pinned published executables on isolated native Linux ARM64",
+      "target": "release_pair",
+      "test": "release_6408_reads_6498_rested_night_and_6498_keeps_its_morning_spent"
+    },
+    {
+      "log_line": 4032,
+      "package": "lamp-skills",
+      "reason": "requires pinned published executables on isolated native Linux ARM64",
+      "target": "release_pair",
+      "test": "release_6498_installs_6408_packages_and_6408_loads_the_replacement"
+    },
+    {
+      "log_line": 4033,
+      "package": "lamp-skills",
+      "reason": "requires pinned published executables on isolated native Linux ARM64",
+      "target": "release_pair",
+      "test": "release_6498_keeps_6408_daily_claims_and_6408_reads_them_back"
+    },
+    {
+      "log_line": 4034,
+      "package": "lamp-skills",
+      "reason": "requires pinned published executables on isolated native Linux ARM64",
+      "target": "release_pair",
+      "test": "release_6498_reads_6408_on_off_and_6408_reads_the_changes_back"
+    },
+    {
+      "log_line": 4035,
+      "package": "lamp-skills",
+      "reason": "requires pinned published executables on isolated native Linux ARM64",
+      "target": "release_pair",
+      "test": "release_6498_reads_6408_rested_night_and_6408_keeps_its_morning_spent"
+    },
+    {
+      "log_line": 4116,
+      "package": "lamp-update",
+      "reason": null,
+      "target": "lamp_update",
+      "test": "fetch::tests::a_release_file_from_github"
+    },
+    {
+      "log_line": 4177,
+      "package": "lamp-update",
+      "reason": "writes records fixtures: run by hand with LAMP_UPDATE_RECORDS_FIXTURE set",
+      "target": "lamp_update",
+      "test": "records::tests::write_records_fixtures"
+    },
+    {
+      "log_line": 4367,
+      "package": "lamp-update",
+      "reason": "needs the two pinned ARM64 artifacts and the owned offline Docker context",
+      "target": "release_pair",
+      "test": "release_6408_recovers_a_cut_written_by_release_6449"
+    },
+    {
+      "log_line": 4368,
+      "package": "lamp-update",
+      "reason": "needs the two pinned ARM64 artifacts and the owned offline Docker context",
+      "target": "release_pair",
+      "test": "release_6449_recovers_a_cut_written_by_release_6408"
+    },
+    {
+      "log_line": 4630,
+      "package": "lamp-update",
+      "reason": "requires Linux ARM64/x86-64 ptrace",
+      "target": "self-cli-exec",
+      "test": "actual_cli_exec_confirms_before_the_next_round"
+    },
+    {
+      "log_line": 4635,
+      "package": "lamp-update",
+      "reason": "requires Linux syscall tracing",
+      "target": "self-process-cuts",
+      "test": "persisted_self_switches_survive_sigkill"
+    },
+    {
+      "log_line": 5785,
+      "package": "lamp-voice",
+      "reason": "requires a built lamp-turn-end and the pinned model",
+      "target": "lamp_voice",
+      "test": "coordinator::tests::endpoint_session::real_worker_session_records_verdict_provenance"
+    },
+    {
+      "log_line": 5945,
+      "package": "lamp-voice",
+      "reason": "manual host probe: the hum's decision to its first chunk sent to the speaker; no lamp claim",
+      "target": "lamp_voice",
+      "test": "coordinator::tests::hand_controls::head_tap_cue_decision_to_speaker_dispatch_latency"
+    },
+    {
+      "log_line": 5947,
+      "package": "lamp-voice",
+      "reason": "manual local-host speaker-control latency probe; no lamp or acoustic claim",
+      "target": "lamp_voice",
+      "test": "coordinator::tests::hand_controls::local_hand_stop_dispatch_latency"
+    },
+    {
+      "log_line": 7608,
+      "package": "lamp-voice",
+      "reason": "manual host probe: a head touch on a real bus to the coordinator's poll; no lamp claim",
+      "target": "lamp_voice",
+      "test": "hand_controls::tests::head_touch_bus_to_poll_latency"
+    },
+    {
+      "log_line": 8820,
+      "package": "lamp-voice",
+      "reason": "one minute of real time; run explicitly",
+      "target": "lamp_voice",
+      "test": "provider_worker::tests::sixty_second_answer_follows_output_capacity"
+    },
+    {
+      "log_line": 9176,
+      "package": "lamp-voice",
+      "reason": "three minutes of real time; run explicitly",
+      "target": "lamp_voice",
+      "test": "provider_worker::tests::three_minute_answer_follows_output_capacity"
+    },
+    {
+      "log_line": 9225,
+      "package": "lamp-voice",
+      "reason": null,
+      "target": "lamp_voice",
+      "test": "reference::recovery::tests::recentred_the_fixed_margin_carries_an_hour_of_that_lamps_drift"
+    },
+    {
+      "log_line": 9247,
+      "package": "lamp-voice",
+      "reason": "four virtual hours; run in release",
+      "target": "lamp_voice",
+      "test": "reference::tests::four_virtual_hours_capture_clocked"
+    },
+    {
+      "log_line": 9507,
+      "package": "lamp-voice",
+      "reason": "a measurement, run by hand",
+      "target": "lamp_voice",
+      "test": "remember::tests::hits_note_latency_on_a_200_entry_kept_list"
+    },
+    {
+      "log_line": 9776,
+      "package": "lamp-voice",
+      "reason": "host-only parent polling measurement; run alone with --ignored --exact --nocapture",
+      "target": "lamp_voice",
+      "test": "reminders::tests::parent_poll_cost"
+    },
+    {
+      "log_line": 9796,
+      "package": "lamp-voice",
+      "reason": "host-only timing probe; run alone with --ignored --exact --nocapture",
+      "target": "lamp_voice",
+      "test": "reminders::transport::tests::poll_cost"
+    },
+    {
+      "log_line": 16076,
+      "package": "lamp-voice",
+      "reason": "a measurement: 20 s of waits",
+      "target": "lamp_voice",
+      "test": "second_provider::tests::policy::measure_the_wait_from_the_call_to_its_run"
+    },
+    {
+      "log_line": 20949,
+      "package": "lamp-voice",
+      "reason": "#560: accepted work whose agent never answers is never told",
+      "target": "lamp_voice",
+      "test": "task_news::tests::work_whose_agent_never_answers_after_it_was_accepted_is_told"
+    },
+    {
+      "log_line": 21006,
+      "package": "lamp-voice",
+      "reason": "writes a thread fixture: run by hand with LAMP_VOICE_THREAD_FIXTURE set",
+      "target": "lamp_voice",
+      "test": "thread::tests::write_a_thread_fixture"
+    },
+    {
+      "log_line": 21138,
+      "package": "lamp-voice",
+      "reason": "host-only timing probe; run alone with --ignored --exact --nocapture",
+      "target": "lamp_voice",
+      "test": "tools::tests::use_skill_cost"
+    },
+    {
+      "log_line": 21643,
+      "package": "lamp-voice",
+      "reason": "requires pinned published executables on isolated native Linux ARM64",
+      "target": "release_pair",
+      "test": "release_6408_reads_6498_completed_delivery_without_another_offer"
+    },
+    {
+      "log_line": 21644,
+      "package": "lamp-voice",
+      "reason": "requires pinned published executables on isolated native Linux ARM64",
+      "target": "release_pair",
+      "test": "release_6408_reads_6498_unfinished_delivery_and_completes_it"
+    },
+    {
+      "log_line": 21645,
+      "package": "lamp-voice",
+      "reason": "requires pinned published executables on isolated native Linux ARM64",
+      "target": "release_pair",
+      "test": "release_6408_replays_6498_exact_ack_intent_without_another_offer"
+    },
+    {
+      "log_line": 21646,
+      "package": "lamp-voice",
+      "reason": "requires pinned published executables on isolated native Linux ARM64",
+      "target": "release_pair",
+      "test": "release_6498_reads_6408_completed_delivery_without_another_offer"
+    },
+    {
+      "log_line": 21647,
+      "package": "lamp-voice",
+      "reason": "requires pinned published executables on isolated native Linux ARM64",
+      "target": "release_pair",
+      "test": "release_6498_reads_6408_unfinished_delivery_and_completes_it"
+    },
+    {
+      "log_line": 21648,
+      "package": "lamp-voice",
+      "reason": "requires pinned published executables on isolated native Linux ARM64",
+      "target": "release_pair",
+      "test": "release_6498_replays_6408_exact_ack_intent_without_another_offer"
+    }
+  ],
+  "packet": "./.claude/worktrees/third-reminder-pending-evidence/current-bdc2",
+  "panic_hooks": {
+    "classification_counts": {
+      "caught_fault_injection": 26,
+      "declared_should_panic": 4,
+      "manual_hold": 1,
+      "unexpected_unjoined_worker": 1
+    },
+    "count": 32,
+    "manual_classification": [
+      {
+        "classification": "manual_hold",
+        "log_line": 4260,
+        "panic_source": "crates/update/tests/install.rs:2998",
+        "reason": "new panic signature or excess occurrence",
+        "test": "an_install_stopped_after_writing_its_units_enables_at_the_next_run"
+      }
+    ],
+    "rows": [
+      {
+        "classification": "declared_should_panic",
+        "log_line": 1626,
+        "panic_source": "crates/memory/src/tidy.rs:410",
+        "source_proof": "crates/memory/src/tidy.rs:402",
+        "test": "tidy::tests::an_input_from_a_later_build_is_read"
+      },
+      {
+        "classification": "caught_fault_injection",
+        "log_line": 2419,
+        "panic_source": "crates/setup/tests/it/wifi_change.rs:1035",
+        "source_proof": "crates/setup/tests/it/wifi_change.rs:1139",
+        "test": "wifi_change::p1_a_helper_cut_mid_change_leaves_the_old_network_to_boot_on"
+      },
+      {
+        "classification": "caught_fault_injection",
+        "log_line": 2429,
+        "panic_source": "crates/setup/tests/it/wifi_change.rs:1035",
+        "source_proof": "crates/setup/tests/it/wifi_change.rs:1227",
+        "test": "wifi_change::p1_the_helpers_stop_puts_a_cut_changes_old_network_back_live"
+      },
+      {
+        "classification": "caught_fault_injection",
+        "log_line": 2437,
+        "panic_source": "crates/setup/tests/it/wifi_change.rs:1035",
+        "source_proof": "crates/setup/tests/it/wifi_change.rs:1385",
+        "test": "wifi_change::p3_1_the_stop_time_restore_with_the_radio_failing_keeps_the_old_file_and_tries_again"
+      },
+      {
+        "classification": "caught_fault_injection",
+        "log_line": 2445,
+        "panic_source": "crates/setup/tests/it/wifi_change.rs:1518",
+        "source_proof": "crates/setup/tests/it/wifi_change.rs:1467",
+        "test": "wifi_change::p3_a_cut_during_the_confirm_wait_leaves_the_old_network_to_restore"
+      },
+      {
+        "classification": "unexpected_unjoined_worker",
+        "log_line": 3361,
+        "panic_source": "crates/skills/tests/it/skills.rs:3074",
+        "source_proof": "crates/skills/tests/it/skills.rs:3068",
+        "test": "<unnamed>"
+      },
+      {
+        "classification": "manual_hold",
+        "log_line": 4260,
+        "panic_source": "crates/update/tests/install.rs:2998",
+        "reason": "new panic signature or excess occurrence",
+        "test": "an_install_stopped_after_writing_its_units_enables_at_the_next_run"
+      },
+      {
+        "classification": "caught_fault_injection",
+        "log_line": 4430,
+        "panic_source": "crates/update/tests/round.rs:305",
+        "source_proof": "crates/update/tests/round.rs:4156",
+        "test": "a_switch_cut_short_after_its_settings_puts_them_back_at_the_next_start"
+      },
+      {
+        "classification": "caught_fault_injection",
+        "log_line": 4459,
+        "panic_source": "crates/update/tests/round/head_touch.rs:475",
+        "source_proof": "crates/update/tests/round/head_touch.rs:479",
+        "test": "head_touch::cut_after_pins_apply_restarts_unchanged_controls_after_restoring_old_pins"
+      },
+      {
+        "classification": "caught_fault_injection",
+        "log_line": 4498,
+        "panic_source": "crates/update/tests/round.rs:305",
+        "source_proof": "crates/update/tests/round/restart_order.rs:579",
+        "test": "restart_order::a_cut_at_reload_saves_the_full_old_projection_before_recovery"
+      },
+      {
+        "classification": "caught_fault_injection",
+        "log_line": 4517,
+        "panic_source": "crates/update/tests/round/self_cuts.rs:145",
+        "source_proof": "crates/update/tests/round/self_cuts.rs:141",
+        "test": "self_cuts::cut_after_candidate_is_synced_keeps_old_runnable_and_reuses_candidate"
+      },
+      {
+        "classification": "caught_fault_injection",
+        "log_line": 4522,
+        "panic_source": "crates/update/tests/round/self_cuts.rs:145",
+        "source_proof": "crates/update/tests/round/self_cuts.rs:141",
+        "test": "self_cuts::cut_after_current_moves_keeps_new_runnable_and_can_confirm_or_put_back"
+      },
+      {
+        "classification": "caught_fault_injection",
+        "log_line": 4525,
+        "panic_source": "crates/update/tests/round/self_cuts.rs:145",
+        "source_proof": "crates/update/tests/round/self_cuts.rs:141",
+        "test": "self_cuts::cut_after_current_moves_keeps_new_runnable_and_can_confirm_or_put_back"
+      },
+      {
+        "classification": "caught_fault_injection",
+        "log_line": 4551,
+        "panic_source": "crates/update/tests/round/runnable_event_controls.rs:176",
+        "source_proof": "crates/update/tests/round/runnable_event_controls.rs:175",
+        "test": "self_cuts::runnable_events::controls::wrong_payload_nonzero_status_and_non_utf8_cannot_satisfy_the_fixture"
+      },
+      {
+        "classification": "caught_fault_injection",
+        "log_line": 4557,
+        "panic_source": "crates/update/tests/round/runnable_event_controls.rs:176",
+        "source_proof": "crates/update/tests/round/runnable_event_controls.rs:175",
+        "test": "self_cuts::runnable_events::controls::wrong_payload_nonzero_status_and_non_utf8_cannot_satisfy_the_fixture"
+      },
+      {
+        "classification": "caught_fault_injection",
+        "log_line": 4561,
+        "panic_source": "crates/update/tests/round/self_cuts.rs:91",
+        "source_proof": "crates/update/tests/round/runnable_event_controls.rs:175",
+        "test": "self_cuts::runnable_events::controls::wrong_payload_nonzero_status_and_non_utf8_cannot_satisfy_the_fixture"
+      },
+      {
+        "classification": "caught_fault_injection",
+        "log_line": 4578,
+        "panic_source": "crates/update/tests/round/setup_lifecycle.rs:213",
+        "source_proof": "crates/update/tests/round/setup_lifecycle.rs:211",
+        "test": "setup_lifecycle::recovery_keeps_the_true_active_journal_but_does_not_restart_completed_setup"
+      },
+      {
+        "classification": "caught_fault_injection",
+        "log_line": 4583,
+        "panic_source": "crates/update/tests/round/setup_lifecycle.rs:213",
+        "source_proof": "crates/update/tests/round/setup_lifecycle.rs:211",
+        "test": "setup_lifecycle::recovery_keeps_the_true_active_journal_but_does_not_restart_completed_setup"
+      },
+      {
+        "classification": "caught_fault_injection",
+        "log_line": 4589,
+        "panic_source": "crates/update/tests/round/setup_lifecycle.rs:427",
+        "source_proof": "crates/update/tests/round/setup_lifecycle.rs:425",
+        "test": "setup_lifecycle::recovery_rechecks_effective_aliases_after_restoring_the_old_unit"
+      },
+      {
+        "classification": "caught_fault_injection",
+        "log_line": 4595,
+        "panic_source": "crates/update/tests/round/setup_lifecycle.rs:294",
+        "source_proof": "crates/update/tests/round/setup_lifecycle.rs:292",
+        "test": "setup_lifecycle::reset_removing_completion_before_recovery_restarts_the_old_setup"
+      },
+      {
+        "classification": "declared_should_panic",
+        "log_line": 5646,
+        "panic_source": "crates/voice/src/coordinator/tests/early_end.rs:691",
+        "source_proof": "crates/voice/src/coordinator/tests/early_end.rs:968",
+        "test": "coordinator::tests::early_end::fixture_policy_tests::a_scoped_clock_is_rejected_before_provider_or_child_startup"
+      },
+      {
+        "classification": "caught_fault_injection",
+        "log_line": 5653,
+        "panic_source": "crates/voice/src/coordinator/tests/early_end.rs:951",
+        "source_proof": "crates/voice/src/coordinator/tests/early_end.rs:953",
+        "test": "coordinator::tests::early_end::fixture_policy_tests::task_panic_payload_propagates_even_when_cancellation_was_requested"
+      },
+      {
+        "classification": "declared_should_panic",
+        "log_line": 5657,
+        "panic_source": "crates/voice/src/coordinator/tests/early_end.rs:707",
+        "source_proof": "crates/voice/src/coordinator/tests/early_end.rs:960",
+        "test": "coordinator::tests::early_end::fixture_policy_tests::unrequested_task_cancellation_is_rejected"
+      },
+      {
+        "classification": "caught_fault_injection",
+        "log_line": 5767,
+        "panic_source": "crates/voice/src/coordinator/tests/endpoint_session.rs:1422",
+        "source_proof": "crates/voice/src/coordinator/tests/endpoint_session.rs:1407",
+        "test": "coordinator::tests::endpoint_session::endpoint_fixture_reaps_on_panic_before_and_after_handoff"
+      },
+      {
+        "classification": "caught_fault_injection",
+        "log_line": 5770,
+        "panic_source": "crates/voice/src/coordinator/tests/endpoint_session.rs:1393",
+        "source_proof": "crates/voice/src/coordinator/tests/endpoint_session.rs:1407",
+        "test": "coordinator::tests::endpoint_session::endpoint_fixture_reaps_on_panic_before_and_after_handoff"
+      },
+      {
+        "classification": "declared_should_panic",
+        "log_line": 5774,
+        "panic_source": "crates/voice/src/coordinator/tests/endpoint_session.rs:954",
+        "source_proof": "crates/voice/src/coordinator/tests/endpoint_session.rs:997",
+        "test": "coordinator::tests::endpoint_session::fixture_policy_tests::a_logical_clock_is_rejected_before_the_process_constructor"
+      },
+      {
+        "classification": "caught_fault_injection",
+        "log_line": 6186,
+        "panic_source": "crates/voice/src/coordinator/tests/pilot_faults.rs:2611",
+        "source_proof": "crates/voice/src/coordinator/tests/pilot_faults.rs:2609",
+        "test": "coordinator::tests::pilot_faults::metadata_release_on_unwind_unblocks_the_real_writer_and_keeps_the_panic"
+      },
+      {
+        "classification": "caught_fault_injection",
+        "log_line": 10096,
+        "panic_source": "crates/voice/src/scenario_clock.rs:411",
+        "source_proof": "crates/voice/src/scenario_clock.rs:414",
+        "test": "scenario_clock::tests::callback_panic_releases_state_and_old_scope_cannot_clear_its_successor"
+      },
+      {
+        "classification": "caught_fault_injection",
+        "log_line": 20757,
+        "panic_source": "crates/voice/src/stalls.rs:767",
+        "source_proof": "crates/voice/src/stalls.rs:762",
+        "test": "stalls::tests::a_pass_that_panics_is_written_as_the_loops_end_while_the_stack_unwinds"
+      },
+      {
+        "classification": "caught_fault_injection",
+        "log_line": 21987,
+        "panic_source": "crates/voice-eval/src/physical/transport_exit_clock_tests.rs:208",
+        "source_proof": "crates/voice-eval/src/physical/transport_exit_clock_tests.rs:205",
+        "test": "physical::mac::transport_exit_clock_tests::a_panic_before_clock_installation_still_reaps_the_child"
+      },
+      {
+        "classification": "caught_fault_injection",
+        "log_line": 21994,
+        "panic_source": "crates/voice-eval/src/physical/transport_exit_clock_tests.rs:63",
+        "source_proof": "crates/voice-eval/src/physical/transport_exit_clock_tests.rs:194",
+        "test": "physical::mac::transport_exit_clock_tests::an_expired_host_watchdog_reaps_before_unwind_without_advancing"
+      },
+      {
+        "classification": "caught_fault_injection",
+        "log_line": 22340,
+        "panic_source": "crates/voice-eval/tests/it/common/serve_relay_clock.rs:474",
+        "source_proof": "crates/voice-eval/tests/it/common/serve_relay_clock.rs:472",
+        "test": "serve_relay::serve_relay_clock::tests::unwinding_releases_the_real_runner_reader_and_control_socket"
+      }
+    ]
+  },
+  "provenance": {
+    "actual_path_evidence": "sealed runtime-before and runtime-after snapshots only",
+    "compiled_driver_count": 70,
+    "normal_local_fresh_false": 48,
+    "pinned_source_hashes": {
+      "crates/memory/src/tidy.rs": "f0a52a38027b56a90b85b62c5c65a362ca1229d7b3bb72e184441b90a3cd0ec1",
+      "crates/memory/tests/voice_observe_room.rs": "85134b7d9406591625a17415d98a78ffffe3e09d50ee2a27e4efafbe03a8b6ab",
+      "crates/setup/tests/it/wifi_change.rs": "6561e9dd87944fa6e280597a46d30687415834b07e7bceb5854cc35959c5b14f",
+      "crates/skills/tests/it/skills.rs": "1f5460d9eb5e6106280819b5b87011637d7edc02cae7777fbe4d6c142d4b78e1",
+      "crates/update/tests/round.rs": "f6d16870e7d7f0da9ab4d995d2af8f92af89a0cf19d1fdeff8b65ccafe62c2f3",
+      "crates/update/tests/round/head_touch.rs": "4edb9bbb1662f1b218d12eb287d879ff5679eb718a7235c81a275cbd4b4e0bb8",
+      "crates/update/tests/round/restart_order.rs": "a5ccc9f79612fbf2edb547e70910b17adc9dd0d01b3e21150ac7477c8ecf8acc",
+      "crates/update/tests/round/runnable_event_controls.rs": "a6fbd54021a7e89acd0b0b012a3d6b9df21035554ebf00792303b4f48ed5c0ac",
+      "crates/update/tests/round/self_cuts.rs": "0304acaead344bfbe3100395bb012f9bf913ab944ab08de25f5255a9cb9f2a06",
+      "crates/update/tests/round/setup_lifecycle.rs": "73a24b6d78c7e3ee9a2b3ca9f30e62d330b0f4d499817968e5415046b2d7da7b",
+      "crates/voice-eval/src/physical/transport_exit_clock_tests.rs": "32a653355cf0a2f42df38bc2e71d5d2ed682ff97cc2edb8321d32373b52910d3",
+      "crates/voice-eval/tests/it/common/serve_relay_clock.rs": "c565b90f6c20335bd02bd91dc9231fe148f21144a2205593998feabd3c6e18ae",
+      "crates/voice/src/coordinator/tests/early_end.rs": "b95ea36cdf9b8486d195aa064aaf725b04b5cc152570ff177fae918e185d001f",
+      "crates/voice/src/coordinator/tests/endpoint_session.rs": "a97b524e00e21e82a38bb8ceece6f82ba95b8e6e4955cc9ced7e5e4829415a0f",
+      "crates/voice/src/coordinator/tests/pilot_faults.rs": "588057ffa2579a8d6a30a90a99b78caaee9390f7ccede283f08ddde0d301ffa2",
+      "crates/voice/src/scenario_clock.rs": "31ff62d7f45928bce43d97c13dfda09c30a628c0a8dd53527a3f4a9ed4e7f1f2",
+      "crates/voice/src/stalls.rs": "e1c05e64db5b89654bc252fff4eba9e930f8c3590a5150658b03e7cc978ca4ef"
+    },
+    "preserved_copies_rehashed": 133,
+    "reference_sha256": "19a0407a5943db6368f787f7f5802da3d9bf52204d03e5bf01c1111a20aff8a2",
+    "source_count": 7259,
+    "workspace_children_captured": 47
+  },
+  "runtime": {
+    "before_cleanup": {
+      "at": "2026-10-26T19:37:51.524978+00:00",
+      "driver_reaped": true,
+      "interruption": null,
+      "process_group": {
+        "state": "absent"
+      },
+      "returncode": 0,
+      "timed_out": false
+    },
+    "driver_reaped": true,
+    "elapsed_seconds": 3388.1493049990004,
+    "forced_cleanup": false,
+    "process_group": {
+      "state": "absent"
+    },
+    "qualified": true,
+    "returncode": 0,
+    "timed_out": false
+  },
+  "runtime_log": {
+    "path": "runtime.log",
+    "sha256": "3a4ce620b113320a38568b37eea075b72cdb5b452f5bbd2d7a4a8f384b729fa3"
+  },
+  "status": "MANUAL_HOLD",
+  "test_reruns": 0,
+  "tree": "f5a9820ed450512953fd8e33f5eb34c9e4b3b7b5",
+  "warnings": [
+    "Known detached Skills Actions mock BrokenPipe remains; Cargo success is not clean stderr. #3604 is a separate repair.",
+    "Memory unknown-field should_panic records existing compatibility debt, not forward-read compatibility.",
+    "Custom Update summaries retain measured/filtered counts but omit the standard finished-in suffix.",
+    "Preserved copies were rehashed; original actual-path bytes are evidenced by sealed before/after snapshots. Live target paths were not read.",
+    "Captured workspace children are not thereby execution-proven. No physical, provider, audible, or end-to-end latency proof.",
+    "Process-group absence does not cover descendants deliberately creating another session."
+  ]
+}

@@ -1,0 +1,132 @@
+{
+  "head": "0945493814f494a49a0a23199ba35dc661bdc546",
+  "base": "bdc277e2667e11ab04daf60e25f8f9fcf8220dce",
+  "top_level": [
+    7480,
+    0,
+    52
+  ],
+  "drivers": 70,
+  "raw": [
+    7481,
+    0,
+    52
+  ],
+  "nested_memory_pass": 1,
+  "doctest_sections": 12,
+  "controls_once": 21,
+  "helper_status": "MANUAL_HOLD preserved; sole line-shifted intentional panic resolved by separate source addendum",
+  "terminal": {
+    "additional_cleanup_budget_seconds": 15,
+    "all_actual_and_saved_bytes_unchanged": true,
+    "all_compiled_drivers_observed": true,
+    "at": "2026-10-26T19:38:00.533043+00:00",
+    "base": "bdc277e2667e11ab04daf60e25f8f9fcf8220dce",
+    "before_cleanup": {
+      "at": "2026-10-26T19:37:51.524978+00:00",
+      "driver_reaped": true,
+      "interruption": null,
+      "process_group": {
+        "state": "absent"
+      },
+      "returncode": 0,
+      "timed_out": false
+    },
+    "captured_executable_paths": 133,
+    "command": [
+      "cargo",
+      "+1.96.0",
+      "test",
+      "--offline",
+      "--locked",
+      "-p",
+      "lamp-skills",
+      "-p",
+      "lamp-cloud",
+      "-p",
+      "lamp-body",
+      "-p",
+      "lamp-expression",
+      "-p",
+      "lamp-keeper",
+      "-p",
+      "lamp-lean",
+      "-p",
+      "lamp-memory",
+      "-p",
+      "lamp-peek",
+      "-p",
+      "lamp-setup",
+      "-p",
+      "lamp-update",
+      "-p",
+      "lamp-voice",
+      "-p",
+      "lamp-voice-eval",
+      "--",
+      "--nocapture",
+      "--test-threads=1"
+    ],
+    "controller_error": null,
+    "deadline_seconds": 10800,
+    "driver_reaped": true,
+    "elapsed_seconds": 3388.1493049990004,
+    "first_failure_summary": null,
+    "forced_cleanup": false,
+    "head": "0945493814f494a49a0a23199ba35dc661bdc546",
+    "interruption": null,
+    "limits": [
+      "No automatic retries or completion of unobserved drivers.",
+      "Custom harness and rustdoc summaries remain separate raw observations.",
+      "Process-group checks do not establish absence of a descendant that deliberately creates another session.",
+      "SIGKILL of this controller cannot execute its cleanup handler."
+    ],
+    "log_sha256": "3a4ce620b113320a38568b37eea075b72cdb5b452f5bbd2d7a4a8f384b729fa3",
+    "observed_driver_starts": 70,
+    "parents": [
+      "bdc277e2667e11ab04daf60e25f8f9fcf8220dce"
+    ],
+    "process_group": {
+      "state": "absent"
+    },
+    "qualified": true,
+    "returncode": 0,
+    "signal": null,
+    "source_check_error": null,
+    "source_unchanged": true,
+    "target": "./.claude/worktrees/third-reminder-dedicated-target",
+    "timed_out": false,
+    "tree": "f5a9820ed450512953fd8e33f5eb34c9e4b3b7b5",
+    "unobserved_compiled_drivers": 0,
+    "worktree": "./.claude/worktrees/third-reminder-pending/lampOS"
+  },
+  "audit_sha256": "2fa5990f966cf86e8a10f8aed4d0bc607cd660c9ba99f14d57a731c088248e6e",
+  "manual_addendum": {
+    "head": "0945493814f494a49a0a23199ba35dc661bdc546",
+    "resolved_manual_row": {
+      "classification": "manual_hold",
+      "log_line": 4260,
+      "panic_source": "crates/update/tests/install.rs:2998",
+      "reason": "new panic signature or excess occurrence",
+      "test": "an_install_stopped_after_writing_its_units_enables_at_the_next_run"
+    },
+    "classification": "caught_fault_injection",
+    "basis": "Exact test function is byte-identical to closed06c; inherited product flag assertion adds one earlier line, moving panic2997 to2998. catch_unwind encloses intentional stopped-here panic, is_err and debt/recovery assertions remain; raw case ends ok.",
+    "function_sha256": "0f1428e18fbf3524f38108a98ebdcac319b473e61d471dc0e58ac56e291862b9",
+    "old_source_sha256": "65ab081d687cc3275048edd4e7098a6cd10617608f71b394dd00ddcaa3cf4903",
+    "current_source_sha256": "7dc7cbca62006922437a6d24f89bd0e211868971fae66a7e61f1dcf3055b3698",
+    "source_delta": "diff --git a/lampOS/crates/update/tests/install.rs b/lampOS/crates/update/tests/install.rs\nindex b22de7091..65a48de0c 100644\n--- a/lampOS/crates/update/tests/install.rs\n+++ b/lampOS/crates/update/tests/install.rs\n@@ -934,6 +934,7 @@ fn the_product_keeps_nothing_personal_while_nobody_is_known() {\n         \"Environment=LAMP_MEMORY_SOCKET=/run/lampos-memory/memory.sock\",\n         \"Environment=LAMP_MEMORY_PERSONAL_NEEDS_FACE=on\",\n         \"Environment=LAMP_MEMORY_ROOM_NOT_ASKER=on\",\n+        \"Environment=LAMP_MEMORY_FORGET_ASKS=on\",\n     ] {\n         assert!(service.contains(&line), \"the voice lacks {line}\");\n     }\n",
+    "counts_after_manual_classification": {
+      "caught_fault_injection": 27,
+      "declared_should_panic": 4,
+      "unexpected_unjoined_worker": 1
+    },
+    "limits": "No test rerun, error suppression, clean-stderr claim or historical failure waiver. Helper MANUAL_HOLD output remains preserved."
+  },
+  "limits": [
+    "Actual094/bdc full consumer execution, not latest0961 or offered3fe qualification.",
+    "One known detached Skills BrokenPipe remains; #3604 is ready separately.",
+    "Content maps cover lampOS, not all external workflow/image/ignored directory inputs; see runtime-input carry audit.",
+    "Old784538/4/9 remains failed; no inferred cause or device acceptance."
+  ]
+}
