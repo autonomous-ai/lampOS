@@ -1061,6 +1061,15 @@ mod unplug_tests {
         /// `light_before`: the light was set before Expression started, as
         /// on a lamp whose light was last changed long ago.
         fn with(enabled: bool, unplug: bool, catalogue: Catalogue, light_before: bool) -> Self {
+            Self::with_initial_voice(enabled, unplug, catalogue, light_before, true)
+        }
+        fn with_initial_voice(
+            enabled: bool,
+            unplug: bool,
+            catalogue: Catalogue,
+            light_before: bool,
+            initial_voice: bool,
+        ) -> Self {
             static NEXT: AtomicU64 = AtomicU64::new(0);
             let root = std::path::Path::new("/tmp").join(format!(
                 "ex-u-{}-{}",
@@ -1082,8 +1091,16 @@ mod unplug_tests {
             if !light_before {
                 light();
             }
-            bus.publisher_declared(VoiceTiming::TOPIC, &VoiceTiming::declaration(), "voice")
-                .unwrap()
+            if initial_voice {
+                let mut voice = bus
+                    .publisher_declared(VoiceTiming::TOPIC, &VoiceTiming::declaration(), "voice")
+                    .unwrap();
+                Self::publish_speaking(&mut voice);
+            }
+            Self { root, bus, service }
+        }
+        fn publish_speaking(voice: &mut Publisher) {
+            voice
                 .publish_json(
                     1,
                     &VoiceTiming {
@@ -1102,7 +1119,6 @@ mod unplug_tests {
                     },
                 )
                 .unwrap();
-            Self { root, bus, service }
         }
         fn say(&self, topic: &str, value: serde_json::Value) {
             let source = if topic == lamp_body::unplug::STATE_TOPIC {
@@ -1142,8 +1158,15 @@ mod unplug_tests {
 
     #[test]
     fn ready_presents_sleep_even_while_voice_speaks_then_acknowledges() {
-        let mut fixture = Fixture::new(true, true);
+        // This case's single speaking observation follows all Ready setup.
+        let mut fixture =
+            Fixture::with_initial_voice(true, true, Catalogue::builtin(), false, false);
+        let mut voice = fixture
+            .bus
+            .publisher_declared(VoiceTiming::TOPIC, &VoiceTiming::declaration(), "voice")
+            .unwrap();
         fixture.request("ready", "r1");
+        Fixture::publish_speaking(&mut voice);
         let output = fixture.step(unix_ms());
         assert_eq!(output.light.unwrap().face, ExpressionFace::Resting);
         assert!(output.state.behaviours.contains(&"asleep".into()));
