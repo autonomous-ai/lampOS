@@ -1,0 +1,555 @@
+{
+  "head": "f281a5575b3cb6487517745a021bc61cad52747a",
+  "base": "2d18e296c0a51ac0f6fb7c610c3c159cef9870c4",
+  "gate_result": "FAIL; no readiness clearance",
+  "command": "cargo +1.96.0 test --offline --locked --jobs 1 -p lamp-update --no-fail-fast -- --test-threads=16",
+  "runtime_attempts": 1,
+  "test_threads": 16,
+  "runtime_reused": false,
+  "full_case_census": {
+    "total": 448,
+    "passed": 439,
+    "failed": 3,
+    "ignored": 6,
+    "unique_target_case_pairs": 448,
+    "ordinary_filtered_out": 0,
+    "all_ordinary_cases_accounted": true,
+    "targets": [
+      {
+        "target": "lamp_update-cebdb705cde8ec81",
+        "total": 127,
+        "counts": {
+          "passed": 125,
+          "failed": 0,
+          "ignored": 2
+        }
+      },
+      {
+        "target": "lamp_update-04671789528a12d3",
+        "total": 3,
+        "counts": {
+          "passed": 3,
+          "failed": 0,
+          "ignored": 0
+        }
+      },
+      {
+        "target": "functions-5603f33a4dae064e",
+        "total": 5,
+        "counts": {
+          "passed": 5,
+          "failed": 0,
+          "ignored": 0
+        }
+      },
+      {
+        "target": "install-56b9137cd677b603",
+        "total": 101,
+        "counts": {
+          "passed": 101,
+          "failed": 0,
+          "ignored": 0
+        }
+      },
+      {
+        "target": "it-49911377a8fbd75d",
+        "total": 13,
+        "counts": {
+          "passed": 13,
+          "failed": 0,
+          "ignored": 0
+        }
+      },
+      {
+        "target": "release_pair-2ff63d2c9df235ef",
+        "total": 2,
+        "counts": {
+          "passed": 0,
+          "failed": 0,
+          "ignored": 2
+        }
+      },
+      {
+        "target": "round-86f3bcf98e2c5ca2",
+        "total": 195,
+        "counts": {
+          "passed": 192,
+          "failed": 3,
+          "ignored": 0
+        }
+      },
+      {
+        "target": "self_cli_exec-54a909607d4dc62b",
+        "total": 1,
+        "counts": {
+          "passed": 0,
+          "failed": 0,
+          "ignored": 1
+        }
+      },
+      {
+        "target": "self_process_cuts-c92b6688279bd59f",
+        "total": 1,
+        "counts": {
+          "passed": 0,
+          "failed": 0,
+          "ignored": 1
+        }
+      }
+    ],
+    "ignored_cases": [
+      {
+        "target": "lamp_update-cebdb705cde8ec81",
+        "case": "fetch::tests::a_release_file_from_github"
+      },
+      {
+        "target": "lamp_update-cebdb705cde8ec81",
+        "case": "records::tests::write_records_fixtures"
+      },
+      {
+        "target": "release_pair-2ff63d2c9df235ef",
+        "case": "release_6408_recovers_a_cut_written_by_release_6449"
+      },
+      {
+        "target": "release_pair-2ff63d2c9df235ef",
+        "case": "release_6449_recovers_a_cut_written_by_release_6408"
+      },
+      {
+        "target": "self_cli_exec-54a909607d4dc62b",
+        "case": "actual_cli_exec_confirms_before_the_next_round"
+      },
+      {
+        "target": "self_process_cuts-c92b6688279bd59f",
+        "case": "persisted_self_switches_survive_sigkill"
+      }
+    ],
+    "doc_counts": {
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0
+    }
+  },
+  "successful_controls": {
+    "product_carrier": {
+      "passed": 12,
+      "failed": 0,
+      "ignored": 0,
+      "cases": [
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "product_carrier::a_comment_only_product_unit_is_an_intended_noop"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "product_carrier::a_corrupt_product_unit_is_refused_before_any_write"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "product_carrier::a_product_template_cannot_change_a_parts_binary_or_build_folder"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "product_carrier::a_product_template_does_not_replace_a_pinned_lamps_unit"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "product_carrier::a_product_unit_switches_with_its_link_and_leaves_local_dropins_alone"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "product_carrier::a_managed_product_manifest_can_bootstrap_the_existing_settings_helper"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "product_carrier::automatic_settings_do_not_change_an_older_non_product_manifest"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "product_carrier::the_lamps_specific_unit_wins_over_the_product_unit"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "product_carrier::an_unhealthy_product_build_restores_the_exact_unit_and_link"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "product_carrier::explicit_off_and_an_unmanaged_updater_do_not_bootstrap_settings"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "product_carrier::a_same_binary_product_unit_records_good_only_after_climb_and_confirmation"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "product_carrier::an_older_updater_climbs_before_the_product_switch_and_fallback"
+        }
+      ]
+    },
+    "head_touch_all_targets": {
+      "passed": 35,
+      "failed": 0,
+      "ignored": 0,
+      "cases": [
+        {
+          "target": "lamp_update-cebdb705cde8ec81",
+          "case": "head_touch::tests::null_masks_do_not_admit_other_character_devices"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "head_touch::body_head_on_an_isolated_bus_is_refused_before_writes"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "head_touch::body_head_repeated_exec_start_is_refused_before_writes"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "head_touch::body_head_mode_and_bus_dropins_are_refused_before_writes"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "head_touch::cut_after_pins_apply_restarts_unchanged_controls_after_restoring_old_pins"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "head_touch::custom_head_wiring_is_kept_or_the_reader_transition_is_refused"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "head_touch::failed_head_reader_candidate_restores_exact_old_pins_and_units"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "head_touch::head_pins_cannot_change_without_restarting_their_controls_reader"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "head_touch::body_head_calibration_cannot_override_the_sleep_reader"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "head_touch::isolated_voice_controls_bus_is_refused_before_any_write"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "head_touch::body_head_complete_bundle_preserves_literal_factory_calibration"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "head_touch::body_head_requires_an_enabled_carried_or_installed_sleep_reader"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "head_touch::paired_head_bus_cannot_diverge_from_voices_enabled_privacy_bus"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "head_touch::environment_only_head_bus_mismatch_is_refused_before_any_write"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "head_touch::paired_head_readers_without_controls_mute_are_refused_before_writes"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "head_touch::paired_head_readers_disable_legacy_even_when_signed_pins_enable_it"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "head_touch::malformed_environment_quotes_are_not_reader_evidence"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "head_touch::mixed_head_readers_are_refused_before_settings_or_units_are_written"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "head_touch::old_apply_helper_pins_mismatch_is_put_back_before_readers_restart"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "head_touch::pr2948_settings_off_preserves_the_old_head_reader"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "head_touch::head_bus_root_dropins_are_not_guessed_from_base_units"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "head_touch::expression_or_controls_bus_mismatch_is_refused_before_any_write"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "head_touch::invalid_mute_path_and_unknown_reader_are_refused"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "head_touch::settings_off_refuses_paired_head_readers_with_legacy_pins"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "head_touch::pr2948_settings_on_keeps_a_head_reader_available"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "head_touch::repeated_projected_pins_keep_their_actual_hash_without_restarting_controls"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "head_touch::matching_explicit_or_default_head_bus_roots_allow_the_paired_transition"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "head_touch::third_review_paired_head_readers_on_different_buses_are_refused"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "head_touch::textually_equal_expanded_head_bus_roots_are_not_a_verified_pair"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "head_touch::custom_active_pins_are_kept_and_checked_against_the_reader_pair"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "head_touch::third_review_binary_update_checks_active_build_local_head_pins"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "head_touch::absent_unused_product_pins_do_not_block_active_build_pins_updates"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "head_touch::head_reader_mode_overrides_are_not_guessed_from_base_units"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "head_touch::semantic_head_reader_paths_cannot_expand_invocation_variables"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "head_touch::stale_unused_product_pins_do_not_block_active_build_pins_updates"
+        }
+      ]
+    },
+    "setup_lifecycle_round": {
+      "passed": 16,
+      "failed": 0,
+      "ignored": 0,
+      "cases": [
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "setup_lifecycle::an_alias_outside_the_lamp_prefix_cannot_bypass_the_product_check"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "setup_lifecycle::a_different_failed_part_still_rolls_back_without_restarting_completed_setup"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "setup_lifecycle::completed_product_setup_keeps_serving_without_restart_or_false_rollback"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "setup_lifecycle::completion_after_the_activity_snapshot_is_rechecked_before_restart"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "setup_lifecycle::completion_removed_during_the_manager_query_is_not_used"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "setup_lifecycle::chained_and_loaded_aliases_retain_normal_restart_even_without_alias_files"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "setup_lifecycle::incomplete_product_setup_still_restarts_and_is_watched"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "setup_lifecycle::custom_base_units_and_candidate_changes_keep_normal_watch_rules"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "setup_lifecycle::reset_removing_completion_before_recovery_restarts_the_old_setup"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "setup_lifecycle::recovery_rechecks_effective_aliases_after_restoring_the_old_unit"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "setup_lifecycle::the_exact_product_exit_note_and_merged_usr_layout_keep_the_exception"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "setup_lifecycle::reset_removing_completion_before_restart_retains_the_normal_watch"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "setup_lifecycle::recovery_keeps_the_true_active_journal_but_does_not_restart_completed_setup"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "setup_lifecycle::unknown_manager_identity_and_custom_loaded_paths_keep_normal_watch"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "setup_lifecycle::uncertain_override_files_do_not_hang_or_grant_the_exception"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "setup_lifecycle::unknown_dropins_at_each_scope_keep_normal_watch_rules"
+        }
+      ]
+    },
+    "setup_lifecycle_library": {
+      "passed": 2,
+      "failed": 0,
+      "ignored": 0,
+      "cases": [
+        {
+          "target": "lamp_update-cebdb705cde8ec81",
+          "case": "setup_lifecycle::tests::incomplete_duplicate_or_malformed_manager_records_are_unknown"
+        },
+        {
+          "target": "lamp_update-cebdb705cde8ec81",
+          "case": "setup_lifecycle::tests::manager_identity_requires_the_exact_loaded_product_with_known_dropins"
+        }
+      ]
+    }
+  },
+  "failures": [
+    {
+      "target": "round-86f3bcf98e2c5ca2",
+      "case": "self_cuts::without_self_opt_in_parts_update_but_no_handover_prefix_is_written",
+      "fixture_check": 3,
+      "repository_caller": "crates/update/tests/round/self_cuts.rs:403:20",
+      "expected_runnable_variant": "old",
+      "expected_fixture_sha256": "464cef54a392e0ee63a30123bda2ca3e5e63254a71659bfd7afd60f124900fe7",
+      "startup_watchdog_bound_s": 5,
+      "observed_elapsed_s": 5.001248921,
+      "first_byte": null,
+      "eof": false,
+      "observed_child_status": null,
+      "captured_output_bytes": 0,
+      "polls": 822,
+      "last_poll_s": [
+        4.996352218,
+        4.996353848
+      ],
+      "final_status": "Ok(None)",
+      "private_fixture_path_and_pid_omitted": true
+    },
+    {
+      "target": "round-86f3bcf98e2c5ca2",
+      "case": "self_cuts::cut_after_current_moves_keeps_new_runnable_and_can_confirm_or_put_back",
+      "fixture_check": 4,
+      "repository_caller": "crates/update/tests/round/self_cuts.rs:292:9",
+      "expected_runnable_variant": "new",
+      "expected_fixture_sha256": "00f9a6da8d109db3cd028e8cfd8c96c4cf446ddf493fccac42fe4aa84f3135c2",
+      "startup_watchdog_bound_s": 5,
+      "observed_elapsed_s": 5.001716143,
+      "first_byte": null,
+      "eof": false,
+      "observed_child_status": null,
+      "captured_output_bytes": 0,
+      "polls": 805,
+      "last_poll_s": [
+        4.99659093,
+        4.996591806
+      ],
+      "final_status": "Ok(None)",
+      "private_fixture_path_and_pid_omitted": true
+    },
+    {
+      "target": "round-86f3bcf98e2c5ca2",
+      "case": "self_cuts::interrupted_put_back_keeps_a_runnable_current_and_finishes_on_restart",
+      "fixture_check": 4,
+      "repository_caller": "crates/update/tests/round/self_cuts.rs:327:5",
+      "expected_runnable_variant": "new",
+      "expected_fixture_sha256": "00f9a6da8d109db3cd028e8cfd8c96c4cf446ddf493fccac42fe4aa84f3135c2",
+      "startup_watchdog_bound_s": 5,
+      "observed_elapsed_s": 5.000067062,
+      "first_byte": null,
+      "eof": false,
+      "observed_child_status": null,
+      "captured_output_bytes": 0,
+      "polls": 809,
+      "last_poll_s": [
+        4.999880844,
+        4.999881724
+      ],
+      "final_status": "Ok(None)",
+      "private_fixture_path_and_pid_omitted": true
+    }
+  ],
+  "prior_stages": {
+    "fmt_passed": true,
+    "strict_packages": [
+      "lamp-body",
+      "lamp-cloud",
+      "lamp-expression",
+      "lamp-eyes",
+      "lamp-keeper",
+      "lamp-lean",
+      "lamp-memory",
+      "lamp-peek",
+      "lamp-setup",
+      "lamp-skills",
+      "lamp-turn-end",
+      "lamp-update",
+      "lamp-voice",
+      "lamp-voice-eval"
+    ],
+    "workspace_build_passed": true,
+    "invalidated_three_package_artifacts_all_fresh_false": true,
+    "promotion_runtime_attempts": 0
+  },
+  "guards": {
+    "source_unchanged": true,
+    "protected_witness_count": 197,
+    "protected_witnesses_unchanged": true,
+    "current_executables_unchanged": true,
+    "command_reaped_and_owned_group_absent": true,
+    "test_exit": 101,
+    "controller_exit": 1,
+    "stage_timed_out": false,
+    "disk_reserve_breached": false
+  },
+  "self_cut_sources_equal_to_base": [
+    {
+      "path": "lampOS/crates/update/tests/round/self_cuts.rs",
+      "base_blob": "876279be733d86116c59be4cfb1f13c2bf144792",
+      "candidate_blob": "876279be733d86116c59be4cfb1f13c2bf144792",
+      "equal": true
+    },
+    {
+      "path": "lampOS/crates/update/tests/round/runnable_events.rs",
+      "base_blob": "8f1d99ba24dc7f2aa807c018e519909351944139",
+      "candidate_blob": "8f1d99ba24dc7f2aa807c018e519909351944139",
+      "equal": true
+    }
+  ],
+  "interpretation": {
+    "failure_boundary": "Three runnable-fixture checks reached the unchanged 5 s first-byte startup watchdog with no output; none observed child exit before the diagnostic ended.",
+    "product_cause_established": false,
+    "source_equality_is_causal_clearance": false,
+    "earlier_ba950_serial_424_pass_clears_current_parallel_failure": false,
+    "matched_base_2d_round_16_control": "Prepared but unrun when this failure packet was requested; no outcome is claimed.",
+    "latest_7d_hardware_only_carry": "Pending current-base qualification; this gate remains bound to f281/2d18.",
+    "retry_or_waiver_authorized_by_this_packet": false,
+    "no_ready_or_push_clearance": true,
+    "performance_comparison": "None. Earlier serial and current 16-thread scopes are distinct."
+  },
+  "receipt_sha256": {
+    "terminal.json": "9a26bbbbf8903b03ebc434b07a02fcf2fffed0bd46f0fe1b28989f115ae28c1c",
+    "update-census.json": "0154f2c0ceaf4dcdf07a2f508b0f396fd35e351024d920afddf742cb4affbe51",
+    "source-after.json": "fe5fa5293288000ed3fb9e6a62c3ca48fa6c28c60e9b5998c6ad4c9c6b043370",
+    "protected-after.json": "5047bebc11c061d158117690dedae1bf495e7f39f9846397821574ab2336e2b0",
+    "update-tests.json": "37230bd6aac76b215181526b514e630b0dc9937a4ad920da1d2ae66017084673",
+    "update-tests.stdout.txt": "8c9f41d3b32d8278dcfd3a7f6ad0d267aa3283a3b0e8dc790b9606f1e3879e17",
+    "self-cut-source-equality.json": "656434f85e736251a1c17541cd3e8ca78d2d8d612d3d18a90d5386092f29094b"
+  },
+  "raw_receipts": "Private; local paths, host process IDs and private fixture directories are excluded."
+}
