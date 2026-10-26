@@ -1,3 +1,11 @@
+## 2026-10-27 03:47 — reminder original workspace native gates green
+
+Ready for lamp-voice: no (#3525 two current independent reads pending)
+
+Current9d/2bf original ARM40395032306/Linux40395032200 pass11,422/0/106, zero bad/unrun, all21 reminder controls once with real metadata roles(two library/19integration), inherited three mock controls once. [Exact native receipt](verification/reminder-pending-present-20261026/native-9d.json) binds ordered preview420d/whole authored tree, complete ordinals, duplicate rows and separate harnesses. Actual scope is --workspace/182 binaries, not a twelve-package selection. General Image/Go/Web/Python green. Current host selection remains its own689/0/11 scope plus12zero docs, not a whole-consumer rerun; old094 full and all historical failures remain separate. Peer reads/live-base check precede readiness.
+
+Own-keys carry9ce/2bf preserves seven patches/metadata and38scope/mode entries; source audit finds no newP1/P2, activation/current-lamp hold remains. New gate scope is thirteen crates plus Controls product-unit scheduling reader. Prior idle bank preservation/source qualification precede any compiler reuse; no device action.
+
 ## 2026-10-27 03:32 — taken stalled own-keys carry
 
 Ready for lamp-voice: no (own-keys carry not qualified)

@@ -1,0 +1,163 @@
+{
+  "pr": 3525,
+  "offered_head": "9d52154fa9f157d5763f3acfe4589901e80d1f35",
+  "offered_base": "2bf5122dc76999f970556bb7c78840ab6e107ce0",
+  "arm64_run": 40395032306,
+  "linux_clippy_run": 40395032200,
+  "arm64_attempt": 1,
+  "linux_clippy_attempt": 1,
+  "arm64_conclusion": "success",
+  "linux_clippy_conclusion": "success",
+  "previews": {
+    "linux-clippy": {
+      "executed_preview": "420d84a744403d02e621b4917cbbea1ef82677cf",
+      "preview_parents": [
+        "2bf5122dc76999f970556bb7c78840ab6e107ce0",
+        "9d52154fa9f157d5763f3acfe4589901e80d1f35"
+      ],
+      "preview_tree": "410eefb17c4aa62202468db8a69858c1093b40ca",
+      "offered_tree": "410eefb17c4aa62202468db8a69858c1093b40ca",
+      "preview_equals_offered_tree": true
+    },
+    "arm64": {
+      "executed_preview": "420d84a744403d02e621b4917cbbea1ef82677cf",
+      "preview_parents": [
+        "2bf5122dc76999f970556bb7c78840ab6e107ce0",
+        "9d52154fa9f157d5763f3acfe4589901e80d1f35"
+      ],
+      "preview_tree": "410eefb17c4aa62202468db8a69858c1093b40ca",
+      "offered_tree": "410eefb17c4aa62202468db8a69858c1093b40ca",
+      "preview_equals_offered_tree": true
+    }
+  },
+  "passed": 11422,
+  "failed": 0,
+  "leaks": 0,
+  "timeouts": 0,
+  "skipped": 106,
+  "unique_terminal_cases": 11422,
+  "repeated_equal_rows": 35,
+  "all_selected_ordinals_present": true,
+  "reported_selected_totals": [
+    11422
+  ],
+  "own_control_pass_counts": {
+    "lamp-skills::it skills::reminder_pending::unchanged_held_reminder_has_one_chance_across_sixty_heartbeats": 1,
+    "lamp-skills::it skills::reminder_pending::core_reminders_can_request_again_after_talk_with_pending_still_positive": 1,
+    "lamp-skills::it skills::reminder_pending::core_reminders_keep_readiness_and_enablement_gates_on_repeated_chances": 1,
+    "lamp-skills::it skills::reminder_pending::core_reminders_coalesce_queue_changes_and_ignore_renewal_metadata": 1,
+    "lamp-skills::it skills::reminder_pending::core_reminders_notice_a_brief_talk_between_schedule_heartbeats": 1,
+    "lamp-skills::it skills::reminder_pending::core_reminders_rearm_after_source_or_condition_expiry": 1,
+    "lamp-skills::it skills::reminder_pending::core_reminders_keep_the_change_snapshot_across_unchanged_reload": 1,
+    "lamp-skills::it skills::reminder_pending::invalid_selected_values_do_not_replace_or_rearm_a_reminder_snapshot": 1,
+    "lamp-skills::it skills::reminder_pending::invalid_selected_trigger_values_do_not_rearm_a_reminder_snapshot": 1,
+    "lamp-skills::it skills::reminder_pending::a_valid_empty_schedule_rearms_after_an_invalid_selected_trigger_value": 1,
+    "lamp-skills::it skills::reminder_pending::a_talk_rearms_even_while_a_selected_trigger_value_is_invalid": 1,
+    "lamp-skills::it skills::reminder_pending::invalid_selected_choice_values_do_not_rearm_a_changes_snapshot": 1,
+    "lamp-skills::it skills::reminder_pending::a_changes_trigger_refuses_selected_while_path_overlap": 1,
+    "lamp-skills::it skills::reminder_pending::a_changes_trigger_keeps_independent_while_paths": 1,
+    "lamp-skills::it skills::reminder_pending::existing_trigger_modes_keep_their_heartbeat_behavior": 1,
+    "lamp-skills::it skills::reminder_pending::a_changes_trigger_reads_a_bounded_tuple_on_another_topic": 1,
+    "lamp-skills::it skills::reminder_pending::a_schedule_ask_only_moves_when_voice_begins_it": 1,
+    "lamp-skills::it skills::reminder_pending::repeated_schedule_chances_keep_one_waiting_runner_and_no_look": 1,
+    "lamp-skills tests::a_change_trigger_requires_bounded_paths_and_compatible_options": 1,
+    "lamp-skills tests::a_change_trigger_requires_a_scalar_comparison": 1,
+    "lamp-skills::it skills::every_skill_folder_passes_its_own_recorded_tests": 1
+  },
+  "terminal_findings": [],
+  "all_pass_audit": true,
+  "qualified": true,
+  "limits": "Original9d/2bf native only. Canonical21 names extracted from FAILED sealed-red packet, outcomes never reused. Current host selected Skills545/0/9, Update123/0/2+13/0, Voice7+1 and12docs0 is not whole12 runtime. Prior094 full7480/0/52 and old784538/4/9 failure remain distinct. No timing/device/readiness/posts claims.",
+  "inherited_mock_control_pass_counts": {
+    "a_repeat_call_with_only_made_steps_is_refused_while_its_run_is_under_way": 1,
+    "the_one_action_reply_reports_an_ack_write_error": 1,
+    "the_one_action_reply_joins_on_unwind_before_connect_and_during_a_partial_request": 1
+  },
+  "separate_harnesses": {
+    "turn_wire": {
+      "passed": 13,
+      "failed": 0,
+      "case_counts": {
+        "an_idle_worker_stays_ready_across_a_long_quiet": 1,
+        "a_worker_reporting_another_model_is_refused_before_any_request": 1,
+        "no_outcome_is_delivered_after_close_even_for_an_answer_on_its_way": 1,
+        "verdict_carries_identity_and_one_request_at_a_time": 1,
+        "missing_model_is_final_and_never_restarted": 1,
+        "missing_executable_fails_at_once": 1,
+        "spawn_returns_while_worker_startup_is_held": 1,
+        "startup_failures_are_final": 1,
+        "serving_failures_are_replaced_within_budget": 1,
+        "protocol_violations_are_replaced": 1,
+        "cancelled_answers_are_never_delivered": 1,
+        "close_during_inference_never_waits": 1,
+        "sustained_requests_stay_bounded": 1
+      }
+    },
+    "docs": {
+      "passed": 4,
+      "failed": 0
+    },
+    "relay_signals": true,
+    "export": true,
+    "artifact_uploaded": true
+  },
+  "selection": {
+    "scope": "workspace, PICKED empty; two custom harness binaries excluded and run separately",
+    "selected_tests": 11422,
+    "selected_binaries": 182,
+    "skipped_tests": 106,
+    "skipped_binaries": 2,
+    "profile": "pr",
+    "partition": "hash:1/1"
+  },
+  "control_target_roles": {
+    "metadata_sha256": "b57ab76c55882f73652bb8c088b299cb047d4eb8579d2591685901232dcf7b72",
+    "targets": [
+      {
+        "name": "lamp_skills",
+        "kind": [
+          "lib"
+        ],
+        "source": "crates/skills/src/lib.rs"
+      },
+      {
+        "name": "lamp-skills",
+        "kind": [
+          "bin"
+        ],
+        "source": "crates/skills/src/main.rs"
+      },
+      {
+        "name": "it",
+        "kind": [
+          "test"
+        ],
+        "source": "crates/skills/tests/it/main.rs"
+      },
+      {
+        "name": "release_pair",
+        "kind": [
+          "test"
+        ],
+        "source": "crates/skills/tests/release_pair.rs"
+      },
+      {
+        "name": "requested_audio",
+        "kind": [
+          "test"
+        ],
+        "source": "crates/skills/tests/requested_audio.rs"
+      }
+    ],
+    "canonical21": {
+      "library_test": 2,
+      "integration_it": 19,
+      "binary_main_test": 0
+    },
+    "inherited_mock3": "integration_it"
+  },
+  "raw_log_sha256": {
+    "linux-clippy": "30299c6e2982ea2721c3f41bc9540089ffe89564a352f4e80f3a01b991ca1005",
+    "arm64": "afa11c2f00821a9f643ac4913129331ccd1f210c9df893a2d46e1d0194819aac"
+  }
+}
