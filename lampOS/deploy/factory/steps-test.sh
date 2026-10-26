@@ -114,6 +114,12 @@ cat >"$T/bin/selftest" <<'EOF'
 echo "selftest $*" >>"$FAKE_LOG"
 exit "${FAKE_SELFTEST_EXIT:-0}"
 EOF
+# systemd-run, as the reset's unit is started: logged, refused with FAKE_RESET_FAIL.
+cat >"$T/bin/systemd-run" <<'EOF'
+#!/usr/bin/env bash
+echo "systemd-run $*" >>"$FAKE_LOG"
+[[ -z ${FAKE_RESET_FAIL:-} ]]
+EOF
 chmod +x "$T"/bin/*
 KEYFILE=$T/key.pub
 head -c 32 /dev/zero | base64 >"$KEYFILE"
@@ -122,8 +128,9 @@ head -c 32 /dev/zero | base64 >"$KEYFILE"
 # measured, no key, and setup's marker. unset_lamp: the same without the marker,
 # as the factory gets it.
 lamp() {
-  rm -rf "$T/root" && mkdir -p "$T/root/etc/lampOS/controls" "$T/root/tmp" "$T/root/var/lib/lampos-setup"
+  rm -rf "$T/root" && mkdir -p "$T/root/etc/lampOS/controls" "$T/root/etc/lampOS/setup" "$T/root/tmp" "$T/root/var/lib/lampos-setup"
   : >"$T/root/var/lib/lampos-setup/done"
+  echo '{}' >"$T/root/etc/lampOS/setup/reset-plan.json"
   printf '{"chip":"/dev/gpiochip0","head_pads":[{"name":"head-1","line":37}]}\n' \
     >"$T/root/etc/lampOS/controls/controls-pins.json"
   : >"$T/log"
@@ -131,7 +138,8 @@ lamp() {
 }
 run() {
   ETC_ROOT=$T/root MEASURE_BIN=$T/bin/measure BODY_BIN=$T/bin/body MOOD_BIN=$T/bin/mood STAND_WAIT=0 HEAD_STAND_WAIT=0 QUIET_WAIT=0 \
-    CONTROLS_BIN=$T/bin/controls SELFTEST_BIN=$T/bin/selftest KEEPER_BIN=$T/bin/keeper SYSTEMCTL=$T/bin/systemctl \
+    CONTROLS_BIN=$T/bin/controls SELFTEST_BIN=$T/bin/selftest KEEPER_BIN=${KEEPER:-$T/bin/keeper} SYSTEMCTL=$T/bin/systemctl \
+    SYSTEMD_RUN=$T/bin/systemd-run SETUP_BIN=/opt/lampOS/setup/current/lamp-setup \
     FAKE_LOG=$T/log bash "$STEPS" --unit-id lamp-test "$@" </dev/null >"$T/out" 2>&1
 }
 ENV=etc/lampOS/body/lamp.env
@@ -198,13 +206,24 @@ lamp; FAKE_BODY_STATE=active FAKE_EXPRESSION_STATE=active FAKE_SELFTEST_EXIT=1 A
 check "a failed self-test still starts lamp-expression again" '[[ $status == 1 ]] && [[ $(grep -c "systemctl start lamp-expression" "$T/log") == 1 ]]'
 lamp; FAKE_BODY_STATE=inactive ASK_ANSWER=y run --write --from 4; status=$?
 check "--from 4 with lamp-body down: it is started and stood, so head_move is checked (#2818)" '[[ $status == 0 ]] && grep -q "lamp-body is inactive: starting it" "$T/out" && [[ $(grep "systemctl start lamp-body\|^mood --socket $T/root/run/lampos-body\|^selftest" "$T/log" | sed "s/ --.*//" | uniq | tr "\n" "|") == "systemctl start lamp-body|mood|selftest|" ]]'
-# #2818: an up voice wakes the lamp to the room and an awake lamp stands, so
-# a passed step 4 leaves it paused, the pause cleared before its own stand.
+# Reviewer-three's P2 on 547d568f0: a passed step 4 leaves the lamp set up as
+# the bench left it, so it asks for the reset and runs it as the button does,
+# and says to remove the lamp from the factory account and pack.
 lamp; FAKE_BODY_STATE=active FAKE_VOICE_STATE=active ASK_ANSWER=y run --write --from 4; status=$?
-check "a passed self-test leaves the lamp paused, an earlier pause cleared before the stand (#2818)" '[[ $status == 0 ]] && [[ $(grep "^keeper\|^mood\|^selftest" "$T/log" | sed "s/ --.*//" | uniq | tr "\n" "|") == "keeper resume|mood|selftest|keeper pause|" ]] && grep -q "the lamp is paused until it is next started" "$T/out"'
+check "a passed self-test runs the reset, an earlier pause cleared before the stand" '[[ $status == 0 ]] && [[ $(grep "^keeper\|^mood\|^selftest\|^systemd-run" "$T/log" | sed "s/ --.*//" | uniq | tr "\n" "|") == "keeper resume|mood|selftest|systemd-run|" ]] && grep -q "^systemd-run --no-block --collect --unit=lamp-setup-wipe --property=Type=oneshot /opt/lampOS/setup/current/lamp-setup reset-now --plan $T/root/etc/lampOS/setup/reset-plan.json --enable$" "$T/log" && grep -q "Then remove it from the factory account in the app, and pack it." "$T/out" && ! grep -q "^keeper pause" "$T/log"'
+lamp; KEEPER=$T/bin/no-keeper FAKE_BODY_STATE=active ASK_ANSWER=y run --write --from 4; status=$?
+check "the product image has no keeper (lamp-52e6): a passed self-test still resets" '[[ $status == 0 ]] && grep -q "^systemd-run .* reset-now " "$T/log" && ! grep -q "^keeper" "$T/log"'
+lamp; FAKE_BODY_STATE=active ASK_ANSWER=y ASK_RESET_ANSWER=n run --write --from 4; status=$?
+check "the reset refused: the lamp is paused, and step 4 fails as not ready to pack" '[[ $status == 1 ]] && grep -q "^keeper pause" "$T/log" && ! grep -q "^systemd-run" "$T/log" && grep -q "the lamp is NOT READY TO PACK: .*Hold the button 5 s (the reset), then remove the lamp from the factory account in the app, then pack" "$T/out" && grep -q "step 4 (the self-test) failed" "$T/out"'
+lamp; KEEPER=$T/bin/no-keeper FAKE_BODY_STATE=active ASK_ANSWER=y ASK_RESET_ANSWER=n run --write --from 4; status=$?
+check "the reset refused with no keeper: not ready to pack, nothing paused" '[[ $status == 1 ]] && ! grep -q "^keeper" "$T/log" && grep -q "NOT READY TO PACK" "$T/out"'
+lamp; FAKE_BODY_STATE=active FAKE_RESET_FAIL=1 ASK_ANSWER=y run --write --from 4; status=$?
+check "a reset that cannot start fails step 4 and says to hold the button" '[[ $status == 1 ]] && grep -q "could not start the reset: hold the button 5 s" "$T/out"'
+lamp; rm -f "$T/root/etc/lampOS/setup/reset-plan.json"; FAKE_BODY_STATE=active ASK_ANSWER=y run --write --from 4; status=$?
+check "no reset plan: step 4 fails and says to hold the button" '[[ $status == 1 ]] && grep -q "there is no reset plan at" "$T/out" && ! grep -q "^systemd-run" "$T/log"'
 lamp; FAKE_BODY_STATE=active FAKE_SELFTEST_EXIT=1 ASK_ANSWER=y run --write --from 4; status=$?
-check "a failed self-test does not pause the lamp" '[[ $status == 1 ]] && ! grep -q "^keeper pause" "$T/log"'
-lamp; FAKE_BODY_STATE=active FAKE_KEEPER_FAIL=1 ASK_ANSWER=y run --write --from 4; status=$?
+check "a failed self-test does not pause or reset the lamp" '[[ $status == 1 ]] && ! grep -q "^keeper pause\|^systemd-run" "$T/log"'
+lamp; FAKE_BODY_STATE=active FAKE_KEEPER_FAIL=1 ASK_ANSWER=y ASK_RESET_ANSWER=n run --write --from 4; status=$?
 check "a pause the keeper cannot say fails step 4 and says the arm is not left at rest" '[[ $status == 1 ]] && grep -q "could not pause the lamp with .*the arm is not left at rest" "$T/out" && grep -q "step 4 (the self-test) failed" "$T/out"'
 for body_state in active inactive; do
   lamp; FAKE_BODY_STATE=$body_state FAKE_EXPRESSION_STATE=active FAKE_KEEPER_RESUME_FAIL=1 FAKE_SELFTEST_EXIT=3 ASK_ANSWER=y run --write --from 4; status=$?
