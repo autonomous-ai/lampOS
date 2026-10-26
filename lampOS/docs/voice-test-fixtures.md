@@ -571,3 +571,28 @@ an empty read then returns `WouldBlock` instead of waiting under that
 timeout. Clearing the accepted stream's flag leaves listener polling,
 request/reply assertions, timeout values and cleanup unchanged. This is a
 test-fixture correction, not a runtime or historical failure-cause claim.
+
+## Memory foreground admission without a stopwatch
+
+The two Days writer admission fixtures retain their real client and Unix socket
+peer. The idle fixture holds the append acknowledgement until `finished_exchange`
+returns, then checks the original append contents, source ID, submission flag,
+conversation prefix and idle lower bound. The full-queue fixture observes the
+first held append, admits exactly the configured queue capacity, refuses the next
+exchange and counts exactly one loss before releasing the acknowledgement. The
+peer no longer releases itself on a timer.
+
+Each scenario runs as exactly one selected test in a child process, with private
+socket/log paths. The parent requires native success and the exact one-test pass,
+so selecting no tests cannot qualify it. A fifteen-second diagnostic watchdog
+kills and reaps a stuck scenario, including its threads; it does not measure
+product latency or promise an operating-system teardown deadline. Child stdout
+and stderr have separate files, so diagnostics cannot split a native result line.
+Only owned fixture files are removed after child cleanup. Failed scenarios keep
+their stdout/stderr files for diagnosis, including watchdog failures.
+
+The original 25 ms and 100 ms admission upper bounds are replaced by these
+return-before-release observations. The 25 ms idle lower bound, the Group B
+request-budget checks and all production timeouts, queue bounds and code remain
+unchanged. A production writer timeout is still a test failure if it loses the
+held exchange; it is never counted as a successful acknowledgement or release.

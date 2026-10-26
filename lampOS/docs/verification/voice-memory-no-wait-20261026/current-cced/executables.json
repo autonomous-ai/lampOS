@@ -1,0 +1,240 @@
+[
+  {
+    "actual_executable": "<target>/debug/examples/admission_latency",
+    "actual_rechecked_unchanged": true,
+    "compiler_fresh": false,
+    "features": [],
+    "manifest": "<source>/lampOS/crates/voice/Cargo.toml",
+    "package_id": "path+file://<source>/lampOS/crates/voice#lamp-voice@0.1.0",
+    "preserved_copy": "<gate>/artifacts/0-admission_latency",
+    "preserved_copy_rechecked": true,
+    "profile_test": false,
+    "sha256": "7482f989beabaaa2118d8798b50469ac565f5e0c51e0e18e08ddef562118bd72",
+    "source": "<source>/lampOS/crates/voice/examples/admission_latency.rs",
+    "target": "admission_latency",
+    "target_kind": [
+      "example"
+    ]
+  },
+  {
+    "actual_executable": "<target>/debug/examples/stop_words_stt_replay-b562124b9ce72d6d",
+    "actual_rechecked_unchanged": true,
+    "compiler_fresh": false,
+    "features": [],
+    "manifest": "<source>/lampOS/crates/voice/Cargo.toml",
+    "package_id": "path+file://<source>/lampOS/crates/voice#lamp-voice@0.1.0",
+    "preserved_copy": "<gate>/artifacts/1-stop_words_stt_replay-b562124b9ce72d6d",
+    "preserved_copy_rechecked": true,
+    "profile_test": true,
+    "sha256": "b411916ffc36328ab2c1b21b6d6e557a5b556beef6beeaa32a9b24113fe530b0",
+    "source": "<source>/lampOS/crates/voice/examples/stop_words_stt_replay.rs",
+    "target": "stop_words_stt_replay",
+    "target_kind": [
+      "example"
+    ]
+  },
+  {
+    "actual_executable": "<target>/debug/examples/hearing_replay",
+    "actual_rechecked_unchanged": true,
+    "compiler_fresh": false,
+    "features": [],
+    "manifest": "<source>/lampOS/crates/voice/Cargo.toml",
+    "package_id": "path+file://<source>/lampOS/crates/voice#lamp-voice@0.1.0",
+    "preserved_copy": "<gate>/artifacts/2-hearing_replay",
+    "preserved_copy_rechecked": true,
+    "profile_test": false,
+    "sha256": "0086798888d1f89290eac73ca5d589211a7eea32fafd96cf7242868602a1ec18",
+    "source": "<source>/lampOS/crates/voice/examples/hearing_replay.rs",
+    "target": "hearing_replay",
+    "target_kind": [
+      "example"
+    ]
+  },
+  {
+    "actual_executable": "<target>/debug/deps/lamp_voice-d0423b4e04fbfa63",
+    "actual_rechecked_unchanged": true,
+    "compiler_fresh": false,
+    "features": [],
+    "manifest": "<source>/lampOS/crates/voice/Cargo.toml",
+    "package_id": "path+file://<source>/lampOS/crates/voice#lamp-voice@0.1.0",
+    "preserved_copy": "<gate>/artifacts/3-lamp_voice-d0423b4e04fbfa63",
+    "preserved_copy_rechecked": true,
+    "profile_test": true,
+    "sha256": "6d8f0f8ec235322f61d282b8da5a1465004f84e707bfdbb22990d5df4f706934",
+    "source": "<source>/lampOS/crates/voice/src/lib.rs",
+    "target": "lamp_voice",
+    "target_kind": [
+      "lib"
+    ]
+  },
+  {
+    "actual_executable": "<target>/debug/deps/it-7d652805487aab85",
+    "actual_rechecked_unchanged": true,
+    "compiler_fresh": false,
+    "features": [],
+    "manifest": "<source>/lampOS/crates/voice/Cargo.toml",
+    "package_id": "path+file://<source>/lampOS/crates/voice#lamp-voice@0.1.0",
+    "preserved_copy": "<gate>/artifacts/4-it-7d652805487aab85",
+    "preserved_copy_rechecked": true,
+    "profile_test": true,
+    "sha256": "9210db9577dd72b4fb3d6130c88e2fed91141fccc3982a2675f03510b32ecaad",
+    "source": "<source>/lampOS/crates/voice/tests/it/main.rs",
+    "target": "it",
+    "target_kind": [
+      "test"
+    ]
+  },
+  {
+    "actual_executable": "<target>/debug/examples/probe_handover",
+    "actual_rechecked_unchanged": true,
+    "compiler_fresh": false,
+    "features": [],
+    "manifest": "<source>/lampOS/crates/voice/Cargo.toml",
+    "package_id": "path+file://<source>/lampOS/crates/voice#lamp-voice@0.1.0",
+    "preserved_copy": "<gate>/artifacts/5-probe_handover",
+    "preserved_copy_rechecked": true,
+    "profile_test": false,
+    "sha256": "799dfde95ac6ca490906ff49c934983f1a7d5e4873aa3e763d34ef5f28b995e9",
+    "source": "<source>/lampOS/crates/voice/examples/probe_handover.rs",
+    "target": "probe_handover",
+    "target_kind": [
+      "example"
+    ]
+  },
+  {
+    "actual_executable": "<target>/debug/deps/release_pair-ced63b27e241a67b",
+    "actual_rechecked_unchanged": true,
+    "compiler_fresh": false,
+    "features": [],
+    "manifest": "<source>/lampOS/crates/voice/Cargo.toml",
+    "package_id": "path+file://<source>/lampOS/crates/voice#lamp-voice@0.1.0",
+    "preserved_copy": "<gate>/artifacts/6-release_pair-ced63b27e241a67b",
+    "preserved_copy_rechecked": true,
+    "profile_test": true,
+    "sha256": "872c578188b60c4c57dbf59e734d4db6ae79a9e74c9bbc761cc0a80e221ac014",
+    "source": "<source>/lampOS/crates/voice/tests/release_pair.rs",
+    "target": "release_pair",
+    "target_kind": [
+      "test"
+    ]
+  },
+  {
+    "actual_executable": "<target>/debug/examples/duplex_lab",
+    "actual_rechecked_unchanged": true,
+    "compiler_fresh": false,
+    "features": [],
+    "manifest": "<source>/lampOS/crates/voice/Cargo.toml",
+    "package_id": "path+file://<source>/lampOS/crates/voice#lamp-voice@0.1.0",
+    "preserved_copy": "<gate>/artifacts/7-duplex_lab",
+    "preserved_copy_rechecked": true,
+    "profile_test": false,
+    "sha256": "01353f595ac6a1458db7f6a2a62be0285537edf2c022f72d4c9865dfd82ac21b",
+    "source": "<source>/lampOS/crates/voice/examples/duplex_lab.rs",
+    "target": "duplex_lab",
+    "target_kind": [
+      "example"
+    ]
+  },
+  {
+    "actual_executable": "<target>/debug/examples/ring_process_probe",
+    "actual_rechecked_unchanged": true,
+    "compiler_fresh": false,
+    "features": [],
+    "manifest": "<source>/lampOS/crates/voice/Cargo.toml",
+    "package_id": "path+file://<source>/lampOS/crates/voice#lamp-voice@0.1.0",
+    "preserved_copy": "<gate>/artifacts/8-ring_process_probe",
+    "preserved_copy_rechecked": true,
+    "profile_test": false,
+    "sha256": "0480fcc218dd071081bc919294c16d6e71cd9513dcd18ee3eab2a0b99ec3b899",
+    "source": "<source>/lampOS/crates/voice/examples/ring_process_probe.rs",
+    "target": "ring_process_probe",
+    "target_kind": [
+      "example"
+    ]
+  },
+  {
+    "actual_executable": "<target>/debug/examples/head_qualification_operator",
+    "actual_rechecked_unchanged": true,
+    "compiler_fresh": false,
+    "features": [],
+    "manifest": "<source>/lampOS/crates/voice/Cargo.toml",
+    "package_id": "path+file://<source>/lampOS/crates/voice#lamp-voice@0.1.0",
+    "preserved_copy": "<gate>/artifacts/9-head_qualification_operator",
+    "preserved_copy_rechecked": true,
+    "profile_test": false,
+    "sha256": "77af995a16e0791cdaa4e1a83740218e487758e4650d123c1c2fada7b5fa4090",
+    "source": "<source>/lampOS/crates/voice/examples/head_qualification_operator.rs",
+    "target": "head_qualification_operator",
+    "target_kind": [
+      "example"
+    ]
+  },
+  {
+    "actual_executable": "<target>/debug/examples/reference_pace",
+    "actual_rechecked_unchanged": true,
+    "compiler_fresh": false,
+    "features": [],
+    "manifest": "<source>/lampOS/crates/voice/Cargo.toml",
+    "package_id": "path+file://<source>/lampOS/crates/voice#lamp-voice@0.1.0",
+    "preserved_copy": "<gate>/artifacts/10-reference_pace",
+    "preserved_copy_rechecked": true,
+    "profile_test": false,
+    "sha256": "f5a4a0bea02cc7849e0e93e296e5cab9211f097d518c690bdac6edefedf847a3",
+    "source": "<source>/lampOS/crates/voice/examples/reference_pace.rs",
+    "target": "reference_pace",
+    "target_kind": [
+      "example"
+    ]
+  },
+  {
+    "actual_executable": "<target>/debug/deps/lamp_voice-51d9141096691d62",
+    "actual_rechecked_unchanged": true,
+    "compiler_fresh": false,
+    "features": [],
+    "manifest": "<source>/lampOS/crates/voice/Cargo.toml",
+    "package_id": "path+file://<source>/lampOS/crates/voice#lamp-voice@0.1.0",
+    "preserved_copy": "<gate>/artifacts/11-lamp_voice-51d9141096691d62",
+    "preserved_copy_rechecked": true,
+    "profile_test": true,
+    "sha256": "e5988014c59b4629ba5110e86644a0464a1ebaac9d938a36c57e8d19c5b653d2",
+    "source": "<source>/lampOS/crates/voice/src/main.rs",
+    "target": "lamp-voice",
+    "target_kind": [
+      "bin"
+    ]
+  },
+  {
+    "actual_executable": "<target>/debug/examples/render_line_second-610fc7099895fda5",
+    "actual_rechecked_unchanged": true,
+    "compiler_fresh": false,
+    "features": [],
+    "manifest": "<source>/lampOS/crates/voice/Cargo.toml",
+    "package_id": "path+file://<source>/lampOS/crates/voice#lamp-voice@0.1.0",
+    "preserved_copy": "<gate>/artifacts/12-render_line_second-610fc7099895fda5",
+    "preserved_copy_rechecked": true,
+    "profile_test": true,
+    "sha256": "9439d570c47aaceeb2fca76128bad85a33a4aa89ecbf3a1f3aa39ef07f75fb1c",
+    "source": "<source>/lampOS/crates/voice/examples/render_line_second.rs",
+    "target": "render_line_second",
+    "target_kind": [
+      "example"
+    ]
+  },
+  {
+    "actual_executable": "<target>/debug/lamp-voice",
+    "actual_rechecked_unchanged": true,
+    "compiler_fresh": false,
+    "features": [],
+    "manifest": "<source>/lampOS/crates/voice/Cargo.toml",
+    "package_id": "path+file://<source>/lampOS/crates/voice#lamp-voice@0.1.0",
+    "preserved_copy": "<gate>/artifacts/13-lamp-voice",
+    "preserved_copy_rechecked": true,
+    "profile_test": false,
+    "sha256": "32ee688bd93157fe19a291dada1fac3e94e85acd5f1506b5f5b776f189af4e89",
+    "source": "<source>/lampOS/crates/voice/src/main.rs",
+    "target": "lamp-voice",
+    "target_kind": [
+      "bin"
+    ]
+  }
+]
