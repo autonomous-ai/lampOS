@@ -1,3 +1,13 @@
+Current status: #3631 repaired original native is green; exact-head peer disposition and readiness follow.
+
+## Current checkpoint: 2026-10-27 06:52 +07, repaired original native qualified
+
+[Original 220251 native proof](verification/reset-query-bounds-20261026/native-220/README.md): ARM **40421023286** and Linux Clippy **40421023292**, attempt 1, pass on actual preview 6a331f02b with ordered b234/220251 parents and authored tree 577b840ab equality. The dependency-selected suite has **1,439 unique passes / 0 failures, leaks, timeouts or selected unrun / 9 skipped**, all eight query controls once. Separate process 13, relay 1, docs 4 across 46 summaries and helper 25 are not added. Promotion/publication are skipped. No workflow rerun. The Clippy cache-restoration delay was observed before compilation, not treated as failure or success.
+
+R3 READ-OK 6429937099 and the lead's no-finding read 6429951133 close the failed-leader P2 on 220251; R3's independent Setup **193/0/1** remains their own run. R2's explicit fresh disposition remains requested. The prior 9784 green stays historical. Source and final host proof remain 220251/b234 **389/0/5** with the discriminating old-prefix failure preserved separately. The new Update output-reader piece was claimed on Queue 6429967310: retain the existing 300,000-byte control, refuse complete responses over 1 MiB, and fix inherited-pipe completion using the corrected ownership mechanics. V1 context/CombinedOutput baseline is inspected; states and stop/restart policy stay outside the piece. No device or release action.
+
+---
+
 Current status: #3631 cleanup repair passed host gates; new original native and peer qualification follows.
 
 ## Current checkpoint: 2026-10-27 06:37 +07, failed-leader regression discriminates

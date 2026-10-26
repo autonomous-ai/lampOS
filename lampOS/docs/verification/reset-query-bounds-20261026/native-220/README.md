@@ -1,0 +1,9 @@
+# Reset-query failed-leader cleanup: original native qualification
+
+PR #3631 authored head `220251c703aedf6babb148439d6fabe9602edbda`, base `b2344a07df6b38d2736e01297999751c26e477a5`. Both original attempt-1 jobs actually checked out preview `6a331f02b642a6c4ba2655f4e59f0aa6e84fb8cc`, with ordered parents [base, head] and full tree `577b840abf1ce27ee612cb81a3f2d2f9dec3996a` identical to the authored tree. No workflow was rerun.
+
+[ARM64 run 40421023286](https://github.com/autonomous-ai/lampOS/actions/runs/40421023286/attempts/1): **success**. Unique nextest terminal census: **1439 PASS, 0 FAIL, 0 LEAK, 0 TIMEOUT**, 9 skipped, 0 selected unrun. 0 identical report echoes excluded. Eight query controls have 8 distinct terminal rows; missing and nonpassing rows are explicit in census.json. This is the dependency-selected PR suite, not an inferred full-workspace run.
+
+Separate scopes: 13 process pass witnesses, 1 relay success witnesses, 4 doctest passes/0 failures across 46 summaries, and 25 promotion-helper passes/0 failures. These are not added to nextest. Skipped promotion jobs are not executed promotion, signing or release evidence.
+
+[Linux Clippy run 40421023292](https://github.com/autonomous-ai/lampOS/actions/runs/40421023292/attempts/1): **success**. Exact jobs/steps and checkout witnesses are retained independently from runtime evidence. Raw API/log bytes and complete terminal census remain in scratch with hashes. The sanitized packet contains no binaries or scripts. Historical host and isolated negative-control results retain their own source identities and are not added here. Earlier green native 9784 is historical evidence and did not qualify the repaired failed-leader cleanup. The eight selected controls include the new same-group closed-output descendant regression. Native query tests do not establish installed reset acceptance or hard kernel-I/O bounds.
