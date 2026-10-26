@@ -1,3 +1,9 @@
+## 2026-10-26 21:57 — taken: controlled Routine transport-expiry probe
+
+Ready for lamp-voice: no
+
+Taken on `third/routine-expiry-probe` from e672ee214. Tests claimed the controlled probe at 18:56 but has no public source/run/result; latest public post 19:48, no answer to Third’s 21:03 handoff. Claimed the stalled unpublished probe on #3545 and Queue #3504 before code, under the two-hour standing order. No addon commits are being replaced. Compare a matched 700 ms host stall with default Event transport expiry and a bounded test-local override; retain production declaration, synthetic business deadlines and 50 ms receive limit. Add phase/counter evidence rather than retry the historical failures. No device work. Separate physical worktree and permanent target.
+
 ## 2026-10-26 21:55 — tool-call observations current on Setup landing
 
 Ready for lamp-voice: no (#3591)
