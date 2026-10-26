@@ -657,8 +657,14 @@ and 6.
   keyed by the `own-` name; the trusted tier's own rates wait for a lamp.
   Its decision, and only one written by `addons`, goes back as
   `machine-addon/decision` with its reason.
+- **On a lamp:** lamp-a0ae, 26 Oct, from the owner's Mac through both
+  Harness daemons: two lights dropped while people talked, one kept in a
+  quiet room, each decision back on the Mac within about a second
+  ([verification](verification/machine-addon-lamp-a0ae-20261026/)). With
+  the privacy switch closed the voice publishes no `voice/state`, so the
+  computer sees none.
 - **Not yet:** the reasons `messages` and `news` (a schema change in
-  `crates/msgs`), a deploy unit, and a run on a lamp.
+  `crates/msgs`), a deploy unit, and a `say` on a lamp.
 
 ### Two tiers of remote add-on
 
