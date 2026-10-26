@@ -3135,7 +3135,9 @@ after a take-over, but now for every turn:
       exchange made before one (`HandOns`), so "forget that" said as the
       line that cuts an answer reaches that answer, held or queued. The
       forget waits up to 300 ms (`FORGET_SETTLE`) for an exchange the writer
-      has in hand.
+      has in hand. A forget that was done has its answer said but kept out
+      of the thread the next turn is given, since it may name what went
+      ([memory.md](memory.md), "A forget's answer stays out of the thread").
     - **A stop:** the held answers go first, then the writer has up to
       150 ms to write them, then the open session closes
       (`remember::close_at_exit`).

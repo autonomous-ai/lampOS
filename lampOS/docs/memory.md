@@ -1379,6 +1379,36 @@ passed. Tests: the notes' exact texts in `remember::tests`.
     conversation's ids and ends the writer's conversation, as `forget`
     does. The context lock is held only to count, to check the session's
     sources and to record, never across a request.
+  - **A forget's answer stays out of the thread** (second route): the
+    answer to a request whose `forget` or `forget_everything` may have
+    removed something is said, but none of it is put in the short thread
+    the next turn is given (`remember::forgetting_reply`, at most 64
+    requests marked, each let go when its turn completes or fails). The
+    Days client marks the request unless the answer is a sure
+    `"forgotten":false` (nothing found, nothing kept of them, refused
+    before it was sent): a forget the store did, one the store did whose
+    step after it failed (their rules' `forget_all`, which answers nothing,
+    Reviewer-two's P2 on #3609), and one whose answer was lost are all
+    marked, as is one whose memory held nothing but whose rules'
+    `forget_all` removed something (Reviewer-two, 02:13): unmarked only
+    when every store reports nothing removed; so is one whose room lines
+    they were seen saying (`forget_said`, `LAMP_MEMORY_ROOM_SPEAKER=on`)
+    were removed, whose step's answer was lost, or whose step failed with
+    an error other than an older memory's `unknown_op` (a `storage` error
+    can follow the committed erase; Reviewer-two, 02:45 and 03:18). A count
+    missing is no zero; only a success counting 0 or `unknown_op` is
+    (`remember::may_have_removed`). The legacy client marks a
+    `forget` that removed something or
+    whose answer was lost. The model may name what went ("I've forgotten
+    your peanut allergy"), and kept in the thread the next turn could say
+    it again after the store and the earlier thread were emptied
+    (lamp-06c1, 26 Oct). With every `LAMP_MEMORY_FORGET_ALL` and
+    `LAMP_MEMORY_LINK_USED` setting. Tests:
+    `remember::tests::a_forget_the_store_did_keeps_its_reply_out_of_the_thread`
+    (through the memory's socket: done then a failed rules forget, a canary
+    reply absent from the next `recent_for`; done; nothing removed, not
+    marked) and
+    `worker::tests::a_forget_confirmation_cannot_reenter_the_next_turns_history`.
   - **Off:** `forget` takes no `about` (its words say a named thing is
     forgotten by naming it, #3113), and an `about` sent anyway is the
     lamp's guard's to read: with nothing heard it names the thing, else the
