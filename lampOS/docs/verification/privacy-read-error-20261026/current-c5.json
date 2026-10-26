@@ -1,0 +1,12 @@
+{
+  "head": "3bccb4a5f544d70ecaa2000c61089ff3c064bf5e",
+  "base": "c5c7603a743690e291f85a664a7ee18624232581",
+  "qualified_source_head": "b34e40ba7a16f7098278b94c7fe768d9b2462d21",
+  "qualified_receipt": "current-756.json",
+  "entire_tree_differences": [
+    "lampOS/docs/build-rows.md"
+  ],
+  "all_other_blobs_and_modes_identical": true,
+  "range_diff": "1:  b34e40ba7 = 1:  3bccb4a5f lampOS: refuse presentation requests when privacy reads fail\n",
+  "qualification": "Existing local gates apply to identical code and test-fixture inputs; not rerun for the score-document-only base change. New native head gate remains required."
+}

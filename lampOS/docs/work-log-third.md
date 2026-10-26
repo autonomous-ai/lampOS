@@ -7,6 +7,22 @@ machine is explicitly named. Third has no lamp access.
 
 
 
+## 2026-10-26 08:18 — Score-document-only carries on current lamp-voice
+
+Ready for lamp-voice: no; current native gates and current reads are pending.
+
+#3512 **3bccb4a5f**, #3513 **48a0bc66c**, and #3520 **1fa9ae1b9**
+are pushed on **c5c7603a7**. Each task's range-diff is equal. For each
+entire candidate tree, the only difference from its locally qualified 756
+head is `docs/build-rows.md`; all other blobs and modes are identical.
+No Rust source reads that score document. Existing local results retain
+their actual 756 heads; they were not rerun or relabelled. The three
+`current-c5.json` receipts beside the previous receipts record this carry.
+Fresh original native ARM64 runs are 40253036689 (privacy), 40253044346
+(preflight), and 40253030459 (fixture). Current Linux Clippy for the fixture
+has passed. No physical acceptance is inferred. The full reminder gate
+continues on its frozen 2a dependency while these independent gates run.
+
 ## 2026-10-26 08:03 — Three current carries pushed; reminder full run restarted on fixture dependency
 
 On current product-unit base **756be347e**:

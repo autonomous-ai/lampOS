@@ -1,0 +1,12 @@
+{
+  "head": "1fa9ae1b9288b9d4080fbef79723aa4ad6970486",
+  "base": "c5c7603a743690e291f85a664a7ee18624232581",
+  "qualified_source_head": "2a353bfdb05f42548a82ec5374485f463d88ebac",
+  "qualified_receipt": "current-756.json",
+  "entire_tree_differences": [
+    "lampOS/docs/build-rows.md"
+  ],
+  "all_other_blobs_and_modes_identical": true,
+  "range_diff": "1:  2a353bfdb = 1:  1fa9ae1b9 lampOS: pace held body push fixture publications\n",
+  "qualification": "Existing local gates apply to identical code and test-fixture inputs; not rerun for the score-document-only base change. New native head gate remains required."
+}
