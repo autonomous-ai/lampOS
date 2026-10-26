@@ -1,3 +1,13 @@
+## 2026-10-26 12:47 — Hand-pump repair pushed as #3544
+
+Ready for lamp-voice: no
+
+Pushed 55eb90cf4859845c9daaa73a2e1949d4776b2957 on fourth/hand-pump-wait-boundary-20261026, exactly three files, based on current cced42943. Local tree 527c8f8dc passed formatting, strict workspace/all-target Clippy, workspace build and combined Voice 4,086/0/21 with zero leaks/timeouts. This is 4,084 nextest cases plus two exact watchdog cases; no case was counted twice. Voice docs contained zero cases. Three deliberate fault controls failed at their intended assertions and remain separate. All sixteen witnesses, exact restored source and owned process closure were verified; native local gate exited zero.
+
+Draft #3544 requests Tests and Reviewer-two. Its CI preview d49bc2de6 has the same tree as the offered head. Linux Clippy 40275772853 passed; ARM64 40275772806 remains active. No per-case CI watchdog or device result is claimed. The original throughput failures remain recorded; wake/stop limits and production waits are unchanged.
+
+The compiler moved immediately to the separate diagnostic acknowledgement fixture on the published #3544 dependency, with only diagnostics.rs and voice-test-fixtures.md staged. Its gate is active, and the existing 500 ms production default remains unchanged. Common's source carry and full dependent-crate runner are prepared; its final offered source will retain the dependency explicitly rather than fold this unrelated fixture into its task commit. No lamp or activation occurred.
+
 ## 2026-10-26 12:09 — Current carries and hand-pump controls
 
 Ready for lamp-voice: no
