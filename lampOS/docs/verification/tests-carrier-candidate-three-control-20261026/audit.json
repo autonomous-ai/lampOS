@@ -1,0 +1,92 @@
+{
+  "observation": "Three previously failed frozen candidate cases, isolated and serial; no full-gate clearance",
+  "candidate_commit": "f281a5575b3cb6487517745a021bc61cad52747a",
+  "binary_sha256": "a29ebb7d9f576433d1550cf0f908ab50f4f5c80143f80017bc84e98055ea682e",
+  "binary_bytes": 16984804,
+  "test_threads": 1,
+  "runtime_attempts": 1,
+  "command": "round <the three exact cases below> --exact --test-threads=1",
+  "outer_diagnostic_deadline_s": 900,
+  "counts": {
+    "passed": 3,
+    "failed": 0,
+    "ignored": 0
+  },
+  "selected_cases": [
+    {
+      "case": "self_cuts::cut_after_current_moves_keeps_new_runnable_and_can_confirm_or_put_back",
+      "result": "ok"
+    },
+    {
+      "case": "self_cuts::interrupted_put_back_keeps_a_runnable_current_and_finishes_on_restart",
+      "result": "ok"
+    },
+    {
+      "case": "self_cuts::without_self_opt_in_parts_update_but_no_handover_prefix_is_written",
+      "result": "ok"
+    }
+  ],
+  "full_Round_inventory_total": 195,
+  "other_cases_filtered_out": 192,
+  "wall_elapsed_s": 66.43936039201799,
+  "test_harness_reported_s": 66.25,
+  "guards": {
+    "clean_candidate_source_unchanged": true,
+    "complete_source_receipts_equal": true,
+    "protected_count": 197,
+    "protected_197_unchanged": true,
+    "owned_group_closed": true,
+    "stop_reason": null,
+    "test_exit": 0
+  },
+  "retained_original_full_failure": {
+    "candidate": "f281a5575b3cb6487517745a021bc61cad52747a",
+    "counts": {
+      "passed": 439,
+      "failed": 3,
+      "ignored": 6
+    },
+    "test_threads": 16,
+    "proof": "https://github.com/autonomous-ai/lampOS/tree/839863049/lampOS/docs/verification/tests-carrier-2d-parallel-failure-20261026"
+  },
+  "retained_unmodified_baseline": {
+    "commit": "7d0017f08ec2a6c709012e6b3754bd414148cb48",
+    "scope": "Full Round integration binary, not full Update package",
+    "counts": {
+      "passed": 183,
+      "failed": 0,
+      "ignored": 0
+    },
+    "test_threads": 16,
+    "proof": "https://github.com/autonomous-ai/lampOS/tree/0d2b1537a/lampOS/docs/verification/tests-carrier-unmodified-round-control-20261026"
+  },
+  "limits": {
+    "product_cause_established": false,
+    "full_suite_failure_waived": false,
+    "new_current_carry_qualified": false,
+    "readiness_or_push_clearance": false,
+    "fixture_bound_changed": false,
+    "source_or_binary_changed_for_control": false,
+    "full_suite_rerun": false,
+    "timing_comparison_claimed": false,
+    "scope_note": "The later current-base source carry happened after this frozen f281 observation and has no current-head gate result in this packet."
+  },
+  "receipt_sha256": {
+    "terminal.json": "564265d07e5edba192765facb98abbfd1f90df0905be5670f2a38646d93cb003",
+    "isolated-three-start.json": "7ee3812f12607c8843ef84b683fc05d95b88deed208643c0815236f7396b4d68",
+    "isolated-three-result.json": "e268ba284806737cd83d8dfc37ba89f6e98d00cfd07bd378195363d272c61399",
+    "isolated-three.stdout": "0875cd4ca5dffb665dfae26f874b570b926f51e9c082db8ccc3e0e3643d696f4",
+    "isolated-three.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "list-start.json": "d7a8d8f1ec043ac529db6ea89a14784e0cbefacf9c88342fb4590d8cbd14baa8",
+    "list-result.json": "e805d7ad013aed20e157bcef66704ed4bb57805ebce79edec329e5e46225dd3f",
+    "list.stdout": "2c2fc10ce1db35dce2f4f8a9ef3b969f1e92a4453ca104b10c13ba5e5eb26ddb",
+    "source-before.json": "36f560b6a7c9696d54ed8841935b5e476e77c56fdfa014f573d5a16ac4e623b2",
+    "source-after.json": "36f560b6a7c9696d54ed8841935b5e476e77c56fdfa014f573d5a16ac4e623b2"
+  },
+  "related_receipt_sha256": {
+    "candidate_full_update_census": "0154f2c0ceaf4dcdf07a2f508b0f396fd35e351024d920afddf742cb4affbe51",
+    "candidate_frozen_manifest": "06daa8b8f8e93250edad5be43430d7742ec433ed875a93d7a9ef9fcdd84bfaa6",
+    "baseline_terminal": "b9ce59ba2882ff23bee345197feba802e32dc862c840f1a434e4bf8af1378db3",
+    "protected_197_manifest": "5047bebc11c061d158117690dedae1bf495e7f39f9846397821574ab2336e2b0"
+  }
+}

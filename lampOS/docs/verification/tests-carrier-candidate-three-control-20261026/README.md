@@ -1,0 +1,9 @@
+# Isolated observation of three candidate cases
+
+The three self-cut cases that failed in the full Update run passed **3/0/0** in one isolated, serial observation of the exact frozen `f281a5575` Round binary, SHA-256 `a29ebb7d9f576433d1550cf0f908ab50f4f5c80143f80017bc84e98055ea682e`. Wall elapsed time was **66.439 s**; the harness reported 66.25 s. The command selected only those three exact names with `--test-threads=1`; the other 192 Round cases were filtered out.
+
+The [original full candidate run](https://github.com/autonomous-ai/lampOS/tree/839863049/lampOS/docs/verification/tests-carrier-2d-parallel-failure-20261026) remains **439/3/6** with sixteen threads. The separately recorded [unmodified Main 7d Round control](https://github.com/autonomous-ai/lampOS/tree/0d2b1537a/lampOS/docs/verification/tests-carrier-unmodified-round-control-20261026) remains **183/0/0** with sixteen threads. All three observations retain their actual scope and binary identity. No product cause, performance comparison, full-suite waiver or readiness clearance follows from this isolated pass.
+
+Candidate source was clean and unchanged throughout the observation; all 197 protected witnesses, including this frozen executable, remained unchanged. The owned process group closed, the test exited zero, and no diagnostic deadline was reached. No fixture timeout, source or binary was changed for this control. Exact selected names and raw-receipt hashes are in `audit.json`; private paths and process identities are omitted.
+
+The later current-base source carry happened after this f281 observation. Its current-head gates remain separate and are not qualified by this packet. This record reports existing receipts only; no additional test, compilation, device action or retry was performed while preparing it.
