@@ -4801,16 +4801,23 @@ mod head_touch_preflight_files {
         }
     }
 
-    fn install_child(case: Case, work: &Path) {
+    fn exercise(case: Case, work: Option<&Path>) {
         let mut lamp = Lamp::new(188, &[]);
-        assert!(lamp.root.starts_with(work), "parent owns all child scratch");
+        if let Some(work) = work {
+            assert!(case.refuses(), "only refusal cases need a child watchdog");
+            assert!(lamp.root.starts_with(work), "parent owns all child scratch");
+        }
         let path = lamp.on(case.local_path());
         let target = lamp.on(TARGET);
         fs::create_dir_all(path.parent().unwrap()).unwrap();
         fs::create_dir_all(target.parent().unwrap()).unwrap();
         match case {
             Case::Fifo | Case::FifoNoWriter | Case::BodyFifo => {
-                fs::rename(work.join("prepared-fifo"), &path).unwrap();
+                fs::rename(
+                    work.expect("FIFO has an owned child").join("prepared-fifo"),
+                    &path,
+                )
+                .unwrap();
                 assert!(fs::symlink_metadata(&path).unwrap().file_type().is_fifo());
             }
             Case::Directory => fs::create_dir(&path).unwrap(),
@@ -4865,8 +4872,10 @@ mod head_touch_preflight_files {
         assert!(lamp.host.calls.is_empty());
         // Publish atomically, after all setup and the snapshot, immediately
         // before the real install call. No FIFO has been opened yet.
-        fs::write(work.join("ready.tmp"), lamp.root.to_str().unwrap()).unwrap();
-        fs::rename(work.join("ready.tmp"), work.join("ready")).unwrap();
+        if let Some(work) = work {
+            fs::write(work.join("ready.tmp"), lamp.root.to_str().unwrap()).unwrap();
+            fs::rename(work.join("ready.tmp"), work.join("ready")).unwrap();
+        }
         let result = lamp.install();
         if case.refuses() {
             let error = result.unwrap_err();
@@ -4890,7 +4899,9 @@ mod head_touch_preflight_files {
                     .any(|call| call.starts_with("enable "))
             );
         }
-        fs::write(work.join("finished"), format!("{case:?}")).unwrap();
+        if let Some(work) = work {
+            fs::write(work.join("finished"), format!("{case:?}")).unwrap();
+        }
     }
 
     fn ready_root(work: &Path) -> io::Result<Option<PathBuf>> {
@@ -4930,8 +4941,7 @@ mod head_touch_preflight_files {
                 && let Some(root) = ready_root(work)?
             {
                 fifo = Some(root.join(case.local_path().trim_start_matches('/')));
-                install_deadline =
-                    Some(Instant::now() + Duration::from_secs(if case.refuses() { 5 } else { 30 }));
+                install_deadline = Some(Instant::now() + Duration::from_secs(5));
             }
             if let Some(status) = child.0.try_wait()? {
                 break Some(status);
@@ -4996,8 +5006,15 @@ mod head_touch_preflight_files {
     }
 
     fn run(case: Case, name: &str) {
+        if !case.refuses() {
+            // These regular/missing paths cannot block on special-file I/O.
+            // Keep the full fresh install and its durability under the suite
+            // bound, like the other install tests, rather than a liveness timer.
+            exercise(case, None);
+            return;
+        }
         if let Some(work) = std::env::var_os(CHILD_ROOT) {
-            install_child(case, Path::new(&work));
+            exercise(case, Some(Path::new(&work)));
             return;
         }
         let work = tempfile::tempdir().unwrap();
