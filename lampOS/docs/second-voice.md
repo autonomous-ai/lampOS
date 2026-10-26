@@ -1117,7 +1117,13 @@ order is kept. A written turn is the same from the chat on.
     name; the name's words wait where words cut short do, answered in its
     place if it is held, and never joined to it (`name_refused`, El's P3:
     the join's own no sign of a second person takes one face in view at
-    each in a busy room). With no rule (`Engine::telling_one_speaker`
+    each in a busy room). Answered so, the name comes with a note that
+    someone went on talking right after it, never what was said, which may
+    be someone else's (`worker::NAME_THEN_HELD`), so the lamp asks what they
+    wanted: on lamp-4ace on 26 Oct the first line after a start, "Lamp." and
+    then "Remember that the plant by the window needs water on Fridays." in
+    a room not yet known to be quiet, got "Mm? I'm here." and the request
+    was lost with nothing asked. With no rule (`Engine::telling_one_speaker`
     unset), nothing carries. Carried, the line is never held as a short
     sound, and the rule is given its words with the name line's words before them when
     those begin with the name ("Lamp. So I have a meeting at three…"), or
