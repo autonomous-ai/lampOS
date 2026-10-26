@@ -71,6 +71,91 @@ lamp-lock.sh <lamp> run <builder> <session> routine -- \
 - `--only` / `--skip` take the step names; `--dry-run` says what it would do.
 - `tools/routine-run-test.py` tests it on a host with stand-ins (no lamp, no sound).
 
+## `tools/factory-voice.py`: the factory steps, each step spoken
+
+`steps.sh` (4c, 4c4) with every step told to the person at the lamp on the
+lamp's own speaker, as it is needed ([#3576](https://github.com/autonomous-ai/lampOS/issues/3576)).
+On [#3530](https://github.com/autonomous-ai/lampOS/issues/3530) the self-test's
+20 s touch window closed four times before its console prompt reached the lamp.
+`steps.sh` runs unchanged under a pseudo-terminal: its questions, its output,
+Ctrl-C and its exit status are its own.
+
+```bash
+bash tools/make-prompts.sh prompts          # once, on a Mac: includes the factory_* prompts
+# prompts to /var/lib/lamp-test/prompts, factory-voice.py beside steps.sh, as above
+sudo python3 factory-voice.py -- ./steps.sh --unit-id <ID> --write --to 3     # 4c1-4c3, lamp unset
+sudo python3 factory-voice.py -- ./steps.sh --unit-id <ID> --write --from 4   # 4c4, lamp set up
+```
+
+- **What it says.**
+  - **Each question:** what to do, then "Say ready when you are ready".
+  - **Step 1:** each stand, "Arm measured", and a refused rest read ("My head
+    is not on its stop…").
+  - **Step 2:** the head pads' timeline, started at the person's yes: hands
+    away for 11 s, then pad one, pad two, any other pad.
+  - **Step 4:** the self-test's touch window as it opens, its result and the
+    reset.
+  - **Any failed step:** "A step failed. Please check the laptop."
+- **The strip.** On r2 the base strip is not read (`LAMP_CONTROLS_STRIP` is
+  unset), so the touch window asks for the head and the button only; `--strip`
+  asks for the swipe too.
+- **The speaker.**
+  - **Steps 1 to 3** run on a lamp not set up: lamp-voice is not running and
+    `aplay -D device_speaker` has the speaker.
+  - **Step 4** runs on a set-up lamp. lamp-voice holds the speaker the whole
+    time it runs (a continuous PCM clock, `crates/voice/src/playback.rs`) and
+    must keep running for the self-test. So before `steps.sh` starts, as
+    `routine-run.py` does, lamp-voice is stopped and the whole self-test is
+    told up front: "In about one minute I will stand up. When I am up, touch
+    my head, then press my button. Keep doing it for twenty seconds." Then
+    lamp-voice is started again and given `--voice-settle` (6 s). During step
+    4 a prompt the speaker refuses is skipped and said once on the console.
+- **A factory tool, not the product:** the prompts belong to the hardware
+  team's bench and are never part of the image.
+- `--no-voice` mutes it and `--dry-run` prints each prompt instead.
+  `tools/factory-voice-test.py` tests it on a host with stand-ins (no lamp, no
+  sound).
+
+## `tools/factory-lamp.sh`: one lamp's factory steps from the Mac
+
+The same run for every lamp on #3530, from the Mac at the bench: the QC
+person answers at the laptop, the lamp says what to do.
+
+```bash
+LAMP_PASS=<lamp password> STEPS=<steps.sh> STEPS_SHA=<its sha256> PROMPTS=prompts \
+  tools/factory-lamp.sh unset 3e83           # lamp not set up, over its hotspot lamp-3e83
+LAMP_PASS=... tools/factory-lamp.sh selftest 3e83 <ip>   # after the app setup: step 4
+```
+
+- **unset:**
+  1. Joins `lamp-ID` with the Mac's Wi-Fi. Ethernet keeps the internet and must be first in the service order.
+  2. Reads the hostname, copies `steps.sh`, `factory-voice.py`, `head-nudge.py` and the prompts.
+  3. Checks r2 (no `country_code`), 4b (camera `01da:5875@3-1.1.4`), 4e–4g, and that the lamp is unset.
+  4. Reads the body at rest. If the head is off its stop, it offers `head-nudge.py`.
+  5. Runs steps 1–3 spoken (from step 2 when `lamp.env` is already there).
+  6. Adds `--gaze` (4d).
+  7. Reads back `lamp.env`, the pins file, `key.pub` and the gaze before it says done.
+- **selftest:** refuses a lamp that is not set up, then runs step 4 spoken; the reset follows as `steps.sh` asks.
+- **Keys:** each unset lamp is at `192.168.100.1`, so each gets its own `known_hosts`, kept in `STATE` (default `~/.factory-lamp`). No key is left on a lamp.
+
+## `tools/head-nudge.py`: a head off its stop
+
+```bash
+sudo python3 head-nudge.py --dry-run            # read and print the plan, write nothing
+sudo python3 head-nudge.py --id 5 --target 2010 # head pitch down, then let go
+```
+
+- **What it writes:** only RAM registers (torque limit 48, goal 42, torque enable 40), never EEPROM.
+- **How it moves:** the torque limit is capped at 50% first, then the goal moves 3 counts every 80 ms.
+- **When it stops:**
+  - load at 45%;
+  - lagging the goal by 40 counts;
+  - 55 °C;
+  - 30 s;
+  - settled for 1 s.
+- **How it ends:** always with torque off and the limit put back.
+- **The target:** a servo under so small a push holds about 16 counts short, so `factory-lamp.sh` aims at 2010 to rest inside the body's 1760..2020 home range. On lamp-3e83: 2102 → 2026, peak load 9%.
+
 ## Five lamps at a time
 
 One hardware builder per lamp (`hw-member1` … `hw-member6`), each with its own
