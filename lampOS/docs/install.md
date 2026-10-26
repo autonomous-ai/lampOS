@@ -677,9 +677,17 @@ on a lamp not set up the body never starts, and every part would be
 (lamp-52e6 with the V2 image on 2026-10-26: step 4 timed out on lamp-body's
 mood socket). The factory therefore runs steps 1 to 3 on the unset lamp, sets
 it up from the app on the factory's Wi-Fi, and runs step 4 (`--from 4`).
-A passed step 4 then asks for the reset and runs it as the button does
-(setup's `reset-now` on the lamp's plan, in the unit `lamp-setup-wipe`): the
-lamp reboots into setup, unset. The lamp is then removed from the factory
+A passed step 4 then asks for the reset. It first stops the lamp and waits
+for every part: `lampos-setup-done.path` (with the marker still there it
+would start the lamp again), then `lampos.target` with each of its parts
+named (its `ConsistsOf`). Then it runs the reset as the button does (setup's
+`reset-now` on the lamp's plan, in the unit `lamp-setup-wipe`), and the lamp
+reboots into setup, unset. The stop waits because `systemctl stop
+lampos.target` alone returns before the parts have stopped (systemd 252:
+0.04 s, a part's write on stop 3.1 s later). On lamp-29e7 on 26 Oct, Voice's
+onboarding, written as it stopped, outlived the wipe, so the customer got no
+first five minutes. A lamp that cannot be stopped is not reset, and step 4
+fails. The lamp is then removed from the factory
 account in the app, and packed. A reset declined leaves step 4 failed, "NOT
 READY TO PACK", so a lamp set up at the bench is never called done; the
 keeper's pause, where the image has a keeper (the product image has none),
