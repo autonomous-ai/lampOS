@@ -90,19 +90,50 @@ fn lamp(root: &Root) -> Plan {
     }
 }
 
+/// The lamp's effects. `parts`: what `systemctl show -p ConsistsOf` prints
+/// of the target; `fail_read`: it cannot be read. `writes_on_stop`: a part,
+/// `lamp-voice.service`, writes this file as it stops, as systemd 252 runs
+/// it: before a stop that names it returns, else after it (here, at the
+/// next command, the reboot).
 #[derive(Default)]
 struct Fake {
     calls: Rc<RefCell<Vec<String>>>,
+    argvs: Rc<RefCell<Vec<Vec<String>>>>,
+    parts: String,
+    fail_read: bool,
     fail_stop: bool,
     fail_reboot: bool,
+    writes_on_stop: Option<PathBuf>,
+    pending: Option<PathBuf>,
 }
 impl Effects for Fake {
     fn run(&mut self, argv: &[String]) -> io::Result<()> {
+        if let Some(late) = self.pending.take() {
+            fs::write(late, b"{\"steps\":\"the factory's\"}").unwrap();
+        }
         self.calls.borrow_mut().push(argv[1].clone());
+        self.argvs.borrow_mut().push(argv.to_vec());
         if (self.fail_stop && argv[1] == "stop") || (self.fail_reboot && argv[1] == "reboot") {
             return Err(io::Error::other("refused"));
         }
+        if argv[1] == "stop"
+            && let Some(file) = self.writes_on_stop.take()
+        {
+            if argv.iter().any(|unit| unit == "lamp-voice.service") {
+                fs::write(file, b"{\"steps\":\"the factory's\"}").unwrap();
+            } else {
+                self.pending = Some(file);
+            }
+        }
         Ok(())
+    }
+    fn read(&mut self, argv: &[String]) -> io::Result<String> {
+        self.calls.borrow_mut().push(argv[1].clone());
+        self.argvs.borrow_mut().push(argv.to_vec());
+        if self.fail_read {
+            return Err(io::Error::other("refused"));
+        }
+        Ok(self.parts.clone())
     }
     fn sync(&mut self) {
         self.calls.borrow_mut().push("sync".into());
@@ -149,7 +180,99 @@ fn a_reset_stops_wipes_removes_the_marker_and_reboots_in_that_order() {
     );
     assert_eq!(
         *fake.calls.borrow(),
-        ["sync", "stop", "sync", "sync", "reboot"]
+        ["sync", "show", "stop", "sync", "sync", "reboot"]
+    );
+}
+
+/// lamp-29e7 on 26 Oct: `systemctl stop lampos.target` returned before the
+/// target's parts had stopped, and Voice's onboarding commit, written as it
+/// stopped, outlived the wipe, so the customer got no first five minutes.
+/// The reset's stop names each part of the target, so each has stopped, and
+/// written what it writes, before anything is wiped.
+#[test]
+fn a_reset_waits_for_every_part_of_the_target_before_wiping() {
+    let root = Root::new();
+    let plan = lamp(&root);
+    let mut fake = Fake {
+        parts: "lamp-voice.service lamp-memory.service\n".into(),
+        writes_on_stop: Some(root.path("memory/progress.json")),
+        ..Fake::default()
+    };
+    reset::reset(&plan, &mut fake).unwrap();
+    wiped(&root);
+    let argvs = fake.argvs.borrow();
+    assert_eq!(
+        argvs[..2],
+        [
+            [
+                "/bin/systemctl",
+                "show",
+                "-p",
+                "ConsistsOf",
+                "--value",
+                "lampos.target"
+            ]
+            .map(String::from)
+            .to_vec(),
+            [
+                "/bin/systemctl",
+                "stop",
+                "lampos.target",
+                "lamp-voice.service",
+                "lamp-memory.service"
+            ]
+            .map(String::from)
+            .to_vec(),
+        ]
+    );
+}
+
+/// The parts cannot be read: as a stop that fails, nothing is wiped and the
+/// lamp reboots into setup, which finishes the wipe with nothing running.
+#[test]
+fn parts_that_cannot_be_read_reboot_without_wiping() {
+    let root = Root::new();
+    let plan = lamp(&root);
+    let mut fake = Fake {
+        fail_read: true,
+        ..Fake::default()
+    };
+    let steps = reset::reset(&plan, &mut fake).unwrap();
+    assert_eq!(steps, [Step::Journal, Step::MarkerRemoved, Step::Rebooting]);
+    assert_eq!(*fake.calls.borrow(), ["sync", "show", "reboot"]);
+    assert!(root.path("setup/reset.json").exists());
+    assert!(root.path("people.json").exists());
+    reset::resume(&plan, &mut Fake::default()).unwrap();
+    wiped(&root);
+}
+
+/// The keeper's stop is not systemd's: it is run as the plan has it, and no
+/// parts are asked for. A unit already named, or a printed word that reads
+/// as an option, is not added.
+#[test]
+fn only_a_systemctl_stop_of_a_target_names_its_parts() {
+    let mut fake = Fake::default();
+    let keeper: Vec<String> = ["/usr/bin/lamp-keeper", "stop", "lamp"]
+        .map(String::from)
+        .into();
+    assert_eq!(reset::waited_stop(&keeper, &mut fake).unwrap(), keeper);
+    assert!(fake.calls.borrow().is_empty());
+    let mut fake = Fake {
+        parts: "lampos.target --now lamp-voice.service".into(),
+        ..Fake::default()
+    };
+    let product: Vec<String> = ["/usr/bin/systemctl", "stop", "lampos.target"]
+        .map(String::from)
+        .into();
+    assert_eq!(
+        reset::waited_stop(&product, &mut fake).unwrap(),
+        [
+            "/usr/bin/systemctl",
+            "stop",
+            "lampos.target",
+            "lamp-voice.service"
+        ]
+        .map(String::from)
     );
 }
 
@@ -163,7 +286,7 @@ fn a_failed_stop_reboots_at_once_into_setup_which_finishes_the_wipe() {
     };
     let steps = reset::reset(&plan, &mut fake).unwrap();
     assert_eq!(steps, [Step::Journal, Step::MarkerRemoved, Step::Rebooting]);
-    assert_eq!(*fake.calls.borrow(), ["sync", "stop", "reboot"]);
+    assert_eq!(*fake.calls.borrow(), ["sync", "show", "stop", "reboot"]);
     // No marker, so the keeper starts only setup; the data is still there.
     assert!(!root.path("setup/done").exists());
     assert!(root.path("setup/reset.json").exists());
