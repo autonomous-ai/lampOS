@@ -1,0 +1,11 @@
+# Music trace: current-base continuation
+
+The committed candidate `6c3169bd3171b89f0903e238fe2f688467f12471` contains release base `2747c72a709882a62d625d5bbb3bfbe3fd797581`. Its full source inventory is bound in [results.json](results.json); [inputs.sha256](inputs.sha256) keeps the production handler and fixture hashes equal to the earlier full-gate inputs.
+
+Mac formatting and strict all-target Clippy for Voice and Voice-eval pass. The first controller completed **10 selected tests**: five music boundary controls, three schedule-ask parser/wire controls and two exact worker environment controls. It then stopped because the force-precedence filter incorrectly used `worker::tests`: Cargo returned exit 0 with **0 passed / 0 failed**, but the expected-one guard rejected this empty selection. The original controller, plan, receipt and log remain unchanged. This is a selection error, not a failing production test or a completed initial gate. The switch census had not run.
+
+A separate continuation uses the actual `worker::memory_observer` module, where the exact force-precedence test passes **1/0**. Both compiled switch-census readers pass **2/0**. The committed head and complete source inventory are identical between the two stages. Together these are **13 successful selected tests, zero test failures and zero ignored**; the zero-selection attempt is retained separately and excluded. The original ten tests were not repeated to replace their results. Literal commands and log hashes are in the results.
+
+The upstream change touches only the recorded eight paths: schedule forcing, its worker environment and product setting, plus documentation. The music handler, service and fixtures are unchanged by that base change. This is a targeted continuation, not another complete Voice run. Earlier full-suite and deliberate-fault evidence remains tied to its own source and is not relabelled. Raw logs and source inventory stay retained privately; artifact freshness is not separately claimed.
+
+The two new fixtures cover unavailable preparation after a valid turn and controlled child stderr with a successful acceptance control. They do not establish persisted journald output, provider or device behavior, physical latency, or a hard storage quota. This local result does not replace this PR's current-head native ARM64/Linux checks.

@@ -1,0 +1,291 @@
+{
+  "combined_successful_selections": {
+    "failed": 0,
+    "ignored": 0,
+    "passed": 13,
+    "selection_errors_excluded": 1
+  },
+  "corrected_continuation": {
+    "commands": [
+      {
+        "command": [
+          "cargo",
+          "+1.96.0",
+          "test",
+          "-q",
+          "--locked",
+          "--offline",
+          "-p",
+          "lamp-voice",
+          "--lib",
+          "second_provider::worker::memory_observer::the_first_force_that_names_a_function_is_the_one_kept",
+          "--",
+          "--exact",
+          "--test-threads=1"
+        ],
+        "exit_code": 0,
+        "failed": 0,
+        "filtered_out": 3804,
+        "ignored": 0,
+        "label": "force-precedence",
+        "log_sha256": "0a7f4fb557c6d9daed294dc2699826380c868b18f2b1b173b7a08318c24a9b53",
+        "passed": 1,
+        "receipt_sha256": "b206b26cd684492772b87f8127a12e610fd70198882f1a1957b1b851319264cf",
+        "source_unchanged": true,
+        "stage": "corrected-continuation"
+      },
+      {
+        "command": [
+          "cargo",
+          "+1.96.0",
+          "test",
+          "-q",
+          "--locked",
+          "--offline",
+          "-p",
+          "lamp-voice-eval",
+          "--test",
+          "it",
+          "switches::",
+          "--",
+          "--test-threads=1"
+        ],
+        "exit_code": 0,
+        "failed": 0,
+        "filtered_out": 236,
+        "ignored": 0,
+        "label": "switch-census",
+        "log_sha256": "1c8ce6b96caada736a13b613365297381769fd85679e71caa8339d3b35fbd927",
+        "passed": 2,
+        "receipt_sha256": "f501f420e641e3e3021893d66a4dd5ce41a2bf42170806c9608e390171612d5c",
+        "source_unchanged": true,
+        "stage": "corrected-continuation"
+      }
+    ],
+    "passing_selected_tests": 3,
+    "same_identity_and_source_inventory": true,
+    "status": "PASSED"
+  },
+  "identity": {
+    "base": "2747c72a709882a62d625d5bbb3bfbe3fd797581",
+    "head": "6c3169bd3171b89f0903e238fe2f688467f12471",
+    "inputs": {
+      "lampOS/crates/voice/src/coordinator.rs": "6060c4a59ca35d13774a0b6cad5a03f141a1a35e676f8dea25c8f15785ea5ede",
+      "lampOS/crates/voice/src/coordinator/tests/requested_audio.rs": "5ae99f09a6e20756671608093eaedcd8dcb49bb82dabb38724977272fa63c460"
+    },
+    "old_base": "d21a854b6a46209c8a76a70d8a8b3f3e286f0ff3",
+    "prior_full_receipt_sha256": "7deba0d2617d0859bc7ce1c464c4bc94388da633bcdc3b110f7bdff8c6a756d4",
+    "prior_negative_receipt_sha256": "08f3814ec2c8ec7c6d64e57f807a54a0e7eb7aa1aa9dd37063ff55016ce64770",
+    "scope": "Current-base focused continuation; not another full Voice run or a native ARM64 gate.",
+    "source_entries": 7168,
+    "source_inventory_sha256": "de2444b7600f6e31a4404b2126763c159560a374659a928ce0552965a712b8d6",
+    "tree": "b13d5d6bc66bec66861c9d6a6b13d71fa153db7f",
+    "upstream_changed_paths": [
+      "lampOS/crates/voice/src/process.rs",
+      "lampOS/crates/voice/src/remember/asked.rs",
+      "lampOS/crates/voice/src/second_provider/worker.rs",
+      "lampOS/crates/voice/src/tools.rs",
+      "lampOS/crates/voice/src/tools/schedule_asked.rs",
+      "lampOS/deploy/product/lamp-voice.service",
+      "lampOS/docs/schedule.md",
+      "lampOS/docs/switches.md"
+    ]
+  },
+  "limits": [
+    "The original controller did not complete; its zero-selection command is not a test pass.",
+    "Thirteen is the aggregate of ten original and three corrected successful selections on identical source.",
+    "Targeted continuation, not another complete Voice suite.",
+    "No local ARM64, provider, physical lamp or latency acceptance.",
+    "Original full gate and deliberate faults retain their original source identities.",
+    "No claim of independently rerun or fresh-only compiled artifacts."
+  ],
+  "original_stage": {
+    "commands": [
+      {
+        "command": [
+          "cargo",
+          "+1.96.0",
+          "fmt",
+          "--all",
+          "--check"
+        ],
+        "exit_code": 0,
+        "label": "fmt",
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "receipt_sha256": "f80ec3ed3c4e6d44d783834d2c5c1c7338287902a1e42f622a442737945b06cc",
+        "source_unchanged": true,
+        "stage": "original"
+      },
+      {
+        "command": [
+          "cargo",
+          "+1.96.0",
+          "clippy",
+          "-q",
+          "--locked",
+          "--offline",
+          "-p",
+          "lamp-voice",
+          "-p",
+          "lamp-voice-eval",
+          "--all-targets",
+          "--message-format=short",
+          "--",
+          "-D",
+          "warnings"
+        ],
+        "exit_code": 0,
+        "label": "clippy",
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "receipt_sha256": "3b0db7efd9ea28c6eab79d5b0a802b0445c7abe0e7b3a1c178f79692fe8636ce",
+        "source_unchanged": true,
+        "stage": "original"
+      },
+      {
+        "command": [
+          "cargo",
+          "+1.96.0",
+          "test",
+          "-q",
+          "--locked",
+          "--offline",
+          "-p",
+          "lamp-voice",
+          "--lib",
+          "coordinator::tests::requested_audio::requested_audio_boundary_",
+          "--",
+          "--test-threads=1"
+        ],
+        "exit_code": 0,
+        "failed": 0,
+        "filtered_out": 3800,
+        "ignored": 0,
+        "label": "music-boundary",
+        "log_sha256": "a6bcc320ab156241db9005a2ecf14cf6f7f9011823210760f373d40b1b165700",
+        "passed": 5,
+        "receipt_sha256": "c962597ccca82b0072fee9ee5e5190f26720422a921a08507e83fe42ed894ba6",
+        "source_unchanged": true,
+        "stage": "original"
+      },
+      {
+        "command": [
+          "cargo",
+          "+1.96.0",
+          "test",
+          "-q",
+          "--locked",
+          "--offline",
+          "-p",
+          "lamp-voice",
+          "--lib",
+          "tools::schedule_asked::tests::",
+          "--",
+          "--test-threads=1"
+        ],
+        "exit_code": 0,
+        "failed": 0,
+        "filtered_out": 3802,
+        "ignored": 0,
+        "label": "schedule-asked",
+        "log_sha256": "8a1a32ded636ffd87f9fe237b6c5ae6677684158222a1ac6318cdc3596c9b24a",
+        "passed": 3,
+        "receipt_sha256": "efe055957d5292664ebda5e473145951997036d66b08c8d3fe35598b8da2f3ef",
+        "source_unchanged": true,
+        "stage": "original"
+      },
+      {
+        "command": [
+          "cargo",
+          "+1.96.0",
+          "test",
+          "-q",
+          "--locked",
+          "--offline",
+          "-p",
+          "lamp-voice",
+          "--lib",
+          "process::tests::cleared_worker_environment_passes_only_the_exact_voice_route_opt_in",
+          "--",
+          "--exact",
+          "--test-threads=1"
+        ],
+        "exit_code": 0,
+        "failed": 0,
+        "filtered_out": 3804,
+        "ignored": 0,
+        "label": "worker-opt-in",
+        "log_sha256": "ed10c1101ca19b586155ed88da3dd51358f83d2010695d0bbf2bfb0af70f9e0e",
+        "passed": 1,
+        "receipt_sha256": "deed73c411e7be4fc5404ce0704717ca7c44a0267a23ed0f6b0a1af12461eaa3",
+        "source_unchanged": true,
+        "stage": "original"
+      },
+      {
+        "command": [
+          "cargo",
+          "+1.96.0",
+          "test",
+          "-q",
+          "--locked",
+          "--offline",
+          "-p",
+          "lamp-voice",
+          "--lib",
+          "process::tests::a_started_worker_gets_its_roles_switches_and_nothing_else",
+          "--",
+          "--exact",
+          "--test-threads=1"
+        ],
+        "exit_code": 0,
+        "failed": 0,
+        "filtered_out": 3804,
+        "ignored": 0,
+        "label": "worker-environment",
+        "log_sha256": "75fcf39fcd34e94317ba9ca8057057ee533891de9a77ce38d5fdd20d84db35b4",
+        "passed": 1,
+        "receipt_sha256": "74095fb6e37a255121b79268762ace15ce88e7f90100f99e12cf1808369dd483",
+        "source_unchanged": true,
+        "stage": "original"
+      }
+    ],
+    "passing_selected_tests": 10,
+    "status": "STOPPED_ON_SELECTION_ERROR"
+  },
+  "retained_input_hashes": {
+    "continuation_plan_sha256": "09ff0ee0a862207ca289cf1167df41a8cc5875e4d08614af3d95c7c9102fb721",
+    "continuation_summary_sha256": "4757ac2c39112101b9678667c953ab56745a37e192db087615854439b799fae1",
+    "original_controller_sha256": "124799dbb50debc685b86eee9a6f14a815a1a82af8f45188b9096a7f38d091b8",
+    "original_plan_sha256": "b314323790b45a4b770a1210d7c09e4ff016c4538540897a32edfae5043da089"
+  },
+  "retained_selection_error": {
+    "command": [
+      "cargo",
+      "+1.96.0",
+      "test",
+      "-q",
+      "--locked",
+      "--offline",
+      "-p",
+      "lamp-voice",
+      "--lib",
+      "second_provider::worker::tests::the_first_force_that_names_a_function_is_the_one_kept",
+      "--",
+      "--exact",
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "expected_passed": 1,
+    "failed": 0,
+    "filtered_out": 3805,
+    "ignored": 0,
+    "label": "force-precedence",
+    "log_sha256": "d98719d784c11b84450c13914c8e59c03d1f9979ff92ac997510d836b77a21d2",
+    "passed": 0,
+    "qualifies": false,
+    "reason": "The supplied exact worker::tests filter selected zero tests; the controller rejected it before the switch census.",
+    "receipt_sha256": "f732d0daddbf2d6635bde024bf11c871bd9608ee7f8b43ed5cb5bc693b2dec9e",
+    "source_unchanged": true,
+    "stage": "original-rejected-selection"
+  },
+  "schema": 2
+}
