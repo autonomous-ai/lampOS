@@ -1,0 +1,198 @@
+{
+  "base": "3696bd0ad819402a3a7893ca037654f06fc11c54",
+  "source_count": 7238,
+  "source_sha256": "ae4df4f8714d54e9d43f4bf81065e8acc3432bd7fb948ba2e3a3882b3644def0",
+  "all_source_unchanged": true,
+  "gates": {
+    "fmt": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "start": "2026-10-26T12:49:13Z",
+      "finish": "2026-10-26T12:49:25Z",
+      "exit": 0,
+      "summaries": [],
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "clippy": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "clippy",
+        "-q",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-update",
+        "-p",
+        "lamp-setup",
+        "-p",
+        "lamp-cloud",
+        "-p",
+        "lamp-keeper",
+        "-p",
+        "lamp-skills",
+        "--all-targets",
+        "--message-format=json",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "start": "2026-10-26T12:49:25Z",
+      "finish": "2026-10-26T12:50:41Z",
+      "exit": 0,
+      "summaries": [],
+      "log_sha256": "8e6b9ced84e97d42eab2cc54eed9f215930e6e8a5e20d771161f07853fa37de5"
+    },
+    "build": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "build",
+        "-q",
+        "--offline",
+        "--locked",
+        "--workspace",
+        "--message-format=json"
+      ],
+      "start": "2026-10-26T12:50:41Z",
+      "finish": "2026-10-26T12:53:46Z",
+      "exit": 0,
+      "summaries": [],
+      "log_sha256": "342ee415ebadbdf8dd41581eebcf3a632f4a6cb26bdc972fbaa44369fad0cd52"
+    },
+    "test-compile": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-update",
+        "--no-run",
+        "--message-format=json"
+      ],
+      "start": "2026-10-26T12:53:46Z",
+      "finish": "2026-10-26T12:55:29Z",
+      "exit": 0,
+      "summaries": [],
+      "log_sha256": "5531c11b907573d31cf6e947d9bca2b611fdf5a4276870b281029f212bae802f"
+    },
+    "test-lib": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-update",
+        "--lib",
+        "--",
+        "--test-threads=1"
+      ],
+      "start": "2026-10-26T12:55:29Z",
+      "finish": "2026-10-26T12:55:40Z",
+      "exit": 0,
+      "summaries": [
+        "test result: ok. 123 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 9.28s"
+      ],
+      "log_sha256": "9fd5736c09380eb510a12e3af57a8b4e74d74ad7a69e1b35c08b8999b292a509"
+    },
+    "test-bin": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-update",
+        "--bin",
+        "lamp-update",
+        "--",
+        "--test-threads=1"
+      ],
+      "start": "2026-10-26T12:55:40Z",
+      "finish": "2026-10-26T12:55:41Z",
+      "exit": 0,
+      "summaries": [
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      ],
+      "log_sha256": "a42c8e78d82e5fd635cc53c6804cb68562ed398293b6322b5ad7bab4a6e6e75e"
+    },
+    "test-integration": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-update",
+        "--test",
+        "functions",
+        "--test",
+        "install",
+        "--test",
+        "it",
+        "--test",
+        "release_pair",
+        "--test",
+        "round",
+        "--test",
+        "self-cli-exec",
+        "--test",
+        "self-process-cuts",
+        "--",
+        "--test-threads=16"
+      ],
+      "start": "2026-10-26T12:55:41Z",
+      "finish": "2026-10-26T13:17:44Z",
+      "exit": 0,
+      "summaries": [
+        "test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s",
+        "test result: ok. 101 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 388.95s",
+        "test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.83s",
+        "test result: ok. 0 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 183 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 928.79s",
+        "test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out",
+        "test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out"
+      ],
+      "log_sha256": "b452c6fe1ed895d0504b41dba5f26027e7fd87512e647861b804c636777f61b4"
+    },
+    "test-doc": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-update",
+        "--doc",
+        "--",
+        "--test-threads=1"
+      ],
+      "start": "2026-10-26T13:17:44Z",
+      "finish": "2026-10-26T13:17:45Z",
+      "exit": 0,
+      "summaries": [
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      ],
+      "log_sha256": "f8718ae0282beb4c124b793e2096f85d7425f8c69a7163bf0a837751efb2b6ee"
+    }
+  },
+  "executables_unchanged_across_runtime": true,
+  "runtime_counts": {
+    "passed": 425,
+    "failed": 0,
+    "ignored": 6
+  },
+  "limits": "Native Mac Update full coverage. Library serial due global DNS budget; explicit integrations sixteen threads, bin/doc serial. Linux-only external harnesses remain ignored here. No real systemd/device or latency qualification."
+}

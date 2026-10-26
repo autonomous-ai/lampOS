@@ -1,0 +1,29 @@
+{
+  "head": "0d36aa8623c712271e05aeb4bb132ef486bc0875",
+  "base": "830c384ae4050d895cfd5f764f9a00f9989b8388",
+  "runtime_head": "3696bd0ad819402a3a7893ca037654f06fc11c54",
+  "runtime_base": "aa9ec9e27a788ee19d7b52a9c91296382208e490",
+  "runtime": [
+    425,
+    0,
+    6
+  ],
+  "runtime_repeated": false,
+  "all10_equal": {
+    "self_cli_exec-54a909607d4dc62b": true,
+    "lamp_update-cebdb705cde8ec81": true,
+    "release_pair-2ff63d2c9df235ef": true,
+    "self_process_cuts-c92b6688279bd59f": true,
+    "functions-5603f33a4dae064e": true,
+    "round-86f3bcf98e2c5ca2": true,
+    "install-56b9137cd677b603": true,
+    "it-49911377a8fbd75d": true,
+    "lamp_update-04671789528a12d3": true,
+    "lamp-update": true
+  },
+  "source_delta": [
+    "docs/build-rows.md"
+  ],
+  "rust_references_to_changed_doc": [],
+  "fresh_compiler_gates": "fmt, strict five-package all-target Clippy, workspace build, Update test compilation all passed"
+}
