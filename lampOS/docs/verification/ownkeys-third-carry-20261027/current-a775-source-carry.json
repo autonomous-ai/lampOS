@@ -1,0 +1,299 @@
+{
+  "all_seven_equal": true,
+  "author_metadata_all_preserved": true,
+  "base": "a3b9c46814bb2b2452f0d6b6cc13bb3a16992c33",
+  "commits": [
+    {
+      "author_metadata_preserved": true,
+      "carried": "b8c38118527547fa57795c6f14f899eeb327a434",
+      "message_preserved": true,
+      "original": "c10d0e62ba9f93d32216d4a1ae949614ed7b7c8a",
+      "patch_equal": true,
+      "stable_patch_id": "831f94dae19906d0a99d5c7cc82d20737b1639ef"
+    },
+    {
+      "author_metadata_preserved": true,
+      "carried": "a6958f9eb224160d34e64ca32751ff1b8a5e5de7",
+      "message_preserved": true,
+      "original": "f7f576fbd118213d7358525785ca2c3ee6f313ba",
+      "patch_equal": true,
+      "stable_patch_id": "d5ef0f78a4af2746d4a066dfa1dda6bc48496d86"
+    },
+    {
+      "author_metadata_preserved": true,
+      "carried": "3c27cd7b60ea6b230ca5e22e74369da32c2747e2",
+      "message_preserved": true,
+      "original": "4991346bb209d50b1433af8ce182dcaa5c717776",
+      "patch_equal": true,
+      "stable_patch_id": "54320f9f9f54cd951fc4132a820558309592cd86"
+    },
+    {
+      "author_metadata_preserved": true,
+      "carried": "17acd358104ae075e0b4faee7323bce3ab20318a",
+      "message_preserved": true,
+      "original": "894799fcd84f65a7b89e01e0a7048a430d03c67d",
+      "patch_equal": true,
+      "stable_patch_id": "4fe1eba61acc08d50b43ba1dbf5daaa480def9ad"
+    },
+    {
+      "author_metadata_preserved": true,
+      "carried": "911b17f30d9ec9f35a16b0c48823778047994edc",
+      "message_preserved": true,
+      "original": "562133cb941d4a2b6583737fc8d95996fcad718c",
+      "patch_equal": true,
+      "stable_patch_id": "e41108a67cdd262974f783a8746f13c8eefe330b"
+    },
+    {
+      "author_metadata_preserved": true,
+      "carried": "0c23e8e74bfb4f80630fbe1c934ae99545eef1e3",
+      "message_preserved": true,
+      "original": "6e37cd441a2a33d60a696d8c3ee112557916ad07",
+      "patch_equal": true,
+      "stable_patch_id": "2f733f7fd60104b62d09c41885fc33848012eb62"
+    },
+    {
+      "author_metadata_preserved": true,
+      "carried": "a775e1a9bd2b677c572ddfbcbed46486b8f5546f",
+      "message_preserved": true,
+      "original": "273c1b6f1c67288d7904d98909edddb1eed40a69",
+      "patch_equal": true,
+      "stable_patch_id": "84e4bfb82563529826f709269d1086f7fa2b258b"
+    }
+  ],
+  "execution_claim": false,
+  "head": "a775e1a9bd2b677c572ddfbcbed46486b8f5546f",
+  "original_base": "521dcb006848a5bc99b11513828233ef65a4883c",
+  "original_head": "273c1b6f1c67288d7904d98909edddb1eed40a69",
+  "scope_count": 38,
+  "scope_modes": [
+    {
+      "new_mode": "100644",
+      "old_mode": "100644",
+      "path": "lampOS/crates/selftest/src/voice_route.rs",
+      "status": "M"
+    },
+    {
+      "new_mode": "100644",
+      "old_mode": "100644",
+      "path": "lampOS/crates/update/src/install.rs",
+      "status": "M"
+    },
+    {
+      "new_mode": "100644",
+      "old_mode": "100644",
+      "path": "lampOS/deploy/product/own-keys-voice.conf\tlampOS/crates/update/src/retired-own-keys-voice.conf",
+      "status": "R100"
+    },
+    {
+      "new_mode": "100644",
+      "old_mode": "100644",
+      "path": "lampOS/crates/update/tests/install.rs",
+      "status": "M"
+    },
+    {
+      "new_mode": "100644",
+      "old_mode": "100644",
+      "path": "lampOS/crates/voice/src/second_config.rs",
+      "status": "M"
+    },
+    {
+      "new_mode": "100644",
+      "old_mode": "100644",
+      "path": "lampOS/deploy/product/README.md",
+      "status": "M"
+    },
+    {
+      "new_mode": "100644",
+      "old_mode": "100644",
+      "path": "lampOS/deploy/product/lamp-cloud.service",
+      "status": "M"
+    },
+    {
+      "new_mode": "100644",
+      "old_mode": "100644",
+      "path": "lampOS/deploy/product/lamp-setup-keys.socket",
+      "status": "M"
+    },
+    {
+      "new_mode": "100644",
+      "old_mode": "100644",
+      "path": "lampOS/deploy/product/lamp-setup.service",
+      "status": "M"
+    },
+    {
+      "new_mode": "100644",
+      "old_mode": "100644",
+      "path": "lampOS/deploy/product/lamp-voice.service",
+      "status": "M"
+    },
+    {
+      "new_mode": "100644",
+      "old_mode": "100644",
+      "path": "lampOS/docs/cloud.md",
+      "status": "M"
+    },
+    {
+      "new_mode": "100644",
+      "old_mode": "100644",
+      "path": "lampOS/docs/install.md",
+      "status": "M"
+    },
+    {
+      "new_mode": "100644",
+      "old_mode": "100644",
+      "path": "lampOS/docs/own-keys.md",
+      "status": "M"
+    },
+    {
+      "new_mode": "100644",
+      "old_mode": "100644",
+      "path": "lampOS/docs/selftest.md",
+      "status": "M"
+    },
+    {
+      "new_mode": "100644",
+      "old_mode": "100644",
+      "path": "lampOS/docs/setup.md",
+      "status": "M"
+    },
+    {
+      "new_mode": "100644",
+      "old_mode": "100644",
+      "path": "lampOS/docs/switches.md",
+      "status": "M"
+    },
+    {
+      "new_mode": "100644",
+      "old_mode": "000000",
+      "path": "lampOS/docs/verification/own-keys-product-carry-20261026/README.md",
+      "status": "A"
+    },
+    {
+      "new_mode": "100644",
+      "old_mode": "000000",
+      "path": "lampOS/docs/verification/own-keys-product-carry-20261026/SHA256SUMS",
+      "status": "A"
+    },
+    {
+      "new_mode": "100644",
+      "old_mode": "000000",
+      "path": "lampOS/docs/verification/own-keys-product-carry-20261026/current-274/README.md",
+      "status": "A"
+    },
+    {
+      "new_mode": "100644",
+      "old_mode": "000000",
+      "path": "lampOS/docs/verification/own-keys-product-carry-20261026/current-274/SHA256SUMS",
+      "status": "A"
+    },
+    {
+      "new_mode": "100644",
+      "old_mode": "000000",
+      "path": "lampOS/docs/verification/own-keys-product-carry-20261026/current-274/inputs.sha256",
+      "status": "A"
+    },
+    {
+      "new_mode": "100644",
+      "old_mode": "000000",
+      "path": "lampOS/docs/verification/own-keys-product-carry-20261026/current-274/range-diff.txt",
+      "status": "A"
+    },
+    {
+      "new_mode": "100644",
+      "old_mode": "000000",
+      "path": "lampOS/docs/verification/own-keys-product-carry-20261026/current-274/results.json",
+      "status": "A"
+    },
+    {
+      "new_mode": "100644",
+      "old_mode": "000000",
+      "path": "lampOS/docs/verification/own-keys-product-carry-20261026/current-756/README.md",
+      "status": "A"
+    },
+    {
+      "new_mode": "100644",
+      "old_mode": "000000",
+      "path": "lampOS/docs/verification/own-keys-product-carry-20261026/current-756/SHA256SUMS",
+      "status": "A"
+    },
+    {
+      "new_mode": "100644",
+      "old_mode": "000000",
+      "path": "lampOS/docs/verification/own-keys-product-carry-20261026/current-756/inputs.sha256",
+      "status": "A"
+    },
+    {
+      "new_mode": "100644",
+      "old_mode": "000000",
+      "path": "lampOS/docs/verification/own-keys-product-carry-20261026/current-756/range-diff.txt",
+      "status": "A"
+    },
+    {
+      "new_mode": "100644",
+      "old_mode": "000000",
+      "path": "lampOS/docs/verification/own-keys-product-carry-20261026/current-756/results.json",
+      "status": "A"
+    },
+    {
+      "new_mode": "100644",
+      "old_mode": "000000",
+      "path": "lampOS/docs/verification/own-keys-product-carry-20261026/current-d21/README.md",
+      "status": "A"
+    },
+    {
+      "new_mode": "100644",
+      "old_mode": "000000",
+      "path": "lampOS/docs/verification/own-keys-product-carry-20261026/current-d21/SHA256SUMS",
+      "status": "A"
+    },
+    {
+      "new_mode": "100644",
+      "old_mode": "000000",
+      "path": "lampOS/docs/verification/own-keys-product-carry-20261026/current-d21/inputs.sha256",
+      "status": "A"
+    },
+    {
+      "new_mode": "100644",
+      "old_mode": "000000",
+      "path": "lampOS/docs/verification/own-keys-product-carry-20261026/current-d21/range-diff.txt",
+      "status": "A"
+    },
+    {
+      "new_mode": "100644",
+      "old_mode": "000000",
+      "path": "lampOS/docs/verification/own-keys-product-carry-20261026/current-d21/results.json",
+      "status": "A"
+    },
+    {
+      "new_mode": "100644",
+      "old_mode": "000000",
+      "path": "lampOS/docs/verification/own-keys-product-carry-20261026/inputs.sha256",
+      "status": "A"
+    },
+    {
+      "new_mode": "100644",
+      "old_mode": "000000",
+      "path": "lampOS/docs/verification/own-keys-product-carry-20261026/results.json",
+      "status": "A"
+    },
+    {
+      "new_mode": "100644",
+      "old_mode": "000000",
+      "path": "lampOS/docs/verification/own-keys-product-carry-20261026/review-docs/README.md",
+      "status": "A"
+    },
+    {
+      "new_mode": "100644",
+      "old_mode": "000000",
+      "path": "lampOS/docs/verification/own-keys-product-carry-20261026/review-docs/SHA256SUMS",
+      "status": "A"
+    },
+    {
+      "new_mode": "100644",
+      "old_mode": "000000",
+      "path": "lampOS/docs/verification/own-keys-product-carry-20261026/review-docs/results.json",
+      "status": "A"
+    }
+  ],
+  "scope_modes_equal": true
+}
