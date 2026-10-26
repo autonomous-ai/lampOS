@@ -1,0 +1,32 @@
+{
+  "head": "a1a905ef677f19f75049f3f96af7c8cbf740ee57",
+  "base": "7d0017f08ec2a6c709012e6b3754bd414148cb48",
+  "range_diff": "Both authored commits = versus883/2d18",
+  "gates": {
+    "fmt": 0,
+    "clippy": 0,
+    "build": 0,
+    "test-compile": 0
+  },
+  "entire_lampOS_source_identical_to_883": true,
+  "all_six_artifacts_identical_to_883": {
+    "it-46363ab9699809b5": true,
+    "lamp_skills-a718b2a0214b6903": true,
+    "requested_audio-019db324b83a9807": true,
+    "release_pair-88349d4c2302e5ab": true,
+    "lamp_skills-c6f44302f3b2c78f": true,
+    "lamp-skills": true
+  },
+  "actual_host_retained": {
+    "head": "08a7185c0ca646a025c5d61d89b4202ee07183f6",
+    "base": "e672ee214ae67eb05538d519a43d1f6ba2662ecb",
+    "focused": [
+      1,
+      0,
+      0
+    ],
+    "ten_rows": true,
+    "reason": "Actual executed integration+child remain byte-identical, synthetic runtime inputs consume none of the changed files. No current-head runtime or native timing claim."
+  },
+  "limits": "Cached carry flags and preimages retained. Current original native and two peer carry reads still required; authorHOLD and historical failures stay."
+}

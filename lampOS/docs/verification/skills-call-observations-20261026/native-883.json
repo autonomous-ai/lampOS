@@ -1,0 +1,95 @@
+{
+  "pr": 3591,
+  "offered_head": "88300511efab088393859e7ff18487cafc1a3f0d",
+  "offered_base": "2d18e296c0a51ac0f6fb7c610c3c159cef9870c4",
+  "arm64_run": 40347745344,
+  "linux_clippy_run": 40347745326,
+  "arm64_attempt": 1,
+  "linux_clippy_attempt": 1,
+  "arm64_conclusion": "success",
+  "linux_clippy_conclusion": "success",
+  "previews": {
+    "linux-clippy": {
+      "executed_preview": "48affad378851c64a0a0b9031426e68e27b9d7f8",
+      "preview_parents": [
+        "2d18e296c0a51ac0f6fb7c610c3c159cef9870c4",
+        "88300511efab088393859e7ff18487cafc1a3f0d"
+      ],
+      "preview_tree": "0582691aa4a0c32e72314a5dcb4f1670c7393ce4",
+      "offered_tree": "0582691aa4a0c32e72314a5dcb4f1670c7393ce4",
+      "preview_equals_offered_tree": true
+    },
+    "arm64": {
+      "executed_preview": "48affad378851c64a0a0b9031426e68e27b9d7f8",
+      "preview_parents": [
+        "2d18e296c0a51ac0f6fb7c610c3c159cef9870c4",
+        "88300511efab088393859e7ff18487cafc1a3f0d"
+      ],
+      "preview_tree": "0582691aa4a0c32e72314a5dcb4f1670c7393ce4",
+      "offered_tree": "0582691aa4a0c32e72314a5dcb4f1670c7393ce4",
+      "preview_equals_offered_tree": true
+    }
+  },
+  "passed": 7533,
+  "failed": 0,
+  "leaks": 0,
+  "timeouts": 0,
+  "skipped": 53,
+  "unique_terminal_cases": 7533,
+  "repeated_equal_rows": 34,
+  "all_selected_ordinals_present": true,
+  "reported_selected_totals": [
+    7533
+  ],
+  "own_control_pass_counts": {
+    "lamp-skills::it call_wait::a_tool_call_is_answered_while_the_program_listens_on_three_topics": 1
+  },
+  "terminal_findings": [],
+  "all_pass_audit": true,
+  "qualified": true,
+  "limits": "Exact original883/2d18 native only. Host focused1/0 remains actual08a/e672 retained by unchanged integration and child bytes; changed main-test binary never executed in that host scope. Prior author HOLD, current independent reads and author closure are outside this audit; no readiness or posting actions.",
+  "separate_harnesses": {
+    "turn_wire": {
+      "passed": 13,
+      "failed": 0,
+      "case_counts": {
+        "an_idle_worker_stays_ready_across_a_long_quiet": 1,
+        "a_worker_reporting_another_model_is_refused_before_any_request": 1,
+        "no_outcome_is_delivered_after_close_even_for_an_answer_on_its_way": 1,
+        "verdict_carries_identity_and_one_request_at_a_time": 1,
+        "missing_model_is_final_and_never_restarted": 1,
+        "missing_executable_fails_at_once": 1,
+        "spawn_returns_while_worker_startup_is_held": 1,
+        "startup_failures_are_final": 1,
+        "serving_failures_are_replaced_within_budget": 1,
+        "protocol_violations_are_replaced": 1,
+        "cancelled_answers_are_never_delivered": 1,
+        "close_during_inference_never_waits": 1,
+        "sustained_requests_stay_bounded": 1
+      }
+    },
+    "docs": {
+      "passed": 4,
+      "failed": 0
+    },
+    "relay_signals": true,
+    "export": true,
+    "artifact_uploaded": true
+  },
+  "selection": {
+    "selected_tests": 7533,
+    "selected_binaries": 70,
+    "skipped_tests": 53,
+    "skipped_binaries": 114
+  },
+  "timing_rows": {
+    "available_in_native_log": false,
+    "matching_lines": 0,
+    "rows": [],
+    "limit": "Native case PASS is not a native timing measurement when observation rows absent. Host1/0 remains actual08a/e672, retained by integration/child binding; main-test binary changed but was not executed in host scope."
+  },
+  "raw_log_sha256": {
+    "linux-clippy": "07c4fa3f79d5452d890ec884ed4607e1e7b015690174240aeb7a10490baa1365",
+    "arm64": "40959336efde5ef1c5e4179d68c8dcfcdc00544ff471ccced9b9567d0c03797a"
+  }
+}

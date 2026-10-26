@@ -1,3 +1,9 @@
+## 2026-10-26 22:35 — diagnostic883 native green; hardware-base carry
+
+Ready for lamp-voice: no (#3591)
+
+Original883/2d18 ARM40347745344 and Linux40347745326 pass:7,533unique/0bad/53skips, completeordinals, changedcaseonce,34identicalduplicatesdeduplicated. Previewparents/fulltree match; separate docs4/0/process13/0/relay/export/upload pass; no native timing rows. [Receipt](verification/skills-call-observations-20261026/native-883.json). Pushed unchangeda1a905ef6 on7d0017f08 after all current compiler stages pass; entirelampOSsource and allsixsavedbinaryhashes identicalto883. [Carry](verification/skills-call-observations-20261026/current-7d00-carry.json). Actualfocused1/0 remains08a/e672, not relabeled. Currentnative/read carries and authorfindingclosure remain required.
+
 ## 2026-10-26 22:32 — controlled-probe base label corrected
 
 Ready for lamp-voice: no
