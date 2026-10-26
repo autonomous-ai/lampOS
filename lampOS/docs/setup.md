@@ -199,7 +199,13 @@ lamp-setup reset-now`). That unit, in this order:
    (systemd units name some of them and would not start without them) and
    loses everything in it. It walks by handle, one component at a time from
    `/`, following no link anywhere: a part that swaps a directory for a link
-   mid-wipe makes the wipe fail instead of reaching outside the plan;
+   mid-wipe makes the wipe fail instead of reaching outside the plan. A
+   wiped `wpa_supplicant-wlan0.conf` goes with the copies Wi-Fi keeps beside
+   it (`.conf.lamp-previous`, the old network a change or the boot's
+   `lamp-setup-wifi-restore` puts back, and setup's `.conf.lamp-setup` and
+   `.conf.lamp-setup-tmp`), matched by name so plans installed before them
+   wipe them too, and `wifi-restore` puts no old network back while a reset
+   is journalled (Third on #3579);
 5. it removes the journal, syncs, and reboots. If the wipe fails it still
    reboots, and if the reboot command fails it forces one: a lamp left dark
    with no marker would wait for a hand.
