@@ -13,6 +13,21 @@ machine is explicitly named. Third has no lamp access.
 
 
 
+## 2026-10-26 14:02 — Reminder native green; factory landed
+
+Ready for lamp-voice: no (#3525, new-base carry gate running)
+
+**ce75aa0a9/9e5d3b9c6** original ARM64 **40281594899** passes 11,381
+unique cases, zero failures/leaks/timeouts, 106 skipped; all 21 controls
+once. Linux **40281595151** passes. Preview **5f84ee178** has exact
+parents and offered tree; Turn-wire 13/0 is separate.
+[Receipt](verification/reminder-pending-present-20261026/native-40281594899.json).
+
+Factory #3546 landed through train 162 at **88335bfbe**; landing audit
+finishes separately. Reminder's new local carry **fe488d108** is one equal
+range-diff commit, with gates running before push. This green event is not
+renamed for that new head. No device test or physical reminder acceptance.
+
 ## 2026-10-26 13:58 — Factory qualified for train 162
 
 Ready for lamp-voice: yes (#3546)

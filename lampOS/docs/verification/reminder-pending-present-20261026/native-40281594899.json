@@ -1,0 +1,112 @@
+{
+  "pr": 3525,
+  "offered_head": "ce75aa0a96679bccc375d4b5b781c512ae1e4681",
+  "offered_base": "9e5d3b9c689638719238c15ecd5c9d334405de97",
+  "arm64_run": 40281594899,
+  "linux_clippy_run": 40281595151,
+  "arm64_attempt": 1,
+  "linux_clippy_attempt": 1,
+  "arm64_conclusion": "success",
+  "linux_clippy_conclusion": "success",
+  "previews": {
+    "linux-clippy": {
+      "executed_preview": "5f84ee178dc0d68855606ef31fd36e2e36e53437",
+      "preview_parents": [
+        "9e5d3b9c689638719238c15ecd5c9d334405de97",
+        "ce75aa0a96679bccc375d4b5b781c512ae1e4681"
+      ],
+      "preview_tree": "4e47afe82d4156159a3f47a739c61135569e9b47",
+      "offered_tree": "4e47afe82d4156159a3f47a739c61135569e9b47",
+      "preview_equals_offered_tree": true
+    },
+    "arm64": {
+      "executed_preview": "5f84ee178dc0d68855606ef31fd36e2e36e53437",
+      "preview_parents": [
+        "9e5d3b9c689638719238c15ecd5c9d334405de97",
+        "ce75aa0a96679bccc375d4b5b781c512ae1e4681"
+      ],
+      "preview_tree": "4e47afe82d4156159a3f47a739c61135569e9b47",
+      "offered_tree": "4e47afe82d4156159a3f47a739c61135569e9b47",
+      "preview_equals_offered_tree": true
+    }
+  },
+  "passed": 11381,
+  "failed": 0,
+  "leaks": 0,
+  "timeouts": 0,
+  "skipped": 106,
+  "unique_terminal_cases": 11381,
+  "repeated_equal_rows": 35,
+  "all_selected_ordinals_present": true,
+  "reported_selected_totals": [
+    11381
+  ],
+  "own_control_pass_counts": {
+    "lamp-skills::it skills::reminder_pending::unchanged_held_reminder_has_one_chance_across_sixty_heartbeats": 1,
+    "lamp-skills::it skills::reminder_pending::core_reminders_can_request_again_after_talk_with_pending_still_positive": 1,
+    "lamp-skills::it skills::reminder_pending::core_reminders_keep_readiness_and_enablement_gates_on_repeated_chances": 1,
+    "lamp-skills::it skills::reminder_pending::core_reminders_coalesce_queue_changes_and_ignore_renewal_metadata": 1,
+    "lamp-skills::it skills::reminder_pending::core_reminders_notice_a_brief_talk_between_schedule_heartbeats": 1,
+    "lamp-skills::it skills::reminder_pending::core_reminders_rearm_after_source_or_condition_expiry": 1,
+    "lamp-skills::it skills::reminder_pending::core_reminders_keep_the_change_snapshot_across_unchanged_reload": 1,
+    "lamp-skills::it skills::reminder_pending::invalid_selected_values_do_not_replace_or_rearm_a_reminder_snapshot": 1,
+    "lamp-skills::it skills::reminder_pending::invalid_selected_trigger_values_do_not_rearm_a_reminder_snapshot": 1,
+    "lamp-skills::it skills::reminder_pending::a_valid_empty_schedule_rearms_after_an_invalid_selected_trigger_value": 1,
+    "lamp-skills::it skills::reminder_pending::a_talk_rearms_even_while_a_selected_trigger_value_is_invalid": 1,
+    "lamp-skills::it skills::reminder_pending::invalid_selected_choice_values_do_not_rearm_a_changes_snapshot": 1,
+    "lamp-skills::it skills::reminder_pending::a_changes_trigger_refuses_selected_while_path_overlap": 1,
+    "lamp-skills::it skills::reminder_pending::a_changes_trigger_keeps_independent_while_paths": 1,
+    "lamp-skills::it skills::reminder_pending::existing_trigger_modes_keep_their_heartbeat_behavior": 1,
+    "lamp-skills::it skills::reminder_pending::a_changes_trigger_reads_a_bounded_tuple_on_another_topic": 1,
+    "lamp-skills::it skills::reminder_pending::a_schedule_ask_only_moves_when_voice_begins_it": 1,
+    "lamp-skills::it skills::reminder_pending::repeated_schedule_chances_keep_one_waiting_runner_and_no_look": 1,
+    "lamp-skills tests::a_change_trigger_requires_bounded_paths_and_compatible_options": 1,
+    "lamp-skills tests::a_change_trigger_requires_a_scalar_comparison": 1,
+    "lamp-skills::it skills::every_skill_folder_passes_its_own_recorded_tests": 1
+  },
+  "terminal_findings": [],
+  "native_summary": "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-26T06:59:46.7629482Z      Summary [ 207.418s] 11381 tests run: 11381 passed, 106 skipped",
+  "all_pass_audit": true,
+  "raw_logs": {
+    "linux-clippy": {
+      "path": "/Users/d/code/autonomous-os/.claude/worktrees/third-reminder-pending-evidence/native-40281594899/linux-clippy-40281595151.log",
+      "bytes": 91685,
+      "sha256": "93313d541e5c0b6b0929f4d4fa68465ea7a9f0031eaf01fb4f6006e77d7f2a94"
+    },
+    "arm64": {
+      "path": "/Users/d/code/autonomous-os/.claude/worktrees/third-reminder-pending-evidence/native-40281594899/arm64-40281594899.log",
+      "bytes": 2734176,
+      "sha256": "74ffc7e1c5566b63e5a066b175c743882e4061f1725ece9ab65ac3a3269001dc"
+    }
+  },
+  "controls_source": {
+    "path": "/Users/d/code/autonomous-os/.claude/worktrees/third-reminder-pending-evidence/current-9e5/sealed.json",
+    "sha256": "44865c06756a5ac00e0439f26dde2ada928d3ded7a062e262c364dd7f723a10c"
+  },
+  "qualified": true,
+  "limits": "Original ce75aa0a9 reminder-changes carry on 9e5d3b9c6 only; earlier native results remain separate. No local tests, workflow retries, device, provider or physical-latency claims.",
+  "turn_wire_custom_harness": {
+    "passed": 13,
+    "failed": 0,
+    "control_pass_counts": {
+      "an_idle_worker_stays_ready_across_a_long_quiet": 1,
+      "a_worker_reporting_another_model_is_refused_before_any_request": 1,
+      "no_outcome_is_delivered_after_close_even_for_an_answer_on_its_way": 1,
+      "verdict_carries_identity_and_one_request_at_a_time": 1,
+      "missing_model_is_final_and_never_restarted": 1,
+      "missing_executable_fails_at_once": 1,
+      "spawn_returns_while_worker_startup_is_held": 1,
+      "startup_failures_are_final": 1,
+      "serving_failures_are_replaced_within_budget": 1,
+      "protocol_violations_are_replaced": 1,
+      "cancelled_answers_are_never_delivered": 1,
+      "close_during_inference_never_waits": 1,
+      "sustained_requests_stay_bounded": 1
+    },
+    "summary": [
+      "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-26T07:00:00.4821609Z test result: 13 passed; 0 failed"
+    ],
+    "counts_separate_from_nextest": true,
+    "qualified": true
+  }
+}
