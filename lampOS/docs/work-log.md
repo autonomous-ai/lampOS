@@ -1,3 +1,13 @@
+Ready for lamp-voice: #3510 7ae6 software CI qualified; new current-base carry underway, activation HOLD.
+
+## Current checkpoint: 2026-10-26 22:01 +07, original 7ae6 native gates complete
+
+[Original 7ae6 native evidence](verification/own-keys-product-carry-20261026/native-7ae6/README.md): ARM64 40323315453 and Linux Clippy 40323315473, attempt 1, pass. Actual preview b51eca4c5 has exact 2a827/7ae6 parents and equals the authored tree. Selected workspace PR-profile census **11,376 unique passes / zero failures, leaks, timeouts or unrun / 106 skips**, all 20 required controls once; 35 echoes excluded. Separate process 13, relay 1, docs 4 across 46 summaries and helper 25 remain separate. No general same-head run exists under its path exclusions. No previous runtime is relabeled.
+
+Main has since reached e672ee214, including reset delivery, Body own ranges and completed-Setup update handling. The next seven-patch carry and actual-reader gate scope are being assessed against that full delta. Reset's helper/activator source findings are closed; delivery is verified by its readers. Existing #2094 and explicit current-lamp own-keys acceptance remain; First's reset erasure/fresh-setup evidence and tomorrow's first-face check are separate. No device, provider, key, signing or release action by Second.
+
+---
+
 Ready for lamp-voice: #3510 current CI pending; helper/activator source findings closed on reset cbc.
 
 ## Current checkpoint: 2026-10-26 19:36 +07, corrected reset source read
