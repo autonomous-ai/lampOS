@@ -1,0 +1,253 @@
+    Finished `test` profile [unoptimized] target(s) in 0.24s
+     Running unittests src/lib.rs (./.claude/worktrees/third-routine-expiry-target/debug/deps/lamp_skills-c6f44302f3b2c78f)
+
+running 1 test
+test routine::tests::a_host_stall_expires_the_request_header_without_changing_the_manager_deadline ... routine request transport probes: [
+    Probe {
+        lifetime_ms: 500,
+        declared_ms: Some(
+            500,
+        ),
+        header: Header {
+            topic: "expression/rest_request",
+            kind: Event,
+            enc: "json",
+            type_name: Some(
+                "lamp_msgs/ExpressionRestRequest",
+            ),
+            source: "skills",
+            boot: "e583cad30450fe3b",
+            seq: 1,
+            at_us: 10000000,
+            at_unix_ms: 1793028551009,
+            expires_ms: Some(
+                500,
+            ),
+        },
+        queued: ExpressionRestRequest {
+            stamp: ClockStamp {
+                clock_id: "routine-host",
+                at_us: 10000000,
+                sequence: 1,
+            },
+            skill: "routine",
+            skill_session_id: "e583cad30450fe3b",
+            expression_session_id: "ec706749c7d21a98",
+            episode: 1,
+            op: Rest,
+            valid_until_us: 13000000,
+        },
+        expected: ExpressionRestRequest {
+            stamp: ClockStamp {
+                clock_id: "routine-host",
+                at_us: 10000000,
+                sequence: 1,
+            },
+            skill: "routine",
+            skill_session_id: "e583cad30450fe3b",
+            expression_session_id: "ec706749c7d21a98",
+            episode: 1,
+            op: Rest,
+            valid_until_us: 13000000,
+        },
+        active_after: Some(
+            ExpressionRestRequest {
+                stamp: ClockStamp {
+                    clock_id: "routine-host",
+                    at_us: 10000000,
+                    sequence: 1,
+                },
+                skill: "routine",
+                skill_session_id: "e583cad30450fe3b",
+                expression_session_id: "ec706749c7d21a98",
+                episode: 1,
+                op: Rest,
+                valid_until_us: 13000000,
+            },
+        ),
+        now_us: [
+            10000000,
+            10000000,
+        ],
+        window_until_us: [
+            39610000000,
+            39610000000,
+        ],
+        totals: [
+            Totals {
+                published: 0,
+                delivered: 0,
+                dropped: 0,
+            },
+            Totals {
+                published: 1,
+                delivered: 1,
+                dropped: 0,
+            },
+            Totals {
+                published: 1,
+                delivered: 1,
+                dropped: 0,
+            },
+        ],
+        subscribers: 1,
+        expired: [
+            0,
+            1,
+        ],
+        malformed: 0,
+        wrong_type: 0,
+        slept: 703.334769ms,
+        elapsed: 754.952869ms,
+        wall_ms: [
+            1793028551009,
+            1793028551713,
+            1793028551764,
+        ],
+        received: Ok(
+            None,
+        ),
+    },
+    Probe {
+        lifetime_ms: 5000,
+        declared_ms: Some(
+            500,
+        ),
+        header: Header {
+            topic: "expression/rest_request",
+            kind: Event,
+            enc: "json",
+            type_name: Some(
+                "lamp_msgs/ExpressionRestRequest",
+            ),
+            source: "skills",
+            boot: "b20949f11be1c039",
+            seq: 1,
+            at_us: 10000000,
+            at_unix_ms: 1793028551771,
+            expires_ms: Some(
+                5000,
+            ),
+        },
+        queued: ExpressionRestRequest {
+            stamp: ClockStamp {
+                clock_id: "routine-host",
+                at_us: 10000000,
+                sequence: 1,
+            },
+            skill: "routine",
+            skill_session_id: "b20949f11be1c039",
+            expression_session_id: "23cde7365856809d",
+            episode: 1,
+            op: Rest,
+            valid_until_us: 13000000,
+        },
+        expected: ExpressionRestRequest {
+            stamp: ClockStamp {
+                clock_id: "routine-host",
+                at_us: 10000000,
+                sequence: 1,
+            },
+            skill: "routine",
+            skill_session_id: "b20949f11be1c039",
+            expression_session_id: "23cde7365856809d",
+            episode: 1,
+            op: Rest,
+            valid_until_us: 13000000,
+        },
+        active_after: Some(
+            ExpressionRestRequest {
+                stamp: ClockStamp {
+                    clock_id: "routine-host",
+                    at_us: 10000000,
+                    sequence: 1,
+                },
+                skill: "routine",
+                skill_session_id: "b20949f11be1c039",
+                expression_session_id: "23cde7365856809d",
+                episode: 1,
+                op: Rest,
+                valid_until_us: 13000000,
+            },
+        ),
+        now_us: [
+            10000000,
+            10000000,
+        ],
+        window_until_us: [
+            39610000000,
+            39610000000,
+        ],
+        totals: [
+            Totals {
+                published: 0,
+                delivered: 0,
+                dropped: 0,
+            },
+            Totals {
+                published: 1,
+                delivered: 1,
+                dropped: 0,
+            },
+            Totals {
+                published: 1,
+                delivered: 1,
+                dropped: 0,
+            },
+        ],
+        subscribers: 1,
+        expired: [
+            0,
+            0,
+        ],
+        malformed: 0,
+        wrong_type: 0,
+        slept: 702.943803ms,
+        elapsed: 703.547226ms,
+        wall_ms: [
+            1793028551770,
+            1793028552474,
+            1793028552474,
+        ],
+        received: Ok(
+            Some(
+                (
+                    Header {
+                        topic: "expression/rest_request",
+                        kind: Event,
+                        enc: "json",
+                        type_name: Some(
+                            "lamp_msgs/ExpressionRestRequest",
+                        ),
+                        source: "skills",
+                        boot: "b20949f11be1c039",
+                        seq: 1,
+                        at_us: 10000000,
+                        at_unix_ms: 1793028551771,
+                        expires_ms: Some(
+                            5000,
+                        ),
+                    },
+                    ExpressionRestRequest {
+                        stamp: ClockStamp {
+                            clock_id: "routine-host",
+                            at_us: 10000000,
+                            sequence: 1,
+                        },
+                        skill: "routine",
+                        skill_session_id: "b20949f11be1c039",
+                        expression_session_id: "23cde7365856809d",
+                        episode: 1,
+                        op: Rest,
+                        valid_until_us: 13000000,
+                    },
+                ),
+            ),
+        ),
+    },
+]
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 157 filtered out; finished in 1.48s
+
+

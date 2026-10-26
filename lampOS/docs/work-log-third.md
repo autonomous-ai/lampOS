@@ -1,3 +1,9 @@
+## 2026-10-26 22:31 — controlled Routine expiry established
+
+Ready for lamp-voice: no
+
+Frozen1adcbe08c/2d18 matched probe1/0: stock500ms Event dropped at read with expired0→1 after703.335ms sleep; scoped5s header delivered exact payload after702.944ms, expired0→0. Published/delivered1,dropped0 in both; logicalnow10,000,000, payload deadline13,000,000 and cachedwindow39,610,000,000 unchanged. Compiler stages pass; initial48localpackagesfreshrebuilt; currentsource/sixactualsavedhashesstable, runtimeexit0/reaped/groupabsent. [Proof](verification/routine-request-expiry-20261026/controlled-host.json). This does not identify historical phase/cause or clear538/4/9 or521/1/9. Next: isolate only the three synthetic-clock policy fixtures with the demonstrated bounded5s test-local header, retaining the stock500ms negative control, every logical assertion and50ms receive. No product change or failed-target retry.
+
 ## 2026-10-26 22:16 — diagnostic carry onto train176
 
 Ready for lamp-voice: no (#3591)

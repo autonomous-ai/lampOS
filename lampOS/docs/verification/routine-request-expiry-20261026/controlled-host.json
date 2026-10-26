@@ -1,0 +1,106 @@
+{
+  "head": "1adcbe08c65bb25b9ff28aba5fa04d865ef27303",
+  "base": "2d18e296c0a51ac0f6fb7c610c3c159cef9870c4",
+  "result": [
+    1,
+    0,
+    0
+  ],
+  "probe": [
+    {
+      "transport_ms": 500,
+      "declared_transport_ms": 500,
+      "stall_ms": 703.334769,
+      "observed_header_age_at_read_ms": 704,
+      "wall_bounds_ms": [
+        1793028551009,
+        1793028551713,
+        1793028551764
+      ],
+      "publisher_delta": {
+        "published": 1,
+        "delivered": 1,
+        "dropped": 0
+      },
+      "subscriber_expired": [
+        0,
+        1
+      ],
+      "result": "None",
+      "logical_now_us": [
+        10000000,
+        10000000
+      ],
+      "payload_valid_until_us": 13000000,
+      "logical_window_until_us": [
+        39610000000,
+        39610000000
+      ]
+    },
+    {
+      "transport_ms": 5000,
+      "declared_transport_ms": 500,
+      "stall_ms": 702.943803,
+      "observed_header_age_at_read_ms": 703,
+      "wall_bounds_ms": [
+        1793028551770,
+        1793028552474,
+        1793028552474
+      ],
+      "publisher_delta": {
+        "published": 1,
+        "delivered": 1,
+        "dropped": 0
+      },
+      "subscriber_expired": [
+        0,
+        0
+      ],
+      "result": "Some exact queued/Manager payload",
+      "logical_now_us": [
+        10000000,
+        10000000
+      ],
+      "payload_valid_until_us": 13000000,
+      "logical_window_until_us": [
+        39610000000,
+        39610000000
+      ]
+    }
+  ],
+  "production_prefix_identical": true,
+  "existing_three_fixture_limits_unchanged_in_this_probe": true,
+  "terminal": {
+    "head": "1adcbe08c65bb25b9ff28aba5fa04d865ef27303",
+    "command": [
+      "cargo",
+      "+1.96.0",
+      "test",
+      "--offline",
+      "--locked",
+      "-p",
+      "lamp-skills",
+      "--lib",
+      "routine::tests::a_host_stall_expires_the_request_header_without_changing_the_manager_deadline",
+      "--",
+      "--exact",
+      "--nocapture",
+      "--test-threads=1"
+    ],
+    "returncode": 0,
+    "signal": null,
+    "deadline_seconds": 120,
+    "timed_out": false,
+    "elapsed_seconds": 2.971958658,
+    "driver_reaped": true,
+    "process_group_absent": true,
+    "pid": 12296,
+    "source_unchanged": true,
+    "six_actual_and_preserved_executables_unchanged": true,
+    "log_sha256": "e6b17315314b581cdb9b0971b04b00c2e9b4e60773a67752daf04057e70c6736"
+  },
+  "test_source_sha256": "8008ebb53ee3a40c1ef62e16ff1bfe279b1f64b7126abf5030525e0d7a751fb0",
+  "fresh_bank": "48 local packages rebuilt with compiler fresh=false at initialc584/e672, then actual cachedcurrentcarry flags retained; source and all six actual/preserved executables stable at runtime.",
+  "scope": "Only library driver executed; five other copied executables get no runtime credit.",
+  "limits": "Controlled mechanism only; historical #3525 538/4/9 and #3545 521/1/9 remain failed, with no proved historical phase/expiry cause. No device or product timing change."
+}
