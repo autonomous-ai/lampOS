@@ -1,0 +1,26 @@
+{
+  "old_head": "5713bece435526832373cc9de38db99a39fc706f",
+  "old_base": "cced429433211e06790f23ed8f51e07be613972d",
+  "head": "db84407d0e35817127332cca2c71430d9f09357e",
+  "base": "d5dc2e87f9a64ae8d21992145d3960035582e6cc",
+  "branch": "tests/1806-ready-speaking-1c",
+  "clean": true,
+  "range_diff_equal": true,
+  "authored_files": [
+    {
+      "path": "lampOS/crates/expression/src/runtime.rs",
+      "equal": true,
+      "old_sha256": "3c3ab3a8c50234b2b40962546cb6fc053efe94c391da2df3de5c19871cd859e1",
+      "current_sha256": "3c3ab3a8c50234b2b40962546cb6fc053efe94c391da2df3de5c19871cd859e1"
+    },
+    {
+      "path": "lampOS/docs/expression.md",
+      "equal": true,
+      "old_sha256": "6be569f6bb32905928ed0e37d037675e6e966e7515d5c0262746e6a169703b34",
+      "current_sha256": "6be569f6bb32905928ed0e37d037675e6e966e7515d5c0262746e6a169703b34"
+    }
+  ],
+  "current_gate": "UNRUN; original5713/cced qualification is not relabelled",
+  "compiler_used": false,
+  "pushed": false
+}

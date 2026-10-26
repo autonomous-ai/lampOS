@@ -1,0 +1,1 @@
+1:  5713bece43 = 1:  db84407d0e lampOS: publish speaking after the Ready fixture finishes setup

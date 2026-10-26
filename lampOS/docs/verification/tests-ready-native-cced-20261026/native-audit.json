@@ -1,0 +1,54 @@
+{
+  "head": "5713bece435526832373cc9de38db99a39fc706f",
+  "base": "cced429433211e06790f23ed8f51e07be613972d",
+  "actual_preview": "1581f6e3660954309c07e1e63a3073e8a9821900",
+  "preview_parents": [
+    "cced429433211e06790f23ed8f51e07be613972d",
+    "5713bece435526832373cc9de38db99a39fc706f"
+  ],
+  "authored_and_preview_tree": "b14553c31577a34c1d43bbc4d7fe40f78a90aad4",
+  "arm64_run": 40278416601,
+  "arm64_attempt": 1,
+  "arm64_conclusion": "success",
+  "linux_clippy_run": 40278416455,
+  "linux_clippy_attempt": 1,
+  "linux_clippy_conclusion": "success",
+  "nextest_unique_pass": 7492,
+  "nextest_unique_fail": 0,
+  "nextest_unique_leak": 0,
+  "nextest_unique_timeout": 0,
+  "nextest_selected": 7492,
+  "nextest_skipped": 53,
+  "nextest_executed_binaries": 70,
+  "nextest_skipped_binaries": 114,
+  "nextest_duration_s": 156.944,
+  "duplicate_terminal_display_lines": 34,
+  "changed_cases": [
+    {
+      "status": "PASS",
+      "duration_s": 0.007,
+      "name": "lamp-expression runtime::unplug_tests::ready_presents_sleep_even_while_voice_speaks_then_acknowledges",
+      "line": 1665
+    }
+  ],
+  "promotion_passed": 25,
+  "promotion_failed": 0,
+  "custom_process": [
+    {
+      "passed": 13,
+      "failed": 0
+    }
+  ],
+  "doc_tests_passed": 4,
+  "doc_tests_failed": 0,
+  "relay_signals": "ok exactly once",
+  "raw_sha256": {
+    "arm64": "3c47ab5932b862a9f382f0d3a499d680217aedd8dd8d0e67f1026432678e90e0",
+    "clippy": "67a182e299c71b034ff478339aab9861c2c06828d00f2d9dd5133a81a9fcac7f"
+  },
+  "limitations": [
+    "Original5713/cced tested identity only; no qualification of later d5dc carry",
+    "Nextest is workflow-selected scope; docs/process/relay/promotion remain separate counts",
+    "No device action or local ARM64 compilation"
+  ]
+}
