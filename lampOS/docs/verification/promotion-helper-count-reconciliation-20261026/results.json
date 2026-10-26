@@ -1,0 +1,348 @@
+{
+  "correct_total": 25,
+  "promotion_integration_only": 22,
+  "published_packets_changed": false,
+  "records": [
+    {
+      "authored_head": "ee9b6253d29f9ac4c4c591a9d1eb19617920d1e5",
+      "command": "cargo test --locked --manifest-path .github/tools/lampos-promote/Cargo.toml",
+      "command_section_raw_lines_1based": {
+        "first": 388,
+        "last": 538
+      },
+      "conclusion": "success",
+      "not_added_to_workspace_nextest": true,
+      "ordered_summaries": [
+        {
+          "failed": 0,
+          "ignored": 0,
+          "literal": "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+          "passed": 2,
+          "raw_line_1based": 491
+        },
+        {
+          "failed": 0,
+          "ignored": 0,
+          "literal": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+          "passed": 0,
+          "raw_line_1based": 496
+        },
+        {
+          "failed": 0,
+          "ignored": 0,
+          "literal": "test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s",
+          "passed": 22,
+          "raw_line_1based": 524
+        },
+        {
+          "failed": 0,
+          "ignored": 0,
+          "literal": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+          "passed": 1,
+          "raw_line_1based": 531
+        },
+        {
+          "failed": 0,
+          "ignored": 0,
+          "literal": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+          "passed": 0,
+          "raw_line_1based": 537
+        }
+      ],
+      "ordered_target_headers": [
+        "Running unittests src/lib.rs",
+        "Running unittests src/main.rs",
+        "Running tests/promotion.rs",
+        "Running tests/workflow.rs",
+        "Doc-tests lampos_promote"
+      ],
+      "overall_failed": 0,
+      "overall_ignored": 0,
+      "overall_passed": 25,
+      "pr": 3515,
+      "prior_published_census_sha256": "ce01c44a14d4d5d8d40c0849480de8c8a694758ac8a8817cb098ae7e1a5609dc",
+      "prior_published_field": {
+        "passed": 22,
+        "scope": "Separate tool workspace; not added to nextest."
+      },
+      "prior_published_readme_sha256": "f2df9a2431d013e387b73d32b86a3115530d26083dcc9659655d4f37db0d98c8",
+      "promotion_integration_only_passed": 22,
+      "published_commit": "24d8c895c",
+      "published_prior_packet": true,
+      "raw_log_sha256": "f63f81b32a77cfc0cb75a81baa4709efc7dd4bc5ac5b79e97e957189b3ce24f0",
+      "run_attempt": 1,
+      "run_id": 40251274254,
+      "run_metadata_sha256": "543c038f14023716b18bce9769fadbf614c011d7ef4a828e71910be126a11276",
+      "run_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40251274254"
+    },
+    {
+      "authored_head": "9941a11c49e98c8624c3c6d78ccae246410a0afd",
+      "command": "cargo test --locked --manifest-path .github/tools/lampos-promote/Cargo.toml",
+      "command_section_raw_lines_1based": {
+        "first": 406,
+        "last": 556
+      },
+      "conclusion": "success",
+      "not_added_to_workspace_nextest": true,
+      "ordered_summaries": [
+        {
+          "failed": 0,
+          "ignored": 0,
+          "literal": "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+          "passed": 2,
+          "raw_line_1based": 509
+        },
+        {
+          "failed": 0,
+          "ignored": 0,
+          "literal": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+          "passed": 0,
+          "raw_line_1based": 514
+        },
+        {
+          "failed": 0,
+          "ignored": 0,
+          "literal": "test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s",
+          "passed": 22,
+          "raw_line_1based": 542
+        },
+        {
+          "failed": 0,
+          "ignored": 0,
+          "literal": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+          "passed": 1,
+          "raw_line_1based": 549
+        },
+        {
+          "failed": 0,
+          "ignored": 0,
+          "literal": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+          "passed": 0,
+          "raw_line_1based": 555
+        }
+      ],
+      "ordered_target_headers": [
+        "Running unittests src/lib.rs",
+        "Running unittests src/main.rs",
+        "Running tests/promotion.rs",
+        "Running tests/workflow.rs",
+        "Doc-tests lampos_promote"
+      ],
+      "overall_failed": 0,
+      "overall_ignored": 0,
+      "overall_passed": 25,
+      "pr": 3510,
+      "prior_published_census_sha256": "1ad68dc3beb0be32bec0e32e35914a3ed2cac51b4e2d136c25afe7497285ef33",
+      "prior_published_field": {
+        "passed": 22,
+        "scope": "Separate tool workspace; not added to nextest."
+      },
+      "prior_published_readme_sha256": "e7b5fafc1989fd565ccb14107fe7c2aaf879fa5b09dd4d55cd804e9bcf95d030",
+      "promotion_integration_only_passed": 22,
+      "published_commit": "24d8c895c",
+      "published_prior_packet": true,
+      "raw_log_sha256": "66801661e8bc8f4a7e1d5636747ae12f0fc4b44239232b0bbf64bd6cc01f64d1",
+      "run_attempt": 1,
+      "run_id": 40251804763,
+      "run_metadata_sha256": "5edfd01450c75f3ebd6f9acff7beee45be95b4855d6bf5518503f40e17bed801",
+      "run_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40251804763"
+    },
+    {
+      "authored_head": "dde97152c1f214fb8b7c2dd5121f608273ff9fa7",
+      "command": "cargo test --locked --manifest-path .github/tools/lampos-promote/Cargo.toml",
+      "command_section_raw_lines_1based": {
+        "first": 406,
+        "last": 556
+      },
+      "conclusion": "success",
+      "not_added_to_workspace_nextest": true,
+      "ordered_summaries": [
+        {
+          "failed": 0,
+          "ignored": 0,
+          "literal": "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+          "passed": 2,
+          "raw_line_1based": 509
+        },
+        {
+          "failed": 0,
+          "ignored": 0,
+          "literal": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+          "passed": 0,
+          "raw_line_1based": 514
+        },
+        {
+          "failed": 0,
+          "ignored": 0,
+          "literal": "test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s",
+          "passed": 22,
+          "raw_line_1based": 542
+        },
+        {
+          "failed": 0,
+          "ignored": 0,
+          "literal": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+          "passed": 1,
+          "raw_line_1based": 549
+        },
+        {
+          "failed": 0,
+          "ignored": 0,
+          "literal": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+          "passed": 0,
+          "raw_line_1based": 555
+        }
+      ],
+      "ordered_target_headers": [
+        "Running unittests src/lib.rs",
+        "Running unittests src/main.rs",
+        "Running tests/promotion.rs",
+        "Running tests/workflow.rs",
+        "Doc-tests lampos_promote"
+      ],
+      "overall_failed": 0,
+      "overall_ignored": 0,
+      "overall_passed": 25,
+      "pr": 3515,
+      "promotion_integration_only_passed": 22,
+      "published_prior_packet": false,
+      "raw_log_sha256": "7405a08a2b2d5bebe130e4a65d9f8cfee9ec46f569701b419afbeee65275ea09",
+      "run_attempt": 1,
+      "run_id": 40253287298,
+      "run_metadata_sha256": "10d757c11b234fb04e763984db50746b785f30378ae8a837262c7c8053106dac",
+      "run_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40253287298"
+    },
+    {
+      "authored_head": "3b78d3b83606b785e4d48e1e86793ca23ee0a5ea",
+      "command": "cargo test --locked --manifest-path .github/tools/lampos-promote/Cargo.toml",
+      "command_section_raw_lines_1based": {
+        "first": 406,
+        "last": 556
+      },
+      "conclusion": "success",
+      "not_added_to_workspace_nextest": true,
+      "ordered_summaries": [
+        {
+          "failed": 0,
+          "ignored": 0,
+          "literal": "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+          "passed": 2,
+          "raw_line_1based": 509
+        },
+        {
+          "failed": 0,
+          "ignored": 0,
+          "literal": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+          "passed": 0,
+          "raw_line_1based": 514
+        },
+        {
+          "failed": 0,
+          "ignored": 0,
+          "literal": "test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s",
+          "passed": 22,
+          "raw_line_1based": 542
+        },
+        {
+          "failed": 0,
+          "ignored": 0,
+          "literal": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+          "passed": 1,
+          "raw_line_1based": 549
+        },
+        {
+          "failed": 0,
+          "ignored": 0,
+          "literal": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+          "passed": 0,
+          "raw_line_1based": 555
+        }
+      ],
+      "ordered_target_headers": [
+        "Running unittests src/lib.rs",
+        "Running unittests src/main.rs",
+        "Running tests/promotion.rs",
+        "Running tests/workflow.rs",
+        "Doc-tests lampos_promote"
+      ],
+      "overall_failed": 0,
+      "overall_ignored": 0,
+      "overall_passed": 25,
+      "pr": 3510,
+      "promotion_integration_only_passed": 22,
+      "published_prior_packet": false,
+      "raw_log_sha256": "f4048acad986d16c5e1fb1d1563832d5e5b13cc729cf0125dd17a9c66fac4824",
+      "run_attempt": 1,
+      "run_id": 40253331342,
+      "run_metadata_sha256": "4f40d97ed7e166f852f4134778883d378bef42d6086db699df640de0dbd044b0",
+      "run_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40253331342"
+    },
+    {
+      "authored_head": "ecaed2484b2df1b1723e222d90647825f3e65764",
+      "command": "cargo test --locked --manifest-path .github/tools/lampos-promote/Cargo.toml",
+      "command_section_raw_lines_1based": {
+        "first": 406,
+        "last": 556
+      },
+      "conclusion": "success",
+      "not_added_to_workspace_nextest": true,
+      "ordered_summaries": [
+        {
+          "failed": 0,
+          "ignored": 0,
+          "literal": "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+          "passed": 2,
+          "raw_line_1based": 509
+        },
+        {
+          "failed": 0,
+          "ignored": 0,
+          "literal": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+          "passed": 0,
+          "raw_line_1based": 515
+        },
+        {
+          "failed": 0,
+          "ignored": 0,
+          "literal": "test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s",
+          "passed": 22,
+          "raw_line_1based": 542
+        },
+        {
+          "failed": 0,
+          "ignored": 0,
+          "literal": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+          "passed": 1,
+          "raw_line_1based": 549
+        },
+        {
+          "failed": 0,
+          "ignored": 0,
+          "literal": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+          "passed": 0,
+          "raw_line_1based": 555
+        }
+      ],
+      "ordered_target_headers": [
+        "Running unittests src/lib.rs",
+        "Running unittests src/main.rs",
+        "Running tests/promotion.rs",
+        "Running tests/workflow.rs",
+        "Doc-tests lampos_promote"
+      ],
+      "overall_failed": 0,
+      "overall_ignored": 0,
+      "overall_passed": 25,
+      "pr": 3524,
+      "promotion_integration_only_passed": 22,
+      "published_prior_packet": false,
+      "raw_log_sha256": "32f663a06fde747944bed3be85ff6a3eeb67c76a21700358f52ab2f655454312",
+      "run_attempt": 1,
+      "run_id": 40253857057,
+      "run_metadata_sha256": "e89b8ce3067a5e80169c2708c0c2aae8a98ecc1e0060b55eff5098c100c580ec",
+      "run_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40253857057"
+    }
+  ],
+  "scope": "Whole helper command total versus promotion-integration-only total",
+  "workflow_or_test_reruns": false
+}

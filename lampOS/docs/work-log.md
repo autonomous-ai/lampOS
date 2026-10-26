@@ -1,3 +1,19 @@
+Ready for lamp-voice: yes (#3515 and #3524); #3510 remains draft activation HOLD.
+
+## Current checkpoint: 2026-10-26 08:38 +07, current native qualification and next IPC fixture
+
+[#3515](https://github.com/autonomous-ai/lampOS/pull/3515) at `dde97152c` on `c5c7603a7` has [original current native evidence](verification/music-refusal-trace-20261026/native-dde/README.md): ARM64 **40253287298**, **11,330 unique PASS / zero FAIL, LEAK or TIMEOUT / 106 skipped / zero selected unrun**, all five boundary controls once. Linux Clippy **40253287387** passes; actual preview `33617b954` has exact base/head parents and tree equal to the authored head. Reviewer-two's current READ-OK confirms equal patches and compiled inputs, with independent full Voice **4,076/0/21** retained on its actual frozen tree. Earlier source reads and author controls remain separately scoped.
+
+[#3524](https://github.com/autonomous-ai/lampOS/pull/3524) at `ecaed2484` on c5 has [original current native evidence](verification/turn-end-wire-no-wait-20261026/native-eca/README.md): ARM64 **40253857057**, **11,325 unique PASS / zero FAIL, LEAK or TIMEOUT / 106 skipped**; the process harness separately passes **13/0**. Linux Clippy **40253857128** passes. Actual preview `78a942629` has exact parents and tree equal to the offered head. Tests' source/proof read is clear; Third's independent exact-head fmt, strict Clippy and complete crate pass **18/0/0**, with retained executable and source identity. Author fault/stall controls and the first cleanup failure remain unchanged in the source proof.
+
+[#3510](https://github.com/autonomous-ai/lampOS/pull/3510) at `3b78d3b83` on c5 has [original current native evidence](verification/own-keys-product-carry-20261026/native-3b78/README.md): ARM64 **40253331342**, **11,335 unique PASS / zero FAIL, LEAK or TIMEOUT / 106 skipped / zero selected unrun**; nine own-keys controls and both census readers pass once. Linux Clippy **40253331383** passes, actual preview `2ed3f95a8` equals its authored tree. It remains draft/HOLD for #2094 and explicit current-lamp acceptance.
+
+[Additive count correction](verification/promotion-helper-count-reconciliation-20261026/README.md): the separate promotion-tool command has **25/0**, made of library **2**, main **0**, promotion integration **22**, workflow integration **1**, docs **0**, in all five audited ee9/994/DDE/3b78/eca runs. Earlier ee9/994 packets retain their original bytes; their reported **22** was the promotion integration subset, not the whole command. New unpublished packets were corrected with prior parser receipts retained. Nextest, relay, process and workspace-doctest counts are unaffected; no CI rerun was used. Also, the earlier broad claim that build-rows has no tool reader was too strong: the generic CI cache source-time helper hashes every tracked lampOS file. It is not a compiled runtime/test input; the current native runs cover that cache reader.
+
+The next #1339 row is [claimed](https://github.com/autonomous-ai/lampOS/issues/1339#issuecomment-6406239687) as `second/ipc-log-no-wait`: full pipe/socket return is observed in an isolated test child with a diagnostic watchdog, keeping the shared-descriptor blocking checks. Source review finds no P1/P2. Mac fmt/strict IPC Clippy and full tests pass **26 tests + one doctest**, with the separate relay signal harness successful. A 400 ms corrected stall passes; the first deliberate write fault fails on an unexpectedly accepted short write instead of blocking, so it remains unqualified as a watchdog control. The larger blocking-write control and source restoration continue. Production source remains unchanged in the offered fixture. No device, provider, real key or release action ran.
+
+---
+
 Current PRs pushed; exact-head native checks and endpoint review active.
 
 ## Current checkpoint: 2026-10-26 08:29 +07, endpoint fixture published and previous native gates retained

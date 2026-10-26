@@ -1,0 +1,28 @@
+Actual checkout: 78a942629db15a84eb91970f0041aa272940302d
+Authored: ecaed2484b2df1b1723e222d90647825f3e65764
+Base: c5c7603a743690e291f85a664a7ee18624232581
+Equal tree: 60ec89d89f1c25e717d0c4e477e4aef0eec570c5
+Starting 11325 tests across 179 binaries (106 tests and 2 binaries skipped)
+Summary [ 210.034s] 11325 tests run: 11325 passed, 106 skipped
+
+test an_idle_worker_stays_ready_across_a_long_quiet ... ok (2011 ms)
+test a_worker_reporting_another_model_is_refused_before_any_request ... ok (2 ms)
+test no_outcome_is_delivered_after_close_even_for_an_answer_on_its_way ... ok (4 ms)
+test verdict_carries_identity_and_one_request_at_a_time ... ok (56 ms)
+test missing_model_is_final_and_never_restarted ... ok (162 ms)
+test missing_executable_fails_at_once ... ok (2 ms)
+test spawn_returns_while_worker_startup_is_held ... ok (6 ms)
+test startup_failures_are_final ... ok (409 ms)
+test serving_failures_are_replaced_within_budget ... ok (514 ms)
+test protocol_violations_are_replaced ... ok (177 ms)
+test cancelled_answers_are_never_delivered ... ok (155 ms)
+test close_during_inference_never_waits ... ok (233 ms)
+test sustained_requests_stay_bounded ... ok (692 ms)
+test result: 13 passed; 0 failed
+relay_signals: ok
+Doctests: 4 passed / 0 failed / 0 ignored (46 groups)
+Promotion helper: 25 passed / 0 failed / 0 ignored
+
+cargo fmt --manifest-path .github/tools/lampos-promote/Cargo.toml --check
+cargo clippy --locked --manifest-path .github/tools/lampos-promote/Cargo.toml --all-targets -- -D warnings
+cargo clippy --locked --workspace --all-targets -- -D warnings

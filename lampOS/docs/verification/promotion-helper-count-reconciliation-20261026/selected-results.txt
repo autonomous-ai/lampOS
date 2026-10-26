@@ -1,0 +1,44 @@
+PR #3515 head ee9b6253d29f9ac4c4c591a9d1eb19617920d1e5 run 40251274254
+cargo test --locked --manifest-path .github/tools/lampos-promote/Cargo.toml
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+Overall: 25 passed / 0 failed / 0 ignored; promotion integration only: 22 passed.
+
+PR #3510 head 9941a11c49e98c8624c3c6d78ccae246410a0afd run 40251804763
+cargo test --locked --manifest-path .github/tools/lampos-promote/Cargo.toml
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+Overall: 25 passed / 0 failed / 0 ignored; promotion integration only: 22 passed.
+
+PR #3515 head dde97152c1f214fb8b7c2dd5121f608273ff9fa7 run 40253287298
+cargo test --locked --manifest-path .github/tools/lampos-promote/Cargo.toml
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+Overall: 25 passed / 0 failed / 0 ignored; promotion integration only: 22 passed.
+
+PR #3510 head 3b78d3b83606b785e4d48e1e86793ca23ee0a5ea run 40253331342
+cargo test --locked --manifest-path .github/tools/lampos-promote/Cargo.toml
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+Overall: 25 passed / 0 failed / 0 ignored; promotion integration only: 22 passed.
+
+PR #3524 head ecaed2484b2df1b1723e222d90647825f3e65764 run 40253857057
+cargo test --locked --manifest-path .github/tools/lampos-promote/Cargo.toml
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+Overall: 25 passed / 0 failed / 0 ignored; promotion integration only: 22 passed.

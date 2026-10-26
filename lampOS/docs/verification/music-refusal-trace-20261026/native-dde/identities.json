@@ -1,0 +1,92 @@
+{
+  "artifact_metadata": [
+    {
+      "digest": "sha256:8664f3bca92047196a2caf6b2dd74d8edba69421ba6a05cacc7a419852f26a69",
+      "expired": false,
+      "id": 12621732423,
+      "name": "lampos-arm64-dde97152c1f214fb8b7c2dd5121f608273ff9fa7",
+      "size_in_bytes": 116007288
+    }
+  ],
+  "artifact_scope": "Metadata only; binary archive was not downloaded or executed by this audit.",
+  "authored_and_tested_tree": "79f664d44fe82b7f145f89488403cc66d94a0a05",
+  "authored_head": "dde97152c1f214fb8b7c2dd5121f608273ff9fa7",
+  "base": "c5c7603a743690e291f85a664a7ee18624232581",
+  "pr": 3515,
+  "preview_parents": [
+    "c5c7603a743690e291f85a664a7ee18624232581",
+    "dde97152c1f214fb8b7c2dd5121f608273ff9fa7"
+  ],
+  "runs": {
+    "arm64": {
+      "actual_checkout": "33617b9542e530293a2f8b3eb873cf8802337dca",
+      "conclusion": "success",
+      "created_at": "2026-10-26T01:15:01Z",
+      "event": "pull_request",
+      "head_sha": "dde97152c1f214fb8b7c2dd5121f608273ff9fa7",
+      "html_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40253287298",
+      "id": 40253287298,
+      "jobs": [
+        {
+          "completed_at": "2026-10-26T01:29:13Z",
+          "conclusion": "success",
+          "id": 121349623368,
+          "name": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+          "started_at": "2026-10-26T01:15:07Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-10-26T01:15:02Z",
+          "conclusion": "skipped",
+          "id": 121349624794,
+          "name": "lampOS \u2014 promote a tested release to the stable feed",
+          "started_at": "2026-10-26T01:15:02Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-10-26T01:29:13Z",
+          "conclusion": "skipped",
+          "id": 121353175229,
+          "name": "lampOS \u2014 sign and publish the tested lamp-voice artifact",
+          "started_at": "2026-10-26T01:29:14Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-10-26T01:29:13Z",
+          "conclusion": "skipped",
+          "id": 121353175346,
+          "name": "report-full-run-failure",
+          "started_at": "2026-10-26T01:29:14Z",
+          "status": "completed"
+        }
+      ],
+      "run_attempt": 1,
+      "status": "completed",
+      "updated_at": "2026-10-26T01:29:14Z"
+    },
+    "clippy": {
+      "actual_checkout": "33617b9542e530293a2f8b3eb873cf8802337dca",
+      "conclusion": "success",
+      "created_at": "2026-10-26T01:15:01Z",
+      "event": "pull_request",
+      "head_sha": "dde97152c1f214fb8b7c2dd5121f608273ff9fa7",
+      "html_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40253287387",
+      "id": 40253287387,
+      "jobs": [
+        {
+          "completed_at": "2026-10-26T01:18:28Z",
+          "conclusion": "success",
+          "id": 121349623620,
+          "name": "lampOS \u2014 clippy, every crate and target (x86 Linux)",
+          "started_at": "2026-10-26T01:15:05Z",
+          "status": "completed"
+        }
+      ],
+      "run_attempt": 1,
+      "status": "completed",
+      "updated_at": "2026-10-26T01:18:29Z"
+    }
+  },
+  "schema": 1,
+  "tested_preview": "33617b9542e530293a2f8b3eb873cf8802337dca"
+}
