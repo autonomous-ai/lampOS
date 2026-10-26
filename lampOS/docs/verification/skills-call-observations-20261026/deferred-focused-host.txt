@@ -1,0 +1,42 @@
+    Finished `test` profile [unoptimized] target(s) in 0.25s
+     Running tests/it/main.rs (./.claude/worktrees/third-reminder-dedicated-target/debug/deps/it-46363ab9699809b5)
+
+running 1 test
+test call_wait::a_tool_call_is_answered_while_the_program_listens_on_three_topics ... lamp-skills: skills from /tmp/cwJD0L4U/skills, the Policy's ask not asked: nothing is done, a skill's light set through the actions part and given back
+lamp-skills: loaded ["air", "faces", "rests", "wave"]
+lamp-skills: wave Triggered: the model called wave with {}
+lamp-skills: wave Done: the model was told what to do next
+lamp-skills: wave Triggered: the model called wave with {}
+lamp-skills: wave Done: the model was told what to do next
+lamp-skills: wave Triggered: the model called wave with {}
+lamp-skills: wave Done: the model was told what to do next
+lamp-skills: wave Triggered: the model called wave with {}
+lamp-skills: wave Done: the model was told what to do next
+lamp-skills: wave Triggered: the model called wave with {}
+lamp-skills: wave Done: the model was told what to do next
+lamp-skills: wave Triggered: the model called wave with {}
+lamp-skills: wave Done: the model was told what to do next
+lamp-skills: wave Triggered: the model called wave with {}
+lamp-skills: wave Done: the model was told what to do next
+lamp-skills: wave Triggered: the model called wave with {}
+lamp-skills: wave Done: the model was told what to do next
+lamp-skills: wave Triggered: the model called wave with {}
+lamp-skills: wave Done: the model was told what to do next
+lamp-skills: wave Triggered: the model called wave with {}
+lamp-skills: wave Done: the model was told what to do next
+tool calls, fastest to slowest: [188.296µs, 320.233µs, 335.56µs, 380.189µs, 400.473µs, 423.096µs, 432.024µs, 432.253µs, 456.997µs, 605.106µs]
+spawn to tools.json observed: 906.31068ms
+call 1/10 elapsed=605.106µs; response="{\"ok\":true,\"result\":{\"next\":\"Say hello.\"}}\n"
+call 2/10 elapsed=188.296µs; response="{\"ok\":true,\"result\":{\"next\":\"Say hello.\"}}\n"
+call 3/10 elapsed=423.096µs; response="{\"ok\":true,\"result\":{\"next\":\"Say hello.\"}}\n"
+call 4/10 elapsed=432.024µs; response="{\"ok\":true,\"result\":{\"next\":\"Say hello.\"}}\n"
+call 5/10 elapsed=456.997µs; response="{\"ok\":true,\"result\":{\"next\":\"Say hello.\"}}\n"
+call 6/10 elapsed=335.56µs; response="{\"ok\":true,\"result\":{\"next\":\"Say hello.\"}}\n"
+call 7/10 elapsed=380.189µs; response="{\"ok\":true,\"result\":{\"next\":\"Say hello.\"}}\n"
+call 8/10 elapsed=432.253µs; response="{\"ok\":true,\"result\":{\"next\":\"Say hello.\"}}\n"
+call 9/10 elapsed=400.473µs; response="{\"ok\":true,\"result\":{\"next\":\"Say hello.\"}}\n"
+call 10/10 elapsed=320.233µs; response="{\"ok\":true,\"result\":{\"next\":\"Say hello.\"}}\n"
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 312 filtered out; finished in 1.25s
+

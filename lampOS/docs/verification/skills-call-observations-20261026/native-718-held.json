@@ -1,0 +1,172 @@
+{
+  "source_head": "7182777eadc3d8968cea32d643a74e7c86442223",
+  "source_disposition": "HOLD: diagnostic writes may alter call timing; superseded by deferred-output correction.",
+  "native_only_audit": {
+    "pr": 3591,
+    "head": "7182777eadc3d8968cea32d643a74e7c86442223",
+    "base": "c121bc16eb9e6a7142bbc1110d4ed692481f1a82",
+    "native_ci_qualified": true,
+    "readiness": "HOLD",
+    "author_hold": {
+      "readiness": "HOLD",
+      "head": "7182777eadc3d8968cea32d643a74e7c86442223",
+      "author_comment": "https://github.com/autonomous-ai/lampOS/pull/3591#issuecomment-6418155032",
+      "reason": "Synchronous diagnostic writes before the first call and between calls can change the workload despite lying outside measured call intervals. A corrected deferred-output version is a separate phase and is not qualified by these runs.",
+      "native_result": "Historical original attempt 1 success only; no clear or ready recommendation."
+    },
+    "original_runs": {
+      "arm64": {
+        "id": 40335125477,
+        "head_sha": "7182777eadc3d8968cea32d643a74e7c86442223",
+        "status": "completed",
+        "conclusion": "success",
+        "run_attempt": 1,
+        "latest_run_attempt": 1,
+        "html_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40335125477"
+      },
+      "linux-clippy": {
+        "id": 40335126540,
+        "head_sha": "7182777eadc3d8968cea32d643a74e7c86442223",
+        "status": "completed",
+        "conclusion": "success",
+        "run_attempt": 1,
+        "latest_run_attempt": 1,
+        "html_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40335126540"
+      }
+    },
+    "previews": {
+      "arm64": {
+        "executed_preview": "25d95160f523def83731947254afd4623ac4917b",
+        "preview_parents": [
+          "c121bc16eb9e6a7142bbc1110d4ed692481f1a82",
+          "7182777eadc3d8968cea32d643a74e7c86442223"
+        ],
+        "preview_tree": "bea90a70c2117780b90b57758e3e47eb798006fd",
+        "offered_tree": "bea90a70c2117780b90b57758e3e47eb798006fd",
+        "verified": true
+      },
+      "linux-clippy": {
+        "executed_preview": "25d95160f523def83731947254afd4623ac4917b",
+        "preview_parents": [
+          "c121bc16eb9e6a7142bbc1110d4ed692481f1a82",
+          "7182777eadc3d8968cea32d643a74e7c86442223"
+        ],
+        "preview_tree": "bea90a70c2117780b90b57758e3e47eb798006fd",
+        "offered_tree": "bea90a70c2117780b90b57758e3e47eb798006fd",
+        "verified": true
+      }
+    },
+    "nextest": {
+      "passed": 7515,
+      "failed": 0,
+      "leaks": 0,
+      "timeouts": 0,
+      "skipped": 53,
+      "unique_terminal_cases": 7515,
+      "repeated_equal_rows": 34,
+      "all_selected_ordinals_present": true,
+      "reported_selected_totals": [
+        7515
+      ],
+      "own_control_pass_counts": {
+        "lamp-skills::it call_wait::a_tool_call_is_answered_while_the_program_listens_on_three_topics": 1
+      },
+      "package_census": {
+        "lamp-body": 621,
+        "lamp-cloud": 196,
+        "lamp-expression": 340,
+        "lamp-keeper": 42,
+        "lamp-lean": 61,
+        "lamp-memory": 330,
+        "lamp-peek": 26,
+        "lamp-setup": 185,
+        "lamp-skills": 525,
+        "lamp-update": 409,
+        "lamp-voice": 4157,
+        "lamp-voice-eval": 623
+      },
+      "selection": [
+        "2026-10-26T14:02:04.8456707Z Changed: lamp-skills. With the crates that depend on them and the three that read other crates' files (lamp-cloud, lamp-voice-eval, lamp-update): 12 of 46 crates.",
+        "2026-10-26T14:02:04.8567680Z   PICKED: package(=lamp-body) | package(=lamp-cloud) | package(=lamp-expression) | package(=lamp-keeper) | package(=lamp-lean) | package(=lamp-memory) | package(=lamp-peek) | package(=lamp-setup) | package(=lamp-skills) | package(=lamp-update) | package(=lamp-voice) | package(=lamp-voice-eval)"
+      ],
+      "nextest_start_rows": [
+        "2026-10-26T14:07:34.2216973Z     Starting 7515 tests across 70 binaries (53 tests and 114 binaries skipped)"
+      ],
+      "native_summary": "2026-10-26T14:10:20.3964064Z      Summary [ 166.172s] 7515 tests run: 7515 passed, 53 skipped",
+      "skip_rows_logged": 0
+    },
+    "call_observations": {
+      "rows": [],
+      "startup_rows": [],
+      "sorted_rows": [],
+      "complete_ten_ordinals": false,
+      "all_responses_success": null,
+      "output_policy": "The call_wait case is not selected by a success-output override in the pinned nextest config. A native PASS does not establish that its captured successful diagnostic rows were printed. Missing rows remain unavailable; host rows are not substituted.",
+      "availability": "not emitted in the successful native nextest log; all ten native timing/response rows remain unverified"
+    },
+    "separate_harnesses": {
+      "doctests": {
+        "passed": 4,
+        "failed": 0,
+        "harnesses": 46
+      },
+      "turn_wire": {
+        "passed": 13,
+        "failed": 0
+      },
+      "relay_ok": 1,
+      "promoter": {
+        "passed": 25,
+        "failed": 0
+      },
+      "offline_checks": {
+        "offline_publication": {
+          "count": 35,
+          "elapsed_seconds": 0.278,
+          "okay_witnesses": 1,
+          "counts_separate_from_nextest": true
+        },
+        "artifact_provenance": {
+          "count": 12,
+          "elapsed_seconds": 0.707,
+          "okay_witnesses": 1,
+          "counts_separate_from_nextest": true
+        },
+        "publication_cli": {
+          "count": 7,
+          "elapsed_seconds": 0.393,
+          "okay_witnesses": 1,
+          "counts_separate_from_nextest": true
+        }
+      }
+    },
+    "source_bounds": {
+      "ten_calls": true,
+      "call_gap_30ms": true,
+      "catalog_deadline_20s": true,
+      "catalog_poll_50ms": true,
+      "socket_read_timeout_5s": true,
+      "median_strictly_below_25ms": true,
+      "call_logging_after_measurement": true,
+      "startup_is_observed_catalog_not_ready": true
+    },
+    "raw_logs": {
+      "arm64": {
+        "path": "arm64-40335125477.log",
+        "bytes": 1876874,
+        "sha256": "af8144e6941552466440b1554e59bcd044be753625190cd24705dd766a41bf16"
+      },
+      "linux-clippy": {
+        "path": "linux-clippy-40335126540.log",
+        "bytes": 111272,
+        "sha256": "b699550d2e419ca7b518f99f175fc0a5e36c77448d591e187a2ef8175b79f319"
+      }
+    },
+    "full_receipt": "native-40335125477.json",
+    "comments_since_anchor": [
+      6417967237,
+      6418155032
+    ],
+    "limits": "Original attempt 1 native CI only; selected packages, not all workspace runtime tests. No rerun, build, source edit, device or public post. Earlier #3525 failures remain separate and unresolved; no startup causality or latency fix inferred. Native successful-output visibility may omit the ten diagnostic rows. Synchronous diagnostic writes before the first call and between calls can change the workload despite lying outside measured call intervals. A corrected deferred-output version is a separate phase and is not qualified by these runs."
+  }
+}

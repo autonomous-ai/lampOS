@@ -1,0 +1,79 @@
+{
+  "head": "12f677377babee495dfb890272d91bc229b2beab",
+  "base": "22a2ddd7912df0b02044169a32c13d473b341ad8",
+  "runtime_frozen_head_before_final_commit": "30dca3387a03a2e4578d48d880267450f21c1bff",
+  "test_source_sha256": "53ece4468ce33a9348a7531e4e75c9f769711adbaaeb0194dec10376ae17196f",
+  "source_unchanged_by_commit": true,
+  "fmt_strict_clippy_workspace_build_test_compile": {
+    "fmt": 0,
+    "clippy": 0,
+    "build": 0,
+    "test-compile": 0
+  },
+  "focused_result": [
+    1,
+    0,
+    0
+  ],
+  "complete_call_rows": 10,
+  "no_diagnostic_io_in_call_loop": true,
+  "diagnostics_on_sequence_exit_or_unwind": true,
+  "observations": {
+    "catalog_observed_ms": 906.31068,
+    "first_call_us": 605.106,
+    "median_us": 423.096
+  },
+  "runtime_terminal": {
+    "head": "30dca3387a03a2e4578d48d880267450f21c1bff",
+    "command": [
+      "cargo",
+      "+1.96.0",
+      "test",
+      "--offline",
+      "--locked",
+      "-p",
+      "lamp-skills",
+      "--test",
+      "it",
+      "call_wait::a_tool_call_is_answered_while_the_program_listens_on_three_topics",
+      "--",
+      "--exact",
+      "--nocapture",
+      "--test-threads=1"
+    ],
+    "returncode": 0,
+    "signal": null,
+    "deadline_seconds": 120,
+    "timed_out": false,
+    "elapsed_seconds": 2.601869000005536,
+    "driver_reaped": true,
+    "process_group_absent": true,
+    "pid": 53789,
+    "source_unchanged": true,
+    "six_actual_and_preserved_executables_unchanged": true,
+    "log_sha256": "4a158197ad45359c45544112b5d3142e5743a7c6922004f3b6082f74e59b18ac"
+  },
+  "all_six_executable_sha256": {
+    "it-46363ab9699809b5": "c3f170b15e8ba0d963555bc2a286aee0b5e4ff12d16a614f9882c17f2cd70363",
+    "lamp_skills-a718b2a0214b6903": "25dfc289bb0011af24f53164f93e4e6306acff48e5d7fea256cc8c196ec4e312",
+    "requested_audio-019db324b83a9807": "bb4078222834b9dec3b36d1ce5e9dd95dbadc75a7e6c95b192b53f89100b3e35",
+    "release_pair-88349d4c2302e5ab": "057f200eacd7617d3fb818a0311d498cf96449d8bbc1004169d7a7f305a70198",
+    "lamp_skills-c6f44302f3b2c78f": "7ed86d3a432d24b9a89265736e56c21443b5f201a32bc7885e8c5fd89229ca6f",
+    "lamp-skills": "eb6d80451d8ac142f68c75b827307c00e4846fd86df1f54a8b3b2a148e93e42c"
+  },
+  "actual_executed_scope": "Only integration driver and unchanged Skills child; four other copied drivers not executed by focused command.",
+  "delta_from_previous_gate": [
+    "crates/skills/tests/it/call_wait.rs",
+    "docs/build-rows.md",
+    "docs/updates.md"
+  ],
+  "product_executables_unchanged_from_previous": {
+    "it-46363ab9699809b5": false,
+    "lamp_skills-a718b2a0214b6903": true,
+    "requested_audio-019db324b83a9807": true,
+    "release_pair-88349d4c2302e5ab": true,
+    "lamp_skills-c6f44302f3b2c78f": true,
+    "lamp-skills": true
+  },
+  "limits": "Test-only observations. Earlier 718 held for diagnostic I/O pacing; earlier host/native passes remain historical. The original #3525 aggregate538/4/9 remains failed and unpublished; no causal or physical-latency clearance."
+}
