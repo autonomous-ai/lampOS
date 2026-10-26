@@ -1,3 +1,15 @@
+Ready for lamp-voice: yes (#3568); #3510 software carry being published, activation HOLD remains.
+
+## Current checkpoint: 2026-10-26 17:05 +07, current startup CI verified
+
+[Current native evidence](verification/reference-first-handshake-native-6cc-20261026/README.md) qualifies exact `6cc0f9c7e` on latest `aa7cf9029`. Original ARM64 `40302732947`, Linux Clippy `40302733044` and general CI `40302723774` all pass. The ARM64/Clippy preview has exact parents and the authored tree; general CI checks out the authored head directly. Selected nextest: **7,501 passed / zero failures, leaks, timeouts or selected unrun / 53 skipped**, with all nine targeted fixtures once and 34 duplicate echoes excluded. Process 13, relay 1, docs 4 and helper 25 stay separate. Image, Go, Web and Python jobs pass. No rerun erased an earlier failure.
+
+Reviewer-three carries READ-OK to this head; Reviewer-two's source/native review has no P1/P2 and its independent frozen host gate remains separate. The P3 wording is corrected. Null-device validation still establishes consumption/privacy refusal, not successful startup, playback or physical acceptance. This PR is ready for the review/train route; no merge is performed by Second.
+
+Own-keys ff17/690 host gate also completed: **6,175 outer passes / 0 failures / 48 ignored**, excluding one nested Memory child pass; factory **94/0** separately. All 66 actual/preserved artifacts and 7,258 source entries stayed unchanged. Its image-only current carry and public proof follow; activation HOLD remains.
+
+---
+
 Ready for lamp-voice: no; #3568 current CI and carry reads pending; #3510 gate active and activation HOLD.
 
 ## Current checkpoint: 2026-10-26 16:53 +07, review wording corrected on latest base

@@ -1,0 +1,65 @@
+[
+  {
+    "binary": "lamp-voice",
+    "name": "transport::tests::initial_capture_prepared_still_requires_age_boot_order_and_nonfuture_time",
+    "ordinal": 6474,
+    "status": "PASS",
+    "total": 7501
+  },
+  {
+    "binary": "lamp-voice",
+    "name": "transport::tests::later_capture_prepared_keeps_the_existing_single_sender_stall_allowance",
+    "ordinal": 6475,
+    "status": "PASS",
+    "total": 7501
+  },
+  {
+    "binary": "lamp-voice",
+    "name": "transport::tests::initial_capture_prepared_survives_bounded_speaker_startup",
+    "ordinal": 6476,
+    "status": "PASS",
+    "total": 7501
+  },
+  {
+    "binary": "lamp-voice",
+    "name": "transport::tests::reference_startup_allowance_does_not_cover_primes_data_or_capture_input",
+    "ordinal": 6479,
+    "status": "PASS",
+    "total": 7501
+  },
+  {
+    "binary": "lamp-voice::it",
+    "name": "speaker_lapse_worker::a_late_prime_from_before_a_lapse_is_dropped",
+    "ordinal": 6842,
+    "status": "PASS",
+    "total": 7501
+  },
+  {
+    "binary": "lamp-voice::it",
+    "name": "speaker_lapse_worker::a_speaker_whose_authority_lapses_before_its_prime_stays_up",
+    "ordinal": 6843,
+    "status": "PASS",
+    "total": 7501
+  },
+  {
+    "binary": "lamp-voice::it",
+    "name": "speaker_lapse_worker::a_stale_renewal_alone_or_a_stale_connect_reference_still_ends_the_speaker",
+    "ordinal": 6844,
+    "status": "PASS",
+    "total": 7501
+  },
+  {
+    "binary": "lamp-voice::it",
+    "name": "speaker_lapse_worker::a_stale_renewal_with_a_fresh_one_behind_it_keeps_the_speaker_going",
+    "ordinal": 6845,
+    "status": "PASS",
+    "total": 7501
+  },
+  {
+    "binary": "lamp-voice::it",
+    "name": "speaker_lapse_worker::an_aged_first_reference_prepare_reaches_the_real_speakers_validation",
+    "ordinal": 6846,
+    "status": "PASS",
+    "total": 7501
+  }
+]
