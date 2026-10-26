@@ -142,14 +142,14 @@ apt-get install -y \\
 apt-get purge -y --auto-remove network-manager network-manager-gnome 2>/dev/null || true
 apt-get clean
 
-# The board's kernel trusts only the upstream signature on the regulatory database; Debian's
-# alternative is refused ("regulatory.db is malformed"), the country stays 00, and hostapd with
-# country_code waits in COUNTRY_UPDATE for a change that never comes: no beacon (lamp-dbda, 26 Oct).
+# The upstream regulatory database, the one a kernel built with the upstream certificate trusts.
+# This board's kernel refused it too at boot (lamp-dbda, 26 Oct), so the 2.4 GHz hotspot below
+# does not depend on it (no country_code); it is kept for a kernel that does trust it.
 [ -e /lib/firmware/regulatory.db-upstream ] || { echo "no upstream regulatory.db" >&2; exit 1; }
 update-alternatives --set regulatory.db /lib/firmware/regulatory.db-upstream
 update-alternatives --set regulatory.db.p7s /lib/firmware/regulatory.db.p7s-upstream 2>/dev/null || true
 [ "\$(readlink /etc/alternatives/regulatory.db)" = /lib/firmware/regulatory.db-upstream ] \\
-  || { echo "regulatory.db is not the upstream one: the hotspot can hang in COUNTRY_UPDATE" >&2; exit 1; }
+  || { echo "regulatory.db is not the upstream one" >&2; exit 1; }
 
 # Disable IPv6, as V1's image does (STA drops).
 mkdir -p /etc/sysctl.d
@@ -327,7 +327,11 @@ update_config=1
 EOF
 chmod 600 /etc/wpa_supplicant/wpa_supplicant-wlan0.conf
 
-# hostapd: SSID placeholder, device-ap-mode replaces it at runtime.
+# hostapd: SSID placeholder, device-ap-mode replaces it at runtime. On 2.4 GHz there is no
+# country_code: this board's kernel refuses every regulatory.db (Debian's and upstream's, "malformed",
+# lamp-dbda 26 Oct), the country stays 00, and with country_code hostapd can wait in COUNTRY_UPDATE
+# with no beacon. Channel 6 is allowed in 00, and without it hostapd reaches AP-ENABLED at once.
+# 5 GHz keeps it: channel 36 is no-IR in 00, so an AP there needs the country set.
 if [ "${AP_BAND}" = "5" ]; then
   cat > /etc/hostapd/hostapd.conf <<EOF
 interface=wlan0
@@ -349,7 +353,6 @@ driver=nl80211
 ssid=lamp-xxxx
 hw_mode=g
 channel=${AP_CHANNEL:-6}
-country_code=${COUNTRY_CODE}
 ieee80211n=1
 wmm_enabled=1
 auth_algs=1
