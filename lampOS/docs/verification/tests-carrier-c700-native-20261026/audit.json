@@ -1,0 +1,81 @@
+{
+  "native": {
+    "head": "c7006af27eef606e811be4ccf0b91e1f72f3aca2",
+    "authored_base": "1aa409fcbdd1f1c32ae3bb9ad6698f83453dde68",
+    "actual_tested_base": "ba950f289b4e0d4fd072d080ea3a1b54e7bce03f",
+    "actual_preview": "9980ef50672813b389c34e27326f44ddbe552783",
+    "preview_parents": [
+      "ba950f289b4e0d4fd072d080ea3a1b54e7bce03f",
+      "c7006af27eef606e811be4ccf0b91e1f72f3aca2"
+    ],
+    "authored_tree": "2871a38df3ad3f0ba8c0f3da9ab258471c9f5310",
+    "tested_preview_tree": "8ba18820a24509abb5517f93de4facd60da48b5d",
+    "preview_equals_authored_tree": false,
+    "arm64_run": 40309937640,
+    "linux_clippy_run": 40309937656,
+    "attempts": 1,
+    "conclusions": "success",
+    "nextest_unique_pass": 11383,
+    "nextest_bad": 0,
+    "nextest_skipped": 106,
+    "executed_binaries": 182,
+    "skipped_binaries": 2,
+    "duration_s": 210.139,
+    "duplicate_display_lines": 35,
+    "all_12_carrier_cases_executed_once": true,
+    "carrier_cases": [
+      "lamp-update::round product_carrier::a_comment_only_product_unit_is_an_intended_noop",
+      "lamp-update::round product_carrier::a_corrupt_product_unit_is_refused_before_any_write",
+      "lamp-update::round product_carrier::a_product_template_cannot_change_a_parts_binary_or_build_folder",
+      "lamp-update::round product_carrier::a_managed_product_manifest_can_bootstrap_the_existing_settings_helper",
+      "lamp-update::round product_carrier::a_product_template_does_not_replace_a_pinned_lamps_unit",
+      "lamp-update::round product_carrier::a_product_unit_switches_with_its_link_and_leaves_local_dropins_alone",
+      "lamp-update::round product_carrier::a_same_binary_product_unit_records_good_only_after_climb_and_confirmation",
+      "lamp-update::round product_carrier::an_unhealthy_product_build_restores_the_exact_unit_and_link",
+      "lamp-update::round product_carrier::automatic_settings_do_not_change_an_older_non_product_manifest",
+      "lamp-update::round product_carrier::an_older_updater_climbs_before_the_product_switch_and_fallback",
+      "lamp-update::round product_carrier::explicit_off_and_an_unmanaged_updater_do_not_bootstrap_settings",
+      "lamp-update::round product_carrier::the_lamps_specific_unit_wins_over_the_product_unit"
+    ],
+    "promotion_passed": 25,
+    "promotion_failed": 0,
+    "docs_passed": 4,
+    "docs_failed": 0,
+    "custom_process_passed": 13,
+    "custom_process_failed": 0,
+    "relay_signals": "ok once",
+    "raw_sha256": {
+      "arm64": "6c7ddd938c9345a8f25565e355e2b2b2528c8c2b98226f40357aefb443871239",
+      "clippy": "62eb4de3348cf61e810bd7a1cc69cc1dd4914478750776c0a28972110722c436"
+    },
+    "limitations": [
+      "Actual newer-base preview differs from authored tree; identities retained separately",
+      "No rerun or device execution; no installed GOOD/BAD acceptance",
+      "Docs/process/promotion/relay are separate from nextest census"
+    ]
+  },
+  "artifact": {
+    "head": "c7006af27eef606e811be4ccf0b91e1f72f3aca2",
+    "run_id": 40309937640,
+    "actual_preview": "9980ef50672813b389c34e27326f44ddbe552783",
+    "artifact_id": 12645280926,
+    "zip_bytes": 116060343,
+    "zip_sha256": "ec7bdd3da7c938613e8e24b156d775818e3f6c18862221413d7f06264d3aa569",
+    "github_artifact_digest_matches": true,
+    "updater_bytes": 4816208,
+    "updater_sha256": "72c8f4a06b431a48d68da2e159f6a0dad73871a95cfbb9df4ad4e6db19460732",
+    "sha256_manifest_match": true,
+    "manifest_sha256": "312a139a7d727f3c752996d4fc0f8f645121c9f90c404421ccf1cfea26c637b2",
+    "elf_class": "64-bit",
+    "elf_endianness": "little",
+    "elf_machine": 183,
+    "architecture": "AArch64",
+    "extracted_members": [
+      "SHA256SUMS",
+      "lamp-update"
+    ],
+    "executed": false,
+    "local_arm64_build": false,
+    "device_action": false
+  }
+}
