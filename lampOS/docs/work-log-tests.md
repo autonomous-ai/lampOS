@@ -1,5 +1,13 @@
 # Tests work log
 
+## 2026-10-27 05:52 — Composed Mood original native checks pass
+
+Ready for lamp-voice: no (#3623 combined-head peer reads pending)
+
+[Fresh f4419 native proof](verification/tests-mood-f4419-native-20261027/) binds original ARM64 **40414617660** and Linux strict **40414617657**, both attempt-one success, to actual preview `caf53af0a` with ordered parents 90ca/f4419 and tree equal to the offered head. The actual twelve-package selection passed **7,541 unique cases / 0 FAIL / 0 LEAK / 0 TIMEOUT**, with 53 aggregate skips; 34 configured final-output reprints are excluded. All **340** Expression cases, both repaired cases and all **14** ordinary Reader controls passed once. Auxiliary results remain separate. Host **340/0/0** at `0ff49ea2e` and native counts overlap rather than add.
+
+The live base remained `90ca725c5` at audit. Both combined-head peer reads were requested; Reviewer-two is reading. Earlier source/native results, controller metadata failures/dispositions and control histories keep their original scope. Sentinel current-base and Carrier selected-runtime gates continue separately. No device action.
+
 ## 2026-10-27 05:45 — Composed Mood pushed after full current host gate
 
 Ready for lamp-voice: no (#3623 fresh native and composed-head reads pending)
