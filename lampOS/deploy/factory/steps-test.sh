@@ -118,9 +118,12 @@ chmod +x "$T"/bin/*
 KEYFILE=$T/key.pub
 head -c 32 /dev/zero | base64 >"$KEYFILE"
 
-# A fresh lamp: the image's GPIO pins (no MPR121), nothing measured, no key.
+# A lamp set up, as step 4 needs: the image's GPIO pins (no MPR121), nothing
+# measured, no key, and setup's marker. unset_lamp: the same without the marker,
+# as the factory gets it.
 lamp() {
-  rm -rf "$T/root" && mkdir -p "$T/root/etc/lampOS/controls" "$T/root/tmp"
+  rm -rf "$T/root" && mkdir -p "$T/root/etc/lampOS/controls" "$T/root/tmp" "$T/root/var/lib/lampos-setup"
+  : >"$T/root/var/lib/lampos-setup/done"
   printf '{"chip":"/dev/gpiochip0","head_pads":[{"name":"head-1","line":37}]}\n' \
     >"$T/root/etc/lampOS/controls/controls-pins.json"
   : >"$T/log"
@@ -162,6 +165,16 @@ check "a written run runs the self-test after its yes" 'grep -q "^selftest --occ
 check "a whole run starts lamp-body after step 1 and stands it for the self-test" '[[ $(grep "^measure\|systemctl start lamp-body\|^mood --socket $T/root/run/lampos-body\|^selftest" "$T/log" | sed "s/ --.*//" | uniq | tr "\n" "|") == "measure|systemctl start lamp-body|mood|selftest|" ]]'
 lamp; ASK_ANSWER=y FAKE_BODY_NO_SOCKET=1 BODY_START_WAIT=1 run --write --update-key "$KEYFILE"; status=$?
 check "a lamp-body that does not come up fails step 4 and says why" '[[ $status == 1 ]] && grep -q "lamp-body did not come up with .*mood.sock within 1 s: fix it" "$T/out" && grep -q "step 4 (the self-test) failed" "$T/out" && ! grep -q "^selftest" "$T/log"'
+unset_lamp() { lamp; rm -f "$T/root/var/lib/lampos-setup/done"; }
+# A lamp not set up (the V2 image's, lamp-52e6 on 2026-10-26): its parts wait
+# for setup's marker, so step 4 refuses before it starts anything; steps 1 to 3
+# pass, and a dry run says what a written one would do.
+unset_lamp; run --update-key "$KEYFILE"; status=$?
+check "unset, dry: all four pass, and step 4 says it waits for setup" '[[ $status == 0 ]] && grep -q "the lamp is not set up: a written step 4 refuses until it is" "$T/out" && ! grep -q "^selftest" "$T/log"'
+unset_lamp; ASK_ANSWER=y run --write --update-key "$KEYFILE"; status=$?
+check "unset, written: steps 1 to 3 done, step 4 refuses and says to set the lamp up" '[[ $status == 1 ]] && grep -q "step 3 done" "$T/out" && grep -q "the lamp is not set up, so its parts are not running and the self-test would check nothing: set it up from the app, run this again with --from 4" "$T/out" && grep -q "step 4 (the self-test) failed" "$T/out" && ! grep -q "^selftest" "$T/log" && ! grep -q "systemctl start lamp-body" "$T/log"'
+unset_lamp; ASK_ANSWER=y run --write --update-key "$KEYFILE" --to 3; status=$?
+check "unset, written --to 3: steps 1 to 3 done" '[[ $status == 0 ]] && grep -q "steps 1 to 3 done (write)" "$T/out"'
 lamp; ASK_ANSWER=y FAKE_SELFTEST_EXIT=3 run --write --update-key "$KEYFILE"; status=$?
 check "a part not checked (exit 3) counts as done" '[[ $status == 0 ]]'
 lamp; ASK_ANSWER=y FAKE_SELFTEST_EXIT=1 run --write --update-key "$KEYFILE"; status=$?
