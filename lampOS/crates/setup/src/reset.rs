@@ -24,6 +24,22 @@ use std::{
 
 mod systemd;
 
+/// The stock reset journal also fences Wi-Fi's independent rollback writer.
+pub const PRODUCT_JOURNAL: &str = "/var/lib/lampos-setup/reset.json";
+const PRODUCT_WIFI: &str = "/etc/wpa_supplicant/wpa_supplicant-wlan0.conf";
+const WIFI_RESTORE_UNIT: &str = "lamp-setup-wifi-restore.service";
+
+/// A pending reset must never restore an old network. Check before reading
+/// any rollback bytes; reset removes those bytes before removing its journal.
+/// Metadata errors refuse restoration too, rather than treating them as absence.
+pub fn wifi_restore_allowed(journal: &Path) -> io::Result<bool> {
+    match fs::symlink_metadata(journal) {
+        Ok(_) => Ok(false),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(true),
+        Err(error) => Err(error),
+    }
+}
+
 /// What is never wiped, whatever a plan says: the software, its update trust,
 /// and the system itself.
 const PROTECTED: [&str; 12] = [
@@ -255,6 +271,11 @@ impl Effects for System {
         if systemd_stop(argv) {
             return systemd::stop();
         }
+        if matches!(argv, [program, verb, unit]
+            if program == "/usr/bin/systemctl" && verb == "stop" && unit == WIFI_RESTORE_UNIT)
+        {
+            return systemd::stop_restore();
+        }
         let status = Command::new(&argv[0]).args(&argv[1..]).status()?;
         if status.success() {
             // The keeper preserves its pause/rest protocol, but its target
@@ -433,13 +454,23 @@ fn reboot(plan: &Plan, effects: &mut impl Effects, steps: &mut Vec<Step>) {
 }
 
 /// At start, before anything else: finish a reset a power cut interrupted.
-/// Nothing of the lamp is running yet, so nothing is stopped and there is no
+/// The lamp's parts are not running yet. The stock plan additionally settles
+/// the independent boot Wi-Fi rollback writer before wiping. There is no
 /// second reboot. Returns the steps taken, empty when there was no reset.
 pub fn resume(plan: &Plan, effects: &mut impl Effects) -> io::Result<Vec<Step>> {
     plan.check().map_err(io::Error::other)?;
     let mut steps = Vec::new();
     match fs::symlink_metadata(&plan.journal) {
-        Ok(_) => finish(plan, effects, &mut steps)?,
+        Ok(_) => {
+            if systemd_stop(&plan.stop) || keeper_stop(&plan.stop) {
+                effects.run(&[
+                    "/usr/bin/systemctl".into(),
+                    "stop".into(),
+                    WIFI_RESTORE_UNIT.into(),
+                ])?;
+            }
+            finish(plan, effects, &mut steps)?;
+        }
         Err(error) if error.kind() == io::ErrorKind::NotFound => {}
         Err(error) => return Err(error),
     }
@@ -447,8 +478,23 @@ pub fn resume(plan: &Plan, effects: &mut impl Effects) -> io::Result<Vec<Step>> 
 }
 
 fn finish(plan: &Plan, effects: &mut impl Effects, steps: &mut Vec<Step>) -> io::Result<()> {
+    finish_with(plan, effects, steps, &mut wipe)
+}
+
+fn finish_with(
+    plan: &Plan,
+    effects: &mut impl Effects,
+    steps: &mut Vec<Step>,
+    erase: &mut impl FnMut(&Path) -> io::Result<()>,
+) -> io::Result<()> {
     for path in &plan.wipe {
-        wipe(path)?;
+        if path == Path::new(PRODUCT_WIFI) {
+            // Existing installed plans already name the canonical file. The
+            // rollback and staging siblings belong to the same credential,
+            // and must go before a later boot may run Wi-Fi restoration.
+            wipe_wifi_siblings(path, erase)?;
+        }
+        erase(path)?;
         steps.push(Step::Wiped(path.clone()));
     }
     // Already gone after `reset`; this covers a journal found without one.
@@ -460,4 +506,158 @@ fn finish(plan: &Plan, effects: &mut impl Effects, steps: &mut Vec<Step>) -> io:
     steps.push(Step::JournalRemoved);
     effects.sync();
     Ok(())
+}
+
+fn wipe_wifi_siblings(
+    conf: &Path,
+    erase: &mut impl FnMut(&Path) -> io::Result<()>,
+) -> io::Result<()> {
+    for extension in [
+        "conf.lamp-previous",
+        "conf.lamp-setup",
+        "conf.lamp-setup-tmp",
+    ] {
+        erase(&conf.with_extension(extension))?;
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::{
+        os::unix::fs::symlink,
+        sync::atomic::{AtomicU64, Ordering},
+    };
+
+    struct Root(PathBuf);
+    impl Root {
+        fn new() -> Self {
+            static NEXT: AtomicU64 = AtomicU64::new(0);
+            let path = std::env::temp_dir().canonicalize().unwrap().join(format!(
+                "reset-wifi-{}-{}",
+                std::process::id(),
+                NEXT.fetch_add(1, Ordering::Relaxed)
+            ));
+            fs::create_dir(&path).unwrap();
+            Self(path)
+        }
+    }
+    impl Drop for Root {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.0);
+        }
+    }
+
+    #[test]
+    fn pending_reset_refuses_wifi_restore_before_reading_old_bytes() {
+        let root = Root::new();
+        let journal = root.0.join("reset.json");
+        assert!(wifi_restore_allowed(&journal).unwrap());
+        fs::write(&journal, b"reset in progress").unwrap();
+        assert!(!wifi_restore_allowed(&journal).unwrap());
+        fs::remove_file(&journal).unwrap();
+        symlink("missing", &journal).unwrap();
+        assert!(!wifi_restore_allowed(&journal).unwrap());
+        let not_directory = root.0.join("not-directory");
+        fs::write(&not_directory, b"x").unwrap();
+        assert!(wifi_restore_allowed(&not_directory.join("reset.json")).is_err());
+    }
+
+    #[test]
+    fn finish_erases_stock_wifi_siblings_before_removing_the_journal() {
+        struct Effects {
+            journal: PathBuf,
+            wifi: PathBuf,
+            syncs: usize,
+        }
+        impl super::Effects for Effects {
+            fn run(&mut self, _: &[String]) -> io::Result<()> {
+                panic!("finish does not start commands")
+            }
+            fn sync(&mut self) {
+                assert_eq!(fs::read_dir(&self.wifi).unwrap().count(), 0);
+                self.syncs += 1;
+                assert_eq!(self.journal.exists(), self.syncs == 1);
+            }
+            fn force_reboot(&mut self) {
+                panic!("finish does not reboot")
+            }
+        }
+        for fail_sibling in [false, true] {
+            let root = Root::new();
+            let directory = root.0.join("wifi");
+            fs::create_dir(&directory).unwrap();
+            let conf = directory.join("wpa_supplicant-wlan0.conf");
+            let journal = root.0.join("reset.json");
+            fs::write(&journal, b"reset in progress").unwrap();
+            // A stopped helper may have just restored the old credential and
+            // left its backup after a failed network rejoin.
+            fs::write(&conf, b"synthetic restored credential").unwrap();
+            for extension in [
+                "conf.lamp-previous",
+                "conf.lamp-setup",
+                "conf.lamp-setup-tmp",
+            ] {
+                fs::write(conf.with_extension(extension), b"synthetic old credential").unwrap();
+            }
+            let calibration = root.0.join("calibration");
+            fs::write(&calibration, b"keep").unwrap();
+            let plan = Plan {
+                marker: root.0.join("done"),
+                journal: journal.clone(),
+                wipe: vec![PRODUCT_WIFI.into()],
+                stop: vec![
+                    "/usr/bin/systemctl".into(),
+                    "stop".into(),
+                    "lampos.target".into(),
+                ],
+                reboot: vec!["/usr/bin/systemctl".into(), "reboot".into()],
+                detach: vec![],
+            };
+            plan.check().unwrap();
+            let mut effects = Effects {
+                journal: journal.clone(),
+                wifi: directory.clone(),
+                syncs: 0,
+            };
+            let mut visited = Vec::new();
+            let mut erase = |path: &Path| {
+                let relative = path.strip_prefix("/etc/wpa_supplicant").unwrap();
+                assert_eq!(relative.components().count(), 1);
+                visited.push(path.to_path_buf());
+                if fail_sibling && relative == Path::new("wpa_supplicant-wlan0.conf.lamp-setup") {
+                    return Err(io::Error::new(
+                        io::ErrorKind::PermissionDenied,
+                        "injected sibling failure",
+                    ));
+                }
+                wipe(&directory.join(relative))
+            };
+            let mut steps = Vec::new();
+            let result = finish_with(&plan, &mut effects, &mut steps, &mut erase);
+            if fail_sibling {
+                assert_eq!(result.unwrap_err().kind(), io::ErrorKind::PermissionDenied);
+                assert!(journal.exists() && conf.exists());
+                assert!(!wifi_restore_allowed(&journal).unwrap());
+                assert!(!steps.contains(&Step::JournalRemoved));
+                assert_eq!(effects.syncs, 0);
+            } else {
+                result.unwrap();
+                assert_eq!(effects.syncs, 2);
+                assert!(wifi_restore_allowed(&journal).unwrap());
+                assert_eq!(
+                    visited,
+                    [
+                        Path::new(PRODUCT_WIFI).with_extension("conf.lamp-previous"),
+                        Path::new(PRODUCT_WIFI).with_extension("conf.lamp-setup"),
+                        Path::new(PRODUCT_WIFI).with_extension("conf.lamp-setup-tmp"),
+                        PathBuf::from(PRODUCT_WIFI),
+                    ]
+                );
+                assert!(steps.contains(&Step::JournalRemoved));
+            }
+            assert_eq!(fs::read(calibration).unwrap(), b"keep");
+        }
+    }
 }

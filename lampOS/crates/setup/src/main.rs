@@ -165,6 +165,10 @@ fn run() -> Result<bool, Box<dyn std::error::Error>> {
             Some("--boot") if given.next().is_none() => true,
             Some(_) => return Err("wifi-restore takes only --boot".into()),
         };
+        if !reset::wifi_restore_allowed(Path::new(reset::PRODUCT_JOURNAL))? {
+            eprintln!("lamp-setup: wifi: reset pending, old network not restored");
+            return Ok(true);
+        }
         let mut host = lamp_setup::wifi_change::ImageRejoin::new();
         let restored = lamp_setup::wifi_change::restore(&mut host, !boot);
         eprintln!("lamp-setup: wifi-restore: {restored:?}");

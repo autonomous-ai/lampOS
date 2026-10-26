@@ -17,8 +17,18 @@ The existing stock product and keeper plans receive this barrier in Setup;
 custom commands still own their stop-completion contract. No Voice protocol,
 storage format, product switch or dependency changes.
 
+Accepted Setup helpers are not target members in already-installed units.
+Reuse systemd's concrete `Triggers` edges after their listener sockets stop,
+then wait for the helper jobs, including Wi-Fi's stop-post restoration.
+Settle the separate boot-restore job during reset recovery too. Keep ordinary
+Wi-Fi rollback when no reset is pending; during reset, fence rollback reads
+with the journal and remove the exact credential backup/staging siblings
+before that journal goes. A template-only change would not cover live old
+instances, and a fixture-only plan change would not cover old installed plans.
+
 The reset latency target is bounded completion of the actual stop barrier:
-60 seconds across discovery, stop and verification, with failure retaining
+180 seconds across discovery, stop and verification (including the existing
+120-second Wi-Fi stop allowance), with failure retaining
 the journal and rebooting without wiping. The five-second gesture and normal
 interaction loops are unchanged. Source evidence and synthetic tests cannot
 establish the affected lamp's exact writer timing or customer onboarding.

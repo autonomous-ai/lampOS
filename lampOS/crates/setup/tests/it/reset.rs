@@ -95,10 +95,14 @@ struct Fake {
     calls: Rc<RefCell<Vec<String>>>,
     fail_stop: bool,
     fail_reboot: bool,
+    stop_argv: Option<Vec<String>>,
 }
 impl Effects for Fake {
     fn run(&mut self, argv: &[String]) -> io::Result<()> {
         self.calls.borrow_mut().push(argv[1].clone());
+        if argv[1] == "stop" {
+            self.stop_argv = Some(argv.to_vec());
+        }
         if (self.fail_stop && argv[1] == "stop") || (self.fail_reboot && argv[1] == "reboot") {
             return Err(io::Error::other("refused"));
         }
@@ -173,13 +177,45 @@ fn a_failed_stop_reboots_at_once_into_setup_which_finishes_the_wipe() {
     let steps = reset::resume(&plan, &mut start).unwrap();
     wiped(&root);
     assert!(!steps.contains(&Step::Rebooting));
-    assert_eq!(*start.calls.borrow(), ["sync", "sync"]);
+    assert_eq!(*start.calls.borrow(), ["stop", "sync", "sync"]);
     // Nothing left to finish.
     assert!(
         reset::resume(&plan, &mut Fake::default())
             .unwrap()
             .is_empty()
     );
+}
+
+#[test]
+fn recovery_keeps_the_journal_and_data_when_boot_wifi_restore_cannot_stop() {
+    let root = Root::new();
+    let plan = lamp(&root);
+    reset::reset(
+        &plan,
+        &mut Fake {
+            fail_stop: true,
+            ..Fake::default()
+        },
+    )
+    .unwrap();
+    let mut recovery = Fake {
+        fail_stop: true,
+        ..Fake::default()
+    };
+    assert!(reset::resume(&plan, &mut recovery).is_err());
+    assert!(plan.journal.exists());
+    assert!(root.path("people.json").exists());
+    assert_eq!(*recovery.calls.borrow(), ["stop"]);
+    assert_eq!(
+        recovery.stop_argv.unwrap(),
+        [
+            "/usr/bin/systemctl",
+            "stop",
+            "lamp-setup-wifi-restore.service"
+        ]
+    );
+    reset::resume(&plan, &mut Fake::default()).unwrap();
+    wiped(&root);
 }
 
 #[test]

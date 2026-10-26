@@ -180,7 +180,11 @@ lamp-setup reset-now`). That unit, in this order:
    each in the stop command. For the stock keeper command
    (`/usr/local/bin/lamp-keeper stop lamp`), it preserves the keeper's
    pause/rest protocol first, then applies the same barrier. It verifies
-   that membership is unchanged and every member is inactive before wiping;
+   that membership is unchanged and every member is inactive. After the
+   change, own-key and Wi-Fi listener sockets are stopped, it discovers
+   their accepted helper instances from `Triggers`, stops those instances
+   and waits through their stop hooks too. These instances need not have
+   `PartOf` in their already-installed units;
 4. it wipes each path in the plan: a file is removed, a directory keeps itself
    (systemd units name some of them and would not start without them) and
    loses everything in it. It walks by handle, one component at a time from
@@ -196,7 +200,10 @@ still flush its cached onboarding outcomes during that interval. Since a
 wipe retains the directory, that late write could restore the factory's
 progress before reboot. The barrier fixes already-installed stock plans;
 it needs no new plan field, switch, or migration. Discovery, explicit stop,
-and verification share a 60 s bound, at most 256 units and 64 KiB per query.
+and verification share a 180 s bound, at most 256 units and 64 KiB per query.
+This permits the Wi-Fi helper's existing 120 s stop allowance; its ordinary
+rollback behavior is not shortened. The keeper's preceding pause command
+retains its existing separate timing.
 An error, unknown state, changed membership or timeout takes the existing
 stop-failure path: no wipe, journal retained, reboot into reset recovery.
 Custom stop commands retain their contract to stop every writer before
@@ -204,12 +211,22 @@ returning. This does not change the five-second button gesture or ordinary
 Voice startup. Installed reset timing and the customer's onboarding must
 still be checked on a lamp.
 
+Wi-Fi's independent boot-restore service is also settled before the stock
+reset or interrupted-reset recovery wipes. While the stock reset journal
+exists, `wifi-restore` refuses to read rollback bytes. A plan that wipes the
+stock `wpa_supplicant-wlan0.conf` now also removes its exact owned siblings
+`.conf.lamp-previous`, `.conf.lamp-setup` and `.conf.lamp-setup-tmp`, before
+the canonical file and before the journal is removed. This applies to old
+installed plans too: it prevents a queued boot restore from finding old
+credentials after the reset fence opens. Ordinary interrupted Wi-Fi changes
+without a reset retain their existing restoration path.
+
 With the keeper's `--setup-marker` (the fifth builder's, agreed on #702), a
 lamp with no marker starts only `lamp-setup.service`. So if the stop fails,
 `lamp-setup` reboots at once without wiping; if the power goes during the
 wipe, the lamp also comes back with no marker and a journal. Either way
 `resume-reset`, the first thing `lamp-setup.service` runs, finishes the wipe
-with nothing of the lamp running, without a second reboot. A power cut between
+after settling the independent Wi-Fi restore writer, without a second reboot. A power cut between
 the journal and the marker's removal leaves both, so the lamp starts; then
 `watch-reset` finds the journal at its start and carries on with the reset. A plan is refused unless every path is absolute and
 plain (no `.` or `..`, read from the text itself), at least two levels below a
