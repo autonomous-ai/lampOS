@@ -1,0 +1,20 @@
+{
+  "actual_executables_reverified_before_any_compiler": true,
+  "actual_preserved_outputs_and_depfiles_reverified_before_any_compiler": true,
+  "changed_source_entries": [
+    "lampOS/crates/voice/src/remember.rs",
+    "lampOS/crates/voice/src/second_provider.rs",
+    "lampOS/crates/voice/src/second_provider/tests.rs",
+    "lampOS/crates/voice/src/second_provider/tests/held_forget.rs",
+    "lampOS/docs/memory.md",
+    "lampOS/docs/second-voice.md"
+  ],
+  "new_empty_target": false,
+  "note": "Same exclusively owned target and worktree; prior full closure retained. No cold-target claim.",
+  "previous_artifact_closure_sha256": "e26eda5df48e44800ec113f8915c78bd0fe3a80fcd70c41ca532471d09ca9cbd",
+  "previous_complete_sha256": "00626898c323c22bb20e1e1224ffa330acb76a5e232655a0403a7e5ecc4a1691",
+  "previous_head": "3f5a8918072f61e81fbb6a41bb58963c7110a80d",
+  "previous_source_inventory_sha256": "29e5448cd8f754cb7b117edd9efeda72a6a14c7f19cdd6cb014e4c9583057477",
+  "source_worktree": "<source>",
+  "target": "<target>"
+}

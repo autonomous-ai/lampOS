@@ -1,3 +1,13 @@
+Current status: reset-query latest-base host qualification passed; original ARM64 and peer reads follow.
+
+## Current checkpoint: 2026-10-27 06:07 +07, b234 query carry qualified
+
+[Exact 9784/b234 proof](verification/reset-query-bounds-20261026/current-9784/README.md): fmt, strict Setup/Cloud Clippy and full matching tests pass: Setup **192/0/1**, Cloud **196/0/4**, total **388/0/5**, all seven query controls once; two zero-doc summaries separate. Runtime 21.660 s. The closed 3f5 target's actual/preserved bytes were verified before reuse; changed Voice and Cloud artifacts rebuilt. All 7,239 source entries, ten executables, 63 local outputs and 445 depfiles passed final guards. No failures or retries. Earlier gates remain bound to their own heads and are not added.
+
+The authored patch still has equal range-diff from 8a; the inherited Voice changes affected Cloud's direct dependency and received fresh qualification. Original native and independent GitHub reads are pending; no installed reset, device or release result is claimed. The evidence log's b234 rebase preserved all 10,248 prior authored blob/mode entries and was pushed as a9ca749db. Source push and PR creation are separate steps, verified from their actual outcomes.
+
+---
+
 Current status: reset-query source pushed at 3f5; current-base carry precedes the PR.
 
 ## Current checkpoint: 2026-10-27 06:03 +07, complete query host gates published as source
