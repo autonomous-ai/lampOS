@@ -1189,7 +1189,13 @@ passed. Tests: the notes' exact texts in `remember::tests`.
     or a context busy just then, keeps it plainly. A model-given `replaces`
     is as before. English only; "I don't like the bakery" (no change word)
     and "I cannot get to the bakery now" (no whole-word "not") correct
-    nothing. Only with `LAMP_MEMORY_REPLACES=on`. With
+    nothing, nor does a "not" that denies nothing: followed by "just",
+    "only", "even", "also", "simply", "merely" or a possessive ("not just
+    a cat", "not only coffee", "not my brother"), or naming a person
+    ("brother", "sister", "friend"…, plurals and possessives too; quotes
+    and marks are read past), it replaces nothing, since the old
+    thing may still hold or be someone else's (reviewer-three's P2 on
+    #3616). When unsure, nothing is replaced. Only with `LAMP_MEMORY_REPLACES=on`. With
     `LAMP_MEMORY_KEEP_HEARD`, a heard line kept instead still drops the
     model's `replaces`, but this may give it one again when the heard line
     itself denies the old fact by its words (that P2's case, "it's green
