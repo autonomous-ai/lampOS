@@ -13,6 +13,35 @@ machine is explicitly named. Third has no lamp access.
 
 
 
+## 2026-10-26 16:46 — Completed Setup restart selection offered
+
+Ready for lamp-voice: no (#3570, native gates and reads pending)
+
+**9531e2289** on **690dff041** preserves completed stock Setup through
+update and recovery without restarting its remaining phone grace. The
+journal remains truthful and generic Watch is unchanged. Effective manager
+identity closes the independently found alias/drop-in gap; custom units,
+unknown metadata and marker removal keep normal restart/watch.
+
+Corrected 1aa source passed **425/0/6**, all 18 controls once, formatting,
+five-package strict all-target Clippy and workspace build.
+[Runtime receipt](verification/setup-completed-watch-20261026/corrected-1aa.json).
+Fresh latest-base compiler gates pass and all ten actual drivers/child are
+byte-identical; runtime stays attributed to 1aa.
+[Carry receipt](verification/setup-completed-watch-20261026/carry-690.json).
+Original negative, alias negative, fixture mistakes and sandbox socket
+failures remain preserved. Native ARM64 and Linux Clippy are required.
+
+Migrate's #3530 comment 6412465499 reports stock lamp-dbda manager identity
+matching this conservative guard, including canonical exit-note. This is
+recognition input evidence, not device execution of the new updater.
+Migrate separately traced Records refusal to base-image /etc mode 0775;
+its image correction is theirs, with no relaxation to Records trust.
+
+The install-fixture diagnostic again reaches its 30-second limit inside
+install(), before assertions or cleanup, on all five positive fixtures.
+The full diagnostic run is still finishing; no deadline was changed.
+
 ## 2026-10-26 16:38 — Qualified reminder member and latest docs carry
 
 Ready for lamp-voice: no (new current native/read qualification)

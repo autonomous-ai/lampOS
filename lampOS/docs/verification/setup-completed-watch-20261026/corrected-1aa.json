@@ -1,0 +1,198 @@
+{
+  "base": "1aa409fcbdd1f1c32ae3bb9ad6698f83453dde68",
+  "source_count": 7238,
+  "source_sha256": "128a2400355af7ac0ed4fd00e9c9435028f2425b9a48eaea11895ae22e5fa451",
+  "all_source_unchanged": true,
+  "gates": {
+    "fmt": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "start": "2026-10-26T08:59:08Z",
+      "finish": "2026-10-26T08:59:20Z",
+      "exit": 0,
+      "summaries": [],
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "clippy": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "clippy",
+        "-q",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-update",
+        "-p",
+        "lamp-setup",
+        "-p",
+        "lamp-cloud",
+        "-p",
+        "lamp-keeper",
+        "-p",
+        "lamp-skills",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "start": "2026-10-26T08:59:20Z",
+      "finish": "2026-10-26T09:00:21Z",
+      "exit": 0,
+      "summaries": [],
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "test-lib": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-update",
+        "--lib",
+        "--",
+        "--test-threads=1"
+      ],
+      "start": "2026-10-26T09:00:21Z",
+      "finish": "2026-10-26T09:00:30Z",
+      "exit": 0,
+      "summaries": [
+        "test result: ok. 123 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 9.26s"
+      ],
+      "log_sha256": "7d74b6c623e058a69a609f0478f931d765f347541b9c6708efb8d05e606f2d7b"
+    },
+    "test-bin": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-update",
+        "--bin",
+        "lamp-update",
+        "--",
+        "--test-threads=1"
+      ],
+      "start": "2026-10-26T09:00:31Z",
+      "finish": "2026-10-26T09:00:32Z",
+      "exit": 0,
+      "summaries": [
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      ],
+      "log_sha256": "f7d2dec64738bf6e07b381cb15705d7d8345a77495fe68deb8c3b2817ef7a303"
+    },
+    "test-integration": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-update",
+        "--test",
+        "functions",
+        "--test",
+        "install",
+        "--test",
+        "it",
+        "--test",
+        "release_pair",
+        "--test",
+        "round",
+        "--test",
+        "self-cli-exec",
+        "--test",
+        "self-process-cuts",
+        "--",
+        "--test-threads=4"
+      ],
+      "start": "2026-10-26T09:00:32Z",
+      "finish": "2026-10-26T09:32:43Z",
+      "exit": 0,
+      "summaries": [
+        "test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s",
+        "test result: ok. 101 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 506.27s",
+        "test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.96s",
+        "test result: ok. 0 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 183 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1413.46s",
+        "test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out",
+        "test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out"
+      ],
+      "log_sha256": "8497301829bee97513dd4c10cbe6a4991e1252c577579df7b713addb52bcd66d"
+    },
+    "test-doc": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-update",
+        "--doc",
+        "--",
+        "--test-threads=1"
+      ],
+      "start": "2026-10-26T09:32:45Z",
+      "finish": "2026-10-26T09:32:48Z",
+      "exit": 0,
+      "summaries": [
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s"
+      ],
+      "log_sha256": "4d6512223acadfa06e61b0abe13701b7287f59458b1d825fce9cae6b1df477a6"
+    },
+    "build": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "build",
+        "-q",
+        "--offline",
+        "--locked",
+        "--workspace"
+      ],
+      "start": "2026-10-26T09:32:48Z",
+      "finish": "2026-10-26T09:34:34Z",
+      "exit": 0,
+      "summaries": [],
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "runtime_counts": {
+    "passed": 425,
+    "failed": 0,
+    "ignored": 6
+  },
+  "limits": "Native Mac Update full coverage. Library serial due global DNS budget; explicit integrations four threads, bin/doc serial. Linux-only external harnesses remain ignored here. No real systemd/device or latency qualification.",
+  "own_control_pass_counts": {
+    "setup_lifecycle::tests::manager_identity_requires_the_exact_loaded_product_with_known_dropins": 1,
+    "setup_lifecycle::tests::incomplete_duplicate_or_malformed_manager_records_are_unknown": 1,
+    "setup_lifecycle::completed_product_setup_keeps_serving_without_restart_or_false_rollback": 1,
+    "setup_lifecycle::incomplete_product_setup_still_restarts_and_is_watched": 1,
+    "setup_lifecycle::the_exact_product_exit_note_and_merged_usr_layout_keep_the_exception": 1,
+    "setup_lifecycle::custom_base_units_and_candidate_changes_keep_normal_watch_rules": 1,
+    "setup_lifecycle::unknown_dropins_at_each_scope_keep_normal_watch_rules": 1,
+    "setup_lifecycle::uncertain_override_files_do_not_hang_or_grant_the_exception": 1,
+    "setup_lifecycle::a_different_failed_part_still_rolls_back_without_restarting_completed_setup": 1,
+    "setup_lifecycle::recovery_keeps_the_true_active_journal_but_does_not_restart_completed_setup": 1,
+    "setup_lifecycle::completion_after_the_activity_snapshot_is_rechecked_before_restart": 1,
+    "setup_lifecycle::reset_removing_completion_before_restart_retains_the_normal_watch": 1,
+    "setup_lifecycle::reset_removing_completion_before_recovery_restarts_the_old_setup": 1,
+    "setup_lifecycle::an_alias_outside_the_lamp_prefix_cannot_bypass_the_product_check": 1,
+    "setup_lifecycle::chained_and_loaded_aliases_retain_normal_restart_even_without_alias_files": 1,
+    "setup_lifecycle::unknown_manager_identity_and_custom_loaded_paths_keep_normal_watch": 1,
+    "setup_lifecycle::completion_removed_during_the_manager_query_is_not_used": 1,
+    "setup_lifecycle::recovery_rechecks_effective_aliases_after_restoring_the_old_unit": 1
+  },
+  "executables_sha256": "52189db1d99b5b21a73ad1c1f4538cf97c30f9915067e08db6b903514fa581c2"
+}

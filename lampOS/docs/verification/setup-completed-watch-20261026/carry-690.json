@@ -1,0 +1,92 @@
+{
+  "base": "690dff041e331b5c89160901b4f38f3a9915e60b",
+  "previous_runtime_base": "1aa409fcbdd1f1c32ae3bb9ad6698f83453dde68",
+  "gates": {
+    "fmt": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "start": "2026-10-26T09:37:14Z",
+      "finish": "2026-10-26T09:37:28Z",
+      "exit": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "clippy": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "clippy",
+        "-q",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-update",
+        "-p",
+        "lamp-setup",
+        "-p",
+        "lamp-cloud",
+        "-p",
+        "lamp-keeper",
+        "-p",
+        "lamp-skills",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "start": "2026-10-26T09:37:28Z",
+      "finish": "2026-10-26T09:37:28Z",
+      "exit": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "build": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "build",
+        "-q",
+        "--offline",
+        "--locked",
+        "--workspace"
+      ],
+      "start": "2026-10-26T09:37:28Z",
+      "finish": "2026-10-26T09:37:29Z",
+      "exit": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "test-compile": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-update",
+        "--no-run"
+      ],
+      "start": "2026-10-26T09:37:29Z",
+      "finish": "2026-10-26T09:37:29Z",
+      "exit": 0,
+      "log_sha256": "146bb91f542fe8e179ef206cbe5d46a7f0b00d79111c505170d9ddfc0f828394"
+    }
+  },
+  "source_changed_from_previous": [
+    "docs/build-rows.md"
+  ],
+  "source_unchanged_during_gate": true,
+  "source_sha256": "4179016975c373832eed5a4fb32860fbd82a8f420adbc000941af81e69d8b145",
+  "actual_executables_compared": 10,
+  "different_executables": [],
+  "all_executables_identical": true,
+  "runtime_carried_as_prior_execution": {
+    "passed": 425,
+    "failed": 0,
+    "ignored": 6
+  },
+  "limits": "Fresh current-base compiler gates only; no runtime tests executed in this carry. Actual425/0/6 remains source-bound1aa execution. build-rows.md is not a referenced Update or dependency compile/runtime fixture; no current native/device qualification inferred."
+}
