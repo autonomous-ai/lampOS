@@ -1,4 +1,16 @@
-## 2026-10-26 09:13 — Common producer controls pass; full runtime continues
+## 2026-10-26 09:27 — Common failed gate retained; current composition qualifying
+
+Ready for lamp-voice: no
+
+Frozen c5 tree 0f01bd160 completed full Eyes/Voice with 4,554 clean PASS, two FAIL and 26 skipped, zero LEAK or nextest TIMEOUT. Both failed tests reported internal timeouts: the mid-search push scenario watchdog/child cleanup, and the DSP-reset recorder acknowledgement. All seven new producer and sixteen required consumer privacy/Checking/join controls passed once. The actual native handle exited 100, both failed drivers were retained independently, and source/witness/group closure verified. A separate capacity assertion refused the next workflow-reader stage at 4,959,797,248 bytes free; installation, workflow/switch readers and docs remained unrun. No retry or waiver was used.
+
+The single Common commit now carries onto train153 0c1f6437e. The three Eyes repair files and eyes.md match the frozen run; upstream memory activation is preserved in switches.md. The carry's first backup command was denied Git metadata access; the exact six paths were recovered from the already-frozen Git tree and every hash verified against the original manifest before reapplication. The source carry is clean. Current tree b1b31625c is now qualifying with workspace fmt/strict Clippy/build, full Voice/Update, Memory observation3, switch readers, separate custom Update and turn-end process harnesses, and four-package docs including the previously unrun Eyes docs. Formatting passed; strict Clippy is active. No current complete-gate result is claimed.
+
+Train153 changes the push fixture, but its causal effect on the old failure is unproved. The unchanged DSP fixture's 500 ms wait includes storage synchronization and acknowledgement; its negative cases can accept timeout as invalid without proving sequence rejection. That gap is reported to Tests and First. Production time limits and the fixture are unchanged in this carry. The residual old-Seen first-grant interval and physical privacy holds remain explicit.
+
+After actual gate release, only 194 incremental cache child directories were removed. Native recovery exited zero and verified 10,510,475,264 bytes free, all twelve independent failure witnesses and twelve compiled bindings unchanged. Onboarding and Peek source preparations are current to train153 with their new checks still UNRUN. Onboarding retains Main's person-scope line/row once. No lamp, installation or child activation occurred.
+
+## 2026-10-26 09:10 — Common producer controls pass; full runtime continues
 
 Ready for lamp-voice: no
 
