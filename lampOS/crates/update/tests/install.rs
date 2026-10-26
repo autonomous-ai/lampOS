@@ -934,6 +934,7 @@ fn the_product_keeps_nothing_personal_while_nobody_is_known() {
         "Environment=LAMP_MEMORY_SOCKET=/run/lampos-memory/memory.sock",
         "Environment=LAMP_MEMORY_PERSONAL_NEEDS_FACE=on",
         "Environment=LAMP_MEMORY_ROOM_NOT_ASKER=on",
+        "Environment=LAMP_MEMORY_FORGET_ASKS=on",
     ] {
         assert!(service.contains(&line), "the voice lacks {line}");
     }
