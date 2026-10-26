@@ -1,0 +1,44 @@
+{
+  "head": "7842205f1e7b85466b6f2fd9b613ef127df1aa39",
+  "terminal": {
+    "head": "7842205f1e7b85466b6f2fd9b613ef127df1aa39",
+    "command": [
+      "cargo",
+      "+1.96.0",
+      "test",
+      "--offline",
+      "--locked",
+      "-p",
+      "lamp-skills",
+      "--",
+      "--test-threads=1"
+    ],
+    "returncode": 101,
+    "signal": null,
+    "deadline_seconds": 1800,
+    "timed_out": false,
+    "elapsed_seconds": 265.4881699999969,
+    "driver_reaped": true,
+    "process_group_absent": true,
+    "pid": 9373,
+    "source_unchanged": true,
+    "six_actual_and_preserved_executables_unchanged": true,
+    "log_sha256": "9e575a08eab650acf94b68e400ad6debec9f2301e530b34c1435f151e7717733"
+  },
+  "runtime_scope": "Library only; Cargo stopped before remaining drivers after first library failure. No complete Skills run is claimed.",
+  "library_result": [
+    156,
+    3,
+    0
+  ],
+  "failures": [
+    "routine::tests::a_delayed_sample_inside_the_window_keeps_its_original_deadline",
+    "routine::tests::a_delayed_wall_sample_cannot_renew_or_admit_after_its_window_ended",
+    "routine::tests::a_future_wall_sample_cannot_admit_work_or_extend_the_cached_window"
+  ],
+  "common_assertion": "crates/skills/src/routine.rs:1381:14 Option::unwrap(None), next_request receive helper",
+  "routine_blob": "cd32f3bf3d5b393d43580e8ed7922b435bd91132ae49d618a718c3564d3e63c7",
+  "routine_unchanged_by_reminder_patch": true,
+  "no_retry": true,
+  "limits": "No causal attribution; Tests owns controlled transport-expiry investigation. Carry remains unpublished."
+}

@@ -1,0 +1,65 @@
+{
+  "source": "source/robots/lamp/hardware/test/tools/head-nudge.py",
+  "results": [
+    {
+      "mode": "success",
+      "return_code": 0,
+      "final_torque": 0,
+      "off_attempts": 1,
+      "final_cap": 1000,
+      "stdout": [
+        "servo 5: pos 2000, load 0%+, temp 25C, torque off, torque limit 1000, EEPROM limits 1000-3000",
+        "plan: cap torque at 50%, 2000 -> 2000 in 3-count steps every 0.08s (~0.0s), stop at load 45% / lag 40 / 55C / 30s, then torque off, limit back to 1000",
+        "  t= 0.1s goal 2000 pos 2000 load  0.0%+ temp 25C",
+        "stopped: reached 2000; peak load 0%; torque off, limit back to 1000",
+        "after letting go: pos 2000, torque off, temp 25C"
+      ],
+      "real_device_operations": 0
+    },
+    {
+      "mode": "off_write_raises",
+      "return_code": 0,
+      "final_torque": 1,
+      "off_attempts": 5,
+      "final_cap": 500,
+      "stdout": [
+        "servo 5: pos 2000, load 0%+, temp 25C, torque off, torque limit 1000, EEPROM limits 1000-3000",
+        "plan: cap torque at 50%, 2000 -> 2000 in 3-count steps every 0.08s (~0.0s), stop at load 45% / lag 40 / 55C / 30s, then torque off, limit back to 1000",
+        "  t= 0.1s goal 2000 pos 2000 load  0.0%+ temp 25C",
+        "stopped: reached 2000; peak load 0%; torque off, limit back to 1000",
+        "after letting go: pos 2000, torque ON, temp 25C"
+      ],
+      "real_device_operations": 0
+    },
+    {
+      "mode": "off_error_reply",
+      "return_code": 0,
+      "final_torque": 1,
+      "off_attempts": 1,
+      "final_cap": 1000,
+      "stdout": [
+        "servo 5: pos 2000, load 0%+, temp 25C, torque off, torque limit 1000, EEPROM limits 1000-3000",
+        "plan: cap torque at 50%, 2000 -> 2000 in 3-count steps every 0.08s (~0.0s), stop at load 45% / lag 40 / 55C / 30s, then torque off, limit back to 1000",
+        "  t= 0.1s goal 2000 pos 2000 load  0.0%+ temp 25C",
+        "stopped: reached 2000; peak load 0%; torque off, limit back to 1000",
+        "after letting go: pos 2000, torque ON, temp 25C"
+      ],
+      "real_device_operations": 0
+    },
+    {
+      "mode": "off_bad_checksum",
+      "return_code": 0,
+      "final_torque": 1,
+      "off_attempts": 1,
+      "final_cap": 1000,
+      "stdout": [
+        "servo 5: pos 2000, load 0%+, temp 25C, torque off, torque limit 1000, EEPROM limits 1000-3000",
+        "plan: cap torque at 50%, 2000 -> 2000 in 3-count steps every 0.08s (~0.0s), stop at load 45% / lag 40 / 55C / 30s, then torque off, limit back to 1000",
+        "  t= 0.1s goal 2000 pos 2000 load  0.0%+ temp 25C",
+        "stopped: reached 2000; peak load 0%; torque off, limit back to 1000",
+        "after letting go: pos 2000, torque ON, temp 25C"
+      ],
+      "real_device_operations": 0
+    }
+  ]
+}
