@@ -31,3 +31,19 @@ build and full parallel-16 install passed: 101/0/0, 383.49 seconds libtest,
 cases produced libtest over-60-second notices; no exact individual duration
 is claimed. The source/driver stayed fixed and owned processes were reaped.
 The three original failed runs remain failed; no retry erased them.
+
+## Delivered source qualification
+
+Train 170 landed this fix as ba950f289. Its candidate, tested preview,
+landing and clean local b63c163d9 all have the same complete tree. The
+corrective local gate invalidated all 46 workspace packages plus patched
+local tough/sonora in a permanently dedicated target. Compiler JSON records
+all 48 local libraries freshly compiled. Full parallel-16 install passed
+101/0/0 in 380.23 s libtest (380.91 s outer), with source, driver and cleanup
+guards. The prior shared-target carry result is preserved but excluded from
+source qualification.
+
+Original train ARM64 40307005142 and Linux Clippy 40307005161 passed. ARM
+ran 7,501 selected cases with 53 skips, including all 101 install tests and
+all nine preflight cases once. Separate docs 4/0, process 13/0 and relay
+passed. This is a test-fixture repair, not a lamp timing result.

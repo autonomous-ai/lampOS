@@ -1,0 +1,123 @@
+{
+  "delivery": "train170 PR3575 landed; original PR3574 closed",
+  "source_trees": {
+    "d04bcc6d4cfc6b8c1327d5fc304711e8830329f4": "1c321244dfa0ffc439570f4e885519a80f3c4caf",
+    "ba950f289b4e0d4fd072d080ea3a1b54e7bce03f": "1c321244dfa0ffc439570f4e885519a80f3c4caf",
+    "b63c163d913885a84333dd5d1b28ce79857b9641": "1c321244dfa0ffc439570f4e885519a80f3c4caf",
+    "98625f184b0d54a3b8d2c08728b51091c462991a": "1c321244dfa0ffc439570f4e885519a80f3c4caf"
+  },
+  "all_four_trees_identical": true,
+  "native_original_runs": [
+    {
+      "lane": "arm",
+      "run_id": 40307005142,
+      "attempt": 1,
+      "head": "d04bcc6d4cfc6b8c1327d5fc304711e8830329f4",
+      "checkout": "98625f184b0d54a3b8d2c08728b51091c462991a",
+      "conclusion": "success",
+      "log_sha256": "c8d594c40ebf59c0db48c1c7ffe4b7ec66a1e80136063393bd71dcf3d70846da"
+    },
+    {
+      "lane": "linux",
+      "run_id": 40307005161,
+      "attempt": 1,
+      "head": "d04bcc6d4cfc6b8c1327d5fc304711e8830329f4",
+      "checkout": "98625f184b0d54a3b8d2c08728b51091c462991a",
+      "conclusion": "success",
+      "log_sha256": "2a94cca79107effcf55a6cc4a1f2b1f1c52d6754ca6c5278d6af95792a63ee1e"
+    }
+  ],
+  "arm_scope": "package(=lamp-body) | package(=lamp-cloud) | package(=lamp-expression) | package(=lamp-keeper) | package(=lamp-lean) | package(=lamp-memory) | package(=lamp-peek) | package(=lamp-setup) | package(=lamp-skills) | package(=lamp-update) | package(=lamp-voice) | package(=lamp-voice-eval)",
+  "arm_scope_limitation": "12 PR-selected reverse-dependent crates; not full-workspace test execution or hardware",
+  "arm_summary": "Summary [ 162.356s] 7501 tests run: 7501 passed, 53 skipped",
+  "unique_install_target_passes": 101,
+  "unique_nine_control_outcomes": [
+    {
+      "test": "head_touch_preflight_files::dangling_drop_in_keeps_missing_file_compatibility",
+      "outcome": "PASS",
+      "duration_s": 0.262,
+      "ordinal": 2498,
+      "total": 7501
+    },
+    {
+      "test": "head_touch_preflight_files::dev_null_drop_in_mask_is_preserved",
+      "outcome": "PASS",
+      "duration_s": 0.26,
+      "ordinal": 2499,
+      "total": 7501
+    },
+    {
+      "test": "head_touch_preflight_files::directory_drop_in_is_refused_before_mutation",
+      "outcome": "PASS",
+      "duration_s": 0.011,
+      "ordinal": 2501,
+      "total": 7501
+    },
+    {
+      "test": "head_touch_preflight_files::fifo_body_calibration_is_refused_before_mutation",
+      "outcome": "PASS",
+      "duration_s": 0.017,
+      "ordinal": 2502,
+      "total": 7501
+    },
+    {
+      "test": "head_touch_preflight_files::fifo_drop_in_is_refused_before_mutation",
+      "outcome": "PASS",
+      "duration_s": 0.017,
+      "ordinal": 2503,
+      "total": 7501
+    },
+    {
+      "test": "head_touch_preflight_files::fifo_without_a_writer_is_refused_before_mutation",
+      "outcome": "PASS",
+      "duration_s": 0.015,
+      "ordinal": 2504,
+      "total": 7501
+    },
+    {
+      "test": "head_touch_preflight_files::missing_local_files_keep_install_compatibility",
+      "outcome": "PASS",
+      "duration_s": 0.245,
+      "ordinal": 2505,
+      "total": 7501
+    },
+    {
+      "test": "head_touch_preflight_files::regular_benign_drop_in_is_preserved",
+      "outcome": "PASS",
+      "duration_s": 0.244,
+      "ordinal": 2506,
+      "total": 7501
+    },
+    {
+      "test": "head_touch_preflight_files::symlink_to_regular_drop_in_is_preserved",
+      "outcome": "PASS",
+      "duration_s": 0.248,
+      "ordinal": 2507,
+      "total": 7501
+    }
+  ],
+  "doc_tests": {
+    "passed": 4,
+    "failed": 0,
+    "ignored": 0
+  },
+  "separate_harnesses": {
+    "relay_signals_ok": true,
+    "turn_end_process_13_pass_zero_fail": true
+  },
+  "linux": "whole-workspace pinned fmt and strict all-target Clippy success; no runtime claim",
+  "published_clean_local_runtime_binding": {
+    "receipt": "../third-install-preflight-evidence/current-666/clean-qualified/parallel16.json",
+    "receipt_sha256": "8703129e3a1c382dac6e27686a558864840ca000933176f5387c6c05d3b79859",
+    "source_head": "b63c163d913885a84333dd5d1b28ce79857b9641",
+    "published_landing": "ba950f289b4e0d4fd072d080ea3a1b54e7bce03f",
+    "binding": "full tracked tree identity, plus exact48-local-package clean and fresh compiler records",
+    "passed": 101,
+    "failed": 0,
+    "ignored": 0,
+    "elapsed_seconds": 380.90633199999866,
+    "driver_sha256": "5e421ce53c193c7b66e15abe9ea2d2a3aa30b54c7c813afaf927c8a0d47beaf6",
+    "runtime_reexecuted": false,
+    "prior_cache_tainted_results_excluded": true
+  }
+}

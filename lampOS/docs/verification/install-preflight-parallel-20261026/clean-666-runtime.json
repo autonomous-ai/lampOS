@@ -1,0 +1,19 @@
+{
+  "head": "b63c163d913885a84333dd5d1b28ce79857b9641",
+  "command": [
+    "./.claude/worktrees/third-install-preflight-evidence/current-666/clean-qualified/install",
+    "--test-threads=16",
+    "--nocapture"
+  ],
+  "returncode": 0,
+  "signal": null,
+  "timed_out": false,
+  "elapsed_seconds": 380.90633199999866,
+  "driver_sha256_before": "5e421ce53c193c7b66e15abe9ea2d2a3aa30b54c7c813afaf927c8a0d47beaf6",
+  "driver_sha256_after": "5e421ce53c193c7b66e15abe9ea2d2a3aa30b54c7c813afaf927c8a0d47beaf6",
+  "sources_unchanged": true,
+  "driver_reaped": true,
+  "process_group_absent": true,
+  "ambient_load": "Corrective qualification after exact48local package clean; fixture-only target; Setup independent gate may overlap",
+  "log_sha256": "8b74ab29de0fd1ecfb3390f7986c4a51a2b63a96f92abe311b015e184797733e"
+}

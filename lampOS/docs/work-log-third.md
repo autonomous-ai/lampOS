@@ -13,6 +13,25 @@ machine is explicitly named. Third has no lamp access.
 
 
 
+## 2026-10-26 17:48 — Preflight fixture repair delivered
+
+Ready for lamp-voice: yes (#3574 delivered by train 170/#3575)
+
+Landing **ba950f289**, candidate **d04bcc6d4**, tested preview **98625f184**
+and clean local **b63c163d9** share full tree **1c321244d**. The source-bound
+corrective host run is **101/0/0** after all 48 local packages were invalidated
+and freshly compiled in the fixture-only target; source/driver/cleanup guards
+pass. The earlier shared-target carry run remains excluded from qualification.
+[Clean gates](verification/install-preflight-parallel-20261026/clean-666-gates.json),
+[clean runtime](verification/install-preflight-parallel-20261026/clean-666-runtime.json).
+
+Original train ARM64 **40307005142** and Linux **40307005161** pass:
+**7,501/0/53**, all 101 install tests and all nine preflight cases once.
+Separate docs 4/0, process 13/0 and relay pass.
+[Delivery binding](verification/install-preflight-parallel-20261026/train170-delivery.json).
+No device claim. Next: reminder dedicated qualification and Setup's guarded
+fixture qualification, keeping its P2 HOLD until the corrected read.
+
 ## 2026-10-26 17:40 — Setup HOLD and cached-library mismatch preserved
 
 Ready for lamp-voice: no (#3570 HOLD; all current carries qualifying)

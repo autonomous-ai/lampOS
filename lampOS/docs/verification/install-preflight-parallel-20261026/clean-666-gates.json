@@ -1,0 +1,50 @@
+{
+  "head": "b63c163d913885a84333dd5d1b28ce79857b9641",
+  "base": "6663ca655b8e31eb9b73926d17b292df576b10aa",
+  "target": "third-reminder-carry-target: permanently fixture-WT-only",
+  "source_binding": "exact46workspace+2localpatched-package clean; no local fingerprint sets; compilerJSON all48workspace/local libs fresh=false in build; Update/Voice/install fresh=false in final testcompile",
+  "checks": [
+    {
+      "command": "cargo fmt --manifest-path lampOS/Cargo.toml --all --check",
+      "exit": 0
+    },
+    {
+      "command": "cargo clippy --locked -q -p lamp-update --all-targets --message-format=json-render-diagnostics -- -D warnings",
+      "cwd": "lampOS",
+      "exit": 0
+    },
+    {
+      "command": "cargo build --locked --workspace --message-format=json-render-diagnostics",
+      "cwd": "lampOS",
+      "exit": 0
+    },
+    {
+      "command": "cargo test --locked -p lamp-update --test install --no-run --message-format=json-render-diagnostics",
+      "cwd": "lampOS",
+      "exit": 0
+    }
+  ],
+  "prior_results": "current-666/parallel16 retained but not source-qualified due cross-worktree target freshness risk",
+  "precompiler_invocation_failure": "first Clippy attempt from parent had no Cargo.toml; no compiler/runtime ran; preservedclippy.stderr",
+  "driver_sha256": "5e421ce53c193c7b66e15abe9ea2d2a3aa30b54c7c813afaf927c8a0d47beaf6",
+  "runtime": {
+    "command": [
+      "./.claude/worktrees/third-install-preflight-evidence/current-666/clean-qualified/install",
+      "--test-threads=16",
+      "--nocapture"
+    ],
+    "returncode": 0,
+    "passed": 101,
+    "failed": 0,
+    "ignored": 0,
+    "elapsed_seconds": 380.90633199999866,
+    "outer_timeout_seconds": 900,
+    "timed_out": false,
+    "driver_reaped": true,
+    "process_group_absent": true,
+    "driver_hash_stable": true,
+    "sources_unchanged": true
+  },
+  "qualified": true,
+  "target_release": "no active compiler/test process; target remains permanently fixture-WT-only"
+}
