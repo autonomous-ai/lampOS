@@ -7897,6 +7897,214 @@ async fn a_held_forget_their_yes_runs_owns_the_yes_words_writes() {
     }));
 }
 
+/// Finding K on #3504 (lamp-06c1, 27 Oct: "Kept: the meeting room is
+/// called Orange." with no `remember` call, 2 of 4): a reply that says it
+/// kept something is said only beside a `remember` call. With none, it is
+/// not said and the model is asked again: a call then runs; a second such
+/// reply is said as the plain line that nothing was kept. A reply that
+/// claims nothing, and a claim beside its call, are said as they come.
+#[tokio::test]
+async fn a_reply_never_says_it_kept_something_with_no_remember_call() {
+    let remember = || {
+        Ok(ChatEvent::ToolCalls(vec![call(
+            "c1",
+            "remember",
+            json!({"text":"The meeting room is called Orange."}),
+        )]))
+    };
+    type Chats = Vec<Vec<Result<ChatEvent, net::Error>>>;
+    let cases: Vec<(Chats, usize, &str)> = vec![
+        // Claimed with no call, then called when asked again.
+        (
+            vec![
+                vec![
+                    text("Kept: the meeting room is called Orange."),
+                    Ok(ChatEvent::Done),
+                ],
+                vec![remember(), Ok(ChatEvent::Done)],
+                vec![text("Kept: it's Orange."), Ok(ChatEvent::Done)],
+            ],
+            1,
+            "said:Kept: it's Orange.",
+        ),
+        // Claimed twice with no call: the plain line.
+        (
+            vec![
+                vec![
+                    text("Kept: the meeting room is called Orange."),
+                    Ok(ChatEvent::Done),
+                ],
+                vec![text("Got it, kept that: Orange."), Ok(ChatEvent::Done)],
+            ],
+            0,
+            "said:I didn't keep that.",
+        ),
+        // Claimed beside its call: said.
+        (
+            vec![
+                vec![
+                    text("Kept: the meeting room is called Orange."),
+                    remember(),
+                    Ok(ChatEvent::Done),
+                ],
+                vec![Ok(ChatEvent::Done)],
+            ],
+            1,
+            "said:Kept: the meeting room is called Orange.",
+        ),
+        // No claim: said as it comes, nothing asked again.
+        (
+            vec![vec![text("Sure, here's a joke."), Ok(ChatEvent::Done)]],
+            0,
+            "said:Sure, here's a joke.",
+        ),
+        // The reviewer-lead's P2 on #3628: an ordinary reply is no claim.
+        (
+            vec![vec![text("Sure, I'll keep it short."), Ok(ChatEvent::Done)]],
+            0,
+            "said:Sure, I'll keep it short.",
+        ),
+        // A claim beside another call: not said, the call runs, the next
+        // round is told nothing was kept.
+        (
+            vec![
+                vec![
+                    text("Kept that, and the light's on."),
+                    Ok(ChatEvent::ToolCalls(vec![call(
+                        "c2",
+                        "light_on",
+                        json!({}),
+                    )])),
+                    Ok(ChatEvent::Done),
+                ],
+                vec![text("The light's on."), Ok(ChatEvent::Done)],
+            ],
+            0,
+            "said:The light's on.",
+        ),
+        // A claim alone in the last round, after reads only: the plain
+        // line, never silence.
+        (
+            vec![
+                vec![
+                    Ok(ChatEvent::ToolCalls(vec![call("c3", "recall", json!({}))])),
+                    Ok(ChatEvent::Done),
+                ],
+                vec![
+                    Ok(ChatEvent::ToolCalls(vec![call("c4", "recall", json!({}))])),
+                    Ok(ChatEvent::Done),
+                ],
+                vec![
+                    Ok(ChatEvent::ToolCalls(vec![call("c5", "recall", json!({}))])),
+                    Ok(ChatEvent::Done),
+                ],
+                vec![text("Kept: it's Orange."), Ok(ChatEvent::Done)],
+            ],
+            0,
+            "said:I didn't keep that.",
+        ),
+        // Reviewer-three's and the reviewer-lead's P2 on #3628: a reminder
+        // the person asked for, set in round 1, confirmed in round 2 with
+        // no call: said, never asked again.
+        (
+            vec![
+                vec![
+                    Ok(ChatEvent::ToolCalls(vec![call(
+                        "c6",
+                        "set_reminder",
+                        json!({}),
+                    )])),
+                    Ok(ChatEvent::Done),
+                ],
+                vec![
+                    text("Got it, I've saved that for five."),
+                    Ok(ChatEvent::Done),
+                ],
+            ],
+            0,
+            "said:Got it, I've saved that for five.",
+        ),
+    ];
+    for (chats, remembers, first_said) in cases {
+        let rounds = chats.len();
+        // The reminder case is the reviewers' own scenario on #3628.
+        let heard = if first_said.contains("saved that for five") {
+            "Remind me at five to call the office."
+        } else {
+            "Remember the meeting room is called Orange."
+        };
+        let script = Arc::new(Script {
+            heard: Mutex::new([Ok(heard.into())].into()),
+            chats: Mutex::new(chats.into()),
+            ..Script::default()
+        });
+        let kept = Arc::new(AtomicUsize::new(0));
+        let lights = Arc::new(AtomicUsize::new(0));
+        let counted = kept.clone();
+        let lit = lights.clone();
+        let runner: ToolRunner = Arc::new(move |_, _, name, _| {
+            counted.fetch_add(usize::from(name == "remember"), Ordering::SeqCst);
+            lit.fetch_add(usize::from(name == "light_on"), Ordering::SeqCst);
+            Box::pin(async { json!({"remembered": true}) })
+        });
+        let mut engine = Engine::with_clock(
+            script.clone(),
+            Arc::new(|| "SYSTEM".to_owned().into()),
+            runner,
+            Arc::new(Instant::now),
+        )
+        .announcing(false);
+        engine.submit(start(1));
+        engine.submit(audio(1, 1));
+        engine.submit(end(1));
+        let labels = turn(&mut engine).await;
+        let said: Vec<&String> = labels
+            .iter()
+            .filter(|label| label.starts_with("said:"))
+            .collect();
+        assert!(
+            said.first()
+                .is_some_and(|said| said.starts_with(first_said)),
+            "{labels:?}"
+        );
+        assert_eq!(kept.load(Ordering::SeqCst), remembers, "{labels:?}");
+        // Every light call ran, a claim beside one included.
+        let want_lights = match first_said {
+            "said:The light's on." => 1,
+            "said:I didn't keep that." if rounds == 4 => 0,
+            _ => 0,
+        };
+        assert_eq!(lights.load(Ordering::SeqCst), want_lights, "{labels:?}");
+        assert!(
+            !said.iter().any(|said| said.starts_with("said:Kept that")),
+            "{labels:?}"
+        );
+        assert_eq!(script.asked.lock().unwrap().len(), rounds, "{labels:?}");
+    }
+}
+
+/// The reviewer-lead's P3 on #3628: a turn offered no function (here a
+/// reminder) is never held for a claim, since it could never call
+/// `remember`: its words are said as they come.
+#[tokio::test]
+async fn a_turn_offered_no_function_is_never_held_for_a_claim() {
+    let script = Arc::new(Script {
+        chats: Mutex::new([vec![text("Saved it: time for water."), Ok(ChatEvent::Done)]].into()),
+        ..Script::default()
+    });
+    let (engine, _, _) = scripted(script.clone());
+    let mut engine = engine.announcing(false).saying_reminders(true);
+    engine.submit(reminder(1, "Time for water."));
+    let labels = turn(&mut engine).await;
+    assert!(
+        labels
+            .iter()
+            .any(|label| label == "said:Saved it: time for water."),
+        "{labels:?}"
+    );
+    assert_eq!(script.asked.lock().unwrap().len(), 1, "{labels:?}");
+}
+
 /// #1712: a line let out for the lamp is answered itself, and the words it
 /// cut short are let go: the person has moved on.
 #[tokio::test]
