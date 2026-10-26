@@ -541,7 +541,10 @@ stand_for_head() {
   local body_state tenths=0
   # A lamp paused by an earlier pass (below) takes every mood as rest and
   # would not stand; the pause is the steps' own, so it is cleared first.
-  [[ -x $KEEPER_BIN ]] && "$KEEPER_BIN" resume
+  if [[ -x $KEEPER_BIN ]] && ! "$KEEPER_BIN" resume; then
+    fail "could not resume the lamp with $KEEPER_BIN before the head check"
+    return 1
+  fi
   body_state=$("$SYSTEMCTL" is-active lamp-body 2>/dev/null)
   # Step 1 needs lamp-body stopped and nothing after it starts it again, so a
   # body not running is started here, whatever step the run began at, and
