@@ -212,7 +212,16 @@ impl Channel {
         now: impl FnMut() -> u64,
         renews: impl Fn(&T) -> bool,
     ) -> io::Result<Option<T>> {
-        let received = self.take_next(now, &renews);
+        self.receive_matching(now, renews, |_: &T| false)
+    }
+
+    fn receive_matching<T: DeserializeOwned>(
+        &mut self,
+        now: impl FnMut() -> u64,
+        renews: impl Fn(&T) -> bool,
+        initial: impl Fn(&T) -> bool,
+    ) -> io::Result<Option<T>> {
+        let received = self.take_next(now, &renews, &initial);
         if received.is_err() {
             // The runs worth reading end so (the reviewer on #1660).
             self.say_run("ended by an error");
@@ -246,6 +255,7 @@ impl Channel {
         &mut self,
         mut now: impl FnMut() -> u64,
         renews: &impl Fn(&T) -> bool,
+        initial: &impl Fn(&T) -> bool,
     ) -> io::Result<Option<T>> {
         #[cfg(test)]
         self.probe.attempt();
@@ -272,7 +282,9 @@ impl Channel {
         // would otherwise look sent in the future, and be refused.
         let mut at_us = now();
         loop {
-            let max_age_us = if self.first_grace && !self.received {
+            let first_grace = self.first_grace
+                || (initial(&packet.payload) && self.incoming.is_in_order(&packet));
+            let max_age_us = if first_grace && !self.received {
                 self.max_age_us.max(FIRST_CONTROL_MAX_AGE_US)
             } else {
                 self.max_age_us
@@ -518,6 +530,7 @@ pub struct ReferenceChannels {
     control_connected: bool,
     connected: bool,
     deadline_us: u64,
+    initial_capture_prepared: bool,
 }
 
 impl ReferenceChannels {
@@ -542,7 +555,33 @@ impl ReferenceChannels {
             deadline_us: monotonic_us()
                 .checked_add(3_000_000)
                 .ok_or_else(|| io::Error::other("reference deadline overflow"))?,
+            initial_capture_prepared: role == "speaker",
         })
+    }
+
+    /// The capture side sends its initial readiness once. It may queue while
+    /// the speaker starts, like the worker's initial control message. Only
+    /// that first, in-order CapturePrepared gets the startup allowance; prime
+    /// acknowledgements, later controls and reference data keep their bounds.
+    /// Readiness grants no playback authority and does not satisfy a prime.
+    pub fn receive_control(&mut self) -> io::Result<Option<ReferenceControl>> {
+        self.receive_control_with(monotonic_us)
+    }
+
+    /// [`Self::receive_control`] with an explicit clock, as [`Channel::receive_with`].
+    pub fn receive_control_with(
+        &mut self,
+        now: impl FnMut() -> u64,
+    ) -> io::Result<Option<ReferenceControl>> {
+        let initial_capture_prepared = self.initial_capture_prepared;
+        self.control.receive_matching(
+            now,
+            |_| false,
+            |control| {
+                initial_capture_prepared
+                    && matches!(control, ReferenceControl::CapturePrepared { .. })
+            },
+        )
     }
 
     /// Optional terminal notice, only after successful local PCM stop and reset.
@@ -615,6 +654,132 @@ mod tests {
         sender.connect(&dir.join("r")).unwrap();
         receiver.connect(&dir.join("s")).unwrap();
         (sender, receiver)
+    }
+
+    fn reference_pair(dir: &Path) -> (ReferenceChannels, ReferenceChannels) {
+        let (capture_boot, speaker_boot) = (new_boot().unwrap(), new_boot().unwrap());
+        let mut capture =
+            ReferenceChannels::bind(dir, "capture", capture_boot, speaker_boot).unwrap();
+        let mut speaker =
+            ReferenceChannels::bind(dir, "speaker", speaker_boot, capture_boot).unwrap();
+        assert!(capture.connect_step().unwrap());
+        assert!(speaker.connect_step().unwrap());
+        (capture, speaker)
+    }
+
+    #[test]
+    fn initial_capture_prepared_survives_bounded_speaker_startup() {
+        for age in [143_402, FIRST_CONTROL_MAX_AGE_US - 1] {
+            let dir = SessionDirectory::create().unwrap();
+            let (mut capture, mut speaker) = reference_pair(&dir.path);
+            capture
+                .control
+                .send_with(
+                    ReferenceControl::CapturePrepared {
+                        privacy_generation: 7,
+                    },
+                    || 10,
+                )
+                .unwrap();
+            assert!(matches!(
+                speaker.receive_control_with(|| 10 + age).unwrap(),
+                Some(ReferenceControl::CapturePrepared {
+                    privacy_generation: 7
+                })
+            ));
+        }
+    }
+
+    #[test]
+    fn initial_capture_prepared_still_requires_age_boot_order_and_nonfuture_time() {
+        for case in ["expired", "future", "wrong-boot", "not-first-sequence"] {
+            let dir = SessionDirectory::create().unwrap();
+            let (mut capture, mut speaker) = reference_pair(&dir.path);
+            if case == "wrong-boot" {
+                capture.control.sender = new_boot().unwrap();
+            }
+            if case == "not-first-sequence" {
+                capture.control.send_sequence = 1;
+            }
+            capture
+                .control
+                .send_with(
+                    ReferenceControl::CapturePrepared {
+                        privacy_generation: 7,
+                    },
+                    || 10,
+                )
+                .unwrap();
+            let at = match case {
+                "expired" => 10 + FIRST_CONTROL_MAX_AGE_US,
+                "future" => 9,
+                _ => 143_412,
+            };
+            assert_eq!(
+                speaker.receive_control_with(|| at).unwrap_err().kind(),
+                io::ErrorKind::InvalidData,
+                "{case}"
+            );
+        }
+    }
+
+    #[test]
+    fn reference_startup_allowance_does_not_cover_primes_data_or_capture_input() {
+        use crate::wire::{PreparedPrime, PrimeDisposition};
+        let dir = SessionDirectory::create().unwrap();
+        let (mut capture, mut speaker) = reference_pair(&dir.path);
+        capture
+            .control
+            .send_with(
+                ReferenceControl::ReferencePrimed {
+                    prepared: PreparedPrime {
+                        playback_epoch: 1,
+                        privacy_generation: 7,
+                        prepared_through: 480,
+                        analysed_through: 480,
+                        disposition: PrimeDisposition::Analysed,
+                    },
+                },
+                || 10,
+            )
+            .unwrap();
+        assert!(speaker.receive_control_with(|| 143_412).is_err());
+        capture.data.send_with(1u32, || 10).unwrap();
+        assert!(speaker.data.receive_with::<u32>(|| 143_412).is_err());
+        speaker
+            .control
+            .send_with(
+                ReferenceControl::CapturePrepared {
+                    privacy_generation: 7,
+                },
+                || 10,
+            )
+            .unwrap();
+        assert!(capture.receive_control_with(|| 143_412).is_err());
+    }
+
+    #[test]
+    fn later_capture_prepared_keeps_the_existing_single_sender_stall_allowance() {
+        let dir = SessionDirectory::create().unwrap();
+        let (mut capture, mut speaker) = reference_pair(&dir.path);
+        for _ in 0..3 {
+            capture
+                .control
+                .send_with(
+                    ReferenceControl::CapturePrepared {
+                        privacy_generation: 7,
+                    },
+                    || 10,
+                )
+                .unwrap();
+        }
+        assert!(speaker.receive_control_with(|| 143_412).unwrap().is_some());
+        // The pre-existing one-message sender-stall allowance still applies
+        // after startup. A run of late messages must not gain first grace.
+        assert!(speaker.receive_control_with(|| 143_412).unwrap().is_some());
+        let error = speaker.receive_control_with(|| 143_412).unwrap_err();
+        assert_eq!(error.kind(), io::ErrorKind::InvalidData);
+        assert!(error.to_string().contains("bound 100000 us"), "{error}");
     }
 
     /// A receiver held up for 400 ms takes the backlog that queued meanwhile;

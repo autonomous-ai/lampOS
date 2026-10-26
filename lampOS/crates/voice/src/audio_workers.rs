@@ -1564,7 +1564,7 @@ fn speaker_loop(
             continue;
         }
         for index in 0..=MAX_CONTROL {
-            let Some(control) = link.control.receive::<ReferenceControl>()? else {
+            let Some(control) = link.receive_control()? else {
                 break;
             };
             if index == MAX_CONTROL {
