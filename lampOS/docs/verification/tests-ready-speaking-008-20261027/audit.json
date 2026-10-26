@@ -1,0 +1,361 @@
+{
+  "head": "f8f1e7a5fce50e4bd43b581e5507dd28f937cb69",
+  "base": "008e7a9746e7ddd58e951f8ea919a7d8beebb5ef",
+  "scope": "Full Mac lamp-expression package once, serial; no reverse-dependent runtime, current native or device claim",
+  "command": "cargo +1.96.0 test --offline --locked --jobs 1 -p lamp-expression -- --test-threads=1",
+  "runtime_attempts": 1,
+  "counts": {
+    "passed": 340,
+    "failed": 0,
+    "ignored": 0
+  },
+  "ordinary_filtered_out": 0,
+  "unique_target_case_pairs": 340,
+  "supervised_command_elapsed_s": 21.57135952799581,
+  "drivers": [
+    {
+      "target": "lamp_expression",
+      "kind": [
+        "lib"
+      ],
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "counts": {
+        "passed": 27,
+        "failed": 0,
+        "ignored": 0
+      },
+      "inventory_count": 27,
+      "ignored_inventory_count": 0,
+      "binary_sha256": "550ea9c5c345743f75e6b28f34709ae1b83c2c515ebbe1415678fb0e660ac20c",
+      "binary_bytes": 5785064
+    },
+    {
+      "target": "lamp-expression",
+      "kind": [
+        "bin"
+      ],
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "counts": {
+        "passed": 4,
+        "failed": 0,
+        "ignored": 0
+      },
+      "inventory_count": 4,
+      "ignored_inventory_count": 0,
+      "binary_sha256": "4ee0baf79a18aabbb9335054c5ad1f509c3d42832e39dd91ead9d9e977dc8e8a",
+      "binary_bytes": 2299560
+    },
+    {
+      "target": "it",
+      "kind": [
+        "test"
+      ],
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "counts": {
+        "passed": 281,
+        "failed": 0,
+        "ignored": 0
+      },
+      "inventory_count": 281,
+      "ignored_inventory_count": 0,
+      "binary_sha256": "8c9ab590428612ba3b9118dda8da259b2dad8f509a922f5afd5aea3fb3b9d476",
+      "binary_bytes": 12734440
+    },
+    {
+      "target": "runtime",
+      "kind": [
+        "test"
+      ],
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "counts": {
+        "passed": 28,
+        "failed": 0,
+        "ignored": 0
+      },
+      "inventory_count": 28,
+      "ignored_inventory_count": 0,
+      "binary_sha256": "870f0d2c8cbf1577b419bcf70080624c8b4f77f0bd2d2e032403b37ad02bb181",
+      "binary_bytes": 6381528
+    }
+  ],
+  "changed_case": {
+    "name": "runtime::unplug_tests::ready_presents_sleep_even_while_voice_speaks_then_acknowledges",
+    "passed_once": true
+  },
+  "doctest_counts_separate": {
+    "passed": 0,
+    "failed": 0,
+    "ignored": 0
+  },
+  "preceding_gates": {
+    "fmt": "PASS",
+    "actual_strict_reverse_closure": [
+      "lamp-body",
+      "lamp-cloud",
+      "lamp-expression",
+      "lamp-keeper",
+      "lamp-lean",
+      "lamp-memory",
+      "lamp-peek",
+      "lamp-setup",
+      "lamp-skills",
+      "lamp-update",
+      "lamp-voice",
+      "lamp-voice-eval"
+    ],
+    "workspace_build": "PASS",
+    "workspace_completed_before_test_compile_and_freezing": true
+  },
+  "initial_fresh_target_proof": {
+    "target_absent_before_allocation": true,
+    "target_created_empty": true,
+    "first_strict_compiler_artifact_rows": 459,
+    "first_strict_all_fresh_false": true,
+    "first_strict_reached_local_artifact_rows": 143,
+    "first_strict_reached_local_package_count": 36,
+    "first_strict_reached_local_packages": [
+      "lamp-actions",
+      "lamp-audio",
+      "lamp-body",
+      "lamp-bus",
+      "lamp-camera",
+      "lamp-cloud",
+      "lamp-controls",
+      "lamp-ears",
+      "lamp-expression",
+      "lamp-gemini",
+      "lamp-health",
+      "lamp-ipc",
+      "lamp-keeper",
+      "lamp-lean",
+      "lamp-local-time",
+      "lamp-memory",
+      "lamp-msgs",
+      "lamp-near-call",
+      "lamp-observer",
+      "lamp-peek",
+      "lamp-policy",
+      "lamp-ring",
+      "lamp-same-voice",
+      "lamp-schedule",
+      "lamp-setup",
+      "lamp-skills",
+      "lamp-sound-fixtures",
+      "lamp-tasks",
+      "lamp-turn-end",
+      "lamp-turn-end-wire",
+      "lamp-turn-owner",
+      "lamp-update",
+      "lamp-voice",
+      "lamp-voice-eval",
+      "lamp-voice-processes",
+      "sonora"
+    ],
+    "first_strict_local_fresh_false": true,
+    "source_manifest_target_profile_feature_bindings_recorded": true,
+    "freshness_scope": "Initial strict compilation in the new exclusive target only; no blanket fresh:false claim for later workspace/test compile steps"
+  },
+  "source_bindings": {
+    "before_after_equal": true,
+    "tracked_files": 10674,
+    "branch": "tests/1806-ready-speaking-1c",
+    "clean_status": true,
+    "index_sha256": "ed05b749b35c692509e7ddb79114159507d03b377d02a28f2609561e62729b8c",
+    "authored_paths": {
+      "lampOS/crates/expression/src/runtime.rs": {
+        "sha256": "3c3ab3a8c50234b2b40962546cb6fc053efe94c391da2df3de5c19871cd859e1",
+        "bytes": 51917,
+        "mode": 420,
+        "kind": "file"
+      },
+      "lampOS/docs/expression.md": {
+        "sha256": "6be569f6bb32905928ed0e37d037675e6e966e7515d5c0262746e6a169703b34",
+        "bytes": 80180,
+        "mode": 420,
+        "kind": "file"
+      }
+    }
+  },
+  "guards": {
+    "original_protected_copies": 199,
+    "new_independent_frozen_copies": 8,
+    "total_sealed_copies": 207,
+    "sealed_copies_unchanged": true,
+    "actual_executable_bindings_unchanged": 8,
+    "owned_process_group_closed": true,
+    "unresolved_owned_processes": 0,
+    "source_unchanged": true
+  },
+  "frozen_executable_identities": [
+    {
+      "package": "lamp-expression",
+      "target": "rest_cost",
+      "kind": [
+        "example"
+      ],
+      "test_profile": false,
+      "sha256": "cfe173587b297236070e00b8407738b417562af69efa8f017f13f20a9451db21",
+      "bytes": 3737504
+    },
+    {
+      "package": "lamp-expression",
+      "target": "recent_playout_cost",
+      "kind": [
+        "example"
+      ],
+      "test_profile": false,
+      "sha256": "f12487c99d0c3def9c256d9c1bf01cc0379b735da087e4ca47fc290bab79a088",
+      "bytes": 3732328
+    },
+    {
+      "package": "lamp-expression",
+      "target": "replay_cost",
+      "kind": [
+        "example"
+      ],
+      "test_profile": false,
+      "sha256": "4da63ed06b4d107c628208b1a78686c0b144d71edc70e53c6d91535bd1f6a528",
+      "bytes": 3714712
+    },
+    {
+      "package": "lamp-expression",
+      "target": "lamp-expression",
+      "kind": [
+        "bin"
+      ],
+      "test_profile": true,
+      "sha256": "4ee0baf79a18aabbb9335054c5ad1f509c3d42832e39dd91ead9d9e977dc8e8a",
+      "bytes": 2299560
+    },
+    {
+      "package": "lamp-expression",
+      "target": "it",
+      "kind": [
+        "test"
+      ],
+      "test_profile": true,
+      "sha256": "8c9ab590428612ba3b9118dda8da259b2dad8f509a922f5afd5aea3fb3b9d476",
+      "bytes": 12734440
+    },
+    {
+      "package": "lamp-expression",
+      "target": "lamp-expression",
+      "kind": [
+        "bin"
+      ],
+      "test_profile": false,
+      "sha256": "bd9cc37c5c411f015089c9110e5eead6c1fe35b1a38f67d5ec511c69b5ad6292",
+      "bytes": 8268912
+    },
+    {
+      "package": "lamp-expression",
+      "target": "runtime",
+      "kind": [
+        "test"
+      ],
+      "test_profile": true,
+      "sha256": "870f0d2c8cbf1577b419bcf70080624c8b4f77f0bd2d2e032403b37ad02bb181",
+      "bytes": 6381528
+    },
+    {
+      "package": "lamp-expression",
+      "target": "lamp_expression",
+      "kind": [
+        "lib"
+      ],
+      "test_profile": true,
+      "sha256": "550ea9c5c345743f75e6b28f34709ae1b83c2c515ebbe1415678fb0e660ac20c",
+      "bytes": 5785064
+    }
+  ],
+  "historical_evidence_separate": {
+    "controlled_setup_pause": {
+      "base": "cced42943",
+      "pause_ms": 1100,
+      "original_counts": {
+        "passed": 0,
+        "failed": 1
+      },
+      "candidate_counts": {
+        "passed": 1,
+        "failed": 0
+      },
+      "observations_each": 1,
+      "original_500_ms_lifespan_and_50_ms_grace_unchanged": true,
+      "proof": "../tests-ready-speaking-control-20261026/",
+      "historical_cause_proven": false,
+      "rerun_on_current_head": false
+    },
+    "old_native": {
+      "ARM64_run": 40299562588,
+      "offered_head": "517e3fe24512c7ed23ea7cff23b57ccaff44063d",
+      "actual_preview_short": "cbffa92",
+      "actual_base": "690dff041e331b5c89160901b4f38f3a9915e60b",
+      "passed": 7496,
+      "failed": 0,
+      "skipped": 53,
+      "proof": "../tests-shared-1aa-gates-20261026/ready-native.json",
+      "current_f8_native_qualification": false
+    }
+  },
+  "limitations": {
+    "new_native_result_in_this_packet": false,
+    "ARM64_built_or_executed_on_Mac": false,
+    "physical_acceptance": false,
+    "full_reverse_dependent_runtime": false,
+    "historical_results_added_to_340": false,
+    "performance_or_idle_host_claim": false
+  },
+  "receipt_sha256": {
+    "terminal.json": "3fd9bde8604b6763a70894c75fe122e1be25a9d4e0b2a51c902d35fdc628f950",
+    "source-before.json": "7a2d5a14748f467f5427072f6411bb2f33240a762d77a28e8b959db144718eb5",
+    "source-after.json": "7a2d5a14748f467f5427072f6411bb2f33240a762d77a28e8b959db144718eb5",
+    "target-before.json": "70dbcac8b01f1efe9bf46c88a8a78c227ca26f4f8b0d1131fc5a158c51b085b8",
+    "target-created.json": "234ae62690851dc5d6a8b7ccffe97e9abfa8249a88224752eb42db5b740b070e",
+    "metadata.stdout": "2a523fb3426bd4b0d5e15bde66a3ff74a4b79d082c1af04f52368202ea194365",
+    "affected.json": "fd10d2dee3ac4f884c295521413ad65bceb7fdc7601396362eb8383a9b871ce2",
+    "strict-all-artifacts.json": "137df661d358c26b08b57760bf35e40370df4dfba652662d236d810f14532ab9",
+    "strict-fresh-local-bindings.json": "0278b504f689633271c96d77c2f006a4fccd09e853cac53525188a2ff3dd2f7b",
+    "fmt-result.json": "1d254a5326530f969fdd4fe565f8c17b8aabe15345c276376503b898e7341238",
+    "strict-result.json": "2f18b02601c0627c05227bb687559f1a80edf7b8dbbc659873bc99485e68ccd8",
+    "workspace-result.json": "3675441ad5a1059bd492d60210a080146ef55032cc7598d84c3e371c555c322a",
+    "test-compile-result.json": "a4a2a81325c8c65be1b2460abbd44eebe9460040f7ae877f863166e1084637f1",
+    "observed-census.json": "c0a9cbbaeba0eee3bbaf18c72991c2894617d6a4ce23e6d41afb71325d9daea1",
+    "inventory.json": "e11b25a3cbf1cbef5ebbbd94a81a09e0b9669eb00c639800bed9d810ddc5655c",
+    "actual-executables.json": "2c900958ddf4bd835a62d7d93f477080e2ade70d59ad762e056fbda3bf742528",
+    "new-frozen.json": "13def7542cb318730f3659409816f4a2186d37c6de45aad0a91ffa465a1e14cf",
+    "protected-before.json": "8f27059d20c366f9bf3d6955798c5c497d35838c4e4be452f2401e91034be3c6",
+    "protected-after.json": "a63ba8d0b6c16b336e9358cc54b4bd8374217edc996d9445cff99369850e76b3",
+    "tests-result.json": "a44f3fd2baad30d2d73b07482f2846045222ac1542a521a5b788c68857837903",
+    "tests.stdout": "434472a8a87132c557d1ea193572f8fee4d43520995289e48b94ebf7780aaff9",
+    "tests.stderr": "a5ec79ece88d01503c0551898e08335575c5a0b72cddcf8f0b6a8d650550df0a"
+  }
+}
