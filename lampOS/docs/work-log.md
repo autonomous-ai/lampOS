@@ -1,3 +1,13 @@
+Ready for lamp-voice: no; #3568 current CI and carry reads pending; #3510 gate active and activation HOLD.
+
+## Current checkpoint: 2026-10-26 16:53 +07, review wording corrected on latest base
+
+#3568 is pushed at `6cc0f9c7e` on `aa7cf9029`. [Current carry proof](verification/reference-first-handshake-current-6cc-20261026/README.md) shows the complete crates tree unchanged from original green `250fd8673`; only the P3 qualifier in two docs and Main's image correction differ. Formatting, image shell syntax and prior targeted artifact guards pass. Original head's ARM64 **7,501/0/53** and Linux Clippy remain bound to their exact event; new original ARM64 `40302732947`, Clippy `40302733044` and general CI `40302723774` are running.
+
+The executed ea5 factory carry is now published as a historical evidence branch so reviewers can fetch it. Earlier proof entries are preserved through this log rebase. Own-keys remains in its frozen ff17/690 runtime gate, then receives the outside-lampOS image carry. No runtime assertions were changed, no prior test counts were relabeled, and no device or release action ran.
+
+---
+
 Ready for lamp-voice: no; #3568 original CI green, documentation qualifier pending; #3510 activation HOLD.
 
 ## Current checkpoint: 2026-10-26 16:48 +07, startup native proof complete

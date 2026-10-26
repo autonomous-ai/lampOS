@@ -1,0 +1,10 @@
+{
+  "tested_head": "250fd8673e53d1ac63aa7165b52a729fa2a00a30",
+  "changed_paths": [
+    "lampOS/docs/pilot-faults.md",
+    "lampOS/docs/reuse-decisions.md"
+  ],
+  "crate_reference_search": "No pilot-faults.md/reuse-decisions.md reference in crates or workspace manifest",
+  "fmt": "cargo +1.96.0 fmt --all --check --manifest-path lampOS/Cargo.toml passed",
+  "runtime_tests_repeated": false
+}

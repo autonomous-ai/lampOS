@@ -1,0 +1,16 @@
+{
+  "head": "6cc0f9c7ef12e81942ed44beb95736bd995d891d",
+  "base": "aa7cf9029ef051ee5770837ccaed4ffc646cd74f",
+  "prior_native_head": "250fd8673e53d1ac63aa7165b52a729fa2a00a30",
+  "changed_paths": [
+    "lampOS/docs/pilot-faults.md",
+    "lampOS/docs/reuse-decisions.md",
+    "scripts/imager/build-orangepi-v2.sh"
+  ],
+  "complete_crates_tree_unchanged": "2e373deaff18fe8876c47d4d03527fca072dc46c",
+  "formatting": "pass",
+  "inherited_image_shell_syntax": "pass",
+  "new_rust_runtime_execution": false,
+  "prior_targeted_actual_and_preserved_artifacts_unchanged": 3,
+  "scope": "P3 wording in two non-embedded docs; inherited Phase2 image-mode correction outside lampOS. Prior strict Clippy/runtime source identities remain explicit; current original PR native checks are required before readiness."
+}
