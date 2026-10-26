@@ -75,6 +75,11 @@ class Decide(unittest.TestCase):
         self.assertRegex(self.studio(env(), busy(1, "in_progress", R.STUCK_RUNNING + 1))[1], "stuck")
         self.assertTrue(self.studio(env(), busy(1, "queued", R.STUCK_QUEUED - 1))[0])
 
+    def test_runs_still_choosing_count_as_busy_but_never_stuck(self):
+        jobs = lambda: [(i, "routing", 0) for i in range(6)]
+        self.assertRegex(self.studio(env(), jobs)[1], "Studio full")
+        self.assertEqual(R.stuck([(1, "routing", 10_000)]), [])
+
     def test_api_error_is_hosted(self):
         def broken():
             raise OSError("timed out")

@@ -36,6 +36,7 @@ from datetime import datetime
 HOSTED = "ubuntu-22.04-arm"
 STUDIO = {"group": "lampos-studio", "labels": ["self-hosted", "linux", "arm64", "studio"]}
 WORKFLOW = "lampos-arm64.yml"
+ROUTE_JOB = "lampOS — choose the ARM64 runner"
 
 BEAT_STALE = 120  # s: the host writes every 30 s
 STUDIO_JOB = 5 * 60  # s: a pull request's job on the Studio, warm cache
@@ -73,7 +74,8 @@ def parse_beat(text, now):
 
 def studio_jobs(repo, own_run):
     """Every queued or running job of this workflow that asked for the Studio,
-    as (run id, status, seconds since queued or started)."""
+    and every other run still choosing, as (run id, status, seconds since
+    queued or started)."""
     now = time.time()
     jobs = []
     for status in ("queued", "in_progress"):
@@ -82,6 +84,12 @@ def studio_jobs(repo, own_run):
             if str(run["id"]) == str(own_run):
                 continue
             for job in api(f"/repos/{repo}/actions/runs/{run['id']}/jobs?filter=latest&per_page=100")["jobs"]:
+                # Another run still choosing may be about to ask for the Studio:
+                # counted as busy, so runs started together don't all see it free
+                # (three did on 26 Oct, studio-par1..3).
+                if job["name"] == ROUTE_JOB and job["status"] == "in_progress":
+                    jobs.append((run["id"], "routing", 0))
+                    continue
                 # A queued job has no runner group yet: its labels say where it
                 # waits (`studio`; the cache warming pool's `studio-trusted` is another).
                 if "studio" not in job.get("labels", []) or job["status"] not in ("queued", "in_progress"):
