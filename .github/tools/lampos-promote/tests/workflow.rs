@@ -2,7 +2,26 @@
 #[test]
 fn promotion_is_manual_separate_and_branch_protected() {
     let workflow = include_str!("../../../workflows/lampos-arm64.yml");
-    assert!(workflow.contains("arm64:\n    if: ${{ !inputs.promote_sequence }}"));
+    // The ARM64 job never runs for a promotion. It needs the runner choice
+    // (route), which is skipped on lamp-voice's pushes, so it and publish
+    // check results themselves instead of the implicit success().
+    let arm64 = workflow
+        .split("\n  arm64:\n")
+        .nth(1)
+        .unwrap()
+        .split("\n    steps:\n")
+        .next()
+        .unwrap();
+    assert!(arm64.contains("needs: route\n"));
+    assert!(arm64.contains("if: ${{ !cancelled() && !inputs.promote_sequence }}"));
+    let publish = workflow
+        .split("\n  publish:\n")
+        .nth(1)
+        .unwrap()
+        .split("\n    steps:\n")
+        .next()
+        .unwrap();
+    assert!(publish.contains("if: ${{ !cancelled() && needs.arm64.result == 'success' && github.event_name == 'push' && github.ref == 'refs/heads/lamp-voice'"));
     let promotion = workflow
         .split("  promote-stable:\n")
         .nth(1)
