@@ -1,3 +1,11 @@
+## 2026-10-27 03:07 — Face fixture recovery and remaining harnesses
+
+Ready for lamp-voice: no
+
+[Selected recovery receipt](verification/common-face-fixture-recovery-20261027/receipt.json) binds e588/9bd. Only the test fixture changed: remember rows now configure the Memory prerequisite required by the production consent mapper. The unchanged assertion passed once, including all 13 Engine scenarios. Production bytes equal the retained original full run, which remains 5,321 passes / one failure / 26 declared ignores. The focused nextest exited 0; its controller exited 125 because a plural-only accounting parser rejected “1 test run”. Private parser copies reconcile retained inputs and preserve the earlier plural counts exactly, without replay. Only-unrun relay 1/0, process 13/0 and three zero-case doc commands then completed with actual native exit 0, stable source and owned-process closure.
+
+The bounded HTTP old-behavior counter probe is active; no fault outcome or current carry qualification is claimed here. The separate camera witness primitive remains unwired with 17 unrun controls. Earlier privacy, source, pin and physical holds remain. No device action.
+
 ## 2026-10-27 02:38 — Original native pass and retained current fixture failure
 
 Ready for lamp-voice: no

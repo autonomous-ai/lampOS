@@ -1,0 +1,43 @@
+{
+  "source_head": "2a2b413fbcf238b95ab2c45bc44ed16c5561c3e3",
+  "source_tree": "9bd44e220356a95c82310f02d14e9ab5a5805ab3",
+  "base": "e5889ebb53e9222762d76ac463ec7ca4718174fa",
+  "fixture_change_only": true,
+  "production_bytes_equal_original_full_run": true,
+  "original_full_run": {
+    "passed": 5321,
+    "failed": 1,
+    "declared_ignored_in_scope": 26,
+    "raw_nextest_exit": 100,
+    "remains_failed": true
+  },
+  "corrected_fixture": {
+    "test": "second_provider::tests::private_context::face_forget::proved_face_tools_retire_private_work_before_actual_scoped_mutation",
+    "executions": 1,
+    "engine_scenarios": 13,
+    "passed": 1,
+    "failed": 0,
+    "actual_nextest_exit": 0,
+    "original_controller_exit": 125,
+    "controller_error": "Singular summary rejected by plural-only accounting parser",
+    "offline_accounting_only": true,
+    "plural_accounting_unchanged": true,
+    "passed_cases_replayed": 0
+  },
+  "unrun_harness_docs": {
+    "actual_native_exit": 0,
+    "relay_passed": 1,
+    "process_passed": 13,
+    "doc_commands_zero_case": 3,
+    "source_stable": true,
+    "all_owned_sessions_groups_closed": true
+  },
+  "raw_inputs_sha256_unchanged": {
+    "/private/tmp/fourth-common-e588-fixture-continuation-20261027/integration-run.stdout": "ff197f3285ee9e39f7dadc41c37210afd2eb3470aab72d3ae09551f6a3d38e53",
+    "/private/tmp/fourth-common-e588-fixture-continuation-20261027/integration-run.stderr": "9a777494841c6e1d6c0782fbed0a340f6679ad01394f7bce31a680e3d5b3656a",
+    "/private/tmp/fourth-common-e588-fixture-continuation-20261027/selected-discovery-view.json": "ff8f3012f4d154aae93620821211d5efed051d9713acf2abbff4704beebce04d",
+    "/private/tmp/fourth-common-e588-fixture-continuation-20261027/integration-run-process.json": "9798a51ff951e18889798f73676e875f304e15685f089493449ed5c18d63e7dc"
+  },
+  "pre_probe_release_sha256": "90fe245a5a4e5242d598ead5ef72c345dd4f75c701c10661e2323fc2913e4f96",
+  "scope": "Host checks only; final current carry, native ARM64, explicit-close integration, independent privacy, pins and physical acceptance remain separate."
+}
