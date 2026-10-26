@@ -1,3 +1,13 @@
+Ready for lamp-voice: yes (#3515 and #3524); #3528 waits on native checks/readers; #3510 activation HOLD.
+
+## Current checkpoint: 2026-10-26 08:48 +07, IPC fixture published and real model-open row taken
+
+[#3528](https://github.com/autonomous-ai/lampOS/pull/3528) is pushed as `f0c7072be` on c5, with [source and retained controls](https://github.com/autonomous-ai/lampOS/blob/f0c7072be3582eda1d1ca6bf7464031b3e2b0434/lampOS/docs/verification/ipc-log-no-wait-20261026/README.md). Mac fmt/strict IPC Clippy pass; full **26 ordinary tests + one doctest + relay signal success**. Original 400 ms pause **0/1**, corrected pause **1/0**, oversized actual-write fault **0/1** at the watchdog and freshly rebuilt restored **1/0** remain source/artifact bound. The first short-write fault fails at the wrong boundary and is not watchdog qualification; its echoed summaries and the continuation's pre-execution syntax error are retained. Production prefix is unchanged. Third/Tests read and original native checks are requested; the PR stays draft for those results.
+
+Taken next after open/merged PR and both Queue checks: #1339's Turn-end model-loader row, on `second/turn-end-model-no-wait`. Keep missing/wrong-file refusal, unavailable submits, exact spawn/ready/kill counts and confirmed worker reaping. A companion will hold the real model open on a private FIFO, require return before release and keep its diagnostic watchdog shorter than the existing startup deadline. No product code, model, deadline or ignored model parity case is changed. Voice's remaining two rows stay separate from the active memory work in #3450/#3064. No device, provider, key or release action ran.
+
+---
+
 Ready for lamp-voice: yes (#3515 and #3524); #3510 remains draft activation HOLD.
 
 ## Current checkpoint: 2026-10-26 08:38 +07, current native qualification and next IPC fixture
