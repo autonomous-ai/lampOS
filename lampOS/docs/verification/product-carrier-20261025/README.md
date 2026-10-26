@@ -89,8 +89,12 @@ restoring the coherent original snapshot. Restore original units, current
 links/builds, complete production records, sequence/refusal state, trust,
 channel and original service/timer states. Remove only the identified trial
 override/key files. Verify the original hashes and healthy/listening Voice.
-The updater must again use `lamp-voice` with the original URL ending in
-`/lampos-lamp-voice/`. Test sequences must not remain in production records.
+The updater must again use the exact signed channel and complete channel
+URL recorded before the trial, verified from its effective command and
+original unit/drop-ins. The signed channel can remain `lamp-voice` while
+the feed URL is `lampos-stable`; do not derive one from the other or change
+the installed feed during teardown. Test sequences must not remain in
+production records.
 Retaining updater 6 is a separate production migration, not this teardown.
 
 Remove disposable signing/trust material after verified restoration. Retain
