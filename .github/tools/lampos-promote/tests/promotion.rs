@@ -24,7 +24,7 @@ fn payload(sequence: u64) -> Value {
         "files_url":format!("https://github.com/{REPO}/releases/download/lampos-lamp-voice-{sequence}/"),
         "files":[{"name":"lamp-update","size":6,"sha256":manifest::sha256_hex(b"binary")}],
         "units":[{"lamp":"product","unit":"lamp-update.service","size":5,"sha256":manifest::sha256_hex(b"unit\n")}],
-        "min_updater":3,"settings":[{"path":"/etc/lampOS/records.json","text":"{}\n","sha256":manifest::sha256_hex(b"{}\n"),"mode":"0644","removed":false}]})
+        "min_updater":manifest::PRODUCT_UNITS_UPDATER,"settings":[{"path":"/etc/lampOS/records.json","text":"{}\n","sha256":manifest::sha256_hex(b"{}\n"),"mode":"0644","removed":false}]})
 }
 fn envelope(value: &Value) -> Vec<u8> {
     manifest::seal(&serde_json::to_vec(value).unwrap(), &key()).unwrap()
