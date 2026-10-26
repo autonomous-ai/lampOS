@@ -1,0 +1,24 @@
+{
+  "run_id": 40304937678,
+  "attempt": 1,
+  "head": "32cc833686748249256d76e8529298a100ac7a82",
+  "checkout": "4e03abbed3a5267e0aec31c9bc9ca7069baa95cd",
+  "tree": "abdbd6197c8535409f8ac76cb905e0751441033c",
+  "conclusion": "success",
+  "lane": "x86 Linux Ubuntu22.04 strict whole-workspace all-target Clippy; no nine-case runtime claim",
+  "formatting": [
+    {
+      "name": "stable promotion formatting and strict Clippy",
+      "conclusion": "success"
+    },
+    {
+      "name": "formatting (whole workspace, pinned Rust)",
+      "conclusion": "success"
+    },
+    {
+      "name": "clippy (every crate and target, warnings as errors)",
+      "conclusion": "success"
+    }
+  ],
+  "log_sha256": "73747095576b88c0aea50f9d3e3da0715b17599a9a7d2fae4a0999d6ef0eb5f8"
+}

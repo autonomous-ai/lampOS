@@ -13,6 +13,20 @@ machine is explicitly named. Third has no lamp access.
 
 
 
+## 2026-10-26 17:15 — Preflight fixture native gates green
+
+Ready for lamp-voice: yes (#3574; train still requires its reader quorum)
+
+**32cc833686/aa7cf9029** original ARM64 **40304937660** and Linux Clippy
+**40304937678** passed. ARM selected 12 reverse-dependent crates:
+**7,496 passed / 53 skipped**, all nine preflight cases once. Separate
+doctests 4/0, process 13/0 and relay passed; exact checkout parents/tree
+match the authored head. R3 READ-OK includes independent parallel 9/0.
+The additional train reader is requested; no source HOLD is known.
+[ARM receipt](verification/install-preflight-parallel-20261026/pr3574-arm-audit.json),
+[Linux receipt](verification/install-preflight-parallel-20261026/pr3574-linux-audit.json).
+This is selected native execution, not full workspace or physical acceptance.
+
 ## 2026-10-26 17:12 — Reminder current runtime rerun and push
 
 Ready for lamp-voice: no (#3525, current native gates and carry reads pending)

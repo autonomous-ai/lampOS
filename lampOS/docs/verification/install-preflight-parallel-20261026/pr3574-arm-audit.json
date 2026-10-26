@@ -1,0 +1,93 @@
+{
+  "run_id": 40304937660,
+  "attempt": 1,
+  "head": "32cc833686748249256d76e8529298a100ac7a82",
+  "checkout": "4e03abbed3a5267e0aec31c9bc9ca7069baa95cd",
+  "tree": "abdbd6197c8535409f8ac76cb905e0751441033c",
+  "conclusion": "success",
+  "selected_filter": "package(=lamp-body) | package(=lamp-cloud) | package(=lamp-expression) | package(=lamp-keeper) | package(=lamp-lean) | package(=lamp-memory) | package(=lamp-peek) | package(=lamp-setup) | package(=lamp-skills) | package(=lamp-update) | package(=lamp-voice) | package(=lamp-voice-eval)",
+  "scope_limitation": "PR-selected reverse-dependent crates; not full-workspace runtime, Mac16-thread run, or physical hardware",
+  "nextest_profile": "pr",
+  "runner_cores": 4,
+  "summary": "Summary [ 155.765s] 7496 tests run: 7496 passed, 53 skipped",
+  "unique_head_touch_case_count": 9,
+  "head_touch_cases": [
+    {
+      "test": "head_touch_preflight_files::dangling_drop_in_keeps_missing_file_compatibility",
+      "outcome": "PASS",
+      "duration_s": 0.227,
+      "ordinal": 2498,
+      "total": 7496
+    },
+    {
+      "test": "head_touch_preflight_files::dev_null_drop_in_mask_is_preserved",
+      "outcome": "PASS",
+      "duration_s": 0.227,
+      "ordinal": 2499,
+      "total": 7496
+    },
+    {
+      "test": "head_touch_preflight_files::directory_drop_in_is_refused_before_mutation",
+      "outcome": "PASS",
+      "duration_s": 0.011,
+      "ordinal": 2501,
+      "total": 7496
+    },
+    {
+      "test": "head_touch_preflight_files::fifo_body_calibration_is_refused_before_mutation",
+      "outcome": "PASS",
+      "duration_s": 0.015,
+      "ordinal": 2502,
+      "total": 7496
+    },
+    {
+      "test": "head_touch_preflight_files::fifo_drop_in_is_refused_before_mutation",
+      "outcome": "PASS",
+      "duration_s": 0.015,
+      "ordinal": 2503,
+      "total": 7496
+    },
+    {
+      "test": "head_touch_preflight_files::fifo_without_a_writer_is_refused_before_mutation",
+      "outcome": "PASS",
+      "duration_s": 0.011,
+      "ordinal": 2504,
+      "total": 7496
+    },
+    {
+      "test": "head_touch_preflight_files::missing_local_files_keep_install_compatibility",
+      "outcome": "PASS",
+      "duration_s": 0.198,
+      "ordinal": 2505,
+      "total": 7496
+    },
+    {
+      "test": "head_touch_preflight_files::symlink_to_regular_drop_in_is_preserved",
+      "outcome": "PASS",
+      "duration_s": 0.199,
+      "ordinal": 2506,
+      "total": 7496
+    },
+    {
+      "test": "head_touch_preflight_files::regular_benign_drop_in_is_preserved",
+      "outcome": "PASS",
+      "duration_s": 0.2,
+      "ordinal": 2507,
+      "total": 7496
+    }
+  ],
+  "doc_tests": {
+    "passed": 4,
+    "failed": 0,
+    "ignored": 0
+  },
+  "separate_harnesses": {
+    "lamp-ipc::relay_signals": true,
+    "lamp-turn-end-wire::process": {
+      "passed": 13,
+      "failed": 0,
+      "terminal_line_present": true
+    }
+  },
+  "log_sha256": "3d561bcf895ccbffcf185d389710239c0203c9dcdf74fdcaf6724d914a5b7f8d"
+}
