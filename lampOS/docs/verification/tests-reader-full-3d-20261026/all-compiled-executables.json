@@ -1,0 +1,3179 @@
+[
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///worktree/lampOS/crates/peek#lamp-peek@0.1.0",
+    "manifest_path": "/worktree/lampOS/crates/peek/Cargo.toml",
+    "target": {
+      "kind": [
+        "bin"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "lamp-peek",
+      "src_path": "/worktree/lampOS/crates/peek/src/main.rs",
+      "edition": "2024",
+      "doc": true,
+      "doctest": false,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": false
+    },
+    "features": [],
+    "filenames": [
+      "/target/x86_64-unknown-linux-gnu/debug/lamp-peek"
+    ],
+    "executable": "/target/x86_64-unknown-linux-gnu/debug/lamp-peek",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///worktree/lampOS/crates/peek#lamp-peek@0.1.0",
+    "manifest_path": "/worktree/lampOS/crates/peek/Cargo.toml",
+    "target": {
+      "kind": [
+        "test"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "peek",
+      "src_path": "/worktree/lampOS/crates/peek/tests/peek.rs",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "filenames": [
+      "/target/x86_64-unknown-linux-gnu/debug/deps/peek-ad7519afeb501722"
+    ],
+    "executable": "/target/x86_64-unknown-linux-gnu/debug/deps/peek-ad7519afeb501722",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///worktree/lampOS/crates/peek#lamp-peek@0.1.0",
+    "manifest_path": "/worktree/lampOS/crates/peek/Cargo.toml",
+    "target": {
+      "kind": [
+        "bin"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "lamp-peek",
+      "src_path": "/worktree/lampOS/crates/peek/src/main.rs",
+      "edition": "2024",
+      "doc": true,
+      "doctest": false,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "filenames": [
+      "/target/x86_64-unknown-linux-gnu/debug/deps/lamp_peek-62b045c2461237d1"
+    ],
+    "executable": "/target/x86_64-unknown-linux-gnu/debug/deps/lamp_peek-62b045c2461237d1",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///worktree/lampOS/crates/cloud#lamp-cloud@0.1.0",
+    "manifest_path": "/worktree/lampOS/crates/cloud/Cargo.toml",
+    "target": {
+      "kind": [
+        "bin"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "lamp-cloud",
+      "src_path": "/worktree/lampOS/crates/cloud/src/main.rs",
+      "edition": "2024",
+      "doc": true,
+      "doctest": false,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": false
+    },
+    "features": [],
+    "filenames": [
+      "/target/x86_64-unknown-linux-gnu/debug/lamp-cloud"
+    ],
+    "executable": "/target/x86_64-unknown-linux-gnu/debug/lamp-cloud",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///worktree/lampOS/crates/cloud#lamp-cloud@0.1.0",
+    "manifest_path": "/worktree/lampOS/crates/cloud/Cargo.toml",
+    "target": {
+      "kind": [
+        "test"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "it",
+      "src_path": "/worktree/lampOS/crates/cloud/tests/it/main.rs",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "filenames": [
+      "/target/x86_64-unknown-linux-gnu/debug/deps/it-40ddbbcf1e1d0dd3"
+    ],
+    "executable": "/target/x86_64-unknown-linux-gnu/debug/deps/it-40ddbbcf1e1d0dd3",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///worktree/lampOS/crates/cloud#lamp-cloud@0.1.0",
+    "manifest_path": "/worktree/lampOS/crates/cloud/Cargo.toml",
+    "target": {
+      "kind": [
+        "bin"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "lamp-cloud",
+      "src_path": "/worktree/lampOS/crates/cloud/src/main.rs",
+      "edition": "2024",
+      "doc": true,
+      "doctest": false,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "filenames": [
+      "/target/x86_64-unknown-linux-gnu/debug/deps/lamp_cloud-c46918b9a6f3b131"
+    ],
+    "executable": "/target/x86_64-unknown-linux-gnu/debug/deps/lamp_cloud-c46918b9a6f3b131",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///worktree/lampOS/crates/cloud#lamp-cloud@0.1.0",
+    "manifest_path": "/worktree/lampOS/crates/cloud/Cargo.toml",
+    "target": {
+      "kind": [
+        "test"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "release_pair",
+      "src_path": "/worktree/lampOS/crates/cloud/tests/release_pair.rs",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "filenames": [
+      "/target/x86_64-unknown-linux-gnu/debug/deps/release_pair-fcccd00738cd5238"
+    ],
+    "executable": "/target/x86_64-unknown-linux-gnu/debug/deps/release_pair-fcccd00738cd5238",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///worktree/lampOS/crates/voice-eval#lamp-voice-eval@0.1.0",
+    "manifest_path": "/worktree/lampOS/crates/voice-eval/Cargo.toml",
+    "target": {
+      "kind": [
+        "bin"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "lamp-voice-eval",
+      "src_path": "/worktree/lampOS/crates/voice-eval/src/main.rs",
+      "edition": "2024",
+      "doc": true,
+      "doctest": false,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "filenames": [
+      "/target/x86_64-unknown-linux-gnu/debug/deps/lamp_voice_eval-3d20edd7af3653a8"
+    ],
+    "executable": "/target/x86_64-unknown-linux-gnu/debug/deps/lamp_voice_eval-3d20edd7af3653a8",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///worktree/lampOS/crates/voice-eval#lamp-voice-eval@0.1.0",
+    "manifest_path": "/worktree/lampOS/crates/voice-eval/Cargo.toml",
+    "target": {
+      "kind": [
+        "test"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "it",
+      "src_path": "/worktree/lampOS/crates/voice-eval/tests/it/main.rs",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "filenames": [
+      "/target/x86_64-unknown-linux-gnu/debug/deps/it-3eff314d1d48ec1c"
+    ],
+    "executable": "/target/x86_64-unknown-linux-gnu/debug/deps/it-3eff314d1d48ec1c",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///worktree/lampOS/crates/voice-eval#lamp-voice-eval@0.1.0",
+    "manifest_path": "/worktree/lampOS/crates/voice-eval/Cargo.toml",
+    "target": {
+      "kind": [
+        "example"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "turn_end_replay",
+      "src_path": "/worktree/lampOS/crates/voice-eval/examples/turn_end_replay.rs",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": false
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": false
+    },
+    "features": [],
+    "filenames": [
+      "/target/x86_64-unknown-linux-gnu/debug/examples/turn_end_replay"
+    ],
+    "executable": "/target/x86_64-unknown-linux-gnu/debug/examples/turn_end_replay",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///worktree/lampOS/crates/voice-eval#lamp-voice-eval@0.1.0",
+    "manifest_path": "/worktree/lampOS/crates/voice-eval/Cargo.toml",
+    "target": {
+      "kind": [
+        "lib"
+      ],
+      "crate_types": [
+        "lib"
+      ],
+      "name": "lamp_voice_eval",
+      "src_path": "/worktree/lampOS/crates/voice-eval/src/lib.rs",
+      "edition": "2024",
+      "doc": true,
+      "doctest": true,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "filenames": [
+      "/target/x86_64-unknown-linux-gnu/debug/deps/lamp_voice_eval-364c38ba7c825c1e"
+    ],
+    "executable": "/target/x86_64-unknown-linux-gnu/debug/deps/lamp_voice_eval-364c38ba7c825c1e",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///worktree/lampOS/crates/voice-eval#lamp-voice-eval@0.1.0",
+    "manifest_path": "/worktree/lampOS/crates/voice-eval/Cargo.toml",
+    "target": {
+      "kind": [
+        "example"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "same_voice_pairs",
+      "src_path": "/worktree/lampOS/crates/voice-eval/examples/same_voice_pairs.rs",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": false
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": false
+    },
+    "features": [],
+    "filenames": [
+      "/target/x86_64-unknown-linux-gnu/debug/examples/same_voice_pairs"
+    ],
+    "executable": "/target/x86_64-unknown-linux-gnu/debug/examples/same_voice_pairs",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///worktree/lampOS/crates/voice-eval#lamp-voice-eval@0.1.0",
+    "manifest_path": "/worktree/lampOS/crates/voice-eval/Cargo.toml",
+    "target": {
+      "kind": [
+        "bin"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "lamp-voice-eval",
+      "src_path": "/worktree/lampOS/crates/voice-eval/src/main.rs",
+      "edition": "2024",
+      "doc": true,
+      "doctest": false,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": false
+    },
+    "features": [],
+    "filenames": [
+      "/target/x86_64-unknown-linux-gnu/debug/lamp-voice-eval"
+    ],
+    "executable": "/target/x86_64-unknown-linux-gnu/debug/lamp-voice-eval",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///worktree/lampOS/crates/cloud#lamp-cloud@0.1.0",
+    "manifest_path": "/worktree/lampOS/crates/cloud/Cargo.toml",
+    "target": {
+      "kind": [
+        "lib"
+      ],
+      "crate_types": [
+        "lib"
+      ],
+      "name": "lamp_cloud",
+      "src_path": "/worktree/lampOS/crates/cloud/src/lib.rs",
+      "edition": "2024",
+      "doc": true,
+      "doctest": true,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "filenames": [
+      "/target/x86_64-unknown-linux-gnu/debug/deps/lamp_cloud-692804290f97a87e"
+    ],
+    "executable": "/target/x86_64-unknown-linux-gnu/debug/deps/lamp_cloud-692804290f97a87e",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///worktree/lampOS/crates/setup#lamp-setup@0.1.0",
+    "manifest_path": "/worktree/lampOS/crates/setup/Cargo.toml",
+    "target": {
+      "kind": [
+        "test"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "it",
+      "src_path": "/worktree/lampOS/crates/setup/tests/it/main.rs",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "filenames": [
+      "/target/x86_64-unknown-linux-gnu/debug/deps/it-f8eaf0a5b77f9f2a"
+    ],
+    "executable": "/target/x86_64-unknown-linux-gnu/debug/deps/it-f8eaf0a5b77f9f2a",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///worktree/lampOS/crates/setup#lamp-setup@0.1.0",
+    "manifest_path": "/worktree/lampOS/crates/setup/Cargo.toml",
+    "target": {
+      "kind": [
+        "test"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "wake",
+      "src_path": "/worktree/lampOS/crates/setup/tests/wake.rs",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "filenames": [
+      "/target/x86_64-unknown-linux-gnu/debug/deps/wake-661cd4d3d7d81eb4"
+    ],
+    "executable": "/target/x86_64-unknown-linux-gnu/debug/deps/wake-661cd4d3d7d81eb4",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///worktree/lampOS/crates/setup#lamp-setup@0.1.0",
+    "manifest_path": "/worktree/lampOS/crates/setup/Cargo.toml",
+    "target": {
+      "kind": [
+        "bin"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "lamp-setup",
+      "src_path": "/worktree/lampOS/crates/setup/src/main.rs",
+      "edition": "2024",
+      "doc": true,
+      "doctest": false,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": false
+    },
+    "features": [],
+    "filenames": [
+      "/target/x86_64-unknown-linux-gnu/debug/lamp-setup"
+    ],
+    "executable": "/target/x86_64-unknown-linux-gnu/debug/lamp-setup",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///worktree/lampOS/crates/setup#lamp-setup@0.1.0",
+    "manifest_path": "/worktree/lampOS/crates/setup/Cargo.toml",
+    "target": {
+      "kind": [
+        "bin"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "lamp-setup",
+      "src_path": "/worktree/lampOS/crates/setup/src/main.rs",
+      "edition": "2024",
+      "doc": true,
+      "doctest": false,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "filenames": [
+      "/target/x86_64-unknown-linux-gnu/debug/deps/lamp_setup-d9c7c8f1ef438823"
+    ],
+    "executable": "/target/x86_64-unknown-linux-gnu/debug/deps/lamp_setup-d9c7c8f1ef438823",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///worktree/lampOS/crates/voice#lamp-voice@0.1.0",
+    "manifest_path": "/worktree/lampOS/crates/voice/Cargo.toml",
+    "target": {
+      "kind": [
+        "example"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "hearing_replay",
+      "src_path": "/worktree/lampOS/crates/voice/examples/hearing_replay.rs",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": false
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": false
+    },
+    "features": [],
+    "filenames": [
+      "/target/x86_64-unknown-linux-gnu/debug/examples/hearing_replay"
+    ],
+    "executable": "/target/x86_64-unknown-linux-gnu/debug/examples/hearing_replay",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///worktree/lampOS/crates/voice#lamp-voice@0.1.0",
+    "manifest_path": "/worktree/lampOS/crates/voice/Cargo.toml",
+    "target": {
+      "kind": [
+        "example"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "duplex_lab",
+      "src_path": "/worktree/lampOS/crates/voice/examples/duplex_lab.rs",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": false
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": false
+    },
+    "features": [],
+    "filenames": [
+      "/target/x86_64-unknown-linux-gnu/debug/examples/duplex_lab"
+    ],
+    "executable": "/target/x86_64-unknown-linux-gnu/debug/examples/duplex_lab",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///worktree/lampOS/crates/voice#lamp-voice@0.1.0",
+    "manifest_path": "/worktree/lampOS/crates/voice/Cargo.toml",
+    "target": {
+      "kind": [
+        "test"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "it",
+      "src_path": "/worktree/lampOS/crates/voice/tests/it/main.rs",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "filenames": [
+      "/target/x86_64-unknown-linux-gnu/debug/deps/it-753f2c8e88c22ac3"
+    ],
+    "executable": "/target/x86_64-unknown-linux-gnu/debug/deps/it-753f2c8e88c22ac3",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///worktree/lampOS/crates/voice#lamp-voice@0.1.0",
+    "manifest_path": "/worktree/lampOS/crates/voice/Cargo.toml",
+    "target": {
+      "kind": [
+        "example"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "stop_words_stt_replay",
+      "src_path": "/worktree/lampOS/crates/voice/examples/stop_words_stt_replay.rs",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "filenames": [
+      "/target/x86_64-unknown-linux-gnu/debug/examples/stop_words_stt_replay-e5f8a95fbdbcadb2"
+    ],
+    "executable": "/target/x86_64-unknown-linux-gnu/debug/examples/stop_words_stt_replay-e5f8a95fbdbcadb2",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///worktree/lampOS/crates/voice#lamp-voice@0.1.0",
+    "manifest_path": "/worktree/lampOS/crates/voice/Cargo.toml",
+    "target": {
+      "kind": [
+        "example"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "ring_process_probe",
+      "src_path": "/worktree/lampOS/crates/voice/examples/ring_process_probe.rs",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": false
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": false
+    },
+    "features": [],
+    "filenames": [
+      "/target/x86_64-unknown-linux-gnu/debug/examples/ring_process_probe"
+    ],
+    "executable": "/target/x86_64-unknown-linux-gnu/debug/examples/ring_process_probe",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///worktree/lampOS/crates/voice#lamp-voice@0.1.0",
+    "manifest_path": "/worktree/lampOS/crates/voice/Cargo.toml",
+    "target": {
+      "kind": [
+        "example"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "reference_pace",
+      "src_path": "/worktree/lampOS/crates/voice/examples/reference_pace.rs",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": false
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": false
+    },
+    "features": [],
+    "filenames": [
+      "/target/x86_64-unknown-linux-gnu/debug/examples/reference_pace"
+    ],
+    "executable": "/target/x86_64-unknown-linux-gnu/debug/examples/reference_pace",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///worktree/lampOS/crates/voice#lamp-voice@0.1.0",
+    "manifest_path": "/worktree/lampOS/crates/voice/Cargo.toml",
+    "target": {
+      "kind": [
+        "example"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "probe_handover",
+      "src_path": "/worktree/lampOS/crates/voice/examples/probe_handover.rs",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": false
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": false
+    },
+    "features": [],
+    "filenames": [
+      "/target/x86_64-unknown-linux-gnu/debug/examples/probe_handover"
+    ],
+    "executable": "/target/x86_64-unknown-linux-gnu/debug/examples/probe_handover",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///worktree/lampOS/crates/voice#lamp-voice@0.1.0",
+    "manifest_path": "/worktree/lampOS/crates/voice/Cargo.toml",
+    "target": {
+      "kind": [
+        "example"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "render_line_second",
+      "src_path": "/worktree/lampOS/crates/voice/examples/render_line_second.rs",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "filenames": [
+      "/target/x86_64-unknown-linux-gnu/debug/examples/render_line_second-5c6e95a6b91a9de1"
+    ],
+    "executable": "/target/x86_64-unknown-linux-gnu/debug/examples/render_line_second-5c6e95a6b91a9de1",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///worktree/lampOS/crates/voice#lamp-voice@0.1.0",
+    "manifest_path": "/worktree/lampOS/crates/voice/Cargo.toml",
+    "target": {
+      "kind": [
+        "test"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "release_pair",
+      "src_path": "/worktree/lampOS/crates/voice/tests/release_pair.rs",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "filenames": [
+      "/target/x86_64-unknown-linux-gnu/debug/deps/release_pair-59f7d5ab41624267"
+    ],
+    "executable": "/target/x86_64-unknown-linux-gnu/debug/deps/release_pair-59f7d5ab41624267",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///worktree/lampOS/crates/voice#lamp-voice@0.1.0",
+    "manifest_path": "/worktree/lampOS/crates/voice/Cargo.toml",
+    "target": {
+      "kind": [
+        "example"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "head_qualification_operator",
+      "src_path": "/worktree/lampOS/crates/voice/examples/head_qualification_operator.rs",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": false
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": false
+    },
+    "features": [],
+    "filenames": [
+      "/target/x86_64-unknown-linux-gnu/debug/examples/head_qualification_operator"
+    ],
+    "executable": "/target/x86_64-unknown-linux-gnu/debug/examples/head_qualification_operator",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///worktree/lampOS/crates/voice#lamp-voice@0.1.0",
+    "manifest_path": "/worktree/lampOS/crates/voice/Cargo.toml",
+    "target": {
+      "kind": [
+        "lib"
+      ],
+      "crate_types": [
+        "lib"
+      ],
+      "name": "lamp_voice",
+      "src_path": "/worktree/lampOS/crates/voice/src/lib.rs",
+      "edition": "2024",
+      "doc": true,
+      "doctest": true,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "filenames": [
+      "/target/x86_64-unknown-linux-gnu/debug/deps/lamp_voice-96ace62d5908f8fc"
+    ],
+    "executable": "/target/x86_64-unknown-linux-gnu/debug/deps/lamp_voice-96ace62d5908f8fc",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///worktree/lampOS/crates/voice#lamp-voice@0.1.0",
+    "manifest_path": "/worktree/lampOS/crates/voice/Cargo.toml",
+    "target": {
+      "kind": [
+        "bin"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "lamp-voice",
+      "src_path": "/worktree/lampOS/crates/voice/src/main.rs",
+      "edition": "2024",
+      "doc": true,
+      "doctest": false,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "filenames": [
+      "/target/x86_64-unknown-linux-gnu/debug/deps/lamp_voice-ca43abd71a377068"
+    ],
+    "executable": "/target/x86_64-unknown-linux-gnu/debug/deps/lamp_voice-ca43abd71a377068",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///worktree/lampOS/crates/voice#lamp-voice@0.1.0",
+    "manifest_path": "/worktree/lampOS/crates/voice/Cargo.toml",
+    "target": {
+      "kind": [
+        "example"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "admission_latency",
+      "src_path": "/worktree/lampOS/crates/voice/examples/admission_latency.rs",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": false
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": false
+    },
+    "features": [],
+    "filenames": [
+      "/target/x86_64-unknown-linux-gnu/debug/examples/admission_latency"
+    ],
+    "executable": "/target/x86_64-unknown-linux-gnu/debug/examples/admission_latency",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///worktree/lampOS/crates/update#lamp-update@0.1.0",
+    "manifest_path": "/worktree/lampOS/crates/update/Cargo.toml",
+    "target": {
+      "kind": [
+        "bin"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "lamp-update",
+      "src_path": "/worktree/lampOS/crates/update/src/main.rs",
+      "edition": "2024",
+      "doc": true,
+      "doctest": false,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "filenames": [
+      "/target/x86_64-unknown-linux-gnu/debug/deps/lamp_update-29aa37ef83b88473"
+    ],
+    "executable": "/target/x86_64-unknown-linux-gnu/debug/deps/lamp_update-29aa37ef83b88473",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///worktree/lampOS/crates/skills#lamp-skills@0.1.0",
+    "manifest_path": "/worktree/lampOS/crates/skills/Cargo.toml",
+    "target": {
+      "kind": [
+        "test"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "it",
+      "src_path": "/worktree/lampOS/crates/skills/tests/it/main.rs",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "filenames": [
+      "/target/x86_64-unknown-linux-gnu/debug/deps/it-9af711af19ecf5b1"
+    ],
+    "executable": "/target/x86_64-unknown-linux-gnu/debug/deps/it-9af711af19ecf5b1",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///worktree/lampOS/crates/update#lamp-update@0.1.0",
+    "manifest_path": "/worktree/lampOS/crates/update/Cargo.toml",
+    "target": {
+      "kind": [
+        "test"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "it",
+      "src_path": "/worktree/lampOS/crates/update/tests/it/main.rs",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "filenames": [
+      "/target/x86_64-unknown-linux-gnu/debug/deps/it-2b3df6cf9c221da4"
+    ],
+    "executable": "/target/x86_64-unknown-linux-gnu/debug/deps/it-2b3df6cf9c221da4",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///worktree/lampOS/crates/update#lamp-update@0.1.0",
+    "manifest_path": "/worktree/lampOS/crates/update/Cargo.toml",
+    "target": {
+      "kind": [
+        "test"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "install",
+      "src_path": "/worktree/lampOS/crates/update/tests/install.rs",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "filenames": [
+      "/target/x86_64-unknown-linux-gnu/debug/deps/install-8f2175e98ed3870a"
+    ],
+    "executable": "/target/x86_64-unknown-linux-gnu/debug/deps/install-8f2175e98ed3870a",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///worktree/lampOS/crates/skills#lamp-skills@0.1.0",
+    "manifest_path": "/worktree/lampOS/crates/skills/Cargo.toml",
+    "target": {
+      "kind": [
+        "test"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "requested_audio",
+      "src_path": "/worktree/lampOS/crates/skills/tests/requested_audio.rs",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "filenames": [
+      "/target/x86_64-unknown-linux-gnu/debug/deps/requested_audio-264ddaeeca4c560e"
+    ],
+    "executable": "/target/x86_64-unknown-linux-gnu/debug/deps/requested_audio-264ddaeeca4c560e",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///worktree/lampOS/crates/skills#lamp-skills@0.1.0",
+    "manifest_path": "/worktree/lampOS/crates/skills/Cargo.toml",
+    "target": {
+      "kind": [
+        "lib"
+      ],
+      "crate_types": [
+        "lib"
+      ],
+      "name": "lamp_skills",
+      "src_path": "/worktree/lampOS/crates/skills/src/lib.rs",
+      "edition": "2024",
+      "doc": true,
+      "doctest": true,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "filenames": [
+      "/target/x86_64-unknown-linux-gnu/debug/deps/lamp_skills-418b83d7718311d3"
+    ],
+    "executable": "/target/x86_64-unknown-linux-gnu/debug/deps/lamp_skills-418b83d7718311d3",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///worktree/lampOS/crates/skills#lamp-skills@0.1.0",
+    "manifest_path": "/worktree/lampOS/crates/skills/Cargo.toml",
+    "target": {
+      "kind": [
+        "test"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "release_pair",
+      "src_path": "/worktree/lampOS/crates/skills/tests/release_pair.rs",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "filenames": [
+      "/target/x86_64-unknown-linux-gnu/debug/deps/release_pair-9f5efe55fb4b9780"
+    ],
+    "executable": "/target/x86_64-unknown-linux-gnu/debug/deps/release_pair-9f5efe55fb4b9780",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///worktree/lampOS/crates/update#lamp-update@0.1.0",
+    "manifest_path": "/worktree/lampOS/crates/update/Cargo.toml",
+    "target": {
+      "kind": [
+        "lib"
+      ],
+      "crate_types": [
+        "lib"
+      ],
+      "name": "lamp_update",
+      "src_path": "/worktree/lampOS/crates/update/src/lib.rs",
+      "edition": "2024",
+      "doc": true,
+      "doctest": true,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "filenames": [
+      "/target/x86_64-unknown-linux-gnu/debug/deps/lamp_update-8df304b2570042e8"
+    ],
+    "executable": "/target/x86_64-unknown-linux-gnu/debug/deps/lamp_update-8df304b2570042e8",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///worktree/lampOS/crates/skills#lamp-skills@0.1.0",
+    "manifest_path": "/worktree/lampOS/crates/skills/Cargo.toml",
+    "target": {
+      "kind": [
+        "bin"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "lamp-skills",
+      "src_path": "/worktree/lampOS/crates/skills/src/main.rs",
+      "edition": "2024",
+      "doc": true,
+      "doctest": false,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "filenames": [
+      "/target/x86_64-unknown-linux-gnu/debug/deps/lamp_skills-21c2ed27804f2aa8"
+    ],
+    "executable": "/target/x86_64-unknown-linux-gnu/debug/deps/lamp_skills-21c2ed27804f2aa8",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///worktree/lampOS/crates/update#lamp-update@0.1.0",
+    "manifest_path": "/worktree/lampOS/crates/update/Cargo.toml",
+    "target": {
+      "kind": [
+        "test"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "functions",
+      "src_path": "/worktree/lampOS/crates/update/tests/functions.rs",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "filenames": [
+      "/target/x86_64-unknown-linux-gnu/debug/deps/functions-18eae675aec50225"
+    ],
+    "executable": "/target/x86_64-unknown-linux-gnu/debug/deps/functions-18eae675aec50225",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///worktree/lampOS/crates/skills#lamp-skills@0.1.0",
+    "manifest_path": "/worktree/lampOS/crates/skills/Cargo.toml",
+    "target": {
+      "kind": [
+        "example"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "render_relaxing_music",
+      "src_path": "/worktree/lampOS/crates/skills/examples/render_relaxing_music.rs",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": false
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": false
+    },
+    "features": [],
+    "filenames": [
+      "/target/x86_64-unknown-linux-gnu/debug/examples/render_relaxing_music"
+    ],
+    "executable": "/target/x86_64-unknown-linux-gnu/debug/examples/render_relaxing_music",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///worktree/lampOS/crates/update#lamp-update@0.1.0",
+    "manifest_path": "/worktree/lampOS/crates/update/Cargo.toml",
+    "target": {
+      "kind": [
+        "test"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "release_pair",
+      "src_path": "/worktree/lampOS/crates/update/tests/release_pair.rs",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "filenames": [
+      "/target/x86_64-unknown-linux-gnu/debug/deps/release_pair-e399f6be01589ed5"
+    ],
+    "executable": "/target/x86_64-unknown-linux-gnu/debug/deps/release_pair-e399f6be01589ed5",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///worktree/lampOS/crates/update#lamp-update@0.1.0",
+    "manifest_path": "/worktree/lampOS/crates/update/Cargo.toml",
+    "target": {
+      "kind": [
+        "test"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "round",
+      "src_path": "/worktree/lampOS/crates/update/tests/round.rs",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "filenames": [
+      "/target/x86_64-unknown-linux-gnu/debug/deps/round-8ba55da63d30fc4a"
+    ],
+    "executable": "/target/x86_64-unknown-linux-gnu/debug/deps/round-8ba55da63d30fc4a",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///worktree/lampOS/crates/update#lamp-update@0.1.0",
+    "manifest_path": "/worktree/lampOS/crates/update/Cargo.toml",
+    "target": {
+      "kind": [
+        "test"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "self-process-cuts",
+      "src_path": "/worktree/lampOS/crates/update/tests/self_process_cuts.rs",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "filenames": [
+      "/target/x86_64-unknown-linux-gnu/debug/deps/self_process_cuts-b191aa690cfad738"
+    ],
+    "executable": "/target/x86_64-unknown-linux-gnu/debug/deps/self_process_cuts-b191aa690cfad738",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///worktree/lampOS/crates/update#lamp-update@0.1.0",
+    "manifest_path": "/worktree/lampOS/crates/update/Cargo.toml",
+    "target": {
+      "kind": [
+        "test"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "self-cli-exec",
+      "src_path": "/worktree/lampOS/crates/update/tests/self_cli_exec.rs",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "filenames": [
+      "/target/x86_64-unknown-linux-gnu/debug/deps/self_cli_exec-2a141ef015fa2afb"
+    ],
+    "executable": "/target/x86_64-unknown-linux-gnu/debug/deps/self_cli_exec-2a141ef015fa2afb",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///worktree/lampOS/crates/setup#lamp-setup@0.1.0",
+    "manifest_path": "/worktree/lampOS/crates/setup/Cargo.toml",
+    "target": {
+      "kind": [
+        "lib"
+      ],
+      "crate_types": [
+        "lib"
+      ],
+      "name": "lamp_setup",
+      "src_path": "/worktree/lampOS/crates/setup/src/lib.rs",
+      "edition": "2024",
+      "doc": true,
+      "doctest": true,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "filenames": [
+      "/target/x86_64-unknown-linux-gnu/debug/deps/lamp_setup-4716185a7b1a7354"
+    ],
+    "executable": "/target/x86_64-unknown-linux-gnu/debug/deps/lamp_setup-4716185a7b1a7354",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///worktree/lampOS/crates/peek#lamp-peek@0.1.0",
+    "manifest_path": "/worktree/lampOS/crates/peek/Cargo.toml",
+    "target": {
+      "kind": [
+        "lib"
+      ],
+      "crate_types": [
+        "lib"
+      ],
+      "name": "lamp_peek",
+      "src_path": "/worktree/lampOS/crates/peek/src/lib.rs",
+      "edition": "2024",
+      "doc": true,
+      "doctest": true,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "filenames": [
+      "/target/x86_64-unknown-linux-gnu/debug/deps/lamp_peek-030fb8918fe8fefd"
+    ],
+    "executable": "/target/x86_64-unknown-linux-gnu/debug/deps/lamp_peek-030fb8918fe8fefd",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///worktree/lampOS/crates/memory#lamp-memory@0.1.0",
+    "manifest_path": "/worktree/lampOS/crates/memory/Cargo.toml",
+    "target": {
+      "kind": [
+        "bin"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "lamp-memory-eval",
+      "src_path": "/worktree/lampOS/crates/memory/src/bin/lamp-memory-eval.rs",
+      "edition": "2024",
+      "doc": true,
+      "doctest": false,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": false
+    },
+    "features": [],
+    "filenames": [
+      "/target/x86_64-unknown-linux-gnu/debug/lamp-memory-eval"
+    ],
+    "executable": "/target/x86_64-unknown-linux-gnu/debug/lamp-memory-eval",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///worktree/lampOS/crates/memory#lamp-memory@0.1.0",
+    "manifest_path": "/worktree/lampOS/crates/memory/Cargo.toml",
+    "target": {
+      "kind": [
+        "test"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "release_pair",
+      "src_path": "/worktree/lampOS/crates/memory/tests/release_pair.rs",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "filenames": [
+      "/target/x86_64-unknown-linux-gnu/debug/deps/release_pair-3ab9598937c09f5a"
+    ],
+    "executable": "/target/x86_64-unknown-linux-gnu/debug/deps/release_pair-3ab9598937c09f5a",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///worktree/lampOS/crates/memory#lamp-memory@0.1.0",
+    "manifest_path": "/worktree/lampOS/crates/memory/Cargo.toml",
+    "target": {
+      "kind": [
+        "test"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "forget_person",
+      "src_path": "/worktree/lampOS/crates/memory/tests/forget_person.rs",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "filenames": [
+      "/target/x86_64-unknown-linux-gnu/debug/deps/forget_person-fa07bf8869f18b2b"
+    ],
+    "executable": "/target/x86_64-unknown-linux-gnu/debug/deps/forget_person-fa07bf8869f18b2b",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///worktree/lampOS/crates/memory#lamp-memory@0.1.0",
+    "manifest_path": "/worktree/lampOS/crates/memory/Cargo.toml",
+    "target": {
+      "kind": [
+        "test"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "voice_observe",
+      "src_path": "/worktree/lampOS/crates/memory/tests/voice_observe.rs",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "filenames": [
+      "/target/x86_64-unknown-linux-gnu/debug/deps/voice_observe-170c6af27bd52a88"
+    ],
+    "executable": "/target/x86_64-unknown-linux-gnu/debug/deps/voice_observe-170c6af27bd52a88",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///worktree/lampOS/crates/memory#lamp-memory@0.1.0",
+    "manifest_path": "/worktree/lampOS/crates/memory/Cargo.toml",
+    "target": {
+      "kind": [
+        "test"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "voice_forget_named",
+      "src_path": "/worktree/lampOS/crates/memory/tests/voice_forget_named.rs",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "filenames": [
+      "/target/x86_64-unknown-linux-gnu/debug/deps/voice_forget_named-29085fa07321c47b"
+    ],
+    "executable": "/target/x86_64-unknown-linux-gnu/debug/deps/voice_forget_named-29085fa07321c47b",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///worktree/lampOS/crates/memory#lamp-memory@0.1.0",
+    "manifest_path": "/worktree/lampOS/crates/memory/Cargo.toml",
+    "target": {
+      "kind": [
+        "test"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "voice_follows_face",
+      "src_path": "/worktree/lampOS/crates/memory/tests/voice_follows_face.rs",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "filenames": [
+      "/target/x86_64-unknown-linux-gnu/debug/deps/voice_follows_face-85ccf350b759f58a"
+    ],
+    "executable": "/target/x86_64-unknown-linux-gnu/debug/deps/voice_follows_face-85ccf350b759f58a",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///worktree/lampOS/crates/memory#lamp-memory@0.1.0",
+    "manifest_path": "/worktree/lampOS/crates/memory/Cargo.toml",
+    "target": {
+      "kind": [
+        "test"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "paraphrase_fixture",
+      "src_path": "/worktree/lampOS/crates/memory/tests/paraphrase_fixture.rs",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "filenames": [
+      "/target/x86_64-unknown-linux-gnu/debug/deps/paraphrase_fixture-338822b6e1796225"
+    ],
+    "executable": "/target/x86_64-unknown-linux-gnu/debug/deps/paraphrase_fixture-338822b6e1796225",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///worktree/lampOS/crates/memory#lamp-memory@0.1.0",
+    "manifest_path": "/worktree/lampOS/crates/memory/Cargo.toml",
+    "target": {
+      "kind": [
+        "test"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "it",
+      "src_path": "/worktree/lampOS/crates/memory/tests/it/main.rs",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "filenames": [
+      "/target/x86_64-unknown-linux-gnu/debug/deps/it-4a781a887ac1f294"
+    ],
+    "executable": "/target/x86_64-unknown-linux-gnu/debug/deps/it-4a781a887ac1f294",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///worktree/lampOS/crates/memory#lamp-memory@0.1.0",
+    "manifest_path": "/worktree/lampOS/crates/memory/Cargo.toml",
+    "target": {
+      "kind": [
+        "test"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "voice_early_words",
+      "src_path": "/worktree/lampOS/crates/memory/tests/voice_early_words.rs",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "filenames": [
+      "/target/x86_64-unknown-linux-gnu/debug/deps/voice_early_words-d1aa298d286b8036"
+    ],
+    "executable": "/target/x86_64-unknown-linux-gnu/debug/deps/voice_early_words-d1aa298d286b8036",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///worktree/lampOS/crates/memory#lamp-memory@0.1.0",
+    "manifest_path": "/worktree/lampOS/crates/memory/Cargo.toml",
+    "target": {
+      "kind": [
+        "test"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "voice_forget",
+      "src_path": "/worktree/lampOS/crates/memory/tests/voice_forget.rs",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "filenames": [
+      "/target/x86_64-unknown-linux-gnu/debug/deps/voice_forget-ab1067f247fce403"
+    ],
+    "executable": "/target/x86_64-unknown-linux-gnu/debug/deps/voice_forget-ab1067f247fce403",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///worktree/lampOS/crates/memory#lamp-memory@0.1.0",
+    "manifest_path": "/worktree/lampOS/crates/memory/Cargo.toml",
+    "target": {
+      "kind": [
+        "test"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "voice_since_until",
+      "src_path": "/worktree/lampOS/crates/memory/tests/voice_since_until.rs",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "filenames": [
+      "/target/x86_64-unknown-linux-gnu/debug/deps/voice_since_until-9185c553f0b8e6f3"
+    ],
+    "executable": "/target/x86_64-unknown-linux-gnu/debug/deps/voice_since_until-9185c553f0b8e6f3",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///worktree/lampOS/crates/memory#lamp-memory@0.1.0",
+    "manifest_path": "/worktree/lampOS/crates/memory/Cargo.toml",
+    "target": {
+      "kind": [
+        "bin"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "lamp-memory-fixture",
+      "src_path": "/worktree/lampOS/crates/memory/src/bin/lamp-memory-fixture.rs",
+      "edition": "2024",
+      "doc": true,
+      "doctest": false,
+      "test": false
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": false
+    },
+    "features": [],
+    "filenames": [
+      "/target/x86_64-unknown-linux-gnu/debug/lamp-memory-fixture"
+    ],
+    "executable": "/target/x86_64-unknown-linux-gnu/debug/lamp-memory-fixture",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///worktree/lampOS/crates/memory#lamp-memory@0.1.0",
+    "manifest_path": "/worktree/lampOS/crates/memory/Cargo.toml",
+    "target": {
+      "kind": [
+        "test"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "forgot",
+      "src_path": "/worktree/lampOS/crates/memory/tests/forgot.rs",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "filenames": [
+      "/target/x86_64-unknown-linux-gnu/debug/deps/forgot-5cc9dc7d51157190"
+    ],
+    "executable": "/target/x86_64-unknown-linux-gnu/debug/deps/forgot-5cc9dc7d51157190",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///worktree/lampOS/crates/memory#lamp-memory@0.1.0",
+    "manifest_path": "/worktree/lampOS/crates/memory/Cargo.toml",
+    "target": {
+      "kind": [
+        "bin"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "lamp-memory",
+      "src_path": "/worktree/lampOS/crates/memory/src/main.rs",
+      "edition": "2024",
+      "doc": true,
+      "doctest": false,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": false
+    },
+    "features": [],
+    "filenames": [
+      "/target/x86_64-unknown-linux-gnu/debug/lamp-memory"
+    ],
+    "executable": "/target/x86_64-unknown-linux-gnu/debug/lamp-memory",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///worktree/lampOS/crates/memory#lamp-memory@0.1.0",
+    "manifest_path": "/worktree/lampOS/crates/memory/Cargo.toml",
+    "target": {
+      "kind": [
+        "test"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "health_control",
+      "src_path": "/worktree/lampOS/crates/memory/tests/health_control.rs",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "filenames": [
+      "/target/x86_64-unknown-linux-gnu/debug/deps/health_control-25c7d9f24a512cee"
+    ],
+    "executable": "/target/x86_64-unknown-linux-gnu/debug/deps/health_control-25c7d9f24a512cee",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///worktree/lampOS/crates/memory#lamp-memory@0.1.0",
+    "manifest_path": "/worktree/lampOS/crates/memory/Cargo.toml",
+    "target": {
+      "kind": [
+        "test"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "forget_shared_exchange",
+      "src_path": "/worktree/lampOS/crates/memory/tests/forget_shared_exchange.rs",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "filenames": [
+      "/target/x86_64-unknown-linux-gnu/debug/deps/forget_shared_exchange-e38f728c90005375"
+    ],
+    "executable": "/target/x86_64-unknown-linux-gnu/debug/deps/forget_shared_exchange-e38f728c90005375",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///worktree/lampOS/crates/memory#lamp-memory@0.1.0",
+    "manifest_path": "/worktree/lampOS/crates/memory/Cargo.toml",
+    "target": {
+      "kind": [
+        "test"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "voice_forget_about",
+      "src_path": "/worktree/lampOS/crates/memory/tests/voice_forget_about.rs",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "filenames": [
+      "/target/x86_64-unknown-linux-gnu/debug/deps/voice_forget_about-feff6f31419b22ca"
+    ],
+    "executable": "/target/x86_64-unknown-linux-gnu/debug/deps/voice_forget_about-feff6f31419b22ca",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///worktree/lampOS/crates/memory#lamp-memory@0.1.0",
+    "manifest_path": "/worktree/lampOS/crates/memory/Cargo.toml",
+    "target": {
+      "kind": [
+        "bin"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "lamp-memory",
+      "src_path": "/worktree/lampOS/crates/memory/src/main.rs",
+      "edition": "2024",
+      "doc": true,
+      "doctest": false,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "filenames": [
+      "/target/x86_64-unknown-linux-gnu/debug/deps/lamp_memory-ebcdf54f1d6e03ff"
+    ],
+    "executable": "/target/x86_64-unknown-linux-gnu/debug/deps/lamp_memory-ebcdf54f1d6e03ff",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///worktree/lampOS/crates/memory#lamp-memory@0.1.0",
+    "manifest_path": "/worktree/lampOS/crates/memory/Cargo.toml",
+    "target": {
+      "kind": [
+        "bin"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "lamp-memory-eval",
+      "src_path": "/worktree/lampOS/crates/memory/src/bin/lamp-memory-eval.rs",
+      "edition": "2024",
+      "doc": true,
+      "doctest": false,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "filenames": [
+      "/target/x86_64-unknown-linux-gnu/debug/deps/lamp_memory_eval-65963d2be6053be7"
+    ],
+    "executable": "/target/x86_64-unknown-linux-gnu/debug/deps/lamp_memory_eval-65963d2be6053be7",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///worktree/lampOS/crates/memory#lamp-memory@0.1.0",
+    "manifest_path": "/worktree/lampOS/crates/memory/Cargo.toml",
+    "target": {
+      "kind": [
+        "test"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "voice_link_used",
+      "src_path": "/worktree/lampOS/crates/memory/tests/voice_link_used.rs",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "filenames": [
+      "/target/x86_64-unknown-linux-gnu/debug/deps/voice_link_used-1b7f7fbe300e0d28"
+    ],
+    "executable": "/target/x86_64-unknown-linux-gnu/debug/deps/voice_link_used-1b7f7fbe300e0d28",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///worktree/lampOS/crates/skills#lamp-skills@0.1.0",
+    "manifest_path": "/worktree/lampOS/crates/skills/Cargo.toml",
+    "target": {
+      "kind": [
+        "bin"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "lamp-skills",
+      "src_path": "/worktree/lampOS/crates/skills/src/main.rs",
+      "edition": "2024",
+      "doc": true,
+      "doctest": false,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": false
+    },
+    "features": [],
+    "filenames": [
+      "/target/x86_64-unknown-linux-gnu/debug/lamp-skills"
+    ],
+    "executable": "/target/x86_64-unknown-linux-gnu/debug/lamp-skills",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///worktree/lampOS/crates/expression#lamp-expression@0.1.0",
+    "manifest_path": "/worktree/lampOS/crates/expression/Cargo.toml",
+    "target": {
+      "kind": [
+        "test"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "runtime",
+      "src_path": "/worktree/lampOS/crates/expression/tests/runtime.rs",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "filenames": [
+      "/target/x86_64-unknown-linux-gnu/debug/deps/runtime-4a40f43a21957654"
+    ],
+    "executable": "/target/x86_64-unknown-linux-gnu/debug/deps/runtime-4a40f43a21957654",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///worktree/lampOS/crates/lean#lamp-lean@0.1.0",
+    "manifest_path": "/worktree/lampOS/crates/lean/Cargo.toml",
+    "target": {
+      "kind": [
+        "lib"
+      ],
+      "crate_types": [
+        "lib"
+      ],
+      "name": "lamp_lean",
+      "src_path": "/worktree/lampOS/crates/lean/src/lib.rs",
+      "edition": "2024",
+      "doc": true,
+      "doctest": true,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "filenames": [
+      "/target/x86_64-unknown-linux-gnu/debug/deps/lamp_lean-0ade680de4e3cd79"
+    ],
+    "executable": "/target/x86_64-unknown-linux-gnu/debug/deps/lamp_lean-0ade680de4e3cd79",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///worktree/lampOS/crates/expression#lamp-expression@0.1.0",
+    "manifest_path": "/worktree/lampOS/crates/expression/Cargo.toml",
+    "target": {
+      "kind": [
+        "example"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "recent_playout_cost",
+      "src_path": "/worktree/lampOS/crates/expression/examples/recent_playout_cost.rs",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": false
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": false
+    },
+    "features": [],
+    "filenames": [
+      "/target/x86_64-unknown-linux-gnu/debug/examples/recent_playout_cost"
+    ],
+    "executable": "/target/x86_64-unknown-linux-gnu/debug/examples/recent_playout_cost",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///worktree/lampOS/crates/expression#lamp-expression@0.1.0",
+    "manifest_path": "/worktree/lampOS/crates/expression/Cargo.toml",
+    "target": {
+      "kind": [
+        "example"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "replay_cost",
+      "src_path": "/worktree/lampOS/crates/expression/examples/replay_cost.rs",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": false
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": false
+    },
+    "features": [],
+    "filenames": [
+      "/target/x86_64-unknown-linux-gnu/debug/examples/replay_cost"
+    ],
+    "executable": "/target/x86_64-unknown-linux-gnu/debug/examples/replay_cost",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///worktree/lampOS/crates/expression#lamp-expression@0.1.0",
+    "manifest_path": "/worktree/lampOS/crates/expression/Cargo.toml",
+    "target": {
+      "kind": [
+        "bin"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "lamp-expression",
+      "src_path": "/worktree/lampOS/crates/expression/src/main.rs",
+      "edition": "2024",
+      "doc": true,
+      "doctest": false,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": false
+    },
+    "features": [],
+    "filenames": [
+      "/target/x86_64-unknown-linux-gnu/debug/lamp-expression"
+    ],
+    "executable": "/target/x86_64-unknown-linux-gnu/debug/lamp-expression",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///worktree/lampOS/crates/expression#lamp-expression@0.1.0",
+    "manifest_path": "/worktree/lampOS/crates/expression/Cargo.toml",
+    "target": {
+      "kind": [
+        "test"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "it",
+      "src_path": "/worktree/lampOS/crates/expression/tests/it/main.rs",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "filenames": [
+      "/target/x86_64-unknown-linux-gnu/debug/deps/it-144c8328348bac67"
+    ],
+    "executable": "/target/x86_64-unknown-linux-gnu/debug/deps/it-144c8328348bac67",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///worktree/lampOS/crates/expression#lamp-expression@0.1.0",
+    "manifest_path": "/worktree/lampOS/crates/expression/Cargo.toml",
+    "target": {
+      "kind": [
+        "bin"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "lamp-expression",
+      "src_path": "/worktree/lampOS/crates/expression/src/main.rs",
+      "edition": "2024",
+      "doc": true,
+      "doctest": false,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "filenames": [
+      "/target/x86_64-unknown-linux-gnu/debug/deps/lamp_expression-d59d0cbf797aadeb"
+    ],
+    "executable": "/target/x86_64-unknown-linux-gnu/debug/deps/lamp_expression-d59d0cbf797aadeb",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///worktree/lampOS/crates/expression#lamp-expression@0.1.0",
+    "manifest_path": "/worktree/lampOS/crates/expression/Cargo.toml",
+    "target": {
+      "kind": [
+        "example"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "rest_cost",
+      "src_path": "/worktree/lampOS/crates/expression/examples/rest_cost.rs",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": false
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": false
+    },
+    "features": [],
+    "filenames": [
+      "/target/x86_64-unknown-linux-gnu/debug/examples/rest_cost"
+    ],
+    "executable": "/target/x86_64-unknown-linux-gnu/debug/examples/rest_cost",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///worktree/lampOS/crates/lean#lamp-lean@0.1.0",
+    "manifest_path": "/worktree/lampOS/crates/lean/Cargo.toml",
+    "target": {
+      "kind": [
+        "test"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "it",
+      "src_path": "/worktree/lampOS/crates/lean/tests/it/main.rs",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "filenames": [
+      "/target/x86_64-unknown-linux-gnu/debug/deps/it-1cbe6736472446fd"
+    ],
+    "executable": "/target/x86_64-unknown-linux-gnu/debug/deps/it-1cbe6736472446fd",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///worktree/lampOS/crates/lean#lamp-lean@0.1.0",
+    "manifest_path": "/worktree/lampOS/crates/lean/Cargo.toml",
+    "target": {
+      "kind": [
+        "example"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "check",
+      "src_path": "/worktree/lampOS/crates/lean/examples/check.rs",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": false
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": false
+    },
+    "features": [],
+    "filenames": [
+      "/target/x86_64-unknown-linux-gnu/debug/examples/check"
+    ],
+    "executable": "/target/x86_64-unknown-linux-gnu/debug/examples/check",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///worktree/lampOS/crates/voice#lamp-voice@0.1.0",
+    "manifest_path": "/worktree/lampOS/crates/voice/Cargo.toml",
+    "target": {
+      "kind": [
+        "bin"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "lamp-voice",
+      "src_path": "/worktree/lampOS/crates/voice/src/main.rs",
+      "edition": "2024",
+      "doc": true,
+      "doctest": false,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": false
+    },
+    "features": [],
+    "filenames": [
+      "/target/x86_64-unknown-linux-gnu/debug/lamp-voice"
+    ],
+    "executable": "/target/x86_64-unknown-linux-gnu/debug/lamp-voice",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///worktree/lampOS/crates/memory#lamp-memory@0.1.0",
+    "manifest_path": "/worktree/lampOS/crates/memory/Cargo.toml",
+    "target": {
+      "kind": [
+        "lib"
+      ],
+      "crate_types": [
+        "lib"
+      ],
+      "name": "lamp_memory",
+      "src_path": "/worktree/lampOS/crates/memory/src/lib.rs",
+      "edition": "2024",
+      "doc": true,
+      "doctest": true,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "filenames": [
+      "/target/x86_64-unknown-linux-gnu/debug/deps/lamp_memory-11ac5dac08a8d7de"
+    ],
+    "executable": "/target/x86_64-unknown-linux-gnu/debug/deps/lamp_memory-11ac5dac08a8d7de",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///worktree/lampOS/crates/expression#lamp-expression@0.1.0",
+    "manifest_path": "/worktree/lampOS/crates/expression/Cargo.toml",
+    "target": {
+      "kind": [
+        "lib"
+      ],
+      "crate_types": [
+        "lib"
+      ],
+      "name": "lamp_expression",
+      "src_path": "/worktree/lampOS/crates/expression/src/lib.rs",
+      "edition": "2024",
+      "doc": true,
+      "doctest": true,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "filenames": [
+      "/target/x86_64-unknown-linux-gnu/debug/deps/lamp_expression-69d98322e669b076"
+    ],
+    "executable": "/target/x86_64-unknown-linux-gnu/debug/deps/lamp_expression-69d98322e669b076",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///worktree/lampOS/crates/body#lamp-body@0.1.0",
+    "manifest_path": "/worktree/lampOS/crates/body/Cargo.toml",
+    "target": {
+      "kind": [
+        "bin"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "lamp-body",
+      "src_path": "/worktree/lampOS/crates/body/src/bin/lamp-body.rs",
+      "edition": "2024",
+      "doc": true,
+      "doctest": false,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "filenames": [
+      "/target/x86_64-unknown-linux-gnu/debug/deps/lamp_body-dad45b56c96cbd16"
+    ],
+    "executable": "/target/x86_64-unknown-linux-gnu/debug/deps/lamp_body-dad45b56c96cbd16",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///worktree/lampOS/crates/body#lamp-body@0.1.0",
+    "manifest_path": "/worktree/lampOS/crates/body/Cargo.toml",
+    "target": {
+      "kind": [
+        "bin"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "lamp-body-measure",
+      "src_path": "/worktree/lampOS/crates/body/src/bin/lamp-body-measure.rs",
+      "edition": "2024",
+      "doc": true,
+      "doctest": false,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "filenames": [
+      "/target/x86_64-unknown-linux-gnu/debug/deps/lamp_body_measure-8345e9fff9c1de82"
+    ],
+    "executable": "/target/x86_64-unknown-linux-gnu/debug/deps/lamp_body_measure-8345e9fff9c1de82",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///worktree/lampOS/crates/body#lamp-body@0.1.0",
+    "manifest_path": "/worktree/lampOS/crates/body/Cargo.toml",
+    "target": {
+      "kind": [
+        "bin"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "lamp-body-inspect",
+      "src_path": "/worktree/lampOS/crates/body/src/bin/lamp-body-inspect.rs",
+      "edition": "2024",
+      "doc": true,
+      "doctest": false,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": false
+    },
+    "features": [],
+    "filenames": [
+      "/target/x86_64-unknown-linux-gnu/debug/lamp-body-inspect"
+    ],
+    "executable": "/target/x86_64-unknown-linux-gnu/debug/lamp-body-inspect",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///worktree/lampOS/crates/body#lamp-body@0.1.0",
+    "manifest_path": "/worktree/lampOS/crates/body/Cargo.toml",
+    "target": {
+      "kind": [
+        "bin"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "lamp-body-worker",
+      "src_path": "/worktree/lampOS/crates/body/src/bin/lamp-body-worker.rs",
+      "edition": "2024",
+      "doc": true,
+      "doctest": false,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": false
+    },
+    "features": [],
+    "filenames": [
+      "/target/x86_64-unknown-linux-gnu/debug/lamp-body-worker"
+    ],
+    "executable": "/target/x86_64-unknown-linux-gnu/debug/lamp-body-worker",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///worktree/lampOS/crates/body#lamp-body@0.1.0",
+    "manifest_path": "/worktree/lampOS/crates/body/Cargo.toml",
+    "target": {
+      "kind": [
+        "example"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "head_plan",
+      "src_path": "/worktree/lampOS/crates/body/examples/head_plan.rs",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": false
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": false
+    },
+    "features": [],
+    "filenames": [
+      "/target/x86_64-unknown-linux-gnu/debug/examples/head_plan"
+    ],
+    "executable": "/target/x86_64-unknown-linux-gnu/debug/examples/head_plan",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///worktree/lampOS/crates/body#lamp-body@0.1.0",
+    "manifest_path": "/worktree/lampOS/crates/body/Cargo.toml",
+    "target": {
+      "kind": [
+        "example"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "expression_ask",
+      "src_path": "/worktree/lampOS/crates/body/examples/expression_ask.rs",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": false
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": false
+    },
+    "features": [],
+    "filenames": [
+      "/target/x86_64-unknown-linux-gnu/debug/examples/expression_ask"
+    ],
+    "executable": "/target/x86_64-unknown-linux-gnu/debug/examples/expression_ask",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///worktree/lampOS/crates/body#lamp-body@0.1.0",
+    "manifest_path": "/worktree/lampOS/crates/body/Cargo.toml",
+    "target": {
+      "kind": [
+        "bin"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "lamp-body-mood",
+      "src_path": "/worktree/lampOS/crates/body/src/bin/lamp-body-mood.rs",
+      "edition": "2024",
+      "doc": true,
+      "doctest": false,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "filenames": [
+      "/target/x86_64-unknown-linux-gnu/debug/deps/lamp_body_mood-5ca2a297f112c2c3"
+    ],
+    "executable": "/target/x86_64-unknown-linux-gnu/debug/deps/lamp_body_mood-5ca2a297f112c2c3",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///worktree/lampOS/crates/body#lamp-body@0.1.0",
+    "manifest_path": "/worktree/lampOS/crates/body/Cargo.toml",
+    "target": {
+      "kind": [
+        "bin"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "lamp-body-mood",
+      "src_path": "/worktree/lampOS/crates/body/src/bin/lamp-body-mood.rs",
+      "edition": "2024",
+      "doc": true,
+      "doctest": false,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": false
+    },
+    "features": [],
+    "filenames": [
+      "/target/x86_64-unknown-linux-gnu/debug/lamp-body-mood"
+    ],
+    "executable": "/target/x86_64-unknown-linux-gnu/debug/lamp-body-mood",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///worktree/lampOS/crates/body#lamp-body@0.1.0",
+    "manifest_path": "/worktree/lampOS/crates/body/Cargo.toml",
+    "target": {
+      "kind": [
+        "test"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "it",
+      "src_path": "/worktree/lampOS/crates/body/tests/it/main.rs",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "filenames": [
+      "/target/x86_64-unknown-linux-gnu/debug/deps/it-15d34b3f9d0c9d6f"
+    ],
+    "executable": "/target/x86_64-unknown-linux-gnu/debug/deps/it-15d34b3f9d0c9d6f",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///worktree/lampOS/crates/body#lamp-body@0.1.0",
+    "manifest_path": "/worktree/lampOS/crates/body/Cargo.toml",
+    "target": {
+      "kind": [
+        "bin"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "lamp-body-inspect",
+      "src_path": "/worktree/lampOS/crates/body/src/bin/lamp-body-inspect.rs",
+      "edition": "2024",
+      "doc": true,
+      "doctest": false,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "filenames": [
+      "/target/x86_64-unknown-linux-gnu/debug/deps/lamp_body_inspect-e1d6097a80f804eb"
+    ],
+    "executable": "/target/x86_64-unknown-linux-gnu/debug/deps/lamp_body_inspect-e1d6097a80f804eb",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///worktree/lampOS/crates/body#lamp-body@0.1.0",
+    "manifest_path": "/worktree/lampOS/crates/body/Cargo.toml",
+    "target": {
+      "kind": [
+        "bin"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "lamp-body",
+      "src_path": "/worktree/lampOS/crates/body/src/bin/lamp-body.rs",
+      "edition": "2024",
+      "doc": true,
+      "doctest": false,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": false
+    },
+    "features": [],
+    "filenames": [
+      "/target/x86_64-unknown-linux-gnu/debug/lamp-body"
+    ],
+    "executable": "/target/x86_64-unknown-linux-gnu/debug/lamp-body",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///worktree/lampOS/crates/body#lamp-body@0.1.0",
+    "manifest_path": "/worktree/lampOS/crates/body/Cargo.toml",
+    "target": {
+      "kind": [
+        "bin"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "lamp-body-measure",
+      "src_path": "/worktree/lampOS/crates/body/src/bin/lamp-body-measure.rs",
+      "edition": "2024",
+      "doc": true,
+      "doctest": false,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": false
+    },
+    "features": [],
+    "filenames": [
+      "/target/x86_64-unknown-linux-gnu/debug/lamp-body-measure"
+    ],
+    "executable": "/target/x86_64-unknown-linux-gnu/debug/lamp-body-measure",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///worktree/lampOS/crates/body#lamp-body@0.1.0",
+    "manifest_path": "/worktree/lampOS/crates/body/Cargo.toml",
+    "target": {
+      "kind": [
+        "bin"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "lamp-body-worker",
+      "src_path": "/worktree/lampOS/crates/body/src/bin/lamp-body-worker.rs",
+      "edition": "2024",
+      "doc": true,
+      "doctest": false,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "filenames": [
+      "/target/x86_64-unknown-linux-gnu/debug/deps/lamp_body_worker-b58cc040b988673f"
+    ],
+    "executable": "/target/x86_64-unknown-linux-gnu/debug/deps/lamp_body_worker-b58cc040b988673f",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///worktree/lampOS/crates/body#lamp-body@0.1.0",
+    "manifest_path": "/worktree/lampOS/crates/body/Cargo.toml",
+    "target": {
+      "kind": [
+        "lib"
+      ],
+      "crate_types": [
+        "lib"
+      ],
+      "name": "lamp_body",
+      "src_path": "/worktree/lampOS/crates/body/src/lib.rs",
+      "edition": "2024",
+      "doc": true,
+      "doctest": true,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "filenames": [
+      "/target/x86_64-unknown-linux-gnu/debug/deps/lamp_body-261e692b04d4b603"
+    ],
+    "executable": "/target/x86_64-unknown-linux-gnu/debug/deps/lamp_body-261e692b04d4b603",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///worktree/lampOS/crates/keeper#lamp-keeper@0.1.0",
+    "manifest_path": "/worktree/lampOS/crates/keeper/Cargo.toml",
+    "target": {
+      "kind": [
+        "bin"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "lamp-keeper",
+      "src_path": "/worktree/lampOS/crates/keeper/src/main.rs",
+      "edition": "2024",
+      "required-features": [
+        "prepare"
+      ],
+      "doc": true,
+      "doctest": false,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [
+      "default",
+      "prepare"
+    ],
+    "filenames": [
+      "/target/x86_64-unknown-linux-gnu/debug/deps/lamp_keeper-9e2c495fb191f865"
+    ],
+    "executable": "/target/x86_64-unknown-linux-gnu/debug/deps/lamp_keeper-9e2c495fb191f865",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///worktree/lampOS/crates/keeper#lamp-keeper@0.1.0",
+    "manifest_path": "/worktree/lampOS/crates/keeper/Cargo.toml",
+    "target": {
+      "kind": [
+        "lib"
+      ],
+      "crate_types": [
+        "lib"
+      ],
+      "name": "lamp_keeper",
+      "src_path": "/worktree/lampOS/crates/keeper/src/lib.rs",
+      "edition": "2024",
+      "doc": true,
+      "doctest": true,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [
+      "default",
+      "prepare"
+    ],
+    "filenames": [
+      "/target/x86_64-unknown-linux-gnu/debug/deps/lamp_keeper-1e9ebfaec99b7646"
+    ],
+    "executable": "/target/x86_64-unknown-linux-gnu/debug/deps/lamp_keeper-1e9ebfaec99b7646",
+    "fresh": false
+  },
+  {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///worktree/lampOS/crates/update#lamp-update@0.1.0",
+    "manifest_path": "/worktree/lampOS/crates/update/Cargo.toml",
+    "target": {
+      "kind": [
+        "bin"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "lamp-update",
+      "src_path": "/worktree/lampOS/crates/update/src/main.rs",
+      "edition": "2024",
+      "doc": true,
+      "doctest": false,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": false
+    },
+    "features": [],
+    "filenames": [
+      "/target/x86_64-unknown-linux-gnu/debug/lamp-update"
+    ],
+    "executable": "/target/x86_64-unknown-linux-gnu/debug/lamp-update",
+    "fresh": false
+  }
+]

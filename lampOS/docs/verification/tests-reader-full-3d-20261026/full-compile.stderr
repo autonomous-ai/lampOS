@@ -1,0 +1,24 @@
+   Compiling lamp-policy v0.1.0 (/worktree/lampOS/crates/policy)
+   Compiling axum v0.8.9
+   Compiling lamp-ears v0.1.0 (/worktree/lampOS/crates/ears)
+   Compiling lamp-tasks v0.1.0 (/worktree/lampOS/crates/tasks)
+   Compiling lamp-setup v0.1.0 (/worktree/lampOS/crates/setup)
+   Compiling lamp-observer v0.1.0 (/worktree/lampOS/crates/observer)
+   Compiling lamp-sound-fixtures v0.1.0 (/worktree/lampOS/crates/sound-fixtures)
+   Compiling tokio-stream v0.1.19
+   Compiling rustls-webpki v0.102.8
+   Compiling rumqttc v0.25.1
+   Compiling lamp-turn-end v0.1.0 (/worktree/lampOS/crates/turn-end)
+   Compiling lamp-voice-eval v0.1.0 (/worktree/lampOS/crates/voice-eval)
+   Compiling lamp-same-voice v0.1.0 (/worktree/lampOS/crates/same-voice)
+   Compiling lamp-cloud v0.1.0 (/worktree/lampOS/crates/cloud)
+   Compiling lamp-peek v0.1.0 (/worktree/lampOS/crates/peek)
+   Compiling lamp-voice v0.1.0 (/worktree/lampOS/crates/voice)
+   Compiling lamp-update v0.1.0 (/worktree/lampOS/crates/update)
+   Compiling lamp-skills v0.1.0 (/worktree/lampOS/crates/skills)
+   Compiling lamp-memory v0.1.0 (/worktree/lampOS/crates/memory)
+   Compiling lamp-expression v0.1.0 (/worktree/lampOS/crates/expression)
+   Compiling lamp-lean v0.1.0 (/worktree/lampOS/crates/lean)
+   Compiling lamp-body v0.1.0 (/worktree/lampOS/crates/body)
+   Compiling lamp-keeper v0.1.0 (/worktree/lampOS/crates/keeper)
+    Finished `test` profile [unoptimized] target(s) in 5m 18s

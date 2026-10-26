@@ -1,0 +1,1388 @@
+[
+  {
+    "guest_path": "/target/x86_64-unknown-linux-gnu/debug/lamp-peek",
+    "saved_path": "frozen-executables/000-lamp-peek",
+    "sha256": "de9d7ae8f78af2cacfce4206b295f85eca2fcaf024e0fcb08ef2ae7279f78f84",
+    "bytes": 6972712,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": false
+    },
+    "target": "lamp-peek"
+  },
+  {
+    "guest_path": "/target/x86_64-unknown-linux-gnu/debug/deps/peek-ad7519afeb501722",
+    "saved_path": "frozen-executables/001-peek-ad7519afeb501722",
+    "sha256": "31e396c9458231befe3ac5837f088569164ed028c24c67ea8b82a788d4211952",
+    "bytes": 7960200,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "target": "peek"
+  },
+  {
+    "guest_path": "/target/x86_64-unknown-linux-gnu/debug/deps/lamp_peek-62b045c2461237d1",
+    "saved_path": "frozen-executables/002-lamp_peek-62b045c2461237d1",
+    "sha256": "4a67dc272df1ffe6718d09d1694464cd70200493329f043feb8b7b581a88c579",
+    "bytes": 1052120,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "target": "lamp-peek"
+  },
+  {
+    "guest_path": "/target/x86_64-unknown-linux-gnu/debug/lamp-cloud",
+    "saved_path": "frozen-executables/003-lamp-cloud",
+    "sha256": "e8b32a307c853e6c8d68ce4fe0e16839e07c83583f5de0903fd73ad4de6685d8",
+    "bytes": 29955280,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": false
+    },
+    "target": "lamp-cloud"
+  },
+  {
+    "guest_path": "/target/x86_64-unknown-linux-gnu/debug/deps/it-40ddbbcf1e1d0dd3",
+    "saved_path": "frozen-executables/004-it-40ddbbcf1e1d0dd3",
+    "sha256": "fef328a65a466056e6c945b67d41da0043ff91cd70b2f1182ab98a1a494ab22f",
+    "bytes": 21730048,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "target": "it"
+  },
+  {
+    "guest_path": "/target/x86_64-unknown-linux-gnu/debug/deps/lamp_cloud-c46918b9a6f3b131",
+    "saved_path": "frozen-executables/005-lamp_cloud-c46918b9a6f3b131",
+    "sha256": "339ca8084fd46ee5b897b6fec6b0b3e2afdb38b5b61bb51d6321a70c1eaa8bcb",
+    "bytes": 1052120,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "target": "lamp-cloud"
+  },
+  {
+    "guest_path": "/target/x86_64-unknown-linux-gnu/debug/deps/release_pair-fcccd00738cd5238",
+    "saved_path": "frozen-executables/006-release_pair-fcccd00738cd5238",
+    "sha256": "fe9256835e48e424f599596db88c4aeedb30af11ac994f504f5a92ed3d21aaec",
+    "bytes": 3044096,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "target": "release_pair"
+  },
+  {
+    "guest_path": "/target/x86_64-unknown-linux-gnu/debug/deps/lamp_voice_eval-3d20edd7af3653a8",
+    "saved_path": "frozen-executables/007-lamp_voice_eval-3d20edd7af3653a8",
+    "sha256": "6ce9c3e705c8399caee595121394d25bcffcde25796fdbfe89a55235a152bfbe",
+    "bytes": 11276448,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "target": "lamp-voice-eval"
+  },
+  {
+    "guest_path": "/target/x86_64-unknown-linux-gnu/debug/deps/it-3eff314d1d48ec1c",
+    "saved_path": "frozen-executables/008-it-3eff314d1d48ec1c",
+    "sha256": "4750b34999755b985db25b1dbcaf0200781b35a719141c967b22b4b3935a344b",
+    "bytes": 21875480,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "target": "it"
+  },
+  {
+    "guest_path": "/target/x86_64-unknown-linux-gnu/debug/examples/turn_end_replay",
+    "saved_path": "frozen-executables/009-turn_end_replay",
+    "sha256": "4bc6b31ee5d4fbfc23f474fff3ad611bb6b6257e2878b7d74982c39d65c9f41d",
+    "bytes": 86529392,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": false
+    },
+    "target": "turn_end_replay"
+  },
+  {
+    "guest_path": "/target/x86_64-unknown-linux-gnu/debug/deps/lamp_voice_eval-364c38ba7c825c1e",
+    "saved_path": "frozen-executables/010-lamp_voice_eval-364c38ba7c825c1e",
+    "sha256": "d4986a0a84e600efaf5ee51c0e8568f033f2e53a87b9c6b67bf98b5fd65ba1a1",
+    "bytes": 31467032,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "target": "lamp_voice_eval"
+  },
+  {
+    "guest_path": "/target/x86_64-unknown-linux-gnu/debug/examples/same_voice_pairs",
+    "saved_path": "frozen-executables/011-same_voice_pairs",
+    "sha256": "359bd9fad32c18213d8f886b05a4b236811226073311a447d5de2230810344c8",
+    "bytes": 86582440,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": false
+    },
+    "target": "same_voice_pairs"
+  },
+  {
+    "guest_path": "/target/x86_64-unknown-linux-gnu/debug/lamp-voice-eval",
+    "saved_path": "frozen-executables/012-lamp-voice-eval",
+    "sha256": "469b049f347aacda84be60f1c6e330a3d5d5241faf8feac7821026e243df137b",
+    "bytes": 34201432,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": false
+    },
+    "target": "lamp-voice-eval"
+  },
+  {
+    "guest_path": "/target/x86_64-unknown-linux-gnu/debug/deps/lamp_cloud-692804290f97a87e",
+    "saved_path": "frozen-executables/013-lamp_cloud-692804290f97a87e",
+    "sha256": "f2907fb16fed564cc3b9518519f932371df9b4f470ee1e0a749b8e2aa56cd6c9",
+    "bytes": 36576896,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "target": "lamp_cloud"
+  },
+  {
+    "guest_path": "/target/x86_64-unknown-linux-gnu/debug/deps/it-f8eaf0a5b77f9f2a",
+    "saved_path": "frozen-executables/014-it-f8eaf0a5b77f9f2a",
+    "sha256": "cbf7307471da7a2306da9a4fbce7d0afa02a13bf8878c2b19319f008d90c92ab",
+    "bytes": 14506088,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "target": "it"
+  },
+  {
+    "guest_path": "/target/x86_64-unknown-linux-gnu/debug/deps/wake-661cd4d3d7d81eb4",
+    "saved_path": "frozen-executables/015-wake-661cd4d3d7d81eb4",
+    "sha256": "f4d1e5642ccff895009cc4bca6992deea0d9a9b3c5e9b26cbf2f6687a8636465",
+    "bytes": 2615488,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "target": "wake"
+  },
+  {
+    "guest_path": "/target/x86_64-unknown-linux-gnu/debug/lamp-setup",
+    "saved_path": "frozen-executables/016-lamp-setup",
+    "sha256": "02d45686cbcf250eed4d27bbb3f0fe16809488aca72d01d30ff26291e57a9e3c",
+    "bytes": 17733192,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": false
+    },
+    "target": "lamp-setup"
+  },
+  {
+    "guest_path": "/target/x86_64-unknown-linux-gnu/debug/deps/lamp_setup-d9c7c8f1ef438823",
+    "saved_path": "frozen-executables/017-lamp_setup-d9c7c8f1ef438823",
+    "sha256": "39928bb39d65309c04b8ea1368676918252aa1eb188f7cc29dfdfe00f41d3e60",
+    "bytes": 1052120,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "target": "lamp-setup"
+  },
+  {
+    "guest_path": "/target/x86_64-unknown-linux-gnu/debug/examples/hearing_replay",
+    "saved_path": "frozen-executables/018-hearing_replay",
+    "sha256": "6574dec35ed4dc5d26cb1969fd85357fb8bba548edefee05c1f393d5a5bb666e",
+    "bytes": 5544376,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": false
+    },
+    "target": "hearing_replay"
+  },
+  {
+    "guest_path": "/target/x86_64-unknown-linux-gnu/debug/examples/duplex_lab",
+    "saved_path": "frozen-executables/019-duplex_lab",
+    "sha256": "6b25c20a996f9854b0b349ba73adcbef09076ed0f6e06bf800dfeb3b06f967ff",
+    "bytes": 6950272,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": false
+    },
+    "target": "duplex_lab"
+  },
+  {
+    "guest_path": "/target/x86_64-unknown-linux-gnu/debug/deps/it-753f2c8e88c22ac3",
+    "saved_path": "frozen-executables/020-it-753f2c8e88c22ac3",
+    "sha256": "6e4dbc91fd1e16855ae0437412dc8984563c7a7422a3e5faa813df75a4a44cf5",
+    "bytes": 110433744,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "target": "it"
+  },
+  {
+    "guest_path": "/target/x86_64-unknown-linux-gnu/debug/examples/stop_words_stt_replay-e5f8a95fbdbcadb2",
+    "saved_path": "frozen-executables/021-stop_words_stt_replay-e5f8a95fbdbcadb2",
+    "sha256": "783e5a18164e4d2bda40ed5ec123119ffed97fbb1f7ed1514aaa42abcca70599",
+    "bytes": 6840704,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "target": "stop_words_stt_replay"
+  },
+  {
+    "guest_path": "/target/x86_64-unknown-linux-gnu/debug/examples/ring_process_probe",
+    "saved_path": "frozen-executables/022-ring_process_probe",
+    "sha256": "7531c46e7975a7398ad0ee17da2aa7b793486199f4035669a8ffc7453c23c15d",
+    "bytes": 9836512,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": false
+    },
+    "target": "ring_process_probe"
+  },
+  {
+    "guest_path": "/target/x86_64-unknown-linux-gnu/debug/examples/reference_pace",
+    "saved_path": "frozen-executables/023-reference_pace",
+    "sha256": "bf7a105f61a4f07cee6e540c3588e96362e865ef70a0a9c8b0a65888bb90cd54",
+    "bytes": 8070920,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": false
+    },
+    "target": "reference_pace"
+  },
+  {
+    "guest_path": "/target/x86_64-unknown-linux-gnu/debug/examples/probe_handover",
+    "saved_path": "frozen-executables/024-probe_handover",
+    "sha256": "03e45964895f47dae78744bbae1006a3f772576f628ef7e2f7a3e3f631feaab9",
+    "bytes": 17196216,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": false
+    },
+    "target": "probe_handover"
+  },
+  {
+    "guest_path": "/target/x86_64-unknown-linux-gnu/debug/examples/render_line_second-5c6e95a6b91a9de1",
+    "saved_path": "frozen-executables/025-render_line_second-5c6e95a6b91a9de1",
+    "sha256": "9973662c66549b0b721520cd0144522a468e1c6e62ae1f3e3c1424f1e635242d",
+    "bytes": 5351104,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "target": "render_line_second"
+  },
+  {
+    "guest_path": "/target/x86_64-unknown-linux-gnu/debug/deps/release_pair-59f7d5ab41624267",
+    "saved_path": "frozen-executables/026-release_pair-59f7d5ab41624267",
+    "sha256": "caf93d1683f923233c4fcae50edebd9ce8e4a6f798de73633d1ba37d10a9e994",
+    "bytes": 9235736,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "target": "release_pair"
+  },
+  {
+    "guest_path": "/target/x86_64-unknown-linux-gnu/debug/examples/head_qualification_operator",
+    "saved_path": "frozen-executables/027-head_qualification_operator",
+    "sha256": "6b3c599953adfc852975331403a3f44aeb6fb5469a8a79a02309e3b4ac3a0ce6",
+    "bytes": 5385368,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": false
+    },
+    "target": "head_qualification_operator"
+  },
+  {
+    "guest_path": "/target/x86_64-unknown-linux-gnu/debug/deps/lamp_voice-96ace62d5908f8fc",
+    "saved_path": "frozen-executables/028-lamp_voice-96ace62d5908f8fc",
+    "sha256": "e41b8ea697842a7c4274371cb7049f00d4af7e952cd43b161700f081ce6d048f",
+    "bytes": 131394304,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "target": "lamp_voice"
+  },
+  {
+    "guest_path": "/target/x86_64-unknown-linux-gnu/debug/deps/lamp_voice-ca43abd71a377068",
+    "saved_path": "frozen-executables/029-lamp_voice-ca43abd71a377068",
+    "sha256": "86019502c58c65855b43678298184181517c1dcdb1d1bb34782a2135dd727df7",
+    "bytes": 5008544,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "target": "lamp-voice"
+  },
+  {
+    "guest_path": "/target/x86_64-unknown-linux-gnu/debug/examples/admission_latency",
+    "saved_path": "frozen-executables/030-admission_latency",
+    "sha256": "be651f4e7471ad742b53650aba36d7e2dbf381e90868968869e2d8024906e751",
+    "bytes": 4722808,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": false
+    },
+    "target": "admission_latency"
+  },
+  {
+    "guest_path": "/target/x86_64-unknown-linux-gnu/debug/deps/lamp_update-29aa37ef83b88473",
+    "saved_path": "frozen-executables/031-lamp_update-29aa37ef83b88473",
+    "sha256": "35e99ed4f6e4853cc7ad4de943f4845b6a95ba520651ad762a566e97d0903cc1",
+    "bytes": 1052120,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "target": "lamp-update"
+  },
+  {
+    "guest_path": "/target/x86_64-unknown-linux-gnu/debug/deps/it-9af711af19ecf5b1",
+    "saved_path": "frozen-executables/032-it-9af711af19ecf5b1",
+    "sha256": "fbc8630cc92711223de8fb604f100b76f63094603451187d58f636ff2fd6076f",
+    "bytes": 27442528,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "target": "it"
+  },
+  {
+    "guest_path": "/target/x86_64-unknown-linux-gnu/debug/deps/it-2b3df6cf9c221da4",
+    "saved_path": "frozen-executables/033-it-2b3df6cf9c221da4",
+    "sha256": "781730000b9ff55526af636c13363d51e107c7dc6c186783728004b0885a8641",
+    "bytes": 1923072,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "target": "it"
+  },
+  {
+    "guest_path": "/target/x86_64-unknown-linux-gnu/debug/deps/install-8f2175e98ed3870a",
+    "saved_path": "frozen-executables/034-install-8f2175e98ed3870a",
+    "sha256": "4d7f1bd24439c06a1dd005e33b15d9d84d2c5e777f1fa11383ec7fc34234d504",
+    "bytes": 19139224,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "target": "install"
+  },
+  {
+    "guest_path": "/target/x86_64-unknown-linux-gnu/debug/deps/requested_audio-264ddaeeca4c560e",
+    "saved_path": "frozen-executables/035-requested_audio-264ddaeeca4c560e",
+    "sha256": "0b12c72e0f010493c8886bd8082e50e3e2e7307603b2f9d73f2165c0c4134879",
+    "bytes": 18772624,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "target": "requested_audio"
+  },
+  {
+    "guest_path": "/target/x86_64-unknown-linux-gnu/debug/deps/lamp_skills-418b83d7718311d3",
+    "saved_path": "frozen-executables/036-lamp_skills-418b83d7718311d3",
+    "sha256": "25f51be528134c5a3c2b6c899c53e70f8fe3386be5f56e60a040e414e3942d22",
+    "bytes": 19582864,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "target": "lamp_skills"
+  },
+  {
+    "guest_path": "/target/x86_64-unknown-linux-gnu/debug/deps/release_pair-9f5efe55fb4b9780",
+    "saved_path": "frozen-executables/037-release_pair-9f5efe55fb4b9780",
+    "sha256": "511ea7ea87999fbebbfd93b775197064265799d5ce310c04882fce4365f2836b",
+    "bytes": 4362928,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "target": "release_pair"
+  },
+  {
+    "guest_path": "/target/x86_64-unknown-linux-gnu/debug/deps/lamp_update-8df304b2570042e8",
+    "saved_path": "frozen-executables/038-lamp_update-8df304b2570042e8",
+    "sha256": "2eb451e30ebfe4b3c394e613847e061472373c33475bf24b1b3a29f63b3313fa",
+    "bytes": 12608496,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "target": "lamp_update"
+  },
+  {
+    "guest_path": "/target/x86_64-unknown-linux-gnu/debug/deps/lamp_skills-21c2ed27804f2aa8",
+    "saved_path": "frozen-executables/039-lamp_skills-21c2ed27804f2aa8",
+    "sha256": "05493cfc40c2c4c3ac0cbabf94f099fb4bd7088fffe250bbad8b5982bb1ddce9",
+    "bytes": 18959992,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "target": "lamp-skills"
+  },
+  {
+    "guest_path": "/target/x86_64-unknown-linux-gnu/debug/deps/functions-18eae675aec50225",
+    "saved_path": "frozen-executables/040-functions-18eae675aec50225",
+    "sha256": "801c3d805d5cf1b3caf50797504c092c30a1bca90db751fd0521826346a87b7c",
+    "bytes": 24392152,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "target": "functions"
+  },
+  {
+    "guest_path": "/target/x86_64-unknown-linux-gnu/debug/examples/render_relaxing_music",
+    "saved_path": "frozen-executables/041-render_relaxing_music",
+    "sha256": "8a7f140187c6bbf41895d5ffe4f9e5075e9faa92563370c4dda730dbf9824035",
+    "bytes": 592464,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": false
+    },
+    "target": "render_relaxing_music"
+  },
+  {
+    "guest_path": "/target/x86_64-unknown-linux-gnu/debug/deps/release_pair-e399f6be01589ed5",
+    "saved_path": "frozen-executables/042-release_pair-e399f6be01589ed5",
+    "sha256": "1b7bd150416be08318c50527338c462219d751fc40be09115a944fd343374066",
+    "bytes": 3577608,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "target": "release_pair"
+  },
+  {
+    "guest_path": "/target/x86_64-unknown-linux-gnu/debug/deps/round-8ba55da63d30fc4a",
+    "saved_path": "frozen-executables/043-round-8ba55da63d30fc4a",
+    "sha256": "0d48dd6a75199ac0fcaed286105213ee8546bfbed46188cf7519cde461b5b670",
+    "bytes": 22510640,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "target": "round"
+  },
+  {
+    "guest_path": "/target/x86_64-unknown-linux-gnu/debug/deps/self_process_cuts-b191aa690cfad738",
+    "saved_path": "frozen-executables/044-self_process_cuts-b191aa690cfad738",
+    "sha256": "66eaf9d482c99657cd0a19405570c4fb88b9c2d7b9f420155f79753344ce477b",
+    "bytes": 10457520,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "target": "self-process-cuts"
+  },
+  {
+    "guest_path": "/target/x86_64-unknown-linux-gnu/debug/deps/self_cli_exec-2a141ef015fa2afb",
+    "saved_path": "frozen-executables/045-self_cli_exec-2a141ef015fa2afb",
+    "sha256": "9651052f04ea5921f876aa4127d457347000cbeae82e3ad4f0f1daea01a75d91",
+    "bytes": 2823896,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "target": "self-cli-exec"
+  },
+  {
+    "guest_path": "/target/x86_64-unknown-linux-gnu/debug/deps/lamp_setup-4716185a7b1a7354",
+    "saved_path": "frozen-executables/046-lamp_setup-4716185a7b1a7354",
+    "sha256": "2db3f42c6bbe9fef8319d9b94d04983daf44c6ad2d3c41cd4e40ff980631707e",
+    "bytes": 12430744,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "target": "lamp_setup"
+  },
+  {
+    "guest_path": "/target/x86_64-unknown-linux-gnu/debug/deps/lamp_peek-030fb8918fe8fefd",
+    "saved_path": "frozen-executables/047-lamp_peek-030fb8918fe8fefd",
+    "sha256": "6f91042c0db2edf8e855e207db736d3c9f941c3b54bae3734a5a16b13b50ee15",
+    "bytes": 4175592,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "target": "lamp_peek"
+  },
+  {
+    "guest_path": "/target/x86_64-unknown-linux-gnu/debug/lamp-memory-eval",
+    "saved_path": "frozen-executables/048-lamp-memory-eval",
+    "sha256": "00845129fa31431296afb468bbac7e3ffafb9e58c6a4c4df4ecb26aac14feca1",
+    "bytes": 4816008,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": false
+    },
+    "target": "lamp-memory-eval"
+  },
+  {
+    "guest_path": "/target/x86_64-unknown-linux-gnu/debug/deps/release_pair-3ab9598937c09f5a",
+    "saved_path": "frozen-executables/049-release_pair-3ab9598937c09f5a",
+    "sha256": "8ecfe2cc287f682bc92a3cf60f113723d6060c2b19e446856a659545e605f299",
+    "bytes": 4459672,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "target": "release_pair"
+  },
+  {
+    "guest_path": "/target/x86_64-unknown-linux-gnu/debug/deps/forget_person-fa07bf8869f18b2b",
+    "saved_path": "frozen-executables/050-forget_person-fa07bf8869f18b2b",
+    "sha256": "139f4cf5e2ccae5bd83d77601d863b45c26c9b08241b3302a3099074ddfd3201",
+    "bytes": 9003704,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "target": "forget_person"
+  },
+  {
+    "guest_path": "/target/x86_64-unknown-linux-gnu/debug/deps/voice_observe-170c6af27bd52a88",
+    "saved_path": "frozen-executables/051-voice_observe-170c6af27bd52a88",
+    "sha256": "46ade7e5fa75fb87fbb5bcd7bab23c2caadbfc5faa0e946d5c38598cf3d77aef",
+    "bytes": 13157984,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "target": "voice_observe"
+  },
+  {
+    "guest_path": "/target/x86_64-unknown-linux-gnu/debug/deps/voice_forget_named-29085fa07321c47b",
+    "saved_path": "frozen-executables/052-voice_forget_named-29085fa07321c47b",
+    "sha256": "36db396cae73615c6c379cc436481f55ca910d6a04b366600f83f5904f237ce3",
+    "bytes": 13905896,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "target": "voice_forget_named"
+  },
+  {
+    "guest_path": "/target/x86_64-unknown-linux-gnu/debug/deps/voice_follows_face-85ccf350b759f58a",
+    "saved_path": "frozen-executables/053-voice_follows_face-85ccf350b759f58a",
+    "sha256": "c1ebb80e1ca078b85b18f6673fa98f515bd4ac9a130306911b56e8f7e04ee487",
+    "bytes": 14012696,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "target": "voice_follows_face"
+  },
+  {
+    "guest_path": "/target/x86_64-unknown-linux-gnu/debug/deps/paraphrase_fixture-338822b6e1796225",
+    "saved_path": "frozen-executables/054-paraphrase_fixture-338822b6e1796225",
+    "sha256": "9079fbc3d192b1d30de890098b1653391537ae93f1a18471a7ebc14579c40f03",
+    "bytes": 2025912,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "target": "paraphrase_fixture"
+  },
+  {
+    "guest_path": "/target/x86_64-unknown-linux-gnu/debug/deps/it-4a781a887ac1f294",
+    "saved_path": "frozen-executables/055-it-4a781a887ac1f294",
+    "sha256": "0a03acb5c726db80fa0fabe05d4a73638005374c2c1c29779e0f015bcd3f99ce",
+    "bytes": 20147224,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "target": "it"
+  },
+  {
+    "guest_path": "/target/x86_64-unknown-linux-gnu/debug/deps/voice_early_words-d1aa298d286b8036",
+    "saved_path": "frozen-executables/056-voice_early_words-d1aa298d286b8036",
+    "sha256": "c85486e1613da8af08129dcced0b6d7120d05da24f7de1c87912bf0bf02577b7",
+    "bytes": 14066216,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "target": "voice_early_words"
+  },
+  {
+    "guest_path": "/target/x86_64-unknown-linux-gnu/debug/deps/voice_forget-ab1067f247fce403",
+    "saved_path": "frozen-executables/057-voice_forget-ab1067f247fce403",
+    "sha256": "2d6413c1f50864c4817c90e8a1ebc127cc311add8421d305ed59644a26055f1b",
+    "bytes": 14241952,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "target": "voice_forget"
+  },
+  {
+    "guest_path": "/target/x86_64-unknown-linux-gnu/debug/deps/voice_since_until-9185c553f0b8e6f3",
+    "saved_path": "frozen-executables/058-voice_since_until-9185c553f0b8e6f3",
+    "sha256": "5d38607d05bcbd6916bfcd027cb7c75d4d4f4538e7f9768257394a660f9f98d2",
+    "bytes": 13830928,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "target": "voice_since_until"
+  },
+  {
+    "guest_path": "/target/x86_64-unknown-linux-gnu/debug/lamp-memory-fixture",
+    "saved_path": "frozen-executables/059-lamp-memory-fixture",
+    "sha256": "05016461db294c6e5897126afed3a974fe3b9d234c02b39703116e5696a08fd7",
+    "bytes": 8777752,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": false
+    },
+    "target": "lamp-memory-fixture"
+  },
+  {
+    "guest_path": "/target/x86_64-unknown-linux-gnu/debug/deps/forgot-5cc9dc7d51157190",
+    "saved_path": "frozen-executables/060-forgot-5cc9dc7d51157190",
+    "sha256": "59a3375ed3b22691d16e04c6199d3f18c361e9c54ade1882724b6cd566787bcd",
+    "bytes": 4912104,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "target": "forgot"
+  },
+  {
+    "guest_path": "/target/x86_64-unknown-linux-gnu/debug/lamp-memory",
+    "saved_path": "frozen-executables/061-lamp-memory",
+    "sha256": "ae2f3f8522d3e72889a750ce68c9999f20374044739d6c5e1606bfee251acae2",
+    "bytes": 8488152,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": false
+    },
+    "target": "lamp-memory"
+  },
+  {
+    "guest_path": "/target/x86_64-unknown-linux-gnu/debug/deps/health_control-25c7d9f24a512cee",
+    "saved_path": "frozen-executables/062-health_control-25c7d9f24a512cee",
+    "sha256": "f821cef1aaa20a6f5c2e969f23c35c34aaed3f767f41690dcf5a471aa89181a9",
+    "bytes": 2645352,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "target": "health_control"
+  },
+  {
+    "guest_path": "/target/x86_64-unknown-linux-gnu/debug/deps/forget_shared_exchange-e38f728c90005375",
+    "saved_path": "frozen-executables/063-forget_shared_exchange-e38f728c90005375",
+    "sha256": "ede89da1516a295ba4d090f786bcc149c01d0354c7e34660b4a5564db537c7ca",
+    "bytes": 6426096,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "target": "forget_shared_exchange"
+  },
+  {
+    "guest_path": "/target/x86_64-unknown-linux-gnu/debug/deps/voice_forget_about-feff6f31419b22ca",
+    "saved_path": "frozen-executables/064-voice_forget_about-feff6f31419b22ca",
+    "sha256": "1b4ac2d849038f9a4df345aa683a992917abed51c6748599e50489a6ff9005e2",
+    "bytes": 13820392,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "target": "voice_forget_about"
+  },
+  {
+    "guest_path": "/target/x86_64-unknown-linux-gnu/debug/deps/lamp_memory-ebcdf54f1d6e03ff",
+    "saved_path": "frozen-executables/065-lamp_memory-ebcdf54f1d6e03ff",
+    "sha256": "6195210dcd1600aa3ade6f5edcdf3e559b2c0248ca6d50ed3f6a57bef5b26c4d",
+    "bytes": 8867696,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "target": "lamp-memory"
+  },
+  {
+    "guest_path": "/target/x86_64-unknown-linux-gnu/debug/deps/lamp_memory_eval-65963d2be6053be7",
+    "saved_path": "frozen-executables/066-lamp_memory_eval-65963d2be6053be7",
+    "sha256": "977b9683b14496a47a7e4e3c481b8c36b7feb5ba92421c3fae504c1164d0216d",
+    "bytes": 2350224,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "target": "lamp-memory-eval"
+  },
+  {
+    "guest_path": "/target/x86_64-unknown-linux-gnu/debug/deps/voice_link_used-1b7f7fbe300e0d28",
+    "saved_path": "frozen-executables/067-voice_link_used-1b7f7fbe300e0d28",
+    "sha256": "9b578f55979b41fa1d3c8d734ee6ffdc611273c53c3f071448050da0d5e2a8f9",
+    "bytes": 13974296,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "target": "voice_link_used"
+  },
+  {
+    "guest_path": "/target/x86_64-unknown-linux-gnu/debug/lamp-skills",
+    "saved_path": "frozen-executables/068-lamp-skills",
+    "sha256": "a2571acd9c3b0280ec10b2ca0d1cffaa24736e420cbafba59a4e441533936f00",
+    "bytes": 26321000,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": false
+    },
+    "target": "lamp-skills"
+  },
+  {
+    "guest_path": "/target/x86_64-unknown-linux-gnu/debug/deps/runtime-4a40f43a21957654",
+    "saved_path": "frozen-executables/069-runtime-4a40f43a21957654",
+    "sha256": "4a2daa7d4f1af24fa12231f7768cb33faab75f3874ff3bb5578993d3ed96efd3",
+    "bytes": 8025944,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "target": "runtime"
+  },
+  {
+    "guest_path": "/target/x86_64-unknown-linux-gnu/debug/deps/lamp_lean-0ade680de4e3cd79",
+    "saved_path": "frozen-executables/070-lamp_lean-0ade680de4e3cd79",
+    "sha256": "c29c739b65382a34cfc251cd7dd063bab9d58d7fd4ebf92fee86fe76dfdafb44",
+    "bytes": 1297232,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "target": "lamp_lean"
+  },
+  {
+    "guest_path": "/target/x86_64-unknown-linux-gnu/debug/examples/recent_playout_cost",
+    "saved_path": "frozen-executables/071-recent_playout_cost",
+    "sha256": "e7d93a59688282a60768ca2b2466f7cb69b0738d8592f1fb0c461f3e81a4b015",
+    "bytes": 5090536,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": false
+    },
+    "target": "recent_playout_cost"
+  },
+  {
+    "guest_path": "/target/x86_64-unknown-linux-gnu/debug/examples/replay_cost",
+    "saved_path": "frozen-executables/072-replay_cost",
+    "sha256": "23df0a63ba54e82df332419dca6805e6c050cb8764aab48a703b07d02cde1ccd",
+    "bytes": 5076336,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": false
+    },
+    "target": "replay_cost"
+  },
+  {
+    "guest_path": "/target/x86_64-unknown-linux-gnu/debug/lamp-expression",
+    "saved_path": "frozen-executables/073-lamp-expression",
+    "sha256": "0646a35f1b96d126e29680c94f222259498c7a03f9b683e36f5b7deca0a0c676",
+    "bytes": 10084928,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": false
+    },
+    "target": "lamp-expression"
+  },
+  {
+    "guest_path": "/target/x86_64-unknown-linux-gnu/debug/deps/it-144c8328348bac67",
+    "saved_path": "frozen-executables/074-it-144c8328348bac67",
+    "sha256": "f46dd7c7c17eb357f03aeb9306157058aa3f70c96f105ecb2e282d24598a21b5",
+    "bytes": 14978256,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "target": "it"
+  },
+  {
+    "guest_path": "/target/x86_64-unknown-linux-gnu/debug/deps/lamp_expression-d59d0cbf797aadeb",
+    "saved_path": "frozen-executables/075-lamp_expression-d59d0cbf797aadeb",
+    "sha256": "efe011a605db7f7cef274cc0db8a26aa9a201ab9ce6eeda8e7ed35d6e1d8a527",
+    "bytes": 3578600,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "target": "lamp-expression"
+  },
+  {
+    "guest_path": "/target/x86_64-unknown-linux-gnu/debug/examples/rest_cost",
+    "saved_path": "frozen-executables/076-rest_cost",
+    "sha256": "b931604896c91133134033f1473f87e58d0d7b3ffd419a17c2acc5d643c30eaf",
+    "bytes": 5094856,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": false
+    },
+    "target": "rest_cost"
+  },
+  {
+    "guest_path": "/target/x86_64-unknown-linux-gnu/debug/deps/it-1cbe6736472446fd",
+    "saved_path": "frozen-executables/077-it-1cbe6736472446fd",
+    "sha256": "3583d809feececa8b51fd0c11bd530aeb72f001ebedb5fb7a6b04cd5f46e3f3d",
+    "bytes": 4325960,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "target": "it"
+  },
+  {
+    "guest_path": "/target/x86_64-unknown-linux-gnu/debug/examples/check",
+    "saved_path": "frozen-executables/078-check",
+    "sha256": "0953148cf1f8079c0eeb6755e9305abff5ce73b30bc11f129949cc2fd1344b9c",
+    "bytes": 3219624,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": false
+    },
+    "target": "check"
+  },
+  {
+    "guest_path": "/target/x86_64-unknown-linux-gnu/debug/lamp-voice",
+    "saved_path": "frozen-executables/079-lamp-voice",
+    "sha256": "9a974c0a251b37cf4f913b240205dc42a81d8b3eb80cd2323d3f4a5e2ff12108",
+    "bytes": 68664472,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": false
+    },
+    "target": "lamp-voice"
+  },
+  {
+    "guest_path": "/target/x86_64-unknown-linux-gnu/debug/deps/lamp_memory-11ac5dac08a8d7de",
+    "saved_path": "frozen-executables/080-lamp_memory-11ac5dac08a8d7de",
+    "sha256": "318e5a2f533404499977e76237ded3d4f18901a10e5dd6f4874be470b1884758",
+    "bytes": 11312600,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "target": "lamp_memory"
+  },
+  {
+    "guest_path": "/target/x86_64-unknown-linux-gnu/debug/deps/lamp_expression-69d98322e669b076",
+    "saved_path": "frozen-executables/081-lamp_expression-69d98322e669b076",
+    "sha256": "9373e74ba9d609fcc087e10fd752c3513d3a63d9ae215bf9d41b08a4a64be6e6",
+    "bytes": 7404744,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "target": "lamp_expression"
+  },
+  {
+    "guest_path": "/target/x86_64-unknown-linux-gnu/debug/deps/lamp_body-dad45b56c96cbd16",
+    "saved_path": "frozen-executables/082-lamp_body-dad45b56c96cbd16",
+    "sha256": "21cc5cd72368584b29da61613045f939b17dd5daa700f0cf719a434c4cdd49a9",
+    "bytes": 3407512,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "target": "lamp-body"
+  },
+  {
+    "guest_path": "/target/x86_64-unknown-linux-gnu/debug/deps/lamp_body_measure-8345e9fff9c1de82",
+    "saved_path": "frozen-executables/083-lamp_body_measure-8345e9fff9c1de82",
+    "sha256": "3d47a7d9914c70ca4bfbf99b2392dac9251b9f7f7b93de164f287f776d087f1a",
+    "bytes": 2080056,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "target": "lamp-body-measure"
+  },
+  {
+    "guest_path": "/target/x86_64-unknown-linux-gnu/debug/lamp-body-inspect",
+    "saved_path": "frozen-executables/084-lamp-body-inspect",
+    "sha256": "bdc39b1ca4d7277e3a19593e675b8d8209b1652d3f8ebf6ccc915847c7e74a08",
+    "bytes": 1945792,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": false
+    },
+    "target": "lamp-body-inspect"
+  },
+  {
+    "guest_path": "/target/x86_64-unknown-linux-gnu/debug/lamp-body-worker",
+    "saved_path": "frozen-executables/085-lamp-body-worker",
+    "sha256": "2db7b1439ea4ae73c09ca89ddc80cca29f938e6b86896f387699c5a68c18ae8e",
+    "bytes": 3551640,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": false
+    },
+    "target": "lamp-body-worker"
+  },
+  {
+    "guest_path": "/target/x86_64-unknown-linux-gnu/debug/examples/head_plan",
+    "saved_path": "frozen-executables/086-head_plan",
+    "sha256": "4ec7d9bb66fb70f5d5289622a19fe3eec18d42395e69ffac60e14667fc7b2776",
+    "bytes": 2166416,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": false
+    },
+    "target": "head_plan"
+  },
+  {
+    "guest_path": "/target/x86_64-unknown-linux-gnu/debug/examples/expression_ask",
+    "saved_path": "frozen-executables/087-expression_ask",
+    "sha256": "56e014f334bca10d0a088ec7d5bd4fac98454c57c9d2175a7f14a2651f42f30e",
+    "bytes": 1594344,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": false
+    },
+    "target": "expression_ask"
+  },
+  {
+    "guest_path": "/target/x86_64-unknown-linux-gnu/debug/deps/lamp_body_mood-5ca2a297f112c2c3",
+    "saved_path": "frozen-executables/088-lamp_body_mood-5ca2a297f112c2c3",
+    "sha256": "b612a2c5a9426571a16ca2f05c946c184f32b1007a7d0af10d97650dddeda28b",
+    "bytes": 1157312,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "target": "lamp-body-mood"
+  },
+  {
+    "guest_path": "/target/x86_64-unknown-linux-gnu/debug/lamp-body-mood",
+    "saved_path": "frozen-executables/089-lamp-body-mood",
+    "sha256": "823ddee4871b6b0d2e48b5fda09471087da60b4d1da8408c8a2e1b2a3113ff67",
+    "bytes": 508248,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": false
+    },
+    "target": "lamp-body-mood"
+  },
+  {
+    "guest_path": "/target/x86_64-unknown-linux-gnu/debug/deps/it-15d34b3f9d0c9d6f",
+    "saved_path": "frozen-executables/090-it-15d34b3f9d0c9d6f",
+    "sha256": "90ecd79046d136269c8c0faa694293d07cf53e37d1e11db29aceeb20f22cfd46",
+    "bytes": 6992088,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "target": "it"
+  },
+  {
+    "guest_path": "/target/x86_64-unknown-linux-gnu/debug/deps/lamp_body_inspect-e1d6097a80f804eb",
+    "saved_path": "frozen-executables/091-lamp_body_inspect-e1d6097a80f804eb",
+    "sha256": "688d72d35ec5313838c20e7d2f49e9b49f5bd018ca0319aca9205b7f4727800f",
+    "bytes": 1934032,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "target": "lamp-body-inspect"
+  },
+  {
+    "guest_path": "/target/x86_64-unknown-linux-gnu/debug/lamp-body",
+    "saved_path": "frozen-executables/092-lamp-body",
+    "sha256": "f2c897f6e1d49332355c1aae6a9b819a572572848cc7e759770ef1fcdf3f1de8",
+    "bytes": 5915616,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": false
+    },
+    "target": "lamp-body"
+  },
+  {
+    "guest_path": "/target/x86_64-unknown-linux-gnu/debug/lamp-body-measure",
+    "saved_path": "frozen-executables/093-lamp-body-measure",
+    "sha256": "e8b94dfd3da486dee41d83b17b873046041e2fa04794b36395c5aba6e7aa075d",
+    "bytes": 3540544,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": false
+    },
+    "target": "lamp-body-measure"
+  },
+  {
+    "guest_path": "/target/x86_64-unknown-linux-gnu/debug/deps/lamp_body_worker-b58cc040b988673f",
+    "saved_path": "frozen-executables/094-lamp_body_worker-b58cc040b988673f",
+    "sha256": "746b9e3ff898e198b733d778e639b0c166838646a6f605d8e735d6d3aa1726dc",
+    "bytes": 1955944,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "target": "lamp-body-worker"
+  },
+  {
+    "guest_path": "/target/x86_64-unknown-linux-gnu/debug/deps/lamp_body-261e692b04d4b603",
+    "saved_path": "frozen-executables/095-lamp_body-261e692b04d4b603",
+    "sha256": "7323de8c49d04f980530d4c582b855961eb563ff2399d0d9b6470c8e6d7a65ca",
+    "bytes": 19778792,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "target": "lamp_body"
+  },
+  {
+    "guest_path": "/target/x86_64-unknown-linux-gnu/debug/deps/lamp_keeper-9e2c495fb191f865",
+    "saved_path": "frozen-executables/096-lamp_keeper-9e2c495fb191f865",
+    "sha256": "59eef199c91b554e80996e8801da68bad88bdcf4dbd4376c0aca113df9e713e8",
+    "bytes": 2362768,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "target": "lamp-keeper"
+  },
+  {
+    "guest_path": "/target/x86_64-unknown-linux-gnu/debug/deps/lamp_keeper-1e9ebfaec99b7646",
+    "saved_path": "frozen-executables/097-lamp_keeper-1e9ebfaec99b7646",
+    "sha256": "a3ee000eee7ac12fbeb7a965aee6cc459bb02d7fd6eafa1cdf43e854c101a9d7",
+    "bytes": 3341920,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "target": "lamp_keeper"
+  },
+  {
+    "guest_path": "/target/x86_64-unknown-linux-gnu/debug/lamp-update",
+    "saved_path": "frozen-executables/098-lamp-update",
+    "sha256": "60ee9e92608b25a643e0c778e149ccb60fca5d956ea87b7c7321b24238eaca2f",
+    "bytes": 11950944,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": false
+    },
+    "target": "lamp-update"
+  }
+]

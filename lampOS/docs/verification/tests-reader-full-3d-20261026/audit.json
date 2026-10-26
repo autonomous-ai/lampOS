@@ -1,0 +1,232 @@
+{
+  "status": "FAILED",
+  "counts": {
+    "passed": 7454,
+    "failed": 3,
+    "ignored": 53,
+    "measured": 0,
+    "filtered": 0
+  },
+  "completed_summaries": 79,
+  "executed_compiled_targets": 67,
+  "zero_test_doctest_summaries": 12,
+  "unique_qualified_terminal_cases": 7510,
+  "single_line_terminal_cases": 7508,
+  "split_terminal_cases": [
+    {
+      "target_ordinal": 65,
+      "name": "physical::fake_lamp::clock_tests::a_pure_clock_keeps_tick_boundaries_and_frozen_polls_distinct",
+      "intervening_output": "test physical::fake_lamp::clock_tests::a_pure_clock_keeps_tick_boundaries_and_frozen_polls_distinct ... {\"seconds\":0,\"status\":\"listening_ready\"}\nok\n"
+    },
+    {
+      "target_ordinal": 65,
+      "name": "physical::fake_lamp::clock_tests::completed_polls_prove_room_consumption_and_keep_cue_fault_timing",
+      "intervening_output": "test physical::fake_lamp::clock_tests::completed_polls_prove_room_consumption_and_keep_cue_fault_timing ... {\"seconds\":8,\"status\":\"listening_ready\"}\nok\n"
+    }
+  ],
+  "failed_cases": [
+    {
+      "name": "relay_hardening::a_closed_runner_transport_stops_the_runtime_and_its_workers",
+      "outcome": "FAILED",
+      "split_terminal": false,
+      "target_ordinal": 67,
+      "package": "lamp-voice-eval",
+      "target": "it",
+      "executable": "/target/x86_64-unknown-linux-gnu/debug/deps/it-3eff314d1d48ec1c",
+      "stdout_byte_start": 704593,
+      "stdout_byte_end": 704686
+    },
+    {
+      "name": "relay_hardening::an_early_relay_error_after_the_runtime_exited_still_stops_its_workers",
+      "outcome": "FAILED",
+      "split_terminal": false,
+      "target_ordinal": 67,
+      "package": "lamp-voice-eval",
+      "target": "it",
+      "executable": "/target/x86_64-unknown-linux-gnu/debug/deps/it-3eff314d1d48ec1c",
+      "stdout_byte_start": 704793,
+      "stdout_byte_end": 704896
+    },
+    {
+      "name": "relay_hardening::workers_left_after_a_normal_exit_are_stopped_and_reported",
+      "outcome": "FAILED",
+      "split_terminal": false,
+      "target_ordinal": 67,
+      "package": "lamp-voice-eval",
+      "target": "it",
+      "executable": "/target/x86_64-unknown-linux-gnu/debug/deps/it-3eff314d1d48ec1c",
+      "stdout_byte_start": 705074,
+      "stdout_byte_end": 705165
+    }
+  ],
+  "source_guards_equal": true,
+  "before_after_executed_hashes_equal": true,
+  "all_preservation_hashes_equal": true,
+  "compiled_executables_preserved": 99,
+  "compiled_executable_bytes": 1389546968,
+  "all_frozen_host_file_hashes_independently_verified": true,
+  "full_command_elapsed_seconds": 1088.3418292230053,
+  "full_command_exit": 101,
+  "prior_compile_stop": "exit137 host disk reserve; no runtime test observation",
+  "unchanged_base_control": "prepared separately; no outcome is included",
+  "cause": "UNPROVEN",
+  "no_test_or_compiler_during_audit": true,
+  "guest_hash_maps_match_all_saved_copies": true,
+  "reader_module_in_full_run": {
+    "passed": 14,
+    "failed": 0,
+    "ignored": 1,
+    "cases": [
+      {
+        "target_ordinal": "59",
+        "package": "lamp-voice",
+        "target": "lamp_voice",
+        "case": "session_reader::tests::finite_and_unset_service_never_resolve_a_reader_group",
+        "outcome": "ok",
+        "stdout_byte_start": "581312",
+        "stdout_byte_end": "581401",
+        "split_terminal": "false"
+      },
+      {
+        "target_ordinal": "59",
+        "package": "lamp-voice",
+        "target": "lamp_voice",
+        "case": "session_reader::tests::group_lookup_failure_retains_private_logging_without_writer_failure",
+        "outcome": "ok",
+        "stdout_byte_start": "581401",
+        "stdout_byte_end": "581504",
+        "split_terminal": "false"
+      },
+      {
+        "target_ordinal": "59",
+        "package": "lamp-voice",
+        "target": "lamp_voice",
+        "case": "session_reader::tests::linux::a_fixture_root_retains_ancestor_mode_acl_and_path_checks",
+        "outcome": "ok",
+        "stdout_byte_start": "581504",
+        "stdout_byte_end": "581603",
+        "split_terminal": "false"
+      },
+      {
+        "target_ordinal": "59",
+        "package": "lamp-voice",
+        "target": "lamp_voice",
+        "case": "session_reader::tests::linux::a_verified_failed_grant_keeps_private_original_records",
+        "outcome": "ok",
+        "stdout_byte_start": "581603",
+        "stdout_byte_end": "581700",
+        "split_terminal": "false"
+      },
+      {
+        "target_ordinal": "59",
+        "package": "lamp-voice",
+        "target": "lamp_voice",
+        "case": "session_reader::tests::linux::access_and_default_acl_are_refused_without_stripping_or_widening_them",
+        "outcome": "ok",
+        "stdout_byte_start": "581700",
+        "stdout_byte_end": "581812",
+        "split_terminal": "false"
+      },
+      {
+        "target_ordinal": "59",
+        "package": "lamp-voice",
+        "target": "lamp_voice",
+        "case": "session_reader::tests::linux::an_earlier_reader_refusal_keeps_a_verified_private_writer",
+        "outcome": "ok",
+        "stdout_byte_start": "581812",
+        "stdout_byte_end": "581912",
+        "split_terminal": "false"
+      },
+      {
+        "target_ordinal": "59",
+        "package": "lamp-voice",
+        "target": "lamp_voice",
+        "case": "session_reader::tests::linux::dedicated_reader_can_only_read_new_events_under_dropped_identity",
+        "outcome": "ignored",
+        "stdout_byte_start": "581912",
+        "stdout_byte_end": "582097",
+        "split_terminal": "false"
+      },
+      {
+        "target_ordinal": "59",
+        "package": "lamp-voice",
+        "target": "lamp_voice",
+        "case": "session_reader::tests::linux::every_grant_failure_restores_private_modes_and_original_groups",
+        "outcome": "ok",
+        "stdout_byte_start": "582097",
+        "stdout_byte_end": "582202",
+        "split_terminal": "false"
+      },
+      {
+        "target_ordinal": "59",
+        "package": "lamp-voice",
+        "target": "lamp_voice",
+        "case": "session_reader::tests::linux::failed_private_rollback_disables_only_metadata",
+        "outcome": "ok",
+        "stdout_byte_start": "582202",
+        "stdout_byte_end": "582291",
+        "split_terminal": "false"
+      },
+      {
+        "target_ordinal": "59",
+        "package": "lamp-voice",
+        "target": "lamp_voice",
+        "case": "session_reader::tests::linux::only_the_new_session_is_shared_after_one_pinned_lookup",
+        "outcome": "ok",
+        "stdout_byte_start": "582291",
+        "stdout_byte_end": "582388",
+        "split_terminal": "false"
+      },
+      {
+        "target_ordinal": "59",
+        "package": "lamp-voice",
+        "target": "lamp_voice",
+        "case": "session_reader::tests::linux::readable_or_linked_voice_siblings_deny_preparation_and_late_grant",
+        "outcome": "ok",
+        "stdout_byte_start": "582388",
+        "stdout_byte_end": "582496",
+        "split_terminal": "false"
+      },
+      {
+        "target_ordinal": "59",
+        "package": "lamp-voice",
+        "target": "lamp_voice",
+        "case": "session_reader::tests::linux::replaced_record_never_changes_an_outside_sentinel",
+        "outcome": "ok",
+        "stdout_byte_start": "582496",
+        "stdout_byte_end": "582588",
+        "split_terminal": "false"
+      },
+      {
+        "target_ordinal": "59",
+        "package": "lamp-voice",
+        "target": "lamp_voice",
+        "case": "session_reader::tests::linux::shared_session_writer_projects_every_segment_without_private_values",
+        "outcome": "ok",
+        "stdout_byte_start": "582588",
+        "stdout_byte_end": "582698",
+        "split_terminal": "false"
+      },
+      {
+        "target_ordinal": "59",
+        "package": "lamp-voice",
+        "target": "lamp_voice",
+        "case": "session_reader::tests::linux::unprepared_or_wrong_group_parent_never_grants_or_changes_ancestors",
+        "outcome": "ok",
+        "stdout_byte_start": "582698",
+        "stdout_byte_end": "582807",
+        "split_terminal": "false"
+      },
+      {
+        "target_ordinal": "59",
+        "package": "lamp-voice",
+        "target": "lamp_voice",
+        "case": "session_reader::tests::local_session_reader_group_is_exact_unique_and_bounded",
+        "outcome": "ok",
+        "stdout_byte_start": "582807",
+        "stdout_byte_end": "582897",
+        "split_terminal": "false"
+      }
+    ]
+  }
+}

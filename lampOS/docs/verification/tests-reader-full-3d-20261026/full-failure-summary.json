@@ -1,0 +1,30 @@
+{
+  "completed_summaries": 79,
+  "counts": {
+    "passed": 7454,
+    "failed": 3,
+    "ignored": 53,
+    "measured": 0,
+    "filtered": 0
+  },
+  "failed_test_lines": [
+    "test relay_hardening::a_closed_runner_transport_stops_the_runtime_and_its_workers ... FAILED",
+    "test relay_hardening::an_early_relay_error_after_the_runtime_exited_still_stops_its_workers ... FAILED",
+    "test relay_hardening::workers_left_after_a_normal_exit_are_stopped_and_reported ... FAILED"
+  ],
+  "command": {
+    "argv": [
+      "/usr/local/bin/podman",
+      "exec",
+      "fe2153c8018706aab0ba88acde0e913c88c560e93137ccd37e63fdadd601db85",
+      "sh",
+      "-ec",
+      "cd /worktree/lampOS; exec cargo test --offline --locked --jobs 1 -p lamp-body -p lamp-cloud -p lamp-expression -p lamp-keeper -p lamp-lean -p lamp-memory -p lamp-peek -p lamp-setup -p lamp-skills -p lamp-update -p lamp-voice -p lamp-voice-eval --no-fail-fast -- --test-threads=1"
+    ],
+    "exit": 101,
+    "elapsed_s": 1088.3418292230053,
+    "stop_reason": null
+  },
+  "source_guard_equal": true,
+  "artifact_hashes_equal": true
+}

@@ -1,5 +1,26 @@
 # Tests work log
 
+## 2026-10-26 07:22 — Reader full failure retained; carrier follows train149
+
+Ready for lamp-voice: no (#3466; reader fixture)
+
+[Reader Linux full gate](verification/tests-reader-full-3d-20261026/) finished
+7,454 passed / 3 failed / 53 ignored, all 79 summaries and 7,510 literal
+terminal cases. The reader module passes 14/0/1 inside this full context.
+Three Voice-eval relay worker PID-existence checks fail; all raw failures
+remain. Ninety-nine compiled executables are frozen and independently hashed,
+including all 67 executed targets. Cause is unproven. An unchanged-3d,
+once-only seven-case module control is prepared after the carrier compiler
+slot; no baseline result or full gate waiver is claimed.
+
+The carrier's frozen 6b/3d formatting, strict twelve-crate Clippy, updater
+build and ten carrier tests passed. Train149 then landed #3477 on2747c72a7.
+All three carrier commits carry equally to01f599d29 on274; its current
+formatting and strict Clippy pass, with build, carrier tests and workspace
+build finishing before publication. Rehearsal packet62452b7be has the reader's
+P1/P2-clear source read, while the real installed lamp and owner inputs remain
+pending. No device action ran.
+
 ## 2026-10-26 06:59 — Product carrier prioritized for the first ten lamps
 
 Ready for lamp-voice: no (#3466)

@@ -1,0 +1,6 @@
+uid=1000 gid=1000 groups=1000
+x86_64
+cargo 1.96.0 (30a34c682 2026-05-25)
+Filesystem      Size  Used Avail Use% Mounted on
+/dev/vda4        40G   30G  9.6G  76% /target
+3.9G	/target
