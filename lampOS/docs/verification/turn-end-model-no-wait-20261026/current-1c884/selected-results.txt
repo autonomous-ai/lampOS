@@ -1,0 +1,13 @@
+Current base: 1c884f16cf4de53a700bba7512c129c3ee01d72d
+
+Full crate:
+test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.98s
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 6 passed; 0 failed; 8 ignored; 0 measured; 0 filtered out; finished in 1.95s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+Focused:
+test parity::worker_process_refuses_missing_or_wrong_models_without_blocking ... ok
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 13 filtered out; finished in 1.06s
+test parity::spawn_returns_while_model_open_is_held ... ok
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 13 filtered out; finished in 0.03s
