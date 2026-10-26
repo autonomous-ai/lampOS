@@ -884,8 +884,10 @@ pub enum Route {
     Executive(PathBuf),
     /// A Schedule-only Actions exchange with bounded connect/read/write.
     Schedule(PathBuf),
-    /// Ask the memory on this socket.
-    Memory(PathBuf),
+    /// Ask the memory on this socket; with the eyes' socket and switches,
+    /// a known person's "forget everything about me" forgets their face too
+    /// ([`crate::remember::forget_everything_face`]).
+    Memory(PathBuf, Option<(PathBuf, crate::known_faces::FaceSwitches)>),
     /// The time: answered here, at once.
     Clock,
     /// Work for an agent elsewhere, through the tasks part.
@@ -945,7 +947,13 @@ pub fn route(settings: &Settings, name: &str) -> Route {
         };
     }
     if let (Some(socket), true) = (&settings.memory, crate::remember::is_tool(name)) {
-        return Route::Memory(socket.clone());
+        return Route::Memory(
+            socket.clone(),
+            settings
+                .who
+                .clone()
+                .map(|who| (who, face_switches(settings))),
+        );
     }
     if crate::agent_tasks::is_tool(name) {
         return settings.tasks.clone().map_or(Route::Nobody, Route::Tasks);
@@ -999,7 +1007,7 @@ pub fn route(settings: &Settings, name: &str) -> Route {
 /// Whether a request with this call stays out of the memory's journal:
 /// being asked to keep or forget something is not itself something to keep.
 pub fn keeps_out(route: &Route, name: &str) -> bool {
-    matches!(route, Route::Memory(_)) && name != crate::remember::RECALL
+    matches!(route, Route::Memory(..)) && name != crate::remember::RECALL
 }
 
 /// One call answered to the end, for a voice route that waits for each
@@ -1197,7 +1205,7 @@ pub fn answer_typed(settings: &Settings, call: &ToolCall, request: u64) -> Value
         return json!({"error": MOVES_ONLY_AT_THE_LAMP});
     }
     match route {
-        Route::Memory(socket) => {
+        Route::Memory(socket, _) => {
             if crate::remember::is_forget(&call.name) {
                 crate::remember_speaker::forget();
             }
@@ -1449,7 +1457,7 @@ fn run_call_with_scope(
     }
     let deadline = ASK_DEADLINE;
     let result = match route {
-        Route::Memory(socket) => {
+        Route::Memory(socket, faces) => {
             if crate::remember::is_forget(&call.name) {
                 crate::remember_speaker::forget();
             }
@@ -1538,6 +1546,17 @@ fn run_call_with_scope(
                 as_heard.as_ref(),
                 crate::remember::replaces_on(),
             );
+            // "Forget everything about me" said at the lamp by the known
+            // person whose line it is: their face, and the name it keeps,
+            // go too, as "forget my face" empties their memory (#2850).
+            let (told, answered) = match (faces, lease) {
+                (Some((who, switches)), Some(lease))
+                    if heard && model.name == crate::remember::FORGET_EVERYTHING =>
+                {
+                    crate::remember::forget_everything_face((told, answered), who, *switches, lease)
+                }
+                _ => (told, answered),
+            };
             ("the memory", (told, answered))
         }
         Route::Executive(directory) => ("the executive", ask(directory, call, deadline)),
@@ -1924,7 +1943,7 @@ mod tests {
             name: crate::remember::RECALL.into(),
             args: json!({}),
         };
-        let route = Route::Memory(PathBuf::from("/missing-memory.sock"));
+        let route = Route::Memory(PathBuf::from("/missing-memory.sock"), None);
         assert_eq!(
             run_call_scoped(&route, &call, 2, true, &lease),
             ("nobody", (unavailable(), false))
@@ -3360,7 +3379,7 @@ mod tests {
         for name in ["remember", "recall", "forget"] {
             assert_eq!(
                 route(&with, name),
-                Route::Memory("/run/lampos-memory/memory.sock".into())
+                Route::Memory("/run/lampos-memory/memory.sock".into(), None)
             );
         }
         assert_eq!(route(&with, "light_on"), Route::Executive(dir.clone()));
