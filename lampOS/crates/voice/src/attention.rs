@@ -1417,7 +1417,9 @@ impl Attention {
             self.bare_call_us = Some((call, ended, Some(self.call_shown())));
         }
         // The line before's sound, when a hearing in it stays with it: not
-        // a call, by its words or as a bare call.
+        // a call, by its words or as a bare call. A hearing at its start is
+        // a call however its words were written ("Lamp." heard as "Ramp.",
+        // the reviewer-lead's P2 on `da9a597de`), and goes on too.
         let line_before = (self.name_stays
             && self.request != request
             && !self.called_in_its_words()
@@ -1426,12 +1428,22 @@ impl Attention {
                 .is_none_or(|(call, _, _)| call != self.request))
         .then_some(self.began_us.zip(self.ended_us))
         .flatten();
-        let counts = move |named: u64| {
-            named.saturating_add(NAME_BEFORE_US) >= now_us
-                && line_before.is_none_or(|(began, ended)| {
-                    named >= now_us || !(began..=ended).contains(&named)
-                })
+        let its_own = move |named: u64| {
+            line_before.is_none_or(|(began, ended)| {
+                named >= now_us
+                    || named <= began.saturating_add(NAME_AT_THE_START_US)
+                    || named > ended
+            })
         };
+        // One that stays with the line before is used up there, so no later
+        // line takes it either (reviewer-two's P2 on `da9a597de`).
+        if !self.named_us.is_some_and(its_own) {
+            self.named_us = None;
+        }
+        if !self.named_sure_us.is_some_and(its_own) {
+            self.named_sure_us = None;
+        }
+        let counts = move |named: u64| named.saturating_add(NAME_BEFORE_US) >= now_us;
         self.began(request, session);
         self.after_another = after_another;
         self.after_question = after_question;
@@ -1496,7 +1508,14 @@ impl Attention {
                 self.began_us,
             )
         });
+        // The first part's hearings are this line's own: kept past
+        // `began_at`, which lets go of one that stays with the line before.
+        let hearings = (self.named_us, self.named_sure_us);
+        let continuing = before.is_some();
         self.began_at(request, session, now_us);
+        if continuing {
+            (self.named_us, self.named_sure_us) = hearings;
+        }
         if let Some((
             (named, named_at_start),
             named_sure,
@@ -4577,6 +4596,31 @@ mod tests {
         assert!(!next_named(true, desk, 11 * second));
         assert!(next_named(true, "Lamp.", 11 * second), "a call's goes on");
         assert!(next_named(true, desk, 12 * second), "the next line's own");
+        // A call at the line's start goes on however its words were written
+        // (the reviewer-lead's P2 on `da9a597de`).
+        let mut attention = Attention::default();
+        attention.keep_the_name_in_its_line(true);
+        attention.began_at(1, 7, 9 * second + 200_000);
+        attention.heard("Ramp.");
+        attention.name_heard_scored(9 * second + 500_000, 0.95);
+        attention.ended(1, 9 * second + 800_000);
+        attention.began_at(2, 7, 10 * second + 500_000);
+        assert!(attention.named, "at its start");
+        // Used up: a hearing that stays with the first line counts for no
+        // later one either (reviewer-two's P2 on `da9a597de`).
+        for stays in [false, true] {
+            let mut attention = Attention::default();
+            attention.keep_the_name_in_its_line(stays);
+            attention.began_at(1, 7, 10 * second);
+            attention.heard("I think the oven is still on, by the way.");
+            attention.name_heard_scored(12 * second + 900_000, 0.999);
+            attention.ended(1, 13 * second);
+            attention.began_at(2, 7, 13 * second + 100_000);
+            assert_eq!(attention.named, !stays, "the second line, stays {stays}");
+            attention.ended(2, 13 * second + 600_000);
+            attention.began_at(3, 7, 13 * second + 700_000);
+            assert_eq!(attention.named, !stays, "the third line, stays {stays}");
+        }
     }
 
     /// The name is the first thing said, a little before the voice is

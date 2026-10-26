@@ -5190,8 +5190,10 @@ impl Heeding {
     /// line's, and is not among the line in hand's signs ([`Self::heed_signs`]):
     /// not its name heard, its name's note, nor its name said to a face. A
     /// line going on from the one before keeps it, so does the line after one
-    /// whose words called the lamp by name ("Lamp."), and a hearing in its
-    /// own window is its own. `lamp-name` tells a hearing once its score falls,
+    /// whose words called the lamp by name ("Lamp."), and so does a hearing
+    /// at the line before's start ([`crate::attention::NAME_AT_THE_START_US`]),
+    /// a call however its words were written; a hearing in its own window is
+    /// its own. `lamp-name` tells a hearing once its score falls,
     /// up to 0.8 s after it began, so one from a line's last words can come
     /// after that line is judged. On lamp-4ace on 2026-10-26 at 06:21 (build
     /// 6919, the busy scene played) a hearing at 0.92 in "Can you pass me
@@ -6385,18 +6387,22 @@ impl Heeding {
     }
 
     /// [`Self::keeping_the_name_in_its_line`]: the hearings that began in the
-    /// sound of the line judged last, before this one began, left out of
-    /// this one's signs, and said in the journal.
+    /// sound of the line judged last, past its start, before this one began,
+    /// left out of this one's signs, and said in the journal.
     fn keep_the_name_in_its_line(&self, request: u64, said: (u64, u64), signs: &mut Signs) {
         let Some((before, (began, ended), _)) = self.last_said.filter(|(before, _, call)| {
             self.name_stays && *before != request && !call && signs.continues_from.is_none()
         }) else {
             return;
         };
+        // Past the line before's start: one at its start is a call however
+        // its words were written ("Lamp." heard as "Ramp."), and goes on (the
+        // reviewer-lead's P2 on `da9a597de`).
+        let past_its_start = began.saturating_add(crate::attention::NAME_AT_THE_START_US);
         let all = signs.names.len();
         signs
             .names
-            .retain(|(at, _)| !((began..=ended).contains(at) && *at < said.0));
+            .retain(|(at, _)| !(*at > past_its_start && *at <= ended && *at < said.0));
         if signs.names.len() < all {
             eprintln!(
                 "lamp-voice second: request {request}: {} hearing(s) of its name began in request {before}'s sound, before this line, and stay with that line (LAMP_NAME_STAYS_IN_ITS_LINE)",
@@ -16684,6 +16690,60 @@ mod tests {
             ),
             None
         );
+    }
+
+    /// The readers' P2s on `da9a597de`, through `heed_signs` with the
+    /// product's second sign in a busy room and the switch on. The
+    /// reviewer-lead's: "Lamp." written "Ramp.", its hearing at its start
+    /// and come late, then "What time is it?" 0.7 s after: the call goes
+    /// on, and the question is played. Reviewer-two's: a 0.999 hearing
+    /// mid-way through a first line, in time, stays with it; the short line
+    /// after it and the third, with no hearing of their own, are both held.
+    /// Off, the second line is played on it (the control).
+    #[test]
+    fn a_call_at_a_lines_start_goes_on_and_a_kept_hearing_is_used_up() {
+        use crate::room_told::Room;
+        let signs = |names| room_name_signs(Room::Busy, false, None, false, names);
+        let mut heeding = room_name_heeding(true);
+        heeding.keeping_the_name_in_its_line();
+        heeding.heed_signs(1, (10_000_000, 10_600_000), "Ramp.", signs(Vec::new()));
+        assert_eq!(
+            heeding.heed_signs(
+                2,
+                (11_300_000, 12_300_000),
+                "What time is it?",
+                signs(vec![(10_300_000, 0.95)]),
+            ),
+            None,
+            "a call at its start goes on"
+        );
+        for stays in [false, true] {
+            let mut heeding = room_name_heeding(true);
+            if stays {
+                heeding.keeping_the_name_in_its_line();
+            }
+            heeding.heed_signs(
+                1,
+                (10_000_000, 13_000_000),
+                "I think the oven is still on, by the way.",
+                signs(vec![(12_900_000, 0.999)]),
+            );
+            let second = heeding.heed_signs(2, (13_100_000, 13_600_000), "Yes.", signs(Vec::new()));
+            assert_eq!(second.is_some(), stays, "the second line, stays {stays}");
+            if stays {
+                assert!(
+                    heeding
+                        .heed_signs(
+                            3,
+                            (13_700_000, 14_500_000),
+                            "What time is it?",
+                            signs(Vec::new())
+                        )
+                        .is_some(),
+                    "the third line"
+                );
+            }
+        }
     }
 
     /// A hearing of the name mid-line in a line said from 10 s to 11.5 s,
