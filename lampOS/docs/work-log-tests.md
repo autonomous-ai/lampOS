@@ -1,5 +1,15 @@
 # Tests work log
 
+## 2026-10-27 05:38 — Current composed Mood and carrier continuation run; Reader parent passed
+
+Ready for lamp-voice: no (remaining carries have explicit gates/base holds)
+
+[Sentinel pinned a3b host proof](verification/tests-sentinel-a3b-20261027/) records local `5ac039201` **4/0/0 once**, formatting, strict twelve-package Clippy, workspace and full Voice-library compilation. Its 3,826-case inventory is not full Voice runtime: 3,822 cases were filtered. Source, actual module and all **236** sealed witnesses stayed exact; native controller/wrapper exited 0 and owned groups closed. This unpublished intermediate source remains distinct from the offered 57 head and the latest carry.
+
+Own source-only carries are clean on `90ca725c5`: Sentinel `0c1d8bc14`, Restart `29df1d71b`, Skills `7cf65eab6`. Each has one equal range-diff and both authored blobs unchanged, with own backup refs. The delegated bulk carry was initially rejected because automatic review did not recognize the standing user authorization; Root verified clean ownership and completed narrower backed-up carries under the explicit standing rebase order. No permission remains blocked. Latest Sentinel parent receipts/236 count and alias equality are bound, but its next compiler gate remains disabled until the current Mood gate closes.
+
+Mood `f4419f830` composes Journal and Mood exactly on 90ca and is actively running the fresh full Expression qualification, with both cases required once and 246 prior witnesses. Carrier runs only 303 previously unstarted identities plus one explicitly separate interrupted-case recovery observation; all completed cases are excluded. Its docs/promoter compiler phase remains unallocated. Original abort and all prior failures remain unchanged. Skills base HOLD is answered with its clean carry and exact remaining current checks. No device action.
+
 ## 2026-10-27 05:28 — Journal landed; disk recovered; Sentinel qualification active
 
 Ready for lamp-voice: no (remaining current carries active; #3622 delivered by train)
