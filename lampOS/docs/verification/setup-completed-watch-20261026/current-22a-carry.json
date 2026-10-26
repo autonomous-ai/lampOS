@@ -1,0 +1,38 @@
+{
+  "head": "ecf9fb9f4dcc805e83b12848572e81bea9487571",
+  "base": "22a2ddd7912df0b02044169a32c13d473b341ad8",
+  "all10_equal": {
+    "self_cli_exec-54a909607d4dc62b": true,
+    "functions-5603f33a4dae064e": true,
+    "self_process_cuts-c92b6688279bd59f": true,
+    "lamp_update-cebdb705cde8ec81": true,
+    "it-49911377a8fbd75d": true,
+    "round-86f3bcf98e2c5ca2": true,
+    "lamp_update-04671789528a12d3": true,
+    "install-56b9137cd677b603": true,
+    "release_pair-2ff63d2c9df235ef": true,
+    "lamp-update": true
+  },
+  "source_delta_fromc121": [
+    "docs/build-rows.md",
+    "docs/updates.md"
+  ],
+  "runtime_repeated": false,
+  "retained_actual_c121": [
+    13,
+    0,
+    0
+  ],
+  "retained_actual_aa9": [
+    412,
+    0,
+    6
+  ],
+  "complete": [
+    425,
+    0,
+    6
+  ],
+  "gates": "fmt/fivepackage strict alltarget Clippy/workspace build/testcompile passed",
+  "input_scope": "Changed docs not consumed by tests; source scanner reads unchanged Rust source. Prior native7533 oncef3/c121 preserved, new native pending."
+}

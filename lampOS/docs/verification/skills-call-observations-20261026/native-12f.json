@@ -1,0 +1,172 @@
+{
+  "pr": 3591,
+  "head": "12f677377babee495dfb890272d91bc229b2beab",
+  "base": "22a2ddd7912df0b02044169a32c13d473b341ad8",
+  "native_ci_qualified": true,
+  "review_disposition": {
+    "native_fact": "GREEN for exact corrected head and original attempt 1 only",
+    "readiness": "HOLD markers remain; this audit does not clear them or mark ready",
+    "author_hold_comment": "https://github.com/autonomous-ai/lampOS/pull/3591#issuecomment-6418155032",
+    "reviewer_two_hold_comment": "https://github.com/autonomous-ai/lampOS/pull/3591#issuecomment-6418259252",
+    "corrected_head_request": "https://github.com/autonomous-ai/lampOS/pull/3591#issuecomment-6418488792",
+    "authority_limit": "Required independent peer reads and root resolution of the author marker remain separate. The earlier 718 green run is historical only; #3525 failures and startup causality remain unresolved."
+  },
+  "original_runs": {
+    "arm64": {
+      "id": 40339169059,
+      "head_sha": "12f677377babee495dfb890272d91bc229b2beab",
+      "status": "completed",
+      "conclusion": "success",
+      "run_attempt": 1,
+      "latest_run_attempt": 1,
+      "html_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40339169059"
+    },
+    "linux-clippy": {
+      "id": 40339168860,
+      "head_sha": "12f677377babee495dfb890272d91bc229b2beab",
+      "status": "completed",
+      "conclusion": "success",
+      "run_attempt": 1,
+      "latest_run_attempt": 1,
+      "html_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40339168860"
+    }
+  },
+  "previews": {
+    "arm64": {
+      "executed_preview": "bdb1fddf579c38b08b0326a774fda87e54dc1ce4",
+      "preview_parents": [
+        "22a2ddd7912df0b02044169a32c13d473b341ad8",
+        "12f677377babee495dfb890272d91bc229b2beab"
+      ],
+      "preview_tree": "d7430634e6eed4be7e27303ed95512097dd414b7",
+      "offered_tree": "d7430634e6eed4be7e27303ed95512097dd414b7",
+      "verified": true
+    },
+    "linux-clippy": {
+      "executed_preview": "bdb1fddf579c38b08b0326a774fda87e54dc1ce4",
+      "preview_parents": [
+        "22a2ddd7912df0b02044169a32c13d473b341ad8",
+        "12f677377babee495dfb890272d91bc229b2beab"
+      ],
+      "preview_tree": "d7430634e6eed4be7e27303ed95512097dd414b7",
+      "offered_tree": "d7430634e6eed4be7e27303ed95512097dd414b7",
+      "verified": true
+    }
+  },
+  "nextest": {
+    "passed": 7515,
+    "failed": 0,
+    "leaks": 0,
+    "timeouts": 0,
+    "skipped": 53,
+    "unique_terminal_cases": 7515,
+    "repeated_equal_rows": 34,
+    "all_selected_ordinals_present": true,
+    "reported_selected_totals": [
+      7515
+    ],
+    "own_control_pass_counts": {
+      "lamp-skills::it call_wait::a_tool_call_is_answered_while_the_program_listens_on_three_topics": 1
+    },
+    "package_census": {
+      "lamp-body": 621,
+      "lamp-cloud": 196,
+      "lamp-expression": 340,
+      "lamp-keeper": 42,
+      "lamp-lean": 61,
+      "lamp-memory": 330,
+      "lamp-peek": 26,
+      "lamp-setup": 185,
+      "lamp-skills": 525,
+      "lamp-update": 409,
+      "lamp-voice": 4157,
+      "lamp-voice-eval": 623
+    },
+    "selection": [
+      "2026-10-26T14:26:17.4263811Z Changed: lamp-skills. With the crates that depend on them and the three that read other crates' files (lamp-cloud, lamp-voice-eval, lamp-update): 12 of 46 crates.",
+      "2026-10-26T14:26:17.4373297Z   PICKED: package(=lamp-body) | package(=lamp-cloud) | package(=lamp-expression) | package(=lamp-keeper) | package(=lamp-lean) | package(=lamp-memory) | package(=lamp-peek) | package(=lamp-setup) | package(=lamp-skills) | package(=lamp-update) | package(=lamp-voice) | package(=lamp-voice-eval)"
+    ],
+    "nextest_start_rows": [
+      "2026-10-26T14:26:34.0062074Z     Starting 7515 tests across 70 binaries (53 tests and 114 binaries skipped)"
+    ],
+    "native_summary": "2026-10-26T14:29:13.5725912Z      Summary [ 159.566s] 7515 tests run: 7515 passed, 53 skipped",
+    "skip_rows_logged": 0
+  },
+  "call_observations": {
+    "rows": [],
+    "startup_rows": [],
+    "sorted_rows": [],
+    "complete_ten_ordinals": false,
+    "all_responses_success": null,
+    "output_policy": "The call_wait case is not selected by a success-output override in the pinned nextest config. A native PASS does not establish that its captured successful diagnostic rows were printed. Missing rows remain unavailable; host rows are not substituted.",
+    "availability": "not emitted in successful native nextest output; all ten native timing/response rows remain unavailable",
+    "terminal_rows": [
+      "2026-10-26T14:27:08.3581942Z         PASS [   0.358s] (1983/7515) lamp-skills::it call_wait::a_tool_call_is_answered_while_the_program_listens_on_three_topics"
+    ]
+  },
+  "separate_harnesses": {
+    "doctests": {
+      "passed": 4,
+      "failed": 0,
+      "harnesses": 46
+    },
+    "turn_wire": {
+      "passed": 13,
+      "failed": 0
+    },
+    "relay_ok": 1,
+    "promoter": {
+      "passed": 25,
+      "failed": 0
+    },
+    "offline_checks": {
+      "offline_publication": {
+        "count": 35,
+        "elapsed_seconds": 0.243,
+        "okay_witnesses": 1,
+        "counts_separate_from_nextest": true
+      },
+      "artifact_provenance": {
+        "count": 12,
+        "elapsed_seconds": 0.979,
+        "okay_witnesses": 1,
+        "counts_separate_from_nextest": true
+      },
+      "publication_cli": {
+        "count": 7,
+        "elapsed_seconds": 0.43,
+        "okay_witnesses": 1,
+        "counts_separate_from_nextest": true
+      }
+    }
+  },
+  "source_bounds": {
+    "ten_calls": true,
+    "call_gap_30ms": true,
+    "catalog_deadline_20s": true,
+    "catalog_poll_50ms": true,
+    "socket_read_timeout_5s": true,
+    "median_strictly_below_25ms": true,
+    "no_diagnostic_io_in_call_cohort": true,
+    "records_buffered_after_measurement": true,
+    "no_diagnostic_io_before_first_call": true,
+    "raii_flush_on_scope_exit": true,
+    "startup_is_observed_catalog_not_ready": true
+  },
+  "raw_logs": {
+    "arm64": {
+      "path": "arm64-40339169059.log",
+      "bytes": 1876550,
+      "sha256": "69f0ee810fff1111cc63c1319d90c15e10ae06e1a6af40118f2586402a22c033"
+    },
+    "linux-clippy": {
+      "path": "linux-clippy-40339168860.log",
+      "bytes": 93286,
+      "sha256": "1c793cec2884503df1596b90817365047b62c6c7b6db062e9c0fab3685b88ca0"
+    }
+  },
+  "full_receipt": "native-40339169059.json",
+  "new_comments_after_6418488792": [],
+  "limits": "Original attempt 1 native CI only; selected packages, not all workspace runtime tests. No rerun, build, source edit, device or public post. Earlier #3525 failures remain separate and unresolved; no startup causality or latency fix inferred. Native successful-output visibility may omit the ten diagnostic rows. Required independent peer reads and root resolution of the author marker remain separate. The earlier 718 green run is historical only; #3525 failures and startup causality remain unresolved.",
+  "public_posts_by_auditor": []
+}
