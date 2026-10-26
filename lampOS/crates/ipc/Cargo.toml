@@ -6,7 +6,7 @@ rust-version.workspace = true
 publish.workspace = true
 
 [dependencies]
-rustix = { version = "1.1", features = ["time", "process", "net", "event", "pipe", "stdio"] }
+rustix = { version = "1.1", features = ["time", "process", "net", "event", "pipe", "stdio", "fs"] }
 nix = { version = "=0.29.0", default-features = false, features = ["signal"] }
 # Whether the kernel's clock is set (adjtimex), which neither the standard
 # library nor rustix asks.
