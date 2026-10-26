@@ -1,5 +1,17 @@
 # Tests work log
 
+## 2026-10-27 06:21 — Actual current Sentinel native preview passed; base carries advance
+
+Ready for lamp-voice: no (latest Mac/current-head and peer disposition pending)
+
+[Sentinel originals 40415967954 / 40415967944](verification/tests-sentinel-0c-b234-native-20261027/) passed on actual preview `5859a00f0`, ordered parents **b234 + 0c**, rather than the authored 0c/90ca whole tree. This is an explicit scope correction: six upstream Voice/memory-doc paths differ. The actual preview passed **7,546 unique cases / 0 FAIL / 0 LEAK / 0 TIMEOUT**, 53 aggregate skips. Voice contributes 3,848, including five upstream added tests. All 14 ordinary Reader controls, including the changed Linux sentinel case, pass once. Auxiliary counts remain separate. The earlier Mac four-case result retains its 0c/90ca scope.
+
+The existing [Mood f4419 native proof](verification/tests-mood-f4419-native-20261027/) now distinguishes its parser-time manifest from a separately verified post-close manifest. Only the private summary-output entry changed after the original snapshot; source, CI logs, case identities/outcomes and published history remain intact, with no replay.
+
+Clean source-only b234 carries are Mood `02485e90a`, Sentinel `8076057e8`, Restart `09132bfb0`, Skills `bd3c23b0b`. Skills' first carry stopped before rebase because its independent Git store lacked b234; an object-only fetch fixed setup, then the rebase succeeded. Carrier's active branch/source stayed unchanged. Restart's pinned 29df/90ca gate closed **21/0/0 once**, strict twelve-package/workspace, source/actual module and **238** sealed witnesses intact. Its later b234 source has no transferred runtime qualification.
+
+Mood's latest b234 compile-and-compare gate is active. The bounded static audit found no fixture-time dynamic read of the six changed paths; all eight rebuilt executable/profile/input comparisons must still pass before explicit reuse of the earlier 340/0/0 host runtime. No new test execution is authorized in that gate. The four permitted parent non-test alias inode changes were observed and pinned at this handoff, without retroactive inode claims; all originally bound attributes and four test-driver identities matched. Carrier's selected round runtime continues; compiler phase remains unallocated. No device action.
+
 ## 2026-10-27 05:58 — Current Sentinel pushed; Restart gate starts
 
 Ready for lamp-voice: no (remaining current-native/read gates pending)

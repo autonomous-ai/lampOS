@@ -1,0 +1,1427 @@
+{
+  "subject": "Original current Sentinel native CI",
+  "pull_request": 3543,
+  "head": "0c1d8bc145c5e6c117f5b2666cea9c1133bf8b29",
+  "base": "90ca725c514bbb1e4b36318d7b3ccbb14dfd05f1",
+  "status": "PASS within actual selected runtime/check scopes",
+  "collected_at_utc": "2026-10-26T23:10:46.387376+00:00",
+  "original_runs": [
+    {
+      "id": 40415967954,
+      "name": "lampOS on ARM64",
+      "event": "pull_request",
+      "status": "completed",
+      "conclusion": "success",
+      "head_sha": "0c1d8bc145c5e6c117f5b2666cea9c1133bf8b29",
+      "run_attempt": 1,
+      "html_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40415967954"
+    },
+    {
+      "id": 40415967944,
+      "name": "lampOS clippy",
+      "event": "pull_request",
+      "status": "completed",
+      "conclusion": "success",
+      "head_sha": "0c1d8bc145c5e6c117f5b2666cea9c1133bf8b29",
+      "run_attempt": 1,
+      "html_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40415967944"
+    }
+  ],
+  "actual_checkout": {
+    "preview_commit": "5859a00f08c3b7c2dd6837f6ba5b014cdc255e98",
+    "tree": "ba192af85cdd90701f50015bb5b62197a0dc7e4b",
+    "ordered_parents": [
+      "b2344a07df6b38d2736e01297999751c26e477a5",
+      "0c1d8bc145c5e6c117f5b2666cea9c1133bf8b29"
+    ],
+    "both_job_logs_match_preview": true,
+    "tracked_tree_equals_authored_head": false,
+    "bound_source_files": {
+      ".github/workflows/lampos-arm64.yml": {
+        "sha256": "43a7eef7907d272904f975d7ee65b456ec3bc4eba63505bee596d1bf196a6e74",
+        "bytes": 20675,
+        "matches_authored_immutable_Git_blob": true,
+        "matches_actual_preview_raw_source": true
+      },
+      ".github/workflows/lampos-clippy.yml": {
+        "sha256": "f979a9e8d87e8f9db255c4a9e81a51ecf7164b6b48118627578ce83722a3db92",
+        "bytes": 4688,
+        "matches_authored_immutable_Git_blob": true,
+        "matches_actual_preview_raw_source": true
+      },
+      "lampOS/.config/nextest.toml": {
+        "sha256": "c4992da8d157df279011a424b5feb4833f001fd1d46ce3edd0a56992c848bb33",
+        "bytes": 5157,
+        "matches_authored_immutable_Git_blob": true,
+        "matches_actual_preview_raw_source": true
+      },
+      "lampOS/crates/voice/src/session_reader/tests.rs": {
+        "sha256": "5f47477a111d7f82da5fdeb3b3893718099eb67a0fe93b76b4f24ddc32adce73",
+        "bytes": 36597,
+        "matches_authored_immutable_Git_blob": true,
+        "matches_actual_preview_raw_source": true
+      },
+      "lampOS/docs/realtime-tests.md": {
+        "sha256": "4b5481d7574ff3445db3d64fb502f4f3788e482fa2a560600fba31c57e53e1ca",
+        "bytes": 115505,
+        "matches_authored_immutable_Git_blob": true,
+        "matches_actual_preview_raw_source": true
+      }
+    },
+    "binary_equivalence_inferred_from_tree": false,
+    "authored_parent_base": "90ca725c514bbb1e4b36318d7b3ccbb14dfd05f1",
+    "actual_preview_base": "b2344a07df6b38d2736e01297999751c26e477a5",
+    "upstream_paths_different_from_authored": [
+      "lampOS/crates/voice/src/remember.rs",
+      "lampOS/crates/voice/src/second_provider.rs",
+      "lampOS/crates/voice/src/second_provider/tests.rs",
+      "lampOS/crates/voice/src/second_provider/tests/held_forget.rs",
+      "lampOS/docs/memory.md",
+      "lampOS/docs/second-voice.md"
+    ],
+    "scope": "Actual b234+0c merge-preview; not authored0c/90ca whole-tree qualification. Bound Reader/docs/workflows/config files equal authored blobs.",
+    "initial90ca_expectation_corrected_without_test_retry": true,
+    "source_transfer_normalization_receipt_sha256": "8e2d7e0409d50f8e2829f0e9b60e083f03e3121443b6bbf7d77b3bff91e73338"
+  },
+  "ARM64": {
+    "run": 40415967954,
+    "job": 121898257176,
+    "runner": "ubuntu-22.04-arm",
+    "release": true,
+    "profile": "pr",
+    "partition": "hash:1/1",
+    "selected_packages": [
+      "lamp-body",
+      "lamp-cloud",
+      "lamp-expression",
+      "lamp-keeper",
+      "lamp-lean",
+      "lamp-memory",
+      "lamp-peek",
+      "lamp-setup",
+      "lamp-skills",
+      "lamp-update",
+      "lamp-voice",
+      "lamp-voice-eval"
+    ],
+    "selected_tests": 7546,
+    "unique_PASS": 7546,
+    "FAIL": 0,
+    "LEAK": 0,
+    "TIMEOUT": 0,
+    "aggregate_skipped": 53,
+    "individual_SKIP_records": 0,
+    "individual_skipped_identities_emitted": false,
+    "skipped_binaries": 114,
+    "selected_binaries": 70,
+    "nonempty_execution_binary_labels": 62,
+    "nextest_seconds": 157.047,
+    "per_binary": [
+      {
+        "binary": "lamp-body",
+        "PASS": 453,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-body::bin/lamp-body",
+        "PASS": 32,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-body::bin/lamp-body-inspect",
+        "PASS": 2,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-body::bin/lamp-body-measure",
+        "PASS": 5,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-body::bin/lamp-body-mood",
+        "PASS": 3,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-body::bin/lamp-body-worker",
+        "PASS": 1,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-body::it",
+        "PASS": 125,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-cloud",
+        "PASS": 166,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-cloud::it",
+        "PASS": 30,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-expression",
+        "PASS": 27,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-expression::bin/lamp-expression",
+        "PASS": 4,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-expression::it",
+        "PASS": 281,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-expression::runtime",
+        "PASS": 28,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-keeper",
+        "PASS": 40,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-keeper::bin/lamp-keeper",
+        "PASS": 2,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-lean",
+        "PASS": 10,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-lean::it",
+        "PASS": 51,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-memory",
+        "PASS": 97,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-memory::bin/lamp-memory",
+        "PASS": 8,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-memory::bin/lamp-memory-eval",
+        "PASS": 8,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-memory::forget_person",
+        "PASS": 3,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-memory::forget_shared_exchange",
+        "PASS": 4,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-memory::forgot",
+        "PASS": 1,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-memory::health_control",
+        "PASS": 23,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-memory::it",
+        "PASS": 167,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-memory::paraphrase_fixture",
+        "PASS": 1,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-memory::voice_early_words",
+        "PASS": 1,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-memory::voice_follows_face",
+        "PASS": 1,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-memory::voice_forget",
+        "PASS": 5,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-memory::voice_forget_about",
+        "PASS": 2,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-memory::voice_forget_named",
+        "PASS": 2,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-memory::voice_link_used",
+        "PASS": 2,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-memory::voice_observe",
+        "PASS": 1,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-memory::voice_observe_forget",
+        "PASS": 1,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-memory::voice_observe_named_forget",
+        "PASS": 1,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-memory::voice_observe_room",
+        "PASS": 1,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-memory::voice_since_until",
+        "PASS": 2,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-peek",
+        "PASS": 15,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-peek::peek",
+        "PASS": 11,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-setup",
+        "PASS": 16,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-setup::it",
+        "PASS": 163,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-setup::wake",
+        "PASS": 6,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-skills",
+        "PASS": 158,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-skills::bin/lamp-skills",
+        "PASS": 23,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-skills::it",
+        "PASS": 314,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-skills::release_pair",
+        "PASS": 2,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-skills::requested_audio",
+        "PASS": 31,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-update",
+        "PASS": 123,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-update::functions",
+        "PASS": 5,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-update::install",
+        "PASS": 101,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-update::it",
+        "PASS": 13,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-update::round",
+        "PASS": 183,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-update::self-cli-exec",
+        "PASS": 1,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-update::self-process-cuts",
+        "PASS": 1,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-voice",
+        "PASS": 3848,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-voice-eval",
+        "PASS": 378,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-voice-eval::bin/lamp-voice-eval",
+        "PASS": 7,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-voice-eval::it",
+        "PASS": 238,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-voice::bin/lamp-voice",
+        "PASS": 1,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-voice::example/render_line_second",
+        "PASS": 4,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-voice::example/stop_words_stt_replay",
+        "PASS": 6,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-voice::it",
+        "PASS": 307,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      }
+    ],
+    "scope": "Twelve-package selected ordinary nextest run; workspace compilation is not full-workspace runtime qualification; custom harnesses/docs separate"
+  },
+  "execution_accounting": {
+    "window": {
+      "start_line": 819,
+      "summary_line": 8367,
+      "following_step_line": 8784,
+      "start": "2026-10-26T23:04:51.3562094Z     Starting 7546 tests across 70 binaries (53 tests and 114 binaries skipped)",
+      "summary": "2026-10-26T23:07:28.4031620Z      Summary [ 157.047s] 7546 tests run: 7546 passed, 53 skipped"
+    },
+    "records": 7546,
+    "unique_identities": 7546,
+    "unique_ordinals": 7546,
+    "execution_duplicates": 0,
+    "retry_flaky_records": 0,
+    "post_summary_reprints": 34,
+    "reprint_classification": {
+      "realtime_success_output_final": 22,
+      "privacy_worker_success_output_final": 12
+    },
+    "post_reprint_scope": "Only between nextest summary and following doc/custom step; identity/status/duration/ordinal match original and nextest final-output config; no blind dedup"
+  },
+  "changed_Linux_case": {
+    "line": 7055,
+    "timestamp": "2026-10-26T23:07:11.1264448Z",
+    "status": "PASS",
+    "seconds": 0.006,
+    "ordinal": 6236,
+    "total": 7546,
+    "binary": "lamp-voice",
+    "test": "session_reader::tests::linux::replaced_record_never_changes_an_outside_sentinel"
+  },
+  "ordinary_Reader_controls": [
+    {
+      "line": 7059,
+      "timestamp": "2026-10-26T23:07:11.1379701Z",
+      "status": "PASS",
+      "seconds": 0.006,
+      "ordinal": 6240,
+      "total": 7546,
+      "binary": "lamp-voice",
+      "test": "session_reader::tests::local_session_reader_group_is_exact_unique_and_bounded"
+    },
+    {
+      "line": 7045,
+      "timestamp": "2026-10-26T23:07:11.0897984Z",
+      "status": "PASS",
+      "seconds": 0.005,
+      "ordinal": 6226,
+      "total": 7546,
+      "binary": "lamp-voice",
+      "test": "session_reader::tests::finite_and_unset_service_never_resolve_a_reader_group"
+    },
+    {
+      "line": 7047,
+      "timestamp": "2026-10-26T23:07:11.0954403Z",
+      "status": "PASS",
+      "seconds": 0.007,
+      "ordinal": 6228,
+      "total": 7546,
+      "binary": "lamp-voice",
+      "test": "session_reader::tests::group_lookup_failure_retains_private_logging_without_writer_failure"
+    },
+    {
+      "line": 7054,
+      "timestamp": "2026-10-26T23:07:11.1229281Z",
+      "status": "PASS",
+      "seconds": 0.01,
+      "ordinal": 6235,
+      "total": 7546,
+      "binary": "lamp-voice",
+      "test": "session_reader::tests::linux::only_the_new_session_is_shared_after_one_pinned_lookup"
+    },
+    {
+      "line": 7057,
+      "timestamp": "2026-10-26T23:07:11.1322199Z",
+      "status": "PASS",
+      "seconds": 0.006,
+      "ordinal": 6238,
+      "total": 7546,
+      "binary": "lamp-voice",
+      "test": "session_reader::tests::linux::unprepared_or_wrong_group_parent_never_grants_or_changes_ancestors"
+    },
+    {
+      "line": 7053,
+      "timestamp": "2026-10-26T23:07:11.1206252Z",
+      "status": "PASS",
+      "seconds": 0.006,
+      "ordinal": 6234,
+      "total": 7546,
+      "binary": "lamp-voice",
+      "test": "session_reader::tests::linux::readable_or_linked_voice_siblings_deny_preparation_and_late_grant"
+    },
+    {
+      "line": 7051,
+      "timestamp": "2026-10-26T23:07:11.1125552Z",
+      "status": "PASS",
+      "seconds": 0.01,
+      "ordinal": 6232,
+      "total": 7546,
+      "binary": "lamp-voice",
+      "test": "session_reader::tests::linux::every_grant_failure_restores_private_modes_and_original_groups"
+    },
+    {
+      "line": 7052,
+      "timestamp": "2026-10-26T23:07:11.1141078Z",
+      "status": "PASS",
+      "seconds": 0.006,
+      "ordinal": 6233,
+      "total": 7546,
+      "binary": "lamp-voice",
+      "test": "session_reader::tests::linux::failed_private_rollback_disables_only_metadata"
+    },
+    {
+      "line": 7050,
+      "timestamp": "2026-10-26T23:07:11.1086091Z",
+      "status": "PASS",
+      "seconds": 0.007,
+      "ordinal": 6231,
+      "total": 7546,
+      "binary": "lamp-voice",
+      "test": "session_reader::tests::linux::an_earlier_reader_refusal_keeps_a_verified_private_writer"
+    },
+    {
+      "line": 7046,
+      "timestamp": "2026-10-26T23:07:11.0950383Z",
+      "status": "PASS",
+      "seconds": 0.005,
+      "ordinal": 6227,
+      "total": 7546,
+      "binary": "lamp-voice",
+      "test": "session_reader::tests::linux::a_fixture_root_retains_ancestor_mode_acl_and_path_checks"
+    },
+    {
+      "line": 7048,
+      "timestamp": "2026-10-26T23:07:11.1009425Z",
+      "status": "PASS",
+      "seconds": 0.005,
+      "ordinal": 6229,
+      "total": 7546,
+      "binary": "lamp-voice",
+      "test": "session_reader::tests::linux::access_and_default_acl_are_refused_without_stripping_or_widening_them"
+    },
+    {
+      "line": 7055,
+      "timestamp": "2026-10-26T23:07:11.1264448Z",
+      "status": "PASS",
+      "seconds": 0.006,
+      "ordinal": 6236,
+      "total": 7546,
+      "binary": "lamp-voice",
+      "test": "session_reader::tests::linux::replaced_record_never_changes_an_outside_sentinel"
+    },
+    {
+      "line": 7056,
+      "timestamp": "2026-10-26T23:07:11.1317920Z",
+      "status": "PASS",
+      "seconds": 0.009,
+      "ordinal": 6237,
+      "total": 7546,
+      "binary": "lamp-voice",
+      "test": "session_reader::tests::linux::shared_session_writer_projects_every_segment_without_private_values"
+    },
+    {
+      "line": 7049,
+      "timestamp": "2026-10-26T23:07:11.1026266Z",
+      "status": "PASS",
+      "seconds": 0.007,
+      "ordinal": 6230,
+      "total": 7546,
+      "binary": "lamp-voice",
+      "test": "session_reader::tests::linux::a_verified_failed_grant_keeps_private_original_records"
+    }
+  ],
+  "known_unrun": [
+    {
+      "test": "session_reader::tests::unsupported_acl_verification_degrades_to_private_metadata",
+      "reason": "non-Linux-only, not compiled in this Linux run"
+    },
+    {
+      "test": "session_reader::tests::linux::dedicated_reader_can_only_read_new_events_under_dropped_identity",
+      "reason": "explicit isolated-root/setpriv DAC test ignored, not enabled by this run"
+    }
+  ],
+  "auxiliary_results_separate": {
+    "promotion": [
+      {
+        "line": 490,
+        "passed": 2,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 496,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 524,
+        "passed": 22,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 532,
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 537,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      }
+    ],
+    "workspace_docs": [
+      {
+        "line": 8795,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 8801,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 8807,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 8813,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 8819,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 8827,
+        "passed": 2,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 8834,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 8840,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 8846,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 8852,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 8858,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 8864,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 8870,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 8876,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 8882,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 8889,
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 8896,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 8902,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 8908,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 8915,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 8920,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 8927,
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 8934,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 8940,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 8946,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 8952,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 8958,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 8964,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 8970,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 8976,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 8982,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 8988,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 8994,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 9000,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 9006,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 9012,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 9018,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 9024,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 9030,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 9036,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 9042,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 9048,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 9054,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 9060,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 9066,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 9072,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      }
+    ],
+    "promotion_counts": {
+      "passed": 25,
+      "failed": 0,
+      "ignored": 0
+    },
+    "workspace_doc_counts": {
+      "passed": 4,
+      "failed": 0,
+      "ignored": 0
+    },
+    "relay_signals": "ok once",
+    "process": {
+      "passed": 13,
+      "failed": 0,
+      "rows": [
+        "test an_idle_worker_stays_ready_across_a_long_quiet ... ok (2009 ms)",
+        "test a_worker_reporting_another_model_is_refused_before_any_request ... ok (2 ms)",
+        "test no_outcome_is_delivered_after_close_even_for_an_answer_on_its_way ... ok (4 ms)",
+        "test verdict_carries_identity_and_one_request_at_a_time ... ok (56 ms)",
+        "test missing_model_is_final_and_never_restarted ... ok (162 ms)",
+        "test missing_executable_fails_at_once ... ok (2 ms)",
+        "test spawn_returns_while_worker_startup_is_held ... ok (6 ms)",
+        "test startup_failures_are_final ... ok (409 ms)",
+        "test serving_failures_are_replaced_within_budget ... ok (514 ms)",
+        "test protocol_violations_are_replaced ... ok (176 ms)",
+        "test cancelled_answers_are_never_delivered ... ok (155 ms)",
+        "test close_during_inference_never_waits ... ok (233 ms)",
+        "test sustained_requests_stay_bounded ... ok (693 ms)"
+      ]
+    },
+    "not_added_to_nextest": true
+  },
+  "Linux_Clippy": {
+    "run": 40415967944,
+    "job": 121898256767,
+    "status": "success",
+    "scope": "Whole-workspace formatting/strict all-targets Clippy and separate promoter fmt/Clippy; same recorded preview",
+    "strict_command": "cargo clippy --locked --workspace --all-targets -- -D warnings"
+  },
+  "artifact": {
+    "id": 12695444368,
+    "name": "lampos-arm64-0c1d8bc145c5e6c117f5b2666cea9c1133bf8b29",
+    "size_in_bytes": 116093129,
+    "digest": "sha256:d7db0219d57b8120b5a790d385c5b55fe2b2370bd622511ddcae5b92bcfcd162",
+    "upload_log_digest": "d7db0219d57b8120b5a790d385c5b55fe2b2370bd622511ddcae5b92bcfcd162",
+    "API_and_upload_digest_agree": true,
+    "export_report": {
+      "current_workspace_binaries": 47,
+      "selected_examples": 2,
+      "checksum_file": "SHA256SUMS",
+      "uploaded_files": 50
+    },
+    "expired_at_collection": false,
+    "binary_archive_downloaded": false,
+    "ARM64_binary_executed_locally": false,
+    "individual_payload_binary_hashes_independently_verified": false
+  },
+  "limits": [
+    "No CI writes, reruns, binary download or ARM64 build/execute on Mac",
+    "Older Sentinel checks retain their old-tree scopes; this run does not qualify Mood or any future Restart source",
+    "Selected nextest counts and auxiliary counts overlap across old/current runs and are not additive"
+  ],
+  "changed_Linux_case_is_member_of_14_ordinary_Reader_controls": true,
+  "Reader_control_count_not_15": true,
+  "Mac_scope": "Separate host run4/0/0; Linux changed case was not compiled or run on Mac",
+  "no_future_Restart_qualification": true,
+  "additional_tests_from_upstream_preview": {
+    "count": 5,
+    "actual_records": [
+      {
+        "line": 6497,
+        "timestamp": "2026-10-26T23:06:57.6017765Z",
+        "status": "PASS",
+        "seconds": 0.008,
+        "ordinal": 5678,
+        "total": 7546,
+        "binary": "lamp-voice",
+        "test": "second_provider::tests::a_held_forget_their_yes_runs_owns_the_yes_words_writes"
+      },
+      {
+        "line": 6582,
+        "timestamp": "2026-10-26T23:06:58.5773248Z",
+        "status": "PASS",
+        "seconds": 0.011,
+        "ordinal": 5763,
+        "total": 7546,
+        "binary": "lamp-voice",
+        "test": "second_provider::tests::an_empty_held_line_does_not_repeat_a_carried_memory_write"
+      },
+      {
+        "line": 6612,
+        "timestamp": "2026-10-26T23:06:59.0482910Z",
+        "status": "PASS",
+        "seconds": 0.315,
+        "ordinal": 5793,
+        "total": 7546,
+        "binary": "lamp-voice",
+        "test": "second_provider::tests::held_forget::a_bare_forget_never_runs_or_holds_forget_everything"
+      },
+      {
+        "line": 6619,
+        "timestamp": "2026-10-26T23:06:59.9363803Z",
+        "status": "PASS",
+        "seconds": 0.503,
+        "ordinal": 5800,
+        "total": 7546,
+        "binary": "lamp-voice",
+        "test": "second_provider::tests::held_forget::a_refusal_now_outweighs_an_ask_before_and_a_held_yes"
+      },
+      {
+        "line": 6621,
+        "timestamp": "2026-10-26T23:06:59.9832984Z",
+        "status": "PASS",
+        "seconds": 0.006,
+        "ordinal": 5802,
+        "total": 7546,
+        "binary": "lamp-voice",
+        "test": "second_provider::tests::held_forget::only_unnegated_words_ask_to_forget_everything"
+      }
+    ],
+    "identity_comparison_reference": "Earlier f4419/90ca native audit; identity accounting only, no runtime reuse",
+    "API_upstream_patch_function_names_match": true
+  },
+  "source_scope_limits": [
+    "Whole preview tree differs from authored0c/90ca at six upstream Voice code/docs paths",
+    "Only the explicitly bound Reader/docs/workflow/config blobs are byte-equal across authored and actual preview",
+    "Separate Mac4 result remains0c/90ca; it does not clear new b234 upstream code",
+    "No future Restart source qualification or binary equivalence claim"
+  ],
+  "receipt_bindings": {
+    "ARM64-job.log": {
+      "sha256": "6868bd0dce57e24f0de1740361fee98bc6177c5bc92233caebd1f955a8b17d88",
+      "bytes": 1333846
+    },
+    "Linux-clippy-job.log": {
+      "sha256": "8044999ce5a87484c18025405ddda9ba6302f3d9cece27ce50ac8d12e0d30995",
+      "bytes": 47297
+    },
+    "run-40415967954-final.json": {
+      "sha256": "5a8b14d10334589d2f1892b88c629be4a3e7a4db5ce7f3e396cd5beb2a6128cf",
+      "bytes": 12734
+    },
+    "run-40415967944-final.json": {
+      "sha256": "36b7f92cdec4f320e613010d396cf02adceae201a936e198980ef7b270862c24",
+      "bytes": 12733
+    },
+    "arm-jobs-final.json": {
+      "sha256": "2f195c033a5bb45faf9be505439ebc86227dfee6d11d04deea1aee972dca898c",
+      "bytes": 3310
+    },
+    "linux-jobs-final.json": {
+      "sha256": "c3afa3b095260ef6c63a95645cfc0db86e112708615270bfff3476ec72a2bbf4",
+      "bytes": 1315
+    },
+    "execution-identities.json": {
+      "sha256": "74eb1670f0ab1027a59e430b585a9e43ae02f89f62ff3e1a5896721d17b58441",
+      "bytes": 2152965
+    },
+    "execution-window.json": {
+      "sha256": "e9b8de33680d104d450c7ae69a60d94ec66ea65cb0821744fe1a1413f26b718d",
+      "bytes": 311
+    },
+    "final-output-reprints.json": {
+      "sha256": "cc820fe283ad927cc690a3c2838687259968555f8fe603354fe7cd7c7f49ae98",
+      "bytes": 23749
+    },
+    "auxiliary-audit.json": {
+      "sha256": "2a81f6860154639fab6fb46d679e33ffd19c7ef9bd27c46af567be1f56b1c468",
+      "bytes": 8016
+    },
+    "collection-manifest.json": {
+      "sha256": "ff39133fbffec903c67b363671d064a21a4488dbf5005d51e265eff4c849d648",
+      "bytes": 5264
+    },
+    "audit.py": {
+      "sha256": "d99191895ce267e8518ecf91fdf2d6159260ea3deabdebc96cd6cf92f480ef7b",
+      "bytes": 14798
+    },
+    "watch-results.json": {
+      "sha256": "3fb2fdd8012a8f4f4fc014a41e87d688743a06f8770fdb2561013603a8fc13a2",
+      "bytes": 555
+    },
+    "preview-vs-authored.json": {
+      "sha256": "f618e1eed8d15cd1423f275855667c3785556d2b64a7ffa5b3b3c77e9ef3065b",
+      "bytes": 74351
+    },
+    "preview-scope-correction.json": {
+      "sha256": "796aad944e7acef765cdeda90f1a31a273244d947111b223b31b120924454602",
+      "bytes": 860
+    },
+    "source-transfer-normalization.json": {
+      "sha256": "8e2d7e0409d50f8e2829f0e9b60e083f03e3121443b6bbf7d77b3bff91e73338",
+      "bytes": 1739
+    },
+    "collection-manifest-final.json": {
+      "sha256": "10daf0b7ca2cdea9cbe30d59acf561c1eedd881c58b81ddb2200ff7528b2844b",
+      "bytes": 5540
+    }
+  },
+  "separate_host_proof": {
+    "path": "lampOS/docs/verification/tests-sentinel-90ca-20261027",
+    "commit": "6f1b71b24034282bb0ef3daac92cfbd4df77f459",
+    "audit_sha256": "3200ee2f800c0a04ce726b8e3db4fea02e16bbc507648f2a8c7cdc4382170dc0",
+    "head": "0c1d8bc145c5e6c117f5b2666cea9c1133bf8b29",
+    "base": "90ca725c514bbb1e4b36318d7b3ccbb14dfd05f1",
+    "Mac_counts": {
+      "passed": 4,
+      "failed": 0,
+      "ignored": 0
+    },
+    "scope": "Four Mac Reader cases only; no full Voice, b234 whole-source or Restart qualification"
+  },
+  "collection_manifest_scope": "Original parser-time manifest is retained as historical producer snapshot; audit.stdout was still being emitted there. Separate final manifest was made only after parser/watch/output closure and every included file hash rechecked. No binary/test/CI execution repeated."
+}

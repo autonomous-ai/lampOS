@@ -1366,7 +1366,28 @@
     "watch-results.json": {
       "sha256": "11ff59083a2c1fe153af898fa59a2f9efd7682276da75a4369b8462e2d730b54",
       "bytes": 555
+    },
+    "collection-manifest-final.json": {
+      "sha256": "604be310c54527f55e072c2ee915ca44e045451d51b82d9182409ec1da1b0000",
+      "bytes": 5267
     }
   },
-  "receipt_scope": "Exported read-only API/log audit; no independent binary reexecution or payload checksum verification."
+  "receipt_scope": "Exported read-only API/log audit; no independent binary reexecution or payload checksum verification.",
+  "collection_manifest_clarification": {
+    "original_parser_time_manifest": {
+      "sha256": "7421b65f6788b71c0b5a393c577eab0fde90ba77126d145c2cc38f81fce2dce0",
+      "retained_unchanged": true,
+      "scope": "Producer-time snapshot; audit.stdout was still being emitted, so that summary entry does not bind its completed bytes."
+    },
+    "post_close_verification_manifest": {
+      "sha256": "604be310c54527f55e072c2ee915ca44e045451d51b82d9182409ec1da1b0000",
+      "all_included_file_hashes_and_sizes_rechecked_after_parser_watcher_output_closure": true,
+      "audit_stdout_final_sha256": "de9f188cdc191cf02772f9693815557ade516ef5fd0fbbcd2b499bac9deed047"
+    },
+    "only_post_snapshot_changed_entry": "audit.stdout",
+    "CI_logs_source_identity_census_receipts_unchanged": true,
+    "CI_or_test_outcome_change": false,
+    "CI_or_test_replay": false,
+    "prior_published_history_preserved": true
+  }
 }
