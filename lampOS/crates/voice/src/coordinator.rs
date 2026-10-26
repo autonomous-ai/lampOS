@@ -7090,8 +7090,9 @@ fn conversation_with_gate_inner(
                             && current.cloud.session == session
                     }) {
                         // Keep the receipt out of Reply's destructor until the
-                        // real owner has been revoked and published. No PCM
-                        // ever received is the only automatic retry case.
+                        // real owner has been revoked and published. This
+                        // deferral retries only before any PCM; admitted user
+                        // interruption has its separate qualified boundary.
                         let mut reminder =
                             reply.as_mut().and_then(|current| current.reminder.take());
                         cancel_reply(owner, reply, trace, "reminder_deferred")?;
@@ -8983,6 +8984,7 @@ fn conversation_with_gate_inner(
                             turn_blocks.extend(loose_blocks.drain(..).map(|(_, level)| level));
                             continue;
                         }
+                        let mut interrupted = take_interrupted_reminder(reply);
                         let (state, draining) =
                             accepted_without_cloud(accepted, owner, reply, &mut admission, trace)?;
                         provider_queue.clear();
@@ -8990,6 +8992,9 @@ fn conversation_with_gate_inner(
                         submission_draining = draining;
                         snapshot = state;
                         rig.publish(snapshot)?;
+                        if let Some(receipt) = &mut interrupted {
+                            receipt.interrupted_after_owner_fenced();
+                        }
                         last_publish = monotonic_us();
                         continue;
                     };
@@ -9235,6 +9240,7 @@ fn conversation_with_gate_inner(
                                 // same, and the rest of the utterance is
                                 // drained, as for any input it cannot take.
                                 let displaced = reply.as_ref().map(|current| current.owner);
+                                let mut interrupted = take_interrupted_reminder(reply);
                                 cancel_reply(owner, reply, trace, "user_interrupted")?;
                                 admission.discard_stream_until_end(monotonic_us())?;
                                 submission_draining = true;
@@ -9252,6 +9258,9 @@ fn conversation_with_gate_inner(
                                 )?;
                                 snapshot = owner.snapshot(now())?;
                                 rig.publish(snapshot)?;
+                                if let Some(receipt) = &mut interrupted {
+                                    receipt.interrupted_after_owner_fenced();
+                                }
                             }
                         }
                         last_publish = monotonic_us();
@@ -13018,6 +13027,7 @@ fn commit_admitted_input(
     let prefix = accepted.audio;
     let replacing = reply.is_some();
     let over_the_lamps_voice = lamps_voice_heard(reply.as_ref());
+    let mut interrupted = take_interrupted_reminder(reply);
     cancel_reply(owner, reply, trace, "user_interrupted")?;
     let input = if replacing {
         AdmittedInput::Interruption
@@ -13137,6 +13147,11 @@ fn commit_admitted_input(
         publish(snapshot)?;
     }
     *reply = Some(current);
+    // The old owner is revoked, its queues cleared, and the replacement
+    // authority successfully published. Only this known interruption retries.
+    if let Some(receipt) = &mut interrupted {
+        receipt.interrupted_after_owner_fenced();
+    }
     Ok(snapshot)
 }
 
@@ -13160,6 +13175,7 @@ fn commit_offline_input(
     mut publish: impl FnMut(Snapshot) -> io::Result<()>,
 ) -> Result<Snapshot> {
     let replacing = reply.is_some();
+    let mut interrupted = take_interrupted_reminder(reply);
     cancel_reply(owner, reply, trace, "user_interrupted")?;
     let input = if replacing {
         AdmittedInput::Interruption
@@ -13224,6 +13240,11 @@ fn commit_offline_input(
         publish(snapshot)?;
     }
     *reply = Some(current);
+    // The old owner is revoked, its queues cleared, and the replacement
+    // authority successfully published. Only this known interruption retries.
+    if let Some(receipt) = &mut interrupted {
+        receipt.interrupted_after_owner_fenced();
+    }
     Ok(snapshot)
 }
 
@@ -13413,6 +13434,7 @@ fn continue_after_early_end(
     trace: &mut SessionState,
     mut publish: impl FnMut(Snapshot) -> io::Result<()>,
 ) -> Result<Snapshot> {
+    let mut interrupted = take_interrupted_reminder(reply);
     cancel_reply(owner, reply, trace, "user_interrupted")?;
     *speaker_pending = None;
     provider_queue.clear();
@@ -13492,6 +13514,11 @@ fn continue_after_early_end(
         )?;
     }
     *reply = Some(current);
+    // The old owner is revoked, its queues cleared, and the replacement
+    // authority successfully published. Only this known interruption retries.
+    if let Some(receipt) = &mut interrupted {
+        receipt.interrupted_after_owner_fenced();
+    }
     Ok(snapshot)
 }
 
@@ -14035,6 +14062,19 @@ fn record_input_rejection(trace: &mut SessionState, rejection: Rejection) -> Res
         json!({"kind":"input_candidate_rejected", "candidate":rejection.candidate,
         "reason":rejection.reason, "at_us":monotonic_us()}),
     )
+}
+
+/// Retain only an otherwise live reminder across a positively admitted
+/// interruption. A known provider failure can still have unretired output;
+/// its normal Reply drop must keep that uncertain attempt held. Taking a
+/// receipt proves no fence: the caller settles it only after cancellation,
+/// queue clearing and successful authority publication, or drops it on error.
+fn take_interrupted_reminder(reply: &mut Option<Reply>) -> Option<crate::reminders::Receipt> {
+    let current = reply.as_mut()?;
+    if matches!(current.cloud.outcome, Some(RequestOutcome::Failed { .. })) {
+        return None;
+    }
+    current.reminder.take()
 }
 
 fn cancel_reply(

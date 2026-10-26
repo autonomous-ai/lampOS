@@ -1765,3 +1765,31 @@ not playing or ready, and may be refused. No new round trip, wait, timer
 or playback authority is added. Target: no additional I/O or scheduling
 on the confirmation path. Model wording and acoustic latency remain lamp
 acceptance, not established by prompt-context assertions.
+
+## A known reminder interruption returns the same occurrence (26 October 2026)
+
+V1 `system/schedule/runner.go` postpones busy delivery and retries a failed
+occurrence on a later tick; its successful handoff is not proof of hearing.
+Keep the useful retry behavior while retaining V2's stronger completion rule:
+only the whole provider/speaker retirement join can acknowledge an occurrence.
+Reuse the existing `OwnerFenced` retirement and durable consumer retry path.
+A new admitted user turn may retire a partly spoken reminder only after old
+output is cancelled and cleared and replacement authority publishes successfully.
+Do not generalize ordinary receipt Drop, provider failure, privacy cancellation,
+clock reset or crash uncertainty into permission to retry in the same process.
+
+This adds no worker, protocol field, dependency, I/O or waiting to input
+admission. The receipt operation only queues the existing consumer command.
+The latency target is no additional capture opportunity on interruption;
+retry retains the five-second attempt pace and all current silence/readiness
+gates. The bounded consumer and durable Schedule occurrence remain the owners
+of later delivery. Synthetic coordinator and ledger controls do not establish
+acoustic timing, word repetition or physical stop behavior; the lamp replay
+must check interruption followed by conversation and later reminder delivery.
+
+The reminder interruption review keeps another conservative boundary: any
+qualified own generation retirement prevents automatic retry. The last words
+may already have played even without a provider terminal join. This also holds
+multi-generation output interrupted after an earlier generation retired;
+no whole-turn completion or Ack is inferred. The live same-pump final-retirement
+control stays held, while accepted/unretired audio still retries after fencing.

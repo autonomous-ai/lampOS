@@ -298,7 +298,7 @@ impl<P: Persistence> Consumer<P> {
                 self.retry.insert(token.key.clone(), (token.clone(), proof));
                 self.journal.item(
                     &token.key,
-                    "not said: given back before any of it played, to be offered again",
+                    "not completed: this attempt can no longer speak, to be offered again",
                 );
             }
             ToWorker::Abandon { .. } => {

@@ -693,6 +693,53 @@ fn a_settled_reminder_finishes_before_the_live_loop_admits_its_successor() {
 }
 
 #[test]
+fn an_interruption_after_reminder_retirement_stays_held_without_ack_or_retry() {
+    use super::provider_terminal::{ReminderBoundary, reminder_admission};
+    // The sole generation's final retirement and onset arrive in the same
+    // pump, but no provider terminal join authorizes a completed receipt.
+    let run = reminder_admission(ReminderBoundary::NoTerminal);
+    assert_eq!(run.starts.len(), 1, "real successor admitted");
+    assert_eq!(run.starts[0].0, 2);
+    assert_eq!(run.audio[0], (1, 1), "successor's first words kept");
+    assert_eq!(run.retirement_sent_at_us, run.onset_at_us);
+    assert!(
+        matches!(run.settlement, ToWorker::Abandon { .. }),
+        "a reminder with its own retired audio must stay held, not retry or Ack"
+    );
+    assert!(matches!(run.answers.as_slice(),
+        [Answer::Begun(_), Answer::Done(Outcome::Dropped(reason))]
+            if reason == "user_interrupted"));
+}
+
+#[test]
+fn a_user_interrupted_reminder_is_retired_for_retry_after_successor_admission() {
+    use super::provider_terminal::{ReminderBoundary, reminder_admission};
+    let boundary = ReminderBoundary::Unretired;
+    let run = reminder_admission(boundary);
+    assert_eq!(run.starts.len(), 1, "{boundary:?}: real successor admitted");
+    assert_eq!(run.starts[0].0, 2);
+    assert_eq!(run.audio[0], (1, 1), "{boundary:?}: first words kept");
+    let ToWorker::Retire { token, proof } = run.settlement else {
+        panic!("{boundary:?}: known user interruption must retry after fencing");
+    };
+    assert_eq!(proof.correlation, token.correlation);
+    assert!(matches!(
+        proof.basis,
+        lamp_schedule::delivery::RetirementBasis::OwnerFenced { turn: 1, .. }
+    ));
+    assert!(matches!(run.answers.as_slice(),
+        [Answer::Begun(_), Answer::Done(Outcome::Dropped(reason))]
+            if reason == "user_interrupted"));
+    assert!(
+        !run.trace
+            .iter()
+            .any(|event| event["kind"] == "turn_finished"
+                && event["turn"] == 1
+                && event["outcome"] == "completed")
+    );
+}
+
+#[test]
 fn the_live_reminder_boundary_keeps_incomplete_failed_reset_and_private_delivery_unacknowledged() {
     use super::provider_terminal::{ReminderBoundary, reminder_admission};
     use crate::say::{Answer, Outcome};
@@ -705,8 +752,13 @@ fn the_live_reminder_boundary_keeps_incomplete_failed_reset_and_private_delivery
         ReminderBoundary::Privacy,
     ] {
         let run = reminder_admission(boundary);
+        let retries = matches!(boundary, ReminderBoundary::Unretired);
         assert!(
-            matches!(run.settlement, ToWorker::Abandon { .. }),
+            if retries {
+                matches!(run.settlement, ToWorker::Retire { .. })
+            } else {
+                matches!(run.settlement, ToWorker::Abandon { .. })
+            },
             "{boundary:?}"
         );
         assert!(
@@ -737,7 +789,7 @@ fn the_live_reminder_boundary_keeps_incomplete_failed_reset_and_private_delivery
         }
         if boundary == ReminderBoundary::Unretired {
             // The fixture delivers the exact old retirement after it has seen
-            // the successor Start. It cannot revive the abandoned receipt or
+            // the successor Start. It cannot revive the retired receipt or
             // emit another completion for the old owner.
             assert_eq!(old_finished[0]["outcome"], "user_interrupted");
             let admitted_at = run
@@ -1805,4 +1857,115 @@ fn a_pulse_switched_on_without_the_asleep_face_says_why_once() {
             "{line}"
         );
     }
+}
+
+#[test]
+fn offline_user_interruption_retries_only_after_successful_authority_publication() {
+    for publish_fails in [false, true] {
+        let mut test = Test::new();
+        let chunk = test.generation(17);
+        test.accept(&chunk, 120);
+        let mut admission = InputAdmission::default();
+        let decision = local_policy_decision(
+            &mut test.owner,
+            &mut admission,
+            Verdict::Accept(AcceptanceBasis::DirectedSessionVadOnly),
+        );
+        let accepted = accepted_decision(decision, &mut test.trace)
+            .unwrap()
+            .unwrap();
+        let mut queue = VecDeque::new();
+        let result = commit_offline_input(
+            &mut test.owner,
+            &mut test.reply,
+            &mut test.pending,
+            &mut queue,
+            accepted,
+            PlayoutStart::default(),
+            false,
+            &mut test.trace,
+            |snapshot| {
+                assert_ne!(snapshot.owner(), Some(chunk.permit.owner()));
+                if publish_fails {
+                    Err(io::Error::other("injected authority publication failure"))
+                } else {
+                    Ok(())
+                }
+            },
+        );
+        assert_eq!(result.is_err(), publish_fails);
+        assert!(queue.is_empty(), "offline input never reaches a provider");
+        if publish_fails {
+            assert!(matches!(
+                test.probe.settlement(),
+                Some(ToWorker::Abandon { .. })
+            ));
+        } else {
+            assert!(matches!(
+                test.probe.settlement(),
+                Some(ToWorker::Retire { .. })
+            ));
+        }
+    }
+}
+
+#[test]
+fn user_interruption_cannot_retry_a_failed_provider_with_unretired_audio() {
+    let clock = crate::scenario_clock::Scope::enter(Duration::from_secs(24)).unwrap();
+    clock.set_pump(|_| Ok(())).unwrap();
+    let mut test = Test::new();
+    let answered = test.ask_skill();
+    let chunk = test.generation(17);
+    test.accept(&chunk, 120);
+    let request = test.reply.as_ref().unwrap().owner.turn();
+    observe_provider_output(
+        &mut CloudAvailability::default(),
+        &mut test.reply,
+        &ProviderOutput::TurnFailed {
+            request,
+            stage: crate::provider_worker::FailedStage::AwaitingResponse,
+            reason: crate::provider_worker::Fault::Transport,
+        },
+    )
+    .unwrap();
+    assert!(matches!(
+        test.reply.as_ref().unwrap().cloud.outcome,
+        Some(RequestOutcome::Failed { .. })
+    ));
+    assert!(!test.reply.as_ref().unwrap().settled(&test.pending));
+    let mut admission = InputAdmission::default();
+    let decision = local_policy_decision(
+        &mut test.owner,
+        &mut admission,
+        Verdict::Accept(AcceptanceBasis::DirectedSessionVadOnly),
+    );
+    let accepted = accepted_decision(decision, &mut test.trace)
+        .unwrap()
+        .unwrap();
+    let mut queue = VecDeque::new();
+    commit_offline_input(
+        &mut test.owner,
+        &mut test.reply,
+        &mut test.pending,
+        &mut queue,
+        accepted,
+        PlayoutStart::default(),
+        false,
+        &mut test.trace,
+        |snapshot| {
+            assert_ne!(snapshot.owner(), Some(chunk.permit.owner()));
+            Ok(())
+        },
+    )
+    .unwrap();
+    assert!(matches!(
+        test.probe.settlement(),
+        Some(ToWorker::Abandon { .. })
+    ));
+    assert!(
+        matches!(answered.try_recv(), Ok(Answer::Done(Outcome::Dropped(reason)))
+        if reason == "user_interrupted")
+    );
+    assert!(queue.is_empty());
+    assert!(test.pending.is_none());
 }

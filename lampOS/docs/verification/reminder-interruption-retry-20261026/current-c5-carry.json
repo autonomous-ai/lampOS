@@ -1,0 +1,10 @@
+{
+  "qualified_base": "2a353bfdb05f42548a82ec5374485f463d88ebac",
+  "current_base": "1fa9ae1b9288b9d4080fbef79723aa4ad6970486",
+  "patch_sha256": "0468043f3877eb1bbf8164dabafd18dbb0fee2b6f607fa9d7b2345aacb649a38",
+  "source_differences": [
+    "lampOS/docs/build-rows.md"
+  ],
+  "all_other_qualified_sources_identical": true,
+  "qualification": "Full gates retain actual 2a stack identity; only score-document changed on current c5 fixture carry. Fresh original native PR gate required."
+}

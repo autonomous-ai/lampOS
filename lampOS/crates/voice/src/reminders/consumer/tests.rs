@@ -893,6 +893,116 @@ fn qualified_pre_audio_retirement_retries_once_with_a_new_durable_correlation() 
     );
 }
 
+#[test]
+fn interrupted_owner_retry_keeps_old_proof_out_of_the_new_attempt_and_ack() {
+    let (engine, socket) = served(1);
+    let mut consumer = consumer(Disk::default());
+    let first = begin(&mut consumer, &engine, &socket);
+    let now = lamp_ipc::monotonic_us();
+    consumer
+        .command(
+            ToWorker::Retire {
+                token: first.token.clone(),
+                proof: QualifiedRetirement {
+                    correlation: first.token.correlation.clone(),
+                    retired_by_session: SESSION.into(),
+                    basis: RetirementBasis::OwnerFenced {
+                        owner_boot: [7; 16],
+                        turn: 1,
+                        microphone_generation: 1,
+                    },
+                },
+            },
+            now,
+        )
+        .unwrap();
+    assert_eq!(consumer.next_offer_us, now + PACE_US);
+    assert!(
+        consumer
+            .journal
+            .lines
+            .last()
+            .unwrap()
+            .contains("this attempt can no longer speak")
+    );
+    consumer.outgoing.clear();
+    let report = due(&engine.lock().unwrap(), now);
+    consumer.tick(&socket.path(), Some(&report), now).unwrap();
+    no_offer(&consumer);
+    assert!(
+        consumer
+            .ledger
+            .view(&first.token.key)
+            .unwrap()
+            .unwrap()
+            .completion
+            .is_none()
+    );
+    assert!(
+        socket
+            .requests()
+            .iter()
+            .all(|request| !matches!(request, Request::Ack { .. }))
+    );
+    // The pacing boundary above is tested without a five-second host sleep.
+    // The next offer still reads the real current Schedule item and commits
+    // the replacement token before any sound can be admitted.
+    consumer.next_offer_us = 0;
+    let next = begin(&mut consumer, &engine, &socket);
+    assert_eq!(next.token.key, first.token.key);
+    assert!(next.token.attempt > first.token.attempt);
+    assert_ne!(next.token.correlation, first.token.correlation);
+    assert!(
+        consumer
+            .command(
+                ToWorker::Complete {
+                    token: first.token.clone(),
+                    proof: completion(&first.token),
+                },
+                now
+            )
+            .is_err()
+    );
+    assert_eq!(consumer.current.as_ref().unwrap().token, next.token);
+    assert!(
+        socket
+            .requests()
+            .iter()
+            .all(|request| !matches!(request, Request::Ack { .. }))
+    );
+    consumer
+        .command(
+            ToWorker::Complete {
+                token: next.token.clone(),
+                proof: completion(&next.token),
+            },
+            now,
+        )
+        .unwrap();
+    consumer.outgoing.clear();
+    let now = lamp_ipc::monotonic_us();
+    let report = due(&engine.lock().unwrap(), now);
+    consumer.tick(&socket.path(), Some(&report), now).unwrap();
+    assert_eq!(engine.lock().unwrap().counts(&sample(1000)), (0, 0, 0));
+    assert_eq!(
+        socket
+            .requests()
+            .iter()
+            .filter(|request| matches!(request, Request::Ack { .. }))
+            .count(),
+        1
+    );
+    assert!(matches!(
+        consumer
+            .ledger
+            .view(&next.token.key)
+            .unwrap()
+            .unwrap()
+            .resolution,
+        Some(Resolution::AckConfirmed { .. })
+    ));
+}
+
 fn complete_current(
     consumer: &mut Consumer<Disk>,
     engine: &Arc<Mutex<Engine<Disk>>>,
