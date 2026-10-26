@@ -1,3 +1,9 @@
+## 2026-10-26 22:32 — controlled-probe base label corrected
+
+Ready for lamp-voice: no
+
+Direct Git inspection proves actual1adcbe08c runtime parent7d0017f08, not2d18 as the earlier folder-derived label said. Corrected packet/README retain this erratum; the entirelampOS subtree2d18..7d is identical, and outcomes/head/hashes are unchanged. The initial clean48compiler qualification remainsc584/e672. No rerun or causal clearance.
+
 ## 2026-10-26 22:31 — controlled Routine expiry established
 
 Ready for lamp-voice: no

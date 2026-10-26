@@ -1,6 +1,6 @@
 # Controlled Routine transport expiry
 
-Pinned base: e672ee214. This is an isolated test-only follow-up to the unpublished probe claimed on #3545, and to the retained #3525 538-pass/4-fail/9-ignored host qualification. It does not replace #3545's addon commits.
+Initial compiler base: e672ee214. Actual controlled runtime: 1adcbe08c on 7d0017f08. This is an isolated test-only follow-up to the unpublished probe claimed on #3545, and to the retained #3525 538-pass/4-fail/9-ignored host qualification. It does not replace #3545's addon commits.
 
 The paired case uses fresh Manager fixtures, one subscriber each, and the same 700 ms monotonic host stall. The publisher keeps its default 500 ms Event transport lifespan in the first arm; only the second arm overrides future transport headers to 5 s. Synthetic Manager time, request payload deadlines, production declaration, and the ordinary 50 ms receive bound remain fixed. A queued datagram is observed without consuming it, so the same subscriber later supplies expiry counters and delivery. No additional receiver races the primary observation.
 
@@ -12,4 +12,6 @@ Fresh dedicated target: third-routine-expiry-target, bound permanently to physic
 
 Controlled expiry can establish a mechanism for recv(None). It cannot retrospectively identify the phase or cause of the historical failures, whose original logs lacked those observations. Historical outcomes remain retained separately.
 
-Observed result: the exact pair passed 1/0 at 1adcbe08c/2d18. Both publications were delivered; the 500 ms event was discarded with expired 0→1, while the 5 s event delivered its exact queued payload with expired unchanged. Both Manager times and deadlines were preserved. Five unexecuted saved drivers get no runtime credit. This is host evidence, not an old-failure causal clearance or device result.
+Observed result: the exact pair passed 1/0 at 1adcbe08c/7d0017f08. Both publications were delivered; the 500 ms event was discarded with expired 0→1, while the 5 s event delivered its exact queued payload with expired unchanged. Both Manager times and deadlines were preserved. Five unexecuted saved drivers get no runtime credit. This is host evidence, not an old-failure causal clearance or device result.
+
+Provenance correction: the first packet used the older scratch folder’s 2d18 label as the base. Direct Git parent inspection proves the actual runtime parent is 7d0017f08; the complete lampOS subtrees at both bases are identical. Outcome, source head and artifact hashes are unchanged.

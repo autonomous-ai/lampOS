@@ -1,6 +1,6 @@
 {
   "head": "1adcbe08c65bb25b9ff28aba5fa04d865ef27303",
-  "base": "2d18e296c0a51ac0f6fb7c610c3c159cef9870c4",
+  "base": "7d0017f08ec2a6c709012e6b3754bd414148cb48",
   "result": [
     1,
     0,
@@ -102,5 +102,6 @@
   "test_source_sha256": "8008ebb53ee3a40c1ef62e16ff1bfe279b1f64b7126abf5030525e0d7a751fb0",
   "fresh_bank": "48 local packages rebuilt with compiler fresh=false at initialc584/e672, then actual cachedcurrentcarry flags retained; source and all six actual/preserved executables stable at runtime.",
   "scope": "Only library driver executed; five other copied executables get no runtime credit.",
-  "limits": "Controlled mechanism only; historical #3525 538/4/9 and #3545 521/1/9 remain failed, with no proved historical phase/expiry cause. No device or product timing change."
+  "limits": "Controlled mechanism only; historical #3525 538/4/9 and #3545 521/1/9 remain failed, with no proved historical phase/expiry cause. No device or product timing change.",
+  "provenance_correction": "Initial packet8d24e66e8 labeled the parent2d18 from a scratch folder name. Directgit parent inspection proves actualruntime1adc/7d; entirelampOS subtree at2d18 and7d is identical. Outcomes/sourcehead/hashes unchanged."
 }
