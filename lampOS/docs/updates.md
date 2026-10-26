@@ -739,7 +739,15 @@ the units a build carries for this lamp by name, and with
 `LAMP_UPDATE_APPLY=on` the product's settings and tmpfiles the build
 carries (below, "Settings and tmpfiles"), and its product skills from
 `lamp-product-skills` (above); otherwise a product lamp
-gets a new product skill or switch when `lamp-update install` is run again. `check` never writes, whatever `--apply` says. `once` and `check` end with
+gets a new product skill or switch when `lamp-update install` is run again. A
+round by hand (`once`) takes the units the build carries for `--lamp`, the
+lamp's own name unless given: on a product-installed lamp that also has dev
+units of its own name in the build (lamp-4ace's and lamp-52e6's, with their
+hash-pinned paths), those are taken and refused ("the build's
+lamp-actions.service does not start /opt/lampOS/actions/ through its current
+link"), and `--lamp lamp-0000`, a name with no units of its own, takes the
+product's (lamp-52e6 with 7071, the lead's agent, 26 Oct). A customer lamp's
+name has none, so this is only a test lamp's. `check` never writes, whatever `--apply` says. `once` and `check` end with
 0 (up to date, switched, or only saying), 1 (refused, put back, failed), 3
 (the channel cannot be reached), 4 (no quiet moment); a wrong option with 2.
 `serve` prints a round's outcome only when it differs from the last. The
