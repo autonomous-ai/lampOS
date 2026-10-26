@@ -53,8 +53,10 @@ pub struct Plan {
     pub wipe: Vec<PathBuf>,
     /// Run before the wipe: the lamp's parts stopped (`lamp-keeper stop
     /// lamp`, or `systemctl stop lampos.target` on a lamp put on by
-    /// `lamp-update install`, which has no keeper). If it fails, the lamp reboots without wiping, into setup,
-    /// which finishes the wipe with nothing running.
+    /// `lamp-update install`, which has no keeper, run with each part of
+    /// the target named: [`waited_stop`]). If it fails, the lamp reboots
+    /// without wiping, into setup, which finishes the wipe with nothing
+    /// running.
     pub stop: Vec<String>,
     /// Run after the wipe.
     pub reboot: Vec<String>,
@@ -240,6 +242,9 @@ pub fn accept(event: &TouchEvent, clock_id: &str, now_us: u64) -> Result<(), &'s
 /// What the reset does outside the filesystem. Injected for tests.
 pub trait Effects {
     fn run(&mut self, argv: &[String]) -> io::Result<()>;
+    /// What a command that only reads printed: the parts of the lamp's
+    /// target ([`waited_stop`]).
+    fn read(&mut self, argv: &[String]) -> io::Result<String>;
     fn sync(&mut self);
     /// The last resort when the reboot command fails: a lamp left dark with
     /// no marker must still come back, into setup.
@@ -255,6 +260,17 @@ impl Effects for System {
             Ok(())
         } else {
             Err(io::Error::other(format!("{} ended with {status}", argv[0])))
+        }
+    }
+    fn read(&mut self, argv: &[String]) -> io::Result<String> {
+        let output = Command::new(&argv[0]).args(&argv[1..]).output()?;
+        if output.status.success() {
+            Ok(String::from_utf8_lossy(&output.stdout).into_owned())
+        } else {
+            Err(io::Error::other(format!(
+                "{} ended with {}",
+                argv[0], output.status
+            )))
         }
     }
     fn sync(&mut self) {
@@ -377,6 +393,44 @@ pub fn wipe(path: &Path) -> io::Result<()> {
     Ok(())
 }
 
+/// The plan's stop, with every part of each target it stops named too, so
+/// that it returns only once each part has stopped. `systemctl stop
+/// lampos.target` alone returns as soon as the target's own job is done,
+/// before its parts have stopped (systemd 252 on lamp-4ace on 26 Oct: 0.04 s,
+/// and a part's write on stop 3.1 s later), so a part that writes as it stops
+/// wrote back into what the reset had just emptied: on lamp-29e7 that day,
+/// Voice's onboarding commit kept the factory session's steps through the
+/// reset, and the customer got no first five minutes. Named, each part's
+/// stop job is waited for. The parts are systemd's `ConsistsOf` of the
+/// target, every unit `PartOf` it. A stop that is not `systemctl stop`
+/// (`lamp-keeper stop lamp`) is the plan's as it is.
+pub fn waited_stop(stop: &[String], effects: &mut impl Effects) -> io::Result<Vec<String>> {
+    let systemctl = stop
+        .first()
+        .is_some_and(|program| Path::new(program).file_name() == Some("systemctl".as_ref()));
+    if !systemctl || stop.get(1).map(String::as_str) != Some("stop") {
+        return Ok(stop.to_vec());
+    }
+    let mut argv = stop.to_vec();
+    for target in stop[2..].iter().filter(|unit| unit.ends_with(".target")) {
+        let show = [
+            stop[0].clone(),
+            "show".into(),
+            "-p".into(),
+            "ConsistsOf".into(),
+            "--value".into(),
+            target.clone(),
+        ];
+        for part in effects.read(&show)?.split_whitespace() {
+            // A unit's name, never an option.
+            if !part.starts_with('-') && !argv.iter().any(|unit| unit == part) {
+                argv.push(part.to_owned());
+            }
+        }
+    }
+    Ok(argv)
+}
+
 /// Begin a reset: journal, remove the marker, stop the lamp, wipe, reboot.
 /// If the stop fails, reboot at once without wiping: setup finishes the wipe
 /// at the next start, before anything of the lamp can run again.
@@ -389,7 +443,12 @@ pub fn reset(plan: &Plan, effects: &mut impl Effects) -> io::Result<Vec<Step>> {
         steps.push(Step::MarkerRemoved);
     }
     effects.sync();
-    if effects.run(&plan.stop).is_err() {
+    // Parts that cannot be read are as a stop that fails: nothing is wiped
+    // while one may still be running.
+    if waited_stop(&plan.stop, effects)
+        .and_then(|stop| effects.run(&stop))
+        .is_err()
+    {
         reboot(plan, effects, &mut steps);
         return Ok(steps);
     }
