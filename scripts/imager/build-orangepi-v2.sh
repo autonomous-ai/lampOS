@@ -151,6 +151,13 @@ update-alternatives --set regulatory.db.p7s /lib/firmware/regulatory.db.p7s-upst
 [ "\$(readlink /etc/alternatives/regulatory.db)" = /lib/firmware/regulatory.db-upstream ] \\
   || { echo "regulatory.db is not the upstream one" >&2; exit 1; }
 
+# The hardware team's base has /etc 0775. Parts that trust a root-owned setting check every
+# ancestor for group or other write, so lamp-records refused /etc/lampOS/records.json
+# ("untrusted JSON file directory", lamp-dbda 26 Oct). V1's lamps have /etc 0755.
+chown root:root /etc
+chmod 0755 /etc
+[ "\$(stat -c %a /etc)" = 755 ] || { echo "/etc is not 0755" >&2; exit 1; }
+
 # Disable IPv6, as V1's image does (STA drops).
 mkdir -p /etc/sysctl.d
 cat > /etc/sysctl.d/99-lamp-wifi.conf <<'SYSCTL'
