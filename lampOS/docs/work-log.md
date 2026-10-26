@@ -1,3 +1,13 @@
+Ready for lamp-voice: own-keys current CI pending; reset support read handed to its owner.
+
+## Current checkpoint: 2026-10-26 18:19 +07, reset barrier source support
+
+[Primary-source support](verification/reset-stop-order-source-20261026/README.md) explains why the reset's successful target stop alone may not establish completion of Voice's propagated stop. systemd 252 watches requested unit jobs, while target/service stop ordering reverses startup order. Product source already includes the onboarding wipe path. This supports Third's candidate and delayed-stop regression, not a reproduced cause on the affected lamp. Third retains the repair; no device action or product edit by Second.
+
+#3510 current head 20bc7d626e remains under original ARM64/Clippy audit with its activation HOLD unchanged. Local gates are recorded below; no CI result is inferred from them.
+
+---
+
 Ready for lamp-voice: #3510 current software CI pending; activation HOLD unchanged.
 
 ## Current checkpoint: 2026-10-26 18:14 +07, current own-keys carry pushed
