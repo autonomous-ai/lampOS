@@ -1,0 +1,19 @@
+{
+  "head": "aa7cf9029ef051ee5770837ccaed4ffc646cd74f",
+  "command": [
+    "<preserved-driver>/fix-install",
+    "--test-threads=16",
+    "--nocapture"
+  ],
+  "returncode": 0,
+  "signal": null,
+  "timed_out": false,
+  "elapsed_seconds": 384.15718399999605,
+  "driver_sha256_before": "3231dd2981e85ca4f9f4d966f51c7de52d70a351f75bbb7961e3a4b6b729d4e3",
+  "driver_sha256_after": "3231dd2981e85ca4f9f4d966f51c7de52d70a351f75bbb7961e3a4b6b729d4e3",
+  "sources_unchanged": true,
+  "driver_reaped": true,
+  "process_group_absent": true,
+  "ambient_load": "Setup four-thread durable-runtime gate finished before this run; latest compiler gate may run concurrently",
+  "log_sha256": "27025480871d2c21d8911d917dfc9ed3865a241d7221551cb63fcf93a7232f85"
+}

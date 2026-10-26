@@ -18,6 +18,16 @@ the earlier durable suite, but ambient compiler load may differ.
 The receipts retain actual driver hashes, log hashes, durations and unchanged
 source checks. Original logs, executable copies, diagnostic patches and source
 manifests remain in private builder scratch. No retry, deadline increase,
-assertion relaxation or product durability change was used. The exact blocking
-operation is not yet established; a separate bounded stage trace is running.
+assertion relaxation or product durability change was used. The individual blocking syscall is not established. The separate stage trace
+shows all five preflights completed in 154–396 ms; builds and links took
+7.8–17.2 seconds, and unit installation was unfinished at the cutoff.
 This is host fixture evidence, not lamp performance or acceptance.
+
+The fix at 32cc833686 on aa7cf9029 keeps the four refusal watchdogs and
+runs five safe compatibility cases through ordinary fresh-install execution,
+with all original assertions. Formatting, strict Update Clippy, workspace
+build and full parallel-16 install passed: 101/0/0, 383.49 seconds libtest,
+384.16 seconds outer runner, within its 900-second bound. All five positive
+cases produced libtest over-60-second notices; no exact individual duration
+is claimed. The source/driver stayed fixed and owned processes were reaped.
+The three original failed runs remain failed; no retry erased them.

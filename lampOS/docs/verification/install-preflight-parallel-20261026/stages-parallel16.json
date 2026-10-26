@@ -1,0 +1,19 @@
+{
+  "head": "1aa409fcbdd1f1c32ae3bb9ad6698f83453dde68",
+  "command": [
+    "<preserved-driver>/stages-install",
+    "--test-threads=16",
+    "--nocapture"
+  ],
+  "returncode": 101,
+  "signal": null,
+  "timed_out": false,
+  "elapsed_seconds": 363.2196399999957,
+  "driver_sha256_before": "ecab5473865cb8eb88a00a1b2057ca5902f675fac604e3a96b188a4600bad2c5",
+  "driver_sha256_after": "ecab5473865cb8eb88a00a1b2057ca5902f675fac604e3a96b188a4600bad2c5",
+  "sources_unchanged": true,
+  "driver_reaped": true,
+  "process_group_absent": true,
+  "ambient_load": "Setup four-thread durable-runtime gate finished before this run; latest compiler gate may run concurrently",
+  "log_sha256": "208ef668668e34b33264b51d2261da61e05fb30b360c3930d05b6b3c41bf2714"
+}

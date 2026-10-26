@@ -13,6 +13,24 @@ machine is explicitly named. Third has no lamp access.
 
 
 
+## 2026-10-26 17:10 — Parallel preflight fixture repair pushed
+
+Ready for lamp-voice: no (#3574, native gates and reads pending)
+
+**32cc833686/aa7cf9029** changes only install tests and their documentation.
+Four refusal cases retain owned-child 15/5-second bounds. Five safe cases
+retain full fresh installs and every assertion, under the ordinary suite
+bound rather than the unrelated 30-second full-installer limit.
+
+Formatting, strict Update Clippy, workspace build and one full parallel-16
+install run pass **101/0/0**, 383.49 s libtest / 384.16 s wrapper. All nine
+cases pass; each positive case produced an over-60-second libtest notice.
+Source/driver hashes remain fixed and the process group is gone. No exact
+per-case timing, product durability change or device acceptance is claimed.
+[Method and original failures](verification/install-preflight-parallel-20261026/README.md),
+[fixed runtime](verification/install-preflight-parallel-20261026/fix-parallel16.json),
+[compiler gates](verification/install-preflight-parallel-20261026/fix-gates.json).
+
 ## 2026-10-26 17:08 — Native qualification and image-only carries
 
 Ready for lamp-voice: no (new carries require their current gates)

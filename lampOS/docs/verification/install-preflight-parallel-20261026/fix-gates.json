@@ -1,0 +1,36 @@
+{
+  "head": "aa7cf9029ef051ee5770837ccaed4ffc646cd74f",
+  "target": "./.claude/worktrees/third-reminder-carry-target",
+  "checks": [
+    {
+      "command": "cargo fmt --manifest-path lampOS/Cargo.toml --all --check",
+      "cwd": "fixture worktree root",
+      "exit": 0,
+      "log": "fix-fmt.log"
+    },
+    {
+      "command": "cargo clippy --locked -q -p lamp-update --all-targets --message-format=short -- -D warnings",
+      "cwd": "lampOS",
+      "exit": 0,
+      "log": "fix-clippy.log"
+    },
+    {
+      "command": "cargo build --locked -q --workspace",
+      "cwd": "lampOS",
+      "exit": 0,
+      "log": "fix-workspace-build.log"
+    },
+    {
+      "command": "cargo test --locked -p lamp-update --test install --no-run --message-format=json-render-diagnostics",
+      "cwd": "lampOS",
+      "exit": 0,
+      "log": "fix-test-build.stderr"
+    }
+  ],
+  "runtime": "single full install target --test-threads=16 --nocapture;900s external bound",
+  "changed_files": [
+    "lampOS/crates/update/tests/install.rs",
+    "lampOS/docs/updates.md"
+  ],
+  "driver_sha256": "3231dd2981e85ca4f9f4d966f51c7de52d70a351f75bbb7961e3a4b6b729d4e3"
+}

@@ -1,0 +1,269 @@
+{
+  "terminal_counts": {
+    "passed": 96,
+    "failed": 5,
+    "ignored": 0
+  },
+  "cases": [
+    {
+      "case": "DanglingSymlink",
+      "post_ready_ms": 30762,
+      "finished": false,
+      "reaped": "SIGKILL",
+      "phases": [
+        {
+          "phase": "entered",
+          "elapsed_ms": 0
+        },
+        {
+          "phase": "newest-done",
+          "elapsed_ms": 39
+        },
+        {
+          "phase": "lock-done",
+          "elapsed_ms": 95
+        },
+        {
+          "phase": "preflight-done",
+          "elapsed_ms": 154
+        },
+        {
+          "phase": "state-done",
+          "elapsed_ms": 229
+        },
+        {
+          "phase": "users-done",
+          "elapsed_ms": 455
+        },
+        {
+          "phase": "builds-start",
+          "elapsed_ms": 474
+        },
+        {
+          "phase": "builds-done",
+          "elapsed_ms": 7847
+        },
+        {
+          "phase": "links-done",
+          "elapsed_ms": 12272
+        },
+        {
+          "phase": "units-start",
+          "elapsed_ms": 12425
+        }
+      ],
+      "last_installer_phase": {
+        "phase": "units-start",
+        "elapsed_ms": 12425
+      }
+    },
+    {
+      "case": "NullMask",
+      "post_ready_ms": 30324,
+      "finished": false,
+      "reaped": "SIGKILL",
+      "phases": [
+        {
+          "phase": "entered",
+          "elapsed_ms": 0
+        },
+        {
+          "phase": "newest-done",
+          "elapsed_ms": 170
+        },
+        {
+          "phase": "lock-done",
+          "elapsed_ms": 264
+        },
+        {
+          "phase": "preflight-done",
+          "elapsed_ms": 396
+        },
+        {
+          "phase": "state-done",
+          "elapsed_ms": 490
+        },
+        {
+          "phase": "users-done",
+          "elapsed_ms": 831
+        },
+        {
+          "phase": "builds-start",
+          "elapsed_ms": 1019
+        },
+        {
+          "phase": "builds-done",
+          "elapsed_ms": 8855
+        },
+        {
+          "phase": "links-done",
+          "elapsed_ms": 14527
+        },
+        {
+          "phase": "units-start",
+          "elapsed_ms": 14605
+        }
+      ],
+      "last_installer_phase": {
+        "phase": "units-start",
+        "elapsed_ms": 14605
+      }
+    },
+    {
+      "case": "Missing",
+      "post_ready_ms": 30532,
+      "finished": false,
+      "reaped": "SIGKILL",
+      "phases": [
+        {
+          "phase": "entered",
+          "elapsed_ms": 0
+        },
+        {
+          "phase": "newest-done",
+          "elapsed_ms": 93
+        },
+        {
+          "phase": "lock-done",
+          "elapsed_ms": 226
+        },
+        {
+          "phase": "preflight-done",
+          "elapsed_ms": 284
+        },
+        {
+          "phase": "state-done",
+          "elapsed_ms": 321
+        },
+        {
+          "phase": "users-done",
+          "elapsed_ms": 322
+        },
+        {
+          "phase": "builds-start",
+          "elapsed_ms": 323
+        },
+        {
+          "phase": "builds-done",
+          "elapsed_ms": 8445
+        },
+        {
+          "phase": "links-done",
+          "elapsed_ms": 15275
+        },
+        {
+          "phase": "units-start",
+          "elapsed_ms": 15376
+        }
+      ],
+      "last_installer_phase": {
+        "phase": "units-start",
+        "elapsed_ms": 15376
+      }
+    },
+    {
+      "case": "RegularSymlink",
+      "post_ready_ms": 30467,
+      "finished": false,
+      "reaped": "SIGKILL",
+      "phases": [
+        {
+          "phase": "entered",
+          "elapsed_ms": 0
+        },
+        {
+          "phase": "newest-done",
+          "elapsed_ms": 76
+        },
+        {
+          "phase": "lock-done",
+          "elapsed_ms": 169
+        },
+        {
+          "phase": "preflight-done",
+          "elapsed_ms": 306
+        },
+        {
+          "phase": "state-done",
+          "elapsed_ms": 417
+        },
+        {
+          "phase": "users-done",
+          "elapsed_ms": 714
+        },
+        {
+          "phase": "builds-start",
+          "elapsed_ms": 805
+        },
+        {
+          "phase": "builds-done",
+          "elapsed_ms": 10158
+        },
+        {
+          "phase": "links-done",
+          "elapsed_ms": 17191
+        },
+        {
+          "phase": "units-start",
+          "elapsed_ms": 17309
+        }
+      ],
+      "last_installer_phase": {
+        "phase": "units-start",
+        "elapsed_ms": 17309
+      }
+    },
+    {
+      "case": "Regular",
+      "post_ready_ms": 30488,
+      "finished": false,
+      "reaped": "SIGKILL",
+      "phases": [
+        {
+          "phase": "entered",
+          "elapsed_ms": 0
+        },
+        {
+          "phase": "newest-done",
+          "elapsed_ms": 38
+        },
+        {
+          "phase": "lock-done",
+          "elapsed_ms": 169
+        },
+        {
+          "phase": "preflight-done",
+          "elapsed_ms": 267
+        },
+        {
+          "phase": "state-done",
+          "elapsed_ms": 379
+        },
+        {
+          "phase": "users-done",
+          "elapsed_ms": 730
+        },
+        {
+          "phase": "builds-start",
+          "elapsed_ms": 824
+        },
+        {
+          "phase": "builds-done",
+          "elapsed_ms": 9897
+        },
+        {
+          "phase": "links-done",
+          "elapsed_ms": 16758
+        },
+        {
+          "phase": "units-start",
+          "elapsed_ms": 16914
+        }
+      ],
+      "last_installer_phase": {
+        "phase": "units-start",
+        "elapsed_ms": 16914
+      }
+    }
+  ]
+}
