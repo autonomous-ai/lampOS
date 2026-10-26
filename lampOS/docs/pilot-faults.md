@@ -341,6 +341,22 @@ Two of the voice's start-up failures, found on lamp-52e6 and lamp-4ace on
   100 ms bound, and a refused message names its socket (for example
   `capture.c.p: stale, …`). A receiver held up later in its run is #784's
   (`HELD_UP_US`), separate from this.
+- **The first direct capture-ready message while the speaker starts.** On
+  build 6963 after setup, lamp-dbda reported `ref.c.speaker` sequence 1
+  after 0, aged 143402 us against 100000 us, then restarted muted (#3530).
+  The report does not establish why that message was delayed. Unlike the
+  worker control channel, the direct reference channel had no startup
+  allowance. Its speaker now accepts only the initial, in-order
+  `CapturePrepared` with the same less-than-1-second startup age bound.
+  A wrong boot, future stamp or noninitial sequence does not gain this
+  allowance. Prime acknowledgements, subsequent controls and reference
+  data retain their existing bounds and receiver/single-sender stall rules.
+  Capture readiness grants no playback authority: the fresh authority,
+  privacy generation and completed prime are still required. The restart
+  guard is unchanged. Deterministic socket cases cover the reported age,
+  upper boundary and refused alternatives; the Linux null-device worker
+  witness can establish message consumption, not successful acoustic
+  startup. An assembled-lamp setup repeat remains required for acceptance.
 - **The provider's input, late in order.** On lamp-4ace at 05:08 on 19 Oct
   the voice ended on `provider.d.w: stale, reordered or wrong-boot runtime
   message (sequence 3916 after 3915, sent 100181 us before now, bound 100000
