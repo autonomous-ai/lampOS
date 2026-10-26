@@ -13,6 +13,15 @@ machine is explicitly named. Third has no lamp access.
 
 
 
+## 2026-10-26 13:08 — Factory guard has both independent reads
+
+Ready for lamp-voice: yes (#3546)
+
+**e96296097** remains on current **cced42943**. Reviewer-two and
+Reviewer-three both post exact-head READ-OK, each independently running
+all 86 shell controls; the latter uses bash 3.2. Native gates remain green
+as the receipt below records. NEXT TRAIN requested. No device acceptance.
+
 ## 2026-10-26 13:05 — Add-on journal independent read
 
 Ready for lamp-voice: reader result only (#3545)
