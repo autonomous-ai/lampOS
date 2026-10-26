@@ -1,0 +1,28 @@
+{
+  "member_pr": 3546,
+  "member": "0038db8cf1447ffa6e719ba701a53748e2113641",
+  "train_pr": 3549,
+  "train_head": "9aaefb05954693278e9cc6fee7d0889108172e6a",
+  "authored_blobs": {
+    "lampOS/deploy/factory/steps-test.sh": {
+      "member": "661938c275bcea068e60f56f60c649d98a8388f2",
+      "train": "661938c275bcea068e60f56f60c649d98a8388f2"
+    },
+    "lampOS/deploy/factory/steps.sh": {
+      "member": "db5e34995108ffc5d8d9e0b45eb4daa9dedd3c8b",
+      "train": "db5e34995108ffc5d8d9e0b45eb4daa9dedd3c8b"
+    },
+    "lampOS/docs/install.md": {
+      "member": "9932830edb61eaa78ff58c47fe8f12757a67d6a0",
+      "train": "9932830edb61eaa78ff58c47fe8f12757a67d6a0"
+    }
+  },
+  "all_equal": true,
+  "limits": "Three factory authored blobs only. Does not establish whole-train composition or qualify native execution.",
+  "separate_review_hold": {
+    "source": "Parent forwarded Queue comment6409766245",
+    "member_pr": 3544,
+    "finding": "R2 old-head independent full Voice:4085 PASS/1 FAIL/21 ignored; unchanged privacy lease-reader exhausted10 attempts, cause unproved; Tests owns. Both changed hand cases pass.",
+    "status": "Not waived by factory blob equality or factory native CI; no whole-train readiness claim."
+  }
+}

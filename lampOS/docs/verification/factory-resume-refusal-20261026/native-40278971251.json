@@ -1,0 +1,86 @@
+{
+  "pr": 3546,
+  "offered_head": "0038db8cf1447ffa6e719ba701a53748e2113641",
+  "offered_base": "d5dc2e87f9a64ae8d21992145d3960035582e6cc",
+  "arm64_run": 40278971251,
+  "linux_clippy_run": 40278971282,
+  "arm64_attempt": 1,
+  "linux_clippy_attempt": 1,
+  "arm64_conclusion": "success",
+  "linux_clippy_conclusion": "success",
+  "previews": {
+    "linux-clippy": {
+      "executed_preview": "550b025365d466f52fd1e65f00857a5a4566db36",
+      "preview_parents": [
+        "d5dc2e87f9a64ae8d21992145d3960035582e6cc",
+        "0038db8cf1447ffa6e719ba701a53748e2113641"
+      ],
+      "preview_tree": "ff60cb5ec43a6c27a3375ea973ccb68675148a6f",
+      "offered_tree": "ff60cb5ec43a6c27a3375ea973ccb68675148a6f",
+      "preview_equals_offered_tree": true
+    },
+    "arm64": {
+      "executed_preview": "550b025365d466f52fd1e65f00857a5a4566db36",
+      "preview_parents": [
+        "d5dc2e87f9a64ae8d21992145d3960035582e6cc",
+        "0038db8cf1447ffa6e719ba701a53748e2113641"
+      ],
+      "preview_tree": "ff60cb5ec43a6c27a3375ea973ccb68675148a6f",
+      "offered_tree": "ff60cb5ec43a6c27a3375ea973ccb68675148a6f",
+      "preview_equals_offered_tree": true
+    }
+  },
+  "passed": 11361,
+  "failed": 0,
+  "leaks": 0,
+  "timeouts": 0,
+  "skipped": 106,
+  "unique_terminal_cases": 11361,
+  "repeated_equal_rows": 35,
+  "all_selected_ordinals_present": true,
+  "reported_selected_totals": [
+    11361
+  ],
+  "own_control_pass_counts": {},
+  "terminal_findings": [],
+  "native_summary": "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-26T06:36:27.5318084Z      Summary [ 211.363s] 11361 tests run: 11361 passed, 106 skipped",
+  "all_pass_audit": true,
+  "raw_logs": {
+    "linux-clippy": {
+      "path": "/Users/d/code/autonomous-os/.claude/worktrees/third-factory-resume-evidence/native-40278971251/linux-clippy-40278971282.log",
+      "bytes": 89770,
+      "sha256": "5f979ee29f02fecb97ac8db8d32fcc7af3d8cbd3f57ff8b5e95e30945efb6f81"
+    },
+    "arm64": {
+      "path": "/Users/d/code/autonomous-os/.claude/worktrees/third-factory-resume-evidence/native-40278971251/arm64-40278971251.log",
+      "bytes": 2736937,
+      "sha256": "a0d20f7bd3e1fe6ada742c8dece19ba2a99cc6761c6116210f42b254df48fdf4"
+    }
+  },
+  "qualified": true,
+  "limits": "Original 0038db8cf factory-resume carry on d5dc2e87f only; prior native run remains separate. No Rust controls added; shell 86-case suite is separate and not counted here. No local tests, workflow retries, device, provider or physical-latency claims.",
+  "turn_wire_custom_harness": {
+    "passed": 13,
+    "failed": 0,
+    "control_pass_counts": {
+      "an_idle_worker_stays_ready_across_a_long_quiet": 1,
+      "a_worker_reporting_another_model_is_refused_before_any_request": 1,
+      "no_outcome_is_delivered_after_close_even_for_an_answer_on_its_way": 1,
+      "verdict_carries_identity_and_one_request_at_a_time": 1,
+      "missing_model_is_final_and_never_restarted": 1,
+      "missing_executable_fails_at_once": 1,
+      "spawn_returns_while_worker_startup_is_held": 1,
+      "startup_failures_are_final": 1,
+      "serving_failures_are_replaced_within_budget": 1,
+      "protocol_violations_are_replaced": 1,
+      "cancelled_answers_are_never_delivered": 1,
+      "close_during_inference_never_waits": 1,
+      "sustained_requests_stay_bounded": 1
+    },
+    "summary": [
+      "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-26T06:36:43.9722482Z test result: 13 passed; 0 failed"
+    ],
+    "counts_separate_from_nextest": true,
+    "qualified": true
+  }
+}

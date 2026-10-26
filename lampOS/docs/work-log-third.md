@@ -13,6 +13,22 @@ machine is explicitly named. Third has no lamp access.
 
 
 
+## 2026-10-26 13:38 — Preserve native factory result across docs-base carry
+
+Ready for lamp-voice: no (#3546)
+
+On **0038db8cf/d5dc2e87f**, ARM64 **40278971251** passes 11,361 unique
+cases, zero failures/leaks/timeouts, 106 skips; Linux **40278971282** and
+all legacy checks pass. Exact preview **550b02536** has correct parents
+and offered tree. Turn-wire 13/0 and factory 86/0 are separate.
+[Native receipt](verification/factory-resume-refusal-20261026/native-40278971251.json).
+Train 160's three factory files equal this head, but its #3544 privacy
+fixture HOLD remains unwaived; the closed train is not delivery.
+
+Docs-only train 161 advanced the base to **9e5d3b9c6**. Current local
+factory **3c54671c0** and reminder **ce75aa0a9** are equal-patch carries;
+latest-base gates run before pushing. The prior receipts are not relabelled.
+
 ## 2026-10-26 13:30 — Trusted-tier limits documentation read
 
 Ready for lamp-voice: reader result only (#3550)
