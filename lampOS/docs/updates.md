@@ -135,8 +135,13 @@ Its envelope is an exact copy of the selected release's signed bytes. The
 signed channel stays `lamp-voice`, and `files_url` still names the original
 immutable `lampos-lamp-voice-<sequence>` release. Stable is a selection feed,
 not a new signature or sequence namespace. A lamp pointed at it still uses
-`--channel lamp-voice`; changing the product unit's feed is a separate
-activation decision. This tool does not install anything on a lamp.
+`--channel lamp-voice`. The product unit (`deploy/product/lamp-update.service`)
+and the V2 image's default (`scripts/imager/build-orangepi-v2.sh`) follow it
+from the first customer lamps on (26 Oct): a lamp in a home gets a build only
+once it is promoted here, never each lamp-voice publish, and a lamp the image
+makes starts on the promoted build. Until a first promotion the feed is absent
+and such a lamp keeps the build it has. This tool does not install anything on
+a lamp.
 
 The verified stable head can only advance. Repeating the same sequence and
 identical envelope is a no-op; a lower sequence or different bytes at the
