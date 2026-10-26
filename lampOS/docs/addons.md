@@ -650,10 +650,9 @@ is at most 4,096 bytes, and the link takes about one batch a second):
   10 ms blocks cannot cross the link. What was said reaches the computer as
   `voice/heard`. A recording on request is a later piece, the Harness
   team's to carry.
-- **A message over 4,096 bytes** (a long turn, a memory read) is cut into
-  numbered parts the service reassembles on the other side, or, if Harness
-  will not take that, journaled and dropped as `too_big`; nothing is
-  rewritten to fit.
+- **A message over 4,096 bytes** (a long turn, a memory read) is sent in
+  parts, with the same envelope a long say uses (below, "Long says, in
+  parts"), and the add-on reassembles it. Nothing is rewritten to fit.
 
 ### What it may propose
 
@@ -661,12 +660,61 @@ The same `addon/proposal` contract, stamped `own-<computer>` by the
 service, never taken from the computer's words:
 
 - `light` and `say`, as for a partner. A `say`'s `note` is the trusted
-  computer's own words, at most 300 bytes on one line, said by the voice
-  quoted, without functions and kept out of memory (part 2c's route).
+  computer's own words, said by the voice quoted, without functions and
+  kept out of memory (part 2c's route). One proposal's `note` is at most
+  300 bytes on one line, as today. A longer say comes in parts (below).
 - **Rates, to be measured on a lamp:** one kept say a minute and 20 an
   hour for that computer, at most one waiting for a decision; its says do
   not count within the partners' 4 an hour. After a drop, 30 s before the
   next is kept.
+
+### Long says, in parts
+
+300 bytes, about 50 words, is too little for what the trusted computer is
+for: a summary of a channel or a meeting is a few sentences. The limit
+appears in three places on the lamp: `ADDON_NOTE_BYTES` (`crates/msgs/src/addon.rs`),
+the say service's `MOST_QUOTED_BYTES` (`crates/voice/src/say.rs`) and the
+remote `note` row above. The voice's model takes a note of up to
+`MAX_NOTE_BYTES`, 1,024 bytes (`crates/gemini/src/wire.rs`). So the parts
+stay small enough to pass every check on the way, and only the trusted
+tier's whole say is longer:
+
+- **The envelope.** Each part is one `addon.proposal` with `act: say` and
+  `params.part = {id, n, of}`. `id` is the computer's (at most 32
+  characters, letters, digits and `-`), `n` runs from 1 to `of`, and `of`
+  is at most 14. Each part's `note` is at most 300 bytes on one line, so
+  each part passes today's per-proposal checks unchanged. The whole say is
+  at most 4,096 bytes, about 650 words.
+- **Gathering.** The service gathers parts by `(computer, id)`. They may
+  arrive in any order; a repeated `n` with the same words is ignored, and
+  one with other words drops the say as `part_changed`. The say is complete
+  when every `n` up to `of` is in. If it is not complete 10 s after its
+  first part, the whole say is dropped as `incomplete`; nothing is said
+  from part of it. One say is gathered at a time for each computer. A
+  second `id` while one is open is dropped as `busy`.
+- **One decision.** The complete say becomes one `AddonProposal` from
+  `own-<computer>`, and the judge decides once for all of it. `holdsMs` is
+  counted from the last part. It counts as one say in the trusted tier's
+  rates, whatever its length, and the decision goes back once, with the
+  `id`.
+- **Speaking it.** The voice says it in turns of at most 1,024 bytes, one
+  `MAX_NOTE_BYTES` note each, made of whole parts in order. A part is never
+  cut. The computer should end each part at the end of a sentence, so each
+  turn ends at a natural point. Between turns the voice waits the same
+  pause task news waits for (`PAUSE_US`, 1 s). If someone speaks, or says
+  "stop" (`stop/heard`), the rest is dropped, and the decision gets
+  `stopped` with the last part said, so the computer knows what was heard.
+- **Only for the trusted tier.** A partner's say stays one proposal of at
+  most 300 bytes. The service drops a `params.part` from any other
+  computer as `not_for_partner`.
+- **Code.** The constants above stay as they are for proposals. The new
+  pieces are `params.part` in `crates/msgs` (a schema change, landed with
+  its readers), the service's gathering, and a say-service request for a
+  trusted say of up to 4,096 bytes from the trusted tier only.
+- **Open:** whether Harness's own `addon.proposal` `note` has a limit
+  below 300 bytes. That limit is Harness's, not the lamp's, and isn't
+  stated in this file. If it is lower, a part's `note` is at most that
+  limit, and `of` grows to keep 4,096 bytes.
 
 ### What stays the same
 
