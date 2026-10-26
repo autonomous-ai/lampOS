@@ -1,0 +1,41 @@
+{
+  "head": "be8e4c9bc4b86156bda5b980742ff734676e87d6",
+  "base": "bdc277e2667e11ab04daf60e25f8f9fcf8220dce",
+  "scope": "first restricted library driver only; remaining drivers unrun",
+  "result": [
+    138,
+    20,
+    0
+  ],
+  "cause_observation": "PermissionDenied/Operation not permitted at Unix socket binds in preserved failure excerpts; execution sandbox blocked fixture setup",
+  "terminal": {
+    "head": "be8e4c9bc4b86156bda5b980742ff734676e87d6",
+    "command": [
+      "cargo",
+      "+1.96.0",
+      "test",
+      "--offline",
+      "--locked",
+      "-p",
+      "lamp-skills",
+      "--",
+      "--nocapture",
+      "--test-threads=1"
+    ],
+    "returncode": 101,
+    "signal": null,
+    "deadline_seconds": 2400,
+    "timed_out": false,
+    "elapsed_seconds": 4.345144427999999,
+    "driver_reaped": true,
+    "process_group_absent": true,
+    "process_group_absent_before_cleanup": true,
+    "forced_cleanup": false,
+    "pid": 42037,
+    "source_unchanged": true,
+    "six_actual_and_preserved_executables_unchanged": true,
+    "log_sha256": "34b889afd81eae4db1daa79195b9a817aa70ed6147c9d6303c282e7539e5c916"
+  },
+  "raw_log_hash": "34b889afd81eae4db1daa79195b9a817aa70ed6147c9d6303c282e7539e5c916",
+  "next": "Separate socket-capable attempt from same frozen source/six preimages; no overwritten log and no historical failure erased."
+}

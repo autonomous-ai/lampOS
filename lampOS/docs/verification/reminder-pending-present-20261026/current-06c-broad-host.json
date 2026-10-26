@@ -1,0 +1,191 @@
+{
+  "head": "06c42ba1f36a69fcc33e6774692f47c423dffba8",
+  "base": "008e7a9746e7ddd58e951f8ea919a7d8beebb5ef",
+  "distinct_top_level_drivers": 70,
+  "aggregate_top_level": [
+    7479,
+    0,
+    52
+  ],
+  "doctest_summaries": 12,
+  "doctest_aggregate": [
+    0,
+    0,
+    0
+  ],
+  "nested_memory_self_invocation": [
+    1,
+    0,
+    0
+  ],
+  "raw_summary_rows": 83,
+  "raw_aggregate": [
+    7480,
+    0,
+    52
+  ],
+  "control_count": 21,
+  "control_matches": "All 21 canonical controls pass once; two multiline completions verified before next test starts.",
+  "panic_hooks": {
+    "total": 32,
+    "intentional_or_expected": 31,
+    "unexpected_passing_case": 1,
+    "known_detached_actions_mock": "skills/tests/it/skills.rs:3074; #3604 separate fix"
+  },
+  "gates": {
+    "fmt": 0,
+    "clippy": 0,
+    "build": 0,
+    "test-compile": 0
+  },
+  "terminal": {
+    "additional_cleanup_budget_seconds": 15,
+    "all_actual_and_saved_bytes_unchanged": true,
+    "all_compiled_drivers_observed": true,
+    "at": "2026-10-26T18:16:03.263122+00:00",
+    "base": "008e7a9746e7ddd58e951f8ea919a7d8beebb5ef",
+    "before_cleanup": {
+      "at": "2026-10-26T18:15:55.044281+00:00",
+      "driver_reaped": true,
+      "interruption": null,
+      "process_group": {
+        "state": "absent"
+      },
+      "returncode": 0,
+      "timed_out": false
+    },
+    "captured_executable_paths": 133,
+    "command": [
+      "cargo",
+      "+1.96.0",
+      "test",
+      "--offline",
+      "--locked",
+      "-p",
+      "lamp-skills",
+      "-p",
+      "lamp-cloud",
+      "-p",
+      "lamp-body",
+      "-p",
+      "lamp-expression",
+      "-p",
+      "lamp-keeper",
+      "-p",
+      "lamp-lean",
+      "-p",
+      "lamp-memory",
+      "-p",
+      "lamp-peek",
+      "-p",
+      "lamp-setup",
+      "-p",
+      "lamp-update",
+      "-p",
+      "lamp-voice",
+      "-p",
+      "lamp-voice-eval",
+      "--",
+      "--nocapture",
+      "--test-threads=1"
+    ],
+    "controller_error": null,
+    "deadline_seconds": 10800,
+    "driver_reaped": true,
+    "elapsed_seconds": 3385.375080979,
+    "first_failure_summary": null,
+    "forced_cleanup": false,
+    "head": "06c42ba1f36a69fcc33e6774692f47c423dffba8",
+    "interruption": null,
+    "limits": [
+      "No automatic retries or completion of unobserved drivers.",
+      "Custom harness and rustdoc summaries remain separate raw observations.",
+      "Process-group checks do not establish absence of a descendant that deliberately creates another session.",
+      "SIGKILL of this controller cannot execute its cleanup handler."
+    ],
+    "log_sha256": "d42dba41329a012aa3318d3be52c2c995e5b52819d40f7fe24645648dc6ed863",
+    "observed_driver_starts": 70,
+    "parents": [
+      "008e7a9746e7ddd58e951f8ea919a7d8beebb5ef"
+    ],
+    "process_group": {
+      "state": "absent"
+    },
+    "qualified": true,
+    "returncode": 0,
+    "signal": null,
+    "source_check_error": null,
+    "source_unchanged": true,
+    "target": "./.claude/worktrees/third-reminder-dedicated-target",
+    "timed_out": false,
+    "tree": "a03e90ceb1798feaae69e17360571ee4b882f4b7",
+    "unobserved_compiled_drivers": 0,
+    "worktree": "./.claude/worktrees/third-reminder-pending/lampOS"
+  },
+  "capture": {
+    "at": "2026-10-26T17:19:30.823096+00:00",
+    "base": "008e7a9746e7ddd58e951f8ea919a7d8beebb5ef",
+    "compiled_test_drivers": 70,
+    "declared_workspace_product_children": 47,
+    "executable_paths": 133,
+    "head": "06c42ba1f36a69fcc33e6774692f47c423dffba8",
+    "inputs": {
+      "actual-artifacts.json": "1caeddb7542e0849ca71ade710dbc0f532a2459a500d9310cda987a45109a395",
+      "base.txt": "e142bf06c57d2fd7b5b18af01c6294ca20a272e572885c385329ec018d30f1db",
+      "build.log": "840266e6ae44f370ba30b80d6992e99fa2c701a48b2c81e4e31c6bad3e932503",
+      "capture.py": "f2d36896038f80ebf2e522bd256bf548bdc516a3dd0c5f62777b2f5fac3f191d",
+      "gate.sh": "396fe2b298d38a12bc28793a7904910f69d3f049a61db5d63d6334c1c4d8c623",
+      "head.txt": "d1a1e7876295c170da9e866510d1f4f7520a87e0609b512c910182846742ac82",
+      "metadata-before.json": "e921838be4dd0cbee28aee7e27a4e7839002caddcfed66d9cd8a7cc423803306",
+      "run-full.py": "c72da43bae37427547599a7a944d41e7b3ac3cbec40ee165e556f91eb76965b0",
+      "source-before.json": "973a810c54ff2d4f31eb7ca447629eec00f7ef32ba52c2023d1ac5ef4ffe29e6",
+      "test-compile.log": "0aef00a9ad0b5a5b4857dd5e41d166d9af3d17a2e37ed27760a543345ee5129e"
+    },
+    "limits": [
+      "Compiler fresh flags are recorded by stage, not inferred from timestamps.",
+      "Captured product children are not thereby claimed to have executed.",
+      "Ephemeral rustdoc executables are not emitted by cargo test --no-run."
+    ],
+    "normal_local_fresh_false": true,
+    "normal_local_packages": 48,
+    "normal_skills_consumers": [
+      "lamp-skills",
+      "lamp-cloud"
+    ],
+    "parents": [
+      "008e7a9746e7ddd58e951f8ea919a7d8beebb5ef"
+    ],
+    "preimages": "independent APFS clones or copies; never hard links; captured after compile, before runtime",
+    "required_feature_children_not_emitted": [],
+    "runtime_scope": "full dev/test consumer closure, not only normal consumers",
+    "selected_packages": [
+      "lamp-skills",
+      "lamp-cloud",
+      "lamp-body",
+      "lamp-expression",
+      "lamp-keeper",
+      "lamp-lean",
+      "lamp-memory",
+      "lamp-peek",
+      "lamp-setup",
+      "lamp-update",
+      "lamp-voice",
+      "lamp-voice-eval"
+    ],
+    "source_files": 7259,
+    "status": "complete",
+    "target": "./.claude/worktrees/third-reminder-dedicated-target",
+    "tree": "a03e90ceb1798feaae69e17360571ee4b882f4b7",
+    "workspace_product_children": 47,
+    "worktree": "./.claude/worktrees/third-reminder-pending/lampOS"
+  },
+  "limits": [
+    "Actual06c/008 broad pass; not current bdc base proof.",
+    "Old784538/4/9 remains failed; this separate candidate does not establish historical cause.",
+    "No device, acoustic latency, gaze or physical reminder acceptance.",
+    "Captured children are not thereby all execution proven; see driver observations.",
+    "Process group absence does not prove absence of escaped session descendants."
+  ],
+  "independent_audit_original_sha256": "19a0407a5943db6368f787f7f5802da3d9bf52204d03e5bf01c1111a20aff8a2",
+  "artifact_scope_note": "Actual paths stable at original before/after runtime snapshots; newer gate now owns live target. Independently rehashed all 133 saved preimages afterward; no current06c-live-target claim."
+}

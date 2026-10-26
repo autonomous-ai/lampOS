@@ -1,0 +1,92 @@
+{
+  "pr": 3604,
+  "offered_head": "92f03b6bc28d78684d45049ea3f80cf8a77d3c73",
+  "offered_base": "e5889ebb53e9222762d76ac463ec7ca4718174fa",
+  "arm64_run": 40376315939,
+  "linux_clippy_run": 40376315850,
+  "arm64_attempt": 1,
+  "linux_clippy_attempt": 1,
+  "arm64_conclusion": "success",
+  "linux_clippy_conclusion": "success",
+  "previews": {
+    "linux-clippy": {
+      "executed_preview": "d5cbf2b2bf5e5440293399620be564c41aae22f3",
+      "preview_parents": [
+        "e5889ebb53e9222762d76ac463ec7ca4718174fa",
+        "92f03b6bc28d78684d45049ea3f80cf8a77d3c73"
+      ],
+      "preview_tree": "1a9a9f7ff7680040a4aae5471dd8b98e191e4265",
+      "offered_tree": "1a9a9f7ff7680040a4aae5471dd8b98e191e4265",
+      "preview_equals_offered_tree": true
+    },
+    "arm64": {
+      "executed_preview": "d5cbf2b2bf5e5440293399620be564c41aae22f3",
+      "preview_parents": [
+        "e5889ebb53e9222762d76ac463ec7ca4718174fa",
+        "92f03b6bc28d78684d45049ea3f80cf8a77d3c73"
+      ],
+      "preview_tree": "1a9a9f7ff7680040a4aae5471dd8b98e191e4265",
+      "offered_tree": "1a9a9f7ff7680040a4aae5471dd8b98e191e4265",
+      "preview_equals_offered_tree": true
+    }
+  },
+  "passed": 7537,
+  "failed": 0,
+  "leaks": 0,
+  "timeouts": 0,
+  "skipped": 53,
+  "unique_terminal_cases": 7537,
+  "repeated_equal_rows": 34,
+  "all_selected_ordinals_present": true,
+  "reported_selected_totals": [
+    7537
+  ],
+  "own_control_pass_counts": {
+    "lamp-skills::it skills::a_repeat_call_with_only_made_steps_is_refused_while_its_run_is_under_way": 1,
+    "lamp-skills::it skills::the_one_action_reply_reports_an_ack_write_error": 1,
+    "lamp-skills::it skills::the_one_action_reply_joins_on_unwind_before_connect_and_during_a_partial_request": 1
+  },
+  "terminal_findings": [],
+  "all_pass_audit": true,
+  "qualified": true,
+  "limits": "Original92f/e588 PR native only. Fresh actual92f/e588 hostfull525/0/9 has two deliberately caught unwind hooks; earlier3bc523/1/9 remains failed. ACK control witnesses actual write failure without widening error classes. No device/timing, readiness or posts claims.",
+  "separate_harnesses": {
+    "turn_wire": {
+      "passed": 13,
+      "failed": 0,
+      "case_counts": {
+        "an_idle_worker_stays_ready_across_a_long_quiet": 1,
+        "a_worker_reporting_another_model_is_refused_before_any_request": 1,
+        "no_outcome_is_delivered_after_close_even_for_an_answer_on_its_way": 1,
+        "verdict_carries_identity_and_one_request_at_a_time": 1,
+        "missing_model_is_final_and_never_restarted": 1,
+        "missing_executable_fails_at_once": 1,
+        "spawn_returns_while_worker_startup_is_held": 1,
+        "startup_failures_are_final": 1,
+        "serving_failures_are_replaced_within_budget": 1,
+        "protocol_violations_are_replaced": 1,
+        "cancelled_answers_are_never_delivered": 1,
+        "close_during_inference_never_waits": 1,
+        "sustained_requests_stay_bounded": 1
+      }
+    },
+    "docs": {
+      "passed": 4,
+      "failed": 0
+    },
+    "relay_signals": true,
+    "export": true,
+    "artifact_uploaded": true
+  },
+  "selection": {
+    "selected_tests": 7537,
+    "selected_binaries": 70,
+    "skipped_tests": 53,
+    "skipped_binaries": 114
+  },
+  "watcher_transport_error": "First gh run watch ended on GitHub HTTP500; preserved log/exit, resumed watching same original attempt1 without workflow rerun.",
+  "raw_log_sha256": {
+    "linux-clippy": "c2b988cf3ce9dc1b13c6f131f6eac29ed6fba4b501d64d8c46c1ce97b8ae3ec5",
+    "arm64": "bf253134e4e8acbd4c051b309f1240c6eb36cd4ad296babe5d5f876ba0b58356"
+  }
+}

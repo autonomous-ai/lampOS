@@ -1,3 +1,11 @@
+## 2026-10-27 01:32 — reminder consumer pass and worker native receipt
+
+Ready for lamp-voice: no (#3525 and #3604 latest-base gates pending)
+
+Actual reminder 06c42ba1f/008e passes the full twelve-consumer command: 70 top-level drivers, 7,479/0/52; all 21 reminder controls once. One nested Memory self-invocation adds one raw pass, twelve docs sections add zero. Source/133 actual and saved hashes stayed stable and the process group was absent without cleanup; all saved preimages independently rechecked. Thirty-one deliberate/expected panic hooks and the known detached Actions mock BrokenPipe are retained. [Bounded host proof](verification/reminder-pending-present-20261026/current-06c-broad-host.json) and [independent audit](verification/reminder-pending-present-20261026/current-06c-independent-audit.json). Old 784 538/4/9 remains failed. Equal-patch latest-base reminder 094549381/bdc2 is undergoing clean compiler qualification, not relabeled as this pass.
+
+Worker 92f03b6bc/e588 original ARM40376315939 and Linux40376315850 pass 7,537/0/53 with all three controls once, exact preview/tree and separate harnesses verified; transient API HTTP500 preserved, no workflow rerun. [Native receipt](verification/skills-actions-mock-20261026/native-92f0.json). New equal-patch be8e4c9bc/bdc2 compiler gates pass. Its first restricted runtime stops at library 138/20/0 with Unix-socket PermissionDenied; [that failure](verification/skills-actions-mock-20261026/current-be8-restricted-failure.json) is preserved. A separate socket-capable command from unchanged source/six binaries is active. No current-base runtime, device or acoustic latency claim yet.
+
 ## 2026-10-27 01:17 — worker current memory-base carry pushed
 
 Ready for lamp-voice: no (#3604 current native/read carries pending)
