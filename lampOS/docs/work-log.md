@@ -1,3 +1,13 @@
+Current status: #3631 is held for a confirmed failed-leader cleanup P2; repair is validating.
+
+## Current checkpoint: 2026-10-27 06:34 +07, original native proof and new P2 kept separate
+
+[Original 9784 native proof](verification/reset-query-bounds-20261026/native-9784/README.md): ARM **40417716476** and Linux Clippy **40417716408**, attempt 1, pass on actual preview 393f06d1a with ordered b234/9784 parents and authored tree equality. The dependency-selected suite is **1,438 unique passes / 0 failures, leaks, timeouts or selected unrun / 9 skipped**, all seven query controls once. Separate process 13, relay 1, docs 4 across 46 summaries and helper 25 are not added. Promotion/publication are skipped. No workflow rerun or full-workspace claim.
+
+R3's current READ-OK and independent Setup 192/0/1 remain source-bound. R2 found P2 6429681520: EOF plus nonzero `try_wait` reaps the failed leader before error cleanup, leaving a same-group descendant that closed output alive. Original green did not exercise that case and is no readiness waiver. The PR remains draft/HOLD. The local single-commit repair 220251c70 uses waitid/NOWAIT, cleans a failed group before wait/reap, and retires unproven identity on ECHILD. Its new regression has positive closed-output/ready and release-after-failure witnesses; bounded old-prefix negative and full eight-control Setup/Cloud gates are starting. No repair-runtime pass is claimed yet. The separate Update reader follow-up is paused. No device or release action.
+
+---
+
 Current status: reset-query latest-base host qualification passed; original ARM64 and peer reads follow.
 
 ## Current checkpoint: 2026-10-27 06:07 +07, b234 query carry qualified
