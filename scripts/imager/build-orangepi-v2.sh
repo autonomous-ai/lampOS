@@ -142,6 +142,13 @@ apt-get install -y \\
 apt-get purge -y --auto-remove network-manager network-manager-gnome 2>/dev/null || true
 apt-get clean
 
+# The board's kernel trusts only the upstream signature on the regulatory database; Debian's
+# alternative is refused ("regulatory.db is malformed"), the country stays 00, and hostapd with
+# country_code waits in COUNTRY_UPDATE for a change that never comes: no beacon (lamp-dbda, 26 Oct).
+[ -e /lib/firmware/regulatory.db-upstream ] || { echo "no upstream regulatory.db" >&2; exit 1; }
+update-alternatives --set regulatory.db /lib/firmware/regulatory.db-upstream
+update-alternatives --set regulatory.db.p7s /lib/firmware/regulatory.db.p7s-upstream 2>/dev/null || true
+
 # Disable IPv6, as V1's image does (STA drops).
 mkdir -p /etc/sysctl.d
 cat > /etc/sysctl.d/99-lamp-wifi.conf <<'SYSCTL'
@@ -502,6 +509,8 @@ done
 for unit in lamp-setup.service lampos-setup-done.path lamp-update.service; do
   [ -L "${MNT}/etc/systemd/system/multi-user.target.wants/${unit}" ] || err "${unit} is not enabled"
 done
+[ "$(readlink "${MNT}/etc/alternatives/regulatory.db")" = /lib/firmware/regulatory.db-upstream ] \
+  || err "regulatory.db is not the upstream one: the hotspot can hang in COUNTRY_UPDATE"
 for unit in hal os-server bootstrap openclaw hermes-gateway led-boot led-shutdown; do
   for dir in etc/systemd/system lib/systemd/system usr/lib/systemd/system; do
     [ ! -e "${MNT}/${dir}/${unit}.service" ] || err "V1's ${unit}.service is on the image (${dir})"
