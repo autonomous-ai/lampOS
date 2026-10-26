@@ -1,3 +1,15 @@
+Ready for lamp-voice: #3568 delivered; #3510 activation HOLD and new startup-base carry underway.
+
+## Current checkpoint: 2026-10-26 17:28 +07, startup landed and installer review passed
+
+[Startup delivery](verification/reference-first-handshake-delivery-20261026/README.md): train 169/#3573 landed #3568 as `6663ca655b`. Member, train and landing have identical entire trees; both train checks pass. This is code delivery, not deployment or physical/acoustic acceptance.
+
+[Independent #3574 review](verification/install-watchdog-second-review-20261026/README.md) on exact `32cc833686`/`aa7cf9029`: fmt and strict Update Clippy pass, then full install target once at 16 threads **101/0/0**, 110.52 s libtest. All source and both actual/preserved executable pairs stay unchanged. No P1/P2 found; five positives retain full installs and assertions, four refusals retain their owned-child bounds. No retry or timing improvement is claimed. The earlier author failures remain historical observations.
+
+Own-keys f378 native qualification continues; the next private carry onto the delivered startup fix has a focused Voice gate, leaving prior full six-crate counts on ff17. #3570's fixture P2 HOLD remains until its corrected head is qualified. No device, release or merge action by Second.
+
+---
+
 Ready for lamp-voice: #3568 ready/in train; #3510 activation HOLD; #3570 review now HOLD.
 
 ## Current checkpoint: 2026-10-26 17:24 +07, Setup review correction

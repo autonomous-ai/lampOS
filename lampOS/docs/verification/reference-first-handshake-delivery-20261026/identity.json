@@ -1,0 +1,17 @@
+{
+  "member": "6cc0f9c7ef12e81942ed44beb95736bd995d891d",
+  "train_pr": 3573,
+  "train": "8528c8f716e4df3f7bca303752dd6db12b9bd308",
+  "landing": "6663ca655b8e31eb9b73926d17b292df576b10aa",
+  "trees": {
+    "6cc0f9c7ef12e81942ed44beb95736bd995d891d": "c7eeed173bc9ead1ebaef35a83b17aab028d4367",
+    "8528c8f716e4df3f7bca303752dd6db12b9bd308": "c7eeed173bc9ead1ebaef35a83b17aab028d4367",
+    "6663ca655b8e31eb9b73926d17b292df576b10aa": "c7eeed173bc9ead1ebaef35a83b17aab028d4367"
+  },
+  "identical_entire_trees": true,
+  "landing_parent": "aa7cf9029ef051ee5770837ccaed4ffc646cd74f",
+  "train_arm_run": 40304896769,
+  "train_clippy_run": 40304896658,
+  "train_checks": "success",
+  "train_test_census": "not independently counted here; exact member original native packet remains separate"
+}

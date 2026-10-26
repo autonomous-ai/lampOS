@@ -1,0 +1,107 @@
+{
+  "completion": {
+    "actual_and_preserved_artifacts": 2,
+    "artifacts_unchanged": true,
+    "base": "aa7cf9029ef051ee5770837ccaed4ffc646cd74f",
+    "complete": true,
+    "head": "32cc833686748249256d76e8529298a100ac7a82",
+    "passed": 101,
+    "source_entries": 7236,
+    "source_unchanged": true
+  },
+  "controller_sha256": "0e015afcb40d4ab0ff256d26822568f2b5a9f7a8040dc5fac6c1ea9ccbf97385",
+  "identity": {
+    "base": "aa7cf9029ef051ee5770837ccaed4ffc646cd74f",
+    "controller_sha256": "0e015afcb40d4ab0ff256d26822568f2b5a9f7a8040dc5fac6c1ea9ccbf97385",
+    "head": "32cc833686748249256d76e8529298a100ac7a82",
+    "runner_sha256": "2e66404ac7e0a43bc84afc01b8ba599bd3c14724c3a29e9fce51c831eaf87183"
+  },
+  "receipts": {
+    "clippy": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "clippy",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-update",
+        "--all-targets",
+        "--message-format=short",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "disk_free_before": 101648216064,
+      "elapsed_seconds": 78.429,
+      "error": null,
+      "exit_code": 0,
+      "log_sha256": "b7c56f18c7d80c72761e5618e90bdacc96d4d4df4ca6b056937e0db61c1f83c1",
+      "source_entries": 7236,
+      "source_unchanged": true
+    },
+    "compile": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-update",
+        "--test",
+        "install",
+        "--no-run",
+        "--message-format=json"
+      ],
+      "disk_free_before": 101417791488,
+      "elapsed_seconds": 105.095,
+      "error": null,
+      "exit_code": 0,
+      "log_sha256": "f99182a6cc24eb9066b73d2cb1f7490d2e8f64829b46f92ada0e94621e5b70c3",
+      "source_entries": 7236,
+      "source_unchanged": true
+    },
+    "fmt": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "disk_free_before": 101649522688,
+      "elapsed_seconds": 6.163,
+      "error": null,
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source_entries": 7236,
+      "source_unchanged": true
+    },
+    "runtime": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-update",
+        "--test",
+        "install",
+        "--no-fail-fast",
+        "--",
+        "--test-threads=16"
+      ],
+      "disk_free_before": 100137791488,
+      "elapsed_seconds": 112.116,
+      "error": null,
+      "exit_code": 0,
+      "log_sha256": "38c79f3cd00b4cc4f9a3c1bf01b34efc62260e0d225303f3bdf53325feeedcf0",
+      "source_entries": 7236,
+      "source_unchanged": true
+    }
+  },
+  "source_inventory_entries": 7236,
+  "source_inventory_sha256": "6a4160247615036286e2d53442a5c9bc73d031fcae49f333316055403142b1b8"
+}
