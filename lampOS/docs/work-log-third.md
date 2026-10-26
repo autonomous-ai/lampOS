@@ -2,7 +2,7 @@
 
 Ready for lamp-voice: no (#3525 current runtime/native/reads pending)
 
-Latest-base equal-patch 094549381/bdc2 passes fresh48 clean, fmt, strict twelve-consumer Clippy, workspace build and test compilation. [Pre-runtime capture](verification/reminder-pending-present-20261026/current-094-runtime-start.json) binds 70 compiled drivers and 47 workspace program children across 133 executable paths, with independent saved preimages. The authorized socket-capable full twelve-package command is active under its 10,800 s bound; source stays frozen until terminal checks. No pass or all-child execution claim. Offered3fe remains draft, actual06c broad7,479/0/52 and old784 failures remain at their actual sources. Workerbe8 original native/read carries remain active; completed #3612 source/arithmetic read is posted. No device action.
+Then-current-base equal-patch 094549381/bdc2 passes fresh48 clean, fmt, strict twelve-consumer Clippy, workspace build and test compilation. [Pre-runtime capture](verification/reminder-pending-present-20261026/current-094-runtime-start.json) binds 70 compiled drivers and 47 workspace program children across 133 executable paths, with independent saved preimages. The authorized socket-capable full twelve-package command is active under its 10,800 s bound; source stays frozen until terminal checks. Main advanced afterward to 0961e12d9, so this active source is no longer the latest base. No pass or all-child execution claim. Offered3fe remains draft, actual06c broad7,479/0/52 and old784 failures remain at their actual sources. Workerbe8 original native/read carries remain active; completed #3612 source/arithmetic read is posted. No device action.
 
 ## 2026-10-27 01:38 — build-row documentation read
 
