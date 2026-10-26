@@ -13,13 +13,13 @@ use lamp_skills::{
 use std::{
     ffi::OsStr,
     fs,
-    io::{BufRead, BufReader, Write},
+    io::{self, BufRead, BufReader, Read, Write},
     os::unix::net::{UnixDatagram, UnixListener, UnixStream},
     path::{Path, PathBuf},
     process::{Child, Command},
     sync::{
         Arc,
-        atomic::{AtomicU64, Ordering},
+        atomic::{AtomicBool, AtomicU64, Ordering},
         mpsc,
     },
     time::{Duration, Instant},
@@ -3010,6 +3010,275 @@ fn a_declared_tool_is_in_the_tools_file_and_a_call_runs_the_skills_steps() {
     assert!(lights[1].contains("blue"), "{lights:?}");
 }
 
+/// Cancels only during explicit fixture teardown. A scoped worker is joined
+/// before the child outside the scope is dropped, including on unwind.
+struct CancelActionReply(Arc<AtomicBool>);
+
+impl Drop for CancelActionReply {
+    fn drop(&mut self) {
+        self.0.store(true, Ordering::SeqCst);
+    }
+}
+
+#[derive(Debug, PartialEq, Eq)]
+enum ActionReplyStage {
+    Listening,
+    PartialRequest,
+    RequestRead,
+}
+
+/// Witnesses for the two lifecycle controls, unused by the tool-call cohort.
+struct ActionReplyWatch {
+    stages: mpsc::SyncSender<ActionReplyStage>,
+    release_ack: Option<mpsc::Receiver<()>>,
+}
+
+/// One Actions request and its complete ACK. None means explicit teardown,
+/// never an I/O error. Separate absolute accept and exchange budgets keep
+/// partial requests and writes from renewing the wait indefinitely.
+fn one_action_reply(
+    listener: UnixListener,
+    cancelled: &AtomicBool,
+    watch: Option<ActionReplyWatch>,
+) -> io::Result<Option<serde_json::Value>> {
+    const SLICE: Duration = Duration::from_millis(20);
+    const ACK: &[u8] = b"{\"ok\":true,\"result\":{}}\n";
+    let remaining = |deadline: Instant| {
+        deadline
+            .checked_duration_since(Instant::now())
+            .filter(|left| !left.is_zero())
+            .ok_or_else(|| io::Error::new(io::ErrorKind::TimedOut, "Actions mock deadline"))
+    };
+    let record = |stage| -> io::Result<()> {
+        if let Some(watch) = &watch {
+            watch.stages.try_send(stage).map_err(io::Error::other)?;
+        }
+        Ok(())
+    };
+    listener.set_nonblocking(true)?;
+    record(ActionReplyStage::Listening)?;
+    // Longer than the unchanged 10 s registry wait; neither call waits here.
+    let accept_by = Instant::now() + Duration::from_secs(20);
+    let mut stream = loop {
+        if cancelled.load(Ordering::SeqCst) {
+            return Ok(None);
+        }
+        let left = remaining(accept_by)?;
+        match listener.accept() {
+            Ok((stream, _)) => break stream,
+            Err(error) if error.kind() == io::ErrorKind::WouldBlock => {
+                lamp_ipc::readable(&listener, left.min(SLICE))?;
+            }
+            Err(error) if error.kind() == io::ErrorKind::Interrupted => continue,
+            Err(error) => return Err(error),
+        }
+    };
+    remaining(accept_by)?;
+    stream.set_nonblocking(false)?;
+    let exchange_by = Instant::now() + Duration::from_secs(2);
+    let mut line = Vec::new();
+    loop {
+        if cancelled.load(Ordering::SeqCst) {
+            return Ok(None);
+        }
+        stream.set_read_timeout(Some(remaining(exchange_by)?.min(SLICE)))?;
+        let mut bytes = [0; 1_024];
+        let n = match stream.read(&mut bytes) {
+            Ok(0) => {
+                return Err(io::Error::new(
+                    io::ErrorKind::UnexpectedEof,
+                    "Actions mock request ended before its newline",
+                ));
+            }
+            Ok(n) => n,
+            Err(error)
+                if matches!(
+                    error.kind(),
+                    io::ErrorKind::Interrupted
+                        | io::ErrorKind::WouldBlock
+                        | io::ErrorKind::TimedOut
+                ) =>
+            {
+                continue;
+            }
+            Err(error) => return Err(error),
+        };
+        remaining(exchange_by)?;
+        let first = line.is_empty();
+        line.extend_from_slice(&bytes[..n]);
+        if line.len() > 8_192 {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "Actions mock request too large",
+            ));
+        }
+        if line.contains(&b'\n') {
+            break;
+        }
+        if first {
+            record(ActionReplyStage::PartialRequest)?;
+        }
+    }
+    let request = serde_json::from_slice(&line)
+        .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
+    record(ActionReplyStage::RequestRead)?;
+    if let Some(release) = watch.as_ref().and_then(|watch| watch.release_ack.as_ref()) {
+        loop {
+            if cancelled.load(Ordering::SeqCst) {
+                return Ok(None);
+            }
+            match release.recv_timeout(remaining(exchange_by)?.min(SLICE)) {
+                Ok(()) => break,
+                Err(mpsc::RecvTimeoutError::Timeout) => continue,
+                Err(error) => return Err(io::Error::other(error)),
+            }
+        }
+    }
+    let mut written = 0;
+    while written < ACK.len() {
+        if cancelled.load(Ordering::SeqCst) {
+            return Ok(None);
+        }
+        stream.set_write_timeout(Some(remaining(exchange_by)?.min(SLICE)))?;
+        match stream.write(&ACK[written..]) {
+            Ok(0) => return Err(io::Error::new(io::ErrorKind::WriteZero, "Actions mock ACK")),
+            Ok(n) => written += n,
+            Err(error)
+                if matches!(
+                    error.kind(),
+                    io::ErrorKind::Interrupted
+                        | io::ErrorKind::WouldBlock
+                        | io::ErrorKind::TimedOut
+                ) => {}
+            Err(error) => return Err(error),
+        }
+        remaining(exchange_by)?;
+    }
+    Ok(Some(request))
+}
+
+#[test]
+fn the_one_action_reply_reports_an_ack_write_error() {
+    let dir = tempfile::Builder::new()
+        .prefix("ak")
+        .tempdir_in("/tmp")
+        .unwrap();
+    let socket = dir.path().join("actions.sock");
+    let listener = UnixListener::bind(&socket).unwrap();
+    let cancelled = Arc::new(AtomicBool::new(false));
+    let (stages, observed) = mpsc::sync_channel(3);
+    let (release, release_ack) = mpsc::sync_channel(1);
+    std::thread::scope(|scope| {
+        let _cancel = CancelActionReply(Arc::clone(&cancelled));
+        let worker = scope.spawn(move || {
+            one_action_reply(
+                listener,
+                &cancelled,
+                Some(ActionReplyWatch {
+                    stages,
+                    release_ack: Some(release_ack),
+                }),
+            )
+        });
+        let mut caller = UnixStream::connect(&socket).unwrap();
+        caller
+            .set_write_timeout(Some(Duration::from_secs(2)))
+            .unwrap();
+        caller
+            .write_all(
+                b"{\"op\":\"call\",\"name\":\"light_colour\",\"args\":{\"colour\":\"white\"}}\n",
+            )
+            .unwrap();
+        assert_eq!(
+            observed.recv_timeout(Duration::from_secs(2)).unwrap(),
+            ActionReplyStage::Listening
+        );
+        // The whole request was read; close the peer before allowing the ACK.
+        loop {
+            match observed.recv_timeout(Duration::from_secs(2)).unwrap() {
+                ActionReplyStage::RequestRead => break,
+                ActionReplyStage::PartialRequest => {}
+                stage => panic!("unexpected stage: {stage:?}"),
+            }
+        }
+        drop(caller);
+        release.send(()).unwrap();
+        let error = worker.join().expect("Actions worker panicked").unwrap_err();
+        assert!(
+            matches!(
+                error.kind(),
+                io::ErrorKind::BrokenPipe | io::ErrorKind::ConnectionReset
+            ),
+            "{error}"
+        );
+    });
+}
+
+#[test]
+fn the_one_action_reply_joins_on_unwind_before_connect_and_during_a_partial_request() {
+    for partial in [false, true] {
+        let dir = tempfile::Builder::new()
+            .prefix("au")
+            .tempdir_in("/tmp")
+            .unwrap();
+        let socket = dir.path().join("actions.sock");
+        let listener = UnixListener::bind(&socket).unwrap();
+        let cancelled = Arc::new(AtomicBool::new(false));
+        let (stages, observed) = mpsc::sync_channel(3);
+        let (finished, outcome) = mpsc::sync_channel(1);
+        // Kept outside the unwinding scope: EOF must not stand in for cancel.
+        let mut caller = None;
+        let mut unwinding_at = None;
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            std::thread::scope(|scope| {
+                let _cancel = CancelActionReply(Arc::clone(&cancelled));
+                scope.spawn(move || {
+                    let result = one_action_reply(
+                        listener,
+                        &cancelled,
+                        Some(ActionReplyWatch {
+                            stages,
+                            release_ack: None,
+                        }),
+                    );
+                    finished.send(result).unwrap();
+                });
+                assert_eq!(
+                    observed.recv_timeout(Duration::from_secs(2)).unwrap(),
+                    ActionReplyStage::Listening
+                );
+                if partial {
+                    let mut stream = UnixStream::connect(&socket).unwrap();
+                    stream
+                        .set_write_timeout(Some(Duration::from_secs(2)))
+                        .unwrap();
+                    stream.write_all(b"{\"op\":").unwrap();
+                    caller = Some(stream);
+                    assert_eq!(
+                        observed.recv_timeout(Duration::from_secs(2)).unwrap(),
+                        ActionReplyStage::PartialRequest
+                    );
+                }
+                unwinding_at = Some(Instant::now());
+                panic!("deliberate Actions fixture unwind");
+            });
+        }));
+        let panic = result.expect_err("the fixture must unwind");
+        assert_eq!(
+            panic.downcast_ref::<&str>(),
+            Some(&"deliberate Actions fixture unwind")
+        );
+        // Returning from scope proves the worker joined; the result proves
+        // explicit cancellation, rather than timeout, EOF or a hidden panic.
+        assert_eq!(outcome.try_recv().unwrap().unwrap(), None);
+        assert!(
+            unwinding_at.unwrap().elapsed() < Duration::from_secs(2),
+            "partial={partial}: cleanup exceeded its bound"
+        );
+        drop(caller);
+    }
+}
+
 /// A skill whose tool only makes things: nothing to tell the model, so a
 /// call while its run is under way is still refused.
 #[test]
@@ -3026,15 +3295,6 @@ fn a_repeat_call_with_only_made_steps_is_refused_while_its_run_is_under_way() {
         .publisher_declared("light/state", &Light::declaration(), "ring")
         .unwrap();
     let actions = UnixListener::bind(root.join("actions.sock")).unwrap();
-    std::thread::spawn(move || {
-        for stream in actions.incoming().flatten() {
-            let mut line = String::new();
-            BufReader::new(&stream).read_line(&mut line).unwrap();
-            (&stream)
-                .write_all(b"{\"ok\":true,\"result\":{}}\n")
-                .unwrap();
-        }
-    });
     let tools = root.join("tools");
     let _running = Running(
         Command::new(env!("CARGO_BIN_EXE_lamp-skills"))
@@ -3051,40 +3311,57 @@ fn a_repeat_call_with_only_made_steps_is_refused_while_its_run_is_under_way() {
             .spawn()
             .unwrap(),
     );
-    skill_with(
-        &root.join("skills"),
-        "glow",
-        &TUTOR
-            .replace("check_my_work", "glow")
-            .replace("look = true\n", "")
-            .replace(
-                "say = \"Tutor: a hint or a question, never the answer.\"\n",
-                "",
-            )
-            .replace("for = \"1s\"", "for = \"3s\""),
-    );
-    let deadline = Instant::now() + Duration::from_secs(10);
-    while !tools.join("tools.json").exists() {
-        assert!(Instant::now() < deadline, "no tools file");
-        std::thread::sleep(Duration::from_millis(50));
-    }
-    let call = || {
-        let stream = std::os::unix::net::UnixStream::connect(tools.join("call.sock")).unwrap();
-        writeln!(&stream, r#"{{"op":"call","name":"glow","args":{{}}}}"#).unwrap();
-        let mut line = String::new();
-        BufReader::new(&stream).read_line(&mut line).unwrap();
-        serde_json::from_str::<serde_json::Value>(&line).unwrap()
-    };
-    ring.publish_json(1, &Light::new(true, "blue", 3).unwrap())
-        .unwrap();
-    let first = call();
-    assert_eq!(first["ok"], true, "{first}");
-    assert_eq!(first["result"]["next"], "Done.");
-    // A tool without a look asks the voice for none.
-    assert!(first["result"].get("look").is_none(), "{first}");
-    let again = call();
-    assert_eq!(again["ok"], false, "{again}");
-    assert_eq!(again["error"], "I'm still doing that.");
+    // This child outlives the scope's worker, even if an assertion unwinds.
+    let cancelled = Arc::new(AtomicBool::new(false));
+    std::thread::scope(|scope| {
+        let _cancel = CancelActionReply(Arc::clone(&cancelled));
+        let worker = scope.spawn(move || one_action_reply(actions, &cancelled, None));
+        skill_with(
+            &root.join("skills"),
+            "glow",
+            &TUTOR
+                .replace("check_my_work", "glow")
+                .replace("look = true\n", "")
+                .replace(
+                    "say = \"Tutor: a hint or a question, never the answer.\"\n",
+                    "",
+                )
+                .replace("for = \"1s\"", "for = \"3s\""),
+        );
+        let deadline = Instant::now() + Duration::from_secs(10);
+        while !tools.join("tools.json").exists() {
+            assert!(Instant::now() < deadline, "no tools file");
+            std::thread::sleep(Duration::from_millis(50));
+        }
+        let call = || {
+            let stream = std::os::unix::net::UnixStream::connect(tools.join("call.sock")).unwrap();
+            writeln!(&stream, r#"{{"op":"call","name":"glow","args":{{}}}}"#).unwrap();
+            let mut line = String::new();
+            BufReader::new(&stream).read_line(&mut line).unwrap();
+            serde_json::from_str::<serde_json::Value>(&line).unwrap()
+        };
+        ring.publish_json(1, &Light::new(true, "blue", 3).unwrap())
+            .unwrap();
+        let first = call();
+        assert_eq!(first["ok"], true, "{first}");
+        assert_eq!(first["result"]["next"], "Done.");
+        // A tool without a look asks the voice for none.
+        assert!(first["result"].get("look").is_none(), "{first}");
+        let again = call();
+        assert_eq!(again["ok"], false, "{again}");
+        assert_eq!(again["error"], "I'm still doing that.");
+        // No wait was added before or between those calls. Join the initial
+        // exchange after both assertions, before Running can close its peer.
+        let made = worker
+            .join()
+            .expect("Actions worker panicked")
+            .expect("Actions exchange failed")
+            .expect("Actions exchange cancelled before teardown");
+        assert_eq!(
+            made,
+            serde_json::json!({"op":"call", "name":"light_colour", "args":{"colour":"white"}})
+        );
+    });
 }
 
 /// A repeat call while the run's light is still on holds its pose again,
