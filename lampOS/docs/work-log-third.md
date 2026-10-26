@@ -13,6 +13,17 @@ machine is explicitly named. Third has no lamp access.
 
 
 
+## 2026-10-26 13:58 — Factory qualified for train 162
+
+Ready for lamp-voice: yes (#3546)
+
+**3c54671c0** has current-head READ-OKs from Reviewer-two, Reviewer-three
+and Second, with original current native gates green. Sole member of
+train 162 **#3552**, candidate **be046be4c** on **9e5d3b9c6**; train
+ARM64 **40282298355** and Linux **40282298313** are separate, pending
+qualification and landing. Earlier shell executions retain their exact
+heads; no lamp acceptance claimed. Latest reminder native audit continues.
+
 ## 2026-10-26 13:56 — Provisional current-base Expression fixture review
 
 Ready for lamp-voice: no (review overlay for #3548)
