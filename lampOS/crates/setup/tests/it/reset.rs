@@ -149,14 +149,25 @@ impl Effects for Fake {
             return Err(io::Error::other("refused"));
         }
         if argv[1] == "list-units" {
-            if argv.iter().any(|unit| unit == "lamp-skills-manage.socket") {
-                return Ok(self.starters.clone());
-            }
-            self.writer_reads += 1;
-            return Ok(match &self.writers_after {
-                Some(after) if self.writer_reads > 1 => after.clone(),
-                _ => self.writers.clone(),
-            });
+            let listed = if argv.iter().any(|unit| unit == "lamp-skills-manage.socket") {
+                self.starters.clone()
+            } else {
+                self.writer_reads += 1;
+                match &self.writers_after {
+                    Some(after) if self.writer_reads > 1 => after.clone(),
+                    _ => self.writers.clone(),
+                }
+            };
+            // As systemd lists them: only units the names and patterns asked
+            // for match, so a unit left out of a list is never listed.
+            return Ok(listed
+                .lines()
+                .filter(|line| {
+                    let unit = line.split_whitespace().find(|word| *word != "\u{25cf}");
+                    unit.is_some_and(|unit| argv[6..].iter().any(|asked| glob(asked, unit)))
+                })
+                .map(|line| format!("{line}\n"))
+                .collect());
         }
         if argv[3] == "ActiveState" {
             return Ok(self
@@ -182,6 +193,27 @@ impl Effects for Fake {
     fn force_reboot(&mut self) {
         self.calls.borrow_mut().push("force".into());
     }
+}
+
+/// A unit name against a `systemctl` pattern, `*` standing for any run of
+/// characters.
+fn glob(pattern: &str, name: &str) -> bool {
+    let mut parts = pattern.split('*');
+    let first = parts.next().unwrap_or_default();
+    let Some(mut rest) = name.strip_prefix(first) else {
+        return false;
+    };
+    let parts: Vec<&str> = parts.collect();
+    let Some((last, middle)) = parts.split_last() else {
+        return rest.is_empty();
+    };
+    for part in middle {
+        let Some(at) = rest.find(part) else {
+            return false;
+        };
+        rest = &rest[at + part.len()..];
+    }
+    rest.ends_with(last)
 }
 
 fn root_user() -> bool {
@@ -303,8 +335,8 @@ fn a_reset_stops_the_writers_outside_the_target_after_what_starts_them() {
     let plan = lamp(&root);
     let mut fake = Fake {
         parts: "lamp-voice.service".into(),
-        starters: "lamp-skills-manage.socket loaded active listening Skills\nlamp-setup-change.socket loaded inactive dead Change\n".into(),
-        writers: "lamp-setup.service loaded active running Setup\nlamp-setup-change@3-1-0.service loaded active running Change\n".into(),
+        starters: "lamp-skills-manage.socket loaded active listening Skills\nlamp-setup-change.socket loaded inactive dead Change\nlamp-update-back.timer loaded active waiting Back\nlamp-update-back.service loaded active running Back\n".into(),
+        writers: "lamp-setup.service loaded active running Setup\nlamp-setup-change@3-1-0.service loaded active running Change\nlamp-setup-keys@9-9-9.service not-found inactive dead lamp-setup-keys@9-9-9.service\n\u{25cf} lamp-update.service loaded failed failed Update\n".into(),
         writer: Some("lamp-setup-change@3-1-0.service".into()),
         writes_on_stop: Some(root.path("memory/display-name")),
         ..Fake::default()
@@ -325,10 +357,12 @@ fn a_reset_stops_the_writers_outside_the_target_after_what_starts_them() {
             "/bin/systemctl",
             "stop",
             "lamp-skills-manage.socket",
-            "lamp-setup-change.socket"
+            "lamp-setup-change.socket",
+            "lamp-update-back.timer",
+            "lamp-update-back.service"
         ]
         .map(String::from),
-        "what starts a writer is stopped first"
+        "what starts a writer, the updater's way back included, is stopped first"
     );
     assert!(at("list-units", "lamp-setup.service") > 1);
     assert_eq!(
@@ -337,18 +371,23 @@ fn a_reset_stops_the_writers_outside_the_target_after_what_starts_them() {
             "lampos.target",
             "lamp-voice.service",
             "lamp-setup.service",
-            "lamp-setup-change@3-1-0.service"
+            "lamp-setup-change@3-1-0.service",
+            "lamp-update.service"
         ]
-        .map(String::from)
+        .map(String::from),
+        "a not-found stub is not named; a failed unit is"
     );
     assert_eq!(
         argvs[at("show", "ActiveState")][5..],
         [
             "lamp-skills-manage.socket",
             "lamp-setup-change.socket",
+            "lamp-update-back.timer",
+            "lamp-update-back.service",
             "lamp-voice.service",
             "lamp-setup.service",
-            "lamp-setup-change@3-1-0.service"
+            "lamp-setup-change@3-1-0.service",
+            "lamp-update.service"
         ]
         .map(String::from),
         "the starters and the writers are read stopped"
@@ -374,9 +413,16 @@ fn a_reset_wipes_the_wifi_copies_and_no_old_network_is_put_back_meanwhile() {
     for file in copies.iter().chain([&conf]) {
         fs::write(file, b"network={ssid=\"factory\"}").unwrap();
     }
+    // And setup's staging copy of a file it writes, cut mid-way (the
+    // reviewer-lead's P3).
+    let backend = root.path("backend.json");
+    let staged = root.path("backend.lamp-setup-tmp");
+    plan.wipe.push(backend.clone());
+    fs::write(&backend, b"{}").unwrap();
+    fs::write(&staged, b"{\"link\":\"the factory's\"}").unwrap();
     reset::reset(&plan, &mut Fake::default()).unwrap();
     wiped(&root);
-    for file in copies.iter().chain([&conf]) {
+    for file in copies.iter().chain([&conf, &backend, &staged]) {
         assert!(!file.exists(), "{} kept", file.display());
     }
     let journal = root.path("journal.json");
