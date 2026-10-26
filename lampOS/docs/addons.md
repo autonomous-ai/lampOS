@@ -677,6 +677,13 @@ is at most 4,096 bytes, and the link takes about one batch a second):
   10 ms blocks cannot cross the link. What was said reaches the computer as
   `voice/heard`. A recording on request is a later piece, the Harness
   team's to carry.
+- **Events, not values (asked on openharness#1654).** `addon.publish`
+  keeps the newest value of each topic, at most 32 topics a device, and
+  forgets them on a hello. The bus has about 80 topics, and many are
+  events (`voice/heard`, `chat/in`, `memory/forgot`) that would overwrite
+  each other between two reads. So the trusted tier needs an event stream
+  from Harness, in order and with no event dropped, not `addon.publish`'s
+  state. Until it has one, nothing in this section can be built.
 - **A message over 4,096 bytes** (a long turn, a memory read) is
   withheld, and the service journals its topic, size and `too_big`, never
   its words. Nothing is rewritten or cut to fit. Sending such a message in
@@ -703,7 +710,8 @@ service, never taken from the computer's words:
 for: a summary of a channel or a meeting is a few sentences. The limit
 appears in three places on the lamp: `ADDON_NOTE_BYTES` (`crates/msgs/src/addon.rs`),
 the say service's `MOST_QUOTED_BYTES` (`crates/voice/src/say.rs`) and the
-remote `note` row above. The voice's model takes a note of up to
+remote `note` row above. Harness has the same limit: `addon.proposal`'s
+`note` is at most 300 bytes (openharness `docs/autonomous-device-addons.md`). The voice's model takes a note of up to
 `MAX_NOTE_BYTES`, 1,024 bytes (`crates/gemini/src/wire.rs`). So the parts
 stay small enough to pass every check on the way, and only the trusted
 tier's whole say is longer:
@@ -760,10 +768,14 @@ tier's whole say is longer:
   source (`crates/addons/src/runtime.rs` takes `skills` only today), and a
   say-service request for a trusted say of up to 4,096 bytes, by reference,
   from that service only.
-- **Open:** whether Harness's own `addon.proposal` `note` has a limit
-  below 300 bytes. That limit is Harness's, not the lamp's, and isn't
-  stated in this file. If it is lower, a part's `note` is at most that
-  limit, and `of` grows to keep 4,096 bytes.
+- **Harness's rates (asked on openharness#1654).** Harness takes six
+  proposals a minute per add-on and device, twelve a minute per device,
+  and four undecided at once (`RATE_LIMITED`, openharness
+  `docs/autonomous-device-addons.md`). So a say of more than a few parts
+  can't cross today. The parts need Harness either to count a say's parts
+  as one proposal (same `id`, within 10 s), or to take one note of up to
+  4,096 bytes from the trusted tier. Until it does, a trusted say is one
+  proposal of at most 300 bytes, as a partner's is.
 
 ### What stays the same
 
