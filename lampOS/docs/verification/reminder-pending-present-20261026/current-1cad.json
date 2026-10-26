@@ -1,0 +1,93 @@
+{
+  "own_control_pass_counts": {
+    "unchanged_held_reminder_has_one_chance_across_sixty_heartbeats": 1,
+    "core_reminders_can_request_again_after_talk_with_pending_still_positive": 1,
+    "core_reminders_keep_readiness_and_enablement_gates_on_repeated_chances": 1,
+    "core_reminders_coalesce_queue_changes_and_ignore_renewal_metadata": 1,
+    "core_reminders_notice_a_brief_talk_between_schedule_heartbeats": 1,
+    "core_reminders_rearm_after_source_or_condition_expiry": 1,
+    "core_reminders_keep_the_change_snapshot_across_unchanged_reload": 1,
+    "invalid_selected_values_do_not_replace_or_rearm_a_reminder_snapshot": 1,
+    "invalid_selected_trigger_values_do_not_rearm_a_reminder_snapshot": 1,
+    "a_valid_empty_schedule_rearms_after_an_invalid_selected_trigger_value": 1,
+    "a_talk_rearms_even_while_a_selected_trigger_value_is_invalid": 1,
+    "invalid_selected_choice_values_do_not_rearm_a_changes_snapshot": 1,
+    "a_changes_trigger_refuses_selected_while_path_overlap": 1,
+    "a_changes_trigger_keeps_independent_while_paths": 1,
+    "existing_trigger_modes_keep_their_heartbeat_behavior": 1,
+    "a_changes_trigger_reads_a_bounded_tuple_on_another_topic": 1,
+    "a_schedule_ask_only_moves_when_voice_begins_it": 1,
+    "repeated_schedule_chances_keep_one_waiting_runner_and_no_look": 1,
+    "a_change_trigger_requires_bounded_paths_and_compatible_options": 1,
+    "a_change_trigger_requires_a_scalar_comparison": 1,
+    "every_skill_folder_passes_its_own_recorded_tests": 1
+  },
+  "head": "a54ba36c33849a9999a947eb4d64f818c13b0e96",
+  "source_count": 7257,
+  "all_source_unchanged": true,
+  "source_manifest_sha256": "dc6eb120bdaead2d756b5725486c29c65b09331e4d507f7e245fdea9c2aa6b59",
+  "gates": {
+    "fmt": {
+      "command": "cargo +1.96.0 fmt --all --check",
+      "started": "2026-10-26T08:47:00Z",
+      "finished": "2026-10-26T08:47:15Z",
+      "exit": 0,
+      "harnesses": 0,
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "disk_error_lines": []
+    },
+    "clippy": {
+      "command": "cargo +1.96.0 clippy -q --offline --locked -p lamp-skills --all-targets -- -D warnings",
+      "started": "2026-10-26T08:47:15Z",
+      "finished": "2026-10-26T08:48:04Z",
+      "exit": 0,
+      "harnesses": 0,
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "disk_error_lines": []
+    },
+    "build": {
+      "command": "cargo +1.96.0 build -q --offline --locked --workspace",
+      "started": "2026-10-26T08:48:04Z",
+      "finished": "2026-10-26T08:49:46Z",
+      "exit": 0,
+      "harnesses": 0,
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "disk_error_lines": []
+    },
+    "test-skills": {
+      "command": "cargo +1.96.0 test --offline --locked -p lamp-skills -- --test-threads=1",
+      "started": "2026-10-26T08:49:46Z",
+      "finished": "2026-10-26T08:55:07Z",
+      "exit": 0,
+      "harnesses": 6,
+      "passed": 542,
+      "failed": 0,
+      "ignored": 9,
+      "disk_error_lines": []
+    }
+  },
+  "changed_case_passes": 1,
+  "executable_sha256": {
+    "lamp_skills-c6f44302f3b2c78f": "e48506dd4fdda69df15af9e416b5215e4df69465bb8e8ffea6776792b52203e2",
+    "lamp_skills-a718b2a0214b6903": "819287baf2f0d6ca8afd584476c552e735f8ff4eded5c25a3f4627a37d64d0b7",
+    "it-46363ab9699809b5": "2d90c1f7ecf7e9aa3be499f492dd71d655fa56dfce9ba9db4e84735bc49d057e",
+    "release_pair-88349d4c2302e5ab": "057f200eacd7617d3fb818a0311d498cf96449d8bbc1004169d7a7f305a70198",
+    "requested_audio-019db324b83a9807": "8308248b2da952dc4d6168b2c4caac32a39ea885031719d191f6086c0043abfa",
+    "lamp-skills": "649eb1cb800177013cfa94cdd6d66e2ed17b0c148a2d3644a245c7532cff9e7c"
+  },
+  "raw_log_sha256": {
+    "fmt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "clippy": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "build": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "test-skills": "316c6193b8abde3ad4735c5614e2bd20cfe755a0abe1152084405ad04a31bb79"
+  },
+  "limits": "Fresh current-base native Mac author gate only. Twenty-one reminder regression and fixture controls pass once in the full suite. No ARM64 local linking or device. Actual test drivers and CARGO_BIN_EXE child preserved before subsequent Cargo.",
+  "base": "1cad670df4fdc3995974d0c15a75fc25bbe8e73d",
+  "qualification": "Actual a54ba36c3 execution on1cad, before factory1aa landed; remains on that head."
+}

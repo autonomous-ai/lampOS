@@ -13,6 +13,32 @@ machine is explicitly named. Third has no lamp access.
 
 
 
+## 2026-10-26 15:59 — Current carries and alias correction
+
+Ready for lamp-voice: no (qualification in progress)
+
+Reminder #3525 locally carried to **a54ba36c3** on **1cad670df**:
+fresh fmt, strict Skills Clippy, workspace build and full Skills **542/0/9**,
+all 21 controls once. [Sealed receipt](verification/reminder-pending-present-20261026/current-1cad.json).
+Factory train 166 landed during that run, so a second equal carry
+**783184fc6** on **1aa409fcb** is receiving fresh compiler/binding checks.
+The published aad5 head remains draft; no old execution is renamed.
+
+Completed Setup's historical 1ec candidate passed **418/0/6** plus fmt,
+five-package strict Clippy and workspace build. [Baseline only](verification/setup-completed-watch-20261026/baseline-1ec.json).
+Independent review then found a P2: alias drop-ins escape a canonical-only
+filesystem check. The alias negative failed 0/1 before correction. The
+current 1aa repair queries fresh effective manager metadata and requires
+only the canonical name/fragment and known exit-note; unknown results keep
+normal restart/watch, with the marker checked after the bounded query.
+Parser 2/0 and lifecycle 16/0 pass; full current qualification and independent
+re-read run now. The prior sandbox 116/5/2 and corrected recovery-fixture
+10/1 remain failures, separately recorded. No device acceptance.
+
+Build targets are isolated: reminder uses its own clone after checking
+64 GiB host RAM and 108 GiB free disk. Setup runtime artifacts were preserved
+before later builds; no concurrent gate overwrites the other's executables.
+
 ## 2026-10-26 15:08 — Reminder ready; Setup evidence narrowed
 
 Ready for lamp-voice: yes (#3525 aad5a4fe3, awaiting train)

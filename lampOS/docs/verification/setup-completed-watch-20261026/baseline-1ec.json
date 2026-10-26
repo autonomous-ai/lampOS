@@ -1,0 +1,103 @@
+{
+  "base": "1ec33957c78e6dc39bd7ca0b3b8f7c74543f6b35",
+  "source_count": 7238,
+  "source_sha256": "9166a1dcab6adbaa77399ea0536a95c36fd20036ee573089e72c069fce9b55a7",
+  "all_source_unchanged": true,
+  "gates": {
+    "fmt": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "start": "2026-10-26T08:15:14Z",
+      "finish": "2026-10-26T08:15:25Z",
+      "exit": 0,
+      "summaries": [],
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "clippy": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "clippy",
+        "-q",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-update",
+        "-p",
+        "lamp-setup",
+        "-p",
+        "lamp-cloud",
+        "-p",
+        "lamp-keeper",
+        "-p",
+        "lamp-skills",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "start": "2026-10-26T08:15:25Z",
+      "finish": "2026-10-26T08:16:51Z",
+      "exit": 0,
+      "summaries": [],
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "test-update": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-update",
+        "--",
+        "--test-threads=1"
+      ],
+      "start": "2026-10-26T08:18:06Z",
+      "finish": "2026-10-26T08:48:40Z",
+      "exit": 0,
+      "summaries": [
+        "test result: ok. 121 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 9.36s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.16s",
+        "test result: ok. 101 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 578.47s",
+        "test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.96s",
+        "test result: ok. 0 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 178 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1238.19s",
+        "test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out",
+        "test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      ],
+      "log_sha256": "8970d7f46d89c9fcaff7453bfa71e79b0d9035b8fc6e1c5a48097cd82fd95f2d"
+    },
+    "build": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "build",
+        "-q",
+        "--offline",
+        "--locked",
+        "--workspace"
+      ],
+      "start": "2026-10-26T08:48:40Z",
+      "finish": "2026-10-26T08:51:52Z",
+      "exit": 0,
+      "summaries": [],
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "runtime_counts": {
+    "passed": 418,
+    "failed": 0,
+    "ignored": 6
+  },
+  "limits": "Native Mac Update execution; Linux-only external harnesses require ARM CI. Fake-systemd Setup controls do not claim a device run.",
+  "qualification": "Historical uncommitted candidate on1ec, blocked by subsequently found alias P2. Not current repair qualification."
+}
