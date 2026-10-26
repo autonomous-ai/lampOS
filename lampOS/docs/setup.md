@@ -188,12 +188,15 @@ lamp-setup reset-now`). That unit, in this order:
    paths outside it (`reset::WRITERS`): `lamp-setup.service`, which serves
    for 600 s after setup, its recovery, the loaded `lamp-setup-change@`,
    `-keys@` and `-wifi@` instances, `lamp-skills-manage@` instances,
-   `lamp-records` and the updater with its apply. What starts them
-   (`reset::STARTERS`: the helpers' and the skills' sockets, the records'
-   timer) is stopped first, so none starts after they are listed, and they
+   `lamp-records`, the updater with its apply, and the boot's Wi-Fi
+   restore. What starts them (`reset::STARTERS`: the helpers' and the
+   skills' sockets, the records' timer, the updater's way back, its timer
+   and a worker already running, which can restart the updater for a pending
+   self-switch, and the keeper's restart socket) is stopped first, so none
+   starts after they are listed, and they
    are read stopped too (reviewer-three, the reviewer-lead and Second on
-   #3579). Only loaded units are named: systemd refuses to stop a unit it
-   does not have. Parts that cannot be read, a part not stopped, or one that
+   #3579). Only units whose LOAD column says `loaded` are named: systemd
+   refuses to stop a unit it does not have. Parts that cannot be read, a part not stopped, or one that
    joined during the stop are as a stop that fails;
 4. it wipes each path in the plan: a file is removed, a directory keeps itself
    (systemd units name some of them and would not start without them) and
@@ -205,7 +208,8 @@ lamp-setup reset-now`). That unit, in this order:
    `lamp-setup-wifi-restore` puts back, and setup's `.conf.lamp-setup` and
    `.conf.lamp-setup-tmp`), matched by name so plans installed before them
    wipe them too, and `wifi-restore` puts no old network back while a reset
-   is journalled (Third on #3579);
+   is journalled (Third on #3579). Every wiped path's staging copy from
+   setup (`.lamp-setup-tmp`, left by a write cut mid-way) goes with it;
 5. it removes the journal, syncs, and reboots. If the wipe fails it still
    reboots, and if the reboot command fails it forces one: a lamp left dark
    with no marker would wait for a hand.
