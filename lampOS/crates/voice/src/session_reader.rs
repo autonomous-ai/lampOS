@@ -93,6 +93,14 @@ fn group_from(name: &str, source: impl Read) -> io::Result<u32> {
     found.ok_or_else(|| invalid("reader group is absent"))
 }
 
+#[cfg(all(test, target_os = "linux"))]
+#[derive(Clone, Debug, Default)]
+struct FailureObservation {
+    injected_grant_hit: bool,
+    injected_rollback_hit: bool,
+    apply_error: Option<String>,
+}
+
 pub(crate) struct Reader {
     gid: u32,
     voice: File,
@@ -102,6 +110,8 @@ pub(crate) struct Reader {
     session: OsString,
     #[cfg(test)]
     failure: Option<(usize, Option<usize>)>,
+    #[cfg(all(test, target_os = "linux"))]
+    failure_observation: Option<std::sync::Arc<std::sync::Mutex<FailureObservation>>>,
 }
 impl Reader {
     pub(super) fn prepare(output: &Path, gid: u32) -> io::Result<Self> {
@@ -145,6 +155,8 @@ impl Reader {
                 session,
                 #[cfg(test)]
                 failure: None,
+                #[cfg(test)]
+                failure_observation: None,
             })
         }
     }
@@ -173,6 +185,8 @@ impl Reader {
     pub(crate) fn grant(self, output: &Path, events: &[File], health: &File) -> io::Result<bool> {
         #[cfg(test)]
         let failure = self.failure;
+        #[cfg(all(test, target_os = "linux"))]
+        let observation = self.failure_observation.clone();
         self.grant_with(output, events, health, move |rollback, step| {
             #[cfg(test)]
             if failure.is_some_and(|(grant, back)| {
@@ -182,6 +196,15 @@ impl Reader {
                     grant == step
                 }
             }) {
+                #[cfg(target_os = "linux")]
+                if let Some(observation) = &observation {
+                    let mut observation = observation.lock().unwrap();
+                    if rollback {
+                        observation.injected_rollback_hit = true;
+                    } else {
+                        observation.injected_grant_hit = true;
+                    }
+                }
                 return Err(io::Error::other("injected reader grant failure"));
             }
             let _ = (rollback, step);
@@ -267,6 +290,18 @@ impl Reader {
                 Some(self.gid),
             )
         })();
+        #[cfg(all(test, target_os = "linux"))]
+        if self.failure.is_some()
+            && let Some(observation) = &self.failure_observation
+        {
+            observation.lock().unwrap().apply_error = apply.as_ref().err().map(|error| {
+                format!(
+                    "{error} (kind={:?}, os={:?})",
+                    error.kind(),
+                    error.raw_os_error()
+                )
+            });
+        }
         if apply.is_ok() {
             return Ok(true);
         }
@@ -340,6 +375,8 @@ fn trusted_directory(path: &Path) -> io::Result<File> {
         return Err(invalid("untrusted session parent path"));
     }
     let mut file: File = fs::open("/", flags(), Mode::empty())?.into();
+    #[cfg(all(test, target_os = "linux"))]
+    let path = tests::fixture_root(&mut file, path)?;
     ancestor(&file)?;
     for part in path.components() {
         match part {
