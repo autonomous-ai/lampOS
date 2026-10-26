@@ -35,6 +35,9 @@ if [[ $1 == start && $2 == lamp-body ]]; then
 fi
 [[ $1 == is-active && -e $FAKE_LOG.body-started ]] && { echo active; exit 0; }
 [[ $1 == is-active ]] && { echo "${FAKE_BODY_STATE:-inactive}"; [[ ${FAKE_BODY_STATE:-inactive} == active ]]; exit; }
+# The target's parts (FAKE_PARTS), and their stop refused with FAKE_PARTS_STOP_FAIL.
+[[ $1 == show && $3 == ConsistsOf ]] && { echo "${FAKE_PARTS-lamp-voice.service lamp-memory.service}"; exit 0; }
+[[ $1 == stop && $2 == lampos.target && -n ${FAKE_PARTS_STOP_FAIL:-} ]] && exit 1
 [[ $1 == show ]] && { echo "Environment=${FAKE_CONTROLS_ENV:-}"; exit 0; }
 exit 0
 EOF
@@ -211,6 +214,16 @@ check "--from 4 with lamp-body down: it is started and stood, so head_move is ch
 # and says to remove the lamp from the factory account and pack.
 lamp; FAKE_BODY_STATE=active FAKE_VOICE_STATE=active ASK_ANSWER=y run --write --from 4; status=$?
 check "a passed self-test runs the reset, an earlier pause cleared before the stand" '[[ $status == 0 ]] && [[ $(grep "^keeper\|^mood\|^selftest\|^systemd-run" "$T/log" | sed "s/ --.*//" | uniq | tr "\n" "|") == "keeper resume|mood|selftest|systemd-run|" ]] && grep -q "^systemd-run --no-block --collect --unit=lamp-setup-wipe --property=Type=oneshot /opt/lampOS/setup/current/lamp-setup reset-now --plan $T/root/etc/lampOS/setup/reset-plan.json --enable$" "$T/log" && grep -q "Then remove it from the factory account in the app, and pack it." "$T/out" && ! grep -q "^keeper pause" "$T/log"'
+# lamp-29e7 on 26 Oct: the reset's own stop returns before the parts have
+# stopped, and Voice's onboarding written on its stop outlived the wipe. A
+# passed step 4 stops the path unit, then the target and each part by name,
+# and only then starts the reset.
+lamp; FAKE_BODY_STATE=active ASK_ANSWER=y run --write --from 4; status=$?
+check "the lamp is stopped, each part named, before the reset starts (lamp-29e7)" '[[ $status == 0 ]] && [[ $(grep "^systemctl stop lampos\|^systemd-run" "$T/log" | sed "s/ --.*//" | tr "\n" "|") == "systemctl stop lampos-setup-done.path|systemctl stop lampos.target lamp-voice.service lamp-memory.service|systemd-run|" ]] && grep -q "every part finished: lamp-voice.service lamp-memory.service" "$T/out"'
+lamp; FAKE_BODY_STATE=active FAKE_PARTS_STOP_FAIL=1 ASK_ANSWER=y run --write --from 4; status=$?
+check "a lamp that cannot be stopped is not reset, and step 4 fails" '[[ $status == 1 ]] && ! grep -q "^systemd-run" "$T/log" && grep -q "the lamp could not be stopped before the reset" "$T/out" && grep -q "step 4 (the self-test) failed" "$T/out"'
+lamp; FAKE_BODY_STATE=active FAKE_PARTS= ASK_ANSWER=y run --write --from 4; status=$?
+check "a target with no parts listed: the target is stopped, then the reset" '[[ $status == 0 ]] && grep -q "^systemctl stop lampos.target$" "$T/log" && grep -q "^systemd-run" "$T/log"'
 lamp; KEEPER=$T/bin/no-keeper FAKE_BODY_STATE=active ASK_ANSWER=y run --write --from 4; status=$?
 check "the product image has no keeper (lamp-52e6): a passed self-test still resets" '[[ $status == 0 ]] && grep -q "^systemd-run .* reset-now " "$T/log" && ! grep -q "^keeper" "$T/log"'
 lamp; FAKE_BODY_STATE=active ASK_ANSWER=y ASK_RESET_ANSWER=n run --write --from 4; status=$?
@@ -248,7 +261,9 @@ before() { [[ -n $1 && -n $2 ]] && (( $1 < $2 )); }
 lamp; FAKE_VOICE_STATE=active ASK_ANSWER=y run --write --from 2 --update-key "$KEYFILE"; status=$?
 check "the voice and ears are stopped before Controls is, started after Controls is back, before the self-test" '[[ $status == 0 ]] && before "$(line "^systemctl stop lamp-voice lamp-ears$")" "$(line "^systemctl stop lamp-controls$")" && before "$(line "lamp-controls$" tail)" "$(line "^systemctl start lamp-voice lamp-ears$")" && before "$(line "^systemctl start lamp-voice")" "$(line "^selftest")" && [[ $(grep -c "^systemctl \(start\|stop\) lamp-voice" "$T/log") == 2 ]] && ! grep -q "^systemctl restart lamp-voice" "$T/log"'
 lamp; ASK_ANSWER=y run --write --from 2 --update-key "$KEYFILE"; status=$?
-check "a voice and ears not running are neither stopped nor started" '[[ $status == 0 ]] && ! grep -q "^systemctl \(stop\|start\|restart\).*lamp-\(voice\|ears\)" "$T/log"'
+# The voice as the first unit named: the reset's stop names it among the
+# target's parts.
+check "a voice and ears not running are neither stopped nor started" '[[ $status == 0 ]] && ! grep -q "^systemctl \(stop\|start\|restart\) lamp-\(voice\|ears\)" "$T/log"'
 lamp; FAKE_VOICE_STATE=active FAKE_DISCOVERY_EXIT=1 ASK_ANSWER=y run --write --from 2 --update-key "$KEYFILE"; status=$?
 check "a failed touch step still starts the voice and ears again, after Controls" '[[ $status == 1 ]] && before "$(line "^systemctl start lamp-controls$" tail)" "$(line "^systemctl start lamp-voice lamp-ears$")"'
 lamp; run --from 3 --to 2; status=$?

@@ -627,6 +627,23 @@ step_selftest() {
   # removed from the factory account there (Backend2 on #3555).
   if ASK_ANSWER=${ASK_RESET_ANSWER:-${ASK_ANSWER:-}} ask "the reset, now: the lamp forgets the bench's Wi-Fi, the factory account and any face or name it was given, keeps what steps 1 to 3 wrote, and reboots into setup, unset."; then
     [[ -e $RESET_PLAN ]] || { fail "the self-test passed, but there is no reset plan at $RESET_PLAN: hold the button 5 s (the reset), then remove the lamp from the factory account in the app, then pack"; return 1; }
+    # The lamp is stopped first, and each part waited on. The reset's own
+    # `systemctl stop lampos.target` returns once the target's job is done,
+    # before its parts have stopped (systemd 252: 0.04 s, the part's write on
+    # stop 3.1 s later), so a part that writes as it stops wrote back into
+    # what the reset had just emptied: on lamp-29e7 on 26 Oct, Voice's
+    # onboarding commit kept the factory session's steps, and the customer
+    # got no first five minutes. Named, each part's stop is waited for. The
+    # path unit goes first: with setup's marker still there, it starts the
+    # target again.
+    local listed parts
+    listed=$("$SYSTEMCTL" show -p ConsistsOf --value lampos.target) \
+      || { fail "the self-test passed, but the lamp's parts could not be read to stop them before the reset (systemctl show -p ConsistsOf lampos.target): run this again with --from 4; do not pack it"; return 1; }
+    read -ra parts <<<"$listed"
+    # ${parts[@]+...}: an empty list under set -u (bash 3.2 reads it as unset).
+    "$SYSTEMCTL" stop lampos-setup-done.path && "$SYSTEMCTL" stop lampos.target ${parts[@]+"${parts[@]}"} \
+      || { fail "the self-test passed, but the lamp could not be stopped before the reset (journalctl says why): run this again with --from 4; do not pack it"; return 1; }
+    say "the lamp is stopped, every part finished: ${parts[*]-none listed}"
     say "resetting: the lamp reboots into setup now. Then remove it from the factory account in the app, and pack it."
     "$SYSTEMD_RUN" --no-block --collect --unit=lamp-setup-wipe --property=Type=oneshot \
       "$SETUP_BIN" reset-now --plan "$RESET_PLAN" --enable \
