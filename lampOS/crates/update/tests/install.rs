@@ -918,7 +918,10 @@ fn time_of_day_parts_wait_for_the_kernel_to_say_the_clock_is_set() {
 /// The lead's decision 1 (23 Oct): a product lamp keeps nothing about a
 /// person while nobody is known, so an unknown speaker's "my favourite
 /// colour is blue" is not kept to the room. The switch acts on the
-/// `remember` the memory socket gives the voice.
+/// `remember` the memory socket gives the voice. And what the room did keep
+/// is never told as the asker's (`LAMP_MEMORY_ROOM_NOT_ASKER`, #3593: on
+/// lamp-4ace on 26 Oct, "Black, no sugar, that's how you've had it" from
+/// the room's talk, in 3 of 3 rounds without it).
 #[test]
 fn the_product_keeps_nothing_personal_while_nobody_is_known() {
     let voice = install::PRODUCT
@@ -930,6 +933,7 @@ fn the_product_keeps_nothing_personal_while_nobody_is_known() {
     for line in [
         "Environment=LAMP_MEMORY_SOCKET=/run/lampos-memory/memory.sock",
         "Environment=LAMP_MEMORY_PERSONAL_NEEDS_FACE=on",
+        "Environment=LAMP_MEMORY_ROOM_NOT_ASKER=on",
     ] {
         assert!(service.contains(&line), "the voice lacks {line}");
     }
