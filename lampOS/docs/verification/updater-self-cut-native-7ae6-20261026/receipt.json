@@ -1,0 +1,64 @@
+{
+  "authored_head": "7ae6afbd9f9cef3610362e3310792401833f6d91",
+  "base": "2a8273ef2ec59a17c6d7669a9942223dd6824eac",
+  "actual_preview": "b51eca4c531e90fd548316633cb1fd8cb68aa8b0",
+  "authored_and_tested_tree": "b181a64fbd4da0b5efaa95a55f2ef01d168488f6",
+  "preview_parents": [
+    "2a8273ef2ec59a17c6d7669a9942223dd6824eac",
+    "7ae6afbd9f9cef3610362e3310792401833f6d91"
+  ],
+  "original_run": 40323315453,
+  "attempt": 1,
+  "job": 121573515398,
+  "full_native_proof_commit": "1ba09c163a",
+  "raw_arm_log_sha256": "0b76f7f898de03f846f88cda98319ef399c61737f044681b4593af0ecba399fb",
+  "source_bindings": {
+    "lampOS/crates/update/tests/round/process_cuts.rs": {
+      "git_blob": "392156ef65d52fb0289867664ded4e6d75bba2f0",
+      "sha256": "e5a04534cb6878c2f1656918d95677292167ddff1cee597800ed590ac6846d6c",
+      "equals_fa82": true
+    },
+    "lampOS/crates/update/tests/self_process_cuts.rs": {
+      "git_blob": "5ca02fbca1b25a2ce9aa7aaf42ee7953f53f41e0",
+      "sha256": "34e68d2c1964c42b12f9d5c88af041133c891737ff683c1c25118f50deacf8a3",
+      "equals_fa82": true
+    },
+    "lampOS/crates/update/tests/self_cli_exec.rs": {
+      "git_blob": "7535b367803d2e410d3a52dea182f5f7426176fb",
+      "sha256": "008d2f7a8533835a75d661967bd7817c27d66897417fea9a4f4dc8b81ef015cd",
+      "equals_fa82": true
+    },
+    "lampOS/crates/update/tests/self_cli_exec/linux.rs": {
+      "git_blob": "ac6078e1aedac1e886d63a58920c6e0b59745d0e",
+      "sha256": "b7833c418d5e62fb52b43cbcad5cb01e2120917bea40225a024073f2d6bbf9b8",
+      "equals_fa82": true
+    }
+  },
+  "source_declared_batch_cases": [
+    "candidate_synced",
+    "pending_synced",
+    "current_synced",
+    "confirmation_synced",
+    "put_back_link_synced",
+    "refusal_synced",
+    "put_back_cleanup_synced"
+  ],
+  "results": [
+    {
+      "name": "actual_cli_exec_confirms_before_the_next_round",
+      "status": "PASS",
+      "duration_seconds": 0.155,
+      "ordinal": 6607,
+      "total": 11376
+    },
+    {
+      "name": "persisted_self_switches_survive_sigkill",
+      "status": "PASS",
+      "duration_seconds": 4.319,
+      "ordinal": 7030,
+      "total": 11376
+    }
+  ],
+  "controls_scope": "CLI source includes its self-switch-off negative witness in the same named batch; no separately visible successful control stdout in original log. The SIGKILL source runs all seven declared cases. No new mutant execution is established.",
+  "prior_fa82_proof_run": 40130968164
+}

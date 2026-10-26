@@ -1,3 +1,13 @@
+Ready for lamp-voice: #2810 automated evidence refreshed; physical attended unplug remains open.
+
+## Current checkpoint: 2026-10-26 22:20 +07, existing self-switch controls extracted
+
+[Original 7ae6 native rows](verification/updater-self-cut-native-7ae6-20261026/README.md): CLI exec confirmation PASS **0.155 s**, persisted self-switch SIGKILL batch PASS **4.319 s**, each once in original ARM64 40323315453. Four implementation/driver source files match the earlier fa82 proof. Source declares all seven fsync cut points and the CLI off-switch negative witness; nextest exposes two batch rows, not separate per-cut logs or new mutation executions. These are selected results from a completed run, with exact preview/tree binding, not rerun tests.
+
+The attended worksheet and exact candidate/fallback/observer selection remain with First/Fifth and the lamp-side person. No actual unplug, flash-durability result or real timer recovery is established here. #1812's later 7071 evidence now supplies authenticated publication plus operator-reported installation, with attended Body acceptance still distinct. The own-keys product-unit reader gate continues on frozen source; no device action by Second.
+
+---
+
 Ready for lamp-voice: #3510 e672 scope passed; current product-unit carry qualification active, activation HOLD.
 
 ## Current checkpoint: 2026-10-26 22:19 +07, frozen e672 runtime complete

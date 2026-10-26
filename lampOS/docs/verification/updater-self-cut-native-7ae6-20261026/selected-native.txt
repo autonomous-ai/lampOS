@@ -1,0 +1,2 @@
+2026-10-26T12:46:40.8503466Z         PASS [   0.155s] ( 6607/11376) lamp-update::self-cli-exec actual_cli_exec_confirms_before_the_next_round
+2026-10-26T12:46:45.1690576Z         PASS [   4.319s] ( 7030/11376) lamp-update::self-process-cuts persisted_self_switches_survive_sigkill
