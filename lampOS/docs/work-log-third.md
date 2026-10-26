@@ -13,6 +13,26 @@ machine is explicitly named. Third has no lamp access.
 
 
 
+## 2026-10-26 13:05 — Add-on journal independent read
+
+Ready for lamp-voice: reader result only (#3545)
+
+READ-OK **942123c90**, no P1/P2. Independent Mac formatting, strict Skills
+Clippy, workspace build and full Skills suite pass: **522/0/9 ignored**.
+The changed case runs both dropped and undecided phases once. All 7,220
+tracked lampOS source files stayed unchanged; five actual test drivers and
+the child lamp-skills executable are retained privately with hashes in the
+[gate receipt](verification/addon-journal-reader-20261026/gate.json).
+The shared cursor consumes only complete new lines; all four actual drop
+refusals fence the fifth request. Main-loop busy clearing precedes the next
+voice input. Original outcomes and 8 s / 3 s / 10 s / 300 s limits remain.
+This is no claim of reliable event delivery or the historical failure cause.
+No local ARM linking or device test. Native producer evidence is separate.
+
+#3546 is now non-draft, native green and independently read by Reviewer-two
+with 86/0; a second reader is requested before train admission. #3525 remains
+ready, and the train bot has restarted. Records still needs image metadata.
+
 ## 2026-10-26 12:54 — Factory resume refusal guard
 
 Ready for lamp-voice: no (#3546)

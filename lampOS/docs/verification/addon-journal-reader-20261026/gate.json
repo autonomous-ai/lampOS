@@ -1,0 +1,68 @@
+{
+  "head": "942123c90d360bfb23a2c2739c229509691f3788",
+  "source_count": 7220,
+  "all_source_unchanged": true,
+  "source_manifest_sha256": "983d677dada5c9390840c35d30a2e22fed322166b0ec17845dfaf4028a977806",
+  "gates": {
+    "fmt": {
+      "command": "cargo +1.96.0 fmt --all --check",
+      "started": "2026-10-26T05:51:55Z",
+      "finished": "2026-10-26T05:52:07Z",
+      "exit": 0,
+      "harnesses": 0,
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "disk_error_lines": []
+    },
+    "clippy": {
+      "command": "cargo +1.96.0 clippy -q --offline --locked -p lamp-skills --all-targets -- -D warnings",
+      "started": "2026-10-26T05:52:07Z",
+      "finished": "2026-10-26T05:53:12Z",
+      "exit": 0,
+      "harnesses": 0,
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "disk_error_lines": []
+    },
+    "build": {
+      "command": "cargo +1.96.0 build -q --offline --locked --workspace",
+      "started": "2026-10-26T05:53:12Z",
+      "finished": "2026-10-26T05:57:23Z",
+      "exit": 0,
+      "harnesses": 0,
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "disk_error_lines": []
+    },
+    "test-skills": {
+      "command": "cargo +1.96.0 test --offline --locked -p lamp-skills -- --test-threads=1",
+      "started": "2026-10-26T05:57:23Z",
+      "finished": "2026-10-26T06:05:35Z",
+      "exit": 0,
+      "harnesses": 6,
+      "passed": 522,
+      "failed": 0,
+      "ignored": 9,
+      "disk_error_lines": []
+    }
+  },
+  "changed_case_passes": 1,
+  "executable_sha256": {
+    "lamp_skills-c6f44302f3b2c78f": "62d8a4bd9e732fb626183d18778d4a81b0ce8652ad6cdc0b60e25f92ed2a2d6c",
+    "lamp_skills-a718b2a0214b6903": "ebd501e05d3f8b0d0d4bf1a3959a1c1a1a8be157a0a48bbb43b11282dbae70d9",
+    "it-46363ab9699809b5": "2eadf70249716b62feb48463115f362b030a05c9158d4c52704d509a9bddb290",
+    "release_pair-88349d4c2302e5ab": "057f200eacd7617d3fb818a0311d498cf96449d8bbc1004169d7a7f305a70198",
+    "requested_audio-019db324b83a9807": "91e8d83a49a6734c4521b95e894e05f1afc93c7b5edb87d8a096e66c30beacc5",
+    "lamp-skills": "b56c42cdc57ef254e7936c0f2e0e0d9ca31400bda4c1c15647d049e7f8588310"
+  },
+  "raw_log_sha256": {
+    "fmt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "clippy": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "build": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "test-skills": "c5bc10c9b3122f6891e84a4e72a2adb8cdf288e1ccbd3a0bb0a485a66bd84d73"
+  },
+  "limits": "Independent native Mac gate only. Changed case executes both dropped and undecided phases once. No ARM64 local linking or device. Actual test drivers and CARGO_BIN_EXE child preserved before subsequent Cargo."
+}
