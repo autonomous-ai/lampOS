@@ -1,0 +1,31 @@
+{
+  "status": "PROVISIONAL SOURCE TEMPLATES ONLY; not installed, signed or uploaded",
+  "ship_base": "3d9722f38817a4dd1601fac051d36ac9f2292969",
+  "ship_build": 6919,
+  "candidate_head": "6b727c3f5cb09b79cf1faf9a19d242b6821034ce",
+  "scope": "unchanged installed Voice, candidate updater, exactly one Voice unit; settings off",
+  "unit_source": "public Git product Voice unit; owner must compare actual installed unit before use",
+  "missing_inputs": [
+    "lamp alias and owner/access approval",
+    "signed installed receipt and actual updater level5",
+    "actual installed Voice executable/sidecars/unit hashes and current links",
+    "original sequence and chosen higher GOOD/BAD values",
+    "green current candidate ARM64 artifact and SHA256",
+    "dedicated HTTPS test channel and immutable asset prefixes",
+    "attended slot and verified coherent backup"
+  ],
+  "files": {
+    "base-6919.service": {
+      "sha256": "bac9ebf6bc7d88507e2278ad9814fb9ae7d4a9912d9a62f2a10d751e36636b21",
+      "bytes": 18264
+    },
+    "GOOD-provisional.service": {
+      "sha256": "dfa46a93256581ab6da3320ccd41d04ef6473d6b15947650759616f2a426c576",
+      "bytes": 18327
+    },
+    "BAD-provisional.service": {
+      "sha256": "9c0d487fb63a8344ba9b26857a8ce06f9526d095089a8ad4c521e18d78b99d7d",
+      "bytes": 18358
+    }
+  }
+}

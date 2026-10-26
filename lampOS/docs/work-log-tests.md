@@ -1,5 +1,28 @@
 # Tests work log
 
+## 2026-10-26 06:59 — Product carrier prioritized for the first ten lamps
+
+Ready for lamp-voice: no (#3466)
+
+First's release direction makes the first product-installed build-6919 lamp
+#3466's GOOD/BAD target before the other nine proceed. The thirteen-file carry
+is prepared as 6b727c3f5 on current 3d9722f38. Runtime/test/unit bytes are equal;
+the sole reuse-decisions conflict kept both inherited sections and the
+carrier section. Current fmt and metadata pass; strict twelve-crate Clippy,
+updater build, ten carrier controls and workspace build are proceeding.
+
+[Concrete rehearsal preparation](verification/product-carrier-build6919-20261026/)
+contains source-bound provisional GOOD/BAD units and exact missing inputs.
+The lamp alias, authorized owner/slot, installed records and fresh native
+artifact are still required. No signing, upload, SSH or device action ran.
+The frozen rollback-fixture Linux full suite continues separately; its prior
+compile-only disk stop is retained, and the later compile completed. The
+completed NoPause cache was removed after preserving its receipts/hashes.
+
+#3404 has Reviewer-two's current READ-OK and is included in proposed train148.
+The Skills carry is clean at d12436cab on 3d, with equal range-diff, awaiting
+its own gates after the release-critical carrier.
+
 ## 2026-10-26 06:45 — NoPause ready; Linux rollback boundary proven
 
 Ready for lamp-voice: yes (#3404); no (rollback fixture)
