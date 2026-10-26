@@ -1548,7 +1548,10 @@ fn run_call_with_scope(
             );
             // "Forget everything about me" said at the lamp by the known
             // person whose line it is: their face, and the name it keeps,
-            // go too, as "forget my face" empties their memory (#2850).
+            // go too, as "forget my face" empties their memory (#2850). Only
+            // for a request the second route's guard marked as asking for
+            // everything (#3564): Live and texts never mark one, so there
+            // the face is kept.
             let (told, answered) = match (faces, lease) {
                 (Some((who, switches)), Some(lease))
                     if heard && model.name == crate::remember::FORGET_EVERYTHING =>

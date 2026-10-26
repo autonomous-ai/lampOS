@@ -296,6 +296,20 @@ const SENTENCE_PACKETS: usize = crate::provider_flow::MAX_REPLY_SAMPLES / PACKET
 pub type ToolRunner =
     Arc<dyn Fn(u64, bool, String, Value) -> BoxFuture<'static, Value> + Send + Sync>;
 /// A tool runner carrying the admitted request's immutable memory authority.
+/// The second route's guard showed a request's own ask for everything
+/// (#3608): its words now, the same person's ask just before, or their yes
+/// to one held. Only this module makes one, so only this route can mark a
+/// request as asking for everything, the mark a forget of everything needs
+/// before it takes the face too
+/// ([`crate::memory_scope::ScopeLease::mark_everything_asked`], #3564).
+pub(crate) struct EverythingShown(());
+
+/// [`EverythingShown`] for a test of the face step itself.
+#[cfg(test)]
+pub(crate) fn everything_shown_for_test() -> EverythingShown {
+    EverythingShown(())
+}
+
 pub type ScopedToolRunner = Arc<
     dyn Fn(u64, bool, String, Value, crate::memory_scope::ScopeLease) -> BoxFuture<'static, Value>
         + Send
@@ -7732,6 +7746,18 @@ async fn answer(
             } else {
                 ran_tool.store(true, Ordering::Relaxed);
                 dispatched.store(true, Ordering::Relaxed);
+                // Their yes to a held `forget_everything`, not refused by
+                // these words above: the request's own ask for everything,
+                // so it takes the face too (#3564). Not on a line held only
+                // by a gap, whose memory call `run_tool` refuses.
+                if call.name == crate::remember::FORGET_EVERYTHING
+                    && heard
+                    && !crate::remember::forget_unguarded()
+                    && !held_by_gap(scope.as_ref())
+                    && let Some(scope) = scope.as_ref()
+                {
+                    scope.mark_everything_asked(&EverythingShown(()));
+                }
                 let result = run_tool(shared, request, heard, &call, scope.as_ref()).await;
                 if scope.as_ref().is_some_and(|scope| !scope.is_current()) {
                     return Err(Stop::Gone);
@@ -8364,6 +8390,19 @@ async fn answer(
                         serde_json::json!({"error": CARRIED_MEMORY_WRITE}).to_string(),
                     ));
                     continue;
+                }
+                // The request's own ask for everything, as the guard above
+                // read it (its words, or their ask just before), goes with
+                // this call on its lease: only then does `forget_everything`
+                // take the face too (#3564; Reviewer-two's P2s at 01:12 and
+                // 02:20). Never on the tool's name alone.
+                if call.name == crate::remember::FORGET_EVERYTHING
+                    && heard
+                    && !crate::remember::forget_unguarded()
+                    && (everything_now == Some(true) || asked_just_before)
+                    && let Some(scope) = scope.as_ref()
+                {
+                    scope.mark_everything_asked(&EverythingShown(()));
                 }
                 ran_tool.store(true, Ordering::Relaxed);
                 let mut answer = match (&shared.requested_audio, spoken) {

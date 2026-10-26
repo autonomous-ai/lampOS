@@ -591,6 +591,14 @@ fn forget_everything_face_if(
     switches: crate::known_faces::FaceSwitches,
     lease: &crate::memory_scope::ScopeLease,
 ) -> (Value, bool) {
+    // Only for the request's own ask for everything, shown by the second
+    // route's guard and marked on its lease (#3608): never on the tool's
+    // name, the person's scope or a model's call alone. Live and texts never
+    // mark it, so there the face is kept, as before (Reviewer-two's P2s on
+    // #3564, 01:12 and 02:20).
+    if !lease.everything_marked() {
+        return told;
+    }
     // Tried for the person the line was admitted as, and sent only while it
     // is still theirs (`still_theirs`, below): a line revoked or narrowed to
     // the room before this step says its face is kept, never everything gone
@@ -9059,8 +9067,10 @@ mod tests {
     /// everything about me" emptied the memory and kept the face and its
     /// name. With the memory of the known person whose line it is emptied,
     /// the eyes are asked to forget that face: their yes is said as
-    /// "forgotten too", no answer as kept. A room's line, a memory not
-    /// emptied and the switch off ask the eyes nothing.
+    /// "forgotten too", no answer as kept. A request not marked as asking
+    /// for everything (Live, texts, a model's call the second route's guard
+    /// did not show asked), a room's line, a memory not emptied and the
+    /// switch off ask the eyes nothing.
     #[test]
     fn forgetting_everything_forgets_the_persons_face_too() {
         let dir = std::env::temp_dir().join(format!("forget-all-face-{}", std::process::id()));
@@ -9071,6 +9081,26 @@ mod tests {
         let emptied = (json!({"forgotten": true, "everything": true}), true);
         let switches = crate::known_faces::FaceSwitches::default();
         let listener = UnixListener::bind(&who).unwrap();
+        // Reviewer-two's P2s on #3564 (01:12, 02:20): Ann's own line, known
+        // by face, faces on, her memory emptied and the eyes listening, but
+        // the request never marked as asking for everything (Live, texts, a
+        // model's own pick of `forget_everything`): the eyes are asked
+        // nothing and the answer is the memory's own.
+        let ann = scoped_request(Some("Ann"), 3_558_001);
+        listener.set_nonblocking(true).unwrap();
+        assert!(!ann.lease().everything_marked());
+        assert_eq!(
+            forget_everything_face_if(true, emptied.clone(), &who, switches, &ann.lease()),
+            emptied
+        );
+        assert!(
+            listener.accept().is_err(),
+            "a forget of everything not shown asked reached the eyes"
+        );
+        listener.set_nonblocking(false).unwrap();
+        // The second route's guard showed her ask for everything.
+        ann.lease()
+            .mark_everything_asked(&crate::second_provider::everything_shown_for_test());
         let eyes = std::thread::spawn(move || {
             let (stream, _) = listener.accept().unwrap();
             let mut line = String::new();
@@ -9078,7 +9108,6 @@ mod tests {
             (&stream).write_all(b"{\"forgot\":true}\n").unwrap();
             line
         });
-        let ann = scoped_request(Some("Ann"), 3_558_001);
         let (told, answered) =
             forget_everything_face_if(true, emptied.clone(), &who, switches, &ann.lease());
         let asked = eyes.join().unwrap();
@@ -9138,6 +9167,7 @@ mod tests {
         // and the face is said to be kept.
         let gone_ann = scoped_request(Some("Ann"), 3_558_003);
         let lease = gone_ann.lease();
+        lease.mark_everything_asked(&crate::second_provider::everything_shown_for_test());
         gone_ann.revoke();
         let (told, _) = forget_everything_face_if(true, emptied.clone(), &who, switches, &lease);
         assert_eq!(told["face"], MEMORY_FACE_KEPT);
@@ -9151,6 +9181,7 @@ mod tests {
         // fence (`still_theirs`) refuses the send, and the answer is partial.
         let narrowed = scoped_request(Some("Ann"), 3_558_004);
         let lease = narrowed.lease();
+        lease.mark_everything_asked(&crate::second_provider::everything_shown_for_test());
         lease.narrow_to_room();
         let (told, _) = forget_everything_face_if(true, emptied.clone(), &who, switches, &lease);
         assert_eq!(told["face"], MEMORY_FACE_KEPT);
@@ -9198,6 +9229,8 @@ mod tests {
         std::fs::remove_file(&who).unwrap();
         // A room's line, a memory not emptied, the switch off: as it was.
         let room = scoped_request(None, 3_558_002);
+        room.lease()
+            .mark_everything_asked(&crate::second_provider::everything_shown_for_test());
         assert_eq!(
             forget_everything_face_if(true, emptied.clone(), &who, switches, &room.lease()),
             emptied
@@ -9210,6 +9243,141 @@ mod tests {
         assert_eq!(
             forget_everything_face_if(false, emptied.clone(), &who, switches, &ann.lease()),
             emptied
+        );
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    const FACE_TOOLS_CHILD: &str = "LAMP_MEMORY_FORGET_FACE_TOOLS_TEST_CHILD";
+
+    /// Reviewer-two's composed pair on #3564 (02:35), through the tools path
+    /// Live calls (`tools::run_call_scoped`): Ann's own line, known by face,
+    /// the eyes' route set and listening, the Days memory with
+    /// `LAMP_MEMORY_FORGET_ALL` answering `forget_everything` as all gone. A
+    /// request not marked as asking for everything, as Live and texts never
+    /// mark one, has its memory emptied and its face kept: the eyes are asked
+    /// nothing. The same call on a request marked as the second route's guard
+    /// marks it forgets the face too. The Days client and its switch are the
+    /// process's, so it runs in a child, its consent file in its own folder.
+    #[test]
+    fn forget_everything_through_the_tools_takes_the_face_only_when_marked() {
+        const NAME: &str =
+            "remember::tests::forget_everything_through_the_tools_takes_the_face_only_when_marked";
+        if std::env::var(FACE_TOOLS_CHILD).ok().as_deref() != Some("1") {
+            let output = std::process::Command::new(std::env::current_exe().unwrap())
+                .args(["--exact", NAME, "--nocapture"])
+                .env(FACE_TOOLS_CHILD, "1")
+                .output()
+                .unwrap();
+            let said = format!(
+                "{}\n{}",
+                String::from_utf8_lossy(&output.stdout),
+                String::from_utf8_lossy(&output.stderr)
+            );
+            assert!(output.status.success(), "{said}");
+            assert!(said.contains("1 passed"), "the child ran no test: {said}");
+            return;
+        }
+        let dir = std::env::temp_dir().join(format!("forget-face-tools-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let memory = dir.join("memory.sock");
+        let eyes = dir.join("eyes.sock");
+        std::fs::write(crate::known_faces::known_file_of(&eyes), "Ann\n").unwrap();
+        // The memory: every forget of everything empties four things, and
+        // anything else (the client's own opening) finds nothing.
+        let listener = UnixListener::bind(&memory).unwrap();
+        listener.set_nonblocking(true).unwrap();
+        let done = Arc::new(AtomicBool::new(false));
+        let served = {
+            let done = done.clone();
+            std::thread::spawn(move || {
+                let until = Instant::now() + Duration::from_secs(10);
+                let mut read = Vec::new();
+                while !done.load(Ordering::Acquire) && Instant::now() < until {
+                    let stream = match listener.accept() {
+                        Ok((stream, _)) => stream,
+                        Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                            std::thread::sleep(Duration::from_millis(5));
+                            continue;
+                        }
+                        Err(error) => panic!("{error}"),
+                    };
+                    stream.set_nonblocking(false).unwrap();
+                    stream
+                        .set_read_timeout(Some(Duration::from_secs(2)))
+                        .unwrap();
+                    let mut line = String::new();
+                    if BufReader::new(&stream).read_line(&mut line).is_err() {
+                        continue;
+                    }
+                    let Ok(request) = serde_json::from_str::<Value>(&line) else {
+                        continue;
+                    };
+                    let answer = match request["op"].as_str() {
+                        Some("forget_all") => json!({"ok": true, "removed": 4}),
+                        _ => json!({"ok": true, "entries": []}),
+                    };
+                    let _ = (&stream).write_all(format!("{answer}\n").as_bytes());
+                    read.push(request);
+                }
+                read
+            })
+        };
+        DAYS_MODE.set(true).unwrap();
+        assert!(switch_forget_all(true));
+        let mut client = DaysClient::new(memory.clone()).unwrap();
+        client.room_sounds = dir.join("room-sounds.json");
+        assert!(DAYS.set(Some(client)).is_ok());
+        let eyes_listener = UnixListener::bind(&eyes).unwrap();
+        eyes_listener.set_nonblocking(true).unwrap();
+        let route = crate::tools::Route::Memory(
+            memory.clone(),
+            Some((eyes.clone(), crate::known_faces::FaceSwitches::default())),
+        );
+        let forget = call(FORGET_EVERYTHING, json!({}));
+        // Not marked: the memory is emptied, the face kept, the eyes asked
+        // nothing.
+        let live = scoped_request(Some("Ann"), 3_564_101);
+        let (_, (told, answered)) =
+            crate::tools::run_call_scoped(&route, &forget, 3_564_101, true, &live.lease());
+        assert!(answered, "{told}");
+        assert_eq!(told["forgotten"], true, "{told}");
+        assert_eq!(told["everything"], true, "{told}");
+        assert!(told.get("face").is_none(), "{told}");
+        assert!(
+            eyes_listener.accept().is_err(),
+            "a forget of everything not marked reached the eyes"
+        );
+        // Marked: the same call, the same settings, and the face goes too.
+        eyes_listener.set_nonblocking(false).unwrap();
+        let asked_eyes = std::thread::spawn(move || {
+            let (stream, _) = eyes_listener.accept().unwrap();
+            let mut line = String::new();
+            BufReader::new(&stream).read_line(&mut line).unwrap();
+            (&stream).write_all(b"{\"forgot\":true}\n").unwrap();
+            line
+        });
+        let second = scoped_request(Some("Ann"), 3_564_102);
+        second
+            .lease()
+            .mark_everything_asked(&crate::second_provider::everything_shown_for_test());
+        let (_, (told, _)) =
+            crate::tools::run_call_scoped(&route, &forget, 3_564_102, true, &second.lease());
+        let asked = asked_eyes.join().unwrap();
+        assert!(asked.contains("\"forget\":\"Ann\""), "{asked}");
+        assert_eq!(told["face"], "forgotten too", "{told}");
+        assert_eq!(told["forgotten"], true, "{told}");
+        done.store(true, Ordering::Release);
+        let read = served.join().unwrap();
+        let person = person_id("Ann");
+        let emptied: Vec<&Value> = read
+            .iter()
+            .filter(|request| request["op"] == "forget_all")
+            .collect();
+        assert_eq!(emptied.len(), 2, "{read:?}");
+        assert!(
+            emptied.iter().all(|request| request["person"] == person),
+            "{read:?}"
         );
         std::fs::remove_dir_all(&dir).unwrap();
     }
