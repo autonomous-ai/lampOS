@@ -1,0 +1,1070 @@
+{
+  "source_head": "2aae46323701bf5b66c7627c88c9abaa6378a612",
+  "units": [
+    {
+      "unit": "lamp-actions.service",
+      "path": "lampOS/deploy/product/lamp-actions.service",
+      "properties": {
+        "PartOf": [
+          {
+            "line": 5,
+            "value": "lampos.target"
+          }
+        ],
+        "After": [
+          {
+            "line": 8,
+            "value": "local-fs.target sound.target"
+          }
+        ],
+        "Type": [
+          {
+            "line": 13,
+            "value": "simple"
+          }
+        ]
+      },
+      "stop_timeout": "manager default/effective drop-ins; not established by repository",
+      "exec_stop_post_dropin": "Install applies exit-note.conf if named in EXIT_NOTE_UNITS; inspect separate list."
+    },
+    {
+      "unit": "lamp-addons.service",
+      "path": "lampOS/deploy/product/lamp-addons.service",
+      "properties": {
+        "PartOf": [
+          {
+            "line": 12,
+            "value": "lampos.target"
+          }
+        ],
+        "After": [
+          {
+            "line": 15,
+            "value": "local-fs.target lamp-voice.service lamp-skills.service"
+          }
+        ],
+        "Type": [
+          {
+            "line": 20,
+            "value": "simple"
+          }
+        ]
+      },
+      "stop_timeout": "manager default/effective drop-ins; not established by repository",
+      "exec_stop_post_dropin": "Install applies exit-note.conf if named in EXIT_NOTE_UNITS; inspect separate list."
+    },
+    {
+      "unit": "lamp-air-clock.service",
+      "path": "lampOS/deploy/product/lamp-air-clock.service",
+      "properties": {
+        "PartOf": [
+          {
+            "line": 10,
+            "value": "lampos.target"
+          }
+        ],
+        "Before": [
+          {
+            "line": 16,
+            "value": "lamp-air.service lamp-controls.service"
+          }
+        ],
+        "After": [
+          {
+            "line": 17,
+            "value": "local-fs.target"
+          }
+        ],
+        "Type": [
+          {
+            "line": 20,
+            "value": "oneshot"
+          }
+        ]
+      },
+      "stop_timeout": "manager default/effective drop-ins; not established by repository",
+      "exec_stop_post_dropin": "Install applies exit-note.conf if named in EXIT_NOTE_UNITS; inspect separate list."
+    },
+    {
+      "unit": "lamp-air.service",
+      "path": "lampOS/deploy/product/lamp-air.service",
+      "properties": {
+        "PartOf": [
+          {
+            "line": 5,
+            "value": "lampos.target"
+          }
+        ],
+        "After": [
+          {
+            "line": 8,
+            "value": "local-fs.target lamp-voice.service"
+          }
+        ],
+        "Type": [
+          {
+            "line": 13,
+            "value": "simple"
+          }
+        ]
+      },
+      "stop_timeout": "manager default/effective drop-ins; not established by repository",
+      "exec_stop_post_dropin": "Install applies exit-note.conf if named in EXIT_NOTE_UNITS; inspect separate list."
+    },
+    {
+      "unit": "lamp-body.service",
+      "path": "lampOS/deploy/product/lamp-body.service",
+      "properties": {
+        "PartOf": [
+          {
+            "line": 10,
+            "value": "lampos.target"
+          }
+        ],
+        "After": [
+          {
+            "line": 13,
+            "value": "lamp-voice.service"
+          }
+        ],
+        "Type": [
+          {
+            "line": 18,
+            "value": "notify"
+          }
+        ],
+        "KillMode": [
+          {
+            "line": 46,
+            "value": "mixed"
+          }
+        ],
+        "KillSignal": [
+          {
+            "line": 47,
+            "value": "SIGTERM"
+          }
+        ],
+        "TimeoutStopSec": [
+          {
+            "line": 49,
+            "value": "25s"
+          }
+        ]
+      },
+      "stop_timeout": "explicit",
+      "exec_stop_post_dropin": "Install applies exit-note.conf if named in EXIT_NOTE_UNITS; inspect separate list."
+    },
+    {
+      "unit": "lamp-cloud.service",
+      "path": "lampOS/deploy/product/lamp-cloud.service",
+      "properties": {
+        "PartOf": [
+          {
+            "line": 13,
+            "value": "lampos.target"
+          }
+        ],
+        "After": [
+          {
+            "line": 20,
+            "value": "network-online.target lamp-actions.service"
+          }
+        ],
+        "Type": [
+          {
+            "line": 26,
+            "value": "simple"
+          }
+        ]
+      },
+      "stop_timeout": "manager default/effective drop-ins; not established by repository",
+      "exec_stop_post_dropin": "Install applies exit-note.conf if named in EXIT_NOTE_UNITS; inspect separate list."
+    },
+    {
+      "unit": "lamp-controls.service",
+      "path": "lampOS/deploy/product/lamp-controls.service",
+      "properties": {
+        "PartOf": [
+          {
+            "line": 9,
+            "value": "lampos.target"
+          }
+        ],
+        "After": [
+          {
+            "line": 12,
+            "value": "lamp-voice.service"
+          }
+        ],
+        "Type": [
+          {
+            "line": 17,
+            "value": "simple"
+          }
+        ]
+      },
+      "stop_timeout": "manager default/effective drop-ins; not established by repository",
+      "exec_stop_post_dropin": "Install applies exit-note.conf if named in EXIT_NOTE_UNITS; inspect separate list."
+    },
+    {
+      "unit": "lamp-ears.service",
+      "path": "lampOS/deploy/product/lamp-ears.service",
+      "properties": {
+        "PartOf": [
+          {
+            "line": 5,
+            "value": "lampos.target"
+          }
+        ],
+        "After": [
+          {
+            "line": 8,
+            "value": "sound.target local-fs.target lamp-voice.service"
+          }
+        ],
+        "Type": [
+          {
+            "line": 13,
+            "value": "simple"
+          }
+        ]
+      },
+      "stop_timeout": "manager default/effective drop-ins; not established by repository",
+      "exec_stop_post_dropin": "Install applies exit-note.conf if named in EXIT_NOTE_UNITS; inspect separate list."
+    },
+    {
+      "unit": "lamp-expression.service",
+      "path": "lampOS/deploy/product/lamp-expression.service",
+      "properties": {
+        "PartOf": [
+          {
+            "line": 5,
+            "value": "lampos.target"
+          }
+        ],
+        "After": [
+          {
+            "line": 8,
+            "value": "lamp-voice.service lamp-body.service"
+          }
+        ],
+        "Type": [
+          {
+            "line": 13,
+            "value": "simple"
+          }
+        ]
+      },
+      "stop_timeout": "manager default/effective drop-ins; not established by repository",
+      "exec_stop_post_dropin": "Install applies exit-note.conf if named in EXIT_NOTE_UNITS; inspect separate list."
+    },
+    {
+      "unit": "lamp-eyes-camera.socket",
+      "path": "lampOS/deploy/product/lamp-eyes-camera.socket",
+      "properties": {},
+      "stop_timeout": "manager default/effective drop-ins; not established by repository",
+      "exec_stop_post_dropin": "Install applies exit-note.conf if named in EXIT_NOTE_UNITS; inspect separate list."
+    },
+    {
+      "unit": "lamp-eyes-camera@.service",
+      "path": "lampOS/deploy/product/lamp-eyes-camera@.service",
+      "properties": {
+        "Type": [
+          {
+            "line": 13,
+            "value": "simple"
+          }
+        ],
+        "RuntimeMaxSec": [
+          {
+            "line": 21,
+            "value": "10"
+          }
+        ]
+      },
+      "stop_timeout": "manager default/effective drop-ins; not established by repository",
+      "exec_stop_post_dropin": "Install applies exit-note.conf if named in EXIT_NOTE_UNITS; inspect separate list."
+    },
+    {
+      "unit": "lamp-eyes.service",
+      "path": "lampOS/deploy/product/lamp-eyes.service",
+      "properties": {
+        "PartOf": [
+          {
+            "line": 5,
+            "value": "lampos.target"
+          }
+        ],
+        "After": [
+          {
+            "line": 8,
+            "value": "lamp-voice.service lamp-body.service"
+          }
+        ],
+        "Type": [
+          {
+            "line": 13,
+            "value": "exec"
+          }
+        ]
+      },
+      "stop_timeout": "manager default/effective drop-ins; not established by repository",
+      "exec_stop_post_dropin": "Install applies exit-note.conf if named in EXIT_NOTE_UNITS; inspect separate list."
+    },
+    {
+      "unit": "lamp-health.service",
+      "path": "lampOS/deploy/product/lamp-health.service",
+      "properties": {
+        "PartOf": [
+          {
+            "line": 5,
+            "value": "lampos.target"
+          }
+        ],
+        "After": [
+          {
+            "line": 8,
+            "value": "local-fs.target"
+          }
+        ],
+        "Type": [
+          {
+            "line": 13,
+            "value": "simple"
+          }
+        ]
+      },
+      "stop_timeout": "manager default/effective drop-ins; not established by repository",
+      "exec_stop_post_dropin": "Install applies exit-note.conf if named in EXIT_NOTE_UNITS; inspect separate list."
+    },
+    {
+      "unit": "lamp-keeper-restart.socket",
+      "path": "lampOS/deploy/product/lamp-keeper-restart.socket",
+      "properties": {},
+      "stop_timeout": "manager default/effective drop-ins; not established by repository",
+      "exec_stop_post_dropin": "Install applies exit-note.conf if named in EXIT_NOTE_UNITS; inspect separate list."
+    },
+    {
+      "unit": "lamp-keeper-restart@.service",
+      "path": "lampOS/deploy/product/lamp-keeper-restart@.service",
+      "properties": {
+        "Type": [
+          {
+            "line": 11,
+            "value": "simple"
+          }
+        ],
+        "RuntimeMaxSec": [
+          {
+            "line": 20,
+            "value": "5min"
+          }
+        ]
+      },
+      "stop_timeout": "manager default/effective drop-ins; not established by repository",
+      "exec_stop_post_dropin": "Install applies exit-note.conf if named in EXIT_NOTE_UNITS; inspect separate list."
+    },
+    {
+      "unit": "lamp-memory.service",
+      "path": "lampOS/deploy/product/lamp-memory.service",
+      "properties": {
+        "PartOf": [
+          {
+            "line": 5,
+            "value": "lampos.target"
+          }
+        ],
+        "After": [
+          {
+            "line": 8,
+            "value": "local-fs.target"
+          }
+        ],
+        "Type": [
+          {
+            "line": 13,
+            "value": "simple"
+          }
+        ]
+      },
+      "stop_timeout": "manager default/effective drop-ins; not established by repository",
+      "exec_stop_post_dropin": "Install applies exit-note.conf if named in EXIT_NOTE_UNITS; inspect separate list."
+    },
+    {
+      "unit": "lamp-mood.service",
+      "path": "lampOS/deploy/product/lamp-mood.service",
+      "properties": {
+        "PartOf": [
+          {
+            "line": 10,
+            "value": "lampos.target"
+          }
+        ],
+        "After": [
+          {
+            "line": 13,
+            "value": "local-fs.target lamp-voice.service"
+          }
+        ],
+        "Type": [
+          {
+            "line": 18,
+            "value": "simple"
+          }
+        ]
+      },
+      "stop_timeout": "manager default/effective drop-ins; not established by repository",
+      "exec_stop_post_dropin": "Install applies exit-note.conf if named in EXIT_NOTE_UNITS; inspect separate list."
+    },
+    {
+      "unit": "lamp-name.service",
+      "path": "lampOS/deploy/product/lamp-name.service",
+      "properties": {
+        "PartOf": [
+          {
+            "line": 5,
+            "value": "lampos.target"
+          }
+        ],
+        "After": [
+          {
+            "line": 8,
+            "value": "lamp-voice.service"
+          }
+        ],
+        "Type": [
+          {
+            "line": 13,
+            "value": "simple"
+          }
+        ]
+      },
+      "stop_timeout": "manager default/effective drop-ins; not established by repository",
+      "exec_stop_post_dropin": "Install applies exit-note.conf if named in EXIT_NOTE_UNITS; inspect separate list."
+    },
+    {
+      "unit": "lamp-policy.service",
+      "path": "lampOS/deploy/product/lamp-policy.service",
+      "properties": {
+        "PartOf": [
+          {
+            "line": 5,
+            "value": "lampos.target"
+          }
+        ],
+        "After": [
+          {
+            "line": 8,
+            "value": "network-online.target lamp-voice.service"
+          }
+        ],
+        "Type": [
+          {
+            "line": 14,
+            "value": "simple"
+          }
+        ]
+      },
+      "stop_timeout": "manager default/effective drop-ins; not established by repository",
+      "exec_stop_post_dropin": "Install applies exit-note.conf if named in EXIT_NOTE_UNITS; inspect separate list."
+    },
+    {
+      "unit": "lamp-records.service",
+      "path": "lampOS/deploy/product/lamp-records.service",
+      "properties": {
+        "Type": [
+          {
+            "line": 6,
+            "value": "oneshot"
+          }
+        ],
+        "TimeoutStartSec": [
+          {
+            "line": 15,
+            "value": "60"
+          }
+        ],
+        "TimeoutStopSec": [
+          {
+            "line": 16,
+            "value": "5"
+          }
+        ]
+      },
+      "stop_timeout": "explicit",
+      "exec_stop_post_dropin": "Install applies exit-note.conf if named in EXIT_NOTE_UNITS; inspect separate list."
+    },
+    {
+      "unit": "lamp-records.timer",
+      "path": "lampOS/deploy/product/lamp-records.timer",
+      "properties": {},
+      "stop_timeout": "manager default/effective drop-ins; not established by repository",
+      "exec_stop_post_dropin": "Install applies exit-note.conf if named in EXIT_NOTE_UNITS; inspect separate list."
+    },
+    {
+      "unit": "lamp-schedule.service",
+      "path": "lampOS/deploy/product/lamp-schedule.service",
+      "properties": {
+        "PartOf": [
+          {
+            "line": 5,
+            "value": "lampos.target"
+          }
+        ],
+        "After": [
+          {
+            "line": 11,
+            "value": "local-fs.target time-sync.target"
+          }
+        ],
+        "Type": [
+          {
+            "line": 16,
+            "value": "simple"
+          }
+        ]
+      },
+      "stop_timeout": "manager default/effective drop-ins; not established by repository",
+      "exec_stop_post_dropin": "Install applies exit-note.conf if named in EXIT_NOTE_UNITS; inspect separate list."
+    },
+    {
+      "unit": "lamp-selftest.service",
+      "path": "lampOS/deploy/product/lamp-selftest.service",
+      "properties": {
+        "After": [
+          {
+            "line": 13,
+            "value": "lampos.target"
+          }
+        ],
+        "Type": [
+          {
+            "line": 16,
+            "value": "oneshot"
+          }
+        ],
+        "TimeoutStartSec": [
+          {
+            "line": 31,
+            "value": "420"
+          }
+        ]
+      },
+      "stop_timeout": "manager default/effective drop-ins; not established by repository",
+      "exec_stop_post_dropin": "Install applies exit-note.conf if named in EXIT_NOTE_UNITS; inspect separate list."
+    },
+    {
+      "unit": "lamp-selftest.timer",
+      "path": "lampOS/deploy/product/lamp-selftest.timer",
+      "properties": {
+        "PartOf": [
+          {
+            "line": 5,
+            "value": "lampos.target"
+          }
+        ]
+      },
+      "stop_timeout": "manager default/effective drop-ins; not established by repository",
+      "exec_stop_post_dropin": "Install applies exit-note.conf if named in EXIT_NOTE_UNITS; inspect separate list."
+    },
+    {
+      "unit": "lamp-setup-change.socket",
+      "path": "lampOS/deploy/product/lamp-setup-change.socket",
+      "properties": {
+        "PartOf": [
+          {
+            "line": 7,
+            "value": "lampos.target"
+          }
+        ]
+      },
+      "stop_timeout": "manager default/effective drop-ins; not established by repository",
+      "exec_stop_post_dropin": "Install applies exit-note.conf if named in EXIT_NOTE_UNITS; inspect separate list."
+    },
+    {
+      "unit": "lamp-setup-change@.service",
+      "path": "lampOS/deploy/product/lamp-setup-change@.service",
+      "properties": {
+        "Type": [
+          {
+            "line": 10,
+            "value": "simple"
+          }
+        ],
+        "RuntimeMaxSec": [
+          {
+            "line": 19,
+            "value": "35min"
+          }
+        ]
+      },
+      "stop_timeout": "manager default/effective drop-ins; not established by repository",
+      "exec_stop_post_dropin": "Install applies exit-note.conf if named in EXIT_NOTE_UNITS; inspect separate list."
+    },
+    {
+      "unit": "lamp-setup-keys.socket",
+      "path": "lampOS/deploy/product/lamp-setup-keys.socket",
+      "properties": {
+        "PartOf": [
+          {
+            "line": 9,
+            "value": "lampos.target"
+          }
+        ]
+      },
+      "stop_timeout": "manager default/effective drop-ins; not established by repository",
+      "exec_stop_post_dropin": "Install applies exit-note.conf if named in EXIT_NOTE_UNITS; inspect separate list."
+    },
+    {
+      "unit": "lamp-setup-keys@.service",
+      "path": "lampOS/deploy/product/lamp-setup-keys@.service",
+      "properties": {
+        "Type": [
+          {
+            "line": 12,
+            "value": "simple"
+          }
+        ],
+        "RuntimeMaxSec": [
+          {
+            "line": 19,
+            "value": "35min"
+          }
+        ]
+      },
+      "stop_timeout": "manager default/effective drop-ins; not established by repository",
+      "exec_stop_post_dropin": "Install applies exit-note.conf if named in EXIT_NOTE_UNITS; inspect separate list."
+    },
+    {
+      "unit": "lamp-setup-recover.service",
+      "path": "lampOS/deploy/product/lamp-setup-recover.service",
+      "properties": {
+        "After": [
+          {
+            "line": 7,
+            "value": "network-pre.target"
+          }
+        ],
+        "Type": [
+          {
+            "line": 13,
+            "value": "simple"
+          }
+        ]
+      },
+      "stop_timeout": "manager default/effective drop-ins; not established by repository",
+      "exec_stop_post_dropin": "Install applies exit-note.conf if named in EXIT_NOTE_UNITS; inspect separate list."
+    },
+    {
+      "unit": "lamp-setup-reset.service",
+      "path": "lampOS/deploy/product/lamp-setup-reset.service",
+      "properties": {
+        "PartOf": [
+          {
+            "line": 6,
+            "value": "lampos.target"
+          }
+        ],
+        "After": [
+          {
+            "line": 9,
+            "value": "lamp-controls.service"
+          }
+        ],
+        "Type": [
+          {
+            "line": 12,
+            "value": "simple"
+          }
+        ]
+      },
+      "stop_timeout": "manager default/effective drop-ins; not established by repository",
+      "exec_stop_post_dropin": "Install applies exit-note.conf if named in EXIT_NOTE_UNITS; inspect separate list."
+    },
+    {
+      "unit": "lamp-setup-wifi-restore.service",
+      "path": "lampOS/deploy/product/lamp-setup-wifi-restore.service",
+      "properties": {
+        "After": [
+          {
+            "line": 9,
+            "value": "local-fs.target"
+          }
+        ],
+        "Before": [
+          {
+            "line": 10,
+            "value": "wpa_supplicant@wlan0.service dhcpcd.service network-pre.target"
+          }
+        ],
+        "Type": [
+          {
+            "line": 15,
+            "value": "oneshot"
+          }
+        ]
+      },
+      "stop_timeout": "manager default/effective drop-ins; not established by repository",
+      "exec_stop_post_dropin": "Install applies exit-note.conf if named in EXIT_NOTE_UNITS; inspect separate list."
+    },
+    {
+      "unit": "lamp-setup-wifi.socket",
+      "path": "lampOS/deploy/product/lamp-setup-wifi.socket",
+      "properties": {
+        "PartOf": [
+          {
+            "line": 7,
+            "value": "lampos.target"
+          }
+        ]
+      },
+      "stop_timeout": "manager default/effective drop-ins; not established by repository",
+      "exec_stop_post_dropin": "Install applies exit-note.conf if named in EXIT_NOTE_UNITS; inspect separate list."
+    },
+    {
+      "unit": "lamp-setup-wifi@.service",
+      "path": "lampOS/deploy/product/lamp-setup-wifi@.service",
+      "properties": {
+        "Type": [
+          {
+            "line": 14,
+            "value": "simple"
+          }
+        ],
+        "RuntimeMaxSec": [
+          {
+            "line": 26,
+            "value": "25min"
+          }
+        ],
+        "ExecStopPost": [
+          {
+            "line": 29,
+            "value": "/opt/lampOS/setup/current/lamp-setup wifi-restore"
+          }
+        ],
+        "TimeoutStopSec": [
+          {
+            "line": 33,
+            "value": "2min"
+          }
+        ]
+      },
+      "stop_timeout": "explicit",
+      "exec_stop_post_dropin": "Install applies exit-note.conf if named in EXIT_NOTE_UNITS; inspect separate list."
+    },
+    {
+      "unit": "lamp-setup.service",
+      "path": "lampOS/deploy/product/lamp-setup.service",
+      "properties": {
+        "After": [
+          {
+            "line": 13,
+            "value": "local-fs.target"
+          }
+        ],
+        "Type": [
+          {
+            "line": 16,
+            "value": "simple"
+          }
+        ],
+        "ExecStopPost": [
+          {
+            "line": 26,
+            "value": "/usr/bin/systemctl stop nginx"
+          }
+        ]
+      },
+      "stop_timeout": "manager default/effective drop-ins; not established by repository",
+      "exec_stop_post_dropin": "Install applies exit-note.conf if named in EXIT_NOTE_UNITS; inspect separate list."
+    },
+    {
+      "unit": "lamp-skills-manage.socket",
+      "path": "lampOS/deploy/product/lamp-skills-manage.socket",
+      "properties": {},
+      "stop_timeout": "manager default/effective drop-ins; not established by repository",
+      "exec_stop_post_dropin": "Install applies exit-note.conf if named in EXIT_NOTE_UNITS; inspect separate list."
+    },
+    {
+      "unit": "lamp-skills-manage@.service",
+      "path": "lampOS/deploy/product/lamp-skills-manage@.service",
+      "properties": {
+        "Type": [
+          {
+            "line": 24,
+            "value": "simple"
+          }
+        ],
+        "RuntimeMaxSec": [
+          {
+            "line": 33,
+            "value": "60"
+          }
+        ]
+      },
+      "stop_timeout": "manager default/effective drop-ins; not established by repository",
+      "exec_stop_post_dropin": "Install applies exit-note.conf if named in EXIT_NOTE_UNITS; inspect separate list."
+    },
+    {
+      "unit": "lamp-skills.service",
+      "path": "lampOS/deploy/product/lamp-skills.service",
+      "properties": {
+        "PartOf": [
+          {
+            "line": 12,
+            "value": "lampos.target"
+          }
+        ],
+        "After": [
+          {
+            "line": 15,
+            "value": "local-fs.target lamp-voice.service lamp-body.service lamp-actions.service"
+          }
+        ],
+        "Type": [
+          {
+            "line": 20,
+            "value": "simple"
+          }
+        ]
+      },
+      "stop_timeout": "manager default/effective drop-ins; not established by repository",
+      "exec_stop_post_dropin": "Install applies exit-note.conf if named in EXIT_NOTE_UNITS; inspect separate list."
+    },
+    {
+      "unit": "lamp-tasks.service",
+      "path": "lampOS/deploy/product/lamp-tasks.service",
+      "properties": {
+        "PartOf": [
+          {
+            "line": 7,
+            "value": "lampos.target"
+          }
+        ],
+        "After": [
+          {
+            "line": 13,
+            "value": "network-online.target"
+          }
+        ],
+        "Type": [
+          {
+            "line": 19,
+            "value": "exec"
+          }
+        ]
+      },
+      "stop_timeout": "manager default/effective drop-ins; not established by repository",
+      "exec_stop_post_dropin": "Install applies exit-note.conf if named in EXIT_NOTE_UNITS; inspect separate list."
+    },
+    {
+      "unit": "lamp-update-apply.service",
+      "path": "lampOS/deploy/product/lamp-update-apply.service",
+      "properties": {
+        "Type": [
+          {
+            "line": 20,
+            "value": "oneshot"
+          }
+        ],
+        "TimeoutStartSec": [
+          {
+            "line": 26,
+            "value": "60"
+          }
+        ]
+      },
+      "stop_timeout": "manager default/effective drop-ins; not established by repository",
+      "exec_stop_post_dropin": "Install applies exit-note.conf if named in EXIT_NOTE_UNITS; inspect separate list."
+    },
+    {
+      "unit": "lamp-update-back.service",
+      "path": "lampOS/deploy/product/lamp-update-back.service",
+      "properties": {
+        "Type": [
+          {
+            "line": 15,
+            "value": "oneshot"
+          }
+        ],
+        "TimeoutStartSec": [
+          {
+            "line": 21,
+            "value": "60"
+          }
+        ]
+      },
+      "stop_timeout": "manager default/effective drop-ins; not established by repository",
+      "exec_stop_post_dropin": "Install applies exit-note.conf if named in EXIT_NOTE_UNITS; inspect separate list."
+    },
+    {
+      "unit": "lamp-update-back.timer",
+      "path": "lampOS/deploy/product/lamp-update-back.timer",
+      "properties": {},
+      "stop_timeout": "manager default/effective drop-ins; not established by repository",
+      "exec_stop_post_dropin": "Install applies exit-note.conf if named in EXIT_NOTE_UNITS; inspect separate list."
+    },
+    {
+      "unit": "lamp-update.service",
+      "path": "lampOS/deploy/product/lamp-update.service",
+      "properties": {
+        "After": [
+          {
+            "line": 11,
+            "value": "network-online.target"
+          }
+        ],
+        "Type": [
+          {
+            "line": 20,
+            "value": "simple"
+          }
+        ]
+      },
+      "stop_timeout": "manager default/effective drop-ins; not established by repository",
+      "exec_stop_post_dropin": "Install applies exit-note.conf if named in EXIT_NOTE_UNITS; inspect separate list."
+    },
+    {
+      "unit": "lamp-voice.service",
+      "path": "lampOS/deploy/product/lamp-voice.service",
+      "properties": {
+        "PartOf": [
+          {
+            "line": 8,
+            "value": "lampos.target"
+          }
+        ],
+        "After": [
+          {
+            "line": 12,
+            "value": "network-online.target sound.target lamp-memory.service lamp-actions.service lamp-schedule.service lamp-tasks.service"
+          },
+          {
+            "line": 15,
+            "value": "lamp-cmedia-speaker.service"
+          }
+        ],
+        "Type": [
+          {
+            "line": 21,
+            "value": "exec"
+          }
+        ],
+        "KillMode": [
+          {
+            "line": 37,
+            "value": "mixed"
+          }
+        ],
+        "KillSignal": [
+          {
+            "line": 38,
+            "value": "SIGTERM"
+          }
+        ],
+        "SendSIGKILL": [
+          {
+            "line": 40,
+            "value": "yes"
+          }
+        ],
+        "TimeoutStopSec": [
+          {
+            "line": 41,
+            "value": "5s"
+          }
+        ]
+      },
+      "stop_timeout": "explicit",
+      "exec_stop_post_dropin": "Install applies exit-note.conf if named in EXIT_NOTE_UNITS; inspect separate list."
+    },
+    {
+      "unit": "lamp-waking.service",
+      "path": "lampOS/deploy/product/lamp-waking.service",
+      "properties": {
+        "After": [
+          {
+            "line": 9,
+            "value": "local-fs.target systemd-udevd.service"
+          }
+        ],
+        "Before": [
+          {
+            "line": 11,
+            "value": "shutdown.target"
+          }
+        ],
+        "Type": [
+          {
+            "line": 16,
+            "value": "simple"
+          }
+        ]
+      },
+      "stop_timeout": "manager default/effective drop-ins; not established by repository",
+      "exec_stop_post_dropin": "Install applies exit-note.conf if named in EXIT_NOTE_UNITS; inspect separate list."
+    },
+    {
+      "unit": "lampos-setup-done.path",
+      "path": "lampOS/deploy/product/lampos-setup-done.path",
+      "properties": {},
+      "stop_timeout": "manager default/effective drop-ins; not established by repository",
+      "exec_stop_post_dropin": "Install applies exit-note.conf if named in EXIT_NOTE_UNITS; inspect separate list."
+    },
+    {
+      "unit": "lampos.target",
+      "path": "lampOS/deploy/product/lampos.target",
+      "properties": {
+        "After": [
+          {
+            "line": 8,
+            "value": "local-fs.target"
+          }
+        ]
+      },
+      "stop_timeout": "manager default/effective drop-ins; not established by repository",
+      "exec_stop_post_dropin": "Install applies exit-note.conf if named in EXIT_NOTE_UNITS; inspect separate list."
+    }
+  ],
+  "exit_note_units": [
+    "lamp-actions.service",
+    "lamp-addons.service",
+    "lamp-air-clock.service",
+    "lamp-air.service",
+    "lamp-body.service",
+    "lamp-cloud.service",
+    "lamp-controls.service",
+    "lamp-ears.service",
+    "lamp-expression.service",
+    "lamp-eyes-camera@.service",
+    "lamp-eyes.service",
+    "lamp-health.service",
+    "lamp-keeper-restart@.service",
+    "lamp-memory.service",
+    "lamp-mood.service",
+    "lamp-name.service",
+    "lamp-policy.service",
+    "lamp-records.service",
+    "lamp-schedule.service",
+    "lamp-selftest.service",
+    "lamp-setup-change@.service",
+    "lamp-setup-keys@.service",
+    "lamp-setup-recover.service",
+    "lamp-setup-reset.service",
+    "lamp-setup-wifi-restore.service",
+    "lamp-setup-wifi@.service",
+    "lamp-setup.service",
+    "lamp-skills-manage@.service",
+    "lamp-skills.service",
+    "lamp-tasks.service",
+    "lamp-update-apply.service",
+    "lamp-update-back.service",
+    "lamp-update.service",
+    "lamp-voice.service",
+    "lamp-waking.service"
+  ],
+  "repo_default_timeout_override_found": false,
+  "limitations": "Repo units and installed exit-note list only. Effective systemd manager defaults, vendor nginx, local drop-ins and dynamic instantiated units were not queried on a lamp."
+}

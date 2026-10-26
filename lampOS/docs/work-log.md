@@ -1,3 +1,13 @@
+Ready for lamp-voice: current own-keys original ARM pending; reset read-command follow-up assessed.
+
+## Current checkpoint: 2026-10-26 23:17 +07, reset command-budget audit
+
+[Unit-budget and reuse audit](verification/reset-command-bounds-audit-20261026/README.md) scans all 46 product units and 35 installed exit-note hooks. A universal 60 s stop deadline is insufficient: Wi-Fi has a 120 s stop allowance and 90 s restore work; Body has 25 s, Voice/Records 5 s, while effective defaults/vendor/drop-ins remain unknown. Third's preserved runner already uses 180 s, which is not a universal budget proof. Stop hooks and ordered phases must remain part of the contract.
+
+Recommended narrow next piece: reuse owned nonblocking/capped output and descendant cleanup for reset manager reads, with an explicit read budget, preserving delivered stop ordering and stop-command allowances. Universal stop limits remain a separate follow-up. No source, test or device change is claimed by this audit. Current #3510 general CI and Linux Clippy pass; ARM's last observed status is in progress, with later GitHub TLS collection errors retained as collection errors.
+
+---
+
 Ready for lamp-voice: #3510 current head pushed; original CI pending and activation HOLD remains.
 
 ## Current checkpoint: 2026-10-26 22:33 +07, final outside-only carry published

@@ -1,0 +1,25 @@
+{
+  "queue": 3504,
+  "comments_scanned": 592,
+  "last_comment_at": "2026-10-26T15:39:51Z",
+  "matches": [
+    {
+      "url": "https://github.com/autonomous-ai/lampOS/issues/3504#issuecomment-6414302455",
+      "created_at": "2026-10-26T10:56:00Z"
+    },
+    {
+      "url": "https://github.com/autonomous-ai/lampOS/issues/3504#issuecomment-6415499372",
+      "created_at": "2026-10-26T12:01:46Z"
+    }
+  ],
+  "conclusion": "No open competing reset/bound follow-up found in queried open PR inventory or Queue; #3583 closed supporting branch, #3579 source-cleared with command-bound P3 retained. Snapshot, not ownership claim.",
+  "private_inventory_sha256": {
+    "open-prs.json": "292d80deecd7d63989197ed2705d5e547fd954bf29eb89ad7b63606e33a7e962",
+    "reset-prs.json": "92f2b1ae485d3cb8b9cb08ad5dd58eb141d54957cda093d27389acb821368dbc"
+  },
+  "private_inventory_counts": {
+    "open-prs.json": 26,
+    "reset-prs.json": 40
+  },
+  "normalization": "Public inventory contains counts, source links and private-file digests; raw PR titles and comment text omitted."
+}
