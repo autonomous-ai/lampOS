@@ -1,3 +1,15 @@
+Ready for lamp-voice: yes (#3542 and #3528); #3510 activation HOLD remains.
+
+## Current checkpoint: 2026-10-26 12:32 +07, IPC current native pass and sentinel review next
+
+[#3528](https://github.com/autonomous-ai/lampOS/pull/3528) current `d8dc4cca8` on cced has [original native qualification](verification/ipc-log-no-wait-20261026/native-d8dc/README.md): ARM64 **40272890604** reports **11,357 unique PASS / zero FAIL, LEAK or TIMEOUT / 106 skipped / zero selected unrun**, with the changed IPC case once at ordinal 3081 and 35 identical display echoes excluded. Separate process **13/0**, docs **4/0** across 46 summaries, relay success and helper **25/0** pass. Linux Clippy **40272890603** passes. Both actual checkouts are preview `8df5d3993`, with exact cced/d8dc parents and the authored complete tree. No run was retried. Third's independent current-head IPC gate passes **26 ordinary tests + one doctest + relay success**, all eight executable copies retained. No P1/P2 is open and the PR is offered ready; Reviewer-two's current audit remains separate.
+
+The old a8 sentinel failure remains failed, with no cause established or clean-Main reproduction inferred from a later pass. Tests has separately opened #3543 at `077734181` to scope that sentinel fixture to its private root, keeping every security assertion. Second takes the requested source/fixture review next; no Linux execution is claimed before its own native qualification.
+
+#3542 is also current and native green, with narrowed control limits recorded. Own-keys current `85b9bcdd7` passed its host gate and starts original native checks; activation HOLD stays. Train coordination is currently stopped on its absent-check handling, with the repair/merge route belonging to First. No device, provider, key, release or local ARM64 action ran.
+
+---
+
 Ready for lamp-voice: yes (#3542); #3528 current native pending; #3510 activation HOLD.
 
 ## Current checkpoint: 2026-10-26 12:30 +07, own-keys current selected-crate gate passed

@@ -1,0 +1,9 @@
+[
+  {
+    "binary": "lamp-ipc",
+    "name": "log_relay::tests::a_full_blocking_pipe_or_socket_is_never_waited_on_nor_made_nonblocking",
+    "ordinal": 3081,
+    "status": "PASS",
+    "total": 11357
+  }
+]
