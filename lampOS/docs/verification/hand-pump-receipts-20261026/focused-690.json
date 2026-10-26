@@ -1,0 +1,36 @@
+{
+  "head": "3dfdc0fdb7bc9f20e8bf6113eb71a942a08d84af",
+  "tree": "cf9fcd83e7badaa46ab244ccad8a16ab644e123a",
+  "main_head": "690dff041e331b5c89160901b4f38f3a9915e60b",
+  "actual_native_session_id": 37961,
+  "actual_native_exit": 125,
+  "actual_native_chunk": "17fd77",
+  "source_stable": true,
+  "all_owned_sessions_groups_closed": true,
+  "full_Voice_qualified": false,
+  "scope": "entire hand_controls module only",
+  "passed": 61,
+  "failed": 0,
+  "ignored": 1,
+  "leaks": 0,
+  "timeouts": 0,
+  "partition": {
+    "direct": 4,
+    "nextest": 57
+  },
+  "outside_module_ignored_only": 14,
+  "nextest_exit": 0,
+  "controller_error": "accounting assertion misclassified synthetic started/ignored records; original exit retained",
+  "runtime_replays": 0,
+  "remaining_at_this_receipt": [
+    "Voice docs",
+    "Update lib/install",
+    "Update docs"
+  ],
+  "receipts_sha256": {
+    "actual-native-release.json": "8428617bcd2cc8244bea4f06666c3e8a8412860148de916b32af3e632504506b",
+    "offline-reconciliation.json": "8e0bd6a50931c5c65ac16fd0592cd1307ba68aa4891cd8c9bb72de01d3bf715e",
+    "accounting-correction.diff": "207db354d6329d87f6af464af168a00ac3eae07acbb180e9c7a7f89d4084fe10",
+    "module-run.stdout": "8de1cdfce7f7ec2c0cd869109c827794b15092995d59b0e936b8536baf962e0d"
+  }
+}

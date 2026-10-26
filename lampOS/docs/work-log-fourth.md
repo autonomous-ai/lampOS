@@ -1,3 +1,11 @@
+## 2026-10-26 17:22 — Focused hand-control result and isolated expiry repair
+
+Ready for lamp-voice: no
+
+The frozen 3df/cf9 follow-up passed formatting, strict workspace/all-target Clippy, workspace build and the entire hand-controls module: 61/0/1, zero leaks/timeouts, four direct cases plus 57 nextest cases once each. [Focused receipt](verification/hand-pump-receipts-20261026/focused-690.json). The controller exited 125 after its accounting assertion mistook 14 out-of-module ignored-only records for executions. Offline reconciliation and an independent raw-terminal check confirmed no outside execution or duplicates. The original error remains; source, all 22 witnesses, preserved debug inputs and nine owned process groups were verified. Only unrun Update and doc stages now continue. This is not a full Voice pass; the earlier six failures remain recorded.
+
+Common's local camera-expiry follow-up is isolated from the canonical six-file repair. It carries receipt-derived permission expiry separately from original recognition age, refreshes permission only on a same-hold successful look, and checks expiry at the final private-source read. Seven new controls are UNRUN, including an actual Engine-to-Services chat-call refusal. Source review fixed a publication-failure borrow panic and found two missed positive fixtures, now migrated with timing assertions preserved. An independent source read found no new P1/P2. Explicit close before the deadline remains a separate HOLD; no compiler, device or readiness result is claimed for this source.
+
 ## 2026-10-26 16:47 — Failed Mac run retained; bounded fixture follow-up
 
 Ready for lamp-voice: no
