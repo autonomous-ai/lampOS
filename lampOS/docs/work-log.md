@@ -1,3 +1,15 @@
+Ready for lamp-voice: #3542 and #3528 delivered in train #3547; #3510 activation HOLD remains.
+
+## Current checkpoint: 2026-10-26 13:23 +07, Memory and IPC delivered
+
+[Original train qualification](verification/train3547-second-delivery-20261026/README.md) verifies train #3547 at `9ce6b924a`: ARM64 **11,361 unique passes / zero failures, leaks or timeouts / 106 skipped / zero unrun**, Linux Clippy green. The tested preview, authored train and landed `d5dc2e87f` have the same complete tree. Every one of the thirteen Memory and seven IPC authored files is preserved, and all three changed fixtures pass once. Process 13/0, docs 4/0, relay success and helper 25/0 stay separate. Earlier failures are neither erased nor diagnosed by this pass.
+
+Own-keys #3510 carries cleanly to `b2c75ba61` with seven equal patches; upstream name-routing additions account for the two shared unit/doc blob changes. Formatting and strict nine-crate Clippy passed; the combined nine-crate product-reader test gate is running before push. No activation acceptance is claimed. Source review of #3548 confirms unchanged production and assertions; independent Expression execution is queued behind this gate.
+
+Factory #3546's carried `0038db8cf` has an equal one-commit range-diff and all three authored files identical to independently tested `e96296097` (86/0). This is a carry source read, not a repeat execution on the new base. The log rebase preserved all 14,255 prior evidence blobs and modes.
+
+---
+
 Ready for lamp-voice: yes (#3542 and #3528); #3510 activation HOLD remains.
 
 ## Current checkpoint: 2026-10-26 13:08 +07, factory resume review complete
