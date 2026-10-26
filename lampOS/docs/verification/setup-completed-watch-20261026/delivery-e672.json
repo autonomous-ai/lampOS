@@ -1,0 +1,24 @@
+{
+  "pr": 3570,
+  "offered_head": "ecf9fb9f4dcc805e83b12848572e81bea9487571",
+  "base": "22a2ddd7912df0b02044169a32c13d473b341ad8",
+  "landing": "e672ee214ae67eb05538d519a43d1f6ba2662ecb",
+  "merged_at": "2026-10-26T14:36:00Z",
+  "full_tree": "dd6b04947d0e62a7b260eb370cbb439fa02e3030",
+  "offered_landing_diff_empty": true,
+  "range_diff": "1:  ecf9fb9f4 = 1:  e672ee214 lampOS: preserve completed Setup across update and recovery\n",
+  "original_arm64": 40338319189,
+  "original_linux": 40338319057,
+  "native_selected": [
+    7533,
+    0,
+    53
+  ],
+  "authored_controls_once": 18,
+  "peer_reads": [
+    6418325100,
+    6418328120,
+    6418536853
+  ],
+  "limits": "Repository merge verified. This is not a train/composition claim or installed/default-update acceptance; First owns device verification. Historical failures and host source/runtime splits remain separately recorded."
+}
