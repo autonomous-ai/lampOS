@@ -1,0 +1,22 @@
+{
+  "pr": 3604,
+  "train": 3615,
+  "offered": "47e3bcb9769fcf79daa9da5bab42c721af8ce7e9",
+  "landed": "2bf5122dc76999f970556bb7c78840ab6e107ce0",
+  "landed_parent_before_two_patches": "fb30bb84482e089c5f3dd73f2cabee6aacc4c51a",
+  "both_authored_blobs_equal": {
+    "lampOS/crates/skills/tests/it/skills.rs": true,
+    "lampOS/docs/voice-test-fixtures.md": true
+  },
+  "both_equal_range_diff": "1:  32dc4cd73 = 1:  5546eca39 lampOS: join the repeat call fixture actions worker before teardown\n2:  47e3bcb97 = 2:  2bf5122dc lampOS: witness mock ACK writes and preserve fixture startup order",
+  "whole_tree_equal": false,
+  "extra_inherited_delta": [
+    "lampOS/docs/build-rows.md"
+  ],
+  "offered_tree": "39596c80bd0400403730921d78fc7c3e82d82c3d",
+  "landed_tree": "ad1caf4b7113a46931643d2092c282fbf6e4f4a5",
+  "exact_push_ARM": 40389270580,
+  "exact_push_Linux": 40389270642,
+  "exact_push_state": "active, no terminal result or publication claim",
+  "limits": "Source delivery only; member PR gates remain at47, train/push events separate. No device action."
+}
