@@ -1,0 +1,437 @@
+{
+  "base": "756be347e13d2e52e7268414295dda8fc554c267",
+  "build_jobs": 1,
+  "gates": {
+    "clippy": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "clippy",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-update",
+        "-p",
+        "lamp-voice",
+        "-p",
+        "lamp-selftest",
+        "-p",
+        "lamp-setup",
+        "-p",
+        "lamp-cloud",
+        "-p",
+        "lamp-health",
+        "-p",
+        "lamp-controls",
+        "-p",
+        "lamp-skills",
+        "-p",
+        "lamp-voice-eval",
+        "--all-targets",
+        "--message-format=short",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "elapsed_seconds": 71.246,
+      "error": null,
+      "exit_code": 0,
+      "log_bytes": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "purpose": "Strict all-target Clippy for the same nine selected crates.",
+      "source_entries": 7178,
+      "source_unchanged": true
+    },
+    "fmt": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "elapsed_seconds": 6.328,
+      "error": null,
+      "exit_code": 0,
+      "log_bytes": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "purpose": "Workspace formatting; no source formatting applied.",
+      "source_entries": 7178,
+      "source_unchanged": true
+    },
+    "imager-syntax": {
+      "command": [
+        "bash",
+        "-n",
+        "../scripts/imager/build-orangepi-v2.sh"
+      ],
+      "elapsed_seconds": 0.322,
+      "error": null,
+      "exit_code": 0,
+      "log_bytes": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "purpose": "Syntax only for the changed upstream imager default; no image build or feed fetch.",
+      "source_entries": 7178,
+      "source_unchanged": true
+    },
+    "install": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-update",
+        "--test",
+        "install",
+        "--",
+        "--test-threads=1"
+      ],
+      "elapsed_seconds": 203.653,
+      "error": null,
+      "exit_code": 0,
+      "log_bytes": 223,
+      "log_sha256": "f1b9751a895ccbb729a18adf22473beb3186061978732f835429052cc7ad187c",
+      "purpose": "Complete install target writes both changed PRODUCT units and covers repeat install/retirement/setup gating.",
+      "source_entries": 7178,
+      "source_unchanged": true,
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 99,
+          "status": "ok"
+        }
+      ],
+      "totals": {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 99
+      }
+    },
+    "installed-product": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-update",
+        "--lib",
+        "check_units::tests::the_product_as_install_writes_it_passes",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "elapsed_seconds": 5.659,
+      "error": null,
+      "exit_code": 0,
+      "log_bytes": 115,
+      "log_sha256": "5f610b2252a8f30132cafb100e1b8379be7cf2c8ea93c48cf270d978648159c2",
+      "purpose": "Actual installed PRODUCT unit comparison, including both changed units.",
+      "source_entries": 7178,
+      "source_unchanged": true,
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered": 122,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1,
+          "status": "ok"
+        }
+      ],
+      "totals": {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 1
+      }
+    },
+    "startup-graph": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-update",
+        "--lib",
+        "unit::restart_order::tests::the_shipped_managed_services_have_a_valid_startup_graph",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "elapsed_seconds": 0.488,
+      "error": null,
+      "exit_code": 0,
+      "log_bytes": 115,
+      "log_sha256": "823877d087b4a6ef1dd99eedb8b24adebf52879c84b0bc198ed48635add593f1",
+      "purpose": "Startup graph consumes the changed product unit declarations.",
+      "source_entries": 7178,
+      "source_unchanged": true,
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered": 122,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1,
+          "status": "ok"
+        }
+      ],
+      "totals": {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 1
+      }
+    },
+    "switches": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-voice-eval",
+        "--test",
+        "it",
+        "switches::",
+        "--",
+        "--test-threads=1"
+      ],
+      "elapsed_seconds": 53.191,
+      "error": null,
+      "exit_code": 0,
+      "log_bytes": 117,
+      "log_sha256": "712924d79c1e2fdde6e2ef23f86b2eaf603dee32e4c78efa5fce309d57f45057",
+      "purpose": "Both compiled switch-document census readers.",
+      "source_entries": 7178,
+      "source_unchanged": true,
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered": 236,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 2,
+          "status": "ok"
+        }
+      ],
+      "totals": {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 2
+      }
+    },
+    "updater-fallback": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-update",
+        "--test",
+        "round",
+        "install_writes_the_fallback_and_no_round_touches_it",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "elapsed_seconds": 8.841,
+      "error": null,
+      "exit_code": 0,
+      "log_bytes": 115,
+      "log_sha256": "b2a1ad7774812da0b36aa6d4a318e70ed1cb985468914d9e8f532e485e2c2a6e",
+      "purpose": "Round fixture reads the installed updater unit and its fallback restrictions.",
+      "source_entries": 7178,
+      "source_unchanged": true,
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered": 166,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1,
+          "status": "ok"
+        }
+      ],
+      "totals": {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 1
+      }
+    },
+    "waking": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-setup",
+        "--lib",
+        "wake::tests::",
+        "--",
+        "--test-threads=1"
+      ],
+      "elapsed_seconds": 6.268,
+      "error": null,
+      "exit_code": 0,
+      "log_bytes": 120,
+      "log_sha256": "c2ded19c7bc1f49856de64d6002db9a184467c26cad40805d2325242e933407d",
+      "purpose": "Existing pure opt-in and painted waking behavior controls; no real ring or cold boot.",
+      "source_entries": 7178,
+      "source_unchanged": true,
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered": 9,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 7,
+          "status": "ok"
+        }
+      ],
+      "totals": {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 7
+      }
+    }
+  },
+  "head": "bb40e10327fa847128d2dc76d205990b958247d6",
+  "host": "aarch64-apple-darwin",
+  "limits": [
+    "This is a focused changed-content-reader continuation, not a Voice or complete nine-crate test rerun.",
+    "All crate source/manifests/toolchain match the completed 274 gate, but changed included unit/doc bytes are new inputs; the listed current readers are rerun.",
+    "Earlier 274 selected tests, d21 full Voice and 98f60 native results retain their original head scopes.",
+    "No compiler/executable artifact manifest is recorded here; source, command and log bindings only.",
+    "Setup waking controls are pure painting/opt-in tests, not real ring/boot acceptance.",
+    "Imager coverage is syntax only; no image creation, feed fetch, stable promotion, signature namespace or device install is executed.",
+    "No hardware, provider, key or latency acceptance; own-keys activation HOLD remains unchanged."
+  ],
+  "rebase": {
+    "all_existing_proof_blobs_modes_preserved": true,
+    "base": "756be347e13d2e52e7268414295dda8fc554c267",
+    "base_and_carry_zero_context_stable_patch_id": "5e6d9ae3322a806ebc5d3bf48eede45a9ea0de58",
+    "changed_paths": [
+      "lampOS/deploy/product/lamp-update.service",
+      "lampOS/deploy/product/lamp-waking.service",
+      "lampOS/docs/switches.md",
+      "lampOS/docs/updates.md",
+      "scripts/imager/build-orangepi-v2.sh"
+    ],
+    "crate_source_equality": {
+      "entries": 1475,
+      "equal": true,
+      "git_tree_listing_sha256": "408a5c0da8e7943ae23b5e582ed21eda9f0f7b413ca4c8f26541ec33e62558a1",
+      "scope": [
+        "lampOS/crates",
+        "lampOS/Cargo.toml",
+        "lampOS/Cargo.lock",
+        "lampOS/rust-toolchain.toml"
+      ]
+    },
+    "equal_changed_content_patches": [
+      {
+        "after": "1f55b53f1ffadcfa33224d3b73a78ef3bcf434d2",
+        "before": "6ffdcc5a7e078bc246d34bc4f9bef9e0e822c050",
+        "zero_context_stable_patch_id": "31dd1d1453f9800a38a4aa2f186b1a83fd0722d1"
+      },
+      {
+        "after": "1deeef4659649de452421a610ecab3736b0a3c5b",
+        "before": "b3297f015bd469e6ebb806fd72e9cfc40971ce0d",
+        "zero_context_stable_patch_id": "5f6a197ceed80ebb2ba012de321c769936478bc0"
+      },
+      {
+        "after": "bd86fc745aefde4eb643d6d8d0a97c2e478052bb",
+        "before": "a092c3a06aaa6ebb14435778632fc27864a6dbee",
+        "zero_context_stable_patch_id": "54320f9f9f54cd951fc4132a820558309592cd86"
+      },
+      {
+        "after": "24d8d8ae218d3fe175c4e3a6a53149b9a9f0eead",
+        "before": "d2a760f4886ab2e366b4dbca00c97eba2d5012bb",
+        "zero_context_stable_patch_id": "7738ed1921e9a164b5543fee2adaa12d61900c22"
+      },
+      {
+        "after": "58592efb7a390b3498a4bde9949c3bfb781c3364",
+        "before": "4a0f0cc4291f4d1d9917c8d7efbe5412200f96fb",
+        "zero_context_stable_patch_id": "e41108a67cdd262974f783a8746f13c8eefe330b"
+      },
+      {
+        "after": "bb40e10327fa847128d2dc76d205990b958247d6",
+        "before": "a7b68b978844a46f3f68258d10989000a50423fe",
+        "zero_context_stable_patch_id": "2f733f7fd60104b62d09c41885fc33848012eb62"
+      }
+    ],
+    "head": "bb40e10327fa847128d2dc76d205990b958247d6",
+    "literal_range_diff_sha256": "4e8144a45db61529ea1bb6f924ef1efcae8744543f67e5c7db6576ad4daefdd7",
+    "previous_base": "2747c72a709882a62d625d5bbb3bfbe3fd797581",
+    "previous_head": "a7b68b978844a46f3f68258d10989000a50423fe",
+    "previous_tested_head": "4a0f0cc4291f4d1d9917c8d7efbe5412200f96fb",
+    "prior_packet_checksums": {
+      "README.md": "1df0ffa974657428419881b42b9809dc626b022c73340ea522b815a15e8ae9cb",
+      "SHA256SUMS": "f437d13f94f33a4750efaf5888a16d8015eef8db1b436b4a7e694419019797c8",
+      "inputs.sha256": "64b3ce17f681636332414b00b5481c5dc10df33a3088ebb5616d8108065b1bf7",
+      "range-diff.txt": "6c486c186e65430d212c4516a5ce48bbf9b5f8e0f10ddc6d5c6bdd277500681b",
+      "results.json": "cb95a2a6ef60c243b437001efd44b6e153632f2ae7406b9b3e5afcb3dc334bb6"
+    },
+    "prior_phase_labels": [
+      "fmt",
+      "clippy",
+      "schedule-asked",
+      "withdrawal",
+      "worker-environment",
+      "force-order",
+      "schedule-actions",
+      "product-ownkeys",
+      "product-relay",
+      "install",
+      "product-functions",
+      "generic-product-units",
+      "matcher",
+      "relay-round",
+      "selftest-product",
+      "setup-product",
+      "controls-product",
+      "skills-product",
+      "switches"
+    ],
+    "prior_proof_entries_preserved": 4465,
+    "prior_proof_paths": [
+      "lampOS/docs/verification/own-keys-product-carry-20261026/current-274/README.md",
+      "lampOS/docs/verification/own-keys-product-carry-20261026/current-274/SHA256SUMS",
+      "lampOS/docs/verification/own-keys-product-carry-20261026/current-274/inputs.sha256",
+      "lampOS/docs/verification/own-keys-product-carry-20261026/current-274/range-diff.txt",
+      "lampOS/docs/verification/own-keys-product-carry-20261026/current-274/results.json"
+    ]
+  },
+  "schema": 1,
+  "source_inventory": {
+    "entries": 7178,
+    "matches_current": true,
+    "scope": [
+      "lampOS",
+      "scripts/imager/build-orangepi-v2.sh"
+    ],
+    "sha256": "c0bc990cafcce3ee24905c81a03da271dbf2bfd4bdefa7ccd9cdce794fb9a846"
+  },
+  "test_threads": 1,
+  "toolchain": "1.96.0"
+}
