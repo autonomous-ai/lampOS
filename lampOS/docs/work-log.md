@@ -1,3 +1,15 @@
+Ready for lamp-voice: #3542 and #3528 delivered; #3510 activation HOLD remains.
+
+## Current checkpoint: 2026-10-26 13:45 +07, public add-on contract review complete
+
+[Independent #3550 review](verification/addons-contract-second-review-20261026/README.md) verifies the documented note/rate/topic limits against the pinned public primary contract, with no P1/P2 and no runtime test claim. P3 distinguishes per-minute `RATE_LIMITED` from the four-undecided `BACKPRESSURE` cap. The docs-only PR is now delivered at `9e5d3b9c6`.
+
+Own-keys d5dc gate continues after fmt, strict nine-crate Clippy and compilation passed. The source remains untouched until its terminal result. The subsequent base change is only addons.md; its carry must retain that exact gate identity and verify executable-input equivalence. Reviewer-two's independent earlier 85b/cced Update/Selftest **493/0/6** and Voice unit readers **23/0** remain separate evidence, with activation HOLD unchanged.
+
+#3548 source review is clear; its independent execution awaits the local slot and the author's current carry. Tests owns the separate privacy fixture investigation reported on #3544. No device, key, release or activation action ran.
+
+---
+
 Ready for lamp-voice: #3542 and #3528 delivered in train #3547; #3510 activation HOLD remains.
 
 ## Current checkpoint: 2026-10-26 13:23 +07, Memory and IPC delivered

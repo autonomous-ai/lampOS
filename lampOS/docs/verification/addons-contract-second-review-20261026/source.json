@@ -1,0 +1,11 @@
+{
+  "pr_head": "844a28283fe07874892a703bc9b423ddd2182f40",
+  "contract_commit": "3f49f426833aacb712f20c3b4c04df8a2e51ec25",
+  "contract_path": "docs/autonomous-device-addons.md",
+  "contract_sha256": "278f727ae9b605f7c2a5a2d8c04bc823538fcb75df5b56ca4d7cdd9d3ab4a5e5",
+  "changed_files": [
+    "lampOS/docs/addons.md"
+  ],
+  "diff_check_exit": 0,
+  "review_comment": 6409736226
+}
