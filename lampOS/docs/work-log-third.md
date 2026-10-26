@@ -7,6 +7,18 @@ machine is explicitly named. Third has no lamp access.
 
 
 
+## 2026-10-26 07:34 — Current preflight carry pushed
+
+#3513 is pushed at **142700df1** on **2747c72a7**, with its one task
+commit range-diff equal to the reviewed b43 head. Current formatting,
+strict all-target Update Clippy, all nine preflight install cases and the
+null-device predicate pass **10/0**. Every source hash is fixed;
+[the current receipt](verification/head-preflight-files-20261026/current-2747.json)
+is separate from the original full 159-case qualification and original
+ARM64 result. Fresh current native gates and reads follow. The counted
+search-fixture negative is next in the compiler slot; no watchdog limit
+or production behavior has changed.
+
 ## 2026-10-26 07:32 — Current privacy carry pushed; fixture failure retained
 
 #3512 is pushed at **a8a30af33** on train 149 **2747c72a7**. Its one

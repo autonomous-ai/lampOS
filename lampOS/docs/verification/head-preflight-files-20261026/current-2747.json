@@ -1,0 +1,67 @@
+{
+  "head": "142700df184dc8ebde29d52925345f4be9a0f762",
+  "base": "2747c72a709882a62d625d5bbb3bfbe3fd797581",
+  "prior_head": "b43cd9b1f79c518116e34b13e78b28bac054ca9f",
+  "range_diff": "1:  b43cd9b1f = 1:  142700df1 lampOS: refuse nonregular head-pair inputs without waiting\n",
+  "source_count": 7164,
+  "all_source_hashes_unchanged": true,
+  "source_manifest_sha256": "b90314477899b8833857c4f167395b1847294cc2d8b05a8afc2d177761ea8f7d",
+  "gates": {
+    "fmt": {
+      "command": "cargo +1.96.0 fmt --all --check",
+      "started": "2026-10-26T00:30:46Z",
+      "finished": "2026-10-26T00:30:58Z",
+      "exit": 0,
+      "harnesses": 0,
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "disk_error_lines": []
+    },
+    "clippy": {
+      "command": "cargo +1.96.0 clippy -q --message-format=short --offline --locked -p lamp-update --all-targets -- -D warnings",
+      "started": "2026-10-26T00:30:58Z",
+      "finished": "2026-10-26T00:31:45Z",
+      "exit": 0,
+      "harnesses": 0,
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "disk_error_lines": []
+    },
+    "test-preflight": {
+      "command": "cargo +1.96.0 test --offline --locked -p lamp-update --test install head_touch_preflight_files:: -- --test-threads=1",
+      "started": "2026-10-26T00:31:45Z",
+      "finished": "2026-10-26T00:33:45Z",
+      "exit": 0,
+      "harnesses": 1,
+      "passed": 9,
+      "failed": 0,
+      "ignored": 0,
+      "disk_error_lines": []
+    },
+    "test-null": {
+      "command": "cargo +1.96.0 test --offline --locked -p lamp-update --lib head_touch::tests:: -- --test-threads=1",
+      "started": "2026-10-26T00:33:45Z",
+      "finished": "2026-10-26T00:33:52Z",
+      "exit": 0,
+      "harnesses": 1,
+      "passed": 1,
+      "failed": 0,
+      "ignored": 0,
+      "disk_error_lines": []
+    }
+  },
+  "own_control_pass_counts": {},
+  "executable_sha256": {
+    "install-56b9137cd677b603": "c28df3972b16711f4cc7a553cbe519c0fa158d8a79971ab18ee5f193daa24417",
+    "lamp_update-cebdb705cde8ec81": "70205d7d18a653bfff4eaf15ff1d3adb5c66e39518d3e2241b60e27510900325"
+  },
+  "raw_log_sha256": {
+    "fmt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "clippy": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "test-preflight": "8e7d8993b25570b33728e446564eb9c595df116dc8cae9418d3e33f3fb213368",
+    "test-null": "fe6c9b71b01accdb66dce6901bcb84f6fd207d68905c8c19fe363ec9284e914e"
+  },
+  "limits": "Native x86_64 Mac current-base gate. Earlier full and ARM64 results retain their original heads; no hardware or latency acceptance."
+}
