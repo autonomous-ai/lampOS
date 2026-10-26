@@ -1029,6 +1029,14 @@ the unchanged legacy client, used unless the new Days client is selected.
       lower-case letters, digits and `_` is `other`), and whether the chat
       begun on the line's early words (`LAMP_SECOND_PREPARED`) stood for
       round 1.
+  - **Event dates in recall:** a ranked `search` result for a kept fact or
+    observation with an event day includes `on`. Voice passes the day to
+    chat as `event_on`, with `today` and `event_status` (`upcoming`, `today`
+    or `past`) computed in the lamp's local time. `at_unix_ms` still means
+    when the fact was recorded; it is not the event day. Results without
+    `on` keep their previous shape. Tests:
+    `days_protocol::tests::search_returns_the_day_attached_to_a_dated_fact`
+    and `remember::tests::a_dated_search_result_says_whether_its_event_is_still_coming`.
   - **Since and until** (take #4): with the switch, each kept thing recall
     finds says `"since":"since last week"`, from its `at_unix_ms`, in the
     words `when` uses (the lamp's local days, never a date). Recall takes

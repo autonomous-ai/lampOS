@@ -409,6 +409,13 @@ fn extra(store: &mut Days, request: Extra) -> Result<Value> {
                 wider,
             )?;
             let mut entries = serde_json::to_value(&records).expect("records are JSON values only");
+            if let Some(entries) = entries.as_array_mut() {
+                for (entry, record) in entries.iter_mut().zip(&records) {
+                    if let Some(day) = store.event_day(&person, record.id)? {
+                        entry["on"] = json!(day);
+                    }
+                }
+            }
             // #2510: with history, a replaced version says until when it
             // held, the newer version's `at_unix_ms`. Without, as before.
             if history && let Some(entries) = entries.as_array_mut() {
@@ -672,6 +679,27 @@ mod tests {
     }
 
     const NOW_MS: u64 = NOW;
+
+    #[test]
+    fn search_returns_the_day_attached_to_a_dated_fact() {
+        let (_scratch, mut store) = Scratch::new("search-event-day");
+        let person = "p-0123456789abcdef";
+        let send = |store: &mut Days, request: Value| -> Value {
+            serde_json::from_str(&answer(store, request.to_string().as_bytes(), NOW).line).unwrap()
+        };
+        let kept = send(
+            &mut store,
+            json!({"op":"remember","person":person,"at_unix_ms":NOW,"text":"Sister's wedding is on Saturday","on":"2026-10-17"}),
+        );
+        assert_eq!(kept["ok"], true, "{kept}");
+        let found = send(
+            &mut store,
+            json!({"op":"search","person":person,"query":"wedding"}),
+        );
+        assert_eq!(found["ok"], true, "{found}");
+        assert_eq!(found["entries"][0]["id"], kept["id"]);
+        assert_eq!(found["entries"][0]["on"], "2026-10-17");
+    }
 
     /// `memory/forgot` (#2467's follow-up): only a `forget_all` that was
     /// done says whose: one person's id, "everyone" when unsaid, every
