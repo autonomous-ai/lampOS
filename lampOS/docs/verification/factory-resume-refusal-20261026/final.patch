@@ -1,0 +1,66 @@
+diff --git a/lampOS/deploy/factory/steps-test.sh b/lampOS/deploy/factory/steps-test.sh
+index 89b00e5d7..661938c27 100755
+--- a/lampOS/deploy/factory/steps-test.sh
++++ b/lampOS/deploy/factory/steps-test.sh
+@@ -100,11 +100,14 @@ if [[ $1 == discover-head ]]; then
+ fi
+ while [[ $# -gt 0 ]]; do [[ $1 == --output ]] && echo '{"calibrated":true}' >"$2"; shift; done
+ EOF
+-# The keeper: FAKE_KEEPER_FAIL, a pause it cannot say.
++# The keeper: independent resume and pause refusals.
+ cat >"$T/bin/keeper" <<'EOF'
+ #!/usr/bin/env bash
+ echo "keeper $*" >>"$FAKE_LOG"
+-[[ -z ${FAKE_KEEPER_FAIL:-} ]]
++case $1 in
++  resume) [[ -z ${FAKE_KEEPER_RESUME_FAIL:-} ]] ;;
++  pause) [[ -z ${FAKE_KEEPER_FAIL:-} ]] ;;
++esac
+ EOF
+ cat >"$T/bin/selftest" <<'EOF'
+ #!/usr/bin/env bash
+@@ -190,6 +193,10 @@ lamp; FAKE_BODY_STATE=active FAKE_SELFTEST_EXIT=1 ASK_ANSWER=y run --write --fro
+ check "a failed self-test does not pause the lamp" '[[ $status == 1 ]] && ! grep -q "^keeper pause" "$T/log"'
+ lamp; FAKE_BODY_STATE=active FAKE_KEEPER_FAIL=1 ASK_ANSWER=y run --write --from 4; status=$?
+ check "a pause the keeper cannot say fails step 4 and says the arm is not left at rest" '[[ $status == 1 ]] && grep -q "could not pause the lamp with .*the arm is not left at rest" "$T/out" && grep -q "step 4 (the self-test) failed" "$T/out"'
++for body_state in active inactive; do
++  lamp; FAKE_BODY_STATE=$body_state FAKE_EXPRESSION_STATE=active FAKE_KEEPER_RESUME_FAIL=1 FAKE_SELFTEST_EXIT=3 ASK_ANSWER=y run --write --from 4; status=$?
++  check "a refused resume stops step 4 before body, expression, mood or self-test ($body_state)" '[[ $status == 1 ]] && grep -q "^keeper resume$" "$T/log" && grep -q "could not resume the lamp with .*before the head check" "$T/out" && grep -q "step 4 (the self-test) failed" "$T/out" && ! grep -q "systemctl start lamp-body\|systemctl stop lamp-expression\|^mood\|^selftest\|^keeper pause" "$T/log"'
++done
+ lamp; FAKE_BODY_STATE=active ASK_ANSWER=n run --write --from 4; status=$?
+ check "step 4 without a yes stands nothing" '[[ $status == 1 ]] && ! grep -q "^mood\|^selftest" "$T/log"'
+ lamp; FAKE_BODY_STATE=active run --from 4; status=$?
+diff --git a/lampOS/deploy/factory/steps.sh b/lampOS/deploy/factory/steps.sh
+index 692809d45..db5e34995 100755
+--- a/lampOS/deploy/factory/steps.sh
++++ b/lampOS/deploy/factory/steps.sh
+@@ -541,7 +541,10 @@ stand_for_head() {
+   local body_state tenths=0
+   # A lamp paused by an earlier pass (below) takes every mood as rest and
+   # would not stand; the pause is the steps' own, so it is cleared first.
+-  [[ -x $KEEPER_BIN ]] && "$KEEPER_BIN" resume
++  if [[ -x $KEEPER_BIN ]] && ! "$KEEPER_BIN" resume; then
++    fail "could not resume the lamp with $KEEPER_BIN before the head check"
++    return 1
++  fi
+   body_state=$("$SYSTEMCTL" is-active lamp-body 2>/dev/null)
+   # Step 1 needs lamp-body stopped and nothing after it starts it again, so a
+   # body not running is started here, whatever step the run began at, and
+diff --git a/lampOS/docs/install.md b/lampOS/docs/install.md
+index c033786d7..9932830ed 100644
+--- a/lampOS/docs/install.md
++++ b/lampOS/docs/install.md
+@@ -730,8 +730,11 @@ again, so step 4 starts a `lamp-body` that is not active
+ (`systemctl start lamp-body`), whatever step the run began at, before the
+ stand, and waits up to 30 s (`BODY_START_WAIT`) for its mood socket; one
+ that does not come up fails step 4 and says to fix it first, since a
+-self-test without it leaves `head_move` unchecked (#2818). A passed step 4 then runs `lamp-keeper pause` (`/usr/local/bin/lamp-keeper`, [keeper.md](keeper.md), "Named states and the pause"): left as it is, the up voice wakes the lamp to anyone talking and an awake lamp stands, so on lamp-52e6, in a talking office, the arm never rested after the steps (#2818), and a factory is no quieter. Paused, every mood is rest and calls, looks and Expression's requests are dropped, so the body folds once its awake time runs out and holds there, and the voice takes no turn; the pause lives in `/run`, so the lamp's next start is not paused. A pause the keeper cannot say fails step 4 ("the arm is not left at rest"), and a failed self-test pauses nothing. Step 4's stand runs `lamp-keeper resume` first, when the keeper is there, so that a second pass in the same power-up can stand the lamp. A key already in place is kept
+-when it is the same and fails the step when it is not. A failed step stops
++self-test without it leaves `head_move` unchecked (#2818). A passed step 4 then runs `lamp-keeper pause` (`/usr/local/bin/lamp-keeper`, [keeper.md](keeper.md), "Named states and the pause"): left as it is, the up voice wakes the lamp to anyone talking and an awake lamp stands, so on lamp-52e6, in a talking office, the arm never rested after the steps (#2818), and a factory is no quieter. Paused, every mood is rest and calls, looks and Expression's requests are dropped, so the body folds once its awake time runs out and holds there, and the voice takes no turn; the pause lives in `/run`, so the lamp's next start is not paused. A pause the keeper cannot say fails step 4 ("the arm is not left at rest"), and a failed self-test pauses nothing. Step 4's stand runs `lamp-keeper resume` first, when the keeper is there, so that a second pass in the same power-up can stand the lamp. If an executable keeper refuses `resume`, step 4 fails immediately after that command, before
++starting the body, stopping Expression, sending a mood or running the self-test.
++It cannot turn that refusal into a successful but unchecked head test. This
++adds no wait to the successful path. A key already in place is kept when
++it is the same and fails the step when it is not. A failed step stops
+ the rest and says which; `--from N` goes on from it. It runs nothing but
+ the lamp's own binaries and the shell. `deploy/factory/steps-test.sh` tests
+ it with no lamp; run it by hand after a change (the ARM64 workflow does not

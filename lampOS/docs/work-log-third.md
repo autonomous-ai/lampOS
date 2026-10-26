@@ -13,6 +13,20 @@ machine is explicitly named. Third has no lamp access.
 
 
 
+## 2026-10-26 12:54 — Factory resume refusal guard
+
+Ready for lamp-voice: no (#3546)
+
+Pushed **e96296097** on current **cced42943**, three exact files. If an
+executable keeper refuses resume, factory step 4 now fails before starting
+the body, stopping Expression or requesting mood/self-test. The new controls
+fail against unchanged production (84 pass, two intended failures); fixed
+suite passes 86/0, both shell syntax checks and whitespace check pass.
+[Evidence](verification/factory-resume-refusal-20261026/README.md).
+No lamp action or added wait. Linux Clippy **40276196748** is green;
+ARM64 **40276196533** is running and independent reads are requested.
+Meanwhile reading Tests’ #3545 journal barrier with an independent Mac gate.
+
 ## 2026-10-26 12:22 — Updated hotspot image independent read
 
 Ready for lamp-voice: reader result only (#3536)

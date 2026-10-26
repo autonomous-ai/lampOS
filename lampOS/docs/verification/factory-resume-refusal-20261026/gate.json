@@ -1,0 +1,31 @@
+{
+  "base": "cced429433211e06790f23ed8f51e07be613972d",
+  "command": "bash lampOS/deploy/factory/steps-test.sh",
+  "rows": {
+    "negative": {
+      "exit": 1,
+      "passed": 84,
+      "failed": [
+        "FAIL: a refused resume stops step 4 before body, expression, mood or self-test (active)",
+        "FAIL: a refused resume stops step 4 before body, expression, mood or self-test (inactive)"
+      ],
+      "log_sha256": "0548bc6ddea5310a41656f3244f7cbcae112ebafa475cf2176f17274c33e8a92"
+    },
+    "fixed": {
+      "exit": 0,
+      "passed": 86,
+      "failed": [],
+      "log_sha256": "728190c9294561aaa040960f837c578c202d8b196b5c3eb85254fe5600b0fce9"
+    }
+  },
+  "fixed_source_sha256": {
+    "lampOS/deploy/factory/steps.sh": "f1622c500555379d4f774a09b13ac92e1e5c7da09e3912a61f4880c2222ffab2",
+    "lampOS/deploy/factory/steps-test.sh": "84026a3e34c8402118b8e34c6ced247ebe42a70c515f570d90fb59e99f86d4eb",
+    "lampOS/docs/install.md": "4ea1723ffd3aafc7bd9f98527b81a5acfd2f38099c1c54b24833061761f43eba"
+  },
+  "negative_scope": "New test and separate resume/pause stubs against unchanged production steps.sh. Exactly active/inactive resume controls failed.",
+  "fixed_scope": "Both scripts unchanged during the successful gate; install prose was clarified during execution and is not read by the suite.",
+  "latency_boundary": "After nonzero resume returns, zero body-start, Expression-stop, mood, self-test or pause calls; no new wait.",
+  "limits": "Native Mac shell with stand-ins and disposable local sockets/files, no lamp, service, motor or physical acceptance. Native PR checks pending.",
+  "head": "e962960977c4e61acb58a727f36eb2bd98cc83d7"
+}
