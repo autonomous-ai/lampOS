@@ -1,0 +1,33 @@
+{
+  "pr": 3598,
+  "landed_head": "008e7a9746e7ddd58e951f8ea919a7d8beebb5ef",
+  "reviewed_head": "50fdff861018eb82e4c2145d958dc139cd7dedbc",
+  "actual_landed_patch_base": "c2bf0dea167b31e99d60c9416a8852d9ed2b497e",
+  "original_member_base": "521dcb006848a5bc99b11513828233ef65a4883c",
+  "three_authored_range_diff": "all =",
+  "authored_blobs": {
+    "lampOS/crates/skills/src/routine.rs": {
+      "reviewed": "44d0df95104ea06afb87bfdd98375692ce3693fc",
+      "landed": "44d0df95104ea06afb87bfdd98375692ce3693fc"
+    },
+    "lampOS/docs/voice-test-fixtures.md": {
+      "reviewed": "2a045ecae3f2e38e40fe9ed311ccbfbe2ab623b9",
+      "landed": "2a045ecae3f2e38e40fe9ed311ccbfbe2ab623b9"
+    }
+  },
+  "whole_tree_not_equal_to_member_reason": [
+    "lampOS/crates/update/tests/install.rs"
+  ],
+  "inherited_delta": "Existing install test also asserts LAMP_MEMORY_ROOM_NOT_ASKER=on; landed ahead of the three Routine commits.",
+  "current_push_ARM": 40360629384,
+  "current_push_Linux": 40360629355,
+  "push_qualification": [
+    11399,
+    0,
+    106
+  ],
+  "all_four_required_cases_once": true,
+  "published_tag": "lampos-lamp-voice-7120",
+  "published_sequence": 7120,
+  "limits": "Member7534/0/53 stays separate. Exact008 push qualifies the inherited delta too. Publication is not a claim of stable promotion, device installation or native timing metrics."
+}

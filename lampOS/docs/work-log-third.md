@@ -1,3 +1,11 @@
+## 2026-10-27 00:09 — Routine delivered and exact push green
+
+Ready for lamp-voice: yes (#3598 merged)
+
+Landed 008e7a974 has both reviewed authored blobs and all three equal patches. The full tree additionally inherits the existing Update install assertion, so the old member tree is not relabeled. Exact 008 push ARM40360629384/Linux40360629355 passes 11,399/0/106, all four Routine controls once; build/publication checkouts match 008. Published 7120 is bound to that source, with no stable-promotion/device claim. [Delivery](verification/routine-request-expiry-20261026/delivery-008e.json).
+
+Mock worker is carried onto 008 as 7b5e99991, preserving reviewed corrected code and both documentation sections; its new full package run is active. Reminder #3525 is resumed locally as 06c42ba1f/008 with a clean 48 source bank and strict 12-consumer compiler gate active. Earlier failed outcomes remain preserved.
+
 ## 2026-10-26 23:36 — mock control failure preserved; Routine ready
 
 Ready for lamp-voice: no (mock worker); yes (#3598 qualification complete)
