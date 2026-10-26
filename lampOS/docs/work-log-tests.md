@@ -1,5 +1,21 @@
 # Tests work log
 
+## 2026-10-26 09:58 — Reader native green; latest-base gates finish
+
+Ready for lamp-voice: no (#3527 current-base native; #3466 rehearsal)
+
+[Reader native evidence](verification/tests-reader-native-0c-20261026/) records
+7,481 unique passes, zero failures/leaks/timeouts and 53 skips on 26c/0c, with
+matched preview and authored trees. Current 9ab/1c fmt, strict twelve-package
+Clippy and workspace build pass; the embedded-document consumer is being
+explicitly rebuilt before push. The equal carry keeps every Reader assertion.
+
+The carrier's 0c missing-declaration compile failure remains retained; no test
+runtime ran. Its equal five-commit 1c carry will receive explicit changed-package
+and document-consumer invalidation. Skills 4843/1c has an equal two-file carry;
+new gates are prepared, not run. Ready-speaking source/control preparation
+follows the current Expression base. No device action or archive deletion ran.
+
 ## 2026-10-26 09:37 — Reader current carry gates; Skills partial run retained
 
 Ready for lamp-voice: no (#3527 latest-base native; #3466 installed rehearsal)

@@ -1,0 +1,129 @@
+{
+  "run_id": 40260092576,
+  "attempt": 1,
+  "status": "success",
+  "head": "26c2cee72738587915672a71974c6f25fc473ddd",
+  "base": "0c1f6437ee57eae3416e3281d91b813d1c3bec1d",
+  "preview": "4c86edd24a2942361925988e200368e23f9bce87",
+  "preview_parents": [
+    "0c1f6437ee57eae3416e3281d91b813d1c3bec1d",
+    "26c2cee72738587915672a71974c6f25fc473ddd"
+  ],
+  "equal_tree": "1572842744dad979726dd5f6aa2b52d8e3569099",
+  "scope": "affected nextest subset; not whole-workspace test census",
+  "selected": 7481,
+  "unique_pass": 7481,
+  "unique_fail": 0,
+  "unique_leak": 0,
+  "unique_timeout": 0,
+  "skipped": 53,
+  "executed_binaries": 70,
+  "skipped_binaries": 114,
+  "elapsed_seconds": 153.698,
+  "duplicate_success_output_lines": 34,
+  "reader_passes": [
+    {
+      "status": "PASS",
+      "duration": "0.005s",
+      "index": 6166,
+      "total": 7481,
+      "name": "lamp-voice session_reader::tests::finite_and_unset_service_never_resolve_a_reader_group"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.007s",
+      "index": 6167,
+      "total": 7481,
+      "name": "lamp-voice session_reader::tests::group_lookup_failure_retains_private_logging_without_writer_failure"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.005s",
+      "index": 6168,
+      "total": 7481,
+      "name": "lamp-voice session_reader::tests::linux::a_fixture_root_retains_ancestor_mode_acl_and_path_checks"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.005s",
+      "index": 6169,
+      "total": 7481,
+      "name": "lamp-voice session_reader::tests::linux::access_and_default_acl_are_refused_without_stripping_or_widening_them"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.007s",
+      "index": 6170,
+      "total": 7481,
+      "name": "lamp-voice session_reader::tests::linux::a_verified_failed_grant_keeps_private_original_records"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.007s",
+      "index": 6171,
+      "total": 7481,
+      "name": "lamp-voice session_reader::tests::linux::an_earlier_reader_refusal_keeps_a_verified_private_writer"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.010s",
+      "index": 6172,
+      "total": 7481,
+      "name": "lamp-voice session_reader::tests::linux::every_grant_failure_restores_private_modes_and_original_groups"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.006s",
+      "index": 6173,
+      "total": 7481,
+      "name": "lamp-voice session_reader::tests::linux::failed_private_rollback_disables_only_metadata"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.009s",
+      "index": 6174,
+      "total": 7481,
+      "name": "lamp-voice session_reader::tests::linux::only_the_new_session_is_shared_after_one_pinned_lookup"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.007s",
+      "index": 6175,
+      "total": 7481,
+      "name": "lamp-voice session_reader::tests::linux::readable_or_linked_voice_siblings_deny_preparation_and_late_grant"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.006s",
+      "index": 6176,
+      "total": 7481,
+      "name": "lamp-voice session_reader::tests::linux::replaced_record_never_changes_an_outside_sentinel"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.009s",
+      "index": 6177,
+      "total": 7481,
+      "name": "lamp-voice session_reader::tests::linux::shared_session_writer_projects_every_segment_without_private_values"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.006s",
+      "index": 6178,
+      "total": 7481,
+      "name": "lamp-voice session_reader::tests::linux::unprepared_or_wrong_group_parent_never_grants_or_changes_ancestors"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.006s",
+      "index": 6179,
+      "total": 7481,
+      "name": "lamp-voice session_reader::tests::local_session_reader_group_is_exact_unique_and_bounded"
+    }
+  ],
+  "reader_ignored_limit": "Existing dedicated_reader_can_only_read_new_events_under_dropped_identity has no executed terminal row; aggregate skips only. No privileged DAC execution claim.",
+  "log_sha256": "05ab9418ff44a07ad83c1d13c52ae021c71a745fd9a865204d6660099f4e19d9",
+  "log_bytes": 1870944,
+  "source_limit": "26c/0c1 event only; later carried source is separate. Historical full/baseline failures retained.",
+  "publication": "Raw log private and not publication-cleared; this minimal JSON contains only reviewed test/source metadata."
+}
