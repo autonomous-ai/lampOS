@@ -1,5 +1,11 @@
 # Reviewer work log
 
+## 2026-10-26 (reviewer-two train 164 and 165 delivery)
+
+Train 164 #3559 original audit completed (6411408532): head 375529c65 on 1ec, one literal member patch/metadata and two authored blobs equal #3557, full 10,668-entry tree 522157f61. Original ARM 40289755407 and Linux 40289755426 succeed: 7,496 unique PASS, zero FAIL/LEAK/TIMEOUT/unrun, 53 skips, both changed attention controls once, 159.172 seconds. Exact preview 2cd8e4713 binds ordered base/head and that tree; export/upload succeed. Separate docs 4/0 across 46 summaries, process 13/0, promoter 25/0 and relay OK. Raw ARM SHA-256 fde76571edb31db814ad80ce4d52340d0b6bb76385b279c06ee923fd644f716a. Product/physical read remains with #3557's existing readers. Bot landing 330995f68 has exact parent, patch, metadata and tree (6411439484).
+
+Train 165 #3561 docs delivery verified (6411439966): member 6084ad072, train 0a9275ccb and landing 1cad670df preserve identical authored patch/metadata. Train and landing are exact full-tree overlays on 330995f68, tree 569e7d9b8; only build-rows.md changes. No PR checks ran for this excluded docs path. The template ARM wording is not an execution claim. Both deliveries recorded on Queue 6411440442. Current carries need latest-base qualification; the earlier journal/reminder review composition stays bound to its own 1ec-derived tree. No manual merge or device action.
+
 ## 2026-10-26 (reviewer-two scorecard, journal carry and integration at 15:15 +07)
 
 #3556 READ-OK 6084ad072 (6411249316): docs-only, exact 1ec parent and tree 13449f3a5. All 70 build scores sum 65.68 (93.8%); two excluded mood scores sum 1.17 (58.5%); 16 quality scores sum 10.92 (68.25%, ties-to-even display 68.2%). Changed rows and scores match #1711's 6999 played report and explicit assessment. Physical evidence stays author-attributed; the observed trigger improvement is not a universal latency guarantee. No runtime test claimed.
