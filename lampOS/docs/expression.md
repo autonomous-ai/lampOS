@@ -1180,6 +1180,13 @@ behavior and end-to-end lamp latency remain unmeasured for this addition.
 
 ## The unplug presentation (#1674)
 
+The speaking-Ready runtime fixture creates its service and publishers before
+publishing Ready, then publishes its one Speaking observation last and takes
+one service step. Other fixture callers retain their original initial voice.
+Its transport lifespan, grace and Ready checks are unchanged; a host stall
+after publication can still expire an input. The test neither retries a step
+nor refreshes an input until the desired output appears.
+
 With `LAMP_UNPLUG=on`, a matching fresh body Ready produces the resting face
 and `asleep` behaviour. Expression acknowledges its publication, or, with no
 light of its own to send (a cancelled voice turn, no fresh voice timing), that
