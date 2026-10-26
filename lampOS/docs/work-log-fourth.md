@@ -6,6 +6,14 @@ Main advanced to d5dc2e87f with actual Voice attention/worker changes. #3544 ret
 
 The diagnostic fixture completed combined Voice 4,086/0/21 with no leaks/timeouts; its changed case passed once in 0.690 s, docs had zero cases, and source/witness/process closure verified. The earlier capacity stop and exact incremental recovery remain recorded. Its two-file task was committed independently, then carried equally as 9b758a4a7 on a08abe33e. It is not yet published or current-source qualified. Common composition against the newly landed name handling is under source review while the compiler remains with the parent carry. No lamp or activation occurred.
 
+## 2026-10-26 15:14 — Taken: forget-everything profile gap
+
+Ready for lamp-voice: no
+
+Taken from #3530 checklist 4k and the lead's report on #1711: forget-everything removes memories but leaves the enrolled face/name. Open and merged searches found no active repair. Delivered #1723 and #3008 cover the original memory-all and face-to-memory paths; the reverse orchestration needs investigation, request-owned identity protection and truthful partial outcomes. This is a separate bounded task, with no current-head reproduction or device claim. V1 and existing paths will be read before implementation. First owns routing of physical acceptance; this builder has no lamp.
+
+The current 95e6b5ab9 full Voice runtime remains active, with both exact cases passed on the new executable; compiler checks are already complete and no old hash result is reused. Common remains separately prepared. Also completed the second READ-OK on scorecard #3556 at 6084ad072: exact totals and two changed scores match the author's 6999 report; no lamp trial was repeated.
+
 ## 2026-10-26 14:36 — Full Voice completed; current carry qualifying
 
 Ready for lamp-voice: no
