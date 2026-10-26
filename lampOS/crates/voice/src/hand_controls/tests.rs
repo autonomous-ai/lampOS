@@ -1467,10 +1467,75 @@ fn waking(shared: &Shared) -> std::os::fd::OwnedFd {
     read
 }
 
+/// Readiness is an observed completed drain after subscriptions, not a delay.
+fn pump_ready_before(shared: &Shared, timeout: Duration) -> bool {
+    let deadline = std::time::Instant::now() + timeout;
+    while !shared.pump_ready.load(Ordering::Acquire) {
+        if std::time::Instant::now() >= deadline {
+            return false;
+        }
+        thread::sleep(Duration::from_micros(100));
+    }
+    true
+}
+
+/// Join before any fixture assertion, including a readiness failure. A stuck
+/// join belongs to the outer test watchdog; never detach a still-running pump.
+fn stop_idle_pump(shared: &Shared, worker: thread::JoinHandle<()>) {
+    shared.stop.store(true, Ordering::Release);
+    shared.wake();
+    worker.thread().unpark();
+    let stopping = std::time::Instant::now();
+    let joined = worker.join();
+    let elapsed = stopping.elapsed();
+    assert!(joined.is_ok(), "the idle pump panicked");
+    assert!(
+        elapsed < Duration::from_secs(2),
+        "the pump took {elapsed:?} to stop and join (limit 2 s)"
+    );
+}
+
+/// Holding the worker before pump entry cannot satisfy readiness. Release the
+/// same worker and require an actual subscribed drain, then clean up before
+/// checking either result. This establishes startup ordering, not throughput.
+#[test]
+fn an_idle_pump_is_ready_only_after_its_first_subscribed_drain() {
+    let directory = Directory::new();
+    let root = directory.0.join("bus");
+    let (sender, _input) = mpsc::sync_channel(QUEUE_CAPACITY);
+    let shared = Arc::new(Shared::default());
+    let (release, held) = mpsc::sync_channel(1);
+    let pump_shared = Arc::clone(&shared);
+    let worker = thread::spawn(move || {
+        if held.recv().is_ok() {
+            pump(root, true, false, None, sender, &pump_shared);
+        }
+    });
+    let prematurely_ready = pump_ready_before(&shared, Duration::from_millis(20));
+    let passes_while_held = shared.passes.load(Ordering::Relaxed);
+    let released = release.send(()).is_ok();
+    let ready = pump_ready_before(&shared, Duration::from_secs(2));
+    stop_idle_pump(&shared, worker);
+    assert!(!prematurely_ready, "held startup was reported ready");
+    assert_eq!(passes_while_held, 0, "held startup completed a pass");
+    assert!(released, "the held worker exited before release");
+    assert!(ready, "the released pump did not finish its first drain");
+}
+
+/// Read only after the worker joined. Progress is sampled before stop so
+/// stop's unpark cannot manufacture a completed idle wait for the test.
+#[derive(Debug)]
+struct TickWaitReceipt {
+    progressed: bool,
+    completed: u64,
+    shortest: Duration,
+    longest: Duration,
+}
+
 /// A pump on a bus with no publishers: how many passes it makes over
 /// `for_ms`, and then, with the wait, how long after a wake it comes round
 /// again, the wake given 20 ms into a 200 ms wait.
-fn idle_pump(wait: bool, for_ms: u64) -> (u64, Option<Duration>) {
+fn idle_pump(wait: bool, for_ms: u64) -> (u64, Option<Duration>, Option<TickWaitReceipt>) {
     let directory = Directory::new();
     let root = directory.0.join("bus");
     let (sender, _input) = mpsc::sync_channel(QUEUE_CAPACITY);
@@ -1478,53 +1543,65 @@ fn idle_pump(wait: bool, for_ms: u64) -> (u64, Option<Duration>) {
     let woken = wait.then(|| waking(&shared));
     let (pump_shared, pump_root) = (Arc::clone(&shared), root.clone());
     let worker = thread::spawn(move || pump(pump_root, true, false, woken, sender, &pump_shared));
-    // Past the subscriptions, then counted.
-    thread::sleep(Duration::from_millis(300));
+    if !pump_ready_before(&shared, Duration::from_secs(2)) {
+        stop_idle_pump(&shared, worker);
+        panic!("the idle pump did not finish its first subscribed drain");
+    }
     let before = shared.passes.load(Ordering::Relaxed);
+    let ticks_before = shared.tick_waits.count.load(Ordering::Acquire);
     thread::sleep(Duration::from_millis(for_ms));
     let passes = shared.passes.load(Ordering::Relaxed) - before;
     let next_pass = |after: u64| {
         let deadline = std::time::Instant::now() + Duration::from_secs(2);
         while shared.passes.load(Ordering::Relaxed) == after {
-            assert!(
-                std::time::Instant::now() < deadline,
-                "the pump stopped passing"
-            );
+            if std::time::Instant::now() >= deadline {
+                return false;
+            }
             thread::sleep(Duration::from_micros(100));
         }
+        true
     };
     // Under load the wake can come after the wait has ended, and the pass
     // timed is then the wait's own: that can hide a pump that ignores the
     // wake, never fail one that heeds it (the lead's reviewer on #2274).
     let woken = wait.then(|| {
-        next_pass(shared.passes.load(Ordering::Relaxed));
+        if !next_pass(shared.passes.load(Ordering::Relaxed)) {
+            return None;
+        }
         thread::sleep(Duration::from_millis(20));
         let waking = std::time::Instant::now();
         let at = shared.passes.load(Ordering::Relaxed);
         shared.wake();
-        next_pass(at);
-        waking.elapsed()
+        next_pass(at).then(|| waking.elapsed())
     });
-    shared.stop.store(true, Ordering::Release);
-    shared.wake();
-    worker.thread().unpark();
-    // The stop ends it, loosely bounded: beside SQLite stores syncing it
-    // took up to 1.09 s (#1569 row 35).
-    let stopping = std::time::Instant::now();
-    while !worker.is_finished() {
-        assert!(
-            stopping.elapsed() < Duration::from_secs(2),
-            "the pump was still running 2 s after its stop"
-        );
-        thread::sleep(Duration::from_millis(1));
-    }
-    worker.join().unwrap();
-    (passes, woken)
+    // Observe actual off-mode wait progress, not a host throughput floor.
+    // Record a missing observation, then stop and join before asserting it.
+    let tick_progress = (!wait).then(|| {
+        let deadline = std::time::Instant::now() + Duration::from_secs(2);
+        while shared.tick_waits.count.load(Ordering::Acquire) == ticks_before
+            && std::time::Instant::now() < deadline
+        {
+            thread::sleep(Duration::from_micros(100));
+        }
+        shared.tick_waits.count.load(Ordering::Acquire) > ticks_before
+    });
+    // Subscription teardown can be slow beside SQLite stores syncing. Keep
+    // its existing two-second bound, checking it only after the owned join.
+    stop_idle_pump(&shared, worker);
+    let woken = woken.map(|observed| observed.expect("the pump stopped passing"));
+    let ticks = tick_progress.map(|progressed| TickWaitReceipt {
+        progressed,
+        completed: shared.tick_waits.count.load(Ordering::Acquire),
+        shortest: Duration::from_nanos(shared.tick_waits.shortest_ns.load(Ordering::Relaxed)),
+        longest: Duration::from_nanos(shared.tick_waits.longest_ns.load(Ordering::Relaxed)),
+    });
+    (passes, woken, ticks)
 }
 
 /// #705, the lamp's heat: with nothing coming, the waiting pump wakes about
-/// five times a second (the bus's 200 ms rescan) where the 2 ms tick wakes
-/// hundreds of times; a stop still ends it at once. A stop is a wake: the
+/// five times a second (the bus's 200 ms rescan). The off-mode park still
+/// requests 2 ms, without claiming a loaded host completes 100 passes/s.
+/// A stop still ends it at once. A stop is a wake: the
 /// wake brings the pump round at once, not at its wait's end, and the pass it
 /// brings finds the stop. That is judged by the pump's next pass; its
 /// thread's end is only bounded loosely, at 2 s: ending, the pump lets go of
@@ -1533,12 +1610,20 @@ fn idle_pump(wait: bool, for_ms: u64) -> (u64, Option<Duration>) {
 /// to 265 ms, while the wake's pass came within 1.5 ms (#1569 row 35).
 #[test]
 fn with_the_wait_an_idle_pump_wakes_five_times_a_second_and_stops_at_once() {
-    let (waiting, woken) = idle_pump(true, 1_000);
+    let (waiting, woken, _) = idle_pump(true, 1_000);
     assert!(waiting <= 10, "{waiting} passes in 1 s");
     let woken = woken.unwrap();
     assert!(woken < Duration::from_millis(100), "{woken:?}");
-    let (ticking, _) = idle_pump(false, 1_000);
-    assert!(ticking >= 100, "{ticking} passes in 1 s");
+    let (ticking, _, ticks) = idle_pump(false, 1_000);
+    let ticks = ticks.expect("off-mode wait receipt after stop and join");
+    eprintln!("idle pump: {ticking} off-mode passes in the sample; {ticks:?}");
+    assert!(
+        ticks.progressed,
+        "no completed off-mode park before stop: {ticks:?}"
+    );
+    assert!(ticks.completed > 0, "{ticks:?}");
+    assert_eq!(ticks.shortest, Duration::from_millis(2), "{ticks:?}");
+    assert_eq!(ticks.longest, Duration::from_millis(2), "{ticks:?}");
 }
 
 /// An owner with head sleep on (`voice/mute` said) and the wait, its pump
@@ -1644,6 +1729,59 @@ fn with_the_wait_a_changed_latch_is_said_at_once() {
     worker.join().unwrap();
 }
 
+/// Test-owned workers are stopped and joined even when a fixture assertion
+/// unwinds. This does not change the service's bounded shutdown policy.
+struct JoinedHeadPump {
+    shared: Arc<Shared>,
+    worker: Option<thread::JoinHandle<()>>,
+}
+
+impl JoinedHeadPump {
+    fn stop_and_join(&mut self) -> thread::Result<()> {
+        self.shared.stop.store(true, Ordering::Release);
+        self.shared.wake();
+        match self.worker.take() {
+            Some(worker) => {
+                worker.thread().unpark();
+                worker.join()
+            }
+            None => Ok(()),
+        }
+    }
+}
+
+impl Drop for JoinedHeadPump {
+    fn drop(&mut self) {
+        let _ = self.stop_and_join();
+    }
+}
+
+#[test]
+fn the_head_touch_fixture_joins_its_worker_before_a_failed_check_returns() {
+    let shared = Arc::new(Shared::default());
+    let stopped = Arc::new(AtomicBool::new(false));
+    let finished = Arc::clone(&stopped);
+    let pump_shared = Arc::clone(&shared);
+    let worker = thread::spawn(move || {
+        while !pump_shared.stop.load(Ordering::Acquire) {
+            thread::park_timeout(Duration::from_millis(2));
+        }
+        finished.store(true, Ordering::Release);
+    });
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        let _worker = JoinedHeadPump {
+            shared,
+            worker: Some(worker),
+        };
+        panic!("controlled fixture failure");
+    }));
+    assert!(result.is_err());
+    assert!(
+        stopped.load(Ordering::Acquire),
+        "worker was joined before return"
+    );
+}
+
 /// A head touch published on a real bus to the owner's poll accepting it,
 /// `rounds` times: each round's time, in µs.
 fn head_touch_rounds(wait: bool, rounds: usize) -> Vec<u64> {
@@ -1675,34 +1813,56 @@ fn head_touch_rounds(wait: bool, rounds: usize) -> Vec<u64> {
         let (pump_shared, pump_root) = (Arc::clone(&shared), root.clone());
         let worker =
             thread::spawn(move || pump(pump_root, true, false, woken, sender, &pump_shared));
-        let deadline = std::time::Instant::now() + Duration::from_secs(2);
-        while bus.subscribers(TouchEvent::TOPIC).unwrap().is_empty() {
-            assert!(
-                std::time::Instant::now() < deadline,
-                "pump never subscribed"
-            );
-            thread::sleep(Duration::from_millis(1));
-        }
-        let (state, touch) = test_head_touch(CLOCK, lamp_ipc::monotonic_us() - 40_000);
-        let published = lamp_ipc::monotonic_us();
-        states.publish_json(published, &state).unwrap();
-        events.publish_json(published, &touch[0]).unwrap();
-        loop {
-            if owner.poll().unwrap().head_touch_at_us.is_some() {
-                elapsed_us.push(lamp_ipc::monotonic_us() - published);
-                break;
+        let mut worker = JoinedHeadPump {
+            shared: Arc::clone(&shared),
+            worker: Some(worker),
+        };
+        let result = (|| -> Result<u64, String> {
+            let ready_until = std::time::Instant::now() + Duration::from_secs(2);
+            while !shared.pump_ready.load(Ordering::Acquire) {
+                if std::time::Instant::now() >= ready_until {
+                    return Err("pump never completed its first subscribed drain".into());
+                }
+                thread::sleep(Duration::from_millis(1));
             }
-            assert!(
-                std::time::Instant::now() < deadline,
-                "the touch never arrived: {:?}",
-                owner.health()
-            );
-            thread::yield_now();
-        }
-        shared.stop.store(true, Ordering::Release);
-        shared.wake();
-        worker.thread().unpark();
-        worker.join().unwrap();
+            let (state, touch) = test_head_touch(CLOCK, lamp_ipc::monotonic_us() - 40_000);
+            let published = lamp_ipc::monotonic_us();
+            states
+                .publish_json(published, &state)
+                .map_err(|error| format!("state publication: {error}"))?;
+            let state_sent = lamp_ipc::monotonic_us();
+            events
+                .publish_json(published, &touch[0])
+                .map_err(|error| format!("event publication: {error}"))?;
+            let event_sent = lamp_ipc::monotonic_us();
+            let receipt_until = std::time::Instant::now() + Duration::from_secs(2);
+            loop {
+                if owner
+                    .poll()
+                    .map_err(|error| format!("owner poll: {error}"))?
+                    .head_touch_at_us
+                    .is_some()
+                {
+                    return Ok(lamp_ipc::monotonic_us() - published);
+                }
+                if std::time::Instant::now() >= receipt_until {
+                    let now = lamp_ipc::monotonic_us();
+                    return Err(format!(
+                        "touch did not arrive; round={round}, state_publish_us={}, event_publish_us={}, state_age_at_publish_us={}, event_age_at_publish_us={}, receipt_wait_us={}, health={:?}",
+                        state_sent.saturating_sub(published),
+                        event_sent.saturating_sub(state_sent),
+                        published.saturating_sub(state.stamp.at_us),
+                        published.saturating_sub(touch[0].stamp.at_us),
+                        now.saturating_sub(event_sent),
+                        owner.health()
+                    ));
+                }
+                thread::yield_now();
+            }
+        })();
+        // Preserve failure evidence, then stop and join before asserting it.
+        worker.stop_and_join().expect("head-touch pump joined");
+        elapsed_us.push(result.unwrap_or_else(|error| panic!("{error}")));
     }
     elapsed_us
 }
