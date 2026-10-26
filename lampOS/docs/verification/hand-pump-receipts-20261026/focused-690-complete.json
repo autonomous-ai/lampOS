@@ -1,0 +1,31 @@
+{
+  "actual_native_session_id": 9165,
+  "actual_native_exit": 0,
+  "actual_native_chunk": "5d72a1",
+  "source_stable": true,
+  "all_owned_sessions_groups_closed": true,
+  "published_head": "6dc3d2b3329756bc20e58a43f13a1e4a2182b65f",
+  "tested_staged_head": "3dfdc0fdb7bc9f20e8bf6113eb71a942a08d84af",
+  "tested_and_published_tree": "cf9fcd83e7badaa46ab244ccad8a16ab644e123a",
+  "base": "690dff041e331b5c89160901b4f38f3a9915e60b",
+  "hand_controls": {
+    "passed": 61,
+    "failed": 0,
+    "ignored": 1
+  },
+  "update_lib_install": {
+    "passed": 222,
+    "failed": 0,
+    "ignored": 2
+  },
+  "docs": "Voice and Update harnesses each passed with zero cases",
+  "full_voice_qualified": false,
+  "leaks": 0,
+  "timeouts": 0,
+  "original_focused_controller_exit": 125,
+  "original_error": "ignored-only accounting projection; offline corrected, no runtime replay",
+  "retained_witnesses": 22,
+  "release_sha256": "b8a7dfcf76f9d5a31a81d821675260f6501c6e0ab611a2fc6483eb64039e8c6b",
+  "update_provenance_sha256": "6c105ec229815878ff29d7181188900b8f9b28b93bee65e100f06d9ad95b7692",
+  "provenance": "Both Update test executables freshly rebuilt; current full embedded inputs verified. Cached non-test library primary compile path and 133 input blobs match qualified baseline."
+}

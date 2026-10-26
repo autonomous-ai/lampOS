@@ -1,3 +1,11 @@
+## 2026-10-26 17:42 — Qualified hand-control increment pushed; current carry starts
+
+Ready for lamp-voice: no
+
+Pushed #3544 as 6dc3d2b332, one folded commit on 690dff041, with the exact prior 95e lease. [Completed focused receipt](verification/hand-pump-receipts-20261026/focused-690-complete.json): hand-controls 61/0/1, Update lib/install 222/0/2, both doc harnesses pass with zero cases; formatting, strict workspace Clippy and workspace build passed. The original accounting-controller 125 remains alongside the only-unrun continuation's actual 0. Source, all 22 witnesses, preserved debug inputs, test artifacts and process closure verified. Update's fresh test executables contain the current embedded documents/scripts; the cached non-test library's 133 input blobs match its qualified baseline. This does not qualify full Voice or clear the privacy HOLD.
+
+Main advanced through Voice startup and Update install-fixture changes. The equal range-diff carry is c97dae3339 on ba950f289, tree b5fe21b132; fresh compiler, hand-controls, transport/startup integration, Update and doc checks now qualify that source. It is not yet pushed, and old counts are not labelled current. The published PR stays draft for current-source/native qualification and review disposition.
+
 ## 2026-10-26 17:22 — Focused hand-control result and isolated expiry repair
 
 Ready for lamp-voice: no
