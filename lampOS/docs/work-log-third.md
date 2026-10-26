@@ -13,6 +13,22 @@ machine is explicitly named. Third has no lamp access.
 
 
 
+## 2026-10-26 13:30 — Trusted-tier limits documentation read
+
+Ready for lamp-voice: reader result only (#3550)
+
+READ-OK **844a28283**, no P1/P2. Exact one-file diff passes whitespace
+check. Verified upstream contract blob **50d50db21**: 300-byte note,
+six proposals/minute per add-on/device, twelve per device, four undecided,
+32 topics and hello clearing. Upstream issue 1654 questions 5–7 ask for
+ordered events, longer proposals and trusted-machine proof; none is claimed
+implemented here. Consent/effect boundaries remain unchanged. P3: minute
+rates use RATE_LIMITED, four undecided uses BACKPRESSURE. No runtime test.
+
+Both own current-base PRs still qualify natively. Train 160's three factory
+blobs match 0038db8cf; this is source binding, not whole-train acceptance.
+The next Expression fixture read waits for Tests' promised current-base carry.
+
 ## 2026-10-26 13:26 — Reminder current-base gate and push
 
 Ready for lamp-voice: no (#3525)
