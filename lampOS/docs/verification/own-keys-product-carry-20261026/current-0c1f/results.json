@@ -1,0 +1,388 @@
+{
+  "activation": "DRAFT HOLD: #2094 and explicit current-lamp activation acceptance remain outstanding.",
+  "artifact_binding": {
+    "available": false,
+    "scope": "This gate did not retain Cargo compiler JSON or executable hashes. Evidence binds source inventories, commands and raw logs only; no binary identity claim."
+  },
+  "audited_at_utc": "2026-10-26T02:42:14.862808+00:00",
+  "base": "0c1f6437ee57eae3416e3281d91b813d1c3bec1d",
+  "carry": {
+    "author_identity_dates_messages_preserved": true,
+    "equal_authored_patches": 7,
+    "literal_range_diff_sha256": "6204c42f8909538efe5d022e8b25dcd72a06a9090acd167da22590ce688a51f1",
+    "prior_verification_blobs_modes_preserved": 4470,
+    "receipt_sha256": "a84f103ccad2dcf84c2281d4fa7a420322897d12e9160d70a66f81614e50de8f",
+    "upstream_changed_paths": 40
+  },
+  "completion": {
+    "continuation_controller_sha256": "fcbf201a9c5fb0c4b0f81436a72d95f3cf055a41565c195a0aade44e716a3a0f",
+    "continued_complete_receipt_sha256": "fdf69205c5f90c643c9cfcbd69902a87afdb73915e9d9a521048db288e5b69e0",
+    "source_unchanged": true
+  },
+  "controller_failure": {
+    "no_completed_stage_repeated": true,
+    "only_remaining_stages_executed": [
+      "installed-product",
+      "update-install",
+      "switches"
+    ],
+    "original_complete_marker_absent": true,
+    "original_error": "single-case selection mismatch memory-observe-room",
+    "original_room_command_exit": 0,
+    "original_stages_retained": 7,
+    "parser_correction_receipt_sha256": "6b8f04f4379a29ee04eac07df74ca8aace1383a5a9a5b8409c3d9069c5bd2793",
+    "preserved_original_controller_sha256": "66c94d55a427c6e1f0647f66da90aeb33be41adac59ef22419bd1fb5de014cbf",
+    "reason": "Naive parser summed the child1/0 and outer1/0 and expected a single pass. The source and literal output show one outer test re-executing itself.",
+    "test_failure": false
+  },
+  "counts": {
+    "installed-product": {
+      "failed": 0,
+      "ignored": 0,
+      "literal_summaries": [
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 123 filtered out; finished in 0.02s"
+      ],
+      "passed": 1
+    },
+    "memory-observe-forget": {
+      "failed": 0,
+      "ignored": 0,
+      "literal_summaries": [
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.41s"
+      ],
+      "passed": 1
+    },
+    "memory-observe-named-forget": {
+      "failed": 0,
+      "ignored": 0,
+      "literal_summaries": [
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.36s"
+      ],
+      "passed": 1
+    },
+    "memory-observe-room": {
+      "child_failed": 0,
+      "child_passed_separately": 1,
+      "failed": 0,
+      "ignored": 0,
+      "literal_summaries": [
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.45s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.46s"
+      ],
+      "passed": 1,
+      "scope": "One outer integration case and one re-executed child case. Do not sum both as two outer cases."
+    },
+    "switches": {
+      "failed": 0,
+      "ignored": 0,
+      "literal_summaries": [
+        "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 236 filtered out; finished in 0.01s"
+      ],
+      "passed": 2
+    },
+    "update-functions": {
+      "failed": 0,
+      "ignored": 0,
+      "literal_summaries": [
+        "test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s"
+      ],
+      "passed": 5
+    },
+    "update-install": {
+      "failed": 0,
+      "ignored": 0,
+      "literal_summaries": [
+        "test result: ok. 108 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 175.67s"
+      ],
+      "passed": 108
+    },
+    "voice-full": {
+      "failed": 0,
+      "ignored": 21,
+      "literal_summaries": [
+        "test result: ok. 3790 passed; 0 failed; 15 ignored; 0 measured; 0 filtered out; finished in 541.14s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 275 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 24.05s",
+        "test result: ok. 0 passed; 0 failed; 6 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.47s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      ],
+      "passed": 4076
+    }
+  },
+  "gates": {
+    "clippy": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "clippy",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-update",
+        "-p",
+        "lamp-voice",
+        "-p",
+        "lamp-selftest",
+        "-p",
+        "lamp-setup",
+        "-p",
+        "lamp-cloud",
+        "-p",
+        "lamp-health",
+        "-p",
+        "lamp-controls",
+        "-p",
+        "lamp-skills",
+        "-p",
+        "lamp-voice-eval",
+        "--all-targets",
+        "--message-format=short",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "elapsed_seconds": 69.491,
+      "execution": "original",
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "purpose": "Strict Clippy for the established nine own-keys crates; no full nine-crate test rerun.",
+      "receipt_sha256": "8f3ccb42b1f8764c9afdb9bc5a8bc68e61e11e4c4122fb53ea1804c297f25e4c",
+      "source_unchanged": true
+    },
+    "fmt": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "elapsed_seconds": 5.926,
+      "execution": "original",
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "purpose": "Workspace formatting; no formatter edits.",
+      "receipt_sha256": "2932a3c8db74e18dfee829f29d6765650e6d292a8f1d8cd5403f634760f77c89",
+      "source_unchanged": true
+    },
+    "installed-product": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-update",
+        "--lib",
+        "check_units::tests::the_product_as_install_writes_it_passes",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "elapsed_seconds": 5.583,
+      "execution": "continuation-1",
+      "exit_code": 0,
+      "log_sha256": "1bb64325c6fcbae5b300f245ce0d2ddcd8f80de47da4a43b21d6a2a671a8034b",
+      "purpose": "Exact installed product-unit reader consumes updated Voice unit.",
+      "receipt_sha256": "50d08ad405ba93120c92605358ef5ed567ac7c2f370b3c50117bcbf20352deb0",
+      "source_unchanged": true
+    },
+    "memory-observe-forget": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-memory",
+        "--test",
+        "voice_observe_forget",
+        "--",
+        "--test-threads=1"
+      ],
+      "elapsed_seconds": 5.733,
+      "execution": "original",
+      "exit_code": 0,
+      "log_sha256": "d36b16484a435248629a10247be0da5d5bfcee2b7ab8fdfa5f0b274865dd84ea",
+      "purpose": "New real-store integration: forget closes old jobs and does not send a waiting job to the observer.",
+      "receipt_sha256": "d233924478205e15c35962ada25bfbdc6ccb8dddad788d13fc00c50acf99bc19",
+      "source_unchanged": true
+    },
+    "memory-observe-named-forget": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-memory",
+        "--test",
+        "voice_observe_named_forget",
+        "--",
+        "--test-threads=1"
+      ],
+      "elapsed_seconds": 1.917,
+      "execution": "original",
+      "exit_code": 0,
+      "log_sha256": "4a7678abf539c6ec9085d7a439602844ff71af55a7d214d17b4b540f463f6c74",
+      "purpose": "New real-store integration: named forget during a conversation closes that conversation job unsent.",
+      "receipt_sha256": "9fabf7ad5d89a5fda78e4d32a4124789c22d9689bd711b1a67b73709254aab7a",
+      "source_unchanged": true
+    },
+    "memory-observe-room": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-memory",
+        "--test",
+        "voice_observe_room",
+        "--",
+        "--test-threads=1"
+      ],
+      "elapsed_seconds": 2.055,
+      "execution": "original",
+      "exit_code": 0,
+      "log_sha256": "d5008b1ddc04810af832dcaa7ec0769208f7d9b4c7e3ffa18accd532c8ab6a5f",
+      "purpose": "New real-store integration: room conversation denied observation, known person allowed, and switch-off behavior retained.",
+      "receipt_sha256": "0ea2844caa7c70586a10d73c186f08d419f6e4d48a83db1a86f332c6c9c69072",
+      "source_unchanged": true
+    },
+    "switches": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-voice-eval",
+        "--test",
+        "it",
+        "switches::",
+        "--",
+        "--test-threads=1"
+      ],
+      "elapsed_seconds": 52.625,
+      "execution": "continuation-1",
+      "exit_code": 0,
+      "log_sha256": "1c8ce6b96caada736a13b613365297381769fd85679e71caa8339d3b35fbd927",
+      "purpose": "Both compiled census readers consume changed switches documentation.",
+      "receipt_sha256": "1d92a4d5470975edbc6ff47aa39e2ff7d9d1738827250d7684f359afc67818c4",
+      "source_unchanged": true
+    },
+    "update-functions": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-update",
+        "--test",
+        "functions",
+        "--",
+        "--test-threads=1"
+      ],
+      "elapsed_seconds": 41.717,
+      "execution": "original",
+      "exit_code": 0,
+      "log_sha256": "9d2f05ffd56b48f1950dc2616da75739562ed09a99c8c782582dae883ffadcd9",
+      "purpose": "Complete product function target consumes all shipped Voice Environment lines; the upstream product now declares 35 functions.",
+      "receipt_sha256": "b7987bb1a5e68ab458729d4a1e03fcc09bc60d0b2ac90e6a4faa143dc51bbe68",
+      "source_unchanged": true
+    },
+    "update-install": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-update",
+        "--test",
+        "install",
+        "--",
+        "--test-threads=1"
+      ],
+      "elapsed_seconds": 178.402,
+      "execution": "continuation-1",
+      "exit_code": 0,
+      "log_sha256": "a26fbb92e912c2db299deeeb7e490d6285bddee71a1cd4ad76cbdafc5427e58d",
+      "purpose": "Complete install target because upstream head_touch nonregular-file preflight production changed; runs all new FIFO/directory/compatibility controls beside own-keys retirement and product controls.",
+      "receipt_sha256": "75a56546ade06959655b4ea0dd78e909883717407481a8c5b514120fe602d20e",
+      "source_unchanged": true
+    },
+    "voice-full": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-voice",
+        "--",
+        "--test-threads=1"
+      ],
+      "elapsed_seconds": 691.196,
+      "execution": "original",
+      "exit_code": 0,
+      "log_sha256": "a03bd7a02bf9755ac86798177284aa41f54a7373853814d18c92eb675c2ecd5d",
+      "purpose": "Full Voice crate because memory/observation and coordinator music runtime changed; includes landed requested-audio and body-push fixture controls. Counts must come from this run.",
+      "receipt_sha256": "f35a5b8bcffeb60a240196f0596f10f005df370614a65a88b40c428abd0d1ecf",
+      "source_unchanged": true
+    }
+  },
+  "head": "3654d62d0016ef1973f55f165ee849c1e2efb856",
+  "head_tree": "00381674e47f45469f554fbef6de7b5822906dfd",
+  "historical_failures": {
+    "initial_directory_fixture": {
+      "failed": 1,
+      "passed": 6,
+      "scope": "Historical fixture error retained; corrected refusal expectation did not weaken runtime.",
+      "url": "https://github.com/autonomous-ai/lampOS/blob/3654d62d0016ef1973f55f165ee849c1e2efb856/lampOS/docs/verification/own-keys-product-carry-20261026/README.md#retained-failed-fixture-and-deliberate-fault"
+    },
+    "original_full_run": {
+      "failed": 1,
+      "ignored": 44,
+      "passed": 6667,
+      "root_cause": "Unproven; subsequent exact candidate/baseline replays do not erase or attribute the original failure.",
+      "url": "https://github.com/autonomous-ai/lampOS/blob/3654d62d0016ef1973f55f165ee849c1e2efb856/lampOS/docs/verification/own-keys-product-carry-20261026/README.md#original-full-run-failed"
+    }
+  },
+  "limits": [
+    "No full nine-crate or full Memory suite is claimed.",
+    "No current-head native run is qualified by this packet; earlier native counts retain original heads.",
+    "No key/provider/systemd/device or latency acceptance; no compiler/tests executed by this audit."
+  ],
+  "previous_base": "41233c1b6954abc812186d7014a7adb19422e29e",
+  "previous_head": "453f8607ad334175f60fcef7bb23cca7d7c9e5d8",
+  "schema": 1,
+  "source_binding": {
+    "all_entries_match_tested_commit_blobs_modes": true,
+    "all_stage_receipts_source_unchanged": true,
+    "entries": 7215,
+    "inventory_sha256": "1dc96d5a30abe875050efce698e165566b2fed0e34aa053d1355190f8f729d7c",
+    "prepared_original_continuation_and_current_inventories_equal": true
+  }
+}

@@ -1,3 +1,17 @@
+Ready for lamp-voice: no; #3510 activation HOLD and #3528 current ARM64 pending.
+
+## Current checkpoint: 2026-10-26 09:44 +07, own-keys current gate complete and pushed
+
+[#3510](https://github.com/autonomous-ai/lampOS/pull/3510) is pushed at `3654d62d0`, containing current `0c1f6437e`. Seven equal patches preserve prior proofs and the newly landed nonregular-input preflight. [Current source-bound gate](verification/own-keys-product-carry-20261026/current-0c1f/README.md) passes fmt and strict nine-crate Clippy, full Voice **4,076/0/21**, complete Update install **108/0**, functions **5/0**, three Memory outer cases **3/0**, installed-product **1/0**, and both census cases **2/0**. The room integration separately reports one child pass. Its command exited zero; the original controller incorrectly summed child and outer summaries and stopped. That parser failure remains, and only three unrun stages continued. No completed stage was repeated and no executable-manifest binding is claimed for this continuation. Original current-head ARM64 **40260331872** and Linux Clippy **40260331874** have started; earlier native results retain their own scope. Draft activation HOLD for #2094 and explicit current-lamp acceptance remains.
+
+[#3528](https://github.com/autonomous-ai/lampOS/pull/3528) at `6e177dee0` now has independent current-head Mac IPC execution from both readers, plus a clean Tests source read. Its original Linux Clippy passes; original ARM64 **40258770126** is still active. It stays draft until that gate completes.
+
+The model-open fixture on 0c1 passes fmt, strict Turn-end Clippy and full **30/0/8**, with both focused cases passing. Original stopwatch plus 400 ms pause fails **0/1**; corrected pauses pass **2/0**; actual synchronous-spawn mutation reaches the named parent watchdog **0/1**; restored source freshly compiles and passes **2/0**. The controls controller rejects the interleaved child-stderr/result line after that expected negative result; its failed receipt is retained for a separate read-only reconciliation. No test rerun is used to erase it. Model source remains uncommitted while that evidence audit completes.
+
+No model download, local full-workspace/ARM64 gate, key, provider, lamp or release action ran.
+
+---
+
 Delivered through train153: #3515 and #3524. Remaining #3528 and #3510 are not ready.
 
 ## Current checkpoint: 2026-10-26 09:26 +07, music and endpoint landed; IPC current carry pushed
