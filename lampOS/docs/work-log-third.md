@@ -1,3 +1,13 @@
+## 2026-10-27 06:07 — reminder partial gate exposes privacy resync fixture
+
+Ready for lamp-voice: no (current fixture failure and latest-base gates pending)
+
+Actual b490/a3 full twelve-package command failed 101 after 62/70 drivers: 6,576 passed, one failed and 46 ignored (raw 6,577 includes one nested Memory pass). All 21 reminder and three joined-mock controls pass once. [Exact partial failure](verification/reminder-pending-present-20261026/current-b490-partial-failure.json): Voice library 3,810/1/15, the kept privacy lease resync fixture exhausted ten attempts with publisher unavailable at privacy_bus.rs:1313. No timeout or forced cleanup, source/raw inputs and all133 actual/saved bytes stayed unchanged. [Separate32-inode disposition](verification/reminder-pending-present-20261026/current-b490-inode-disposition.json) retains the original metadata HOLD, with16 normal binaries/16 examples and no test-driver metadata drift.
+
+Claimed a separate test-only follow-up at6429132612/6429133091, after open/merged searches. Kept values do not reset the stock20ms datagram-silence clock; this fixture deliberately has no datagrams. The two-file staged repair scopes a one-second period to that fixture while keeping envelope/payload50ms and all original first-datagram/one-second/gap assertions. On new90ca base, local formatting/strictVoice+Bus+Msgs Clippy pass; build/test compilation continue in the preserved idle Reset bank. No product declaration or device action. Only the eight unstarted Reminder drivers now run; failed Voice library is not retried.
+
+Own-keys a775 continuation completed all58commands with stable source/raw140byte/metadata guards and no forced cleanup; independent terminal audit precedes its next carry. Its original journal failure remains failed; inherited repair90ca is delivered.
+
 ## 2026-10-27 04:47 — own-keys partial runtime retains journal failure
 
 Ready for lamp-voice: no (current journal fixture failure and activation HOLD)

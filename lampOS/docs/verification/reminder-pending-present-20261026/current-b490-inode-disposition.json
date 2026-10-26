@@ -1,0 +1,517 @@
+{
+  "all_compiled_test_driver_metadata_unchanged": true,
+  "at": "2026-10-26T23:03:22.235394+00:00",
+  "base": "a3b9c46814bb2b2452f0d6b6cc13bb3a16992c33",
+  "decision": "Only inode changed on these normal binary/example paths, with actual bytes equal independent saved preimages. Permit planning exact eight previously unrun drivers using the current terminal metadata baseline; do not make the failed full command pass, erase its guard hold, or qualify unrun targets.",
+  "head": "b49073d5900cd6fdeb080599ea1888adea638b34",
+  "kind_counts": {
+    "bin": 16,
+    "example": 16
+  },
+  "limits": [
+    "Before/after observations do not identify which operation or instant replaced an inode.",
+    "Source/raw-input guards were independently checked in independent-partial-runtime-audit.json; no retroactive atomic filesystem proof."
+  ],
+  "original_metadata_hold_preserved": true,
+  "original_runtime_exit": 101,
+  "original_runtime_qualified": false,
+  "rows": [
+    {
+      "artifact": "0d0fe1ed9700c9124337c625",
+      "observed_inode": 325670399,
+      "old_inode": 325654744,
+      "path_relative_to_target": "debug/examples/same_voice_pairs",
+      "profile_test": false,
+      "roles": [
+        "test_compile_auxiliary_executable"
+      ],
+      "sha256": "b5361b1c6c00bf6f9480967079945a7b157784c067f8d883b9f6fe19e9232690",
+      "target_kind": [
+        "example"
+      ],
+      "test_driver": false
+    },
+    {
+      "artifact": "0f464e7eeba7fa2622aebe83",
+      "observed_inode": 325670417,
+      "old_inode": 325656615,
+      "path_relative_to_target": "debug/examples/rest_cost",
+      "profile_test": false,
+      "roles": [
+        "test_compile_auxiliary_executable"
+      ],
+      "sha256": "4430fbfd709b906adb6b64daf4c2e6186503272ed972596c361d9d9841158d56",
+      "target_kind": [
+        "example"
+      ],
+      "test_driver": false
+    },
+    {
+      "artifact": "102e0749d60051aab9b84bc4",
+      "observed_inode": 325670419,
+      "old_inode": 325656755,
+      "path_relative_to_target": "debug/lamp-voice",
+      "profile_test": false,
+      "roles": [
+        "workspace_product_child",
+        "test_compile_auxiliary_executable"
+      ],
+      "sha256": "c428fc5a9293279c1babcdb440bc0d6b81193263c9b4fc97a29c5837eaba5366",
+      "target_kind": [
+        "bin"
+      ],
+      "test_driver": false
+    },
+    {
+      "artifact": "19b007eed62ec93bf2c2823c",
+      "observed_inode": 325670422,
+      "old_inode": 325656921,
+      "path_relative_to_target": "debug/examples/head_plan",
+      "profile_test": false,
+      "roles": [
+        "test_compile_auxiliary_executable"
+      ],
+      "sha256": "326b0ffc2850173810eaf260b04a583b217480f93335a34d232ac41ef621fe65",
+      "target_kind": [
+        "example"
+      ],
+      "test_driver": false
+    },
+    {
+      "artifact": "238ba833c43d3f8b67439fd7",
+      "observed_inode": 325670420,
+      "old_inode": 325656982,
+      "path_relative_to_target": "debug/lamp-body",
+      "profile_test": false,
+      "roles": [
+        "workspace_product_child",
+        "test_compile_auxiliary_executable"
+      ],
+      "sha256": "e9dfe5580b57b3362e707683e948f39f7f48eedfd8209a5165c8f5124391118b",
+      "target_kind": [
+        "bin"
+      ],
+      "test_driver": false
+    },
+    {
+      "artifact": "26ce302815033076c9a0754c",
+      "observed_inode": 325670403,
+      "old_inode": 325655458,
+      "path_relative_to_target": "debug/examples/probe_handover",
+      "profile_test": false,
+      "roles": [
+        "test_compile_auxiliary_executable"
+      ],
+      "sha256": "f4592f2224858d5180cd09f2cef1c10db9c488298f1b9fdd51331b8525453a28",
+      "target_kind": [
+        "example"
+      ],
+      "test_driver": false
+    },
+    {
+      "artifact": "29cdf871593220f5f1c20a36",
+      "observed_inode": 325670402,
+      "old_inode": 325655408,
+      "path_relative_to_target": "debug/examples/admission_latency",
+      "profile_test": false,
+      "roles": [
+        "test_compile_auxiliary_executable"
+      ],
+      "sha256": "57f6cf9a6641646aac72b489e77dc55a34385e3da94bf6a551abda0e650c53ef",
+      "target_kind": [
+        "example"
+      ],
+      "test_driver": false
+    },
+    {
+      "artifact": "35ddc70305f2916e1684691f",
+      "observed_inode": 325670427,
+      "old_inode": 325657090,
+      "path_relative_to_target": "debug/lamp-update",
+      "profile_test": false,
+      "roles": [
+        "workspace_product_child",
+        "test_compile_auxiliary_executable"
+      ],
+      "sha256": "49af0426e7a78988198353169d0db757479bc17855ef5358cbe52a5d7962922b",
+      "target_kind": [
+        "bin"
+      ],
+      "test_driver": false
+    },
+    {
+      "artifact": "402fb3d05b56fa0d3b32046f",
+      "observed_inode": 325670426,
+      "old_inode": 325656951,
+      "path_relative_to_target": "debug/lamp-body-mood",
+      "profile_test": false,
+      "roles": [
+        "workspace_product_child",
+        "test_compile_auxiliary_executable"
+      ],
+      "sha256": "d77d6a2e22b72cae78524c4bd728fa81a5cb3c1ea164c8e5a8886b3997fae7e5",
+      "target_kind": [
+        "bin"
+      ],
+      "test_driver": false
+    },
+    {
+      "artifact": "4bfac514e05a2ad2038845f5",
+      "observed_inode": 325670400,
+      "old_inode": 325654846,
+      "path_relative_to_target": "debug/lamp-voice-eval",
+      "profile_test": false,
+      "roles": [
+        "workspace_product_child",
+        "test_compile_auxiliary_executable"
+      ],
+      "sha256": "2c157332221eb049d0e770d73c1fb626284026bf6afe98ff986556bb40867f1d",
+      "target_kind": [
+        "bin"
+      ],
+      "test_driver": false
+    },
+    {
+      "artifact": "4dded07b4964a18fbdbc2740",
+      "observed_inode": 325670396,
+      "old_inode": 325654556,
+      "path_relative_to_target": "debug/lamp-peek",
+      "profile_test": false,
+      "roles": [
+        "workspace_product_child",
+        "test_compile_auxiliary_executable"
+      ],
+      "sha256": "550650a546b8c4fe366d3c4dc72f3430ee4302dc02228ab22a1632b64526c107",
+      "target_kind": [
+        "bin"
+      ],
+      "test_driver": false
+    },
+    {
+      "artifact": "71c24cd34447e3c809e07a9e",
+      "observed_inode": 325670411,
+      "old_inode": 325656220,
+      "path_relative_to_target": "debug/lamp-memory-eval",
+      "profile_test": false,
+      "roles": [
+        "workspace_product_child",
+        "test_compile_auxiliary_executable"
+      ],
+      "sha256": "c5e88588bee5a243177d7ad6c468bec1da1a7aa93bfcb867a39fcfd4704f7a7c",
+      "target_kind": [
+        "bin"
+      ],
+      "test_driver": false
+    },
+    {
+      "artifact": "8ce3b1ab3047cf5e3f0f6ab6",
+      "observed_inode": 325670424,
+      "old_inode": 325656883,
+      "path_relative_to_target": "debug/examples/expression_ask",
+      "profile_test": false,
+      "roles": [
+        "test_compile_auxiliary_executable"
+      ],
+      "sha256": "cd3e3e3026eba336845b243b5d6e71a31e19133f0de652a3cbcf745d34a39be7",
+      "target_kind": [
+        "example"
+      ],
+      "test_driver": false
+    },
+    {
+      "artifact": "8d62a918a3bb21e723f8053f",
+      "observed_inode": 325670405,
+      "old_inode": 325655489,
+      "path_relative_to_target": "debug/examples/hearing_replay",
+      "profile_test": false,
+      "roles": [
+        "test_compile_auxiliary_executable"
+      ],
+      "sha256": "1970a42e56f23647fa082702eee42c80501790550453439b4943230a9b987aa4",
+      "target_kind": [
+        "example"
+      ],
+      "test_driver": false
+    },
+    {
+      "artifact": "9581a2bf647ab2a147d9e927",
+      "observed_inode": 325670398,
+      "old_inode": 325654817,
+      "path_relative_to_target": "debug/examples/turn_end_replay",
+      "profile_test": false,
+      "roles": [
+        "test_compile_auxiliary_executable"
+      ],
+      "sha256": "a4caf0ffe8092029272eca8837d5b9aec790a317e91dfdf4cb93ca50b8179c6d",
+      "target_kind": [
+        "example"
+      ],
+      "test_driver": false
+    },
+    {
+      "artifact": "9d542197837e07d58c0730f1",
+      "observed_inode": 325670415,
+      "old_inode": 325656598,
+      "path_relative_to_target": "debug/examples/check",
+      "profile_test": false,
+      "roles": [
+        "test_compile_auxiliary_executable"
+      ],
+      "sha256": "8796f8a7f94e61bd5bd5f494238590500d15ece421a554e62ac59ba669a82465",
+      "target_kind": [
+        "example"
+      ],
+      "test_driver": false
+    },
+    {
+      "artifact": "9f19b0fe176a5787e4501267",
+      "observed_inode": 325670410,
+      "old_inode": 325656004,
+      "path_relative_to_target": "debug/lamp-skills",
+      "profile_test": false,
+      "roles": [
+        "workspace_product_child",
+        "test_compile_auxiliary_executable"
+      ],
+      "sha256": "d9bd6be109624c2c987b25c009ca5fb50130a95d6278730a2ade1fd0da728b82",
+      "target_kind": [
+        "bin"
+      ],
+      "test_driver": false
+    },
+    {
+      "artifact": "a95a337a3d073bff61b6483d",
+      "observed_inode": 325670425,
+      "old_inode": 325656825,
+      "path_relative_to_target": "debug/lamp-body-worker",
+      "profile_test": false,
+      "roles": [
+        "workspace_product_child",
+        "test_compile_auxiliary_executable"
+      ],
+      "sha256": "d1d9a788ac6037114c00a4ef41d2d04c2c48dbcfefb519eea04b79a9789dc0ec",
+      "target_kind": [
+        "bin"
+      ],
+      "test_driver": false
+    },
+    {
+      "artifact": "ae7431c4ee6665bcd3faed6d",
+      "observed_inode": 325670414,
+      "old_inode": 325656672,
+      "path_relative_to_target": "debug/lamp-expression",
+      "profile_test": false,
+      "roles": [
+        "workspace_product_child",
+        "test_compile_auxiliary_executable"
+      ],
+      "sha256": "72b9c1cefc44c844e34199d7ac9ac9793153b909e12687cb5860f1bb3eedc235",
+      "target_kind": [
+        "bin"
+      ],
+      "test_driver": false
+    },
+    {
+      "artifact": "b32b14646fc50d2296274594",
+      "observed_inode": 325670409,
+      "old_inode": 325655874,
+      "path_relative_to_target": "debug/examples/render_relaxing_music",
+      "profile_test": false,
+      "roles": [
+        "test_compile_auxiliary_executable"
+      ],
+      "sha256": "5b8b094f8e018f1e9eff4b11ab343fd78a9d7c8841227c7ecaf27e7c889ec044",
+      "target_kind": [
+        "example"
+      ],
+      "test_driver": false
+    },
+    {
+      "artifact": "b37385eeeb53452d2c66b9ad",
+      "observed_inode": 325670418,
+      "old_inode": 325656649,
+      "path_relative_to_target": "debug/examples/replay_cost",
+      "profile_test": false,
+      "roles": [
+        "test_compile_auxiliary_executable"
+      ],
+      "sha256": "0cf4416ab13a0ace8996677b83d42506f489a12fc5540e70d1de5f29d2338a8a",
+      "target_kind": [
+        "example"
+      ],
+      "test_driver": false
+    },
+    {
+      "artifact": "b3ff04fda3c20050364439f7",
+      "observed_inode": 325670406,
+      "old_inode": 325655474,
+      "path_relative_to_target": "debug/examples/reference_pace",
+      "profile_test": false,
+      "roles": [
+        "test_compile_auxiliary_executable"
+      ],
+      "sha256": "20c4220452416cd7eaef6786449def1b63119f9e6c1768fd0a6a7ce5b789fd17",
+      "target_kind": [
+        "example"
+      ],
+      "test_driver": false
+    },
+    {
+      "artifact": "be6b8aca7235f178cf0285be",
+      "observed_inode": 325670397,
+      "old_inode": 325654632,
+      "path_relative_to_target": "debug/lamp-cloud",
+      "profile_test": false,
+      "roles": [
+        "workspace_product_child",
+        "test_compile_auxiliary_executable"
+      ],
+      "sha256": "4f28c85b14462160172fbfc94857b58a479c216a0ddb5bea6dc01cba2580e423",
+      "target_kind": [
+        "bin"
+      ],
+      "test_driver": false
+    },
+    {
+      "artifact": "bf982d0f35ba43911665da92",
+      "observed_inode": 325670421,
+      "old_inode": 325656798,
+      "path_relative_to_target": "debug/lamp-body-inspect",
+      "profile_test": false,
+      "roles": [
+        "workspace_product_child",
+        "test_compile_auxiliary_executable"
+      ],
+      "sha256": "0e9e3397feeb376c718ddca68b3939e26fa71d70a29271430f94884f71760d07",
+      "target_kind": [
+        "bin"
+      ],
+      "test_driver": false
+    },
+    {
+      "artifact": "c5528015f3325e4d40861e44",
+      "observed_inode": 325670423,
+      "old_inode": 325656996,
+      "path_relative_to_target": "debug/lamp-body-measure",
+      "profile_test": false,
+      "roles": [
+        "workspace_product_child",
+        "test_compile_auxiliary_executable"
+      ],
+      "sha256": "ab8757fc262912a4995591a2722a8d95c17cf86bf351d7e814f0bcee44069217",
+      "target_kind": [
+        "bin"
+      ],
+      "test_driver": false
+    },
+    {
+      "artifact": "c588c813b7f784e2051bec92",
+      "observed_inode": 325670404,
+      "old_inode": 325654996,
+      "path_relative_to_target": "debug/examples/ring_process_probe",
+      "profile_test": false,
+      "roles": [
+        "test_compile_auxiliary_executable"
+      ],
+      "sha256": "55dce328bbb5d27221d0ccec38d89aac352358e06d64874939c0e5885f2729ee",
+      "target_kind": [
+        "example"
+      ],
+      "test_driver": false
+    },
+    {
+      "artifact": "c5fcb3d19d505ccaf7436519",
+      "observed_inode": 325670401,
+      "old_inode": 325654966,
+      "path_relative_to_target": "debug/lamp-setup",
+      "profile_test": false,
+      "roles": [
+        "workspace_product_child",
+        "test_compile_auxiliary_executable"
+      ],
+      "sha256": "df324998dd03e8c468a0444b09f815684978d976ce7b56b96ba683ae29b498f0",
+      "target_kind": [
+        "bin"
+      ],
+      "test_driver": false
+    },
+    {
+      "artifact": "c5fffdf01b141689ce6e608f",
+      "observed_inode": 325670407,
+      "old_inode": 325654981,
+      "path_relative_to_target": "debug/examples/duplex_lab",
+      "profile_test": false,
+      "roles": [
+        "test_compile_auxiliary_executable"
+      ],
+      "sha256": "e50dd60a9f3dc3ed9a39b8c8dc6d286474ac2390a0566f622b1f2a9d6ca30938",
+      "target_kind": [
+        "example"
+      ],
+      "test_driver": false
+    },
+    {
+      "artifact": "c6c0b147d21b5c076bbde554",
+      "observed_inode": 325670413,
+      "old_inode": 325656332,
+      "path_relative_to_target": "debug/lamp-memory-fixture",
+      "profile_test": false,
+      "roles": [
+        "workspace_product_child",
+        "test_compile_auxiliary_executable"
+      ],
+      "sha256": "7477fb7c85aefee71d2082fe596a4b0dacdb6752d85a490347b6288a54e86ad1",
+      "target_kind": [
+        "bin"
+      ],
+      "test_driver": false
+    },
+    {
+      "artifact": "e373be97e63da5728206d080",
+      "observed_inode": 325670408,
+      "old_inode": 325655505,
+      "path_relative_to_target": "debug/examples/head_qualification_operator",
+      "profile_test": false,
+      "roles": [
+        "test_compile_auxiliary_executable"
+      ],
+      "sha256": "9d91066f3f269942bdb4ac75b2942f5e97478b4e3670949a2a1bbb4bd2f563e1",
+      "target_kind": [
+        "example"
+      ],
+      "test_driver": false
+    },
+    {
+      "artifact": "eedb6f6b3b9e2f69887d2ad0",
+      "observed_inode": 325670416,
+      "old_inode": 325656633,
+      "path_relative_to_target": "debug/examples/recent_playout_cost",
+      "profile_test": false,
+      "roles": [
+        "test_compile_auxiliary_executable"
+      ],
+      "sha256": "6b25bbe515b0859ceac4c44a406db81254c807adea21576e8afcd97b31c1a806",
+      "target_kind": [
+        "example"
+      ],
+      "test_driver": false
+    },
+    {
+      "artifact": "fb35cb67871925cc8989c573",
+      "observed_inode": 325670412,
+      "old_inode": 325656272,
+      "path_relative_to_target": "debug/lamp-memory",
+      "profile_test": false,
+      "roles": [
+        "workspace_product_child",
+        "test_compile_auxiliary_executable"
+      ],
+      "sha256": "14576bff4273cd8dcdaf943161be6f0420ee21befdea0b5fa73689a7ada81485",
+      "target_kind": [
+        "bin"
+      ],
+      "test_driver": false
+    }
+  ],
+  "scope": "Separate read-only metadata disposition; no test reruns or source/target mutations."
+}

@@ -1,0 +1,149 @@
+{
+  "base": "a3b9c46814bb2b2452f0d6b6cc13bb3a16992c33",
+  "counts": {
+    "doctest_cases": {
+      "failed": 0,
+      "ignored": 0,
+      "passed": 0
+    },
+    "doctest_headings": 0,
+    "nested_exclusions": [
+      {
+        "excluded_child_summary": {
+          "failed": 0,
+          "filtered_out": 0,
+          "finished_in": "1.46s",
+          "ignored": 0,
+          "line": 2174,
+          "measured": 0,
+          "passed": 1,
+          "status": "ok"
+        },
+        "retained_outer_summary": {
+          "failed": 0,
+          "filtered_out": 0,
+          "finished_in": "1.47s",
+          "ignored": 0,
+          "line": 2178,
+          "measured": 0,
+          "passed": 1,
+          "status": "ok"
+        },
+        "source": "crates/memory/tests/voice_observe_room.rs:145",
+        "source_sha256": "85134b7d9406591625a17415d98a78ffffe3e09d50ee2a27e4efafbe03a8b6ab"
+      }
+    ],
+    "nonoverlapping_top_level": {
+      "failed": 1,
+      "ignored": 46,
+      "passed": 6576
+    },
+    "per_package": {
+      "lamp-body": {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 616
+      },
+      "lamp-cloud": {
+        "failed": 0,
+        "ignored": 4,
+        "passed": 196
+      },
+      "lamp-expression": {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 340
+      },
+      "lamp-keeper": {
+        "failed": 0,
+        "ignored": 1,
+        "passed": 41
+      },
+      "lamp-lean": {
+        "failed": 0,
+        "ignored": 2,
+        "passed": 61
+      },
+      "lamp-memory": {
+        "failed": 0,
+        "ignored": 8,
+        "passed": 331
+      },
+      "lamp-peek": {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 26
+      },
+      "lamp-setup": {
+        "failed": 0,
+        "ignored": 1,
+        "passed": 185
+      },
+      "lamp-skills": {
+        "failed": 0,
+        "ignored": 9,
+        "passed": 545
+      },
+      "lamp-update": {
+        "failed": 0,
+        "ignored": 6,
+        "passed": 425
+      },
+      "lamp-voice": {
+        "failed": 1,
+        "ignored": 15,
+        "passed": 3810
+      }
+    },
+    "raw_summary_rows": 63,
+    "raw_totals": {
+      "failed": 1,
+      "ignored": 46,
+      "passed": 6577
+    },
+    "top_level_drivers": 62
+  },
+  "feature_controls_once": {
+    "joined_mock": 3,
+    "reminder": 21
+  },
+  "first_failure": {
+    "followup": "Separate claimed fixture-only repair; production privacy and resync bounds unchanged.",
+    "message": "the host stalled in 10 of 10 attempts: privacy publisher unavailable",
+    "source": "crates/voice/src/privacy_bus.rs:1313",
+    "test": "privacy_bus::tests::the_lease_reader_resyncs_on_kept_leases_only_before_its_first_datagram_in_its_first_second"
+  },
+  "head": "b49073d5900cd6fdeb080599ea1888adea638b34",
+  "integrity": {
+    "actual_and_saved_paths": 133,
+    "all_actual_and_saved_bytes_unchanged": true,
+    "inode_only_changes": 32,
+    "metadata_guard_qualified": false,
+    "original_controller_errors": [
+      "artifact metadata changed during runtime; manual qualification hold",
+      "postflight source/artifact/raw-input/controller guard failed"
+    ],
+    "raw_input_inventory_content_links_and_metadata_unchanged": true,
+    "source_unchanged": true
+  },
+  "next": "Run only eight unstarted drivers and one separate12-package doc-only cohort; keep the failed Voice library excluded. Repair fixture in a separate own branch, then qualify the actual current-base feature carry.",
+  "private_original_audit_limit": "Digest refers to retained private original, not this selected public summary.",
+  "private_original_audit_sha256": "0571e91df4e4b76c2b8f8b09159d2b5d41b38701b2a865d526e275ee52d7f17f",
+  "runtime": {
+    "driver_reaped": true,
+    "elapsed_seconds": 4462.878359368,
+    "forced_cleanup": false,
+    "observed_driver_starts": 62,
+    "process_group": {
+      "state": "absent"
+    },
+    "qualified": false,
+    "returncode": 101,
+    "timed_out": false,
+    "unobserved_compiled_drivers": 8
+  },
+  "scope": "Stopped full twelve-package command, actual partial observations; never a passing whole cohort.",
+  "status": "MANUAL_HOLD",
+  "test_reruns": 0,
+  "tree": "853c9917e71a9c9973aaf0fb89072bddd55ab979"
+}
