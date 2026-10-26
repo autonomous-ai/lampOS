@@ -88,6 +88,11 @@ pub const FORGET_ASKED_ENVIRONMENT: &str = "LAMP_FORGET_ASKED";
 /// text, a written turn, or with nobody known by face, nothing is held.
 pub const NOT_ASKED_TO_FORGET: &str = "Nothing was forgotten: a forget runs when what they say asks for it, in words such as forget, delete or erase, or on a yes said aloud to your question about it by someone you know by face, when the lamp held the call. A yes is not enough here: if they meant it, ask them to say it, for example \"Yes, forget everything.\" Otherwise answer what they asked.";
 
+/// What the model is told of a `forget_everything` called for words that
+/// ask to forget one thing, "forget that" among them (lamp-06c1, 26 Oct: a
+/// bare "forget that" could take all of a person). Nothing is held for a
+/// yes: the words asked for something else.
+pub const NOT_ASKED_TO_FORGET_EVERYTHING: &str = "Nothing was forgotten: they asked to forget one thing, not everything about them. Use forget for that thing, or ask which thing they mean; do not call forget_everything for these words.";
 /// How long a forget held for a person's yes waits for it.
 pub const HELD_FORGET_FOR: std::time::Duration = std::time::Duration::from_secs(60);
 /// What the model is told of a forget run on the person's yes in the turn
@@ -141,7 +146,7 @@ pub const HELD_DESCRIBED: &str = " If they didn't ask in their own words, the la
 /// `forget_everything` for those turns: called at once, as the engine
 /// confirms it, never only after a yes the model asked for (the reviewer
 /// on #2334: that yes alone was refused).
-const FORGET_EVERYTHING_HELD: &str = "Call this when the person asks you to forget everything about them; if you are not sure they mean everything, still call it once and ask. It forgets all you keep of them: what they asked you to remember, your conversations and what you noticed. It works only for someone you know by face; otherwise say what it tells you. Then tell them plainly that it is all gone.";
+const FORGET_EVERYTHING_HELD: &str = "Call this only when the person asks to forget everything about them. A request to forget one thing, such as 'forget that', does not ask for this. If you are unsure whether they mean everything, ask without calling this function. It removes what they asked you to remember, their conversations and what you noticed. It works only for someone you know by face; otherwise say what it tells you. Then tell them plainly that it is all gone.";
 
 /// The forget functions as told to the second route's spoken turns: with
 /// [`HELD_DESCRIBED`], unless `LAMP_FORGET_ASKED=off`, where they are as
@@ -153,8 +158,9 @@ pub fn held_forgets_described(mut tools: Vec<Tool>) -> Vec<Tool> {
     for tool in tools.iter_mut().filter(|tool| is_forget(&tool.name)) {
         if tool.name == FORGET_EVERYTHING {
             FORGET_EVERYTHING_HELD.clone_into(&mut tool.description);
+        } else {
+            tool.description.push_str(HELD_DESCRIBED);
         }
-        tool.description.push_str(HELD_DESCRIBED);
     }
     tools
 }
@@ -198,6 +204,176 @@ const ASKS: &[&str] = &[
 /// Vietnamese, accents kept: "quên", "xóa" and "xoá".
 const ASKS_KEPT: &[&str] = &["qu\u{ea}n", "x\u{f3}a", "xo\u{e1}"];
 
+/// The phrases that ask to forget ([`asks_to_forget`]).
+const PHRASES: &[&[&str]] = &[
+    &["stop", "remembering"],
+    &["scratch", "that"],
+    &["get", "rid", "of"],
+    &["don't", "keep"],
+    &["dont", "keep"],
+    &["do", "not", "keep"],
+    &["off", "your", "list"],
+];
+
+/// Words that, before a forget word in its clause, say not to forget
+/// ([`everything_asked`]): "don't forget everything", "do not erase
+/// everything".
+const NEGATES: &[&str] = &[
+    "don't",
+    "dont",
+    "not",
+    "no",
+    "never",
+    "won't",
+    "wont",
+    "shouldn't",
+    "shouldnt",
+];
+/// Words that, in a clause of their own after an ask, take it back
+/// ([`everything_asked`]): "Forget everything. Actually, don't." Not
+/// "not": "forget everything, not just that" still asks.
+const WITHDRAWS: &[&str] = &["don't", "dont", "no", "never", "wait"];
+/// Vietnamese, accents kept: "đừng", "không", "chẳng", "chưa", "thôi".
+const NEGATES_KEPT: &[&str] = &[
+    "\u{111}\u{1eeb}ng",
+    "kh\u{f4}ng",
+    "ch\u{1eb3}ng",
+    "ch\u{1b0}a",
+    "th\u{f4}i",
+];
+/// Words that, anywhere after "everything" in the same request, keep
+/// something back or take it back ([`everything_asked`]): "Forget
+/// everything, except my name.", "…, but keep my name", "Forget everything
+/// and don't forget everything." ask for less than everything, so the
+/// lamp asks (Reviewer-two's HOLD on #3608, 01:59).
+const SAVE_FOR: &[&str] = &[
+    "but", "except", "besides", "apart", "save", "keep", "don't", "dont", "not", "no", "never",
+    "wait", "without", "just", "only", "cancel", "stop", "hold", "hang", "actually",
+];
+/// Vietnamese, accents kept: "trừ", "ngoài", "giữ", "nhưng", "đừng",
+/// "không", "chẳng", "chưa", "thôi", "chỉ".
+const SAVE_FOR_KEPT: &[&str] = &[
+    "tr\u{1eeb}",
+    "ngo\u{e0}i",
+    "gi\u{1eef}",
+    "nh\u{1b0}ng",
+    "\u{111}\u{1eeb}ng",
+    "kh\u{f4}ng",
+    "ch\u{1eb3}ng",
+    "ch\u{1b0}a",
+    "th\u{f4}i",
+    "ch\u{1ec9}",
+];
+
+/// What `said`, a person's own words, says of forgetting everything about
+/// them, read clause by clause (split at `.`, `!`, `?`, `;`, `,` and `…`),
+/// the last clause that says anything deciding (a later withdrawal wins):
+/// `Some(true)` asks for everything, `Some(false)` refuses it or asks for
+/// something less, `None` says nothing of it.
+///
+/// A clause asks with a forget word ([`ASKS`], [`ASKS_KEPT`]) or phrase
+/// ([`PHRASES`]); with a [`NEGATES`] word anywhere before it in the
+/// clause, it says not to. An ask that names everything ([`names_forget`],
+/// "everything" or "tất cả" in that clause) is `Some(true)`, unless a
+/// [`SAVE_FOR`] word comes anywhere after "everything" in the request;
+/// any other ask, "forget that", is `Some(false)`.
+/// Not to forget everything is `Some(false)`, as is not to forget anything
+/// once something was asked; "don't forget my keys" alone says nothing. A
+/// clause with no forget word but a [`WITHDRAWS`] one, after an ask, takes
+/// it back, as does one that names everything with a [`NEGATES`] one. Refusing a real ask costs a repeat; a wrong yes costs all of a
+/// person (lamp-06c1, 26 Oct; Reviewer-two's HOLD on #3608).
+pub fn everything_asked(said: &str) -> Option<bool> {
+    let composed = said
+        .to_lowercase()
+        .replace("e\u{302}", "\u{ea}")
+        .replace("o\u{301}", "\u{f3}")
+        .replace("a\u{301}", "\u{e1}");
+    let mut asked = None;
+    for clause in composed.split(['.', '!', '?', ';', ',', '\u{2026}', '\u{3002}']) {
+        let words = crate::known_faces::folded_words(clause);
+        let kept = crate::known_faces::lower_words(clause);
+        let negated = |words: &[String], negates: &[&str]| {
+            words.iter().any(|word| negates.contains(&word.as_str()))
+                || words
+                    .windows(2)
+                    .any(|pair| pair[0] == "do" && pair[1] == "not")
+        };
+        let phrase_at = PHRASES.iter().find_map(|phrase| {
+            words.windows(phrase.len()).position(|window| {
+                window
+                    .iter()
+                    .zip(phrase.iter())
+                    .all(|(word, want)| word == want)
+            })
+        });
+        let english = words
+            .iter()
+            .position(|word| ASKS.contains(&word.as_str()))
+            .into_iter()
+            .chain(phrase_at)
+            .min()
+            .map(|at| negated(&words[..at], NEGATES));
+        let vietnamese = kept
+            .iter()
+            .position(|word| ASKS_KEPT.contains(&word.as_str()))
+            .map(|at| negated(&kept[..at], NEGATES_KEPT));
+        let all = names_forget(clause, FORGET_EVERYTHING);
+        asked = match english.or(vietnamese) {
+            Some(true) if all || asked.is_some() => Some(false),
+            Some(true) => asked,
+            Some(false) => Some(all),
+            // "Actually, don't", or "not everything" with no forget word.
+            None if (asked == Some(true)
+                && (negated(&words, WITHDRAWS) || negated(&kept, NEGATES_KEPT)))
+                || (all && (negated(&words, NEGATES) || negated(&kept, NEGATES_KEPT))) =>
+            {
+                Some(false)
+            }
+            None => asked,
+        };
+    }
+    // Anything after "everything" in the request that keeps something back
+    // or takes it back means less than everything, in any later clause.
+    let saved = |words: &[String], everything: &[&str], save: &[&str]| {
+        words
+            .windows(everything.len())
+            .position(|window| {
+                window
+                    .iter()
+                    .zip(everything.iter())
+                    .all(|(word, want)| word == want)
+            })
+            .is_some_and(|at| {
+                words[at + everything.len()..]
+                    .iter()
+                    .any(|word| save.contains(&word.as_str()))
+            })
+    };
+    if asked == Some(true)
+        && (saved(
+            &crate::known_faces::folded_words(&composed),
+            &["everything"],
+            SAVE_FOR,
+        ) || saved(
+            &crate::known_faces::lower_words(&composed),
+            &["t\u{1ea5}t", "c\u{1ea3}"],
+            SAVE_FOR_KEPT,
+        ))
+    {
+        return Some(false);
+    }
+    asked
+}
+
+/// Whether `said` asks to forget everything about them ([`everything_asked`]
+/// is `Some(true)`). "Forget everything about me." and "xóa tất cả về tôi"
+/// do; "forget that", "don't forget everything", "Don't get rid of
+/// everything.", "Forget everything. Actually, don't forget everything."
+/// and "Don't forget everything; forget that one." don't.
+pub fn asks_to_forget_everything(said: &str) -> bool {
+    everything_asked(said) == Some(true)
+}
+
 /// Whether `said` asks to forget, by its words: the English ones folded as
 /// names are matched, and the Vietnamese ones with their accents kept,
 /// written as one letter or as a letter and its mark, since without them
@@ -205,15 +381,6 @@ const ASKS_KEPT: &[&str] = &["qu\u{ea}n", "x\u{f3}a", "xo\u{e1}"];
 /// #2324). Not taken, so asked again: "never mind what I told you", "don't
 /// tell anyone", and other words without one of these.
 pub fn asks_to_forget(said: &str) -> bool {
-    const PHRASES: &[&[&str]] = &[
-        &["stop", "remembering"],
-        &["scratch", "that"],
-        &["get", "rid", "of"],
-        &["don't", "keep"],
-        &["dont", "keep"],
-        &["do", "not", "keep"],
-        &["off", "your", "list"],
-    ];
     let composed = said
         .to_lowercase()
         .replace("e\u{302}", "\u{ea}")
