@@ -1,3 +1,9 @@
+## 2026-10-26 12:58 — Reconcile hand-pump control receipt status
+
+Ready for lamp-voice: no
+
+Tests' source read found no P1/P2 on #3544 and flagged the generic controller's stale case-status placeholder. The supplemental [reconciliation](verification/hand-pump-receipts-20261026/reconciliation.json) binds the three original exit-101 cases to their exact failed terminals, intended assertions and closed processes. Original receipts and raw outcomes remain unchanged, and no case was rerun. ARM64 qualification and independent review remain separate from this metadata correction.
+
 ## 2026-10-26 12:47 — Hand-pump repair pushed as #3544
 
 Ready for lamp-voice: no
