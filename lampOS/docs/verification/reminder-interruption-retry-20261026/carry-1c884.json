@@ -1,0 +1,30 @@
+{
+  "old": "04253d6dfbf7e4f3752011e92b6b89567985601a",
+  "head": "4b45bbf0606c5d94213438cab3afb201a6a2fd92",
+  "base": "1c884f16cf4de53a700bba7512c129c3ee01d72d",
+  "whole_authored_file_blob_equal": {
+    "lampOS/crates/voice/src/coordinator.rs": true,
+    "lampOS/crates/voice/src/coordinator/tests/reminders.rs": true,
+    "lampOS/crates/voice/src/reminders.rs": true,
+    "lampOS/crates/voice/src/reminders/consumer.rs": true,
+    "lampOS/crates/voice/src/reminders/consumer/tests.rs": true,
+    "lampOS/crates/voice/src/reminders/tests.rs": true,
+    "lampOS/docs/reuse-decisions.md": false,
+    "lampOS/docs/schedule.md": true,
+    "lampOS/docs/verification/reminder-interruption-retry-20261026/README.md": true,
+    "lampOS/docs/verification/reminder-interruption-retry-20261026/carry-0c1.json": true,
+    "lampOS/docs/verification/reminder-interruption-retry-20261026/current-0c1.json": true,
+    "lampOS/docs/verification/reminder-interruption-retry-20261026/current-c5-carry.json": true,
+    "lampOS/docs/verification/reminder-interruption-retry-20261026/earlier-failed-full.json": true,
+    "lampOS/docs/verification/reminder-interruption-retry-20261026/fixed.json": true,
+    "lampOS/docs/verification/reminder-interruption-retry-20261026/negative.json": true,
+    "lampOS/docs/verification/reminder-interruption-retry-20261026/negative.patch": true,
+    "lampOS/docs/verification/reminder-interruption-retry-20261026/review-fixed.json": true,
+    "lampOS/docs/verification/reminder-interruption-retry-20261026/review-negative.json": true,
+    "lampOS/docs/verification/reminder-interruption-retry-20261026/review-negative.patch": true
+  },
+  "authored_patch_id_equal": true,
+  "changed_inherited_doc": "reuse-decisions.md includes the landed privacy section",
+  "range_diff": "1:  04253d6df = 1:  4b45bbf06 lampOS: retry reminders interrupted before audio retirement\n",
+  "preparation_note": "Initial whole-file equality assertion correctly stopped on the inherited privacy prose; no gate ran. Stable authored patch IDs and all remaining whole blobs are equal."
+}

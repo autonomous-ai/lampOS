@@ -1,0 +1,75 @@
+{
+  "base": "4b45bbf0606c5d94213438cab3afb201a6a2fd92",
+  "patch_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "source_count": 7210,
+  "all_source_hashes_unchanged": true,
+  "source_manifest_sha256": "df72e884176d3c8ca4ffc2991ab091bb5fa79b857b541c6074b95da1d4fe678b",
+  "changed_source_sha256": {},
+  "gates": {
+    "fmt": {
+      "command": "cargo +1.96.0 fmt --all --check",
+      "started": "2026-10-26T02:53:34Z",
+      "finished": "2026-10-26T02:53:46Z",
+      "exit": 0,
+      "harnesses": 0,
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "disk_error_lines": []
+    },
+    "clippy": {
+      "command": "cargo +1.96.0 clippy -q --message-format=short --offline --locked -p lamp-voice -p lamp-voice-eval --all-targets -- -D warnings",
+      "started": "2026-10-26T02:53:46Z",
+      "finished": "2026-10-26T02:55:40Z",
+      "exit": 0,
+      "harnesses": 0,
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "disk_error_lines": []
+    },
+    "test-focused": {
+      "command": "cargo +1.96.0 test --offline --locked -p lamp-voice --lib reminders -- --test-threads=1",
+      "started": "2026-10-26T02:55:40Z",
+      "finished": "2026-10-26T02:58:03Z",
+      "exit": 0,
+      "harnesses": 1,
+      "passed": 110,
+      "failed": 0,
+      "ignored": 2,
+      "disk_error_lines": []
+    },
+    "build": {
+      "command": "cargo +1.96.0 build -q --offline --locked --workspace",
+      "started": "2026-10-26T02:58:03Z",
+      "finished": "2026-10-26T02:59:46Z",
+      "exit": 0,
+      "harnesses": 0,
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "disk_error_lines": []
+    }
+  },
+  "own_control_pass_counts": {
+    "an_interruption_after_reminder_retirement_stays_held_without_ack_or_retry": 1,
+    "interrupted_receipt_with_own_retirement_stays_held_even_with_later_audio": 1,
+    "a_user_interrupted_reminder_is_retired_for_retry_after_successor_admission": 1,
+    "offline_user_interruption_retries_only_after_successful_authority_publication": 1,
+    "user_interruption_cannot_retry_a_failed_provider_with_unretired_audio": 1,
+    "interrupted_receipt_retires_before_or_after_audio_without_claiming_completion": 1,
+    "interrupted_receipt_preserves_completed_and_invalidated_outcomes": 1,
+    "interrupted_receipt_waits_for_drop_and_exact_consumer_settlement": 1,
+    "interrupted_owner_retry_keeps_old_proof_out_of_the_new_attempt_and_ack": 1
+  },
+  "executable_sha256": {
+    "lamp_voice-6d619bbdd1df3a0d": "fa63d589d50e6738fceea7f8c149ef58383a48230e60c8086fcd63f1b614b4a7"
+  },
+  "raw_log_sha256": {
+    "fmt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "clippy": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "test-focused": "a469c87b3f36a7f69bd43dd1df38d848697838ddbbbe85996f0b355e250b71b0",
+    "build": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "limits": "Native x86_64 Mac. Focused reminder controls on the clean current1c884 carry, after prior full41233 and native0c1 qualification; no ARM64 link, physical latency, played-word or device acceptance."
+}
