@@ -613,11 +613,11 @@ A paired real-bus control uses fresh fixtures and the same 700 ms host pause.
 It peeks the actual queued header and payload without consuming the message,
 then the original subscriber records a stock event expiring and the bounded
 fixture delivering its exact request. Both publications must be accepted,
-with no dropped sends; Manager time and deadlines must not advance. Header
-age checks reject clock steps or overruns, and all diagnostics wait until
-both observations are captured. Missing-request diagnostics identify the
-None/Rest/Wake iteration, expected operation, publisher/expiry counters and
-prior request before cancellation.
+with no dropped sends; Manager time and deadlines must not advance. Header-age
+and elapsed-time checks reject observations outside the controlled window,
+and all diagnostics wait until both observations are captured. Missing-request
+diagnostics identify the None/Rest/Wake iteration, expected operation,
+publisher/expiry counters and prior request before cancellation.
 
 This isolates policy assertions from unrelated host scheduling during a
 real-wall transport lease. It does not increase any product deadline,
