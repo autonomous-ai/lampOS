@@ -1857,8 +1857,8 @@ then use that person's scope:
   gains one sentence (`remember::FORGET_ASKS_DESCRIBED`): when nothing was
   forgotten and the words may have been misheard, a word close to something
   the lamp was shown as kept, it says nothing matched and asks whether they
-  meant that one, and forgets it only when they ask again; never something
-  else. On lamp-4ace on 26 Oct, "forget what I told you about the plant" was
+  meant the one closest, naming only it and never listing what it keeps, and
+  forgets it only when they ask again; never something else. On lamp-4ace on 26 Oct, "forget what I told you about the plant" was
   heard as "slant" or "plan" in 3 of 4 rounds, forgot nothing, and the lamp
   said so and stopped with the plant still kept.
 

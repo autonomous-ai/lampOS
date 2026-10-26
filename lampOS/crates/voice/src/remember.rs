@@ -638,8 +638,11 @@ pub fn switch_forget_asks(on: bool) -> bool {
 }
 
 /// What [`FORGET_ASKS_ENVIRONMENT`] adds to `forget`'s description: never
-/// forgetting anything else, as the description already says.
-pub const FORGET_ASKS_DESCRIBED: &str = " If nothing was forgotten and their words may have been misheard, a word close to something you were shown as kept, say nothing matched and ask whether they meant that one, such as 'Nothing about a bake. Did you mean the bike? Say forget the bike.'; forget it only when they ask for it again.";
+/// forgetting anything else, as the description already says, and naming
+/// only the one kept thing closest to the words, never a list: with nobody
+/// known that is the room's, which the note tells it never to list (the
+/// reviewer-lead's P3 on #3601: "Did you mean the plant, or the coffee?").
+pub const FORGET_ASKS_DESCRIBED: &str = " If nothing was forgotten and their words may have been misheard, a word close to one thing you were shown as kept, say nothing matched and ask whether they meant that one, naming only it, such as 'Nothing about a bake. Did you mean the bike? Say forget the bike.'; never list what you keep, and forget it only when they ask for it again.";
 
 /// Only the exact value `on`, with the Days client: `forget` also takes what
 /// it is `about`, and forgets the kept things of whoever is at the lamp that
