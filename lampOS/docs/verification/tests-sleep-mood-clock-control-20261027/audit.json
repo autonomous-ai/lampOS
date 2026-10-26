@@ -1,0 +1,271 @@
+{
+  "status": "PAIRED_CONTROL_COMPLETE",
+  "base": "bdc277e2667e11ab04daf60e25f8f9fcf8220dce",
+  "scope": "One exact Mood runtime case, old then new, on the same private copied source path; no ordinary full-suite qualification",
+  "test": "sleep_name::the_service_breathes_the_head_with_moods_breath_from_the_bus",
+  "controller_exit_code": 0,
+  "controller_elapsed_s": 211.62605940698995,
+  "test_threads": 1,
+  "retries": 0,
+  "compile_command": "cargo +1.96.0 test --offline --locked --jobs 1 -p lamp-expression --test runtime --no-run --message-format=json",
+  "runtime_command": "<actual runtime executable> --exact sleep_name::the_service_breathes_the_head_with_moods_breath_from_the_bus --test-threads=1 --nocapture",
+  "minimum_synthetic_publication_span_us": 450000,
+  "clock_formula": "actual_publication_span_us.max(450_000), subtract the variant tick quantum; actual physical wall samples and transport expiry remain unchanged",
+  "variants": [
+    {
+      "variant": "baseline",
+      "exit_code": 101,
+      "runtime_attempts": 1,
+      "case_rows": [
+        [
+          "sleep_name::the_service_breathes_the_head_with_moods_breath_from_the_bus",
+          "FAILED"
+        ]
+      ],
+      "counts": {
+        "passed": 0,
+        "failed": 1,
+        "ignored": 0
+      },
+      "ordinary_filtered_out": 27,
+      "runtime_inventory_all": 28,
+      "runtime_inventory_ignored": 0,
+      "command_elapsed_s": 0.733562,
+      "diagnostic_samples": 91,
+      "source_age_us": [
+        250000
+      ],
+      "accepted_adapter_phases": [
+        0.5480769230769231,
+        0.5600961538461539
+      ],
+      "actual_publication_span_us_minmax": [
+        1000,
+        2000
+      ],
+      "receive_clock_advance_us_minmax": [
+        0,
+        0
+      ],
+      "nonzero_receive_clock_samples": 0,
+      "all_physical_ttl_checks_passed": true,
+      "all_adapter_admissions_valid": true,
+      "before_after_envelopes_equal": true,
+      "input_refusals_and_errors": 0,
+      "consumer_liveliness_journal": [
+        "0.00",
+        "0.50"
+      ],
+      "last_observed_body_pitch": -0.03762630130102758,
+      "last_behaviours": [
+        "breathing"
+      ],
+      "executables": [
+        {
+          "artifact": "debug/lamp-expression",
+          "sha256": "bd9cc37c5c411f015089c9110e5eead6c1fe35b1a38f67d5ec511c69b5ad6292",
+          "bytes": 8268912,
+          "mode": "0o755",
+          "target": "lamp-expression",
+          "kind": [
+            "bin"
+          ],
+          "profile": {
+            "opt_level": "0",
+            "debuginfo": 0,
+            "debug_assertions": true,
+            "overflow_checks": true,
+            "test": false
+          },
+          "features": [],
+          "fresh": false
+        },
+        {
+          "artifact": "debug/deps/runtime-f9b92bb4002b831f",
+          "sha256": "295227deafe2b4522d25742bdf49babbbf33d89d3be3d1f93bd93af8cdb06a80",
+          "bytes": 6454160,
+          "mode": "0o755",
+          "target": "runtime",
+          "kind": [
+            "test"
+          ],
+          "profile": {
+            "opt_level": "0",
+            "debuginfo": 0,
+            "debug_assertions": true,
+            "overflow_checks": true,
+            "test": true
+          },
+          "features": [],
+          "fresh": false
+        }
+      ],
+      "owned_group_closed": true,
+      "unresolved_owned_processes": 0
+    },
+    {
+      "variant": "candidate",
+      "exit_code": 0,
+      "runtime_attempts": 1,
+      "case_rows": [
+        [
+          "sleep_name::the_service_breathes_the_head_with_moods_breath_from_the_bus",
+          "ok"
+        ]
+      ],
+      "counts": {
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0
+      },
+      "ordinary_filtered_out": 27,
+      "runtime_inventory_all": 28,
+      "runtime_inventory_ignored": 0,
+      "command_elapsed_s": 0.903999,
+      "diagnostic_samples": 120,
+      "source_age_us": [
+        0
+      ],
+      "accepted_adapter_phases": [
+        0.5
+      ],
+      "actual_publication_span_us_minmax": [
+        1000,
+        2000
+      ],
+      "receive_clock_advance_us_minmax": [
+        0,
+        1000
+      ],
+      "nonzero_receive_clock_samples": 36,
+      "all_physical_ttl_checks_passed": true,
+      "all_adapter_admissions_valid": true,
+      "before_after_envelopes_equal": true,
+      "input_refusals_and_errors": 0,
+      "consumer_liveliness_journal": [
+        "0.00",
+        "0.50"
+      ],
+      "last_observed_body_pitch": -0.03899999999999999,
+      "last_behaviours": [
+        "breathing"
+      ],
+      "executables": [
+        {
+          "artifact": "debug/lamp-expression",
+          "sha256": "bd9cc37c5c411f015089c9110e5eead6c1fe35b1a38f67d5ec511c69b5ad6292",
+          "bytes": 8268912,
+          "mode": "0o755",
+          "target": "lamp-expression",
+          "kind": [
+            "bin"
+          ],
+          "profile": {
+            "opt_level": "0",
+            "debuginfo": 0,
+            "debug_assertions": true,
+            "overflow_checks": true,
+            "test": false
+          },
+          "features": [],
+          "fresh": false
+        },
+        {
+          "artifact": "debug/deps/runtime-f9b92bb4002b831f",
+          "sha256": "91415fe3c1f6cca879ef0438cba09f6d65c72549995f9fcdf08421e44d9e0eb3",
+          "bytes": 6458512,
+          "mode": "0o755",
+          "target": "runtime",
+          "kind": [
+            "test"
+          ],
+          "profile": {
+            "opt_level": "0",
+            "debuginfo": 0,
+            "debug_assertions": true,
+            "overflow_checks": true,
+            "test": true
+          },
+          "features": [],
+          "fresh": false
+        }
+      ],
+      "owned_group_closed": true,
+      "unresolved_owned_processes": 0
+    }
+  ],
+  "original_assertions": [
+    "(held - -0.03).abs() < 1e-3",
+    "(held - -0.039).abs() < 1e-3",
+    "high - low > 0.01"
+  ],
+  "old_failure": {
+    "source": "crates/expression/tests/runtime.rs:494",
+    "condition": "Original most-lively held head-amplitude assertion",
+    "observed_pitch": -0.03762630130102758,
+    "expected_pitch": -0.039,
+    "unchanged_absolute_tolerance": 0.001,
+    "observed_behaviour": "breathing; no sleep, waking or drift"
+  },
+  "candidate_source": {
+    "runtime_sha256": "1826a7889fc76a40ed0a9faa0005babd10c44c4076eae486baecc3ee21685dca",
+    "English_doc_sha256": "0cafccecef4dc76642515b54239f12e316af685c37900a2264d6df7eb2cc6805",
+    "baseline_runtime_sha256": "c3ce0c89740b7090f1b521a4e46518a84689e7fdb4fffa544face34a45c8d99f",
+    "state": "Uncommitted reviewed fixture/doc patch on the pinned base; diagnostic overlays only in private copied test source",
+    "product_source_instrumentation": false,
+    "pace_TTL_cache_period_and_assertions_unchanged": true,
+    "journal_test_unchanged": true
+  },
+  "diagnostic_limits": {
+    "actual_envelope_and_adapter": "Read-only physical Bus.latest envelopes, public runtime::mood_in admission, stamp/phase and real header expiry before/after Service",
+    "actual_consumer": "Genuine Service calm/lively journal plus source-bound due-cache/read path; private cache not directly observed or mutated",
+    "new_source_age_and_phase": "All120 samples age0 and phase0.5;36 samples exercised nonzero final-I/O accounting",
+    "real_vs_synthetic": "Actual publication spans1\u20132ms;450ms is a synthetic logical minimum, not an observed host delay",
+    "long_physical_Mood_write_delay_tested": false,
+    "performance_comparison_claim": false,
+    "historical_failure_cause_established": false,
+    "historical_failure_waived": false,
+    "ordinary_current_base_gate_pass_claim": false
+  },
+  "guards": {
+    "source_files": 10674,
+    "permanent_Mood_worktree_unchanged": true,
+    "private_canonical_candidate_restored_after_closed_groups": true,
+    "prior_sealed_copies": 226,
+    "new_independent_frozen_copies": 4,
+    "final_sealed_copies": 230,
+    "all_source_artifact_and_sealed_guards_passed": true,
+    "all_owned_groups_closed": true,
+    "lease_released": true
+  },
+  "current_source_carry_note": "The later source-only 2bf carry and its future plain gate are separate from this bdc controlled observation.",
+  "private_receipt_sha256": {
+    "plan.json": "c4a2fff900d513d91ddfa6d4977c15dc3fd5ee0c233530fd297302cc460bb8b8",
+    "launch.json": "ef1c19f0831657bf6a2055260548c2efb52a0bb03576b78b250a4b3e0a8eac98",
+    "terminal.json": "42a7f8031865af5f8709b4a2db3730a7937756c2e6022e1ab2a3f228839a881e",
+    "native-controller-result.json": "1c046d576b73f9ffab659d69633377c53cdfd104ac22801d31d5e8c54dea9c0b",
+    "baseline-observation.json": "0cd966251302a60ab14e9e399dd5a74c8fa2ef2cee744ae16352ae566757c2b3",
+    "candidate-observation.json": "bfea0bffc684728cf95c57103a56aa4653cf53cbc962288bf57ea079a27abcab",
+    "baseline-compiler-artifacts.json": "70ca580e51b8679238f3dd1aca70c40922279674d9c3d38c7727b911a0b8590e",
+    "candidate-compiler-artifacts.json": "c5d509f059750456de4c1d6e5c52fe13d5d198048515b6979688c1996c522287",
+    "baseline-source-before.json": "728da867cf69187c8ae7ce56bee552b70add744e39bcf4acb60405a04507c3af",
+    "baseline-source-after.json": "728da867cf69187c8ae7ce56bee552b70add744e39bcf4acb60405a04507c3af",
+    "candidate-source-before.json": "f12fcf5f144c47372c87c8d066793895d6415efdcf3d56a3732d5bd10e9ef21c",
+    "candidate-source-after.json": "f12fcf5f144c47372c87c8d066793895d6415efdcf3d56a3732d5bd10e9ef21c",
+    "baseline-actual.json": "0eba6cab678504519a6784401d42ed10bca675cc20512fa926caa07c99bb0168",
+    "candidate-actual.json": "762db68667cc6f4b42ca6c1981dc5c90441083d6e50aa101ff689bd36e4b38d1",
+    "baseline-frozen.json": "d33c3df0d22c6366db53e8af508ccbf407cb53b831a5e938634ef8fcc6ddf0ef",
+    "candidate-frozen.json": "4a1e8153c1f82b78f64d9f8eb6bba79833575fb1e9b78160b1db1722df36b395",
+    "protected-before.json": "8ce11a3c04eaf07e6b10fb668ec62a826c8a1651d166e121af940f1636a953b8",
+    "protected-after.json": "8e78786937d17d5d33215afa735e127788fbedd6b419ae960ad7ea5ed6662d3b",
+    "canonical-source-after.json": "64425cc0b85303edb1c5e0116770dc5e521862a19a8ede70dcfa6fcc50bcebdf",
+    "permanent-source-initial.json": "3efa9557e0fcbc1b2871cdf0c90b25461f639ac1ceaaae23424579066ff5709d",
+    "permanent-source-after.json": "3efa9557e0fcbc1b2871cdf0c90b25461f639ac1ceaaae23424579066ff5709d",
+    "cmd-baseline-runtime.json": "8fb96e2a97fb5b60fd19ed1fc2ecbc4244e4bb2f96dd56ba135a0e08d979d087",
+    "cmd-candidate-runtime.json": "540a05ef9c349e3335b4ae0277f95c2a329a9ceae1cac54a6fb270710d32e282",
+    "baseline-instrumented.rs": "061ffd9f4aaf0a0543b4864491fd6bf889f42550e164e4c8dd14e5791d46aa3a",
+    "candidate-instrumented.rs": "0c66983e6e61ccb5bc15d9cda05b85ad387b6ee50875fc25e74aee3f43ed35d6",
+    "baseline-diagnostic-overlay.patch": "b254c96e2a0d3095123c2129a1494d73227b9de4447566ab6ed1d71342b051e5",
+    "candidate-diagnostic-overlay.patch": "56b1071d7c6fc8f2f9b1f96e544033b5823ba0901cdc6a9bec1fb651e9e90f3b"
+  }
+}

@@ -1,0 +1,467 @@
+{
+  "recorded_at_utc": "2026-10-26T20:31:45Z",
+  "pull_request": 3543,
+  "head": "57ecd800a8353066e6e874808ac0455280797943",
+  "base": "2bf5122dc76999f970556bb7c78840ab6e107ce0",
+  "status": "PASS",
+  "scope": "All actual Mac cases under session_reader::tests:: once serial; no full Voice runtime claim. Changed Linux case unrun on Mac; fresh native run still required after push.",
+  "command": "<Voice-lib executable> session_reader::tests:: --test-threads=1",
+  "runtime_attempts": 1,
+  "counts": {
+    "passed": 4,
+    "failed": 0,
+    "ignored": 0
+  },
+  "ordinary_filtered_out": 3819,
+  "module_cases": [
+    {
+      "name": "session_reader::tests::finite_and_unset_service_never_resolve_a_reader_group",
+      "outcome": "ok"
+    },
+    {
+      "name": "session_reader::tests::group_lookup_failure_retains_private_logging_without_writer_failure",
+      "outcome": "ok"
+    },
+    {
+      "name": "session_reader::tests::local_session_reader_group_is_exact_unique_and_bounded",
+      "outcome": "ok"
+    },
+    {
+      "name": "session_reader::tests::unsupported_acl_verification_degrades_to_private_metadata",
+      "outcome": "ok"
+    }
+  ],
+  "supervised_command_elapsed_s": 0.5986738550127484,
+  "libtest_reported_elapsed_s": 0.09,
+  "inventory": {
+    "Voice_lib_all": 3823,
+    "Voice_lib_ignored": 15,
+    "module_all": 4,
+    "module_ignored": 0
+  },
+  "changed_Linux_case": {
+    "name": "session_reader::tests::linux::replaced_record_never_changes_an_outside_sentinel",
+    "present_on_Mac": false,
+    "executed_on_Mac": false
+  },
+  "gates": {
+    "fmt": true,
+    "strict_all_targets": [
+      "lamp-body",
+      "lamp-cloud",
+      "lamp-expression",
+      "lamp-keeper",
+      "lamp-lean",
+      "lamp-memory",
+      "lamp-peek",
+      "lamp-setup",
+      "lamp-skills",
+      "lamp-update",
+      "lamp-voice",
+      "lamp-voice-eval"
+    ],
+    "strict_flags": "--offline --locked --all-targets --jobs 1 -- -D warnings",
+    "strict_Voice_artifact_rows": 17,
+    "invalidated_Voice_artifacts_fresh_false": true,
+    "whole_local_closure_freshness_claim": false,
+    "workspace_build_before_Voice_lib_compile": true,
+    "Voice_lib_compile": "cargo +1.96.0 test --offline --locked --jobs 1 -p lamp-voice --lib --no-run --message-format=json",
+    "jobs": 1,
+    "debug_info": 0,
+    "incremental": false,
+    "offline": true,
+    "locked": true,
+    "retries": 0
+  },
+  "source": {
+    "tracked_files": 10674,
+    "clean_before_and_after": true,
+    "tracked_bytes_modes_and_index_unchanged": true,
+    "index_sha256": "68f816a6bb918901c2b427227822037a0d238831842dc71999d91aa420db0dc2",
+    "canonical_alias_matches_preserved_original_source_except_branch_label": true,
+    "qualification_alias_pushed": false,
+    "range_diff": "1:  7b66f85967c0e0b61f96fd4ed045068a8892cc9c = 1:  57ecd800a8353066e6e874808ac0455280797943 lampOS: isolate the reader sentinel fixture from host ancestry",
+    "authored_paths": {
+      "lampOS/crates/voice/src/session_reader/tests.rs": {
+        "sha256": "5f47477a111d7f82da5fdeb3b3893718099eb67a0fe93b76b4f24ddc32adce73",
+        "bytes": 36597,
+        "mode": 420,
+        "blob": "08f2fd1ca4c18ed01c5b3577d51248ed0e30e588"
+      },
+      "lampOS/docs/realtime-tests.md": {
+        "sha256": "4b5481d7574ff3445db3d64fb502f4f3788e482fa2a560600fba31c57e53e1ca",
+        "bytes": 115505,
+        "mode": 420,
+        "blob": "80ae29b16b4d298a263ad333ec9672b4eeafadd0"
+      }
+    },
+    "official_ref_publication_outside_this_proof": true
+  },
+  "executable": {
+    "artifact": "debug/deps/lamp_voice-6d619bbdd1df3a0d",
+    "sha256": "aeee61723087e62daaed0df9e59fcb1218a1d93674150621a3198c1fda5d1ff7",
+    "bytes": 115836448,
+    "mode": "0755",
+    "frozen_mode": "0555",
+    "compiler_profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "fresh": false,
+    "actual_and_independent_frozen_copy_unchanged": true
+  },
+  "witnesses": {
+    "sealed_before": 226,
+    "new_independent_Voice_lib_copy": 1,
+    "sealed_final": 227,
+    "all_unchanged": true,
+    "actual_Voice_lib_guard_unchanged": true
+  },
+  "closure": {
+    "all_stage_exits": 0,
+    "all_owned_process_groups_closed": true,
+    "unresolved_owned_processes": 0,
+    "lease_released": true,
+    "scope": "Owned groups only; no detached-descendant claim",
+    "native_controller_exit": 0,
+    "all_stage_count": 11
+  },
+  "historical_scope": "Original7cafe/008 Mac and original ARM64dc47[978,7cafe] receipts retain those sources. Readyeb/bdc338/2 remains FAIL; completed unmodifiedbdc runtime28/0 is an integrity/cache handoff only and no waiver or cause finding.",
+  "private_receipt_sha256": {
+    "Voice-compiler-artifacts.json": "3661d1e5ca7309bbcd89142b9ef7fd5e20325de76943c376428887c08f50fe7f",
+    "actual-executable.json": "80bd5a33cf18c4ebd680be242c7e00097ed60e39e8b0662065f5318a7358f91f",
+    "authored-blob-comparisons.json": "052b4e11e0d5876e21dba3499a41011b396ad16ac4ae6f45c1e380f40e5bf04b",
+    "clean-Voice-only-result.json": "dddefe5c7d29b6b75d6aad6c62445b8a5a663677d329a9a780533431c7562581",
+    "clean-Voice-only.stderr": "36ecf32c2aef5e3de47b5f5bf3479d518cc8dcd9256c61cfba019b23afd79259",
+    "clean-Voice-only.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "compile-Voice-lib-result.json": "3b34a7692a437e74a118f1b93ff7d56483da834e488cb16af2c44ce579f9b6c5",
+    "compile-Voice-lib.stderr": "f38a12618e6240ab27697556b0c56996a8f85866ee6888d939da557a50ce493b",
+    "compile-Voice-lib.stdout": "3b0ad281cc6cdea92cda858b3c48f23148e242b6fad29fd1a09c41c3b7e4f455",
+    "fmt-result.json": "29437f06a4ab7d018c7b1c3c88fd0cc18ae0718cb8ee16a510053f40fee39500",
+    "fmt.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "fmt.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "inventory-all-result.json": "432850c5f0d238c4c69be2730fe82f08a849d564fd40b25a9d8d971c23ae8f20",
+    "inventory-all.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "inventory-all.stdout": "1d0d6ece54fea4b474030d4103071022c612223939b2cba43633eac95a652b54",
+    "inventory-ignored-result.json": "24caef4b03089941944226105eb9e9a008a761623b325b61732b81e90330392a",
+    "inventory-ignored.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "inventory-ignored.stdout": "5460a54eff06379661a554db4840fe29e11c241e26db2b69cb181abaff998dcf",
+    "inventory-module-result.json": "0f06cb563af59dee77fed46edb7634e6decb3c43a54a43ccab5fa6562be24c7f",
+    "inventory-module.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "inventory-module.stdout": "b0df7fff9caa0edf6d6754caeb7f3e43fec5112fadf0bd5d7a0499803ee65e0c",
+    "inventory-module_ignored-result.json": "30daed3e73e806537c8edc12d5c1cea9c524770b23de4f0f51d2f2c5eea9a757",
+    "inventory-module_ignored.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "inventory-module_ignored.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "inventory.json": "a7a3063c6c53631b66e9b1ed33da47003b41c34ee080441edcace9c4535f6e97",
+    "metadata-result.json": "9c4065f173a1790b1090debb796af3f2c3c9a413f26c3f8ce961f3930987d57c",
+    "metadata.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "metadata.stdout": "2a523fb3426bd4b0d5e15bde66a3ff74a4b79d082c1af04f52368202ea194365",
+    "module-runtime-result.json": "6d0680ce8535777f8d5b90bda62fe7ea032cf6decf3454035e8dd1d4c1c727ac",
+    "module-runtime.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "module-runtime.stdout": "d2c0e38d18d92601077109336fef7bdd123e0d5cc51cc5307257e98c6df1b1b9",
+    "native-controller-result.json": "a2919e6cbfba2482427623f472a5e45dc96a00e50585c94507691d0a8e9ed399",
+    "new-frozen.json": "12178274d5eb29394b76985c06e2ad5129843216340315016e46dd75dc7925e5",
+    "observed-census.json": "1f929af804dac51edbf47fda85664d97cf3a821ed98fd5d896c91460d6a1a19e",
+    "plan.json": "0091b332d9dc983d7ae22a7d0690b19945af233000dea94175f677437cd3bf20",
+    "prepared-source-original-ownWT.json": "3a6b95cceb673c9918924b14bb121dba7a7ddc8378db18c8af35c67cd0469bbf",
+    "prepared-source.json": "391eef14e86c52e068d93088a9f4a8b1adbd220eb444c37b8a019cf17fc31c26",
+    "protected-after.json": "647d88dad3a696f22bfa6b4b95b2a02650ce816ec63a5caab83eb0f85ba03dc3",
+    "protected-before.json": "8ce11a3c04eaf07e6b10fb668ec62a826c8a1651d166e121af940f1636a953b8",
+    "range-diff.txt": "f38eacea8a3256ee295fad4fd610af767a8b00886b9a5ff18e46a4989e82817e",
+    "root-alias-binding.json": "f7c68543b94c8444b6b7656a0d51fc50e11cd2912cc4fa170699cfaa1218964a",
+    "run.py": "3e3f7fe804a0ead637df8fe4ac5b808a558a5cd3a6b65ce8b4e828c19baa13dc",
+    "source-after.json": "391eef14e86c52e068d93088a9f4a8b1adbd220eb444c37b8a019cf17fc31c26",
+    "source-before.json": "391eef14e86c52e068d93088a9f4a8b1adbd220eb444c37b8a019cf17fc31c26",
+    "strict-all-artifacts.json": "149ea165015f696c077dce7a7905f72a8ffd3c06f39b2b5d0a56e33480408368",
+    "strict-local-bindings.json": "16c6d1a6cb881b9b520055a55c39c7b16e367c9c85694fa0f3fd9c326f0a165a",
+    "strict-result.json": "6ad56a94f52b444fb62904875381669c38360e71f5573a513568c0ff8032bd9a",
+    "strict.stderr": "4369f08e8ff44ea7eb29e386e8f0da5dfc146859073839c259afe13e9b086c71",
+    "strict.stdout": "d772d6e9bccad30625430211efe4573f3454b601aa1e817076c21da556b5921a",
+    "terminal.json": "8da9879bade4eb6b3e222c67714956410e0b1cf2c7acadebbbbb2cb882ab6d10",
+    "workspace-artifacts.json": "f96b9aa57dd10cbedbd86444ab3cb0dcea60f9fd12d8a8c52bbf40ad2d774635",
+    "workspace-result.json": "41dc951e4e3c501c0efac2119b48c635b46fa420fa7c7f71f236439961d37a95",
+    "workspace.stderr": "06644a89fb2df0fd0515218e93bfa77c7dca8226063bfbb1fbdfe6ffe38a6ab0",
+    "workspace.stdout": "ed3656c85a4e774fc38cc71227dffdba3bc1ba92aee00472a8050a9f35552185"
+  },
+  "current_native_CI": {
+    "new_ARM64_run_claim": false,
+    "new_Linux_runtime_claim": false,
+    "fresh_exact_head_native_and_independent_read": "pending"
+  },
+  "integrity_only_parent_handoff": {
+    "Ready_head": "eb617a785c3bb56752432dfc1482fd69d111dd4a",
+    "handoff_base": "bdc277e2667e11ab04daf60e25f8f9fcf8220dce",
+    "Ready_status": "FAIL",
+    "Ready_counts": {
+      "passed": 338,
+      "failed": 2,
+      "ignored": 0
+    },
+    "baseline_control_status": "CONTROL_COMPLETE",
+    "baseline_control_counts": {
+      "passed": 28,
+      "failed": 0,
+      "ignored": 0
+    },
+    "candidate_restored": true,
+    "parent_test_result_reused": false,
+    "failed_result_waived": false,
+    "initial_union_sealed_count": 226,
+    "receipt_sha256": {
+      "Ready_terminal": "5d18af9764793ce2f18ba21e553ff521da1a05c11affe7584cdbdf32731678db",
+      "Ready_census": "f6dde3a8665eacbf432c3fe46563b3557a61e8d54521fa262000623fa93ef3e1",
+      "baseline_control_terminal": "150c47742e6e2b6641e1b55bdccf30470c433b2fed4f18c97cfb4be89047318f",
+      "restored_Ready_source": "dfcadaa114f3a2e329faba0c1cde718353b9bebc60c80619afb8c0237dd8b3b3"
+    }
+  },
+  "retained_disabled_zero_work_launches": {
+    "Sentinel": {
+      "controller_exit": 0,
+      "no_compiler_or_runtime_started": true,
+      "qualification_credit": false,
+      "receipt_sha256": {
+        "disposition.json": "8a961bbc12879210accb61ed44cebd8ed4bbb85fa9996ea07b320831336b6024",
+        "native-controller-result.json": "3c6198b007e43acadebf99a27bfb35d2c3d4784d62917003312fa92de97412ff",
+        "native-controller.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "native-controller.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "Carrier": {
+      "controller_exit": 0,
+      "no_compiler_or_runtime_started": true,
+      "qualification_credit": false,
+      "receipt_sha256": {
+        "disposition.json": "8a961bbc12879210accb61ed44cebd8ed4bbb85fa9996ea07b320831336b6024",
+        "native-controller-result.json": "aa9122195696b66cb8859e025de698eda253286b12f82f3fcd309b2cb8c01b48",
+        "native-controller.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "native-controller.stdout": "78fcd516f8eb95d4bb0c2352b6e43084edae0fcb95e413ed7a39d97969e915a1"
+      }
+    }
+  },
+  "stage_receipts": {
+    "clean-Voice-only": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "clean",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-voice"
+      ],
+      "exit": 0,
+      "elapsed_s": 0.3929179970000405,
+      "source_guard_scope": "Quick HEAD/branch/index/clean status only",
+      "owned_group_closed": true,
+      "stop_reason": null,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "36ecf32c2aef5e3de47b5f5bf3479d518cc8dcd9256c61cfba019b23afd79259"
+    },
+    "compile-Voice-lib": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "--no-run",
+        "--message-format=json",
+        "--jobs",
+        "1"
+      ],
+      "exit": 0,
+      "elapsed_s": 143.12428980099503,
+      "source_guard_scope": "Full source and sealed witnesses",
+      "owned_group_closed": true,
+      "stop_reason": null,
+      "stdout_sha256": "3b0ad281cc6cdea92cda858b3c48f23148e242b6fad29fd1a09c41c3b7e4f455",
+      "stderr_sha256": "f38a12618e6240ab27697556b0c56996a8f85866ee6888d939da557a50ce493b"
+    },
+    "fmt": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit": 0,
+      "elapsed_s": 13.157599215017399,
+      "source_guard_scope": "Quick HEAD/branch/index/clean status only",
+      "owned_group_closed": true,
+      "stop_reason": null,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "inventory-all": {
+      "command": [
+        "<target>/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+        "--list",
+        "--format",
+        "terse"
+      ],
+      "exit": 0,
+      "elapsed_s": 2.9933961579808965,
+      "source_guard_scope": "Quick HEAD/branch/index/clean status only",
+      "owned_group_closed": true,
+      "stop_reason": null,
+      "stdout_sha256": "1d0d6ece54fea4b474030d4103071022c612223939b2cba43633eac95a652b54",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "inventory-ignored": {
+      "command": [
+        "<target>/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+        "--ignored",
+        "--list",
+        "--format",
+        "terse"
+      ],
+      "exit": 0,
+      "elapsed_s": 0.7362428880005609,
+      "source_guard_scope": "Quick HEAD/branch/index/clean status only",
+      "owned_group_closed": true,
+      "stop_reason": null,
+      "stdout_sha256": "5460a54eff06379661a554db4840fe29e11c241e26db2b69cb181abaff998dcf",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "inventory-module": {
+      "command": [
+        "<target>/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+        "session_reader::tests::",
+        "--list",
+        "--format",
+        "terse"
+      ],
+      "exit": 0,
+      "elapsed_s": 0.6657952259993181,
+      "source_guard_scope": "Quick HEAD/branch/index/clean status only",
+      "owned_group_closed": true,
+      "stop_reason": null,
+      "stdout_sha256": "b0df7fff9caa0edf6d6754caeb7f3e43fec5112fadf0bd5d7a0499803ee65e0c",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "inventory-module_ignored": {
+      "command": [
+        "<target>/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+        "session_reader::tests::",
+        "--ignored",
+        "--list",
+        "--format",
+        "terse"
+      ],
+      "exit": 0,
+      "elapsed_s": 0.5967527149769012,
+      "source_guard_scope": "Quick HEAD/branch/index/clean status only",
+      "owned_group_closed": true,
+      "stop_reason": null,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "metadata": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "metadata",
+        "--offline",
+        "--locked",
+        "--format-version",
+        "1"
+      ],
+      "exit": 0,
+      "elapsed_s": 0.8272423400194384,
+      "source_guard_scope": "Quick HEAD/branch/index/clean status only",
+      "owned_group_closed": true,
+      "stop_reason": null,
+      "stdout_sha256": "2a523fb3426bd4b0d5e15bde66a3ff74a4b79d082c1af04f52368202ea194365",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "module-runtime": {
+      "command": [
+        "<target>/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+        "session_reader::tests::",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "elapsed_s": 0.5986738550127484,
+      "source_guard_scope": "Full source and sealed witnesses",
+      "owned_group_closed": true,
+      "stop_reason": null,
+      "stdout_sha256": "d2c0e38d18d92601077109336fef7bdd123e0d5cc51cc5307257e98c6df1b1b9",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "strict": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "clippy",
+        "--offline",
+        "--locked",
+        "--all-targets",
+        "--jobs",
+        "1",
+        "--message-format=json",
+        "-p",
+        "lamp-body",
+        "-p",
+        "lamp-cloud",
+        "-p",
+        "lamp-expression",
+        "-p",
+        "lamp-keeper",
+        "-p",
+        "lamp-lean",
+        "-p",
+        "lamp-memory",
+        "-p",
+        "lamp-peek",
+        "-p",
+        "lamp-setup",
+        "-p",
+        "lamp-skills",
+        "-p",
+        "lamp-update",
+        "-p",
+        "lamp-voice",
+        "-p",
+        "lamp-voice-eval",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit": 0,
+      "elapsed_s": 172.9999437200022,
+      "source_guard_scope": "Full source and sealed witnesses",
+      "owned_group_closed": true,
+      "stop_reason": null,
+      "stdout_sha256": "d772d6e9bccad30625430211efe4573f3454b601aa1e817076c21da556b5921a",
+      "stderr_sha256": "4369f08e8ff44ea7eb29e386e8f0da5dfc146859073839c259afe13e9b086c71"
+    },
+    "workspace": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "build",
+        "--offline",
+        "--locked",
+        "--workspace",
+        "--jobs",
+        "1",
+        "--message-format=json"
+      ],
+      "exit": 0,
+      "elapsed_s": 89.3135244710138,
+      "source_guard_scope": "Full source and sealed witnesses",
+      "owned_group_closed": true,
+      "stop_reason": null,
+      "stdout_sha256": "ed3656c85a4e774fc38cc71227dffdba3bc1ba92aee00472a8050a9f35552185",
+      "stderr_sha256": "06644a89fb2df0fd0515218e93bfa77c7dca8226063bfbb1fbdfe6ffe38a6ab0"
+    }
+  }
+}

@@ -1,5 +1,17 @@
 # Tests work log
 
+## 2026-10-27 03:35 — Controlled repairs complete; Sentinel carry pushed
+
+Ready for lamp-voice: no (fresh native checks and remaining plain gates/read carries)
+
+Sentinel #3543 is pushed at `57ecd800a` on pinned `2bf5122dc`: [current Mac proof](verification/tests-sentinel-2bf-20261027/) records four Reader cases once, strict twelve-package Clippy, workspace build, actual source/executable and 227 sealed guards. Its original ARM64 **40396415507** and Linux Clippy **40396415483** started; no current native result is credited yet. Full Mac Voice and the changed Linux-only case were not run locally.
+
+The separate [journal control](verification/tests-sleep-name-journal-control-20261027/) failed the old watchdog 3/3 and passed the new original checks 3/3 under symmetric private delays. The [Mood control](verification/tests-sleep-mood-clock-control-20261027/) failed old once and passed new once under a synthetic 450 ms logical publication floor; actual I/O was 1–2 ms. Original bounds/assertions remain; these are constructed counterexamples, not historical cause findings. The journal's first sandbox stop ran no compiler/tests; later absence audit and a distinct lease disposition allowed its zero-runtime continuation. Both completed control leases closed cleanly.
+
+Both plain two-file candidates are carried to 2bf and their separate full Expression gates are running without private overlays. No code commit or fixture PR is credited before those gates. Carrier `3be8fa45b` has current strict fourteen-package Clippy and workspace passes; its full serial Update/promoter command continues. Restart `4ff8d6d8d` and Skills `6361913f1` remain source-only pending qualification. Ready `7c9daad3e` is also a clean equal-patch 2bf carry; its previous 338/2 stays failed while the two fixture repairs are qualified.
+
+The earlier Sentinel/Carrier activation preflight used the wrong Mood receipt key and invoked still-disabled scripts: zero work, no qualification credit. Corrected active gates retain those receipts. Root-source unrelated files remain untouched; no device action.
+
 ## 2026-10-27 03:02 — Ready failure retained; separate base control passes
 
 Ready for lamp-voice: no (new fixture comparisons and latest-base qualification remain)

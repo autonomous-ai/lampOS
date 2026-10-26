@@ -1,0 +1,314 @@
+{
+  "schema": 1,
+  "status": "CONTROL_COMPLETE for private controlled fixture experiment only",
+  "base": "bdc277e2667e11ab04daf60e25f8f9fcf8220dce",
+  "case": "sleep_name::an_expired_sleeping_name_is_journaled_once_by_the_service",
+  "source_scope": "Pinned base versus the reviewed journal-only runtime-fixture proposal and English fixture paragraph. Plain proposal changes no product source/API/Cargo/dependencies/TTL/freshness/cache period.",
+  "plain_source_hashes": {
+    "old_runtime": "c3ce0c89740b7090f1b521a4e46518a84689e7fdb4fffa544face34a45c8d99f",
+    "new_runtime": "8008a33e6f3b7e72c61cf421058b411bf6a523c0d8cc160225f4de8bfe55b3a6",
+    "old_English_fixture_doc": "1f1fb3d4d38cdf6e67b5fc20c130e445564b6667b2bea27b71b55e6630d6225a",
+    "new_English_fixture_doc": "ce21fab134257e71a1ecec2cb8a09464c39173265c0b7e0dd6e75938da9f5778",
+    "proposed_diff_sha256": "c894fd74be34131305382d87fb442abd46d6bfa91455aaa93416ae557af013fa"
+  },
+  "private_control_overlay_hashes": {
+    "old": "626804e2f4d3b437f117e1a4a355b262976edffab8e98391db6373a141b1db35",
+    "new": "323649ffe7096c4cf1bdd1d5b5d140c156f84c9c46ad81545bdb9e1af185bc99"
+  },
+  "predeclared_control": {
+    "pairs": [
+      [
+        "old",
+        "new"
+      ],
+      [
+        "new",
+        "old"
+      ],
+      [
+        "old",
+        "new"
+      ]
+    ],
+    "runs_per_variant": 3,
+    "prepublication_delay_ms": 75,
+    "Room_to_Voice_delay_ms": 20,
+    "trace_outside_publication_boundary": true,
+    "journal_capture_separate_from_trace": true,
+    "same_source_copy_path": true,
+    "single_dedicated_target": true,
+    "both_compile_before_pairs": true,
+    "no_compiler_during_pairs": true,
+    "no_runtime_retry": true,
+    "original_watchdog_start": "Immediately after child spawn, unchanged",
+    "original_watchdog_seconds": 15,
+    "outer_deadline_seconds": 30,
+    "original_status_exact_line_25checks_unchanged": true
+  },
+  "result": {
+    "old_original_watchdog_failures": 3,
+    "new_original_exact_check_passes": 3,
+    "observations": 6,
+    "normal_helper_sha_equal_required_and_proven": true,
+    "normal_helper_sha256": "bd9cc37c5c411f015089c9110e5eead6c1fe35b1a38f67d5ec511c69b5ad6292",
+    "new_journal_bytes": 85,
+    "new_exact_journal_sha256": "4a842bfcf55eb819250325885bea86ce70e2a55907b338e7921b357e413efda2",
+    "exact_journal_line": "lamp-expression: ignored sleeping name (1): no validated person speech within +/-2 s\n",
+    "new_first_observed_asleep_step": 22,
+    "new_successful_steps_each": 48,
+    "new_largest_logical_step_us": 60000000,
+    "private_plain_candidate_restored": true,
+    "source_and_artifact_guards_passed": true,
+    "lease_released": true,
+    "native_controller_exit": 0
+  },
+  "artifact_profiles": [
+    {
+      "role": "runtime",
+      "target_name": "runtime",
+      "target_kind": [
+        "test"
+      ],
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "profile_features_source_paths_equal": true,
+      "old_binary_sha256": "5588d6f68fa31af24745016f428ca6efa2f2c2e7e73f78ed1eabccc013da6e7e",
+      "new_binary_sha256": "f7380fcafddb52af47ed638cbcc1da4c4e4604c0c06268754174e87e26242849",
+      "byte_identical": false
+    },
+    {
+      "role": "normal_helper",
+      "target_name": "lamp-expression",
+      "target_kind": [
+        "bin"
+      ],
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "profile_features_source_paths_equal": true,
+      "old_binary_sha256": "bd9cc37c5c411f015089c9110e5eead6c1fe35b1a38f67d5ec511c69b5ad6292",
+      "new_binary_sha256": "bd9cc37c5c411f015089c9110e5eead6c1fe35b1a38f67d5ec511c69b5ad6292",
+      "byte_identical": true
+    }
+  ],
+  "observations": [
+    {
+      "pair": 1,
+      "position": 1,
+      "mode": "old",
+      "classification": "ORIGINAL_WATCHDOG_FAIL",
+      "exit": 101,
+      "wall_seconds": 15.097088,
+      "successful_steps": 132,
+      "first_asleep_step": null,
+      "largest_logical_step_us": 200000,
+      "publication_span_ms": {
+        "min": 22,
+        "median": 29.0,
+        "max": 67
+      },
+      "minimum_measured_prepublication_us": 75036,
+      "minimum_measured_room_voice_delay_us": 20019,
+      "journal_bytes": 0,
+      "journal_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "exact_new_journal": null,
+      "command_receipt_sha256": "c34260c5285790ab588b9a17d650acfd90f81633ddc2be374d0a43670c6feaaa",
+      "stdout_sha256": "d4f483ae961c3f3c033b78244b41b77ddcfd4b76bb5e17fb413045cf9b9668ff",
+      "stderr_sha256": "00cb3fc459a0a6f10906b920230422723b3f6ad61f76164a5843c9232eee37d3",
+      "trace_sha256": "de0b73ad3a9167d500a713a972585ba204f5c2d9c0ccee8795a31e65a3fb6795",
+      "selected_case_occurrences": 1,
+      "original_inner_watchdog_seconds": 15,
+      "outer_deadline_seconds": 30,
+      "owned_group_closed": true
+    },
+    {
+      "pair": 1,
+      "position": 2,
+      "mode": "new",
+      "classification": "ORIGINAL_EXACT_CHECKS_PASS",
+      "exit": 0,
+      "wall_seconds": 5.534902,
+      "successful_steps": 48,
+      "first_asleep_step": 22,
+      "largest_logical_step_us": 60000000,
+      "publication_span_ms": {
+        "min": 21,
+        "median": 28.0,
+        "max": 102
+      },
+      "minimum_measured_prepublication_us": 75020,
+      "minimum_measured_room_voice_delay_us": 20025,
+      "journal_bytes": 85,
+      "journal_sha256": "4a842bfcf55eb819250325885bea86ce70e2a55907b338e7921b357e413efda2",
+      "exact_new_journal": true,
+      "command_receipt_sha256": "21aab515ff74b5a890ed4551291910c670804f537f7f9f8a5c1456798b19e591",
+      "stdout_sha256": "a92b23a818adee75d69ece8b251ce1dec2c25c57f555e79dbbb77c85ce4413ae",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "trace_sha256": "eb99c893d12d986facfb45b37ad1d393c417af0fed113d84d153e6f2d00ae2fb",
+      "selected_case_occurrences": 1,
+      "original_inner_watchdog_seconds": 15,
+      "outer_deadline_seconds": 30,
+      "owned_group_closed": true
+    },
+    {
+      "pair": 2,
+      "position": 1,
+      "mode": "new",
+      "classification": "ORIGINAL_EXACT_CHECKS_PASS",
+      "exit": 0,
+      "wall_seconds": 5.482721,
+      "successful_steps": 48,
+      "first_asleep_step": 22,
+      "largest_logical_step_us": 60000000,
+      "publication_span_ms": {
+        "min": 22,
+        "median": 28.0,
+        "max": 33
+      },
+      "minimum_measured_prepublication_us": 75165,
+      "minimum_measured_room_voice_delay_us": 20082,
+      "journal_bytes": 85,
+      "journal_sha256": "4a842bfcf55eb819250325885bea86ce70e2a55907b338e7921b357e413efda2",
+      "exact_new_journal": true,
+      "command_receipt_sha256": "b58f5784afca613b37536625edc08bd8cedfcdbd0d64dba995099423cfd50467",
+      "stdout_sha256": "b2326e77d8ea3491baab1d52906224ecb79791e253438a680250553d2a36593f",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "trace_sha256": "662758001443ae5d917347b8cda016f3133599b496b1e2f33485c65e3f9bd1bf",
+      "selected_case_occurrences": 1,
+      "original_inner_watchdog_seconds": 15,
+      "outer_deadline_seconds": 30,
+      "owned_group_closed": true
+    },
+    {
+      "pair": 2,
+      "position": 2,
+      "mode": "old",
+      "classification": "ORIGINAL_WATCHDOG_FAIL",
+      "exit": 101,
+      "wall_seconds": 15.107516,
+      "successful_steps": 135,
+      "first_asleep_step": null,
+      "largest_logical_step_us": 200000,
+      "publication_span_ms": {
+        "min": 22,
+        "median": 28,
+        "max": 33
+      },
+      "minimum_measured_prepublication_us": 75034,
+      "minimum_measured_room_voice_delay_us": 20032,
+      "journal_bytes": 0,
+      "journal_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "exact_new_journal": null,
+      "command_receipt_sha256": "85dbb51073a0d4ce7aea699479540d5158d4539190dd4171e70bea66094b2467",
+      "stdout_sha256": "3feb110dc5ccbc1e780d594e3378155304047ca6ac790ac16de4f5044707c306",
+      "stderr_sha256": "1940196c0dba9d4c21d9e0c3d70b2828d45e0e709ef80de2c854e1b4edefa42d",
+      "trace_sha256": "d912e34b35c6d4e00f931d5891ea16b06e5b158f898facc762b3bfe7398d555e",
+      "selected_case_occurrences": 1,
+      "original_inner_watchdog_seconds": 15,
+      "outer_deadline_seconds": 30,
+      "owned_group_closed": true
+    },
+    {
+      "pair": 3,
+      "position": 1,
+      "mode": "old",
+      "classification": "ORIGINAL_WATCHDOG_FAIL",
+      "exit": 101,
+      "wall_seconds": 15.110787,
+      "successful_steps": 133,
+      "first_asleep_step": null,
+      "largest_logical_step_us": 200000,
+      "publication_span_ms": {
+        "min": 21,
+        "median": 29,
+        "max": 80
+      },
+      "minimum_measured_prepublication_us": 75156,
+      "minimum_measured_room_voice_delay_us": 20034,
+      "journal_bytes": 0,
+      "journal_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "exact_new_journal": null,
+      "command_receipt_sha256": "0a3fcc914f376697931778226c25f5c347255153ef6a256d4ebd8cba1cab021f",
+      "stdout_sha256": "3feb110dc5ccbc1e780d594e3378155304047ca6ac790ac16de4f5044707c306",
+      "stderr_sha256": "90d8c01c71128cc9dcb8ac9849b3b8a64627852ec0804cee3a17fc1169c94814",
+      "trace_sha256": "86330d0841c14321363cf774f2d8be292ab7db21fbde72ced9a80731abe6cb46",
+      "selected_case_occurrences": 1,
+      "original_inner_watchdog_seconds": 15,
+      "outer_deadline_seconds": 30,
+      "owned_group_closed": true
+    },
+    {
+      "pair": 3,
+      "position": 2,
+      "mode": "new",
+      "classification": "ORIGINAL_EXACT_CHECKS_PASS",
+      "exit": 0,
+      "wall_seconds": 5.454241,
+      "successful_steps": 48,
+      "first_asleep_step": 22,
+      "largest_logical_step_us": 60000000,
+      "publication_span_ms": {
+        "min": 22,
+        "median": 28.0,
+        "max": 32
+      },
+      "minimum_measured_prepublication_us": 75155,
+      "minimum_measured_room_voice_delay_us": 21113,
+      "journal_bytes": 85,
+      "journal_sha256": "4a842bfcf55eb819250325885bea86ce70e2a55907b338e7921b357e413efda2",
+      "exact_new_journal": true,
+      "command_receipt_sha256": "9e2910e1c61a054aab6a5dc0249c70222f95c96bed5110948fc833ab91488da5",
+      "stdout_sha256": "0127d10d93a7404e0989934b6d28708712596b3770de202084828882a54e2d55",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "trace_sha256": "4479d9f34508cd80ddd48db0d337b2b223cb08f4afc2ec96fd2353e6a062d9fc",
+      "selected_case_occurrences": 1,
+      "original_inner_watchdog_seconds": 15,
+      "outer_deadline_seconds": 30,
+      "owned_group_closed": true
+    }
+  ],
+  "retained_initial_stop": {
+    "status": "INCONCLUSIVE",
+    "stage": "First metadata command; sandbox denied process observation",
+    "test_compile_attempts": 0,
+    "runtime_attempts": 0,
+    "original_receipt_preserved": true,
+    "direct_wait_status_not_reconstructed": true,
+    "separate_postcontroller_disposition": "Read-only recorded group absence authorized private source restoration and a fresh future lease. It did not change the old cleanup result.",
+    "terminal_sha256": "501ac4926619342dbfa55d971f0b8f28e5580b8c1d384fdfe3e4ad10d1aff290",
+    "metadata_command_receipt_sha256": "85fe97ffb142a1b81811c18c6af0313f60ccd52ef039193b86f8c27b7a8c5cd0",
+    "readonly_group_audit_sha256": "6f18ad729f88a23dda387a188475ddebf97281d98ddafdcb236cd65eb7fb6335",
+    "lease_disposition_sha256": "751f83c45fed5caf85dd183a6dcc6c30370ad41cee294fff4a3786dc440a337a"
+  },
+  "receipt_hashes": {
+    "controller_source_sha256": "e234358987454701e84c9cbed7921c603dec02c58479c519acfdf3b913f5f3cc",
+    "enabled_plan_sha256": "1a3016d64a48cc0c7d32cba46d447163c7918322a2aa6cceea048119ace538b7",
+    "launch_receipt_sha256": "03802a0cd28515e707a58d4cabdb60266632bc618d2eff5451a00c7beb976468",
+    "initial_source_snapshot_sha256": "f686215eb00dea63f5e7f6336bc0f9beec9847a46535a83d77338f0fb313a310",
+    "restored_source_snapshot_sha256": "f686215eb00dea63f5e7f6336bc0f9beec9847a46535a83d77338f0fb313a310",
+    "terminal_sha256": "ae8c5dd94305586421b675de87525c7989becbcc1d1fc248680269231019b81f",
+    "native_exit_receipt_sha256": "42a225c855d740b68f89927948363d22a47503221bb5aea8cf9293b97373d07f",
+    "artifact_comparison_sha256": "73d7171dd3de7b5cf67b143ab48f85fd086d5f3509469261b03c2555e70fa3b1",
+    "final_semantic_audit_sha256": "1aa4dba73410e0283cf8705718c40213c696f73b4cecf9e6621ab914003331eb",
+    "evidence_manifest_sha256": "0c31c3f8c52c1a6ae9a7ce2a045107e30580add6a58ff6e51dbb1ac5dc8bd0e6"
+  },
+  "limits": [
+    "Synthetic delays, trace and journal-capture observer are private controls and are not shipped.",
+    "Expected old result is only the unchanged original journal host-watchdog failure; expected new result is the original exact assertions passing. No failed/inconclusive runtime was retried.",
+    "The experiment demonstrates the fixture budget under its predeclared cost, not the historical cause of earlier flakes.",
+    "It is neither a full Expression/workspace gate nor Linux/ARM64/device qualification. The later2bf plain candidate gate is separate and not credited here.",
+    "The prior Ready full Mac 338/2/0 command remains failed and retained; no failure waiver or product-cause claim is made.",
+    "Completed-step traces preserve input-refusal/error assertions; partial old steps stopped by the watchdog are not counted as successful."
+  ]
+}
