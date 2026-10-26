@@ -549,7 +549,54 @@
     "protected-after.json": "5047bebc11c061d158117690dedae1bf495e7f39f9846397821574ab2336e2b0",
     "update-tests.json": "37230bd6aac76b215181526b514e630b0dc9937a4ad920da1d2ae66017084673",
     "update-tests.stdout.txt": "8c9f41d3b32d8278dcfd3a7f6ad0d267aa3283a3b0e8dc790b9606f1e3879e17",
-    "self-cut-source-equality.json": "656434f85e736251a1c17541cd3e8ca78d2d8d612d3d18a90d5386092f29094b"
+    "self-cut-source-equality.json": "656434f85e736251a1c17541cd3e8ca78d2d8d612d3d18a90d5386092f29094b",
+    "update-originals.json": "5771aa5f42f81098502091cf404c59e9a259c1c86f32965cc502d5825ab427b5",
+    "update-frozen.json": "06daa8b8f8e93250edad5be43430d7742ec433ed875a93d7a9ef9fcdd84bfaa6",
+    "update-compiler-artifacts.json": "6eecca9789ba90711f3e37679ef1f25ed7fd82108646096165197fca835e5641"
   },
-  "raw_receipts": "Private; local paths, host process IDs and private fixture directories are excluded."
+  "raw_receipts": "Private; local paths, host process IDs and private fixture directories are excluded.",
+  "exported_round_artifact_binding": {
+    "scope": "Export of the original retained failure manifests and compiler record; not independent binary re-execution or a new test result",
+    "compiled_artifact_relative_to_target": "debug/deps/round-86f3bcf98e2c5ca2",
+    "frozen_artifact_relative_to_receipt": "update-frozen/0-round-86f3bcf98e2c5ca2",
+    "sha256": "a29ebb7d9f576433d1550cf0f908ab50f4f5c80143f80017bc84e98055ea682e",
+    "bytes": 16984804,
+    "compiled_mode_octal": "0755",
+    "frozen_mode_octal": "0555",
+    "target": {
+      "package": "lamp-update",
+      "name": "round",
+      "kind": [
+        "test"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "source": "lampOS/crates/update/tests/round.rs",
+      "manifest": "lampOS/crates/update/Cargo.toml"
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "compiler_record_fresh": false,
+    "original_and_frozen_manifest_hash_and_size_equal": true,
+    "isolated_three_case_public_proof": {
+      "link": "https://github.com/autonomous-ai/lampOS/tree/f7f01e798/lampOS/docs/verification/tests-carrier-candidate-three-control-20261026",
+      "same_reported_binary_sha256": "a29ebb7d9f576433d1550cf0f908ab50f4f5c80143f80017bc84e98055ea682e",
+      "scope": "Separate one serial exact-three observation, 3/0/0; it does not waive original full 439/3/6"
+    },
+    "original_public_packet_preserved": {
+      "commit": "839863049",
+      "link": "https://github.com/autonomous-ai/lampOS/tree/839863049/lampOS/docs/verification/tests-carrier-2d-parallel-failure-20261026",
+      "pre_amendment_file_sha256": {
+        "README.md": "33208cd56da015749ba1c15f1d3147cb43d148780ea043fa8539cf377a155886",
+        "audit.json": "3a092ec40366fccc3d2de2614611a0bb595323129f3341f117e4f5d0329807b9"
+      }
+    }
+  }
 }
