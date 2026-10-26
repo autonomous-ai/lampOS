@@ -1,0 +1,3575 @@
+{
+  "head": "b67b9827e521d98b875af7bf02005c051ed0dca4",
+  "base": "bdc277e2667e11ab04daf60e25f8f9fcf8220dce",
+  "status": "PASS",
+  "platform": "Mac",
+  "scope": "Clean b67/bdc canonical SERIAL fullgate: fmt,actualmetadata,cleanONLYUpdate/Setup/Body,strict14,workspaceJSONbeforetestcompile/freezephasevariant,completeUpdateonce1thread,completepromoterallactualtargetsonce1thread. Prior008serialPASS and historicalparallelFAIL keep their source/workload scopes; no runtime reuse or failure waiver.",
+  "runtime_reuse": false,
+  "test_threads": 1,
+  "update_command": "cargo +1.96.0 test --offline --locked --jobs 1 -p lamp-update --no-fail-fast -- --test-threads=1",
+  "promotion_command": "cargo +1.96.0 test --offline --locked --jobs 1 -p lampos-promote --no-fail-fast -- --test-threads=1",
+  "update_runtime_attempts": 1,
+  "promotion_runtime_attempts": 1,
+  "update_counts": {
+    "passed": 442,
+    "failed": 0,
+    "ignored": 6
+  },
+  "promotion_counts": {
+    "passed": 25,
+    "failed": 0,
+    "ignored": 0
+  },
+  "update_elapsed_s": 1901.98065,
+  "promotion_elapsed_s": 0.461751,
+  "ordinary_filter_count": 0,
+  "update_target_case_pairs": 448,
+  "update_targets": [
+    {
+      "target": "lamp_update-cebdb705cde8ec81",
+      "counts": {
+        "passed": 125,
+        "failed": 0,
+        "ignored": 2
+      },
+      "cases": [
+        {
+          "name": "apply::tests::a_new_skills_folder_is_removed_when_it_is_put_back_and_a_folder_in_use_stays",
+          "outcome": "ok"
+        },
+        {
+          "name": "apply::tests::a_path_both_a_setting_and_an_image_file_is_refused_with_nothing_written",
+          "outcome": "ok"
+        },
+        {
+          "name": "apply::tests::a_put_back_asked_again_after_being_cut_short_puts_every_record_back",
+          "outcome": "ok"
+        },
+        {
+          "name": "apply::tests::a_reload_that_fails_fails_the_apply_and_a_speaker_that_fails_is_said",
+          "outcome": "ok"
+        },
+        {
+          "name": "apply::tests::a_removed_setting_goes_only_where_it_is_still_the_builds",
+          "outcome": "ok"
+        },
+        {
+          "name": "apply::tests::a_request_with_a_field_it_does_not_know_is_read",
+          "outcome": "ok"
+        },
+        {
+          "name": "apply::tests::a_setting_still_the_builds_is_written_and_one_the_lamp_changed_is_kept",
+          "outcome": "ok"
+        },
+        {
+          "name": "apply::tests::a_setting_the_lamp_removed_stays_removed_and_one_never_there_is_written",
+          "outcome": "ok"
+        },
+        {
+          "name": "apply::tests::a_signed_image_file_outside_the_list_is_refused_with_nothing_written",
+          "outcome": "ok"
+        },
+        {
+          "name": "apply::tests::a_unit_systemd_cannot_load_writes_nothing",
+          "outcome": "ok"
+        },
+        {
+          "name": "apply::tests::an_envelope_signed_with_another_key_or_of_another_build_writes_nothing",
+          "outcome": "ok"
+        },
+        {
+          "name": "apply::tests::put_back_keeps_a_file_changed_since_and_a_stale_back_file_is_not_used",
+          "outcome": "ok"
+        },
+        {
+          "name": "apply::tests::put_back_restores_each_file_byte_for_byte_and_its_mode",
+          "outcome": "ok"
+        },
+        {
+          "name": "apply::tests::put_back_restores_the_images_files_and_reloads_again",
+          "outcome": "ok"
+        },
+        {
+          "name": "apply::tests::the_apply_path_never_restarts_or_signals_journald",
+          "outcome": "ok"
+        },
+        {
+          "name": "apply::tests::the_apply_unit_can_write_every_carried_path_and_never_names_journald",
+          "outcome": "ok"
+        },
+        {
+          "name": "apply::tests::the_images_files_are_written_where_the_lamp_has_one_the_image_shipped",
+          "outcome": "ok"
+        },
+        {
+          "name": "apply::tests::the_tmpfiles_are_created_only_when_they_are_there",
+          "outcome": "ok"
+        },
+        {
+          "name": "apply::tests::the_tmpfiles_install_writes_is_one_it_shipped",
+          "outcome": "ok"
+        },
+        {
+          "name": "apply::tests::the_variants_file_is_written_and_none_of_another",
+          "outcome": "ok"
+        },
+        {
+          "name": "apply::tests::unrecorded_tmpfiles_an_install_shipped_are_the_builds_and_others_the_lamps",
+          "outcome": "ok"
+        },
+        {
+          "name": "apply::tests::without_a_request_nothing_is_done",
+          "outcome": "ok"
+        },
+        {
+          "name": "apply::tests::without_the_image_asked_or_from_an_older_copy_none_is_written",
+          "outcome": "ok"
+        },
+        {
+          "name": "check_units::tests::a_masked_unit_fails_an_implicit_slice_does_not_and_white_space_shows",
+          "outcome": "ok"
+        },
+        {
+          "name": "check_units::tests::a_units_own_path_line_is_its_text_and_hides_nothing",
+          "outcome": "ok"
+        },
+        {
+          "name": "check_units::tests::exactly_the_product_passes_and_a_unit_from_elsewhere_does_not",
+          "outcome": "ok"
+        },
+        {
+          "name": "check_units::tests::same_changed_drop_in_extra_and_missing_are_each_said_and_fail_the_check",
+          "outcome": "ok"
+        },
+        {
+          "name": "check_units::tests::systemctl_cat_is_read_file_by_file_and_a_comment_with_a_path_is_no_file",
+          "outcome": "ok"
+        },
+        {
+          "name": "check_units::tests::the_images_unit_is_the_images_not_extra_and_compared_with_its_variant",
+          "outcome": "ok"
+        },
+        {
+          "name": "check_units::tests::the_product_as_install_writes_it_passes",
+          "outcome": "ok"
+        },
+        {
+          "name": "fetch::tests::a_chunked_file_and_one_to_the_end",
+          "outcome": "ok"
+        },
+        {
+          "name": "fetch::tests::a_file_by_its_length_after_a_redirect",
+          "outcome": "ok"
+        },
+        {
+          "name": "fetch::tests::a_folder_on_the_lamp",
+          "outcome": "ok"
+        },
+        {
+          "name": "fetch::tests::a_name_lookup_that_hangs_is_given_up_and_no_round_starts_another_until_it_ends",
+          "outcome": "ok"
+        },
+        {
+          "name": "fetch::tests::a_release_file_from_github",
+          "outcome": "ignored"
+        },
+        {
+          "name": "fetch::tests::an_answered_lookup_is_counted_out_before_its_answer_arrives",
+          "outcome": "ok"
+        },
+        {
+          "name": "fetch::tests::missing_too_large_short_and_other_answers",
+          "outcome": "ok"
+        },
+        {
+          "name": "fetch::tests::no_network_is_unreachable",
+          "outcome": "ok"
+        },
+        {
+          "name": "fetch::tests::urls_and_redirects",
+          "outcome": "ok"
+        },
+        {
+          "name": "head_touch::tests::null_masks_do_not_admit_other_character_devices",
+          "outcome": "ok"
+        },
+        {
+          "name": "image::tests::a_file_not_listed_as_shipped_is_refused",
+          "outcome": "ok"
+        },
+        {
+          "name": "image::tests::a_unit_reloads_systemd_a_rule_reloads_udev_and_asound_restarts_the_voice",
+          "outcome": "ok"
+        },
+        {
+          "name": "image::tests::every_image_file_of_every_variant_is_listed_as_shipped",
+          "outcome": "ok"
+        },
+        {
+          "name": "image::tests::journald_is_never_restarted_nor_signalled",
+          "outcome": "ok"
+        },
+        {
+          "name": "image::tests::the_variant_is_the_images_and_none_is_standard",
+          "outcome": "ok"
+        },
+        {
+          "name": "install::tests::a_timed_service_is_never_enabled_and_its_timer_is",
+          "outcome": "ok"
+        },
+        {
+          "name": "install::tests::a_unit_through_current_is_read",
+          "outcome": "ok"
+        },
+        {
+          "name": "install::tests::every_deploy_product_unit_is_installed_or_named_left_out",
+          "outcome": "ok"
+        },
+        {
+          "name": "install::tests::every_product_part_starts_through_its_current_link",
+          "outcome": "ok"
+        },
+        {
+          "name": "install::tests::every_tool_the_factory_steps_run_is_installed_where_they_look",
+          "outcome": "ok"
+        },
+        {
+          "name": "install::tests::no_product_unit_names_a_lamp",
+          "outcome": "ok"
+        },
+        {
+          "name": "install::tests::offsets_are_read",
+          "outcome": "ok"
+        },
+        {
+          "name": "install::tests::the_cloud_is_enabled_with_the_lamp",
+          "outcome": "ok"
+        },
+        {
+          "name": "install::tests::the_eyes_camera_helper_socket_is_enabled_and_names_the_eyes_camera",
+          "outcome": "ok"
+        },
+        {
+          "name": "install::tests::the_skills_manage_socket_is_enabled_and_its_template_is_not",
+          "outcome": "ok"
+        },
+        {
+          "name": "install::tests::the_wifi_helper_is_never_listed_without_its_restore_at_boot",
+          "outcome": "ok"
+        },
+        {
+          "name": "judge::tests::a_part_that_stays_up_with_one_process_and_says_it_is_well_is_well",
+          "outcome": "ok"
+        },
+        {
+          "name": "judge::tests::restarted_failed_or_another_process_is_not_well",
+          "outcome": "ok"
+        },
+        {
+          "name": "judge::tests::the_part_s_own_word_counts_against_what_it_said_before",
+          "outcome": "ok"
+        },
+        {
+          "name": "manifest::tests::a_build_for_a_newer_updater_is_refused_by_an_older_one_only",
+          "outcome": "ok"
+        },
+        {
+          "name": "manifest::tests::a_key_made_by_openssl_signs_as_well",
+          "outcome": "ok"
+        },
+        {
+          "name": "manifest::tests::a_manifest_without_min_updater_is_written_and_read_as_before",
+          "outcome": "ok"
+        },
+        {
+          "name": "manifest::tests::a_newer_manifest_this_updater_cannot_read_is_refused_for_its_updater",
+          "outcome": "ok"
+        },
+        {
+          "name": "manifest::tests::a_sealed_manifest_opens_with_its_key_and_gives_back_its_bytes",
+          "outcome": "ok"
+        },
+        {
+          "name": "manifest::tests::a_setting_with_a_field_it_does_not_know_is_still_read",
+          "outcome": "ok"
+        },
+        {
+          "name": "manifest::tests::an_image_file_outside_the_list_listed_twice_or_not_its_sha_is_refused",
+          "outcome": "ok"
+        },
+        {
+          "name": "manifest::tests::another_key_a_changed_byte_or_a_changed_signature_is_refused",
+          "outcome": "ok"
+        },
+        {
+          "name": "manifest::tests::min_updater_is_signed_with_the_rest",
+          "outcome": "ok"
+        },
+        {
+          "name": "manifest::tests::min_updater_raised_under_the_same_signature_is_a_bad_signature",
+          "outcome": "ok"
+        },
+        {
+          "name": "manifest::tests::models_are_read_only_with_the_updater_they_need_and_plain_paths",
+          "outcome": "ok"
+        },
+        {
+          "name": "manifest::tests::names_are_plain",
+          "outcome": "ok"
+        },
+        {
+          "name": "manifest::tests::nothing_but_a_plain_manifest_is_signed_or_taken",
+          "outcome": "ok"
+        },
+        {
+          "name": "manifest::tests::product_units_require_the_signed_updater_level_before_older_readers_select_them",
+          "outcome": "ok"
+        },
+        {
+          "name": "manifest::tests::settings_are_read_only_with_the_updater_they_need_and_their_own_paths",
+          "outcome": "ok"
+        },
+        {
+          "name": "manifest::tests::the_reset_plan_is_read_only_with_its_updater_and_its_own_path",
+          "outcome": "ok"
+        },
+        {
+          "name": "models::tests::a_link_into_the_store_is_relative_and_a_unit_reads_by_path_or_folder",
+          "outcome": "ok"
+        },
+        {
+          "name": "product_skills::tests::a_link_in_place_of_a_core_file_is_put_back_and_never_read",
+          "outcome": "ok"
+        },
+        {
+          "name": "product_skills::tests::each_file_is_one_of_three",
+          "outcome": "ok"
+        },
+        {
+          "name": "product_skills::tests::only_plain_paths_in_the_skills_it_names_are_taken",
+          "outcome": "ok"
+        },
+        {
+          "name": "product_skills::tests::the_bundle_of_the_repository_is_what_install_writes",
+          "outcome": "ok"
+        },
+        {
+          "name": "product_skills::tests::what_is_written_is_put_back_and_a_file_changed_since_is_left",
+          "outcome": "ok"
+        },
+        {
+          "name": "publish::tests::binaries_and_each_lamps_units_but_nothing_else",
+          "outcome": "ok"
+        },
+        {
+          "name": "publish::tests::models_are_carried_with_the_updater_they_need",
+          "outcome": "ok"
+        },
+        {
+          "name": "publish::tests::product_services_and_linked_lamp_overrides_are_carried_with_level_six",
+          "outcome": "ok"
+        },
+        {
+          "name": "publish::tests::the_images_files_are_carried_with_the_updater_they_need",
+          "outcome": "ok"
+        },
+        {
+          "name": "publish::tests::the_products_settings_are_carried_with_the_updater_they_need",
+          "outcome": "ok"
+        },
+        {
+          "name": "quiet::tests::a_voice_that_says_nothing_is_never_quiet",
+          "outcome": "ok"
+        },
+        {
+          "name": "quiet::tests::forty_five_seconds_of_nothing_after_the_last_word",
+          "outcome": "ok"
+        },
+        {
+          "name": "quiet::tests::hearing_thinking_or_speaking_is_a_turn",
+          "outcome": "ok"
+        },
+        {
+          "name": "quiet::tests::quiet_needs_as_long_a_watch",
+          "outcome": "ok"
+        },
+        {
+          "name": "records::tests::a_link_left_beside_is_replaced_and_never_written_through",
+          "outcome": "ok"
+        },
+        {
+          "name": "records::tests::a_state_from_a_later_build_keeps_its_fields_across_a_save",
+          "outcome": "ok"
+        },
+        {
+          "name": "records::tests::a_state_from_before_the_settings_reads_and_writes_as_before",
+          "outcome": "ok"
+        },
+        {
+          "name": "records::tests::a_state_that_cannot_be_read_is_kept_aside",
+          "outcome": "ok"
+        },
+        {
+          "name": "records::tests::each_kept_state_and_journal_reads_as_saved",
+          "outcome": "ok"
+        },
+        {
+          "name": "records::tests::one_at_a_time",
+          "outcome": "ok"
+        },
+        {
+          "name": "records::tests::state_journal_and_previous_units_are_kept",
+          "outcome": "ok"
+        },
+        {
+          "name": "records::tests::write_records_fixtures",
+          "outcome": "ignored"
+        },
+        {
+          "name": "setup_lifecycle::tests::incomplete_duplicate_or_malformed_manager_records_are_unknown",
+          "outcome": "ok"
+        },
+        {
+          "name": "setup_lifecycle::tests::manager_identity_requires_the_exact_loaded_product_with_known_dropins",
+          "outcome": "ok"
+        },
+        {
+          "name": "status::tests::a_restart_keeps_the_last_result_each_end_is_said_and_it_is_said_again",
+          "outcome": "ok"
+        },
+        {
+          "name": "status::tests::the_status_is_the_records_build_the_phase_and_the_last_end_without_its_reason",
+          "outcome": "ok"
+        },
+        {
+          "name": "status::tests::the_value_lasts_three_periods_so_a_dead_updater_reads_stale",
+          "outcome": "ok"
+        },
+        {
+          "name": "unit::restart_order::tests::a_declared_socket_precedes_its_service",
+          "outcome": "ok"
+        },
+        {
+          "name": "unit::restart_order::tests::a_path_through_an_unchanged_unit_still_orders_its_ends",
+          "outcome": "ok"
+        },
+        {
+          "name": "unit::restart_order::tests::cycles_including_self_edges_are_refused",
+          "outcome": "ok"
+        },
+        {
+          "name": "unit::restart_order::tests::repeated_and_folded_declarations_keep_each_edge",
+          "outcome": "ok"
+        },
+        {
+          "name": "unit::restart_order::tests::requirements_and_directives_in_other_sections_do_not_order_units",
+          "outcome": "ok"
+        },
+        {
+          "name": "unit::restart_order::tests::the_shipped_managed_services_have_a_valid_startup_graph",
+          "outcome": "ok"
+        },
+        {
+          "name": "unit::restart_order::tests::unsupported_ordering_cannot_silently_lose_a_dependency",
+          "outcome": "ok"
+        },
+        {
+          "name": "unit::tests::a_new_build_is_written_everywhere_the_folder_is_named",
+          "outcome": "ok"
+        },
+        {
+          "name": "unit::tests::comments_do_not_make_a_unit_another",
+          "outcome": "ok"
+        },
+        {
+          "name": "unit::tests::lamp_4aces_own_units_are_read",
+          "outcome": "ok"
+        },
+        {
+          "name": "unit::tests::only_a_part_installed_by_build_is_a_program",
+          "outcome": "ok"
+        },
+        {
+          "name": "unit::tests::the_generic_package_sets_up_and_resets_as_the_product_does",
+          "outcome": "ok"
+        },
+        {
+          "name": "unit::tests::the_generic_voice_answers_whom_the_product_does",
+          "outcome": "ok"
+        },
+        {
+          "name": "unit::tests::the_generic_voice_has_the_product_clock_and_session_context",
+          "outcome": "ok"
+        },
+        {
+          "name": "unit::tests::the_generic_voice_runs_the_ring_as_the_product_does",
+          "outcome": "ok"
+        },
+        {
+          "name": "unit::tests::the_generic_voice_says_its_failures_as_the_product_does",
+          "outcome": "ok"
+        },
+        {
+          "name": "world::tests::self_recovery_accepts_an_armed_timer_and_an_inactive_service",
+          "outcome": "ok"
+        },
+        {
+          "name": "world::tests::self_recovery_refuses_a_timer_not_armed_persistently",
+          "outcome": "ok"
+        },
+        {
+          "name": "world::tests::self_recovery_refuses_an_unloaded_masked_or_ephemeral_service",
+          "outcome": "ok"
+        },
+        {
+          "name": "world::tests::self_recovery_refuses_malformed_or_unexpected_query_records",
+          "outcome": "ok"
+        },
+        {
+          "name": "world::tests::self_recovery_requires_one_of_each_record_and_required_property",
+          "outcome": "ok"
+        },
+        {
+          "name": "world::tests::systemctl_show_is_read_unit_by_unit",
+          "outcome": "ok"
+        },
+        {
+          "name": "world::tests::the_bus_hears_the_voice_and_not_an_old_state",
+          "outcome": "ok"
+        },
+        {
+          "name": "world::tests::the_real_disk_has_room",
+          "outcome": "ok"
+        }
+      ],
+      "executable": {
+        "sha256": "ce51484500e4d053d1f23e5b840fed70bc869c12115988ac6cfbc94cefba203b",
+        "bytes": 11411540,
+        "mode": "0o755"
+      }
+    },
+    {
+      "target": "lamp_update-04671789528a12d3",
+      "counts": {
+        "passed": 3,
+        "failed": 0,
+        "ignored": 0
+      },
+      "cases": [
+        {
+          "name": "product_settings_tests::an_unreadable_apply_value_is_present_and_never_enables_product_settings",
+          "outcome": "ok"
+        },
+        {
+          "name": "product_settings_tests::manifest_defaults_follow_the_product_tree_but_explicit_choices_win",
+          "outcome": "ok"
+        },
+        {
+          "name": "product_settings_tests::only_an_absent_apply_switch_and_self_switch_allow_the_product_default",
+          "outcome": "ok"
+        }
+      ],
+      "executable": {
+        "sha256": "33a513463794698385400ed74d91c898c99bda92af594e3fb122353c02a28080",
+        "bytes": 1184760,
+        "mode": "0o755"
+      }
+    },
+    {
+      "target": "functions-5603f33a4dae064e",
+      "counts": {
+        "passed": 5,
+        "failed": 0,
+        "ignored": 0
+      },
+      "cases": [
+        {
+          "name": "a_product_chat_request_offers_dance_at_the_bound",
+          "outcome": "ok"
+        },
+        {
+          "name": "a_product_lamp_declares_every_function_it_has_within_the_bound",
+          "outcome": "ok"
+        },
+        {
+          "name": "the_generic_voice_declares_the_clock_and_receives_time_and_session_context",
+          "outcome": "ok"
+        },
+        {
+          "name": "the_product_voice_s_functions_in_a_process_of_their_own",
+          "outcome": "ok"
+        },
+        {
+          "name": "with_reports_on_dance_stays_at_the_bound",
+          "outcome": "ok"
+        }
+      ],
+      "executable": {
+        "sha256": "cbd85758ef8d7b4ae5786d815f5cedf6ecdf83ad5a2cd5dc9ffe181f0fc7c7e2",
+        "bytes": 18488808,
+        "mode": "0o755"
+      }
+    },
+    {
+      "target": "install-56b9137cd677b603",
+      "counts": {
+        "passed": 101,
+        "failed": 0,
+        "ignored": 0
+      },
+      "cases": [
+        {
+          "name": "a_blank_lamp_gets_every_part_its_units_and_nothing_started",
+          "outcome": "ok"
+        },
+        {
+          "name": "a_blank_lamp_runs_every_product_skill_as_the_skill",
+          "outcome": "ok"
+        },
+        {
+          "name": "a_build_without_a_part_is_refused_before_anything_is_written",
+          "outcome": "ok"
+        },
+        {
+          "name": "a_build_without_the_bodys_factory_tools_still_installs",
+          "outcome": "ok"
+        },
+        {
+          "name": "a_closed_etc_lampos_is_said_and_left_as_it_is",
+          "outcome": "ok"
+        },
+        {
+          "name": "a_default_found_closed_is_opened_and_a_lamps_own_found_closed_is_said",
+          "outcome": "ok"
+        },
+        {
+          "name": "a_device_key_found_open_is_narrowed_and_never_said",
+          "outcome": "ok"
+        },
+        {
+          "name": "a_disabled_core_skill_turned_on_stays_on_through_an_install",
+          "outcome": "ok"
+        },
+        {
+          "name": "a_failed_exit_note_write_keeps_reload_debt_for_the_next_install",
+          "outcome": "ok"
+        },
+        {
+          "name": "a_failing_step_keeps_the_record_and_a_later_run_finishes",
+          "outcome": "ok"
+        },
+        {
+          "name": "a_file_left_beside_by_a_run_cut_off_does_not_lend_its_mode_to_the_key",
+          "outcome": "ok"
+        },
+        {
+          "name": "a_file_that_does_not_match_installs_nothing_of_it",
+          "outcome": "ok"
+        },
+        {
+          "name": "a_key_a_reset_removed_is_never_put_back_from_v1s_config",
+          "outcome": "ok"
+        },
+        {
+          "name": "a_lamp_set_up_before_setup_wrote_zone_env_gets_its_saved_zone_at_the_next_install",
+          "outcome": "ok"
+        },
+        {
+          "name": "a_lamps_own_pins_gain_the_privacy_section_and_keep_the_rest",
+          "outcome": "ok"
+        },
+        {
+          "name": "a_lamps_own_pins_on_the_old_guess_get_every_head_line",
+          "outcome": "ok"
+        },
+        {
+          "name": "a_missing_store_drop_in_is_repaired_and_failed_reload_is_retried",
+          "outcome": "ok"
+        },
+        {
+          "name": "a_moved_lamp_is_given_the_product_voices_five_lines",
+          "outcome": "ok"
+        },
+        {
+          "name": "a_newer_build_moves_each_link_and_keeps_the_old_folders",
+          "outcome": "ok"
+        },
+        {
+          "name": "a_newer_default_replaces_only_a_setting_nobody_changed",
+          "outcome": "ok"
+        },
+        {
+          "name": "a_product_lamp_without_a_link_says_so_once_and_never_drops_speech_in_silence",
+          "outcome": "ok"
+        },
+        {
+          "name": "a_refused_service_install_records_nothing_and_keeps_the_drop_in",
+          "outcome": "ok"
+        },
+        {
+          "name": "a_reset_then_prepare_does_not_restore_the_old_key",
+          "outcome": "ok"
+        },
+        {
+          "name": "a_set_aside_holds_for_keys_there_and_after_a_mark_that_was_not_saved",
+          "outcome": "ok"
+        },
+        {
+          "name": "a_setting_changed_on_the_lamp_is_kept_when_install_runs_again",
+          "outcome": "ok"
+        },
+        {
+          "name": "a_setting_in_the_way_stops_the_install_before_any_is_written",
+          "outcome": "ok"
+        },
+        {
+          "name": "a_setting_written_but_not_yet_recorded_is_still_installs",
+          "outcome": "ok"
+        },
+        {
+          "name": "an_install_puts_a_core_skills_changed_file_back_and_says_so",
+          "outcome": "ok"
+        },
+        {
+          "name": "an_install_stopped_after_writing_its_units_enables_at_the_next_run",
+          "outcome": "ok"
+        },
+        {
+          "name": "an_install_whose_enable_failed_enables_at_the_next_run_and_keeps_its_settings_record",
+          "outcome": "ok"
+        },
+        {
+          "name": "corrupt_records_are_set_aside_and_never_bring_back_a_key_a_reset_removed",
+          "outcome": "ok"
+        },
+        {
+          "name": "every_part_of_the_brain_has_a_product_unit",
+          "outcome": "ok"
+        },
+        {
+          "name": "every_part_of_the_lamp_waits_for_setups_marker_itself",
+          "outcome": "ok"
+        },
+        {
+          "name": "every_skill_folder_is_in_the_product_or_says_why_not",
+          "outcome": "ok"
+        },
+        {
+          "name": "harness_at_boot_gives_lamposs_manager_its_home_first",
+          "outcome": "ok"
+        },
+        {
+          "name": "harness_is_set_to_start_at_boot_once_when_it_is_there",
+          "outcome": "ok"
+        },
+        {
+          "name": "harness_off_after_a_first_install_leaves_no_linger",
+          "outcome": "ok"
+        },
+        {
+          "name": "harness_off_runs_uninstall_stop_status_then_the_linger_then_pgrep",
+          "outcome": "ok"
+        },
+        {
+          "name": "harness_on_installs_with_harnesss_own_installer_then_sets_it_at_boot",
+          "outcome": "ok"
+        },
+        {
+          "name": "harness_on_keeps_a_harness_already_there",
+          "outcome": "ok"
+        },
+        {
+          "name": "harness_on_stops_at_a_failing_step_and_leaves_no_link",
+          "outcome": "ok"
+        },
+        {
+          "name": "harness_on_updates_its_own_older_harness_and_says_one_too_old",
+          "outcome": "ok"
+        },
+        {
+          "name": "harness_versions_are_read_as_harness_prints_them",
+          "outcome": "ok"
+        },
+        {
+          "name": "head_touch_comes_whole_and_never_beside_the_old_engines_head",
+          "outcome": "ok"
+        },
+        {
+          "name": "head_touch_preflight_files::dangling_drop_in_keeps_missing_file_compatibility",
+          "outcome": "ok"
+        },
+        {
+          "name": "head_touch_preflight_files::dev_null_drop_in_mask_is_preserved",
+          "outcome": "ok"
+        },
+        {
+          "name": "head_touch_preflight_files::directory_drop_in_is_refused_before_mutation",
+          "outcome": "ok"
+        },
+        {
+          "name": "head_touch_preflight_files::fifo_body_calibration_is_refused_before_mutation",
+          "outcome": "ok"
+        },
+        {
+          "name": "head_touch_preflight_files::fifo_drop_in_is_refused_before_mutation",
+          "outcome": "ok"
+        },
+        {
+          "name": "head_touch_preflight_files::fifo_without_a_writer_is_refused_before_mutation",
+          "outcome": "ok"
+        },
+        {
+          "name": "head_touch_preflight_files::missing_local_files_keep_install_compatibility",
+          "outcome": "ok"
+        },
+        {
+          "name": "head_touch_preflight_files::regular_benign_drop_in_is_preserved",
+          "outcome": "ok"
+        },
+        {
+          "name": "head_touch_preflight_files::symlink_to_regular_drop_in_is_preserved",
+          "outcome": "ok"
+        },
+        {
+          "name": "install_head_body_keeps_factory_calibration",
+          "outcome": "ok"
+        },
+        {
+          "name": "install_head_body_refuses_calibration_environment_overrides_before_mutation",
+          "outcome": "ok"
+        },
+        {
+          "name": "install_places_every_exit_note_hook_and_keeps_other_drop_ins",
+          "outcome": "ok"
+        },
+        {
+          "name": "install_places_the_voices_recorded_lines_where_the_product_voice_reads_them",
+          "outcome": "ok"
+        },
+        {
+          "name": "install_prepares_store_off_and_keeps_the_lamps_store_choice",
+          "outcome": "ok"
+        },
+        {
+          "name": "install_records_the_tmpfiles_it_writes",
+          "outcome": "ok"
+        },
+        {
+          "name": "install_review_head_pair_keeps_a_benign_drop_in",
+          "outcome": "ok"
+        },
+        {
+          "name": "install_review_head_pair_refusal_precedes_state_and_host_mutation",
+          "outcome": "ok"
+        },
+        {
+          "name": "install_review_head_pair_refuses_a_disabling_drop_in_before_mutation",
+          "outcome": "ok"
+        },
+        {
+          "name": "install_review_head_pair_refuses_a_removed_mute_before_mutation",
+          "outcome": "ok"
+        },
+        {
+          "name": "install_review_head_pair_retry_keeps_calibration_and_is_idempotent",
+          "outcome": "ok"
+        },
+        {
+          "name": "install_setup_on_replaces_a_hand_placed_plan_and_keeps_the_old_in_the_records",
+          "outcome": "ok"
+        },
+        {
+          "name": "lamp_update_back_waits_for_its_binary_rather_than_failing",
+          "outcome": "ok"
+        },
+        {
+          "name": "missing_models_are_fetched_checked_and_placed_and_a_lamps_own_is_kept",
+          "outcome": "ok"
+        },
+        {
+          "name": "music_sway_and_watch_you_leave_are_on_in_the_product",
+          "outcome": "ok"
+        },
+        {
+          "name": "prepare_places_the_recorded_lines_a_moved_lamps_voice_reads",
+          "outcome": "ok"
+        },
+        {
+          "name": "prepare_sets_corrupt_records_aside_and_leaves_unreadable_ones_alone",
+          "outcome": "ok"
+        },
+        {
+          "name": "prepare_then_reset_then_install_does_not_restore_the_old_key",
+          "outcome": "ok"
+        },
+        {
+          "name": "product_routine_state_is_private_persistent_and_keeps_new_switches_off",
+          "outcome": "ok"
+        },
+        {
+          "name": "product_units_pass_only_options_an_older_binary_takes",
+          "outcome": "ok"
+        },
+        {
+          "name": "run_twice_it_changes_nothing",
+          "outcome": "ok"
+        },
+        {
+          "name": "second_review_body_head_off_refuses_before_bundle_mutation",
+          "outcome": "ok"
+        },
+        {
+          "name": "settings_written_before_one_that_fails_are_still_installs",
+          "outcome": "ok"
+        },
+        {
+          "name": "setup_settings_are_written_only_with_setup_on_and_kept_once_changed",
+          "outcome": "ok"
+        },
+        {
+          "name": "the_builds_plan_already_there_is_no_change_and_no_backup",
+          "outcome": "ok"
+        },
+        {
+          "name": "the_device_key_is_provisioned_private_and_only_where_missing",
+          "outcome": "ok"
+        },
+        {
+          "name": "the_exit_note_allowlist_is_exactly_clouds_product_services",
+          "outcome": "ok"
+        },
+        {
+          "name": "the_installed_bedtime_skill_is_disabled_and_absent_from_live_catalogs",
+          "outcome": "ok"
+        },
+        {
+          "name": "the_parts_that_keep_local_time_read_the_zone_setup_saves",
+          "outcome": "ok"
+        },
+        {
+          "name": "the_pinned_models_are_the_ones_their_parts_check",
+          "outcome": "ok"
+        },
+        {
+          "name": "the_plans_install_shipped_are_listed",
+          "outcome": "ok"
+        },
+        {
+          "name": "the_product_full_look_is_on_in_both_units_with_one_file",
+          "outcome": "ok"
+        },
+        {
+          "name": "the_product_keeps_nothing_personal_while_nobody_is_known",
+          "outcome": "ok"
+        },
+        {
+          "name": "the_product_sees_who_speaks",
+          "outcome": "ok"
+        },
+        {
+          "name": "the_product_skills_are_exactly_the_core_skills",
+          "outcome": "ok"
+        },
+        {
+          "name": "the_second_route_gets_its_services_on_the_voices_key_and_a_lamps_own_is_kept",
+          "outcome": "ok"
+        },
+        {
+          "name": "the_skills_tools_are_in_their_own_folder_which_the_voice_reads",
+          "outcome": "ok"
+        },
+        {
+          "name": "the_tasks_part_closes_the_harness_a_told_task_started",
+          "outcome": "ok"
+        },
+        {
+          "name": "the_tasks_part_waits_for_harness_rather_than_failing",
+          "outcome": "ok"
+        },
+        {
+          "name": "the_voice_gets_its_service_and_the_lamps_device_key_from_v1s_config",
+          "outcome": "ok"
+        },
+        {
+          "name": "time_of_day_parts_wait_for_the_kernel_to_say_the_clock_is_set",
+          "outcome": "ok"
+        },
+        {
+          "name": "tmpfiles_make_lock_folders_the_parts_accept_and_the_voices_sessions_folder",
+          "outcome": "ok"
+        },
+        {
+          "name": "two_failed_runs_in_a_row_keep_a_written_setting_as_installs",
+          "outcome": "ok"
+        },
+        {
+          "name": "unreadable_records_stop_install_rather_than_being_written_over",
+          "outcome": "ok"
+        },
+        {
+          "name": "what_harness_service_status_still_has_is_read_from_its_json",
+          "outcome": "ok"
+        },
+        {
+          "name": "what_harness_still_has_is_said_and_without_harness_the_record_is_kept",
+          "outcome": "ok"
+        },
+        {
+          "name": "without_a_usable_key_nothing_is_written_and_the_key_is_never_said",
+          "outcome": "ok"
+        },
+        {
+          "name": "without_setup_on_a_plan_there_follows_the_build_and_none_is_never_added",
+          "outcome": "ok"
+        }
+      ],
+      "executable": {
+        "sha256": "9cb2101055555ba5f14d7e90d56af9d58ed656fea82a4ee4f2c905a3efe94660",
+        "bytes": 13917996,
+        "mode": "0o755"
+      }
+    },
+    {
+      "target": "it-49911377a8fbd75d",
+      "counts": {
+        "passed": 13,
+        "failed": 0,
+        "ignored": 0
+      },
+      "cases": [
+        {
+          "name": "ci_paths::every_doc_a_crate_reads_is_named_back_in_the_workflows_pull_request_paths",
+          "outcome": "ok"
+        },
+        {
+          "name": "ci_paths::the_scan_sees_paths_in_strings_and_not_in_comments_or_prose",
+          "outcome": "ok"
+        },
+        {
+          "name": "image_journal::systemd_reads_it_last_beside_another_drop_in",
+          "outcome": "ok"
+        },
+        {
+          "name": "image_journal::the_journal_is_kept_well_inside_the_ram_disk",
+          "outcome": "ok"
+        },
+        {
+          "name": "image_ramlog::a_failed_move_keeps_the_kept_boots_and_says_so",
+          "outcome": "ok"
+        },
+        {
+          "name": "image_ramlog::logrotate_runs_the_lamps_copy_back_in_place_of_the_bases",
+          "outcome": "ok"
+        },
+        {
+          "name": "image_ramlog::ramlogs_copies_leave_the_journal_out",
+          "outcome": "ok"
+        },
+        {
+          "name": "image_ramlog::ramlogs_stop_keeps_the_journal_before_its_own_stop",
+          "outcome": "ok"
+        },
+        {
+          "name": "image_ramlog::the_copy_back_leaves_the_journal_alone",
+          "outcome": "ok"
+        },
+        {
+          "name": "image_ramlog::the_defaults_keep_the_bases_settings",
+          "outcome": "ok"
+        },
+        {
+          "name": "image_ramlog::the_last_two_boots_are_kept_at_shutdown_only",
+          "outcome": "ok"
+        },
+        {
+          "name": "scratch_paths::no_two_files_of_a_test_binary_build_the_same_scratch_folder",
+          "outcome": "ok"
+        },
+        {
+          "name": "scratch_paths::the_names_read_are_the_scratch_folders_only",
+          "outcome": "ok"
+        }
+      ],
+      "executable": {
+        "sha256": "0e819852bb302b9d9f52156d135f18f4f573bea16e678f48fd188401d85b271b",
+        "bytes": 1648848,
+        "mode": "0o755"
+      }
+    },
+    {
+      "target": "release_pair-2ff63d2c9df235ef",
+      "counts": {
+        "passed": 0,
+        "failed": 0,
+        "ignored": 2
+      },
+      "cases": [
+        {
+          "name": "release_6408_recovers_a_cut_written_by_release_6449",
+          "outcome": "ignored"
+        },
+        {
+          "name": "release_6449_recovers_a_cut_written_by_release_6408",
+          "outcome": "ignored"
+        }
+      ],
+      "executable": {
+        "sha256": "af5db66da111e5b3750028d00ad0c076939dcf2ab5c58e137f9d26cb15bd49fc",
+        "bytes": 2820076,
+        "mode": "0o755"
+      }
+    },
+    {
+      "target": "round-86f3bcf98e2c5ca2",
+      "counts": {
+        "passed": 195,
+        "failed": 0,
+        "ignored": 0
+      },
+      "cases": [
+        {
+          "name": "a_bad_signature_or_a_bad_checksum_is_refused_with_nothing_installed",
+          "outcome": "ok"
+        },
+        {
+          "name": "a_build_for_a_newer_updater_is_refused_and_taken_once_the_updater_can",
+          "outcome": "ok"
+        },
+        {
+          "name": "a_build_of_only_new_product_skills_places_them_and_restarts_nothing",
+          "outcome": "ok"
+        },
+        {
+          "name": "a_build_put_back_puts_its_settings_back_byte_for_byte",
+          "outcome": "ok"
+        },
+        {
+          "name": "a_build_put_back_puts_the_images_files_back",
+          "outcome": "ok"
+        },
+        {
+          "name": "a_build_put_back_puts_the_old_reset_plan_back",
+          "outcome": "ok"
+        },
+        {
+          "name": "a_build_put_back_puts_the_product_skills_back",
+          "outcome": "ok"
+        },
+        {
+          "name": "a_changed_model_is_fetched_checked_and_switched_with_its_part",
+          "outcome": "ok"
+        },
+        {
+          "name": "a_command_is_read_within_its_bound_and_killed_after",
+          "outcome": "ok"
+        },
+        {
+          "name": "a_core_skill_turned_on_stays_on_through_a_round",
+          "outcome": "ok"
+        },
+        {
+          "name": "a_cut_inside_the_put_back_of_an_unreadable_self_json_never_turns_it_around",
+          "outcome": "ok"
+        },
+        {
+          "name": "a_disk_too_full_for_a_second_copy_is_refused_before_anything_is_written",
+          "outcome": "ok"
+        },
+        {
+          "name": "a_folder_made_two_builds_ago_is_removed_and_one_never_made_is_kept",
+          "outcome": "ok"
+        },
+        {
+          "name": "a_hardware_profile_that_cannot_be_read_never_fails_the_round",
+          "outcome": "ok"
+        },
+        {
+          "name": "a_lamp_short_of_room_for_the_models_refuses_before_fetching",
+          "outcome": "ok"
+        },
+        {
+          "name": "a_lamp_update_back_from_before_the_plan_writes_the_rest_and_the_round_says_so",
+          "outcome": "ok"
+        },
+        {
+          "name": "a_lamp_with_an_old_reset_plan_updated_by_a_round_ends_with_the_builds_and_a_backup",
+          "outcome": "ok"
+        },
+        {
+          "name": "a_lamp_with_no_reset_plan_gets_none_from_a_round",
+          "outcome": "ok"
+        },
+        {
+          "name": "a_lamp_without_lamp_update_apply_puts_the_build_back_with_nothing_written",
+          "outcome": "ok"
+        },
+        {
+          "name": "a_lamps_own_asound_is_kept_and_the_voice_not_restarted_for_it",
+          "outcome": "ok"
+        },
+        {
+          "name": "a_link_switch_cut_short_is_put_back_at_the_next_start",
+          "outcome": "ok"
+        },
+        {
+          "name": "a_linked_part_keeps_its_build_and_the_one_before",
+          "outcome": "ok"
+        },
+        {
+          "name": "a_linked_part_that_dies_is_put_back_by_its_link",
+          "outcome": "ok"
+        },
+        {
+          "name": "a_model_fetch_cut_by_the_network_is_unreachable_not_refused",
+          "outcome": "ok"
+        },
+        {
+          "name": "a_model_only_switch_cut_short_restarts_the_part_that_reads_it",
+          "outcome": "ok"
+        },
+        {
+          "name": "a_model_switch_cut_short_is_put_back_at_the_next_start",
+          "outcome": "ok"
+        },
+        {
+          "name": "a_model_switch_whose_part_dies_puts_the_model_back",
+          "outcome": "ok"
+        },
+        {
+          "name": "a_model_that_cannot_be_put_back_leaves_the_others_put_back_and_the_journal_kept",
+          "outcome": "ok"
+        },
+        {
+          "name": "a_model_that_does_not_match_its_sha_refuses_the_build_with_nothing_switched",
+          "outcome": "ok"
+        },
+        {
+          "name": "a_new_build_is_installed_beside_the_old_and_switched",
+          "outcome": "ok"
+        },
+        {
+          "name": "a_new_updater_not_confirmed_by_the_deadline_is_put_back",
+          "outcome": "ok"
+        },
+        {
+          "name": "a_new_updater_that_confirms_keeps_its_switch",
+          "outcome": "ok"
+        },
+        {
+          "name": "a_new_updater_that_exits_at_once_is_put_back",
+          "outcome": "ok"
+        },
+        {
+          "name": "a_new_updater_that_refuses_every_manifest_is_put_back",
+          "outcome": "ok"
+        },
+        {
+          "name": "a_new_worker_beside_an_unchanged_voice_gets_a_folder_named_by_its_list",
+          "outcome": "ok"
+        },
+        {
+          "name": "a_part_put_back_says_its_restarts_and_last_line_in_the_outcome_only",
+          "outcome": "ok"
+        },
+        {
+          "name": "a_part_that_dies_is_put_back_and_its_build_refused",
+          "outcome": "ok"
+        },
+        {
+          "name": "a_part_that_says_it_is_in_error_is_put_back_after_its_minute",
+          "outcome": "ok"
+        },
+        {
+          "name": "a_part_whose_folder_is_gone_is_installed_afresh",
+          "outcome": "ok"
+        },
+        {
+          "name": "a_product_lamp_without_a_tmpfiles_record_takes_the_builds_tmpfiles",
+          "outcome": "ok"
+        },
+        {
+          "name": "a_reset_plan_changed_on_the_lamp_is_replaced_by_a_round_never_kept",
+          "outcome": "ok"
+        },
+        {
+          "name": "a_round_after_install_keeps_lamp_updates_own_folder",
+          "outcome": "ok"
+        },
+        {
+          "name": "a_round_after_its_own_switch_keeps_the_old_binarys_folder",
+          "outcome": "ok"
+        },
+        {
+          "name": "a_round_by_hand_keeps_the_folder_it_runs_from",
+          "outcome": "ok"
+        },
+        {
+          "name": "a_round_does_not_switch_lamp_skills_onto_checks_its_old_folders_fail",
+          "outcome": "ok"
+        },
+        {
+          "name": "a_round_keeping_second_json_still_reaches_deepseek_through_the_relay",
+          "outcome": "ok"
+        },
+        {
+          "name": "a_round_places_second_json_before_a_voice_unit_that_needs_it",
+          "outcome": "ok"
+        },
+        {
+          "name": "a_round_puts_a_core_skills_files_back_and_keeps_the_persons_own",
+          "outcome": "ok"
+        },
+        {
+          "name": "a_round_that_cannot_place_second_json_writes_no_unit",
+          "outcome": "ok"
+        },
+        {
+          "name": "a_round_that_sets_damaged_records_aside_keeps_the_keys_marked",
+          "outcome": "ok"
+        },
+        {
+          "name": "a_round_with_nothing_to_change_only_checks",
+          "outcome": "ok"
+        },
+        {
+          "name": "a_self_json_from_a_later_version_still_reads",
+          "outcome": "ok"
+        },
+        {
+          "name": "a_self_json_the_disk_cannot_give_is_tried_again_next_round",
+          "outcome": "ok"
+        },
+        {
+          "name": "a_skill_the_build_removes_leaves_the_turned_on_record_with_one_line",
+          "outcome": "ok"
+        },
+        {
+          "name": "a_switch_cut_short_after_its_settings_puts_them_back_at_the_next_start",
+          "outcome": "ok"
+        },
+        {
+          "name": "a_switch_cut_short_is_put_back_at_the_next_start",
+          "outcome": "ok"
+        },
+        {
+          "name": "a_unit_the_build_carries_is_carried_with_the_build_written_in",
+          "outcome": "ok"
+        },
+        {
+          "name": "a_voice_that_is_well_is_put_back_between_two_turns",
+          "outcome": "ok"
+        },
+        {
+          "name": "an_old_updater_climbs_one_updater_a_round",
+          "outcome": "ok"
+        },
+        {
+          "name": "an_older_build_is_not_taken",
+          "outcome": "ok"
+        },
+        {
+          "name": "an_older_lamp_update_back_ignores_the_images_files_and_the_round_says_so",
+          "outcome": "ok"
+        },
+        {
+          "name": "an_unchanged_model_is_not_fetched_and_its_file_stays",
+          "outcome": "ok"
+        },
+        {
+          "name": "an_unreadable_journal_is_set_aside_and_the_round_goes_on",
+          "outcome": "ok"
+        },
+        {
+          "name": "an_unreadable_self_json_with_both_builds_known_is_put_back",
+          "outcome": "ok"
+        },
+        {
+          "name": "an_unreadable_self_json_with_the_builds_unknown_is_set_aside",
+          "outcome": "ok"
+        },
+        {
+          "name": "an_updater_too_old_for_a_build_not_newer_than_installed_takes_nothing_it_carries",
+          "outcome": "ok"
+        },
+        {
+          "name": "an_updater_too_old_for_a_build_takes_only_the_updater_it_carries_then_the_rest",
+          "outcome": "ok"
+        },
+        {
+          "name": "an_updater_too_old_for_a_build_without_an_updater_is_refused_with_nothing_written",
+          "outcome": "ok"
+        },
+        {
+          "name": "asound_waits_for_a_quiet_moment_within_the_bound_and_then_for_the_next_round",
+          "outcome": "ok"
+        },
+        {
+          "name": "both_kinds_of_part_switch_in_one_round_each_its_own_way",
+          "outcome": "ok"
+        },
+        {
+          "name": "head_touch::absent_unused_product_pins_do_not_block_active_build_pins_updates",
+          "outcome": "ok"
+        },
+        {
+          "name": "head_touch::body_head_calibration_cannot_override_the_sleep_reader",
+          "outcome": "ok"
+        },
+        {
+          "name": "head_touch::body_head_complete_bundle_preserves_literal_factory_calibration",
+          "outcome": "ok"
+        },
+        {
+          "name": "head_touch::body_head_mode_and_bus_dropins_are_refused_before_writes",
+          "outcome": "ok"
+        },
+        {
+          "name": "head_touch::body_head_on_an_isolated_bus_is_refused_before_writes",
+          "outcome": "ok"
+        },
+        {
+          "name": "head_touch::body_head_repeated_exec_start_is_refused_before_writes",
+          "outcome": "ok"
+        },
+        {
+          "name": "head_touch::body_head_requires_an_enabled_carried_or_installed_sleep_reader",
+          "outcome": "ok"
+        },
+        {
+          "name": "head_touch::custom_active_pins_are_kept_and_checked_against_the_reader_pair",
+          "outcome": "ok"
+        },
+        {
+          "name": "head_touch::custom_head_wiring_is_kept_or_the_reader_transition_is_refused",
+          "outcome": "ok"
+        },
+        {
+          "name": "head_touch::cut_after_pins_apply_restarts_unchanged_controls_after_restoring_old_pins",
+          "outcome": "ok"
+        },
+        {
+          "name": "head_touch::environment_only_head_bus_mismatch_is_refused_before_any_write",
+          "outcome": "ok"
+        },
+        {
+          "name": "head_touch::expression_or_controls_bus_mismatch_is_refused_before_any_write",
+          "outcome": "ok"
+        },
+        {
+          "name": "head_touch::failed_head_reader_candidate_restores_exact_old_pins_and_units",
+          "outcome": "ok"
+        },
+        {
+          "name": "head_touch::head_bus_root_dropins_are_not_guessed_from_base_units",
+          "outcome": "ok"
+        },
+        {
+          "name": "head_touch::head_pins_cannot_change_without_restarting_their_controls_reader",
+          "outcome": "ok"
+        },
+        {
+          "name": "head_touch::head_reader_mode_overrides_are_not_guessed_from_base_units",
+          "outcome": "ok"
+        },
+        {
+          "name": "head_touch::invalid_mute_path_and_unknown_reader_are_refused",
+          "outcome": "ok"
+        },
+        {
+          "name": "head_touch::isolated_voice_controls_bus_is_refused_before_any_write",
+          "outcome": "ok"
+        },
+        {
+          "name": "head_touch::malformed_environment_quotes_are_not_reader_evidence",
+          "outcome": "ok"
+        },
+        {
+          "name": "head_touch::matching_explicit_or_default_head_bus_roots_allow_the_paired_transition",
+          "outcome": "ok"
+        },
+        {
+          "name": "head_touch::mixed_head_readers_are_refused_before_settings_or_units_are_written",
+          "outcome": "ok"
+        },
+        {
+          "name": "head_touch::old_apply_helper_pins_mismatch_is_put_back_before_readers_restart",
+          "outcome": "ok"
+        },
+        {
+          "name": "head_touch::paired_head_bus_cannot_diverge_from_voices_enabled_privacy_bus",
+          "outcome": "ok"
+        },
+        {
+          "name": "head_touch::paired_head_readers_disable_legacy_even_when_signed_pins_enable_it",
+          "outcome": "ok"
+        },
+        {
+          "name": "head_touch::paired_head_readers_without_controls_mute_are_refused_before_writes",
+          "outcome": "ok"
+        },
+        {
+          "name": "head_touch::pr2948_settings_off_preserves_the_old_head_reader",
+          "outcome": "ok"
+        },
+        {
+          "name": "head_touch::pr2948_settings_on_keeps_a_head_reader_available",
+          "outcome": "ok"
+        },
+        {
+          "name": "head_touch::repeated_projected_pins_keep_their_actual_hash_without_restarting_controls",
+          "outcome": "ok"
+        },
+        {
+          "name": "head_touch::semantic_head_reader_paths_cannot_expand_invocation_variables",
+          "outcome": "ok"
+        },
+        {
+          "name": "head_touch::settings_off_refuses_paired_head_readers_with_legacy_pins",
+          "outcome": "ok"
+        },
+        {
+          "name": "head_touch::stale_unused_product_pins_do_not_block_active_build_pins_updates",
+          "outcome": "ok"
+        },
+        {
+          "name": "head_touch::textually_equal_expanded_head_bus_roots_are_not_a_verified_pair",
+          "outcome": "ok"
+        },
+        {
+          "name": "head_touch::third_review_binary_update_checks_active_build_local_head_pins",
+          "outcome": "ok"
+        },
+        {
+          "name": "head_touch::third_review_paired_head_readers_on_different_buses_are_refused",
+          "outcome": "ok"
+        },
+        {
+          "name": "install_writes_the_fallback_and_no_round_touches_it",
+          "outcome": "ok"
+        },
+        {
+          "name": "lamp_update_back_puts_back_an_unreadable_self_json",
+          "outcome": "ok"
+        },
+        {
+          "name": "no_line_is_asked_of_a_good_switch_and_none_is_said_when_there_is_none",
+          "outcome": "ok"
+        },
+        {
+          "name": "no_line_is_asked_when_systemd_itself_cannot_be_asked",
+          "outcome": "ok"
+        },
+        {
+          "name": "no_network_changes_nothing_and_says_so",
+          "outcome": "ok"
+        },
+        {
+          "name": "no_second_round_begins_while_lamp_updates_own_switch_waits",
+          "outcome": "ok"
+        },
+        {
+          "name": "only_a_skill_that_would_stop_loading_holds_lamp_skills_back",
+          "outcome": "ok"
+        },
+        {
+          "name": "product_carrier::a_comment_only_product_unit_is_an_intended_noop",
+          "outcome": "ok"
+        },
+        {
+          "name": "product_carrier::a_corrupt_product_unit_is_refused_before_any_write",
+          "outcome": "ok"
+        },
+        {
+          "name": "product_carrier::a_managed_product_manifest_can_bootstrap_the_existing_settings_helper",
+          "outcome": "ok"
+        },
+        {
+          "name": "product_carrier::a_product_template_cannot_change_a_parts_binary_or_build_folder",
+          "outcome": "ok"
+        },
+        {
+          "name": "product_carrier::a_product_template_does_not_replace_a_pinned_lamps_unit",
+          "outcome": "ok"
+        },
+        {
+          "name": "product_carrier::a_product_unit_switches_with_its_link_and_leaves_local_dropins_alone",
+          "outcome": "ok"
+        },
+        {
+          "name": "product_carrier::a_same_binary_product_unit_records_good_only_after_climb_and_confirmation",
+          "outcome": "ok"
+        },
+        {
+          "name": "product_carrier::an_older_updater_climbs_before_the_product_switch_and_fallback",
+          "outcome": "ok"
+        },
+        {
+          "name": "product_carrier::an_unhealthy_product_build_restores_the_exact_unit_and_link",
+          "outcome": "ok"
+        },
+        {
+          "name": "product_carrier::automatic_settings_do_not_change_an_older_non_product_manifest",
+          "outcome": "ok"
+        },
+        {
+          "name": "product_carrier::explicit_off_and_an_unmanaged_updater_do_not_bootstrap_settings",
+          "outcome": "ok"
+        },
+        {
+          "name": "product_carrier::the_lamps_specific_unit_wins_over_the_product_unit",
+          "outcome": "ok"
+        },
+        {
+          "name": "product_skills_go_only_into_installs_folder_and_only_when_it_can_be_written",
+          "outcome": "ok"
+        },
+        {
+          "name": "product_skills_written_by_a_switch_cut_short_are_put_back_at_the_next_start",
+          "outcome": "ok"
+        },
+        {
+          "name": "prune_keeps_the_models_of_the_kept_builds",
+          "outcome": "ok"
+        },
+        {
+          "name": "prune_keeps_what_a_model_path_links_to_when_the_state_was_set_aside",
+          "outcome": "ok"
+        },
+        {
+          "name": "restart_order::a_cut_at_reload_saves_the_full_old_projection_before_recovery",
+          "outcome": "ok"
+        },
+        {
+          "name": "restart_order::a_cycle_in_an_older_recovery_journal_is_retained_without_arbitrary_restarts",
+          "outcome": "ok"
+        },
+        {
+          "name": "restart_order::a_cycle_in_either_candidate_or_rollback_plan_refuses_before_mutation",
+          "outcome": "ok"
+        },
+        {
+          "name": "restart_order::a_legacy_journal_uses_saved_declarations_and_unchanged_transitive_dependencies",
+          "outcome": "ok"
+        },
+        {
+          "name": "restart_order::after_and_before_order_the_forward_restarts_instead_of_unit_names",
+          "outcome": "ok"
+        },
+        {
+          "name": "restart_order::empty_saved_order_recovers_files_and_keeps_live_builds_when_inventory_is_unreadable",
+          "outcome": "ok"
+        },
+        {
+          "name": "restart_order::interrupted_recovery_orders_saved_units_despite_a_shuffled_partial_journal",
+          "outcome": "ok"
+        },
+        {
+          "name": "restart_order::malformed_present_rollback_orders_retain_the_prefix_and_do_not_fetch",
+          "outcome": "ok"
+        },
+        {
+          "name": "restart_order::ordering_does_not_start_inactive_or_restart_unchanged_dependencies",
+          "outcome": "ok"
+        },
+        {
+          "name": "restart_order::rollback_uses_the_saved_old_dependencies_not_the_new_graph_or_its_reverse",
+          "outcome": "ok"
+        },
+        {
+          "name": "restart_order::saved_rollback_order_keeps_transitive_edges_after_an_unchanged_unit_drifts",
+          "outcome": "ok"
+        },
+        {
+          "name": "restart_order::saved_rollback_order_survives_a_newly_unreadable_installed_unit",
+          "outcome": "ok"
+        },
+        {
+          "name": "restart_order::saved_rollback_order_survives_an_interrupted_put_back_and_keeps_inactive_units_off",
+          "outcome": "ok"
+        },
+        {
+          "name": "restart_order::the_product_voices_declared_managed_prerequisites_restart_before_it",
+          "outcome": "ok"
+        },
+        {
+          "name": "restart_quiet::continuous_speech_puts_prerequisites_back_without_restarting_voice",
+          "outcome": "ok"
+        },
+        {
+          "name": "restart_quiet::queued_speech_during_a_prerequisite_is_heard_before_restarting_voice",
+          "outcome": "ok"
+        },
+        {
+          "name": "self_cuts::cut_after_candidate_is_synced_keeps_old_runnable_and_reuses_candidate",
+          "outcome": "ok"
+        },
+        {
+          "name": "self_cuts::cut_after_confirmation_clears_pending_keeps_new_runnable_on_restart",
+          "outcome": "ok"
+        },
+        {
+          "name": "self_cuts::cut_after_current_moves_keeps_new_runnable_and_can_confirm_or_put_back",
+          "outcome": "ok"
+        },
+        {
+          "name": "self_cuts::cut_after_pending_is_saved_keeps_old_runnable_and_recovers_before_next_round",
+          "outcome": "ok"
+        },
+        {
+          "name": "self_cuts::interrupted_put_back_keeps_a_runnable_current_and_finishes_on_restart",
+          "outcome": "ok"
+        },
+        {
+          "name": "self_cuts::runnable_events::controls::a_never_released_first_output_gate_hits_the_startup_watchdog",
+          "outcome": "ok"
+        },
+        {
+          "name": "self_cuts::runnable_events::controls::a_partial_first_output_also_starts_the_finish_watchdog",
+          "outcome": "ok"
+        },
+        {
+          "name": "self_cuts::runnable_events::controls::a_read_error_restores_flags_and_leaves_the_direct_child_owned",
+          "outcome": "ok"
+        },
+        {
+          "name": "self_cuts::runnable_events::controls::an_exited_leader_does_not_make_a_held_output_descriptor_complete",
+          "outcome": "ok"
+        },
+        {
+          "name": "self_cuts::runnable_events::controls::first_output_can_follow_a_gate_longer_than_the_old_spawn_watchdog",
+          "outcome": "ok"
+        },
+        {
+          "name": "self_cuts::runnable_events::controls::full_output_without_exit_hits_the_absolute_finish_watchdog",
+          "outcome": "ok"
+        },
+        {
+          "name": "self_cuts::runnable_events::controls::later_bytes_do_not_renew_the_first_byte_finish_deadline",
+          "outcome": "ok"
+        },
+        {
+          "name": "self_cuts::runnable_events::controls::no_output_is_not_readiness",
+          "outcome": "ok"
+        },
+        {
+          "name": "self_cuts::runnable_events::controls::output_beyond_the_previous_capture_limit_fails_explicitly",
+          "outcome": "ok"
+        },
+        {
+          "name": "self_cuts::runnable_events::controls::wrong_payload_nonzero_status_and_non_utf8_cannot_satisfy_the_fixture",
+          "outcome": "ok"
+        },
+        {
+          "name": "self_cuts::without_self_opt_in_parts_update_but_no_handover_prefix_is_written",
+          "outcome": "ok"
+        },
+        {
+          "name": "self_recovery::an_absent_or_unrunnable_fallback_keeps_the_completed_parts_and_old_updater",
+          "outcome": "ok"
+        },
+        {
+          "name": "self_recovery::an_unchanged_or_refused_updater_needs_no_recovery_query",
+          "outcome": "ok"
+        },
+        {
+          "name": "self_recovery::missing_recovery_also_defers_an_updater_first_climb_without_touching_parts",
+          "outcome": "ok"
+        },
+        {
+          "name": "self_recovery::unavailable_recovery_keeps_the_parts_and_can_be_retried_when_armed",
+          "outcome": "ok"
+        },
+        {
+          "name": "setup_lifecycle::a_different_failed_part_still_rolls_back_without_restarting_completed_setup",
+          "outcome": "ok"
+        },
+        {
+          "name": "setup_lifecycle::an_alias_outside_the_lamp_prefix_cannot_bypass_the_product_check",
+          "outcome": "ok"
+        },
+        {
+          "name": "setup_lifecycle::chained_and_loaded_aliases_retain_normal_restart_even_without_alias_files",
+          "outcome": "ok"
+        },
+        {
+          "name": "setup_lifecycle::completed_product_setup_keeps_serving_without_restart_or_false_rollback",
+          "outcome": "ok"
+        },
+        {
+          "name": "setup_lifecycle::completion_after_the_activity_snapshot_is_rechecked_before_restart",
+          "outcome": "ok"
+        },
+        {
+          "name": "setup_lifecycle::completion_removed_during_the_manager_query_is_not_used",
+          "outcome": "ok"
+        },
+        {
+          "name": "setup_lifecycle::custom_base_units_and_candidate_changes_keep_normal_watch_rules",
+          "outcome": "ok"
+        },
+        {
+          "name": "setup_lifecycle::incomplete_product_setup_still_restarts_and_is_watched",
+          "outcome": "ok"
+        },
+        {
+          "name": "setup_lifecycle::recovery_keeps_the_true_active_journal_but_does_not_restart_completed_setup",
+          "outcome": "ok"
+        },
+        {
+          "name": "setup_lifecycle::recovery_rechecks_effective_aliases_after_restoring_the_old_unit",
+          "outcome": "ok"
+        },
+        {
+          "name": "setup_lifecycle::reset_removing_completion_before_recovery_restarts_the_old_setup",
+          "outcome": "ok"
+        },
+        {
+          "name": "setup_lifecycle::reset_removing_completion_before_restart_retains_the_normal_watch",
+          "outcome": "ok"
+        },
+        {
+          "name": "setup_lifecycle::the_exact_product_exit_note_and_merged_usr_layout_keep_the_exception",
+          "outcome": "ok"
+        },
+        {
+          "name": "setup_lifecycle::uncertain_override_files_do_not_hang_or_grant_the_exception",
+          "outcome": "ok"
+        },
+        {
+          "name": "setup_lifecycle::unknown_dropins_at_each_scope_keep_normal_watch_rules",
+          "outcome": "ok"
+        },
+        {
+          "name": "setup_lifecycle::unknown_manager_identity_and_custom_loaded_paths_keep_normal_watch",
+          "outcome": "ok"
+        },
+        {
+          "name": "the_apps_off_and_on_hold_through_a_round_and_a_restart",
+          "outcome": "ok"
+        },
+        {
+          "name": "the_fallback_reads_a_self_json_written_by_a_later_updater",
+          "outcome": "ok"
+        },
+        {
+          "name": "the_guard_still_refuses_a_persons_skill_the_new_lamp_skills_will_not_load",
+          "outcome": "ok"
+        },
+        {
+          "name": "the_journal_line_is_the_units_own_last_cleaned_and_cut",
+          "outcome": "ok"
+        },
+        {
+          "name": "the_old_build_not_well_either_says_the_first_unit_not_wells_line",
+          "outcome": "ok"
+        },
+        {
+          "name": "the_voice_is_not_switched_while_someone_talks_to_the_lamp",
+          "outcome": "ok"
+        },
+        {
+          "name": "with_apply_off_a_builds_settings_are_not_written_and_that_is_said",
+          "outcome": "ok"
+        },
+        {
+          "name": "with_apply_on_a_builds_settings_are_written_at_the_switch_and_the_part_reading_one_restarted",
+          "outcome": "ok"
+        },
+        {
+          "name": "with_image_off_the_images_files_are_not_written_and_that_is_said",
+          "outcome": "ok"
+        },
+        {
+          "name": "with_image_on_the_images_files_are_written_and_asound_restarts_the_voice_at_a_quiet_moment",
+          "outcome": "ok"
+        },
+        {
+          "name": "with_models_off_a_new_updater_confirms_and_the_build_waits_for_models",
+          "outcome": "ok"
+        },
+        {
+          "name": "with_the_switch_off_a_build_with_other_models_is_refused",
+          "outcome": "ok"
+        },
+        {
+          "name": "with_the_switch_off_a_lamps_own_model_is_kept_as_with_it_on",
+          "outcome": "ok"
+        },
+        {
+          "name": "with_the_switch_off_an_updater_too_old_for_a_build_takes_nothing_it_carries",
+          "outcome": "ok"
+        },
+        {
+          "name": "with_the_switch_off_lamp_update_never_switches_itself",
+          "outcome": "ok"
+        },
+        {
+          "name": "without_apply_nothing_is_written_and_what_would_change_is_said",
+          "outcome": "ok"
+        }
+      ],
+      "executable": {
+        "sha256": "e512543932ceff7d15bc9bb00cd6503cb5dbea419012bab08dda61524ae334db",
+        "bytes": 16984844,
+        "mode": "0o755"
+      }
+    },
+    {
+      "target": "self_cli_exec-54a909607d4dc62b",
+      "counts": {
+        "passed": 0,
+        "failed": 0,
+        "ignored": 1
+      },
+      "cases": [
+        {
+          "name": "actual_cli_exec_confirms_before_the_next_round",
+          "outcome": "ignored"
+        }
+      ],
+      "executable": {
+        "sha256": "5ef45ffe216d697c28c2ad1ca3d4f2a96660b8782cd88baebc2f123256c4d581",
+        "bytes": 473952,
+        "mode": "0o755"
+      }
+    },
+    {
+      "target": "self_process_cuts-c92b6688279bd59f",
+      "counts": {
+        "passed": 0,
+        "failed": 0,
+        "ignored": 1
+      },
+      "cases": [
+        {
+          "name": "persisted_self_switches_survive_sigkill",
+          "outcome": "ignored"
+        }
+      ],
+      "executable": {
+        "sha256": "bbec57611a6decf7fa05766ede1d1b7dc5ec9295a0e88e9cd4fd2d0a1e96aa61",
+        "bytes": 474016,
+        "mode": "0o755"
+      }
+    }
+  ],
+  "promotion_targets": [
+    {
+      "target": "lampos_promote-88d95a8362d8e5c8",
+      "counts": {
+        "passed": 2,
+        "failed": 0,
+        "ignored": 0
+      },
+      "cases": [
+        {
+          "name": "github::tests::stream_hash_is_bounded_and_matches_bytes",
+          "outcome": "ok"
+        },
+        {
+          "name": "github::tests::unrelated_release_notes_may_be_null_but_selected_notes_still_refuse",
+          "outcome": "ok"
+        }
+      ],
+      "executable": {
+        "sha256": "fac18b18a0474955b2446cff9a37f185034e2d78e8fffa131423f9e5bd942076",
+        "bytes": 1442820,
+        "mode": "0o755"
+      }
+    },
+    {
+      "target": "lampos_promote-8be9c061c6e3176a",
+      "counts": {
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0
+      },
+      "cases": [],
+      "executable": {
+        "sha256": "cd1342401c70e490d3d9752dd10540b8d5123c5d42d659ab3ea6d9976e18b116",
+        "bytes": 941840,
+        "mode": "0o755"
+      }
+    },
+    {
+      "target": "promotion-0f4e04193d74a5c0",
+      "counts": {
+        "passed": 22,
+        "failed": 0,
+        "ignored": 0
+      },
+      "cases": [
+        {
+          "name": "bootstrap_copies_only_envelope",
+          "outcome": "ok"
+        },
+        {
+          "name": "bootstrap_lost_rename_response_removes_canonical_and_keeps_stage",
+          "outcome": "ok"
+        },
+        {
+          "name": "changed_downloaded_payload_refuses_before_writes",
+          "outcome": "ok"
+        },
+        {
+          "name": "context_requires_exact_switch_and_trusted_public_key",
+          "outcome": "ok"
+        },
+        {
+          "name": "equal_identical_is_noop_and_older_is_refused",
+          "outcome": "ok"
+        },
+        {
+          "name": "equal_sequence_different_valid_envelope_refuses",
+          "outcome": "ok"
+        },
+        {
+          "name": "external_models_are_explicitly_unsupported",
+          "outcome": "ok"
+        },
+        {
+          "name": "failures_before_and_after_each_rename_restore_exact_old_bytes",
+          "outcome": "ok"
+        },
+        {
+          "name": "final_verification_failure_restores_old_bytes",
+          "outcome": "ok"
+        },
+        {
+          "name": "foreign_canonical_during_recovery_is_untouched",
+          "outcome": "ok"
+        },
+        {
+          "name": "missing_canonical_or_orphan_tag_never_bootstraps_over_existing_state",
+          "outcome": "ok"
+        },
+        {
+          "name": "promotion_preserves_signed_bytes_and_old_backup",
+          "outcome": "ok"
+        },
+        {
+          "name": "restoration_failure_reports_retained_asset_ids",
+          "outcome": "ok"
+        },
+        {
+          "name": "signature_valid_future_updater_requirement_refuses_before_writes",
+          "outcome": "ok"
+        },
+        {
+          "name": "signed_identity_must_match_source_and_fixed_url",
+          "outcome": "ok"
+        },
+        {
+          "name": "source_provenance_must_match_original_successful_attempt",
+          "outcome": "ok"
+        },
+        {
+          "name": "stable_changed_while_staging_is_not_overwritten",
+          "outcome": "ok"
+        },
+        {
+          "name": "staged_corruption_leaves_old_canonical_intact",
+          "outcome": "ok"
+        },
+        {
+          "name": "staging_and_backup_names_are_never_overwritten",
+          "outcome": "ok"
+        },
+        {
+          "name": "uncertain_or_duplicate_inventories_refuse",
+          "outcome": "ok"
+        },
+        {
+          "name": "upload_failure_before_or_after_remote_write_preserves_old_canonical",
+          "outcome": "ok"
+        },
+        {
+          "name": "wrong_trusted_key_refuses_before_writes",
+          "outcome": "ok"
+        }
+      ],
+      "executable": {
+        "sha256": "509d033d97320eb30d2899b1931a357b725ea197d318d0f5f5893bc0c23cd931",
+        "bytes": 2936524,
+        "mode": "0o755"
+      }
+    },
+    {
+      "target": "workflow-ccfba36233de2857",
+      "counts": {
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0
+      },
+      "cases": [
+        {
+          "name": "promotion_is_manual_separate_and_branch_protected",
+          "outcome": "ok"
+        }
+      ],
+      "executable": {
+        "sha256": "5d7933f70fb1a2c39beff6b7d52e24189595bb8906d2af00a6d307fd20073f72",
+        "bytes": 1003704,
+        "mode": "0o755"
+      }
+    }
+  ],
+  "update_doc_blocks": [
+    "\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n"
+  ],
+  "promotion_doc_blocks": [
+    "\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n"
+  ],
+  "successful_controls": {
+    "product_carrier": {
+      "passed": 12,
+      "failed": 0,
+      "ignored": 0,
+      "cases": [
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "product_carrier::a_comment_only_product_unit_is_an_intended_noop"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "product_carrier::a_corrupt_product_unit_is_refused_before_any_write"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "product_carrier::a_product_template_cannot_change_a_parts_binary_or_build_folder"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "product_carrier::a_product_template_does_not_replace_a_pinned_lamps_unit"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "product_carrier::a_product_unit_switches_with_its_link_and_leaves_local_dropins_alone"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "product_carrier::a_managed_product_manifest_can_bootstrap_the_existing_settings_helper"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "product_carrier::automatic_settings_do_not_change_an_older_non_product_manifest"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "product_carrier::the_lamps_specific_unit_wins_over_the_product_unit"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "product_carrier::an_unhealthy_product_build_restores_the_exact_unit_and_link"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "product_carrier::explicit_off_and_an_unmanaged_updater_do_not_bootstrap_settings"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "product_carrier::a_same_binary_product_unit_records_good_only_after_climb_and_confirmation"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "product_carrier::an_older_updater_climbs_before_the_product_switch_and_fallback"
+        }
+      ]
+    },
+    "head_touch_all_targets": {
+      "passed": 35,
+      "failed": 0,
+      "ignored": 0,
+      "cases": [
+        {
+          "target": "lamp_update-cebdb705cde8ec81",
+          "case": "head_touch::tests::null_masks_do_not_admit_other_character_devices"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "head_touch::body_head_on_an_isolated_bus_is_refused_before_writes"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "head_touch::body_head_repeated_exec_start_is_refused_before_writes"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "head_touch::body_head_mode_and_bus_dropins_are_refused_before_writes"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "head_touch::cut_after_pins_apply_restarts_unchanged_controls_after_restoring_old_pins"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "head_touch::custom_head_wiring_is_kept_or_the_reader_transition_is_refused"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "head_touch::failed_head_reader_candidate_restores_exact_old_pins_and_units"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "head_touch::head_pins_cannot_change_without_restarting_their_controls_reader"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "head_touch::body_head_calibration_cannot_override_the_sleep_reader"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "head_touch::isolated_voice_controls_bus_is_refused_before_any_write"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "head_touch::body_head_complete_bundle_preserves_literal_factory_calibration"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "head_touch::body_head_requires_an_enabled_carried_or_installed_sleep_reader"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "head_touch::paired_head_bus_cannot_diverge_from_voices_enabled_privacy_bus"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "head_touch::environment_only_head_bus_mismatch_is_refused_before_any_write"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "head_touch::paired_head_readers_without_controls_mute_are_refused_before_writes"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "head_touch::paired_head_readers_disable_legacy_even_when_signed_pins_enable_it"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "head_touch::malformed_environment_quotes_are_not_reader_evidence"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "head_touch::mixed_head_readers_are_refused_before_settings_or_units_are_written"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "head_touch::old_apply_helper_pins_mismatch_is_put_back_before_readers_restart"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "head_touch::pr2948_settings_off_preserves_the_old_head_reader"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "head_touch::head_bus_root_dropins_are_not_guessed_from_base_units"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "head_touch::expression_or_controls_bus_mismatch_is_refused_before_any_write"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "head_touch::invalid_mute_path_and_unknown_reader_are_refused"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "head_touch::settings_off_refuses_paired_head_readers_with_legacy_pins"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "head_touch::pr2948_settings_on_keeps_a_head_reader_available"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "head_touch::repeated_projected_pins_keep_their_actual_hash_without_restarting_controls"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "head_touch::matching_explicit_or_default_head_bus_roots_allow_the_paired_transition"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "head_touch::third_review_paired_head_readers_on_different_buses_are_refused"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "head_touch::textually_equal_expanded_head_bus_roots_are_not_a_verified_pair"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "head_touch::custom_active_pins_are_kept_and_checked_against_the_reader_pair"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "head_touch::third_review_binary_update_checks_active_build_local_head_pins"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "head_touch::absent_unused_product_pins_do_not_block_active_build_pins_updates"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "head_touch::head_reader_mode_overrides_are_not_guessed_from_base_units"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "head_touch::semantic_head_reader_paths_cannot_expand_invocation_variables"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "head_touch::stale_unused_product_pins_do_not_block_active_build_pins_updates"
+        }
+      ]
+    },
+    "setup_lifecycle_round": {
+      "passed": 16,
+      "failed": 0,
+      "ignored": 0,
+      "cases": [
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "setup_lifecycle::an_alias_outside_the_lamp_prefix_cannot_bypass_the_product_check"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "setup_lifecycle::a_different_failed_part_still_rolls_back_without_restarting_completed_setup"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "setup_lifecycle::completed_product_setup_keeps_serving_without_restart_or_false_rollback"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "setup_lifecycle::completion_after_the_activity_snapshot_is_rechecked_before_restart"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "setup_lifecycle::completion_removed_during_the_manager_query_is_not_used"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "setup_lifecycle::chained_and_loaded_aliases_retain_normal_restart_even_without_alias_files"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "setup_lifecycle::incomplete_product_setup_still_restarts_and_is_watched"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "setup_lifecycle::custom_base_units_and_candidate_changes_keep_normal_watch_rules"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "setup_lifecycle::reset_removing_completion_before_recovery_restarts_the_old_setup"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "setup_lifecycle::recovery_rechecks_effective_aliases_after_restoring_the_old_unit"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "setup_lifecycle::the_exact_product_exit_note_and_merged_usr_layout_keep_the_exception"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "setup_lifecycle::reset_removing_completion_before_restart_retains_the_normal_watch"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "setup_lifecycle::recovery_keeps_the_true_active_journal_but_does_not_restart_completed_setup"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "setup_lifecycle::unknown_manager_identity_and_custom_loaded_paths_keep_normal_watch"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "setup_lifecycle::uncertain_override_files_do_not_hang_or_grant_the_exception"
+        },
+        {
+          "target": "round-86f3bcf98e2c5ca2",
+          "case": "setup_lifecycle::unknown_dropins_at_each_scope_keep_normal_watch_rules"
+        }
+      ]
+    },
+    "setup_lifecycle_library": {
+      "passed": 2,
+      "failed": 0,
+      "ignored": 0,
+      "cases": [
+        {
+          "target": "lamp_update-cebdb705cde8ec81",
+          "case": "setup_lifecycle::tests::incomplete_duplicate_or_malformed_manager_records_are_unknown"
+        },
+        {
+          "target": "lamp_update-cebdb705cde8ec81",
+          "case": "setup_lifecycle::tests::manager_identity_requires_the_exact_loaded_product_with_known_dropins"
+        }
+      ]
+    }
+  },
+  "historical_failed_cases_now_serial_pass": [
+    {
+      "target": "round-86f3bcf98e2c5ca2",
+      "case": "self_cuts::without_self_opt_in_parts_update_but_no_handover_prefix_is_written",
+      "historical_parallel_outcome": "FAILED",
+      "current_serial_outcome": "ok"
+    },
+    {
+      "target": "round-86f3bcf98e2c5ca2",
+      "case": "self_cuts::cut_after_current_moves_keeps_new_runnable_and_can_confirm_or_put_back",
+      "historical_parallel_outcome": "FAILED",
+      "current_serial_outcome": "ok"
+    },
+    {
+      "target": "round-86f3bcf98e2c5ca2",
+      "case": "self_cuts::interrupted_put_back_keeps_a_runnable_current_and_finishes_on_restart",
+      "historical_parallel_outcome": "FAILED",
+      "current_serial_outcome": "ok"
+    }
+  ],
+  "gates": {
+    "fmt": true,
+    "strict_all_targets_packages": [
+      "lamp-body",
+      "lamp-cloud",
+      "lamp-expression",
+      "lamp-eyes",
+      "lamp-keeper",
+      "lamp-lean",
+      "lamp-memory",
+      "lamp-peek",
+      "lamp-setup",
+      "lamp-skills",
+      "lamp-turn-end",
+      "lamp-update",
+      "lamp-voice",
+      "lamp-voice-eval"
+    ],
+    "workspace_build_before_test_compile": true,
+    "supported_clean_packages": [
+      "lamp-update",
+      "lamp-setup",
+      "lamp-body"
+    ],
+    "only_invalidated_three_packages_fresh_false_required": true,
+    "whole_local_closure_freshness_claim": false
+  },
+  "guards": {
+    "tracked_files": 10676,
+    "source_bytes_modes_index_unchanged": true,
+    "clean_before_after": true,
+    "sealed_before": 215,
+    "sealed_final": 231,
+    "sealed_and_actual_executable_bindings_unchanged": true,
+    "owned_groups_closed": true,
+    "unresolved_owned_processes": 0,
+    "compiler_lease_released": true,
+    "detached_descendant_claim": false
+  },
+  "limits": {
+    "historical_parallel439_3_6_remains": "FAIL",
+    "product_cause_established": false,
+    "parallel_failure_waived": false,
+    "matched_control_performance_comparison": false,
+    "latest_Main": "2bf5122dc76999f970556bb7c78840ab6e107ce0",
+    "latest_base_carry_qualified": false,
+    "new_native_result_claim": false,
+    "merge_disposition": "current-Main gates, fresh native qualification and review remain pending"
+  },
+  "private_receipt_sha256": {
+    "clean-changed-packages.json": "f21a2d7225e32905f9f563a6e627ebf8359c25a2351fabcb8e3806d3ce9bc21c",
+    "fmt.json": "323a0ff45ada762b2ea6136214f7494a7ff3f2d79110a2be1539d9c2dcaf8000",
+    "metadata.json": "1d790924970c8fe8aef173dea942f7eea2eacf099c41a85956a2fa1f5af729af",
+    "plan.json": "1f68173e9c5c990e6f2fa140bd2781447afa724fa410315eadc2191df240d445",
+    "promotion-census.json": "89418aaff0e0327141492f1eef230f9e838af11f0de3cfa3c9646bfd182e8f20",
+    "promotion-compile.json": "1bc4fb9d0905712e6f24984f2890390a08dbe68fcafe57c0691c06593f82ee1f",
+    "promotion-compiler-artifacts.json": "2587fc9a67affa6190b88697c67d104929dd8f6b457b45d539ff5dc1ffbb74cd",
+    "promotion-executables.json": "f21f62e46dd3e00c12da172951bfd9dad7bd49e27ba703ca4a6f02f9f9054c6d",
+    "promotion-fmt.json": "334e1b6dd6c5b275ccf31fcaef5f80e260bcccee0fc2e0d6e8e6eabd896be32a",
+    "promotion-frozen.json": "c2b886c2d0a498cbc953bf91d033e85f7220d13e1f534b654a4e23aa9c630a8c",
+    "promotion-inventory.json": "6449fbd6a07b14e4bb80e9a56c40828b38c0220a2e772fa3cf952adf735bb9a3",
+    "promotion-list-0-all.json": "8f29ea8348cb24de20f9af6ac98610a82f87a27ee4316a9b824ee5dab54b4d4d",
+    "promotion-list-0-ignored.json": "6469553b41e3525fdbb0f5f6d779a8f70217d095d2a13efd870d91fdcfce87bc",
+    "promotion-list-1-all.json": "ef1e36b3431efc1ed231533149b89b6b78aa12902e7861edffb3cabd6ce9a6ca",
+    "promotion-list-1-ignored.json": "b2a182657fa36e87161a80417cd92fd099bdc5f0c9c89d8fcd735f37a6dec286",
+    "promotion-list-2-all.json": "d4e3c053c034e4077764389c66510998a966a2e507fe3c5198bb22a50fc1cc2f",
+    "promotion-list-2-ignored.json": "ca4f76b8fa59f0e09c68b88049eae2c9b4402fe962e9c901ea30f37634eb9e3e",
+    "promotion-list-3-all.json": "9c36da463917d92443e8783abc66de1a81426e0522e95edf9bd08214e895d542",
+    "promotion-list-3-ignored.json": "07eb735f7577b101688316a20220814c56d364bcbbad8c450b94ea0bd0c66487",
+    "promotion-metadata.json": "a4815c475583a5d267d83156277a8dd82519c57358e82866fc6fe02efd204fab",
+    "promotion-originals.json": "4df1f457cbc3b697f85df2666d5fb1d650765062b009bbceb799eaae92a33271",
+    "promotion-strict-artifacts.json": "52327c0091540ab1f935bdd9d8a1367f4cf206b747496681b376a09771f7edc8",
+    "promotion-strict.json": "9b4235992aac597348e4cad91660d778adff718117ab7e759df05de925c3cd2b",
+    "promotion-tests.json": "8819dead60f9ef5e79866a5bef8cf81e790ec075b2b540060482618c5c6468a6",
+    "protected-after.json": "94d07590b86056e4b79df69a7986015d31632e9b3ed896ff66f4b3850a191932",
+    "protected-before.json": "005edc08774f7ed1a75664723749baee9bb1b6e9b101b7d6ccffa872ab4cd2df",
+    "run.py": "aaede30bef2b6a6ad6fc8f4824b098663b1a058eac20403b8877d544cf61d872",
+    "source-after.json": "9f8cf979e99c01d5a057e5f83bb70bddb721f3ee7012139fcad658a74178eda4",
+    "source-before.json": "9f8cf979e99c01d5a057e5f83bb70bddb721f3ee7012139fcad658a74178eda4",
+    "source-carry.json": "7994bd4d74c27fa252951647e84f667ac7139c0f09e37fe54c2b4f91b6c1ae24",
+    "strict-all-artifacts.json": "47a6d0e8b654ac18e831b1f3d2b0985034c831b6d41a4a46a4eac468ee27d24c",
+    "strict.json": "ed5b3f37af591edf8a77389d98a6132de8a51382006183c6f45aa6ce2eae43f0",
+    "terminal.json": "b11c567bd8084c50a74fba3d4f6de5ad93d41708993b6202c0711b843bd4d1cd",
+    "update-census.json": "b4d06c0a6201a1fe927528fa78e55e75f2ce3ee410c3f2c8cd651504014edb27",
+    "update-compile.json": "2491336fffe3535548d2b4b7cca94a11a0cc9968c8aaf705cf4f910b7153e0df",
+    "update-compiler-artifacts.json": "3795daf165042956207688145e8219a19e1f5b2cc005f2f8d9430711e9d4c7e6",
+    "update-executables.json": "5a097cda319ecdc67d1f3bfa01b9bb04f362abcbdb4dde35ef9dc1e4e98d9d9c",
+    "update-frozen.json": "f56f3eee711f41951a43378af20f8688499719b76424f0394439b6c2444cbd6a",
+    "update-inventory.json": "5d8823cf8bb82d7aebc95eca5602c5a4b188a1f4dbfc7d426fa9d2bc389c2cb9",
+    "update-list-0-all.json": "20aa451324dd308e6a15a44af2138ec7be025a20c6a4fb60dd202769e404e05d",
+    "update-list-0-ignored.json": "85a267541409e7249348d25028a48485a11969e17dbedf45ea4ee6b7998adf04",
+    "update-list-1-all.json": "e150331511110e60989dec31eb54045cde1a100fd62bc9cb1e512a3216211b7a",
+    "update-list-1-ignored.json": "862195bfb238cee39c08c72fb114973a671d82d2f1561ebf7379446e2c2858a7",
+    "update-list-2-all.json": "436d8499696e8d90eabdbc30bb5d08ab30b31908bec2b08ff589116e615dba0e",
+    "update-list-2-ignored.json": "b92a59bd366fa6a013ad1530e4dd1ca70f90efea698fcbaf3075daf763fac328",
+    "update-list-3-all.json": "04cdcc03173f27121e30cf5aed8243279f56bf5642e995ea3dece8e06af009d2",
+    "update-list-3-ignored.json": "4353a29a72115b0aa4762de26ebefd30a8e7392d504d91c2418215e4e5566468",
+    "update-list-4-all.json": "8b2000a2ee718198cd0b8a76a4f3879fd889a8cf684a22092a90960e2a7b64d6",
+    "update-list-4-ignored.json": "4148cca2661375ee4e405881f2cd9c9301b3c356cefd896b234df2a71572c81b",
+    "update-list-5-all.json": "e54894a5169a4add7bd562ed2514a9c4ff6aa7514784445ad097c51a011f2436",
+    "update-list-5-ignored.json": "51c43b187f3b1327fde2b54fddcc725baa73becceb460a75bba42e056571a513",
+    "update-list-6-all.json": "179d5605e25e0e095028018d406a49dcb8904ee9c02c578c3ce70607212fcb19",
+    "update-list-6-ignored.json": "67df007f6c03f2db62cb783bd212d1b6d722c5fbcdf08a543845155620f6b8c0",
+    "update-list-7-all.json": "3bb00e79e157a939792df7060da16a2eb1740ab829394d7f48074b3d3e45a2c1",
+    "update-list-7-ignored.json": "4a614f11e8ec1af093fe74b891155bc8cd1bd53be5300d14b8efcfa65c491cac",
+    "update-list-8-all.json": "f3ecd6d81ef2a0f0d4288600071fcb20473cc435d7aa255a245e150871383c39",
+    "update-list-8-ignored.json": "9f8d781f63367bbd9cc60ad4c4efd49186f6c1614e35343d3d62eb6c67c9b1f8",
+    "update-originals.json": "d024383e73baba7f97254c81a94d32449ed0fcf368af29be9820bd9806cea6e8",
+    "update-tests.json": "8da3f73d7ad963a77806786031cb3a54818f935c1f1a10bc74f26c057b9c7488",
+    "workspace-artifacts.json": "df1b93eedb82f5877d7743419996f5f974d672a725abc7045f3470dba76b1755",
+    "workspace-helper-variant.json": "e903a1065d246de8a4854695ea57274613164c35bb2217cf8d8ae29ae1e79ff0",
+    "workspace.json": "57e75e3b0ae30dea948e22da38d92d36e0f1417114cd3aa2af12f02ada0113fe"
+  },
+  "Round_actual_executable": {
+    "sha256": "e512543932ceff7d15bc9bb00cd6503cb5dbea419012bab08dda61524ae334db",
+    "bytes": 16984844,
+    "mode": "0o755"
+  },
+  "Round_binary_identical_to_prior008_serial": false,
+  "prior008_Round_executable": {
+    "sha256": "a29ebb7d9f576433d1550cf0f908ab50f4f5c80143f80017bc84e98055ea682e",
+    "bytes": 16984804,
+    "mode": "0o755"
+  },
+  "raw_census_equal_to_prior008_including_executable_field": {
+    "update": true,
+    "promotion": true
+  },
+  "case_census_equality_does_not_establish_binary_identity": true,
+  "qualified_source_identity": {
+    "head": "b67b9827e521d98b875af7bf02005c051ed0dca4",
+    "declared_qualification_base": "bdc277e2667e11ab04daf60e25f8f9fcf8220dce",
+    "head_stack_immediate_parent": "d00cda9f565220713c6f60f9cfb4f5ea2494325a",
+    "before_after_source_receipts_equal": true,
+    "immutable_tree_blob_kind_and_index_match": true,
+    "symlink_host_permission_bits_verified_by_gate_receipts_not_git_tree": true
+  },
+  "source_carry_from_prior008": {
+    "six_authored_patches_equal": true,
+    "source_receipt_sha256": "7994bd4d74c27fa252951647e84f667ac7139c0f09e37fe54c2b4f91b6c1ae24"
+  },
+  "execution_provenance": {
+    "durable_terminal_status": "PASS",
+    "root_native_session_expired_before_resume": true,
+    "root_native_exit_status": null,
+    "root_native_exit_claim": false,
+    "owned_command_count": 38,
+    "all_owned_command_direct_wait_status_zero": true,
+    "all_owned_command_exit_code_zero": true,
+    "no_compiler_or_test_run_during_publication": true,
+    "no_actual_target_reads_during_publication": true,
+    "immutable_qualified_tree_matches_before_after_source_receipts": true,
+    "live_worktree_observed_head": "3be8fa45be42999980d29c1fac7c0971ee75b1a2",
+    "live_worktree_clean": true,
+    "live_worktree_observation_qualification_claim": false,
+    "source_snapshot_receipt_sha256": "9f8cf979e99c01d5a057e5f83bb70bddb721f3ee7012139fcad658a74178eda4"
+  },
+  "owned_command_receipts": {
+    "clean-changed-packages.json": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "clean",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-update",
+        "-p",
+        "lamp-setup",
+        "-p",
+        "lamp-body"
+      ],
+      "started_at": "2026-10-26T18:38:48.317950+00:00",
+      "finished_at": "2026-10-26T18:38:51.032849+00:00",
+      "elapsed_s": 2.700977,
+      "direct_wait_status": 0,
+      "exit_code": 0,
+      "owned_group_closed": true,
+      "timed_out": false,
+      "disk_reserve_breached": false,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "7e919cb8b2f8a6fcacf0b2ff6da806a097ec5d30a3b7e211dbbf72ce2e1cc1c9"
+    },
+    "fmt.json": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "started_at": "2026-10-26T18:38:08.301151+00:00",
+      "finished_at": "2026-10-26T18:38:20.761840+00:00",
+      "elapsed_s": 12.45951,
+      "direct_wait_status": 0,
+      "exit_code": 0,
+      "owned_group_closed": true,
+      "timed_out": false,
+      "disk_reserve_breached": false,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "metadata.json": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "metadata",
+        "--offline",
+        "--locked",
+        "--format-version",
+        "1"
+      ],
+      "started_at": "2026-10-26T18:38:34.091918+00:00",
+      "finished_at": "2026-10-26T18:38:34.666270+00:00",
+      "elapsed_s": 0.574233,
+      "direct_wait_status": 0,
+      "exit_code": 0,
+      "owned_group_closed": true,
+      "timed_out": false,
+      "disk_reserve_breached": false,
+      "stdout_sha256": "891cecea57976cf8572901ec6f15ce7becbde0302a103452ad189590a77fee8b",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "promotion-compile.json": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--offline",
+        "--locked",
+        "--jobs",
+        "1",
+        "-p",
+        "lampos-promote",
+        "--no-run",
+        "--message-format=json"
+      ],
+      "started_at": "2026-10-26T19:25:37.158411+00:00",
+      "finished_at": "2026-10-26T19:25:47.033412+00:00",
+      "elapsed_s": 9.873705,
+      "direct_wait_status": 0,
+      "exit_code": 0,
+      "owned_group_closed": true,
+      "timed_out": false,
+      "disk_reserve_breached": false,
+      "stdout_sha256": "555ff49a76f7e60316642f0de9da29b69191f74072a7d4b15695ac75dcb82df9",
+      "stderr_sha256": "d4e582aaf33b5c7f96c7b8f40e744f582a151baa28195c071937a5f039b0dee6"
+    },
+    "promotion-fmt.json": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "started_at": "2026-10-26T19:24:35.153483+00:00",
+      "finished_at": "2026-10-26T19:24:48.209417+00:00",
+      "elapsed_s": 13.055835,
+      "direct_wait_status": 0,
+      "exit_code": 0,
+      "owned_group_closed": true,
+      "timed_out": false,
+      "disk_reserve_breached": false,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "promotion-list-0-all.json": {
+      "command": [
+        "<target>/debug/deps/lampos_promote-8be9c061c6e3176a",
+        "--list",
+        "--format",
+        "terse"
+      ],
+      "started_at": "2026-10-26T19:26:01.610523+00:00",
+      "finished_at": "2026-10-26T19:26:02.307307+00:00",
+      "elapsed_s": 0.696294,
+      "direct_wait_status": 0,
+      "exit_code": 0,
+      "owned_group_closed": true,
+      "timed_out": false,
+      "disk_reserve_breached": false,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "promotion-list-0-ignored.json": {
+      "command": [
+        "<target>/debug/deps/lampos_promote-8be9c061c6e3176a",
+        "--ignored",
+        "--list",
+        "--format",
+        "terse"
+      ],
+      "started_at": "2026-10-26T19:26:16.410055+00:00",
+      "finished_at": "2026-10-26T19:26:16.549611+00:00",
+      "elapsed_s": 0.139405,
+      "direct_wait_status": 0,
+      "exit_code": 0,
+      "owned_group_closed": true,
+      "timed_out": false,
+      "disk_reserve_breached": false,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "promotion-list-1-all.json": {
+      "command": [
+        "<target>/debug/deps/workflow-ccfba36233de2857",
+        "--list",
+        "--format",
+        "terse"
+      ],
+      "started_at": "2026-10-26T19:26:30.667039+00:00",
+      "finished_at": "2026-10-26T19:26:31.329310+00:00",
+      "elapsed_s": 0.661872,
+      "direct_wait_status": 0,
+      "exit_code": 0,
+      "owned_group_closed": true,
+      "timed_out": false,
+      "disk_reserve_breached": false,
+      "stdout_sha256": "22069bb3aef6f5c29546532dd27626f571ced0f3bcc0ade2dd8ca1b713dd2066",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "promotion-list-1-ignored.json": {
+      "command": [
+        "<target>/debug/deps/workflow-ccfba36233de2857",
+        "--ignored",
+        "--list",
+        "--format",
+        "terse"
+      ],
+      "started_at": "2026-10-26T19:26:45.636116+00:00",
+      "finished_at": "2026-10-26T19:26:45.772502+00:00",
+      "elapsed_s": 0.135526,
+      "direct_wait_status": 0,
+      "exit_code": 0,
+      "owned_group_closed": true,
+      "timed_out": false,
+      "disk_reserve_breached": false,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "promotion-list-2-all.json": {
+      "command": [
+        "<target>/debug/deps/promotion-0f4e04193d74a5c0",
+        "--list",
+        "--format",
+        "terse"
+      ],
+      "started_at": "2026-10-26T19:27:00.382718+00:00",
+      "finished_at": "2026-10-26T19:27:01.047997+00:00",
+      "elapsed_s": 0.664843,
+      "direct_wait_status": 0,
+      "exit_code": 0,
+      "owned_group_closed": true,
+      "timed_out": false,
+      "disk_reserve_breached": false,
+      "stdout_sha256": "b6edab726a1fd58b5cfaedadf851783aed005dc060469638f903e29433bd026f",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "promotion-list-2-ignored.json": {
+      "command": [
+        "<target>/debug/deps/promotion-0f4e04193d74a5c0",
+        "--ignored",
+        "--list",
+        "--format",
+        "terse"
+      ],
+      "started_at": "2026-10-26T19:27:15.102852+00:00",
+      "finished_at": "2026-10-26T19:27:15.211931+00:00",
+      "elapsed_s": 0.108255,
+      "direct_wait_status": 0,
+      "exit_code": 0,
+      "owned_group_closed": true,
+      "timed_out": false,
+      "disk_reserve_breached": false,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "promotion-list-3-all.json": {
+      "command": [
+        "<target>/debug/deps/lampos_promote-88d95a8362d8e5c8",
+        "--list",
+        "--format",
+        "terse"
+      ],
+      "started_at": "2026-10-26T19:27:29.384908+00:00",
+      "finished_at": "2026-10-26T19:27:30.006566+00:00",
+      "elapsed_s": 0.621491,
+      "direct_wait_status": 0,
+      "exit_code": 0,
+      "owned_group_closed": true,
+      "timed_out": false,
+      "disk_reserve_breached": false,
+      "stdout_sha256": "c2896ae2cc1816c0186819c1760411ecfdc05b820d5e2e34dfda107d1529ba7a",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "promotion-list-3-ignored.json": {
+      "command": [
+        "<target>/debug/deps/lampos_promote-88d95a8362d8e5c8",
+        "--ignored",
+        "--list",
+        "--format",
+        "terse"
+      ],
+      "started_at": "2026-10-26T19:27:44.134814+00:00",
+      "finished_at": "2026-10-26T19:27:44.232983+00:00",
+      "elapsed_s": 0.098026,
+      "direct_wait_status": 0,
+      "exit_code": 0,
+      "owned_group_closed": true,
+      "timed_out": false,
+      "disk_reserve_breached": false,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "promotion-metadata.json": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "metadata",
+        "--offline",
+        "--locked",
+        "--format-version",
+        "1"
+      ],
+      "started_at": "2026-10-26T19:25:04.130267+00:00",
+      "finished_at": "2026-10-26T19:25:04.409137+00:00",
+      "elapsed_s": 0.27871,
+      "direct_wait_status": 0,
+      "exit_code": 0,
+      "owned_group_closed": true,
+      "timed_out": false,
+      "disk_reserve_breached": false,
+      "stdout_sha256": "c0a07e8651cfb9f74ec7ea71ba0befadff55f0d19104a398a4ba8f690597df37",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "promotion-strict.json": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "clippy",
+        "--offline",
+        "--locked",
+        "--all-targets",
+        "--jobs",
+        "1",
+        "--message-format=json",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "started_at": "2026-10-26T19:25:18.625479+00:00",
+      "finished_at": "2026-10-26T19:25:22.681105+00:00",
+      "elapsed_s": 4.055339,
+      "direct_wait_status": 0,
+      "exit_code": 0,
+      "owned_group_closed": true,
+      "timed_out": false,
+      "disk_reserve_breached": false,
+      "stdout_sha256": "fba618c988f15d76d3e1b487705458e7de3bf0f0784845c702ececa8c72c52fe",
+      "stderr_sha256": "5a3698b97ac7314e194c43242477958e10cd9594e4710d0d141098e0b5cce62f"
+    },
+    "promotion-tests.json": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--offline",
+        "--locked",
+        "--jobs",
+        "1",
+        "-p",
+        "lampos-promote",
+        "--no-fail-fast",
+        "--",
+        "--test-threads=1"
+      ],
+      "started_at": "2026-10-26T19:27:58.285576+00:00",
+      "finished_at": "2026-10-26T19:27:58.747464+00:00",
+      "elapsed_s": 0.461751,
+      "direct_wait_status": 0,
+      "exit_code": 0,
+      "owned_group_closed": true,
+      "timed_out": false,
+      "disk_reserve_breached": false,
+      "stdout_sha256": "57d8c9110aeca7ab1bcb708f425d1be415b22c0e2e068618305c89f491a9e6b8",
+      "stderr_sha256": "d65175a9096ec3fa52d39061166a7dd0219f5b74ca431faf43fd6a4381becb20"
+    },
+    "strict.json": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "clippy",
+        "--offline",
+        "--locked",
+        "--all-targets",
+        "--jobs",
+        "1",
+        "--message-format=json",
+        "-p",
+        "lamp-body",
+        "-p",
+        "lamp-cloud",
+        "-p",
+        "lamp-expression",
+        "-p",
+        "lamp-eyes",
+        "-p",
+        "lamp-keeper",
+        "-p",
+        "lamp-lean",
+        "-p",
+        "lamp-memory",
+        "-p",
+        "lamp-peek",
+        "-p",
+        "lamp-setup",
+        "-p",
+        "lamp-skills",
+        "-p",
+        "lamp-turn-end",
+        "-p",
+        "lamp-update",
+        "-p",
+        "lamp-voice",
+        "-p",
+        "lamp-voice-eval",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "started_at": "2026-10-26T18:39:04.649625+00:00",
+      "finished_at": "2026-10-26T18:42:29.343851+00:00",
+      "elapsed_s": 204.682149,
+      "direct_wait_status": 0,
+      "exit_code": 0,
+      "owned_group_closed": true,
+      "timed_out": false,
+      "disk_reserve_breached": false,
+      "stdout_sha256": "6735fbeb28987457aa4980133242b4c45d6c474485f18c2e01d09813f91cc961",
+      "stderr_sha256": "1547c0107eb83ce65c6482d27c24f0ac0720a35c8c82685c529bb703cac8352f"
+    },
+    "update-compile.json": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--offline",
+        "--locked",
+        "--jobs",
+        "1",
+        "-p",
+        "lamp-update",
+        "--no-run",
+        "--message-format=json"
+      ],
+      "started_at": "2026-10-26T18:45:28.111771+00:00",
+      "finished_at": "2026-10-26T18:47:24.476205+00:00",
+      "elapsed_s": 116.282702,
+      "direct_wait_status": 0,
+      "exit_code": 0,
+      "owned_group_closed": true,
+      "timed_out": false,
+      "disk_reserve_breached": false,
+      "stdout_sha256": "b439867e86d7986a2f0f5b51a872d5b23de4aa9277b4716c7d719127fc2bd01e",
+      "stderr_sha256": "ce564642ed9bb002671d73e654ff9475a9c0678fb03b1a7d2b3ed2c6742f6e0a"
+    },
+    "update-list-0-all.json": {
+      "command": [
+        "<target>/debug/deps/lamp_update-cebdb705cde8ec81",
+        "--list",
+        "--format",
+        "terse"
+      ],
+      "started_at": "2026-10-26T18:47:40.435643+00:00",
+      "finished_at": "2026-10-26T18:47:41.643565+00:00",
+      "elapsed_s": 1.20157,
+      "direct_wait_status": 0,
+      "exit_code": 0,
+      "owned_group_closed": true,
+      "timed_out": false,
+      "disk_reserve_breached": false,
+      "stdout_sha256": "9513cec21ee34c85f3989705bac505826ffc6531e94d8a4432ee03787528ffbc",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "update-list-0-ignored.json": {
+      "command": [
+        "<target>/debug/deps/lamp_update-cebdb705cde8ec81",
+        "--ignored",
+        "--list",
+        "--format",
+        "terse"
+      ],
+      "started_at": "2026-10-26T18:47:55.720780+00:00",
+      "finished_at": "2026-10-26T18:47:55.929734+00:00",
+      "elapsed_s": 0.194286,
+      "direct_wait_status": 0,
+      "exit_code": 0,
+      "owned_group_closed": true,
+      "timed_out": false,
+      "disk_reserve_breached": false,
+      "stdout_sha256": "bc91a05483d02d07eac64b1dfbfc89be9ee76b939b7cbdf10473700665cba987",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "update-list-1-all.json": {
+      "command": [
+        "<target>/debug/deps/it-49911377a8fbd75d",
+        "--list",
+        "--format",
+        "terse"
+      ],
+      "started_at": "2026-10-26T18:48:10.031946+00:00",
+      "finished_at": "2026-10-26T18:48:10.810096+00:00",
+      "elapsed_s": 0.765894,
+      "direct_wait_status": 0,
+      "exit_code": 0,
+      "owned_group_closed": true,
+      "timed_out": false,
+      "disk_reserve_breached": false,
+      "stdout_sha256": "baddc58d8487566c4ab3bb050066f6f2725ff6b2b1be4e9de23aba32cef9ada6",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "update-list-1-ignored.json": {
+      "command": [
+        "<target>/debug/deps/it-49911377a8fbd75d",
+        "--ignored",
+        "--list",
+        "--format",
+        "terse"
+      ],
+      "started_at": "2026-10-26T18:48:25.298322+00:00",
+      "finished_at": "2026-10-26T18:48:25.486041+00:00",
+      "elapsed_s": 0.174179,
+      "direct_wait_status": 0,
+      "exit_code": 0,
+      "owned_group_closed": true,
+      "timed_out": false,
+      "disk_reserve_breached": false,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "update-list-2-all.json": {
+      "command": [
+        "<target>/debug/deps/self_cli_exec-54a909607d4dc62b",
+        "--list",
+        "--format",
+        "terse"
+      ],
+      "started_at": "2026-10-26T18:48:45.541783+00:00",
+      "finished_at": "2026-10-26T18:48:49.297906+00:00",
+      "elapsed_s": 3.753795,
+      "direct_wait_status": 0,
+      "exit_code": 0,
+      "owned_group_closed": true,
+      "timed_out": false,
+      "disk_reserve_breached": false,
+      "stdout_sha256": "635e634394d967384e42754cf17d0a7b33ba13614d6169cb8ba9d8ee2a6da7cd",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "update-list-2-ignored.json": {
+      "command": [
+        "<target>/debug/deps/self_cli_exec-54a909607d4dc62b",
+        "--ignored",
+        "--list",
+        "--format",
+        "terse"
+      ],
+      "started_at": "2026-10-26T18:49:11.796800+00:00",
+      "finished_at": "2026-10-26T18:49:11.895745+00:00",
+      "elapsed_s": 0.098792,
+      "direct_wait_status": 0,
+      "exit_code": 0,
+      "owned_group_closed": true,
+      "timed_out": false,
+      "disk_reserve_breached": false,
+      "stdout_sha256": "635e634394d967384e42754cf17d0a7b33ba13614d6169cb8ba9d8ee2a6da7cd",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "update-list-3-all.json": {
+      "command": [
+        "<target>/debug/deps/self_process_cuts-c92b6688279bd59f",
+        "--list",
+        "--format",
+        "terse"
+      ],
+      "started_at": "2026-10-26T18:49:28.270473+00:00",
+      "finished_at": "2026-10-26T18:49:29.008901+00:00",
+      "elapsed_s": 0.736951,
+      "direct_wait_status": 0,
+      "exit_code": 0,
+      "owned_group_closed": true,
+      "timed_out": false,
+      "disk_reserve_breached": false,
+      "stdout_sha256": "902aefa939fe0a67e5b85cc08b264e25ed9ae462a25569e46159c9a20f948c17",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "update-list-3-ignored.json": {
+      "command": [
+        "<target>/debug/deps/self_process_cuts-c92b6688279bd59f",
+        "--ignored",
+        "--list",
+        "--format",
+        "terse"
+      ],
+      "started_at": "2026-10-26T18:49:45.732401+00:00",
+      "finished_at": "2026-10-26T18:49:45.847500+00:00",
+      "elapsed_s": 0.11482,
+      "direct_wait_status": 0,
+      "exit_code": 0,
+      "owned_group_closed": true,
+      "timed_out": false,
+      "disk_reserve_breached": false,
+      "stdout_sha256": "902aefa939fe0a67e5b85cc08b264e25ed9ae462a25569e46159c9a20f948c17",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "update-list-4-all.json": {
+      "command": [
+        "<target>/debug/deps/lamp_update-04671789528a12d3",
+        "--list",
+        "--format",
+        "terse"
+      ],
+      "started_at": "2026-10-26T18:50:00.048663+00:00",
+      "finished_at": "2026-10-26T18:50:00.717321+00:00",
+      "elapsed_s": 0.66851,
+      "direct_wait_status": 0,
+      "exit_code": 0,
+      "owned_group_closed": true,
+      "timed_out": false,
+      "disk_reserve_breached": false,
+      "stdout_sha256": "892eabeab1a827ca96850527d029a6830d419c7a5d3c88ba3c993d9a1c5d9135",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "update-list-4-ignored.json": {
+      "command": [
+        "<target>/debug/deps/lamp_update-04671789528a12d3",
+        "--ignored",
+        "--list",
+        "--format",
+        "terse"
+      ],
+      "started_at": "2026-10-26T18:50:14.860513+00:00",
+      "finished_at": "2026-10-26T18:50:15.016633+00:00",
+      "elapsed_s": 0.155944,
+      "direct_wait_status": 0,
+      "exit_code": 0,
+      "owned_group_closed": true,
+      "timed_out": false,
+      "disk_reserve_breached": false,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "update-list-5-all.json": {
+      "command": [
+        "<target>/debug/deps/functions-5603f33a4dae064e",
+        "--list",
+        "--format",
+        "terse"
+      ],
+      "started_at": "2026-10-26T18:50:29.529511+00:00",
+      "finished_at": "2026-10-26T18:50:30.491067+00:00",
+      "elapsed_s": 0.96141,
+      "direct_wait_status": 0,
+      "exit_code": 0,
+      "owned_group_closed": true,
+      "timed_out": false,
+      "disk_reserve_breached": false,
+      "stdout_sha256": "e646864d91e3a0e969823165f0300cb29d827a9f3f2e4630badfc24b9df3f594",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "update-list-5-ignored.json": {
+      "command": [
+        "<target>/debug/deps/functions-5603f33a4dae064e",
+        "--ignored",
+        "--list",
+        "--format",
+        "terse"
+      ],
+      "started_at": "2026-10-26T18:50:44.735932+00:00",
+      "finished_at": "2026-10-26T18:50:44.877039+00:00",
+      "elapsed_s": 0.140606,
+      "direct_wait_status": 0,
+      "exit_code": 0,
+      "owned_group_closed": true,
+      "timed_out": false,
+      "disk_reserve_breached": false,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "update-list-6-all.json": {
+      "command": [
+        "<target>/debug/deps/round-86f3bcf98e2c5ca2",
+        "--list",
+        "--format",
+        "terse"
+      ],
+      "started_at": "2026-10-26T18:50:59.630261+00:00",
+      "finished_at": "2026-10-26T18:51:00.571199+00:00",
+      "elapsed_s": 0.940096,
+      "direct_wait_status": 0,
+      "exit_code": 0,
+      "owned_group_closed": true,
+      "timed_out": false,
+      "disk_reserve_breached": false,
+      "stdout_sha256": "a2a821822e5d03ebefb4ac793c9ba28ccfc212745609c4f792471a0291f56bbc",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "update-list-6-ignored.json": {
+      "command": [
+        "<target>/debug/deps/round-86f3bcf98e2c5ca2",
+        "--ignored",
+        "--list",
+        "--format",
+        "terse"
+      ],
+      "started_at": "2026-10-26T18:51:16.480608+00:00",
+      "finished_at": "2026-10-26T18:51:16.627244+00:00",
+      "elapsed_s": 0.146154,
+      "direct_wait_status": 0,
+      "exit_code": 0,
+      "owned_group_closed": true,
+      "timed_out": false,
+      "disk_reserve_breached": false,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "update-list-7-all.json": {
+      "command": [
+        "<target>/debug/deps/install-56b9137cd677b603",
+        "--list",
+        "--format",
+        "terse"
+      ],
+      "started_at": "2026-10-26T18:51:31.256812+00:00",
+      "finished_at": "2026-10-26T18:51:32.172747+00:00",
+      "elapsed_s": 0.903133,
+      "direct_wait_status": 0,
+      "exit_code": 0,
+      "owned_group_closed": true,
+      "timed_out": false,
+      "disk_reserve_breached": false,
+      "stdout_sha256": "1ec086a8dd56ac7708c113f2f186ea95b7e6b2cfbb50c0f4f2fbc1ce26b7544a",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "update-list-7-ignored.json": {
+      "command": [
+        "<target>/debug/deps/install-56b9137cd677b603",
+        "--ignored",
+        "--list",
+        "--format",
+        "terse"
+      ],
+      "started_at": "2026-10-26T18:51:46.230518+00:00",
+      "finished_at": "2026-10-26T18:51:46.358220+00:00",
+      "elapsed_s": 0.127545,
+      "direct_wait_status": 0,
+      "exit_code": 0,
+      "owned_group_closed": true,
+      "timed_out": false,
+      "disk_reserve_breached": false,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "update-list-8-all.json": {
+      "command": [
+        "<target>/debug/deps/release_pair-2ff63d2c9df235ef",
+        "--list",
+        "--format",
+        "terse"
+      ],
+      "started_at": "2026-10-26T18:52:00.535119+00:00",
+      "finished_at": "2026-10-26T18:52:01.178831+00:00",
+      "elapsed_s": 0.643563,
+      "direct_wait_status": 0,
+      "exit_code": 0,
+      "owned_group_closed": true,
+      "timed_out": false,
+      "disk_reserve_breached": false,
+      "stdout_sha256": "dc225e21d620592b1c67f560a9aaca305bd16d460961d4ee34ee9e37cbbba993",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "update-list-8-ignored.json": {
+      "command": [
+        "<target>/debug/deps/release_pair-2ff63d2c9df235ef",
+        "--ignored",
+        "--list",
+        "--format",
+        "terse"
+      ],
+      "started_at": "2026-10-26T18:52:15.194094+00:00",
+      "finished_at": "2026-10-26T18:52:15.347098+00:00",
+      "elapsed_s": 0.1522,
+      "direct_wait_status": 0,
+      "exit_code": 0,
+      "owned_group_closed": true,
+      "timed_out": false,
+      "disk_reserve_breached": false,
+      "stdout_sha256": "dc225e21d620592b1c67f560a9aaca305bd16d460961d4ee34ee9e37cbbba993",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "update-tests.json": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--offline",
+        "--locked",
+        "--jobs",
+        "1",
+        "-p",
+        "lamp-update",
+        "--no-fail-fast",
+        "--",
+        "--test-threads=1"
+      ],
+      "started_at": "2026-10-26T18:52:29.359504+00:00",
+      "finished_at": "2026-10-26T19:24:11.413000+00:00",
+      "elapsed_s": 1901.98065,
+      "direct_wait_status": 0,
+      "exit_code": 0,
+      "owned_group_closed": true,
+      "timed_out": false,
+      "disk_reserve_breached": false,
+      "stdout_sha256": "8e90618701fc5e2f9f1e6a218a2094f0fa7c6d7e77de45c02cb17e551f733e61",
+      "stderr_sha256": "14a621b21491d3599a0ff9889da4b2745046fc2c149cb81e5f2c24bea7517828"
+    },
+    "workspace.json": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "build",
+        "--offline",
+        "--locked",
+        "--workspace",
+        "--jobs",
+        "1",
+        "--message-format=json"
+      ],
+      "started_at": "2026-10-26T18:42:43.130230+00:00",
+      "finished_at": "2026-10-26T18:45:14.176709+00:00",
+      "elapsed_s": 151.034443,
+      "direct_wait_status": 0,
+      "exit_code": 0,
+      "owned_group_closed": true,
+      "timed_out": false,
+      "disk_reserve_breached": false,
+      "stdout_sha256": "d519a1cd52758603fe1b8b781b2559307206e240619fd4e693d6cbe8f6d1ebe4",
+      "stderr_sha256": "4be0e6978115c0b75feb2e90a6775d8bff373c2d85e1f9de9f14ed793fba0b21"
+    }
+  },
+  "actual_executable_bindings": {
+    "update": [
+      {
+        "target": "lamp_update-cebdb705cde8ec81",
+        "cargo_target_name": "lamp_update",
+        "kind": [
+          "lib"
+        ],
+        "test_profile": true,
+        "sha256": "ce51484500e4d053d1f23e5b840fed70bc869c12115988ac6cfbc94cefba203b",
+        "bytes": 11411540,
+        "mode": "0o755",
+        "binding": "Current compiler artifact to actual-original receipt to verified independent sealed copy; no prior hash copied."
+      },
+      {
+        "target": "it-49911377a8fbd75d",
+        "cargo_target_name": "it",
+        "kind": [
+          "test"
+        ],
+        "test_profile": true,
+        "sha256": "0e819852bb302b9d9f52156d135f18f4f573bea16e678f48fd188401d85b271b",
+        "bytes": 1648848,
+        "mode": "0o755",
+        "binding": "Current compiler artifact to actual-original receipt to verified independent sealed copy; no prior hash copied."
+      },
+      {
+        "target": "self_cli_exec-54a909607d4dc62b",
+        "cargo_target_name": "self-cli-exec",
+        "kind": [
+          "test"
+        ],
+        "test_profile": true,
+        "sha256": "5ef45ffe216d697c28c2ad1ca3d4f2a96660b8782cd88baebc2f123256c4d581",
+        "bytes": 473952,
+        "mode": "0o755",
+        "binding": "Current compiler artifact to actual-original receipt to verified independent sealed copy; no prior hash copied."
+      },
+      {
+        "target": "self_process_cuts-c92b6688279bd59f",
+        "cargo_target_name": "self-process-cuts",
+        "kind": [
+          "test"
+        ],
+        "test_profile": true,
+        "sha256": "bbec57611a6decf7fa05766ede1d1b7dc5ec9295a0e88e9cd4fd2d0a1e96aa61",
+        "bytes": 474016,
+        "mode": "0o755",
+        "binding": "Current compiler artifact to actual-original receipt to verified independent sealed copy; no prior hash copied."
+      },
+      {
+        "target": "lamp_update-04671789528a12d3",
+        "cargo_target_name": "lamp-update",
+        "kind": [
+          "bin"
+        ],
+        "test_profile": true,
+        "sha256": "33a513463794698385400ed74d91c898c99bda92af594e3fb122353c02a28080",
+        "bytes": 1184760,
+        "mode": "0o755",
+        "binding": "Current compiler artifact to actual-original receipt to verified independent sealed copy; no prior hash copied."
+      },
+      {
+        "target": "functions-5603f33a4dae064e",
+        "cargo_target_name": "functions",
+        "kind": [
+          "test"
+        ],
+        "test_profile": true,
+        "sha256": "cbd85758ef8d7b4ae5786d815f5cedf6ecdf83ad5a2cd5dc9ffe181f0fc7c7e2",
+        "bytes": 18488808,
+        "mode": "0o755",
+        "binding": "Current compiler artifact to actual-original receipt to verified independent sealed copy; no prior hash copied."
+      },
+      {
+        "target": "round-86f3bcf98e2c5ca2",
+        "cargo_target_name": "round",
+        "kind": [
+          "test"
+        ],
+        "test_profile": true,
+        "sha256": "e512543932ceff7d15bc9bb00cd6503cb5dbea419012bab08dda61524ae334db",
+        "bytes": 16984844,
+        "mode": "0o755",
+        "binding": "Current compiler artifact to actual-original receipt to verified independent sealed copy; no prior hash copied."
+      },
+      {
+        "target": "install-56b9137cd677b603",
+        "cargo_target_name": "install",
+        "kind": [
+          "test"
+        ],
+        "test_profile": true,
+        "sha256": "9cb2101055555ba5f14d7e90d56af9d58ed656fea82a4ee4f2c905a3efe94660",
+        "bytes": 13917996,
+        "mode": "0o755",
+        "binding": "Current compiler artifact to actual-original receipt to verified independent sealed copy; no prior hash copied."
+      },
+      {
+        "target": "release_pair-2ff63d2c9df235ef",
+        "cargo_target_name": "release_pair",
+        "kind": [
+          "test"
+        ],
+        "test_profile": true,
+        "sha256": "af5db66da111e5b3750028d00ad0c076939dcf2ab5c58e137f9d26cb15bd49fc",
+        "bytes": 2820076,
+        "mode": "0o755",
+        "binding": "Current compiler artifact to actual-original receipt to verified independent sealed copy; no prior hash copied."
+      },
+      {
+        "target": "lamp-update",
+        "cargo_target_name": "lamp-update",
+        "kind": [
+          "bin"
+        ],
+        "test_profile": false,
+        "sha256": "1d138ec983eb329c0132d66711c77e3c47c47d281371d5d820c55ef79e91bf8a",
+        "bytes": 10901748,
+        "mode": "0o755",
+        "binding": "Current compiler artifact to actual-original receipt to verified independent sealed copy; no prior hash copied."
+      }
+    ],
+    "promotion": [
+      {
+        "target": "lampos-promote",
+        "cargo_target_name": "lampos-promote",
+        "kind": [
+          "bin"
+        ],
+        "test_profile": false,
+        "sha256": "0e2e95767f7db4024b03ba341d8a9aac6c22f504992e43215a3e14dcaeed9f6b",
+        "bytes": 2765068,
+        "mode": "0o755",
+        "binding": "Current compiler artifact to actual-original receipt to verified independent sealed copy; no prior hash copied."
+      },
+      {
+        "target": "lampos_promote-8be9c061c6e3176a",
+        "cargo_target_name": "lampos-promote",
+        "kind": [
+          "bin"
+        ],
+        "test_profile": true,
+        "sha256": "cd1342401c70e490d3d9752dd10540b8d5123c5d42d659ab3ea6d9976e18b116",
+        "bytes": 941840,
+        "mode": "0o755",
+        "binding": "Current compiler artifact to actual-original receipt to verified independent sealed copy; no prior hash copied."
+      },
+      {
+        "target": "workflow-ccfba36233de2857",
+        "cargo_target_name": "workflow",
+        "kind": [
+          "test"
+        ],
+        "test_profile": true,
+        "sha256": "5d7933f70fb1a2c39beff6b7d52e24189595bb8906d2af00a6d307fd20073f72",
+        "bytes": 1003704,
+        "mode": "0o755",
+        "binding": "Current compiler artifact to actual-original receipt to verified independent sealed copy; no prior hash copied."
+      },
+      {
+        "target": "promotion-0f4e04193d74a5c0",
+        "cargo_target_name": "promotion",
+        "kind": [
+          "test"
+        ],
+        "test_profile": true,
+        "sha256": "509d033d97320eb30d2899b1931a357b725ea197d318d0f5f5893bc0c23cd931",
+        "bytes": 2936524,
+        "mode": "0o755",
+        "binding": "Current compiler artifact to actual-original receipt to verified independent sealed copy; no prior hash copied."
+      },
+      {
+        "target": "lampos_promote-88d95a8362d8e5c8",
+        "cargo_target_name": "lampos_promote",
+        "kind": [
+          "lib"
+        ],
+        "test_profile": true,
+        "sha256": "fac18b18a0474955b2446cff9a37f185034e2d78e8fffa131423f9e5bd942076",
+        "bytes": 1442820,
+        "mode": "0o755",
+        "binding": "Current compiler artifact to actual-original receipt to verified independent sealed copy; no prior hash copied."
+      }
+    ]
+  },
+  "workspace_helper_phase_variant": {
+    "cargo_target_name": "lamp-update",
+    "sha256": "616a9c91a72965020b8dd342f2f5947eb7e1abda0ee7afb4fa8126182ff51d7f",
+    "bytes": 10873924,
+    "scope": "Frozen workspace-build phase variant before package test compilation; separate from the later runtime helper binding."
+  }
+}
