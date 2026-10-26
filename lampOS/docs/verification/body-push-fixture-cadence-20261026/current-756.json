@@ -1,0 +1,68 @@
+{
+  "head": "2a353bfdb05f42548a82ec5374485f463d88ebac",
+  "base": "756be347e13d2e52e7268414295dda8fc554c267",
+  "range_diff": "1:  2520690da = 1:  2a353bfdb lampOS: pace held body push fixture publications\n",
+  "source_count": 7164,
+  "all_source_hashes_unchanged": true,
+  "source_manifest_sha256": "d7f5c7a0c4a4634501e59c44650b388fe789839334a2cc7395e3f129bdb9f053",
+  "gates": {
+    "fmt": {
+      "command": "cargo +1.96.0 fmt --all --check",
+      "started": "2026-10-26T00:46:47Z",
+      "finished": "2026-10-26T00:46:59Z",
+      "exit": 0,
+      "harnesses": 0,
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "disk_error_lines": []
+    },
+    "clippy": {
+      "command": "cargo +1.96.0 clippy -q --message-format=short --offline --locked -p lamp-voice --all-targets -- -D warnings",
+      "started": "2026-10-26T00:46:59Z",
+      "finished": "2026-10-26T00:48:02Z",
+      "exit": 0,
+      "harnesses": 0,
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "disk_error_lines": []
+    },
+    "test-body-push": {
+      "command": "cargo +1.96.0 test --offline --locked -p lamp-voice --lib coordinator::tests::second_route::a_push_ -- --test-threads=1 --nocapture",
+      "started": "2026-10-26T00:48:02Z",
+      "finished": "2026-10-26T00:50:12Z",
+      "exit": 0,
+      "harnesses": 1,
+      "passed": 2,
+      "failed": 0,
+      "ignored": 0,
+      "disk_error_lines": []
+    },
+    "test-hand-reader": {
+      "command": "cargo +1.96.0 test --offline --locked -p lamp-voice --lib search_pushed:: -- --test-threads=1",
+      "started": "2026-10-26T00:50:12Z",
+      "finished": "2026-10-26T00:50:13Z",
+      "exit": 0,
+      "harnesses": 1,
+      "passed": 7,
+      "failed": 0,
+      "ignored": 0,
+      "disk_error_lines": []
+    }
+  },
+  "publication_counts_in_run_order": [
+    97,
+    0,
+    92,
+    0
+  ],
+  "executable_sha256": "cc73123e19b75057d14093a1825203f84d94b29bfa01c5b35a9ddf180f558d14",
+  "raw_log_sha256": {
+    "fmt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "clippy": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "test-body-push": "da94b7a7d03e17aa9313b5d89975ce1f0c1ee2af63e80c1e6b47d3d0b5ee85a0",
+    "test-hand-reader": "cd2bfa5ff733f3836bbedbc5514f71ff5adf13f27282f2965691fb45fbe905e6"
+  },
+  "limits": "Native x86_64 Mac current-base test-only qualification. Earlier reminder full-suite failure remains failed; no physical behavior claim."
+}

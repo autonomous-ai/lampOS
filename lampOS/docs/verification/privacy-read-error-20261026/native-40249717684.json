@@ -1,0 +1,35 @@
+{
+  "offered_head": "a8a30af3376fc81a67a903dbd56a6e037c6fb4db",
+  "original_base": "2747c72a709882a62d625d5bbb3bfbe3fd797581",
+  "arm64_run": 40249717684,
+  "linux_clippy_run": 40249717586,
+  "arm64_attempt": 1,
+  "linux_clippy_attempt": 1,
+  "arm64_status": "completed",
+  "linux_clippy_status": "completed",
+  "arm64_conclusion": "success",
+  "linux_clippy_conclusion": "success",
+  "executed_preview": "4ec590d861dbe3b11ba59005eacf9ca8a9c76314",
+  "preview_parents": [
+    "2747c72a709882a62d625d5bbb3bfbe3fd797581",
+    "a8a30af3376fc81a67a903dbd56a6e037c6fb4db"
+  ],
+  "preview_tree": "83a886586d032ed016cf77c9439be7372703fce5",
+  "offered_tree": "83a886586d032ed016cf77c9439be7372703fce5",
+  "preview_equals_offered_tree": true,
+  "passed": 11327,
+  "failed": 0,
+  "leaks": 0,
+  "timeouts": 0,
+  "skipped": 106,
+  "unique_terminal_cases": 11327,
+  "repeated_equal_rows": 35,
+  "own_control_pass_counts": {
+    "lamp-expression::runtime sleep_name::a_privacy_read_error_refuses_a_tap_until_a_valid_open_lease": 1,
+    "lamp-expression::it rest_requests::live_privacy_read_error_refuses_rest_until_a_valid_open_lease": 1
+  },
+  "native_summary": "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-26T00:45:39.4003485Z      Summary [ 208.492s] 11327 tests run: 11327 passed, 106 skipped",
+  "raw_log_bytes": 2719627,
+  "raw_log_sha256": "753621410023384e37a35bd6163397a5a1cf497e36e37ff6212cb3d65ae97c2c",
+  "limits": "Original a8a30af33 gate only. This receipt qualifies the 2747 carry only; later 756 rebases and their CI remain separate. No local test execution, retry, provider, device or latency claim."
+}

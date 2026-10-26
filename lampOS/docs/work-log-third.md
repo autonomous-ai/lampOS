@@ -7,6 +7,34 @@ machine is explicitly named. Third has no lamp access.
 
 
 
+## 2026-10-26 08:03 — Three current carries pushed; reminder full run restarted on fixture dependency
+
+On current product-unit base **756be347e**:
+
+- #3512 **b34e40ba7**: fmt, strict all-target Expression Clippy and full
+  Expression **340/0**; [current receipt](verification/privacy-read-error-20261026/current-756.json).
+- #3513 **fcf5d36f6**: fmt, strict all-target Update Clippy and all ten
+  preflight/null controls **10/0**; [current receipt](verification/head-preflight-files-20261026/current-756.json).
+- #3520 **2a353bfdb**: fmt, strict all-target Voice Clippy and the two
+  body-push plus seven Hand reader controls **9/0**; paired real publication
+  counts **97/0 and 92/0**; [current receipt](verification/body-push-fixture-cadence-20261026/current-756.json).
+
+Each task patch rebases equal; fresh native gates are active. Prior 2747
+native runs remain separate: privacy **11,327 PASS**, preflight **11,335
+PASS**, both zero leaks/failures/timeouts and 106 skipped, with exact
+preview/parent/tree checks. Their receipts are preserved beside the current
+ones. No physical privacy, hand, update activation or acoustic claim.
+
+The reminder repair now rests on the separately reviewable #3520 commit,
+with its eight-file runtime/test/doc patch restored unchanged in scope.
+A new full Voice/Schedule gate is running on that frozen dependency stack;
+the older d21 full failure and its isolates remain retained and failed.
+The pending-trigger fix remains test-only on its own branch. A private
+paired replay with the existing developer app rejects the old edge's two
+calls against eighteen expected, then passes all four recordings with the
+proposed present trigger; that exploratory run is not a fresh compiler
+gate or an end-to-end delivery proof.
+
 ## 2026-10-26 07:34 — Current preflight carry pushed
 
 #3513 is pushed at **142700df1** on **2747c72a7**, with its one task
