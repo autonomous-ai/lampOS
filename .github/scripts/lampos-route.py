@@ -39,8 +39,12 @@ WORKFLOW = "lampos-arm64.yml"
 ROUTE_JOB = "lampOS — choose the ARM64 runner"
 
 BEAT_STALE = 120  # s: the host writes every 30 s
-STUDIO_JOB = 5 * 60  # s: a pull request's job on the Studio, warm cache
-HOSTED_JOB = 12 * 60  # s: the same job on GitHub-hosted (13.5 min median, less margin)
+# A pull request's job on one 12-vCPU Studio slot, cold: about 8.5 to 9 min
+# (estimated from 26 Oct's runs at 20 vCPU and the 27 Oct slot benchmark), and
+# 13.5 min at the median on GitHub-hosted. So a job waits for a slot only
+# while waiting still beats GitHub-hosted: with these, never.
+STUDIO_JOB = 9 * 60  # s
+HOSTED_JOB = int(13.5 * 60)  # s
 STUCK_QUEUED = 8 * 60  # s
 STUCK_RUNNING = 25 * 60  # s: the Studio's jobs take 5 to 7 minutes
 API_TIMEOUT = 10  # s per request

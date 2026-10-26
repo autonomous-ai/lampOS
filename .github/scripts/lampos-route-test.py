@@ -58,17 +58,21 @@ class Decide(unittest.TestCase):
             self.assertFalse(studio, beat)
             self.assertRegex(reason, "heartbeat|healthy")
 
-    def test_queue_up_to_one_round_then_hosted(self):
-        # 3 healthy slots, 5-minute jobs, hosted 12: a full round of waiting (10 min) is too long.
-        self.assertTrue(self.studio(env(), busy(2))[0])
-        self.assertTrue(self.studio(env(), busy(3))[0])
-        self.assertTrue(self.studio(env(), busy(5))[0])
-        self.assertRegex(self.studio(env(), busy(6))[1], "Studio full")
-
-    def test_fewer_healthy_slots_queue_less(self):
-        e = env(LAMPOS_STUDIO_BEAT=f"v1 {NOW} 3 1 1")
+    def test_a_free_slot_or_hosted(self):
+        # 9-minute Studio jobs, 13.5 hosted: waiting one job out (18 min) never pays.
+        e = env(LAMPOS_STUDIO_BEAT=f"v1 {NOW} 2 2 1")
         self.assertTrue(self.studio(e, busy(1))[0])
-        self.assertFalse(self.studio(e, busy(2))[0])
+        self.assertRegex(self.studio(e, busy(2))[1], "Studio full")
+
+    def test_the_queue_follows_the_timings(self):
+        saved = R.STUDIO_JOB, R.HOSTED_JOB
+        R.STUDIO_JOB, R.HOSTED_JOB = 5 * 60, 12 * 60
+        try:
+            # 3 slots, 5-minute jobs, hosted 12: one round of waiting (5 min) pays, two don't.
+            self.assertTrue(self.studio(env(), busy(5))[0])
+            self.assertRegex(self.studio(env(), busy(6))[1], "Studio full")
+        finally:
+            R.STUDIO_JOB, R.HOSTED_JOB = saved
 
     def test_a_stuck_job_sends_everything_hosted(self):
         self.assertRegex(self.studio(env(), busy(1, "queued", R.STUCK_QUEUED + 1))[1], "stuck")
