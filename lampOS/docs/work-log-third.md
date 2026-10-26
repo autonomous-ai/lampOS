@@ -24,7 +24,11 @@ fail against unchanged production (84 pass, two intended failures); fixed
 suite passes 86/0, both shell syntax checks and whitespace check pass.
 [Evidence](verification/factory-resume-refusal-20261026/README.md).
 No lamp action or added wait. Linux Clippy **40276196748** is green;
-ARM64 **40276196533** is running and independent reads are requested.
+ARM64 **40276196533** passes 11,357 unique tests with zero failures, leaks or
+timeouts and 106 skipped. Preview 43b1d8b6f has exact base/head parents and
+the offered tree. Turn-wire 13/0 is separate, as is the local shell suite.
+[Native receipt](verification/factory-resume-refusal-20261026/native-40276196533.json).
+Independent reads are in progress.
 Meanwhile reading Tests’ #3545 journal barrier with an independent Mac gate.
 
 ## 2026-10-26 12:22 — Updated hotspot image independent read
