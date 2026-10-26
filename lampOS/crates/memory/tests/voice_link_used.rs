@@ -155,7 +155,9 @@ fn switches() {
     // one thread observed, cited from every exchange.
     observe_with(Box::new(|input: &Value| {
         Some(json!({"observations":[{
-            "text":"Their sister's wedding is in June and they need a gift",
+            // Words of both conversations' heard lines: an observation
+            // rests on what the person said (finding M on #3504).
+            "text":"Their sister's wedding is in June, they need a gift and ask what to keep",
             "category":"thread",
             "source_ids":input["source_ids"],
             "supersedes":null

@@ -1846,6 +1846,32 @@ impl Days {
         tidy::validate_output(&input, output).map_err(|_| {
             bad("the model result is empty, exceeds its limits, or has invalid provenance")
         })?;
+        // Only what rests on the person's own words is kept, never what the
+        // lamp alone said (`tidy::said_by_the_person`, finding M on #3504).
+        let theirs = tidy::Output {
+            observations: output
+                .observations
+                .iter()
+                .filter(|proposal| tidy::said_by_the_person(&input, proposal))
+                .cloned()
+                .collect(),
+        };
+        let left_out = output.observations.len() - theirs.observations.len();
+        if left_out > 0 {
+            eprintln!(
+                "lamp-memory: tidy_apply left out {left_out} of {} observations resting only on the lamp's words",
+                output.observations.len()
+            );
+        }
+        if theirs.observations.is_empty() {
+            tx.execute(
+                "UPDATE jobs SET state='done',input='',result='[]' WHERE job=?",
+                [job],
+            )?;
+            tx.commit()?;
+            return Ok(vec![]);
+        }
+        let output = &theirs;
         validate_sources(&tx, person, &input.source_ids, true)?;
         let count: u64 = tx.query_row(
             "SELECT count(*) FROM entries WHERE person=? AND kind='observation'",
