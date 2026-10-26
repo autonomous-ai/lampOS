@@ -1,5 +1,11 @@
 # Tests work log
 
+## 2026-10-27 05:18 — Skills current native audit complete
+
+Ready for lamp-voice: no (#3545 current peer reads requested next)
+
+[Skills b634 native proof](verification/tests-skills-b634-native-20261027/) binds original ARM64 **40407745272** and Linux strict **40407745318**, both attempt-one success, to preview `2b35b976e` with parents a3b/b634 and a tracked tree equal to the offered head. Native selected twelve packages: **7,541 unique PASS / 0 FAIL / 0 LEAK / 0 TIMEOUT**, 53 aggregate skips; 34 configured final reprints are excluded. The addon case and all 14 ordinary Reader controls passed once. Native Skills **528** reconciles to host **525/0/9** plus exactly three source-confirmed Linux-only binary tests, without adding the counts. Original 521/1/9 and other failures remain retained. Current peer reads follow; no device action.
+
 ## 2026-10-27 05:15 — Journal ready; exact carrier interruption retained
 
 Ready for lamp-voice: yes (#3622 only)
