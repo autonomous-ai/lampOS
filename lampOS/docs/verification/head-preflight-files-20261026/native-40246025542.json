@@ -1,0 +1,43 @@
+{
+  "offered_head": "b43cd9b1f79c518116e34b13e78b28bac054ca9f",
+  "original_base": "3d9722f38817a4dd1601fac051d36ac9f2292969",
+  "arm64_run": 40246025542,
+  "linux_clippy_run": 40246025547,
+  "arm64_attempt": 1,
+  "linux_clippy_attempt": 1,
+  "arm64_status": "completed",
+  "linux_clippy_status": "completed",
+  "arm64_conclusion": "success",
+  "linux_clippy_conclusion": "success",
+  "executed_preview": "842567668db5d38bd0f31f0795436c64d11337ed",
+  "preview_parents": [
+    "3d9722f38817a4dd1601fac051d36ac9f2292969",
+    "b43cd9b1f79c518116e34b13e78b28bac054ca9f"
+  ],
+  "preview_tree": "d2154b7e72370470e57df776fc529b5dc43669e7",
+  "offered_tree": "d2154b7e72370470e57df776fc529b5dc43669e7",
+  "preview_equals_offered_tree": true,
+  "passed": 11329,
+  "failed": 0,
+  "leaks": 0,
+  "timeouts": 0,
+  "skipped": 106,
+  "unique_terminal_cases": 11329,
+  "repeated_equal_rows": 35,
+  "own_control_pass_counts": {
+    "lamp-update::install head_touch_preflight_files::fifo_drop_in_is_refused_before_mutation": 1,
+    "lamp-update::install head_touch_preflight_files::fifo_without_a_writer_is_refused_before_mutation": 1,
+    "lamp-update::install head_touch_preflight_files::fifo_body_calibration_is_refused_before_mutation": 1,
+    "lamp-update::install head_touch_preflight_files::directory_drop_in_is_refused_before_mutation": 1,
+    "lamp-update::install head_touch_preflight_files::regular_benign_drop_in_is_preserved": 1,
+    "lamp-update::install head_touch_preflight_files::symlink_to_regular_drop_in_is_preserved": 1,
+    "lamp-update::install head_touch_preflight_files::missing_local_files_keep_install_compatibility": 1,
+    "lamp-update::install head_touch_preflight_files::dangling_drop_in_keeps_missing_file_compatibility": 1,
+    "lamp-update::install head_touch_preflight_files::dev_null_drop_in_mask_is_preserved": 1,
+    "lamp-update head_touch::tests::null_masks_do_not_admit_other_character_devices": 1
+  },
+  "native_summary": "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-25T23:57:33.0569877Z      Summary [ 203.134s] 11329 tests run: 11329 passed, 106 skipped",
+  "raw_log_bytes": 2722241,
+  "raw_log_sha256": "091fa1dee677a6e4342b0d5519060a21a49e3281abc77f7964ceeec42bb405b3",
+  "limits": "Original b43cd9b1f gate only. Later rebases and their CI remain separate. No local test execution, retry, provider, device or latency claim."
+}

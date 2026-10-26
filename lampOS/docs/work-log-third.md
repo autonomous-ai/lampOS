@@ -6,6 +6,32 @@ All measurements below are from the development machine unless a different
 machine is explicitly named. Third has no lamp access.
 
 
+
+## 2026-10-26 07:32 — Current privacy carry pushed; fixture failure retained
+
+#3512 is pushed at **a8a30af33** on train 149 **2747c72a7**. Its one
+commit range-diffs equal to the reviewed 7a head. Current formatting,
+strict all-target Expression Clippy and full Expression pass **340/0**,
+with every source hash unchanged; [current receipt](verification/privacy-read-error-20261026/current-2747.json).
+Fresh native gates follow. #3513's rebased **142700df1** is in its current
+Mac gate; [its original native receipt](verification/head-preflight-files-20261026/native-40246025542.json)
+records 11,329 unique PASS, zero leaks/failures/timeouts, 106 skipped.
+
+The reminder repair's d21 full gate failed: **3,787 passed, 2 failed,
+15 ignored**, both existing body-push/search scenarios reaching the host
+watchdog before scripted mute. Schedule did not run after that failure.
+The exact full binary and manifest are retained. Its isolated mid-search
+case passes 1/0 in 18.55 s; after-picture fails 0/1 in 24.61 s. The older
+3d unchanged-production executable passes after-picture 1/0 in 7.73 s.
+These different sources are not collapsed into a passing gate or a cause.
+
+The scenarios have no reminder instance. Their hand fixture writes a
+Latest bus file every 2 ms logical step despite promising a 100 ms cadence;
+a separate test-only correction is claimed on Queue 6405547853. The host
+watchdog and cleanup requirements remain unchanged. The reminder repair
+stays unpublished while this is diagnosed; its seven new controls pass.
+No device action or physical latency claim.
+
 ## 2026-10-26 07:00 — Face delivered; reminder retry qualified in focused tests
 
 Train 148 (#3514) delivered #3486 as lamp-voice **d21a854b6**. The old
