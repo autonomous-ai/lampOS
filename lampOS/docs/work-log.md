@@ -1,3 +1,13 @@
+Ready for lamp-voice: yes (#3542); #3528 current native pending; #3510 activation HOLD.
+
+## Current checkpoint: 2026-10-26 12:30 +07, own-keys current selected-crate gate passed
+
+[#3510](https://github.com/autonomous-ai/lampOS/pull/3510) is carried to `85b9bcdd7` on latest `cced42943`: seven equal patches, all 38 authored blobs/modes unchanged, no conflict. [Current host evidence](verification/own-keys-product-carry-20261026/current-cced/README.md) passes fmt, strict nine-crate all-target Clippy, compilation and the combined Voice/Skills/Voice-eval test command: **5,230 passed / zero failed / 30 ignored**. The literal summaries comprise Skills **522/0/9**, Voice **4,085/0/21** and Voice-eval **623/0/0**. All 7,242 source entries and all 27 actual/preserved executable hashes remain unchanged; the final guards and completion marker pass. Compilation and execution use the same combined package selection. This new success does not erase or diagnose the earlier five-output artifact mismatch or the peer's install failures. Other unchanged product readers retain their separately recorded earlier results. New original native checks now qualify this offered head; activation remains HOLD for #2094 and current-lamp acceptance.
+
+#3542 remains current and offered ready with original ARM64 **11,357/0/106**, no leaks/timeouts/unrun, Linux Clippy green and clear source reads. Its narrowed stuck-loop control scope is linked in the body/log. IPC #3528 retains its current local/independent gate passes and prior failed native record; current original ARM64 is still pending. No release, key, provider, device or local ARM64 action ran.
+
+---
+
 Ready for lamp-voice: yes (#3542); #3528 current native pending, #3510 activation HOLD.
 
 ## Current checkpoint: 2026-10-26 12:27 +07, memory original native qualification complete
