@@ -1374,13 +1374,222 @@ mod tests {
                 .clone()
         }
     }
-    fn next_request(requests: &mut lamp_bus::Subscriber) -> Request {
-        requests
-            .recv(Duration::from_millis(50))
-            .unwrap()
-            .unwrap()
-            .parse()
-            .unwrap()
+    fn next_request(
+        requests: &mut lamp_bus::Subscriber,
+        fixture: &Fixture,
+        phase: Option<Op>,
+        expected: Op,
+        stage: &str,
+        previous: Option<&Request>,
+    ) -> Request {
+        let began = std::time::Instant::now();
+        let expired_before = requests.expired();
+        let received = requests.recv(Duration::from_millis(50));
+        // Format only on failure; diagnostics must not delay the next phase.
+        let context = || {
+            format!(
+                "stage={stage} phase={phase:?} expected={expected:?} waited={:?} now_us={} publisher={:?} expired={expired_before}->{} malformed={} wrong_type={} active={:?} previous={previous:?}",
+                began.elapsed(),
+                fixture.now,
+                fixture.manager.publisher.totals(),
+                requests.expired(),
+                requests.malformed(),
+                requests.wrong_type(),
+                fixture
+                    .manager
+                    .sources
+                    .get("routine")
+                    .and_then(|source| source.active.as_ref())
+                    .map(|active| &active.request),
+            )
+        };
+        let message = received
+            .unwrap_or_else(|error| panic!("request receive failed: {error}; {}", context()))
+            .unwrap_or_else(|| panic!("no request received; {}", context()));
+        message.parse().unwrap_or_else(|error| {
+            panic!(
+                "request parse failed: {error}; header={:?}; {}",
+                message.header,
+                context()
+            )
+        })
+    }
+    #[test]
+    fn a_host_stall_expires_the_request_header_without_changing_the_manager_deadline() {
+        use std::{
+            os::fd::AsFd,
+            time::{Instant, SystemTime, UNIX_EPOCH},
+        };
+
+        #[derive(Debug)]
+        struct Probe {
+            lifetime_ms: u64,
+            declared_ms: Option<u64>,
+            header: lamp_bus::Header,
+            queued: Request,
+            expected: Request,
+            active_after: Option<Request>,
+            now_us: [u64; 2],
+            window_until_us: [u64; 2],
+            totals: [lamp_bus::Totals; 3],
+            subscribers: usize,
+            expired: [u64; 2],
+            malformed: u64,
+            wrong_type: u64,
+            slept: Duration,
+            elapsed: Duration,
+            wall_ms: [u64; 3],
+            received: Result<Option<(lamp_bus::Header, Request)>, String>,
+        }
+        let wall_ms = || -> u64 {
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_millis()
+                .try_into()
+                .unwrap()
+        };
+        let mut probes = Vec::with_capacity(2);
+        for extended in [false, true] {
+            let mut f = Fixture::new();
+            // Only this positive control changes transport headers. The
+            // declaration, payload lease and every other fixture stay stock.
+            if extended {
+                f.manager
+                    .publisher
+                    .expires_after(Some(Duration::from_secs(5)));
+            }
+            let mut requests = f.manager.bus.subscribe(Request::TOPIC, "stall").unwrap();
+            let before = f.manager.publisher.totals();
+            let now_us = f.now;
+            let _pending = f.ask(Op::Rest);
+            let began = Instant::now();
+            let wall_before = wall_ms();
+            f.tick(NIGHT);
+            let active = f.manager.sources["routine"].active.as_ref().unwrap();
+            let expected = active.request.clone();
+            let window_until_us = active.window_until_us;
+            let published = f.manager.publisher.totals();
+
+            // Peek this subscriber's actual queued frame without consuming
+            // it or introducing a second receiver that could race the stall.
+            let mut bytes = vec![0; lamp_bus::MOST_BYTES + 1];
+            let (_, length) = rustix::net::recv(
+                requests.as_fd(),
+                &mut bytes[..],
+                rustix::net::RecvFlags::PEEK | rustix::net::RecvFlags::DONTWAIT,
+            )
+            .unwrap();
+            let end = bytes[..length]
+                .iter()
+                .position(|byte| *byte == b'\n')
+                .unwrap();
+            let header = serde_json::from_slice(&bytes[..end]).unwrap();
+            let queued = serde_json::from_slice(&bytes[end + 1..length]).unwrap();
+            let expired_before = requests.expired();
+            // No business-clock advance or Manager tick occurs during this
+            // host stall. Both arms leave the same pending payload queued.
+            let stall = Instant::now();
+            std::thread::sleep(Duration::from_millis(700));
+            let slept = stall.elapsed();
+            let wall_read = wall_ms();
+            let received = requests.recv(Duration::from_millis(50));
+            let wall_after = wall_ms();
+            let elapsed = began.elapsed();
+            let received = received
+                .map_err(|error| error.to_string())
+                .and_then(|message| {
+                    message
+                        .map(|message| {
+                            let request = message.parse().map_err(|error| error.to_string())?;
+                            Ok((message.header, request))
+                        })
+                        .transpose()
+                });
+            let active_after = f.manager.sources["routine"].active.as_ref().unwrap();
+            probes.push(Probe {
+                lifetime_ms: if extended { 5_000 } else { 500 },
+                declared_ms: f.manager.publisher.declaration().unwrap().lifespan_ms,
+                header,
+                queued,
+                expected,
+                active_after: Some(active_after.request.clone()),
+                now_us: [now_us, f.now],
+                window_until_us: [window_until_us, active_after.window_until_us],
+                totals: [before, published, f.manager.publisher.totals()],
+                subscribers: f.manager.publisher.subscribers().len(),
+                expired: [expired_before, requests.expired()],
+                malformed: requests.malformed(),
+                wrong_type: requests.wrong_type(),
+                slept,
+                elapsed,
+                wall_ms: [wall_before, wall_read, wall_after],
+                received,
+            });
+        }
+        // Preserve both observations before any diagnostic I/O or outcome
+        // assertion. This proves a controlled mechanism, not the cause of an
+        // earlier missing request; a clock step/overrun invalidates the pair.
+        eprintln!("routine request transport probes: {probes:#?}");
+        for probe in &probes {
+            assert!(
+                probe.slept >= Duration::from_millis(700)
+                    && probe.elapsed < Duration::from_secs(5)
+                    && probe.wall_ms[0] <= probe.header.at_unix_ms
+                    && probe.header.at_unix_ms <= probe.wall_ms[1]
+                    && probe.wall_ms[1] <= probe.wall_ms[2],
+                "probe clock step or host overrun; no historical cause established: {probe:?}"
+            );
+            assert_eq!(probe.declared_ms, Some(500));
+            assert_eq!(probe.header.expires_ms, Some(probe.lifetime_ms));
+            assert_eq!(probe.header.kind, lamp_bus::Kind::Event);
+            assert_eq!(probe.header.topic, Request::TOPIC);
+            assert_eq!(probe.header.source, Request::SOURCE);
+            assert_eq!(probe.header.seq, probe.expected.stamp.sequence);
+            assert_eq!(probe.header.at_us, probe.expected.stamp.at_us);
+            assert_eq!(probe.queued, probe.expected);
+            probe.expected.check().unwrap();
+            assert_eq!(probe.active_after.as_ref(), Some(&probe.expected));
+            assert_eq!(probe.now_us[0], probe.now_us[1]);
+            assert_eq!(probe.window_until_us[0], probe.window_until_us[1]);
+            assert_eq!(probe.expected.valid_until_us, probe.now_us[0] + 3_000_000);
+            let [before, published, after] = probe.totals;
+            assert_eq!(published.published - before.published, 1);
+            assert_eq!(published.delivered - before.delivered, 1);
+            assert_eq!(published.dropped - before.dropped, 0);
+            assert_eq!(after, published);
+            assert_eq!(probe.subscribers, 1);
+            assert_eq!(probe.expired[0], 0);
+            assert_eq!(probe.malformed, 0);
+            assert_eq!(probe.wrong_type, 0);
+            let expired = probe.lifetime_ms == 500;
+            for wall in &probe.wall_ms[1..] {
+                assert_eq!(
+                    probe.header.expired_at(*wall),
+                    expired,
+                    "probe left its controlled header-age window; clock step/overrun: {probe:?}"
+                );
+            }
+            let received = probe.received.as_ref().expect("probe receive/parse failed");
+            if expired {
+                assert!(received.is_none());
+                assert_eq!(probe.expired[1], 1);
+            } else {
+                let (header, request) = received.as_ref().expect("bounded header should survive");
+                assert_eq!(header, &probe.header);
+                assert_eq!(request, &probe.expected);
+                assert_eq!(probe.expired[1], 0);
+            }
+        }
+        // Fresh fixtures have distinct session IDs. Their exact wire payloads
+        // match their own Managers above; these logical fields match the pair.
+        let ordinary = &probes[0].expected;
+        let bounded = &probes[1].expected;
+        assert_eq!(ordinary.stamp, bounded.stamp);
+        assert_eq!(ordinary.skill, bounded.skill);
+        assert_eq!(ordinary.episode, bounded.episode);
+        assert_eq!(ordinary.op, bounded.op);
+        assert_eq!(ordinary.valid_until_us, bounded.valid_until_us);
     }
     #[test]
     fn an_ask_issued_after_the_tick_sample_waits_so_its_request_is_not_stamped_earlier() {
@@ -1632,11 +1841,18 @@ mod tests {
             let mut pending = None;
             if existing.is_some() {
                 f.resting();
-                next_request(&mut requests);
+                next_request(
+                    &mut requests,
+                    &f,
+                    existing,
+                    Op::Rest,
+                    "expired/bootstrap",
+                    None,
+                );
                 if existing == Some(Op::Wake) {
                     pending = Some(f.ask(Op::Wake));
                     f.tick(NIGHT);
-                    next_request(&mut requests);
+                    next_request(&mut requests, &f, existing, Op::Wake, "expired/wake", None);
                 }
             }
             let sampled_at_us = f.now;
@@ -1653,6 +1869,11 @@ mod tests {
             }
             // The sample was 100 ms before the end, but reaches this tick
             // 300 ms later. Fresh Expression evidence cannot recover it.
+            let previous = f
+                .manager
+                .sources
+                .get("routine")
+                .and_then(|source| source.active.as_ref().map(|active| active.request.clone()));
             f.tick_sample(sampled_at_us, NIGHT + 11 * 3_600_000 - 100);
             assert!(
                 f.manager
@@ -1664,7 +1885,18 @@ mod tests {
                 assert!(pending.try_recv().unwrap().is_err());
             }
             if existing.is_some() {
-                assert_eq!(next_request(&mut requests).op, Op::Cancel);
+                assert_eq!(
+                    next_request(
+                        &mut requests,
+                        &f,
+                        existing,
+                        Op::Cancel,
+                        "expired/cancel",
+                        previous.as_ref(),
+                    )
+                    .op,
+                    Op::Cancel
+                );
                 assert_eq!(f.manager.publisher.totals().published, published + 1);
             } else {
                 assert_eq!(f.manager.publisher.totals().published, published);
@@ -1680,11 +1912,18 @@ mod tests {
             let mut pending = None;
             if existing.is_some() {
                 f.resting();
-                next_request(&mut requests);
+                next_request(
+                    &mut requests,
+                    &f,
+                    existing,
+                    Op::Rest,
+                    "inside/bootstrap",
+                    None,
+                );
                 if existing == Some(Op::Wake) {
                     pending = Some(f.ask(Op::Wake));
                     f.tick(NIGHT);
-                    next_request(&mut requests);
+                    next_request(&mut requests, &f, existing, Op::Wake, "inside/wake", None);
                 }
             }
             let sampled_at_us = f.now;
@@ -1702,7 +1941,14 @@ mod tests {
                 pending = Some(f.ask(Op::Rest));
             }
             f.tick_sample(sampled_at_us, wall);
-            let issued = next_request(&mut requests);
+            let issued = next_request(
+                &mut requests,
+                &f,
+                existing,
+                existing.unwrap_or(Op::Rest),
+                "inside/shortened",
+                None,
+            );
             assert_eq!(issued.op, existing.unwrap_or(Op::Rest));
             assert_eq!(issued.valid_until_us, until);
             assert_eq!(issued.valid_until_us - f.now, 200_000);
@@ -1720,11 +1966,23 @@ mod tests {
             assert_eq!(active.window_until_us, until);
             assert_eq!(active.request.valid_until_us, until);
             assert!(requests.recv(Duration::ZERO).unwrap().is_none());
+            let previous = active.request.clone();
             f.now = until;
             f.observe(phase);
             f.tick_sample(sampled_at_us, wall);
             assert!(f.manager.sources["routine"].active.is_none());
-            assert_eq!(next_request(&mut requests).op, Op::Cancel);
+            assert_eq!(
+                next_request(
+                    &mut requests,
+                    &f,
+                    existing,
+                    Op::Cancel,
+                    "inside/cancel",
+                    Some(&previous),
+                )
+                .op,
+                Op::Cancel
+            );
             if let Some(pending) = pending {
                 assert!(pending.try_recv().unwrap().is_err());
             }
@@ -1739,7 +1997,14 @@ mod tests {
         assert!(rest.try_recv().unwrap().is_err());
         assert!(requests.recv(Duration::ZERO).unwrap().is_none());
         let initial = f.resting();
-        next_request(&mut requests);
+        next_request(
+            &mut requests,
+            &f,
+            Some(Op::Rest),
+            Op::Rest,
+            "future/bootstrap",
+            None,
+        );
         let until = f.manager.sources["routine"]
             .active
             .as_ref()
@@ -1750,7 +2015,14 @@ mod tests {
         let wake = f.ask(Op::Wake);
         f.tick_sample(f.now + 1, NIGHT);
         assert!(wake.try_recv().unwrap().is_err());
-        let continued = next_request(&mut requests);
+        let continued = next_request(
+            &mut requests,
+            &f,
+            Some(Op::Rest),
+            Op::Rest,
+            "future/continued",
+            None,
+        );
         assert_eq!(continued.op, Op::Rest);
         assert_eq!(continued.episode, initial.episode);
         assert_eq!(
