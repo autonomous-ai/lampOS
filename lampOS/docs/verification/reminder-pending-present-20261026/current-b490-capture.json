@@ -1,0 +1,87 @@
+{
+  "at": "2026-10-26T21:24:08.426641+00:00",
+  "base": "a3b9c46814bb2b2452f0d6b6cc13bb3a16992c33",
+  "commits_after_base": 1,
+  "compiled_test_drivers": 70,
+  "compiler_bank": "cold local-package cleanup completed; actual fresh/cache flags retained",
+  "compiler_provenance": {
+    "normal_fresh_flags": "Recorded as emitted, including cache/build-script records.",
+    "previous_bank_runtime_required": false,
+    "scope": "Current cold local-package cleanup and compilation only; no runtime qualification."
+  },
+  "compiler_stages": {
+    "build": {
+      "command": "cargo +1.96.0 build -q --offline --locked --workspace --message-format=json",
+      "exit": 0
+    },
+    "clean": {
+      "command": "cargo +1.96.0 clean --offline --locked --target-dir <owned-permanent-target> -p lamp-actions -p lamp-addons -p lamp-air -p lamp-audio -p lamp-body -p lamp-bus -p lamp-camera -p lamp-cloud -p lamp-controls -p lamp-ears -p lamp-environment -p lamp-expression -p lamp-eyes -p lamp-gemini -p lamp-health -p lamp-ipc -p lamp-keeper -p lamp-lean -p lamp-local-time -p lamp-memory -p lamp-mood -p lamp-msgs -p lamp-name -p lamp-near-call -p lamp-observer -p lamp-peek -p lamp-policy -p lamp-records -p lamp-ring -p lamp-same-voice -p lamp-schedule -p lamp-selftest -p lamp-settings -p lamp-setup -p lamp-skills -p lamp-sound-fixtures -p lamp-station -p lamp-surround -p lamp-tasks -p lamp-turn-end -p lamp-turn-end-wire -p lamp-turn-owner -p lamp-update -p lamp-voice -p lamp-voice-eval -p lamp-voice-processes -p sonora -p tough",
+      "exit": 0
+    },
+    "clippy": {
+      "command": "cargo +1.96.0 clippy -q --offline --locked -p lamp-skills -p lamp-cloud -p lamp-body -p lamp-expression -p lamp-keeper -p lamp-lean -p lamp-memory -p lamp-peek -p lamp-setup -p lamp-update -p lamp-voice -p lamp-voice-eval --all-targets --message-format=json -- -D warnings",
+      "exit": 0
+    },
+    "fmt": {
+      "command": "cargo +1.96.0 fmt --all --check",
+      "exit": 0
+    },
+    "test-compile": {
+      "command": "cargo +1.96.0 test --offline --locked -p lamp-skills -p lamp-cloud -p lamp-body -p lamp-expression -p lamp-keeper -p lamp-lean -p lamp-memory -p lamp-peek -p lamp-setup -p lamp-update -p lamp-voice -p lamp-voice-eval --no-run --message-format=json",
+      "exit": 0
+    }
+  },
+  "controller_sha256": "3fc1d67dd5f3a12a14f2cbdb38cf9e546486a614485d7223a1ddf339e165ac1d",
+  "executable_paths": 133,
+  "freshness_scope": "Observed normal-build compiler records including build scripts; no all-false or cold-cache assertion.",
+  "head": "b49073d5900cd6fdeb080599ea1888adea638b34",
+  "limits": [
+    "Compiler fresh flags are recorded by stage, not inferred from timestamps.",
+    "Captured product children are not thereby claimed to have executed.",
+    "Ephemeral rustdoc executables are not emitted by cargo test --no-run.",
+    "The source map covers tracked and nonignored files under lampOS; it is not a raw ignored/external runtime-input inventory.",
+    "Raw source/external inventories are current observations, not historical preimages.",
+    "This b490/a3 compiler packet is not a current gate after a rebase; all later source/artifact changes need separate qualification.",
+    "No actual systemd, provider, device, own-key activation, or native CI claim."
+  ],
+  "normal_local_fresh_records": {
+    "false": 96,
+    "true": 0
+  },
+  "normal_local_packages": 48,
+  "preimages": "independent APFS clones or copies; never hard links; captured after compile, before any test execution",
+  "private_original_capture_sha256": "3b3097a881006253efb38960c9281d85633ec614af3e64e1cae0fc496fe4fe6c",
+  "private_preimage_limit": "The capture digest refers to the private original, not this selected public summary. No private inventory or file-metadata preimage is published.",
+  "raw_inputs": {
+    "bytes_hashed": 209108474,
+    "content_inventory_sha256": "4df4cb390ef9d7c5ae8ca7d09046d4615817708989d1e4e130cc56b3deb8c6ec",
+    "entries": 8719,
+    "holds": 0,
+    "observed_stat_sha256": "af00e4bf1ec15e2b05b96f54fe251f6d8aec25b9308b445f5b974a5e944c0cfc",
+    "scope": "Private current inventories of lampOS including ignored entries and declared workflow/rootfs/overrides roots; no retroactive input guard.",
+    "status": "complete"
+  },
+  "runtime_executed": false,
+  "runtime_scope": "NONE; a current full 12-package runtime remains required",
+  "runtime_status_at_publication": "Full twelve-package Cargo command started separately; no runtime result claimed by this compile-only receipt.",
+  "scope": "COMPILER-ONLY; no runtime tests executed or qualified",
+  "selected_packages": [
+    "lamp-skills",
+    "lamp-cloud",
+    "lamp-body",
+    "lamp-expression",
+    "lamp-keeper",
+    "lamp-lean",
+    "lamp-memory",
+    "lamp-peek",
+    "lamp-setup",
+    "lamp-update",
+    "lamp-voice",
+    "lamp-voice-eval"
+  ],
+  "source_files": 7259,
+  "status": "complete",
+  "tests_executed_by_capture": 0,
+  "tree": "853c9917e71a9c9973aaf0fb89072bddd55ab979",
+  "workspace_product_children": 47
+}
