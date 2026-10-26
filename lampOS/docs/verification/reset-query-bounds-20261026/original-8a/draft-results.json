@@ -1,0 +1,77 @@
+{
+  "complete": {
+    "base": "521dcb006848a5bc99b11513828233ef65a4883c",
+    "complete": true,
+    "head": "521dcb006848a5bc99b11513828233ef65a4883c",
+    "note": "Each scope closed artifact guards before subsequent compilation; only last scope current actual paths claimed at final completion.",
+    "scopes": [
+      "setup-cloud"
+    ],
+    "source_entries": 7239,
+    "source_unchanged": true
+  },
+  "receipts": {
+    "clippy": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "clippy",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-setup",
+        "-p",
+        "lamp-cloud",
+        "--all-targets",
+        "--message-format=short",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "disk_free_before": 78270857216,
+      "elapsed_seconds": 88.912,
+      "error": null,
+      "exit_code": 0,
+      "log_sha256": "2009dfc5699ea9fe9c9eae4ff9dd013d9236013fd7a652dbcac86f317c4d79e1",
+      "source_entries": 7239,
+      "source_unchanged": true
+    },
+    "fmt": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "disk_free_before": 78282723328,
+      "elapsed_seconds": 6.784,
+      "error": null,
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source_entries": 7239,
+      "source_unchanged": true
+    },
+    "metadata": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "metadata",
+        "--locked",
+        "--offline",
+        "--format-version",
+        "1",
+        "--filter-platform",
+        "aarch64-apple-darwin"
+      ],
+      "disk_free_before": 78286086144,
+      "elapsed_seconds": 1.061,
+      "error": null,
+      "exit_code": 0,
+      "log_sha256": "4973aee04d1660c4c20a49d23a38c3e07d6fb34c18e13d579e5dae594e6ef41f",
+      "source_entries": 7239,
+      "source_unchanged": true
+    }
+  },
+  "source_inventory_sha256": "568b143d6a024dc77fec85ca9e39fb82d51e624f4910f1640f126cd06a0a9a45"
+}

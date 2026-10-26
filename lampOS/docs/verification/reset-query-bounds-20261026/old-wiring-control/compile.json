@@ -1,0 +1,22 @@
+{
+  "cleanup_seconds": 15,
+  "command": [
+    "cargo",
+    "+1.96.0",
+    "test",
+    "--locked",
+    "--offline",
+    "-p",
+    "lamp-setup",
+    "--lib",
+    "reset::query::tests::system_read_enforces_the_query_output_bound",
+    "--no-run",
+    "--message-format=json"
+  ],
+  "deadline_seconds": 1800,
+  "elapsed_seconds": 62.418,
+  "error": null,
+  "exit_code": 0,
+  "log_sha256": "cd29e809c9631adb8bfbeafe900604282b11ff3dced8a3f79aec7870a61d2d24",
+  "source_unchanged": true
+}

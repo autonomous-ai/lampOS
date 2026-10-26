@@ -1,0 +1,8 @@
+{
+  "base": "521dcb006848a5bc99b11513828233ef65a4883c",
+  "draft_source_inventory_sha256": "568b143d6a024dc77fec85ca9e39fb82d51e624f4910f1640f126cd06a0a9a45",
+  "final_commit": "8a050d1bfd098769a8361849171271964a5082f7",
+  "final_commit_matches_frozen_final_source": true,
+  "final_source_inventory_sha256": "b978b9bb3f6e746c372808cee8c2f92846d34c24e2310ab5b789ec077feefa51",
+  "source_entries": 7239
+}

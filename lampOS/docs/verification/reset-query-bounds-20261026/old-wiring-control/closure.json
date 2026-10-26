@@ -1,0 +1,9 @@
+{
+  "actual_preserved_outputs_unchanged": true,
+  "depfiles": 139,
+  "executables": 1,
+  "local_outputs": 15,
+  "mutant_source_unchanged": true,
+  "original_source_status_head_unchanged": true,
+  "runtime_exit_code": 101
+}

@@ -1,0 +1,58 @@
+{
+  "complete": {
+    "base": "521dcb006848a5bc99b11513828233ef65a4883c",
+    "complete": true,
+    "head": "521dcb006848a5bc99b11513828233ef65a4883c",
+    "note": "Each scope closed artifact guards before subsequent compilation; only last scope current actual paths claimed at final completion.",
+    "scopes": [
+      "system-read-cap",
+      "closed-stdout-deadline"
+    ],
+    "source_entries": 7239,
+    "source_unchanged": true
+  },
+  "receipts": {
+    "clippy": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "clippy",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-setup",
+        "-p",
+        "lamp-cloud",
+        "--all-targets",
+        "--message-format=short",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "disk_free_before": 75866177536,
+      "elapsed_seconds": 4.765,
+      "error": null,
+      "exit_code": 0,
+      "log_sha256": "15d7799471805aea0b0617d4b58497d4c6831113e152769ca6e4df531d0c97d0",
+      "source_entries": 7239,
+      "source_unchanged": true
+    },
+    "fmt": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "disk_free_before": 75866185728,
+      "elapsed_seconds": 6.221,
+      "error": null,
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source_entries": 7239,
+      "source_unchanged": true
+    }
+  },
+  "source_inventory_sha256": "b978b9bb3f6e746c372808cee8c2f92846d34c24e2310ab5b789ec077feefa51"
+}

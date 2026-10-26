@@ -1,0 +1,9 @@
+{
+  "case": "reset::query::tests::system_read_enforces_the_query_output_bound",
+  "failure": "called `Result::unwrap_err()` on an `Ok` value: [65 KiB output redacted]",
+  "observed_once": true,
+  "original_source_unchanged": true,
+  "raw_runtime_log_sha256": "7977fa7889b15d57bd5073e3fcde97f176c18eb1a0c524919d9e12ad941e638d",
+  "reason": "Reverted System::read accepted overflow; the original helper and tests were unchanged.",
+  "summary": "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 22 filtered out; finished in 0.01s"
+}

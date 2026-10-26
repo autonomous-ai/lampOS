@@ -1,0 +1,15 @@
+{
+  "draft_controls": [
+    "reset::query::tests::query_refuses_nonzero_exit_and_spawn_failure",
+    "reset::query::tests::query_reads_output_with_closed_stdin_and_discarded_stderr",
+    "reset::query::tests::query_accepts_64_kib_and_refuses_more",
+    "reset::query::tests::real_query_error_keeps_reset_data_and_journal_and_reboots",
+    "reset::query::tests::query_deadline_also_applies_after_stdout_closes",
+    "reset::query::tests::query_timeout_cleans_the_exited_leaders_pipe_holding_descendant"
+  ],
+  "final_supplement": [
+    "reset::query::tests::system_read_enforces_the_query_output_bound",
+    "reset::query::tests::query_deadline_also_applies_after_stdout_closes"
+  ],
+  "note": "Draft six passed once. Final adds actual System wiring and strengthens one draft deadline control; counts are not summed into a claimed full final-source suite."
+}

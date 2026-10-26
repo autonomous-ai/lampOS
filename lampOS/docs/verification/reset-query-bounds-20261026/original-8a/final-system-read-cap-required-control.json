@@ -1,0 +1,11 @@
+{
+  "name": "reset::query::tests::system_read_enforces_the_query_output_bound",
+  "observed": [
+    [
+      "reset::query::tests::system_read_enforces_the_query_output_bound",
+      "ok"
+    ]
+  ],
+  "platform_absent": false,
+  "scope": "Absent is unrun, never a pass."
+}

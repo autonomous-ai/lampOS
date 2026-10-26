@@ -1,0 +1,11 @@
+{
+  "all_actual_preserved_outputs_checked": true,
+  "changed_paths": [
+    "lampOS/crates/setup/src/reset/query.rs",
+    "lampOS/docs/reuse-decisions.md",
+    "lampOS/docs/setup.md"
+  ],
+  "previous_complete_sha256": "05f40157e7680bf857808368f7f120fc1e2443f5a4e7c7dc738c4afa4a35d01e",
+  "production_query_bytes_unchanged": true,
+  "source_inventory_sha256": "568b143d6a024dc77fec85ca9e39fb82d51e624f4910f1640f126cd06a0a9a45"
+}

@@ -1,3 +1,15 @@
+Ready for lamp-voice: reset query bounds await current-base qualification; Third carries #3510.
+
+## Current checkpoint: 2026-10-27 04:37 +07, query regression and ownership reconciled
+
+[Original 8a query proof](verification/reset-query-bounds-20261026/original-8a/README.md) preserves the full frozen draft Setup **191/0/1** and Cloud **196/0/4**, then two final test-only focused supplements **1/0 each**. Overlapping scopes are not added or called a full final-source command. Local commit **8a050d1bf/521dcb006** changes only read-only queries, leaving stop allowances and failed-reset recovery intact. Latest-base gates and original Linux qualification remain required before readiness.
+
+[Old-wiring negative control](verification/reset-query-bounds-20261026/old-wiring-control/README.md) compiled successfully and ran the exact System-read cap test once: **0 passed / 1 failed / 22 filtered**, expected Cargo exit 101 when the former unbounded read returned success on overflow. Original 8a source/head stayed clean and unchanged; this is no failure or rerun of the implementation. The packet omits the raw panic payload and records its hash. This control proves the cap wiring, not the default deadline or installed acceptance.
+
+Queue and own PR comments read through 6426841236/6426643397: Third took #3510's stalled carry at 03:31; Second will not duplicate it. Original 273c native qualification remains historical, and activation #2094/current-lamp acceptance stays held. Direct source fetch and Queue writes have failed with TLS/reset errors; browser fallback also stalled, so no successful status post is claimed. Exact public object recovery is preparing the reset-query current-base carry. No device, provider, key or release action.
+
+---
+
 Ready for lamp-voice: 273c native qualified; latest-base publication waits on source transport; query change locally qualified.
 
 ## Current checkpoint: 2026-10-27 01:37 +07, connector native continuation complete

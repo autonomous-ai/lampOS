@@ -1,0 +1,22 @@
+[
+  {
+    "fresh": true,
+    "package_id": "path+file://<source>/lampOS/crates/setup#lamp-setup@0.1.0",
+    "path": "<target>/debug/deps/lamp_setup-de3fa91126a60dc6",
+    "sha256": "caecf4431248fb4d3c48443de050fad8a633a2265bb5afd71cf04e7fea266945",
+    "target": {
+      "crate_types": [
+        "lib"
+      ],
+      "doc": true,
+      "doctest": true,
+      "edition": "2024",
+      "kind": [
+        "lib"
+      ],
+      "name": "lamp_setup",
+      "src_path": "<source>/lampOS/crates/setup/src/lib.rs",
+      "test": true
+    }
+  }
+]

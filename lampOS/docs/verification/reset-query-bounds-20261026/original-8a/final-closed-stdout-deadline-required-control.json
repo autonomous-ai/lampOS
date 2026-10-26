@@ -1,0 +1,11 @@
+{
+  "name": "reset::query::tests::query_deadline_also_applies_after_stdout_closes",
+  "observed": [
+    [
+      "reset::query::tests::query_deadline_also_applies_after_stdout_closes",
+      "ok"
+    ]
+  ],
+  "platform_absent": false,
+  "scope": "Absent is unrun, never a pass."
+}

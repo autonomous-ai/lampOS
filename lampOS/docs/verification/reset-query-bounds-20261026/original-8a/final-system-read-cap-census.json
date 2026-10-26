@@ -1,0 +1,27 @@
+{
+  "cases": [
+    [
+      "reset::query::tests::system_read_enforces_the_query_output_bound",
+      "ok"
+    ]
+  ],
+  "note": "Literal summaries preserve nested child outputs separately; audit before aggregate counts.",
+  "runtime_bindings": [
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_setup-de3fa91126a60dc6)",
+      "sha256": "caecf4431248fb4d3c48443de050fad8a633a2265bb5afd71cf04e7fea266945"
+    }
+  ],
+  "scope": "system-read-cap",
+  "summaries": [
+    {
+      "failed": 0,
+      "filtered": 22,
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_setup-de3fa91126a60dc6)",
+      "ignored": 0,
+      "literal": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 22 filtered out; finished in 0.03s",
+      "passed": 1,
+      "status": "ok"
+    }
+  ]
+}

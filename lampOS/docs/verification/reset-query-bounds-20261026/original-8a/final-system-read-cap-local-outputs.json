@@ -1,0 +1,122 @@
+[
+  {
+    "fresh": true,
+    "package_id": "path+file://<source>/lampOS/crates/bus#lamp-bus@0.1.0",
+    "path": "<target>/debug/deps/liblamp_bus-8ed4963f3a74bcdb.rlib",
+    "preserved_path": "<final-gate>/system-read-cap/artifacts/0-liblamp_bus-8ed4963f3a74bcdb.rlib",
+    "sha256": "4cf01f97134842d7ebe65d9075019daf53d68e6adc503f69d8ee13035d0dd6e0",
+    "target": "lamp_bus"
+  },
+  {
+    "fresh": true,
+    "package_id": "path+file://<source>/lampOS/crates/bus#lamp-bus@0.1.0",
+    "path": "<target>/debug/deps/liblamp_bus-8ed4963f3a74bcdb.rmeta",
+    "preserved_path": "<final-gate>/system-read-cap/artifacts/1-liblamp_bus-8ed4963f3a74bcdb.rmeta",
+    "sha256": "d47e4541e2f620e82ddacf87cd8ef6c77c76d8322e48aa247e6b44cfa1392473",
+    "target": "lamp_bus"
+  },
+  {
+    "fresh": false,
+    "package_id": "path+file://<source>/lampOS/crates/msgs#lamp-msgs@0.1.0",
+    "path": "<target>/debug/deps/liblamp_msgs-8dd6c9464b60fb71.rlib",
+    "preserved_path": "<final-gate>/system-read-cap/artifacts/2-liblamp_msgs-8dd6c9464b60fb71.rlib",
+    "sha256": "279f391185a26a537c4a9f75ca48baa6df988fbbe3da00a718e0bd152b5242ea",
+    "target": "lamp_msgs"
+  },
+  {
+    "fresh": false,
+    "package_id": "path+file://<source>/lampOS/crates/msgs#lamp-msgs@0.1.0",
+    "path": "<target>/debug/deps/liblamp_msgs-8dd6c9464b60fb71.rmeta",
+    "preserved_path": "<final-gate>/system-read-cap/artifacts/3-liblamp_msgs-8dd6c9464b60fb71.rmeta",
+    "sha256": "af7f18b179bd3dcd295af5ddaf9aefc3757848e12bfe7fe0997483180cce75a4",
+    "target": "lamp_msgs"
+  },
+  {
+    "fresh": false,
+    "package_id": "path+file://<source>/lampOS/crates/ipc#lamp-ipc@0.1.0",
+    "path": "<target>/debug/deps/liblamp_ipc-feeaa577d12c7675.rlib",
+    "preserved_path": "<final-gate>/system-read-cap/artifacts/4-liblamp_ipc-feeaa577d12c7675.rlib",
+    "sha256": "d63f238da76ce028c41872c59e746d533e57ad239cc694b0608975c6ad7a2d25",
+    "target": "lamp_ipc"
+  },
+  {
+    "fresh": false,
+    "package_id": "path+file://<source>/lampOS/crates/ipc#lamp-ipc@0.1.0",
+    "path": "<target>/debug/deps/liblamp_ipc-feeaa577d12c7675.rmeta",
+    "preserved_path": "<final-gate>/system-read-cap/artifacts/5-liblamp_ipc-feeaa577d12c7675.rmeta",
+    "sha256": "2664c7ca11108dcddd4ac71bd903121b545a7ab9987c42f0fb1e53559473acb6",
+    "target": "lamp_ipc"
+  },
+  {
+    "fresh": true,
+    "package_id": "path+file://<source>/lampOS/crates/turn-owner#lamp-turn-owner@0.1.0",
+    "path": "<target>/debug/deps/liblamp_turn_owner-dd9e1e6bd8d30965.rlib",
+    "preserved_path": "<final-gate>/system-read-cap/artifacts/6-liblamp_turn_owner-dd9e1e6bd8d30965.rlib",
+    "sha256": "4cb1d3cdbfff8f35af2b6e7e93ce3cb203a4750b81a7ad1603ac85166144eb83",
+    "target": "lamp_turn_owner"
+  },
+  {
+    "fresh": true,
+    "package_id": "path+file://<source>/lampOS/crates/turn-owner#lamp-turn-owner@0.1.0",
+    "path": "<target>/debug/deps/liblamp_turn_owner-dd9e1e6bd8d30965.rmeta",
+    "preserved_path": "<final-gate>/system-read-cap/artifacts/7-liblamp_turn_owner-dd9e1e6bd8d30965.rmeta",
+    "sha256": "179e29201a9948af20e0e0be3028fb7b50a869f558264e9b75604590850e0c4c",
+    "target": "lamp_turn_owner"
+  },
+  {
+    "fresh": false,
+    "package_id": "path+file://<source>/lampOS/crates/update#lamp-update@0.1.0",
+    "path": "<target>/debug/deps/liblamp_update-4df08f734ae64b65.rlib",
+    "preserved_path": "<final-gate>/system-read-cap/artifacts/8-liblamp_update-4df08f734ae64b65.rlib",
+    "sha256": "97a45dc3ad995bcf9d42f11251f953b10fab3ae68bb05f0384d8a57eae2eea20",
+    "target": "lamp_update"
+  },
+  {
+    "fresh": false,
+    "package_id": "path+file://<source>/lampOS/crates/update#lamp-update@0.1.0",
+    "path": "<target>/debug/deps/liblamp_update-4df08f734ae64b65.rmeta",
+    "preserved_path": "<final-gate>/system-read-cap/artifacts/9-liblamp_update-4df08f734ae64b65.rmeta",
+    "sha256": "e59b19e59cca1261ab281863e5dfd150403c39d0da6e4dd0be130bab1c1b37bc",
+    "target": "lamp_update"
+  },
+  {
+    "fresh": false,
+    "package_id": "path+file://<source>/lampOS/crates/ring#lamp-ring@0.1.0",
+    "path": "<target>/debug/deps/liblamp_ring-9eb9d0bfc1a93739.rlib",
+    "preserved_path": "<final-gate>/system-read-cap/artifacts/10-liblamp_ring-9eb9d0bfc1a93739.rlib",
+    "sha256": "026c0cc1388d1ff8aad3e9f17800ad3b1d35ef392a6cf356e042ae019606eae1",
+    "target": "lamp_ring"
+  },
+  {
+    "fresh": false,
+    "package_id": "path+file://<source>/lampOS/crates/ring#lamp-ring@0.1.0",
+    "path": "<target>/debug/deps/liblamp_ring-9eb9d0bfc1a93739.rmeta",
+    "preserved_path": "<final-gate>/system-read-cap/artifacts/11-liblamp_ring-9eb9d0bfc1a93739.rmeta",
+    "sha256": "0dd98d3843d3ec82bf21eb53cb738a4a9cc8dd2681a24b212c36dd2856d3725c",
+    "target": "lamp_ring"
+  },
+  {
+    "fresh": false,
+    "package_id": "path+file://<source>/lampOS/crates/local-time#lamp-local-time@0.1.0",
+    "path": "<target>/debug/deps/liblamp_local_time-0ba1d770369ec162.rlib",
+    "preserved_path": "<final-gate>/system-read-cap/artifacts/12-liblamp_local_time-0ba1d770369ec162.rlib",
+    "sha256": "ad46e0f66fd34ef7412df4a19f528d2690b83dcc0b751ee5e1c34e90405fba42",
+    "target": "lamp_local_time"
+  },
+  {
+    "fresh": false,
+    "package_id": "path+file://<source>/lampOS/crates/local-time#lamp-local-time@0.1.0",
+    "path": "<target>/debug/deps/liblamp_local_time-0ba1d770369ec162.rmeta",
+    "preserved_path": "<final-gate>/system-read-cap/artifacts/13-liblamp_local_time-0ba1d770369ec162.rmeta",
+    "sha256": "eb0f003335eea1c7a82ae1b9b1da9ff3d9cc11f054c9593238b6437016815088",
+    "target": "lamp_local_time"
+  },
+  {
+    "fresh": false,
+    "package_id": "path+file://<source>/lampOS/crates/setup#lamp-setup@0.1.0",
+    "path": "<target>/debug/deps/lamp_setup-de3fa91126a60dc6",
+    "preserved_path": "<final-gate>/system-read-cap/artifacts/14-lamp_setup-de3fa91126a60dc6",
+    "sha256": "caecf4431248fb4d3c48443de050fad8a633a2265bb5afd71cf04e7fea266945",
+    "target": "lamp_setup"
+  }
+]

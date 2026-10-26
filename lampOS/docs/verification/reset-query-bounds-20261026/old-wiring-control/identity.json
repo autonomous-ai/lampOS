@@ -1,0 +1,17 @@
+{
+  "archive_sha256": "b10617855446294e16d761595c80fed1ffc2e9588dce84b18cf8d29bfc08e98a",
+  "mutant_patch_sha256": "84c2aa1e34e29e67688c44fe61a915dc7cf5636a98aa57f76fdaf8110cf57207",
+  "original_head": "8a050d1bfd098769a8361849171271964a5082f7",
+  "selection": [
+    "cargo",
+    "+1.96.0",
+    "test",
+    "--locked",
+    "--offline",
+    "-p",
+    "lamp-setup",
+    "--lib",
+    "reset::query::tests::system_read_enforces_the_query_output_bound"
+  ],
+  "target_absent_and_atomically_empty_before_compile": true
+}

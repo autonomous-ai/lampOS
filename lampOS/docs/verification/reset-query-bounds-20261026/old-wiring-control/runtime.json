@@ -1,0 +1,23 @@
+{
+  "cleanup_seconds": 15,
+  "command": [
+    "cargo",
+    "+1.96.0",
+    "test",
+    "--locked",
+    "--offline",
+    "-p",
+    "lamp-setup",
+    "--lib",
+    "reset::query::tests::system_read_enforces_the_query_output_bound",
+    "--",
+    "--exact",
+    "--test-threads=1"
+  ],
+  "deadline_seconds": 120,
+  "elapsed_seconds": 1.186,
+  "error": null,
+  "exit_code": 101,
+  "log_sha256": "7977fa7889b15d57bd5073e3fcde97f176c18eb1a0c524919d9e12ad941e638d",
+  "source_unchanged": true
+}

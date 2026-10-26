@@ -1,0 +1,19 @@
+--- a/lampOS/crates/setup/src/reset.rs
++++ b/lampOS/crates/setup/src/reset.rs
+@@ -298,7 +298,15 @@
+         }
+     }
+     fn read(&mut self, argv: &[String]) -> io::Result<String> {
+-        query::read(argv)
++        let output = Command::new(&argv[0]).args(&argv[1..]).output()?;
++        if output.status.success() {
++            Ok(String::from_utf8_lossy(&output.stdout).into_owned())
++        } else {
++            Err(io::Error::other(format!(
++                "{} ended with {}",
++                argv[0], output.status
++            )))
++        }
+     }
+     fn sync(&mut self) {
+         rustix::fs::sync();
