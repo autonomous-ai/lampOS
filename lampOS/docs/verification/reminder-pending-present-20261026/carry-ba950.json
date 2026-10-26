@@ -1,0 +1,30 @@
+{
+  "head": "3fe3ecd1a5a7ceec8dc2e6dda791a92e70b739ec",
+  "base": "ba950f289b4e0d4fd072d080ea3a1b54e7bce03f",
+  "gates": {
+    "fmt": 0,
+    "clippy": 0,
+    "build": 0,
+    "test-compile": 0
+  },
+  "source_unchanged": true,
+  "delta_from_clean_runtime_head": [
+    "lampOS/crates/update/tests/install.rs",
+    "lampOS/docs/updates.md"
+  ],
+  "six_executables_identical_to_clean_666": {
+    "lamp_skills-a718b2a0214b6903": true,
+    "lamp-skills": true,
+    "it-46363ab9699809b5": true,
+    "requested_audio-019db324b83a9807": true,
+    "release_pair-88349d4c2302e5ab": true,
+    "lamp_skills-c6f44302f3b2c78f": true
+  },
+  "runtime_reused_from": "a02dd8c67de51a087380e309e98307efb8f612d4",
+  "runtime": [
+    542,
+    0,
+    9
+  ],
+  "scope": "Compiler gates fresh at this carry; runtime remains actual clean666 execution. Changed update install test and docs are not Skills runtime inputs. Dedicated target only; no hardware result."
+}
