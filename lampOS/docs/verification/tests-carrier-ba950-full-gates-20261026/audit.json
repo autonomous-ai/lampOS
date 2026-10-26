@@ -1,0 +1,234 @@
+{
+  "status": "Pinned Mac composite gate completed; all three controller failures retained",
+  "head": "09c067f9205756dceccba611e504a4af359b7871",
+  "base": "ba950f289b4e0d4fd072d080ea3a1b54e7bce03f",
+  "source_epoch": "Tested 09c plus exactly one verification README; committed as 3cb6771a2 with all 10,670 tracked bytes/modes equal",
+  "commit_binding": {
+    "tested_head": "09c067f9205756dceccba611e504a4af359b7871",
+    "committed_head": "3cb6771a2634e2efab20383e7d2bdf76fa2784d4",
+    "all_tracked_bytes_and_modes_equal": true,
+    "tracked_files": 10670,
+    "old_receipt_sha256": "48273055716a272c2dc6ceecee0c4caee5ce4dbc1af69753d4606ac9d7655adf"
+  },
+  "update": {
+    "runtime_attempts": 1,
+    "counts": {
+      "passed": 424,
+      "failed": 0,
+      "ignored": 6
+    },
+    "case_rows": 430,
+    "carrier_cases_once": 12,
+    "head_touch_cases_once": 35,
+    "targets": [
+      {
+        "target": "lamp_update-cebdb705cde8ec81",
+        "counts": {
+          "passed": 123,
+          "failed": 0,
+          "ignored": 2
+        }
+      },
+      {
+        "target": "lamp_update-04671789528a12d3",
+        "counts": {
+          "passed": 3,
+          "failed": 0,
+          "ignored": 0
+        }
+      },
+      {
+        "target": "functions-5603f33a4dae064e",
+        "counts": {
+          "passed": 5,
+          "failed": 0,
+          "ignored": 0
+        }
+      },
+      {
+        "target": "install-56b9137cd677b603",
+        "counts": {
+          "passed": 101,
+          "failed": 0,
+          "ignored": 0
+        }
+      },
+      {
+        "target": "it-49911377a8fbd75d",
+        "counts": {
+          "passed": 13,
+          "failed": 0,
+          "ignored": 0
+        }
+      },
+      {
+        "target": "release_pair-2ff63d2c9df235ef",
+        "counts": {
+          "passed": 0,
+          "failed": 0,
+          "ignored": 2
+        }
+      },
+      {
+        "target": "round-86f3bcf98e2c5ca2",
+        "counts": {
+          "passed": 179,
+          "failed": 0,
+          "ignored": 0
+        }
+      },
+      {
+        "target": "self_cli_exec-54a909607d4dc62b",
+        "counts": {
+          "passed": 0,
+          "failed": 0,
+          "ignored": 1
+        }
+      },
+      {
+        "target": "self_process_cuts-c92b6688279bd59f",
+        "counts": {
+          "passed": 0,
+          "failed": 0,
+          "ignored": 1
+        }
+      }
+    ],
+    "runtime_s": 1881.000728,
+    "command_exit": 0
+  },
+  "workspace": {
+    "command_exit": 0,
+    "runtime_s": 468.908879,
+    "package_helper_sha256": "402d5667aa2e13f973f1c84dc8545d9bd4415f6b11df092f55cbcfe69cf2b38b",
+    "workspace_helper_sha256": "b2504901b4cf36ce95c5f6cfd6f8c50dfe5f908bad61c891df59603c24c5e377",
+    "root_profile_features_equal": true,
+    "exact_transitive_feature_cause_established": false,
+    "manual_copy_back_to_target": false
+  },
+  "promotion": {
+    "runtime_attempts": 1,
+    "counts": {
+      "passed": 25,
+      "failed": 0,
+      "ignored": 0
+    },
+    "targets": [
+      {
+        "target": "lampos_promote-88d95a8362d8e5c8",
+        "counts": {
+          "passed": 2,
+          "failed": 0,
+          "ignored": 0
+        }
+      },
+      {
+        "target": "lampos_promote-8be9c061c6e3176a",
+        "counts": {
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        }
+      },
+      {
+        "target": "promotion-0f4e04193d74a5c0",
+        "counts": {
+          "passed": 22,
+          "failed": 0,
+          "ignored": 0
+        }
+      },
+      {
+        "target": "workflow-ccfba36233de2857",
+        "counts": {
+          "passed": 1,
+          "failed": 0,
+          "ignored": 0
+        }
+      }
+    ],
+    "actual_test_executables": 4,
+    "case_rows": 25,
+    "command_exit": 0,
+    "doc_blocks": [
+      "\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n"
+    ]
+  },
+  "stops": [
+    {
+      "stage": "Original controller progress print after completed Update",
+      "status": "FAIL",
+      "error": "BrokenPipeError(32, 'Broken pipe')",
+      "update_command_exit": 0
+    },
+    {
+      "stage": "Workspace completion guard",
+      "status": "FAIL",
+      "error": "AssertionError()",
+      "workspace_command_exit": 0,
+      "reason": "Only the normal updater helper changed to a workspace graph variant; nine actual tests and all 180 earlier frozen copies stayed unchanged."
+    },
+    {
+      "stage": "Promotion executable selection",
+      "status": "FAIL",
+      "error": "AssertionError()",
+      "promotion_runtime_attempts": 0,
+      "reason": "Controller assumed one test binary; actual metadata/compiler records showed four test targets and a normal CLI."
+    }
+  ],
+  "final_runtime_only_completion": {
+    "status": "PASS",
+    "update_runtime_attempts": 0,
+    "workspace_runtime_attempts": 0,
+    "promotion_runtime_attempts": 1,
+    "source_unchanged": true,
+    "protected_witnesses_unchanged": true,
+    "protected_count": 186,
+    "actual_executables_unchanged": true
+  },
+  "strict_packages": [
+    "lamp-body",
+    "lamp-cloud",
+    "lamp-expression",
+    "lamp-eyes",
+    "lamp-keeper",
+    "lamp-lean",
+    "lamp-memory",
+    "lamp-peek",
+    "lamp-setup",
+    "lamp-skills",
+    "lamp-turn-end",
+    "lamp-update",
+    "lamp-voice",
+    "lamp-voice-eval"
+  ],
+  "first_local_compiler_artifacts_all_fresh_false": true,
+  "limitations": [
+    "The completed raw commands and three failed supervisors are separate results; none was erased or relabelled.",
+    "Only unrun stages were continued; Update and workspace were not repeated.",
+    "This is a pinned Mac source epoch, not a latest-head native result or another installed-lamp trial.",
+    "The normal helper has equal root profile/features but different dependency fingerprints; exact transitive feature causation remains unverified."
+  ],
+  "receipt_sha256": {
+    "original/terminal.json": "6ca501f1137f90f3fd211fd947ed865ab287b1e588ace03615377a088168a8ca",
+    "original/update-tests.json": "5494483f4858f4a142a94b83499b711cf640680b854c542390aec1d887e2b07c",
+    "original/update-tests.stdout.txt": "2732b8eb8ffb19107c59cd865fb49543f4a191004e27903d34ef48bfa75f6880",
+    "original/update-tests.stderr.txt": "3722be412df80c37250166d8a0089bbed6945b34c6e0f73fd1c344e93451e973",
+    "original/source-after.json": "48273055716a272c2dc6ceecee0c4caee5ce4dbc1af69753d4606ac9d7655adf",
+    "original/protected-after.json": "d58d860c4b929fd73dcf942600e3e91b727405a9f739fc2a2467aa353c2a7b6b",
+    "workspace/terminal.json": "9863eb3e079939d7603bc04cc27af90f8f8a139c48a28b26e5bb79c97a27814f",
+    "workspace/workspace.json": "c6dec54be6bcb654484a8fc76e003504671916b50fdd5df917ffc923173bb635",
+    "workspace/completed-update-census.json": "5b2834fb0f002f4b07453e2dce3f125e9eac5896544d73b167011ee9c462fc79",
+    "promotion-preparation/terminal.json": "98d4fb499765ead3bb97b71573b0f720e5b5809c2913fea569c4429d7c626446",
+    "promotion-preparation/promotion-fmt.json": "e8da45a3fabcf958ae7eab4362793c7caec3107d0fa9307a5247b6fa63a4ff1f",
+    "promotion-preparation/promotion-strict.json": "799c46b24c0aeabea1d797d815497b353d197b98c4d8bf9e28c4ee7c8ed5f0e2",
+    "promotion-preparation/promotion-compile.json": "e1a945a6568ba7afa5cc2f48c4b3fe8d809ccb1bae3f479cc782d8544c407ed5",
+    "promotion-preparation/workspace-helper-variant-audit.json": "a22256cc3e08006e1b7431629391e6dee83923219174a9d12ae5805e6532d7bf",
+    "promotion-runtime/terminal.json": "21f094345d81bf811e114f6584a50be17780c6e82acd8959bc70c1f58232c31b",
+    "promotion-runtime/tests.json": "1259396cd27f6382e27594c1f42aa2d14bfb8a7733bd91c1836d578f17a4509f",
+    "promotion-runtime/census.json": "a00d34d165b5b899d1100554e9dfdf7f5037724b516a244a0a68089f65fdba96",
+    "promotion-runtime/source-after.json": "48273055716a272c2dc6ceecee0c4caee5ce4dbc1af69753d4606ac9d7655adf",
+    "promotion-runtime/protected-after.json": "d1c69e24ef71989a7be5a459fc1b7a0228485b35fd6be133a6a38a61393b2693",
+    "promotion-runtime/commit-binding.json": "c0b25ad9613cde241dfa7ea3dd56b067340ec86164d71eab885cc43f3ff76675"
+  }
+}
