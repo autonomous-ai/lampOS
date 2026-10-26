@@ -1,0 +1,70 @@
+{
+  "pr": 3615,
+  "offered_head": "625de46441cfbf44db6df67562251be460692747",
+  "offered_base": "0961e12d9d02c2327d9601c2ec125f4f2599a631",
+  "arm64_run": 40388323395,
+  "linux_clippy_run": 40388323191,
+  "arm64_attempt": 1,
+  "linux_clippy_attempt": 1,
+  "arm64_conclusion": "success",
+  "linux_clippy_conclusion": "success",
+  "previews": {
+    "linux-clippy": {
+      "executed_preview": "fd0798ac1397f7b71ac9ef7c7f66a28f7a35b3b2",
+      "preview_parents": [
+        "0961e12d9d02c2327d9601c2ec125f4f2599a631",
+        "625de46441cfbf44db6df67562251be460692747"
+      ],
+      "preview_tree": "ad1caf4b7113a46931643d2092c282fbf6e4f4a5",
+      "offered_tree": "ad1caf4b7113a46931643d2092c282fbf6e4f4a5",
+      "preview_equals_offered_tree": true
+    },
+    "arm64": {
+      "executed_preview": "fd0798ac1397f7b71ac9ef7c7f66a28f7a35b3b2",
+      "preview_parents": [
+        "0961e12d9d02c2327d9601c2ec125f4f2599a631",
+        "625de46441cfbf44db6df67562251be460692747"
+      ],
+      "preview_tree": "ad1caf4b7113a46931643d2092c282fbf6e4f4a5",
+      "offered_tree": "ad1caf4b7113a46931643d2092c282fbf6e4f4a5",
+      "preview_equals_offered_tree": true
+    }
+  },
+  "passed": 7537,
+  "failed": 0,
+  "leaks": 0,
+  "timeouts": 0,
+  "skipped": 53,
+  "unique_terminal_cases": 7537,
+  "repeated_equal_rows": 34,
+  "all_selected_ordinals_present": true,
+  "reported_selected_totals": [
+    7537
+  ],
+  "own_control_pass_counts": {
+    "lamp-skills::it skills::a_repeat_call_with_only_made_steps_is_refused_while_its_run_is_under_way": 1,
+    "lamp-skills::it skills::the_one_action_reply_reports_an_ack_write_error": 1,
+    "lamp-skills::it skills::the_one_action_reply_joins_on_unwind_before_connect_and_during_a_partial_request": 1
+  },
+  "terminal_findings": [],
+  "native_summary": "lampOS \u2014 build and test on Linux ARM64 (1/1)\tUNKNOWN STEP\t2026-10-26T19:42:45.1101935Z      Summary [ 168.851s] 7537 tests run: 7537 passed, 53 skipped",
+  "all_pass_audit": true,
+  "raw_logs": {
+    "linux-clippy": {
+      "path": "./.claude/worktrees/third-skills-actions-mock-evidence/current-0961/delivery/train/linux-clippy-40388323191.log",
+      "bytes": 91661,
+      "sha256": "a28828b58f5bc822a560b4eae3affa7b6c2128138859c2ce32294f4a60617417"
+    },
+    "arm64": {
+      "path": "./.claude/worktrees/third-skills-actions-mock-evidence/current-0961/delivery/train/arm64-40388323395.log",
+      "bytes": 1879196,
+      "sha256": "732fb509a4ccc64dfceacbbb3cd58c38e9c69b98fcaed10e9dc854287f5799be"
+    }
+  },
+  "controls_source": {
+    "path": "./.claude/worktrees/third-skills-actions-mock-evidence/current-0961/sealed-pass.json",
+    "sha256": "8ff80755cec921e40e30a265467e31bdf5c33eb7dc067f06a7ca933ff341ea3a"
+  },
+  "qualified": true,
+  "limits": "Train3615 candidate625de on0961 only, contains docs3612 and member3604. Distinct from member47e and landing2bf push qualification. No publication/device claims."
+}
