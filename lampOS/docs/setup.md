@@ -214,6 +214,19 @@ lamp-setup reset-now`). That unit, in this order:
    reboots, and if the reboot command fails it forces one: a lamp left dark
    with no marker would wait for a hand.
 
+Read-only reset queries retain at most 64 KiB of stdout and have five seconds
+per query, matching the updater's setup-unit query allowance. A timeout,
+oversized output or unsuccessful command follows the existing failed-stop
+path: keep the journal and personal data, and reboot into setup. The query
+runner has null stdin and keeps stderr out of the reset response. It owns
+its child process group and cleans it on errors, including a descendant
+holding stdout after the leader exits. An unsuccessful exit also stops
+descendants that closed output, before the leader is reaped. It does not
+claim to stop descendants that detach or close stdout before successful
+completion. Stop commands keep
+their existing allowances: this query deadline does not shorten Body folding
+or Wi-Fi rollback, and is not an overall reset or hard kernel-I/O deadline.
+
 With the keeper's `--setup-marker` (the fifth builder's, agreed on #702), a
 lamp with no marker starts only `lamp-setup.service`. So if the stop fails,
 `lamp-setup` reboots at once without wiping; if the power goes during the

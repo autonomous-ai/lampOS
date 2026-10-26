@@ -2013,3 +2013,29 @@ systemd job cancellation and reset policy are outside this piece. Exclusive
 child ownership and normal-success descendant limits remain explicit; host
 controls do not establish installed update acceptance or a hard kernel-I/O
 deadline.
+
+## Reset query output and time bounds (26 October 2026)
+
+Keep the delivered reset's starter/writer ordering, journal, custom stop and
+recovery policy. V1's `system/server/system/factoryreset.go::runFactoryReset`
+resets the agent, wipes device state and schedules a reboot; it does not
+supply the V2 systemd membership-query barrier. Reuse the owned-process-group,
+nonblocking pipe and unreaped-leader mechanics from the preserved Rust reset
+runner (258b2a9f10, #3583), without importing its alternate stop policy. Use
+the updater's existing five-second setup-unit query allowance and a 64 KiB
+stdout cap for Setup's read-only queries. No new dependency or public setting.
+
+The leader is not reaped while a descendant may still hold stdout or an
+unsuccessful exit still needs group cleanup. Exit status is observed with
+`waitid`/`NOWAIT`, then a failed group is stopped before the leader is reaped,
+including descendants that closed output. If the OS reports that another
+reaper already consumed the child, the query fails without signalling its
+unproven identity. With exclusive child ownership, this retains the identity
+through error cleanup. Successful EOF and leader
+exit end ownership; detached descendants or descendants closing stdout are
+not claimed as cleaned up. Stderr was captured but never exposed; it is now
+discarded without a buffer. Stop commands retain their budgets (Wi-Fi has a
+two-minute unit allowance); neither a shared 60-second stop limit nor a new
+reset-wide deadline is introduced. Query failures keep data and the journal
+and take the existing reboot path. Host subprocess controls do not prove
+installed reset acceptance or a hard bound on kernel spawn/reap/filesystem I/O.
