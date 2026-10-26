@@ -4702,6 +4702,12 @@ checkable sentence. A line in `replaces`' description ("If the answer says
 not_replaced, don't say the old one changed.") measured 17/20 and 12/20,
 no better, and is not in.
 
+In the live second route with `LAMP_MEMORY_REPLACES=on`, a correction in
+the person's words with no `replaces` ("I work at a library now, not the
+bakery") is sent with the id of the one shown kept thing it denies; more
+than one keeps nothing and the model asks (memory.md, "A correction in
+their words, with no id"). With the switch off, nothing changes.
+
 Run it like `probe-cache`, where lamp-actions runs:
 
 ```sh

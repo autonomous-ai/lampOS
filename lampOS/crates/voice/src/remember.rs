@@ -4463,6 +4463,66 @@ fn content_words(text: &str) -> Vec<String> {
     words
 }
 
+/// What the model is told of a correction in their words that denies more
+/// than one kept thing it was shown ([`correction_candidates`]).
+const CORRECTS_MORE_THAN_ONE: &str = "I found more than one old thing this could correct, so I kept nothing new. Ask which one they mean.";
+
+/// The kept things of `person`'s this session was shown (`shown`) that
+/// `said` corrects, for a `remember` with no `replaces`: `said` has a
+/// change word ("now", "anymore", "no longer", "instead of") and, after its
+/// last "not", "no longer" or "instead of", up to the clause's end, words
+/// every one of which the old thing has ("not the bakery": "works at a
+/// bakery"). "I don't like the bakery" has no change word; "not the
+/// bakery" alone corrects nothing; another person's, or one not shown, is
+/// never one. English only.
+fn correction_candidates(
+    context: &DaysContext,
+    person: Option<&str>,
+    spoken: &str,
+    shown: &[u64],
+) -> Vec<u64> {
+    // Padded, so each cue and marker is whole words: "cannot" is no "not".
+    let lower = format!(" {} ", spoken.to_lowercase().replace("don't", "do not"));
+    if ![" now", " anymore", " no longer ", " instead of "]
+        .iter()
+        .any(|cue| lower.contains(cue))
+    {
+        return vec![];
+    }
+    let Some((at, marker)) = [" not ", " no longer ", " instead of "]
+        .iter()
+        .filter_map(|marker| lower.rfind(marker).map(|at| (at, *marker)))
+        .max_by_key(|(at, _)| *at)
+    else {
+        return vec![];
+    };
+    let clause = lower[at + marker.len()..]
+        .split(['.', ',', ';', '?', '!'])
+        .next()
+        .unwrap_or_default();
+    let mut denied = content_words(clause);
+    denied.retain(|word| {
+        !matches!(
+            word.as_str(),
+            "anymore" | "currently" | "instead" | "before" | "work" | "worked"
+        )
+    });
+    if denied.is_empty() {
+        return vec![];
+    }
+    context
+        .texts
+        .iter()
+        .filter(|(whose, id, text)| {
+            whose.as_deref() == person && shown.contains(id) && {
+                let old = content_words(text);
+                denied.iter().all(|word| old.contains(word))
+            }
+        })
+        .map(|(_, id, _)| *id)
+        .collect()
+}
+
 /// A word as [`content_words`] gives it: a plural's `s` taken off.
 fn plural_off(word: &str) -> &str {
     word.strip_suffix('s')
@@ -5676,19 +5736,54 @@ impl DaysClient {
         }
         // #2510: a correction, with what this session was shown of this
         // scope; the store checks it. An id that is no id is not sent.
+        let replaces = call
+            .args
+            .get("replaces")
+            .and_then(Value::as_u64)
+            .filter(|id| *id > 0 && *id <= i64::MAX as u64);
         if call.name == REMEMBER
             && self.replaces.load(Ordering::Acquire)
-            && let Some(old) = call
-                .args
-                .get("replaces")
-                .and_then(Value::as_u64)
-                .filter(|id| *id > 0 && *id <= i64::MAX as u64)
+            && let Some(old) = replaces
         {
             let Ok(context) = self.context.try_lock() else {
                 return (gone(), false);
             };
             request["replaces"] = json!(old);
             request["shown"] = json!(context.shown(person));
+        }
+        // With no id given, a plain correction in their words ("I work at
+        // a library now, not the bakery") replaces the one kept thing of
+        // theirs this session was shown that it denies
+        // ([`correction_candidates`]; lamp-06c1, 26 Oct: the model left
+        // `replaces` out, so bakery and library both stayed current). More
+        // than one such thing keeps nothing and asks which; none, or a
+        // context busy just now, keeps it plainly, as before.
+        if call.name == REMEMBER && self.replaces.load(Ordering::Acquire) && replaces.is_none() {
+            let heard = asked_in.and_then(|id| {
+                crate::thread::THREAD
+                    .try_lock()
+                    .ok()
+                    .and_then(|thread| thread.heard_for(id, Instant::now()))
+            });
+            let said = heard.or_else(|| request["text"].as_str().map(str::to_owned));
+            if let Some(said) = said
+                && let Ok(context) = self.context.try_lock()
+            {
+                let shown = context.shown(person);
+                match correction_candidates(&context, person, &said, &shown)[..] {
+                    [] => {}
+                    [old] => {
+                        request["replaces"] = json!(old);
+                        request["shown"] = json!(shown);
+                    }
+                    _ => {
+                        return (
+                            json!({"remembered": false, "note": CORRECTS_MORE_THAN_ONE}),
+                            true,
+                        );
+                    }
+                }
+            }
         }
         // A room's kept thing, with who was seen saying the line that asked
         // for it (#2849): their words, so their forget everything takes it.
@@ -8409,6 +8504,61 @@ mod tests {
         io::{BufRead, BufReader, Write},
         os::unix::net::UnixListener,
     };
+
+    /// lamp-06c1, 26 Oct: "I work at a library now, not the bakery" with no
+    /// `replaces` picks the one shown kept thing it denies, and nothing when
+    /// it is no correction, not theirs, not shown, or more than one.
+    #[test]
+    fn an_explicit_correction_selects_only_one_shown_old_fact() {
+        let person = Some("p-0123456789abcdef");
+        let mut context = DaysContext::default();
+        context.shown_as(person, 26, "works at a bakery");
+        assert_eq!(
+            correction_candidates(
+                &context,
+                person,
+                "Remember I work at a library now, not the bakery.",
+                &[26]
+            ),
+            vec![26]
+        );
+        assert!(
+            correction_candidates(&context, person, "I do not like the bakery", &[26]).is_empty()
+        );
+        assert!(
+            correction_candidates(&context, person, "I cannot get to the bakery now", &[26])
+                .is_empty()
+        );
+        assert!(
+            correction_candidates(
+                &context,
+                None,
+                "I work at a library now, not the bakery",
+                &[26]
+            )
+            .is_empty()
+        );
+        assert!(
+            correction_candidates(
+                &context,
+                person,
+                "I work at a library now, not the bakery",
+                &[]
+            )
+            .is_empty()
+        );
+        context.shown_as(person, 27, "the bakery's opening hours");
+        assert_eq!(
+            correction_candidates(
+                &context,
+                person,
+                "I work at a library now, not the bakery",
+                &[26, 27]
+            ),
+            vec![26, 27],
+            "an ambiguous correction must never pick an old id"
+        );
+    }
 
     /// #2850: "forget my face" with its person's memory emptied says so;
     /// one with nothing kept of them is as good; a memory that couldn't be
@@ -16326,6 +16476,40 @@ mod tests {
         assert_eq!(read[3].replace("green", ""), read[4].replace("green", ""));
         assert!(sent[3].get("replaces").is_none() && sent[3].get("shown").is_none());
         drop(client);
+        std::fs::remove_file(&socket).unwrap();
+    }
+
+    #[test]
+    fn a_clear_correction_without_a_model_id_replaces_one_shown_fact() {
+        let person = "p-0123456789abcdef";
+        let (socket, served) = memory_lines("correction-without-id", 1, |request| {
+            assert_eq!(request["op"], "remember");
+            assert_eq!(request["replaces"], 26);
+            assert_eq!(request["shown"], json!([26]));
+            json!({"ok":true,"id":27,"replaced":26})
+        });
+        let client = DaysClient::new(socket.clone()).unwrap();
+        client.replaces.store(true, Ordering::Release);
+        {
+            let mut context = client.context.lock().unwrap();
+            context.hit(Some(person), &[26]);
+            context.shown_as(Some(person), 26, "works at a bakery");
+        }
+        let result = client.run_at(
+            &call(
+                REMEMBER,
+                json!({"text":"I work at a library now, not the bakery."}),
+            ),
+            FIRST_READ,
+            NOW,
+            Some(&EAST),
+            Some(person),
+        );
+        assert_eq!(
+            result,
+            (json!({"remembered":true,"replaced":26,"id":27}), true)
+        );
+        served.join().unwrap();
         std::fs::remove_file(&socket).unwrap();
     }
 
