@@ -1,0 +1,73 @@
+{
+  "base": "fac0279ca3c78fa1fb82e7a209e3b8a19596f868",
+  "overlay_patch_sha256": "3cb1b201465dde086d7272dcc9dd63b51c9a310083990b74a0c920d42c62b537",
+  "all_overlay_source_hashes_unchanged": true,
+  "source_count": 7204,
+  "gates": {
+    "fmt": {
+      "command": "cargo +1.96.0 fmt --all --check",
+      "started": "2026-10-26T03:23:20Z",
+      "finished": "2026-10-26T03:23:32Z",
+      "exit": 0,
+      "harnesses": 0,
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "disk_error_lines": []
+    },
+    "clippy": {
+      "command": "cargo +1.96.0 clippy -q --message-format=short --offline --locked -p lamp-update --test round -- -D warnings",
+      "started": "2026-10-26T03:23:32Z",
+      "finished": "2026-10-26T03:23:34Z",
+      "exit": 0,
+      "harnesses": 0,
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "disk_error_lines": []
+    },
+    "test-actual-parsers": {
+      "command": "cargo +1.96.0 test --offline --locked -p lamp-update --test round third_actual_skills_compatibility:: -- --test-threads=1 --nocapture",
+      "started": "2026-10-26T03:23:34Z",
+      "finished": "2026-10-26T03:23:46Z",
+      "exit": 0,
+      "harnesses": 1,
+      "passed": 3,
+      "failed": 0,
+      "ignored": 0,
+      "disk_error_lines": []
+    },
+    "test-product-skills": {
+      "command": "cargo +1.96.0 test --offline --locked -p lamp-update --test round product_skills -- --test-threads=1",
+      "started": "2026-10-26T03:23:46Z",
+      "finished": "2026-10-26T03:23:49Z",
+      "exit": 0,
+      "harnesses": 1,
+      "passed": 4,
+      "failed": 0,
+      "ignored": 0,
+      "disk_error_lines": []
+    }
+  },
+  "actual_parser_control_pass_counts": {
+    "bundle_only_changes_is_refused_by_the_actual_old_parser": 1,
+    "complete_changes_update_uses_the_actual_new_parser": 1,
+    "rollback_restores_the_actual_old_parser_and_its_reminders_rule": 1
+  },
+  "actual_new_app_sha256": "b70b7f00fc7734b9b9930c6c43ccaa88065357917285ef2fdf77f39e723c33a0",
+  "actual_old_app_sha256": "835d05246e8f8a71a7224c8d6c2ff5b50abbcea08ac09ad49fe18f642ddaf4b8",
+  "fixtures_sha256": "dae09283d28894d67b902b0270a88f744046c009ec82850c1354e81c67426608",
+  "executable_sha256": {
+    "round-86f3bcf98e2c5ca2": "be9d7867abc5f2234d61ff33533b0c21fef256a32d5c8da5bbb431e8bb88c06c"
+  },
+  "raw_log_sha256": {
+    "fmt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "clippy": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "test-actual-parsers": "e24660df9d0a9f4e5e1cf2e2c9e6f565b5b6ee81d4e4864e7c653bc9e4a61836",
+    "test-product-skills": "4b7c384e627ed6a6aeb81bd4100cb1e583416ddf2bb05d3aa12c3549037c1130"
+  },
+  "test_overlay_restored_byte_exact": true,
+  "restored_round_sha256": "fb4d5b1a8d1c2b378168dd915b9922c4b195af723a4d13445610bb578ed83ff2",
+  "final_product_source_manifest_restored": true,
+  "limits": "Actual native Mac parser executables and Update round/library/filesystem; text exec adapters. Host service lifecycle, clock, health and channel are simulated. No device, real service restart, live rolling update, acoustic or Voice-fallback execution. Private nonportable test overlay is not shipped."
+}

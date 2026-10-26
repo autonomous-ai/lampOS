@@ -1,0 +1,13 @@
+{
+  "base": "ed8e4819477f626dc4fbde4a23c5d43ef6fdfa17",
+  "patch_sha256": "3a91d1ca47496b7cd13be0ed129d0b45f7028f0768006862e2729b1a1b5cee0b",
+  "all_source_hashes_unchanged": true,
+  "source_count": 7197,
+  "exit": 101,
+  "passed": 1,
+  "failed": 2,
+  "qualified_pending_failure": "missing selected predicate rearmed unchanged valid pending work",
+  "unqualified_choice_failure": "fixture name changing_choice refused before exercising behavior",
+  "executable_sha256": "2d871073a04b154334f3977b129a56e6b06694e59373ade49ea35ad5fd94721c",
+  "log_sha256": "6f7e3c8ccffcb08d5c6ec5a8d3e21559a30a45de99cefcb81836a3d20bba8f69"
+}

@@ -1,0 +1,46 @@
+{
+  "binary_sha256": "835d05246e8f8a71a7224c8d6c2ff5b50abbcea08ac09ad49fe18f642ddaf4b8",
+  "old_manifest_sha256": "60207fe650905b2559b413b1771a8aa46594be193ce26f17c3e66228caa5a281",
+  "new_manifest_sha256": "9d0e6b27bba6f74c321bea97fd44a5fe49a4b6441e21d681808ecdda035b7b45",
+  "witnesses": [
+    {
+      "stage": "old_rule_loaded",
+      "pid": 58974,
+      "alive": true
+    },
+    {
+      "stage": "new_rule_refused_only_reminders_removed",
+      "pid": 58974,
+      "alive": true
+    },
+    {
+      "stage": "old_rule_restored_and_reloaded",
+      "pid": 58974,
+      "alive": true
+    }
+  ],
+  "success": true,
+  "limits": "Retained native Mac Skills daemon with private bus and no publishers. No updater, Voice, provider, speaker, device, or physical activity.",
+  "command": [
+    "/Users/d/code/autonomous-os/.claude/worktrees/third-reminder-pending-evidence/old-parser/lamp-skills",
+    "--dir",
+    "/tmp/r38wdfmwt8/skills",
+    "--bus-root",
+    "/tmp/r38wdfmwt8/bus",
+    "--state-dir",
+    "/tmp/r38wdfmwt8/state",
+    "--gaze-socket",
+    "/tmp/r38wdfmwt8/gaze",
+    "--mood-socket",
+    "/tmp/r38wdfmwt8/mood",
+    "--actions-socket",
+    "/tmp/r38wdfmwt8/actions",
+    "--say-socket",
+    "/tmp/r38wdfmwt8/say"
+  ],
+  "pid": 58974,
+  "restored_manifest_exact": true,
+  "reaped_returncode": -15,
+  "scratch_removed": true,
+  "raw_stderr_sha256": "4d5a2a59ad445c5653a158f5273fb2962c1d92301cfc38632c41715319fdc71d"
+}

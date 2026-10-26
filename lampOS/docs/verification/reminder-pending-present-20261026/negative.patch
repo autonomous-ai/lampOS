@@ -1,0 +1,939 @@
+diff --git a/lampOS/crates/skills/tests/it/skills.rs b/lampOS/crates/skills/tests/it/skills.rs
+index ca5eeb7ba..07ee3a5a2 100644
+--- a/lampOS/crates/skills/tests/it/skills.rs
++++ b/lampOS/crates/skills/tests/it/skills.rs
+@@ -11995,3 +11995,192 @@ fn resting_a_budget_queue_and_a_while_without_a_wait_say_why_not_run() {
+         ["hush not run: its while did not hold: voice/state state resting"]
+     );
+ }
++
++// The core skill offers a chance to Voice; a Schedule count is not a delivery
++// receipt. These tests keep that trigger boundary separate from the runner's
++// existing requirement that Voice begin the say before the body moves.
++mod reminder_pending {
++    use super::*;
++    use lamp_msgs::{ClockStamp, ScheduleDue, ScheduleNotice};
++
++    fn heartbeat(
++        engine: &mut Engine,
++        second: u64,
++        pending: u32,
++        ready: bool,
++        enabled: bool,
++        voice: &str,
++    ) -> Vec<lamp_skills::Run> {
++        let at_us = second * 1_000_000;
++        assert!(
++            engine
++                .observe(Faces::TOPIC, at_us, FACE.as_bytes(), Some(3_000))
++                .is_empty()
++        );
++        assert!(
++            engine
++                .observe(
++                    "voice/state",
++                    at_us,
++                    &serde_json::to_vec(&serde_json::json!({ "state": voice })).unwrap(),
++                    Some(3_000),
++                )
++                .is_empty()
++        );
++        let due = ScheduleDue {
++            stamp: ClockStamp {
++                clock_id: "schedule".into(),
++                at_us,
++                sequence: second + 1,
++            },
++            store_id: "0123456789abcdef0123456789abcdef".into(),
++            revision: 3,
++            enabled,
++            ready,
++            pending,
++            waiting_for_clock: 0,
++            oldest: (pending > 0 && ready && enabled).then_some(ScheduleNotice {
++                id: 188,
++                delivery: 1,
++                due_unix_ms: 1_792_130_400_000,
++                late_by_ms: None,
++                late: false,
++            }),
++        };
++        due.check().unwrap();
++        engine.observe(
++            ScheduleDue::TOPIC,
++            at_us,
++            &serde_json::to_vec(&due).unwrap(),
++            Some(3_000),
++        )
++    }
++
++    fn one_chance(runs: Vec<lamp_skills::Run>) {
++        assert_eq!(runs.len(), 1, "{runs:?}");
++        assert!(!runs[0].queue, "ordinary triggers do not queue more runs");
++        assert_eq!(
++            runs[0].calls.iter().map(Call::named).collect::<Vec<_>>(),
++            [
++                (
++                    "body.gaze",
++                    serde_json::json!({"look_at":"face","x":0.0,"y":-0.25,"size":0.25}),
++                ),
++                ("say", serde_json::json!({"from":"schedule"})),
++            ]
++        );
++    }
++
++    #[test]
++    fn core_reminders_can_request_again_after_talk_with_pending_still_positive() {
++        let mut engine = Engine::new(vec![load(&skills_root().join("reminders")).unwrap()], true);
++        assert!(heartbeat(&mut engine, 0, 0, true, true, "resting").is_empty());
++        one_chance(heartbeat(&mut engine, 1, 1, true, true, "resting"));
++
++        // The original chance has already been taken. Heartbeats stay one
++        // second apart throughout a talk longer than a source ask's 20 s
++        // lifetime, so neither an absent count nor stale source rearms it.
++        for second in 2..=30 {
++            let voice = match second {
++                2..=10 => "listening",
++                11..=20 => "thinking",
++                _ => "speaking",
++            };
++            assert!(heartbeat(&mut engine, second, 1, true, true, voice).is_empty());
++        }
++
++        // An older held occurrence can keep this same oldest/count positive
++        // when a later one becomes due. Held state and actual offers are not
++        // on this bus: only Voice's durable consumer may choose a delivery.
++        // The skill must offer another chance without requiring pending=0.
++        one_chance(heartbeat(&mut engine, 31, 2, true, true, "resting"));
++        one_chance(heartbeat(&mut engine, 32, 1, true, true, "resting"));
++        assert!(heartbeat(&mut engine, 33, 0, true, true, "resting").is_empty());
++    }
++
++    #[test]
++    fn core_reminders_keep_readiness_and_enablement_gates_on_repeated_chances() {
++        let mut engine = Engine::new(vec![load(&skills_root().join("reminders")).unwrap()], true);
++        assert!(heartbeat(&mut engine, 0, 0, true, true, "resting").is_empty());
++        assert!(heartbeat(&mut engine, 1, 1, false, true, "resting").is_empty());
++        one_chance(heartbeat(&mut engine, 2, 1, true, true, "resting"));
++        assert!(heartbeat(&mut engine, 3, 1, true, false, "resting").is_empty());
++        one_chance(heartbeat(&mut engine, 4, 1, true, true, "resting"));
++        assert!(heartbeat(&mut engine, 5, 0, true, true, "resting").is_empty());
++        assert!(heartbeat(&mut engine, 6, 1, true, true, "listening").is_empty());
++        one_chance(heartbeat(&mut engine, 7, 1, true, true, "resting"));
++    }
++
++    #[test]
++    fn a_schedule_ask_only_moves_when_voice_begins_it() {
++        // The executable fixture triggers on faces so it can isolate the
++        // runner's source-say handshake from Schedule and delivery policy.
++        let skill = FROM_SCHEDULE.replace(
++            "light = { colour = \"warm\" }",
++            "body = { look_at = \"face\" }\nlight = { colour = \"warm\" }",
++        );
++        let expired = the_program_with(&skill, true, &[r#"{"outcome":"expired"}"#], 3, 1, 4);
++        assert_eq!(expired.events.len(), 4);
++        assert_eq!(expired.events[3].why, "say: expired");
++        assert_eq!((expired.looked, expired.lights.len()), (None, 0));
++        let ask: serde_json::Value =
++            serde_json::from_str(expired.asked.as_deref().unwrap()).unwrap();
++        assert_eq!(ask["from"], "schedule");
++        assert_eq!(ask["priority"], 8);
++        assert!(ask.get("note").is_none());
++
++        let begun = the_program_with(
++            &skill,
++            true,
++            &[r#"{"event":"begun","at_us":5}"#, r#"{"outcome":"spoken"}"#],
++            3,
++            1,
++            4,
++        );
++        assert_eq!(begun.events.len(), 4);
++        assert_eq!(
++            begun.looked.as_deref(),
++            Some(r#"{"face":{"size":0.25,"turned":0.0,"x":0.0,"y":-0.25}}"#)
++        );
++        assert_eq!(begun.lights.len(), 2, "one light change and its return");
++        assert!(begun.events[3].why.contains("say: spoken"));
++    }
++
++    #[test]
++    fn repeated_schedule_chances_keep_one_waiting_runner_and_no_look() {
++        // A held-only Schedule can leave a wildcard ask waiting until Voice
++        // expires it. Repeated trigger chances while that run waits must not
++        // queue more executions or move the body without a begun response.
++        let skill = FROM_SCHEDULE
++            .replace("when = \"appears\"", "when = \"present\"")
++            .replace(
++                "light = { colour = \"warm\" }",
++                "body = { look_at = \"face\" }\nlight = { colour = \"warm\" }",
++            );
++        // The three face messages are 50 ms apart; the first expiry response
++        // is withheld for 200 ms, so all three chances precede its completion.
++        // Voice's own source-ask test separately pins the real 20 s cap.
++        let seen = the_program_with(&skill, true, &[r#"{"outcome":"expired"}"#], 3, 3, 12);
++        assert_eq!(seen.events.len(), 12, "{:?}", seen.events);
++        assert_eq!(
++            seen.events
++                .iter()
++                .filter(|event| event.why == "say: expired")
++                .count(),
++            1,
++            "{:?}",
++            seen.events
++        );
++        assert_eq!(
++            seen.events
++                .iter()
++                .filter(|event| event.why == "not made: its last run is still under way")
++                .count(),
++            2,
++            "{:?}",
++            seen.events
++        );
++        assert!(seen.asked.is_some());
++        assert_eq!((seen.looked, seen.lights.len()), (None, 0));
++    }
++}
+diff --git a/lampOS/skills/reminders/tests/due-during-a-talk-said-when-it-ends/expect.toml b/lampOS/skills/reminders/tests/due-during-a-talk-said-when-it-ends/expect.toml
+index 8e00a955a..7a9b084b6 100644
+--- a/lampOS/skills/reminders/tests/due-during-a-talk-said-when-it-ends/expect.toml
++++ b/lampOS/skills/reminders/tests/due-during-a-talk-said-when-it-ends/expect.toml
+@@ -1,19 +1,96 @@
+-# Someone at the desk throughout, talking with the lamp from 20 s to 60.5 s
+-# (voice/state listening, thinking, speaking). A reminder falls due at 30 s,
+-# in the talk: nothing then. The talk ends at 60.5 s, and at Schedule's next
+-# second, 61 s, the lamp looks at them and asks the voice to say it, which
+-# the voice says then too, once, with the look (the reviewer's P2 on #1667:
+-# asked for at 30 s, the ask would be gone at 50 s, and the voice would say
+-# it at 71 s with no look). Acknowledged at 70 s.
++# Someone is at the desk throughout, talking from 20 s through 60.5 s.
++# A reminder becomes due at 30 s. The Engine plans nothing during the talk,
++# then a look/source-say chance at the next Schedule heartbeat (61 s) and
++# each heartbeat through 69 s, before acknowledgement at 70 s. This replay
++# checks planned chances, not delivered words: Voice owns durable delivery,
++# and the runner moves only after Voice says begun.
+ 
+ [[expect]]
+ at = "61s"
+-within = "500ms"
+ call = "body.gaze"
+ args = { look_at = "face", x = 0.0, y = -0.25, size = 0.25 }
+ 
+ [[expect]]
+ at = "61s"
+-within = "500ms"
++call = "say"
++args = { from = "schedule" }
++
++[[expect]]
++at = "62s"
++call = "body.gaze"
++args = { look_at = "face", x = 0.0, y = -0.25, size = 0.25 }
++
++[[expect]]
++at = "62s"
++call = "say"
++args = { from = "schedule" }
++
++[[expect]]
++at = "63s"
++call = "body.gaze"
++args = { look_at = "face", x = 0.0, y = -0.25, size = 0.25 }
++
++[[expect]]
++at = "63s"
++call = "say"
++args = { from = "schedule" }
++
++[[expect]]
++at = "64s"
++call = "body.gaze"
++args = { look_at = "face", x = 0.0, y = -0.25, size = 0.25 }
++
++[[expect]]
++at = "64s"
++call = "say"
++args = { from = "schedule" }
++
++[[expect]]
++at = "65s"
++call = "body.gaze"
++args = { look_at = "face", x = 0.0, y = -0.25, size = 0.25 }
++
++[[expect]]
++at = "65s"
++call = "say"
++args = { from = "schedule" }
++
++[[expect]]
++at = "66s"
++call = "body.gaze"
++args = { look_at = "face", x = 0.0, y = -0.25, size = 0.25 }
++
++[[expect]]
++at = "66s"
++call = "say"
++args = { from = "schedule" }
++
++[[expect]]
++at = "67s"
++call = "body.gaze"
++args = { look_at = "face", x = 0.0, y = -0.25, size = 0.25 }
++
++[[expect]]
++at = "67s"
++call = "say"
++args = { from = "schedule" }
++
++[[expect]]
++at = "68s"
++call = "body.gaze"
++args = { look_at = "face", x = 0.0, y = -0.25, size = 0.25 }
++
++[[expect]]
++at = "68s"
++call = "say"
++args = { from = "schedule" }
++
++[[expect]]
++at = "69s"
++call = "body.gaze"
++args = { look_at = "face", x = 0.0, y = -0.25, size = 0.25 }
++
++[[expect]]
++at = "69s"
+ call = "say"
+ args = { from = "schedule" }
+diff --git a/lampOS/skills/reminders/tests/due-while-they-are-at-the-desk/expect.toml b/lampOS/skills/reminders/tests/due-while-they-are-at-the-desk/expect.toml
+index 01dec6460..bd7daa289 100644
+--- a/lampOS/skills/reminders/tests/due-while-they-are-at-the-desk/expect.toml
++++ b/lampOS/skills/reminders/tests/due-while-they-are-at-the-desk/expect.toml
+@@ -1,7 +1,8 @@
+-# Schedule says every second. Nothing due for a minute, someone at the desk
+-# throughout. At 60 s a reminder is due: the lamp looks at them and asks the
+-# voice to say it, once, though it stays due until it is acknowledged at
+-# 70 s.
++# Schedule reports once a second. Nothing is due before 60 s, then the
++# Engine plans one look/source-say chance per heartbeat through 69 s.
++# Acknowledged at 70 s, it plans no further chance. These are planned calls,
++# not actual speech or movement: Voice owns durable delivery, and the runner
++# allows one executing run and moves only after Voice says begun.
+ 
+ [[expect]]
+ at = "60s"
+@@ -12,3 +13,93 @@ args = { look_at = "face", x = 0.0, y = -0.25, size = 0.25 }
+ at = "60s"
+ call = "say"
+ args = { from = "schedule" }
++
++[[expect]]
++at = "61s"
++call = "body.gaze"
++args = { look_at = "face", x = 0.0, y = -0.25, size = 0.25 }
++
++[[expect]]
++at = "61s"
++call = "say"
++args = { from = "schedule" }
++
++[[expect]]
++at = "62s"
++call = "body.gaze"
++args = { look_at = "face", x = 0.0, y = -0.25, size = 0.25 }
++
++[[expect]]
++at = "62s"
++call = "say"
++args = { from = "schedule" }
++
++[[expect]]
++at = "63s"
++call = "body.gaze"
++args = { look_at = "face", x = 0.0, y = -0.25, size = 0.25 }
++
++[[expect]]
++at = "63s"
++call = "say"
++args = { from = "schedule" }
++
++[[expect]]
++at = "64s"
++call = "body.gaze"
++args = { look_at = "face", x = 0.0, y = -0.25, size = 0.25 }
++
++[[expect]]
++at = "64s"
++call = "say"
++args = { from = "schedule" }
++
++[[expect]]
++at = "65s"
++call = "body.gaze"
++args = { look_at = "face", x = 0.0, y = -0.25, size = 0.25 }
++
++[[expect]]
++at = "65s"
++call = "say"
++args = { from = "schedule" }
++
++[[expect]]
++at = "66s"
++call = "body.gaze"
++args = { look_at = "face", x = 0.0, y = -0.25, size = 0.25 }
++
++[[expect]]
++at = "66s"
++call = "say"
++args = { from = "schedule" }
++
++[[expect]]
++at = "67s"
++call = "body.gaze"
++args = { look_at = "face", x = 0.0, y = -0.25, size = 0.25 }
++
++[[expect]]
++at = "67s"
++call = "say"
++args = { from = "schedule" }
++
++[[expect]]
++at = "68s"
++call = "body.gaze"
++args = { look_at = "face", x = 0.0, y = -0.25, size = 0.25 }
++
++[[expect]]
++at = "68s"
++call = "say"
++args = { from = "schedule" }
++
++[[expect]]
++at = "69s"
++call = "body.gaze"
++args = { look_at = "face", x = 0.0, y = -0.25, size = 0.25 }
++
++[[expect]]
++at = "69s"
++call = "say"
++args = { from = "schedule" }
+diff --git a/lampOS/skills/reminders/tests/each-reminder-once/expect.toml b/lampOS/skills/reminders/tests/each-reminder-once/expect.toml
+index a3cc8a1a4..981b816f7 100644
+--- a/lampOS/skills/reminders/tests/each-reminder-once/expect.toml
++++ b/lampOS/skills/reminders/tests/each-reminder-once/expect.toml
+@@ -1,7 +1,9 @@
+-# One reminder due at 30 s and acknowledged at 40 s; another due at 50 s,
+-# and a third due at 55 s while the second still is: the lamp asks at 30 s
+-# and at 50 s. The third is one trigger with the second: the voice says it
+-# after the second, by itself.
++# One reminder is due at 30 s and acknowledged at 40 s; another is due at
++# 50 s, and a third at 55 s while pending is still positive. The Engine
++# plans a look/source-say chance on each due heartbeat, including 55 s.
++# This replay does not count actual deliveries despite its historical name:
++# Voice's ledger prevents duplicate delivery, and the runner allows one
++# executing run and moves only after Voice says begun.
+ 
+ [[expect]]
+ at = "30s"
+@@ -13,6 +15,96 @@ at = "30s"
+ call = "say"
+ args = { from = "schedule" }
+ 
++[[expect]]
++at = "31s"
++call = "body.gaze"
++args = { look_at = "face", x = 0.0, y = -0.25, size = 0.25 }
++
++[[expect]]
++at = "31s"
++call = "say"
++args = { from = "schedule" }
++
++[[expect]]
++at = "32s"
++call = "body.gaze"
++args = { look_at = "face", x = 0.0, y = -0.25, size = 0.25 }
++
++[[expect]]
++at = "32s"
++call = "say"
++args = { from = "schedule" }
++
++[[expect]]
++at = "33s"
++call = "body.gaze"
++args = { look_at = "face", x = 0.0, y = -0.25, size = 0.25 }
++
++[[expect]]
++at = "33s"
++call = "say"
++args = { from = "schedule" }
++
++[[expect]]
++at = "34s"
++call = "body.gaze"
++args = { look_at = "face", x = 0.0, y = -0.25, size = 0.25 }
++
++[[expect]]
++at = "34s"
++call = "say"
++args = { from = "schedule" }
++
++[[expect]]
++at = "35s"
++call = "body.gaze"
++args = { look_at = "face", x = 0.0, y = -0.25, size = 0.25 }
++
++[[expect]]
++at = "35s"
++call = "say"
++args = { from = "schedule" }
++
++[[expect]]
++at = "36s"
++call = "body.gaze"
++args = { look_at = "face", x = 0.0, y = -0.25, size = 0.25 }
++
++[[expect]]
++at = "36s"
++call = "say"
++args = { from = "schedule" }
++
++[[expect]]
++at = "37s"
++call = "body.gaze"
++args = { look_at = "face", x = 0.0, y = -0.25, size = 0.25 }
++
++[[expect]]
++at = "37s"
++call = "say"
++args = { from = "schedule" }
++
++[[expect]]
++at = "38s"
++call = "body.gaze"
++args = { look_at = "face", x = 0.0, y = -0.25, size = 0.25 }
++
++[[expect]]
++at = "38s"
++call = "say"
++args = { from = "schedule" }
++
++[[expect]]
++at = "39s"
++call = "body.gaze"
++args = { look_at = "face", x = 0.0, y = -0.25, size = 0.25 }
++
++[[expect]]
++at = "39s"
++call = "say"
++args = { from = "schedule" }
++
+ [[expect]]
+ at = "50s"
+ call = "body.gaze"
+@@ -22,3 +114,193 @@ args = { look_at = "face", x = 0.0, y = -0.25, size = 0.25 }
+ at = "50s"
+ call = "say"
+ args = { from = "schedule" }
++
++[[expect]]
++at = "51s"
++call = "body.gaze"
++args = { look_at = "face", x = 0.0, y = -0.25, size = 0.25 }
++
++[[expect]]
++at = "51s"
++call = "say"
++args = { from = "schedule" }
++
++[[expect]]
++at = "52s"
++call = "body.gaze"
++args = { look_at = "face", x = 0.0, y = -0.25, size = 0.25 }
++
++[[expect]]
++at = "52s"
++call = "say"
++args = { from = "schedule" }
++
++[[expect]]
++at = "53s"
++call = "body.gaze"
++args = { look_at = "face", x = 0.0, y = -0.25, size = 0.25 }
++
++[[expect]]
++at = "53s"
++call = "say"
++args = { from = "schedule" }
++
++[[expect]]
++at = "54s"
++call = "body.gaze"
++args = { look_at = "face", x = 0.0, y = -0.25, size = 0.25 }
++
++[[expect]]
++at = "54s"
++call = "say"
++args = { from = "schedule" }
++
++[[expect]]
++at = "55s"
++call = "body.gaze"
++args = { look_at = "face", x = 0.0, y = -0.25, size = 0.25 }
++
++[[expect]]
++at = "55s"
++call = "say"
++args = { from = "schedule" }
++
++[[expect]]
++at = "56s"
++call = "body.gaze"
++args = { look_at = "face", x = 0.0, y = -0.25, size = 0.25 }
++
++[[expect]]
++at = "56s"
++call = "say"
++args = { from = "schedule" }
++
++[[expect]]
++at = "57s"
++call = "body.gaze"
++args = { look_at = "face", x = 0.0, y = -0.25, size = 0.25 }
++
++[[expect]]
++at = "57s"
++call = "say"
++args = { from = "schedule" }
++
++[[expect]]
++at = "58s"
++call = "body.gaze"
++args = { look_at = "face", x = 0.0, y = -0.25, size = 0.25 }
++
++[[expect]]
++at = "58s"
++call = "say"
++args = { from = "schedule" }
++
++[[expect]]
++at = "59s"
++call = "body.gaze"
++args = { look_at = "face", x = 0.0, y = -0.25, size = 0.25 }
++
++[[expect]]
++at = "59s"
++call = "say"
++args = { from = "schedule" }
++
++[[expect]]
++at = "60s"
++call = "body.gaze"
++args = { look_at = "face", x = 0.0, y = -0.25, size = 0.25 }
++
++[[expect]]
++at = "60s"
++call = "say"
++args = { from = "schedule" }
++
++[[expect]]
++at = "61s"
++call = "body.gaze"
++args = { look_at = "face", x = 0.0, y = -0.25, size = 0.25 }
++
++[[expect]]
++at = "61s"
++call = "say"
++args = { from = "schedule" }
++
++[[expect]]
++at = "62s"
++call = "body.gaze"
++args = { look_at = "face", x = 0.0, y = -0.25, size = 0.25 }
++
++[[expect]]
++at = "62s"
++call = "say"
++args = { from = "schedule" }
++
++[[expect]]
++at = "63s"
++call = "body.gaze"
++args = { look_at = "face", x = 0.0, y = -0.25, size = 0.25 }
++
++[[expect]]
++at = "63s"
++call = "say"
++args = { from = "schedule" }
++
++[[expect]]
++at = "64s"
++call = "body.gaze"
++args = { look_at = "face", x = 0.0, y = -0.25, size = 0.25 }
++
++[[expect]]
++at = "64s"
++call = "say"
++args = { from = "schedule" }
++
++[[expect]]
++at = "65s"
++call = "body.gaze"
++args = { look_at = "face", x = 0.0, y = -0.25, size = 0.25 }
++
++[[expect]]
++at = "65s"
++call = "say"
++args = { from = "schedule" }
++
++[[expect]]
++at = "66s"
++call = "body.gaze"
++args = { look_at = "face", x = 0.0, y = -0.25, size = 0.25 }
++
++[[expect]]
++at = "66s"
++call = "say"
++args = { from = "schedule" }
++
++[[expect]]
++at = "67s"
++call = "body.gaze"
++args = { look_at = "face", x = 0.0, y = -0.25, size = 0.25 }
++
++[[expect]]
++at = "67s"
++call = "say"
++args = { from = "schedule" }
++
++[[expect]]
++at = "68s"
++call = "body.gaze"
++args = { look_at = "face", x = 0.0, y = -0.25, size = 0.25 }
++
++[[expect]]
++at = "68s"
++call = "say"
++args = { from = "schedule" }
++
++[[expect]]
++at = "69s"
++call = "body.gaze"
++args = { look_at = "face", x = 0.0, y = -0.25, size = 0.25 }
++
++[[expect]]
++at = "69s"
++call = "say"
++args = { from = "schedule" }
+diff --git a/lampOS/skills/reminders/tests/quiet-while-schedule-cannot-serve-it/expect.toml b/lampOS/skills/reminders/tests/quiet-while-schedule-cannot-serve-it/expect.toml
+index 4a62bbf83..bca86b43b 100644
+--- a/lampOS/skills/reminders/tests/quiet-while-schedule-cannot-serve-it/expect.toml
++++ b/lampOS/skills/reminders/tests/quiet-while-schedule-cannot-serve-it/expect.toml
+@@ -1,7 +1,9 @@
+-# A reminder is counted due at 20 s while Schedule is not ready to serve it:
+-# nothing. Ready at 40 s with it still due: the chance kept since 20 s
+-# (wait, the reviewer's P2 on #1667) is taken then, as the voice is offered
+-# it, so the lamp looks at them as it is said.
++# A reminder is counted due at 20 s while Schedule cannot serve it: no
++# planned calls. Ready at 40 s with pending still positive, the Engine plans
++# a look/source-say chance at 40 s and each heartbeat through 59 s. The
++# readiness condition remains required; no saved appears chance is needed.
++# These are plans only: Voice owns delivery, and the runner moves only
++# after Voice says begun.
+ 
+ [[expect]]
+ at = "40s"
+@@ -12,3 +14,193 @@ args = { look_at = "face", x = 0.0, y = -0.25, size = 0.25 }
+ at = "40s"
+ call = "say"
+ args = { from = "schedule" }
++
++[[expect]]
++at = "41s"
++call = "body.gaze"
++args = { look_at = "face", x = 0.0, y = -0.25, size = 0.25 }
++
++[[expect]]
++at = "41s"
++call = "say"
++args = { from = "schedule" }
++
++[[expect]]
++at = "42s"
++call = "body.gaze"
++args = { look_at = "face", x = 0.0, y = -0.25, size = 0.25 }
++
++[[expect]]
++at = "42s"
++call = "say"
++args = { from = "schedule" }
++
++[[expect]]
++at = "43s"
++call = "body.gaze"
++args = { look_at = "face", x = 0.0, y = -0.25, size = 0.25 }
++
++[[expect]]
++at = "43s"
++call = "say"
++args = { from = "schedule" }
++
++[[expect]]
++at = "44s"
++call = "body.gaze"
++args = { look_at = "face", x = 0.0, y = -0.25, size = 0.25 }
++
++[[expect]]
++at = "44s"
++call = "say"
++args = { from = "schedule" }
++
++[[expect]]
++at = "45s"
++call = "body.gaze"
++args = { look_at = "face", x = 0.0, y = -0.25, size = 0.25 }
++
++[[expect]]
++at = "45s"
++call = "say"
++args = { from = "schedule" }
++
++[[expect]]
++at = "46s"
++call = "body.gaze"
++args = { look_at = "face", x = 0.0, y = -0.25, size = 0.25 }
++
++[[expect]]
++at = "46s"
++call = "say"
++args = { from = "schedule" }
++
++[[expect]]
++at = "47s"
++call = "body.gaze"
++args = { look_at = "face", x = 0.0, y = -0.25, size = 0.25 }
++
++[[expect]]
++at = "47s"
++call = "say"
++args = { from = "schedule" }
++
++[[expect]]
++at = "48s"
++call = "body.gaze"
++args = { look_at = "face", x = 0.0, y = -0.25, size = 0.25 }
++
++[[expect]]
++at = "48s"
++call = "say"
++args = { from = "schedule" }
++
++[[expect]]
++at = "49s"
++call = "body.gaze"
++args = { look_at = "face", x = 0.0, y = -0.25, size = 0.25 }
++
++[[expect]]
++at = "49s"
++call = "say"
++args = { from = "schedule" }
++
++[[expect]]
++at = "50s"
++call = "body.gaze"
++args = { look_at = "face", x = 0.0, y = -0.25, size = 0.25 }
++
++[[expect]]
++at = "50s"
++call = "say"
++args = { from = "schedule" }
++
++[[expect]]
++at = "51s"
++call = "body.gaze"
++args = { look_at = "face", x = 0.0, y = -0.25, size = 0.25 }
++
++[[expect]]
++at = "51s"
++call = "say"
++args = { from = "schedule" }
++
++[[expect]]
++at = "52s"
++call = "body.gaze"
++args = { look_at = "face", x = 0.0, y = -0.25, size = 0.25 }
++
++[[expect]]
++at = "52s"
++call = "say"
++args = { from = "schedule" }
++
++[[expect]]
++at = "53s"
++call = "body.gaze"
++args = { look_at = "face", x = 0.0, y = -0.25, size = 0.25 }
++
++[[expect]]
++at = "53s"
++call = "say"
++args = { from = "schedule" }
++
++[[expect]]
++at = "54s"
++call = "body.gaze"
++args = { look_at = "face", x = 0.0, y = -0.25, size = 0.25 }
++
++[[expect]]
++at = "54s"
++call = "say"
++args = { from = "schedule" }
++
++[[expect]]
++at = "55s"
++call = "body.gaze"
++args = { look_at = "face", x = 0.0, y = -0.25, size = 0.25 }
++
++[[expect]]
++at = "55s"
++call = "say"
++args = { from = "schedule" }
++
++[[expect]]
++at = "56s"
++call = "body.gaze"
++args = { look_at = "face", x = 0.0, y = -0.25, size = 0.25 }
++
++[[expect]]
++at = "56s"
++call = "say"
++args = { from = "schedule" }
++
++[[expect]]
++at = "57s"
++call = "body.gaze"
++args = { look_at = "face", x = 0.0, y = -0.25, size = 0.25 }
++
++[[expect]]
++at = "57s"
++call = "say"
++args = { from = "schedule" }
++
++[[expect]]
++at = "58s"
++call = "body.gaze"
++args = { look_at = "face", x = 0.0, y = -0.25, size = 0.25 }
++
++[[expect]]
++at = "58s"
++call = "say"
++args = { from = "schedule" }
++
++[[expect]]
++at = "59s"
++call = "body.gaze"
++args = { look_at = "face", x = 0.0, y = -0.25, size = 0.25 }
++
++[[expect]]
++at = "59s"
++call = "say"
++args = { from = "schedule" }

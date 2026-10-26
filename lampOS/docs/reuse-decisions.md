@@ -2039,3 +2039,33 @@ two-minute unit allowance); neither a shared 60-second stop limit nor a new
 reset-wide deadline is introduced. Query failures keep data and the journal
 and take the existing reboot path. Host subprocess controls do not prove
 installed reset acceptance or a hard bound on kernel spawn/reap/filesystem I/O.
+
+## Reminder skills offer another chance while work remains (26 October 2026)
+
+V1 `system/schedule/runner.go` revisits due work after a busy tick or failed
+handoff. Keep that opportunity without requesting on every positive heartbeat:
+the opt-in Skills `changes` trigger compares a bounded scalar tuple. Reminders
+selects store identity, pending count, oldest ID and delivery state. First
+eligibility, a changed tuple, or restored eligibility rearms one chance;
+renewal timestamps, revision and lateness do not. The new mode requires a
+scalar trigger comparison and keeps selected paths independent of same-topic
+while fields; overlapping configurations are refused at load. Existing `appears` and
+`present` definitions retain their behavior. The durable Voice consumer still
+owns selection, completion, retry pace and acknowledgements.
+
+Retain resting, ready and enabled guards, one executing run and the Voice-begun
+body gate. The target is a chance on the next eligible observation of changed
+work or restored eligibility, without sixty requests for sixty unchanged held
+heartbeats. No new worker, protocol or model round trip is added. Synthetic
+Engine and runner controls distinguish opportunities from delivery and gaze;
+physical latency and motion remain unverified.
+
+The old Skills parser rejects the new trigger and omits Reminders if it reloads
+a new bundle before its binary restarts; unrelated valid skills remain loaded.
+The updater's `skills_still_load` guard refuses this bundle for a bundle-only
+update that keeps the old binary. A complete update writes the bundle before
+restarting parts, so it still has an old-reader interval. Normal rollback
+restores skill files before restarting the old binary; crash recovery requires
+Update to run again. Voice's existing ten-second fallback is an eligible-offer
+wait, not guaranteed end-to-end delivery or proof of mixed-version parity.
+Keep these crossings explicit in validation; no atomic-update claim is made.

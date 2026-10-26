@@ -1,0 +1,13 @@
+{
+  "base": "fac0279ca3c78fa1fb82e7a209e3b8a19596f868",
+  "patch_sha256": "b2882404e6aabba325585c7add76973f3cbc6f8b236bdd58c5b6d1f34472260c",
+  "all_source_hashes_unchanged": true,
+  "source_count": 7204,
+  "exit": 101,
+  "passed": 0,
+  "failed": 1,
+  "qualified_failure": "compound Changes comparison accepted; expected load refusal",
+  "limit": "Observed parser acceptance, not an executed malformed-child rearm round; the latter was a source finding.",
+  "executable_sha256": "fc0a03fe1be1a99e9b27d7b2a5d40f6b16e3ab93e58f34917a920710ac8a6097",
+  "log_sha256": "3a672e64120e816aec6d3e6c46b600009116d672e16e6ffbf211b8c87f08a829"
+}

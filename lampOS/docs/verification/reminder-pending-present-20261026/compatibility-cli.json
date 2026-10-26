@@ -1,0 +1,36 @@
+{
+  "app_sha256": "b70b7f00fc7734b9b9930c6c43ccaa88065357917285ef2fdf77f39e723c33a0",
+  "rows": [
+    {
+      "case": "new-list",
+      "command": [
+        "list",
+        "--dir",
+        "/private/tmp/third-reminder-pending-evidence/compatibility/new-changes"
+      ],
+      "exit": 0,
+      "stdout": "NAME          KIND  VERSION  MAY USE\nreminders     core  1.0.0    reads schedule/due, humans/faces/tracked, voice/state; speak, body\nwelcome-back  core  1.0.0    reads humans/faces/tracked, voice/state; speak, light, body, who is at the lamp\nThe skills here give the model no function.\n",
+      "stderr": ""
+    },
+    {
+      "case": "new-recordings",
+      "command": [
+        "test",
+        "/private/tmp/third-reminder-pending-evidence/compatibility/new-changes/reminders"
+      ],
+      "exit": 0,
+      "stdout": "/private/tmp/third-reminder-pending-evidence/compatibility/new-changes/reminders: 4 cases pass, 0 have no recording yet\n",
+      "stderr": ""
+    },
+    {
+      "case": "old-recordings",
+      "command": [
+        "test",
+        "/private/tmp/third-reminder-pending-evidence/compatibility/old-appears/reminders"
+      ],
+      "exit": 0,
+      "stdout": "/private/tmp/third-reminder-pending-evidence/compatibility/old-appears/reminders: 4 cases pass, 0 have no recording yet\n",
+      "stderr": ""
+    }
+  ]
+}

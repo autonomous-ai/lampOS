@@ -1,0 +1,120 @@
+{
+  "base": "ed8e4819477f626dc4fbde4a23c5d43ef6fdfa17",
+  "patch_sha256": "156f3af56096c4c0cb4a13ca17988f0dac512349f9afd0e3488688065f0d21f5",
+  "source_count": 7197,
+  "all_source_hashes_unchanged": true,
+  "source_manifest_sha256": "dc9c98d699966bd166c37c375945c55a08dd10a571ff29f3b93f1db693e4f4a5",
+  "changed_source_sha256": {
+    "lampOS/crates/skills/src/lib.rs": "0e36d15dd4375ba20fa00ed53fd3f3ba6c8efff8fef67640ed45f4528d9c94ca",
+    "lampOS/crates/skills/tests/it/skills.rs": "4112969f13ea4368ea612b23bb49c46ce81d9edf173e7c12a8551b39d30f56a1",
+    "lampOS/docs/reuse-decisions.md": "c3644cad661eb8494e1f2057794ef9e0bb6e8798f2f6d882370887c139303b9c",
+    "lampOS/docs/schedule.md": "2c94d6a64dd440a7ef83f778c32243e7e2fcd26820e647addbaefdb90bd03154",
+    "lampOS/docs/skills.md": "ed86f9dcb05c2230c0e925190a53ce8fac51c5833c89b8d6b74e0e0cb21154dc",
+    "lampOS/skills/reminders/SKILL.md": "c8a525dac9074cedc30018d5f69cc8650991f799c59069ced61bad733f219dc9",
+    "lampOS/skills/reminders/skill.toml": "9d0e6b27bba6f74c321bea97fd44a5fe49a4b6441e21d681808ecdda035b7b45",
+    "lampOS/skills/reminders/tests/due-during-a-talk-said-when-it-ends/expect.toml": "0df2ac9258fbc25f0c83156cd8bd264ae12ca0f3f1c79fb96c64eb3f27ea01f6",
+    "lampOS/skills/reminders/tests/due-while-they-are-at-the-desk/expect.toml": "e4bacd213d0cd2ad6e2828079fbe0e4fc89e8b9d736cfdf5ed66c366bfec726d",
+    "lampOS/skills/reminders/tests/each-reminder-once/expect.toml": "6880f969ba059ab357aa29c4cb9a9d9ab187c3bb0600bf096391c6dd32400146",
+    "lampOS/skills/reminders/tests/quiet-while-schedule-cannot-serve-it/expect.toml": "53d657afa4c5fa4735b44c10a342f1753dae815f42ef89e7cd9461e6af737d94"
+  },
+  "gates": {
+    "fmt": {
+      "command": "cargo +1.96.0 fmt --all --check",
+      "started": "2026-10-26T02:33:25Z",
+      "finished": "2026-10-26T02:33:36Z",
+      "exit": 0,
+      "harnesses": 0,
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "disk_error_lines": []
+    },
+    "clippy": {
+      "command": "cargo +1.96.0 clippy -q --message-format=short --offline --locked -p lamp-skills --all-targets -- -D warnings",
+      "started": "2026-10-26T02:33:36Z",
+      "finished": "2026-10-26T02:34:15Z",
+      "exit": 0,
+      "harnesses": 0,
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "disk_error_lines": []
+    },
+    "test-focused": {
+      "command": "cargo +1.96.0 test --offline --locked -p lamp-skills --test it skills::reminder_pending:: -- --test-threads=1",
+      "started": "2026-10-26T02:34:15Z",
+      "finished": "2026-10-26T02:34:41Z",
+      "exit": 0,
+      "harnesses": 1,
+      "passed": 12,
+      "failed": 0,
+      "ignored": 0,
+      "disk_error_lines": []
+    },
+    "test-parser": {
+      "command": "cargo +1.96.0 test --offline --locked -p lamp-skills --lib tests::a_change_trigger_requires_bounded_paths_and_compatible_options -- --exact --test-threads=1",
+      "started": "2026-10-26T02:34:41Z",
+      "finished": "2026-10-26T02:34:51Z",
+      "exit": 0,
+      "harnesses": 1,
+      "passed": 1,
+      "failed": 0,
+      "ignored": 0,
+      "disk_error_lines": []
+    },
+    "build": {
+      "command": "cargo +1.96.0 build -q --offline --locked --workspace",
+      "started": "2026-10-26T02:34:51Z",
+      "finished": "2026-10-26T02:36:32Z",
+      "exit": 0,
+      "harnesses": 0,
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "disk_error_lines": []
+    },
+    "test-skills": {
+      "command": "cargo +1.96.0 test --offline --locked -p lamp-skills -- --test-threads=1",
+      "started": "2026-10-26T02:36:32Z",
+      "finished": "2026-10-26T02:40:33Z",
+      "exit": 0,
+      "harnesses": 6,
+      "passed": 535,
+      "failed": 0,
+      "ignored": 9,
+      "disk_error_lines": []
+    }
+  },
+  "full_suite_control_pass_counts": {
+    "unchanged_held_reminder_has_one_chance_across_sixty_heartbeats": 1,
+    "core_reminders_can_request_again_after_talk_with_pending_still_positive": 1,
+    "core_reminders_keep_readiness_and_enablement_gates_on_repeated_chances": 1,
+    "core_reminders_coalesce_queue_changes_and_ignore_renewal_metadata": 1,
+    "core_reminders_notice_a_brief_talk_between_schedule_heartbeats": 1,
+    "core_reminders_rearm_after_source_or_condition_expiry": 1,
+    "core_reminders_keep_the_change_snapshot_across_unchanged_reload": 1,
+    "invalid_selected_values_do_not_replace_or_rearm_a_reminder_snapshot": 1,
+    "existing_trigger_modes_keep_their_heartbeat_behavior": 1,
+    "a_changes_trigger_reads_a_bounded_tuple_on_another_topic": 1,
+    "a_schedule_ask_only_moves_when_voice_begins_it": 1,
+    "repeated_schedule_chances_keep_one_waiting_runner_and_no_look": 1,
+    "a_change_trigger_requires_bounded_paths_and_compatible_options": 1,
+    "every_skill_folder_passes_its_own_recorded_tests": 1
+  },
+  "executable_sha256": {
+    "lamp_skills-c6f44302f3b2c78f": "a07ee9a96ac669b0a9430de0ca5be0f727f0ea4b6b8abc2ce4ec3e82c1e999f4",
+    "lamp_skills-a718b2a0214b6903": "1a67af1697d767b3b70d03afbc30dbf9eaf84995a81d40d2e836f8df7ea1f22b",
+    "it-46363ab9699809b5": "2c7b1f0c00102fbab50a24d92d7e51e583c46aaeb0c2cea3bcd6078fb71dc75c",
+    "release_pair-88349d4c2302e5ab": "057f200eacd7617d3fb818a0311d498cf96449d8bbc1004169d7a7f305a70198",
+    "requested_audio-019db324b83a9807": "bf4dedb682328fad636c549cd4d6fd482641732fde260a95dd06a8ee8d2a2b69"
+  },
+  "raw_log_sha256": {
+    "fmt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "clippy": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "test-focused": "597c3efa13bc95a6ebb2d7fdbba2e587a5e9bf5d62a33364d9b084cacbe1911e",
+    "test-parser": "d71c8639277c1150d3148ceeefad251031c23fc97cf93d353808b07e5f36b319",
+    "build": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "test-skills": "7e045226b0c1f8c3596dbe3ade8d3465238cac4fa58a0ddeccae16309f2d8b29"
+  },
+  "limits": "Native x86_64 Mac. Focused counts overlap full suite and are not added. Replays count planned calls, not actual delivery. No physical gaze, acoustic timing or Linux ARM64 claim."
+}

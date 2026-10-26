@@ -1,0 +1,11 @@
+{
+  "old_baseline": "ed8e4819477f626dc4fbde4a23c5d43ef6fdfa17",
+  "new_baseline": "fac0279ca3c78fa1fb82e7a209e3b8a19596f868",
+  "base": "1c884f16cf4de53a700bba7512c129c3ee01d72d",
+  "runtime_patch_applied_without_change": true,
+  "prior_patch_sha256": "5b5325b429a6f96e0df1db582c9d41094ac6641c7fad0b70b3b96f54bb1d857a",
+  "base_changes": [
+    "Expression privacy read repair and corresponding docs/proof"
+  ],
+  "range_diff": "1:  ed8e48194 = 1:  fac0279ca lampOS: offer reminder skill chances while work remains pending\n"
+}

@@ -1,0 +1,15 @@
+{
+  "base": "ed8e4819477f626dc4fbde4a23c5d43ef6fdfa17",
+  "patch_sha256": "0a8548ca39d11e70490d7359f810254b390fbc15441d7b4e43bd45ac90e463ac",
+  "all_source_hashes_unchanged": true,
+  "source_count": 7197,
+  "exit": 101,
+  "passed": 1,
+  "failed": 2,
+  "qualified_failures": [
+    "missing selected predicate rearmed unchanged valid pending work",
+    "missing selected choice rearmed an unchanged valid snapshot"
+  ],
+  "executable_sha256": "a56d800f2b92b857dc2ea503103478564335406e5ca268e4e92e5a6c30cd47ce",
+  "log_sha256": "01c66baf595ffee989b93dca539c5daf60650ff63c69057b074edf2ce4efe06b"
+}

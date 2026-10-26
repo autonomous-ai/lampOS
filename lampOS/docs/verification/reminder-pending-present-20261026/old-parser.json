@@ -1,0 +1,7 @@
+{
+  "binary_sha256": "835d05246e8f8a71a7224c8d6c2ff5b50abbcea08ac09ad49fe18f642ddaf4b8",
+  "dependency_file_sha256": "6a220088d3670707756cfc31c13c3dd3fa7b4688bf3160dfed9387f659d2007d",
+  "source_context": "Workspace build during retirement review-fixed gate on f3c898341 plus its frozen overlay; Skills parser/loader sources unchanged from41233. Captured before compiling the new changes mode.",
+  "build_receipt": "../../third-reminder-evidence/review-fixed/sealed.json",
+  "limits": "Developer native x86_64 Mac app for explicit old-parser/new-manifest check; not a device release binary."
+}
