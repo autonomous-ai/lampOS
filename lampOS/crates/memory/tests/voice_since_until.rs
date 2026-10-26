@@ -169,21 +169,31 @@ fn recall_says_since_and_gives_history_with_until_only_when_asked() {
     assert!(found(&client, Some(ANA), true).is_empty());
 }
 
-/// The room's scope never gives history: with nobody known, history asked
-/// for gives only the current one; and someone known asking for theirs
-/// never gets the room's replaced version.
+/// Finding L on #3504: with nobody known, history asked for gives the
+/// room's own corrected version too, with until when; someone known asking
+/// for theirs still never gets the room's replaced version.
 #[test]
-fn the_rooms_scope_never_gives_history() {
+fn the_rooms_scope_gives_its_own_history_only_to_its_own_recall() {
     switch_replaces(true);
     switch_forget_all(true);
     let fixture = Fixture::new("room");
     let client = DaysClient::new(fixture.socket.clone()).unwrap();
-    let (_, green) = violet_then_green(&client, None);
+    let (violet, green) = violet_then_green(&client, None);
 
-    for person in [None, Some(ANA)] {
-        let items = found(&client, person, true);
-        assert_eq!(items.len(), 1, "{person:?}: {items:?}");
-        assert_eq!(items[0]["source_id"], green);
-        assert!(items[0].get("until").is_none(), "{items:?}");
-    }
+    let items = found(&client, None, true);
+    assert_eq!(items.len(), 2, "{items:?}");
+    assert!(
+        items
+            .iter()
+            .any(|item| item["source_id"] == green && item.get("until").is_none())
+    );
+    assert!(
+        items
+            .iter()
+            .any(|item| item["source_id"] == violet && item.get("until").is_some())
+    );
+    let items = found(&client, Some(ANA), true);
+    assert_eq!(items.len(), 1, "{items:?}");
+    assert_eq!(items[0]["source_id"], green);
+    assert!(items[0].get("until").is_none(), "{items:?}");
 }
