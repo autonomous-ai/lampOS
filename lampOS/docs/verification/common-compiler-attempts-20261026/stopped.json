@@ -1,0 +1,94 @@
+{
+  "attempts": [
+    {
+      "packet": "/private/tmp/fourth-common-c5be-prepared-full-gates-20261026",
+      "release_sha256": "0750ed3e339048fe24a7557b3f78755b30f5bc2716f7f4200758392a6fa1d930",
+      "release": {
+        "head": "c5be13f1b30de38aa5e325b0b5ec468366c003ae",
+        "tree": "94817850c7ab7faff721339ccc878afb932af1dc",
+        "actual_native_session_id": 25335,
+        "actual_native_exit": 125,
+        "actual_native_chunk": "fb1d17",
+        "fmt_exit": 0,
+        "clippy_exit": 101,
+        "case_execution_status": "No runtime launched; strict Clippy failed collapsible_if in eyes/who.rs389",
+        "source_stable": true,
+        "all_owned_sessions_groups_closed": true,
+        "target_release_permitted": true,
+        "fresh_process_census": [
+          {
+            "stage": "fmt",
+            "sid": 67949,
+            "members": [],
+            "inspection_errors": []
+          },
+          {
+            "stage": "clippy",
+            "sid": 69089,
+            "members": [],
+            "inspection_errors": []
+          }
+        ],
+        "preserved_witnesses": 22,
+        "preserved_debug_clones": 7492,
+        "preserved_passed_driver_clones": 4,
+        "free_bytes": 27602006016,
+        "receipts": {
+          "run.py": "c07280cb29634cecfc7a79243c075384f1d0373ef8817a187f462f2a8734fca5",
+          "binding.json": "3b2ca94beb7f9906912e4f85d225567922b9879c57e94837b619c65641a15bee",
+          "operations.json": "94b7faf494d272a59b46c768ec2038d675298f33bdeeecd45bdc9797f7af3540",
+          "terminal.json": "906c835f058c4d3f7af1fc51a780aca3c79873ecc36666efeb3da61cbbd82864",
+          "clippy.stdout": "21bf74c17a85676aa455b7c9b22230b692eadf3e9463725b92ad9f3c1a345176",
+          "clippy.stderr": "69d9d62fca6067a240a4b161c696be6de44d0c82029a0c096bd158be366be2cd",
+          "native-observations.jsonl": "9f6c3071a3f9d7dd8b17c4b83dc63e802f6a60ca6ef041c2268cf507d5f2e38c"
+        }
+      }
+    },
+    {
+      "packet": "/private/tmp/fourth-common-2a827-full-gates-20261026",
+      "release_sha256": "276398fee5d511cad51df84e7c7ab2f73beabb7db0ea8ebcac4015b2175e6d89",
+      "release": {
+        "head": "0e5c49ca01b34521e2990a4dd717c26426387271",
+        "tree": "8e5298ea0a3a345e0e8f2851c583903942bbceb7",
+        "actual_native_session_id": 45502,
+        "actual_native_exit": 125,
+        "actual_native_chunk": "a28f97",
+        "fmt_exit": 0,
+        "clippy_exit": 101,
+        "case_execution_status": "No runtime launched; strict Clippy failed E0689 ambiguous integer checked_add in eyes/who.rs3934",
+        "source_stable": true,
+        "all_owned_sessions_groups_closed": true,
+        "target_release_permitted": true,
+        "fresh_process_census": [
+          {
+            "stage": "fmt",
+            "sid": 87690,
+            "members": [],
+            "inspection_errors": []
+          },
+          {
+            "stage": "clippy",
+            "sid": 89659,
+            "members": [],
+            "inspection_errors": []
+          }
+        ],
+        "preserved_witnesses": 22,
+        "preserved_debug_clones": 7492,
+        "preserved_passed_driver_clones": 4,
+        "free_bytes": 26152710144,
+        "receipts": {
+          "run.py": "c07280cb29634cecfc7a79243c075384f1d0373ef8817a187f462f2a8734fca5",
+          "binding.json": "d0a73a2b469a88a821005ee52336f3aa057b5d9127a31b58060685a517497fed",
+          "operations.json": "33df0045a7ae8510cbc58661abd4960ae9d40e267cf0f446f2861397bf547206",
+          "terminal.json": "ebeff9d548cd1478e1cc263471e3bf3d58af61ba28f82987cff16553e6e2208c",
+          "clippy.stdout": "c03eab88292aedd6c1e9027dd44107bb0ad54dcdd41c36f7d62d5b53ba28f04e",
+          "clippy.stderr": "2a10f68c3c371850e79aca3bd89d604bcebfab40fd97a05e3e1ea9c2e03568fc",
+          "native-observations.jsonl": "ae013f9d2e6a0b2ddca0b66ce629099e88eb14749466425604cd1b1fdb3ced4c"
+        }
+      }
+    }
+  ],
+  "runtime_cases_executed": 0,
+  "limits": "Compiler failures retained. No retry-to-pass runtime result exists. Corrected source requires new qualification."
+}

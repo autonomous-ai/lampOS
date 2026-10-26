@@ -1,3 +1,13 @@
+## 2026-10-26 19:33 — Current Common gate resumed after compiler corrections
+
+Ready for lamp-voice: no
+
+Common is rebased onto 2a8273ef2 with equal three-commit range-diff; current HEAD 0e5c49ca0 and staged tree d9f10adf3 hold the 16-file repair. [Retained compiler attempts](verification/common-compiler-attempts-20261026/stopped.json) record fmt passing and strict Clippy failing first on collapsible_if, then on an ambiguous integer timestamp in a new test. Both actual controllers exited 125 after compiler 101, closed all owned sessions and executed zero runtime cases. The nested condition and u64 annotation are corrected; no failed result is erased.
+
+Fresh local-package cleanup completed before the corrected gate, preserving 22 witnesses, 7,492 debug inputs, four passed executable clones and external fingerprints. Full gates are running in /private/tmp/fourth-common-u64-full-gates-20261026 under native session 37842: default profiles, incremental off from the first stage, one compiler, two test slots, zero retries, 33 required boundary cases. No current pass is claimed yet. The changed factory stand-ins independently passed 97/0 at the earlier unchanged shell inputs; shell syntax passed. Callback source carries the same correction as tree 94188e1c0 and remains unrun.
+
+The explicit-close authority gap has a source-only follow-up plan: an unexpired old Seen cannot be sufficient after a listener-side close or reopen while publication is blocked. Existing request revocation is reused, with an independently observable permit incarnation still to be designed. No device, activation, or quality-score change.
+
 ## 2026-10-26 18:49 — Diagnostic native pass and final source correction
 
 Ready for lamp-voice: no
