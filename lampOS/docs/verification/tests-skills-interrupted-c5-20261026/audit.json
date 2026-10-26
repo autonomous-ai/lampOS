@@ -1,0 +1,145 @@
+{
+  "status": "PARTIAL RUN; no full-suite PASS",
+  "source_head": "0c6fc02c7067b35905ba371cee04b29febb8d9c3",
+  "source_base": "c5c7603a743690e291f85a664a7ee18624232581",
+  "audit_method": "Read-only source/history/log/artifact audit; no Cargo, binaries, --list or tests executed; active target never accessed",
+  "raw_file_sha256": {
+    "full-tests.stdout": "50cd0901b898227abf04b5e2797b9a01ac7557f7f9f6503c5bed0960c8b81cb5",
+    "full-tests.stderr": "07923f2b3568bd2a52663c235f30b419bf8cc6915ad10ae35a102a6e095cd1eb",
+    "full-tests-result.json": "b62c7514f1808004210607007c96606b4a39cf3eb56678678904fe8fceb47d23",
+    "full-tests-source-guard.json": "0db981b67c4301a5911488d5c2954eb52345e3e22175a193d0e52afd0167d6d6",
+    "full-compile.stdout": "003661c2c4371a22c94b5da6873749ea8972b7e06aed3d4e85d2b09d7bc96031",
+    "full-compile-result.json": "a50f3ff063e11197f03b18859f9271f82d7e4644e371aaa0e1f5cf5f0519af9f",
+    "all-compiled-executables.json": "8557c8041d8cac161fcc5ec317a1edf9cba7f2784b2f1340477c3f62dc719636",
+    "test-target-artifacts.json": "79ae111d20a147e2e273ee2b599546e44833873e22cde25c584758cb22ff8b0a",
+    "metadata.stdout": "196e4cca020d7865390059f2d3c5b8147a5306c45f6c2e4328de9b1c1e765dea",
+    "metadata-result.json": "03b58b8519c1abbc6477194f5008afee9ac185bfe9e7b10314fe51f443aa7a21",
+    "executable-hashes-before.json": "617ddb12c2859393986d07e6b61ba536c3b6acba3441707c1b0d347fee7259e7",
+    "executable-hashes-after.json": "617ddb12c2859393986d07e6b61ba536c3b6acba3441707c1b0d347fee7259e7",
+    "frozen-executables.json": "938552a2e2296b17e7fc6f874d5c23466b70cb36a195f2bee6cdcff93480035a",
+    "source-before.json": "faf4245dba2acf9e49fc3b3a421d66fef3126ccd5a8d8d13b43aec849eec2283",
+    "source-after.json": "faf4245dba2acf9e49fc3b3a421d66fef3126ccd5a8d8d13b43aec849eec2283",
+    "terminal.json": "16e570f314a24a9f950e399498041c8a1c95c7046a6e598651ba230b08288ac8"
+  },
+  "source_bindings": [
+    {
+      "path": "lampOS/crates/skills/tests/it/addon.rs",
+      "sha256": "15db11e18468504635db4019862d1d5c4d35ecdacb60529c204aa28233b819c9",
+      "equal_compiled_source_snapshot_and_commit": true
+    },
+    {
+      "path": "lampOS/crates/skills/tests/it/main.rs",
+      "sha256": "a501e8a910fa65091b055e273b89fb9510aa34b265881cc6510c00498ff7b13e",
+      "equal_compiled_source_snapshot_and_commit": true
+    },
+    {
+      "path": "lampOS/crates/skills/Cargo.toml",
+      "sha256": "e471ae369f2a32a479c9e34a48480535cbca7720bfc4f85a90b6b46a4d64beb1",
+      "equal_compiled_source_snapshot_and_commit": true
+    },
+    {
+      "path": "lampOS/crates/update/tests/install.rs",
+      "sha256": "0a48efebe83ceddf73a74bb0cc0ed540bb30113044f93b79d47146b54ceeb977",
+      "equal_compiled_source_snapshot_and_commit": true
+    },
+    {
+      "path": "lampOS/docs/skills.md",
+      "sha256": "627892816c1381c43e7e8fc49db846619fefbfc113e39b7d0f2993e41d1be5f3",
+      "equal_compiled_source_snapshot_and_commit": true
+    }
+  ],
+  "compile": {
+    "exit": 0,
+    "elapsed_s": 795.0673614170228,
+    "compiled_executables": 99,
+    "compiled_test_profile_executables": 67
+  },
+  "runtime": {
+    "exit": -15,
+    "elapsed_s": 1393.497754120006,
+    "timeout_s": 5400,
+    "stop_reason": "disk reserve",
+    "cleanup": [
+      {
+        "signal": "SIGTERM",
+        "action": "sent to owned group"
+      },
+      {
+        "signal": "SIGKILL",
+        "action": "skipped; leader exited unreaped"
+      }
+    ],
+    "direct_child_reaped": true
+  },
+  "completed_harnesses": 52,
+  "completed_summary_totals": {
+    "passed": 2423,
+    "failed": 0,
+    "ignored": 27
+  },
+  "skills": {
+    "completed_compiled_harnesses": 5,
+    "totals": {
+      "passed": 522,
+      "failed": 0,
+      "ignored": 9
+    },
+    "declared_cases": 531,
+    "doc_tests": "No doc-test invocation or result observed; not claimed"
+  },
+  "changed_case": {
+    "target": "lamp-skills / test it",
+    "case": "addon::says_the_judge_dropped_do_not_spend_the_hour",
+    "observed": "exact literal ok once in completed it block",
+    "a_fifth_say_true": "Source calls true and validates fifth proposal plus five-minute refusal before false call",
+    "a_fifth_say_false": "Source then calls false and asserts the fifth is refused by four-proposals/hour bound",
+    "coverage_basis": "One observed passing Rust test entails both sequential helper calls and their assertions completed; not two test observations or measured branch tracing",
+    "function_source_sha256": "7f3d7ad2a49a018f7d4f7e5abf45af74861ccad6fc28c4599061eaf58903d84f",
+    "source_lines": [
+      808,
+      822
+    ]
+  },
+  "unfinished": {
+    "ordinal": 53,
+    "package": "lamp-update",
+    "target": "install",
+    "kind": [
+      "test"
+    ],
+    "entry_source": "lampOS/crates/update/tests/install.rs",
+    "executable_basename": "install-1ac5cd8688fb5552",
+    "executable_sha256": "4246b32c6f6fa01b009896f290e73b88b57106fab7d177b81cf2ad10858ffc61",
+    "stdout_lines": [
+      2712,
+      2777
+    ],
+    "stderr_running_line": 653,
+    "declared_tests": 92,
+    "terminal_case_lines": {
+      "passed": 64,
+      "failed": 0,
+      "ignored": 0
+    },
+    "ordered_terminal_case_records_sha256": "7b8629333396c69f1cc9a7649d51227885df94f35dbf52bc7484989fa7c78653",
+    "summary_complete": false,
+    "compiler_profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "unfinished_case": "run_twice_it_changes_nothing",
+    "declared_tests_without_start_or_terminal_line": 27
+  },
+  "limits": [
+    "No executable inventory --list was run; no unobserved case identities invented",
+    "Interrupted target is lamp-update/install, not lamp-setup",
+    "64 explicit ok lines in interrupted install block excluded from 2423 completed-summary passed total",
+    "Incomplete case has no result and is neither passed nor failed",
+    "No full suite, all doc-tests, subsequent workspace build or device behavior qualification",
+    "No retries, source edits, active target access, cleanup, posting, commits or pushes by this audit"
+  ]
+}

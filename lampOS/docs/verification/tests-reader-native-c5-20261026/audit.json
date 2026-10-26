@@ -1,0 +1,122 @@
+{
+  "run_id": 40254820731,
+  "attempt": 1,
+  "status": "success",
+  "head": "a26fdc9d317821a85febf46f7a25f64da92d4f06",
+  "base": "c5c7603a743690e291f85a664a7ee18624232581",
+  "preview": "6d18fb66b4a89ac312172a31cec4c5b06acb400d",
+  "equal_tree": "1c9831606b7422d93fcde2fde69540c6bdc1b0d3",
+  "scope": "affected nextest subset; not whole workspace test census",
+  "selected": 7463,
+  "unique_pass": 7463,
+  "fail_leak_timeout": 0,
+  "skipped": 53,
+  "executed_binaries": 67,
+  "skipped_binaries": 114,
+  "elapsed_seconds": 156.119,
+  "duplicate_success_output_lines": 34,
+  "reader_passes": [
+    {
+      "status": "PASS",
+      "duration": "0.005s",
+      "index": 6148,
+      "total": 7463,
+      "name": "lamp-voice session_reader::tests::finite_and_unset_service_never_resolve_a_reader_group"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.005s",
+      "index": 6149,
+      "total": 7463,
+      "name": "lamp-voice session_reader::tests::linux::a_fixture_root_retains_ancestor_mode_acl_and_path_checks"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.007s",
+      "index": 6150,
+      "total": 7463,
+      "name": "lamp-voice session_reader::tests::group_lookup_failure_retains_private_logging_without_writer_failure"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.005s",
+      "index": 6151,
+      "total": 7463,
+      "name": "lamp-voice session_reader::tests::linux::access_and_default_acl_are_refused_without_stripping_or_widening_them"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.007s",
+      "index": 6152,
+      "total": 7463,
+      "name": "lamp-voice session_reader::tests::linux::a_verified_failed_grant_keeps_private_original_records"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.008s",
+      "index": 6153,
+      "total": 7463,
+      "name": "lamp-voice session_reader::tests::linux::an_earlier_reader_refusal_keeps_a_verified_private_writer"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.010s",
+      "index": 6154,
+      "total": 7463,
+      "name": "lamp-voice session_reader::tests::linux::every_grant_failure_restores_private_modes_and_original_groups"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.006s",
+      "index": 6155,
+      "total": 7463,
+      "name": "lamp-voice session_reader::tests::linux::failed_private_rollback_disables_only_metadata"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.006s",
+      "index": 6156,
+      "total": 7463,
+      "name": "lamp-voice session_reader::tests::linux::readable_or_linked_voice_siblings_deny_preparation_and_late_grant"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.009s",
+      "index": 6157,
+      "total": 7463,
+      "name": "lamp-voice session_reader::tests::linux::only_the_new_session_is_shared_after_one_pinned_lookup"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.006s",
+      "index": 6158,
+      "total": 7463,
+      "name": "lamp-voice session_reader::tests::linux::replaced_record_never_changes_an_outside_sentinel"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.010s",
+      "index": 6159,
+      "total": 7463,
+      "name": "lamp-voice session_reader::tests::linux::shared_session_writer_projects_every_segment_without_private_values"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.006s",
+      "index": 6160,
+      "total": 7463,
+      "name": "lamp-voice session_reader::tests::linux::unprepared_or_wrong_group_parent_never_grants_or_changes_ancestors"
+    },
+    {
+      "status": "PASS",
+      "duration": "0.006s",
+      "index": 6161,
+      "total": 7463,
+      "name": "lamp-voice session_reader::tests::local_session_reader_group_is_exact_unique_and_bounded"
+    }
+  ],
+  "reader_ignored_limit": "Existing dedicated_reader_can_only_read_new_events_under_dropped_identity is ignored in source and has no executed terminal row; log has aggregate skip count only. No privileged DAC execution claim.",
+  "log_sha256": "98e5dc50db5c51f295718008bb8034a6eabcc8f35bc58f9834a12fe0675f0e53",
+  "historical_full_failure": "7454/3/53 unchanged and not waived or rerun",
+  "publication": "Private raw log only; not inspected for raw publication"
+}

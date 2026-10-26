@@ -1,5 +1,29 @@
 # Tests work log
 
+## 2026-10-26 09:37 — Reader current carry gates; Skills partial run retained
+
+Ready for lamp-voice: no (#3527 latest-base native; #3466 installed rehearsal)
+
+[Reader c5 native proof](verification/tests-reader-native-c5-20261026/) records
+7,463 passes, zero failures/leaks/timeouts and 53 skips, with equal tested and
+authored trees. The current 26c2cee72/0c1 carry preserves the Rust patch and both
+document sections. Formatting, strict twelve-package Clippy and workspace build pass; fresh
+native qualification follows push.
+
+[Skills partial-run evidence](verification/tests-skills-interrupted-c5-20261026/)
+retains the disk-reserve interruption: 52 completed harnesses total 2,423/0/27;
+all five Skills harnesses completed at 522/0/9, including the journal fixture's
+two sequential branches. Update install is incomplete, with 64 explicit passes
+excluded from that total. No full-gate pass is claimed. All 99 executable
+witnesses were preserved independently before compiler-target reuse.
+
+Carrier fed2c6c58 is carried locally onto 0c1; its gates follow the Reader.
+Real installed GOOD/BAD still needs an owner and lamp slot. The requested
+#3528 source read is active; Fourth owns the recorder fixture gap. No archive
+deletions or device action occurred. The new compile-only allocation uses a
+3 GiB preflight and 2 GiB plus 64 MiB reserve; the old run's 5 GiB interruption
+remains unchanged.
+
 ## 2026-10-26 08:37 — Current carrier native green; reader PR published
 
 Ready for lamp-voice: no (#3466 rehearsal; #3527 native checks and read)
