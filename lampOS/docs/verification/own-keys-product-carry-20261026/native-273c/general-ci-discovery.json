@@ -1,0 +1,43 @@
+{
+  "head": "273c1b6f1c67288d7904d98909edddb1eed40a69",
+  "observed_runs": [
+    {
+      "id": 40359072590,
+      "name": "lampOS on ARM64",
+      "status": "completed",
+      "conclusion": "success",
+      "run_number": 7113,
+      "jobs_url": "https://api.github.com/repos/autonomous-ai/lampOS/actions/runs/40359072590/jobs",
+      "logs_url": "https://api.github.com/repos/autonomous-ai/lampOS/actions/runs/40359072590/logs",
+      "workflow_id": 384179159
+    },
+    {
+      "id": 40359072624,
+      "name": "lampOS clippy",
+      "status": "completed",
+      "conclusion": "success",
+      "run_number": 3099,
+      "jobs_url": "https://api.github.com/repos/autonomous-ai/lampOS/actions/runs/40359072624/jobs",
+      "logs_url": "https://api.github.com/repos/autonomous-ai/lampOS/actions/runs/40359072624/logs",
+      "workflow_id": 389977098
+    }
+  ],
+  "general_status": "No general CI run discovered; not passed or skipped",
+  "lookup_limit": "Connector filters pull_request runs, first page only; no claim about undiscovered push-triggered runs. Two returned PR runs are exact requested native run IDs.",
+  "prior_to_current_delta": [
+    "lampOS/crates/skills/tests/it/call_wait.rs"
+  ],
+  "workflow_trigger_lines": [
+    "name: CI",
+    "",
+    "on:",
+    "  # The V1 checks (Go, web, HAL, CTS) skip a change that only touches lampOS:",
+    "  # lampos-arm64.yml and lampos-clippy.yml check those, with their scripts",
+    "  # (.github/scripts/lampos-*.py). A change touching anything else still runs them.",
+    "  push:",
+    "    paths-ignore: ['lampOS/**', '.github/workflows/lampos-arm64.yml', '.github/workflows/lampos-clippy.yml', '.github/scripts/lampos-*.py']",
+    "  pull_request:",
+    "    paths-ignore: ['lampOS/**', '.github/workflows/lampos-arm64.yml', '.github/workflows/lampos-clippy.yml', '.github/scripts/lampos-*.py']"
+  ],
+  "workflow_sha256": "b552e831175a9033100ca4786d392f28d0ddd8e63fe60bfdd81d3f509059ced0"
+}

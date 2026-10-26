@@ -1,3 +1,13 @@
+Ready for lamp-voice: 273c native qualified; latest-base publication waits on source transport; query change locally qualified.
+
+## Current checkpoint: 2026-10-27 01:37 +07, connector native continuation complete
+
+[273c original native proof](verification/own-keys-product-carry-20261026/native-273c/README.md): **11,408 unique passes / zero failures, leaks, timeouts or unrun / 106 skips**, all 66 exact required controls once, 35 echoes excluded. Original ARM 40359072590 and Linux Clippy 40359072624 pass. Original job identities, actual preview checkouts, exact 521d/273c parents and authored-tree equality verify. Separate process 13, relay 1, docs 4 across 46 and helper 25 remain separate. The first watcher reached its deadline without qualification amid TLS failures; connector read-only continuation supplies the terminal proof and explicitly hashes decoded text. No CI rerun or latest-base relabel.
+
+GitHub connector reads work with the configured actor; direct Git source transport has reset/stalled. Current public Main has later assertion/Routine/Voice changes; local refs are not called current after a failed fetch. Narrow public-tip negotiation is running before source carries. The new query-bound change is committed locally at 8a050d1bf, with draft full Setup/Cloud 387/0/5 plus final test-only System-read wiring/phase-witness checks; it is not pushed or ready until current-base and original native qualification. No device or release action. Activation #2094/current-lamp acceptance remains held.
+
+---
+
 Ready for lamp-voice: own-keys current CI pending; separate reset query-bound piece taken.
 
 ## Current checkpoint: 2026-10-26 23:32 +07, next bounded-query piece

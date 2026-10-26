@@ -1,0 +1,63 @@
+{
+  "initial_watch": {
+    "completed": [
+      "clippy"
+    ],
+    "pending": [
+      "arm64"
+    ],
+    "elapsed_seconds": 3600.0055042089953,
+    "max_poll_seconds": 300,
+    "deadline_seconds": 3600
+  },
+  "initial_errors": [
+    {
+      "at": "2026-10-26T16:45:19.784149+00:00",
+      "name": "arm64",
+      "error": "RuntimeError: API exited 1"
+    },
+    {
+      "at": "2026-10-26T16:50:31.056859+00:00",
+      "name": "arm64",
+      "error": "RuntimeError: API exited 1"
+    },
+    {
+      "at": "2026-10-26T16:55:43.553087+00:00",
+      "name": "arm64",
+      "error": "RuntimeError: API exited 1"
+    },
+    {
+      "at": "2026-10-26T17:01:28.577050+00:00",
+      "name": "arm64",
+      "error": "TimeoutExpired: Command '['gh', 'api', 'repos/autonomous-ai/lampOS/actions/runs/40359072590/attempts/1']' timed out after 45 seconds"
+    },
+    {
+      "at": "2026-10-26T17:06:38.789254+00:00",
+      "name": "arm64",
+      "error": "RuntimeError: API exited 1"
+    },
+    {
+      "at": "2026-10-26T17:11:53.141026+00:00",
+      "name": "arm64",
+      "error": "RuntimeError: API exited 1"
+    },
+    {
+      "at": "2026-10-26T17:17:05.354797+00:00",
+      "name": "arm64",
+      "error": "RuntimeError: API exited 1"
+    },
+    {
+      "at": "2026-10-26T17:22:19.563933+00:00",
+      "name": "arm64",
+      "error": "RuntimeError: API exited 1"
+    }
+  ],
+  "continuation": "Read-only GitHub connector, original job ID121699291569 matches initial attempt1 metadata; no CI rerun.",
+  "decoded_text_characters": 1956964,
+  "decoded_text_utf8_sha256": "8b0106234a9cbbdd47a6cdad2fd6610ab30769f3566fbaadb53343241e054ea9",
+  "connector_metadata_hashes": {
+    "connector-runs.json": "f76a3e9c70b087badcdbbdd0e4b6d7fd7816aa0a86888cf9748fa6fa81efefe4",
+    "connector-arm-jobs.json": "84e65d0d35f912f2bfa22935cf3e32e9c13ce233df6995632af72b9b7604bdbe",
+    "connector-arm-artifacts.json": "3ee9f70672563d689525652f0837fc832202a1abe756ffa2d8735e2f41a6843e"
+  }
+}
