@@ -165,6 +165,13 @@ fn run() -> Result<bool, Box<dyn std::error::Error>> {
             Some("--boot") if given.next().is_none() => true,
             Some(_) => return Err("wifi-restore takes only --boot".into()),
         };
+        // A reset journalled: its wipe of the Wi-Fi is not undone (Third on #3579).
+        if !reset::wifi_restore_allowed(Path::new(reset::PRODUCT_JOURNAL))? {
+            eprintln!(
+                "lamp-setup: wifi-restore: a reset is journalled, the old network is not put back"
+            );
+            return Ok(true);
+        }
         let mut host = lamp_setup::wifi_change::ImageRejoin::new();
         let restored = lamp_setup::wifi_change::restore(&mut host, !boot);
         eprintln!("lamp-setup: wifi-restore: {restored:?}");

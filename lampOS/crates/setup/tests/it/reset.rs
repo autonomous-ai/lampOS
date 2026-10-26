@@ -355,6 +355,39 @@ fn a_reset_stops_the_writers_outside_the_target_after_what_starts_them() {
     );
 }
 
+/// Third on #3579: Wi-Fi's rollback copy beside its file (`.lamp-previous`,
+/// which the boot's restore puts back) and setup's staging copies go with
+/// the file, so no later boot brings the factory's network back; and while a
+/// reset is journalled, Wi-Fi puts no old network back.
+#[test]
+fn a_reset_wipes_the_wifi_copies_and_no_old_network_is_put_back_meanwhile() {
+    let root = Root::new();
+    let mut plan = lamp(&root);
+    let conf = root.path("wpa_supplicant-wlan0.conf");
+    plan.wipe.push(conf.clone());
+    let copies = [
+        "conf.lamp-previous",
+        "conf.lamp-setup",
+        "conf.lamp-setup-tmp",
+    ]
+    .map(|copy| conf.with_extension(copy));
+    for file in copies.iter().chain([&conf]) {
+        fs::write(file, b"network={ssid=\"factory\"}").unwrap();
+    }
+    reset::reset(&plan, &mut Fake::default()).unwrap();
+    wiped(&root);
+    for file in copies.iter().chain([&conf]) {
+        assert!(!file.exists(), "{} kept", file.display());
+    }
+    let journal = root.path("journal.json");
+    assert!(reset::wifi_restore_allowed(&journal).unwrap());
+    fs::write(&journal, b"{}").unwrap();
+    assert!(!reset::wifi_restore_allowed(&journal).unwrap());
+    fs::remove_file(&journal).unwrap();
+    symlink(root.path("missing"), &journal).unwrap();
+    assert!(!reset::wifi_restore_allowed(&journal).unwrap());
+}
+
 /// The parts cannot be read: as a stop that fails, nothing is wiped and the
 /// lamp reboots into setup, which finishes the wipe with nothing running.
 #[test]
