@@ -1,5 +1,15 @@
 # Tests work log
 
+## 2026-10-27 04:07 — Two fixture commits pushed; release base advanced
+
+Ready for lamp-voice: no (draft native/current-base qualification and reads)
+
+Mood `09c9c7726` and journal `2011fa4b3` are committed and pushed separately, each exact two files with a one-line message. Entire committed source snapshots match their qualified working copies. Their plain full Expression commands passed **340/0/0** each, with separate zero-case doctests. Formatting, strict twelve-package checks and workspace builds passed. [Mood proof](verification/tests-mood-2bf-plain-20261027/) and [journal proof](verification/tests-journal-2bf-plain-20261027/) preserve controller **FAIL/1**: only four non-test executable aliases changed inode, while all source, test drivers and 238 sealed copies stayed exact. The separate bounded read-only dispositions reconcile every existing test outcome; no test was replayed or failed assertion waived.
+
+[Sentinel's fresh original native proof](verification/tests-sentinel-57-native-20261027/) verifies **7,537 unique PASS / 0 FAIL / 0 LEAK / 0 TIMEOUT**, 53 aggregate skips and all 14 ordinary Reader cases once. The 34 later records are configured final-output reprints. Actual preview `2ce6a5253` has ordered parents `[2bf5122dc, 57ecd800a]` and the offered tree. Linux Clippy passes; auxiliary results remain separate. Reviewer-three carries its source read. Current readiness remains held because Main advanced.
+
+Restart `4ff8d6d8d` completed its current-at-start Mac module gate **21/0/0**, strict twelve-package Clippy, workspace and 228 guards; native controller exit zero. Publication stopped when the latest-base check detected new Main commits. Main is now pinned `a3b9c4681`: the next carries preserve authored files while rerunning relevant gates. Carrier `3be8fa45b` still owns its serial full Update command and is left untouched until closure. No device action.
+
 ## 2026-10-27 03:35 — Controlled repairs complete; Sentinel carry pushed
 
 Ready for lamp-voice: no (fresh native checks and remaining plain gates/read carries)
