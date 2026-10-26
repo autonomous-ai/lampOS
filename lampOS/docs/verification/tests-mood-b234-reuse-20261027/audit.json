@@ -1,0 +1,455 @@
+{
+  "status": "PASS_COMPILE_AND_EXPLICIT_RUNTIME_REUSE",
+  "head": "02485e90a8960fa10ae72d340139af51a1a0f8d7",
+  "base": "b2344a07df6b38d2736e01297999751c26e477a5",
+  "qualification_mode": "explicitly_authorized_runtime_reuse",
+  "runtime_attempts": 0,
+  "current_test_execution_claim": false,
+  "runtime_reuse": true,
+  "reused_run": {
+    "source_head": "f4419f83042513ae8aca0d3f565926ddc8737423",
+    "source_base": "90ca725c514bbb1e4b36318d7b3ccbb14dfd05f1",
+    "counts": {
+      "passed": 340,
+      "failed": 0,
+      "ignored": 0
+    },
+    "actual_prior_runtime_attempts": 1,
+    "both_required_cases_passed_in_prior_run": [
+      "sleep_name::the_service_breathes_the_head_with_moods_breath_from_the_bus",
+      "sleep_name::an_expired_sleeping_name_is_journaled_once_by_the_service"
+    ],
+    "prior_doc_blocks": [
+      "\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n"
+    ],
+    "proof_path": "lampOS/docs/verification/tests-mood-90ca-composed-20261027",
+    "parent_terminal_sha256": "97c72ecd86e6ed9325a0850375db932e68c7aa5d58624055fcf0272d8299b203"
+  },
+  "current_gates": {
+    "fmt": true,
+    "strict_all_targets_packages": [
+      "lamp-body",
+      "lamp-cloud",
+      "lamp-expression",
+      "lamp-keeper",
+      "lamp-lean",
+      "lamp-memory",
+      "lamp-peek",
+      "lamp-setup",
+      "lamp-skills",
+      "lamp-update",
+      "lamp-voice",
+      "lamp-voice-eval"
+    ],
+    "workspace_build": true,
+    "full_Expression_test_compilation_no_run": true,
+    "package_clean": false,
+    "fresh_false_required": false,
+    "freshness_observed_only": true,
+    "test_list_or_fixture_helper_launch": false,
+    "owned_commands": 5,
+    "command_exits": [
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "controller_exit": 0,
+    "controller_elapsed_s": 424.3352546610113
+  },
+  "eight_executable_reuse_comparisons": [
+    {
+      "identity_profile_features": {
+        "package_id": "path+file://${WORKTREE}/lampOS/crates/expression#lamp-expression@0.1.0",
+        "target": {
+          "kind": [
+            "example"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "replay_cost",
+          "src_path": "${WORKTREE}/lampOS/crates/expression/examples/replay_cost.rs",
+          "edition": "2024",
+          "doc": false,
+          "doctest": false,
+          "test": false
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": false
+        },
+        "features": []
+      },
+      "actual_artifact": "debug/examples/replay_cost",
+      "parent_sealed_copy": "frozen/1-replay_cost",
+      "parent_sha256": "4da63ed06b4d107c628208b1a78686c0b144d71edc70e53c6d91535bd1f6a528",
+      "current_sha256": "4da63ed06b4d107c628208b1a78686c0b144d71edc70e53c6d91535bd1f6a528",
+      "parent_bytes": 3714712,
+      "current_bytes": 3714712,
+      "bytes_equal": true
+    },
+    {
+      "identity_profile_features": {
+        "package_id": "path+file://${WORKTREE}/lampOS/crates/expression#lamp-expression@0.1.0",
+        "target": {
+          "kind": [
+            "bin"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "lamp-expression",
+          "src_path": "${WORKTREE}/lampOS/crates/expression/src/main.rs",
+          "edition": "2024",
+          "doc": true,
+          "doctest": false,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": false
+        },
+        "features": []
+      },
+      "actual_artifact": "debug/lamp-expression",
+      "parent_sealed_copy": "frozen/4-lamp-expression",
+      "parent_sha256": "bd9cc37c5c411f015089c9110e5eead6c1fe35b1a38f67d5ec511c69b5ad6292",
+      "current_sha256": "bd9cc37c5c411f015089c9110e5eead6c1fe35b1a38f67d5ec511c69b5ad6292",
+      "parent_bytes": 8268912,
+      "current_bytes": 8268912,
+      "bytes_equal": true
+    },
+    {
+      "identity_profile_features": {
+        "package_id": "path+file://${WORKTREE}/lampOS/crates/expression#lamp-expression@0.1.0",
+        "target": {
+          "kind": [
+            "test"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "it",
+          "src_path": "${WORKTREE}/lampOS/crates/expression/tests/it/main.rs",
+          "edition": "2024",
+          "doc": false,
+          "doctest": false,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": []
+      },
+      "actual_artifact": "debug/deps/it-707453661fb429d2",
+      "parent_sealed_copy": "frozen/2-it-707453661fb429d2",
+      "parent_sha256": "755088600fc24520b41652f249863e2ae78bdb2674500e38e9193bae78ddf1cf",
+      "current_sha256": "755088600fc24520b41652f249863e2ae78bdb2674500e38e9193bae78ddf1cf",
+      "parent_bytes": 12734440,
+      "current_bytes": 12734440,
+      "bytes_equal": true
+    },
+    {
+      "identity_profile_features": {
+        "package_id": "path+file://${WORKTREE}/lampOS/crates/expression#lamp-expression@0.1.0",
+        "target": {
+          "kind": [
+            "test"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "runtime",
+          "src_path": "${WORKTREE}/lampOS/crates/expression/tests/runtime.rs",
+          "edition": "2024",
+          "doc": false,
+          "doctest": false,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": []
+      },
+      "actual_artifact": "debug/deps/runtime-f9b92bb4002b831f",
+      "parent_sealed_copy": "frozen/6-runtime-f9b92bb4002b831f",
+      "parent_sha256": "c518054b772d6502313596791a86e42aa0b1bb2a1f20b45e9b7720e4973607c8",
+      "current_sha256": "c518054b772d6502313596791a86e42aa0b1bb2a1f20b45e9b7720e4973607c8",
+      "parent_bytes": 6381904,
+      "current_bytes": 6381904,
+      "bytes_equal": true
+    },
+    {
+      "identity_profile_features": {
+        "package_id": "path+file://${WORKTREE}/lampOS/crates/expression#lamp-expression@0.1.0",
+        "target": {
+          "kind": [
+            "example"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "rest_cost",
+          "src_path": "${WORKTREE}/lampOS/crates/expression/examples/rest_cost.rs",
+          "edition": "2024",
+          "doc": false,
+          "doctest": false,
+          "test": false
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": false
+        },
+        "features": []
+      },
+      "actual_artifact": "debug/examples/rest_cost",
+      "parent_sealed_copy": "frozen/3-rest_cost",
+      "parent_sha256": "cfe173587b297236070e00b8407738b417562af69efa8f017f13f20a9451db21",
+      "current_sha256": "cfe173587b297236070e00b8407738b417562af69efa8f017f13f20a9451db21",
+      "parent_bytes": 3737504,
+      "current_bytes": 3737504,
+      "bytes_equal": true
+    },
+    {
+      "identity_profile_features": {
+        "package_id": "path+file://${WORKTREE}/lampOS/crates/expression#lamp-expression@0.1.0",
+        "target": {
+          "kind": [
+            "example"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "recent_playout_cost",
+          "src_path": "${WORKTREE}/lampOS/crates/expression/examples/recent_playout_cost.rs",
+          "edition": "2024",
+          "doc": false,
+          "doctest": false,
+          "test": false
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": false
+        },
+        "features": []
+      },
+      "actual_artifact": "debug/examples/recent_playout_cost",
+      "parent_sealed_copy": "frozen/0-recent_playout_cost",
+      "parent_sha256": "f12487c99d0c3def9c256d9c1bf01cc0379b735da087e4ca47fc290bab79a088",
+      "current_sha256": "f12487c99d0c3def9c256d9c1bf01cc0379b735da087e4ca47fc290bab79a088",
+      "parent_bytes": 3732328,
+      "current_bytes": 3732328,
+      "bytes_equal": true
+    },
+    {
+      "identity_profile_features": {
+        "package_id": "path+file://${WORKTREE}/lampOS/crates/expression#lamp-expression@0.1.0",
+        "target": {
+          "kind": [
+            "bin"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "lamp-expression",
+          "src_path": "${WORKTREE}/lampOS/crates/expression/src/main.rs",
+          "edition": "2024",
+          "doc": true,
+          "doctest": false,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": []
+      },
+      "actual_artifact": "debug/deps/lamp_expression-7d5e7ac9619c42c0",
+      "parent_sealed_copy": "frozen/5-lamp_expression-7d5e7ac9619c42c0",
+      "parent_sha256": "4ee0baf79a18aabbb9335054c5ad1f509c3d42832e39dd91ead9d9e977dc8e8a",
+      "current_sha256": "4ee0baf79a18aabbb9335054c5ad1f509c3d42832e39dd91ead9d9e977dc8e8a",
+      "parent_bytes": 2299560,
+      "current_bytes": 2299560,
+      "bytes_equal": true
+    },
+    {
+      "identity_profile_features": {
+        "package_id": "path+file://${WORKTREE}/lampOS/crates/expression#lamp-expression@0.1.0",
+        "target": {
+          "kind": [
+            "lib"
+          ],
+          "crate_types": [
+            "lib"
+          ],
+          "name": "lamp_expression",
+          "src_path": "${WORKTREE}/lampOS/crates/expression/src/lib.rs",
+          "edition": "2024",
+          "doc": true,
+          "doctest": true,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": []
+      },
+      "actual_artifact": "debug/deps/lamp_expression-97b0d6d78b5cc498",
+      "parent_sealed_copy": "frozen/7-lamp_expression-97b0d6d78b5cc498",
+      "parent_sha256": "86434515115fd6f927efaa81ac324e184254c534d8f6caec6de50ff684974ef8",
+      "current_sha256": "86434515115fd6f927efaa81ac324e184254c534d8f6caec6de50ff684974ef8",
+      "parent_bytes": 5784872,
+      "current_bytes": 5784872,
+      "bytes_equal": true
+    }
+  ],
+  "forward_inputs": {
+    "metadata_equal": true,
+    "source_config_equal_inside_relevant_roots": true,
+    "closure_kind_policy": "Include root Expression dev dependencies; traverse normal/build dependency edges only below the root, retaining all target predicates conservatively. Dependency dev-only edges do not propagate.",
+    "local_packages": [
+      "lamp-body",
+      "lamp-bus",
+      "lamp-expression",
+      "lamp-ipc",
+      "lamp-keeper",
+      "lamp-lean",
+      "lamp-local-time",
+      "lamp-msgs",
+      "lamp-turn-owner",
+      "lamp-update"
+    ],
+    "changed_paths_outside_closure": [
+      "lampOS/crates/voice/src/remember.rs",
+      "lampOS/crates/voice/src/second_provider.rs",
+      "lampOS/crates/voice/src/second_provider/tests.rs",
+      "lampOS/crates/voice/src/second_provider/tests/held_forget.rs",
+      "lampOS/docs/memory.md",
+      "lampOS/docs/second-voice.md"
+    ],
+    "registry_limit": "Source IDs and Cargo.lock checksums compared; no historical registry per-file snapshot invented"
+  },
+  "relevant_build_environment_comparison": {
+    "equal": true,
+    "hashes": {
+      "CARGO_TARGET_DIR": "609cf2fd96456ae0954629d4be7a5b96e4a7fa4e5e28c765e422657d49ad8169",
+      "CARGO_BUILD_JOBS": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b",
+      "CARGO_INCREMENTAL": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+      "CARGO_PROFILE_DEV_DEBUG": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+      "CARGO_PROFILE_TEST_DEBUG": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+      "CARGO_NET_OFFLINE": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+      "CARGO_TERM_COLOR": "6497e4b3d7bed16979a343a7db4efa6d57725529f5ac3cec45c1f08fabcbdafc"
+    }
+  },
+  "dynamic_input_review": {
+    "provenance": "Root bounded review retained in activated plan root_review field",
+    "scope": "Stated Expression fixture invocations under the compared environment; no reads of six changed Voice/docs paths identified",
+    "universal_external_input_or_historical_registry_snapshot_claim": false
+  },
+  "source": {
+    "full_tracked_file_count": 10674,
+    "clean_committed_owner_head_parent_index_and_source_equal": true,
+    "all_source_and_owner_bytes_modes_mtimes_inodes_unchanged": true,
+    "authored_paths": {
+      "lampOS/crates/expression/tests/runtime.rs": {
+        "sha256": "e6d2dd7aeb19addfc1b83faf2049da5b0d38d73945a6b16b17166748abbcb4ce",
+        "bytes": 53210,
+        "mode": 420,
+        "kind": "file"
+      },
+      "lampOS/docs/expression.md": {
+        "sha256": "3d893182d80d5481be63798fd4449c75b3098699e6185d48da62f13b95b9dd4c",
+        "bytes": 81109,
+        "mode": 420,
+        "kind": "file"
+      }
+    },
+    "prepush_owner_snapshot_and_eight_modes_equal": true
+  },
+  "strict_handoff": {
+    "parent_pre_command_map_retained": true,
+    "parent_allowed_non_test_alias_inode_changes": 4,
+    "all_other_parent_bound_attributes_and_four_test_driver_inodes_equal": true,
+    "all_eight_full_metadata_observed_and_pinned_at_current_handoff": true,
+    "handoff_receipt_sha256": "ae7e420ad106d4183ab28c40506e193c32de90d8389847764950622e13e4fe05",
+    "no_retrospective_parent_alias_inode_claim": true,
+    "current_alias_exception_enabled": false,
+    "declared_actual_guard_release_before_build": true,
+    "all_eight_new_actual_and_all_frozen_attributes_strict": true
+  },
+  "guards": {
+    "prior_independent_frozen": 254,
+    "new_independent_frozen": 8,
+    "final_independent_frozen": 262,
+    "source_unchanged": true,
+    "permanent_owner_unchanged": true,
+    "actual_executable_guards_passed": true,
+    "sealed_witnesses_unchanged": true,
+    "all_groups_closed": true,
+    "unresolved_owned_pids": [],
+    "lease_released": true
+  },
+  "limits": [
+    "No current Mac test, documentation test, inventory/list or fixture helper was executed",
+    "Historical340/0/0 reused explicitly fromf441; not new02485 runtime",
+    "Fresh current-head original native checks remain separate",
+    "No full local reverse-dependent runtime, device acceptance or performance claim",
+    "Historical failures and bounded alias dispositions keep original scopes"
+  ],
+  "private_receipt_sha256": {
+    "terminal.json": "0db08565fd18f316893bb2090908580327a8cd998231c8f08184be69dface425",
+    "native-controller-result.json": "aa0264fb7df3c927e6fba7abb6a94fde29503f293f362acaaea857bc989c0e67",
+    "run.py": "2d37357605dbb3369756fe6d07b0f4e2a69354de0adedf9c9597daeafd8e1243",
+    "run.py.before-root-handoff": "278260a6eccf8c57cbb0eaff0993b217e2a02c6d6d2956f4493b04dc15cc9b89",
+    "root-handoff-controller.diff": "ee3e5257788e6d7a791cfe3143e23f69e8092de7a8e8ccb1b048b76be8c0be22",
+    "plan.json": "2448cecb23815dca5a421aaa48363eeab58fcdb2859302c5e0ed5d3ca0fd57ae",
+    "root-parent-current-actual-handoff.json": "ae7e420ad106d4183ab28c40506e193c32de90d8389847764950622e13e4fe05",
+    "root-parent-current-actual-handoff-review.json": "d3aaee544ceeab2bb1b546c3ffe385c411223d8f690c437a0934e771f3a7e7a2",
+    "root-prepush-owner-mode-check.json": "6a452effc9fb80781d25877783a9339c6f5ae4bad87fa66c78a023e32c6ae5d9",
+    "eight-executable-reuse-comparison.json": "04af8132c77ac0ca3065be5b78812869b2de432f590f3b30743a090f9dbc50ef",
+    "forward-input-reuse-comparison.json": "913134e17c15985cf59cf083c568e7fc7e23f0dd58ea10a958c8535e303c8092",
+    "build-environment-reuse-comparison.json": "5eae1f24fc47d923285c68230a3ed27d5af68d12f15bda4fb8b15a0f20c34d81",
+    "source-before.json": "258ef2360e97276c4b37ab82dd88d12c778f4006a3f15f5a858f8d511b0c77a9",
+    "source-after.json": "258ef2360e97276c4b37ab82dd88d12c778f4006a3f15f5a858f8d511b0c77a9",
+    "owner-source-before.json": "b8278afe2e1840eacf8071e049319d3d7b64edbf3f36823efefede917db70168",
+    "owner-source-after.json": "b8278afe2e1840eacf8071e049319d3d7b64edbf3f36823efefede917db70168",
+    "actual-executables.json": "47d06a6c7871d460223760a2f493f1265614e311eb94db4d44a40f333703bab2",
+    "protected-before.json": "ff9006aabed94f3fe5232acc8c3c24ea972d0efe42911447f9eb8abd9f95ec8c",
+    "new-frozen.json": "a9bdd70c21b53ce5fc3a4a71c95e182393582ef7c0c715b7fb3895e7bf8a4ee1",
+    "protected-after.json": "944871b397eab546d8b97a3ce71951adf6c4d0b27da78bd3ccc5d5b011d54244",
+    "cmd-workspace.json": "83fe7c004163a3d400b7e91697f51e84d587b6cead048a54d8e9a15c73daacbc",
+    "cmd-metadata.json": "ec8f89439e8b15e0ba1bf124c1e7c119b336a5b38e2842d06b35614e66ab710c",
+    "cmd-fmt.json": "309d06557357e977616aff8c4f67496303c090aeff6e9a5a71c9758723e0d439",
+    "cmd-strict.json": "1fb1f19d3e35e892fa53c656694f0bca6d336be9852c0dde7745839dc90139e8",
+    "cmd-test-compile.json": "6c13dc3a45ea28be4547ea99b6a29fcc07f3b0951ffaffe8885721f79ec64178"
+  }
+}

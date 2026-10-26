@@ -1,5 +1,15 @@
 # Tests work log
 
+## 2026-10-27 06:41 — Latest Mood compile comparisons and original native gates pass
+
+Ready for lamp-voice: no (#3623 current peer clearances pending)
+
+Mood `02485e90a/b234` is pushed. [Its current Mac carry proof](verification/tests-mood-b234-reuse-20261027/) has **zero current runtime attempts**: formatting, strict twelve-package Clippy, workspace and full Expression no-run compilation passed, and all eight executable bytes/lengths/targets/profiles/features plus relevant inputs/environment and modes match the sealed f441 proof. The **340/0/0** host result is explicitly reused from that earlier full run. No package clean or forced freshness claim was used; all **262** frozen/source/current-actual guards passed, controller exit 0 and groups closed.
+
+[Fresh original ARM64 40420007810 / Linux 40420007893](verification/tests-mood-02485-native-20261027/) passed at actual preview `9a1707eb2` with parents b234/02485 and tree equal to the offered head. Actual selected native execution is **7,546 unique PASS / 0 FAIL / 0 LEAK / 0 TIMEOUT**, 53 aggregate skips. All **340** Expression cases, both repaired controls and all **14** ordinary Main Reader cases pass once. The fresh native and reused host observations stay distinct; auxiliary counts are separate. Main was still b234 at audit; current peer reads follow.
+
+Carrier's final previously unstarted default-ignored declaration completed separately with controller exit 0. Its new binding accounts for all **448** ordinary identities, **442 PASS / 0 FAIL / 6 IGNORE**, across the preserved separate observations. The original reserve abort and parser-controller failure remain unchanged, and this is not one full Cargo command. Docs/promoter remain unrun pending their separate compiler allocation. Current Sentinel `8076057e8/b234` now runs the reviewed latest-source Mac gate on the released warm target. No device action.
+
 ## 2026-10-27 06:21 — Actual current Sentinel native preview passed; base carries advance
 
 Ready for lamp-voice: no (latest Mac/current-head and peer disposition pending)
