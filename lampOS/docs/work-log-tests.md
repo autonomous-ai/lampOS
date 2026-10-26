@@ -1,5 +1,15 @@
 # Tests work log
 
+## 2026-10-27 04:36 — Both fixture carries pass on a3b
+
+Ready for lamp-voice: no (fresh native checks and current reads pending)
+
+[Mood #3623](https://github.com/autonomous-ai/lampOS/pull/3623) is pushed at `fa67e6889` and [journal #3622](https://github.com/autonomous-ai/lampOS/pull/3622) at `c2ab4426a`, each on pinned `a3b9c4681` with one equal authored patch. Their new committed-source gates both completed with controller exit **0/PASS** and full Expression **340/0/0** once, plus separate zero-case doctests. Formatting, strict twelve-package Clippy, workspace build and all source, actual test-driver and 246 sealed-copy guards passed. [Mood proof](verification/tests-mood-a3b-plain-20261027/) and [journal proof](verification/tests-journal-a3b-plain-20261027/) keep the older controller metadata failures/dispositions separate. The typed non-test-alias inode policy was declared before these runs; all content and test-driver/frozen identity checks stayed strict.
+
+Current Mood ARM64 **40404562154** and Linux Clippy **40404562142** started; journal current checks are being collected. Reviewer-three's independent runtime/source reads cover the initial patches; Reviewer-two is reading current carries. No old native result is relabeled. The shared `step_by` helper must compose once when the second fixture PR rebases after the first lands.
+
+Carrier `3be8fa45b/2bf` completed **442/0/6** and promoter **25/0/0**, controller exit zero and all 247 guards. Its equal-six-patch local `63a2a9579/a3b` remains source-only pending the next gate. Skills is now qualifying clean `b634b5544/a3b` on the released warm target; its first alias activation lacked the commit object in that separate Git database and stopped before any compiler/tests. Exact-object import fixed the setup; the actual current gate is running. Sentinel's `5ac039201/a3b` carry is source-only while its next gate is prepared. No device action.
+
 ## 2026-10-27 04:07 — Two fixture commits pushed; release base advanced
 
 Ready for lamp-voice: no (draft native/current-base qualification and reads)
