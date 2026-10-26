@@ -1,0 +1,16 @@
+{
+  "landed_head": "521dcb006848a5bc99b11513828233ef65a4883c",
+  "reviewed_head": "a1a905ef677f19f75049f3f96af7c8cbf740ee57",
+  "base": "7d0017f08ec2a6c709012e6b3754bd414148cb48",
+  "fulltree_diff_empty": true,
+  "range_diff": "Both authored patches =, landed07db243c0 +521dcb006",
+  "member_pr_state": "#3591 closed as carried, not direct GitHub merge",
+  "original_ARM": 40350669035,
+  "original_Linux": 40350668992,
+  "qualification": [
+    7533,
+    0,
+    53
+  ],
+  "limits": "Repository delivery verified; no native timings or device change. Full host focused actual08a/e672 remains separately attributed."
+}

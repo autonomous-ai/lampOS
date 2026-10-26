@@ -1,3 +1,11 @@
+## 2026-10-26 23:04 — observations delivered; Routine native green on prior base
+
+Ready for lamp-voice: yes (#3591 delivered as 521dcb006)
+
+Verified delivered tree equals reviewed a1a905ef6 and both range-diff patches are equal; member #3591 closed as carried. Original current native 7,533/0/53 and two peer reads remain bound to the identical tree. [Delivery](verification/skills-call-observations-20261026/delivery-521d.json).
+
+Routine #3598 original cbde/7d ARM40353184888 and Linux40353184695 pass 7,534/0/53; all four required cases once, preview parents/tree verified, no native probe timings. [Receipt](verification/routine-request-expiry-20261026/native-cbde.json). Latest base now includes the observation test; carrying Routine there and rechecking affected integration execution before push. Its author HOLD remains. Mock-worker lifecycle repair is claimed separately and being implemented on the same latest base. No device change.
+
 ## 2026-10-26 22:54 — taken: bounded Skills actions mock teardown
 
 Ready for lamp-voice: no
