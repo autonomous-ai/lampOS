@@ -896,6 +896,16 @@ stale retained inputs after restart, new session ownership and both offline
 face outcomes retain their original assertions. A stall after publication
 can still expire an input; the fixtures neither refresh it nor retry a step.
 
+The sleeping-name journal fixture first admits a fresh empty face observation,
+then advances its injected clock across the catalogue's 60-second absence
+threshold while publishing fresh inputs again. It waits for the service's
+observed `asleep` output before sending the name, avoiding a minute represented
+by hundreds of durable bus-publication steps. The default fixture step remains
+200 ms; transport lifetimes, freshness and service cache periods are unchanged.
+The name's two-second source window and 300 ms delivery grace, all 25 subsequent
+checks, the exact single journal line, child status check and the 15-second host
+watchdog starting after child spawn retain their original bounds and assertions.
+
 The following counts and cost measurements are the **original task 4
 gate**, not a new task 18 result. On Third's Intel i7-10700K x86_64 Mac
 (64 GiB, Darwin 25.6.0, Rust 1.96.0), the full dependent gate passed 1,701
