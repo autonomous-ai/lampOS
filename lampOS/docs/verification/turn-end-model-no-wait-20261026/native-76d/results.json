@@ -1,0 +1,214 @@
+{
+  "artifact_metadata": [
+    {
+      "created_at": "2026-10-26T03:12:42Z",
+      "digest": "sha256:ab466834ebeb29985a96bb7f9cc1132f54f675b021b3c07226118816208baf2e",
+      "expired": false,
+      "expires_at": "2026-11-02T03:12:35Z",
+      "id": 12625835174,
+      "name": "lampos-arm64-76d9940ec321d42c2d0d726a15b4115a6ba5fbdb",
+      "size_in_bytes": 116059159
+    }
+  ],
+  "artifact_scope": "Metadata only; binary archive neither downloaded nor executed.",
+  "authored_and_preview_tree": "560869e48cb06a9a506f411dd007117cd6a04c70",
+  "base": "1c884f16cf4de53a700bba7512c129c3ee01d72d",
+  "commit_metadata_sha256": {
+    "authored": "8c9cbbe5b5fe3e12cca9b8661bbf4586fe1e75583d995b40a854b224dbe73ac8",
+    "base": "a5edbc0485ae6794c2175165628922a8a6e02c140ab14d3e11def416b6feb3e4",
+    "preview": "61d7fb08a2c6522cd90a46d135cc0d85c8520fbe5e27d2050239d40aea2d254a"
+  },
+  "head": "76d9940ec321d42c2d0d726a15b4115a6ba5fbdb",
+  "limits": [
+    "Original attempt 1 native CI only; no workflow rerun or local compiler during audit.",
+    "PR profile skipped tests remain skipped, not nightly full qualification.",
+    "Earlier Mac host receipts remain at their original identities; this packet qualifies only the recorded authored head and preview.",
+    "No artifact execution, release promotion, device, acoustic or physical-latency acceptance.",
+    "Raw logs/API metadata retained privately; access and retention depend on GitHub."
+  ],
+  "model_integration_controls": [
+    {
+      "binary": "lamp-turn-end::it",
+      "name": "parity::spawn_returns_while_model_open_is_held",
+      "ordinal": 6137,
+      "status": "PASS",
+      "total": 11346
+    },
+    {
+      "binary": "lamp-turn-end::it",
+      "name": "parity::worker_process_refuses_missing_or_wrong_models_without_blocking",
+      "ordinal": 6141,
+      "status": "PASS",
+      "total": 11346
+    }
+  ],
+  "nextest": {
+    "binaries": 182,
+    "excluded_custom_harness_binaries": 2,
+    "identical_echo_rows_excluded": 35,
+    "literal_summary": "Summary [ 214.348s] 11346 tests run: 11346 passed, 106 skipped",
+    "ordinal_coverage": "1 through 11346 exactly once",
+    "selected": 11346,
+    "skipped": 106,
+    "unique_counts": {
+      "FAIL": 0,
+      "LEAK": 0,
+      "PASS": 11346,
+      "TIMEOUT": 0
+    },
+    "unrun": 0,
+    "wire_library_cases": [
+      {
+        "binary": "lamp-turn-end-wire",
+        "name": "client::tests::native_reap_is_visible_while_reader_and_teardown_are_pending",
+        "ordinal": 6149,
+        "status": "PASS",
+        "total": 11346
+      },
+      {
+        "binary": "lamp-turn-end-wire",
+        "name": "frame::tests::long_reasons_are_truncated_on_a_character_boundary",
+        "ordinal": 6150,
+        "status": "PASS",
+        "total": 11346
+      },
+      {
+        "binary": "lamp-turn-end-wire",
+        "name": "frame::tests::malformed_frames_are_rejected_before_allocation",
+        "ordinal": 6151,
+        "status": "PASS",
+        "total": 11346
+      },
+      {
+        "binary": "lamp-turn-end-wire",
+        "name": "frame::tests::request_round_trips_and_keeps_only_the_latest_window",
+        "ordinal": 6152,
+        "status": "PASS",
+        "total": 11346
+      },
+      {
+        "binary": "lamp-turn-end-wire",
+        "name": "frame::tests::responses_round_trip",
+        "ordinal": 6153,
+        "status": "PASS",
+        "total": 11346
+      }
+    ],
+    "wire_library_count_already_included": 5
+  },
+  "pr": 3533,
+  "preview": "78cebeea1ccc47955bf19f55ce87c91136fcb598",
+  "preview_parents": [
+    "1c884f16cf4de53a700bba7512c129c3ee01d72d",
+    "76d9940ec321d42c2d0d726a15b4115a6ba5fbdb"
+  ],
+  "promotion_helper": {
+    "command": "cargo test --locked --manifest-path .github/tools/lampos-promote/Cargo.toml",
+    "failed": 0,
+    "ignored": 0,
+    "passed": 25,
+    "scope": "Whole separate helper command; library 2 + main 0 + promotion integration 22 + workflow integration 1 + docs 0. Not added to workspace nextest.",
+    "summary_pass_counts": [
+      2,
+      0,
+      22,
+      1,
+      0
+    ]
+  },
+  "runs": {
+    "arm64": {
+      "actual_checkout": "78cebeea1ccc47955bf19f55ce87c91136fcb598",
+      "attempt": 1,
+      "completed_at": "2026-10-26T03:12:44Z",
+      "conclusion": "success",
+      "job_id": 121374144652,
+      "job_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40261322616/job/121374144652",
+      "jobs_metadata_sha256": "5c4cc19e7fcc67caa20b28e98e4fa2668404ce1bc4b47aa64757b7c9d061636a",
+      "other_jobs": [
+        {
+          "conclusion": "skipped",
+          "name": "lampOS \u2014 promote a tested release to the stable feed"
+        },
+        {
+          "conclusion": "skipped",
+          "name": "report-full-run-failure"
+        },
+        {
+          "conclusion": "skipped",
+          "name": "lampOS \u2014 sign and publish the tested lamp-voice artifact"
+        }
+      ],
+      "raw_log_sha256": "84a09dfee9064dc2237310c39ff4e74a48df19cabd1341a0302949a8aec04fed",
+      "run_id": 40261322616,
+      "run_metadata_sha256": "4ad59944d215852076ee4845335b24593652024ce6dbaeda0a7b5b21535caaf9",
+      "run_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40261322616",
+      "started_at": "2026-10-26T02:53:31Z",
+      "watcher": {
+        "deadline_seconds": 3600,
+        "elapsed_seconds": 1212.798,
+        "exit_code": 0,
+        "interval_seconds": 300,
+        "receipt_sha256": "22e2df4485da7eb409d8524c55a1e271073653b8a4500b83a6402f06792b1129"
+      }
+    },
+    "clippy": {
+      "actual_checkout": "78cebeea1ccc47955bf19f55ce87c91136fcb598",
+      "attempt": 1,
+      "commands": [
+        "cargo +1.96.0 fmt --all --check",
+        "cargo clippy --locked --workspace --all-targets -- -D warnings",
+        "cargo fmt --manifest-path .github/tools/lampos-promote/Cargo.toml --check",
+        "cargo clippy --locked --manifest-path .github/tools/lampos-promote/Cargo.toml --all-targets -- -D warnings"
+      ],
+      "completed_at": "2026-10-26T02:56:56Z",
+      "conclusion": "success",
+      "job_id": 121374144970,
+      "job_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40261322623/job/121374144970",
+      "jobs_metadata_sha256": "95b67d6b97952e713ff99fdcf0f432b8177ad84c5ba8954d80d2309e6cd8645a",
+      "other_jobs": [],
+      "raw_log_sha256": "b6bb3cbffdf334719cadb6de048602c0474bc44e13e79e01de2ab03b3f8032d6",
+      "run_id": 40261322623,
+      "run_metadata_sha256": "964da19c002e7b4075ccabc0d167f49def3ba395c45cc575c4adc9b5cdc8a6de",
+      "run_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40261322623",
+      "started_at": "2026-10-26T02:53:28Z",
+      "watcher": {
+        "deadline_seconds": 3600,
+        "elapsed_seconds": 305.275,
+        "exit_code": 0,
+        "interval_seconds": 300,
+        "receipt_sha256": "3c288c7e20890ef1a0c0a2c812a65c1c4ba0e967f5b5b2a645764670c8281295"
+      }
+    }
+  },
+  "schema": 1,
+  "separate_workspace_checks": {
+    "doctests": {
+      "failed": 0,
+      "ignored": 0,
+      "passed": 4,
+      "summary_count": 46
+    },
+    "process_harness": {
+      "cases": [
+        "test an_idle_worker_stays_ready_across_a_long_quiet ... ok (2015 ms)",
+        "test a_worker_reporting_another_model_is_refused_before_any_request ... ok (2 ms)",
+        "test no_outcome_is_delivered_after_close_even_for_an_answer_on_its_way ... ok (4 ms)",
+        "test verdict_carries_identity_and_one_request_at_a_time ... ok (56 ms)",
+        "test missing_model_is_final_and_never_restarted ... ok (162 ms)",
+        "test missing_executable_fails_at_once ... ok (2 ms)",
+        "test spawn_returns_while_worker_startup_is_held ... ok (6 ms)",
+        "test startup_failures_are_final ... ok (409 ms)",
+        "test serving_failures_are_replaced_within_budget ... ok (514 ms)",
+        "test protocol_violations_are_replaced ... ok (177 ms)",
+        "test cancelled_answers_are_never_delivered ... ok (155 ms)",
+        "test close_during_inference_never_waits ... ok (233 ms)",
+        "test sustained_requests_stay_bounded ... ok (692 ms)"
+      ],
+      "failed": 0,
+      "passed": 13
+    },
+    "relay_signals": "ok",
+    "scope": "Custom harnesses and doctests are separate from the nextest census."
+  }
+}

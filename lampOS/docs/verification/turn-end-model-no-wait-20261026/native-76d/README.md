@@ -1,0 +1,11 @@
+# PR #3533: original native qualification on 1c884
+
+Head `76d9940ec321d42c2d0d726a15b4115a6ba5fbdb` is based on `1c884f16cf4de53a700bba7512c129c3ee01d72d`. Both original attempt-1 jobs checked out `78cebeea1ccc47955bf19f55ce87c91136fcb598`, whose exact parents are that base and head. Its complete tree `560869e48cb06a9a506f411dd007117cd6a04c70` equals the authored tree.
+
+[ARM64 run 40261322616](https://github.com/autonomous-ai/lampOS/actions/runs/40261322616/job/121374144652) succeeds: **11,346 unique PASS / zero FAIL, LEAK or TIMEOUT / 106 skipped / zero selected unrun**. All ordinals reconcile exactly once; 35 identical displayed echoes are excluded. Both named model integration fixtures pass once: the missing/wrong-model refusal and held FIFO model-open return case. They and the five Turn-end-wire library cases are already included in that census.
+
+The separate process harness passes **13/0**, including missing-executable and held-startup return cases. Workspace doctests pass **4/0 across 46 summaries**, and relay-signals succeeds. The separate whole promotion-helper command passes **25/0**, comprising library 2, main 0, promotion integration 22, workflow integration 1 and docs 0. None of these separate scopes is added to the nextest count.
+
+[Linux Clippy run 40261322623](https://github.com/autonomous-ai/lampOS/actions/runs/40261322623/job/121374144970) succeeds, including pinned workspace formatting, strict workspace/all-target Clippy and the helper's separate formatting/strict Clippy.
+
+[results.json](results.json) binds terminal jobs, checkout parents/tree, unique counts, original log/metadata hashes and artifact metadata. [selected-results.txt](selected-results.txt) retains compact outcomes. The original read-only watches used 300-second intervals and one-hour deadlines. No workflow was rerun or local test/build launched for this audit. Earlier Mac host controls on frozen 0c1 and the 1c884 continuation remain separately bound to their recorded sources; native success does not rewrite the retained host parser failure. PR-profile skips are not full-nightly coverage; artifact metadata is not an independently downloaded or executed binary, and no release, lamp or latency acceptance is claimed. Raw logs and metadata remain privately retained.

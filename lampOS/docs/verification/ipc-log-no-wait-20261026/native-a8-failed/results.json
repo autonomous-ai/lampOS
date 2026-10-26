@@ -1,0 +1,133 @@
+{
+  "authored_tree_equal": true,
+  "base": "1c884f16cf4de53a700bba7512c129c3ee01d72d",
+  "failure_context": {
+    "limitation": "This does not establish why this invocation failed or prove a base-only reproduction. No rerun was requested.",
+    "prior_same_case": "Original run40258770126/job121366308498 on6e177dee passed this same case once. Its test-file blob equals current head and base.",
+    "source_identity": {
+      "git_blobs": {
+        "1c884f16cf4de53a700bba7512c129c3ee01d72d": "4cbeab4bc7300d3d880b91fac31748f292f7582f",
+        "6e177dee0c40557fe7ceedc9b414734c26add031": "4cbeab4bc7300d3d880b91fac31748f292f7582f",
+        "a8d6a4970dcf73a9007850703d9f27af24ea74e5": "4cbeab4bc7300d3d880b91fac31748f292f7582f"
+      },
+      "path": "lampOS/crates/voice/src/session_reader/tests.rs"
+    }
+  },
+  "head": "a8d6a4970dcf73a9007850703d9f27af24ea74e5",
+  "nextest": {
+    "binaries": 182,
+    "changed_ipc_case": "log_relay::tests::a_full_blocking_pipe_or_socket_is_never_waited_on_nor_made_nonblocking",
+    "changed_ipc_case_ordinal": 3081,
+    "changed_ipc_case_pass_occurrences": 1,
+    "executed_unique": 10041,
+    "failure_binary": "lamp-voice",
+    "failure_case": "session_reader::tests::linux::replaced_record_never_changes_an_outside_sentinel",
+    "failure_ordinal": 10038,
+    "leak": 0,
+    "no_latency_claim": true,
+    "panic_location": "lampOS/crates/voice/src/session_reader/tests.rs:160:53",
+    "panic_reason": "called `Result::unwrap()` on an `Err` value: Custom { kind: PermissionDenied, error: \"session object changed during ACL inspection\" }",
+    "profile": "pr",
+    "profile_skipped": 106,
+    "replayed_display_rows_excluded": 24,
+    "scope": "whole workspace",
+    "selected": 11345,
+    "selected_unrun_fail_fast": 1304,
+    "skipped_harness_binaries": 2,
+    "summary": "Summary [ 195.454s] 10041/11345 tests run: 10040 passed, 1 failed, 106 skipped",
+    "timeout": 0,
+    "unique_failed": 1,
+    "unique_passed": 10040
+  },
+  "preview": "7b528af489ed64e4acc0a4f8b1b47e727a79013b",
+  "preview_parents": [
+    "1c884f16cf4de53a700bba7512c129c3ee01d72d",
+    "a8d6a4970dcf73a9007850703d9f27af24ea74e5"
+  ],
+  "preview_tree": "66c720ba130835604fabe3c8d454921641e1ef56",
+  "promotion_helper": {
+    "command": "cargo test --locked --manifest-path .github/tools/lampos-promote/Cargo.toml",
+    "failed": 0,
+    "groups": [
+      2,
+      0,
+      22,
+      1,
+      0
+    ],
+    "overall_passed": 25,
+    "separate_from_nextest": true
+  },
+  "retained_receipts_sha256": {
+    "arm64-artifacts.json": "244563f989470892c537c9a4622920af0d228ee4528f7d00c64a06d6cd95856c",
+    "arm64-job.log": "d79bd55f4b64e9b13e444887dc13235af0ebba5bc9df7aeb99d77318422107e5",
+    "arm64-jobs-final.json": "96d8a1f6819e5482b15732897d34a38efd01272cfac396b056c838665c6473d0",
+    "arm64-run-final.json": "ae9d588a75a1d5f84b0b4a2ac0e8bec1246880c3f0d3af0fd059d05fa14cb719",
+    "arm64-watch.json": "cb50fa205bc88514427de3731dd2316dbcda930e16a0d4711af3f88795e0aa76",
+    "authored-commit.json": "4f659f89ebdc8a03dbf0cf5a3534cc93df3e8b8a2c414d2283269e0c2ff812bc",
+    "base-commit.json": "a5edbc0485ae6794c2175165628922a8a6e02c140ab14d3e11def416b6feb3e4",
+    "clippy-job.log": "1b50f86c93248a78d1d44816764e955bb800928d382672d1de600cf8cb7be5f8",
+    "clippy-jobs-final.json": "3e9e9fcedc0746d45a8afb8678a887969753a3966a5cd8e2a6b5bb36fada7ccf",
+    "clippy-run-final.json": "089014d95216fee82cfd41306fe393a42131ee4dee56968ecbfee08dbbf574fe",
+    "clippy-watch.json": "ee6adaba05a8de43793d2917336f532abbc90148c362e02f156c6f61d46b5013",
+    "failing-source-identity.json": "9c513dd9184ecdc63087d93fc9907aab15ad7916bfa60a7a5cdf94db01b2e3b1",
+    "preview-commit.json": "3148537065f543617cba1e1a9b0827d571a10b62678ee787b50545ca25b1ac28"
+  },
+  "runs": {
+    "arm64": {
+      "attempt": 1,
+      "completed_at": "2026-10-26T03:06:55Z",
+      "conclusion": "failure",
+      "job": 121373140459,
+      "job_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40260992363/job/121373140459",
+      "other_jobs": [
+        {
+          "conclusion": "skipped",
+          "name": "lampOS \u2014 promote a tested release to the stable feed"
+        },
+        {
+          "conclusion": "skipped",
+          "name": "lampOS \u2014 sign and publish the tested lamp-voice artifact"
+        },
+        {
+          "conclusion": "skipped",
+          "name": "report-full-run-failure"
+        }
+      ],
+      "raw_log_sha256": "d79bd55f4b64e9b13e444887dc13235af0ebba5bc9df7aeb99d77318422107e5",
+      "run": 40260992363,
+      "watcher_deadline_seconds": 3600,
+      "watcher_exit": 1,
+      "watcher_interval_seconds": 300
+    },
+    "clippy": {
+      "attempt": 1,
+      "commands": [
+        "cargo fmt --manifest-path .github/tools/lampos-promote/Cargo.toml --check",
+        "cargo clippy --locked --manifest-path .github/tools/lampos-promote/Cargo.toml --all-targets -- -D warnings",
+        "cargo clippy --locked --workspace --all-targets -- -D warnings"
+      ],
+      "completed_at": "2026-10-26T02:52:43Z",
+      "conclusion": "success",
+      "job": 121373140725,
+      "job_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40260992391/job/121373140725",
+      "other_jobs": [],
+      "raw_log_sha256": "1b50f86c93248a78d1d44816764e955bb800928d382672d1de600cf8cb7be5f8",
+      "run": 40260992391,
+      "watcher_deadline_seconds": 3600,
+      "watcher_exit": 0,
+      "watcher_interval_seconds": 300
+    }
+  },
+  "script_sha256": "b9c78f331c44686a19b7b740ce9fd9f8fea0d49b3b5628cd4d114929d8e8a316",
+  "unrun": [
+    "1304 selected nextest tests after fail-fast",
+    "106 tests excluded by PR profile",
+    "workspace doctests",
+    "relay_signals custom harness",
+    "Turn-end-wire process custom harness",
+    "artifact export and upload",
+    "native experimental mutations",
+    "device or physical latency trial"
+  ]
+}

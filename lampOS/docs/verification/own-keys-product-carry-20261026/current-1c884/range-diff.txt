@@ -1,0 +1,7 @@
+1:  bfb0cc6924 = 1:  513dbb5094 lampOS: the product units turn on LAMP_OWN_KEYS, so a person's own keys from setup or the app are used, for #2846
+2:  19c2959208 = 2:  533387099c lampOS: preserve customized own-keys drop-ins
+3:  cc3190ddb4 = 3:  9233140181 lampOS: record current own-keys carry qualification
+4:  607176ec33 = 4:  367a91076e lampOS: clarify own-keys activation and per-unit overrides
+5:  981d04f7c2 = 5:  3a2e5daa8e lampOS: record own-keys qualification on the d21 base
+6:  9ccde548b2 = 6:  67f6952ce3 lampOS: retain own-keys scheduling and product-reader checks
+7:  3654d62d00 = 7:  aca41e14d4 lampOS: qualify own-keys carry with current product units

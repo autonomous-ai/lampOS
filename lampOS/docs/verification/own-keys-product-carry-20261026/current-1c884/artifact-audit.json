@@ -1,0 +1,307 @@
+{
+  "all_different_profile_test_false": true,
+  "different": 5,
+  "guard": "The final all-artifacts equality assertion failed and has not been bypassed or relabeled successful.",
+  "interpretation": "Combined-package no-run compile followed by separate package tests can produce different dependency graphs and relink shared non-test output paths. This is a plausible explanation, not a proven causal diagnosis. Quiet test logs do not provide linker commands or executed executable hashes. Matching outputs also do not establish which exact executable each test command ran.",
+  "matching": 22,
+  "recorded": 27,
+  "records": [
+    {
+      "audit_sha256": "2ff4b47cbe47f1106cf21200abd198823e620218af58e6aa9a4f3ed97ca333df",
+      "compile_snapshot_sha256": "98778871aa9633d9db1a1820aa4ccc5afd5134a988e43045ded6023e68291a55",
+      "kind": [
+        "example"
+      ],
+      "matches": false,
+      "profile_test": false,
+      "target": "same_voice_pairs",
+      "target_path": "debug/examples/same_voice_pairs"
+    },
+    {
+      "audit_sha256": "4989bdb7295853e7c493b9925626830c08f718f4e55a0301b074f352e52835fe",
+      "compile_snapshot_sha256": "4989bdb7295853e7c493b9925626830c08f718f4e55a0301b074f352e52835fe",
+      "kind": [
+        "bin"
+      ],
+      "matches": true,
+      "profile_test": true,
+      "target": "lamp-voice-eval",
+      "target_path": "debug/deps/lamp_voice_eval-9eecae0ae6380f17"
+    },
+    {
+      "audit_sha256": "98a517d4aecebe0075add01ed4e6c5a79b4cbac19f1bca2879d4353187b9fa38",
+      "compile_snapshot_sha256": "100ecbbb2e08a6b861b37a24612cd7180fe6741ae9dbf23ff03610501e6c88c1",
+      "kind": [
+        "example"
+      ],
+      "matches": false,
+      "profile_test": false,
+      "target": "turn_end_replay",
+      "target_path": "debug/examples/turn_end_replay"
+    },
+    {
+      "audit_sha256": "f7425c2b1d04ea1fe832b2cc623d7be5c32208d9e9239cf1a90847975b27ee1d",
+      "compile_snapshot_sha256": "f7425c2b1d04ea1fe832b2cc623d7be5c32208d9e9239cf1a90847975b27ee1d",
+      "kind": [
+        "test"
+      ],
+      "matches": true,
+      "profile_test": true,
+      "target": "it",
+      "target_path": "debug/deps/it-e36ace84e3a3848f"
+    },
+    {
+      "audit_sha256": "4f3fff0fa408d477491f947ab0f3510493a86f85c3808e776a785893740f0016",
+      "compile_snapshot_sha256": "4f3fff0fa408d477491f947ab0f3510493a86f85c3808e776a785893740f0016",
+      "kind": [
+        "lib"
+      ],
+      "matches": true,
+      "profile_test": true,
+      "target": "lamp_voice_eval",
+      "target_path": "debug/deps/lamp_voice_eval-cea9639ba8c23b1a"
+    },
+    {
+      "audit_sha256": "a29f7fa1fd30cbd6c8ac649c846809fc04212a5f83d8b82da137cf7ea907c1a8",
+      "compile_snapshot_sha256": "5d6c365018d0c1005b440e1b796887a16b45d250b0662c9ca553a3545197df43",
+      "kind": [
+        "bin"
+      ],
+      "matches": false,
+      "profile_test": false,
+      "target": "lamp-voice-eval",
+      "target_path": "debug/lamp-voice-eval"
+    },
+    {
+      "audit_sha256": "1cf580b5516ab8f5a2b4e958a0fe92b95bd9a2846799784cd20b72e778028245",
+      "compile_snapshot_sha256": "1cf580b5516ab8f5a2b4e958a0fe92b95bd9a2846799784cd20b72e778028245",
+      "kind": [
+        "test"
+      ],
+      "matches": true,
+      "profile_test": true,
+      "target": "it",
+      "target_path": "debug/deps/it-28b434e58004c40d"
+    },
+    {
+      "audit_sha256": "b6be6da20474400a77aaeaa3c776e1307f99706855b2a49e658d2bf0824cf39d",
+      "compile_snapshot_sha256": "b6be6da20474400a77aaeaa3c776e1307f99706855b2a49e658d2bf0824cf39d",
+      "kind": [
+        "test"
+      ],
+      "matches": true,
+      "profile_test": true,
+      "target": "release_pair",
+      "target_path": "debug/deps/release_pair-34c3e6d8c103356a"
+    },
+    {
+      "audit_sha256": "808afc248d323399e5341508152f04ba19931c28b14e316a3faa90fb7cdde26d",
+      "compile_snapshot_sha256": "808afc248d323399e5341508152f04ba19931c28b14e316a3faa90fb7cdde26d",
+      "kind": [
+        "bin"
+      ],
+      "matches": true,
+      "profile_test": true,
+      "target": "lamp-skills",
+      "target_path": "debug/deps/lamp_skills-42958bab35378bef"
+    },
+    {
+      "audit_sha256": "cf1a4baa0c9781857e1e827196eab4d912c342650b43534485214da28c2aa698",
+      "compile_snapshot_sha256": "cf1a4baa0c9781857e1e827196eab4d912c342650b43534485214da28c2aa698",
+      "kind": [
+        "test"
+      ],
+      "matches": true,
+      "profile_test": true,
+      "target": "requested_audio",
+      "target_path": "debug/deps/requested_audio-db84924b473da20c"
+    },
+    {
+      "audit_sha256": "fd95a3677f71c30f5e37ab073f99f5d1271f8b91682d533e51acf447c1339a9f",
+      "compile_snapshot_sha256": "e785868546077bfe3d9b3bae6f4332c1c1c590589852be0f5f191a68d36acfa1",
+      "kind": [
+        "example"
+      ],
+      "matches": false,
+      "profile_test": false,
+      "target": "render_relaxing_music",
+      "target_path": "debug/examples/render_relaxing_music"
+    },
+    {
+      "audit_sha256": "d5c69e184836398f7b3e5ebb61c948031d3f1009e3cc73ee7a8f6c1045a46b47",
+      "compile_snapshot_sha256": "d5c69e184836398f7b3e5ebb61c948031d3f1009e3cc73ee7a8f6c1045a46b47",
+      "kind": [
+        "lib"
+      ],
+      "matches": true,
+      "profile_test": true,
+      "target": "lamp_skills",
+      "target_path": "debug/deps/lamp_skills-82a48e1d592b91cc"
+    },
+    {
+      "audit_sha256": "5449e520ade1c0508e22c767cf1aa2b0b994be6c271b47e12514addd749b2e5e",
+      "compile_snapshot_sha256": "7fe7a3f7e0e89dd9127f07fd880e4f370b1cebdbe6bb80cea10bd2051bf8dcbc",
+      "kind": [
+        "bin"
+      ],
+      "matches": false,
+      "profile_test": false,
+      "target": "lamp-skills",
+      "target_path": "debug/lamp-skills"
+    },
+    {
+      "audit_sha256": "84a98f57d35507db9a1a285fff01c9e681c909ae99174a40d795223879f633ce",
+      "compile_snapshot_sha256": "84a98f57d35507db9a1a285fff01c9e681c909ae99174a40d795223879f633ce",
+      "kind": [
+        "lib"
+      ],
+      "matches": true,
+      "profile_test": true,
+      "target": "lamp_voice",
+      "target_path": "debug/deps/lamp_voice-d0423b4e04fbfa63"
+    },
+    {
+      "audit_sha256": "75a24338204ebc0fdca6b44d28c81069899c588668b9519a062def302f1f3887",
+      "compile_snapshot_sha256": "75a24338204ebc0fdca6b44d28c81069899c588668b9519a062def302f1f3887",
+      "kind": [
+        "example"
+      ],
+      "matches": true,
+      "profile_test": true,
+      "target": "render_line_second",
+      "target_path": "debug/examples/render_line_second-610fc7099895fda5"
+    },
+    {
+      "audit_sha256": "9b989cfbd5faea6c857cd1e005346a45321e3492b686fbc23d9c269638189204",
+      "compile_snapshot_sha256": "9b989cfbd5faea6c857cd1e005346a45321e3492b686fbc23d9c269638189204",
+      "kind": [
+        "test"
+      ],
+      "matches": true,
+      "profile_test": true,
+      "target": "it",
+      "target_path": "debug/deps/it-7d652805487aab85"
+    },
+    {
+      "audit_sha256": "00884aa63651e603924a231683cb4e50b66d463e40d184bae27a2db7a8e0c587",
+      "compile_snapshot_sha256": "00884aa63651e603924a231683cb4e50b66d463e40d184bae27a2db7a8e0c587",
+      "kind": [
+        "example"
+      ],
+      "matches": true,
+      "profile_test": false,
+      "target": "hearing_replay",
+      "target_path": "debug/examples/hearing_replay"
+    },
+    {
+      "audit_sha256": "133687cc0709e83a7423fa7feee1b21a8f79f587a7363d12171a19bffa2b12c7",
+      "compile_snapshot_sha256": "133687cc0709e83a7423fa7feee1b21a8f79f587a7363d12171a19bffa2b12c7",
+      "kind": [
+        "example"
+      ],
+      "matches": true,
+      "profile_test": false,
+      "target": "probe_handover",
+      "target_path": "debug/examples/probe_handover"
+    },
+    {
+      "audit_sha256": "631440745ab8b1d56dd5fa1ca5adcdd7f0f989cfc61883a5eb0c3e4881d7d7d4",
+      "compile_snapshot_sha256": "631440745ab8b1d56dd5fa1ca5adcdd7f0f989cfc61883a5eb0c3e4881d7d7d4",
+      "kind": [
+        "example"
+      ],
+      "matches": true,
+      "profile_test": false,
+      "target": "reference_pace",
+      "target_path": "debug/examples/reference_pace"
+    },
+    {
+      "audit_sha256": "816e633b662c10f69b087333d9b2ae00418c0a56844366eb9a422ac78d766cb8",
+      "compile_snapshot_sha256": "816e633b662c10f69b087333d9b2ae00418c0a56844366eb9a422ac78d766cb8",
+      "kind": [
+        "example"
+      ],
+      "matches": true,
+      "profile_test": false,
+      "target": "ring_process_probe",
+      "target_path": "debug/examples/ring_process_probe"
+    },
+    {
+      "audit_sha256": "d4d384c51117272e4453ef9dca64e38f65a5db2335392ca4b02fa2adb71f956b",
+      "compile_snapshot_sha256": "d4d384c51117272e4453ef9dca64e38f65a5db2335392ca4b02fa2adb71f956b",
+      "kind": [
+        "example"
+      ],
+      "matches": true,
+      "profile_test": false,
+      "target": "admission_latency",
+      "target_path": "debug/examples/admission_latency"
+    },
+    {
+      "audit_sha256": "70545252dabf4046e3ef4af6d368309dc52834c8d501c54447cdf3ea651e7078",
+      "compile_snapshot_sha256": "70545252dabf4046e3ef4af6d368309dc52834c8d501c54447cdf3ea651e7078",
+      "kind": [
+        "bin"
+      ],
+      "matches": true,
+      "profile_test": true,
+      "target": "lamp-voice",
+      "target_path": "debug/deps/lamp_voice-51d9141096691d62"
+    },
+    {
+      "audit_sha256": "f281b61b9c045f7e627514d634f6a6287193271845cd3c0a47d94a8bc4ba1a79",
+      "compile_snapshot_sha256": "f281b61b9c045f7e627514d634f6a6287193271845cd3c0a47d94a8bc4ba1a79",
+      "kind": [
+        "example"
+      ],
+      "matches": true,
+      "profile_test": false,
+      "target": "head_qualification_operator",
+      "target_path": "debug/examples/head_qualification_operator"
+    },
+    {
+      "audit_sha256": "1c2d46190c97bab05903d4e409cbd52348c44529ce41a43c59b1d980025c2056",
+      "compile_snapshot_sha256": "1c2d46190c97bab05903d4e409cbd52348c44529ce41a43c59b1d980025c2056",
+      "kind": [
+        "test"
+      ],
+      "matches": true,
+      "profile_test": true,
+      "target": "release_pair",
+      "target_path": "debug/deps/release_pair-ced63b27e241a67b"
+    },
+    {
+      "audit_sha256": "682ae829fca563badcd3f7f64c0a8f4e1d4c2dc26d6057f8680a3a2cabe5e818",
+      "compile_snapshot_sha256": "682ae829fca563badcd3f7f64c0a8f4e1d4c2dc26d6057f8680a3a2cabe5e818",
+      "kind": [
+        "example"
+      ],
+      "matches": true,
+      "profile_test": true,
+      "target": "stop_words_stt_replay",
+      "target_path": "debug/examples/stop_words_stt_replay-b562124b9ce72d6d"
+    },
+    {
+      "audit_sha256": "ee256d53a00f75bf7f6ca6820f872841945441d2ef4b917a7de1bb82535582f3",
+      "compile_snapshot_sha256": "ee256d53a00f75bf7f6ca6820f872841945441d2ef4b917a7de1bb82535582f3",
+      "kind": [
+        "example"
+      ],
+      "matches": true,
+      "profile_test": false,
+      "target": "duplex_lab",
+      "target_path": "debug/examples/duplex_lab"
+    },
+    {
+      "audit_sha256": "347508de95b55ef83dc22b6086822444da9913c591543b2223881a50f0709381",
+      "compile_snapshot_sha256": "347508de95b55ef83dc22b6086822444da9913c591543b2223881a50f0709381",
+      "kind": [
+        "bin"
+      ],
+      "matches": true,
+      "profile_test": false,
+      "target": "lamp-voice",
+      "target_path": "debug/lamp-voice"
+    }
+  ]
+}

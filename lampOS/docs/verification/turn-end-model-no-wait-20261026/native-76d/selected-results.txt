@@ -1,0 +1,37 @@
+Authored: 76d9940ec321d42c2d0d726a15b4115a6ba5fbdb
+Base: 1c884f16cf4de53a700bba7512c129c3ee01d72d
+Actual preview: 78cebeea1ccc47955bf19f55ce87c91136fcb598
+Equal complete tree: 560869e48cb06a9a506f411dd007117cd6a04c70
+Summary [ 214.348s] 11346 tests run: 11346 passed, 106 skipped
+Unique terminal rows: 11346; display echoes excluded: 35
+
+PASS (6137/11346) lamp-turn-end::it parity::spawn_returns_while_model_open_is_held
+PASS (6141/11346) lamp-turn-end::it parity::worker_process_refuses_missing_or_wrong_models_without_blocking
+PASS (6149/11346) lamp-turn-end-wire client::tests::native_reap_is_visible_while_reader_and_teardown_are_pending
+PASS (6150/11346) lamp-turn-end-wire frame::tests::long_reasons_are_truncated_on_a_character_boundary
+PASS (6151/11346) lamp-turn-end-wire frame::tests::malformed_frames_are_rejected_before_allocation
+PASS (6152/11346) lamp-turn-end-wire frame::tests::request_round_trips_and_keeps_only_the_latest_window
+PASS (6153/11346) lamp-turn-end-wire frame::tests::responses_round_trip
+
+test an_idle_worker_stays_ready_across_a_long_quiet ... ok (2015 ms)
+test a_worker_reporting_another_model_is_refused_before_any_request ... ok (2 ms)
+test no_outcome_is_delivered_after_close_even_for_an_answer_on_its_way ... ok (4 ms)
+test verdict_carries_identity_and_one_request_at_a_time ... ok (56 ms)
+test missing_model_is_final_and_never_restarted ... ok (162 ms)
+test missing_executable_fails_at_once ... ok (2 ms)
+test spawn_returns_while_worker_startup_is_held ... ok (6 ms)
+test startup_failures_are_final ... ok (409 ms)
+test serving_failures_are_replaced_within_budget ... ok (514 ms)
+test protocol_violations_are_replaced ... ok (177 ms)
+test cancelled_answers_are_never_delivered ... ok (155 ms)
+test close_during_inference_never_waits ... ok (233 ms)
+test sustained_requests_stay_bounded ... ok (692 ms)
+test result: 13 passed; 0 failed
+relay_signals: ok
+Workspace doctests: 4 passed / 0 failed across 46 summaries
+Whole promotion helper: 25 passed / 0 failed (2+0+22+1+0)
+
+cargo +1.96.0 fmt --all --check
+cargo clippy --locked --workspace --all-targets -- -D warnings
+cargo fmt --manifest-path .github/tools/lampos-promote/Cargo.toml --check
+cargo clippy --locked --manifest-path .github/tools/lampos-promote/Cargo.toml --all-targets -- -D warnings

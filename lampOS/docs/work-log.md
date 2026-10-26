@@ -1,3 +1,17 @@
+Ready for lamp-voice: yes (#3533); #3528 failed native gate and #3510 activation HOLD remain.
+
+## Current checkpoint: 2026-10-26 10:18 +07, model native qualification complete; IPC failure retained
+
+[#3533](https://github.com/autonomous-ai/lampOS/pull/3533) at `76d9940ec` contains current `1c884f16c`. [Original native proof](verification/turn-end-model-no-wait-20261026/native-76d/README.md): ARM64 **40261322616** passes **11,346 unique cases / zero FAIL, LEAK or TIMEOUT / 106 skipped / zero selected unrun**. Both model fixtures pass once. Separate process **13/0**, doctests **4/0**, relay success and helper **25/0** pass. Linux Clippy **40261322623** passes; actual preview `78cebeea1` has exact base/head parents and complete tree equal to the offered head. The additional Cloud and Surround reader checks are green by terminal metadata. Public source/proof reads from Tests, Reviewer-two and Reviewer-lead have no P1/P2; independent Mac execution remains separately queued by Reviewer-two. The PR is offered ready. The optional old-test rename is left for selector continuity with #1339 and original controls; the companion and documentation explicitly carry the ordering proof, with no physical latency claim.
+
+[#3528](https://github.com/autonomous-ai/lampOS/pull/3528) current `a8d6a4970` has a [failed original native event](verification/ipc-log-no-wait-20261026/native-a8-failed/README.md). ARM64 **40260992363**: **10,040 unique PASS / 1 FAIL / 106 skipped / 1,304 selected unrun**. The unchanged Voice sentinel fixture fails during `Reader::prepare` with ACL-inspection PermissionDenied; the changed IPC case passes once. Downstream docs/process/relay/export steps were skipped. Linux Clippy passes. Same file bytes at head/base/previous offer, and a prior passing occurrence, do not establish a clean-Main reproduction or the failing ancestor. No retry was issued. Tests received the exact failure and a source-only assessment that current #3527 leaves this particular sentinel case outside its new private-root scope. IPC remains draft; no failed gate is waived.
+
+[#3510](https://github.com/autonomous-ai/lampOS/pull/3510) is pushed current as `aca41e14d`. [Six source-bound Cargo commands](verification/own-keys-product-carry-20261026/current-1c884/README.md) pass: fmt, strict nine-crate Clippy, combined compilation, Voice **4,076/0/21**, Skills **522/0/9**, Voice-eval **623/0/0**. The procedure then fails its final hash guard: five of 27 recorded executable paths differ, all non-test targets; 22 match. Relinking is a plausible explanation, not a proven cause. The failed procedure and absent completion marker remain; exact executed-executable identity is not claimed. Source and all seven carried patches are verified, with no rerun or altered receipt. Current ARM64 **40263032904** is active and Linux Clippy **40263032936** passes; draft activation HOLD is unchanged.
+
+The remaining Voice memory admission fixtures are in their own local gate, the sole compiler job. Source review has no P1/P2 and confirms all production and Group B bytes unchanged. Failed isolated scenarios now retain their logs after owned child cleanup. Full tests and fault/pause controls still await completion; no result is inferred from quiet compilation. No device, key, provider, model download, local ARM64 or release action ran.
+
+---
+
 Ready for lamp-voice: no; current native gates/readers and own-keys activation HOLD remain.
 
 ## Current checkpoint: 2026-10-26 10:07 +07, original own-keys native pass and remaining memory fixtures claimed
