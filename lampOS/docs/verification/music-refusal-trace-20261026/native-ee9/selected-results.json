@@ -1,0 +1,37 @@
+[
+  {
+    "binary": "lamp-voice",
+    "name": "coordinator::tests::requested_audio::requested_audio_boundary_records_a_safe_fixed_refusal_without_offer_data",
+    "ordinal": 7455,
+    "status": "PASS",
+    "total": 11330
+  },
+  {
+    "binary": "lamp-voice",
+    "name": "coordinator::tests::requested_audio::requested_audio_boundary_journals_one_refusal_and_no_acceptance",
+    "ordinal": 7456,
+    "status": "PASS",
+    "total": 11330
+  },
+  {
+    "binary": "lamp-voice",
+    "name": "coordinator::tests::requested_audio::requested_audio_boundary_records_acceptance_with_explicit_null_and_one_repeat_refusal",
+    "ordinal": 7457,
+    "status": "PASS",
+    "total": 11330
+  },
+  {
+    "binary": "lamp-voice",
+    "name": "coordinator::tests::requested_audio::requested_audio_boundary_records_preparation_failure_and_consumes_the_attempt",
+    "ordinal": 7459,
+    "status": "PASS",
+    "total": 11330
+  },
+  {
+    "binary": "lamp-voice",
+    "name": "coordinator::tests::requested_audio::requested_audio_boundary_records_unavailable_and_stale_envelope_refusals",
+    "ordinal": 7470,
+    "status": "PASS",
+    "total": 11330
+  }
+]

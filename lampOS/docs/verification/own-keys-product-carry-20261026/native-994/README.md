@@ -1,0 +1,13 @@
+# Own-keys carry: original native qualification on the 756 base
+
+PR #3510 authored head `9941a11c49e98c8624c3c6d78ccae246410a0afd` is based on `756be347e13d2e52e7268414295dda8fc554c267`. Both original jobs checked out merge preview `fa2e16cbcbd819e0c705c67ab98a6630a837f6d0`. Its complete tree `00eaa3d70182c9d0f8ab6b5c3f2478a4f558348a` equals the authored head tree, with the exact base/head as its parents. [identities.json](identities.json) records the original run, job and artifact metadata.
+
+[ARM64 run 40251804763, attempt 1](https://github.com/autonomous-ai/lampOS/actions/runs/40251804763/attempts/1) succeeds: **11,335 unique PASS, zero LEAK/FAIL/TIMEOUT, 106 skipped and zero selected unrun**. All ordinals 1–11,335 reconcile exactly once; 35 identical report echoes are excluded. All nine own-keys installer, matcher and product controls pass once, including the Linux-only FIFO matcher. Both compiled switch-census readers also pass. [selected-results.json](selected-results.json) retains all eleven exact case names and ordinals; [census.json](census.json) retains the literal summary and raw-log hashes.
+
+The two excluded own-harness binaries run separately: relay signals succeeds and 12 process tests pass. Workspace doctests contribute four passes across 46 summaries and 46 distinct crate headers. Their stdout/stderr streams interleave, so individual summary rows are not assigned to crate names. The separate stable-promotion tool workspace reports 22 passes. These scopes are not added to the nextest count.
+
+[Linux Clippy run 40251804817, attempt 1](https://github.com/autonomous-ai/lampOS/actions/runs/40251804817/attempts/1) succeeds, including pinned workspace formatting and strict workspace/all-target Clippy, plus the separate stable-promotion tool formatting and Clippy. Neither original job was rerun for this audit. Promotion, signing and failure-report jobs were skipped, not passed.
+
+Raw logs and API receipts remain retained privately. The published artifact metadata is bound to this authored head; its archive was not downloaded or executed by this audit. The FIFO case exercises only cleanup's private matcher, not successful whole-install FIFO handling. Earlier original/amended-head native runs, the failed Mac selected gate and completed d21/274/756 local continuations retain their own source and outcome scopes. This packet qualifies only this original 994 head and its actual tested tree; later amendments require their own evidence.
+
+Product activation remains HOLD for #2094 and fresh current-base lamp acceptance. No real key, provider, systemd installation, stable promotion, physical lamp, cold-boot timing or latency acceptance is claimed.

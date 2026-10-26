@@ -1,0 +1,11 @@
+# Music refusal boundary: ee9 native qualification
+
+PR #3515 authored head `ee9b6253d29f9ac4c4c591a9d1eb19617920d1e5` is based on `756be347e13d2e52e7268414295dda8fc554c267`. Both original attempt-1 jobs checked out merge preview `3208e828891b36767594fa586698c1b39e4e8d9e`. Its complete tree `884a618021c4b75dfe3f36f5d9457b8f72b541b5` equals the authored head tree, with the exact base/head as its parents. [identities.json](identities.json) records run, job and artifact metadata.
+
+[ARM64 run 40251274254, attempt 1](https://github.com/autonomous-ai/lampOS/actions/runs/40251274254/attempts/1) succeeds: **11,330 unique PASS, zero LEAK/FAIL/TIMEOUT, 106 skipped and zero selected unrun**. All ordinals reconcile exactly once; 35 identical report echoes are excluded. All five requested-audio boundary controls pass once, including capacity refusal and the child-stderr positive/refusal case. [selected-results.json](selected-results.json) keeps their exact names and ordinals.
+
+The two excluded own-harness binaries run separately: relay signals succeeds and 12 process tests pass. Workspace doctests contribute four passes across 46 summaries. The separate stable-promotion tool workspace reports 22 passes. These scopes are not added to the nextest count. [census.json](census.json) retains distinct counts, summary and log hashes.
+
+[Linux Clippy run 40251274240, attempt 1](https://github.com/autonomous-ai/lampOS/actions/runs/40251274240/attempts/1) succeeds, including pinned workspace formatting and strict workspace/all-target Clippy, plus the separate stable-promotion tool checks. No workflow was rerun for this audit. Skipped publication/promotion jobs are retained as skipped in the identities.
+
+This packet qualifies ee9 on the recorded 756 base only; it does not qualify a later carry or an advanced release base. Earlier full local results, deliberate faults and the rejected zero-selection attempt remain separate. The earlier b04 ARM64 run was cancelled before completion and is not passing native evidence for this head. Raw logs and API receipts remain retained privately. The artifact archive was neither downloaded nor executed by this audit. The child test captures stderr from the shared handler, not persisted systemd journal output. No provider, real key, physical lamp, audio quality or latency acceptance is claimed; #2793 remains separate.

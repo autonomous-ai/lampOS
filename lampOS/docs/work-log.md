@@ -1,3 +1,17 @@
+Current PRs pushed; exact-head native checks and endpoint review active.
+
+## Current checkpoint: 2026-10-26 08:29 +07, endpoint fixture published and previous native gates retained
+
+[#3524](https://github.com/autonomous-ai/lampOS/pull/3524) publishes #1339's missing-executable row at `ecaed2484` on current `c5c7603a7`. Test-only held startup requires spawn-return before release and verifies readiness plus owned teardown. Production code and deadlines are unchanged. [Immutable source and controls](https://github.com/autonomous-ai/lampOS/tree/ecaed2484b2df1b1723e222d90647825f3e65764/lampOS/docs/verification/turn-end-wire-no-wait-20261026) retain fmt/strict Clippy, **5 library + 13 process passes, zero failures**, focused **2/0**, the original 400 ms stall failure, corrected stalls **2/0**, deliberately blocking spawn **0/1** at the named watchdog, and freshly restored **2/0**. The first cleanup fixture's **1/1** remains a separate failed attempt with full suite unrun. The rebase keeps its one source patch equal; fresh current fmt/Clippy pass. Linux Clippy **40253857128** is green; original ARM64 **40253857057** and team review are pending.
+
+[#3515](https://github.com/autonomous-ai/lampOS/pull/3515) now has four equal patches at `dde97152c` on c5; only upstream build-rows.md differs from ee9, with no code or tool reader found. Fresh fmt/strict Voice/Voice-eval Clippy pass, and unchanged tests were not repeated. [Completed ee9 native evidence](verification/music-refusal-trace-20261026/native-ee9/README.md) binds ARM64 **40251274254** to its actual preview tree: **11,330 unique PASS, zero FAIL/LEAK/TIMEOUT, 106 skipped, zero selected unrun**, all five boundary controls once. Linux Clippy **40251274240** passes. The new DDE ARM64 **40253287298** remains active; its Linux Clippy **40253287387** passes. Earlier source reads and full local counts retain their original identities; current readiness waits for exact-head native completion and current reads.
+
+[#3510](https://github.com/autonomous-ai/lampOS/pull/3510) has seven equal patches at `3b78d3b83` on c5; only the same upstream document differs from 994. Fresh fmt/strict selected nine-crate Clippy pass. [Completed 994 native evidence](verification/own-keys-product-carry-20261026/native-994/README.md) records ARM64 **40251804763** with **11,335 unique PASS, zero FAIL/LEAK/TIMEOUT, 106 skipped, zero selected unrun**; all nine own-keys controls and both census readers pass once. Linux Clippy **40251804817** passes and the actual preview tree equals the authored head. Current 3b78 ARM64 **40253331342** remains active; Linux Clippy **40253331383** passes. Draft activation HOLD remains for #2094 and explicit current-lamp acceptance. The inherited updater self-replacement does not demonstrate migration of already-installed updater units to the stable feed.
+
+The log rebase preserves **14,063** prior verification blobs and modes. The packets keep actual prior heads separate from later carries, distinguish custom harnesses and doctests, and exclude identical report echoes. No local ARM64, device, provider, real-key or release action ran. Next is exact-head native qualification and the next unowned Group A fixture after checking open and merged claims.
+
+---
+
 Both current carries pushed; next nonwaiting fixture in validation.
 
 ## Current checkpoint: 2026-10-26 08:02 +07, music and own-keys on the stable-feed base
