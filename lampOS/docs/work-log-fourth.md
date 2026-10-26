@@ -1,3 +1,13 @@
+## 2026-10-26 18:49 — Diagnostic native pass and final source correction
+
+Ready for lamp-voice: no
+
+#3577 at 2cc71e720 passed original ARM64 40315208865 and Linux Clippy 40315208876. [Native receipt](verification/diagnostic-sequence-20261026/native-2cc.json) binds actual preview 0d85939c9, ba950/head parents and exact ebc05e3be tree: 7,503 unique passes, zero failures/leaks/timeouts/selected unrun, 53 summary-only skips. Diagnostics 18 passed, including the changed control once; separate docs 4, process 13 and relay pass. Second posted READ-OK after independent fmt, strict Voice Clippy and diagnostics 18/0/0; that independent focused result belongs to its reader. Parent #3544's privacy/runtime HOLD remains.
+
+Common preparation removed generated artifacts for 48 local/path packages after preserving 22 failure witnesses, 7,492 debug inputs and four passed executable clones. Cleanup exited 0, external fingerprints and source stayed unchanged, and free space rose from 6.02 to 28.16 GB. No compiler ran. Final source review then found delayed empty frames could be restamped as fresh absence. The capture-time correction and producer/consumer regressions are being added before the source freeze; all remain unrun. Explicit camera-close while the publishing loop is blocked remains a separate HOLD.
+
+Re-read #3564 at 8162f0792 and closed Fourth's blocked-connect P2: bounded nonblocking transport rechecks actual authority before writes, with a narrowed-after-connect zero-byte control. Source-only; no independent runtime claim.
+
 ## 2026-10-26 18:40 — Current native hand-control qualification recorded
 
 Ready for lamp-voice: no
