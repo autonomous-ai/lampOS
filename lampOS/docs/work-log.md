@@ -1,3 +1,17 @@
+Ready for lamp-voice: no; current native gates/readers and own-keys activation HOLD remain.
+
+## Current checkpoint: 2026-10-26 10:07 +07, original own-keys native pass and remaining memory fixtures claimed
+
+[#3510](https://github.com/autonomous-ai/lampOS/pull/3510) published `3654d62d0` has [original native qualification](verification/own-keys-product-carry-20261026/native-3654/README.md): ARM64 **40260331872** passes **11,353 unique PASS / zero FAIL, LEAK or TIMEOUT / 106 skipped / zero selected unrun**. All nine own-keys controls and two compiled census readers run once; 35 identical display echoes are excluded. Separate process **13/0**, doctests **4/0**, relay success and whole helper **25/0** pass. Linux Clippy **40260331874** passes. Both original jobs check exact preview `274ca5da9`, whose parents are 0c1/3654 and whose complete tree equals the authored head. This qualifies only that original 0c1 offer. The latest 1c884 carry `aca41e14d` remains unpushed while dependent crate tests run: current fmt/strict nine-crate Clippy, compilation and full Voice **4,076/0/21** pass; Skills and Voice-eval follow. Activation HOLD for #2094 and explicit current-lamp acceptance remains.
+
+[#3533](https://github.com/autonomous-ai/lampOS/pull/3533) now offers the real model-open fixture at `76d9940ec`; its source/control/current-host evidence is committed and original native checks/readers are active. #3528 current `a8d6a4970` retains fresh host qualification and awaits its original ARM64 result; current Linux Clippy is green.
+
+Taken on [#1339](https://github.com/autonomous-ai/lampOS/issues/1339#issuecomment-6407206623) and the [Queue](https://github.com/autonomous-ai/lampOS/issues/3504#issuecomment-6407207267): its two remaining Voice admission rows, on `second/voice-memory-no-wait`. Open and delivered PRs were checked; #3064 changes the same memory file but not these test functions or their writer/admission entry points. Preparation changes only those fixtures, a test-only child helper and fixture documentation. Real acknowledgements stay held until foreground return; original payloads, idle lower bound, exact queue capacity and overflow loss are retained. The child isolates deadlocks and requires exact native one-test success; no Group B deadline or production source change is intended. Independent source review is active, with no compiler/test result yet. This waits behind the sole own-keys compiler gate.
+
+No device, provider, key, model download, local ARM64, stable promotion or release action ran.
+
+---
+
 Ready for lamp-voice: no; current carries await native gates and #3510 keeps its activation HOLD.
 
 ## Current checkpoint: 2026-10-26 09:54 +07, IPC current again and model fixture published
