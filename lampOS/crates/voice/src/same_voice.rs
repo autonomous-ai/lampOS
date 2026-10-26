@@ -1249,17 +1249,20 @@ mod tests {
         (journal, kept)
     }
 
-    /// The journal fixture owns the actual constructor's worker. A print
-    /// being journaled is not evidence that the worker's child was reaped.
-    struct JournalWorker {
+    /// These fixtures own their actual constructor's worker. A journal line
+    /// or a restart is not evidence that the worker's child was reaped.
+    struct FixtureWorker {
         prints: Option<Prints>,
         done: mpsc::Receiver<()>,
         worker: Option<thread::JoinHandle<()>>,
     }
 
-    impl JournalWorker {
+    impl FixtureWorker {
         fn start(program: PathBuf, journal: Journal) -> Self {
-            let mut prints = Prints::journaled(program, "model".into(), QUICK, journal);
+            Self::new(Prints::journaled(program, "model".into(), QUICK, journal))
+        }
+
+        fn new(mut prints: Prints) -> Self {
             let worker = prints.test_worker.take();
             let done = prints.test_done.take().unwrap();
             Self {
@@ -1273,21 +1276,21 @@ mod tests {
             drop(self.prints.take());
             self.done
                 .recv_timeout(Duration::from_secs(5))
-                .expect("same-voice journal worker did not finish after its channels closed");
+                .expect("same-voice fixture worker did not finish after its channels closed");
             self.worker.take().unwrap().join().unwrap();
         }
     }
 
-    impl Drop for JournalWorker {
+    impl Drop for FixtureWorker {
         fn drop(&mut self) {
             drop(self.prints.take());
             if let Some(worker) = self.worker.take() {
                 // Assertion failure or a completion timeout still owns this
                 // join. Rust cannot cancel a thread: a stuck OS spawn/reap
                 // needs the enclosing test-process watchdog, never detachment.
-                eprintln!("same-voice journal fixture: joining its worker during cleanup");
+                eprintln!("same-voice fixture: joining its worker during cleanup");
                 if worker.join().is_err() {
-                    eprintln!("same-voice journal fixture: its worker panicked");
+                    eprintln!("same-voice fixture: its worker panicked");
                 }
             }
         }
@@ -1333,7 +1336,7 @@ printf '{"request":1,"print":[1.0,0.0]}\n'
 exec sleep 30"#,
         );
         let (journal, kept) = kept_journal();
-        let mut worker = JournalWorker::start(path, journal);
+        let mut worker = FixtureWorker::start(path, journal);
         ask_until(worker.prints.as_mut().unwrap(), |answer| answer.is_ok());
         let timed: Vec<String> = kept.lock().unwrap().clone();
         assert_eq!(timed.len(), 1, "{timed:?}");
@@ -1354,8 +1357,8 @@ exec sleep 30"#,
             "hung",
             r#"printf '{"ready":true,"loaded_ms":1}\n'; exec sleep 30"#,
         );
-        let mut prints = Prints::timed(path, "model".into(), QUICK);
-        ask_until(&mut prints, |answer| {
+        let mut worker = FixtureWorker::new(Prints::timed(path, "model".into(), QUICK));
+        ask_until(worker.prints.as_mut().unwrap(), |answer| {
             answer
                 .as_ref()
                 .err()
@@ -1369,6 +1372,7 @@ exec sleep 30"#,
             );
             std::thread::sleep(Duration::from_millis(5));
         }
+        worker.finish();
     }
 
     #[test]
