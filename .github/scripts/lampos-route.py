@@ -154,18 +154,33 @@ def route(env):
                 f.write(text)
 
 
+def completed(repo, run_id, within):
+    for _ in range(within // 5):
+        if api(f"/repos/{repo}/actions/runs/{run_id}")["status"] == "completed":
+            return True
+        time.sleep(5)
+    return False
+
+
 def sweep(env):
     repo = env["GITHUB_REPOSITORY"]
     rescued = 0
     for run_id in sorted({j[0] for j in stuck(studio_jobs(repo, None))}):
         print(f"run {run_id}: Studio job stuck, cancelling and running it again")
-        api(f"/repos/{repo}/actions/runs/{run_id}/cancel", "POST")
-        for _ in range(30):
-            if api(f"/repos/{repo}/actions/runs/{run_id}")["status"] == "completed":
-                break
-            time.sleep(5)
-        api(f"/repos/{repo}/actions/runs/{run_id}/rerun", "POST")
-        rescued += 1
+        try:
+            # A runner too slow or gone may never acknowledge a cancel (seen on
+            # 40363864391): then force it, which needs no runner.
+            for how in ("cancel", "force-cancel"):
+                api(f"/repos/{repo}/actions/runs/{run_id}/{how}", "POST")
+                if completed(repo, run_id, 60):
+                    break
+            else:
+                print(f"run {run_id}: still not cancelled, left for the next sweep")
+                continue
+            api(f"/repos/{repo}/actions/runs/{run_id}/rerun", "POST")
+            rescued += 1
+        except (OSError, ValueError, KeyError) as e:
+            print(f"run {run_id}: {e}")
     print(f"rescued {rescued} run(s)")
     if rescued and env.get("GITHUB_STEP_SUMMARY"):
         with open(env["GITHUB_STEP_SUMMARY"], "a") as f:
