@@ -133,7 +133,8 @@ too.
 
 | Condition | Effect | Test |
 | --- | --- | --- |
-| Worker executable missing | `Failed` at once; every pause uses the baseline window | `missing_executable_fails_at_once` |
+| Worker executable missing | The launch error becomes `Failed`; every pause uses the baseline window | `missing_executable_fails_at_once` |
+| Worker startup held before `Ready` | `spawn` returns while the worker remains `Loading`; the caller does not wait for readiness | `spawn_returns_while_worker_startup_is_held` |
 | Model missing, truncated, same-size corrupt or a different file | The worker refuses it before the ONNX parser sees it; `Failed`, never restarted | `worker_process_refuses_missing_or_wrong_models_without_blocking`, `worker_process_refuses_truncated_and_corrupt_models_once` (real binary), `missing_model_session_ends_on_the_unchanged_silence_fallback` (full session) |
 | Not ready within 10 s, or a crash or protocol violation before ready | `Failed`, never restarted | `startup_failures_are_final` |
 | `Ready` reports a model other than the command's pinned SHA256 | `Failed` before any request is sent; never restarted | `a_worker_reporting_another_model_is_refused_before_any_request` |
@@ -146,8 +147,14 @@ too.
 | Long idle | The worker stays ready with the same process; only a request in flight is timed | `an_idle_worker_stays_ready_across_a_long_quiet`, `worker_process_stays_ready_and_bounded_across_idle_and_repeated_checks` |
 
 The process tests (`crates/turn-end-wire/tests/process.rs`) re-execute their
-own binary as a scripted worker. Every path above runs through a real child
-process and real pipes.
+own binary as a scripted worker, using real child processes and pipes when a
+worker starts. The missing-executable case checks the launch failure,
+unavailable submissions and zero spawned workers without a 20 ms stopwatch.
+Its companion holds a worker before `Ready` and requires both worker-entry
+and spawn-return events before releasing startup. Success also requires
+readiness, confirmed teardown and a successful scenario-child exit. The
+parent owns the scenario's process group and private scratch directory;
+long watchdogs diagnose a stuck fixture rather than measure physical latency.
 
 The six in-process classifier scenarios explicitly use the stepped peer
 clock described in [Voice fixtures](voice-test-fixtures.md), including
