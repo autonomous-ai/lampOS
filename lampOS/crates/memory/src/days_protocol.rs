@@ -415,13 +415,16 @@ fn extra(store: &mut Days, request: Extra) -> Result<Value> {
             day_to,
             recall_v2,
         } => {
+            // `more` is said only for a span of days (#3627): every other
+            // answer is byte for byte what it was.
+            let spanned = day_from.is_some();
             let (day, last_day) = span(day, day_from, day_to)?;
             let wider = Wider {
                 last_day,
                 second: recall_v2,
             };
             let person = one(person)?;
-            let records = store.search_wider(
+            let (records, more) = store.search_wider_more(
                 &person,
                 &ask(Some(&query), day.as_deref(), limit, max_bytes)?,
                 history,
@@ -446,7 +449,13 @@ fn extra(store: &mut Days, request: Extra) -> Result<Value> {
                     }
                 }
             }
-            json!({"ok":true,"entries":entries})
+            // #3627: for a span, whether more matched than was given, by
+            // count or bytes.
+            let mut found = json!({"ok":true,"entries":entries});
+            if spanned {
+                found["more"] = json!(more);
+            }
+            found
         }
         Extra::Recall {
             person,
@@ -458,18 +467,24 @@ fn extra(store: &mut Days, request: Extra) -> Result<Value> {
             day_to,
             recall_v2,
         } => {
+            // `more` is said only for a span of days (#3627): every other
+            // answer is byte for byte what it was.
+            let spanned = day_from.is_some();
             let (day, last_day) = span(day, day_from, day_to)?;
             let wider = Wider {
                 last_day,
                 second: recall_v2,
             };
-            value(Response::Recalled {
-                entries: store.recall_wider(
-                    &one(person)?,
-                    &ask(query.as_deref(), day.as_deref(), limit, max_bytes)?,
-                    wider,
-                )?,
-            })
+            let (entries, more) = store.recall_wider_more(
+                &one(person)?,
+                &ask(query.as_deref(), day.as_deref(), limit, max_bytes)?,
+                wider,
+            )?;
+            let mut recalled = value(Response::Recalled { entries });
+            if spanned {
+                recalled["more"] = json!(more);
+            }
+            recalled
         }
         Extra::Forget {
             person,
@@ -805,6 +820,82 @@ mod tests {
                 selective
             );
         }
+    }
+
+    #[test]
+    fn a_broad_day_span_keeps_older_kept_facts_among_recent_exchanges() {
+        let (_scratch, mut store) = Scratch::new("span-kept-priority");
+        let person = "p-0123456789abcdef";
+        let send = |store: &mut Days, request: Value| -> Value {
+            serde_json::from_str(&answer(store, request.to_string().as_bytes(), NOW).line).unwrap()
+        };
+        let old = send(
+            &mut store,
+            json!({"op":"remember","person":person,"at_unix_ms":NOW-5*86_400_000,"text":"works at a bakery"}),
+        );
+        assert_eq!(old["ok"], true);
+        for n in 0..10 {
+            let added = send(
+                &mut store,
+                json!({"op":"append","person":person,"at_unix_ms":NOW+n,"heard":format!("today's unrelated update {n}"),"said":"okay"}),
+            );
+            assert_eq!(added["ok"], true, "{added}");
+        }
+        let found = send(
+            &mut store,
+            json!({"op":"recall","person":person,"day_from":"2026-10-08","day_to":"2026-10-13","recall_v2":true,"limit":6}),
+        );
+        assert_eq!(found["ok"], true, "{found}");
+        assert!(
+            found["entries"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|entry| entry["id"] == old["id"]),
+            "{found}"
+        );
+    }
+
+    /// #3627 (the reviewer-lead's P2): a span's answer says `more` exactly,
+    /// when there was one past its `limit` or its `max_bytes` left one out,
+    /// and not when it gave all; a search says it too.
+    #[test]
+    fn a_span_answer_says_when_there_is_more_than_it_gives() {
+        let (_scratch, mut store) = Scratch::new("span-more");
+        let person = "p-0123456789abcdef";
+        let send = |store: &mut Days, request: Value| -> Value {
+            serde_json::from_str(&answer(store, request.to_string().as_bytes(), NOW).line).unwrap()
+        };
+        for n in 0..3 {
+            let added = send(
+                &mut store,
+                json!({"op":"append","person":person,"at_unix_ms":NOW+n,"heard":format!("the coffee update {n}"),"said":"okay"}),
+            );
+            assert_eq!(added["ok"], true, "{added}");
+        }
+        let span = |limit: u64, max_bytes: u64| json!({"op":"recall","person":person,"day_from":"2026-10-08","day_to":"2026-10-13","recall_v2":true,"limit":limit,"max_bytes":max_bytes});
+        for (limit, max_bytes, given, more) in [
+            (3, 4096, 3, false),
+            (2, 4096, 2, true),
+            (6, 30, 1, true),
+            (6, 4096, 3, false),
+        ] {
+            let found = send(&mut store, span(limit, max_bytes));
+            assert_eq!(found["ok"], true, "{found}");
+            assert_eq!(found["entries"].as_array().unwrap().len(), given, "{found}");
+            assert_eq!(found["more"], more, "{limit} {max_bytes}: {found}");
+        }
+        let searched = send(
+            &mut store,
+            json!({"op":"search","person":person,"query":"coffee","limit":2,"day_from":"2026-10-08","day_to":"2026-10-13"}),
+        );
+        assert_eq!(searched["more"], true, "{searched}");
+        // No span: no `more`, the answer as it was.
+        let plain = send(
+            &mut store,
+            json!({"op":"search","person":person,"query":"coffee","limit":2}),
+        );
+        assert!(plain.get("more").is_none(), "{plain}");
     }
 
     /// `memory/forgot` (#2467's follow-up): only a `forget_all` that was
