@@ -19,6 +19,7 @@
 //! # Ok::<(), std::io::Error>(())
 //! ```
 
+pub mod camera_authority;
 mod clock;
 pub mod log_relay;
 mod wait;
