@@ -555,6 +555,15 @@ and `with_the_switch_and_a_voice_check_a_line_held_as_another_voice_counts_as_ta
 The child with the real model, its timing and memory on the A733, and
 real voices are not shown.
 
+The journal and hung-child restart fixtures retain the worker from their actual
+`Prints` constructor. After the original assertions, they close its channels,
+wait for its completion event with a five-second diagnostic bound, then join
+the worker. The restart case still uses `Prints::timed` and checks the same
+answer timeout and second start. Unwinding also retains the join; a stuck OS
+spawn or reap requires the enclosing test-process watchdog. This fixture
+cleanup does not change production supervision or establish the cause of a
+historical native leak.
+
 ## The caller's voice only (#2602, 21 October)
 
 On lamp-4ace on 21 October at 20:06 (sv-ab, after a quiet-gated restart),
