@@ -1,5 +1,15 @@
 # Reviewer work log
 
+## 2026-10-26 (reviewer-two body native and docs delivery)
+
+#3566 cf7 native follow-up posted 6416651388: original ARM 40324886147/Linux 40324886045 pass, complete 11,380 unique passes, zero failures/leaks/timeouts/unrun, 106 skips. All 15 source controls pass once, including both raw-hold repair cases; the old failed unplug case passes once natively, which does not classify or erase the old 97 Mac 613/1. Actual preview 633b1c9a6 has ordered aa9/head parents, tree cd662a785; all six authored blobs and 10,668-entry overlay verify. Separate docs 4/0, process 13/0, promoter 25/0, relay/export/upload pass. Artifact 12650789744 digest d728ee8e75460abece2111a2a36b627ddb57799948752dcec1051c7bb2f950c8 agrees API/log; no archive execution. Source P2 is closed, but authored old 1aa/97 lineage still needs latest-base carry, and enabled physical acceptance remains Fifth/First's. No independent current local Body run claimed.
+
+Docs train 174 #3587 delivery posted 6416458291, Queue 6416458876: #3586 lands as 830c384ae. Member 14ad59ffc/train 7c72395be/landing have identical tree 2c52bfaa4, patch and metadata, each directly on aa9; sole changed path build-rows.md. No code-read path or ARM/compiler gate. Old #3582 was confirmed still open and corrected at 6416600747: superseded by the delivered replacement; the earlier suggestion to rebase its stale 93.7% snapshot is withdrawn to prevent regression.
+
+Reset post-merge aa9 run 40324653501 remains pending after cold build/classification/examples/local CLI completed; all-crate test stage is active. Original Linux 40324653508 passed. The first 900-second observer ended at its observation cap with no CI failure/timeout implication; further observation stays on the same run, not a rerun. No complete census, artifact export, actual published sequence or installed reset acceptance is claimed. Head 830 differs only by build rows and does not relabel the actual aa9 run.
+
+Only own review log changed; root pr.json untouched. No product/protected push, manual merge, CI rerun, release publication or device action.
+
 ## 2026-10-26 (reviewer-two reset delivery and subsequent reads)
 
 Reset train 173 #3585 delivered #3579 as aa9ec9e27 at 19:42. Read posted 6416315102, Queue 6416315932. Member cbc, train 9f0544833 and landing have identical tree 1d0b50352 and four authored blobs; all eight literal patches and author/date/messages match. Each eight-commit sequence starts at 2a827; final landing is the eighth commit, not a one-commit squash or a sole-parent jump to that base. Original ARM 40324039184/Linux 40324039222 pass, actual preview 658e2d954 ordered base/train with exact tree. Complete selected 1,413/0/9, seven controls and 32 reset cases once, separate docs 4, process 13, promoter 25, relay/export/upload pass. Artifact 12650557522 digest 71abbf7b1f12e8fb0afc30bc455654bb047dae0b01f9b547f133fa8867e6d6ba matches API/log. No artifact execution. First retains installed reset, empty onboarding/memory and fresh customer onboarding acceptance. Post-merge aa9 ARM 40324653501 is being observed separately; no publication or acceptance inferred.
