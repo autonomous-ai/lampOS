@@ -32,3 +32,14 @@ the builder whose lamp it is, on the Queue issue.
   take, or another route); how the judge, which takes proposals only from
   `skills`, takes a remote one; whether it waits for 1.0, as AGENTS.md keeps
   Harness out of this release.
+
+## 26 Oct, after P2: Harness's limits and the Harness half
+
+- #3550 (docs only): records that Harness's `addon.proposal` note is 300 bytes too, with rates of 6 a minute per add-on, 12 per device and 4 undecided, and one value per topic. READ-OK from reviewer-three, Second and Third; merged in train #3551 (lamp-voice `9e5d3b9c6`). Questions 5–7 (event stream, long notes, trusted machine) asked on openharness#1654.
+- openharness#1717, at the owner's request, answers #1654 questions 1–3:
+  - the lamp's own service publishes, decides and takes its proposals over its daemon's loopback (`machine-addon/hello|publish|decision|proposals`);
+  - the owner's machines use a sealed `machine_addon` request, `addon … --machine <lamp>` on the CLI;
+  - each proposal carries `from: {machineId, label}`, taken from the link's pairing record.
+
+  The owner is testing it before merge.
+
