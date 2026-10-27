@@ -1,0 +1,650 @@
+{
+  "authored_head": "75f865b66999515e34865c9873988fb0029dad24",
+  "authored_original_base": "4bff5f2c517bf64d4a32c31a90e0b24dc1a4810a",
+  "ci_steps": {
+    "arm": [
+      {
+        "conclusion": "success",
+        "name": "Set up job"
+      },
+      {
+        "conclusion": "success",
+        "name": "system packages"
+      },
+      {
+        "conclusion": "success",
+        "name": "Run actions/checkout@v4"
+      },
+      {
+        "conclusion": "success",
+        "name": "publication failure tests (offline, no signing secret)"
+      },
+      {
+        "conclusion": "success",
+        "name": "Rust 1.96.0"
+      },
+      {
+        "conclusion": "success",
+        "name": "artifact provenance regression (offline, disposable Cargo workspace)"
+      },
+      {
+        "conclusion": "success",
+        "name": "stable promotion tests (offline, disposable test key)"
+      },
+      {
+        "conclusion": "success",
+        "name": "restore the cache"
+      },
+      {
+        "conclusion": "success",
+        "name": "unchanged source files get the cached build's times back"
+      },
+      {
+        "conclusion": "skipped",
+        "name": "record fresh source times for a cold publication build"
+      },
+      {
+        "conclusion": "success",
+        "name": "Run taiki-e/install-action@v2"
+      },
+      {
+        "conclusion": "success",
+        "name": "build (release, the lamps' binaries)"
+      },
+      {
+        "conclusion": "success",
+        "name": "every built lamp-* binary is classified for the lamp-os package"
+      },
+      {
+        "conclusion": "success",
+        "name": "build the two selected artifact examples without filename collisions"
+      },
+      {
+        "conclusion": "success",
+        "name": "publication CLI rehearsal (local test key and simulated GitHub only)"
+      },
+      {
+        "conclusion": "success",
+        "name": "which crates a pull request tests"
+      },
+      {
+        "conclusion": "success",
+        "name": "test (full run, every test one at a time; otherwise without the realtime group, in parallel)"
+      },
+      {
+        "conclusion": "success",
+        "name": "doc tests and the own-harness tests (nextest runs neither)"
+      },
+      {
+        "conclusion": "success",
+        "name": "export only current Cargo targets and their SHA-256"
+      },
+      {
+        "conclusion": "success",
+        "name": "Run actions/upload-artifact@v4"
+      },
+      {
+        "conclusion": "skipped",
+        "name": "discard the isolated example target before saving the cache"
+      },
+      {
+        "conclusion": "skipped",
+        "name": "save the cache"
+      },
+      {
+        "conclusion": "success",
+        "name": "Post Run actions/checkout@v4"
+      },
+      {
+        "conclusion": "success",
+        "name": "Complete job"
+      }
+    ],
+    "linux": [
+      {
+        "conclusion": "success",
+        "name": "Set up job"
+      },
+      {
+        "conclusion": "success",
+        "name": "system packages"
+      },
+      {
+        "conclusion": "success",
+        "name": "Run actions/checkout@v4"
+      },
+      {
+        "conclusion": "success",
+        "name": "Rust 1.96.0"
+      },
+      {
+        "conclusion": "success",
+        "name": "stable promotion formatting and strict Clippy"
+      },
+      {
+        "conclusion": "success",
+        "name": "formatting (whole workspace, pinned Rust)"
+      },
+      {
+        "conclusion": "success",
+        "name": "restore the cache"
+      },
+      {
+        "conclusion": "success",
+        "name": "unchanged source files get the cached build's times back"
+      },
+      {
+        "conclusion": "success",
+        "name": "clippy (every crate and target, warnings as errors)"
+      },
+      {
+        "conclusion": "skipped",
+        "name": "save the cache"
+      },
+      {
+        "conclusion": "success",
+        "name": "Post Run actions/checkout@v4"
+      },
+      {
+        "conclusion": "success",
+        "name": "Complete job"
+      }
+    ]
+  },
+  "controls": {
+    "linux_only_once_pass": 6,
+    "missing_or_nonpass": [],
+    "once_pass": 71,
+    "required": 71
+  },
+  "limits": [
+    "Run event head is75f; executed preview is882 with0811 base, not authored75f/4bff tree or localE220/737 tree.",
+    "All workspace selected under profile pr all;106skips have no per-case names in log and are not waived.",
+    "CI artifact export/upload success is not a signed release publication or device acceptance.",
+    "No binary artifact downloaded or executed; no workflow rerun."
+  ],
+  "nextest": {
+    "actual_unique_rows": 11448,
+    "excluded_custom_binaries": [
+      "lamp-ipc::relay_signals",
+      "lamp-turn-end-wire::process"
+    ],
+    "fail": 0,
+    "full_workspace_selector": true,
+    "ipc_camera_authority_pass": 18,
+    "leak": 0,
+    "per_package_pass": {
+      "lamp-actions": 123,
+      "lamp-addons": 50,
+      "lamp-air": 27,
+      "lamp-audio": 193,
+      "lamp-body": 624,
+      "lamp-bus": 107,
+      "lamp-camera": 89,
+      "lamp-cloud": 196,
+      "lamp-controls": 516,
+      "lamp-ears": 76,
+      "lamp-environment": 12,
+      "lamp-expression": 340,
+      "lamp-eyes": 339,
+      "lamp-gemini": 285,
+      "lamp-health": 91,
+      "lamp-ipc": 45,
+      "lamp-keeper": 42,
+      "lamp-lean": 61,
+      "lamp-local-time": 11,
+      "lamp-memory": 336,
+      "lamp-mood": 118,
+      "lamp-msgs": 172,
+      "lamp-name": 44,
+      "lamp-near-call": 8,
+      "lamp-observer": 46,
+      "lamp-peek": 26,
+      "lamp-policy": 284,
+      "lamp-records": 193,
+      "lamp-ring": 53,
+      "lamp-same-voice": 5,
+      "lamp-schedule": 215,
+      "lamp-selftest": 85,
+      "lamp-settings": 49,
+      "lamp-setup": 185,
+      "lamp-skills": 528,
+      "lamp-sound-fixtures": 15,
+      "lamp-station": 69,
+      "lamp-surround": 268,
+      "lamp-tasks": 220,
+      "lamp-turn-end": 32,
+      "lamp-turn-end-wire": 5,
+      "lamp-turn-owner": 37,
+      "lamp-update": 436,
+      "lamp-voice": 4167,
+      "lamp-voice-eval": 623,
+      "lamp-voice-processes": 2
+    },
+    "profile_pr_default_all": true,
+    "skip_names_available": false,
+    "summary_skipped": 106,
+    "timeout": 0,
+    "unique_pass": 11448,
+    "verified_post_summary_reprints_excluded": 35,
+    "voice_all_binaries_pass": 4167,
+    "voice_library_pass": 3849
+  },
+  "preview": {
+    "authored_blob_exceptions": [
+      "lampOS/docs/switches.md"
+    ],
+    "authored_blobs_equal_offered_and_e220": 37,
+    "authored_path_count": 38,
+    "difference_paths": [
+      "lampOS/crates/body/src/body.rs",
+      "lampOS/crates/body/src/body/tests.rs",
+      "lampOS/docs/body.md",
+      "lampOS/docs/switches.md"
+    ],
+    "equals_local_e220_tree": false,
+    "extra_base_commit": "0811b553b76823fd19fa018d7af0137007204b32",
+    "extra_base_overlay_verified": [
+      {
+        "clean_threeway_overlay_matches_preview": true,
+        "path": "lampOS/crates/body/src/body.rs"
+      },
+      {
+        "clean_threeway_overlay_matches_preview": true,
+        "path": "lampOS/crates/body/src/body/tests.rs"
+      },
+      {
+        "clean_threeway_overlay_matches_preview": true,
+        "path": "lampOS/docs/body.md"
+      },
+      {
+        "clean_threeway_overlay_matches_preview": true,
+        "path": "lampOS/docs/switches.md"
+      }
+    ],
+    "local_e220_tree": "25680827dca13fbeba7a9b0907e3e1ab47e85c01",
+    "ordered_parents": [
+      "0811b553b76823fd19fa018d7af0137007204b32",
+      "75f865b66999515e34865c9873988fb0029dad24"
+    ],
+    "sha": "882a0795d29713c06ed25f778d363ae1b7b1fa91",
+    "tree": "54bef624a07b1f80ab288babc9134a5762f3ad48"
+  },
+  "raw": {
+    "arm-job.log": "4e98b19244662ab5ae5852eb212465099e5a3b8e3f0b1f67da4bfb7e718e4266",
+    "arm-jobs.json": "0e59edf19db9a32e94469b5f4f4e668ea90a0dbc0947d068241724959430965b",
+    "arm-run.json": "0194f66bc854ec79ade6c86641263b192738973536c3392c3c4f6a3b82e04abb",
+    "commit-0811b553b76823fd19fa018d7af0137007204b32.json": "6989435012e2b25d6e81c29abdd0f00dfe06651b81c0638ea2c23e66f72b10b6",
+    "commit-75f865b66999515e34865c9873988fb0029dad24.json": "a71d77b548e0b1323eed22fa524b75a71b68eb1aae4813467b6d656aae105920",
+    "commit-882a0795d29713c06ed25f778d363ae1b7b1fa91.json": "8ed49cedbd62e44258c60f4f792ab062e6359cb65f2d48e4cecb1b2fdb1aafad",
+    "controls71.json": "c8cb1dc0fe062438302c4a5cdaf9de1768a6c635a3e0bb97c06f038e9d41d0a6",
+    "linux-job.log": "970377a7f70994765ebab450d7127d42b8ae86124868d9b28696231090708134",
+    "linux-jobs.json": "94a443dbdba311e291ef015ead1fec9932fbf25b61dda196d50000e1d5d10a34",
+    "linux-run.json": "196d4674d12b4e9eebb8b48bb162cf6701628dac4e1cf4861e2ba715e83471ef",
+    "nextest-unique-cases.json": "3f76091ae9b3fd712c5faa5e4a7ad51e284679ab5b53903215861e60eff91ca9",
+    "preview-local-tree-delta.json": "75db803863663f0505b06bc498f1dc872ac7c4e9acc5b2f522c4979b143cdfa9",
+    "preview-tree-recursive.json": "988a5109e86755636d948acbb9d35502e7f45c2fc59469675d552e79309f8b89"
+  },
+  "runs": {
+    "arm": {
+      "actual_checkout": "882a0795d29713c06ed25f778d363ae1b7b1fa91",
+      "conclusion": "success",
+      "event": "pull_request",
+      "head_sha": "75f865b66999515e34865c9873988fb0029dad24",
+      "job": 121961838809,
+      "original_attempt": 1,
+      "run": 40435118439
+    },
+    "linux": {
+      "actual_checkout": "882a0795d29713c06ed25f778d363ae1b7b1fa91",
+      "conclusion": "success",
+      "event": "pull_request",
+      "head_sha": "75f865b66999515e34865c9873988fb0029dad24",
+      "job": 121961839547,
+      "original_attempt": 1,
+      "run": 40435118510
+    }
+  },
+  "separate_custom_harnesses": {
+    "relay_signals_ok": true,
+    "turn_end_wire_process_13_0": true
+  },
+  "separate_docs": {
+    "failed": 0,
+    "ignored": 0,
+    "passed": 4,
+    "rows": [
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok",
+        "target": "lampos_promote"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok",
+        "target": "lamp_actions"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok",
+        "target": "lamp_addons"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok",
+        "target": "lamp_air"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok",
+        "target": "lamp_audio"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok",
+        "target": "lamp_body"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 2,
+        "status": "ok",
+        "target": "lamp_bus"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok",
+        "target": "lamp_camera"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok",
+        "target": "lamp_cloud"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok",
+        "target": "lamp_controls"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok",
+        "target": "lamp_ears"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok",
+        "target": "lamp_environment"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok",
+        "target": "lamp_expression"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok",
+        "target": "lamp_eyes"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok",
+        "target": "lamp_gemini"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok",
+        "target": "lamp_health"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 1,
+        "status": "ok",
+        "target": "lamp_ipc"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok",
+        "target": "lamp_keeper"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok",
+        "target": "lamp_lean"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok",
+        "target": "lamp_local_time"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok",
+        "target": "lamp_memory"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok",
+        "target": "lamp_mood"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 1,
+        "status": "ok",
+        "target": "lamp_msgs"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok",
+        "target": "lamp_name"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok",
+        "target": "lamp_near_call"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok",
+        "target": "lamp_observer"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok",
+        "target": "lamp_peek"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok",
+        "target": "lamp_policy"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok",
+        "target": "lamp_records"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok",
+        "target": "lamp_ring"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok",
+        "target": "lamp_same_voice"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok",
+        "target": "lamp_schedule"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok",
+        "target": "lamp_selftest"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok",
+        "target": "lamp_settings"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok",
+        "target": "lamp_setup"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok",
+        "target": "lamp_skills"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok",
+        "target": "lamp_sound_fixtures"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok",
+        "target": "lamp_station"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok",
+        "target": "lamp_surround"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok",
+        "target": "lamp_tasks"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok",
+        "target": "lamp_turn_end"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok",
+        "target": "lamp_turn_end_wire"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok",
+        "target": "lamp_turn_owner"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok",
+        "target": "lamp_update"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok",
+        "target": "lamp_voice"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok",
+        "target": "lamp_voice_eval"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok",
+        "target": "lamp_voice_processes"
+      }
+    ],
+    "sections": 47
+  },
+  "status": "ORIGINAL_NATIVE_PASSED_PREVIEW_BOUND"
+}

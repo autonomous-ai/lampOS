@@ -1,0 +1,415 @@
+{
+  "base": "737331535d0cab813170d288110fc44ff5d41a68",
+  "command_results": [
+    {
+      "complete_observed_cases_sha256": "1e9997ad0913a0a100ea11777e15ebf98d641fcedcb093055de5a4d448e714b3",
+      "label": "skills-lib",
+      "log": "selected-01-skills-lib.log",
+      "log_sha256": "135a5aa213708a7213748ab1aa1dbe351396d1cca490e2da01fd3aec11c25f18",
+      "observed_case_count": 160,
+      "package": "lamp-skills",
+      "returncode": 0,
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "line": 429,
+          "measured": 0,
+          "passed": 160,
+          "status": "ok"
+        }
+      ],
+      "target": "lamp_skills"
+    },
+    {
+      "complete_observed_cases_sha256": "0335ad05828a01034fe8a611537da8f31c7a8fbb85fb05337ffd41f3f6e30adf",
+      "label": "skills-bin",
+      "log": "selected-02-skills-bin.log",
+      "log_sha256": "1a34b38f0958b573e2d772592003b3fbc0f0baa19532c8eebc58bd3220cf46a3",
+      "observed_case_count": 20,
+      "package": "lamp-skills",
+      "returncode": 0,
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "line": 63,
+          "measured": 0,
+          "passed": 20,
+          "status": "ok"
+        }
+      ],
+      "target": "lamp-skills"
+    },
+    {
+      "complete_observed_cases_sha256": "6413d746e8c1297776a6765d5cb5c7e664f1763f49cd0aee94afacb662ecdec2",
+      "label": "skills-it",
+      "log": "selected-03-skills-it.log",
+      "log_sha256": "da331cb9ccad280ad7dd308f40d48022e5cbd1c6d1cf6ee53582f4777d09b942",
+      "observed_case_count": 333,
+      "package": "lamp-skills",
+      "returncode": 0,
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 1,
+          "line": 1056,
+          "measured": 0,
+          "passed": 332,
+          "status": "ok"
+        }
+      ],
+      "target": "it"
+    },
+    {
+      "complete_observed_cases_sha256": "71ab0d12baf2e087b2de18638a17cf89346c2557ab0dd55490a0d0af84381fb3",
+      "label": "skills-release-pair",
+      "log": "selected-04-skills-release-pair.log",
+      "log_sha256": "49e5eb3283dbb3ec43dce4dc53657ace1adebaef72c89b995fc8654cc8b4c0a1",
+      "observed_case_count": 10,
+      "package": "lamp-skills",
+      "returncode": 0,
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 8,
+          "line": 14,
+          "measured": 0,
+          "passed": 2,
+          "status": "ok"
+        }
+      ],
+      "target": "release_pair"
+    },
+    {
+      "complete_observed_cases_sha256": "8851b9571bf87442b5a1cdec6c755c181f55bf0224850929b1e404747559b842",
+      "label": "skills-requested-audio",
+      "log": "selected-05-skills-requested-audio.log",
+      "log_sha256": "2f17d44d16d2a8488ea397d1651a0e006c134c6c09dee214a4deacbabbb4ae7f",
+      "observed_case_count": 31,
+      "package": "lamp-skills",
+      "returncode": 0,
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "line": 38,
+          "measured": 0,
+          "passed": 31,
+          "status": "ok"
+        }
+      ],
+      "target": "requested_audio"
+    },
+    {
+      "complete_observed_cases_sha256": "85400b99151c2bbc8ea3986f6c44870062640722779027759b5220716f4c4523",
+      "label": "update-lib",
+      "log": "selected-06-update-lib.log",
+      "log_sha256": "194e2a4c247c1482a8589c0acfe975a632bf45316d7751cef3dfe70d0fd5cde6",
+      "observed_case_count": 125,
+      "package": "lamp-update",
+      "returncode": 0,
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 2,
+          "line": 129,
+          "measured": 0,
+          "passed": 123,
+          "status": "ok"
+        }
+      ],
+      "target": "lamp_update"
+    },
+    {
+      "complete_observed_cases_sha256": "05939a53299ed1b311fb3753c05312c2049e62c876500f34c5a61f77e7205b43",
+      "label": "update-it",
+      "log": "selected-07-update-it.log",
+      "log_sha256": "f01b67ab7c1abd62ac88d09d22e638e7494c0fc029b79a3e4c2f7d78fb94ba77",
+      "observed_case_count": 13,
+      "package": "lamp-update",
+      "returncode": 0,
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "line": 19,
+          "measured": 0,
+          "passed": 13,
+          "status": "ok"
+        }
+      ],
+      "target": "it"
+    },
+    {
+      "complete_observed_cases_sha256": "8349ff286147c42ab92ce400458fe008c88d26acdf86f870096ac465cde6b587",
+      "label": "voice-switch-census",
+      "log": "selected-08-voice-switch-census.log",
+      "log_sha256": "4cccbb8b70b9e73915d7a63d602bfd9f27c725195e9801911ef2dde4a2c483cc",
+      "observed_case_count": 7,
+      "package": "lamp-voice",
+      "returncode": 0,
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered": 3825,
+          "ignored": 0,
+          "line": 11,
+          "measured": 0,
+          "passed": 7,
+          "status": "ok"
+        }
+      ],
+      "target": "lamp_voice"
+    },
+    {
+      "complete_observed_cases_sha256": "0fd561e55c57eec775d7cb3c0385be3f749a91fdf043e05163eac205ec3da979",
+      "label": "voice-welcome-source",
+      "log": "selected-09-voice-welcome-source.log",
+      "log_sha256": "e9640ae97fc87be48f83870b4036def78f8f82c027934f814bea318910f70283",
+      "observed_case_count": 1,
+      "package": "lamp-voice",
+      "returncode": 0,
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered": 3831,
+          "ignored": 0,
+          "line": 5,
+          "measured": 0,
+          "passed": 1,
+          "status": "ok"
+        }
+      ],
+      "target": "lamp_voice"
+    },
+    {
+      "complete_observed_cases_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+      "label": "doctests-12",
+      "log": "selected-10-doctests-12.log",
+      "log_sha256": "85905550cb3b32a3508353bb055eccbcc56924f099390a719e64bbca09729f8b",
+      "observed_case_count": 0,
+      "package": null,
+      "returncode": 0,
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "line": 6,
+          "measured": 0,
+          "passed": 0,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "line": 12,
+          "measured": 0,
+          "passed": 0,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "line": 18,
+          "measured": 0,
+          "passed": 0,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "line": 24,
+          "measured": 0,
+          "passed": 0,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "line": 30,
+          "measured": 0,
+          "passed": 0,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "line": 36,
+          "measured": 0,
+          "passed": 0,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "line": 42,
+          "measured": 0,
+          "passed": 0,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "line": 48,
+          "measured": 0,
+          "passed": 0,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "line": 54,
+          "measured": 0,
+          "passed": 0,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "line": 60,
+          "measured": 0,
+          "passed": 0,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "line": 66,
+          "measured": 0,
+          "passed": 0,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "line": 72,
+          "measured": 0,
+          "passed": 0,
+          "status": "ok"
+        }
+      ],
+      "target": null
+    }
+  ],
+  "complete_independent_auditor_receipt_sha256": "1469dac1311403ee7d82e2cc298a72638f2f9bfce3c63d5f61027f36639cc1d4",
+  "controller_sha256": "429de776b08165c2fb397c4b21d885aee78792c1fe39d49e14c234b11eb65396",
+  "doc_headings": [
+    "lamp_body",
+    "lamp_cloud",
+    "lamp_expression",
+    "lamp_keeper",
+    "lamp_lean",
+    "lamp_memory",
+    "lamp_peek",
+    "lamp_setup",
+    "lamp_skills",
+    "lamp_update",
+    "lamp_voice",
+    "lamp_voice_eval"
+  ],
+  "head": "96506fb4218c419a0ff9c30430307d13159e109c",
+  "helper_sha256": "6d904887bf28717489a88341034335014a59546fbfa9ed39a4c6735f1a2f34d4",
+  "holds": [],
+  "integrity": {
+    "actual_and_saved_paths_rehashed": 133,
+    "raw_entries": 8722,
+    "source_files": 7262
+  },
+  "limits": [
+    "Selected Skills/Update plus seven switch and one Welcome cases, and twelve-package docs; not current full twelve-package runtime.",
+    "Historical b490 full-suite privacy failure remains failed and separate.",
+    "No native, device or latency qualification."
+  ],
+  "metadata": {
+    "after": [],
+    "before": [],
+    "current": []
+  },
+  "panic_hooks": {
+    "classified": [
+      {
+        "classification": "deliberately caught unwind, false/true partial loop; worker outcome and caught payload asserted",
+        "line": 821,
+        "log": "selected-03-skills-it.log",
+        "payload": "deliberate Actions fixture unwind",
+        "site": "crates/skills/tests/it/skills.rs:3329",
+        "source_proof": "crates/skills/tests/it/skills.rs:3298",
+        "test": "skills::the_one_action_reply_joins_on_unwind_before_connect_and_during_a_partial_request"
+      },
+      {
+        "classification": "deliberately caught unwind, false/true partial loop; worker outcome and caught payload asserted",
+        "line": 825,
+        "log": "selected-03-skills-it.log",
+        "payload": "deliberate Actions fixture unwind",
+        "site": "crates/skills/tests/it/skills.rs:3329",
+        "source_proof": "crates/skills/tests/it/skills.rs:3298",
+        "test": "skills::the_one_action_reply_joins_on_unwind_before_connect_and_during_a_partial_request"
+      }
+    ],
+    "expected_occurrences": 2,
+    "unknown": []
+  },
+  "report_scope": "Concise public independent-audit summary; complete per-case inventory remains in the immutable full receipt.",
+  "required_host_witnesses": {
+    "process::switch_census_tests::a_helper_is_named_by_its_functions_not_by_its_types": true,
+    "process::switch_census_tests::a_helper_left_out_loses_its_switches": true,
+    "process::switch_census_tests::every_switch_the_workers_read_reaches_a_worker_or_says_why_not": true,
+    "process::switch_census_tests::remember_speaker_arguments_survive_both_workers_cleared_environments": true,
+    "process::switch_census_tests::session_read_access_is_owned_by_the_coordinator_and_never_given_to_a_worker": true,
+    "process::switch_census_tests::the_census_follows_the_helpers_a_worker_calls_and_sees_their_switches": true,
+    "process::switch_census_tests::the_coordinators_functions_are_still_in_their_files": true,
+    "skills::a_repeat_call_with_only_made_steps_is_refused_while_its_run_is_under_way": true,
+    "skills::every_skill_folder_passes_its_own_recorded_tests": true,
+    "skills::reminder_pending::a_changes_trigger_keeps_independent_while_paths": true,
+    "skills::reminder_pending::a_changes_trigger_reads_a_bounded_tuple_on_another_topic": true,
+    "skills::reminder_pending::a_changes_trigger_refuses_selected_while_path_overlap": true,
+    "skills::reminder_pending::a_schedule_ask_only_moves_when_voice_begins_it": true,
+    "skills::reminder_pending::a_talk_rearms_even_while_a_selected_trigger_value_is_invalid": true,
+    "skills::reminder_pending::a_valid_empty_schedule_rearms_after_an_invalid_selected_trigger_value": true,
+    "skills::reminder_pending::core_reminders_can_request_again_after_talk_with_pending_still_positive": true,
+    "skills::reminder_pending::core_reminders_coalesce_queue_changes_and_ignore_renewal_metadata": true,
+    "skills::reminder_pending::core_reminders_keep_readiness_and_enablement_gates_on_repeated_chances": true,
+    "skills::reminder_pending::core_reminders_keep_the_change_snapshot_across_unchanged_reload": true,
+    "skills::reminder_pending::core_reminders_notice_a_brief_talk_between_schedule_heartbeats": true,
+    "skills::reminder_pending::core_reminders_rearm_after_source_or_condition_expiry": true,
+    "skills::reminder_pending::existing_trigger_modes_keep_their_heartbeat_behavior": true,
+    "skills::reminder_pending::invalid_selected_choice_values_do_not_rearm_a_changes_snapshot": true,
+    "skills::reminder_pending::invalid_selected_trigger_values_do_not_rearm_a_reminder_snapshot": true,
+    "skills::reminder_pending::invalid_selected_values_do_not_replace_or_rearm_a_reminder_snapshot": true,
+    "skills::reminder_pending::repeated_schedule_chances_keep_one_waiting_runner_and_no_look": true,
+    "skills::reminder_pending::unchanged_held_reminder_has_one_chance_across_sixty_heartbeats": true,
+    "skills::the_one_action_reply_joins_on_unwind_before_connect_and_during_a_partial_request": true,
+    "skills::the_one_action_reply_reports_an_ack_write_error": true,
+    "speak_up::tests::only_welcome_back_says_hello_on_an_arrival": true,
+    "tests::a_change_trigger_requires_a_scalar_comparison": true,
+    "tests::a_change_trigger_requires_bounded_paths_and_compatible_options": true
+  },
+  "selected_direct_counts": {
+    "failed": 0,
+    "ignored": 11,
+    "passed": 689
+  },
+  "status": "VERIFIED_SELECTED_REMINDER_SCOPE",
+  "tests_retried": 0,
+  "tree": "ddc4b23ec4e32e7ee400c48d7b111a1e62d0792a"
+}

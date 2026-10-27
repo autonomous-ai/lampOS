@@ -1,0 +1,63 @@
+{
+  "head": "642f7974a15f287b8b3f9830e6b41f427f814894",
+  "authored_base": "737331535d0cab813170d288110fc44ff5d41a68",
+  "actual_preview": "097dbba660c5ad704fcbd111faa9799301896759",
+  "preview_base": "33d5627cadad7184f9ea2dcdc5b858f3aa3de58d",
+  "run": 40437107774,
+  "job": 121968312729,
+  "overall_conclusion": "failure",
+  "nextest_summary": {
+    "passed": 6246,
+    "failed": 1,
+    "skipped": 53,
+    "selected_unrun_after_fail_fast": 1308,
+    "ran": 6247,
+    "selected": 7555
+  },
+  "failure": {
+    "test": "session_reader::tests::linux::only_the_new_session_is_shared_after_one_pinned_lookup",
+    "source": "lampOS/crates/voice/src/session_reader/tests.rs:289",
+    "assertion": "report.acknowledged && !report.degraded",
+    "reported_setup_elapsed_us": [
+      375,
+      340
+    ],
+    "reported_setup_target_us": 50000,
+    "cause": "unknown; unchanged-source assertion is not proof of host timing or unrelatedness"
+  },
+  "privacy9_pass_lines": {
+    "privacy_bus::tests::source_expiry_is_ridden_only_when_enabled_after_permission": [
+      5181
+    ],
+    "privacy_bus::tests::only_recovery_finishes_the_source_episode_and_allows_a_new_one": [
+      5178
+    ],
+    "privacy_bus::tests::recovery_queued_after_a_source_stall_reports_the_old_expiry_first": [
+      5179
+    ],
+    "privacy_bus::tests::the_order_begins_again_only_before_the_first_datagram_in_the_first_second": [
+      5183
+    ],
+    "privacy_bus::tests::a_receipt_comes_only_with_a_slides_reading": [
+      5176
+    ],
+    "privacy_bus::tests::selected_endpoints_bind_and_read_a_real_bus": [
+      5180
+    ],
+    "privacy_bus::tests::the_lease_reader_resyncs_on_kept_leases_only_before_its_first_datagram_in_its_first_second": [
+      5182
+    ],
+    "privacy_bus::tests::after_a_datagram_a_gap_ends_the_lease_reader_inside_its_first_second": [
+      5177
+    ],
+    "privacy_bus::tests::the_lease_watch_answers_at_once_through_refused_input_and_lets_a_lease_expire": [
+      5204
+    ]
+  },
+  "tests_retried": false,
+  "failure_waived": false,
+  "log_sha256": "793aca45803ba49f847030afefdfb17c538eea4997e2d990ab642e602c60c8f7",
+  "actual_preview_tree": "0352c7b2a36d016ca915aaa71712b0193766ea77",
+  "latest_local17e_tree_equal": true,
+  "new_commit_will_trigger_automatic_CI": "Not a source fix or a manual retry; original failed assertion stays blocked with its fixture owner."
+}

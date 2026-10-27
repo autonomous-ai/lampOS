@@ -1,0 +1,226 @@
+{
+  "base": "737331535d0cab813170d288110fc44ff5d41a68",
+  "command_results": [
+    {
+      "complete_observed_cases_sha256": "5ae49549d86a87fe785f28b2c5f74fd243fececaedf071bffffcc2ac90a22d91",
+      "label": "voice-privacy-carry",
+      "log": "selected-01-voice-privacy-carry.log",
+      "log_sha256": "a5bd76d9bd48e650a79e7cc582713d6cb08a8b38dadd16cc9b9ab26091c2300b",
+      "observed_case_count": 9,
+      "package": "lamp-voice",
+      "returncode": 0,
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered": 3823,
+          "ignored": 0,
+          "line": 13,
+          "measured": 0,
+          "passed": 9,
+          "status": "ok"
+        }
+      ],
+      "target": "lamp_voice"
+    },
+    {
+      "complete_observed_cases_sha256": "91b9bc77fcae77772e78155ab17a3fed86c4d531b99ec5aa00d4957607c2972e",
+      "label": "msgs-lib",
+      "log": "selected-02-msgs-lib.log",
+      "log_sha256": "8328ca49497a615638d05f1e857b899794dd63a559fd730e9f8c3a1504d48dee",
+      "observed_case_count": 92,
+      "package": "lamp-msgs",
+      "returncode": 0,
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "line": 96,
+          "measured": 0,
+          "passed": 92,
+          "status": "ok"
+        }
+      ],
+      "target": "lamp_msgs"
+    },
+    {
+      "complete_observed_cases_sha256": "9ac00f98b604decd8c3ad11425add52a49b475068efdd737a6f7151327fc56ab",
+      "label": "msgs-it",
+      "log": "selected-03-msgs-it.log",
+      "log_sha256": "e6b523270569c19fe96ea84bdfa9648257f4bbcb16f25accd3cb8179b1a9ac8a",
+      "observed_case_count": 80,
+      "package": "lamp-msgs",
+      "returncode": 0,
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "line": 84,
+          "measured": 0,
+          "passed": 80,
+          "status": "ok"
+        }
+      ],
+      "target": "it"
+    },
+    {
+      "complete_observed_cases_sha256": "0b1884287b9f0c41412864b3dc032cc6e71e8458844eda74bb6894b086087de8",
+      "label": "bus-lib",
+      "log": "selected-04-bus-lib.log",
+      "log_sha256": "23bca58f38705a8bd6a89abdf7753c59eec5238c338ca35c6a471bb634b3ce77",
+      "observed_case_count": 56,
+      "package": "lamp-bus",
+      "returncode": 0,
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 1,
+          "line": 67,
+          "measured": 0,
+          "passed": 55,
+          "status": "ok"
+        }
+      ],
+      "target": "lamp_bus"
+    },
+    {
+      "complete_observed_cases_sha256": "ea9ee1911149bcf5cd069cb097f48c0930a300796799fbc1c48de30ef61fe5b1",
+      "label": "bus-liveness-controls",
+      "log": "selected-05-bus-liveness-controls.log",
+      "log_sha256": "345b97e414af7b97764796bf71b7e808a47938e1330b1f1ba7b1b30b37aa7abe",
+      "observed_case_count": 2,
+      "package": "lamp-bus",
+      "returncode": 0,
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered": 48,
+          "ignored": 0,
+          "line": 6,
+          "measured": 0,
+          "passed": 2,
+          "status": "ok"
+        }
+      ],
+      "target": "it"
+    },
+    {
+      "complete_observed_cases_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+      "label": "doctests-3",
+      "log": "selected-06-doctests-3.log",
+      "log_sha256": "20e37d4e53e4668499a65d040d1e979f19b9a3fd1a1a91108e285a0fdb63d4fb",
+      "observed_case_count": 0,
+      "package": null,
+      "returncode": 0,
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "line": 8,
+          "measured": 0,
+          "passed": 2,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "line": 16,
+          "measured": 0,
+          "passed": 1,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "line": 23,
+          "measured": 0,
+          "passed": 0,
+          "status": "ok"
+        }
+      ],
+      "target": null
+    }
+  ],
+  "complete_independent_auditor_receipt_sha256": "f2517ff1bfeee591749efd7cfb9a6af11f1c363cfc279d0384b06b0514cab528",
+  "controller_sha256": "1c1194565c77a9d79424f8abacfd12ba0bc916ae93e5836fcf08f7471caeed87",
+  "doc_headings": [
+    "lamp_bus",
+    "lamp_msgs",
+    "lamp_voice"
+  ],
+  "head": "642f7974a15f287b8b3f9830e6b41f427f814894",
+  "helper_sha256": "74df3fa0cd9c3201bdfe82874ba2d127bcddaf86bde8a543d65119e976cfc6ad",
+  "holds": [],
+  "integrity": {
+    "actual_and_saved_paths_rehashed": 65,
+    "raw_entries": 8700,
+    "source_files": 7241
+  },
+  "limits": [
+    "Focused host privacy carry on 642f/737 only; no current full host Voice claim.",
+    "Historical full Voice selection belongs to4bff; not reattributed.",
+    "Fresh original current native full Voice remains required before readiness; later base drift needs a separate carry.",
+    "No historical cause/device/physical-latency claim."
+  ],
+  "metadata": {
+    "after": [],
+    "before": [],
+    "current": []
+  },
+  "panic_hooks": {
+    "classified": [
+      {
+        "classification": "caught_fault_injection",
+        "line": 48,
+        "log": "selected-04-bus-lib.log",
+        "payload": "fixture unwind",
+        "site": "crates/bus/src/guarded_publish_tests.rs:200",
+        "source_proof": "crates/bus/src/guarded_publish_tests.rs:196",
+        "test": "publish::guarded_tests::owned_encoded_buffer_is_scrubbed_on_error_and_unwind"
+      },
+      {
+        "classification": "caught_fault_injection",
+        "line": 53,
+        "log": "selected-04-bus-lib.log",
+        "payload": "fixture unwind",
+        "site": "crates/bus/src/guarded_publish_tests.rs:176",
+        "source_proof": "crates/bus/src/guarded_publish_tests.rs:173",
+        "test": "publish::guarded_tests::partial_encoding_errors_are_scrubbed_and_never_touch_reusable_storage"
+      }
+    ],
+    "expected_occurrences": 2,
+    "unknown": []
+  },
+  "report_scope": "Concise public independent-audit summary; complete per-case inventory remains in the immutable full receipt.",
+  "required_host_witnesses": {
+    "bus::a_subscriber_is_told_once_that_the_source_has_gone_and_once_that_it_is_back": true,
+    "bus::a_topic_that_promised_a_period_is_late_after_twice_that_and_on_time_with_the_next": true,
+    "privacy::a_lamp_with_no_slide_permits_only_with_its_marker_and_a_fresh_observation": true,
+    "privacy::envelope_must_name_voice_and_match_payload_clock_time_session_and_sequence": true,
+    "privacy::freshness_is_original_acquisition_bounded_and_boot_scoped": true,
+    "privacy::permission_requires_known_open_switch_and_bounded_valid_lineage": true,
+    "privacy::topic_is_additive_and_json_roundtrips": true,
+    "privacy_bus::tests::a_receipt_comes_only_with_a_slides_reading": true,
+    "privacy_bus::tests::after_a_datagram_a_gap_ends_the_lease_reader_inside_its_first_second": true,
+    "privacy_bus::tests::only_recovery_finishes_the_source_episode_and_allows_a_new_one": true,
+    "privacy_bus::tests::recovery_queued_after_a_source_stall_reports_the_old_expiry_first": true,
+    "privacy_bus::tests::selected_endpoints_bind_and_read_a_real_bus": true,
+    "privacy_bus::tests::source_expiry_is_ridden_only_when_enabled_after_permission": true,
+    "privacy_bus::tests::the_lease_reader_resyncs_on_kept_leases_only_before_its_first_datagram_in_its_first_second": true,
+    "privacy_bus::tests::the_lease_watch_answers_at_once_through_refused_input_and_lets_a_lease_expire": true,
+    "privacy_bus::tests::the_order_begins_again_only_before_the_first_datagram_in_the_first_second": true
+  },
+  "selected_direct_counts": {
+    "failed": 0,
+    "ignored": 1,
+    "passed": 238
+  },
+  "status": "VERIFIED_FOCUSED_HOST_CARRY",
+  "tests_retried": 0,
+  "tree": "866d235b9119009641c7d61b2c16f85a57b2a58f"
+}
