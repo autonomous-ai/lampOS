@@ -2321,8 +2321,19 @@ impl Onboarding {
                 .led
                 .as_ref()
                 .is_some_and(|led| led.step == step && led.asked_us.is_some());
+            // A face `remember_my_face` saved (#3740) is no report of the
+            // model's: its nudge record says so, and the walk's record names
+            // the face save as what ended the step (the Reviewer-lead's P3s on
+            // #3746).
+            let by_face =
+                told.get("by").and_then(Value::as_str) == Some(crate::known_faces::REMEMBER);
             if led && step.reportable(outcome) {
-                self.nudge_record(true, now_us);
+                self.nudge_record(!by_face, now_us);
+                if by_face {
+                    self.records.push(
+                        json!({"kind":"onboarding_face_saved","step":step.name(),"at_us":now_us}),
+                    );
+                }
                 if step == Step::Privacy {
                     self.invalidate_privacy(privacy::Invalidation::Redo);
                     self.privacy_flow.pending_result = Some((outcome, None));
@@ -2715,7 +2726,8 @@ pub fn run(file: &Path, call: &ToolCall) -> (Value, bool) {
 /// a tester's 7071 lamp on 27 Oct the chat saved the face twice and the
 /// step was never recorded.
 pub fn face_saved(file: &Path) {
-    let line = json!({"step": Step::WhoYouAre.name(), "outcome": "done"});
+    let line = json!({"step": Step::WhoYouAre.name(), "outcome": "done",
+        "by": crate::known_faces::REMEMBER});
     if let Err(error) = post(file, &line) {
         eprintln!("lamp-voice: onboarding: a face saved, not noted for \"who you are\": {error}");
     }
@@ -3638,6 +3650,34 @@ mod tests {
         // ... and only then is the person asked to turn it.
         assert_eq!(room.wait(2 * S, Some(edge)), [SIT_TURN]);
         assert!(room.walk.looking());
+    }
+
+    /// With the nudge on, a face saved ends "who you are" too, but its
+    /// nudge record is no report of the model's, and the walk's record
+    /// names the face save (the Reviewer-lead's P3s on #3746).
+    #[test]
+    fn a_face_saved_with_the_nudge_on_is_no_report_of_the_models() {
+        let mut room = at_who("face-saved-nudge", true);
+        room.walk.take_records();
+        face_saved(&room.walk.file);
+        room.wait(S, Some(NEAR_MIDDLE));
+        assert_eq!(room.outcome(Step::WhoYouAre), Some(Outcome::Done));
+        let records = room.walk.take_records();
+        let nudges: Vec<&Value> = records
+            .iter()
+            .filter(|line| line["kind"] == "onboarding_nudge")
+            .collect();
+        assert!(!nudges.is_empty(), "{records:?}");
+        assert!(
+            nudges.iter().all(|line| line["reported"] == false),
+            "{nudges:?}"
+        );
+        assert!(
+            records.iter().any(
+                |line| line["kind"] == "onboarding_face_saved" && line["step"] == "who_you_are"
+            ),
+            "{records:?}"
+        );
     }
 
     /// A face `remember_my_face` saved while "who you are" is led ends it
