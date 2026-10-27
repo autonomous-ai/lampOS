@@ -1,0 +1,13 @@
+# Interrupted #3796 host gate and independent audit
+
+The full twelve-package GREEN gate on `db3d44d73` remains **FAIL**. The controller was interrupted after its sole serial Cargo test invocation stalled in Body bin's `tests::a_step_reads_a_bounded_amount_of_its_holder`. The controller exited 1; owned Cargo exited -15 after cleanup. This is an incomplete gate, with no full-closure qualification.
+
+Body lib completed **469 passed**, then Body bin completed **11 passed** and entered the holder test without completing it. Its other 27 cases never started. The other **68 compiled drivers never launched**; these include all **212 Round cases and all fourteen authored product regressions**. Docs did not launch. The retained raw stdout/stderr and compiled identity inventory bind this partial census. Later continuation results are separate and are not included.
+
+An independent read-only audit after closure verified all **10,802 tracked source files**, their bytes/modes/kinds and full physical attributes, plus HEAD/branch/status/index, against the gate's initial records. All **407 inherited +102 new sealed executable copies** match every bound SHA and metadata field. All **102 mutable executable hashes** match; every testdriver retains its full bound metadata. Exactly **32 normal bin/example convenience aliases changed inode only**: bytes, size, mode, mtime and device stayed equal. The audit JSON exports each normalized artifact name and exact old/new inode value.
+
+The interrupted command raised before the controller's post-command alias handling. Its final strict-inode guard therefore raised separately. No interrupted-command inode exception had been authorized. The original FAIL and raw receipts remain immutable; the post-close audit does not change their disposition or establish the Body stall's cause.
+
+The WNOWAIT-owned Cargo process group was inventoried and closed before reaping, with no unresolved owned PID, no unexpected owned descendants and the lease released. This proves that owned group's cleanup; no detached-descendant claim is made. No timeout or disk reserve breach was recorded.
+
+`audit.json` exports the source and executable audit conclusions, exact alias differences, partial runtime accounting, process cleanup receipt and SHA/size bindings of the original raw records and complete private audit. No source/binary copies are published. This packet introduces no Cargo run, test replay, source/ref/target change, native CI claim or device action. The original six-case RED control remains a distinct retained result ([published control](https://github.com/autonomous-ai/lampOS/tree/f0ccbc97d/lampOS/docs/verification/tests-3796-mixed-host-control-20261027)).

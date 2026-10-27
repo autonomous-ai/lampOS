@@ -1,0 +1,577 @@
+{
+  "schema": 1,
+  "prepared_at": "2026-10-27T13:07:02.377967+00:00",
+  "scope": "Closed interrupted db3 GREEN full reverse-closure host invocation and independent post-close read-only audit only",
+  "base": "db3d44d7303a1c026c4c0f1dcf995adf40b0605d",
+  "source_status": "Three authored dirty paths immutable during gate",
+  "authored_paths": [
+    "lampOS/crates/update/src/round.rs",
+    "lampOS/crates/update/tests/round/product_carrier.rs",
+    "lampOS/docs/updates.md"
+  ],
+  "authored_test_payload_sha256": "186f14125da71d8859dbb9587d59709c6a5f2fd2b7a191add351f4e4ad6ded16",
+  "original_status": "FAIL",
+  "original_controller_error": "KeyboardInterrupt()",
+  "original_guard_error": "AssertionError()",
+  "native_controller_exit": 1,
+  "cargo_process_exit": -15,
+  "cargo_runtime_attempts": 1,
+  "command_wall_seconds": 873.288831,
+  "runtime_selected_packages": [
+    "lamp-body",
+    "lamp-cloud",
+    "lamp-expression",
+    "lamp-keeper",
+    "lamp-lean",
+    "lamp-memory",
+    "lamp-peek",
+    "lamp-setup",
+    "lamp-skills",
+    "lamp-update",
+    "lamp-voice",
+    "lamp-voice-eval"
+  ],
+  "runtime_threads": 1,
+  "full_gate_complete": false,
+  "completed_drivers": [
+    {
+      "package": "lamp-body",
+      "target": "lamp_body",
+      "completed_passes": 469,
+      "summary": "ok. 469 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 40.75s",
+      "incomplete": [],
+      "unstarted_case_count": 0
+    },
+    {
+      "package": "lamp-body",
+      "target": "lamp-body",
+      "completed_passes": 11,
+      "summary": null,
+      "incomplete": [
+        "tests::a_step_reads_a_bounded_amount_of_its_holder"
+      ],
+      "unstarted_case_count": 27
+    }
+  ],
+  "completed_passes": 480,
+  "wholly_unstarted_driver_count": 68,
+  "unstarted_round_cases": 212,
+  "unstarted_required14": [
+    "product_carrier::a_linked_part_uses_product_before_its_pinned_lamp_template",
+    "product_carrier::a_linked_part_uses_product_after_its_pinned_lamp_template",
+    "product_carrier::a_compatible_linked_lamp_template_still_wins_in_either_manifest_order",
+    "product_carrier::a_pinned_part_keeps_its_pinned_lamp_template_beside_product_in_either_order",
+    "product_carrier::a_climbed_updater_confirms_product_before_its_pinned_lamp_template",
+    "product_carrier::a_climbed_updater_confirms_product_after_its_pinned_lamp_template",
+    "product_carrier::skipping_a_pinned_host_logs_only_its_unit_host_and_installed_link",
+    "product_carrier::an_invalid_linked_host_is_refused_instead_of_falling_back_to_product",
+    "product_carrier::a_pinned_host_without_a_product_candidate_keeps_the_existing_refusal",
+    "product_carrier::the_product_fallback_still_rejects_corrupt_signed_unit_bytes",
+    "product_carrier::an_unreachable_product_fallback_does_not_switch_any_part",
+    "product_carrier::a_corrupt_pinned_host_is_not_silently_skipped_for_product",
+    "product_carrier::an_unreachable_pinned_host_is_not_silently_skipped_for_product",
+    "product_carrier::a_product_voice_ignores_its_legacy_pinned_releases_template"
+  ],
+  "docs_unexecuted": true,
+  "source_audit": {
+    "tracked_count": 10802,
+    "all_tracked_bytes_modes_kinds_equal": true,
+    "all_tracked_stat6_equal": true,
+    "HEAD_branch_index_status_equal": true
+  },
+  "sealed_audit": {
+    "inherited": 407,
+    "new": 102,
+    "total": 509,
+    "all_full_hash_and_bound_metadata_equal": true
+  },
+  "actual_audit": {
+    "count": 102,
+    "all_hashes_equal": true,
+    "testdrivers_all_bound_metadata_equal": true,
+    "exact_inode_only_alias_difference_count": 32,
+    "only_normal_bin_example_aliases": true,
+    "other_bound_fields_equal": true,
+    "differences": [
+      {
+        "artifact": "debug/lamp-peek",
+        "changes": {
+          "inode": {
+            "before": 487867150,
+            "after": 487915867
+          }
+        },
+        "sha256_equal": true,
+        "current_sha256": "5372475b1bdd127294b61e9e4f34e271e62d7ce5ae991d09206bef3ce0172f14"
+      },
+      {
+        "artifact": "debug/lamp-cloud",
+        "changes": {
+          "inode": {
+            "before": 487867752,
+            "after": 487915868
+          }
+        },
+        "sha256_equal": true,
+        "current_sha256": "e74180bcdc0f46941a0a124da98d68252fc2706b3d9e12af10555beb953c86f5"
+      },
+      {
+        "artifact": "debug/examples/same_voice_pairs",
+        "changes": {
+          "inode": {
+            "before": 487867912,
+            "after": 487915870
+          }
+        },
+        "sha256_equal": true,
+        "current_sha256": "e35af206a41ff59e211dae410d64601d8c02b37cc9256c0ddfa394d8055ad15f"
+      },
+      {
+        "artifact": "debug/examples/turn_end_replay",
+        "changes": {
+          "inode": {
+            "before": 487868233,
+            "after": 487915869
+          }
+        },
+        "sha256_equal": true,
+        "current_sha256": "d282c14b92661c2f73f65ca7a6319e2e621f66e98412a24f69b6e75d84c10cf0"
+      },
+      {
+        "artifact": "debug/lamp-voice-eval",
+        "changes": {
+          "inode": {
+            "before": 487870545,
+            "after": 487915871
+          }
+        },
+        "sha256_equal": true,
+        "current_sha256": "57c6ee9b8e1d3979c089289d83a2723fc5e56a25068bf92676e3299f53f42c8a"
+      },
+      {
+        "artifact": "debug/lamp-setup",
+        "changes": {
+          "inode": {
+            "before": 487871408,
+            "after": 487915872
+          }
+        },
+        "sha256_equal": true,
+        "current_sha256": "ec81b009a14ce681db9af1e2d026c57f86da27eaa93b737ed6016d14a1acbf78"
+      },
+      {
+        "artifact": "debug/examples/duplex_lab",
+        "changes": {
+          "inode": {
+            "before": 487871474,
+            "after": 487915876
+          }
+        },
+        "sha256_equal": true,
+        "current_sha256": "f34a18017b70144a3169a52a8b9742390b857fbd3b6762dabd71accde0575c05"
+      },
+      {
+        "artifact": "debug/examples/hearing_replay",
+        "changes": {
+          "inode": {
+            "before": 487871687,
+            "after": 487915875
+          }
+        },
+        "sha256_equal": true,
+        "current_sha256": "e51d7172808194dee2d525fe22fa492642885eda59781f2b32675f5aad0732f5"
+      },
+      {
+        "artifact": "debug/examples/head_qualification_operator",
+        "changes": {
+          "inode": {
+            "before": 487871773,
+            "after": 487915878
+          }
+        },
+        "sha256_equal": true,
+        "current_sha256": "838b884824b35d7bdba069efb9c8a3056ba49b2ba43a957f301e11c3b61985e1"
+      },
+      {
+        "artifact": "debug/examples/admission_latency",
+        "changes": {
+          "inode": {
+            "before": 487871858,
+            "after": 487915874
+          }
+        },
+        "sha256_equal": true,
+        "current_sha256": "24657a0f23bcc8ceda231c4c7ef46c35e49c970c79502cce4696790dcb93e645"
+      },
+      {
+        "artifact": "debug/examples/probe_handover",
+        "changes": {
+          "inode": {
+            "before": 487896950,
+            "after": 487915873
+          }
+        },
+        "sha256_equal": true,
+        "current_sha256": "42e2643cf616a0cf8980ccd15ce51ec0afce4c04738689ccaa52eb268ca102e9"
+      },
+      {
+        "artifact": "debug/examples/reference_pace",
+        "changes": {
+          "inode": {
+            "before": 487897015,
+            "after": 487915879
+          }
+        },
+        "sha256_equal": true,
+        "current_sha256": "6c60730a5efea42011c842526900b6f057b956bdb6298cc93393f995e8fdabdb"
+      },
+      {
+        "artifact": "debug/examples/ring_process_probe",
+        "changes": {
+          "inode": {
+            "before": 487897037,
+            "after": 487915877
+          }
+        },
+        "sha256_equal": true,
+        "current_sha256": "a62a9fe5687bbc2b968d28837fd67893206b46a3e3344d8d83a7d943a438ff31"
+      },
+      {
+        "artifact": "debug/examples/render_relaxing_music",
+        "changes": {
+          "inode": {
+            "before": 487901193,
+            "after": 487915880
+          }
+        },
+        "sha256_equal": true,
+        "current_sha256": "99e02c791293bc711743c4a7c5fd33a5d51dee12878303935559e610dff288f4"
+      },
+      {
+        "artifact": "debug/lamp-skills",
+        "changes": {
+          "inode": {
+            "before": 487901520,
+            "after": 487915881
+          }
+        },
+        "sha256_equal": true,
+        "current_sha256": "cb9f595375a15e17b717bdace5b96b3c5fe1a53faafb6a3ead17e66c2fd0b23c"
+      },
+      {
+        "artifact": "debug/lamp-memory-eval",
+        "changes": {
+          "inode": {
+            "before": 487901688,
+            "after": 487915882
+          }
+        },
+        "sha256_equal": true,
+        "current_sha256": "8f771f061ccbf9b4e19297eed6b9ec53804378d9cbe64536fd305da0260cb3d1"
+      },
+      {
+        "artifact": "debug/lamp-memory-fixture",
+        "changes": {
+          "inode": {
+            "before": 487901747,
+            "after": 487915883
+          }
+        },
+        "sha256_equal": true,
+        "current_sha256": "e06e0e8e358838844defa64b0b05a1f1fac601eb81d0c698c59ed35973f027bb"
+      },
+      {
+        "artifact": "debug/lamp-memory",
+        "changes": {
+          "inode": {
+            "before": 487901794,
+            "after": 487915884
+          }
+        },
+        "sha256_equal": true,
+        "current_sha256": "c03e21200a8de6f00740f5efef9016e69467ff7a1f24c90e275ed086252cfeeb"
+      },
+      {
+        "artifact": "debug/examples/recent_playout_cost",
+        "changes": {
+          "inode": {
+            "before": 487902024,
+            "after": 487915889
+          }
+        },
+        "sha256_equal": true,
+        "current_sha256": "5a05a228851672709272edf467e44ac22df7f710d91e8541228fbecd75549c6c"
+      },
+      {
+        "artifact": "debug/examples/replay_cost",
+        "changes": {
+          "inode": {
+            "before": 487902041,
+            "after": 487915887
+          }
+        },
+        "sha256_equal": true,
+        "current_sha256": "4876869591bf60d9787a5d68c7acb71f1e2e64c352c1c13899d918a603d27817"
+      },
+      {
+        "artifact": "debug/examples/rest_cost",
+        "changes": {
+          "inode": {
+            "before": 487902074,
+            "after": 487915886
+          }
+        },
+        "sha256_equal": true,
+        "current_sha256": "912c13f1403ffd02d8b24a043032bce45b2e072cb963f4ed2554d75e23f3ceea"
+      },
+      {
+        "artifact": "debug/examples/check",
+        "changes": {
+          "inode": {
+            "before": 487902151,
+            "after": 487915885
+          }
+        },
+        "sha256_equal": true,
+        "current_sha256": "a5cc02469354090d52d99e1c6cb31c86babf88862393fea56f1a94dc85cddaa7"
+      },
+      {
+        "artifact": "debug/lamp-expression",
+        "changes": {
+          "inode": {
+            "before": 487902190,
+            "after": 487915888
+          }
+        },
+        "sha256_equal": true,
+        "current_sha256": "9c5fc2916022b4f2c7687ddcb1ed0b843955f410b1f42a74146253d84f0c7eba"
+      },
+      {
+        "artifact": "debug/lamp-voice",
+        "changes": {
+          "inode": {
+            "before": 487902372,
+            "after": 487915890
+          }
+        },
+        "sha256_equal": true,
+        "current_sha256": "61febcaf2d1bae05f6853f326a45a192dd108b5abf6dec17f1e2b695deb89784"
+      },
+      {
+        "artifact": "debug/lamp-body-mood",
+        "changes": {
+          "inode": {
+            "before": 487902539,
+            "after": 487915894
+          }
+        },
+        "sha256_equal": true,
+        "current_sha256": "ae2bcf2f7a24926170bcbbe7bb433fc9f5021bd655d1769b7821c3a89ee709eb"
+      },
+      {
+        "artifact": "debug/lamp-body-worker",
+        "changes": {
+          "inode": {
+            "before": 487902569,
+            "after": 487915891
+          }
+        },
+        "sha256_equal": true,
+        "current_sha256": "7cddd0bb65edaab2a53d1be1ed081753b35edcf8c86d069bae9c5adfd55afcb7"
+      },
+      {
+        "artifact": "debug/examples/head_plan",
+        "changes": {
+          "inode": {
+            "before": 487902583,
+            "after": 487915893
+          }
+        },
+        "sha256_equal": true,
+        "current_sha256": "f6d8f351e19bed607b6b4540eb3617483f06de29cc5ae65783c202ba74b72018"
+      },
+      {
+        "artifact": "debug/lamp-body",
+        "changes": {
+          "inode": {
+            "before": 487902601,
+            "after": 487915895
+          }
+        },
+        "sha256_equal": true,
+        "current_sha256": "71ce882bfe00d3a52ca4f63ebd4b3bd77e2fb6bc07315c5fc58a1918baa443df"
+      },
+      {
+        "artifact": "debug/examples/expression_ask",
+        "changes": {
+          "inode": {
+            "before": 487902660,
+            "after": 487915896
+          }
+        },
+        "sha256_equal": true,
+        "current_sha256": "bfef3da2d31de3c9e38b71ba7577d0a83cc8fa9984080b3eb3f3f29780c80679"
+      },
+      {
+        "artifact": "debug/lamp-body-inspect",
+        "changes": {
+          "inode": {
+            "before": 487902739,
+            "after": 487915892
+          }
+        },
+        "sha256_equal": true,
+        "current_sha256": "2c369a13f400acbc39b3b81ff12903eab3770c50b2389ae6a95ec2f7ec340db8"
+      },
+      {
+        "artifact": "debug/lamp-body-measure",
+        "changes": {
+          "inode": {
+            "before": 487902805,
+            "after": 487915897
+          }
+        },
+        "sha256_equal": true,
+        "current_sha256": "cf819cb861be9c1194799dba7a2d37b01cc38575a9c3caebbab947d638e3b357"
+      },
+      {
+        "artifact": "debug/lamp-update",
+        "changes": {
+          "inode": {
+            "before": 487904997,
+            "after": 487915898
+          }
+        },
+        "sha256_equal": true,
+        "current_sha256": "87f2c7feddad96814e477cac7a7d22b8434db8b755b8acb21c6567c08d66cfc1"
+      }
+    ]
+  },
+  "guard_disposition": "Interrupted command raised before post-command normal-alias republish handling; final guard used strict inode equality. Thirty-two independently verified inode-only alias changes explain that guard failure. Interrupted-command inode exception was not authorized. Original terminal FAIL is retained; no waiver or terminal rewrite.",
+  "cleanup": {
+    "process_group_scope": "Owned group only; no detached-descendant cleanup claim.",
+    "group_closure_method": "WNOWAIT leader reservation and ps group inventory before reap",
+    "timeout_cleanup": [
+      {
+        "signal": "SIGTERM",
+        "action": "sent to reserved owned group"
+      },
+      {
+        "action": "leader exited unreaped; no other owned group members",
+        "members": [
+          {
+            "pid": 64352,
+            "state": "Z"
+          }
+        ]
+      }
+    ],
+    "direct_wait_status": -15,
+    "exit_code": -15,
+    "owned_group_absent_after_cleanup": true,
+    "unexpected_owned_descendants": false,
+    "unresolved_owned_pids": [],
+    "compiler_lease_held": false,
+    "timed_out": false,
+    "disk_reserve_breached": false,
+    "disk_minimum_available_bytes": 15234453504
+  },
+  "limitations": [
+    "No full12 gate success",
+    "No new current native CI claim",
+    "No source, binary or target mutation by independent audit",
+    "All fourteen product regressions were unexecuted at this closed boundary",
+    "Any later Round/remaining-first-runtime result is a separate scope and is not read or included here",
+    "Body holder stall cause is not established by alias audit"
+  ],
+  "exported_private_receipt_digests": {
+    "3796-green-gates-prep/terminal.json": {
+      "sha256": "2758fe6ca3ad94b7356b03e698ef556dfba4513dccb5376036ac612b130d532b",
+      "bytes": 456
+    },
+    "3796-green-gates-prep/native-controller-result.json": {
+      "sha256": "1b65083af50d777b2defa66651a4ec69729cb1f9b43e8492b64b5ce635fa12f3",
+      "bytes": 472
+    },
+    "3796-green-gates-prep/run.py": {
+      "sha256": "590459995319abefe3e96935334c9bb80ec31b7b7f91ed92bedc8a9990e01c00",
+      "bytes": 15057
+    },
+    "3796-green-gates-prep/plan.json": {
+      "sha256": "82d2f120b59e7a2222a1bd8b2157a6f4757ea9160f06ba7cbb179185f52c7ef5",
+      "bytes": 8117
+    },
+    "3796-green-gates-prep/launch.json": {
+      "sha256": "5f62e44357f19aa0f61911484e0fe393f4e3020c77239b6aec6ad50749a9c0c5",
+      "bytes": 586
+    },
+    "3796-green-gates-prep/cmd-full-closure.json": {
+      "sha256": "754b7ca4343a28f10261db973eae7d3c81a0d8bcadfb6b936ddd2930f0a339b8",
+      "bytes": 2438
+    },
+    "3796-green-gates-prep/cmd-full-closure.stdout.txt": {
+      "sha256": "3488cf9b40b520e9426d85150d964159b2a911dade940c67042ecdc9b84106ee",
+      "bytes": 41808
+    },
+    "3796-green-gates-prep/cmd-full-closure.stderr.txt": {
+      "sha256": "127474addb863369476417a0d3c9259d71b91f554ae4036abf05987fe404f331",
+      "bytes": 319
+    },
+    "3796-green-gates-prep/compiled-census.json": {
+      "sha256": "b0b275ba256d964a3948f29d0be0133caf0ca003139c5a4b9742818c261ce940",
+      "bytes": 746145
+    },
+    "3796-green-gates-prep/protected-before.json": {
+      "sha256": "7c05bc9c86b5baaa11c8832153c50c2ca2fe4398abbcce9d9a4dad2cbf55c92d",
+      "bytes": 167661
+    },
+    "3796-green-gates-prep/new-frozen.json": {
+      "sha256": "5604e752a564d84e8be3154ac97d770bfc8781531d47fbf493e6a959cc841fe6",
+      "bytes": 40696
+    },
+    "3796-green-gates-prep/actual-artifacts.json": {
+      "sha256": "cd190e29c00088b84cf5e73a7e67eba6954b04471703ada539875c77949674a1",
+      "bytes": 146555
+    },
+    "3796-interrupted-gate-audit/audit.json": {
+      "sha256": "31296d6fa737f46477c9836a6ddf2aca9b1cc0602b6e99b91eb5aad28487ee54",
+      "bytes": 12139
+    },
+    "3796-interrupted-gate-audit/manifest.json": {
+      "sha256": "c6e097dbad19b49a6fdbe3d3f7bf3bdd6f30a8c857e9959b82110147cf2834c2",
+      "bytes": 1467
+    },
+    "3796-interrupted-gate-audit/source-observed.json": {
+      "sha256": "bbc4bf5658c07a55d10639379ad4ad7697917261365ed3df70202a1f877ad486",
+      "bytes": 2433056
+    },
+    "3796-interrupted-gate-audit/source-physical-observed.json": {
+      "sha256": "ef394717a64ae525397d9e05d33b11b8226ccc54ff6b28d2c7828e9e13a7237a",
+      "bytes": 2335492
+    },
+    "3796-interrupted-gate-audit/protected-observed.json": {
+      "sha256": "aff4ee3bb418b7bc023f97d51216938763a025d5af47f487ff959f525b830569",
+      "bytes": 167661
+    },
+    "3796-interrupted-gate-audit/new-frozen-observed.json": {
+      "sha256": "af4175f5c964b35517ea02c7c8fa67520b1c2dd921aada8d95d12dd0c1fd0a24",
+      "bytes": 40696
+    },
+    "3796-interrupted-gate-audit/actual-observed.json": {
+      "sha256": "997b880c9aa77f083d8364c4d93c6154aad16efa9eaa302c5e39e6f314dd2350",
+      "bytes": 30902
+    },
+    "3796-interrupted-gate-audit/exact-differences.json": {
+      "sha256": "556a2c9ed9b29cb89f735ef79ce3542357ff754f1dd6f434d30d5e0cdd5435cd",
+      "bytes": 8123
+    },
+    "3796-interrupted-gate-audit/partial-runtime.json": {
+      "sha256": "788566eb15b8148e4a6a150a261af3e50998d0c46d6cd05b5a9cf7ee1f309f3e",
+      "bytes": 103058
+    },
+    "3796-interrupted-gate-audit/old-input-bindings.json": {
+      "sha256": "cdc8d1e96e4096bff354555e50ef72aabdd3621f1120bc90d8d9fbd85bcf8864",
+      "bytes": 1861
+    }
+  }
+}

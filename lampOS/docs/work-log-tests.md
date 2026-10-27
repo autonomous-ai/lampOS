@@ -1,5 +1,14 @@
 # Tests work log
 
+## 2026-10-27 20:10 — interrupted broad gate retained; independent Main Body repair
+
+Ready for lamp-voice: no (#3796 fixed Round and remaining gates pending).
+
+The [interrupted twelve-package host gate](verification/tests-3796-interrupted-host-gate-20261027/) passed formatting, strict Clippy, workspace build and full compilation, then its serial runtime completed Body library 469 passes and Body binary 11 passes before a socket-write test wedged. The owned run was stopped and cleaned up; native 1 / Cargo -15 remains FAIL. All 10,802 source files, 509 sealed copies and 102 executable hashes remain equal. Exactly 32 normal aliases republished identical bytes with new inodes, causing a separate strict-guard failure; the audit records this without waiving the original failure. The unstarted Round target is running once separately; none of its current results are included in that packet.
+
+A separate unchanged Main control reproduced the same Body test's five-second hang. Its reviewed test-only repair passes the focused case while preserving every original read assertion and checking byte conservation; full gates on `tests/body-holder-buffer-bound` are underway. This does not alter #3796 product code or its failed gate record. No additional lamp access or ARM64 build on the Mac.
+
+
 ## 2026-10-27 19:06 — #3796 mixed-layout control reproduces the exact refusal
 
 Ready for lamp-voice: no (full fixed-source gates active).
