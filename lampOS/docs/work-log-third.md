@@ -1,3 +1,11 @@
+## 2026-10-27 21:03 — SDK floor workflow read completed on the replacement head
+
+READ-OK #3848 ea04d75ae after [ten exact-shell controls and original CI binding](verification/sdk-workflow-floor-read-3848-20261027/current-ea04.json). Both path filters include skill format; required control copies fail when missing, every changed copy fails, and the future skill-format copy remains intentionally optional until #3840. The earlier missing-required-copy P3 is closed.
+
+Original SDK run 40515626368 completes SUCCESS, attempt 1, with all five jobs on actual 88a999e38 [992303fc8/ea04], tree aaacc69dc. Node 20.11.1 and 22.23.4 each pass 33/0; Python 3.10.22 and 3.12.15 each pass 29/0; schema copies pass. The workflow blob equals authored ea04; this preview differs from current Main only by that workflow. Three inherited JavaScript files differ from the authored bf6-based tree because #3833 landed, so these counts remain preview-scoped. Initial old-head log access failed while incomplete; the bounded local watcher timed out and was reaped, without cancelling or rerunning CI. No Rust, ARM64 linking, device or product-runtime acceptance.
+
+#3831 remains held at a4 after a ten-minute replacement watch found no new head. #3646 remains original-native-green draft on its broker prerequisite. Taking the addressed #3851 host-prose and #3064 corrected-boundary reads; existing privacy, composition, pins and lamp holds remain.
+
 ## 2026-10-27 20:51 — updater documentation delivered through the tested train
 
 #3827 is [independently verified delivered](verification/product-unit-docs-carry-3827-20261027/delivery-bf6.json) by train238/#3841 to Mainbf6f7bbdf at20:33. Landed commit45096e2b0 preserves the original raw author/date/message, complete context-free payload and100644 mode from d0a9; all added blocks remain after receipt3808's composed additions. Final whole Main tree2b2cc3107 equals qualified train801. Closure alone was not treated as delivery.

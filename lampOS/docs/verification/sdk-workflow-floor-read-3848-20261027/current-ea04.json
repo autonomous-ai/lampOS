@@ -1,0 +1,179 @@
+{
+  "pr": 3848,
+  "review_head": "ea04d75ae5c256666d62fee1371f7dbe5bbcd80e",
+  "authored_base": "bf6f7bbdf5e936c2ef82621e1bb7592d511c1453",
+  "authored_tree": "3e17349747329b8d2300e237212550c1d8380736",
+  "source": {
+    "only_owned_change": ".github/workflows/lampos-sdk.yml",
+    "both_path_filters_include_skill_format": true,
+    "matrix_node": [
+      "20.11",
+      "22"
+    ],
+    "matrix_python": [
+      "3.10",
+      "3.12"
+    ],
+    "permissions": "contents: read",
+    "workflow_blob_equal_preview": true
+  },
+  "local_exact_shell": {
+    "head": "ea04d75ae5c256666d62fee1371f7dbe5bbcd80e",
+    "exact_block_sha256": "b21717d45cbaa3fc19543831f2c4863e890901053019a35236fae4d739d77c2e",
+    "controls": [
+      {
+        "case": "optional_absent",
+        "returncode": 0,
+        "annotations": 0
+      },
+      {
+        "case": "all_equal",
+        "returncode": 0,
+        "annotations": 0
+      },
+      {
+        "case": "py_mismatch",
+        "returncode": 1,
+        "annotations": 1
+      },
+      {
+        "case": "js_mismatch",
+        "returncode": 1,
+        "annotations": 1
+      },
+      {
+        "case": "skill_mismatch",
+        "returncode": 1,
+        "annotations": 1
+      },
+      {
+        "case": "all_mismatch",
+        "returncode": 1,
+        "annotations": 3
+      },
+      {
+        "case": "skill_source_missing",
+        "returncode": 1,
+        "annotations": 1
+      },
+      {
+        "case": "required_py_missing",
+        "returncode": 1,
+        "annotations": 1
+      },
+      {
+        "case": "required_js_missing",
+        "returncode": 1,
+        "annotations": 1
+      },
+      {
+        "case": "both_required_missing",
+        "returncode": 1,
+        "annotations": 2
+      }
+    ],
+    "former_missing_required_P3": "closed in ea04; both mandatory copies fail while future skill copy remains conditional",
+    "limits": [
+      "Isolated exact shell block only; SDK/whole workflow results separate"
+    ]
+  },
+  "original_ci": {
+    "run": {
+      "conclusion": "success",
+      "head_sha": "ea04d75ae5c256666d62fee1371f7dbe5bbcd80e",
+      "id": 40515626368,
+      "run_attempt": 1,
+      "status": "completed"
+    },
+    "preview": "88a999e38452c1fb8d20705063f2c8455d71d423",
+    "parents": [
+      "992303fc8d72322bab46cdb18801c853ea43bb81",
+      "ea04d75ae5c256666d62fee1371f7dbe5bbcd80e"
+    ],
+    "tree": "aaacc69dc09bab0f4d8019a7b172d992a1e6622e",
+    "only_difference_from_current_base": ".github/workflows/lampos-sdk.yml",
+    "jobs": [
+      {
+        "conclusion": "success",
+        "id": 122228719018,
+        "name": "lampOS SDK \u2014 JavaScript, Node 22 (node --test)",
+        "status": "completed",
+        "checkout": "88a999e38452c1fb8d20705063f2c8455d71d423",
+        "selected_result_lines": [
+          "2026-10-27T13:50:41.8107586Z node: v22.23.4",
+          "2026-10-27T13:50:49.9450865Z # tests 33",
+          "2026-10-27T13:50:49.9451502Z # pass 33",
+          "2026-10-27T13:50:49.9451824Z # fail 0",
+          "2026-10-27T13:50:49.9452185Z # cancelled 0",
+          "2026-10-27T13:50:49.9452804Z # skipped 0",
+          "2026-10-27T13:50:49.9453575Z # todo 0"
+        ]
+      },
+      {
+        "conclusion": "success",
+        "id": 122228719247,
+        "name": "lampOS SDK \u2014 Python 3.10 (pytest)",
+        "status": "completed",
+        "checkout": "88a999e38452c1fb8d20705063f2c8455d71d423",
+        "selected_result_lines": [
+          "2026-10-27T13:50:48.8863546Z Successfully set up CPython (3.10.22)",
+          "2026-10-27T13:51:02.2471555Z 29 passed in 5.47s"
+        ]
+      },
+      {
+        "conclusion": "success",
+        "id": 122228719299,
+        "name": "lampOS SDK \u2014 JavaScript, Node 20.11 (node --test)",
+        "status": "completed",
+        "checkout": "88a999e38452c1fb8d20705063f2c8455d71d423",
+        "selected_result_lines": [
+          "2026-10-27T13:50:59.2139317Z node: v20.11.1",
+          "2026-10-27T13:51:07.1499593Z # tests 33",
+          "2026-10-27T13:51:07.1500549Z # pass 33",
+          "2026-10-27T13:51:07.1501081Z # fail 0",
+          "2026-10-27T13:51:07.1501602Z # cancelled 0",
+          "2026-10-27T13:51:07.1502091Z # skipped 0",
+          "2026-10-27T13:51:07.1502616Z # todo 0"
+        ]
+      },
+      {
+        "conclusion": "success",
+        "id": 122228719428,
+        "name": "lampOS SDK \u2014 schema copies equal docs/control.schema.json",
+        "status": "completed",
+        "checkout": "88a999e38452c1fb8d20705063f2c8455d71d423",
+        "selected_result_lines": []
+      },
+      {
+        "conclusion": "success",
+        "id": 122228719567,
+        "name": "lampOS SDK \u2014 Python 3.12 (pytest)",
+        "status": "completed",
+        "checkout": "88a999e38452c1fb8d20705063f2c8455d71d423",
+        "selected_result_lines": [
+          "2026-10-27T13:50:41.6806947Z Successfully set up CPython (3.12.15)",
+          "2026-10-27T13:50:55.2796527Z 29 passed in 5.63s"
+        ]
+      }
+    ],
+    "log_sha256": "ed5851ad5cfea2b92a37d945ce43e3e653c00b740a76f67c13c7d556e14ccdd7"
+  },
+  "historical_old_5dd": {
+    "initial_log_collection": "unavailable while aggregate run in progress; exit 1, not test failure",
+    "bounded_watch": {
+      "returncode": -15,
+      "timed_out": true,
+      "reaped": true,
+      "process_group": "absent",
+      "actions": [
+        "TERM"
+      ]
+    },
+    "scope": "local watcher timed out and was reaped; no original workflow cancellation or rerun; old head replaced"
+  },
+  "limits": [
+    "CI executed the 992/ea04 merge preview, not the whole authored bf6/ea04 tree; three inherited JavaScript files differ due to delivered #3833.",
+    "Current required-control-copy P3 closed; future skill-format copy remains conditional until #3840 follow-up.",
+    "No local SDK package runtime rerun, Rust gates, ARM64 linking, device, or product-runtime acceptance."
+  ]
+}
