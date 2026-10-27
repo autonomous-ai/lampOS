@@ -13,7 +13,8 @@
 # the words before a production manifest goes into the image.
 set -eu
 
-LINE="I can't reach any Wi-Fi. Hold my button for five seconds to set me up again."
+# The words are wifi_change::SAY_LOST's (crates/setup/src/wifi_change.rs, #3743): change both together.
+LINE="I can't reach any Wi-Fi. If your Wi-Fi has changed, hold the reset button for five seconds. That erases me and starts setup again."
 
 [ $# -ge 2 ] && [ $# -le 3 ] || { echo "usage: $0 PROVIDER.json NEW_FOLDER [production|test]" >&2; exit 2; }
 provider=$1

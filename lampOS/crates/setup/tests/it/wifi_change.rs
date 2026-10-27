@@ -24,6 +24,9 @@ struct Network {
     broker: bool,
     /// It joins only from this many milliseconds after the radio's start.
     after_ms: u64,
+    /// Its router is off until this time on the fake's clock (a restart);
+    /// 0 when it is always on.
+    back_at_ms: u64,
 }
 
 /// The fake: wpa_supplicant's file, the old one kept, the networks in range
@@ -126,9 +129,9 @@ impl Fake {
     }
 
     fn up(&self) -> Option<&(String, Network)> {
-        self.joined
-            .as_ref()
-            .filter(|(_, network)| self.now_ms >= self.started_ms + network.after_ms)
+        self.joined.as_ref().filter(|(_, network)| {
+            self.now_ms >= self.started_ms + network.after_ms && self.now_ms >= network.back_at_ms
+        })
     }
 }
 
@@ -238,12 +241,14 @@ const GOOD: Network = Network {
     address: true,
     broker: true,
     after_ms: 8_000,
+    back_at_ms: 0,
 };
 const OLD: Network = Network {
     password: OLD_PASSWORD,
     address: true,
     broker: true,
     after_ms: 5_000,
+    back_at_ms: 0,
 };
 
 fn asked(ssid: &str) -> Asked {
@@ -671,7 +676,7 @@ fn the_lamp_says_what_happened_in_a_few_words_and_never_the_name() {
     );
     assert_eq!(
         SAY_LOST,
-        "I can't reach any Wi-Fi. Hold my button for five seconds to set me up again."
+        "I can't reach any Wi-Fi. If your Wi-Fi has changed, hold the reset button for five seconds. That erases me and starts setup again."
     );
     // After a real change and a real fall-back: one line each, no name.
     for (networks, want) in [
@@ -802,6 +807,47 @@ fn with_no_wifi_back_the_lost_line_is_said_at_most_once_a_minute_until_one_is() 
     assert_eq!(heard.0.len() as u64, LOST_MOST.as_secs() / 60);
     assert!(heard.0.iter().all(|(_, line)| line == "played wifi_lost"));
     assert!(fake.now_ms - started <= LOST_MOST.as_millis() as u64 + 5_000);
+}
+
+/// #3743: a router's restart (2-3 minutes) never hears the no-Wi-Fi line.
+/// The old router restarts as the change begins and is back 2.5 minutes
+/// later; the new network's key is wrong, so the lamp is back to waiting for
+/// the old one within seconds, the worst case. It hears only that the change
+/// was not taken. And when the old router never comes back, the line is
+/// first said 3 minutes at least after the lamp left it.
+#[test]
+fn a_router_restart_of_two_and_a_half_minutes_never_hears_the_lost_line() {
+    let wrong_key = Network {
+        password: "another-fake-pass",
+        ..GOOD
+    };
+    let restarting = Network {
+        back_at_ms: 150_000,
+        ..OLD
+    };
+    let mut fake = Fake::new(&[("Old Home", restarting), ("New Home", wrong_key)]);
+    let changed = change(&mut fake, "VN", &asked("New Home"));
+    assert!(matches!(changed, Changed::Back { .. }), "{changed:?}");
+    let mut heard = Heard::default();
+    assert_eq!(say_after(&mut fake, &mut heard, &changed, BROKER), 1);
+    assert_eq!(heard.0.len(), 1);
+    assert_eq!(heard.0[0].1, SAY_BACK);
+
+    // Never back: the first lost line no sooner than 3 minutes on.
+    let gone = Network {
+        back_at_ms: u64::MAX,
+        ..OLD
+    };
+    let mut fake = Fake::new(&[("Old Home", gone), ("New Home", wrong_key)]);
+    let left = fake.now_ms;
+    let changed = change(&mut fake, "VN", &asked("New Home"));
+    assert!(matches!(changed, Changed::NotBack { .. }), "{changed:?}");
+    let first = fake.now_ms - left;
+    assert!(first >= 180_000, "first said {first} ms after the loss");
+    let mut heard = Heard::default();
+    let said = say_after(&mut fake, &mut heard, &changed, BROKER);
+    assert!(said >= 1);
+    assert_eq!(said as u64, LOST_MOST.as_secs() / 60);
 }
 
 #[test]
