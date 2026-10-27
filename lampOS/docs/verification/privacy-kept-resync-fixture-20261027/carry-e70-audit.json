@@ -1,0 +1,171 @@
+{
+  "head": "021f0089705df64ad10a02899c1575f5a3f3c98b",
+  "base": "e70da415d928d6b03664b90d3074c295609ae820",
+  "tree": "1ac66a5837670eb166973a465f75acea1104e31b",
+  "status": "VERIFIED_FOCUSED_HOST_CARRY",
+  "holds": [],
+  "limits": [
+    "Focused host privacy carry on 021f00897/e70da415d only; no current full host Voice claim.",
+    "Historical full Voice selection belongs to4bff; not reattributed.",
+    "Fresh original current native full Voice remains required before readiness; later base drift needs a separate carry.",
+    "Existing native642 Reader failure remains unresolved; this selected host carry does not establish its cause or waive it.",
+    "No historical cause/device/physical-latency claim."
+  ],
+  "selected_direct_counts": {
+    "failed": 0,
+    "ignored": 1,
+    "passed": 238
+  },
+  "integrity": {
+    "actual_and_saved_paths_rehashed": 65,
+    "raw_entries": 8703,
+    "source_files": 7243
+  },
+  "metadata": {
+    "after": [],
+    "before": [],
+    "current": []
+  },
+  "controller_sha256": "244c322227602380ab969be4e7638c6c89463c8f706547a4f573048bfd1e11e7",
+  "helper_sha256": "a6faab128a48e49703fb76731a6532054d8bcb900bb84a3e17b93e4470c3e8f4",
+  "doc_headings": [
+    "lamp_bus",
+    "lamp_msgs",
+    "lamp_voice"
+  ],
+  "full_private_receipt_sha256": "01ee405509b31dccce1d3d9b9b61129f6d4a89ed9a7fec0215195c0c77e363b9",
+  "required_host_witnesses": 16,
+  "panic_hooks": {
+    "expected_occurrences": 2,
+    "unknown": 0
+  },
+  "commands": [
+    {
+      "label": "voice-privacy-carry",
+      "package": "lamp-voice",
+      "target": "lamp_voice",
+      "returncode": 0,
+      "log_sha256": "2a618042532c693dda75bd754041ff62d38fc8cacbfe3dcbc74ea92cad700bd3",
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered": 3823,
+          "ignored": 0,
+          "line": 13,
+          "measured": 0,
+          "passed": 9,
+          "status": "ok"
+        }
+      ]
+    },
+    {
+      "label": "msgs-lib",
+      "package": "lamp-msgs",
+      "target": "lamp_msgs",
+      "returncode": 0,
+      "log_sha256": "8328ca49497a615638d05f1e857b899794dd63a559fd730e9f8c3a1504d48dee",
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "line": 96,
+          "measured": 0,
+          "passed": 92,
+          "status": "ok"
+        }
+      ]
+    },
+    {
+      "label": "msgs-it",
+      "package": "lamp-msgs",
+      "target": "it",
+      "returncode": 0,
+      "log_sha256": "e6b523270569c19fe96ea84bdfa9648257f4bbcb16f25accd3cb8179b1a9ac8a",
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "line": 84,
+          "measured": 0,
+          "passed": 80,
+          "status": "ok"
+        }
+      ]
+    },
+    {
+      "label": "bus-lib",
+      "package": "lamp-bus",
+      "target": "lamp_bus",
+      "returncode": 0,
+      "log_sha256": "dcc4909358f02f2a0066d3f2fe3c378ca5c7db4151d5298117a036be42eaed71",
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 1,
+          "line": 67,
+          "measured": 0,
+          "passed": 55,
+          "status": "ok"
+        }
+      ]
+    },
+    {
+      "label": "bus-liveness-controls",
+      "package": "lamp-bus",
+      "target": "it",
+      "returncode": 0,
+      "log_sha256": "9bd9b36870d36e7f89010f42fe4e9853150ebb64d89a603584752ead13890f46",
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered": 48,
+          "ignored": 0,
+          "line": 6,
+          "measured": 0,
+          "passed": 2,
+          "status": "ok"
+        }
+      ]
+    },
+    {
+      "label": "doctests-3",
+      "package": null,
+      "target": null,
+      "returncode": 0,
+      "log_sha256": "169951f2db3749b641d36ce1c3fb2568b0d7ec64de02776b9563900bb8638895",
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "line": 8,
+          "measured": 0,
+          "passed": 2,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "line": 16,
+          "measured": 0,
+          "passed": 1,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "line": 23,
+          "measured": 0,
+          "passed": 0,
+          "status": "ok"
+        }
+      ]
+    }
+  ],
+  "runtime_permission_context": "Explicit require_escalated; no retry in this carry."
+}
