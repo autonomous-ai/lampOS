@@ -1,0 +1,62 @@
+{
+  "head": "4bc7768e3d8a8f82bc7ab83ff73993f16123ca5f",
+  "stages": [
+    {
+      "stage": "pytest",
+      "command": [
+        "<WORKSPACE>/.claude/worktrees/third-read-3799-env/bin/python",
+        "-m",
+        "pytest",
+        "-q",
+        "-p",
+        "no:cacheprovider",
+        "<WORKSPACE>/.claude/worktrees/third-read-3799/lampOS/sdk/python/tests"
+      ],
+      "returncode": 0,
+      "timed_out": false,
+      "reaped": true,
+      "process_group": "absent",
+      "cleanup": [],
+      "seconds": 6.59,
+      "log_sha256": "3ebd5d9217e8396538d14c1debc3c6783eec89ba5631da826d757dafe3b1f18c",
+      "summaries": []
+    },
+    {
+      "stage": "cancel-probe",
+      "command": [
+        "<WORKSPACE>/.claude/worktrees/third-read-3799-env/bin/python",
+        "<WORKSPACE>/.claude/worktrees/third-read-3799-evidence/current-4bc/cancel-probe.py"
+      ],
+      "returncode": 0,
+      "timed_out": false,
+      "reaped": true,
+      "process_group": "absent",
+      "cleanup": [],
+      "seconds": 0.52,
+      "log_sha256": "2f300bd1a2e693a5c241c5ce1ef8a9dae5ee26d9853742cf52301e7a497d5c5f"
+    }
+  ],
+  "source_hashes_unchanged": 7309,
+  "limits": [
+    "Supported isolated Python3.12 and local FakeLamp TLS only",
+    "No actual Control server, native ARM or device claim",
+    "Delayed-await refusal latch and future API compatibility remain known P3s"
+  ],
+  "pytest_counts": {
+    "passed": 29,
+    "failed": 0
+  },
+  "cancellation_observation": {
+    "cancelled_public_wait_calls": 8,
+    "client_websocket_waiters_before": 0,
+    "after_caller_cancellation": 0,
+    "after_socket_close": 0,
+    "observation": "Cancelled public wait calls leave no client websocket wait tasks."
+  },
+  "finding_status": "Third original8-task retention P3 closed on4bc; handled refusal repair passes own committed regression",
+  "known_followups": [
+    "Lead delayed-awaited refusal remains latched",
+    "on returns Subscription awaitable, not Future",
+    "gesture/move wait for body reply follow-up remains separate"
+  ]
+}

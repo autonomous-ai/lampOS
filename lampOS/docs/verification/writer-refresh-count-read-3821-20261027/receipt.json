@@ -1,0 +1,37 @@
+{
+  "head": "b7da417171ab23b511f66998ffce0c03e550a081",
+  "base": "3b9bfb628e1c416926b958fecf56f65c539dc533",
+  "changed_files": [
+    "lampOS/docs/reuse-decisions.md",
+    "lampOS/docs/settings-writer-refresh.md"
+  ],
+  "diff_check": 0,
+  "unique_test_controls": [
+    "no_apply_does_not_qualify_but_one_exact_apply_can_enter_without_an_ordinary_round",
+    "a_restart_at_every_unqualified_prefix_requires_recovery_and_never_reissues_the_grant",
+    "qualified_writer_and_preimages_survive_a_restart_until_the_product_journal_closes",
+    "identity_substitution_never_changes_or_admits_the_saved_transaction",
+    "a_stale_or_modified_first_apply_cannot_consume_the_single_grant",
+    "unsupported_or_malformed_journals_are_retained_and_block_every_admission",
+    "missing_and_nonregular_records_do_not_turn_into_a_fresh_transaction",
+    "future_nonsemantic_metadata_is_preserved_without_becoming_admission_authority",
+    "write_bound_and_invalid_identities_leave_no_journal_or_partial_acceptance",
+    "diagnostics_hide_unknown_values_and_known_duplicate_or_shadowed_fields_are_refused",
+    "guard_lock_is_exclusive_and_independent_of_the_product_lock",
+    "failed_persist_after_publication_poisons_the_live_session_until_actual_disk_state_is_recovered",
+    "first_apply_binds_its_own_later_envelope_and_sequence_without_replacing_the_refresh_identity",
+    "restoring_an_apply_requires_its_original_grant_and_preimage_identity",
+    "reloaded_inputs_keep_the_exact_origin_and_distinguish_writer_from_apply_restoration",
+    "qualified_and_closed_inputs_keep_the_compatible_writer_and_bound_product_receipts",
+    "live_or_poisoned_sessions_cannot_expose_stale_recovery_inputs",
+    "recovery_views_retain_later_metadata_in_the_bound_inputs_without_reparsing"
+  ],
+  "count": 18,
+  "rust_blob_modes_exact_to_qualified_e74": true,
+  "rust_paths": [
+    "lampOS/crates/update/src/writer_refresh.rs",
+    "lampOS/crates/update/src/writer_refresh/tests.rs"
+  ],
+  "source_inspection_initially_missing_qualified_object": "First e74 lookup failed before receipt; fetched original3775 head then exact source comparison succeeded. No runtime attempted.",
+  "limit": "Source/docs only; no Cargo/native/device execution and no new runtime qualification"
+}

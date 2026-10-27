@@ -1,0 +1,591 @@
+{
+  "all3changed_files_equal_preview": true,
+  "authored_head": "6819ced6b53ad970badb14ee3af9a88b8099707b",
+  "authored_tree": "5012b3e21f25faca2bf76e0e325f6e5961dfaf44",
+  "collector_handles_terminal0": [
+    21674,
+    12172,
+    27139,
+    96572,
+    42338,
+    91977
+  ],
+  "current_pr_state": "OPEN",
+  "file_hashes": {
+    "arm.json": "4a537c1fe38bc0e48623d75d64723df2d60b915b1e37862db0cd900b20b7ddf8",
+    "arm.log": "c0d4dda5bad91bf2c5f368c1d5f66559e146370d00cf21ea265001df2ad6dad7",
+    "linux.json": "154442524fbbdc9b0e5129ac899cf6e3bcebc3161f2a42697dcce366a4c773fa",
+    "linux.log": "d791d95876eaf00206238944c31beab193f8cee0e28e9a2b39f324e8404fd3e0",
+    "pr-final.json": "9bf7a5759057dfed83a7ff9f61a79cc0cc1cbf298c5bc43897bf6cfcbd164a9e",
+    "preview-commit.json": "7e44fc6d39a6f57537b54eb926cd9f1a1b333a4e0b7814610fee3a7f115f3029",
+    "source-bindings.json": "3c8250e2e37ce764f43ec378f838bf091c8cf0145e38a8bfdd8bacf42786180e",
+    "test-audit.json": "9eec44be51ade50fc775541775fb09f25774ba3ceb66f1a0234797ee6df14d43"
+  },
+  "local_worktree_clean": true,
+  "ordered_parents": [
+    "11a1c867ea709c77d6421b8870144e0e5bba8ecc",
+    "6819ced6b53ad970badb14ee3af9a88b8099707b"
+  ],
+  "other_readonly_fetch_terminal0": 91977,
+  "preview_vs_authored_differing_files": 180,
+  "qualification": "Native SUCCESS qualifies preview501aff7/a2238033, selected PR profile13/47 crates, with exact3changed-source binding to6819. No whole authored tree/current Main/full realtime/device or real-model acceptance inference. No jobs rerun/cancelled; runs already terminal at discovery. All bounded read-only collectors closed. Target3660 left untouched (Root-owned).",
+  "runs": {
+    "arm": {
+      "attempt": 1,
+      "conclusion": "success",
+      "id": 40494675464,
+      "jobs": [
+        {
+          "conclusion": "success",
+          "id": 122157009999,
+          "name": "lampOS \u2014 build and test on Linux ARM64 (1/1)"
+        },
+        {
+          "conclusion": "skipped",
+          "id": 122157072608,
+          "name": "lampOS \u2014 promote a tested release to the stable feed"
+        },
+        {
+          "conclusion": "skipped",
+          "id": 122165255958,
+          "name": "report-full-run-failure"
+        },
+        {
+          "conclusion": "skipped",
+          "id": 122165255982,
+          "name": "lampOS \u2014 sign and publish the tested lamp-voice artifact"
+        }
+      ],
+      "status": "completed"
+    },
+    "linux": {
+      "attempt": 1,
+      "conclusion": "success",
+      "id": 40494675480,
+      "jobs": [
+        {
+          "conclusion": "success",
+          "id": 122156998456,
+          "name": "lampOS \u2014 clippy, every crate and target (x86 Linux)"
+        }
+      ],
+      "status": "completed"
+    }
+  },
+  "source_hashes_unchanged": 7282,
+  "test_audit": {
+    "all_cargo_test_summaries": [
+      "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s",
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 337 filtered out; finished in 3.62s",
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 337 filtered out; finished in 1.15s",
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 337 filtered out; finished in 4.52s",
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 337 filtered out; finished in 0.92s",
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 337 filtered out; finished in 1.74s",
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3907 filtered out; finished in 3.02s",
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3907 filtered out; finished in 2.73s",
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3907 filtered out; finished in 1.30s",
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 307 filtered out; finished in 0.96s",
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 307 filtered out; finished in 1.56s",
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 307 filtered out; finished in 0.88s",
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 307 filtered out; finished in 1.01s",
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 307 filtered out; finished in 2.25s",
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 307 filtered out; finished in 0.80s",
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 307 filtered out; finished in 2.80s",
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 307 filtered out; finished in 2.80s",
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 307 filtered out; finished in 1.30s",
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 307 filtered out; finished in 2.31s",
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 307 filtered out; finished in 3.50s",
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 307 filtered out; finished in 7.91s",
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 307 filtered out; finished in 1.61s",
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 307 filtered out; finished in 2.51s",
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 307 filtered out; finished in 0.00s",
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 307 filtered out; finished in 0.08s",
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 307 filtered out; finished in 0.05s",
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 307 filtered out; finished in 0.40s",
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 307 filtered out; finished in 0.21s",
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 307 filtered out; finished in 0.20s",
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 307 filtered out; finished in 0.64s",
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 307 filtered out; finished in 0.24s",
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 307 filtered out; finished in 0.12s",
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 307 filtered out; finished in 0.11s",
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 307 filtered out; finished in 0.33s",
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 307 filtered out; finished in 1.13s",
+      "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "test result: 13 passed; 0 failed"
+    ],
+    "bad_terminal_test_lines": [],
+    "docs": {
+      "crate_summaries": 47,
+      "failed": 0,
+      "ignored": 0,
+      "passed": 4
+    },
+    "duplicate_detail_keys": [
+      {
+        "binary": "lamp-skills::it",
+        "occurrences": 2,
+        "test": "skills::a_reading_pose_is_held_on_the_mood_socket_for_its_for_and_then_let_go"
+      },
+      {
+        "binary": "lamp-skills::it",
+        "occurrences": 2,
+        "test": "skills::asking_the_policy_a_hello_made_and_not_noticed_rests"
+      },
+      {
+        "binary": "lamp-skills::it",
+        "occurrences": 2,
+        "test": "skills::asking_the_policy_on_the_hosts_clock_gives_up_after_its_wait"
+      },
+      {
+        "binary": "lamp-skills::it",
+        "occurrences": 2,
+        "test": "skills::the_program_forgets_a_snooze_at_a_restart"
+      },
+      {
+        "binary": "lamp-skills::it",
+        "occurrences": 2,
+        "test": "skills::the_program_keeps_a_skill_off_across_a_restart"
+      },
+      {
+        "binary": "lamp-voice",
+        "occurrences": 2,
+        "test": "coordinator::tests::endpoint_session::endpoint_fixture_reaps_on_panic_before_and_after_handoff"
+      },
+      {
+        "binary": "lamp-voice",
+        "occurrences": 2,
+        "test": "hand_controls::tests::with_the_wait_an_idle_pump_wakes_five_times_a_second_and_stops_at_once"
+      },
+      {
+        "binary": "lamp-voice",
+        "occurrences": 2,
+        "test": "hand_controls::tests::with_the_wait_an_owner_polling_every_2_ms_does_not_wake_the_pump"
+      },
+      {
+        "binary": "lamp-voice::it",
+        "occurrences": 2,
+        "test": "capture_hold_worker::a_microphone_busy_for_a_moment_at_start_is_opened_once_it_is_free"
+      },
+      {
+        "binary": "lamp-voice::it",
+        "occurrences": 2,
+        "test": "capture_hold_worker::a_microphone_gone_for_a_moment_at_start_is_opened_once_it_is_back"
+      },
+      {
+        "binary": "lamp-voice::it",
+        "occurrences": 2,
+        "test": "capture_hold_worker::a_mute_while_a_busy_microphone_is_waited_for_opens_nothing"
+      },
+      {
+        "binary": "lamp-voice::it",
+        "occurrences": 2,
+        "test": "capture_hold_worker::a_mute_while_the_microphone_is_waited_for_opens_nothing"
+      },
+      {
+        "binary": "lamp-voice::it",
+        "occurrences": 2,
+        "test": "capture_hold_worker::a_speaker_held_up_ends_the_capture_worker_unless_recovery_is_bounded"
+      },
+      {
+        "binary": "lamp-voice::it",
+        "occurrences": 2,
+        "test": "capture_hold_worker::a_stop_is_read_though_the_worker_has_gone_when_authority_falls_due"
+      },
+      {
+        "binary": "lamp-voice::it",
+        "occurrences": 2,
+        "test": "capture_hold_worker::another_microphone_is_handed_on_at_once_and_its_early_sound_is_not_accounted_for"
+      },
+      {
+        "binary": "lamp-voice::it",
+        "occurrences": 2,
+        "test": "capture_hold_worker::mic1_frames_wait_four_blocks_with_their_own_times_and_a_stop_drops_what_is_held"
+      },
+      {
+        "binary": "lamp-voice::it",
+        "occurrences": 2,
+        "test": "capture_hold_worker::mic1_muted_while_frames_are_held_hands_none_of_them_on"
+      },
+      {
+        "binary": "lamp-voice::it",
+        "occurrences": 2,
+        "test": "capture_hold_worker::mic1_with_a_recording_keeps_the_held_steps_before_the_first_block"
+      },
+      {
+        "binary": "lamp-voice::it",
+        "occurrences": 2,
+        "test": "capture_hold_worker::stalls_in_a_row_each_reopen_the_microphone_while_the_reference_goes_on"
+      },
+      {
+        "binary": "lamp-voice::it",
+        "occurrences": 2,
+        "test": "capture_hold_worker::stop_words_blocks_carry_what_was_asked_only_when_asked"
+      },
+      {
+        "binary": "lamp-voice::it",
+        "occurrences": 2,
+        "test": "capture_hold_worker::the_loop_waits_on_the_microphone_only_with_the_switch"
+      },
+      {
+        "binary": "lamp-voice::it",
+        "occurrences": 2,
+        "test": "capture_hold_worker::with_the_render_5_ms_after_each_block_all_but_a_few_blocks_are_read_within_a_ms"
+      },
+      {
+        "binary": "lamp-voice::it",
+        "occurrences": 2,
+        "test": "privacy_worker::a_producer_kept_up_only_if_its_samples_span_the_scenario"
+      },
+      {
+        "binary": "lamp-voice::it",
+        "occurrences": 2,
+        "test": "privacy_worker::after_its_first_datagram_a_gap_ends_the_worker_as_discontinuous"
+      },
+      {
+        "binary": "lamp-voice::it",
+        "occurrences": 2,
+        "test": "privacy_worker::allowed_authority_without_a_first_observation_cannot_start_a_gap_ride"
+      },
+      {
+        "binary": "lamp-voice::it",
+        "occurrences": 2,
+        "test": "privacy_worker::a_gap_ride_survives_controls_late_and_restabilizes_before_reopening"
+      },
+      {
+        "binary": "lamp-voice::it",
+        "occurrences": 2,
+        "test": "privacy_worker::before_any_datagram_the_worker_reads_the_kept_value_past_gaps_until_controls_is_late"
+      },
+      {
+        "binary": "lamp-voice::it",
+        "occurrences": 2,
+        "test": "privacy_worker::expiry_without_the_opt_in_or_allowed_authority_still_ends_the_worker"
+      },
+      {
+        "binary": "lamp-voice::it",
+        "occurrences": 2,
+        "test": "privacy_worker::a_gap_ride_recovers_short_repeated_publication_gaps_in_the_same_worker"
+      },
+      {
+        "binary": "lamp-voice::it",
+        "occurrences": 2,
+        "test": "privacy_worker::fresh_low_during_a_gap_ride_never_grants_the_same_worker_again"
+      },
+      {
+        "binary": "lamp-voice::it",
+        "occurrences": 2,
+        "test": "privacy_worker::losing_controls_ends_the_real_worker_cleanly_and_expires_its_lease"
+      },
+      {
+        "binary": "lamp-voice::it",
+        "occurrences": 2,
+        "test": "privacy_worker::the_real_worker_with_no_slide_grants_from_its_controller_alone"
+      },
+      {
+        "binary": "lamp-voice::it",
+        "occurrences": 2,
+        "test": "privacy_worker::selected_worker_requires_authority_latches_low_and_recovers_only_after_verified_stop"
+      },
+      {
+        "binary": "lamp-voice::it",
+        "occurrences": 2,
+        "test": "privacy_worker::an_isolated_fresh_high_does_not_extend_the_real_workers_gap_ride"
+      }
+    ],
+    "module_controls": {
+      "lamp-eyes": [
+        "who::tests::a_camera_closed_lets_a_held_person_go_at_once",
+        "who::tests::a_face_is_remembered_only_as_the_one_face_near_and_otherwise_says_why",
+        "who::tests::a_face_known_by_two_names_is_refused_with_both_and_replaced_for_both",
+        "who::tests::a_face_twice_the_size_and_further_on_is_brought_to_the_reference",
+        "who::tests::a_file_from_a_later_build_is_read",
+        "who::tests::a_forget_says_whether_the_names_memory_id_is_someone_elses",
+        "who::tests::a_forget_that_cannot_reach_a_set_aside_file_waits_and_is_finished_when_it_can",
+        "who::tests::a_full_crop_keeps_the_detail_the_shrunk_picture_drops",
+        "who::tests::a_full_crop_reads_the_frame_where_the_shrunk_picture_has_the_face",
+        "who::tests::a_held_id_is_kept_before_an_earlier_record_with_none_is_given_one",
+        "who::tests::a_held_person_stays_through_one_miss_and_goes_after_the_hold",
+        "who::tests::a_later_field_reads_one_release_forward",
+        "who::tests::a_left_temporary_file_and_a_linked_folder_are_left_alone",
+        "who::tests::a_near_face_with_a_near_name_is_asked_about_not_kept_beside_it",
+        "who::tests::a_new_name_for_a_face_near_someone_kept_is_asked_about_not_added",
+        "who::tests::a_person_it_cannot_read_is_set_aside_and_the_rest_load",
+        "who::tests::a_printed_face_keeps_the_held_name_only_if_it_still_looks_like_them",
+        "who::tests::a_remember_kept_is_recognised_at_the_next_look_and_then_every_two_seconds",
+        "who::tests::a_remember_refused_waits_the_two_seconds",
+        "who::tests::a_remembered_person_grows_familiar_once_a_day_and_fades_and_is_forgotten",
+        "who::tests::a_rename_keeps_the_memory_id_and_the_known_file_tells_it",
+        "who::tests::a_set_aside_file_that_holds_nothing_never_keeps_a_forget_waiting",
+        "who::tests::a_whole_file_it_cannot_read_is_moved_and_the_eyes_start",
+        "who::tests::a_yes_or_no_to_being_named_is_asked_alone",
+        "who::tests::a_yes_to_being_named_is_kept_with_the_face_and_goes_with_a_no_or_a_forget",
+        "who::tests::an_old_record_with_no_id_keeps_its_memory_key",
+        "who::tests::an_unprinted_near_face_keeps_the_held_name_only_with_the_same_id",
+        "who::tests::each_kept_people_file_opens_with_everyone_in_it",
+        "who::tests::forget_refuses_unremovable_temporary_before_mutating_the_store",
+        "who::tests::forget_removes_complete_uncommitted_people_copies_without_reopening",
+        "who::tests::forget_unlinks_temporary_symlinks_without_following_them",
+        "who::tests::forgetting_a_name_reaches_its_set_aside_records",
+        "who::tests::marks_where_the_reference_has_them_cut_out_the_corner_as_it_is",
+        "who::tests::names_one_letter_apart_are_near_and_short_or_same_names_are_not",
+        "who::tests::names_prints_and_people_are_bounded_and_a_bad_file_is_set_aside",
+        "who::tests::nobody_is_known_until_asked_and_a_forgotten_face_is_gone_from_the_file",
+        "who::tests::one_face_keeps_one_name_and_another_is_taken_only_in_its_place",
+        "who::tests::open_discards_partial_and_complete_uncommitted_people_files_only",
+        "who::tests::open_discards_uncommitted_files_even_without_a_canonical_store",
+        "who::tests::open_refuses_a_temporary_entry_it_cannot_unlink",
+        "who::tests::open_unlinks_temporary_symlinks_without_following_them",
+        "who::tests::repair_cas_rejects_a_second_snapshot_and_an_intervening_save_even_if_restored",
+        "who::tests::repair_never_allocates_an_id_for_a_legacy_record",
+        "who::tests::repair_refuses_a_temporary_mode_changed_before_rename",
+        "who::tests::repair_refuses_an_occupied_fixed_temporary_without_overwriting_it",
+        "who::tests::repair_refuses_deleted_renamed_and_deleted_then_recreated_targets",
+        "who::tests::repair_refuses_every_changed_target_field",
+        "who::tests::repair_rejects_any_print_matching_another_person_even_when_the_target_matches_better",
+        "who::tests::repair_rejects_invalid_embeddings_without_changing_memory_or_disk",
+        "who::tests::repair_reserves_the_whole_record_then_replaces_only_prints_and_visit_consent",
+        "who::tests::repair_syncs_the_file_before_rename_and_the_directory_before_success",
+        "who::tests::repair_targets_are_missing_or_bound_to_their_original_live_store",
+        "who::tests::repair_write_faults_leave_ram_matching_the_visible_old_or_new_file",
+        "who::tests::someone_remembered_after_a_waiting_forget_is_kept",
+        "who::tests::the_forgets_that_wait_never_stop_a_forget",
+        "who::tests::the_known_face_is_kept_beside_the_known_name_and_goes_with_it",
+        "who::tests::the_same_record_is_set_aside_once_and_a_linked_folder_is_refused",
+        "who::tests::the_voice_asks_in_one_of_four_lines_and_anything_else_is_nothing",
+        "who::tests::two_people_never_share_one_memory_id",
+        "who::tests::without_the_stable_id_the_files_are_as_before",
+        "who::tests::without_the_switch_nobody_is_held"
+      ],
+      "lamp-voice": [
+        "known_faces::tests::a_call_without_a_name_is_not_sent_and_a_silent_eye_is_said_so",
+        "known_faces::tests::a_known_person_looking_away_is_still_there_and_another_counts_once_known_10_s",
+        "known_faces::tests::a_line_ending_before_its_name_is_told_apart",
+        "known_faces::tests::a_name_counts_only_when_the_person_said_it_or_spelled_it",
+        "known_faces::tests::a_name_given_is_told_from_talk_that_only_mentions_a_name",
+        "known_faces::tests::a_name_said_before_is_kept_once_said_back_and_agreed_to",
+        "known_faces::tests::a_near_name_is_spelled_and_no_yes_stands_in_for_it",
+        "known_faces::tests::a_new_name_for_a_near_face_says_no_name_and_a_no_sends_nothing",
+        "known_faces::tests::a_rooms_forget_needs_the_named_face_seen_saying_it",
+        "known_faces::tests::a_switch_apart_from_the_eyes_is_said_once_and_uses_no_ids",
+        "known_faces::tests::a_yes_is_any_ordinary_one_and_any_no_takes_it_back",
+        "known_faces::tests::a_yes_to_the_read_back_holds_nothing_but_the_yes_and_the_name",
+        "known_faces::tests::an_ask_to_remember_is_their_own_face_and_never_a_question_or_a_no",
+        "known_faces::tests::forget_my_face_asks_for_the_known_person_whose_line_it_is",
+        "known_faces::tests::forget_my_face_sends_the_name_the_eyes_keep",
+        "known_faces::tests::observations_expire_from_source_age_without_renewal_on_reread",
+        "known_faces::tests::someone_remembered_is_asked_once_about_being_named_and_the_eyes_answer_is_said",
+        "known_faces::tests::the_known_name_counts_only_while_the_eyes_keep_it_fresh",
+        "known_faces::tests::the_three_names_of_16_46_are_refused_or_read_back",
+        "known_faces::tests::the_word_that_called_the_lamp_is_not_their_name",
+        "known_faces::tests::what_the_eyes_say_becomes_words_the_model_can_say",
+        "known_faces::tests::whose_memory_is_the_eyes_id_with_the_stable_id_else_the_names",
+        "known_faces::tests::with_names_checked_only_a_name_they_said_reaches_the_eyes_and_one_face_keeps_one"
+      ]
+    },
+    "nextest_summary": [
+      "Summary [ 168.242s] 8048 tests run: 8048 passed, 58 skipped"
+    ],
+    "own_harness": {
+      "process_failed": 0,
+      "process_passed": 13,
+      "process_summary_present": true,
+      "relay_signals": true
+    },
+    "pass_lines": 8082,
+    "qualification": "Original PR profile selected13/47crates, not full/realtime suite. 8048 unique PASS;34 duplicate detail printouts not double-counted. Caught fixture panic output may appear; no bad nextest terminal status. Additional promotion/provenance tests run separately and not added to8048.",
+    "required": [
+      {
+        "binary": "lamp-eyes",
+        "occurrences": 1,
+        "test": "who::tests::a_new_name_for_a_face_near_someone_kept_is_asked_about_not_added"
+      },
+      {
+        "binary": "lamp-voice",
+        "occurrences": 1,
+        "test": "known_faces::tests::a_new_name_for_a_near_face_says_no_name_and_a_no_sends_nothing"
+      }
+    ],
+    "selected_crates": "Changed: lamp-eyes, lamp-voice. With the crates that depend on them and the three that read other crates' files (lamp-cloud, lamp-voice-eval, lamp-update): 13 of 47 crates.",
+    "unique_passes": 8048,
+    "voice_known_faces_broad_selector": [
+      {
+        "binary": "lamp-voice",
+        "occurrences": 1,
+        "test": "known_faces::tests::a_call_without_a_name_is_not_sent_and_a_silent_eye_is_said_so"
+      },
+      {
+        "binary": "lamp-voice",
+        "occurrences": 1,
+        "test": "known_faces::tests::a_known_person_looking_away_is_still_there_and_another_counts_once_known_10_s"
+      },
+      {
+        "binary": "lamp-voice",
+        "occurrences": 1,
+        "test": "known_faces::tests::a_line_ending_before_its_name_is_told_apart"
+      },
+      {
+        "binary": "lamp-voice",
+        "occurrences": 1,
+        "test": "known_faces::tests::a_name_counts_only_when_the_person_said_it_or_spelled_it"
+      },
+      {
+        "binary": "lamp-voice",
+        "occurrences": 1,
+        "test": "known_faces::tests::a_name_given_is_told_from_talk_that_only_mentions_a_name"
+      },
+      {
+        "binary": "lamp-voice",
+        "occurrences": 1,
+        "test": "known_faces::tests::a_name_said_before_is_kept_once_said_back_and_agreed_to"
+      },
+      {
+        "binary": "lamp-voice",
+        "occurrences": 1,
+        "test": "known_faces::tests::a_near_name_is_spelled_and_no_yes_stands_in_for_it"
+      },
+      {
+        "binary": "lamp-voice",
+        "occurrences": 1,
+        "test": "known_faces::tests::a_new_name_for_a_near_face_says_no_name_and_a_no_sends_nothing"
+      },
+      {
+        "binary": "lamp-voice",
+        "occurrences": 1,
+        "test": "known_faces::tests::a_rooms_forget_needs_the_named_face_seen_saying_it"
+      },
+      {
+        "binary": "lamp-voice",
+        "occurrences": 1,
+        "test": "known_faces::tests::a_switch_apart_from_the_eyes_is_said_once_and_uses_no_ids"
+      },
+      {
+        "binary": "lamp-voice",
+        "occurrences": 1,
+        "test": "known_faces::tests::a_yes_is_any_ordinary_one_and_any_no_takes_it_back"
+      },
+      {
+        "binary": "lamp-voice",
+        "occurrences": 1,
+        "test": "known_faces::tests::a_yes_to_the_read_back_holds_nothing_but_the_yes_and_the_name"
+      },
+      {
+        "binary": "lamp-voice",
+        "occurrences": 1,
+        "test": "known_faces::tests::an_ask_to_remember_is_their_own_face_and_never_a_question_or_a_no"
+      },
+      {
+        "binary": "lamp-voice",
+        "occurrences": 1,
+        "test": "known_faces::tests::forget_my_face_asks_for_the_known_person_whose_line_it_is"
+      },
+      {
+        "binary": "lamp-voice",
+        "occurrences": 1,
+        "test": "known_faces::tests::forget_my_face_sends_the_name_the_eyes_keep"
+      },
+      {
+        "binary": "lamp-voice",
+        "occurrences": 1,
+        "test": "known_faces::tests::observations_expire_from_source_age_without_renewal_on_reread"
+      },
+      {
+        "binary": "lamp-voice",
+        "occurrences": 1,
+        "test": "known_faces::tests::someone_remembered_is_asked_once_about_being_named_and_the_eyes_answer_is_said"
+      },
+      {
+        "binary": "lamp-voice",
+        "occurrences": 1,
+        "test": "known_faces::tests::the_known_name_counts_only_while_the_eyes_keep_it_fresh"
+      },
+      {
+        "binary": "lamp-voice",
+        "occurrences": 1,
+        "test": "known_faces::tests::the_three_names_of_16_46_are_refused_or_read_back"
+      },
+      {
+        "binary": "lamp-voice",
+        "occurrences": 1,
+        "test": "known_faces::tests::the_word_that_called_the_lamp_is_not_their_name"
+      },
+      {
+        "binary": "lamp-voice",
+        "occurrences": 1,
+        "test": "known_faces::tests::what_the_eyes_say_becomes_words_the_model_can_say"
+      },
+      {
+        "binary": "lamp-voice",
+        "occurrences": 1,
+        "test": "known_faces::tests::whose_memory_is_the_eyes_id_with_the_stable_id_else_the_names"
+      },
+      {
+        "binary": "lamp-voice",
+        "occurrences": 1,
+        "test": "known_faces::tests::with_names_checked_only_a_name_they_said_reaches_the_eyes_and_one_face_keeps_one"
+      },
+      {
+        "binary": "lamp-voice",
+        "occurrences": 1,
+        "test": "second_provider::tests::a_line_another_face_spoke_is_the_rooms_and_the_known_faces_stays_theirs"
+      },
+      {
+        "binary": "lamp-voice",
+        "occurrences": 1,
+        "test": "second_provider::worker::tests::an_empty_rooms_turn_then_an_unknown_faces_carry_no_typed_name"
+      }
+    ]
+  },
+  "tested_preview": "501aff7351a0ae9780e8546f436cd3d3aec50872",
+  "tested_tree": "a2238033d0b4a8e3865818bd075c6c1c9e28b505",
+  "whole_authored_tree_equal_preview": false
+}
