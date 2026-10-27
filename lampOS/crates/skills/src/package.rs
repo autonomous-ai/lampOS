@@ -133,6 +133,11 @@ pub struct Package {
     pub files: Files,
     pub signature: Option<Vec<u8>>,
     pub signed_by: Option<String>,
+    /// The author's key, for a shared package read with
+    /// [`read_shared_package_bytes`]: the push path pins a skill's name to
+    /// all 32 bytes of it, not the fingerprint, which is only for showing
+    /// (Eighth's P3 on #3931; `control.md`, "Skills pushed from a computer").
+    pub author: Option<Author>,
     pub sha256: String,
 }
 
@@ -188,13 +193,37 @@ pub fn installed_from(folder: &Path) -> Option<Installed> {
 #[serde(deny_unknown_fields)]
 struct Signed {
     key: String,
+    /// An author's public key, base64 of its 32 bytes, in a shared
+    /// package ([`check_author`]): a lamp knows the Store's key, never an
+    /// author's. Absent in a Store package, as before.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    public: Option<String>,
     signature: String,
+}
+
+/// The author a shared package is signed by: their key's fingerprint, as
+/// `lamp-update` gives it (16 hex), and the key itself.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Author {
+    pub fingerprint: String,
+    pub public: [u8; 32],
 }
 
 /// What `lamp-skill.sig` holds for these manifest bytes, signed with `key`:
 /// what the Store's side writes into a package (`lamp-skills pack
 /// --key-file`).
 pub fn signature_for(manifest: &[u8], key: &Ed25519KeyPair) -> Result<Vec<u8>, String> {
+    signed_by(manifest, key, false)
+}
+
+/// What `lamp-skill.sig` holds for a package its author shares: as
+/// [`signature_for`], with the author's public key, so any lamp can check
+/// it (`lamp-skills pack --key-file --author`).
+pub fn author_signature_for(manifest: &[u8], key: &Ed25519KeyPair) -> Result<Vec<u8>, String> {
+    signed_by(manifest, key, true)
+}
+
+fn signed_by(manifest: &[u8], key: &Ed25519KeyPair, author: bool) -> Result<Vec<u8>, String> {
     use ring::signature::KeyPair;
     let public: [u8; 32] = key
         .public_key()
@@ -203,11 +232,65 @@ pub fn signature_for(manifest: &[u8], key: &Ed25519KeyPair) -> Result<Vec<u8>, S
         .map_err(|_| "the key's public half is not 32 bytes".to_owned())?;
     let signed = Signed {
         key: lamp_update::manifest::fingerprint(&public),
+        public: author.then(|| STANDARD.encode(public)),
         signature: STANDARD.encode(key.sign(manifest).as_ref()),
     };
     let mut bytes = serde_json::to_vec(&signed).map_err(|error| error.to_string())?;
     bytes.push(b'\n');
     Ok(bytes)
+}
+
+/// Whether a shared package's `signature` is its author's over the
+/// `manifest` bytes: the key it carries, the fingerprint it names being
+/// that key's, and the signature that key's. The author, or why not.
+/// Asked before the manifest is read, as [`check_signature`] is; the
+/// manifest's hashes then cover every file.
+pub fn check_author(manifest: &[u8], signature: Option<&[u8]>) -> Result<Author, String> {
+    let signature = signature.ok_or(format!(
+        "it carries no {SIGNATURE}: a shared skill must be signed by its author \
+         (lamp-skills pack --key-file KEY --author)"
+    ))?;
+    if signature.len() > MOST_SIGNATURE_BYTES {
+        return Err(format!("{SIGNATURE} is too large to be a signature"));
+    }
+    let signed: Signed = serde_json::from_slice(signature).map_err(|_| {
+        format!("{SIGNATURE} is not a signature: {{\"key\", \"public\", \"signature\"}}")
+    })?;
+    let public = signed.public.ok_or(format!(
+        "{SIGNATURE} names a key but carries none: a shared skill carries its author's public key"
+    ))?;
+    let public: [u8; 32] = STANDARD
+        .decode(&public)
+        .ok()
+        .and_then(|bytes| bytes.try_into().ok())
+        .ok_or(format!(
+            "{SIGNATURE}: the author's key is not 32 bytes of base64"
+        ))?;
+    let fingerprint = lamp_update::manifest::fingerprint(&public);
+    if fingerprint != signed.key {
+        return Err(format!(
+            "{SIGNATURE} names key {}, and the key it carries is {fingerprint}",
+            if signed.key.len() == 16 && signed.key.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+                signed.key.as_str()
+            } else {
+                "that is not a key's fingerprint"
+            }
+        ));
+    }
+    let raw = STANDARD
+        .decode(&signed.signature)
+        .map_err(|_| format!("{SIGNATURE}: the signature is not base64"))?;
+    UnparsedPublicKey::new(&ED25519, &public)
+        .verify(manifest, &raw)
+        .map_err(|_| {
+            format!(
+                "{SIGNATURE} does not match {MANIFEST}: the package was changed after its author signed it"
+            )
+        })?;
+    Ok(Author {
+        fingerprint,
+        public,
+    })
 }
 
 /// Whether `signature`, a package's `lamp-skill.sig`, is one of `keys`'
@@ -424,6 +507,18 @@ pub fn pack_signed(
     out: &Path,
     key: Option<&Ed25519KeyPair>,
 ) -> Result<PathBuf, String> {
+    pack_signed_by(dir, out, key, false)
+}
+
+/// As [`pack_signed`]; with `author`, the signature is an author's
+/// ([`author_signature_for`]), carrying their public key, for a package
+/// they share.
+pub fn pack_signed_by(
+    dir: &Path,
+    out: &Path,
+    key: Option<&Ed25519KeyPair>,
+    author: bool,
+) -> Result<PathBuf, String> {
     let skill = load(dir).map_err(|why| format!("not packed: {why}"))?;
     if skill.kind == SkillKind::Core {
         return Err(format!(
@@ -456,7 +551,12 @@ pub fn pack_signed(
     let mut builder = tar::Builder::new(Vec::new());
     append(&mut builder, MANIFEST, &json)?;
     if let Some(key) = key {
-        append(&mut builder, SIGNATURE, &signature_for(&json, key)?)?;
+        let signature = if author {
+            author_signature_for(&json, key)?
+        } else {
+            signature_for(&json, key)?
+        };
+        append(&mut builder, SIGNATURE, &signature)?;
     }
     for (path, bytes) in &files {
         append(&mut builder, &format!("{}/{path}", skill.name), bytes)?;
@@ -513,6 +613,29 @@ pub fn read_package(path: &Path) -> Result<Package, String> {
 /// checked once the tar is read and before the manifest is parsed or any
 /// file is compared with it.
 pub fn read_package_bytes(bytes: &[u8], keys: Option<&[[u8; 32]]>) -> Result<Package, String> {
+    read_checked(bytes, keys.map_or(Check::None, Check::Store))
+}
+
+/// A shared package from its bytes (decision 4, "sharing from day one"):
+/// read and checked as [`read_package_bytes`] does, and signed by its
+/// author ([`check_author`]), checked before the manifest is parsed. Its
+/// `author` is that key, which the push path keeps with the skill, so an
+/// update must come from the same author.
+pub fn read_shared_package_bytes(bytes: &[u8]) -> Result<Package, String> {
+    read_checked(bytes, Check::Author)
+}
+
+/// What a package's signature is held to as it is read.
+enum Check<'a> {
+    /// Kept, not checked: a file installed by hand.
+    None,
+    /// One of the Store's keys ([`check_signature`]).
+    Store(&'a [[u8; 32]]),
+    /// Its author's, the key it carries ([`check_author`]).
+    Author,
+}
+
+fn read_checked(bytes: &[u8], check: Check) -> Result<Package, String> {
     if bytes.len() as u64 > MOST_PACKAGE_BYTES {
         return Err(format!(
             "more than {MOST_PACKAGE_BYTES} bytes: too big for a skill"
@@ -593,9 +716,16 @@ pub fn read_package_bytes(bytes: &[u8], keys: Option<&[[u8; 32]]>) -> Result<Pac
         }
     }
     let manifest = manifest.ok_or(format!("no {MANIFEST}: not a skill's package"))?;
-    let signed_by = match keys {
-        Some(keys) => Some(check_signature(&manifest, signature.as_deref(), keys)?),
-        None => None,
+    let (signed_by, author) = match check {
+        Check::None => (None, None),
+        Check::Store(keys) => (
+            Some(check_signature(&manifest, signature.as_deref(), keys)?),
+            None,
+        ),
+        Check::Author => {
+            let author = check_author(&manifest, signature.as_deref())?;
+            (Some(author.fingerprint.clone()), Some(author))
+        }
     };
     let manifest: Manifest =
         serde_json::from_slice(&manifest).map_err(|error| format!("{MANIFEST}: {error}"))?;
@@ -650,6 +780,7 @@ pub fn read_package_bytes(bytes: &[u8], keys: Option<&[[u8; 32]]>) -> Result<Pac
         files,
         signature,
         signed_by,
+        author,
         sha256: sha256_hex(bytes),
     })
 }

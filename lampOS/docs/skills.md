@@ -1592,6 +1592,41 @@ and says so (`its signature not checked: a package installed by hand from
 a file`, or `it carries no signature: …`); a package from the Skills Store
 is installed only with it.
 
+**A shared package** (decision 4, "sharing from day one"; Ten on #3504,
+28 Oct). An author shares a skill with no Store: as any file or URL.
+- **Signing:** `lamp-skills pack --key-file PRIVATE --author` signs it with
+  the author's own Ed25519 key. Its `lamp-skill.sig` carries the key too,
+  `{"key": FINGERPRINT, "public": BASE64, "signature": BASE64}`, since a lamp
+  knows the Store's key but never an author's. A Store package is as before,
+  with no `public`.
+- **Integrity, not trust** (Fourteen's point 1 on #3504): a signature says
+  the bytes are that key's, not who is behind the key, since anyone can make
+  one. Consent stays with the computer's grants and the owner's yes for the
+  picture. Words for it say "signed by key FPR16, not the Store", never
+  "verified" or "trusted".
+- **Reading** (`package::read_shared_package_bytes`, `package::check_author`):
+  - `public` must be 32 bytes, and `key` its fingerprint;
+  - the signature must be that key's over the manifest's exact bytes;
+  - then every file is checked against the manifest, as for any package.
+- **Refused, nothing written:**
+  - a package with no signature;
+  - one signed as the Store signs (no `public`);
+  - one whose signature names another key than it carries;
+  - one whose manifest or any file changed after it was signed.
+- **Planned, not yet built:**
+  - a shared install is a `skill.push` of a signed package, with the
+    `asks` the computer showed (required for a signed one), so its consent
+    is the push path's (`control.md`, "Skills pushed from a computer"):
+    the paired computer's `skills` grant, the owner's yes to the
+    permissions and the author key shown before install (`lamp skill
+    install`), and the picture's own yes;
+  - the push path keeps a skill's name with the key that installed it
+    (`.pushed.json`'s `author`): all 32 bytes, as `Package.author` gives
+    them, since the 64-bit fingerprint is only for showing. An update must be signed by the same key;
+    another author's package of that name, or an unsigned one, is refused
+    until the skill is removed. A signer never changes in place.
+  - They land with the helper's, the door's and the SDK's halves.
+
 **From the Skills Store** (#1722, the first builder's 21:51, 18:33 and
 22:23). The app sends `skills.install` with a catalogue entry,
 `{"name", "version", "sha256", "url"}` ([cloud.md](cloud.md), "Installing

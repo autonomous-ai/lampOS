@@ -9,6 +9,7 @@ mod made;
 mod night_sleep;
 mod package;
 mod routine_service;
+mod shared;
 mod skills;
 mod store;
 mod welcome_stuck;
