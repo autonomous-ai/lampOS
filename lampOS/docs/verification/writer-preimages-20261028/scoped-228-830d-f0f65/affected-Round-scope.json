@@ -1,0 +1,72 @@
+{
+  "source": "<private-path>",
+  "sha256": "9e5b72d8cc9a3a116c1b2c8b33fc3e130b6f43079aff1409cc2281b393551568",
+  "plan": {
+    "old_base": "90846c8089870adb1840c1f52c9e0083d91efaa0",
+    "new_base": "f0f65dc995e493c0c7fe13e47a84aba21d0381b2",
+    "comparison_sha256": "4a93389538af0a22b5584d28af6fc56b37a36bf8e728e886fc92d17b98f7e290",
+    "changed_paths": [
+      ".github/scripts/lampos-publish-test.py",
+      ".github/scripts/lampos-publish.py",
+      "lampOS/crates/body/src/bin/lamp-body-measure.rs",
+      "lampOS/crates/control/src/protocol.rs",
+      "lampOS/crates/control/tests/door.rs",
+      "lampOS/crates/local-time/src/lib.rs",
+      "lampOS/crates/local-time/tests/local_time.rs",
+      "lampOS/docs/body.md",
+      "lampOS/docs/install.md",
+      "lampOS/docs/updates.md"
+    ],
+    "actual_prior_compiler_input_sha256": "098c73b7291c3efe4c9aa28843576c4e35e77f80ff051cfeb5e9946e17f35d88",
+    "normal_local_time_artifact": {
+      "package_id": "path+file://<private-path>",
+      "manifest_path": "<private-path>",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_local_time",
+        "src_path": "<private-path>",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "filenames": [
+        "<controlled-target>/debug/deps/liblamp_local_time-7303148ca459ce04.rlib",
+        "<controlled-target>/debug/deps/liblamp_local_time-7303148ca459ce04.rmeta"
+      ],
+      "fresh": true
+    },
+    "normal_local_time_change": "Adds only QUIET_FROM_MINUTE,QUIET_TO_MINUTE and public quiet_hours; existing function bodies unchanged. Dependency production source is consumed, so scope gets fresh relevant execution.",
+    "body_scope": "Only separate src/bin/lamp-body-measure.rs changed; normal Body lib source unchanged.",
+    "unconsumed": "Control protocol documentation and door test are distinct from physical lamp-controls; local-time standalone tests excluded from dependency compilation; Python publisher/docs are not Update operational inputs.",
+    "runtime_repository_reader_scope": "Fresh full Update it scanner suite included.",
+    "update_installed_units_skills_models_manifests_config_unchanged": true,
+    "raw_required_controls": 49,
+    "pid_required_controls": 33,
+    "raw_scope_projection": 219,
+    "pid_scope_projection": 203,
+    "required_gates": [
+      "fmt",
+      "strict Update all-target Clippy",
+      "full JSON compilation and fresh full/scoped discovery",
+      "LIB/functions/it plus3receiptRound",
+      "docs/Mac contracts"
+    ],
+    "all_round_or_install_repetition_required": false,
+    "shared_authored_doc_overlap": "Raw docs/updates.md must retain upstream publisher paragraph; nine full blobs plus authored patch/modes unchanged, not ten full blobs"
+  },
+  "projection228_only_until_discovery": true
+}

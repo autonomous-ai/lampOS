@@ -1,0 +1,17 @@
+{
+  "actual_clean_execution_head": "830d8a69534b454f26da9c0d16d9c8e90e8494d1",
+  "Raw_parent": "c08ae7b8b144195606b5228ea0e7c3465103379e",
+  "Main_base": "f0f65dc995e493c0c7fe13e47a84aba21d0381b2",
+  "tree": "5303fb04069e58deaeb1422e94c2aca111976a5a",
+  "all7509_source_hashes_modes_equal_before_after": true,
+  "working_patch_empty": true,
+  "five_full_nonshared_payloads_modes_equal_537": true,
+  "shared_updates_doc_authored_block_and_all_new_upstream_text_preserved": true,
+  "six_whole_blob_equality_claimed": false,
+  "raw_source_before_SHA256": "31e81dbf505c630259dd9df50b7946367a25112389f371a41a88d0a30fe599df",
+  "raw_source_after_SHA256": "31e81dbf505c630259dd9df50b7946367a25112389f371a41a88d0a30fe599df",
+  "raw_compile_JSON_SHA256": "b58a25298ccdf58e1eda66b84aaef86727709dc842895b1d5e52d722a1b76f3d",
+  "ten_immutable_preserved_binaries_reverified": true,
+  "postrelease_actual_target_rehash_claimed": false,
+  "old_original0f420_native_failure_unwaived": true
+}

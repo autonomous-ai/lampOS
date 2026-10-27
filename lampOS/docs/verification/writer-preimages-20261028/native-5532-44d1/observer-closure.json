@@ -1,0 +1,12 @@
+{
+  "ARM_watch2993_exit": 0,
+  "ARM_log85495_exit": 0,
+  "Linux_watch97258_exit": 0,
+  "Linux_log43641_exit": 0,
+  "artifact_download96456_exit": 1,
+  "actual_required_job_metadata_checked": true,
+  "watch_exit_alone_never_success_proof": true,
+  "all_original_attempts": 1,
+  "workflow_reruns_or_cancellations": 0,
+  "optional_archive_network_timeout_retained": true
+}

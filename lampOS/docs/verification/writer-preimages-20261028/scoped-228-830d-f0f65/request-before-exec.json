@@ -1,0 +1,21 @@
+{
+  "approved": true,
+  "head": "830d8a69534b454f26da9c0d16d9c8e90e8494d1",
+  "raw_parent": "c08ae7b8b144195606b5228ea0e7c3465103379e",
+  "base": "f0f65dc995e493c0c7fe13e47a84aba21d0381b2",
+  "scope": "current preimages fullLIB functions it plus3receipt",
+  "projection_only": 228,
+  "all_required": 58,
+  "donor": "<private-path>",
+  "donor_sha256": "88d764c53fd1cda4a322971b2ffa1d86a367fe3d2f4003e2b6f4500a3379ca4f",
+  "donor_closure_sha256": "a82d1932fae9ace9054f996e49565d41950682ad302b9f0319a714a4d59824c2",
+  "donor_explicitly_released_by_Root": true,
+  "controller": "<gate-evidence>.py",
+  "controller_sha256": "7c64449cf743cb8d3096f72105cb4c5588e2cb454585512c8e46e43e145f3bb5",
+  "runtime": "Root START after Query95539 closed0 and explicit local slot release; no execution yet",
+  "preservation": "five full payloads/modes + exact shared-doc authored insertion AND entire upstream Raw prose",
+  "earlier90846": "native84316 stopped before Cargo on live-Main guard; no runtime count",
+  "earlier5532_native7824": "separate original source/case closure retained",
+  "old5532_source_case_audit_terminal": true,
+  "optional_archive": "Original download96456 exited1 network-read timeout; partial retained, no final digest or replay claim; does not gate current source execution"
+}

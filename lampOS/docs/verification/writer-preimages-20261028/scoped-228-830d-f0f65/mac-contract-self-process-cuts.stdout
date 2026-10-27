@@ -1,0 +1,4 @@
+running 1 test
+test persisted_self_switches_survive_sigkill ... ignored, requires Linux syscall tracing
+
+test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out

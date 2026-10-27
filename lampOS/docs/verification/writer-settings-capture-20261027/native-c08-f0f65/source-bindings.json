@@ -1,0 +1,336 @@
+{
+  "files": [
+    {
+      "blob": "2e5e541d8eb974694cf451f27eac1a57897c1b69",
+      "mode": "100644",
+      "path": "lampOS/crates/update/src/apply.rs",
+      "sha256": "db0720893ee7a085e2612000ca89a9a5066f1430d7ff96b6f6d2cb5489e52fb8"
+    },
+    {
+      "blob": "eabce9979706dd25226a36a1720f366351ed3263",
+      "mode": "100644",
+      "path": "lampOS/crates/update/src/head_touch.rs",
+      "sha256": "0703bf2d4ddbba946b365240f44bcb79b5edcfc28fd2c31c34e92d8e82d41334"
+    },
+    {
+      "blob": "721cd928ac6e537a3a9d3461ea6dbd2e4e691954",
+      "mode": "100644",
+      "path": "lampOS/crates/update/src/head_touch/input_tests.rs",
+      "sha256": "f5a761bd56600c56173f87a647e6e2cf39c2e8bf8d83883f6d56efe3538cae43"
+    },
+    {
+      "blob": "d10a9823678d0a044f126c120b394a11147cf25d",
+      "mode": "100644",
+      "path": "lampOS/crates/update/src/lib.rs",
+      "sha256": "d429a76236d320f916997619f4a1384705a8ee35c39f5c6d1333cec89a46ab47"
+    },
+    {
+      "blob": "79b0f419624e2ed1f8416673844afd7e988531e7",
+      "mode": "100644",
+      "path": "lampOS/crates/update/src/writer_files.rs",
+      "sha256": "13657a14e71d7dd07f0bffe176a09585ef270051ed90dfb756ff96d85267b55c"
+    },
+    {
+      "blob": "9dadf2e73c5db037d5126b95e78a7fcac768df1f",
+      "mode": "100644",
+      "path": "lampOS/crates/update/src/writer_files/tests.rs",
+      "sha256": "8165868d61749055d934b068abad50bc8b514f366b51b8e3973e9e8c937baf95"
+    },
+    {
+      "blob": "a9bb99c4ace0198232f37c658984f7d2a8ec79ae",
+      "mode": "100644",
+      "path": "lampOS/crates/update/src/writer_refresh/tests.rs",
+      "sha256": "45aac2379e34fbf4585f2270e76ef445dbc09a7ca8e38bf849e3f47272616b9c"
+    },
+    {
+      "blob": "7afb9d0ddf4c2372dc95ece82f9bfa1ba42fc8c6",
+      "mode": "100644",
+      "path": "lampOS/crates/update/src/writer_settings.rs",
+      "sha256": "53080a07a94e76ecc47f83bf0316a203be43abdfc6af6156e99f2bd9859d7248"
+    },
+    {
+      "blob": "00aaca5cffce778e7787b98bb3a4c3f66d85baa3",
+      "mode": "100644",
+      "path": "lampOS/crates/update/src/writer_settings/tests.rs",
+      "sha256": "327273cc855dc85d5034b0dc511abd03477b710bf113f3fe6df3f61189161bad"
+    },
+    {
+      "blob": "2b9cf68c94a0cb30ba30f68002e2a37f541c832c",
+      "mode": "100644",
+      "path": "lampOS/crates/update/tests/round.rs",
+      "sha256": "a9afd0629cf3c0e5b1c5ffe3bca655e1f49a9d3301d3f6f62b3f10386f778422"
+    },
+    {
+      "blob": "a41755ffd97d653e52cda21a77e52f422dba661e",
+      "mode": "100644",
+      "path": "lampOS/docs/reuse-decisions.md",
+      "sha256": "eefc7fd76d2afb77c360d6895313ee35dacb98dd76fd5ea6a45a73692760d98b"
+    },
+    {
+      "blob": "db7df8bdb19d87afe3ebab89f606772df2a95bbb",
+      "mode": "100644",
+      "path": "lampOS/docs/updates.md",
+      "sha256": "9f404e8b212ac4dbd87dbf6ed1b4fa86690fed49d395d4edab69b1889a9ad93a"
+    },
+    {
+      "blob": "62a923dabe6c1dd267742ddd5275c6e25f3dcbdc",
+      "mode": "100644",
+      "path": "lampOS/docs/writer-file-observation.md",
+      "sha256": "369d7ce1ac493f37ecc1a5cb414f3f5ba14b2796de33b89de7a2024725da109d"
+    },
+    {
+      "blob": "b9c8d7ba9bc37b7c26acc19d9723139a211b3f90",
+      "mode": "100644",
+      "path": "lampOS/docs/writer-settings-capture.md",
+      "sha256": "9766bdaed2e350b920f2ab09252e5f2435a11a1c8243feb8e25f5442af7ab149"
+    }
+  ],
+  "head": "c08ae7b8b144195606b5228ea0e7c3465103379e",
+  "required_control_source_files": [
+    {
+      "binary": "lamp-update",
+      "name": "apply::tests::a_done_for_another_operation_does_not_change_any_setting_record",
+      "source": "lampOS/crates/update/src/apply.rs"
+    },
+    {
+      "binary": "lamp-update",
+      "name": "apply::tests::a_done_for_another_sequence_does_not_change_any_setting_record",
+      "source": "lampOS/crates/update/src/apply.rs"
+    },
+    {
+      "binary": "lamp-update",
+      "name": "apply::tests::a_matching_done_keeps_the_permanent_forward_read_contract",
+      "source": "lampOS/crates/update/src/apply.rs"
+    },
+    {
+      "binary": "lamp-update",
+      "name": "apply::tests::an_explicit_expected_identity_does_not_follow_a_rewritten_staged_request",
+      "source": "lampOS/crates/update/src/apply.rs"
+    },
+    {
+      "binary": "lamp-update",
+      "name": "apply::tests::an_unknown_done_operation_is_refused_without_changing_any_setting_record",
+      "source": "lampOS/crates/update/src/apply.rs"
+    },
+    {
+      "binary": "lamp-update",
+      "name": "head_touch::input_tests::an_uncaptured_key_never_becomes_a_captured_absence",
+      "source": "lampOS/crates/update/src/head_touch/input_tests.rs"
+    },
+    {
+      "binary": "lamp-update",
+      "name": "head_touch::input_tests::ordinary_inputs_keep_regular_links_null_masks_and_directory_aliases",
+      "source": "lampOS/crates/update/src/head_touch/input_tests.rs"
+    },
+    {
+      "binary": "lamp-update",
+      "name": "head_touch::input_tests::projection_and_verification_replay_closed_inputs_without_filesystem_fallback",
+      "source": "lampOS/crates/update/src/head_touch/input_tests.rs"
+    },
+    {
+      "binary": "lamp-update",
+      "name": "head_touch::input_tests::rejecting_an_early_override_does_not_consume_a_later_directory_error",
+      "source": "lampOS/crates/update/src/head_touch/input_tests.rs"
+    },
+    {
+      "binary": "lamp-update",
+      "name": "head_touch::tests::null_masks_do_not_admit_other_character_devices",
+      "source": "lampOS/crates/update/src/head_touch.rs"
+    },
+    {
+      "binary": "lamp-update",
+      "name": "writer_files::tests::a_fifo_is_refused_without_waiting_for_a_writer_and_its_worker_is_always_joined",
+      "source": "lampOS/crates/update/src/writer_files/tests.rs"
+    },
+    {
+      "binary": "lamp-update",
+      "name": "writer_files::tests::a_hard_link_is_not_accepted_as_a_setting_and_directories_are_not_read",
+      "source": "lampOS/crates/update/src/writer_files/tests.rs"
+    },
+    {
+      "binary": "lamp-update",
+      "name": "writer_files::tests::descriptor_and_ancestor_metadata_changes_refuse_the_observation",
+      "source": "lampOS/crates/update/src/writer_files/tests.rs"
+    },
+    {
+      "binary": "lamp-update",
+      "name": "writer_files::tests::errors_and_debug_do_not_expose_relative_names_or_file_contents",
+      "source": "lampOS/crates/update/src/writer_files/tests.rs"
+    },
+    {
+      "binary": "lamp-update",
+      "name": "writer_files::tests::explicit_content_caps_and_the_hard_ceiling_are_enforced_without_truncating_success",
+      "source": "lampOS/crates/update/src/writer_files/tests.rs"
+    },
+    {
+      "binary": "lamp-update",
+      "name": "writer_files::tests::invalid_or_unbounded_relative_names_are_refused_before_opening_the_root",
+      "source": "lampOS/crates/update/src/writer_files/tests.rs"
+    },
+    {
+      "binary": "lamp-update",
+      "name": "writer_files::tests::missing_intermediate_and_leaf_are_distinct_and_keep_only_existing_ancestors",
+      "source": "lampOS/crates/update/src/writer_files/tests.rs"
+    },
+    {
+      "binary": "lamp-update",
+      "name": "writer_files::tests::no_follow_rejects_leaf_ancestor_and_root_links_without_reading_the_outside_witness",
+      "source": "lampOS/crates/update/src/writer_files/tests.rs"
+    },
+    {
+      "binary": "lamp-update",
+      "name": "writer_files::tests::pre_open_inode_or_metadata_substitution_and_disappearance_are_not_read_as_the_original_file",
+      "source": "lampOS/crates/update/src/writer_files/tests.rs"
+    },
+    {
+      "binary": "lamp-update",
+      "name": "writer_files::tests::regular_bytes_and_all_existing_ancestor_identities_are_observed_without_changing_them",
+      "source": "lampOS/crates/update/src/writer_files/tests.rs"
+    },
+    {
+      "binary": "lamp-update",
+      "name": "writer_refresh::tests::a_restart_at_every_unqualified_prefix_requires_recovery_and_never_reissues_the_grant",
+      "source": "lampOS/crates/update/src/writer_refresh/tests.rs"
+    },
+    {
+      "binary": "lamp-update",
+      "name": "writer_refresh::tests::a_stale_or_modified_first_apply_cannot_consume_the_single_grant",
+      "source": "lampOS/crates/update/src/writer_refresh/tests.rs"
+    },
+    {
+      "binary": "lamp-update",
+      "name": "writer_refresh::tests::diagnostics_hide_unknown_values_and_known_duplicate_or_shadowed_fields_are_refused",
+      "source": "lampOS/crates/update/src/writer_refresh/tests.rs"
+    },
+    {
+      "binary": "lamp-update",
+      "name": "writer_refresh::tests::failed_persist_after_publication_poisons_the_live_session_until_actual_disk_state_is_recovered",
+      "source": "lampOS/crates/update/src/writer_refresh/tests.rs"
+    },
+    {
+      "binary": "lamp-update",
+      "name": "writer_refresh::tests::first_apply_binds_its_own_later_envelope_and_sequence_without_replacing_the_refresh_identity",
+      "source": "lampOS/crates/update/src/writer_refresh/tests.rs"
+    },
+    {
+      "binary": "lamp-update",
+      "name": "writer_refresh::tests::future_nonsemantic_metadata_is_preserved_without_becoming_admission_authority",
+      "source": "lampOS/crates/update/src/writer_refresh/tests.rs"
+    },
+    {
+      "binary": "lamp-update",
+      "name": "writer_refresh::tests::guard_lock_is_exclusive_and_independent_of_the_product_lock",
+      "source": "lampOS/crates/update/src/writer_refresh/tests.rs"
+    },
+    {
+      "binary": "lamp-update",
+      "name": "writer_refresh::tests::identity_substitution_never_changes_or_admits_the_saved_transaction",
+      "source": "lampOS/crates/update/src/writer_refresh/tests.rs"
+    },
+    {
+      "binary": "lamp-update",
+      "name": "writer_refresh::tests::live_or_poisoned_sessions_cannot_expose_stale_recovery_inputs",
+      "source": "lampOS/crates/update/src/writer_refresh/tests.rs"
+    },
+    {
+      "binary": "lamp-update",
+      "name": "writer_refresh::tests::missing_and_nonregular_records_do_not_turn_into_a_fresh_transaction",
+      "source": "lampOS/crates/update/src/writer_refresh/tests.rs"
+    },
+    {
+      "binary": "lamp-update",
+      "name": "writer_refresh::tests::no_apply_does_not_qualify_but_one_exact_apply_can_enter_without_an_ordinary_round",
+      "source": "lampOS/crates/update/src/writer_refresh/tests.rs"
+    },
+    {
+      "binary": "lamp-update",
+      "name": "writer_refresh::tests::qualified_and_closed_inputs_keep_the_compatible_writer_and_bound_product_receipts",
+      "source": "lampOS/crates/update/src/writer_refresh/tests.rs"
+    },
+    {
+      "binary": "lamp-update",
+      "name": "writer_refresh::tests::qualified_writer_and_preimages_survive_a_restart_until_the_product_journal_closes",
+      "source": "lampOS/crates/update/src/writer_refresh/tests.rs"
+    },
+    {
+      "binary": "lamp-update",
+      "name": "writer_refresh::tests::recovery_views_retain_later_metadata_in_the_bound_inputs_without_reparsing",
+      "source": "lampOS/crates/update/src/writer_refresh/tests.rs"
+    },
+    {
+      "binary": "lamp-update",
+      "name": "writer_refresh::tests::reloaded_inputs_keep_the_exact_origin_and_distinguish_writer_from_apply_restoration",
+      "source": "lampOS/crates/update/src/writer_refresh/tests.rs"
+    },
+    {
+      "binary": "lamp-update",
+      "name": "writer_refresh::tests::restoring_an_apply_requires_its_original_grant_and_preimage_identity",
+      "source": "lampOS/crates/update/src/writer_refresh/tests.rs"
+    },
+    {
+      "binary": "lamp-update",
+      "name": "writer_refresh::tests::unsupported_or_malformed_journals_are_retained_and_block_every_admission",
+      "source": "lampOS/crates/update/src/writer_refresh/tests.rs"
+    },
+    {
+      "binary": "lamp-update",
+      "name": "writer_refresh::tests::write_bound_and_invalid_identities_leave_no_journal_or_partial_acceptance",
+      "source": "lampOS/crates/update/src/writer_refresh/tests.rs"
+    },
+    {
+      "binary": "lamp-update",
+      "name": "writer_settings::tests::captured_bytes_preserve_ordinary_ownership_and_keep_all_omitted_noops",
+      "source": "lampOS/crates/update/src/writer_settings/tests.rs"
+    },
+    {
+      "binary": "lamp-update",
+      "name": "writer_settings::tests::old_byte_limits_allow_exact_budget_then_empty_or_absent_but_never_a_prefix",
+      "source": "lampOS/crates/update/src/writer_settings/tests.rs"
+    },
+    {
+      "binary": "lamp-update",
+      "name": "writer_settings::tests::oversized_or_invalid_new_inputs_are_bounded_and_redacted_before_observation",
+      "source": "lampOS/crates/update/src/writer_settings/tests.rs"
+    },
+    {
+      "binary": "lamp-update",
+      "name": "writer_settings::tests::revalidation_refuses_byte_mode_deletion_and_same_byte_inode_changes",
+      "source": "lampOS/crates/update/src/writer_settings/tests.rs"
+    },
+    {
+      "binary": "lamp-update",
+      "name": "writer_settings::tests::revalidation_refuses_new_negative_dependencies_and_replaced_ancestors",
+      "source": "lampOS/crates/update/src/writer_settings/tests.rs"
+    },
+    {
+      "binary": "lamp-update",
+      "name": "writer_settings::tests::revalidation_refuses_replaced_roots_links_and_nonregular_leaves",
+      "source": "lampOS/crates/update/src/writer_settings/tests.rs"
+    },
+    {
+      "binary": "lamp-update",
+      "name": "writer_settings::tests::selected_invalid_values_refuse_before_filesystem_access_and_unrelated_values_are_ignored",
+      "source": "lampOS/crates/update/src/writer_settings/tests.rs"
+    },
+    {
+      "binary": "lamp-update",
+      "name": "writer_settings::tests::shared_classifier_keeps_tmpfiles_marker_and_image_shipped_precedence",
+      "source": "lampOS/crates/update/src/writer_settings/tests.rs"
+    },
+    {
+      "binary": "lamp-update::round",
+      "name": "a_rejected_apply_receipt_runs_real_back_and_restores_written_settings_modes_and_records",
+      "source": "lampOS/crates/update/tests/round.rs"
+    },
+    {
+      "binary": "lamp-update::round",
+      "name": "a_rejected_back_receipt_keeps_the_journal_until_real_back_is_acknowledged",
+      "source": "lampOS/crates/update/tests/round.rs"
+    },
+    {
+      "binary": "lamp-update::round",
+      "name": "the_round_rejects_a_done_matching_a_rewritten_request_instead_of_its_own_request",
+      "source": "lampOS/crates/update/tests/round.rs"
+    }
+  ]
+}

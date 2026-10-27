@@ -1,0 +1,14 @@
+{
+  "path": "lampOS/docs/updates.md",
+  "mode": "100644",
+  "old_complete_SHA256": "4e24ea01c6fae2087c91dee1fb3b73ee18d95d2dc13a40cca868ce76bfcd5a15",
+  "new_complete_SHA256": "da0722349ce9284a2aae39f0fecdfce267a174ae9a49af7ba77bac93fe840b17",
+  "new_Raw_base_SHA256": "9f404e8b212ac4dbd87dbf6ed1b4fa86690fed49d395d4edab69b1889a9ad93a",
+  "old_Raw_base_SHA256": "9fd68ef6663534f868586faa69c98ab50c301becfd1e327eb68372154ea72c4e",
+  "authored_added_block_SHA256": "6b021f18bb6e8de153fbe3706ba5a3b2fa6cd0cbd0366814a55c42f63cad5110",
+  "authored_added_block": "The unwired [private before-image bundle](writer-preimages.md) preserves bounded\nordinary captures as immutable, versioned bytes, with fixed-name durable\npublication in an existing private directory. This adds no live write, apply\nadmission, restoration or helper bootstrap. Unknown semantics retain bytes\nand refuse; content identity does not authenticate the caller.\n\n",
+  "exact_authored_hunk_preserved_once": true,
+  "removing_only_authored_block_equals_entire_new_Raw_document": true,
+  "new_upstream_text_preserved_exactly": true,
+  "whole_blob_equality_claimed": false
+}

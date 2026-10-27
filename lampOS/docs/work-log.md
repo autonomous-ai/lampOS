@@ -1,3 +1,19 @@
+## 28 October 2026, 02:41 +07 — f0f source/native qualification and the next narrow carry
+
+Ready for lamp-voice: no (the next 2e66 carries and their original checks/read dispositions remain separate).
+
+#3858's [original c08/f0f ARM run](verification/writer-settings-capture-20261027/native-c08-f0f65/README.md) passes **7,817 unique tests**, all **49** controls once, zero bad or selected unrun, with 53 summary skips. Its [original Linux formatting and strict Clippy](verification/writer-settings-capture-20261027/linux-c08-f0f65/README.md) pass; actual preview and authored complete trees agree. This packet does not verify an optional production archive or invent individual test-executable hashes. The prior current Mac gate remains 219 passes/all 49 on c08/f0f.
+
+#3913's [649a/f0f Mac gate](verification/writer-refresh-drop-20261028/scoped-203-649a-f0f65/README.md) independently passes **203 tests**, all **33** controls, zero bad or selected unrun; all 7,500 guards and ten actual/preserved output bindings close. [Original Linux](verification/writer-refresh-drop-20261028/linux-649a-f0f65/README.md) passes on its exact preview tree. Its original ARM result remains separate and is not inferred from Linux or an earlier source.
+
+#3907's [830d/f0f Mac gate](verification/writer-preimages-20261028/scoped-228-830d-f0f65/README.md) passes **228 tests**, all **58** controls once, zero bad or selected unrun; all 7,509 guards and ten output bindings close. Five full files and the exact shared-document insertion retain their qualified bytes while preserving upstream publisher prose. The [earlier 5532/44d native packet](verification/writer-preimages-20261028/native-5532-44d1/README.md) separately records **7,824 unique passes**, all 58 controls, zero bad or selected unrun and 53 summary skips, with exact authored/preview trees and both required jobs successful. Its optional artifact download timed out with partial bytes retained: no complete archive digest, inventory or binary verification is claimed. Current 830d native acceptance is not borrowed from that earlier run.
+
+Collector 8ef/f0f passed 222 tests/all 52 controls locally; its pre-push guard then caught Main 2e66 and left the published 9e7 head unchanged. The exact Main delta changes only two independent Memory integration targets and control documentation. Actual compiler censuses show those test targets are not normal Update inputs, while repository scanners consume their source. Fresh formatting, strict all-target Clippy, targeted compilation/discovery and all 13 IT checks are therefore used for the next carries; no repeat of the broader 219/203/228/222 scopes is claimed. Collector's first such 13887/2e66 gate has closed successfully; its guarded publication follows separately.
+
+The private Head codec has source reviews and documented byte, schema, resource and authority boundaries. New refusal/replay tests and protocol prose are authored; remaining evaluator and revalidation groups still precede its first runtime gate. The later independent-restorer ownership audit remains a proposal only. Historical failed and inconclusive runs remain unchanged; no root helper activation, authenticated executable plan, live restoration, signing, promotion, lamp or physical power-cut result is claimed.
+
+All six new packet manifests, 87 member paths and their staged/committed bytes are checked separately. Evidence publication does not execute source or retry CI.
+
 ## 28 October 2026, 02:21 +07 — current-base gates and original native evidence remain separate
 
 Ready for lamp-voice: no (current base, original native gates and reader conditions remain; #3907 also depends on #3858).
