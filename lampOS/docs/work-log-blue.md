@@ -669,3 +669,4 @@ Ready for lamp-voice: yes (#2553), once its ARM64 run is green
 - 23:29: Fourteen READ-OK #3869 a7820079d inside the 30 min (no fallback needed); P3s noted (drop "(planned)" when piece B lands; pairing screen line pinned in a test; ceiling enforcement named in a skill-push PR). Third and Reviewer-two reading #3880. #3842 merged.
 - 23:34: Eighth READ-OK #3869 a7820079d (carry). #3869 ARM64 pending, then NEXT TRAIN.
 - 23:40: #3869 brought in line with Nine/Eighth's helper agreement (one push lamp-wide; same-computer re-push replaces and drops the picture yes) as 09c4e4bb7; short re-look asked.
+- 23:44: NEXT TRAIN #3880 ad095ae61 (Third READ-OK, Reviewer-two base-only HOLD, green). Nine's door side for skill push on nine/control-skill-push, opens after #3869 and part 5.
