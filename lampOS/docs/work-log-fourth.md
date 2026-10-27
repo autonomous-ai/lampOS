@@ -1,3 +1,13 @@
+## 2026-10-28 05:02 ICT — Fresh hand and diagnostic host gates passed; hand ARM failed
+
+[Hand host proof](verification/hand-1b1-current-host-20261028/README.md): #3544 is pushed as `1b1da9ae3` on Main `82a62867c`, with the three authored files unchanged and an equal range-diff. Fresh formatting, metadata, strict workspace Clippy and build passed. Its runtime passed 4,177 unique cases: four direct controls with 30 s deadlines and 2 s TERM grace, then a disjoint 4,173-case remainder. All 22 host-required controls passed; four doctests are separate. This covers the Voice library and stated Update tests, with no child integration or prior-result credit. The proof contains saved input hashes, with no current-target rehash or lamp latency claim.
+
+[Diagnostic host proof](verification/diagnostic-4cd-current-host-20261028/README.md): #3577 is pushed as `4cd9d4995` on qualified parent `1b1da9ae3`; both authored files are unchanged and the range-diff is equal. Its fresh compiler gate and whole Voice integration run passed: 275 unique cases, including all 18 diagnostics and the one sequence test within those 18; four doctests are separate. No parent or previous-child results are transferred. Its original new-head native checks are active.
+
+The original hand ARM run 40588908587 then failed: 6,466 passed, three failed and 1,336 selected unrun. The failures are the held-two-faces worker assertion, trace writer completion timeout and privacy-worker stand-in exit timeout. Linux Clippy passed. These failures remain gate failures; the host result does not override them. Original source and failed-case evidence are being preserved and routed; no rerun or cause waiver.
+
+Consent `a616ce5ca` has original ARM and Clippy green (11,829 unique passes, all 56 controls and updated doc readers once). Its recorded mixed-build and physical activation acceptance remains held. Common awaits delivered #3898; the N3 source read found no upstream defect and identified the future confirmation-fixture adaptation. An actual independent N3 test read is being prepared. No device action.
+
 ## 2026-10-28 03:38 ICT — Exact-tree native consent gates pass; final carry is bounded
 
 [Original native proof](verification/onboarding-2ced-current-native-20261028/README.md): #3472 2ced256ff has ARM 40575097415 and Linux Clippy 40575097494 green. Both checked out d2b33e18b/tree43da54b09, exactly the rebased bc06a6eff tree. ARM has 11,829 unique passes, all 56 controls once and zero bad/unrun; docs4, relay1 aggregate and process13 remain separate. Fresh Mac compiler8385/0 passed all four stages on that tree; a second full Mac runtime was not run or credited. Reviewer-three posted READ-OK; Reviewer-two is still reading.

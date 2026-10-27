@@ -1,0 +1,78 @@
+{
+  "source_head": "1b1da9ae3fc6fbf1101cd1b88f10bcaa37fb55ad",
+  "source_tree": "5c1f55fda333a87b71de05b1e3faa859a2e10642",
+  "owned_files": [
+    {
+      "path": "lampOS/crates/voice/src/hand_controls.rs",
+      "git_mode": "100644",
+      "git_blob": "233a2c6f0d5a01241020031c5ebb688ef2ceea72",
+      "sha256": "6f7ccdebf95bc841bdc57de1d8d042e32d92fffb5b96577a9282ba5cfa510df6",
+      "exact_original4084_blob": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/hand_controls/tests.rs",
+      "git_mode": "100644",
+      "git_blob": "ed5029cc4dfd47eba12d017d7f6ea1687a83bd88",
+      "sha256": "c19bd7259a707d26651fa722b1266878a18c5aa952ab6830c42a334c1aa25d29",
+      "exact_original4084_blob": true
+    },
+    {
+      "path": "lampOS/docs/realtime-tests.md",
+      "git_mode": "100644",
+      "git_blob": "1d529515bacbf8ac6cc7df4e41ae0a9ce0f0f013",
+      "sha256": "fd1ae380f4465ae866e30928d335e01eb66637b828faeaeeb70110a66b1da9b6",
+      "exact_original4084_blob": true
+    }
+  ],
+  "recorded_runtime_executables": [
+    {
+      "name": "lamp-voice",
+      "kind": "normal_companion",
+      "sha256": "b6b635b2460f9cc90ace850775b2f090126638b35eda2ae10e4b045f0ea87cab",
+      "bytes": 40823544,
+      "mode": "0755",
+      "hash_origin": "saved Parent78382 runtime input manifest"
+    },
+    {
+      "name": "lamp-update",
+      "kind": "normal_companion",
+      "sha256": "b7cd6e55ad40a3272b36c5ab5422ab322fd6a3d7f8cd4787a8ade784da879467",
+      "bytes": 11096620,
+      "mode": "0755",
+      "hash_origin": "saved Parent78382 runtime input manifest"
+    },
+    {
+      "name": "lamp-voice",
+      "kind": "test_driver",
+      "sha256": "fdf9ff702b08102589ff986a2ba6490c4ac99b04ae412375225a4af382cdfd9f",
+      "bytes": 117384928,
+      "mode": "0755",
+      "hash_origin": "saved Parent78382 runtime input manifest"
+    },
+    {
+      "name": "lamp-update",
+      "kind": "test_driver",
+      "sha256": "ecfdba08c66b3ccb33c5d0a555975174dea662152b3b0c93d18bd7894b818cf3",
+      "bytes": 12616140,
+      "mode": "0755",
+      "hash_origin": "saved Parent78382 runtime input manifest"
+    },
+    {
+      "name": "lamp-update::install",
+      "kind": "test_driver",
+      "sha256": "37efbdd62315628189cf16b830ace3b2536f415083b5157c3a82abfd58b07e82",
+      "bytes": 14341836,
+      "mode": "0755",
+      "hash_origin": "saved Parent78382 runtime input manifest"
+    },
+    {
+      "name": "lamp-update::it",
+      "kind": "test_driver",
+      "sha256": "772ff15f6355f18b4de328efa4562b3860733adbe4c40352c6b0f28614a2a241",
+      "bytes": 1648824,
+      "mode": "0755",
+      "hash_origin": "saved Parent78382 runtime input manifest"
+    }
+  ],
+  "evidence_boundary": "Hashes copied from saved runtime78382 records; no current target artifact read or rehash. Inputs were guarded before/after every direct and nextest stage; later docs/builds have separate artifact boundaries."
+}

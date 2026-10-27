@@ -1,0 +1,10 @@
+{
+  "format": "text-only-public-evidence-v1",
+  "files": {
+    "README.md": "2ee82a70acddf42045fd58eb8a994dfb04ce984c0229a3ef0db6b6d95cf06f14",
+    "receipt.json": "f1e837cc794e9f75f67e85e200f85cc8e68abfc74ab4d2d8244042aa8a4cd706",
+    "source-ledger.json": "00ffba74ec22c1d783ae5a34c7a9ececb3b070f3d5d6770076054a1807bd5b25"
+  },
+  "binary_artifacts": false,
+  "private_paths_or_raw_logs_included": false
+}

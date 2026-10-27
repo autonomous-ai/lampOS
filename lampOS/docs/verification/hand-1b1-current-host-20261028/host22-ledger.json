@@ -1,0 +1,278 @@
+[
+  {
+    "binary": "lamp-voice",
+    "test": "hand_controls::tests::an_idle_pump_is_ready_only_after_its_first_subscribed_drain",
+    "event": "PASS",
+    "source_path": "lampOS/crates/voice/src/hand_controls/tests.rs",
+    "source_line": 1502,
+    "partition": "direct_watchdog",
+    "watchdog_seconds": 30,
+    "TERM_grace_seconds": 2,
+    "recorded_session_seconds": 0.20499463402666152,
+    "terminal_reference": {
+      "named_stdout_line": 3,
+      "summary_stdout_line": 5
+    }
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "hand_controls::tests::with_the_wait_an_idle_pump_wakes_five_times_a_second_and_stops_at_once",
+    "event": "PASS",
+    "source_path": "lampOS/crates/voice/src/hand_controls/tests.rs",
+    "source_line": 1612,
+    "partition": "direct_watchdog",
+    "watchdog_seconds": 30,
+    "TERM_grace_seconds": 2,
+    "recorded_session_seconds": 2.444110207958147,
+    "terminal_reference": {
+      "named_stdout_line": 3,
+      "summary_stdout_line": 5
+    }
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "hand_controls::tests::with_the_wait_a_head_touch_is_read_as_it_arrives",
+    "event": "PASS",
+    "source_path": "lampOS/crates/voice/src/hand_controls/tests.rs",
+    "source_line": 1876,
+    "partition": "direct_watchdog",
+    "watchdog_seconds": 30,
+    "TERM_grace_seconds": 2,
+    "recorded_session_seconds": 0.3649550330010243,
+    "terminal_reference": {
+      "named_stdout_line": 3,
+      "summary_stdout_line": 5
+    }
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "hand_controls::tests::with_the_wait_a_mute_taken_through_the_owners_poll_is_said_at_once",
+    "event": "PASS",
+    "source_path": "lampOS/crates/voice/src/hand_controls/tests.rs",
+    "source_line": 1668,
+    "partition": "direct_watchdog",
+    "watchdog_seconds": 30,
+    "TERM_grace_seconds": 2,
+    "recorded_session_seconds": 0.21366869495250285,
+    "terminal_reference": {
+      "named_stdout_line": 3,
+      "summary_stdout_line": 5
+    }
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "privacy_bus::tests::after_a_datagram_a_gap_ends_the_lease_reader_inside_its_first_second",
+    "event": "PASS",
+    "source_path": "lampOS/crates/voice/src/privacy_bus.rs",
+    "source_line": 1326,
+    "partition": "nextest_remainder",
+    "terminal_reference": {
+      "outer_JSON_line": 3763,
+      "outer_terminal_ordinal": 1877
+    }
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "privacy_bus::tests::selected_endpoints_bind_and_read_a_real_bus",
+    "event": "PASS",
+    "source_path": "lampOS/crates/voice/src/privacy_bus.rs",
+    "source_line": 1155,
+    "partition": "nextest_remainder",
+    "terminal_reference": {
+      "outer_JSON_line": 3769,
+      "outer_terminal_ordinal": 1880
+    }
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "privacy_bus::tests::the_lease_reader_resyncs_on_kept_leases_only_before_its_first_datagram_in_its_first_second",
+    "event": "PASS",
+    "source_path": "lampOS/crates/voice/src/privacy_bus.rs",
+    "source_line": 1217,
+    "partition": "nextest_remainder",
+    "terminal_reference": {
+      "outer_JSON_line": 3773,
+      "outer_terminal_ordinal": 1882
+    }
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "privacy_bus::tests::the_lease_watch_answers_at_once_through_refused_input_and_lets_a_lease_expire",
+    "event": "PASS",
+    "source_path": "lampOS/crates/voice/src/privacy_bus.rs",
+    "source_line": 1481,
+    "partition": "nextest_remainder",
+    "terminal_reference": {
+      "outer_JSON_line": 3791,
+      "outer_terminal_ordinal": 1891
+    }
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "transport::tests::initial_capture_prepared_survives_bounded_speaker_startup",
+    "event": "PASS",
+    "source_path": "lampOS/crates/voice/src/transport.rs",
+    "source_line": 671,
+    "partition": "nextest_remainder",
+    "terminal_reference": {
+      "outer_JSON_line": 8197,
+      "outer_terminal_ordinal": 4094
+    }
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "transport::tests::initial_capture_prepared_still_requires_age_boot_order_and_nonfuture_time",
+    "event": "PASS",
+    "source_path": "lampOS/crates/voice/src/transport.rs",
+    "source_line": 694,
+    "partition": "nextest_remainder",
+    "terminal_reference": {
+      "outer_JSON_line": 8195,
+      "outer_terminal_ordinal": 4093
+    }
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "transport::tests::reference_startup_allowance_does_not_cover_primes_data_or_capture_input",
+    "event": "PASS",
+    "source_path": "lampOS/crates/voice/src/transport.rs",
+    "source_line": 727,
+    "partition": "nextest_remainder",
+    "terminal_reference": {
+      "outer_JSON_line": 8205,
+      "outer_terminal_ordinal": 4098
+    }
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "transport::tests::later_capture_prepared_keeps_the_existing_single_sender_stall_allowance",
+    "event": "PASS",
+    "source_path": "lampOS/crates/voice/src/transport.rs",
+    "source_line": 762,
+    "partition": "nextest_remainder",
+    "terminal_reference": {
+      "outer_JSON_line": 8199,
+      "outer_terminal_ordinal": 4095
+    }
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "transport::tests::a_receiver_held_up_takes_what_queued_meanwhile_within_a_bound",
+    "event": "PASS",
+    "source_path": "lampOS/crates/voice/src/transport.rs",
+    "source_line": 789,
+    "partition": "nextest_remainder",
+    "terminal_reference": {
+      "outer_JSON_line": 8187,
+      "outer_terminal_ordinal": 4089
+    }
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "transport::tests::a_stale_renewal_with_the_next_renewal_behind_it_is_passed_over",
+    "event": "PASS",
+    "source_path": "lampOS/crates/voice/src/transport.rs",
+    "source_line": 814,
+    "partition": "nextest_remainder",
+    "terminal_reference": {
+      "outer_JSON_line": 8193,
+      "outer_terminal_ordinal": 4092
+    }
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "transport::tests::renewals_read_on_time_are_taken_one_by_one",
+    "event": "PASS",
+    "source_path": "lampOS/crates/voice/src/transport.rs",
+    "source_line": 899,
+    "partition": "nextest_remainder",
+    "terminal_reference": {
+      "outer_JSON_line": 8207,
+      "outer_terminal_ordinal": 4099
+    }
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "transport::tests::only_the_next_message_in_order_may_come_late_from_a_held_up_sender",
+    "event": "PASS",
+    "source_path": "lampOS/crates/voice/src/transport.rs",
+    "source_line": 925,
+    "partition": "nextest_remainder",
+    "terminal_reference": {
+      "outer_JSON_line": 8201,
+      "outer_terminal_ordinal": 4096
+    }
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "transport::tests::the_providers_input_takes_a_message_late_in_order_and_its_output_does_not",
+    "event": "PASS",
+    "source_path": "lampOS/crates/voice/src/transport.rs",
+    "source_line": 965,
+    "partition": "nextest_remainder",
+    "terminal_reference": {
+      "outer_JSON_line": 8211,
+      "outer_terminal_ordinal": 4101
+    }
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "transport::tests::only_the_providers_input_takes_late_and_every_other_channel_keeps_its_bound",
+    "event": "PASS",
+    "source_path": "lampOS/crates/voice/src/transport.rs",
+    "source_line": 1033,
+    "partition": "nextest_remainder",
+    "terminal_reference": {
+      "outer_JSON_line": 8203,
+      "outer_terminal_ordinal": 4097
+    }
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "transport::tests::a_run_of_late_messages_is_said_however_it_ends",
+    "event": "PASS",
+    "source_path": "lampOS/crates/voice/src/transport.rs",
+    "source_line": 1081,
+    "partition": "nextest_remainder",
+    "terminal_reference": {
+      "outer_JSON_line": 8189,
+      "outer_terminal_ordinal": 4090
+    }
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "transport::tests::the_second_routes_input_takes_a_message_late_only_as_the_only_voice",
+    "event": "PASS",
+    "source_path": "lampOS/crates/voice/src/transport.rs",
+    "source_line": 1165,
+    "partition": "nextest_remainder",
+    "terminal_reference": {
+      "outer_JSON_line": 8213,
+      "outer_terminal_ordinal": 4102
+    }
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "transport::tests::the_providers_input_still_refuses_another_boot_or_another_order",
+    "event": "PASS",
+    "source_path": "lampOS/crates/voice/src/transport.rs",
+    "source_line": 1188,
+    "partition": "nextest_remainder",
+    "terminal_reference": {
+      "outer_JSON_line": 8209,
+      "outer_terminal_ordinal": 4100
+    }
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "transport::tests::a_send_to_a_peer_that_has_gone_is_refused_with_the_sockets_name",
+    "event": "PASS",
+    "source_path": "lampOS/crates/voice/src/transport.rs",
+    "source_line": 1220,
+    "partition": "nextest_remainder",
+    "terminal_reference": {
+      "outer_JSON_line": 8191,
+      "outer_terminal_ordinal": 4091
+    }
+  }
+]

@@ -1,0 +1,67 @@
+{
+  "status": "CURRENT_PARENT_HOST_QUALIFIED_NATIVE_CHECKS_SEPARATE",
+  "head": "1b1da9ae3fc6fbf1101cd1b88f10bcaa37fb55ad",
+  "tree": "5c1f55fda333a87b71de05b1e3faa859a2e10642",
+  "base": "82a62867cc1bcbbc4b0848519c6757f623d112ce",
+  "original_authored_head": "4084e4e1dde24ea17d6c88d944256f78904579c0",
+  "range_diff": "=",
+  "three_owned_blobs_exact_original": true,
+  "compiler": {
+    "native": 52860,
+    "exit": 0,
+    "normal_stages": [
+      "fmt",
+      "metadata",
+      "strict workspace/all-target Clippy",
+      "workspace build"
+    ]
+  },
+  "runtime": {
+    "native": 78382,
+    "exit": 0,
+    "selected_unique": 4177,
+    "passed_unique": 4177,
+    "failed": 0,
+    "unrun_selected": 0,
+    "direct_controls": 4,
+    "direct_watchdog_seconds": 30,
+    "direct_TERM_grace_seconds": 2,
+    "nextest_disjoint_remainder": 4173,
+    "required_host_PASS": 22,
+    "Linux_only_UNRUN_on_Mac": 1,
+    "LEAK": 0,
+    "timeout": 0,
+    "retry": 0,
+    "repeated_selected_cases": 0,
+    "scope": {
+      "Voice_lib": 3887,
+      "Update_lib": 180,
+      "Update_install": 108,
+      "Update_ci_paths": 2
+    },
+    "Voice_it_or_child3577_credit": false,
+    "old4163_credit": false
+  },
+  "docs": {
+    "passed": 4,
+    "failed": 0,
+    "ignored": 0,
+    "separate_from_runtime": true
+  },
+  "discovery": {
+    "listed": 4205,
+    "natural_ignored_declarations": 17,
+    "filter_mismatches": 28,
+    "counts_not_added_to_PASS": true,
+    "ignore_and_filter_counts_may_overlap": true
+  },
+  "Linux_required_identity": "transport::tests::a_refused_send_drops_what_the_gone_peer_had_sent",
+  "artifact_evidence": "saved recorded input hashes only; current target may have changed during child compilation",
+  "process_boundaries": "actual owned stages/groups closed; direct elapsed values describe whole bounded driver sessions, not hardware input-to-feedback latency",
+  "evidence_sha256": {
+    "compiler_actual_release": "904b25882260442f0928076a48494fc8d520913b829ac6200524f8b93893b140",
+    "runtime_actual_release": "a04ef9f8b21d871d67b6228673123cd8a3f86aa2855bbcc52875faa126110866",
+    "unique4177_ledger": "c26216ebb9f316d6ad9c79465a8d968bd0726f30c18946ba75077a8d649cb9a2",
+    "saved79_runtime_inputs": "2285e030531e908073ec84cff68be1702e0f9c49af2c9595081f9f63c7f30ca5"
+  }
+}

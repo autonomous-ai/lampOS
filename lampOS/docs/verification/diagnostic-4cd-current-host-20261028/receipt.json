@@ -1,0 +1,59 @@
+{
+  "status": "CURRENT_CHILD_HOST_QUALIFIED_NATIVE_CHECKS_SEPARATE",
+  "head": "4cd9d4995c482e0bc15f2ee537066205efd3d234",
+  "tree": "61b8507430ae3b4791cc7a441e18e58e4a0618e8",
+  "parent": "1b1da9ae3fc6fbf1101cd1b88f10bcaa37fb55ad",
+  "compiler": {
+    "native": 7280,
+    "exit": 0,
+    "stages": [
+      "fmt",
+      "metadata",
+      "strict workspace/all-target Clippy",
+      "workspace build"
+    ]
+  },
+  "runtime": {
+    "native": 50364,
+    "exit": 0,
+    "scope": "complete lamp-voice::it integration binary",
+    "listed": 275,
+    "selected_unique": 275,
+    "passed_unique": 275,
+    "failed": 0,
+    "selected_unrun": 0,
+    "LEAK": 0,
+    "timeout": 0,
+    "retry": 0,
+    "ignored": 0,
+    "filter_mismatch": 0,
+    "repeated_selected_cases": 0,
+    "required_diagnostics_PASS": 18,
+    "required_sequence_PASS": 1,
+    "sequence_is_subset_of18_not_added": true,
+    "Parent4177_credit": false,
+    "old275_credit": false
+  },
+  "docs": {
+    "passed": 4,
+    "failed": 0,
+    "ignored": 0,
+    "separate_from_runtime": true
+  },
+  "source_integrity": {
+    "two_child_blobs_exact_a47": true,
+    "tracked_source_stable": true,
+    "owned_process_sessions_groups_closed": true
+  },
+  "evidence_sha256": {
+    "compiler_actual_release": "7d52fa0c45b318775e9233ceabc9a737f5b4b912276eda75e9de1efc303df3d8",
+    "runtime_actual_release": "8af095c71fb73bff7c2ea79cfd84e1d91ae62d299bd10f71f803d981be53106b",
+    "unique275_ledger": "8957a32ceacea228cfc74abd77e577e90960bd516da0bea75578e03e619d9a98",
+    "recorded_runtime_inputs": "3180161815185c3019f2d971071c7d4ad6b322d532d0c38cd2bd0555953d8950"
+  },
+  "limits": [
+    "native PR checks and review remain separate",
+    "host fixtures do not establish hardware latency or activate lamp behavior",
+    "record does not claim current-target identity after later builds"
+  ]
+}

@@ -1,0 +1,161 @@
+{
+  "head": "4cd9d4995c482e0bc15f2ee537066205efd3d234",
+  "tree": "61b8507430ae3b4791cc7a441e18e58e4a0618e8",
+  "parent": "1b1da9ae3fc6fbf1101cd1b88f10bcaa37fb55ad",
+  "original_child_head": "a47fe22e56d181f6d7946bc5b98d90dd9560293e",
+  "two_owned_blobs_exact_original_a47": true,
+  "source_files": [
+    {
+      "path": "lampOS/crates/voice/tests/it/diagnostics.rs",
+      "git_mode": "100644",
+      "git_blob": "a86c8e10871ac53cb79802addb177078ebc5e5be",
+      "sha256": "b368573cd5894ccfada720835d9d098297e1250ea61477702c6169a99db8e8eb",
+      "exact_original_a47_blob": true
+    },
+    {
+      "path": "lampOS/docs/voice-test-fixtures.md",
+      "git_mode": "100644",
+      "git_blob": "89924bf63ccd3230b8021cf9a189a30ab00dc1b2",
+      "sha256": "daecb04228dff4bbbbd9d32014dd0392a81304eb52fa6ac54aafded1787fb21d",
+      "exact_original_a47_blob": true
+    }
+  ],
+  "recorded_runtime_executables": [
+    {
+      "name": "lamp-voice",
+      "kind": "normal_companion",
+      "sha256": "b6b635b2460f9cc90ace850775b2f090126638b35eda2ae10e4b045f0ea87cab",
+      "bytes": 40823544,
+      "mode": "0755",
+      "hash_origin": "saved actual50364 input manifest"
+    },
+    {
+      "name": "lamp-voice::it",
+      "kind": "test_driver",
+      "sha256": "c4c794f3f9c933f0602f4ba4296ab64eed46461c8823f5f0d50a7fc8703ad599",
+      "bytes": 94650468,
+      "mode": "0755",
+      "hash_origin": "saved actual50364 input manifest"
+    }
+  ],
+  "required_diagnostics": [
+    {
+      "test": "diagnostics::accepted_speech_gap_zeros_are_explicit_and_do_not_replace_neighboring_pcm",
+      "event": "ok",
+      "line_one_based": 130,
+      "terminal_ordinal_one_based": 64
+    },
+    {
+      "test": "diagnostics::audio_fault_end_is_incomplete_even_with_good_written_pcm",
+      "event": "ok",
+      "line_one_based": 132,
+      "terminal_ordinal_one_based": 65
+    },
+    {
+      "test": "diagnostics::capture_files_preserve_pcm_offsets_hashes_and_full_acknowledgement",
+      "event": "ok",
+      "line_one_based": 136,
+      "terminal_ordinal_one_based": 67
+    },
+    {
+      "test": "diagnostics::capture_processing_cannot_be_mislabelled_as_render_processing",
+      "event": "ok",
+      "line_one_based": 134,
+      "terminal_ordinal_one_based": 66
+    },
+    {
+      "test": "diagnostics::capture_sequence_gap_and_unannounced_epoch_change_fail",
+      "event": "ok",
+      "line_one_based": 140,
+      "terminal_ordinal_one_based": 69
+    },
+    {
+      "test": "diagnostics::closed_privacy_cannot_be_overridden_by_pcm_metadata",
+      "event": "ok",
+      "line_one_based": 138,
+      "terminal_ordinal_one_based": 68
+    },
+    {
+      "test": "diagnostics::dsp_reset_preserves_capture_sequence_and_cannot_cover_a_gap",
+      "event": "ok",
+      "line_one_based": 146,
+      "terminal_ordinal_one_based": 72
+    },
+    {
+      "test": "diagnostics::duration_and_frame_shape_limits_disable_evidence_without_blocking",
+      "event": "ok",
+      "line_one_based": 142,
+      "terminal_ordinal_one_based": 70
+    },
+    {
+      "test": "diagnostics::explicit_reset_and_privacy_boundaries_are_retained_and_split_epochs",
+      "event": "ok",
+      "line_one_based": 144,
+      "terminal_ordinal_one_based": 71
+    },
+    {
+      "test": "diagnostics::no_overwrite_private_parent_and_symlink_rejection",
+      "event": "ok",
+      "line_one_based": 148,
+      "terminal_ordinal_one_based": 73
+    },
+    {
+      "test": "diagnostics::omitted_open_privacy_and_missing_opening_frames_are_invalid",
+      "event": "ok",
+      "line_one_based": 150,
+      "terminal_ordinal_one_based": 74
+    },
+    {
+      "test": "diagnostics::playback_reset_requires_matching_old_discard_and_advancing_epoch",
+      "event": "ok",
+      "line_one_based": 152,
+      "terminal_ordinal_one_based": 75
+    },
+    {
+      "test": "diagnostics::processing_provenance_matches_pending_result_and_acknowledged_summary",
+      "event": "ok",
+      "line_one_based": 158,
+      "terminal_ordinal_one_based": 78
+    },
+    {
+      "test": "diagnostics::render_cursor_gap_does_not_insert_silence",
+      "event": "ok",
+      "line_one_based": 154,
+      "terminal_ordinal_one_based": 76
+    },
+    {
+      "test": "diagnostics::render_records_only_accepted_prefix_and_typed_priming_silence",
+      "event": "ok",
+      "line_one_based": 156,
+      "terminal_ordinal_one_based": 77
+    },
+    {
+      "test": "diagnostics::repeated_privacy_observation_does_not_reset_the_render_cursor",
+      "event": "ok",
+      "line_one_based": 160,
+      "terminal_ordinal_one_based": 79
+    },
+    {
+      "test": "diagnostics::replaced_artifact_never_receives_original_pcm_or_valid_marker",
+      "event": "ok",
+      "line_one_based": 162,
+      "terminal_ordinal_one_based": 80
+    },
+    {
+      "test": "diagnostics::replacement_directory_and_existing_final_marker_cannot_be_certified",
+      "event": "ok",
+      "line_one_based": 178,
+      "terminal_ordinal_one_based": 88
+    }
+  ],
+  "required_sequence": {
+    "test": "diagnostics::dsp_reset_preserves_capture_sequence_and_cannot_cover_a_gap",
+    "event": "PASS",
+    "outer_JSON_line": 146,
+    "outer_terminal_ordinal": 72,
+    "assertion_macros": 19,
+    "three_sequence_rows_one_identity": true,
+    "included_in_required18_and_total275": true
+  },
+  "boundary": "copied saved records; no current target artifact opened, statted or rehashed; runtime input guards before/after Voice-it, later Cargo docs separate"
+}
