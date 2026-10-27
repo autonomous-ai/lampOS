@@ -202,4 +202,25 @@ mod tests {
         assert_eq!(TWO.at(200_000), None);
         assert_eq!(TWO.at(u64::MAX), None);
     }
+
+    /// docs/control.md's gestures are the body's clips but `idle`, the
+    /// lamp's own life, and `scanning`, a sweep rule 8 keeps for a person's
+    /// ask: a clip added here is either named there or left out on purpose.
+    #[test]
+    fn the_control_schemas_gestures_are_the_clips_but_idle_and_scanning() {
+        let schema: serde_json::Value =
+            serde_json::from_str(include_str!("../../../docs/control.schema.json")).unwrap();
+        let named: Vec<&str> = schema["$defs"]["gesture"]["enum"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|name| name.as_str().unwrap())
+            .collect();
+        let offered: Vec<&str> = ALL
+            .iter()
+            .map(|clip| clip.name)
+            .filter(|name| !["idle", "scanning"].contains(name))
+            .collect();
+        assert_eq!(named, offered);
+    }
 }
