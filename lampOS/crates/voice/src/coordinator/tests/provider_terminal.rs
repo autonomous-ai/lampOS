@@ -630,7 +630,8 @@ fn run_with_notice_policy(
                                     | ProviderInput::Called { .. }
                                     | ProviderInput::Paused { .. }
                                     | ProviderInput::CountOnly { .. }
-                                    | ProviderInput::StepCall { .. },
+                                    | ProviderInput::StepCall { .. }
+                                    | ProviderInput::Onboarding { .. },
                                 ) => {}
                                 None => break,
                             }

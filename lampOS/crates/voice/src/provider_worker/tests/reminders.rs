@@ -865,6 +865,7 @@ async fn reminder_tools_are_denied_even_in_quiet_and_do_not_change_the_next_turn
     let mut chosen = options(true);
     chosen.name_signal = true;
     chosen.tools = crate::tools::Settings {
+        sleep_asked: false,
         decline: true,
         use_skill: false,
         requested_audio: true,

@@ -788,6 +788,13 @@ pub enum ProviderInput {
         request: u64,
         privacy_generation: u64,
     },
+    /// The request in hand began while onboarding is under way, with
+    /// `LAMP_SLEEP_ASKED=on` (#3748), sent just after its Start: a
+    /// `go_to_sleep` it calls is answered not now ([`crate::sleep_asked`]).
+    Onboarding {
+        request: u64,
+        privacy_generation: u64,
+    },
     /// A whole request in writing, for a turn the lamp begins itself: it is
     /// a start and an end at once and carries no sound.
     Written {
@@ -835,6 +842,7 @@ impl ProviderInput {
             | Self::Paused { request, .. }
             | Self::CountOnly { request, .. }
             | Self::StepCall { request, .. }
+            | Self::Onboarding { request, .. }
             | Self::Written { request, .. }
             | Self::Reminder { request, .. } => *request,
         }
@@ -860,6 +868,9 @@ impl ProviderInput {
                 privacy_generation, ..
             }
             | Self::StepCall {
+                privacy_generation, ..
+            }
+            | Self::Onboarding {
                 privacy_generation, ..
             }
             | Self::Written {
@@ -987,6 +998,12 @@ pub enum ProviderOutput {
     NewsAnswered {
         request: u64,
         key: String,
+    },
+    /// The model called `go_to_sleep` for `request` and was told the line
+    /// to say (#3748, [`crate::sleep_asked`]): the coordinator asks the
+    /// sleep once that turn has played, and never during onboarding.
+    SleepAsked {
+        request: u64,
     },
     /// The second route's times for `request` (19 Oct: an A/B is scored on
     /// each request's first answer audio, never a wait cue), sent once,
@@ -1368,6 +1385,7 @@ fn prune_retired_output(output: &mut VecDeque<Outbound>, retired_through: u64) {
         | ProviderOutput::LookAsked { request, .. }
         | ProviderOutput::LookNoCall { request, .. }
         | ProviderOutput::NewsAnswered { request, .. }
+        | ProviderOutput::SleepAsked { request }
         | ProviderOutput::WordsEnd { request, .. }
         | ProviderOutput::Stages { request, .. } => Some(*request),
         };
@@ -2123,6 +2141,9 @@ async fn serve_with_visual<C: Connect>(
                 }
                 for news in desk.news_answered() {
                     output.push_back(Outbound::Output(news));
+                }
+                for sleep in desk.take_sleeps() {
+                    output.push_back(Outbound::Output(sleep));
                 }
                 // Each call answered, for the first-output record when
                 // there is one (#799); let go when there is none.
@@ -3463,6 +3484,9 @@ struct ToolDesk {
     /// Requests whose `check_agent_task` answer, taken by the model, held a
     /// finished task's news, with its key, since the worker last took them.
     news: Vec<(u64, String)>,
+    /// Requests whose `go_to_sleep` was answered with the line to say, since
+    /// the worker last took them (#3748).
+    sleeps: Vec<u64>,
 }
 /// The longest a skill tool's look is owed after its answer: it begins
 /// within `LOOK_BEGINS_WITHIN` and waits `STILL_WAIT` for its still.
@@ -3559,6 +3583,7 @@ impl ToolDesk {
             ended: Vec::new(),
             looks: Vec::new(),
             news: Vec::new(),
+            sleeps: Vec::new(),
         }
     }
     /// The requests ended because they asked again for an action held,
@@ -3663,6 +3688,7 @@ impl ToolDesk {
                         | Route::Mark(_)
                         | Route::Onboarding(_)
                         | Route::ReportsStop(_)
+                        | Route::Sleep
                 ))
         {
             let (sent, sent_us) = tell(&crate::tools::declined());
@@ -3749,6 +3775,34 @@ impl ToolDesk {
                 );
                 eprintln!(
                     "lamp-voice provider: request {request}: the model asked about reports; told whether they are sent"
+                );
+            }
+            Route::Sleep => {
+                // Answered at once, as the time is: the line to say, or not
+                // now while onboarding is under way (#3748). The sleep is the
+                // coordinator's, once the line has played.
+                let onboarding = crate::sleep_asked::during_onboarding(request);
+                let told = crate::sleep_asked::told(onboarding);
+                let (sent, sent_us) = tell(&told);
+                self.line(
+                    lineage.session,
+                    request,
+                    &call.name,
+                    called_us,
+                    sent_us,
+                    true,
+                    sent,
+                );
+                if sent && !onboarding {
+                    self.sleeps.push(request);
+                }
+                eprintln!(
+                    "lamp-voice provider: request {request}: the model asked the lamp to sleep; {}",
+                    if onboarding {
+                        "not now: onboarding is under way"
+                    } else {
+                        "told the line"
+                    }
                 );
             }
             Route::Clock => {
@@ -4353,6 +4407,14 @@ impl ToolDesk {
         std::mem::take(&mut self.declines)
     }
     /// The requests whose look was asked in a call's answer since the last take.
+    /// The sleeps asked since the last take, as the coordinator is told
+    /// them (#3748).
+    fn take_sleeps(&mut self) -> Vec<ProviderOutput> {
+        std::mem::take(&mut self.sleeps)
+            .into_iter()
+            .map(|request| ProviderOutput::SleepAsked { request })
+            .collect()
+    }
     fn take_looks(&mut self) -> Vec<(u64, u64, Option<String>)> {
         std::mem::take(&mut self.looks)
     }
@@ -6204,6 +6266,10 @@ impl InputHandoff {
             // The second route's: on Live the coordinator holds a bare
             // call's End in the step's window itself.
             ProviderInput::StepCall { .. } => self.require_open(request)?,
+            ProviderInput::Onboarding { .. } => {
+                self.require_open(request)?;
+                crate::sleep_asked::mark_onboarding(request.get());
+            }
             ProviderInput::End { sound, cut_in, .. } => {
                 self.require_open(request)?;
                 if self.called.take() == Some(request.get()) {

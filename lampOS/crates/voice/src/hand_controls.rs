@@ -387,6 +387,8 @@ pub struct HandControls {
     /// The late sleep window ([`Self::allow_late_sleep`]), given to the head
     /// pads' receiver once the first Controls state is applied.
     late_sleep: Option<LateSleep>,
+    /// A sleep asked aloud, for the next poll ([`Self::ask_sleep`]).
+    sleep_asked: bool,
     /// When the conversation last read the press queue ([`Self::poll`]), on
     /// the wall clock: a clean stop's floor for the next start's late sleep
     /// ([`Self::disarm_after_clean_stop`]).
@@ -866,6 +868,7 @@ impl HandControls {
             could_not_start: 0,
             restored_after_fault: false,
             late_sleep: None,
+            sleep_asked: false,
             polled_at: None,
             #[cfg(test)]
             while_held: None,
@@ -936,6 +939,13 @@ impl HandControls {
     /// there is no walk to ask. False until first said.
     pub fn set_onboarding(&mut self, under_way: bool) {
         self.onboarding = under_way;
+    }
+
+    /// The person asked aloud for the lamp to sleep (`go_to_sleep`,
+    /// #3748): the next [`Self::poll`] asks the same sleep a hand's hold
+    /// does, unless onboarding is under way.
+    pub fn ask_sleep(&mut self) {
+        self.sleep_asked = true;
     }
 
     /// What [`Self::set_onboarding`] last said.
@@ -1191,6 +1201,20 @@ impl HandControls {
             || self.persistence_failed
         {
             self.fence_at(now_us);
+        }
+        // A sleep asked aloud (#3748): the same request a hand's hold makes,
+        // begun and asked now, and never while the walk is under way. Only
+        // with head sleep: a tap on the head is how it is woken.
+        if std::mem::take(&mut self.sleep_asked) && self.options.head_sleep() && !self.onboarding {
+            match self.receiver.request_sleep(now_us, now_us, now_us) {
+                Ok(true) => {
+                    self.dirty = true;
+                    observation.mute_changed = true;
+                    earlier(&mut observation.acquired_at_us, now_us);
+                }
+                Ok(false) => {}
+                Err(_) => add(&self.shared.rejected, 1),
+            }
         }
         observation.muted = self.muted();
         observation.asleep = self.asleep();

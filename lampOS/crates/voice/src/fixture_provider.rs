@@ -449,6 +449,10 @@ impl FixtureProvider {
                 request,
                 privacy_generation,
             }
+            | ProviderInput::Onboarding {
+                request,
+                privacy_generation,
+            }
             | ProviderInput::Written {
                 request,
                 privacy_generation,
@@ -549,7 +553,8 @@ impl FixtureProvider {
             ProviderInput::Called { .. }
             | ProviderInput::Paused { .. }
             | ProviderInput::CountOnly { .. }
-            | ProviderInput::StepCall { .. } => {}
+            | ProviderInput::StepCall { .. }
+            | ProviderInput::Onboarding { .. } => {}
             ProviderInput::End { .. } => {
                 let input = self
                     .input
@@ -778,6 +783,7 @@ fn output_request(event: &ProviderOutput) -> Option<u64> {
         | ProviderOutput::LookAsked { request, .. }
         | ProviderOutput::LookNoCall { request, .. }
         | ProviderOutput::NewsAnswered { request, .. }
+        | ProviderOutput::SleepAsked { request }
         | ProviderOutput::WordsEnd { request, .. }
         | ProviderOutput::Stages { request, .. } => Some(*request),
         ProviderOutput::Transcript { request, .. } => *request,
