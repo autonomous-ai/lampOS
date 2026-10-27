@@ -1,5 +1,16 @@
 # Tests work log
 
+## 2026-10-27 21:03 — original native proofs green; both PRs carried to fetched Main
+
+Ready for lamp-voice: no (fresh carried-head checks/current reads and device acceptance pending).
+
+[Updater original native proof](verification/tests-3843-original-native-20261027/) records ARM40512378554 and Linux40512378505 success: **7,767 unique PASS, zero bad/unrun, 53 aggregate skips**, all fourteen regressions once. The authenticated artifact checksum manifest reports updater `3be431071…`, different from refused `b35b4c9b…`; only the checksum member was read, with no ARM payload extraction or execution. The actual preview is 0b6bca821 [02677931d, ee6f88d2a], not the authored tree; all three updater blobs match.
+
+[Body original native proof](verification/tests-3845-original-native-20261027/) records ARM40513295888 and Linux40513295945 success: **7,765 unique PASS, zero bad/unrun, 53 aggregate skips**, holder test once. Actual preview39bfb7ec8 [bf6f7bbdf,2adcc4e2] includes newer upstream Body files; full blobs differ, but the exact owned function and documentation paragraph remain equal. Each packet separately excludes 34 configured status reprints and auxiliary scopes, preserves warnings and the historical Cloud LEAK/Main Mac HOLD.
+
+Fetched Main992303fc8 and carried #3843 to bd0e0371e (owned code/tests unchanged; doc conflict resolved retaining Main foundation/apply detail) and #3845 to536fc9c3e (one equal range-diff). Both fresh-head native checks remain pending; earlier native runs are not relabelled. No new lamp access; Fifth owns the stopgap.
+
+
 ## 2026-10-27 20:36 — updater draft offered; Body repair current gates pass
 
 Ready for lamp-voice: no (native checks, current reader marks and device acceptance remain).
