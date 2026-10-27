@@ -6,6 +6,9 @@ it all with no lamp.
     lamp hello [LAMP_ID]
     lamp fake [--every 10] [--cycles N]
     lamp skill check FOLDER...
+    lamp skill push FOLDER [LAMP_ID]
+    lamp skill list [LAMP_ID]
+    lamp skill remove NAME [LAMP_ID]
 """
 
 from __future__ import annotations
@@ -91,6 +94,32 @@ async def _skill_check(args) -> int:
     return 1 if failed else 0
 
 
+async def _skill_push(args) -> int:
+    async with await Lamp.connect(args.lamp) as lamp:
+        skill = await lamp.push_skill(args.folder)
+    held = f", held: {skill['held']}" if skill.get("held") else ""
+    print(f"{skill.get('name')} {skill.get('version')} pushed, {'on' if skill.get('on') else 'off'}{held}")
+    for shown in skill.get("shown", []):
+        print(f"  {shown}")
+    return 0
+
+
+async def _skill_list(args) -> int:
+    async with await Lamp.connect(args.lamp) as lamp:
+        for skill in await lamp.skills():
+            state = "on" if skill.get("on") else "off"
+            held = f" (held: {skill['held']})" if skill.get("held") else ""
+            print(f"{skill.get('name')}\t{skill.get('version')}\t{state}{held}")
+    return 0
+
+
+async def _skill_remove(args) -> int:
+    async with await Lamp.connect(args.lamp) as lamp:
+        await lamp.remove_skill(args.name)
+    print(f"{args.name} removed")
+    return 0
+
+
 async def _hello(args) -> int:
     async with await Lamp.connect(args.lamp) as lamp:
         print(f"{lamp.info.get('id')}: grants {', '.join(lamp.grants)}")
@@ -120,11 +149,22 @@ def main(argv: list[str] | None = None) -> int:
     hello = commands.add_parser("hello", help="connect to a paired lamp and show its grants")
     hello.add_argument("lamp", nargs="?")
     hello.set_defaults(run=_hello)
-    skill = commands.add_parser("skill", help="skill folders: lamp skill check FOLDER...")
+    skill = commands.add_parser("skill", help="skill folders: check, push, list, remove")
     skill_commands = skill.add_subparsers(dest="skill_command", required=True)
     skill_check = skill_commands.add_parser("check", help="check skill folders against the skill format, version 1")
     skill_check.add_argument("folders", nargs="+", help="each a folder with SKILL.md and skill.toml")
     skill_check.set_defaults(run=_skill_check)
+    skill_push = skill_commands.add_parser("push", help="check a skill folder and put it on your paired lamp (the skills grant)")
+    skill_push.add_argument("folder")
+    skill_push.add_argument("lamp", nargs="?")
+    skill_push.set_defaults(run=_skill_push)
+    skill_list = skill_commands.add_parser("list", help="the skills this computer has pushed")
+    skill_list.add_argument("lamp", nargs="?")
+    skill_list.set_defaults(run=_skill_list)
+    skill_remove = skill_commands.add_parser("remove", help="take one of this computer's pushed skills off the lamp")
+    skill_remove.add_argument("name")
+    skill_remove.add_argument("lamp", nargs="?")
+    skill_remove.set_defaults(run=_skill_remove)
     args = parser.parse_args(argv)
     try:
         return asyncio.run(args.run(args))

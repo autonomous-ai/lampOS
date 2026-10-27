@@ -36,7 +36,7 @@ LAMPOS_HOME=/tmp/lampos-try python examples/greet.py
 
 Terminal 1 then shows `asked {"op": "gesture", "name": "greeting"}`. Every
 example runs this way: `greet.py`, `follow.py`, `phrase.py`, `pomodoro.py`,
-`ci_light.py`.
+`ci_light.py`, and `push_skill.py ../../examples/relaxing-music` (a pairing with `skills`).
 
 It answers as a lamp does today: `gesture` and `move` with `{"to": "body"}`,
 `express` as the feelings skill's move and light,
@@ -150,3 +150,30 @@ the only picture, so a `look = true` step there needs `camera = true`; a
 format other than 1 or 2 is refused. The rules between keys, such as permissions
 covering every read, are the lamp's own load check: a folder that passes
 here can still be refused there, with its reason.
+
+## Push a skill to your own lamp
+
+With the `skills` grant, which the owner ticks at pairing, a computer can put
+a skill of its own on its own lamp, with no Store
+([control.md](../../docs/control.md), "Skills pushed from a computer"):
+
+```sh
+lamp skill push path/to/my-skill     # checks it, packs it, sends it in parts
+lamp skill list
+lamp skill remove my-skill
+```
+
+`push` first runs `lamp skill check`, and refuses on this computer what the
+lamp would refuse:
+- a check error;
+- a grant this pairing doesn't hold;
+- a `core` or add-on skill;
+- `hear` or `sound` topics, which wait for format 2's phrase and class lists;
+- a raw topic, or a key outside the protocol's grants.
+
+The lamp checks it all again. A skill that sees the picture is held off until
+the owner says yes in the app, and the answer says so. In code:
+`await lamp.push_skill(folder)`, `await lamp.skills()`,
+`await lamp.remove_skill(name)`. A pushed skill keeps running after this
+computer goes; revoking the computer, or taking back `skills`, turns its
+skills off.

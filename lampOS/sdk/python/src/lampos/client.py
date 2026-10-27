@@ -108,7 +108,8 @@ def _check(op: str, fields: dict) -> None:
     for value in fields.get("events", ()):
         if value not in schema.events():
             raise LampError(f"no event {value!r}", code="bad_request")
-    for value in fields.get("parts", ()):
+    # A lease's parts (a list); `skill.push`'s `parts` is a count.
+    for value in fields.get("parts", ()) if isinstance(fields.get("parts"), list) else ():
         if value not in schema.parts():
             raise LampError(f"no part {value!r}", code="bad_request")
 
@@ -545,4 +546,47 @@ class Lamp:
 
     async def stop(self) -> dict:
         return await self._act("stop", False)
+
+    # Skills of this computer's own, put on the lamp (the `skills` grant;
+    # docs/control.md, "Skills pushed from a computer").
+
+    async def push_skill(self, folder) -> dict:
+        """Check the skill folder as `lamp skill check` does, pack it, and send
+        it in parts; returns the lamp's `skill` (what it asks, whether it's
+        on or held for the owner's yes). A check error, or a grant this
+        pairing lacks, refuses it here, before any byte is sent."""
+        from .push import asks_beyond, pack
+        from .skillcheck import check
+
+        report = check(folder)
+        if not report.ok:
+            raise LampError(f"{report.folder.name}: {report.errors[0]}", code="bad_request")
+        if "skills" not in self.grants:
+            raise BY_CODE["no_grant"]("not granted: skills")
+        beyond = asks_beyond(folder, self.grants)
+        if beyond:
+            code, why = beyond
+            raise BY_CODE[code](why)
+        package = pack(folder)
+        parts = package.parts()
+        reply: dict = {}
+        for part, data in enumerate(parts):
+            reply = await self.request(
+                "skill.push",
+                name=package.name,
+                sha256=package.sha256,
+                size=len(package.data),
+                part=part,
+                parts=len(parts),
+                data=data,
+            )
+        return reply.get("skill", {})
+
+    async def skills(self) -> list[dict]:
+        """This computer's own pushed skills."""
+        return (await self.request("skill.list")).get("skills", [])
+
+    async def remove_skill(self, name: str) -> dict:
+        """Take one of this computer's own pushed skills off the lamp."""
+        return await self.request("skill.remove", name=name)
 

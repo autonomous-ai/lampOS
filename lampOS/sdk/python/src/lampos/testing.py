@@ -134,6 +134,9 @@ class FakeLamp:
         # Every frame that arrived, taken or refused.
         self.received: list[dict] = []
         self.leases: dict[str, dict] = {}
+        # Pushed skills by name, and the one push in flight on the lamp.
+        self.pushed: dict[str, dict] = {}
+        self._pushing: dict | None = None
         self.subscribed: dict[str, set[str]] = defaultdict(set)
         self.state: dict[str, Any] = {
             "presence": {"count": 0},
@@ -298,6 +301,8 @@ class FakeLamp:
             return sorted({self.EVENT_GRANT[e] for e in request.get("events", []) if e in self.EVENT_GRANT})
         if op == "get":
             return ["look"] if "presence" in request.get("state", []) else []
+        if op == "lease.take":
+            return [{"body": "body", "light": "light", "voice": "speak"}[p] for p in request.get("parts", [])]
         body = {"gesture", "move", "play", "joints", "look"}
         if op in body:
             return ["body", "look"] if op == "look" and request.get("at") == "face" else ["body"]
@@ -306,8 +311,58 @@ class FakeLamp:
             "light": ["light"],
             "say": ["speak"],
             "sound": ["speak"],
-            "lease.take": [{"body": "body", "light": "light", "voice": "speak"}[p] for p in request.get("parts", [])],
+            "skill.push": ["skills"],
+            "skill.list": ["skills"],
+            "skill.remove": ["skills"],
         }.get(op, [])
+
+    async def _push(self, ws, client: str, id_: int, request: dict) -> None:
+        """A part of a push, as lamp-control and the helper take it: in order
+        from 0, one push at a time, the whole checked against its SHA-256 and
+        its manifest, then kept as this computer's."""
+        import base64
+        import hashlib
+        import io
+        import tarfile
+
+        going = self._pushing
+        if request["part"] == 0:
+            if going and going["client"] != client:
+                await self._refuse(ws, id_, "busy", "another computer's push is in flight")
+                return
+            going = self._pushing = {"client": client, "request": request, "data": b""}
+        elif not going or going["client"] != client or request["part"] != going["part"] + 1:
+            await self._refuse(ws, id_, "bad_request", "parts out of order")
+            return
+        going["part"] = request["part"]
+        going["data"] += base64.b64decode(request["data"])
+        if request["part"] < request["parts"] - 1:
+            await self._ok(ws, id_, got=request["part"] + 1)
+            return
+        self._pushing = None
+        data = going["data"]
+        if len(data) != request["size"] or hashlib.sha256(data).hexdigest() != request["sha256"].lower():
+            await self._refuse(ws, id_, "bad_request", "the package's SHA-256 doesn't match")
+            return
+        with tarfile.open(fileobj=io.BytesIO(data)) as tar:
+            names = tar.getnames()
+            manifest = json.loads(tar.extractfile("lamp-skill.json").read())
+        if names[0] != "lamp-skill.json" or manifest["name"] != request["name"]:
+            await self._refuse(ws, id_, "refused", "not a package of that skill")
+            return
+        kept = self.pushed.get(request["name"])
+        if kept and kept["client"] != client:
+            await self._refuse(ws, id_, "refused", "another computer's skill has that name")
+            return
+        skill = {
+            "name": manifest["name"],
+            "version": manifest["version"],
+            "sha256": request["sha256"].lower(),
+            "on": True,
+            "held": None,
+        }
+        self.pushed[request["name"]] = {**skill, "client": client, "pushed_at": _now()}
+        await self._ok(ws, id_, skill={**skill, "asks": [], "shown": []})
 
     async def _op(self, ws, client: str, request: dict) -> None:
         op, id_ = request["op"], request["id"]
@@ -367,6 +422,17 @@ class FakeLamp:
                 await self._refuse(ws, id_, "bad_request", "feeling: one of glad, lively, low")
                 return
             await self._ok(ws, id_, to="body", move=_feeling_move(request), light=True)
+        elif op == "skill.push":
+            await self._push(ws, client, id_, request)
+        elif op == "skill.list":
+            await self._ok(ws, id_, skills=[s for s in self.pushed.values() if s["client"] == client])
+        elif op == "skill.remove":
+            kept = self.pushed.get(request["name"])
+            if not kept or kept["client"] != client:
+                await self._refuse(ws, id_, "refused", "not one of this computer's pushed skills")
+                return
+            del self.pushed[request["name"]]
+            await self._ok(ws, id_)
         elif op == "say":
             # As lamp-control: the voice takes it, and its `done` follows.
             await self._ok(ws, id_, to="voice")

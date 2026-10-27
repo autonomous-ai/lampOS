@@ -90,7 +90,8 @@ function check(op, fields) {
   for (const event of fields.events ?? []) {
     if (!schema.events.includes(event)) throw new LampError(`no event ${event}`, { code: 'bad_request' });
   }
-  for (const part of fields.parts ?? []) {
+  // A lease's parts (a list); `skill.push`'s `parts` is a count.
+  for (const part of Array.isArray(fields.parts) ? fields.parts : []) {
     if (!schema.parts.includes(part)) throw new LampError(`no part ${part}`, { code: 'bad_request' });
   }
 }
@@ -367,4 +368,25 @@ export class Lamp {
   say(text) { return this.act('say', { text }); }
   sound(name) { return this.act('sound', { name }); }
   stop() { return this.act('stop', {}); }
+
+  // Skills of this computer's own, put on the lamp (the `skills` grant;
+  // docs/control.md, "Skills pushed from a computer"). `pushSkill(folder)`
+  // packs the folder and sends it in parts, and resolves with the lamp's
+  // `skill`: what it asks, and whether it's on or held for the owner's yes.
+  async pushSkill(folder) {
+    if (!this.grants.includes('skills')) throw new byCode.no_grant('not granted: skills');
+    const { pack } = await import('./push.js');
+    const pkg = pack(folder);
+    let reply = {};
+    for (const [part, data] of pkg.parts.entries()) {
+      reply = await this.request('skill.push', {
+        name: pkg.name, sha256: pkg.sha256, size: pkg.data.length, part, parts: pkg.parts.length, data,
+      });
+    }
+    return reply.skill ?? {};
+  }
+
+  async skills() { return (await this.request('skill.list')).skills ?? []; }
+
+  removeSkill(name) { return this.request('skill.remove', { name }); }
 }

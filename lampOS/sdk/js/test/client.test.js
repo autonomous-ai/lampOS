@@ -1,7 +1,8 @@
 // The SDK against the fake lamp: pairing, hello, events, actions, leases and
 // refusals, as docs/control.md says them. No lamp needed.
 import assert from 'node:assert/strict';
-import { chmodSync, existsSync, mkdtempSync, readFileSync, statSync } from 'node:fs';
+import { execFile, execFileSync } from 'node:child_process';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
@@ -48,7 +49,8 @@ test('proofs name what they are for', async () => {
 
 test('every op has a call and every error code a class', () => {
   const plumbing = new Set(['pair', 'hello', 'subscribe', 'unsubscribe', 'get', 'lease.take', 'lease.renew', 'lease.release']);
-  for (const op of schema.ops) assert.ok(plumbing.has(op) || typeof Lamp.prototype[op] === 'function', op);
+  const named = { 'skill.push': 'pushSkill', 'skill.list': 'skills', 'skill.remove': 'removeSkill' };
+  for (const op of schema.ops) assert.ok(plumbing.has(op) || typeof Lamp.prototype[named[op] ?? op] === 'function', op);
   for (const code of schema.errorCodes) assert.equal(new byCode[code]('x').code, code);
   assert.equal(fromReply({ code: 'rate', why: 'x', retry_ms: 900 }).retryMs, 900);
   assert.ok(fromReply({ code: 'no_grant', why: 'x' }) instanceof byCode.no_grant);
@@ -468,4 +470,114 @@ test('the fake checks the lease before the routing refusal', async () => {
       await assert.rejects(lamp.look('face'), (error) => error.code === 'refused' && error.why.startsWith('not routed yet'));
     });
   });
+});
+
+function skillFolder(name, rules = 'version = "0.1.0"\n[permissions]\nlight = true\n') {
+  const dir = join(folder(), name);
+  mkdirSync(join(dir, 'moves'), { recursive: true });
+  writeFileSync(join(dir, 'SKILL.md'), `---\nname: ${name}\ndescription: A test skill.\n---\n`);
+  writeFileSync(join(dir, 'skill.toml'), rules);
+  writeFileSync(join(dir, 'moves', 'wave.json'), '{}');
+  writeFileSync(join(dir, '.DS_Store'), '\0mac');
+  return dir;
+}
+
+test('a skill is packed as lamp-skills packs it, and tar reads it', async () => {
+  const { pack } = await import('../src/push.js');
+  const dir = skillFolder('desk-wave');
+  const pkg = pack(dir);
+  assert.deepEqual(pack(dir).data, pkg.data, 'the same folder packs to the same bytes');
+  const file = join(folder(), 'p.tar');
+  writeFileSync(file, pkg.data);
+  const listed = execFileSync('tar', ['-tvf', file], { encoding: 'utf8' }).trim().split('\n');
+  assert.deepEqual(listed.map((line) => line.split(/\s+/).at(-1)), ['lamp-skill.json', 'desk-wave/SKILL.md', 'desk-wave/moves/wave.json', 'desk-wave/skill.toml']);
+  assert.ok(listed.every((line) => line.startsWith('-rw-r--r--')), listed.join('\n'));
+  const manifest = JSON.parse(execFileSync('tar', ['-xOf', file, 'lamp-skill.json'], { encoding: 'utf8' }));
+  assert.deepEqual([manifest.format, manifest.name, manifest.version], [1, 'desk-wave', '0.1.0']);
+  assert.deepEqual(manifest.files.map((f) => f.path), ['SKILL.md', 'moves/wave.json', 'skill.toml']);
+});
+
+// Reviewer-lead's P3 on #4029: a literal string is TOML too, and Python packs it.
+test('a version in a literal string packs as in a basic one', async () => {
+  const { pack } = await import('../src/push.js');
+  const pkg = pack(skillFolder('desk-lit', "version = '0.2.0'\n[permissions]\nlight = true\n"));
+  assert.equal(pkg.version, '0.2.0');
+});
+
+test('a skill is pushed in parts, listed and removed', async () => {
+  const push = await import('../src/push.js');
+  await withLamp({ grants: ['light', 'skills'] }, async (lamp, fake) => {
+    const skill = await lamp.pushSkill(skillFolder('desk-wave'));
+    assert.deepEqual([skill.name, skill.version, skill.on], ['desk-wave', '0.1.0', true]);
+    assert.equal(fake.asked('skill.push').length, push.pack(skillFolder('desk-wave')).parts.length);
+    assert.deepEqual((await lamp.skills()).map((s) => s.name), ['desk-wave']);
+    await lamp.removeSkill('desk-wave');
+    assert.deepEqual(await lamp.skills(), []);
+  });
+});
+
+test('lamp skill push, list and remove run as the Python CLI\'s do', async () => {
+  const fake = await FakeLamp.start({ grants: ['light', 'skills'] });
+  const home = folder();
+  try {
+    await Lamp.pair(fake.code, fake.host, { pin: fake.pin, port: fake.port, keyring: new Keyring(home) });
+    // Not execFileSync: the fake answers on this process's event loop.
+    const lamp = (...args) => new Promise((done) => {
+      execFile(process.execPath, [new URL('../src/cli.js', import.meta.url).pathname, ...args], { env: { ...process.env, LAMPOS_HOME: home } },
+        (error, stdout, stderr) => done({ code: error?.code ?? 0, out: stdout.trim(), err: stderr.trim() }));
+    });
+    assert.deepEqual(await lamp('skill', 'push', skillFolder('desk-wave')), { code: 0, out: 'desk-wave 0.1.0 pushed, on', err: '' });
+    assert.equal((await lamp('skill', 'list')).out, 'desk-wave\t0.1.0\ton');
+    assert.equal((await lamp('skill', 'remove', 'desk-wave')).out, 'desk-wave removed');
+    assert.equal((await lamp('skill', 'list')).out, '');
+    const core = await lamp('skill', 'push', skillFolder('core', 'version = "0.1.0"\nkind = "core"\n'));
+    assert.deepEqual([core.code, core.err], [1, 'lamp: refused: kind = "core": a pushed skill is installable']);
+    assert.deepEqual(fake.asked('skill.remove'), [{ name: 'desk-wave' }]);
+  } finally { await fake.stop(); }
+});
+
+test('a push without the skills grant, or of a core skill, sends nothing', async () => {
+  await withLamp({ grants: ['light'] }, async (lamp, fake) => {
+    await assert.rejects(lamp.pushSkill(skillFolder('lit')), byCode.no_grant);
+    assert.equal(fake.asked('skill.push').length, 0);
+  });
+  await withLamp({ grants: ['light', 'skills'] }, async (lamp, fake) => {
+    await assert.rejects(lamp.pushSkill(skillFolder('core', 'version = "0.1.0"\nkind = "core"\n')), (error) => error.code === 'refused' && /installable/.test(error.why));
+    assert.equal(fake.asked('skill.push').length, 0);
+  });
+});
+
+// harness-reviewer's P3 on #4029: the tar crate's bytes, so this, the Python
+// SDK and `lamp-skills pack` give one SHA-256 for one folder (the Python test
+// pins the same digest).
+test('a skill packs to the bytes lamp-skills writes', async () => {
+  const { pack } = await import('../src/push.js');
+  const dir = join(folder(), 'desk-golden');
+  mkdirSync(join(dir, 'moves'), { recursive: true });
+  writeFileSync(join(dir, 'SKILL.md'), '---\nname: desk-golden\ndescription: A test skill.\n---\n');
+  writeFileSync(join(dir, 'skill.toml'), 'version = "0.1.0"\n[permissions]\nlight = true\n');
+  writeFileSync(join(dir, 'moves', 'wave.json'), '{}');
+  const pkg = pack(dir);
+  assert.equal(pkg.sha256, '4b956fc5e58e17f1165e68ccb16024df1a135a14e65d50b94febe372bf4a8321');
+  assert.match(pkg.data.subarray(148, 156).toString('latin1'), /^[0-7]{7}\0$/);
+  assert.equal(pkg.data.length, 5 * 1024);
+});
+
+// Reviewer-lead's P3 on #4029: lamp-skills' path rule first, then the tar
+// crate's ustar cut, never a name cut short.
+test('a path lamp-skills refuses or no header holds is refused before packing', async () => {
+  const { pack } = await import('../src/push.js');
+  const skill = (name, path) => {
+    const dir = join(folder(), name);
+    mkdirSync(join(dir, path, '..'), { recursive: true });
+    writeFileSync(join(dir, 'skill.toml'), 'version = "0.1.0"\n');
+    writeFileSync(join(dir, path), '{}');
+    return dir;
+  };
+  assert.throws(() => pack(skill('desk-part', `${'m'.repeat(101)}.json`)), (error) => /at most 4 parts/.test(error.why));
+  assert.throws(() => pack(skill('desk-deep', 'a/b/c/d/e.json')), (error) => /at most 4 parts/.test(error.why));
+  const file = join(folder(), 'long.tar');
+  writeFileSync(file, pack(skill('desk-long', `${'a'.repeat(100)}/w.json`)).data);
+  assert.ok(execFileSync('tar', ['-tf', file], { encoding: 'utf8' }).split('\n').includes(`desk-long/${'a'.repeat(100)}/w.json`));
+  assert.throws(() => pack(skill('desk-over', `${'a'.repeat(100)}/${'b'.repeat(100)}/c.json`)), (error) => /longer than a tar header holds/.test(error.why));
 });
