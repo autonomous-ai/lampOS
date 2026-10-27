@@ -2208,8 +2208,15 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                 change.set_lit(own_light.lit(light));
             }
             // With `LAMP_FACE_FULL_CROP=on`, the decoded frame is kept for
-            // this look, for the near face's print (`who::align_full`).
-            let (decoded, full_frame) = if who.as_ref().is_some_and(|who| who.held.on()) {
+            // this look, for the near face's print (`who::align_full`), and
+            // with `--full-look` and `--mouth-model`, for the mouths' mesh
+            // (`mesh::crop_full`): a seated face's eyes are about 20 of the
+            // picture's pixels apart, too few for the mesh to be judged on.
+            // The picture is shrunk from that same decode, so keeping it
+            // costs no second decode.
+            let full_crop = who.as_ref().is_some_and(|who| who.held.on());
+            let full_mouth = arguments.full_look.is_some() && mesh.is_some();
+            let (decoded, full_frame) = if full_crop || full_mouth {
                 match Picture::from_jpeg_full(&frame[..used]) {
                     Ok((picture, full)) => (Ok(picture), Some(full)),
                     Err(error) => (Err(error), None),
@@ -2289,6 +2296,11 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                         // Each meshed face's points this look, for a
                         // Blendshape V2 read due on it below.
                         let mut meshed: Vec<(usize, Vec<f32>)> = Vec::new();
+                        // The frame at its own size the mouths are cut
+                        // from, with `--full-look`, and how many of its
+                        // pixels a detector pixel is.
+                        let mouth_frame = full_frame.as_ref().filter(|_| full_mouth);
+                        let mesh_scale = mouth_frame.map_or(1.0, |frame| 1.0 / frame.scale);
                         if let Some(mesh) = mesh.as_mut()
                             && mouth_wanted
                         {
@@ -2303,13 +2315,16 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                                 }
                                 let face = &faces[index];
                                 let one = Instant::now();
-                                let open = mesh.landmarks(&picture, face).map(|landmarks| {
-                                    landmarks.and_then(|landmarks| {
-                                        let open = lamp_eyes::mesh::mouth_open(&landmarks);
-                                        meshed.push((index, landmarks));
-                                        open
-                                    })
-                                });
+                                let open = lamp_eyes::mesh::crop_of(&picture, mouth_frame, face)
+                                    .map(|input| mesh.landmarks_of(input))
+                                    .transpose()
+                                    .map(|landmarks| {
+                                        landmarks.and_then(|landmarks| {
+                                            let open = lamp_eyes::mesh::mouth_open(&landmarks);
+                                            meshed.push((index, landmarks));
+                                            open
+                                        })
+                                    });
                                 last = one.elapsed();
                                 let eyes = lamp_eyes::speaking::shape(&face.marks)
                                     .map_or(0.0, |shape| shape.1);
@@ -2332,6 +2347,7 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                         }
                         if let Some(bus) = bus_out.as_mut() {
                             let now = lamp_ipc::monotonic_us();
+                            bus.set_mesh_scale(mesh_scale);
                             bus.saw(&faces, &opens, picture.filled, now);
                             if let Some(answered) = answered.as_mut() {
                                 answered.looked(now, bus.talking());
@@ -2373,7 +2389,7 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                                 bus_out.as_ref().and_then(|bus| bus.speaking_id(index))
                             });
                             let print = near
-                                .and_then(|(_, (face, _))| match &full_frame {
+                                .and_then(|(_, (face, _))| match full_frame.as_ref().filter(|_| full_crop) {
                                     Some(full) => lamp_eyes::who::align_full(full, &face.marks),
                                     None => align(&picture, &face.marks),
                                 })
@@ -2697,7 +2713,7 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                                 .position(|(at, _)| *at == index)
                                 .map(|at| meshed.swap_remove(at));
                             match lamp_eyes::blendshapes::input(points, index, || {
-                                lamp_eyes::mesh::crop(&picture, face)
+                                lamp_eyes::mesh::crop_of(&picture, mouth_frame, face)
                             })
                             .zip(lamp_eyes::mesh::eye_line(face))
                             {
