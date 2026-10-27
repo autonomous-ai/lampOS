@@ -11,8 +11,9 @@ SDKs generate from.
 **Built so far** (Nine, `crates/control`):
 - **piece 1** (#3715): the protocol's messages and checks (`protocol.rs`), the lease rules (`lease.rs`) and the rates (`rate.rs`), with their tests;
 - **piece 2** (#3736): pairing and hello (`pairing.rs`), and each connection's session over grants, leases and rates (`session.rs`).
+- **piece 3**: the door on the network (`server.rs`, `cert.rs`, the `lamp-control` binary): WebSocket over TLS 1.3 at `/v1`, the lamp's own certificate, and the owner's admin socket. Every action is still refused with a why (`not routed to the lamp's parts yet`) until the routing piece.
 
-**Nothing listens yet**, and there's no unit: the server, discovery and the routing to the parts are the next pieces, off unless `LAMP_CONTROL=on`, and the owner turns developer
+**No unit carries it yet**, so nothing listens on a lamp; discovery and the routing to the parts are the next pieces, off unless `LAMP_CONTROL=on`, and the owner turns developer
 access on in the app. This
 page is the contract it and the SDKs are built to. Its protocol types, lease
 rules and rates are `crates/control` (Nine, #3715), and the schema follows
@@ -123,6 +124,30 @@ own consent screen.
 | Script skills: code on the lamp, sandboxed, the same protocol on a local socket | developers who want it to run without their computer | 3 |
 | No-code editing by voice and the app | everyone | 4 |
 
+## Running the door (piece 3)
+
+```text
+lamp-control serve [--state-dir DIR] [--listen ADDR] [--admin-socket PATH] [--name NAME]
+lamp-control code --grants body,light,speak,look  # the owner's side: a pairing code and the pin; look for presence events
+lamp-control revoke c_…
+lamp-control clients
+```
+
+- **Off by default:** `serve` runs only with `LAMP_CONTROL=on`; otherwise it says so and exits 0. No product unit passes it yet.
+- **The certificate:** made on first start in `--state-dir` (`/var/lib/lampos-control`): P-256, valid to 2100, `cert.der` and `key.der`, the key 0600. Its pin, the certificate's SHA-256 in hex, is journaled at start and returned with every pairing code.
+- **Listening:** `--listen`, `0.0.0.0:7731` by default. TLS 1.3 only, and only `/v1`: any other path is 404 before the WebSocket opens.
+  - Frames are capped at 64 KiB, text only.
+  - The TLS and WebSocket handshakes must finish within 10 s of the TCP connection, or it is closed.
+  - At most 32 connections at once, and 4 from one address. Past either, a new connection is closed at once, holding nothing. An accept that fails waits 100 ms before the next.
+  - A connection that says neither `pair` nor `hello` within 30 s is closed, and so is one quiet for 2 minutes. A WebSocket ping or pong counts, so a client that only listens stays open on its keepalive.
+  - Lease changes (a lapse, a conversation, a hand) go to every connection of the computer that held the lease.
+- **The owner's side:** `--admin-socket`, `/run/lampos-control/admin.sock`, 0600 in a 0700 folder, one JSON object a line:
+  - `{"code": {"grants": [...]}}` → `{"code", "pin"}`;
+  - `{"revoke": "c_…"}` → `{"revoked"}`;
+  - `{"clients": true}` → the list.
+
+  The app reaches it through the lamp's cloud part in a later piece.
+
 ## The wire
 
 **Where:** `wss://<lamp>.local:7731/v1`, served by `lamp-control`. Nothing
@@ -201,8 +226,8 @@ zero byte, then the welcome's 32 nonce bytes. Each proof names what it is for,
 so one made for pairing can never stand as a hello's, or the other way round
 (Nine, #3504). An unpaired client, a revoked one or a bad signature gets
 `unpaired` and the connection closes. One `hello` a connection: a second is
-`bad_request`. A revoked computer's open connections get `unpaired` at their
-next frame and close, and its leases end; they also end when its last
+`bad_request`. A revoked computer's open connections close at once, a
+listener's included, after its leases' `lost`, and its leases end; they also end when its last
 connection closes. `limits` says the rates below, so an
 SDK can keep under them: for each class (`joints`, `motion`, `light`, `say`,
 `express`) a list of `{"most": N, "within_ms": M}`, and `hold_max_ms`,

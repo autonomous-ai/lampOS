@@ -33,6 +33,23 @@ pub trait Parts {
     fn stop(&mut self, client: &str, now_us: u64);
 }
 
+/// The parts before actions are routed to them: every action is refused
+/// with a why, and state is not known yet.
+pub struct Unrouted;
+
+impl Parts for Unrouted {
+    fn act(&mut self, _: &str, _: &Op, _: u64) -> Result<Value, Error> {
+        Err(Error::new(
+            ErrorCode::Refused,
+            "not routed to the lamp's parts yet",
+        ))
+    }
+    fn state(&self, _: StateKind) -> Value {
+        Value::Null
+    }
+    fn stop(&mut self, _: &str, _: u64) {}
+}
+
 /// One connection's own state.
 #[derive(Debug)]
 pub struct Session {
@@ -135,7 +152,8 @@ impl Door {
     }
 
     /// The owner revokes `client`: its leases end, told. Whether it was
-    /// paired. Its connections close at their next frame.
+    /// paired. The server closes its connections at once; a frame that
+    /// beats it is refused.
     pub fn revoke(&mut self, client: &str, now_us: u64) -> std::io::Result<(bool, Vec<Change>)> {
         let was = self.clients.revoke(client);
         if was {
@@ -162,6 +180,11 @@ impl Door {
             return self.leases.client_gone(client, LeaseWhy::Released, now_us);
         }
         Vec::new()
+    }
+
+    /// The paired computers.
+    pub fn clients(&self) -> &Clients {
+        &self.clients
     }
 
     /// The lamp's own events for every lease: a conversation began or ended,
@@ -308,15 +331,22 @@ impl Door {
                 "another computer holds the body".to_owned(),
             );
         }
-        if let Some(class) = Class::of(&op)
-            && let Err(retry_ms) = self.rates.take(&client, class, now_us)
+        let class = Class::of(&op);
+        if let Some(class) = class
+            && let Err(retry_ms) = self.rates.check(&client, class, now_us)
         {
-            let mut error = Error::new(ErrorCode::Rate, format!("{class:?} rate"));
+            let mut error = Error::new(ErrorCode::Rate, class.says());
             error.retry_ms = Some(retry_ms);
             return reply_refused(Some(re), error);
         }
         match parts.act(&client, &op, now_us) {
-            Ok(with) => ok(re, with),
+            Ok(with) => {
+                // Counted only once the part took it.
+                if let Some(class) = class {
+                    self.rates.count(&client, class, now_us);
+                }
+                ok(re, with)
+            }
             Err(error) => reply_refused(Some(re), error),
         }
     }
@@ -699,6 +729,24 @@ mod tests {
         assert!(outcome.close);
     }
 
+    /// harness-reviewer's P2 on #3778: an action the part refuses isn't
+    /// counted against its rate.
+    #[test]
+    fn an_action_the_part_refuses_is_not_counted() {
+        let computer = Computer::new(1);
+        let (mut door, mut session, mut fake) = paired(&computer, &[Grant::Body, Grant::Light]);
+        fake.refuse_with = Some(Error::new(ErrorCode::Refused, "not routed"));
+        let express = r#"{"id":3,"op":"express","feeling":"happy"}"#;
+        let refused = door.handle(&mut session, express, &mut fake, 2 * S, 1);
+        assert_eq!(code_of(&refused), Some("refused"));
+        fake.refuse_with = None;
+        let taken = door.handle(&mut session, express, &mut fake, 3 * S, 1);
+        assert_eq!(reply(&taken)["ok"], true, "{:?}", taken.send);
+        let again = door.handle(&mut session, express, &mut fake, 4 * S, 1);
+        assert_eq!(code_of(&again), Some("rate"));
+        assert_eq!(reply(&again)["error"]["why"], "express: 1 a minute");
+    }
+
     #[test]
     fn grants_leases_the_body_holder_and_rates_are_checked_before_the_part() {
         let computer = Computer::new(1);
@@ -754,6 +802,7 @@ mod tests {
         );
         assert_eq!(code_of(&again), Some("rate"));
         assert_eq!(reply(&again)["error"]["retry_ms"], 1000);
+        assert_eq!(reply(&again)["error"]["why"], "motion: 1 each 2 s");
         let joints = door.handle(
             &mut session,
             r#"{"id":8,"op":"joints","lease":"l_9","targets":{"pitch":3},"within_ms":200}"#,
