@@ -1,0 +1,136 @@
+{
+  "changes": [
+    {
+      "path": "lampOS/crates/update/src/head_touch.rs",
+      "authored": {
+        "path": "lampOS/crates/update/src/head_touch.rs",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "eabce9979706dd25226a36a1720f366351ed3263",
+        "size": 21864,
+        "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/eabce9979706dd25226a36a1720f366351ed3263"
+      },
+      "actual": {
+        "path": "lampOS/crates/update/src/head_touch.rs",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "f0f048d74a3010d0dd917b08b8eca0d31b239ad9",
+        "size": 22043,
+        "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/f0f048d74a3010d0dd917b08b8eca0d31b239ad9"
+      }
+    },
+    {
+      "path": "lampOS/crates/update/src/head_touch/capture.rs",
+      "authored": null,
+      "actual": {
+        "path": "lampOS/crates/update/src/head_touch/capture.rs",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "5deea5940ac2427a790425c842165ba264644181",
+        "size": 23567,
+        "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/5deea5940ac2427a790425c842165ba264644181"
+      }
+    },
+    {
+      "path": "lampOS/crates/update/src/head_touch/capture/codec.rs",
+      "authored": null,
+      "actual": {
+        "path": "lampOS/crates/update/src/head_touch/capture/codec.rs",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "f5d233a33dbe6328f12e4d5e6856a7db53ce4279",
+        "size": 69742,
+        "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/f5d233a33dbe6328f12e4d5e6856a7db53ce4279"
+      }
+    },
+    {
+      "path": "lampOS/crates/update/src/head_touch/capture/codec/tests.rs",
+      "authored": null,
+      "actual": {
+        "path": "lampOS/crates/update/src/head_touch/capture/codec/tests.rs",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "04537dd4ad9e9fa26b7a033739d1f91ebb414dd1",
+        "size": 42099,
+        "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/04537dd4ad9e9fa26b7a033739d1f91ebb414dd1"
+      }
+    },
+    {
+      "path": "lampOS/crates/update/src/head_touch/capture/tests.rs",
+      "authored": null,
+      "actual": {
+        "path": "lampOS/crates/update/src/head_touch/capture/tests.rs",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "442d2cb4598035b0974c5f3d7a39e7edd89f3b76",
+        "size": 27694,
+        "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/442d2cb4598035b0974c5f3d7a39e7edd89f3b76"
+      }
+    },
+    {
+      "path": "lampOS/docs/head-touch-capture.md",
+      "authored": null,
+      "actual": {
+        "path": "lampOS/docs/head-touch-capture.md",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "5aaff01db09dd8d1432dc226f002745ff9f9ff4a",
+        "size": 12993,
+        "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/5aaff01db09dd8d1432dc226f002745ff9f9ff4a"
+      }
+    },
+    {
+      "path": "lampOS/docs/head-touch-codec.md",
+      "authored": null,
+      "actual": {
+        "path": "lampOS/docs/head-touch-codec.md",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "917fc48e0c02a2fbae4135972f35b6a8b07bfd4e",
+        "size": 6615,
+        "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/917fc48e0c02a2fbae4135972f35b6a8b07bfd4e"
+      }
+    },
+    {
+      "path": "lampOS/docs/reuse-decisions.md",
+      "authored": {
+        "path": "lampOS/docs/reuse-decisions.md",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "050d3e9eab4bc54a7af2197e7b036f99681316c6",
+        "size": 149763,
+        "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/050d3e9eab4bc54a7af2197e7b036f99681316c6"
+      },
+      "actual": {
+        "path": "lampOS/docs/reuse-decisions.md",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "9c29653056a211f84aed8f67b5a37d8723772c87",
+        "size": 152042,
+        "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/9c29653056a211f84aed8f67b5a37d8723772c87"
+      }
+    },
+    {
+      "path": "lampOS/docs/updates.md",
+      "authored": {
+        "path": "lampOS/docs/updates.md",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "8e3b89613d7eb71116eec5a822faff2cad78c54c",
+        "size": 172369,
+        "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/8e3b89613d7eb71116eec5a822faff2cad78c54c"
+      },
+      "actual": {
+        "path": "lampOS/docs/updates.md",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "07f7cfbeb5b452fb264e832ad5cb1883d4a47619",
+        "size": 175594,
+        "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/07f7cfbeb5b452fb264e832ad5cb1883d4a47619"
+      }
+    }
+  ],
+  "count": 9,
+  "actual_preview": "bed131c54859d30f1d1768d3c3fbe5ab98ae8579",
+  "authored_head": "527a103ed04f78c6ecc38ab0cc3e70508a7dba83"
+}

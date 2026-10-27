@@ -1,0 +1,19 @@
+{
+  "status": "ROOT_VERIFIED_LATEST_SKILLS_FULL_FOR_OWN_PUSH",
+  "head": "527a103ed04f78c6ecc38ab0cc3e70508a7dba83",
+  "base": "ef90c8561b3f9b22472f1962ea1ffb10bf6a423b",
+  "live_main_at_admission": "fc9c781afaed38dc976f650484c30f65bf5db57a",
+  "same_base_at_observation": false,
+  "full_package": {
+    "passed": 557,
+    "failed": 0,
+    "ignored": 9
+  },
+  "required3_once": true,
+  "sealed": 190,
+  "actual": 7,
+  "whole_owned_blobs_modes_patch_equal": true,
+  "range_diff": "1:  6c931b8cd = 1:  527a103ed lampOS: count completed addon judgements from new journal bytes\n",
+  "old_Doc3_parent_runtime_not_replayed": true,
+  "draft_until_new_native_current_reads": true
+}

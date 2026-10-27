@@ -1,0 +1,7 @@
+{
+  "file_count_each": 10913,
+  "canonical_before_after_SHA256": "bea011e7263ef0aa0895f8875c42b860bfc55fef3a5e2e6180bc07e0709ac1a3",
+  "official_before_after_SHA256": "1911bbbad34f47ca385f9347cec17f2be97d5da1acecd45881bd82f227547263",
+  "canonical_official_equal_except_branch": true,
+  "same_scope_only_no_live_cache_or_owner_rehash": true
+}

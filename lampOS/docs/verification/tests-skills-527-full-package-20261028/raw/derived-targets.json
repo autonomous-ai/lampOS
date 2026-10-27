@@ -1,0 +1,232 @@
+{
+  "test_drivers": [
+    {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///private/tmp/tests-skills-canonical-20261028/lampOS/crates/skills#lamp-skills@0.1.0",
+      "manifest_path": "/private/tmp/tests-skills-canonical-20261028/lampOS/crates/skills/Cargo.toml",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "it",
+        "src_path": "/private/tmp/tests-skills-canonical-20261028/lampOS/crates/skills/tests/it/main.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "filenames": [
+        "/private/tmp/tests-body-holder-cargo-20261027/debug/deps/it-aabcadd0c6d2694b"
+      ],
+      "executable": "/private/tmp/tests-body-holder-cargo-20261027/debug/deps/it-aabcadd0c6d2694b",
+      "fresh": false
+    },
+    {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///private/tmp/tests-skills-canonical-20261028/lampOS/crates/skills#lamp-skills@0.1.0",
+      "manifest_path": "/private/tmp/tests-skills-canonical-20261028/lampOS/crates/skills/Cargo.toml",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "release_pair",
+        "src_path": "/private/tmp/tests-skills-canonical-20261028/lampOS/crates/skills/tests/release_pair.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "filenames": [
+        "/private/tmp/tests-body-holder-cargo-20261027/debug/deps/release_pair-e9612804d54e7498"
+      ],
+      "executable": "/private/tmp/tests-body-holder-cargo-20261027/debug/deps/release_pair-e9612804d54e7498",
+      "fresh": true
+    },
+    {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///private/tmp/tests-skills-canonical-20261028/lampOS/crates/skills#lamp-skills@0.1.0",
+      "manifest_path": "/private/tmp/tests-skills-canonical-20261028/lampOS/crates/skills/Cargo.toml",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-skills",
+        "src_path": "/private/tmp/tests-skills-canonical-20261028/lampOS/crates/skills/src/main.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "filenames": [
+        "/private/tmp/tests-body-holder-cargo-20261027/debug/deps/lamp_skills-b6219d16028772de"
+      ],
+      "executable": "/private/tmp/tests-body-holder-cargo-20261027/debug/deps/lamp_skills-b6219d16028772de",
+      "fresh": true
+    },
+    {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///private/tmp/tests-skills-canonical-20261028/lampOS/crates/skills#lamp-skills@0.1.0",
+      "manifest_path": "/private/tmp/tests-skills-canonical-20261028/lampOS/crates/skills/Cargo.toml",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "requested_audio",
+        "src_path": "/private/tmp/tests-skills-canonical-20261028/lampOS/crates/skills/tests/requested_audio.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "filenames": [
+        "/private/tmp/tests-body-holder-cargo-20261027/debug/deps/requested_audio-deef722372f12c7e"
+      ],
+      "executable": "/private/tmp/tests-body-holder-cargo-20261027/debug/deps/requested_audio-deef722372f12c7e",
+      "fresh": true
+    },
+    {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///private/tmp/tests-skills-canonical-20261028/lampOS/crates/skills#lamp-skills@0.1.0",
+      "manifest_path": "/private/tmp/tests-skills-canonical-20261028/lampOS/crates/skills/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_skills",
+        "src_path": "/private/tmp/tests-skills-canonical-20261028/lampOS/crates/skills/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "filenames": [
+        "/private/tmp/tests-body-holder-cargo-20261027/debug/deps/lamp_skills-8299c9194e44862b"
+      ],
+      "executable": "/private/tmp/tests-body-holder-cargo-20261027/debug/deps/lamp_skills-8299c9194e44862b",
+      "fresh": true
+    }
+  ],
+  "normal_program_helpers": [
+    {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///private/tmp/tests-skills-canonical-20261028/lampOS/crates/skills#lamp-skills@0.1.0",
+      "manifest_path": "/private/tmp/tests-skills-canonical-20261028/lampOS/crates/skills/Cargo.toml",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-skills",
+        "src_path": "/private/tmp/tests-skills-canonical-20261028/lampOS/crates/skills/src/main.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "filenames": [
+        "/private/tmp/tests-body-holder-cargo-20261027/debug/lamp-skills"
+      ],
+      "executable": "/private/tmp/tests-body-holder-cargo-20261027/debug/lamp-skills",
+      "fresh": true
+    },
+    {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///private/tmp/tests-skills-canonical-20261028/lampOS/crates/skills#lamp-skills@0.1.0",
+      "manifest_path": "/private/tmp/tests-skills-canonical-20261028/lampOS/crates/skills/Cargo.toml",
+      "target": {
+        "kind": [
+          "example"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "render_relaxing_music",
+        "src_path": "/private/tmp/tests-skills-canonical-20261028/lampOS/crates/skills/examples/render_relaxing_music.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": false
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "filenames": [
+        "/private/tmp/tests-body-holder-cargo-20261027/debug/examples/render_relaxing_music"
+      ],
+      "executable": "/private/tmp/tests-body-holder-cargo-20261027/debug/examples/render_relaxing_music",
+      "fresh": true
+    }
+  ],
+  "custom_targets": [],
+  "all_counts_metadata_derived": true
+}

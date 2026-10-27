@@ -1,0 +1,17 @@
+{
+  "base": "82a62867cc1bcbbc4b0848519c6757f623d112ce",
+  "admitted_base": "ef90c8561b3f9b22472f1962ea1ffb10bf6a423b",
+  "actual_changed_paths": [
+    "lampOS/crates/name/src/main.rs",
+    "lampOS/docs/install.md",
+    "lampOS/docs/name.md"
+  ],
+  "allowed_changed_paths": [
+    "lampOS/crates/name/src/main.rs",
+    "lampOS/docs/install.md",
+    "lampOS/docs/name.md"
+  ],
+  "all_other_tracked_entries_equal": 10910,
+  "Name_code_explicitly_allowed_not_asserted_outside_all_closures": true,
+  "no_runtime_reuse": true
+}

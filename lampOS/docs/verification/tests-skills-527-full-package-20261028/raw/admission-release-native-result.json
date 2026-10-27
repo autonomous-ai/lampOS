@@ -1,0 +1,13 @@
+{
+  "exit_code": 0,
+  "stdout": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-latest-doc3-full-gates-prep-20261028/atomic-bindings/release.stdout",
+    "sha256": "da8402e2a36265a2889aa13003c6c93480b7890b698c6c6ccdfffd4d4ac07d8f",
+    "bytes": 28
+  },
+  "stderr": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-latest-doc3-full-gates-prep-20261028/atomic-bindings/release.stderr",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  }
+}

@@ -1,0 +1,73 @@
+{
+  "definition": "Original log warning-colon and GitHub warning annotations; exact lines retained, no inference from success status",
+  "records": {
+    "ARM64": [
+      {
+        "file": "ARM64-job-122508916472.log",
+        "line": 135,
+        "raw": "2026-10-27T22:29:10.7141563Z rehash: warning: skipping ca-certificates.crt,it does not contain exactly one certificate or CRL"
+      },
+      {
+        "file": "ARM64-job-122508916472.log",
+        "line": 666,
+        "raw": "2026-10-27T22:30:08.7431100Z warning: output filename collision at /home/runner/work/lampOS/lampOS/lampOS/target/release/examples/replay_cost"
+      },
+      {
+        "file": "ARM64-job-122508916472.log",
+        "line": 671,
+        "raw": "2026-10-27T22:30:08.7435257Z warning: output filename collision at /home/runner/work/lampOS/lampOS/lampOS/target/release/examples/replay_cost.dwp"
+      },
+      {
+        "file": "ARM64-job-122508916472.log",
+        "line": 676,
+        "raw": "2026-10-27T22:30:08.7439840Z warning: output filename collision at /home/runner/work/lampOS/lampOS/lampOS/target/release/examples/progress_cost"
+      },
+      {
+        "file": "ARM64-job-122508916472.log",
+        "line": 681,
+        "raw": "2026-10-27T22:30:08.7444128Z warning: output filename collision at /home/runner/work/lampOS/lampOS/lampOS/target/release/examples/progress_cost.dwp"
+      },
+      {
+        "file": "ARM64-job-122508916472.log",
+        "line": 824,
+        "raw": "2026-10-27T22:34:29.5148687Z warning: output filename collision at /home/runner/work/lampOS/lampOS/lampOS/target/release/examples/replay_cost"
+      },
+      {
+        "file": "ARM64-job-122508916472.log",
+        "line": 829,
+        "raw": "2026-10-27T22:34:29.5153553Z warning: output filename collision at /home/runner/work/lampOS/lampOS/lampOS/target/release/examples/replay_cost.dwp"
+      },
+      {
+        "file": "ARM64-job-122508916472.log",
+        "line": 834,
+        "raw": "2026-10-27T22:34:29.5158297Z warning: output filename collision at /home/runner/work/lampOS/lampOS/lampOS/target/release/examples/progress_cost"
+      },
+      {
+        "file": "ARM64-job-122508916472.log",
+        "line": 839,
+        "raw": "2026-10-27T22:34:29.5162496Z warning: output filename collision at /home/runner/work/lampOS/lampOS/lampOS/target/release/examples/progress_cost.dwp"
+      },
+      {
+        "file": "ARM64-job-122508916472.log",
+        "line": 9505,
+        "raw": "2026-10-27T22:44:02.7188490Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/cache/restore@v4, actions/checkout@v4, actions/upload-artifact@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/"
+      }
+    ],
+    "Linux-clippy": [
+      {
+        "file": "Linux-clippy-job-122508916434.log",
+        "line": 181,
+        "raw": "2026-10-27T22:29:02.0020804Z rehash: warning: skipping ca-certificates.crt,it does not contain exactly one certificate or CRL"
+      },
+      {
+        "file": "Linux-clippy-job-122508916434.log",
+        "line": 633,
+        "raw": "2026-10-27T22:33:58.5754769Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/cache/restore@v4, actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/"
+      }
+    ]
+  },
+  "counts": {
+    "ARM64": 10,
+    "Linux-clippy": 2
+  }
+}

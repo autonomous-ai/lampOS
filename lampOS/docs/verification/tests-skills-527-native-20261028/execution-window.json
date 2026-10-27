@@ -1,0 +1,40 @@
+{
+  "starting_line": 860,
+  "summary_line": 8712,
+  "following_group_line": 9130,
+  "start_raw": "2026-10-27T22:40:46.6904502Z     Starting 7850 tests across 70 binaries (54 tests and 120 binaries skipped)",
+  "summary_raw": "2026-10-27T22:43:40.3696125Z      Summary [ 173.680s] 7850 tests run: 7850 passed, 54 skipped",
+  "selected": 7850,
+  "binaries": 70,
+  "aggregate_skips": 54,
+  "skipped_binaries": 120,
+  "execution_records": 7850,
+  "unique_identities": 7850,
+  "unique_ordinals": 7850,
+  "outcomes": {
+    "PASS": 7850
+  },
+  "unobserved_selected": 0,
+  "duplicate_execution_identities": [],
+  "post_summary_reprints": 34,
+  "outside_records": [],
+  "retry_flaky_records": [],
+  "selected_packages": [
+    "lamp-body",
+    "lamp-cloud",
+    "lamp-expression",
+    "lamp-keeper",
+    "lamp-lean",
+    "lamp-memory",
+    "lamp-peek",
+    "lamp-setup",
+    "lamp-skills",
+    "lamp-update",
+    "lamp-voice",
+    "lamp-voice-eval"
+  ],
+  "picked_raw": [
+    821,
+    "2026-10-27T22:34:28.9791016Z   PICKED: package(=lamp-body) | package(=lamp-cloud) | package(=lamp-expression) | package(=lamp-keeper) | package(=lamp-lean) | package(=lamp-memory) | package(=lamp-peek) | package(=lamp-setup) | package(=lamp-skills) | package(=lamp-update) | package(=lamp-voice) | package(=lamp-voice-eval)"
+  ]
+}

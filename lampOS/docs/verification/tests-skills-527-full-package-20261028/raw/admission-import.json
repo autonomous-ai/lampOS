@@ -1,0 +1,8 @@
+{
+  "status": "SOURCE_HANDOFF_COMPLETE_NO_COMPILER_OR_RUNTIME",
+  "head": "527a103ed04f78c6ecc38ab0cc3e70508a7dba83",
+  "canonical_branch": "tests/3545-qualify-doc3-ef90c8561-body-20261028",
+  "prior_Skills_qualifier_preserved": true,
+  "Skills_official_unchanged": true,
+  "no_compiler_runtime_or_target_writes": true
+}

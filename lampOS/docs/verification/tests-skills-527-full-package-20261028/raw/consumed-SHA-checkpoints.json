@@ -1,0 +1,168 @@
+[
+  {
+    "phase": "inventory-0-all-before",
+    "paths": [
+      "/private/tmp/tests-body-holder-cargo-20261027/debug/deps/it-aabcadd0c6d2694b"
+    ],
+    "actual_and_independent_copy_SHA_verified": true
+  },
+  {
+    "phase": "inventory-0-all-after",
+    "paths": [
+      "/private/tmp/tests-body-holder-cargo-20261027/debug/deps/it-aabcadd0c6d2694b"
+    ],
+    "actual_and_independent_copy_SHA_verified": true
+  },
+  {
+    "phase": "inventory-0-ignored-before",
+    "paths": [
+      "/private/tmp/tests-body-holder-cargo-20261027/debug/deps/it-aabcadd0c6d2694b"
+    ],
+    "actual_and_independent_copy_SHA_verified": true
+  },
+  {
+    "phase": "inventory-0-ignored-after",
+    "paths": [
+      "/private/tmp/tests-body-holder-cargo-20261027/debug/deps/it-aabcadd0c6d2694b"
+    ],
+    "actual_and_independent_copy_SHA_verified": true
+  },
+  {
+    "phase": "inventory-1-all-before",
+    "paths": [
+      "/private/tmp/tests-body-holder-cargo-20261027/debug/deps/release_pair-e9612804d54e7498"
+    ],
+    "actual_and_independent_copy_SHA_verified": true
+  },
+  {
+    "phase": "inventory-1-all-after",
+    "paths": [
+      "/private/tmp/tests-body-holder-cargo-20261027/debug/deps/release_pair-e9612804d54e7498"
+    ],
+    "actual_and_independent_copy_SHA_verified": true
+  },
+  {
+    "phase": "inventory-1-ignored-before",
+    "paths": [
+      "/private/tmp/tests-body-holder-cargo-20261027/debug/deps/release_pair-e9612804d54e7498"
+    ],
+    "actual_and_independent_copy_SHA_verified": true
+  },
+  {
+    "phase": "inventory-1-ignored-after",
+    "paths": [
+      "/private/tmp/tests-body-holder-cargo-20261027/debug/deps/release_pair-e9612804d54e7498"
+    ],
+    "actual_and_independent_copy_SHA_verified": true
+  },
+  {
+    "phase": "inventory-2-all-before",
+    "paths": [
+      "/private/tmp/tests-body-holder-cargo-20261027/debug/deps/lamp_skills-b6219d16028772de"
+    ],
+    "actual_and_independent_copy_SHA_verified": true
+  },
+  {
+    "phase": "inventory-2-all-after",
+    "paths": [
+      "/private/tmp/tests-body-holder-cargo-20261027/debug/deps/lamp_skills-b6219d16028772de"
+    ],
+    "actual_and_independent_copy_SHA_verified": true
+  },
+  {
+    "phase": "inventory-2-ignored-before",
+    "paths": [
+      "/private/tmp/tests-body-holder-cargo-20261027/debug/deps/lamp_skills-b6219d16028772de"
+    ],
+    "actual_and_independent_copy_SHA_verified": true
+  },
+  {
+    "phase": "inventory-2-ignored-after",
+    "paths": [
+      "/private/tmp/tests-body-holder-cargo-20261027/debug/deps/lamp_skills-b6219d16028772de"
+    ],
+    "actual_and_independent_copy_SHA_verified": true
+  },
+  {
+    "phase": "inventory-3-all-before",
+    "paths": [
+      "/private/tmp/tests-body-holder-cargo-20261027/debug/deps/requested_audio-deef722372f12c7e"
+    ],
+    "actual_and_independent_copy_SHA_verified": true
+  },
+  {
+    "phase": "inventory-3-all-after",
+    "paths": [
+      "/private/tmp/tests-body-holder-cargo-20261027/debug/deps/requested_audio-deef722372f12c7e"
+    ],
+    "actual_and_independent_copy_SHA_verified": true
+  },
+  {
+    "phase": "inventory-3-ignored-before",
+    "paths": [
+      "/private/tmp/tests-body-holder-cargo-20261027/debug/deps/requested_audio-deef722372f12c7e"
+    ],
+    "actual_and_independent_copy_SHA_verified": true
+  },
+  {
+    "phase": "inventory-3-ignored-after",
+    "paths": [
+      "/private/tmp/tests-body-holder-cargo-20261027/debug/deps/requested_audio-deef722372f12c7e"
+    ],
+    "actual_and_independent_copy_SHA_verified": true
+  },
+  {
+    "phase": "inventory-4-all-before",
+    "paths": [
+      "/private/tmp/tests-body-holder-cargo-20261027/debug/deps/lamp_skills-8299c9194e44862b"
+    ],
+    "actual_and_independent_copy_SHA_verified": true
+  },
+  {
+    "phase": "inventory-4-all-after",
+    "paths": [
+      "/private/tmp/tests-body-holder-cargo-20261027/debug/deps/lamp_skills-8299c9194e44862b"
+    ],
+    "actual_and_independent_copy_SHA_verified": true
+  },
+  {
+    "phase": "inventory-4-ignored-before",
+    "paths": [
+      "/private/tmp/tests-body-holder-cargo-20261027/debug/deps/lamp_skills-8299c9194e44862b"
+    ],
+    "actual_and_independent_copy_SHA_verified": true
+  },
+  {
+    "phase": "inventory-4-ignored-after",
+    "paths": [
+      "/private/tmp/tests-body-holder-cargo-20261027/debug/deps/lamp_skills-8299c9194e44862b"
+    ],
+    "actual_and_independent_copy_SHA_verified": true
+  },
+  {
+    "phase": "full-skills-before",
+    "paths": [
+      "/private/tmp/tests-body-holder-cargo-20261027/debug/deps/it-aabcadd0c6d2694b",
+      "/private/tmp/tests-body-holder-cargo-20261027/debug/deps/release_pair-e9612804d54e7498",
+      "/private/tmp/tests-body-holder-cargo-20261027/debug/deps/lamp_skills-b6219d16028772de",
+      "/private/tmp/tests-body-holder-cargo-20261027/debug/lamp-skills",
+      "/private/tmp/tests-body-holder-cargo-20261027/debug/deps/requested_audio-deef722372f12c7e",
+      "/private/tmp/tests-body-holder-cargo-20261027/debug/examples/render_relaxing_music",
+      "/private/tmp/tests-body-holder-cargo-20261027/debug/deps/lamp_skills-8299c9194e44862b"
+    ],
+    "actual_and_independent_copy_SHA_verified": true
+  },
+  {
+    "phase": "full-skills-after",
+    "paths": [
+      "/private/tmp/tests-body-holder-cargo-20261027/debug/deps/it-aabcadd0c6d2694b",
+      "/private/tmp/tests-body-holder-cargo-20261027/debug/deps/release_pair-e9612804d54e7498",
+      "/private/tmp/tests-body-holder-cargo-20261027/debug/deps/lamp_skills-b6219d16028772de",
+      "/private/tmp/tests-body-holder-cargo-20261027/debug/lamp-skills",
+      "/private/tmp/tests-body-holder-cargo-20261027/debug/deps/requested_audio-deef722372f12c7e",
+      "/private/tmp/tests-body-holder-cargo-20261027/debug/examples/render_relaxing_music",
+      "/private/tmp/tests-body-holder-cargo-20261027/debug/deps/lamp_skills-8299c9194e44862b"
+    ],
+    "actual_and_independent_copy_SHA_verified": true
+  }
+]

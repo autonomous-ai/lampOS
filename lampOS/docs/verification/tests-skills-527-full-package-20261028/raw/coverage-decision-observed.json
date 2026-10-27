@@ -1,0 +1,12 @@
+{
+  "status": "PROSPECTIVE_FULL_PACKAGE_RUNTIME_REQUIRED",
+  "new_source": "527a103ed04f78c6ecc38ab0cc3e70508a7dba83",
+  "runtime_reuse": false,
+  "parent_Doc3_not_replayed": true,
+  "actual_upstream_delta": [
+    "lampOS/crates/name/src/main.rs",
+    "lampOS/docs/install.md",
+    "lampOS/docs/name.md"
+  ],
+  "Name_workspace_build_required_without_blanket_closure_claim": true
+}

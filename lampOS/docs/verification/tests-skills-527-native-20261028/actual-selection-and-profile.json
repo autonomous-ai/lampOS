@@ -1,0 +1,91 @@
+{
+  "commands": [
+    {
+      "line": 814,
+      "raw": "2026-10-27T22:34:28.9769656Z \u001b[36;1mcargo nextest run --locked --release --workspace \\\u001b[0m"
+    },
+    {
+      "line": 815,
+      "raw": "2026-10-27T22:34:28.9770048Z \u001b[36;1m  --profile pr \\\u001b[0m"
+    },
+    {
+      "line": 817,
+      "raw": "2026-10-27T22:34:28.9770956Z \u001b[36;1m  --partition hash:1/1 \\\u001b[0m"
+    },
+    {
+      "line": 821,
+      "raw": "2026-10-27T22:34:28.9791016Z   PICKED: package(=lamp-body) | package(=lamp-cloud) | package(=lamp-expression) | package(=lamp-keeper) | package(=lamp-lean) | package(=lamp-memory) | package(=lamp-peek) | package(=lamp-setup) | package(=lamp-skills) | package(=lamp-update) | package(=lamp-voice) | package(=lamp-voice-eval)"
+    }
+  ],
+  "selected_packages": [
+    "lamp-body",
+    "lamp-cloud",
+    "lamp-expression",
+    "lamp-keeper",
+    "lamp-lean",
+    "lamp-memory",
+    "lamp-peek",
+    "lamp-setup",
+    "lamp-skills",
+    "lamp-update",
+    "lamp-voice",
+    "lamp-voice-eval"
+  ],
+  "workflow_sha256": "5ddf0f7ae45bceaba81e899719ca199a4246a045b6f32f505edcccc61b3d170f",
+  "nextest_config_sha256": "c4992da8d157df279011a424b5feb4833f001fd1d46ce3edd0a56992c848bb33",
+  "pr_default_filter": "all()",
+  "config": {
+    "nextest-version": {
+      "required": "0.9.91"
+    },
+    "test-groups": {
+      "realtime": {
+        "max-threads": 1
+      }
+    },
+    "profile": {
+      "default": {
+        "overrides": [
+          {
+            "filter": "    (binary_id(lamp-voice::it) & test(/^capture_hold_worker::/))\n  | (binary_id(lamp-voice) & test(=coordinator::tests::endpoint_session::endpoint_fixture_reaps_on_panic_before_and_after_handoff))\n  | (binary_id(lamp-health::it) & test(=program::between_two_healths_five_seconds_apart_the_program_is_not_taken_for_gone))\n  | (binary_id(lamp-skills::it) & (test(=skills::asking_the_policy_on_the_hosts_clock_gives_up_after_its_wait) | test(=skills::a_reading_pose_is_held_on_the_mood_socket_for_its_for_and_then_let_go) | test(=skills::asking_the_policy_a_hello_made_and_not_noticed_rests) | test(=skills::the_program_keeps_a_skill_off_across_a_restart) | test(=skills::the_program_forgets_a_snooze_at_a_restart)))\n  | (binary_id(lamp-voice) & (test(=hand_controls::tests::with_the_wait_an_idle_pump_wakes_five_times_a_second_and_stops_at_once) | test(=hand_controls::tests::with_the_wait_an_owner_polling_every_2_ms_does_not_wake_the_pump)))\n",
+            "test-group": "realtime",
+            "priority": 100,
+            "success-output": "final"
+          },
+          {
+            "filter": "binary_id(lamp-voice::it) & test(/^speaker_lapse_worker::/)",
+            "threads-required": "num-cpus"
+          },
+          {
+            "filter": "binary_id(lamp-voice::it) & test(/^privacy_worker::/)",
+            "success-output": "final"
+          }
+        ]
+      },
+      "pr": {
+        "default-filter": "all()"
+      },
+      "realtime": {
+        "default-filter": "    (binary_id(lamp-voice::it) & test(/^capture_hold_worker::/))\n  | (binary_id(lamp-voice) & test(=coordinator::tests::endpoint_session::endpoint_fixture_reaps_on_panic_before_and_after_handoff))\n  | (binary_id(lamp-health::it) & test(=program::between_two_healths_five_seconds_apart_the_program_is_not_taken_for_gone))\n  | (binary_id(lamp-skills::it) & (test(=skills::asking_the_policy_on_the_hosts_clock_gives_up_after_its_wait) | test(=skills::a_reading_pose_is_held_on_the_mood_socket_for_its_for_and_then_let_go) | test(=skills::asking_the_policy_a_hello_made_and_not_noticed_rests) | test(=skills::the_program_keeps_a_skill_off_across_a_restart) | test(=skills::the_program_forgets_a_snooze_at_a_restart)))\n  | (binary_id(lamp-voice) & (test(=hand_controls::tests::with_the_wait_an_idle_pump_wakes_five_times_a_second_and_stops_at_once) | test(=hand_controls::tests::with_the_wait_an_owner_polling_every_2_ms_does_not_wake_the_pump)))\n"
+      }
+    }
+  },
+  "remote_action_and_container_resolutions": [
+    {
+      "line": 32,
+      "raw": "2026-10-27T22:28:46.0649987Z Download action repository 'actions/checkout@v4' (SHA:11d5960a326750d5838078e36cf38b85af677262)"
+    },
+    {
+      "line": 33,
+      "raw": "2026-10-27T22:28:46.4902840Z Download action repository 'actions/cache@v4' (SHA:0057852bfaa89a56745cba8c7296529d2fc39830)"
+    },
+    {
+      "line": 34,
+      "raw": "2026-10-27T22:28:46.6490891Z Download action repository 'taiki-e/install-action@v2' (SHA:5488ac5a951645ce95062214902ac4b6bc1a1037)"
+    },
+    {
+      "line": 35,
+      "raw": "2026-10-27T22:28:46.8183017Z Download action repository 'actions/upload-artifact@v4' (SHA:ea165f8d65b6e75b540449e92b4886f43607fa02)"
+    }
+  ]
+}

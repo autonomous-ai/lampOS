@@ -1,0 +1,85 @@
+{
+  "count": 16,
+  "commands": {
+    "cmd-fmt": {
+      "receipt": "raw/cmd-fmt.json",
+      "exit_code": 0,
+      "owned_group_closed": true
+    },
+    "cmd-full-skills": {
+      "receipt": "raw/cmd-full-skills.json",
+      "exit_code": 0,
+      "owned_group_closed": true
+    },
+    "cmd-inventory-0-all": {
+      "receipt": "raw/cmd-inventory-0-all.json",
+      "exit_code": 0,
+      "owned_group_closed": true
+    },
+    "cmd-inventory-0-ignored": {
+      "receipt": "raw/cmd-inventory-0-ignored.json",
+      "exit_code": 0,
+      "owned_group_closed": true
+    },
+    "cmd-inventory-1-all": {
+      "receipt": "raw/cmd-inventory-1-all.json",
+      "exit_code": 0,
+      "owned_group_closed": true
+    },
+    "cmd-inventory-1-ignored": {
+      "receipt": "raw/cmd-inventory-1-ignored.json",
+      "exit_code": 0,
+      "owned_group_closed": true
+    },
+    "cmd-inventory-2-all": {
+      "receipt": "raw/cmd-inventory-2-all.json",
+      "exit_code": 0,
+      "owned_group_closed": true
+    },
+    "cmd-inventory-2-ignored": {
+      "receipt": "raw/cmd-inventory-2-ignored.json",
+      "exit_code": 0,
+      "owned_group_closed": true
+    },
+    "cmd-inventory-3-all": {
+      "receipt": "raw/cmd-inventory-3-all.json",
+      "exit_code": 0,
+      "owned_group_closed": true
+    },
+    "cmd-inventory-3-ignored": {
+      "receipt": "raw/cmd-inventory-3-ignored.json",
+      "exit_code": 0,
+      "owned_group_closed": true
+    },
+    "cmd-inventory-4-all": {
+      "receipt": "raw/cmd-inventory-4-all.json",
+      "exit_code": 0,
+      "owned_group_closed": true
+    },
+    "cmd-inventory-4-ignored": {
+      "receipt": "raw/cmd-inventory-4-ignored.json",
+      "exit_code": 0,
+      "owned_group_closed": true
+    },
+    "cmd-metadata": {
+      "receipt": "raw/cmd-metadata.json",
+      "exit_code": 0,
+      "owned_group_closed": true
+    },
+    "cmd-strict": {
+      "receipt": "raw/cmd-strict.json",
+      "exit_code": 0,
+      "owned_group_closed": true
+    },
+    "cmd-test-compile": {
+      "receipt": "raw/cmd-test-compile.json",
+      "exit_code": 0,
+      "owned_group_closed": true
+    },
+    "cmd-workspace": {
+      "receipt": "raw/cmd-workspace.json",
+      "exit_code": 0,
+      "owned_group_closed": true
+    }
+  }
+}

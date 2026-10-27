@@ -1,0 +1,12 @@
+{
+  "wrapper_exit": 0,
+  "head": "527a103ed04f78c6ecc38ab0cc3e70508a7dba83",
+  "base": "ef90c8561b3f9b22472f1962ea1ffb10bf6a423b",
+  "one_fresh_full_Skills_attempt": true,
+  "Doc3_replayed": false,
+  "native_result": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-latest-doc3-full-gates-prep-20261028/native-controller-result.json",
+    "sha256": "363d6e307f40d5261c921be8f42a9bec69cdbffbd57cb7a71eb677e4be2940a0",
+    "bytes": 472
+  }
+}

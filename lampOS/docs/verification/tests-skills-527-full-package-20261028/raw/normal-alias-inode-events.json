@@ -1,0 +1,14 @@
+[
+  {
+    "path": "/private/tmp/tests-body-holder-cargo-20261027/debug/lamp-skills",
+    "old_inode": 490241676,
+    "new_inode": 490242021,
+    "all_other_fields_SHA_equal": true
+  },
+  {
+    "path": "/private/tmp/tests-body-holder-cargo-20261027/debug/examples/render_relaxing_music",
+    "old_inode": 490241677,
+    "new_inode": 490242020,
+    "all_other_fields_SHA_equal": true
+  }
+]

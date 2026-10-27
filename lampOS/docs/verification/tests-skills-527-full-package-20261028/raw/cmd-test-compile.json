@@ -1,0 +1,61 @@
+{
+  "command": [
+    "/Users/autonomous/.cargo/bin/cargo",
+    "+1.96.0",
+    "test",
+    "--offline",
+    "--locked",
+    "--jobs",
+    "1",
+    "-p",
+    "lamp-skills",
+    "--no-run",
+    "--message-format=json"
+  ],
+  "cwd": "/private/tmp/tests-skills-canonical-20261028/lampOS",
+  "started_at": "2026-10-27T22:20:10.838537+00:00",
+  "timeout_seconds": 3600,
+  "stdout": "cmd-test-compile.stdout.txt",
+  "stderr": "cmd-test-compile.stderr.txt",
+  "timeout_cleanup": [
+    {
+      "action": "leader exited unreaped; no other owned group members",
+      "members": [
+        {
+          "pid": 99290,
+          "state": "Z"
+        }
+      ]
+    }
+  ],
+  "timed_out": false,
+  "disk_reserve_breached": false,
+  "stop_reason": null,
+  "process_group_scope": "Owned group only; no detached-descendant cleanup claim.",
+  "group_closure_method": "WNOWAIT leader reservation and ps group inventory before reap",
+  "launch_state": "Popen_recorded",
+  "disk_reserve_bytes": 2214592512,
+  "disk_sample_interval_seconds": 1,
+  "disk_paths": [
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-latest-doc3-full-gates-prep-20261028",
+    "/private/tmp/tests-body-holder-cargo-20261027"
+  ],
+  "disk_samples": 10,
+  "disk_last_available_bytes": 3815206912,
+  "disk_minimum_available_bytes": 3815206912,
+  "available_bytes_before_Cargo": 3842985984,
+  "owned_pid": 99290,
+  "owned_process_group": 99290,
+  "direct_wait_status": 0,
+  "exit_code": 0,
+  "owned_group_absent_after_cleanup": true,
+  "unexpected_owned_descendants": false,
+  "unresolved_owned_pids": [],
+  "compiler_lease_held": false,
+  "wall_seconds": 9.737644,
+  "finished_at": "2026-10-27T22:20:20.576133+00:00",
+  "stdout_sha256": "bdef0ad511578fff2d5ab4d4e574674103cdc53419ec43aa48d5446e4c268ce4",
+  "stdout_bytes": 193678,
+  "stderr_sha256": "71c0779a1cf92a9498efb93219885dc4cbec2ad3f6da82cf7d60a73614982fb1",
+  "stderr_bytes": 161
+}

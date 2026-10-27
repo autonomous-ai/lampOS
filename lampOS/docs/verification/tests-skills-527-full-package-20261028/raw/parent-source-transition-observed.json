@@ -1,0 +1,89 @@
+{
+  "changed_entries": {
+    "lampOS/crates/expression/tests/runtime.rs": {
+      "before": {
+        "sha256": "34c0f7b294e1fa4011cdb0da02daba8035432cdcc28bbd57864cf06951e94752",
+        "bytes": 53262,
+        "mode": 420,
+        "kind": "file"
+      },
+      "after": {
+        "sha256": "89ab1c70d31f5202bdd61c77aa4aee949ad7d03b373d7c38863fa8e5cec0d279",
+        "bytes": 52242,
+        "mode": 420,
+        "kind": "file"
+      }
+    },
+    "lampOS/crates/name/src/main.rs": {
+      "before": {
+        "sha256": "a383a7f51a029003f5a7a4e0b25b2da6c9b000c328ea397698073338b8006dfe",
+        "bytes": 62802,
+        "mode": 420,
+        "kind": "file"
+      },
+      "after": {
+        "sha256": "382f8925452fd90117ce22f0c95d536065ed6079f7b8f58f4919b42808db4c31",
+        "bytes": 68659,
+        "mode": 420,
+        "kind": "file"
+      }
+    },
+    "lampOS/crates/skills/tests/it/addon.rs": {
+      "before": {
+        "sha256": "3d4ff1036bb4e62ca35b4d2f2907df33d29cb1a263b9780cc3bebf130e1d5861",
+        "bytes": 29895,
+        "mode": 420,
+        "kind": "file"
+      },
+      "after": {
+        "sha256": "886d83f75fffd352ffc3f721af202bd152d8f2f500ef13f825b0e035fbc83c2b",
+        "bytes": 31421,
+        "mode": 420,
+        "kind": "file"
+      }
+    },
+    "lampOS/docs/expression.md": {
+      "before": {
+        "sha256": "3d893182d80d5481be63798fd4449c75b3098699e6185d48da62f13b95b9dd4c",
+        "bytes": 81109,
+        "mode": 420,
+        "kind": "file"
+      },
+      "after": {
+        "sha256": "ce21fab134257e71a1ecec2cb8a09464c39173265c0b7e0dd6e75938da9f5778",
+        "bytes": 80449,
+        "mode": 420,
+        "kind": "file"
+      }
+    },
+    "lampOS/docs/name.md": {
+      "before": {
+        "sha256": "defc0184234f128c3ac8df98eb563f18d1aac3e620e020da43b6fed2ec988ac8",
+        "bytes": 29033,
+        "mode": 420,
+        "kind": "file"
+      },
+      "after": {
+        "sha256": "22e6ec6d3a3b7c25b19678c64103c4274843fffcd108d2dabe4823908be43d70",
+        "bytes": 30037,
+        "mode": 420,
+        "kind": "file"
+      }
+    },
+    "lampOS/docs/skills.md": {
+      "before": {
+        "sha256": "f241296740bf9b006bb1a7c9a69f5abba9a01287cfb23026b1a0092f9975384e",
+        "bytes": 215950,
+        "mode": 420,
+        "kind": "file"
+      },
+      "after": {
+        "sha256": "7b5a1200b155c64f11f567c04087f2bb6b453f94db6c072fbde84b6d31d9022d",
+        "bytes": 216663,
+        "mode": 420,
+        "kind": "file"
+      }
+    }
+  },
+  "no_parent_runtime_transfer": true
+}

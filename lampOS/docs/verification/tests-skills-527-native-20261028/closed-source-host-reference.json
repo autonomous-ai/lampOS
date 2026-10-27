@@ -1,0 +1,55 @@
+{
+  "head": "527a103ed04f78c6ecc38ab0cc3e70508a7dba83",
+  "base": "ef90c8561b3f9b22472f1962ea1ffb10bf6a423b",
+  "terminal_status": "PASS",
+  "protected_count": 190,
+  "actual_count": 7,
+  "source_unchanged": true,
+  "scope": "Fresh full unfiltered serial Skills Cargo package including docs/custom cases",
+  "receipt_bindings": [
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-latest-doc3-full-gates-prep-20261028/terminal.json",
+      "bytes": 1613,
+      "sha256": "29aa01ec41a8677618cabf060ebd984d78b63f8385e985bb66721384f73c624d"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-latest-doc3-full-gates-prep-20261028/native-controller-result.json",
+      "bytes": 472,
+      "sha256": "363d6e307f40d5261c921be8f42a9bec69cdbffbd57cb7a71eb677e4be2940a0"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-latest-doc3-full-gates-prep-20261028/source-before.json",
+      "bytes": 2458083,
+      "sha256": "bea011e7263ef0aa0895f8875c42b860bfc55fef3a5e2e6180bc07e0709ac1a3"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-latest-doc3-full-gates-prep-20261028/source-after.json",
+      "bytes": 2458083,
+      "sha256": "bea011e7263ef0aa0895f8875c42b860bfc55fef3a5e2e6180bc07e0709ac1a3"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-latest-doc3-full-gates-prep-20261028/protected-after.json",
+      "bytes": 81028,
+      "sha256": "e12608f23d2bbb4835f97aafe365b0a7459c9d357d37c039497b384eb84c8c8a"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-latest-doc3-full-gates-prep-20261028/actual-after.json",
+      "bytes": 11371,
+      "sha256": "a3aa62460da29ce6626af0c2d54c4d4b5e94d5091440aeaad33e03548d4c50ad"
+    }
+  ],
+  "no_binary_or_target_rehash_in_this_audit": true,
+  "counts": {
+    "passed": 557,
+    "failed": 0,
+    "ignored": 9
+  },
+  "runtime_reuse": false,
+  "drivers": 5,
+  "helpers": 2,
+  "compiled_census": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-latest-doc3-full-gates-prep-20261028/compiled-census.json",
+    "bytes": 48658,
+    "sha256": "65305adc075a1d3c3695bbddfd23ffe37edde9d799ef5ccc13248d0fc78fb5fe"
+  }
+}

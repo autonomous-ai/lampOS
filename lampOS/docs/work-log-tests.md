@@ -1,5 +1,15 @@
 # Tests work log
 
+## 2026-10-28 05:51 — published Skills 527 host and original native qualifications
+
+Ready for lamp-voice: no (Reviewer-two's latest-base HOLD and current source reads remain; PR stays draft).
+
+[Skills 527 fresh full Mac package](verification/tests-skills-527-full-package-20261028/) on frozen ef90 passes **557/0/9 + docs 0** once, all five drivers/566 identities and required add-on plus both Routine controls once. Formatting, actual twelve-package strict Clippy/workspace/current no-run/inventories pass; current IT 344 is fresh:false. All 16 command groups, 10,913-file source/owner bookends, 190 sealed witnesses and seven actual executable guards pass. Parent Doc3 transfers cache integrity only, with no Doc3 replay or old full-count transfer.
+
+[Original ARM 40595102975 / Linux 40595102984](verification/tests-skills-527-native-20261028/) both succeed, attempt 1: **7,850 unique PASS, zero bad/selected unrun, 54 aggregate skips**. Skills contributes 560 (Mac 557 plus three Linux-only cases), required three once, nine declared ignores unrun; Reader 14 / Trace 7 once. Thirty-four configured final-output reprints and promoter 25/docs 4/process 13/relay/Python 49,12,7 remain separate. Actual preview bed131c54 has ordered parents fc9/527 and tree 9681ecafc; nine upstream Update/docs entries differ from authored ef90, while both owned blobs/modes, all 44 fetched inputs and all 94 CI/config inputs per platform match. No authored whole-tree equality or host-on-fc9 claim. Original metadata/log digests only; no archive or payload.
+
+Private 110-entry seal is preserved; the public text/JSON subsets retain byte-equal primary captures and explicit manifests. One bounded watcher closed normally. Old failures remain failed and source-specific. No ready transition, device access, local compiler, source or cache mutation in this publication.
+
 ## 2026-10-28 05:35 — full x86 parallel Voice and current Mood/ARM packets
 
 Ready for lamp-voice: no (latest authored-base maintenance and current reads remain).

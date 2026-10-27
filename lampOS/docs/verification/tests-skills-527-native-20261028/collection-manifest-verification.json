@@ -1,0 +1,12 @@
+{
+  "entries_checked": 110,
+  "all_bytes_SHA256_match": true,
+  "manifest_sha256": "2f52f7552928e889efe59db4e8a5f041771911856a37830a2673e04c6c04343e",
+  "mismatches": [],
+  "unlisted_nonexcluded": [],
+  "both_originals_terminal_before_collection": true,
+  "both_terminal_at_initial_discovery": false,
+  "watcher_started": true,
+  "archive_or_binary_downloaded": false,
+  "prepublication_prose_correction_retained": "prose-correction-receipt.json"
+}

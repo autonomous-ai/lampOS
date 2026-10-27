@@ -1,0 +1,9 @@
+{
+  "head": "527a103ed04f78c6ecc38ab0cc3e70508a7dba83",
+  "canonical_root": "/private/tmp/tests-skills-canonical-20261028",
+  "source_index_sha256": "7a1a737ee7fd5f7524732b455b6e824e02bd73de67b02ea6440b2ee1e36b7d16",
+  "bytes_sha256": "886d83f75fffd352ffc3f721af202bd152d8f2f500ef13f825b0e035fbc83c2b",
+  "mtime_ns": 1793139557472873162,
+  "normal_git_checkout_only": true,
+  "mtime_refresh_performed": false
+}

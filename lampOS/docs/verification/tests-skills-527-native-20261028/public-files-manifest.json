@@ -1,0 +1,126 @@
+{
+  "definition": "Exact text/JSON/log public subset of completed110-entry private collection; no source programs, payloads, archives or private Git API metadata published. Private recursive seal is retained as historical full-collection receipt, not a claim that every private member is copied here.",
+  "private_collection_manifest_SHA256": "2f52f7552928e889efe59db4e8a5f041771911856a37830a2673e04c6c04343e",
+  "files": {
+    "README.md": {
+      "sha256": "e01deb269cef86d68a1bba55cbf7530ff61d55cdc821403855540a1b569523cb",
+      "bytes": 3681,
+      "byte_equal_private_sealed_file": true
+    },
+    "audit.json": {
+      "sha256": "ab5d3070c0fa8ec08caaeeab18abd1faecfbdcdf36a20e63489e1a96eeb758a7",
+      "bytes": 60354,
+      "byte_equal_private_sealed_file": true
+    },
+    "ARM64-full-tree-delta.json": {
+      "sha256": "8324022fd441ec9d5a80cff216c103db3eec7e69a5675c27af72d62dd70bbed2",
+      "bytes": 4964,
+      "byte_equal_private_sealed_file": true
+    },
+    "Linux-clippy-full-tree-delta.json": {
+      "sha256": "8324022fd441ec9d5a80cff216c103db3eec7e69a5675c27af72d62dd70bbed2",
+      "bytes": 4964,
+      "byte_equal_private_sealed_file": true
+    },
+    "Reader-platform-audit.json": {
+      "sha256": "e18403857bd9e6d004142dd9959feeb601547c6fb8076435ec8081de7811b63e",
+      "bytes": 9997,
+      "byte_equal_private_sealed_file": true
+    },
+    "Trace-platform-audit.json": {
+      "sha256": "b4494687b4a908b2c2d579d24c9b78196e7866e3c6706485a15a641e2d26dffc",
+      "bytes": 5036,
+      "byte_equal_private_sealed_file": true
+    },
+    "actual-selection-and-profile.json": {
+      "sha256": "eb3a750397b7822a664f602a9d0483cd270219a3349f6ce54d6cf188d8cf252e",
+      "bytes": 4699,
+      "byte_equal_private_sealed_file": true
+    },
+    "actual-source-bindings.json": {
+      "sha256": "8d7de810f178283a0b255fd8b2eef34fb7dd01ddbdbeff4a3698400399b44f49",
+      "bytes": 44993,
+      "byte_equal_private_sealed_file": true
+    },
+    "all-tracked-CI-input-bindings.json": {
+      "sha256": "7dcb9da8f7b2fc27ed6dd23e8fad9e66b4cfa61a1d55cd7fd39d85b522c49bdc",
+      "bytes": 158124,
+      "byte_equal_private_sealed_file": true
+    },
+    "auxiliary-stage-audit.json": {
+      "sha256": "81235991abacff86ce2b987f78e428e755d5078b0da95a38d7a60f50691b60f2",
+      "bytes": 8199,
+      "byte_equal_private_sealed_file": true
+    },
+    "build-warning-audit.json": {
+      "sha256": "90e8425e4875b980cc2cf574068af4c2ee41ebd3453f39eee0bbd9692f4d0997",
+      "bytes": 3555,
+      "byte_equal_private_sealed_file": true
+    },
+    "closed-source-host-reference.json": {
+      "sha256": "d5bf28a14767f1988095328353dc4b54c739f28f8f10a93dfc9f12569e497b4b",
+      "bytes": 2796,
+      "byte_equal_private_sealed_file": true
+    },
+    "collection-manifest-verification.json": {
+      "sha256": "6a461458c768a56d0917a7c4dadb49b3026bf0534da5e5d7fccaf42c1851baa0",
+      "bytes": 449,
+      "byte_equal_private_sealed_file": true
+    },
+    "collection-manifest.json": {
+      "sha256": "2f52f7552928e889efe59db4e8a5f041771911856a37830a2673e04c6c04343e",
+      "bytes": 17670,
+      "byte_equal_private_sealed_file": true
+    },
+    "execution-window.json": {
+      "sha256": "b4c01d11aaa972d04df636383bcf31929a7d46147b2c65c3055c1630cb08c33a",
+      "bytes": 1307,
+      "byte_equal_private_sealed_file": true
+    },
+    "execution-identities.json": {
+      "sha256": "c181c63115a2b4fcc4aa66c0a6c9c92c3a6e945fe14277d71511cc7765aa2602",
+      "bytes": 2239508,
+      "byte_equal_private_sealed_file": true
+    },
+    "final-reprints.json": {
+      "sha256": "65f4ddf5c8cc450be610356ed0ec7fc7e5d67ccd0b314f950a8e81ce6d1ba03f",
+      "bytes": 24555,
+      "byte_equal_private_sealed_file": true
+    },
+    "retained-failure-and-control-scope.json": {
+      "sha256": "5e021d0e51cc627b2f3c99a3798c3803a33312dfa19bd48df15d2badf3b6011d",
+      "bytes": 1590,
+      "byte_equal_private_sealed_file": true
+    },
+    "subject-case-audit.json": {
+      "sha256": "c2de2acc5cb9453f2b8a2abdcee6160d1aa6be21dfe549951214cfbaaecc759f",
+      "bytes": 243067,
+      "byte_equal_private_sealed_file": true
+    },
+    "single-watch-session-result.json": {
+      "sha256": "600d86fd8db5b8ce8e113c7a994d9b4504a0055da718844783c4196f30dcbe6d",
+      "bytes": 784,
+      "byte_equal_private_sealed_file": true
+    },
+    "ARM64-bounded-watch-result.json": {
+      "sha256": "d0d3e8157731d1d4b3183476af23fea0e6ca81d0361869fe03c87620d7b7b8dc",
+      "bytes": 316,
+      "byte_equal_private_sealed_file": true
+    },
+    "Linux-clippy-bounded-watch-result.json": {
+      "sha256": "25052ebb66ec89e4d0fbba1422dedf38bfde06740c3d977818ff7c77b307fb1f",
+      "bytes": 316,
+      "byte_equal_private_sealed_file": true
+    },
+    "ARM64-job-122508916472.log": {
+      "sha256": "8fcbcb61d2329412862f1be01b5176a31065dd3fcf1b775d5e4401ec255ab6f5",
+      "bytes": 1386922,
+      "byte_equal_private_sealed_file": true
+    },
+    "Linux-clippy-job-122508916434.log": {
+      "sha256": "d7d386ca80c6b56578d85aa751c95446d026a2b9f15709251d0110656aff00aa",
+      "bytes": 48877,
+      "byte_equal_private_sealed_file": true
+    }
+  }
+}

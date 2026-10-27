@@ -1,0 +1,190 @@
+{
+  "status": "ROOT_REVIEWED_FRESH_FULL_HOST_SKILLS_PASS",
+  "head": "527a103ed04f78c6ecc38ab0cc3e70508a7dba83",
+  "base": "ef90c8561b3f9b22472f1962ea1ffb10bf6a423b",
+  "counts": {
+    "passed": 557,
+    "failed": 0,
+    "ignored": 9
+  },
+  "actual_driver_count": 5,
+  "actual_helper_count": 2,
+  "targets": [
+    {
+      "name": "lamp_skills",
+      "kind": [
+        "lib"
+      ],
+      "counts": {
+        "passed": 160,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 0
+      },
+      "compiled": 160,
+      "compiled_ignored": 0,
+      "executable_SHA256": "d23b43ff8ca0df5025db168e61accb81c1509ff32aef736fd34b7cdeaba7c2ed"
+    },
+    {
+      "name": "lamp-skills",
+      "kind": [
+        "bin"
+      ],
+      "counts": {
+        "passed": 20,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 0
+      },
+      "compiled": 20,
+      "compiled_ignored": 0,
+      "executable_SHA256": "c84cc0b40ce04e16f9d4d8903514f794ed84719c2b75f1b06425278be986e8d8"
+    },
+    {
+      "name": "it",
+      "kind": [
+        "test"
+      ],
+      "counts": {
+        "passed": 344,
+        "failed": 0,
+        "ignored": 1,
+        "measured": 0,
+        "filtered_out": 0
+      },
+      "compiled": 345,
+      "compiled_ignored": 1,
+      "executable_SHA256": "a46e630f0141126cb7942287c320a239437e2603c6144307346ebd3d9b9fdb6b"
+    },
+    {
+      "name": "release_pair",
+      "kind": [
+        "test"
+      ],
+      "counts": {
+        "passed": 2,
+        "failed": 0,
+        "ignored": 8,
+        "measured": 0,
+        "filtered_out": 0
+      },
+      "compiled": 10,
+      "compiled_ignored": 8,
+      "executable_SHA256": "8c202ad745f0ef4ac839eae486eedf71dfde70b566e5a57077915392c23822b9"
+    },
+    {
+      "name": "requested_audio",
+      "kind": [
+        "test"
+      ],
+      "counts": {
+        "passed": 31,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 0
+      },
+      "compiled": 31,
+      "compiled_ignored": 0,
+      "executable_SHA256": "69187003f5a138d6c2bda17db87cf82f4e756d6d80f87dc1dd4d9d20b043eb07"
+    }
+  ],
+  "compiled_identities": 566,
+  "IT_fresh": false,
+  "runtime_attempts": 1,
+  "runtime_reuse": false,
+  "runtime_seconds": 242.792586,
+  "native_controller_exit": 0,
+  "command_closures": 16,
+  "strict_packages": [
+    "lamp-body",
+    "lamp-cloud",
+    "lamp-expression",
+    "lamp-keeper",
+    "lamp-lean",
+    "lamp-memory",
+    "lamp-peek",
+    "lamp-setup",
+    "lamp-skills",
+    "lamp-update",
+    "lamp-voice",
+    "lamp-voice-eval"
+  ],
+  "current_source_count": 10913,
+  "source_and_owner_bookends_equal": true,
+  "protected_count": 190,
+  "actual_guard_count": 7,
+  "owned_groups_closed": true,
+  "lease_released": true,
+  "unresolved_owned_pids": [],
+  "required_cases_once": [
+    "addon::says_the_judge_dropped_do_not_spend_the_hour",
+    "routine::tests::a_delayed_sample_inside_the_window_keeps_its_original_deadline",
+    "routine::tests::a_host_stall_expires_the_request_header_without_changing_the_manager_deadline"
+  ],
+  "parent_scope": {
+    "head": "cd4e8e0012440d77235b180a056d6777899b5685",
+    "base": "c1fa2bc9f327f5d553bb3dcc355053d8e7e94bfa",
+    "Doc3_counts": {
+      "install": {
+        "ok": 1
+      },
+      "it": {
+        "ok": 2
+      }
+    },
+    "source_scope_only": true,
+    "no_broad_Skills_Expression_Update_parent_credit": true,
+    "Doc3_not_replayed": true
+  },
+  "accepted_upstream_delta": {
+    "base": "82a62867cc1bcbbc4b0848519c6757f623d112ce",
+    "admitted_base": "ef90c8561b3f9b22472f1962ea1ffb10bf6a423b",
+    "actual_changed_paths": [
+      "lampOS/crates/name/src/main.rs",
+      "lampOS/docs/install.md",
+      "lampOS/docs/name.md"
+    ],
+    "allowed_changed_paths": [
+      "lampOS/crates/name/src/main.rs",
+      "lampOS/docs/install.md",
+      "lampOS/docs/name.md"
+    ],
+    "all_other_tracked_entries_equal": 10910,
+    "Name_code_explicitly_allowed_not_asserted_outside_all_closures": true,
+    "no_runtime_reuse": true
+  },
+  "Name_current_workspace_build_no_blanket_closure_or_runtime_claim": true,
+  "known_Main_postgate_push": "fc9c781afaed38dc976f650484c30f65bf5db57a",
+  "raw_review_field_label_disposition": "Root task identifiesfc9 as Main atpush/postgate. The rawreview field live_main_at_admission is retained byte-identically; actual frozen-source admission is ef90 in the origin/delta record. No fc9 testcredit.",
+  "new_original_native": {
+    "ARM64": {
+      "id": 40595102975,
+      "status": "PENDING_AUDIT"
+    },
+    "Linux": {
+      "id": 40595102984,
+      "status": "PENDING_AUDIT"
+    }
+  },
+  "guard_policy": "Full source/owner/all-sealed SHA initial/final; fullfile-set/stat6/Git and sealedmetadata atotherboundaries; all activeactualSHA/stat +adjacentconsumedcopySHA. Modes preserved. Only normalaliasinode-only at closed norecompile Cargo0/101 with allotherfields/hash equal; tests/frozeninode strict.",
+  "normal_alias_events": [
+    {
+      "path": "/private/tmp/tests-body-holder-cargo-20261027/debug/lamp-skills",
+      "old_inode": 490241676,
+      "new_inode": 490242021,
+      "all_other_fields_SHA_equal": true
+    },
+    {
+      "path": "/private/tmp/tests-body-holder-cargo-20261027/debug/examples/render_relaxing_music",
+      "old_inode": 490241677,
+      "new_inode": 490242020,
+      "all_other_fields_SHA_equal": true
+    }
+  ],
+  "no_fs_readonly_or_idlehost_claim": true,
+  "old_source_cohorts_retained_no_cause_waiver": true,
+  "closed_producer_receipts_not_independent_reexecution": true
+}

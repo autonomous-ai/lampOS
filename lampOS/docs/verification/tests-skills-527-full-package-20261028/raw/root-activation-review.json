@@ -1,0 +1,31 @@
+{
+  "status": "ROOT_APPROVED_DOC3_TO_FRESH_SKILLS_ADMITTED",
+  "parent_Doc3_counts": {
+    "install": {
+      "ok": 1
+    },
+    "it": {
+      "ok": 2
+    }
+  },
+  "source_head": "527a103ed04f78c6ecc38ab0cc3e70508a7dba83",
+  "base": "ef90c8561b3f9b22472f1962ea1ffb10bf6a423b",
+  "actual_delta": [
+    "lampOS/crates/name/src/main.rs",
+    "lampOS/docs/install.md",
+    "lampOS/docs/name.md"
+  ],
+  "controller": "316cbb460790493f6e1dfe6c98c4bd81eefd814977a796d5fce6983f7873d545",
+  "plan": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-latest-doc3-full-gates-prep-20261028/plan.json",
+    "sha256": "47c57e67aa22eb7d1577cb87c627d4d099dd3eecd50f8e7cac21d33218c67024",
+    "bytes": 14656
+  },
+  "launch": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-latest-doc3-full-gates-prep-20261028/launch.json",
+    "sha256": "20d9fd3da791e08a24a20a3d70281be2458d78c31bbe2d8fcca8cf3586151d3e",
+    "bytes": 954
+  },
+  "free_bytes": 3807461376,
+  "no_parent_Doc3_replay": true
+}

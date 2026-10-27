@@ -1,0 +1,28 @@
+{
+  "status": "CLOSED_VERIFIED_DOC3_RELEASE_FOR_SKILLS",
+  "previous": "mood-c1fa-doc-consumers-phase2-prep-20261028",
+  "parent_native_exit": 0,
+  "parent_counts": {
+    "install": {
+      "ok": 1
+    },
+    "it": {
+      "ok": 2
+    }
+  },
+  "protected_count": 183,
+  "actual_count": 3,
+  "target": "/private/tmp/tests-body-holder-cargo-20261027",
+  "target_dev_ino": [
+    16777222,
+    487951267
+  ],
+  "lsof_exit": 1,
+  "full_hash_metadata_verified": true,
+  "actual_bindings_retired": true,
+  "lsof_no_open_target_file": true,
+  "owned_groups_previously_closed": true,
+  "source_and_official_owner_full_bytes_stat_verified": true,
+  "no_historical_failure_waived": true,
+  "broad_Skills_Mood_Update_runtime_credit": false
+}

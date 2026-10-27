@@ -1,0 +1,97 @@
+{
+  "targets": [
+    {
+      "name": "lamp_skills",
+      "kind": [
+        "lib"
+      ],
+      "counts": {
+        "passed": 160,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 0
+      },
+      "compiled": 160,
+      "compiled_ignored": 0,
+      "executable_SHA256": "d23b43ff8ca0df5025db168e61accb81c1509ff32aef736fd34b7cdeaba7c2ed"
+    },
+    {
+      "name": "lamp-skills",
+      "kind": [
+        "bin"
+      ],
+      "counts": {
+        "passed": 20,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 0
+      },
+      "compiled": 20,
+      "compiled_ignored": 0,
+      "executable_SHA256": "c84cc0b40ce04e16f9d4d8903514f794ed84719c2b75f1b06425278be986e8d8"
+    },
+    {
+      "name": "it",
+      "kind": [
+        "test"
+      ],
+      "counts": {
+        "passed": 344,
+        "failed": 0,
+        "ignored": 1,
+        "measured": 0,
+        "filtered_out": 0
+      },
+      "compiled": 345,
+      "compiled_ignored": 1,
+      "executable_SHA256": "a46e630f0141126cb7942287c320a239437e2603c6144307346ebd3d9b9fdb6b"
+    },
+    {
+      "name": "release_pair",
+      "kind": [
+        "test"
+      ],
+      "counts": {
+        "passed": 2,
+        "failed": 0,
+        "ignored": 8,
+        "measured": 0,
+        "filtered_out": 0
+      },
+      "compiled": 10,
+      "compiled_ignored": 8,
+      "executable_SHA256": "8c202ad745f0ef4ac839eae486eedf71dfde70b566e5a57077915392c23822b9"
+    },
+    {
+      "name": "requested_audio",
+      "kind": [
+        "test"
+      ],
+      "counts": {
+        "passed": 31,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 0
+      },
+      "compiled": 31,
+      "compiled_ignored": 0,
+      "executable_SHA256": "69187003f5a138d6c2bda17db87cf82f4e756d6d80f87dc1dd4d9d20b043eb07"
+    }
+  ],
+  "doc_targets": [
+    {
+      "name": "lamp-skills:doctests",
+      "counts": {
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 0
+      },
+      "result": "ok"
+    }
+  ]
+}

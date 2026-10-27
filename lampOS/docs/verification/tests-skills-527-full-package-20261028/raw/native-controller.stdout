@@ -1,0 +1,32 @@
+{"event": "start", "label": "cmd-fmt", "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-latest-doc3-full-gates-prep-20261028"}
+{"event": "finish", "label": "cmd-fmt", "exit_code": 0, "wall_seconds": 13.02384}
+{"event": "start", "label": "cmd-metadata", "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-latest-doc3-full-gates-prep-20261028"}
+{"event": "finish", "label": "cmd-metadata", "exit_code": 0, "wall_seconds": 0.57003}
+{"event": "start", "label": "cmd-strict", "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-latest-doc3-full-gates-prep-20261028"}
+{"event": "finish", "label": "cmd-strict", "exit_code": 0, "wall_seconds": 5.696205}
+{"event": "start", "label": "cmd-workspace", "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-latest-doc3-full-gates-prep-20261028"}
+{"event": "finish", "label": "cmd-workspace", "exit_code": 0, "wall_seconds": 3.165951}
+{"event": "start", "label": "cmd-test-compile", "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-latest-doc3-full-gates-prep-20261028"}
+{"event": "finish", "label": "cmd-test-compile", "exit_code": 0, "wall_seconds": 9.737644}
+{"event": "start", "label": "cmd-inventory-0-all", "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-latest-doc3-full-gates-prep-20261028"}
+{"event": "finish", "label": "cmd-inventory-0-all", "exit_code": 0, "wall_seconds": 0.943203}
+{"event": "start", "label": "cmd-inventory-0-ignored", "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-latest-doc3-full-gates-prep-20261028"}
+{"event": "finish", "label": "cmd-inventory-0-ignored", "exit_code": 0, "wall_seconds": 0.091897}
+{"event": "start", "label": "cmd-inventory-1-all", "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-latest-doc3-full-gates-prep-20261028"}
+{"event": "finish", "label": "cmd-inventory-1-all", "exit_code": 0, "wall_seconds": 0.126162}
+{"event": "start", "label": "cmd-inventory-1-ignored", "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-latest-doc3-full-gates-prep-20261028"}
+{"event": "finish", "label": "cmd-inventory-1-ignored", "exit_code": 0, "wall_seconds": 0.096266}
+{"event": "start", "label": "cmd-inventory-2-all", "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-latest-doc3-full-gates-prep-20261028"}
+{"event": "finish", "label": "cmd-inventory-2-all", "exit_code": 0, "wall_seconds": 0.12837}
+{"event": "start", "label": "cmd-inventory-2-ignored", "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-latest-doc3-full-gates-prep-20261028"}
+{"event": "finish", "label": "cmd-inventory-2-ignored", "exit_code": 0, "wall_seconds": 0.101648}
+{"event": "start", "label": "cmd-inventory-3-all", "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-latest-doc3-full-gates-prep-20261028"}
+{"event": "finish", "label": "cmd-inventory-3-all", "exit_code": 0, "wall_seconds": 0.124771}
+{"event": "start", "label": "cmd-inventory-3-ignored", "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-latest-doc3-full-gates-prep-20261028"}
+{"event": "finish", "label": "cmd-inventory-3-ignored", "exit_code": 0, "wall_seconds": 0.09875}
+{"event": "start", "label": "cmd-inventory-4-all", "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-latest-doc3-full-gates-prep-20261028"}
+{"event": "finish", "label": "cmd-inventory-4-all", "exit_code": 0, "wall_seconds": 0.120299}
+{"event": "start", "label": "cmd-inventory-4-ignored", "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-latest-doc3-full-gates-prep-20261028"}
+{"event": "finish", "label": "cmd-inventory-4-ignored", "exit_code": 0, "wall_seconds": 0.102327}
+{"event": "start", "label": "cmd-full-skills", "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-latest-doc3-full-gates-prep-20261028"}
+{"event": "finish", "label": "cmd-full-skills", "exit_code": 0, "wall_seconds": 242.792586}

@@ -1,0 +1,61 @@
+{
+  "status": "PASS",
+  "head": "527a103ed04f78c6ecc38ab0cc3e70508a7dba83",
+  "base": "ef90c8561b3f9b22472f1962ea1ffb10bf6a423b",
+  "runtime_attempts": 1,
+  "scope": "Fresh full unfiltered serial Skills Cargo package including docs/custom cases",
+  "runtime_reuse": false,
+  "old_521_1_9_failure_retained": true,
+  "no_clean": true,
+  "full_reverse_package_runtime_claim": false,
+  "native_claim": false,
+  "observed_counts": {
+    "passed": 557,
+    "failed": 0,
+    "ignored": 9
+  },
+  "runtime_command_exit": 0,
+  "complete_target_binding": true,
+  "counts": {
+    "passed": 557,
+    "failed": 0,
+    "ignored": 9
+  },
+  "required_cases_once": [
+    "addon::says_the_judge_dropped_do_not_spend_the_hour",
+    "routine::tests::a_delayed_sample_inside_the_window_keeps_its_original_deadline",
+    "routine::tests::a_host_stall_expires_the_request_header_without_changing_the_manager_deadline"
+  ],
+  "single_addon_Rust_identity_with_two_internal_variants": true,
+  "strict_packages": [
+    "lamp-body",
+    "lamp-cloud",
+    "lamp-expression",
+    "lamp-keeper",
+    "lamp-lean",
+    "lamp-memory",
+    "lamp-peek",
+    "lamp-setup",
+    "lamp-skills",
+    "lamp-update",
+    "lamp-voice",
+    "lamp-voice-eval"
+  ],
+  "actual_driver_count": 5,
+  "actual_helper_count": 2,
+  "doc_targets": [
+    "lamp-skills"
+  ],
+  "source_unchanged": true,
+  "official_owner_unchanged": true,
+  "sealed_and_actual_guards": true,
+  "protected_count": 190,
+  "actual_count": 7,
+  "full_hash_checkpoints": [
+    "initial",
+    "final"
+  ],
+  "owned_groups_closed": true,
+  "unresolved_owned_pids": [],
+  "lease_released": true
+}

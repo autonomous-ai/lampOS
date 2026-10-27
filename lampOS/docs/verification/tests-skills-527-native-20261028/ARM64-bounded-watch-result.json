@@ -1,0 +1,12 @@
+{
+  "run_id": 40595102975,
+  "head": "527a103ed04f78c6ecc38ab0cc3e70508a7dba83",
+  "attempt": 1,
+  "started_at": "2026-10-27T22:34:55.492256+00:00",
+  "completed_at": "2026-10-27T22:44:33.236476+00:00",
+  "exit_code": 0,
+  "timeout_s": 1800,
+  "interval_s": 30,
+  "timed_out": false,
+  "watch_only_no_rerun": true
+}
