@@ -294,7 +294,7 @@ before those generated assets and envelope history. Actual totals must
 be measured on the build selected for activation; the public host record
 keeps the measured inventory identity.
 
-### The key and verified channel
+### Publication authorization, the key and verified channel
 
 The job names the GitHub environment **`lampos-update-publish`**. Before
 provisioning the real key, the owner must create and protect that
@@ -310,18 +310,52 @@ without them when a job references a missing name. Keep publication off
 until the owner has verified the environment's configuration. See
 [GitHub's environment setup](https://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/manage-environments).
 
+The owner must also supply **`LAMPOS_RELEASE_TOKEN`** in that same protected
+environment, with no repository or organization copy. Use an already authorized,
+repository-limited GitHub App installation token or fine-grained access token
+with **Contents: write** and **Workflows: write**. Keep its lifetime and renewal
+under the owner's credential policy. At preparation, the metadata-only audit
+found only the signing-key secret in this environment; it did not read any
+secret value. This change creates no account, token, key or environment secret.
+
+The built-in Actions `GITHUB_TOKEN` is sometimes refused when it creates the
+release: `gh release create` gets HTTP 403, "Resource not accessible by
+integration" (#3906). On 27 Oct it refused 7 of 9 publishes between 19:15 and
+22:30 UTC, then none for 19; on 28 Oct it refused two more (`8a1cfa93a` and
+`83c334356`). What triggers it is not established. Refused and published
+commits differed from `main` in the same workflow files and came from the same
+pusher, and commits already superseded on lamp-voice published fine. A token
+with Workflows: write is not held to the built-in token's workflow rule
+([release API](https://docs.github.com/en/rest/releases/releases#create-a-release),
+[workflow scope](https://github.blog/changelog/2023-11-02-github-actions-enforcing-workflow-scope-when-creating-a-release/)),
+which the built-in token can never be given. Keep `--target` equal to the
+tested artifact's exact SHA. Retargeting to a newer commit would break
+provenance and is not an authorization fix.
+
+The publication step maps the protected release credential to `GH_TOKEN`;
+the job's built-in token has only Contents: read. If `GH_TOKEN` is absent,
+empty or whitespace, the helper refuses before any child command, artifact
+preparation or signing with
+`LAMPOS_RELEASE_TOKEN is absent from the protected publication environment`.
+An ambient built-in token cannot substitute for it.
+
 The owner makes the real Ed25519 PKCS#8 key outside the repository, puts
-its base64 form in that environment secret, and provisions its public
+its base64 form in **`LAMPOS_UPDATE_KEY`**, and provisions its public
 half (`lamp-update public-key --key-file FILE`) to lamps as
 `/etc/lampOS/update/key.pub`. Keep **`LAMPOS_UPDATE_PUBLISH` as a repository
 variable**: the build and publication gates must decide before the
 environment starts. This PR provisions no environment, secret or variable.
 
-Within this workflow, only the gated publication step references the
-environment secret. The helper writes it outside the upload folder in a
-0600 temporary file, removes it in `finally` after signing, and excludes it
-from child-process environments and command arguments. Each child command
-has a 600-second timeout. Command timeouts and handled `SIGINT`/`SIGTERM`
+Within this workflow, only the gated publication step references these
+two environment secrets. The helper writes the signing key outside the upload
+folder in a 0600 temporary file, removes it in `finally` after signing, and
+excludes it from child-process environments and command arguments. It also
+removes `GH_TOKEN`, `GITHUB_TOKEN`, `GH_ENTERPRISE_TOKEN` and
+`GITHUB_ENTERPRISE_TOKEN` from its base child context. Only a `gh` child receives
+the original publication `GH_TOKEN`; Git and the artifact's updater receive no
+GitHub authorization tokens. The parent context stays unchanged, and diagnostic
+redaction still uses the original secret values. Each child command has a
+600-second timeout. Command timeouts and handled `SIGINT`/`SIGTERM`
 unwind through the same cleanup, but cancellation can interrupt cleanup
 before it finishes. `SIGKILL` or a lost runner cannot execute it, so the
 ephemeral runner's disposal remains the final boundary. No real key is

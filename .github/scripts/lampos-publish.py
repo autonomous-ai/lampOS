@@ -22,6 +22,7 @@ ENVELOPE = "lampos-manifest.json"
 ENABLE = "LAMPOS_UPDATE_PUBLISH"
 BOOTSTRAP = "LAMPOS_UPDATE_BOOTSTRAP"
 SECRET = "LAMPOS_UPDATE_KEY"
+AUTH_TOKENS = frozenset({"GH_TOKEN", "GITHUB_TOKEN", "GH_ENTERPRISE_TOKEN", "GITHUB_ENTERPRISE_TOKEN"})
 NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]*\Z")
 BINARY = re.compile(r"lamp-[a-z0-9-]{1,39}\Z")
 DIAGNOSTIC_LIMIT = 320
@@ -95,7 +96,8 @@ def tree_info(root):
 
 class Commands:
     def __init__(self, environ):
-        self.environ = {key: value for key, value in environ.items() if key != SECRET}
+        self.environ = {key: value for key, value in environ.items() if key != SECRET and key not in AUTH_TOKENS}
+        self.gh_token = environ.get("GH_TOKEN")
         self.redactions = sorted({
             part for key, value in environ.items()
             if re.search(r"(?:^|_)(?:TOKEN|KEY|SECRET|PASSWORD|CREDENTIAL)(?:_|$)", key.upper())
@@ -135,10 +137,14 @@ class Commands:
         return line[:DIAGNOSTIC_LIMIT] or "empty stderr line"
 
     def run(self, words, output=None):
-        # No shell or signing key in children. Only gh's redacted first error line is echoed.
+        # Only gh receives release authorization; git and the verified updater
+        # need neither that credential nor the signing key in their environment.
+        environ = self.environ.copy()
+        if Path(str(words[0])).name == "gh" and self.gh_token is not None:
+            environ["GH_TOKEN"] = self.gh_token
         try:
             result = subprocess.run(
-                [str(word) for word in words], env=self.environ, stdin=subprocess.DEVNULL,
+                [str(word) for word in words], env=environ, stdin=subprocess.DEVNULL,
                 stdout=output if output else subprocess.PIPE, stderr=subprocess.PIPE,
                 timeout=600, check=False,
             )
@@ -195,6 +201,9 @@ class Publisher:
         self.sequence = int(self.env["GITHUB_RUN_NUMBER"])
         require(positive(self.sequence), "sequence is out of range")
         require(self.env.get(BOOTSTRAP, "") in ("", "off", "on"), "bootstrap must be on or off")
+        authorization = self.env.get("GH_TOKEN")
+        require(isinstance(authorization, str) and bool(authorization.strip()),
+                "LAMPOS_RELEASE_TOKEN is absent from the protected publication environment")
         require(bool(self.env.get(SECRET)), "real signing key is absent")
         actual = self.command("git", "-C", self.source, "rev-parse", "HEAD").decode().strip()
         require(actual == self.sha, "checkout differs from this run's SHA")
