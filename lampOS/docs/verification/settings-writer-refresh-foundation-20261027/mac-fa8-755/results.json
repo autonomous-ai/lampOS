@@ -1,0 +1,67 @@
+[
+  {
+    "stage": "fmt",
+    "argv": [
+      "cargo",
+      "+1.96.0",
+      "fmt",
+      "--all",
+      "--check"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 5.998
+  },
+  {
+    "stage": "clippy",
+    "argv": [
+      "cargo",
+      "+1.96.0",
+      "clippy",
+      "--locked",
+      "--offline",
+      "-q",
+      "-p",
+      "lamp-update",
+      "--all-targets",
+      "--message-format=short",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 18.984
+  },
+  {
+    "stage": "compile",
+    "argv": [
+      "cargo",
+      "+1.96.0",
+      "test",
+      "--locked",
+      "--offline",
+      "-p",
+      "lamp-update",
+      "--no-run",
+      "--message-format=json"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 26.832
+  },
+  {
+    "stage": "tests",
+    "argv": [
+      "cargo",
+      "+1.96.0",
+      "test",
+      "--locked",
+      "--offline",
+      "-p",
+      "lamp-update",
+      "--no-fail-fast",
+      "--",
+      "--test-threads=1"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 629.395
+  }
+]

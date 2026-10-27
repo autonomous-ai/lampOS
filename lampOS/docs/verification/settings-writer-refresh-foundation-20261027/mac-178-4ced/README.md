@@ -1,0 +1,5 @@
+# Writer-refresh foundation: foreign fixture-only carry
+
+Actual source 178aca5fdc on 4cedf51308: fmt, strict Update all-target Clippy, fresh compiler JSON and `cargo test --locked --offline -p lamp-update --lib --test functions --no-fail-fast -- --test-threads=1` pass **164/0/2** (159 library passes/2 ignored, five function-reader passes). All fourteen new controls are included once. Head/status and 7314 source/workflow hashes close unchanged; actual/preserved compiled executables are hash-bound. The complete 481/0/6 remains separately on fa8/755; it is not a full-crate rerun here.
+
+Final 16f0e1cb27/3d8c75558e is an exact clean carry over another foreign cfg(test)-only Voice/Tasks fixture commit. Its current fmt passes, all six authored full blobs/modes and zero-context diff are identical, as final-source-carry.json records. This is source equivalence and prior scoped qualification, not execution of 164 or 481 on 16f. Original PR ARM64/Linux remain separate. No privileged writer behavior is wired or tested.

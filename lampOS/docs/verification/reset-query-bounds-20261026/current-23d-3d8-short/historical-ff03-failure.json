@@ -1,0 +1,13 @@
+{
+  "closure_sha256": "8c1de0bd95af28d32525a08a1af2158a5d0e7d27bd94c4bb915896d94838278b",
+  "counts": "388 passed; 1 failed; 5 ignored",
+  "current_actual_paths_reasserted": false,
+  "head": "ff03ad11f3884e4ed09bb5538a6ba2a495891124",
+  "note": "Historical failed16-thread composition only. Latest prior actual target is successful7a67/755 serial. A serial pass is not causal proof or waiver of old failure.",
+  "preserved_outputs_depfiles_reverified": true,
+  "runtime_exit_code": 101,
+  "runtime_receipt_sha256": "f7388972b866c9e0044ab578cab3a1bc7604ad6ecc1e6cc37f634a0b2c633289",
+  "source_inventory_sha256": "789256a7b80a846ea8c9d5627ca045394f5afe32d121284a07dab3cd05166a91",
+  "unchanged_assertion_ms": 150,
+  "wake_observation_ms": 163.063834
+}

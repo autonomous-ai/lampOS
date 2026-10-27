@@ -1,0 +1,83 @@
+{
+  "summaries": [
+    {
+      "passed": 159,
+      "failed": 0,
+      "ignored": 2,
+      "line": "test result: ok. 159 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 22.21s"
+    },
+    {
+      "passed": 5,
+      "failed": 0,
+      "ignored": 0,
+      "line": "test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s"
+    }
+  ],
+  "totals": {
+    "passed": 164,
+    "failed": 0,
+    "ignored": 2
+  },
+  "writer_controls": [
+    [
+      "writer_refresh::tests::a_restart_at_every_unqualified_prefix_requires_recovery_and_never_reissues_the_grant",
+      "ok"
+    ],
+    [
+      "writer_refresh::tests::a_stale_or_modified_first_apply_cannot_consume_the_single_grant",
+      "ok"
+    ],
+    [
+      "writer_refresh::tests::diagnostics_hide_unknown_values_and_known_duplicate_or_shadowed_fields_are_refused",
+      "ok"
+    ],
+    [
+      "writer_refresh::tests::failed_persist_after_publication_poisons_the_live_session_until_actual_disk_state_is_recovered",
+      "ok"
+    ],
+    [
+      "writer_refresh::tests::first_apply_binds_its_own_later_envelope_and_sequence_without_replacing_the_refresh_identity",
+      "ok"
+    ],
+    [
+      "writer_refresh::tests::future_nonsemantic_metadata_is_preserved_without_becoming_admission_authority",
+      "ok"
+    ],
+    [
+      "writer_refresh::tests::guard_lock_is_exclusive_and_independent_of_the_product_lock",
+      "ok"
+    ],
+    [
+      "writer_refresh::tests::identity_substitution_never_changes_or_admits_the_saved_transaction",
+      "ok"
+    ],
+    [
+      "writer_refresh::tests::missing_and_nonregular_records_do_not_turn_into_a_fresh_transaction",
+      "ok"
+    ],
+    [
+      "writer_refresh::tests::no_apply_does_not_qualify_but_one_exact_apply_can_enter_without_an_ordinary_round",
+      "ok"
+    ],
+    [
+      "writer_refresh::tests::qualified_writer_and_preimages_survive_a_restart_until_the_product_journal_closes",
+      "ok"
+    ],
+    [
+      "writer_refresh::tests::restoring_an_apply_requires_its_original_grant_and_preimage_identity",
+      "ok"
+    ],
+    [
+      "writer_refresh::tests::unsupported_or_malformed_journals_are_retained_and_block_every_admission",
+      "ok"
+    ],
+    [
+      "writer_refresh::tests::write_bound_and_invalid_identities_leave_no_journal_or_partial_acceptance",
+      "ok"
+    ]
+  ],
+  "running_lines": [
+    "     Running unittests src/lib.rs (<target>/debug/deps/lamp_update-2fc2e5180de6bc32)",
+    "     Running tests/functions.rs (<target>/debug/deps/functions-9e56cee2cd1d1695)"
+  ]
+}

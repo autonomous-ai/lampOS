@@ -1,0 +1,10 @@
+{
+  "actual_and_preserved_outputs_unchanged": true,
+  "base": "75571bd0a439cc2dd4b18e0f4b6c3de9ff3153a8",
+  "controller_sha256": "0709973f367139121cd19bc6fa6b76c8ef377fc9b40de94eb850f94c8bc084a8",
+  "head": "7a67d7406df6688f308bbe657c494197160f974c",
+  "prepared": true,
+  "runtime_executed": false,
+  "scope": "setup-cloud",
+  "source_unchanged": true
+}

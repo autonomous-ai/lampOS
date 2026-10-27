@@ -1,0 +1,146 @@
+{
+  "cases": [
+    [
+      "keys::tests::the_check_is_one_request_with_the_key_in_its_header",
+      "ok"
+    ],
+    [
+      "keys::tests::the_services_error_body_is_never_passed_on",
+      "ok"
+    ],
+    [
+      "light::tests::a_new_look_turns_into_the_next_over_the_change",
+      "ok"
+    ],
+    [
+      "light::tests::each_phase_has_its_look_and_a_done_lamp_has_none",
+      "ok"
+    ],
+    [
+      "light::tests::it_fades_in_then_breathes_and_never_goes_dark",
+      "ok"
+    ],
+    [
+      "light::tests::joining_breathes_twice_as_fast_as_waiting",
+      "ok"
+    ],
+    [
+      "light::tests::let_go_it_fades_out_then_is_dark_and_comes_back_from_nothing",
+      "ok"
+    ],
+    [
+      "reset::query::tests::a_failed_query_cleans_its_same_group_child_even_after_output_closes",
+      "ok"
+    ],
+    [
+      "reset::query::tests::query_accepts_64_kib_and_refuses_more",
+      "ok"
+    ],
+    [
+      "reset::query::tests::query_deadline_also_applies_after_stdout_closes",
+      "ok"
+    ],
+    [
+      "reset::query::tests::query_reads_output_with_closed_stdin_and_discarded_stderr",
+      "ok"
+    ],
+    [
+      "reset::query::tests::query_refuses_nonzero_exit_and_spawn_failure",
+      "ok"
+    ],
+    [
+      "reset::query::tests::query_timeout_cleans_the_exited_leaders_pipe_holding_descendant",
+      "ok"
+    ],
+    [
+      "reset::query::tests::real_query_error_keeps_reset_data_and_journal_and_reboots",
+      "ok"
+    ],
+    [
+      "reset::query::tests::system_read_enforces_the_query_output_bound",
+      "ok"
+    ],
+    [
+      "scan::tests::a_command_that_hangs_is_killed_at_its_limit",
+      "ok"
+    ],
+    [
+      "scan::tests::a_long_output_is_read_whole_without_stalling_the_command",
+      "ok"
+    ],
+    [
+      "wake::tests::a_painter_fades_over_the_fades_it_is_given_and_the_lamps_by_default",
+      "ok"
+    ],
+    [
+      "wake::tests::it_breathes_every_six_seconds_then_every_ten_once_unwell",
+      "ok"
+    ],
+    [
+      "wake::tests::it_fades_in_and_opens_up_the_ring_over_the_opening",
+      "ok"
+    ],
+    [
+      "wake::tests::its_first_frame_is_already_lit",
+      "ok"
+    ],
+    [
+      "wake::tests::let_go_it_fades_out_within_the_fade_and_stays_dark",
+      "ok"
+    ],
+    [
+      "wake::tests::only_on_turns_it_on",
+      "ok"
+    ],
+    [
+      "wake::tests::with_no_voice_for_five_minutes_it_turns_pale",
+      "ok"
+    ],
+    [
+      "a_ring_that_is_not_there_yet_is_tried_again_and_shown",
+      "ok"
+    ],
+    [
+      "a_waking_face_that_never_answers_cannot_keep_the_privacy_ring_dark",
+      "ok"
+    ],
+    [
+      "asked_before_any_ring_opened_it_answers_at_once_and_never_opens_one",
+      "ok"
+    ],
+    [
+      "it_lights_at_once_and_the_voice_finds_the_ring_free_once_answered",
+      "ok"
+    ],
+    [
+      "something_that_is_not_the_voices_ask_leaves_the_ring_lit",
+      "ok"
+    ],
+    [
+      "the_privacy_ring_has_it_within_100_ms_of_asking",
+      "ok"
+    ]
+  ],
+  "note": "Literal summaries preserve nested child outputs separately; audit before aggregate counts.",
+  "scope": "setup-query-wake",
+  "summaries": [
+    {
+      "failed": 0,
+      "filtered": 0,
+      "header": "Running unittests src/lib.rs (<review-scratch>/debug/deps/lamp_setup-de3fa91126a60dc6)",
+      "ignored": 0,
+      "literal": "test result: ok. 24 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.50s",
+      "passed": 24,
+      "status": "ok"
+    },
+    {
+      "failed": 0,
+      "filtered": 0,
+      "header": "Running tests/wake.rs (<review-scratch>/debug/deps/wake-a7cd8f8c806435b2)",
+      "ignored": 0,
+      "literal": "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.85s",
+      "passed": 6,
+      "status": "ok"
+    }
+  ]
+}

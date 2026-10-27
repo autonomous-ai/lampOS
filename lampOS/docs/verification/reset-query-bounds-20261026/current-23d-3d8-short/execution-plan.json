@@ -1,0 +1,5 @@
+{
+  "current_runtime_scope": "Setup library and wake only; prior755 complete Setup/Cloud390/0/5 remains separate, with production inputs unchanged by3d8 foreign cfg(test) delta",
+  "reason": "First qualification of new3d8 reset carry with one runtime thread. Previousff/737 full16-thread failure is retained; no threshold, assertion or source change, no proven old-failure cause, no automatic rerun if this gate fails.",
+  "test_threads": 1
+}

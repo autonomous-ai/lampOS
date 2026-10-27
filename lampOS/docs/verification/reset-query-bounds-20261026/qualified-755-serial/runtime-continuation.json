@@ -1,0 +1,10 @@
+{
+  "actual_and_preserved_artifacts_equal_before_runtime": true,
+  "base": "75571bd0a439cc2dd4b18e0f4b6c3de9ff3153a8",
+  "compiler_reexecution_requested": false,
+  "continuation_controller_sha256": "3bcbeafcb1b72d91db62ce1ca01d650b206720f52ce76d8e5a5a30c1ab3f29a1",
+  "note": "Runtime deferred until parent Update gate closed. No source/configuration/head mutation or negative control execution. Cargo may check freshness; all actual artifacts are bound before and after.",
+  "prepared_controller_sha256": "0709973f367139121cd19bc6fa6b76c8ef377fc9b40de94eb850f94c8bc084a8",
+  "prepared_head": "7a67d7406df6688f308bbe657c494197160f974c",
+  "source_equal_to_preparation": true
+}

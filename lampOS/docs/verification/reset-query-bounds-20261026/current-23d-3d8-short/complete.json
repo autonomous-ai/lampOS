@@ -1,0 +1,11 @@
+{
+  "base": "3d8c75558e235c125b9cf953a66a6c193888fd9e",
+  "complete": true,
+  "head": "23d0c3fbbfe050dae1979c0de0b8127e8ed4de60",
+  "note": "Each scope closed artifact guards before subsequent compilation; only last scope current actual paths claimed at final completion.",
+  "scopes": [
+    "setup-query-wake"
+  ],
+  "source_entries": 7283,
+  "source_unchanged": true
+}

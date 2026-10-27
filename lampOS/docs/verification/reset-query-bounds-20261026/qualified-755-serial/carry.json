@@ -1,0 +1,38 @@
+{
+  "all_authored_full_blobs_modes_identical": true,
+  "base_changed_paths": [
+    "lampOS/crates/addons/src/situation.rs",
+    "lampOS/crates/addons/tests/judge.rs",
+    "lampOS/crates/controls/tests/it/touch_pins.rs",
+    "lampOS/crates/expression/tests/runtime.rs",
+    "lampOS/crates/mood/src/engine.rs",
+    "lampOS/crates/mood/src/runtime.rs",
+    "lampOS/crates/mood/tests/it/engine.rs",
+    "lampOS/crates/msgs/src/mood.rs",
+    "lampOS/crates/voice-eval/src/mood_minute.rs",
+    "lampOS/crates/voice/src/onboarding.rs",
+    "lampOS/crates/voice/src/remember_speaker.rs",
+    "lampOS/crates/voice/src/ring_mood.rs",
+    "lampOS/crates/voice/src/second_provider.rs",
+    "lampOS/crates/voice/src/speak_up.rs",
+    "lampOS/crates/voice/src/speaking_faces.rs",
+    "lampOS/crates/voice/src/tools.rs",
+    "lampOS/docs/mood.md",
+    "lampOS/docs/onboarding.md",
+    "lampOS/docs/second-voice.md"
+  ],
+  "base_runtime_dependencies_changed": true,
+  "files": {
+    "lampOS/crates/setup/src/reset.rs": "100644 blob 754a4b7dfa1c62bd01c07a0c5c1d35bb9514ade0\tlampOS/crates/setup/src/reset.rs",
+    "lampOS/crates/setup/src/reset/query.rs": "100644 blob 8684e05e8b92250225d794403fb60af1c25b1594\tlampOS/crates/setup/src/reset/query.rs",
+    "lampOS/docs/reuse-decisions.md": "100644 blob d9e1644dc2a13638afa72826f95a77aa73d71132\tlampOS/docs/reuse-decisions.md",
+    "lampOS/docs/setup.md": "100644 blob 8001d51e6f8a1bff3332962987cb8c7889b41643\tlampOS/docs/setup.md"
+  },
+  "kind": "reset",
+  "new_base": "75571bd0a439cc2dd4b18e0f4b6c3de9ff3153a8",
+  "new_head": "7a67d7406df6688f308bbe657c494197160f974c",
+  "old_base": "f7252d81dc2e72494afc6ea842bd8b0445f1991c",
+  "old_head": "ad693e626823eeea856f6cb45b749be8082eb83f",
+  "original_native_runtime_not_relabelled": true,
+  "range_diff": "1:  ad693e6268 = 1:  7a67d7406d lampOS: bound reset read-only queries and retain failed-reset recovery\n"
+}

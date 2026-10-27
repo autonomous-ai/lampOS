@@ -1,0 +1,16 @@
+{
+  "command": [
+    "<reviewer-home>/.cargo/bin/cargo",
+    "+1.96.0",
+    "fmt",
+    "--all",
+    "--check"
+  ],
+  "disk_free_before": 25065021440,
+  "elapsed_seconds": 6.943,
+  "error": null,
+  "exit_code": 0,
+  "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "source_entries": 7283,
+  "source_unchanged": true
+}

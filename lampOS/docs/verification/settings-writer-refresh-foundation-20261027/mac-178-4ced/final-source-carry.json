@@ -1,0 +1,26 @@
+{
+  "qualified_carry": "178aca5fdc4998169202d8a53d3f83e1da5d44fd",
+  "qualified_base": "4cedf513089c723402e2307161e288dd71bc94cd",
+  "head": "16f0e1cb27d2796c953ba1e0d0de92f4e37aff53",
+  "base": "3d8c75558e235c125b9cf953a66a6c193888fd9e",
+  "authored_paths": [
+    "lampOS/crates/update/src/lib.rs",
+    "lampOS/crates/update/src/writer_refresh.rs",
+    "lampOS/crates/update/src/writer_refresh/tests.rs",
+    "lampOS/docs/reuse-decisions.md",
+    "lampOS/docs/settings-writer-refresh.md",
+    "lampOS/docs/updates.md"
+  ],
+  "all_owned_blobs_modes_equal": true,
+  "zero_context_authored_diff_equal": true,
+  "change": "3d8c75558e lampOS: tests pin that a brand said in passing names no agent and that each given name of a machine's name is kept from the journal (P3s on #3723, #3727)",
+  "owned_blobs_modes": {
+    "lampOS/crates/update/src/lib.rs": "100644 blob 77d5807ac882409e634840bbfda142623797a31d\tlampOS/crates/update/src/lib.rs",
+    "lampOS/crates/update/src/writer_refresh.rs": "100644 blob 1ee75c86bad7c8e6f7e6faab85af311b8d8a9287\tlampOS/crates/update/src/writer_refresh.rs",
+    "lampOS/crates/update/src/writer_refresh/tests.rs": "100644 blob ee5665ce0a7def7a98297098032725be766fb259\tlampOS/crates/update/src/writer_refresh/tests.rs",
+    "lampOS/docs/reuse-decisions.md": "100644 blob 3424f7d8bda9b706f43ceda77acc808984ec5e6c\tlampOS/docs/reuse-decisions.md",
+    "lampOS/docs/settings-writer-refresh.md": "100644 blob 6c2522c13b7c5e7995818618e38c3e55b2d0f542\tlampOS/docs/settings-writer-refresh.md",
+    "lampOS/docs/updates.md": "100644 blob 324c2a0edf3637b94f3c91d8878dc1981a37de7e\tlampOS/docs/updates.md"
+  },
+  "working_directory": "repository root; each selected entry required nonempty"
+}

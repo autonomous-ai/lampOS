@@ -1,0 +1,24 @@
+{
+  "all_authored_full_blobs_modes_identical": true,
+  "base_changed_paths": [
+    "lampOS/crates/tasks/tests/harness.rs",
+    "lampOS/crates/voice/src/agent_tasks.rs",
+    "lampOS/crates/voice/src/privacy_bus.rs",
+    "lampOS/docs/voice-test-fixtures.md"
+  ],
+  "files": {
+    "lampOS/crates/setup/src/reset.rs": "100644 blob 754a4b7dfa1c62bd01c07a0c5c1d35bb9514ade0\tlampOS/crates/setup/src/reset.rs",
+    "lampOS/crates/setup/src/reset/query.rs": "100644 blob 8684e05e8b92250225d794403fb60af1c25b1594\tlampOS/crates/setup/src/reset/query.rs",
+    "lampOS/docs/reuse-decisions.md": "100644 blob d9e1644dc2a13638afa72826f95a77aa73d71132\tlampOS/docs/reuse-decisions.md",
+    "lampOS/docs/setup.md": "100644 blob 8001d51e6f8a1bff3332962987cb8c7889b41643\tlampOS/docs/setup.md"
+  },
+  "inspection": "All Rust base hunks are Voice cfg(test) or tasks integration tests; other path is fixture documentation. Voice cfg(test) is not compiled as a Cloud dependency.",
+  "kind": "reset",
+  "new_base": "3d8c75558e235c125b9cf953a66a6c193888fd9e",
+  "new_head": "23d0c3fbbfe050dae1979c0de0b8127e8ed4de60",
+  "old_base": "75571bd0a439cc2dd4b18e0f4b6c3de9ff3153a8",
+  "old_full_counts_not_relabelled": true,
+  "old_head": "7a67d7406df6688f308bbe657c494197160f974c",
+  "production_delta": false,
+  "range_diff": "1:  7a67d7406d = 1:  23d0c3fbbf lampOS: bound reset read-only queries and retain failed-reset recovery\n"
+}

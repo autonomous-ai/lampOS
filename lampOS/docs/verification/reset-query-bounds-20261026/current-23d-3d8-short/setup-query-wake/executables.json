@@ -1,0 +1,62 @@
+[
+  {
+    "fresh": false,
+    "package_id": "path+file://<review-scratch>/lampOS/crates/setup#lamp-setup@0.1.0",
+    "path": "<review-scratch>/debug/deps/wake-a7cd8f8c806435b2",
+    "sha256": "5a15c68cdeac7485d95c238b6044f0057d87cd609afaca83782a0a09a0a8e860",
+    "target": {
+      "crate_types": [
+        "bin"
+      ],
+      "doc": false,
+      "doctest": false,
+      "edition": "2024",
+      "kind": [
+        "test"
+      ],
+      "name": "wake",
+      "src_path": "<review-scratch>/lampOS/crates/setup/tests/wake.rs",
+      "test": true
+    }
+  },
+  {
+    "fresh": false,
+    "package_id": "path+file://<review-scratch>/lampOS/crates/setup#lamp-setup@0.1.0",
+    "path": "<review-scratch>/debug/lamp-setup",
+    "sha256": "5668e150a9630364154731ba2191209d098e87307dc5067efa2337fd88577c45",
+    "target": {
+      "crate_types": [
+        "bin"
+      ],
+      "doc": true,
+      "doctest": false,
+      "edition": "2024",
+      "kind": [
+        "bin"
+      ],
+      "name": "lamp-setup",
+      "src_path": "<review-scratch>/lampOS/crates/setup/src/main.rs",
+      "test": true
+    }
+  },
+  {
+    "fresh": false,
+    "package_id": "path+file://<review-scratch>/lampOS/crates/setup#lamp-setup@0.1.0",
+    "path": "<review-scratch>/debug/deps/lamp_setup-de3fa91126a60dc6",
+    "sha256": "b06b4c8f5eb68998ada7fa44219f81a293c3d0a9329f1fa4230fb07e0fbf0b4c",
+    "target": {
+      "crate_types": [
+        "lib"
+      ],
+      "doc": true,
+      "doctest": true,
+      "edition": "2024",
+      "kind": [
+        "lib"
+      ],
+      "name": "lamp_setup",
+      "src_path": "<review-scratch>/lampOS/crates/setup/src/lib.rs",
+      "test": true
+    }
+  }
+]

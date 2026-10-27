@@ -1,3 +1,39 @@
+Ready for lamp-voice: no (#3775 original native/read pending); query clean carries continue
+
+## Current checkpoint: 2026-10-27 15:39 +07, writer foundation PR opened
+
+**#3775** is open as draft at **16f0e1cb27 / 3d8c75558e**. It is the
+unwired record/admission piece of #3689, not a helper deployment. [Complete
+Mac evidence](verification/settings-writer-refresh-foundation-20261027/mac-fa8-755/README.md)
+on actual fa8/755 passes fmt, strict all-target Update Clippy, compiler
+JSON and full Update **481/0/6**; all fourteen new controls once, 7314
+tracked source/workflow files unchanged and all actual/preserved executables
+bound. [Foreign-fixture carry evidence](verification/settings-writer-refresh-foundation-20261027/mac-178-4ced/README.md)
+on 178/4ced passes the same compiler stages plus full Update library and
+function readers **164/0/2**. Final 16f has current fmt, both patches `=`,
+all six full authored blobs/modes and zero-context diff equal; intervening
+Main changes are foreign cfg(test)/docs only. Earlier counts are not new
+16f execution. Original ARM40474816592/Linux40474816661 are active.
+
+The packet reconstructs the entire executed fa8 tree from public Main 755
+and the six exact authored files, and retains all first failures: format,
+large-enum lint, Apple fixture compile, then 14 actual private-fixture
+precondition failures with preserved executable. Corrected focused 14/0 is
+separate. Ambiguous save-error poisoning, exact later first-apply identity
+and restoration provenance are implemented. Actual root copy, signature
+verification, file restore, boot admission and 7071 GOOD/BAD are not.
+An isolated next branch adds validated read-only recovery inputs; its extra
+four tests are authored but unrun while query gates own the compiler.
+
+Reset is now **23d0c3fbb / 3d8**, with current [short gate 30/0/0](verification/reset-query-bounds-20261026/current-23d-3d8-short/README.txt)
+plus fmt/strict Clippy and all eight controls; its [complete 755 gate 390/0/5](verification/reset-query-bounds-20261026/qualified-755-serial/README.txt)
+keeps its actual source. Prior ad693/f725 original native remains 1,482/0/9
+clean. Cloud's new 3d8 full scoped gate follows, with prior 238c/f725 original
+native 11,551 clean passes/106 skips, ten controls once and reader 2+2 intact.
+No prior failure, LEAK or actual execution identity is erased.
+
+---
+
 Ready for lamp-voice: no (latest-base query carries); #3689 foundation complete gate active
 
 ## Current checkpoint: 2026-10-27 15:15 +07, both query native gates clean

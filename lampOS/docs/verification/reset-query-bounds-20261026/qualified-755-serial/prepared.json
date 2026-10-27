@@ -1,0 +1,10 @@
+{
+  "base": "75571bd0a439cc2dd4b18e0f4b6c3de9ff3153a8",
+  "controller_sha256": "0709973f367139121cd19bc6fa6b76c8ef377fc9b40de94eb850f94c8bc084a8",
+  "head": "7a67d7406df6688f308bbe657c494197160f974c",
+  "prepared": true,
+  "runtime_executed": false,
+  "scope": "setup-cloud",
+  "source_sha256": "f4bb10c0379a6b187fb972c54f58e67fdf9edcc70eb45bd368b9fa25e78c055d",
+  "target": "<review-scratch>"
+}

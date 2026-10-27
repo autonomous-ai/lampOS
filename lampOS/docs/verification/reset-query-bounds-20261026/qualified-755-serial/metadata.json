@@ -1,0 +1,20 @@
+{
+  "command": [
+    "<reviewer-home>/.cargo/bin/cargo",
+    "+1.96.0",
+    "metadata",
+    "--locked",
+    "--offline",
+    "--format-version",
+    "1",
+    "--filter-platform",
+    "aarch64-apple-darwin"
+  ],
+  "disk_free_before": 25229914112,
+  "elapsed_seconds": 1.624,
+  "error": null,
+  "exit_code": 0,
+  "log_sha256": "9a16a2ebf9e4a1744aa7c430729692b6f59a3eaa7b722aa831a41841cc045adf",
+  "source_entries": 7283,
+  "source_unchanged": true
+}

@@ -1,0 +1,45 @@
+{
+  "execution_head": "fa8ac496353c4679d2ab43e70e37b80f1924296f",
+  "execution_tree": "7dd7ec1fd9406365f0a2f7e44a7a327d6ce2daec",
+  "base": "75571bd0a439cc2dd4b18e0f4b6c3de9ff3153a8",
+  "current_carry": "178aca5fdc4998169202d8a53d3f83e1da5d44fd",
+  "authored_paths": {
+    "lampOS/crates/update/src/lib.rs": {
+      "mode": "100644",
+      "type": "blob",
+      "blob": "77d5807ac882409e634840bbfda142623797a31d"
+    },
+    "lampOS/crates/update/src/writer_refresh.rs": {
+      "mode": "100644",
+      "type": "blob",
+      "blob": "1ee75c86bad7c8e6f7e6faab85af311b8d8a9287"
+    },
+    "lampOS/crates/update/src/writer_refresh/tests.rs": {
+      "mode": "100644",
+      "type": "blob",
+      "blob": "ee5665ce0a7def7a98297098032725be766fb259"
+    },
+    "lampOS/docs/reuse-decisions.md": {
+      "mode": "100644",
+      "type": "blob",
+      "blob": "3424f7d8bda9b706f43ceda77acc808984ec5e6c"
+    },
+    "lampOS/docs/settings-writer-refresh.md": {
+      "mode": "100644",
+      "type": "blob",
+      "blob": "6c2522c13b7c5e7995818618e38c3e55b2d0f542"
+    },
+    "lampOS/docs/updates.md": {
+      "mode": "100644",
+      "type": "blob",
+      "blob": "324c2a0edf3637b94f3c91d8878dc1981a37de7e"
+    }
+  },
+  "all_authored_blobs_modes_equal": true,
+  "base_plus_current_owned_paths_equals_entire_execution_tree": true,
+  "entire_tree_entries": 10726,
+  "source_guard_files": 7314,
+  "raw_source_before_sha256": "feb7dc13a53fddb60ee64d18625ce32145f92090293ec880f5d7b6b0c6a7eada",
+  "raw_source_after_sha256": "feb7dc13a53fddb60ee64d18625ce32145f92090293ec880f5d7b6b0c6a7eada",
+  "full_raw_retained_privately": true
+}

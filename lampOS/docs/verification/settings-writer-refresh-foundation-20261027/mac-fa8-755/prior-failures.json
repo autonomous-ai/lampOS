@@ -1,0 +1,22 @@
+{
+  "format_first": "failed, compiler/tests unrun",
+  "v1": "Clippy large enum variant, tests unrun",
+  "v2": "Apple mkfifoat unavailable, tests unrun",
+  "v3": {
+    "passed": 0,
+    "failed": 14,
+    "ignored": 0,
+    "filtered": 147,
+    "stage": "private fixture-directory precondition",
+    "preserved_failed_executable_sha256": "0d2ab558e914db306d3a2cce9f2b0ac24fee973617be4d7ecd66dc54c869ac3c"
+  },
+  "v4": {
+    "passed": 14,
+    "failed": 0,
+    "ignored": 0,
+    "filtered": 147,
+    "scope": "focused corrected source, separate from complete fa8 execution"
+  },
+  "production_private_directory_policy_unchanged": true,
+  "no_old_failure_relabelled": true
+}

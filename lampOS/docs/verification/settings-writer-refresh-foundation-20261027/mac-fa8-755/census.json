@@ -1,0 +1,139 @@
+{
+  "summaries": [
+    {
+      "passed": 159,
+      "failed": 0,
+      "ignored": 2,
+      "line": "test result: ok. 159 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 21.76s"
+    },
+    {
+      "passed": 3,
+      "failed": 0,
+      "ignored": 0,
+      "line": "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    },
+    {
+      "passed": 5,
+      "failed": 0,
+      "ignored": 0,
+      "line": "test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.12s"
+    },
+    {
+      "passed": 105,
+      "failed": 0,
+      "ignored": 0,
+      "line": "test result: ok. 105 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 189.09s"
+    },
+    {
+      "passed": 13,
+      "failed": 0,
+      "ignored": 0,
+      "line": "test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.61s"
+    },
+    {
+      "passed": 0,
+      "failed": 0,
+      "ignored": 2,
+      "line": "test result: ok. 0 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    },
+    {
+      "passed": 196,
+      "failed": 0,
+      "ignored": 0,
+      "line": "test result: ok. 196 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 410.90s"
+    },
+    {
+      "passed": 0,
+      "failed": 0,
+      "ignored": 1,
+      "line": "test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out"
+    },
+    {
+      "passed": 0,
+      "failed": 0,
+      "ignored": 1,
+      "line": "test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out"
+    },
+    {
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "line": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    }
+  ],
+  "totals": {
+    "passed": 481,
+    "failed": 0,
+    "ignored": 6
+  },
+  "writer_controls": [
+    [
+      "writer_refresh::tests::a_restart_at_every_unqualified_prefix_requires_recovery_and_never_reissues_the_grant",
+      "ok"
+    ],
+    [
+      "writer_refresh::tests::a_stale_or_modified_first_apply_cannot_consume_the_single_grant",
+      "ok"
+    ],
+    [
+      "writer_refresh::tests::diagnostics_hide_unknown_values_and_known_duplicate_or_shadowed_fields_are_refused",
+      "ok"
+    ],
+    [
+      "writer_refresh::tests::failed_persist_after_publication_poisons_the_live_session_until_actual_disk_state_is_recovered",
+      "ok"
+    ],
+    [
+      "writer_refresh::tests::first_apply_binds_its_own_later_envelope_and_sequence_without_replacing_the_refresh_identity",
+      "ok"
+    ],
+    [
+      "writer_refresh::tests::future_nonsemantic_metadata_is_preserved_without_becoming_admission_authority",
+      "ok"
+    ],
+    [
+      "writer_refresh::tests::guard_lock_is_exclusive_and_independent_of_the_product_lock",
+      "ok"
+    ],
+    [
+      "writer_refresh::tests::identity_substitution_never_changes_or_admits_the_saved_transaction",
+      "ok"
+    ],
+    [
+      "writer_refresh::tests::missing_and_nonregular_records_do_not_turn_into_a_fresh_transaction",
+      "ok"
+    ],
+    [
+      "writer_refresh::tests::no_apply_does_not_qualify_but_one_exact_apply_can_enter_without_an_ordinary_round",
+      "ok"
+    ],
+    [
+      "writer_refresh::tests::qualified_writer_and_preimages_survive_a_restart_until_the_product_journal_closes",
+      "ok"
+    ],
+    [
+      "writer_refresh::tests::restoring_an_apply_requires_its_original_grant_and_preimage_identity",
+      "ok"
+    ],
+    [
+      "writer_refresh::tests::unsupported_or_malformed_journals_are_retained_and_block_every_admission",
+      "ok"
+    ],
+    [
+      "writer_refresh::tests::write_bound_and_invalid_identities_leave_no_journal_or_partial_acceptance",
+      "ok"
+    ]
+  ],
+  "running_lines": [
+    "     Running unittests src/lib.rs (<target>/debug/deps/lamp_update-2fc2e5180de6bc32)",
+    "     Running unittests src/main.rs (<target>/debug/deps/lamp_update-1c2005188bf8e5ab)",
+    "     Running tests/functions.rs (<target>/debug/deps/functions-9e56cee2cd1d1695)",
+    "     Running tests/install.rs (<target>/debug/deps/install-7739a60369055fbf)",
+    "     Running tests/it/main.rs (<target>/debug/deps/it-ae5bcab57f15def3)",
+    "     Running tests/release_pair.rs (<target>/debug/deps/release_pair-2447bcdc916504d4)",
+    "     Running tests/round.rs (<target>/debug/deps/round-f8d7f0920c4648fb)",
+    "     Running tests/self_cli_exec.rs (<target>/debug/deps/self_cli_exec-25113342c679f525)",
+    "     Running tests/self_process_cuts.rs (<target>/debug/deps/self_process_cuts-8ce1b6350e2ac329)",
+    "   Doc-tests lamp_update"
+  ]
+}

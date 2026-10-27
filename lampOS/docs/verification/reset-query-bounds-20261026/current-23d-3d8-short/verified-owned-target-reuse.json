@@ -1,0 +1,19 @@
+{
+  "actual_executables_reverified_before_any_compiler": true,
+  "actual_preserved_outputs_and_depfiles_reverified_before_any_compiler": true,
+  "changed_source_entries": [
+    "lampOS/crates/tasks/tests/harness.rs",
+    "lampOS/crates/voice/src/agent_tasks.rs",
+    "lampOS/crates/voice/src/privacy_bus.rs",
+    "lampOS/docs/voice-test-fixtures.md"
+  ],
+  "new_empty_target": false,
+  "note": "Same exclusively owned target and worktree. Latest7a67/755 full serial gate succeeded390/0/5; its actual and preserved source/artifact boundary is verified. Current new3d8 composition uses one runtime thread. Old ff03/737 failure remains historical only, with no causal attribution or waiver. No cold-target or automatic retry claim.",
+  "previous_artifact_closure_sha256": "e26eda5df48e44800ec113f8915c78bd0fe3a80fcd70c41ca532471d09ca9cbd",
+  "previous_head": "7a67d7406df6688f308bbe657c494197160f974c",
+  "previous_runtime_exit_code": 0,
+  "previous_runtime_receipt_sha256": "c639d553c49cfedb5840a481e2aeea8e3f0709772ecec3cc1715aa4ccc50d3f4",
+  "previous_source_inventory_sha256": "f4bb10c0379a6b187fb972c54f58e67fdf9edcc70eb45bd368b9fa25e78c055d",
+  "source_worktree": "<review-scratch>",
+  "target": "<review-scratch>"
+}
