@@ -660,3 +660,4 @@ Ready for lamp-voice: yes (#2553), once its ARM64 run is green
 - 22:49: quiet tick; #3875 ARM64 pending.
 - 22:54: NEXT TRAIN #3875 1be302a37 (ARM64 green). #3813 merged; #3840 next for the reviewer-lead. Ten's #3878 (format 2): order note posted (copy the skill schema to the SDK if it lands after #3840; skill check will follow format 2).
 - 22:59: Reviewer-two verified #3875's ARM64/Linux/SDK gates (source P1/P2 none). Waiting: #3840 merge (next), #3875 train, #3869 Fourteen's re-read.
+- 23:05: #3840 merged (197f21533). Opened its P3 follow-up (blue/skill-check-p3 b76c3912a; first name line, dir move, warning wording, CI skill copy required; 59 passed on 3.12/3.10). Told Ten #3878 must copy the skill schema to the SDK (it changes the doc only).
