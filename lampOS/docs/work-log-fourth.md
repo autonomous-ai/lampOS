@@ -1,11 +1,23 @@
+## 2026-10-27 15:55 UTC — Onboarding consent validation failure retained and data repaired
+
+Ready for lamp-voice: no
+
+[Failed b202 gate](verification/onboarding-b202-consent-failure-20261027/README.md):
+actual 12696/125, nextest 100; all 958 selected terminate as 844 PASS / 114 FAIL, no
+leaks/timeouts, docs UNRUN. Own note broke the mandatory consent literal;
+112 onboarding and two product-reader failures remain recorded. All 115 actual
+inputs and both failed drivers are preserved. The 0063 data repair restores
+the literal without changing validators/assertions. Fresh affected 230 scope
+and compiler gates are running; no old-source pass or native credit transfers.
+
 ## 2026-10-27 15:07 UTC — Superseded onboarding scope interrupted and retained
 
 Ready for lamp-voice: no
 
 [Actual interrupted receipt](verification/onboarding-bf6f-interrupted-20261027/README.md):
-old 9ab/bf6 broad runtime ended controller125/nextest100 after an intentional
+old 9ab/bf6 broad runtime ended controller 125/nextest 100 after an intentional
 scope correction: 745 clean PASS, two SIGINT/raw-failed, 4,874 selected unrun.
-Docs are unrun; both earlier zero-body125 stops remain. All115 input backings
+Docs are unrun; both earlier zero-body125 stops remain. All 115 input backings
 and the interrupted Round witness are retained independently; source/closure
 pass. No qualification or product-failure cause is inferred. Current c3eb
 onboarding composes the landed exact words and goes through focused host plus
@@ -185,7 +197,7 @@ Ready for lamp-voice: no
 normal compiler stages pass; all 5,537 selected local cases terminate with
 5,532 passes / five failures. Required controls are 110/1 of 111; the separate
 525 contract ledger is 521/4, with 25 overlaps not added. The named CONTROL
-regression passes. Native125 / nextest100 remain failed; zero leaks/timeouts,
+regression passes. Native125 / nextest 100 remain failed; zero leaks/timeouts,
 43 natural ignores (27 JSON, 16 start-only). Docs/custom are unrun. The exact
 failed Voice driver and actual zero-backing inspections are retained; helper0
 checks 7,888 protected files and source/process closure before release. The
@@ -222,7 +234,7 @@ The complete four-crate plus IPC camera union gives 5,435 passes / 86 failures,
 all 5,521 selected cases terminal; all 110 controls give 79 passes / 31 failures.
 There are zero leaks, timeouts or retries. The 43 natural ignores split into
 27 JSON terminals and 16 start-only entries with human SKIP, not executions.
-Actual controller125 and nextest100 remain failed. It was not cancelled and
+Actual controller 125 and nextest 100 remain failed. It was not cancelled and
 no manual signal was sent; docs/custom stages are unrun.
 
 Both failed drivers are independently retained. Actual dsymutil and independent
@@ -262,7 +274,7 @@ Ready for lamp-voice: no
 
 [Original a8 native receipt](verification/common-a8-native-20261027/receipt.json): ARM40397666310 and Linux40397665945 pass at actual preview dfa859e8d / tree7ae4b834b, ordered parents16f3e976c and a8a2aa953. The preview adds three Main paths beyond the authored2bf carry and differs from the host tree. Complete ARM census is 11,571 unique passes, zero bad/unrun, [all60 required once](verification/common-a8-native-20261027/required-controls.json);35 duplicate displays add no cases. Aggregate106 skips lack identities, so no natural-ignore split is invented. Docs4/0, process13/0 and one relay-ok receipt pass. Four hand and two Update custom cases are inside11,571. Export47binaries+2examples succeeds; ZIP digest is API/upload-log bound, not independently downloaded. This does not qualify latera3, IPC or clock source, physical behavior, or waive historical failures.
 
-[Original IPC failure](verification/ipc-camera-original-failure-20261027/receipt.json) on a3/cfd6:43 selected,33pass/10fail/0skip, all started/terminal once. Existing26pass; camera17 gives7pass/10fail. Nine positives reject valid Darwin unnamed peers; one truncated-rights case aborts inside rustix. SIGABRT is one of the10failures. Actual nextest100 remains; controller125 came from the human-label parser, now reproduced offline without test replay. Exact failed driver and15debug inputs are retained; all25witnesses, prior snapshots and fresh process/source closure are verified. Fix source is being prepared, UNRUN. Relay/docs remain unrun. The prior capacity attempt executed zero commands. All old source worktrees remain intact.
+[Original IPC failure](verification/ipc-camera-original-failure-20261027/receipt.json) on a3/cfd6:43 selected,33pass/10fail/0skip, all started/terminal once. Existing26pass; camera17 gives7pass/10fail. Nine positives reject valid Darwin unnamed peers; one truncated-rights case aborts inside rustix. SIGABRT is one of the10failures. Actual nextest 100 remains; controller 125 came from the human-label parser, now reproduced offline without test replay. Exact failed driver and15debug inputs are retained; all25witnesses, prior snapshots and fresh process/source closure are verified. Fix source is being prepared, UNRUN. Relay/docs remain unrun. The prior capacity attempt executed zero commands. All old source worktrees remain intact.
 
 Common's object-only a3 carry is prepared separately, unqualified. Eyes' reviewed retirement/renewal repair preserves the original deadline and adds a fresh post-shutdown capture floor; tests remain unrun. HTTP/face reader disposition, explicit-close Voice wiring, independent privacy, pins and physical holds remain. No device action.
 
@@ -270,7 +282,7 @@ Common's object-only a3 carry is prepared separately, unqualified. Eyes' reviewe
 
 Ready for lamp-voice: no
 
-Pushed #3064 a8a2aa953 on Main 2bf5122dc with exact lease replacement of ef831cec9. [Current selected receipt](verification/common-current-2bf-20261027/receipt.json) and [all 60 named terminals](verification/common-current-2bf-20261027/required-controls.json): formatting, strict workspace/all-target Clippy, build, full metadata and discovery pass; the exact union is 60/0/0, zero leaks/timeouts/retries. Common/fixture controls 42, complete name-carry module 15 and changed Skills fixtures 3 each execute once. This is not a whole-workspace runtime gate. The original metadata-accounting controller125 remains; only unrun stages continued after offline Clippy provenance recovery. Actual continuation0, source/evidence and fresh process closure verified. Ordinary reused/rebuilt artifacts remain distinct.
+Pushed #3064 a8a2aa953 on Main 2bf5122dc with exact lease replacement of ef831cec9. [Current selected receipt](verification/common-current-2bf-20261027/receipt.json) and [all 60 named terminals](verification/common-current-2bf-20261027/required-controls.json): formatting, strict workspace/all-target Clippy, build, full metadata and discovery pass; the exact union is 60/0/0, zero leaks/timeouts/retries. Common/fixture controls 42, complete name-carry module 15 and changed Skills fixtures 3 each execute once. This is not a whole-workspace runtime gate. The original metadata-accounting controller 125 remains; only unrun stages continued after offline Clippy provenance recovery. Actual continuation0, source/evidence and fresh process closure verified. Ordinary reused/rebuilt artifacts remain distinct.
 
 Tested897/tree6a026 is publicly retained on fourth/common-2bf-tested-20261027. Final a8/treeeddaf differs only in the verification README; all production/test/manifest blobs match. Both fixture parents retain equal range-diffs; Common folds the post-construction HTTP and deliberate face-operation repairs into its one commit. New ARM40397666310 and Linux Clippy40397665945 are running, not passed. Earlier full/native failures remain failed. Readers are asked to read the pushed repair; explicit-close integration, independent privacy, pins and physical holds remain. The standalone IPC witness gate is next, while the Eyes half is under construction. No device action.
 
@@ -284,7 +296,7 @@ Ready for lamp-voice: no
 
 Ready for lamp-voice: no
 
-[Selected old-behavior receipt](verification/common-http-fault-counter-20261027/receipt.json) binds one final permission-check omission to the retained fault source and executable. The build completed; initial execution admission failed because the private copy had mode0600, so zero test children launched. That original controller125 remains recorded. An independent mode0700 copy of the same built executable then ran the exact counter control once: expected exit101, zero passes/one failure, one concrete HTTP send polled versus required zero. This is the requested discriminating negative control, not a fixed-code pass. No compiler or passed-test replay occurred in the continuation.
+[Selected old-behavior receipt](verification/common-http-fault-counter-20261027/receipt.json) binds one final permission-check omission to the retained fault source and executable. The build completed; initial execution admission failed because the private copy had mode0600, so zero test children launched. That original controller 125 remains recorded. An independent mode0700 copy of the same built executable then ran the exact counter control once: expected exit101, zero passes/one failure, one concrete HTTP send polled versus required zero. This is the requested discriminating negative control, not a fixed-code pass. No compiler or passed-test replay occurred in the continuation.
 
 The checked9bd source was restored exactly. All151 actual fault debug backing inputs were independently COW-cloned; the prior23 witnesses,7492+151 inputs and four passed driver clones remain intact. Actual preservation/control continuations exited0 and fresh owned sessions were empty before cache release. The original probe's native tool exit was unobserved and is not invented. Common repairs are now folded on currentMain2bf, source897/tree6a026; current composition runtime is UNRUN. Next is its delta gate, then own-branch push and new native gates. The camera witness remains a separate unwired prerequisite. Explicit-close, independent privacy, pin and physical holds remain; no device action.
 

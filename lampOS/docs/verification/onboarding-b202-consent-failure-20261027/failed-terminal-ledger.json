@@ -1,0 +1,800 @@
+[
+  {
+    "binary": "lamp-update::install",
+    "test": "the_installed_bedtime_skill_is_disabled_and_absent_from_live_catalogs",
+    "event": "failed",
+    "line_one_based": 219,
+    "terminal_ordinal_one_based": 106
+  },
+  {
+    "binary": "lamp-update::install",
+    "test": "the_product_skills_are_exactly_the_core_skills",
+    "event": "failed",
+    "line_one_based": 217,
+    "terminal_ordinal_one_based": 105
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::giving_way_flow_tests::a_clock_that_jumped_does_not_make_a_push_done",
+    "event": "failed",
+    "line_one_based": 260,
+    "terminal_ordinal_one_based": 125
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::giving_way_flow_tests::a_hand_still_on_the_head_is_not_done_and_two_tries_unfelt_fail",
+    "event": "failed",
+    "line_one_based": 262,
+    "terminal_ordinal_one_based": 126
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::giving_way_flow_tests::a_hand_that_moves_the_head_and_lets_go_is_the_only_done",
+    "event": "failed",
+    "line_one_based": 264,
+    "terminal_ordinal_one_based": 127
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::giving_way_flow_tests::a_head_not_moved_far_or_not_held_where_the_hand_put_it_is_not_done",
+    "event": "failed",
+    "line_one_based": 266,
+    "terminal_ordinal_one_based": 128
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::giving_way_flow_tests::a_held_progress_write_never_holds_the_loop_and_nothing_is_done_before_it",
+    "event": "failed",
+    "line_one_based": 268,
+    "terminal_ordinal_one_based": 129
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::giving_way_flow_tests::a_rebuilt_walk_keeps_its_invitations_and_does_not_ask_a_third_time",
+    "event": "failed",
+    "line_one_based": 272,
+    "terminal_ordinal_one_based": 131
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::giving_way_flow_tests::an_ask_never_said_three_times_is_not_available_never_failed",
+    "event": "failed",
+    "line_one_based": 274,
+    "terminal_ordinal_one_based": 132
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::giving_way_flow_tests::an_invitation_the_voice_never_said_is_no_try_and_is_asked_again",
+    "event": "failed",
+    "line_one_based": 276,
+    "terminal_ordinal_one_based": 133
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::giving_way_flow_tests::an_offer_never_taken_gives_its_try_back",
+    "event": "failed",
+    "line_one_based": 278,
+    "terminal_ordinal_one_based": 134
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::giving_way_flow_tests::late_evidence_after_a_skip_or_a_redo_is_ignored",
+    "event": "failed",
+    "line_one_based": 280,
+    "terminal_ordinal_one_based": 135
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::giving_way_flow_tests::the_base_turned_by_a_hand_as_on_52e6_is_done_once_the_body_says_the_hand",
+    "event": "failed",
+    "line_one_based": 282,
+    "terminal_ordinal_one_based": 136
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::giving_way_flow_tests::the_same_turn_with_the_hand_never_said_is_not_done",
+    "event": "failed",
+    "line_one_based": 284,
+    "terminal_ordinal_one_based": 137
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::giving_way_flow_tests::with_the_file_from_before_3769_a_second_try_asks_as_the_first",
+    "event": "failed",
+    "line_one_based": 286,
+    "terminal_ordinal_one_based": 138
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::giving_way_flow_tests::without_a_body_or_under_the_pause_it_is_not_available",
+    "event": "failed",
+    "line_one_based": 288,
+    "terminal_ordinal_one_based": 139
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::near_flow_tests::a_clock_jump_or_a_source_restart_spoils_the_try",
+    "event": "failed",
+    "line_one_based": 294,
+    "terminal_ordinal_one_based": 142
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::near_flow_tests::a_hearing_begun_at_six_seconds_counts_and_one_a_millisecond_later_does_not",
+    "event": "failed",
+    "line_one_based": 296,
+    "terminal_ordinal_one_based": 143
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::near_flow_tests::a_held_near_call_write_never_holds_the_loop_and_nothing_is_done_before_it",
+    "event": "failed",
+    "line_one_based": 298,
+    "terminal_ordinal_one_based": 144
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::near_flow_tests::a_name_begun_over_the_prompts_last_word_is_offered_again_not_measured",
+    "event": "failed",
+    "line_one_based": 300,
+    "terminal_ordinal_one_based": 145
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::near_flow_tests::a_prompt_spoken_over_is_offered_again_twice_at_most",
+    "event": "failed",
+    "line_one_based": 302,
+    "terminal_ordinal_one_based": 146
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::near_flow_tests::a_sentence_said_close_with_its_words_covering_it_ends_the_step_done_and_keeps_none_of_it",
+    "event": "failed",
+    "line_one_based": 304,
+    "terminal_ordinal_one_based": 147
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::near_flow_tests::absence_drops_the_prompt_or_try_and_asks_again_when_someone_is_back",
+    "event": "failed",
+    "line_one_based": 306,
+    "terminal_ordinal_one_based": 148
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::near_flow_tests::calls_answered_at_the_prompts_end_leave_no_bar_and_the_seats_sentence_still_passes",
+    "event": "failed",
+    "line_one_based": 308,
+    "terminal_ordinal_one_based": 149
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::near_flow_tests::five_prompts_at_most",
+    "event": "failed",
+    "line_one_based": 310,
+    "terminal_ordinal_one_based": 150
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::near_flow_tests::in_a_loud_room_the_sentence_is_judged_against_the_persons_own_calls",
+    "event": "failed",
+    "line_one_based": 312,
+    "terminal_ordinal_one_based": 151
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::near_flow_tests::invalid_scores_and_levels_are_refused_before_they_reach_a_try",
+    "event": "failed",
+    "line_one_based": 314,
+    "terminal_ordinal_one_based": 152
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::near_flow_tests::late_lines_skip_redo_and_a_new_cycle_in_the_sentence_part",
+    "event": "failed",
+    "line_one_based": 316,
+    "terminal_ordinal_one_based": 153
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::near_flow_tests::skip_and_redo_drop_late_evidence_and_keep_any_earlier_bar_on_skip",
+    "event": "failed",
+    "line_one_based": 320,
+    "terminal_ordinal_one_based": 155
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::near_flow_tests::the_lamp_speaking_spoils_only_the_half_second_before_to_a_second_after",
+    "event": "failed",
+    "line_one_based": 322,
+    "terminal_ordinal_one_based": 156
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::near_flow_tests::the_lamps_own_last_word_or_echo_heard_as_its_name_is_not_a_call",
+    "event": "failed",
+    "line_one_based": 324,
+    "terminal_ordinal_one_based": 157
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::near_flow_tests::the_reply_is_held_only_in_the_try_window_and_the_held_call_counts",
+    "event": "failed",
+    "line_one_based": 326,
+    "terminal_ordinal_one_based": 158
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::near_flow_tests::the_step_follows_privacy_that_is_not_available",
+    "event": "failed",
+    "line_one_based": 328,
+    "terminal_ordinal_one_based": 159
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::near_flow_tests::the_step_is_the_sentences_whatever_the_name_part_came_to",
+    "event": "failed",
+    "line_one_based": 330,
+    "terminal_ordinal_one_based": 160
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::near_flow_tests::three_calls_from_the_seat_keep_a_bar_and_only_they_mark_the_step_done",
+    "event": "failed",
+    "line_one_based": 335,
+    "terminal_ordinal_one_based": 162
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::near_flow_tests::too_few_calls_or_too_far_apart_keep_no_file_and_the_default",
+    "event": "failed",
+    "line_one_based": 337,
+    "terminal_ordinal_one_based": 163
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::near_flow_tests::too_quiet_is_coached_a_little_louder_once_and_a_fragment_a_little_closer",
+    "event": "failed",
+    "line_one_based": 339,
+    "terminal_ordinal_one_based": 164
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::privacy_flow_tests::a_close_before_the_invitation_began_is_not_its_answer",
+    "event": "failed",
+    "line_one_based": 359,
+    "terminal_ordinal_one_based": 174
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::privacy_flow_tests::a_close_while_the_invitation_is_said_counts_without_another_offer",
+    "event": "failed",
+    "line_one_based": 361,
+    "terminal_ordinal_one_based": 175
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::privacy_flow_tests::a_consumed_redo_mailbox_batch_is_not_replayed_by_the_next_voice_cycle",
+    "event": "failed",
+    "line_one_based": 363,
+    "terminal_ordinal_one_based": 176
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::privacy_flow_tests::a_receipt_never_open_and_fresh_leaves_privacy_not_available_after_the_bound",
+    "event": "failed",
+    "line_one_based": 365,
+    "terminal_ordinal_one_based": 177
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::privacy_flow_tests::a_storage_failure_retries_no_write_until_an_explicit_mailbox_redo",
+    "event": "failed",
+    "line_one_based": 371,
+    "terminal_ordinal_one_based": 180
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::privacy_flow_tests::an_arm_that_fails_while_the_invitation_is_said_spends_no_try",
+    "event": "failed",
+    "line_one_based": 373,
+    "terminal_ordinal_one_based": 181
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::privacy_flow_tests::an_open_fresh_receipt_before_the_bound_is_offered_as_usual",
+    "event": "failed",
+    "line_one_based": 375,
+    "terminal_ordinal_one_based": 182
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::privacy_flow_tests::cancellation_retries_once_and_model_success_is_refused",
+    "event": "failed",
+    "line_one_based": 377,
+    "terminal_ordinal_one_based": 183
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::privacy_flow_tests::expiry_is_checked_only_when_the_physical_switch_reopens",
+    "event": "failed",
+    "line_one_based": 379,
+    "terminal_ordinal_one_based": 184
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::privacy_flow_tests::fast_reopen_cannot_use_a_closed_proof_while_its_storage_is_stalled",
+    "event": "failed",
+    "line_one_based": 381,
+    "terminal_ordinal_one_based": 185
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::privacy_flow_tests::no_person_means_no_privacy_invitation_and_missing_profile_is_unavailable",
+    "event": "failed",
+    "line_one_based": 383,
+    "terminal_ordinal_one_based": 186
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::privacy_flow_tests::older_completion_never_replaces_a_newer_desired_snapshot",
+    "event": "failed",
+    "line_one_based": 385,
+    "terminal_ordinal_one_based": 187
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::privacy_flow_tests::pause_then_physical_reclose_orders_a_durable_discard_after_old_closed",
+    "event": "failed",
+    "line_one_based": 387,
+    "terminal_ordinal_one_based": 188
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::privacy_flow_tests::privacy_is_first_and_only_the_current_committed_core_offer_gets_words",
+    "event": "failed",
+    "line_one_based": 389,
+    "terminal_ordinal_one_based": 189
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::privacy_flow_tests::stalled_initialization_keeps_tutorial_loading_without_blocking_input_ticks",
+    "event": "failed",
+    "line_one_based": 391,
+    "terminal_ordinal_one_based": 190
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::privacy_flow_tests::stalled_old_done_cannot_overwrite_redo_or_publish_its_acknowledgement",
+    "event": "failed",
+    "line_one_based": 393,
+    "terminal_ordinal_one_based": 191
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::privacy_flow_tests::the_invitation_is_one_short_sentence_with_the_location",
+    "event": "failed",
+    "line_one_based": 395,
+    "terminal_ordinal_one_based": 192
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::privacy_flow_tests::the_mute_reads_only_what_the_last_look_at_the_bus_kept",
+    "event": "failed",
+    "line_one_based": 398,
+    "terminal_ordinal_one_based": 194
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::privacy_flow_tests::unplayed_invitation_never_arms_and_restarts_use_only_one_retry",
+    "event": "failed",
+    "line_one_based": 397,
+    "terminal_ordinal_one_based": 193
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::privacy_flow_tests::verified_close_requires_new_ready_open_and_done_commit_precedes_ack",
+    "event": "failed",
+    "line_one_based": 403,
+    "terminal_ordinal_one_based": 196
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::privacy_flow_tests::with_eyes_that_give_receipts_done_needs_the_receipt_for_this_close",
+    "event": "failed",
+    "line_one_based": 401,
+    "terminal_ordinal_one_based": 195
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::privacy_flow_tests::without_a_receipt_source_privacy_is_unavailable_and_the_walk_goes_on",
+    "event": "failed",
+    "line_one_based": 407,
+    "terminal_ordinal_one_based": 198
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::privacy_flow_tests::without_eyes_on_the_bus_done_claims_the_microphones_only",
+    "event": "failed",
+    "line_one_based": 405,
+    "terminal_ordinal_one_based": 197
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::skill::tests::a_file_without_the_3769_lines_still_loads",
+    "event": "failed",
+    "line_one_based": 409,
+    "terminal_ordinal_one_based": 199
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::skill::tests::an_expanded_name_confirmation_fits_one_note_without_cutting_a_name",
+    "event": "failed",
+    "line_one_based": 411,
+    "terminal_ordinal_one_based": 200
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::skill::tests::both_consent_clauses_hold_for_first_and_reoffer_in_the_installed_file",
+    "event": "failed",
+    "line_one_based": 413,
+    "terminal_ordinal_one_based": 201
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::skill::tests::installed_file_is_bounded_regular_and_has_no_fallback",
+    "event": "failed",
+    "line_one_based": 415,
+    "terminal_ordinal_one_based": 202
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::skill::tests::installed_startup_and_cached_selection_have_no_turn_path_io",
+    "event": "failed",
+    "line_one_based": 417,
+    "terminal_ordinal_one_based": 203
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::skill::tests::invalid_sequence_bounds_words_and_slots_are_refused",
+    "event": "failed",
+    "line_one_based": 419,
+    "terminal_ordinal_one_based": 204
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::skill::tests::shipped_definition_matches_the_original_order_words_and_reoffers_byte_for_byte",
+    "event": "failed",
+    "line_one_based": 421,
+    "terminal_ordinal_one_based": 205
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::skill::tests::template_values_are_filled_once_and_never_become_slots",
+    "event": "failed",
+    "line_one_based": 423,
+    "terminal_ordinal_one_based": 206
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::tests::a_face_at_the_edge_is_looked_at_before_the_lamp_asks_to_be_turned",
+    "event": "failed",
+    "line_one_based": 447,
+    "terminal_ordinal_one_based": 218
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::tests::a_face_saved_ends_who_you_are_only_while_it_is_led",
+    "event": "failed",
+    "line_one_based": 449,
+    "terminal_ordinal_one_based": 219
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::tests::a_face_saved_with_the_nudge_on_is_no_report_of_the_models",
+    "event": "failed",
+    "line_one_based": 451,
+    "terminal_ordinal_one_based": 220
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::tests::a_failing_step_says_what_to_do_and_moves_on",
+    "event": "failed",
+    "line_one_based": 453,
+    "terminal_ordinal_one_based": 221
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::tests::a_good_evening_is_not_the_quiet_hours",
+    "event": "failed",
+    "line_one_based": 457,
+    "terminal_ordinal_one_based": 223
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::tests::a_hello_answer_needs_a_yes_or_a_no_in_it",
+    "event": "failed",
+    "line_one_based": 459,
+    "terminal_ordinal_one_based": 224
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::tests::a_line_that_is_not_a_name_never_ends_who_you_are",
+    "event": "failed",
+    "line_one_based": 461,
+    "terminal_ordinal_one_based": 225
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::tests::a_name_said_alone_is_asked_back_and_kept_on_a_yes",
+    "event": "failed",
+    "line_one_based": 463,
+    "terminal_ordinal_one_based": 226
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::tests::a_name_said_and_confirmed_ends_who_you_are_with_no_call",
+    "event": "failed",
+    "line_one_based": 465,
+    "terminal_ordinal_one_based": 227
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::tests::a_seat_beside_the_lamp_is_taken_after_one_guide",
+    "event": "failed",
+    "line_one_based": 467,
+    "terminal_ordinal_one_based": 228
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::tests::a_step_is_skipped_and_the_walk_redone",
+    "event": "failed",
+    "line_one_based": 469,
+    "terminal_ordinal_one_based": 229
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::tests::a_step_that_was_not_available_is_offered_once_a_day_when_it_is",
+    "event": "failed",
+    "line_one_based": 471,
+    "terminal_ordinal_one_based": 230
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::tests::a_step_the_model_ends_is_nudged_once_after_it_is_answered",
+    "event": "failed",
+    "line_one_based": 473,
+    "terminal_ordinal_one_based": 231
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::tests::a_step_this_build_does_not_know_is_read_past_and_kept",
+    "event": "failed",
+    "line_one_based": 475,
+    "terminal_ordinal_one_based": 232
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::tests::a_step_whose_conversation_ended_is_asked_again_not_failed",
+    "event": "failed",
+    "line_one_based": 477,
+    "terminal_ordinal_one_based": 233
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::tests::a_tap_read_on_a_tick_that_returns_early_still_ends_touch",
+    "event": "failed",
+    "line_one_based": 479,
+    "terminal_ordinal_one_based": 234
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::tests::a_touch_before_the_touch_step_is_asked_is_not_kept",
+    "event": "failed",
+    "line_one_based": 481,
+    "terminal_ordinal_one_based": 235
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::tests::a_touch_on_the_head_after_the_ask_is_done",
+    "event": "failed",
+    "line_one_based": 483,
+    "terminal_ordinal_one_based": 236
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::tests::a_turn_gone_before_its_first_audio_is_no_ask_and_a_redo_forgets_the_count",
+    "event": "failed",
+    "line_one_based": 485,
+    "terminal_ordinal_one_based": 237
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::tests::a_yes_to_face_expressions_is_kept_once_and_redo_wipes_it",
+    "event": "failed",
+    "line_one_based": 487,
+    "terminal_ordinal_one_based": 238
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::tests::a_yes_to_room_sounds_is_kept_once_and_redo_wipes_it",
+    "event": "failed",
+    "line_one_based": 489,
+    "terminal_ordinal_one_based": 239
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::tests::any_sign_of_a_body_keeps_the_gate_closed_for_good",
+    "event": "failed",
+    "line_one_based": 491,
+    "terminal_ordinal_one_based": 240
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::tests::both_preferences_heard_end_the_step_with_no_call",
+    "event": "failed",
+    "line_one_based": 493,
+    "terminal_ordinal_one_based": 241
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::tests::completed_setup_steps_do_not_move_the_body",
+    "event": "failed",
+    "line_one_based": 495,
+    "terminal_ordinal_one_based": 242
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::tests::face_expressions_is_offered_only_with_its_switch_and_kept_where_the_eyes_read",
+    "event": "failed",
+    "line_one_based": 497,
+    "terminal_ordinal_one_based": 243
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::tests::installed_order_words_and_nudge_drive_the_existing_runner",
+    "event": "failed",
+    "line_one_based": 499,
+    "terminal_ordinal_one_based": 244
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::tests::installed_reoffer_words_and_interval_drive_the_existing_runner",
+    "event": "failed",
+    "line_one_based": 501,
+    "terminal_ordinal_one_based": 245
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::tests::no_or_silence_to_face_expressions_leaves_it_off_and_is_not_asked_again",
+    "event": "failed",
+    "line_one_based": 503,
+    "terminal_ordinal_one_based": 246
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::tests::no_or_silence_to_room_sounds_leaves_it_off_and_is_not_asked_again",
+    "event": "failed",
+    "line_one_based": 505,
+    "terminal_ordinal_one_based": 247
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::tests::no_touch_is_reminded_once_then_failed",
+    "event": "failed",
+    "line_one_based": 507,
+    "terminal_ordinal_one_based": 248
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::tests::room_sounds_is_offered_only_on_a_lamp_with_no_slide",
+    "event": "failed",
+    "line_one_based": 509,
+    "terminal_ordinal_one_based": 249
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::tests::the_leads_seat_at_about_a_metre_passes_without_a_guide",
+    "event": "failed",
+    "line_one_based": 513,
+    "terminal_ordinal_one_based": 251
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::tests::the_pause_and_an_empty_room_stop_the_step_being_led",
+    "event": "failed",
+    "line_one_based": 517,
+    "terminal_ordinal_one_based": 253
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::tests::the_steps_are_walked_in_order_and_kept",
+    "event": "failed",
+    "line_one_based": 519,
+    "terminal_ordinal_one_based": 254
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::tests::the_walk_is_under_way_from_its_start_to_its_end_gaps_and_all",
+    "event": "failed",
+    "line_one_based": 523,
+    "terminal_ordinal_one_based": 256
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::tests::touch_is_done_only_by_what_controls_feels",
+    "event": "failed",
+    "line_one_based": 525,
+    "terminal_ordinal_one_based": 257
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::tests::touch_is_not_available_without_the_bus",
+    "event": "failed",
+    "line_one_based": 527,
+    "terminal_ordinal_one_based": 258
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::tests::where_you_sit_guides_only_once",
+    "event": "failed",
+    "line_one_based": 529,
+    "terminal_ordinal_one_based": 259
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::tests::where_you_sit_holds_only_on_fresh_evidence_from_the_body",
+    "event": "failed",
+    "line_one_based": 531,
+    "terminal_ordinal_one_based": 260
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::tests::where_you_sit_holds_only_while_the_head_is_still",
+    "event": "failed",
+    "line_one_based": 533,
+    "terminal_ordinal_one_based": 261
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::tests::where_you_sit_is_done_only_by_what_the_eyes_see",
+    "event": "failed",
+    "line_one_based": 535,
+    "terminal_ordinal_one_based": 262
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::tests::with_the_file_from_before_3769_a_touch_still_ends_the_step",
+    "event": "failed",
+    "line_one_based": 537,
+    "terminal_ordinal_one_based": 263
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::tests::with_the_nudge_a_hand_on_the_lamp_still_keeps_the_seat_open",
+    "event": "failed",
+    "line_one_based": 539,
+    "terminal_ordinal_one_based": 264
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::tests::with_the_nudge_a_heard_name_ends_who_you_are_once_and_is_kept",
+    "event": "failed",
+    "line_one_based": 541,
+    "terminal_ordinal_one_based": 265
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::tests::with_the_nudge_a_steady_face_after_the_guide_is_a_seat_while_the_gaze_moves_the_head",
+    "event": "failed",
+    "line_one_based": 543,
+    "terminal_ordinal_one_based": 266
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::tests::with_the_nudge_the_walk_waits_for_a_near_face_that_stays",
+    "event": "failed",
+    "line_one_based": 545,
+    "terminal_ordinal_one_based": 267
+  }
+]
