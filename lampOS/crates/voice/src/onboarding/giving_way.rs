@@ -22,7 +22,7 @@
 //! The model may only skip it. Nothing here asks the body for anything.
 //! What it saw and decided is said on the journal (`lamp-voice: giving_way:`).
 #[cfg(test)]
-pub use super::legacy_words::{GIVE_ASK, GIVE_DONE, GIVE_FAILED};
+pub use super::legacy_words::{GIVE_AGAIN, GIVE_ASK, GIVE_DONE, GIVE_FAILED};
 
 use super::{
     Delivery, FRESH_MS, GONE_US, MOST_UNSAID, NOT_SAID, Onboarding, Outcome, SIT_GIVE_UP_US,
@@ -341,6 +341,12 @@ impl Onboarding {
         }
         offer.claimed = true;
         offer.ready = false;
+        // A second try says what didn't work and how to do it (#3769).
+        if offer.attempt > 1
+            && let Some(again) = &self.definition.words.give_again
+        {
+            return Some(again.clone());
+        }
         Some(
             self.definition
                 .note(

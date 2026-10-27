@@ -2028,10 +2028,13 @@ impl Onboarding {
         }
         if step == Step::Touch {
             // Done only by a touch Controls felt; one reminder, then failed.
+            // Either end is said before the next step is asked (#3769).
             if touched || led.touched {
                 self.finish(step, Outcome::Done, None, now_us);
+                self.owed = self.definition.words.touch_done.clone();
             } else if now_us.saturating_sub(asked_us) >= TOUCH_GIVE_UP_US {
                 self.finish(step, Outcome::Failed, None, now_us);
+                self.owed = self.definition.words.touch_failed.clone();
             } else if can_speak && quiet_us >= GUIDE_EVERY_US && led.guided_us == Some(asked_us) {
                 led.guided_us = Some(now_us);
                 self.records
@@ -4082,6 +4085,11 @@ mod tests {
         assert_eq!(room.outcome(Step::Touch), Some(Outcome::Done));
         // Spoken, never a nod (the owner's #841 decision).
         assert_eq!(room.walk.take_gesture(), None);
+        // That it worked is said before the next step is asked (#3769).
+        assert_eq!(
+            room.wait(8 * S, Some(NEAR_MIDDLE)),
+            [TOUCH_DONE, PREFERENCES_NOTE]
+        );
         // Only the outcome is kept.
         assert_eq!(room.walk.kept().steps["touch"].framing, None);
         std::fs::remove_dir_all(root).unwrap();
@@ -4150,6 +4158,23 @@ mod tests {
         std::fs::remove_dir_all(root).unwrap();
     }
 
+    /// With the onboarding file an older updater's `install` writes (before
+    /// #3769), a touch still ends the step and the walk goes on, as before:
+    /// no line of its own (Reviewer-two's P2 on #3781).
+    #[test]
+    fn with_the_file_from_before_3769_a_touch_still_ends_the_step() {
+        let (mut room, mut says, root) = at_touch("touched-before-3769");
+        room.walk.definition = Arc::new(skill::parse(skill::tests::BEFORE_3769).unwrap());
+        let (_, touches) = crate::hand_controls::test_head_touch("boot", lamp_ipc::monotonic_us());
+        for (at, touch) in touches.iter().enumerate() {
+            says.publish_json(at as u64 + 1, touch).unwrap();
+        }
+        until_touch_ends(&mut room);
+        assert_eq!(room.outcome(Step::Touch), Some(Outcome::Done));
+        assert_eq!(room.wait(8 * S, Some(NEAR_MIDDLE)), [PREFERENCES_NOTE]);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
     #[test]
     fn touch_is_done_only_by_what_controls_feels() {
         let (mut room, _says, root) = at_touch("touch-forged");
@@ -4178,7 +4203,7 @@ mod tests {
         let (mut room, _says, root) = at_touch("untouched");
         assert_eq!(
             room.wait(61 * S, Some(NEAR_MIDDLE)),
-            [TOUCH_REMIND, PREFERENCES_NOTE]
+            [TOUCH_REMIND, TOUCH_FAILED, PREFERENCES_NOTE]
         );
         assert_eq!(room.outcome(Step::Touch), Some(Outcome::Failed));
         assert_eq!(room.walk.take_gesture(), None);
