@@ -11,9 +11,10 @@ SDKs generate from.
 **Built so far** (Nine, `crates/control`):
 - **piece 1** (#3715): the protocol's messages and checks (`protocol.rs`), the lease rules (`lease.rs`) and the rates (`rate.rs`), with their tests;
 - **piece 2** (#3736): pairing and hello (`pairing.rs`), and each connection's session over grants, leases and rates (`session.rs`).
-- **piece 3**: the door on the network (`server.rs`, `cert.rs`, the `lamp-control` binary): WebSocket over TLS 1.3 at `/v1`, the lamp's own certificate, and the owner's admin socket. Every action is still refused with a why (`not routed to the lamp's parts yet`) until the routing piece.
+- **piece 3**: the door on the network (`server.rs`, `cert.rs`, the `lamp-control` binary): WebSocket over TLS 1.3 at `/v1`, the lamp's own certificate, and the owner's admin socket. Its actions were refused until piece 4.
+- **piece 4**: the routing (`parts.rs`). `gesture` and `move` go to the body's mood socket, `light` is a `light/request` on the bus, and `say` goes to the voice's say socket with its outcome as a `done` event. Each is at `skill` priority as `lamp-control`, held to the part's own checks. `look` and `joints` (the body's lease socket), `express`, `play` and `sound` are refused with what they wait for. A computer's last connection closing, or a revoke, stops what it asked for, and actions a part refuses are bounded at 20 a second.
 
-**No unit carries it yet**, so nothing listens on a lamp; discovery and the routing to the parts are the next pieces, off unless `LAMP_CONTROL=on`, and the owner turns developer
+**No unit carries it yet**, so nothing listens on a lamp; discovery, and the bus's events and state, are the next pieces, off unless `LAMP_CONTROL=on`, and the owner turns developer
 access on in the app. This
 page is the contract it and the SDKs are built to. Its protocol types, lease
 rules and rates are `crates/control` (Nine, #3715), and the schema follows
@@ -139,7 +140,7 @@ lamp-control clients
   - Frames are capped at 64 KiB, text only.
   - The TLS and WebSocket handshakes must finish within 10 s of the TCP connection, or it is closed.
   - At most 32 connections at once, and 4 from one address. Past either, a new connection is closed at once, holding nothing. An accept that fails waits 100 ms before the next.
-  - A connection that says neither `pair` nor `hello` within 30 s is closed, and so is one quiet for 2 minutes. A WebSocket ping or pong counts, so a client that only listens stays open on its keepalive.
+  - A connection that hasn't said `hello` within 30 s of its welcome is closed, a `pair` first included, and other frames before it buy no more time. One quiet for 2 minutes after `hello` is closed too. A WebSocket ping or pong counts, so a client that only listens stays open on its keepalive.
   - Lease changes (a lapse, a conversation, a hand) go to every connection of the computer that held the lease.
 - **The owner's side:** `--admin-socket`, `/run/lampos-control/admin.sock`, 0600 in a 0700 folder, one JSON object a line:
   - `{"code": {"grants": [...]}}` → `{"code", "pin"}`;
@@ -230,7 +231,7 @@ so one made for pairing can never stand as a hello's, or the other way round
 listener's included, after its leases' `lost`, and its leases end; they also end when its last
 connection closes. `limits` says the rates below, so an
 SDK can keep under them: for each class (`joints`, `motion`, `light`, `say`,
-`express`) a list of `{"most": N, "within_ms": M}`, and `hold_max_ms`,
+`express`, `refused`) a list of `{"most": N, "within_ms": M}`, and `hold_max_ms`,
 `take_max_ms` and `say_max_chars`.
 
 ### Subscribe and state
@@ -289,7 +290,12 @@ connection closed). Ids are `l_` and a number.
 
 A reply comes when the action is taken. A long one also ends with
 `{"ev":"done","re":11,"how":"finished","why":"…"}`, `how` one of
-`finished`, `cut_short`, `dropped`.
+`finished`, `cut_short`, `dropped`. Today only `say` ends with `done`:
+`finished` once it's spoken, or `dropped` with the voice's own word and why
+(`expired`, `refused: …`, `dropped: …`, or the voice not reached). `gesture`
+and `move` answer `{"to":"body"}` once the body has them, and no `done`
+follows yet: the body plays or drops them by its own checks and doesn't say
+which back. An SDK's wait for them returns at the answer.
 
 ### Errors
 
@@ -371,6 +377,7 @@ Rates a client is held to:
 | `light` | 5 a second |
 | `say`, `sound` | 6 a minute and 60 an hour |
 | `express` | 1 a minute |
+| actions a part refused | 20 a second, then the connection closes |
 | registered phrases | 16, of 64 characters at most |
 
 `gesture`, `move`, `play` and `look` share one class, `motion`. A refusal

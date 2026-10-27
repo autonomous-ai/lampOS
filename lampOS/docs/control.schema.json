@@ -1028,6 +1028,26 @@
             ]
           }
         },
+        "refused": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "most": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "within_ms": {
+                "type": "integer",
+                "minimum": 1
+              }
+            },
+            "required": [
+              "most",
+              "within_ms"
+            ]
+          }
+        },
         "hold_max_ms": {
           "type": "integer"
         },

@@ -21,6 +21,10 @@ pub enum Class {
     Say,
     /// `express`: one a minute.
     Express,
+    /// Actions a part refused: 20 a second, then the connection closes
+    /// (Fourteen's P3 on #3798: a refusal is a round trip to a part, so
+    /// spinning refused actions must cost something).
+    Refused,
 }
 
 impl Class {
@@ -47,6 +51,7 @@ impl Class {
             Self::Light => &[(5, S)],
             Self::Say => &[(6, 60 * S), (60, 3_600 * S)],
             Self::Express => &[(1, 60 * S)],
+            Self::Refused => &[(20, S)],
         }
     }
 
@@ -58,6 +63,7 @@ impl Class {
             Self::Light => "light: 5 a second",
             Self::Say => "say: 6 a minute and 60 an hour",
             Self::Express => "express: 1 a minute",
+            Self::Refused => "refused actions: 20 a second",
         }
     }
 

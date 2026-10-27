@@ -16,6 +16,7 @@
 pub mod cert;
 pub mod lease;
 pub mod pairing;
+pub mod parts;
 pub mod protocol;
 pub mod rate;
 pub mod server;
