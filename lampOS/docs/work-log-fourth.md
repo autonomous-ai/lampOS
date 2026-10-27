@@ -1,3 +1,17 @@
+## 2026-10-27 13:15 UTC — Common 314 artifact digests independently verified
+
+Ready for lamp-voice: no
+
+[Artifact supplement](verification/common-314-native-20261027/artifact-integrity.json):
+the later authorized 160 MiB follow-up verifies the 118,176,415-byte ZIP and
+all 50 payload SHA-256/CRC values and ELF64/AArch64 headers, without extracting
+or executing binaries. Source remains actual CI `4339358153` / tree `fd5a343984`.
+Voice `5bf07f4c10a005092cb52d944bd046fb1a995ec1bbc61239bd70e4124ce72223`
+and Eyes `2e08b98629d903e00ecaa6aa159b77d7a32e6b8f5e3160e6fdae450c41da5e9a`
+come from that same artifact. The initial 32 MiB audit/receipt remains unchanged.
+Installed pins, device/privacy/readers/latest-base holds remain; no deployment,
+mixed-build, recognition, physical, later-source or Ready acceptance is claimed.
+
 ## 2026-10-27 13:00 UTC — Common 314 native gates pass on the observed merge
 
 Ready for lamp-voice: no

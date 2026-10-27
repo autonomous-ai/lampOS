@@ -50,3 +50,10 @@ No later green result rewrites that outcome.
 Current-base qualification, current-head readers, privacy acceptance, matching
 pins and assigned lamp/device/physical acceptance remain **HOLD**. This packet
 makes no Ready transition or hardware acceptance claim.
+
+A [later artifact-integrity follow-up](artifact-integrity.md), using a
+160 MiB download cap, downloaded the 118 MB archive and
+verified all 50 payload hashes, CRCs and ELF64/AArch64 headers. The initial
+32 MiB audit above did not download it; its [receipt](receipt.json) remains
+unchanged. The supplement establishes same-build Voice/Eyes digests, not
+installed pins, deployment, recognition, physical acceptance or readiness.

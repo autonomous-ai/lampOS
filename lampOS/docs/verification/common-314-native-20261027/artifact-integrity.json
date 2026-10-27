@@ -1,0 +1,75 @@
+{
+  "ready_for_lamp_voice": false,
+  "result": "PASS",
+  "scope": "Artifact integrity and same-build Voice/Eyes digest pair only",
+  "source": {
+    "published_head": "314a0f6bcb4061e360b85b8e0c9f0a9048cba8cd",
+    "actual_checkout": "433935815339d6d773d44e2107635db7d73b7a0c",
+    "actual_checkout_tree": "fd5a3439849af70dd65fc06927163cc6cbb23d78",
+    "merge_parents": [
+      "241f51500f258ea06594f9edf3928a702d6a2038",
+      "314a0f6bcb4061e360b85b8e0c9f0a9048cba8cd"
+    ],
+    "run_id": 40504365418,
+    "artifact_id": 12736055317
+  },
+  "artifact": {
+    "id": 12736055317,
+    "run_id": 40504365418,
+    "compressed_bytes": 118176415,
+    "zip_sha256": "3e56be88bcd28f06b4f60422dbe6d5cf051d4de5dc3521f2102fd488d566a6e8",
+    "full_retained_zip_hash_matches_API_and_upload_log": true
+  },
+  "limits": {
+    "compressed_cap_bytes": 167772160,
+    "aggregate_uncompressed_cap_bytes": 1073741824,
+    "aggregate_uncompressed_bytes": 318191011,
+    "initial_free_bytes": 13443592192,
+    "required_payload_plus_reserve_bytes": 2265660063,
+    "reserve_bytes": 2147483648
+  },
+  "verification": {
+    "download_command_exit": 0,
+    "stream_verification_exit": 0,
+    "archive_member_count": 51,
+    "payload_count": 50,
+    "workspace_binaries": 48,
+    "selected_examples": 2,
+    "unique_filenames": true,
+    "all_payload_SHA256_match_SHA256SUMS": true,
+    "all_payload_ZIP_CRC_verified": true,
+    "all_payload_ELF64_little_endian_AArch64": true,
+    "absolute_traversal_symlink_encrypted_special_members": false,
+    "binary_extraction_or_execution": false
+  },
+  "manifest": {
+    "file": "validated-export-manifest.json",
+    "sha256": "55b82f7cb27dde81c405fd5f0a6cac2d72fdb0e0ec6f86d6803f0e5adbb5aeca",
+    "original_SHA256SUMS_sha256": "6ebac1980d3e7fc73bbced0119e5fa092c43d8869b11bc475a6cebaab23b01d8"
+  },
+  "voice_eyes_sha256": {
+    "lamp-eyes": "2e08b98629d903e00ecaa6aa159b77d7a32e6b8f5e3160e6fdae450c41da5e9a",
+    "lamp-voice": "5bf07f4c10a005092cb52d944bd046fb1a995ec1bbc61239bd70e4124ce72223"
+  },
+  "evidence": {
+    "reviewed_private_supplemental_receipt_sha256": "248dda5455515a86b99aab758ec9286851353ce7111758565649c297ae5edf01",
+    "artifact_API_sha256": "b332a42c9032a06b5d775074f178c0fcee4da42e0c1a86da33d6bcf4f41a1449",
+    "initial_public_receipt_file": "receipt.json",
+    "initial_public_receipt_sha256": "f77daa644761fa1f957e678899895b1e28b0f143488695e9de15b10a42efd6dd"
+  },
+  "chronology": "The initial32MiB audit did not download the archive. A later explicitly authorized160MiB follow-up downloaded and verified it. Initial receipt/history remains unchanged.",
+  "holds": [
+    "Installed pins unverified",
+    "Device/lamp and physical acceptance",
+    "Core privacy acceptance",
+    "Required current-head readers",
+    "Latest-base qualification"
+  ],
+  "not_claimed": [
+    "Deployment or installed-pin verification",
+    "Mixed-build compatibility",
+    "Physical behavior or recognition acceptance",
+    "Qualification of the current worktree or any later carry",
+    "Ready transition"
+  ]
+}

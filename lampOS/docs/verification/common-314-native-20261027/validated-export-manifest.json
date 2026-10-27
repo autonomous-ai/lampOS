@@ -1,0 +1,802 @@
+[
+  {
+    "name": "lamp-actions",
+    "kind": "workspace_binary",
+    "bytes": 4510440,
+    "expected_sha256": "8e29b506f3bc1be5f8bb8185ae41c6c40b920e2228fa779368c571dcacaf0292",
+    "verified_sha256": "8e29b506f3bc1be5f8bb8185ae41c6c40b920e2228fa779368c571dcacaf0292",
+    "zip_member_CRC_verified_on_complete_read": true,
+    "elf": {
+      "class": "ELF64",
+      "endianness": "little",
+      "machine": "AArch64",
+      "e_machine": 183,
+      "e_type": 3,
+      "version": 1
+    }
+  },
+  {
+    "name": "lamp-addons",
+    "kind": "workspace_binary",
+    "bytes": 1154744,
+    "expected_sha256": "1d1ca9bf054be4a646c23c70387cc0c430ad3f20aceba0cada082f01c1c640ea",
+    "verified_sha256": "1d1ca9bf054be4a646c23c70387cc0c430ad3f20aceba0cada082f01c1c640ea",
+    "zip_member_CRC_verified_on_complete_read": true,
+    "elf": {
+      "class": "ELF64",
+      "endianness": "little",
+      "machine": "AArch64",
+      "e_machine": 183,
+      "e_type": 3,
+      "version": 1
+    }
+  },
+  {
+    "name": "lamp-air",
+    "kind": "workspace_binary",
+    "bytes": 896272,
+    "expected_sha256": "ba842a61ddfdaca26b482311bc302b7b7a922557f0c0356c0afa172368237346",
+    "verified_sha256": "ba842a61ddfdaca26b482311bc302b7b7a922557f0c0356c0afa172368237346",
+    "zip_member_CRC_verified_on_complete_read": true,
+    "elf": {
+      "class": "ELF64",
+      "endianness": "little",
+      "machine": "AArch64",
+      "e_machine": 183,
+      "e_type": 3,
+      "version": 1
+    }
+  },
+  {
+    "name": "lamp-audio",
+    "kind": "workspace_binary",
+    "bytes": 2121152,
+    "expected_sha256": "2a47f6a8b753ea38ababf08732b205114e696386878ed2dda0879c4154d3620c",
+    "verified_sha256": "2a47f6a8b753ea38ababf08732b205114e696386878ed2dda0879c4154d3620c",
+    "zip_member_CRC_verified_on_complete_read": true,
+    "elf": {
+      "class": "ELF64",
+      "endianness": "little",
+      "machine": "AArch64",
+      "e_machine": 183,
+      "e_type": 3,
+      "version": 1
+    }
+  },
+  {
+    "name": "lamp-body",
+    "kind": "workspace_binary",
+    "bytes": 2028056,
+    "expected_sha256": "17eb0445f4b0720b951cae46c73d114c32f087f74ec76fa28f833fc47acdb43a",
+    "verified_sha256": "17eb0445f4b0720b951cae46c73d114c32f087f74ec76fa28f833fc47acdb43a",
+    "zip_member_CRC_verified_on_complete_read": true,
+    "elf": {
+      "class": "ELF64",
+      "endianness": "little",
+      "machine": "AArch64",
+      "e_machine": 183,
+      "e_type": 3,
+      "version": 1
+    }
+  },
+  {
+    "name": "lamp-body-inspect",
+    "kind": "workspace_binary",
+    "bytes": 698544,
+    "expected_sha256": "8d7379e387fb05fb76cc634c9c40446379602abf0c34530daa5035cf6620d181",
+    "verified_sha256": "8d7379e387fb05fb76cc634c9c40446379602abf0c34530daa5035cf6620d181",
+    "zip_member_CRC_verified_on_complete_read": true,
+    "elf": {
+      "class": "ELF64",
+      "endianness": "little",
+      "machine": "AArch64",
+      "e_machine": 183,
+      "e_type": 3,
+      "version": 1
+    }
+  },
+  {
+    "name": "lamp-body-measure",
+    "kind": "workspace_binary",
+    "bytes": 1362664,
+    "expected_sha256": "eb5f9820439acd8e394d7e5597de389d3cf3b0458c9d0ab7cd99b42e859d3a3a",
+    "verified_sha256": "eb5f9820439acd8e394d7e5597de389d3cf3b0458c9d0ab7cd99b42e859d3a3a",
+    "zip_member_CRC_verified_on_complete_read": true,
+    "elf": {
+      "class": "ELF64",
+      "endianness": "little",
+      "machine": "AArch64",
+      "e_machine": 183,
+      "e_type": 3,
+      "version": 1
+    }
+  },
+  {
+    "name": "lamp-body-mood",
+    "kind": "workspace_binary",
+    "bytes": 477072,
+    "expected_sha256": "bb7d3ec66f7c8957033d59290ff3cd3e3048d0d4a06cebe6faf37578446c315f",
+    "verified_sha256": "bb7d3ec66f7c8957033d59290ff3cd3e3048d0d4a06cebe6faf37578446c315f",
+    "zip_member_CRC_verified_on_complete_read": true,
+    "elf": {
+      "class": "ELF64",
+      "endianness": "little",
+      "machine": "AArch64",
+      "e_machine": 183,
+      "e_type": 3,
+      "version": 1
+    }
+  },
+  {
+    "name": "lamp-body-worker",
+    "kind": "workspace_binary",
+    "bytes": 1171136,
+    "expected_sha256": "fa8c9efc754d3cb3778081417669a26184969127348e92e09a70e8018c19f352",
+    "verified_sha256": "fa8c9efc754d3cb3778081417669a26184969127348e92e09a70e8018c19f352",
+    "zip_member_CRC_verified_on_complete_read": true,
+    "elf": {
+      "class": "ELF64",
+      "endianness": "little",
+      "machine": "AArch64",
+      "e_machine": 183,
+      "e_type": 3,
+      "version": 1
+    }
+  },
+  {
+    "name": "lamp-bus",
+    "kind": "workspace_binary",
+    "bytes": 1106576,
+    "expected_sha256": "bca4b1dc589c3522daeb6b5ff42d124fc6878f82cd8c9fb1436d1b1f0deab5a7",
+    "verified_sha256": "bca4b1dc589c3522daeb6b5ff42d124fc6878f82cd8c9fb1436d1b1f0deab5a7",
+    "zip_member_CRC_verified_on_complete_read": true,
+    "elf": {
+      "class": "ELF64",
+      "endianness": "little",
+      "machine": "AArch64",
+      "e_machine": 183,
+      "e_type": 3,
+      "version": 1
+    }
+  },
+  {
+    "name": "lamp-cloud",
+    "kind": "workspace_binary",
+    "bytes": 10789376,
+    "expected_sha256": "53be7834064300f9b4f1d30ffe12ed5e9ac14f5fc15685eb40d201326fadbf6b",
+    "verified_sha256": "53be7834064300f9b4f1d30ffe12ed5e9ac14f5fc15685eb40d201326fadbf6b",
+    "zip_member_CRC_verified_on_complete_read": true,
+    "elf": {
+      "class": "ELF64",
+      "endianness": "little",
+      "machine": "AArch64",
+      "e_machine": 183,
+      "e_type": 3,
+      "version": 1
+    }
+  },
+  {
+    "name": "lamp-control",
+    "kind": "workspace_binary",
+    "bytes": 4017248,
+    "expected_sha256": "ccc9c1dc5508b9128c70a41ee679536c43ef73240bb44ed1d37a43d8d704939c",
+    "verified_sha256": "ccc9c1dc5508b9128c70a41ee679536c43ef73240bb44ed1d37a43d8d704939c",
+    "zip_member_CRC_verified_on_complete_read": true,
+    "elf": {
+      "class": "ELF64",
+      "endianness": "little",
+      "machine": "AArch64",
+      "e_machine": 183,
+      "e_type": 3,
+      "version": 1
+    }
+  },
+  {
+    "name": "lamp-controls",
+    "kind": "workspace_binary",
+    "bytes": 2469128,
+    "expected_sha256": "5d5d033eef46f4250f316e349017bd040a640a3ac715e951eafab36118ed70fa",
+    "verified_sha256": "5d5d033eef46f4250f316e349017bd040a640a3ac715e951eafab36118ed70fa",
+    "zip_member_CRC_verified_on_complete_read": true,
+    "elf": {
+      "class": "ELF64",
+      "endianness": "little",
+      "machine": "AArch64",
+      "e_machine": 183,
+      "e_type": 3,
+      "version": 1
+    }
+  },
+  {
+    "name": "lamp-ears",
+    "kind": "workspace_binary",
+    "bytes": 24861328,
+    "expected_sha256": "d058ef34b2bb902af48914ea9e64da6d04fe27c57da1ff2813712f12a09c139b",
+    "verified_sha256": "d058ef34b2bb902af48914ea9e64da6d04fe27c57da1ff2813712f12a09c139b",
+    "zip_member_CRC_verified_on_complete_read": true,
+    "elf": {
+      "class": "ELF64",
+      "endianness": "little",
+      "machine": "AArch64",
+      "e_machine": 183,
+      "e_type": 3,
+      "version": 1
+    }
+  },
+  {
+    "name": "lamp-expression",
+    "kind": "workspace_binary",
+    "bytes": 4200368,
+    "expected_sha256": "cd0f8ef8d5e4befa356980d230dec74e49b4e829b3541bdb1405b1ac37d507a7",
+    "verified_sha256": "cd0f8ef8d5e4befa356980d230dec74e49b4e829b3541bdb1405b1ac37d507a7",
+    "zip_member_CRC_verified_on_complete_read": true,
+    "elf": {
+      "class": "ELF64",
+      "endianness": "little",
+      "machine": "AArch64",
+      "e_machine": 183,
+      "e_type": 3,
+      "version": 1
+    }
+  },
+  {
+    "name": "lamp-eyes",
+    "kind": "workspace_binary",
+    "bytes": 26488208,
+    "expected_sha256": "2e08b98629d903e00ecaa6aa159b77d7a32e6b8f5e3160e6fdae450c41da5e9a",
+    "verified_sha256": "2e08b98629d903e00ecaa6aa159b77d7a32e6b8f5e3160e6fdae450c41da5e9a",
+    "zip_member_CRC_verified_on_complete_read": true,
+    "elf": {
+      "class": "ELF64",
+      "endianness": "little",
+      "machine": "AArch64",
+      "e_machine": 183,
+      "e_type": 3,
+      "version": 1
+    }
+  },
+  {
+    "name": "lamp-health",
+    "kind": "workspace_binary",
+    "bytes": 1315144,
+    "expected_sha256": "681d314a98b1e898b86f0ffc252eea974483a3eadef994e7aa92e3c980d9bcb0",
+    "verified_sha256": "681d314a98b1e898b86f0ffc252eea974483a3eadef994e7aa92e3c980d9bcb0",
+    "zip_member_CRC_verified_on_complete_read": true,
+    "elf": {
+      "class": "ELF64",
+      "endianness": "little",
+      "machine": "AArch64",
+      "e_machine": 183,
+      "e_type": 3,
+      "version": 1
+    }
+  },
+  {
+    "name": "lamp-ipc-probe",
+    "kind": "workspace_binary",
+    "bytes": 667592,
+    "expected_sha256": "80a3898dde91c6109dbf55f0cc6d1fd49e491be7bb6ef941df914e02411296cb",
+    "verified_sha256": "80a3898dde91c6109dbf55f0cc6d1fd49e491be7bb6ef941df914e02411296cb",
+    "zip_member_CRC_verified_on_complete_read": true,
+    "elf": {
+      "class": "ELF64",
+      "endianness": "little",
+      "machine": "AArch64",
+      "e_machine": 183,
+      "e_type": 3,
+      "version": 1
+    }
+  },
+  {
+    "name": "lamp-keeper",
+    "kind": "workspace_binary",
+    "bytes": 3254304,
+    "expected_sha256": "b25a855d0a40e0ec1f729255aa77491882bd15e2910301825e072b8460231be7",
+    "verified_sha256": "b25a855d0a40e0ec1f729255aa77491882bd15e2910301825e072b8460231be7",
+    "zip_member_CRC_verified_on_complete_read": true,
+    "elf": {
+      "class": "ELF64",
+      "endianness": "little",
+      "machine": "AArch64",
+      "e_machine": 183,
+      "e_type": 3,
+      "version": 1
+    }
+  },
+  {
+    "name": "lamp-memory",
+    "kind": "workspace_binary",
+    "bytes": 4848456,
+    "expected_sha256": "57968edba8271bf1cb73d1c28acba67e5c47aa9eba4b9d6dfde7fb9ad2ad9765",
+    "verified_sha256": "57968edba8271bf1cb73d1c28acba67e5c47aa9eba4b9d6dfde7fb9ad2ad9765",
+    "zip_member_CRC_verified_on_complete_read": true,
+    "elf": {
+      "class": "ELF64",
+      "endianness": "little",
+      "machine": "AArch64",
+      "e_machine": 183,
+      "e_type": 3,
+      "version": 1
+    }
+  },
+  {
+    "name": "lamp-memory-eval",
+    "kind": "workspace_binary",
+    "bytes": 3051712,
+    "expected_sha256": "ff78f2a1d6d66847a40102c81e20da4f819b0d6ced9c0c3c94c3b9f788b78023",
+    "verified_sha256": "ff78f2a1d6d66847a40102c81e20da4f819b0d6ced9c0c3c94c3b9f788b78023",
+    "zip_member_CRC_verified_on_complete_read": true,
+    "elf": {
+      "class": "ELF64",
+      "endianness": "little",
+      "machine": "AArch64",
+      "e_machine": 183,
+      "e_type": 3,
+      "version": 1
+    }
+  },
+  {
+    "name": "lamp-memory-fixture",
+    "kind": "workspace_binary",
+    "bytes": 5006880,
+    "expected_sha256": "f976b1c8ac251abe3145d7305648ec0d8ecf7bce9466b89f3320d6cd3047c7bb",
+    "verified_sha256": "f976b1c8ac251abe3145d7305648ec0d8ecf7bce9466b89f3320d6cd3047c7bb",
+    "zip_member_CRC_verified_on_complete_read": true,
+    "elf": {
+      "class": "ELF64",
+      "endianness": "little",
+      "machine": "AArch64",
+      "e_machine": 183,
+      "e_type": 3,
+      "version": 1
+    }
+  },
+  {
+    "name": "lamp-mood",
+    "kind": "workspace_binary",
+    "bytes": 1985064,
+    "expected_sha256": "8612ab35c53d7ba427c5f3f08bc6dbd86ef4dfe385efaf73d85f28269cfdaeeb",
+    "verified_sha256": "8612ab35c53d7ba427c5f3f08bc6dbd86ef4dfe385efaf73d85f28269cfdaeeb",
+    "zip_member_CRC_verified_on_complete_read": true,
+    "elf": {
+      "class": "ELF64",
+      "endianness": "little",
+      "machine": "AArch64",
+      "e_machine": 183,
+      "e_type": 3,
+      "version": 1
+    }
+  },
+  {
+    "name": "lamp-name",
+    "kind": "workspace_binary",
+    "bytes": 24279344,
+    "expected_sha256": "d1ebff99336618eff2b6565786f055cc2d71b480c6bbac62aaa91214d5dbd7e4",
+    "verified_sha256": "d1ebff99336618eff2b6565786f055cc2d71b480c6bbac62aaa91214d5dbd7e4",
+    "zip_member_CRC_verified_on_complete_read": true,
+    "elf": {
+      "class": "ELF64",
+      "endianness": "little",
+      "machine": "AArch64",
+      "e_machine": 183,
+      "e_type": 3,
+      "version": 1
+    }
+  },
+  {
+    "name": "lamp-observer",
+    "kind": "workspace_binary",
+    "bytes": 884120,
+    "expected_sha256": "24d48e53babb9efc35b430d93579830ab0854f42011654c0f39ba019944fd670",
+    "verified_sha256": "24d48e53babb9efc35b430d93579830ab0854f42011654c0f39ba019944fd670",
+    "zip_member_CRC_verified_on_complete_read": true,
+    "elf": {
+      "class": "ELF64",
+      "endianness": "little",
+      "machine": "AArch64",
+      "e_machine": 183,
+      "e_type": 3,
+      "version": 1
+    }
+  },
+  {
+    "name": "lamp-peek",
+    "kind": "workspace_binary",
+    "bytes": 2719208,
+    "expected_sha256": "1ed8001a4054a773b791adab54d28953cfac06616782f75060689057a663a4ac",
+    "verified_sha256": "1ed8001a4054a773b791adab54d28953cfac06616782f75060689057a663a4ac",
+    "zip_member_CRC_verified_on_complete_read": true,
+    "elf": {
+      "class": "ELF64",
+      "endianness": "little",
+      "machine": "AArch64",
+      "e_machine": 183,
+      "e_type": 3,
+      "version": 1
+    }
+  },
+  {
+    "name": "lamp-policy",
+    "kind": "workspace_binary",
+    "bytes": 5028880,
+    "expected_sha256": "98e526031153a1deaf3a19efbc46df55f57dafb216771e09bc9f2c995e833e23",
+    "verified_sha256": "98e526031153a1deaf3a19efbc46df55f57dafb216771e09bc9f2c995e833e23",
+    "zip_member_CRC_verified_on_complete_read": true,
+    "elf": {
+      "class": "ELF64",
+      "endianness": "little",
+      "machine": "AArch64",
+      "e_machine": 183,
+      "e_type": 3,
+      "version": 1
+    }
+  },
+  {
+    "name": "lamp-policy-fit",
+    "kind": "workspace_binary",
+    "bytes": 919256,
+    "expected_sha256": "a576e4b7632a28d355ae8eefa07fdf149f9350e2e8c188c60ff67ee311816ccd",
+    "verified_sha256": "a576e4b7632a28d355ae8eefa07fdf149f9350e2e8c188c60ff67ee311816ccd",
+    "zip_member_CRC_verified_on_complete_read": true,
+    "elf": {
+      "class": "ELF64",
+      "endianness": "little",
+      "machine": "AArch64",
+      "e_machine": 183,
+      "e_type": 3,
+      "version": 1
+    }
+  },
+  {
+    "name": "lamp-policy-judges",
+    "kind": "workspace_binary",
+    "bytes": 4541792,
+    "expected_sha256": "df1c70d85c32071ee4bbc5e1d3b2bc0e90115a28311d8328d143f98c65d92667",
+    "verified_sha256": "df1c70d85c32071ee4bbc5e1d3b2bc0e90115a28311d8328d143f98c65d92667",
+    "zip_member_CRC_verified_on_complete_read": true,
+    "elf": {
+      "class": "ELF64",
+      "endianness": "little",
+      "machine": "AArch64",
+      "e_machine": 183,
+      "e_type": 3,
+      "version": 1
+    }
+  },
+  {
+    "name": "lamp-policy-replay",
+    "kind": "workspace_binary",
+    "bytes": 2959984,
+    "expected_sha256": "f13013138557b5a689877872f72a3056ec8e9315d8f575dbb745b71c87f4d7ec",
+    "verified_sha256": "f13013138557b5a689877872f72a3056ec8e9315d8f575dbb745b71c87f4d7ec",
+    "zip_member_CRC_verified_on_complete_read": true,
+    "elf": {
+      "class": "ELF64",
+      "endianness": "little",
+      "machine": "AArch64",
+      "e_machine": 183,
+      "e_type": 3,
+      "version": 1
+    }
+  },
+  {
+    "name": "lamp-records",
+    "kind": "workspace_binary",
+    "bytes": 1406984,
+    "expected_sha256": "1aa5274dd33c3db7053a70dd45eec743d056ceede216a1360ccbb3d2e651ff57",
+    "verified_sha256": "1aa5274dd33c3db7053a70dd45eec743d056ceede216a1360ccbb3d2e651ff57",
+    "zip_member_CRC_verified_on_complete_read": true,
+    "elf": {
+      "class": "ELF64",
+      "endianness": "little",
+      "machine": "AArch64",
+      "e_machine": 183,
+      "e_type": 3,
+      "version": 1
+    }
+  },
+  {
+    "name": "lamp-records-fixture",
+    "kind": "workspace_binary",
+    "bytes": 1450056,
+    "expected_sha256": "1627e88117fff3902c7e3cea8387974174555552ad632ab272a8db63bb68762c",
+    "verified_sha256": "1627e88117fff3902c7e3cea8387974174555552ad632ab272a8db63bb68762c",
+    "zip_member_CRC_verified_on_complete_read": true,
+    "elf": {
+      "class": "ELF64",
+      "endianness": "little",
+      "machine": "AArch64",
+      "e_machine": 183,
+      "e_type": 3,
+      "version": 1
+    }
+  },
+  {
+    "name": "lamp-same-voice",
+    "kind": "workspace_binary",
+    "bytes": 24216664,
+    "expected_sha256": "4bea8b3d39e024184357b3fc7b4f759cbddad788fc4cfc6b2c5c9c0c21a55523",
+    "verified_sha256": "4bea8b3d39e024184357b3fc7b4f759cbddad788fc4cfc6b2c5c9c0c21a55523",
+    "zip_member_CRC_verified_on_complete_read": true,
+    "elf": {
+      "class": "ELF64",
+      "endianness": "little",
+      "machine": "AArch64",
+      "e_machine": 183,
+      "e_type": 3,
+      "version": 1
+    }
+  },
+  {
+    "name": "lamp-schedule",
+    "kind": "workspace_binary",
+    "bytes": 4490344,
+    "expected_sha256": "91e438ce6c2d865af427a085475e5611550b01f6e8cad74905d6890bf4a5e3e2",
+    "verified_sha256": "91e438ce6c2d865af427a085475e5611550b01f6e8cad74905d6890bf4a5e3e2",
+    "zip_member_CRC_verified_on_complete_read": true,
+    "elf": {
+      "class": "ELF64",
+      "endianness": "little",
+      "machine": "AArch64",
+      "e_machine": 183,
+      "e_type": 3,
+      "version": 1
+    }
+  },
+  {
+    "name": "lamp-seems-measure",
+    "kind": "workspace_binary",
+    "bytes": 16740720,
+    "expected_sha256": "ab832f69a812363fb088095c71aa60a0effbf042a94c86de756f5c2f968eb39f",
+    "verified_sha256": "ab832f69a812363fb088095c71aa60a0effbf042a94c86de756f5c2f968eb39f",
+    "zip_member_CRC_verified_on_complete_read": true,
+    "elf": {
+      "class": "ELF64",
+      "endianness": "little",
+      "machine": "AArch64",
+      "e_machine": 183,
+      "e_type": 3,
+      "version": 1
+    }
+  },
+  {
+    "name": "lamp-selftest",
+    "kind": "workspace_binary",
+    "bytes": 1560016,
+    "expected_sha256": "1d8e6682b9de5d8664d98651a2fcd574af34c79afc17f73268625db7f3b4b331",
+    "verified_sha256": "1d8e6682b9de5d8664d98651a2fcd574af34c79afc17f73268625db7f3b4b331",
+    "zip_member_CRC_verified_on_complete_read": true,
+    "elf": {
+      "class": "ELF64",
+      "endianness": "little",
+      "machine": "AArch64",
+      "e_machine": 183,
+      "e_type": 3,
+      "version": 1
+    }
+  },
+  {
+    "name": "lamp-settings",
+    "kind": "workspace_binary",
+    "bytes": 1529768,
+    "expected_sha256": "7aca992aa1936ef35604eed9d647dcaab88571fca3f9fdcb450b01813a33ef24",
+    "verified_sha256": "7aca992aa1936ef35604eed9d647dcaab88571fca3f9fdcb450b01813a33ef24",
+    "zip_member_CRC_verified_on_complete_read": true,
+    "elf": {
+      "class": "ELF64",
+      "endianness": "little",
+      "machine": "AArch64",
+      "e_machine": 183,
+      "e_type": 3,
+      "version": 1
+    }
+  },
+  {
+    "name": "lamp-setup",
+    "kind": "workspace_binary",
+    "bytes": 7616336,
+    "expected_sha256": "dccda47e70d7c4aa61bb13c25dc87cb971ca70b3c93a8a09ee280ee5db99796c",
+    "verified_sha256": "dccda47e70d7c4aa61bb13c25dc87cb971ca70b3c93a8a09ee280ee5db99796c",
+    "zip_member_CRC_verified_on_complete_read": true,
+    "elf": {
+      "class": "ELF64",
+      "endianness": "little",
+      "machine": "AArch64",
+      "e_machine": 183,
+      "e_type": 3,
+      "version": 1
+    }
+  },
+  {
+    "name": "lamp-skills",
+    "kind": "workspace_binary",
+    "bytes": 8819112,
+    "expected_sha256": "f75ef5a8e093c7e7c989833c1cfe084981517c33faa1f739681655fa4d5fd510",
+    "verified_sha256": "f75ef5a8e093c7e7c989833c1cfe084981517c33faa1f739681655fa4d5fd510",
+    "zip_member_CRC_verified_on_complete_read": true,
+    "elf": {
+      "class": "ELF64",
+      "endianness": "little",
+      "machine": "AArch64",
+      "e_machine": 183,
+      "e_type": 3,
+      "version": 1
+    }
+  },
+  {
+    "name": "lamp-sound-fixtures",
+    "kind": "workspace_binary",
+    "bytes": 1006096,
+    "expected_sha256": "404cd34297318d5cb82f1fff194a3955b61923c48d3fc1b0d4ca601876a3e28f",
+    "verified_sha256": "404cd34297318d5cb82f1fff194a3955b61923c48d3fc1b0d4ca601876a3e28f",
+    "zip_member_CRC_verified_on_complete_read": true,
+    "elf": {
+      "class": "ELF64",
+      "endianness": "little",
+      "machine": "AArch64",
+      "e_machine": 183,
+      "e_type": 3,
+      "version": 1
+    }
+  },
+  {
+    "name": "lamp-station",
+    "kind": "workspace_binary",
+    "bytes": 1816960,
+    "expected_sha256": "230700906735101ac097305a06efedffa30b9f87765fb8a071662abfe06fe636",
+    "verified_sha256": "230700906735101ac097305a06efedffa30b9f87765fb8a071662abfe06fe636",
+    "zip_member_CRC_verified_on_complete_read": true,
+    "elf": {
+      "class": "ELF64",
+      "endianness": "little",
+      "machine": "AArch64",
+      "e_machine": 183,
+      "e_type": 3,
+      "version": 1
+    }
+  },
+  {
+    "name": "lamp-surround",
+    "kind": "workspace_binary",
+    "bytes": 13872272,
+    "expected_sha256": "fc54597ac1073b31bfe85cc967d2fa49934287e2da23032f268dc7171f492aa8",
+    "verified_sha256": "fc54597ac1073b31bfe85cc967d2fa49934287e2da23032f268dc7171f492aa8",
+    "zip_member_CRC_verified_on_complete_read": true,
+    "elf": {
+      "class": "ELF64",
+      "endianness": "little",
+      "machine": "AArch64",
+      "e_machine": 183,
+      "e_type": 3,
+      "version": 1
+    }
+  },
+  {
+    "name": "lamp-tasks",
+    "kind": "workspace_binary",
+    "bytes": 4725968,
+    "expected_sha256": "685159ca0abc94fa507676dae23dce8c3e0646d021c57c41eea9865884cec9ad",
+    "verified_sha256": "685159ca0abc94fa507676dae23dce8c3e0646d021c57c41eea9865884cec9ad",
+    "zip_member_CRC_verified_on_complete_read": true,
+    "elf": {
+      "class": "ELF64",
+      "endianness": "little",
+      "machine": "AArch64",
+      "e_machine": 183,
+      "e_type": 3,
+      "version": 1
+    }
+  },
+  {
+    "name": "lamp-tasks-harness-fixture",
+    "kind": "workspace_binary",
+    "bytes": 752840,
+    "expected_sha256": "4f891bc0d3866cc56b3b0fa44de4141575d3602ae008ca9e806756b66a6a81f9",
+    "verified_sha256": "4f891bc0d3866cc56b3b0fa44de4141575d3602ae008ca9e806756b66a6a81f9",
+    "zip_member_CRC_verified_on_complete_read": true,
+    "elf": {
+      "class": "ELF64",
+      "endianness": "little",
+      "machine": "AArch64",
+      "e_machine": 183,
+      "e_type": 3,
+      "version": 1
+    }
+  },
+  {
+    "name": "lamp-turn-end",
+    "kind": "workspace_binary",
+    "bytes": 24796648,
+    "expected_sha256": "21404167a7b2fe26b809db57f03a869f482f62a7c8cdfadaacc01d77c24741aa",
+    "verified_sha256": "21404167a7b2fe26b809db57f03a869f482f62a7c8cdfadaacc01d77c24741aa",
+    "zip_member_CRC_verified_on_complete_read": true,
+    "elf": {
+      "class": "ELF64",
+      "endianness": "little",
+      "machine": "AArch64",
+      "e_machine": 183,
+      "e_type": 3,
+      "version": 1
+    }
+  },
+  {
+    "name": "lamp-update",
+    "kind": "workspace_binary",
+    "bytes": 4896160,
+    "expected_sha256": "0db6003aaf218cf7655f6ed6dd1495a77daac69ba4c475c71826e43ca8e048e9",
+    "verified_sha256": "0db6003aaf218cf7655f6ed6dd1495a77daac69ba4c475c71826e43ca8e048e9",
+    "zip_member_CRC_verified_on_complete_read": true,
+    "elf": {
+      "class": "ELF64",
+      "endianness": "little",
+      "machine": "AArch64",
+      "e_machine": 183,
+      "e_type": 3,
+      "version": 1
+    }
+  },
+  {
+    "name": "lamp-voice",
+    "kind": "workspace_binary",
+    "bytes": 29107040,
+    "expected_sha256": "5bf07f4c10a005092cb52d944bd046fb1a995ec1bbc61239bd70e4124ce72223",
+    "verified_sha256": "5bf07f4c10a005092cb52d944bd046fb1a995ec1bbc61239bd70e4124ce72223",
+    "zip_member_CRC_verified_on_complete_read": true,
+    "elf": {
+      "class": "ELF64",
+      "endianness": "little",
+      "machine": "AArch64",
+      "e_machine": 183,
+      "e_type": 3,
+      "version": 1
+    }
+  },
+  {
+    "name": "lamp-voice-eval",
+    "kind": "workspace_binary",
+    "bytes": 13317016,
+    "expected_sha256": "3f0abf11bfcc4e5af406df7389ce3976b68c0a9b0146db81fed66744c750181e",
+    "verified_sha256": "3f0abf11bfcc4e5af406df7389ce3976b68c0a9b0146db81fed66744c750181e",
+    "zip_member_CRC_verified_on_complete_read": true,
+    "elf": {
+      "class": "ELF64",
+      "endianness": "little",
+      "machine": "AArch64",
+      "e_machine": 183,
+      "e_type": 3,
+      "version": 1
+    }
+  },
+  {
+    "name": "replay_cost",
+    "kind": "selected_example",
+    "bytes": 1572328,
+    "expected_sha256": "916ace17a3930b51a8f0ca9349123c7d4d5a8844e1d22d86aa69edf901935871",
+    "verified_sha256": "916ace17a3930b51a8f0ca9349123c7d4d5a8844e1d22d86aa69edf901935871",
+    "zip_member_CRC_verified_on_complete_read": true,
+    "elf": {
+      "class": "ELF64",
+      "endianness": "little",
+      "machine": "AArch64",
+      "e_machine": 183,
+      "e_type": 3,
+      "version": 1
+    }
+  },
+  {
+    "name": "schedule_check",
+    "kind": "selected_example",
+    "bytes": 4679632,
+    "expected_sha256": "e3b3d8c7921d4f4e3ffd06b3418840743d7aa653902973004f7a42b64acebd70",
+    "verified_sha256": "e3b3d8c7921d4f4e3ffd06b3418840743d7aa653902973004f7a42b64acebd70",
+    "zip_member_CRC_verified_on_complete_read": true,
+    "elf": {
+      "class": "ELF64",
+      "endianness": "little",
+      "machine": "AArch64",
+      "e_machine": 183,
+      "e_type": 3,
+      "version": 1
+    }
+  }
+]
