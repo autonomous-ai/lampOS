@@ -229,3 +229,23 @@ def test_links_the_lamp_reads_are_refused_and_others_warned(tmp_path):
 def test_an_unknown_top_level_key_is_named_plainly(tmp_path):
     report = check(skill(tmp_path / "typo", rules='version = "1.0.0"\n[[triggerz]]\n'))
     assert "skill.toml: [triggerz] isn't a key of format 1" in report.errors
+
+
+def test_the_first_name_line_is_the_name_even_empty(tmp_path):
+    # The lamp's `find_map` stops at the first `name:` line.
+    report = check(skill(tmp_path / "e", md="---\nname:\nname: e\ndescription: A.\n---\n"))
+    assert any("has no name" in line for line in report.errors), report.errors
+
+
+def test_a_directory_named_as_a_move_is_not_a_file(tmp_path):
+    folder = skill(tmp_path / "dirmove")
+    (folder / "moves" / "x.json").mkdir(parents=True)
+    assert "moves/x.json: not a file" in check(folder).errors
+
+
+def test_a_dot_named_move_is_passed_over_as_the_body_does(tmp_path):
+    # A Mac's AppleDouble `._wave.json`: lamp-body's `moves::load` skips it.
+    folder = skill(tmp_path / "mac")
+    (folder / "moves").mkdir()
+    (folder / "moves" / "._wave.json").write_bytes(b"\0\0mac")
+    assert check(folder).ok, check(folder).errors

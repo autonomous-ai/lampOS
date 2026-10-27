@@ -36,7 +36,7 @@ jobs:
         run: |
           status=0
           # A copy marked `required` must exist: a deleted or renamed one
-          # fails. The skill-format copy is `until-3840` until #3840 adds it.
+          # fails.
           while read -r doc copy need; do
             if [ ! -e "$copy" ]; then
               if [ "$need" = required ]; then
@@ -52,7 +52,7 @@ jobs:
           done <<'COPIES'
           lampOS/docs/control.schema.json lampOS/sdk/python/src/lampos/control.schema.json required
           lampOS/docs/control.schema.json lampOS/sdk/js/src/control.schema.json required
-          lampOS/docs/skill-format.schema.json lampOS/sdk/python/src/lampos/skill-format.schema.json until-3840
+          lampOS/docs/skill-format.schema.json lampOS/sdk/python/src/lampos/skill-format.schema.json required
           COPIES
           exit $status
 

@@ -109,10 +109,12 @@ def _front_matter(text: str) -> tuple[dict[str, str], str | None]:
         for line in body.split("\n"):
             line = line.removesuffix("\r")
             if line.startswith(key) and line[len(key) :].startswith(":"):
+                # The first such line is the key's, empty or not, as the
+                # lamp's `find_map` takes it.
                 value = line[len(key) + 1 :].strip()
                 if value:
                     keys[key] = value
-                    break
+                break
     return keys, None
 
 
@@ -207,8 +209,11 @@ def _walk(folder: Path, report: Report) -> None:
 
 def _move(path: Path, where: Path, report: Report) -> None:
     """One move, held as lamp-body's `moves::read` and `moves::check` hold it."""
-    if path.is_symlink() or not path.is_file():
-        return  # said by _walk, or not a file the body reads
+    if path.is_symlink():
+        return  # said by _walk
+    if not path.is_file():
+        report.errors.append(f"{where}: not a file")
+        return
     try:
         if path.stat().st_size > MOVE_MOST_BYTES:
             report.errors.append(f"{where}: larger than 256 KiB")
@@ -267,7 +272,9 @@ def _move(path: Path, where: Path, report: Report) -> None:
 def _files(folder: Path, report: Report) -> None:
     _walk(folder, report)
     for path in sorted((folder / "moves").glob("*.json")):
-        _move(path, path.relative_to(folder), report)
+        # lamp-body's `moves::load` passes over dot-names (a Mac's `._x.json`).
+        if not path.name.startswith("."):
+            _move(path, path.relative_to(folder), report)
     for path in sorted((folder / "sounds").glob("*")):
         where = path.relative_to(folder)
         if path.is_symlink():
@@ -294,12 +301,12 @@ def _files(folder: Path, report: Report) -> None:
 def _permissions(rules: dict[str, Any], report: Report) -> None:
     permissions = rules.get("permissions")
     if isinstance(permissions, dict) and permissions.get("look") is True and permissions.get("camera") is not True:
-        # Format 1's `look = true` alone still gives the picture
-        # (lamp-skills' `sees_picture`); `camera` is that grant's own name,
-        # and `look` is presence (docs/skill-format.md).
+        # Format 1's `look = true` alone gives the picture (lamp-skills'
+        # `sees_picture`); `camera` is that grant's own name, and format 1's
+        # presence is the presence topics (docs/skill-format.md).
         report.warnings.append(
             "skill.toml: permissions.look = true alone gives the model the full picture, as format 1 reads it; "
-            "ask camera = true for the picture, and keep look for presence only"
+            "ask camera = true for the picture; in format 1, presence is the topics"
         )
 
 
