@@ -1,0 +1,40 @@
+lamp-eyes --device ABSOLUTE_PATH --lock-directory PRIVATE_ABSOLUTE_DIRECTORY --usb VENDOR:PRODUCT@TOPOLOGY --model ABSOLUTE_PATH --permit-socket ABSOLUTE_PATH --body-socket ABSOLUTE_PATH [--sight-file ABSOLUTE_PATH] [--presence-file ABSOLUTE_PATH] [--recogniser ABSOLUTE_PATH --people ABSOLUTE_PATH --who-socket ABSOLUTE_PATH [--known-file ABSOLUTE_PATH]] [--leave-still-faces on|off] [--steady-rate on|off] [--look-on-change on|off] [--full-look WIDTHxHEIGHT --full-look-file ABSOLUTE_PATH [--full-look-movement on|off]] [--mouth-model ABSOLUTE_PATH [--mouth-on-heard on|off] [--mouth-runtime ABSOLUTE_PATH]]
+
+Owns the camera at --device (checked against the USB identity given, hex vendor and
+product and the port topology, for example 01da:5875@3-1.1.4) and looks for a face in
+its frames four times a second while there is one and less than twice a second when
+there is none, with the pinned YuNet model at --model. With --steady-rate on, it looks
+twice a second while one face has sat still for 3 s (off unless given). With
+--look-on-change on, once no face has been found for 4 s, a frame like the last one the
+detector ran on is said to hold no face without it, and the detector runs at least every
+3 s (off unless given). Each look
+sends one datagram to --body-socket: {"face":{"x":..,"y":..,"size":..,"turned":..}} or
+{"face":null}. The camera is open only while {"camera":true} keeps arriving on
+--permit-socket, at least every 1.5 s; {"camera":false} closes it at once. Without
+--sight-file and --full-look-file no frame is written anywhere and none leaves this process. With it the
+newest frame, and only that one, is kept in that file (mode 0600) while the camera is
+open and removed when it closes: it is what the voice service shows the model. With
+--presence-file one line, the near face's height as a share of the picture's, is kept
+fresh in that file while there is a face: no picture, only that number. With
+--recogniser (the pinned SFace model), --people and --who-socket, the eyes remember
+a face when the voice service asks ({"remember":"NAME"} on the socket), forget it
+({"forget":"NAME"}), list the names ({"list":true}) and say whose face is at the
+lamp ({"who":true}). Only the prints of people who asked are kept, in --people
+(mode 0600); no picture. With --known-file, the name of the one known at the lamp is
+kept fresh in that file while they are there. With --leave-still-faces on, a face at a place
+where faces have come from for half an hour, every one small (under 0.14 of the height)
+and faint (scored under 0.8), is not a person: it is left out of what the body is told,
+the bus and recognition (off unless given). With --full-look and --full-look-file the
+camera runs at that size, the working frame is kept in --sight-file at 320 across as before, and {"look_full":ID} on
+--permit-socket asks for one still: taken once the head has settled
+(body/joint_states on the bus, at most 2 s), at most 1024 across and 64 KiB, or with
+{"look_full":ID,"side":PIXELS} at most that side across and 184 KiB, marked
+with the ID in a JPEG comment, kept in --full-look-file for 15 s and removed (off unless given).
+With --full-look-movement on the head settles on movement only: the camera's aim, the arm's
+joints with the head's, and never a joint's distance to its goal (off unless given).
+With --mouth-model (the pinned Face Mesh V2), the journal says how open the largest
+face's mouth is each look, and with LAMP_EYES_SPEAKING=on that face's speaking reads it
+(off unless given). With --mouth-on-heard on, the mesh runs only while the voice hears a
+line (voice/heard on the bus, from its first words until 2 s after it ends).
+With --mouth-runtime (the voice's pinned ONNX Runtime library, checked before it is loaded),
+the mesh runs under ONNX Runtime on one thread instead of tract.

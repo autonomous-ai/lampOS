@@ -186,6 +186,9 @@ struct Look {
     boot: String,
     /// The passing ids that read speaking in this look.
     speaking: Vec<String>,
+    /// The original frame contains exactly one face, positively speaking.
+    /// Used only by the strict two-look exception, before filtering others.
+    single_positive: bool,
     /// Every passing id in this look, speaking or not
     /// ([`SpeakingFaces::in_view_at`]).
     tracked: Vec<String>,
@@ -242,15 +245,13 @@ impl SpeakingFaces {
             }
             Some(((boot, seq), _)) => looks.frame = Some((boot.to_owned(), seq)),
             None => {
-                if looks.frame.is_none()
-                    && looks
-                        .kept
-                        .back()
-                        .is_some_and(|last| at.saturating_duration_since(last.at) < EYES_EVERY)
-                {
+                // A missed read is not a new publisher frame. Keep its
+                // deduplication key so recovery cannot count it twice.
+                if looks.kept.back().is_some_and(|last| {
+                    last.boot.is_empty() && at.saturating_duration_since(last.at) < EYES_EVERY
+                }) {
                     return;
                 }
-                looks.frame = None;
             }
         }
         let speaking_faces: Vec<_> = frame
@@ -266,6 +267,11 @@ impl SpeakingFaces {
                     .collect()
             })
             .unwrap_or_default();
+        let single_positive = frame.is_some_and(|((boot, _), faces)| {
+            faces.faces.len() == 1
+                && speaking_faces.len() == 1
+                && crate::memory_scope::qualified_speaker(&format!("{boot}/{}", faces.faces[0].id))
+        });
         let speaking = speaking_faces.iter().map(|face| face.id.clone()).collect();
         let tracked = frame
             .map(|(_, faces)| faces.faces.iter().map(|face| face.id.clone()).collect())
@@ -320,6 +326,7 @@ impl SpeakingFaces {
             at,
             boot,
             speaking,
+            single_positive,
             tracked,
             turned,
             turned_silent,
@@ -343,6 +350,48 @@ impl SpeakingFaces {
                 .map(|id| format!("{}/{id}", look.boot))
                 .collect()
         })
+    }
+
+    /// Positive evidence for sensitive per-request disclosure or consent:
+    /// exactly one boot-qualified face spoke in the interval, in at least
+    /// half of at least three distinct looks, or in both of exactly two
+    /// looks whose original frames each contain that face alone, speaking.
+    /// Another speaker in even one look refuses the proof; a majority must
+    /// not hide a second person's short contribution. This does not establish
+    /// liveness or identity.
+    pub(crate) fn positive_speaker(&self, from: Instant, to: Instant) -> Speakers {
+        let Ok(looks) = self.looks.lock() else {
+            return Vec::new();
+        };
+        let mut speaker: Option<String> = None;
+        let mut frames = 0;
+        let mut spoken = 0;
+        let mut single_positive = 0;
+        for look in looks
+            .kept
+            .iter()
+            .filter(|look| look.at >= from && look.at <= to)
+        {
+            frames += 1;
+            single_positive += usize::from(look.single_positive);
+            if !look.speaking.is_empty() {
+                spoken += 1;
+            }
+            for id in &look.speaking {
+                let qualified = format!("{}/{id}", look.boot);
+                match &speaker {
+                    Some(seen) if *seen != qualified => return Vec::new(),
+                    None => speaker = Some(qualified),
+                    _ => {}
+                }
+            }
+        }
+        if (frames >= FEWEST_LOOKS && spoken * 2 >= frames) || (frames == 2 && single_positive == 2)
+        {
+            speaker.into_iter().collect()
+        } else {
+            Vec::new()
+        }
     }
 
     /// One face seen speaking this line, for requested enrollment. A brief
@@ -644,6 +693,315 @@ fn face_in(path: &Path) -> Option<(String, SystemTime)> {
         .then(|| (id.to_owned(), written))
 }
 
+/// An explicit, indivisible name/identity/face observation written by Eyes.
+/// Legacy `known-face` has no boot and is never upgraded by reader timing.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct KnownSpeaker {
+    pub(crate) name: String,
+    pub(crate) person: String,
+    /// Keep the source identity even when memory is keyed by the name.
+    pub(crate) id: Option<String>,
+    pub(crate) face: String,
+    pub(crate) epoch: Option<KnownSpeakerEpoch>,
+}
+
+/// Producer lifecycle and revocation epoch, never inferred from file timing.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct KnownSpeakerEpoch {
+    pub(crate) boot: String,
+    pub(crate) publisher: String,
+    pub(crate) generation: u64,
+}
+
+pub(crate) enum KnownSpeakerSource {
+    Seen(KnownSpeaker),
+    Absent(KnownSpeakerEpoch),
+    /// A returning/new track is awaiting actual recognition: deny immediately.
+    Checking(KnownSpeakerEpoch),
+    Revoked(KnownSpeakerEpoch),
+}
+
+pub(crate) fn known_speaker_of(known: &Path) -> PathBuf {
+    let mut beside = known.as_os_str().to_owned();
+    beside.push("-speaker");
+    PathBuf::from(beside)
+}
+
+/// Read one bounded source file, with a conservative monotonic deadline
+/// anchored before I/O. Sample wall time after the opened file's metadata:
+/// an atomic publication during open is not a future-dated observation.
+/// An old Eyes boot stays old even when a new publisher reuses its passing fN.
+#[cfg(test)]
+pub(crate) fn known_speaker(known: &Path) -> Option<KnownSpeaker> {
+    match read_known_speaker_source(
+        || std::fs::File::open(known_speaker_of(known)),
+        SystemTime::now,
+    )? {
+        KnownSpeakerSource::Seen(known) => Some(known),
+        KnownSpeakerSource::Absent(_)
+        | KnownSpeakerSource::Checking(_)
+        | KnownSpeakerSource::Revoked(_) => None,
+    }
+}
+
+/// Compatibility seam for existing positive publication/clock controls.
+#[cfg(test)]
+fn read_known_speaker(
+    open: impl FnOnce() -> std::io::Result<std::fs::File>,
+    wall: impl FnOnce() -> SystemTime,
+) -> Option<KnownSpeaker> {
+    match read_known_speaker_source(open, wall)? {
+        KnownSpeakerSource::Seen(known) => Some(known),
+        KnownSpeakerSource::Absent(_)
+        | KnownSpeakerSource::Checking(_)
+        | KnownSpeakerSource::Revoked(_) => None,
+    }
+}
+
+/// Metadata and contents belong to one bounded FD. Only explicit versioned
+/// absence can continue a request; missing, old and malformed sources cannot.
+#[cfg(test)]
+fn read_known_speaker_source(
+    open: impl FnOnce() -> std::io::Result<std::fs::File>,
+    wall: impl FnOnce() -> SystemTime,
+) -> Option<KnownSpeakerSource> {
+    read_known_speaker_source_at(open, wall, lamp_ipc::monotonic_us, false)
+}
+
+#[cfg(test)]
+enum SourceAuthority {
+    Required,
+    #[cfg(test)]
+    LegacyCompatibility,
+}
+
+#[cfg(test)]
+pub(crate) fn read_known_speaker_source_at(
+    open: impl FnOnce() -> std::io::Result<std::fs::File>,
+    wall: impl FnOnce() -> SystemTime,
+    now_us: impl FnMut() -> u64,
+    require_authority: bool,
+) -> Option<KnownSpeakerSource> {
+    parse_known_speaker_source(
+        open,
+        wall,
+        now_us,
+        if require_authority {
+            SourceAuthority::Required
+        } else {
+            SourceAuthority::LegacyCompatibility
+        },
+    )
+}
+
+#[cfg(test)]
+fn parse_known_speaker_source(
+    open: impl FnOnce() -> std::io::Result<std::fs::File>,
+    wall: impl FnOnce() -> SystemTime,
+    mut now_us: impl FnMut() -> u64,
+    authority_policy: SourceAuthority,
+) -> Option<KnownSpeakerSource> {
+    let require_authority = matches!(authority_policy, SourceAuthority::Required);
+    use std::io::Read;
+    #[derive(serde::Deserialize)]
+    #[serde(deny_unknown_fields)]
+    struct Legacy {
+        name: String,
+        id: Option<String>,
+        boot: String,
+        face: String,
+    }
+    #[derive(serde::Deserialize)]
+    #[serde(tag = "state", rename_all = "lowercase", deny_unknown_fields)]
+    enum Published {
+        Seen {
+            name: String,
+            id: Option<String>,
+            boot: String,
+            face: String,
+            publisher: String,
+            generation: u64,
+            #[serde(default)]
+            permission_until_us: Option<u64>,
+            #[serde(default)]
+            observed_us: Option<u64>,
+        },
+        Absent {
+            boot: String,
+            publisher: String,
+            generation: u64,
+            #[serde(default)]
+            permission_until_us: Option<u64>,
+            #[serde(default)]
+            observed_us: Option<u64>,
+        },
+        Checking {
+            boot: String,
+            publisher: String,
+            generation: u64,
+            #[serde(default)]
+            permission_until_us: Option<u64>,
+            #[serde(default)]
+            observed_us: Option<u64>,
+        },
+        Revoked {
+            boot: String,
+            publisher: String,
+            generation: u64,
+            #[serde(default)]
+            permission_until_us: Option<u64>,
+            #[serde(default)]
+            observed_us: Option<u64>,
+        },
+    }
+    impl Published {
+        fn authority(&self) -> Option<(u64, u64)> {
+            let (until, observed) = match self {
+                Self::Seen {
+                    permission_until_us,
+                    observed_us,
+                    ..
+                }
+                | Self::Absent {
+                    permission_until_us,
+                    observed_us,
+                    ..
+                }
+                | Self::Checking {
+                    permission_until_us,
+                    observed_us,
+                    ..
+                }
+                | Self::Revoked {
+                    permission_until_us,
+                    observed_us,
+                    ..
+                } => (*permission_until_us, *observed_us),
+            };
+            Some((until?, observed?))
+        }
+    }
+    #[derive(serde::Deserialize)]
+    #[serde(untagged)]
+    enum Source {
+        Legacy(Legacy),
+        Published(Published),
+    }
+    let began = Instant::now();
+    let file = open().ok()?;
+    let modified = file.metadata().ok()?.modified().ok()?;
+    let age = wall().duration_since(modified).ok()?;
+    let remaining = crate::known_faces::FRESH.checked_sub(age)?;
+    let expires = began.checked_add(remaining)?;
+    let mut bytes = Vec::new();
+    file.take(4097).read_to_end(&mut bytes).ok()?;
+    if bytes.len() > 4096 {
+        return None;
+    }
+    let source: Source = serde_json::from_slice(&bytes).ok()?;
+    let authority = match &source {
+        Source::Published(published) => published.authority(),
+        Source::Legacy(_) => None,
+    };
+    let revoked = matches!(&source, Source::Published(Published::Revoked { .. }));
+    if require_authority && !revoked && !source_authority_current(authority, now_us()) {
+        return None;
+    }
+    let epoch = |boot: String, publisher: String, generation: u64| {
+        (crate::memory_scope::qualified_speaker(&format!("{boot}/f1"))
+            && publisher.len() == 32
+            && publisher
+                .bytes()
+                .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+            && generation != 0)
+            .then_some(KnownSpeakerEpoch {
+                boot,
+                publisher,
+                generation,
+            })
+    };
+    let seen = |name: String,
+                id: Option<String>,
+                boot: String,
+                face: String,
+                epoch: Option<KnownSpeakerEpoch>| {
+        let face = format!("{boot}/{face}");
+        (crate::memory_scope::qualified_speaker(&face)
+            && !name.is_empty()
+            && name.trim() == name
+            && name.chars().count() <= 40
+            && !name.chars().any(char::is_control)
+            && id.as_deref().is_none_or(lamp_msgs::known::is_person_id))
+        .then(|| {
+            KnownSpeakerSource::Seen(KnownSpeaker {
+                person: crate::known_faces::person_of(
+                    &name,
+                    id.as_deref(),
+                    lamp_msgs::known::stable_ids(),
+                ),
+                name,
+                id,
+                face,
+                epoch,
+            })
+        })
+    };
+    let source = match source {
+        Source::Legacy(Legacy {
+            name,
+            id,
+            boot,
+            face,
+        }) => seen(name, id, boot, face, None)?,
+        Source::Published(Published::Seen {
+            name,
+            id,
+            boot,
+            face,
+            publisher,
+            generation,
+            ..
+        }) => {
+            let epoch = epoch(boot.clone(), publisher, generation)?;
+            seen(name, id, boot, face, Some(epoch))?
+        }
+        Source::Published(Published::Absent {
+            boot,
+            publisher,
+            generation,
+            ..
+        }) => KnownSpeakerSource::Absent(epoch(boot, publisher, generation)?),
+        Source::Published(Published::Checking {
+            boot,
+            publisher,
+            generation,
+            ..
+        }) => KnownSpeakerSource::Checking(epoch(boot, publisher, generation)?),
+        Source::Published(Published::Revoked {
+            boot,
+            publisher,
+            generation,
+            ..
+        }) => KnownSpeakerSource::Revoked(epoch(boot, publisher, generation)?),
+    };
+    (Instant::now() < expires
+        && (!require_authority || revoked || source_authority_current(authority, now_us())))
+    .then_some(source)
+}
+
+/// Both deadlines are checked at the final reader boundary. Publication mtime
+/// may advance for camera renewals; original identity age must never advance.
+#[cfg(test)]
+fn source_authority_current(authority: Option<(u64, u64)>, now_us: u64) -> bool {
+    authority.is_some_and(|(until, observed)| {
+        observed > 0
+            && observed <= now_us
+            && Duration::from_micros(now_us - observed) < crate::known_faces::FRESH
+            && now_us < until
+            && until - now_us <= 1_500_000
+    })
+}
+
 /// Whether a line admitted for `person` may be someone else's: a face
 /// spoke through it that is not the face of the person the eyes know now,
 /// or the eyes now know someone other than `person`. No face speaking
@@ -834,6 +1192,283 @@ mod tests {
         assert_eq!(eyes.enrollment_speaker(from, to), None);
         eyes.forget();
         assert_eq!(eyes.enrollment_speaker(from, to), None);
+    }
+
+    #[test]
+    fn explicit_known_speaker_is_atomic_bounded_fresh_and_never_guesses_a_boot() {
+        let dir = std::env::temp_dir().join(format!("known-speaker-source-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir(&dir).unwrap();
+        let known = dir.join("known");
+        let source = known_speaker_of(&known);
+        assert_eq!(source.file_name().unwrap(), "known-speaker");
+        std::fs::write(&known, "Example").unwrap();
+        std::fs::write(known_face_of(&known), "f1").unwrap();
+        assert!(known_speaker(&known).is_none());
+        let good = serde_json::json!({"name":"Example", "id":null,
+            "boot":"0123456789abcdef", "face":"f1"});
+        std::fs::write(&source, good.to_string()).unwrap();
+        let read = known_speaker(&known).unwrap();
+        assert_eq!(read.name, "Example");
+        assert_eq!(read.person, lamp_msgs::known::person_id("Example"));
+        assert_eq!(read.face, "0123456789abcdef/f1");
+        // The atomic source owns its name; separate old legacy files cannot
+        // mix that new face with another name or freshly guess its boot.
+        std::fs::write(&known, "Another").unwrap();
+        assert_eq!(known_speaker(&known).unwrap().name, "Example");
+        for (field, bad) in [
+            ("name", serde_json::json!("")),
+            ("name", serde_json::json!(" Example")),
+            ("name", serde_json::json!("Example\nInjected")),
+            ("name", serde_json::json!("x".repeat(41))),
+            ("id", serde_json::json!("not-a-person-id")),
+            ("boot", serde_json::json!("")),
+            ("boot", serde_json::json!("0123456789abcdeF")),
+            ("face", serde_json::json!("f")),
+            ("face", serde_json::json!("f1/another")),
+            ("face", serde_json::json!("f12345678901")),
+        ] {
+            let mut bad_source = good.clone();
+            bad_source[field] = bad;
+            std::fs::write(&source, bad_source.to_string()).unwrap();
+            assert!(known_speaker(&known).is_none(), "bad {field}");
+        }
+        for text in ["f1".to_owned(), "{}".to_owned(), "x".repeat(4097)] {
+            std::fs::write(&source, text).unwrap();
+            assert!(known_speaker(&known).is_none());
+        }
+        for modified in [
+            SystemTime::now() - Duration::from_secs(4),
+            SystemTime::now() + Duration::from_secs(60),
+        ] {
+            std::fs::write(&source, good.to_string()).unwrap();
+            std::fs::File::options()
+                .write(true)
+                .open(&source)
+                .unwrap()
+                .set_times(std::fs::FileTimes::new().set_modified(modified))
+                .unwrap();
+            assert!(known_speaker(&known).is_none());
+        }
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn atomic_publication_between_reader_entry_and_open_is_fresh_not_future() {
+        use std::{cell::Cell, fs::File};
+        let directory =
+            std::env::temp_dir().join(format!("known-speaker-publication-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&directory);
+        std::fs::create_dir(&directory).unwrap();
+        let source = known_speaker_of(&directory.join("known"));
+        let temporary = directory.join("known-speaker.new");
+        let before = SystemTime::UNIX_EPOCH + Duration::from_secs(1_000_000);
+        let published_at = before + Duration::from_secs(1);
+        let published = Cell::new(false);
+        let write = |path: &Path, face: &str, modified| {
+            std::fs::write(
+                path,
+                serde_json::json!({"name":"Synthetic owner", "id":null,
+                "boot":"0123456789abcdef", "face":face})
+                .to_string(),
+            )
+            .unwrap();
+            File::options()
+                .write(true)
+                .open(path)
+                .unwrap()
+                .set_times(std::fs::FileTimes::new().set_modified(modified))
+                .unwrap();
+        };
+        write(&source, "f1", before - Duration::from_secs(4));
+        let read = read_known_speaker(
+            || {
+                // Eyes replaces a complete file after reader entry but before
+                // open resolves its FD, exactly the real publisher's rename.
+                write(&temporary, "f2", published_at);
+                std::fs::rename(&temporary, &source)?;
+                published.set(true);
+                File::open(&source)
+            },
+            || {
+                if published.get() {
+                    published_at
+                } else {
+                    before
+                }
+            },
+        )
+        .expect("a publication during open must not look future-dated");
+        assert_eq!(read.face, "0123456789abcdef/f2");
+        assert_eq!(read.person, lamp_msgs::known::person_id("Synthetic owner"));
+        // The ordering fix adds no future tolerance and extends no stale age.
+        assert!(read_known_speaker(|| File::open(&source), || before).is_none());
+        assert!(
+            read_known_speaker(
+                || File::open(&source),
+                || published_at + crate::known_faces::FRESH
+            )
+            .is_none()
+        );
+        std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn positive_speaker_never_hides_a_minority_speaker_or_an_eyes_restart() {
+        let (eyes, from, to) = seen(&[
+            &[("f1", Yes)],
+            &[("f1", Yes)],
+            &[("f1", Yes)],
+            &[("f2", Yes)],
+        ]);
+        assert_eq!(eyes.speakers_with_boot(from, to), ["b/f1"]);
+        assert!(eyes.positive_speaker(from, to).is_empty());
+        let (eyes, from, to) = seen(&[&[("f1", Yes)], &[("f1", Yes)], &[("f1", No)]]);
+        assert_eq!(eyes.positive_speaker(from, to), ["b/f1"]);
+        eyes.look(to, Some((("new-boot", 0), &faces(&[("f1", Yes)]))));
+        assert!(eyes.positive_speaker(from, to).is_empty());
+        let (eyes, from, to) = seen(&[&[("f1", Yes)], &[("f1", Yes)]]);
+        assert!(eyes.positive_speaker(from, to).is_empty());
+        let (eyes, from, to) = seen(&[&[("f1", No)], &[("f1", Unknown)], &[("f1", No)]]);
+        assert!(eyes.positive_speaker(from, to).is_empty());
+    }
+
+    /// Two observations suffice only when both original frames contain one
+    /// positive face. Legacy narrowing still requires its three-look bar.
+    #[test]
+    fn two_short_looks_require_the_same_single_positive_face() {
+        const BOOT: &str = "0123456789abcdef";
+        for (case, second, same_frame, expected) in [
+            ("same", vec![("f1", Yes)], false, true),
+            ("one frame read twice", vec![("f1", Yes)], true, false),
+            ("still", vec![("f1", No)], false, false),
+            ("unknown", vec![("f1", Unknown)], false, false),
+            ("none", vec![], false, false),
+            ("other", vec![("f2", Yes)], false, false),
+            ("two speakers", vec![("f1", Yes), ("f2", Yes)], false, false),
+            (
+                "unknown neighbour",
+                vec![("f1", Yes), ("f2", Unknown)],
+                false,
+                false,
+            ),
+            (
+                "silent neighbour",
+                vec![("f1", Yes), ("f2", No)],
+                false,
+                false,
+            ),
+            (
+                "duplicate face",
+                vec![("f1", Yes), ("f1", Yes)],
+                false,
+                false,
+            ),
+        ] {
+            let eyes = SpeakingFaces::default();
+            let from = Instant::now();
+            eyes.look(from, Some(((BOOT, 1), &faces(&[("f1", Yes)]))));
+            eyes.look(
+                from + EVERY,
+                Some(((BOOT, if same_frame { 1 } else { 2 }), &faces(&second))),
+            );
+            let to = from + EVERY * 2;
+            assert_eq!(
+                eyes.positive_speaker(from, to),
+                if expected {
+                    vec![format!("{BOOT}/f1")]
+                } else {
+                    Vec::new()
+                },
+                "{case}"
+            );
+            assert!(
+                eyes.speakers(from, to).is_empty(),
+                "legacy bar unchanged: {case}"
+            );
+        }
+        for (boot, id) in [("bad", "f1"), (BOOT, "bad")] {
+            let eyes = SpeakingFaces::default();
+            let from = Instant::now();
+            for seq in 0..2 {
+                eyes.look(
+                    from + EVERY * seq,
+                    Some(((boot, u64::from(seq)), &faces(&[(id, Yes)]))),
+                );
+            }
+            assert!(eyes.positive_speaker(from, from + EVERY * 2).is_empty());
+        }
+        let eyes = SpeakingFaces::default();
+        let from = Instant::now();
+        eyes.look(from, Some(((BOOT, 1), &faces(&[("f1", Yes)]))));
+        eyes.look(
+            from + EVERY,
+            Some((("fedcba9876543210", 2), &faces(&[("f1", Yes)]))),
+        );
+        assert!(eyes.positive_speaker(from, from + EVERY * 2).is_empty());
+        eyes.forget();
+        assert!(eyes.positive_speaker(from, from + EVERY * 2).is_empty());
+    }
+
+    /// A transient bus error becomes None in the reader. Reading the same
+    /// still-fresh publisher frame afterward cannot create another look.
+    #[test]
+    fn missing_reads_do_not_recount_a_published_speaking_frame() {
+        const BOOT: &str = "0123456789abcdef";
+        for reads in [3, 7] {
+            let eyes = SpeakingFaces::default();
+            let from = Instant::now();
+            let speaking = faces(&[("f1", Yes)]);
+            for read in 0..reads {
+                eyes.look(
+                    from + EVERY * read,
+                    (read % 2 == 0).then_some(((BOOT, 1), &speaking)),
+                );
+            }
+            let to = from + EVERY * reads;
+            assert!(eyes.positive_speaker(from, to).is_empty());
+            assert!(eyes.enrollment_speaker(from, to).is_none());
+            assert!(eyes.speakers(from, to).is_empty());
+            let looks = eyes.looks.lock().unwrap();
+            assert_eq!(
+                looks
+                    .kept
+                    .iter()
+                    .filter(|look| !look.boot.is_empty())
+                    .count(),
+                1
+            );
+        }
+    }
+
+    #[test]
+    fn recovery_after_a_missing_read_counts_a_new_frame() {
+        const BOOT: &str = "0123456789abcdef";
+        let eyes = SpeakingFaces::default();
+        let from = Instant::now();
+        let speaking = faces(&[("f1", Yes)]);
+        eyes.look(from, Some(((BOOT, 1), &speaking)));
+        eyes.look(from + EVERY, None);
+        eyes.look(from + EVERY * 2, Some(((BOOT, 1), &speaking)));
+        assert!(eyes.positive_speaker(from, from + EVERY * 3).is_empty());
+        eyes.look(from + EVERY * 3, Some(((BOOT, 2), &speaking)));
+        assert_eq!(
+            eyes.positive_speaker(from, from + EVERY * 4),
+            [format!("{BOOT}/f1")]
+        );
+        assert!(eyes.enrollment_speaker(from, from + EVERY * 4).is_none());
+    }
+
+    #[test]
+    fn repeated_missing_reads_keep_the_original_empty_look_rate() {
+        let eyes = SpeakingFaces::default();
+        let from = Instant::now();
+        for read in 0..10 {
+            eyes.look(from + EVERY * read, None);
+        }
+        let looks = eyes.looks.lock().unwrap();
+        assert_eq!(looks.kept.len(), 2);
+        assert!(looks.kept.iter().all(|look| look.boot.is_empty()));
     }
 
     /// #2287's follow-up: of the faces speaking, only those turned to the

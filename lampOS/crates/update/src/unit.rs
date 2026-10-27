@@ -502,6 +502,70 @@ mod tests {
         );
     }
 
+    /// Private Days context needs one connected source/authority path, not
+    /// independent switches whose readers point at different Eyes sockets.
+    #[test]
+    fn lamp_4aces_private_memory_has_matching_authority_and_speaking_sources() {
+        let voice = include_str!("../../../deploy/lamp-4ace/lamp-voice.service");
+        let eyes = include_str!("../../../deploy/lamp-4ace/lamp-eyes.service");
+        let argument = |unit: &str, flag: &str| {
+            let exec = meaning(unit)
+                .into_iter()
+                .find_map(|line| line.strip_prefix("ExecStart="))
+                .expect("unit needs ExecStart");
+            let words: Vec<_> = exec.split_whitespace().collect();
+            let values: Vec<_> = words
+                .windows(2)
+                .filter_map(|pair| (pair[0] == flag).then_some(pair[1]))
+                .collect();
+            assert_eq!(values.len(), 1, "one parsed {flag}: {exec}");
+            values[0].to_owned()
+        };
+        assert_eq!(program(voice).unwrap().binary, "lamp-voice");
+        assert_eq!(program(eyes).unwrap().binary, "lamp-eyes");
+        for (unit, names) in [
+            (
+                voice,
+                &[
+                    "LAMP_BUS",
+                    "LAMP_MEMORY_DAYS",
+                    "LAMP_SECOND_SCOPED_CONTEXT",
+                    "LAMP_CAMERA_FOLLOWS_EYES",
+                    "LAMP_EYES_SPEAKING",
+                ][..],
+            ),
+            (eyes, &["LAMP_BUS", "LAMP_EYES_SPEAKING"][..]),
+        ] {
+            for name in names {
+                assert_eq!(environment(unit, name).as_deref(), Some("on"), "{name}");
+            }
+        }
+        assert_eq!(
+            environment(voice, "LAMP_VOICE_ROUTE").as_deref(),
+            Some("second")
+        );
+        let memory = environment(voice, "LAMP_MEMORY_SOCKET").unwrap();
+        assert!(std::path::Path::new(&memory).is_absolute());
+        let who = environment(voice, "LAMP_EYES_WHO_SOCKET").unwrap();
+        let permit = environment(voice, "LAMP_EYES_PERMIT_SOCKET").unwrap();
+        assert!(std::path::Path::new(&who).is_absolute());
+        assert!(std::path::Path::new(&permit).is_absolute());
+        assert_eq!(argument(eyes, "--who-socket"), who);
+        assert_eq!(argument(eyes, "--permit-socket"), permit);
+        // The worker derives known from its who socket, and both legacy
+        // admission and the atomic speaker source live beside that same file.
+        assert_eq!(
+            std::path::Path::new(&argument(eyes, "--known-file")),
+            std::path::Path::new(&who).with_file_name("known")
+        );
+        for flag in ["--recogniser", "--people"] {
+            assert!(std::path::Path::new(&argument(eyes, flag)).is_absolute());
+        }
+        // Halving still-face looks starves the speaking classifier's five
+        // observations per two-second window, even when the sockets match.
+        assert_eq!(argument(eyes, "--steady-rate"), "off");
+    }
+
     #[test]
     fn a_new_build_is_written_everywhere_the_folder_is_named() {
         let text = format!(

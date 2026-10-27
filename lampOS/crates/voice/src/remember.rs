@@ -36,7 +36,7 @@
 //!   their memory and told to each of their sessions after its note.
 //!
 //! No word of what was said, kept or asked for is ever logged.
-use crate::thread::FinishedExchange;
+use crate::{second_provider::PermissionState, thread::FinishedExchange};
 use lamp_gemini::{Tool, ToolCall};
 use lamp_local_time::LocalTime;
 use serde_json::{Value, json};
@@ -2950,6 +2950,9 @@ pub fn told_for_fresh_session(
     fresh_session_note(socket, session, person, fresh).text
 }
 
+/// Internal request-owned read permission, never a wire or model value.
+pub(crate) type NotePermission = Arc<dyn Fn() -> PermissionState + Send + Sync>;
+
 /// A rendered note and whether every requested snapshot scope was read.
 /// A valid empty snapshot is complete; unavailable personal data is not.
 pub struct SessionNote {
@@ -3055,18 +3058,19 @@ pub(crate) fn fresh_note_read(
     person: Option<&str>,
     deadline: Duration,
     follow_up: bool,
+    permitted: NotePermission,
 ) -> NoteRead {
     match DAYS
         .get()
         .and_then(Option::as_ref)
         .filter(|client| DAYS_MODE.get() == Some(&true) && client.socket == socket)
     {
-        Some(client) => client.read_note_within(
+        Some(client) => client.read_note_permitted(
             session,
             person,
             crate::rules::on(),
             deadline,
-            (true, follow_up),
+            (true, follow_up, &permitted),
         ),
         None => NoteRead::unavailable(),
     }
@@ -3203,6 +3207,16 @@ impl DaysClient {
 /// ([`DaysClient::follow_up_read`], [`NoteRead::follow_up`]). Given, it
 /// counts as one of the memory's offers.
 fn read_follow_up(socket: &Path, person: &str, events: bool, until: Instant) -> Option<FollowUp> {
+    read_follow_up_permitted(socket, person, events, until, None)
+}
+
+fn read_follow_up_permitted(
+    socket: &Path,
+    person: &str,
+    events: bool,
+    until: Instant,
+    permitted: Option<&NotePermission>,
+) -> Option<FollowUp> {
     let left = until.checked_duration_since(Instant::now())?;
     let mut line = json!({"op":"follow_up","person":person});
     // With events, a dated one comes only after its day, with that day
@@ -3217,7 +3231,7 @@ fn read_follow_up(socket: &Path, person: &str, events: bool, until: Instant) -> 
     // lamp-06c1 told one at "good morning" and never asked). An older
     // memory refuses the field and the session is told none.
     line["until_asked"] = json!(true);
-    let answer = bounded_exchange(socket, &line, left)?;
+    let answer = bounded_exchange_permitted(socket, &line, left, permitted)?;
     let found = &answer["follow_up"];
     let id = found["id"]
         .as_u64()
@@ -3540,6 +3554,15 @@ pub struct NoteRead {
     cause: Option<NoteCause>,
 }
 
+/// Taking a completed read is non-consuming while recognition is pending.
+/// Box only the retained read so the result itself stays small; the existing
+/// note, snapshots, deadlines and context stamp remain unchanged.
+pub(crate) enum NoteAdoption {
+    Ready(SessionNote),
+    Pending(Box<NoteRead>),
+    Lost,
+}
+
 /// What a read keeps for its turn: the client's shared state it is taken
 /// into, and what the store gave.
 struct ReadHeld {
@@ -3635,6 +3658,18 @@ impl NoteRead {
     /// to take it ([`Self::adopt`]); nothing when none is wanted. Only now
     /// does the memory count the offer.
     pub fn follow_up(&mut self, within: Duration) {
+        self.follow_up_checked(within, None);
+    }
+
+    pub(crate) fn follow_up_permitted(&mut self, within: Duration, permitted: &NotePermission) {
+        self.follow_up_checked(within, Some(permitted));
+    }
+
+    fn follow_up_checked(&mut self, within: Duration, permitted: Option<&NotePermission>) {
+        let until = Instant::now() + within;
+        if !wait_note_permission(permitted, None, until) {
+            return;
+        }
         let Some(held) = self.held.as_mut().filter(|held| held.follow_wanted) else {
             return;
         };
@@ -3642,7 +3677,8 @@ impl NoteRead {
         let Some(person) = held.person.as_deref() else {
             return;
         };
-        held.follow_up = read_follow_up(&held.socket, person, held.events, Instant::now() + within);
+        held.follow_up =
+            read_follow_up_permitted(&held.socket, person, held.events, until, permitted);
         if let Some(follow_up) = &held.follow_up {
             self.text.push_str(&follow_up.told);
         }
@@ -3667,23 +3703,63 @@ impl NoteRead {
     /// keeps may have changed since the read began ([`DaysContext::changes`]:
     /// a forget, a rule forgotten, a stop or a lost write): its snapshot may
     /// hold what was forgotten, and it is never told.
-    pub fn adopt(mut self) -> Option<SessionNote> {
-        let text = std::mem::take(&mut self.text);
-        let (complete, cause) = (self.complete, self.cause);
-        let Some(held) = self.held.as_mut() else {
-            return Some(SessionNote {
-                text,
-                complete,
-                cause,
+    pub fn adopt(self) -> Option<SessionNote> {
+        match self.adopt_checked(None) {
+            NoteAdoption::Ready(note) => Some(note),
+            NoteAdoption::Pending(_) | NoteAdoption::Lost => None,
+        }
+    }
+
+    /// Pending returns the exact completed read for reinsertion into its
+    /// existing request slot; no snapshot is adopted or asked for again.
+    pub(crate) fn adopt_permitted(self, permitted: &NotePermission) -> NoteAdoption {
+        self.adopt_checked(Some(permitted))
+    }
+
+    fn adopt_checked(mut self, permitted: Option<&NotePermission>) -> NoteAdoption {
+        match permitted.map_or(PermissionState::Ready, |permitted| permitted()) {
+            PermissionState::Ready => (),
+            PermissionState::Pending => return NoteAdoption::Pending(Box::new(self)),
+            PermissionState::Lost => return NoteAdoption::Lost,
+        }
+        let Some(held) = self.held.as_ref() else {
+            return NoteAdoption::Ready(SessionNote {
+                text: std::mem::take(&mut self.text),
+                complete: self.complete,
+                cause: self.cause,
             });
         };
-        let changes = held.changes?;
-        let Ok(mut context) = held.context.lock() else {
-            return None;
+        let Some(changes) = held.changes else {
+            return NoteAdoption::Lost;
         };
+        // Own the lock through a cloned Arc rather than borrowing the read:
+        // Pending must be able to return that whole read after releasing it.
+        let context = Arc::clone(&held.context);
+        let Ok(mut context) = context.lock() else {
+            return NoteAdoption::Lost;
+        };
+        // A forget or lost write invalidates the read even if recognition is
+        // pending. No cache/source/session mutation has happened at this point.
         if context.changes != changes {
-            return None;
+            drop(context);
+            return NoteAdoption::Lost;
         }
+        // The existing mutex may have been contended while permission changed.
+        // Never poll or wait for recognition with it (or Sessions) held.
+        match permitted.map_or(PermissionState::Ready, |permitted| permitted()) {
+            PermissionState::Ready => (),
+            PermissionState::Pending => {
+                drop(context);
+                return NoteAdoption::Pending(Box::new(self));
+            }
+            PermissionState::Lost => {
+                drop(context);
+                return NoteAdoption::Lost;
+            }
+        }
+        let text = std::mem::take(&mut self.text);
+        let (complete, cause) = (self.complete, self.cause);
+        let held = self.held.as_mut().expect("held before context acquisition");
         context.read_done(&held.name);
         let person = held.person.as_deref();
         let (mut said, mut resumed) = (None, None);
@@ -3731,7 +3807,7 @@ impl NoteRead {
         if let Some(said) = followed {
             follow_up_told(said);
         }
-        Some(SessionNote {
+        NoteAdoption::Ready(SessionNote {
             text,
             complete,
             cause,
@@ -3773,15 +3849,57 @@ impl Drop for NoteRead {
     }
 }
 
-/// The legacy note with what the person at the lamp asked to keep, read
-/// now within `deadline` (the note's 300 ms on the lamp, a test's longer
-/// one on a loaded machine), after the room's. Nobody known, or a voice
-/// without a memory: the room's note as it is.
+/// Second's legacy note after the room-note lock, with request permission
+/// checked again at the personal kept exchange. Raw Live callers keep their
+/// existing `theirs_too` transport and authority behavior.
+pub(crate) fn legacy_told_permitted(
+    socket: &Path,
+    person: Option<&str>,
+    permitted: &NotePermission,
+) -> String {
+    if !note_permitted(Some(permitted)) {
+        return String::new();
+    }
+    // NOTE may have been contended while proof expired. Recheck after it.
+    let room = told();
+    if !note_permitted(Some(permitted)) {
+        return String::new();
+    }
+    // This legacy callback runs while Sessions is held. It must not wait
+    // for recognition inside the existing bounded kept read. This adapter
+    // changes only transport policy, never the request's disclosure latch.
+    let immediate = legacy_note_permission(permitted);
+    let note = theirs_too_checked(socket, room, person, FIRST_READ, Some(&immediate));
+    if note_permitted(Some(permitted)) {
+        note
+    } else {
+        String::new()
+    }
+}
+
+fn legacy_note_permission(permitted: &NotePermission) -> NotePermission {
+    let permitted = permitted.clone();
+    Arc::new(move || match permitted() {
+        PermissionState::Pending => PermissionState::Lost,
+        current => current,
+    })
+}
+
 fn theirs_too(socket: &Path, room: String, person: Option<&str>, deadline: Duration) -> String {
+    theirs_too_checked(socket, room, person, deadline, None)
+}
+
+fn theirs_too_checked(
+    socket: &Path,
+    room: String,
+    person: Option<&str>,
+    deadline: Duration,
+    permitted: Option<&NotePermission>,
+) -> String {
     let Some(person) = person.filter(|_| !room.is_empty()) else {
         return room;
     };
-    let theirs = kept(socket, Some(person), deadline).unwrap_or_default();
+    let theirs = kept_permitted(socket, Some(person), deadline, permitted).unwrap_or_default();
     if theirs.is_empty() {
         return room;
     }
@@ -4499,6 +4617,34 @@ pub fn event_turn_note(person: Option<&str>, heard: &str) -> Option<String> {
     days_client()?.event_turn(person, heard)
 }
 
+/// A completed event decision is distinct from a permission check that did
+/// not consume it. Pending is returned only before any event/job mutation.
+pub(crate) enum EventNote {
+    Ready(Option<String>),
+    Pending,
+    Lost,
+}
+impl EventNote {
+    fn into_option(self) -> Option<String> {
+        match self {
+            Self::Ready(note) => note,
+            Self::Pending | Self::Lost => None,
+        }
+    }
+}
+
+/// Second's event read rechecks its request after waiting for the Days lock.
+pub(crate) fn event_turn_note_permitted(
+    person: Option<&str>,
+    heard: &str,
+    permitted: &NotePermission,
+) -> EventNote {
+    match days_client() {
+        Some(client) => client.event_turn_checked(person, heard, Some(permitted)),
+        None => EventNote::Ready(None),
+    }
+}
+
 /// [`DaysClient::event_withheld`] on the lamp's Days client: nothing
 /// without one.
 pub fn event_withheld() -> Option<String> {
@@ -4685,24 +4831,65 @@ pub fn hits_note_counted(
     now_unix_ms: u64,
     zone: Option<&LocalTime>,
 ) -> Option<(String, HitsCount)> {
-    if hit_words(heard).is_empty() {
+    hits_note_checked(socket, person, heard, now_unix_ms, zone, None)
+}
+
+/// Second's counted hits use the same request permission at each socket boundary.
+pub(crate) fn hits_note_permitted(
+    socket: &Path,
+    person: Option<&str>,
+    heard: &str,
+    now_unix_ms: u64,
+    zone: Option<&LocalTime>,
+    permitted: &NotePermission,
+) -> Option<(String, HitsCount)> {
+    hits_note_checked(socket, person, heard, now_unix_ms, zone, Some(permitted))
+}
+
+fn hits_note_checked(
+    socket: &Path,
+    person: Option<&str>,
+    heard: &str,
+    now_unix_ms: u64,
+    zone: Option<&LocalTime>,
+    permitted: Option<&NotePermission>,
+) -> Option<(String, HitsCount)> {
+    let until = Instant::now().checked_add(HITS_WITHIN)?;
+    if hit_words(heard).is_empty() || !wait_note_permission(permitted, None, until) {
         return None;
     }
     let request = for_person(json!({"op":"kept","max_bytes":HITS_KEPT_BYTES}), person);
-    let answer = bounded_exchange_up_to(socket, &request, HITS_WITHIN, HITS_ANSWER_BYTES)?;
+    let answer = exchange_permitted(
+        socket,
+        &request,
+        until.checked_duration_since(Instant::now())?,
+        None,
+        HITS_ANSWER_BYTES,
+        permitted,
+        None,
+    )?;
     let ids = DAYS
         .get()
         .and_then(Option::as_ref)
         .filter(|client| client.socket == socket && client.replaces.load(Ordering::Acquire));
     let (told, shown, count) = hits_told(&answer, heard, now_unix_ms, zone, ids.is_some())?;
+    if !wait_note_permission(permitted, None, until) {
+        return None;
+    }
     // Told by id, so shown: one of them may be corrected (#2510).
     if let Some(client) = ids
         && let Ok(mut context) = client.context.lock()
     {
+        if !note_permitted(permitted) {
+            return None;
+        }
         context.hit(person, &shown);
         for (id, text) in entry_texts(&answer, &shown) {
             context.shown_as(person, id, &text);
         }
+    }
+    if !wait_note_permission(permitted, None, until) {
+        return None;
     }
     let note = match person {
         Some(_) => format!("{told}\n{HITS_OWN_NOTE}"),
@@ -5460,7 +5647,7 @@ impl DaysClient {
         }
         close_replaced(&self.jobs, &name, previous, previous_person);
         let until = started + deadline;
-        let room = self.open_room_for(&name, person, until)?;
+        let room = self.open_room_for(&name, person, until, None)?;
         let theirs = person.and_then(|person| self.open_one(&name, Some(person), until).ok());
         // What each note line says is worked out before the context is held.
         let mut opened = self.opened(room, theirs);
@@ -5533,7 +5720,45 @@ impl DaysClient {
         deadline: Duration,
         (fresh, follow_up): (bool, bool),
     ) -> NoteRead {
+        self.read_note_checked(session, person, rules, deadline, (fresh, follow_up, None))
+    }
+
+    /// Second's request-owned read. Every subdispatch keeps its original budget
+    /// and checks the same caller's current private-source permission.
+    pub(crate) fn read_note_permitted(
+        &self,
+        session: u64,
+        person: Option<&str>,
+        rules: bool,
+        deadline: Duration,
+        (fresh, follow_up, permitted): (bool, bool, &NotePermission),
+    ) -> NoteRead {
+        self.read_note_checked(
+            session,
+            person,
+            rules,
+            deadline,
+            (fresh, follow_up, Some(permitted)),
+        )
+    }
+
+    fn read_note_checked(
+        &self,
+        session: u64,
+        person: Option<&str>,
+        rules: bool,
+        deadline: Duration,
+        (fresh, follow_up, permitted): (bool, bool, Option<&NotePermission>),
+    ) -> NoteRead {
         let started = Instant::now();
+        let until = started + deadline;
+        if !wait_note_permission(permitted, None, until) {
+            return NoteRead::failed(if Instant::now() >= until {
+                NoteCause::Timeout
+            } else {
+                NoteCause::Refused
+            });
+        }
         let name = format!("{}-{session:x}", self.prefix);
         // Taken as the read begins: a keep after it marks the note again,
         // and one this read was to cover is marked again if it is never
@@ -5544,7 +5769,10 @@ impl DaysClient {
                 "lamp-voice second: something was kept: this turn asks the memory's note again (#2540)"
             );
         }
-        let begun = self.context.lock().ok().map(|mut context| {
+        let begun = self.context.lock().ok().and_then(|mut context| {
+            if !note_permitted(permitted) {
+                return None;
+            }
             // Stopped before this read began, with what was then uncertain.
             let resumable = (fresh
                 && (context.journal_inhibited || context.lost_writes > 0)
@@ -5552,7 +5780,7 @@ impl DaysClient {
                 && self.resumes.load(Ordering::Acquire))
             .then_some((context.inhibits, context.lost_writes));
             context.reading(&name, person);
-            (context.changes, resumable)
+            Some((context.changes, resumable))
         });
         let mut held = ReadHeld {
             context: Arc::clone(&self.context),
@@ -5592,12 +5820,13 @@ impl DaysClient {
         {
             *tried = Some(Instant::now());
         }
-        let until = started + deadline;
         let opened = self
-            .open_room_for(&name, person, until)
+            .open_room_for(&name, person, until, permitted)
             .map(|room| {
-                let theirs =
-                    person.and_then(|person| self.open_one(&name, Some(person), until).ok());
+                let theirs = person.and_then(|person| {
+                    self.open_one_permitted(&name, Some(person), until, permitted)
+                        .ok()
+                });
                 self.opened(room, theirs)
             })
             .and_then(|opened| {
@@ -5633,7 +5862,7 @@ impl DaysClient {
         let mut follows = true;
         if rules {
             match crate::rules::read(
-                |line, left| bounded_exchange_scoped(&self.socket, line, left, None),
+                |line, left| bounded_exchange_permitted(&self.socket, line, left, permitted),
                 person,
                 until,
             ) {
@@ -5646,13 +5875,31 @@ impl DaysClient {
         }
         if let Some(person) = person.filter(|_| follows && self.threads.load(Ordering::Acquire)) {
             if follow_up {
-                held.follow_up = self.follow_up_read(person, until);
+                held.follow_up = read_follow_up_permitted(
+                    &self.socket,
+                    person,
+                    self.events.load(Ordering::Acquire),
+                    until,
+                    permitted,
+                );
                 if let Some(follow_up) = &held.follow_up {
                     text.push_str(&follow_up.told);
                 }
             } else {
                 held.follow_wanted = true;
             }
+        }
+        if permitted.is_some() && !wait_note_permission(permitted, None, until) {
+            return NoteRead {
+                held: Some(held),
+                text: UNAVAILABLE.into(),
+                complete: false,
+                cause: Some(if Instant::now() >= until {
+                    NoteCause::Timeout
+                } else {
+                    NoteCause::Refused
+                }),
+            };
         }
         NoteRead {
             held: Some(held),
@@ -5730,8 +5977,9 @@ impl DaysClient {
         name: &str,
         person: Option<&str>,
         until: Instant,
+        permitted: Option<&NotePermission>,
     ) -> Result<(Value, Vec<u64>), NoteCause> {
-        let (snapshot, ids) = self.open_one(name, None, until)?;
+        let (snapshot, ids) = self.open_one_permitted(name, None, until, permitted)?;
         let Some(them) = self.forgot_today(person, unix_ms(), crate::local_time::system()) else {
             return Ok((snapshot, ids));
         };
@@ -5750,6 +5998,16 @@ impl DaysClient {
         person: Option<&str>,
         until: Instant,
     ) -> Result<(Value, Vec<u64>), NoteCause> {
+        self.open_one_permitted(name, person, until, None)
+    }
+
+    fn open_one_permitted(
+        &self,
+        name: &str,
+        person: Option<&str>,
+        until: Instant,
+        permitted: Option<&NotePermission>,
+    ) -> Result<(Value, Vec<u64>), NoteCause> {
         let close = || {
             let _ = self
                 .jobs
@@ -5759,13 +6017,14 @@ impl DaysClient {
             close();
             return Err(NoteCause::Timeout);
         };
-        let answer = bounded_exchange(
+        let answer = bounded_exchange_permitted(
             &self.socket,
             &for_person(
                 json!({"op":"session_open","session":name,"max_bytes":NOTE_BYTES}),
                 person,
             ),
             left,
+            permitted,
         );
         let scope = if person.is_some() {
             PERSON_SCOPE
@@ -7017,27 +7276,52 @@ impl DaysClient {
     /// ([`Opening::Nothing`]), anyone else's, and every line after the
     /// first decide nothing.
     pub fn event_turn(&self, person: Option<&str>, heard: &str) -> Option<String> {
-        if !self.events.load(Ordering::Acquire) {
-            return None;
+        self.event_turn_checked(person, heard, None).into_option()
+    }
+
+    fn event_turn_checked(
+        &self,
+        person: Option<&str>,
+        heard: &str,
+        permitted: Option<&NotePermission>,
+    ) -> EventNote {
+        match permitted.map_or(PermissionState::Ready, |permitted| permitted()) {
+            PermissionState::Ready => {}
+            PermissionState::Pending => return EventNote::Pending,
+            PermissionState::Lost => return EventNote::Lost,
         }
-        let person = person?;
+        if !self.events.load(Ordering::Acquire) {
+            return EventNote::Ready(None);
+        }
+        let Some(person) = person else {
+            return EventNote::Ready(None);
+        };
         let opening = opening(heard);
-        let mut context = self.context.lock().ok()?;
+        let Ok(mut context) = self.context.lock() else {
+            return EventNote::Ready(None);
+        };
+        match permitted.map_or(PermissionState::Ready, |permitted| permitted()) {
+            PermissionState::Ready => {}
+            PermissionState::Pending => return EventNote::Pending,
+            PermissionState::Lost => return EventNote::Lost,
+        }
         let context = &mut *context;
-        let event = context.event_turn.as_mut()?;
+        let Some(event) = context.event_turn.as_mut() else {
+            return EventNote::Ready(None);
+        };
         if event.decided.is_some() || event.person != person || opening == Opening::Nothing {
-            return None;
+            return EventNote::Ready(None);
         }
         // The lamp asked about it already: nothing to ask, nothing to take back.
         if !context.asking.iter().any(|(asked_of, asked, _, dated)| {
             *asked_of == event.person && *asked == event.id && *dated
         }) {
             event.decided = Some(Decided::Asked);
-            return None;
+            return EventNote::Ready(None);
         }
         if opening == Opening::Greets {
             event.decided = Some(Decided::Greeted);
-            return Some(event_turn_line(&event.text));
+            return EventNote::Ready(Some(event_turn_line(&event.text)));
         }
         event.decided = Some(Decided::Withheld);
         let unoffered = DaysJob::Unoffered {
@@ -7045,7 +7329,7 @@ impl DaysClient {
             id: event.id,
         };
         let _ = self.jobs.try_send(unoffered);
-        None
+        EventNote::Ready(None)
     }
 
     /// With [`EVENTS_ENVIRONMENT`]: the note's section for the session's
@@ -8578,6 +8862,47 @@ fn bounded_exchange(socket: &Path, line: &Value, budget: Duration) -> Option<Val
     bounded_exchange_scoped(socket, line, budget, None)
 }
 
+/// A nonblocking check, including every check made under NOTE/DaysContext.
+fn note_permitted(permitted: Option<&NotePermission>) -> bool {
+    permitted.is_none_or(|permitted| matches!(permitted(), PermissionState::Ready))
+}
+
+/// Only blocking memory-read threads may wait here. Every phase keeps the
+/// same absolute deadline, including time spent awaiting recognition.
+fn wait_note_permission(
+    permitted: Option<&NotePermission>,
+    lease: Option<&crate::memory_scope::ScopeLease>,
+    until: Instant,
+) -> bool {
+    loop {
+        if !scope_current(lease) {
+            return false;
+        }
+        let Some(left) = until
+            .checked_duration_since(Instant::now())
+            .filter(|left| !left.is_zero())
+        else {
+            return false;
+        };
+        match permitted.map_or(PermissionState::Ready, |permitted| permitted()) {
+            PermissionState::Ready => return scope_current(lease) && Instant::now() < until,
+            PermissionState::Lost => return false,
+            PermissionState::Pending => {
+                std::thread::sleep(left.min(Duration::from_millis(20)));
+            }
+        }
+    }
+}
+
+fn bounded_exchange_permitted(
+    socket: &Path,
+    line: &Value,
+    budget: Duration,
+    permitted: Option<&NotePermission>,
+) -> Option<Value> {
+    exchange_permitted(socket, line, budget, None, ANSWER_BYTES, permitted, None)
+}
+
 fn bounded_exchange_scoped(
     socket: &Path,
     line: &Value,
@@ -8605,7 +8930,7 @@ fn exchange_within(
     lease: Option<&crate::memory_scope::ScopeLease>,
     most: usize,
 ) -> Option<Value> {
-    exchange_guarded(socket, line, budget, lease, most, None)
+    exchange_permitted(socket, line, budget, lease, most, None, None)
 }
 
 /// The same bounded transport with a request-local evidence fence, for
@@ -8617,26 +8942,35 @@ pub(crate) fn bounded_exchange_guarded(
     lease: &crate::memory_scope::ScopeLease,
     current: &dyn Fn() -> bool,
 ) -> Option<Value> {
-    exchange_guarded(
+    exchange_permitted(
         socket,
         line,
         budget,
         Some(lease),
         ANSWER_BYTES,
+        None,
         Some(current),
     )
 }
 
-fn exchange_guarded(
+fn exchange_permitted(
     socket: &Path,
     line: &Value,
     budget: Duration,
     lease: Option<&crate::memory_scope::ScopeLease>,
     most: usize,
+    permitted: Option<&NotePermission>,
     guard: Option<&dyn Fn() -> bool>,
 ) -> Option<Value> {
-    let current = || scope_current(lease) && guard.is_none_or(|guard| guard());
-    let cancellable = lease.is_some() || guard.is_some();
+    let until = Instant::now().checked_add(budget)?;
+    // Note disclosure may pause for Checking; enrollment has its own exact
+    // request guard. Neither authorizes or changes the other's lifetime.
+    let current = || {
+        guard.is_none_or(|guard| guard())
+            && wait_note_permission(permitted, lease, until)
+            && guard.is_none_or(|guard| guard())
+    };
+    let cancellable = lease.is_some() || permitted.is_some() || guard.is_some();
     if !current() {
         return None;
     }
@@ -8644,7 +8978,6 @@ fn exchange_guarded(
         event::{PollFd, PollFlags, Timespec, poll},
         net::{SocketAddrUnix, connect},
     };
-    let until = Instant::now().checked_add(budget)?;
     let address = SocketAddrUnix::new(socket).ok()?;
     let stream = unconnected()?;
     if !current() {
@@ -8772,11 +9105,23 @@ fn note(kept: &[String]) -> String {
 /// The newest kept things that fit the note, asked of the memory now: the
 /// room's, or this person's.
 fn kept(socket: &Path, person: Option<&str>, deadline: Duration) -> Option<Vec<String>> {
+    kept_permitted(socket, person, deadline, None)
+}
+
+fn kept_permitted(
+    socket: &Path,
+    person: Option<&str>,
+    deadline: Duration,
+    permitted: Option<&NotePermission>,
+) -> Option<Vec<String>> {
     let mut line = json!({"op":"kept","max_bytes":NOTE_BYTES});
     if let Some(person) = person {
         line["person"] = json!(person);
     }
-    let answer = crate::tools::exchange(socket, &line, deadline)?;
+    let answer = match permitted {
+        Some(_) => bounded_exchange_permitted(socket, &line, deadline, permitted),
+        None => crate::tools::exchange(socket, &line, deadline),
+    }?;
     Some(
         answer
             .get("entries")?
@@ -8864,7 +9209,7 @@ fn unconnected() -> Option<UnixStream> {
 /// tests (reviewer-two's P2 on #3059); the test module stays private, as
 /// the switch census reads it as one (reviewer-two on #3059, 23:17).
 #[cfg(test)]
-pub(crate) use tests::event_memory;
+pub(crate) use tests::{event_memory, event_read_fixture};
 
 #[cfg(test)]
 #[path = "remember_no_wait.rs"]
@@ -8931,6 +9276,606 @@ mod tests {
             vec![26, 27],
             "an ambiguous correction must never pick an old id"
         );
+    }
+
+    const ADOPTION_FACT: &str = "Synthetic adoption fact.";
+
+    fn adoption_snapshot(request: &Value) -> Value {
+        let mut answer = empty_session_note(request);
+        if request["person"].is_string() {
+            answer["snapshot"]["source_ids"] = json!([71]);
+            answer["snapshot"]["note"] = json!(
+                json!({
+                    "scope":PERSON_SCOPE,"untrusted":true,
+                    "facts":[{"id":71,"kind":"preference","text":ADOPTION_FACT}]
+                })
+                .to_string()
+            );
+        }
+        answer
+    }
+
+    /// Read a complete private snapshot through the real socket path. Replace
+    /// only its writer-less cleanup queue, so Pending/Drop effects are visible.
+    fn adoption_read() -> (NoteRead, DaysClient, Receiver<DaysJob>) {
+        let directory = crate::process::SessionDirectory::create().unwrap();
+        let socket = directory.path.join("adoption.sock");
+        let listener = UnixListener::bind(&socket).unwrap();
+        let served = std::thread::spawn(move || {
+            let mut requests = Vec::new();
+            for _ in 0..2 {
+                let (mut stream, request) = session_note_request(&listener);
+                stream
+                    .set_write_timeout(Some(Duration::from_secs(2)))
+                    .unwrap();
+                stream
+                    .write_all(format!("{}\n", adoption_snapshot(&request)).as_bytes())
+                    .unwrap();
+                requests.push(request);
+            }
+            requests
+        });
+        let client = resumes_test_client(socket, false);
+        client.kept_since_note.store(true, Ordering::Release);
+        let mut read = client.read_note_within(
+            17,
+            Some("p-0123456789abcdef"),
+            false,
+            Duration::from_secs(2),
+            (true, false),
+        );
+        assert!(read.complete());
+        assert!(read.text.contains(ADOPTION_FACT));
+        let requests = served.join().unwrap();
+        assert_eq!(requests.len(), 2);
+        assert!(
+            requests
+                .iter()
+                .all(|request| request["op"] == "session_open")
+        );
+        assert_eq!(
+            requests
+                .iter()
+                .filter(|request| request["person"].is_string())
+                .count(),
+            1
+        );
+        assert!(!client.kept_since_note.load(Ordering::Acquire));
+        let (jobs, work) = sync_channel(8);
+        read.held.as_mut().unwrap().jobs = jobs;
+        (read, client, work)
+    }
+
+    #[test]
+    fn pending_note_adoption_before_lock_retains_the_completed_read_until_ready() {
+        let (read, client, work) = adoption_read();
+        let text = read.text.clone();
+        let pointer = read.text.as_ptr();
+        let changes = read.held.as_ref().unwrap().changes;
+        let pending: NotePermission = Arc::new(|| PermissionState::Pending);
+        let read = match read.adopt_permitted(&pending) {
+            NoteAdoption::Pending(read) => *read,
+            _ => panic!("Pending must return its completed read"),
+        };
+        assert_eq!(read.text, text);
+        assert_eq!(read.text.as_ptr(), pointer, "no text extraction or copy");
+        assert_eq!(read.held.as_ref().unwrap().changes, changes);
+        assert!(read.held.as_ref().unwrap().opened.is_some());
+        assert!(!read.held.as_ref().unwrap().adopted);
+        assert!(!client.kept_since_note.load(Ordering::Acquire));
+        assert!(
+            work.try_recv().is_err(),
+            "no cleanup or follow-up jobs on Pending"
+        );
+        {
+            let context = client.context.lock().unwrap();
+            assert_eq!(context.reads.len(), 1);
+            assert!(context.session.is_none());
+            assert!(context.sources.is_empty());
+        }
+        let ready: NotePermission = Arc::new(|| PermissionState::Ready);
+        let note = match read.adopt_permitted(&ready) {
+            NoteAdoption::Ready(note) => note,
+            _ => panic!("Ready must adopt the same completed read"),
+        };
+        assert_eq!(note.text, text);
+        assert!(note.complete);
+        assert_eq!(note.cause, None);
+        assert!(client.context.lock().unwrap().reads.is_empty());
+        assert_eq!(
+            client.context.lock().unwrap().session.as_deref(),
+            Some("voice-test-11")
+        );
+        assert!(!client.kept_since_note.load(Ordering::Acquire));
+        assert!(
+            work.try_recv().is_err(),
+            "adopted data is not closed as untold"
+        );
+    }
+
+    #[test]
+    fn pending_note_adoption_after_context_lock_retains_data_and_resumes_without_reading_again() {
+        let (read, client, work) = adoption_read();
+        let text = read.text.clone();
+        let pointer = read.text.as_ptr() as usize;
+        let context = client.context.clone();
+        let held = context.lock().unwrap();
+        let (entered, entering) = sync_channel(1);
+        let state = Arc::new(std::sync::atomic::AtomicU8::new(0));
+        let permission: NotePermission = {
+            let (context, state) = (context.clone(), state.clone());
+            let first = AtomicBool::new(true);
+            Arc::new(move || {
+                if first.swap(false, Ordering::AcqRel) {
+                    entered.try_send(()).unwrap();
+                    return PermissionState::Ready;
+                }
+                assert!(
+                    matches!(context.try_lock(), Err(std::sync::TryLockError::WouldBlock)),
+                    "the second decision is made with the real DaysContext mutex held"
+                );
+                match state.load(Ordering::Acquire) {
+                    0 => PermissionState::Ready,
+                    1 => PermissionState::Pending,
+                    _ => PermissionState::Lost,
+                }
+            })
+        };
+        let (finished, finishing) = sync_channel(1);
+        let adopting = std::thread::spawn(move || {
+            assert!(finished.send(read.adopt_permitted(&permission)).is_ok());
+        });
+        entering.recv_timeout(Duration::from_secs(2)).unwrap();
+        // The adopter saw Ready but cannot acquire DaysContext yet. Change
+        // the source decision before releasing that actual mutex, no sleeps.
+        state.store(1, Ordering::Release);
+        assert_eq!(held.reads.len(), 1);
+        assert!(held.session.is_none());
+        drop(held);
+        let read = match finishing.recv_timeout(Duration::from_secs(2)).unwrap() {
+            NoteAdoption::Pending(read) => *read,
+            _ => panic!("Pending after mutex acquisition must not consume the read"),
+        };
+        adopting.join().unwrap();
+        assert_eq!(read.text, text);
+        assert_eq!(read.text.as_ptr() as usize, pointer);
+        assert!(read.complete());
+        assert_eq!(read.cause(), None);
+        assert!(!read.held.as_ref().unwrap().adopted);
+        assert_eq!(client.context.lock().unwrap().reads.len(), 1);
+        assert!(client.context.lock().unwrap().session.is_none());
+        assert!(!client.kept_since_note.load(Ordering::Acquire));
+        assert!(work.try_recv().is_err());
+        let ready: NotePermission = Arc::new(|| PermissionState::Ready);
+        let note = match read.adopt_permitted(&ready) {
+            NoteAdoption::Ready(note) => note,
+            _ => panic!("completed data must still be adoptable after the pause"),
+        };
+        assert_eq!(note.text, text);
+        assert!(note.complete);
+        assert!(client.context.lock().unwrap().reads.is_empty());
+        assert_eq!(
+            client.context.lock().unwrap().session.as_deref(),
+            Some("voice-test-11")
+        );
+        assert!(work.try_recv().is_err());
+    }
+
+    #[test]
+    fn pending_note_adoption_terminal_loss_and_forget_fence_still_drop_untold_data() {
+        for case in ["initial-lost", "locked-lost", "changed"] {
+            let (read, client, work) = adoption_read();
+            if case == "changed" {
+                client.context.lock().unwrap().changing();
+            }
+            let context = client.context.clone();
+            let first = AtomicBool::new(true);
+            let permission: NotePermission = Arc::new(move || {
+                if case == "initial-lost" {
+                    return PermissionState::Lost;
+                }
+                if first.swap(false, Ordering::AcqRel) {
+                    return PermissionState::Ready;
+                }
+                assert!(matches!(
+                    context.try_lock(),
+                    Err(std::sync::TryLockError::WouldBlock)
+                ));
+                PermissionState::Lost
+            });
+            assert!(
+                matches!(read.adopt_permitted(&permission), NoteAdoption::Lost),
+                "{case}"
+            );
+            assert!(
+                client.kept_since_note.load(Ordering::Acquire),
+                "untold keep restored: {case}"
+            );
+            assert!(client.context.lock().unwrap().reads.is_empty(), "{case}");
+            assert!(client.context.lock().unwrap().session.is_none(), "{case}");
+            assert!(client.context.lock().unwrap().sources.is_empty(), "{case}");
+            let jobs: Vec<_> = work.try_iter().collect();
+            assert_eq!(
+                jobs.len(),
+                2,
+                "exact Room and person closes, no re-read: {case}"
+            );
+            assert!(
+                jobs.iter().all(|job| matches!(job, DaysJob::Close(_, _))),
+                "{case}"
+            );
+        }
+    }
+
+    // Socket controls for the transport's trusted permission decision. Actual
+    // identity/epoch admission remains covered by the worker proof fixtures.
+    fn pending_transport_accept(listener: &UnixListener) -> UnixStream {
+        use rustix::event::{PollFd, PollFlags, Timespec, poll};
+        let mut fds = [PollFd::new(listener, PollFlags::IN)];
+        assert!(
+            poll(
+                &mut fds,
+                Some(&Timespec {
+                    tv_sec: 3,
+                    tv_nsec: 0
+                })
+            )
+            .unwrap()
+                > 0
+        );
+        let stream = listener.accept().unwrap().0;
+        // Darwin may inherit O_NONBLOCK from the listener; a timeout does
+        // not make an accepted stream blocking while its peer resumes.
+        stream.set_nonblocking(false).unwrap();
+        stream
+            .set_read_timeout(Some(Duration::from_secs(3)))
+            .unwrap();
+        stream
+            .set_write_timeout(Some(Duration::from_secs(3)))
+            .unwrap();
+        stream
+    }
+
+    fn pending_transport_permission(
+        state: Arc<std::sync::atomic::AtomicU8>,
+        observed: SyncSender<()>,
+    ) -> NotePermission {
+        let announced = AtomicBool::new(false);
+        Arc::new(move || match state.load(Ordering::Acquire) {
+            0 => PermissionState::Ready,
+            1 => {
+                if !announced.swap(true, Ordering::AcqRel) {
+                    observed.try_send(()).unwrap();
+                }
+                PermissionState::Pending
+            }
+            _ => PermissionState::Lost,
+        })
+    }
+
+    #[test]
+    fn pending_note_transport_waits_before_connect_without_sending_and_resumes_once() {
+        let directory = crate::process::SessionDirectory::create().unwrap();
+        let socket = directory.path.join("note.sock");
+        let listener = UnixListener::bind(&socket).unwrap();
+        listener.set_nonblocking(true).unwrap();
+        let state = Arc::new(std::sync::atomic::AtomicU8::new(1));
+        let (observed, seeing) = sync_channel(1);
+        let permission = pending_transport_permission(state.clone(), observed);
+        let (finished, finishing) = sync_channel(1);
+        let reading = std::thread::spawn(move || {
+            let answer = bounded_exchange_permitted(
+                &socket,
+                &json!({"op":"kept"}),
+                Duration::from_secs(3),
+                Some(&permission),
+            );
+            finished.send(answer).unwrap();
+        });
+        seeing.recv_timeout(Duration::from_secs(2)).unwrap();
+        assert_eq!(
+            listener.accept().unwrap_err().kind(),
+            io::ErrorKind::WouldBlock
+        );
+        assert!(matches!(
+            finishing.try_recv(),
+            Err(std::sync::mpsc::TryRecvError::Empty)
+        ));
+        state.store(0, Ordering::Release);
+        let mut stream = pending_transport_accept(&listener);
+        let mut request = String::new();
+        BufReader::new(stream.try_clone().unwrap())
+            .read_line(&mut request)
+            .unwrap();
+        assert_eq!(
+            serde_json::from_str::<Value>(&request).unwrap(),
+            json!({"op":"kept"})
+        );
+        stream.write_all(b"{\"ok\":true}\n").unwrap();
+        assert_eq!(
+            finishing.recv_timeout(Duration::from_secs(2)).unwrap(),
+            Some(json!({"ok":true}))
+        );
+        reading.join().unwrap();
+        assert_eq!(
+            listener.accept().unwrap_err().kind(),
+            io::ErrorKind::WouldBlock,
+            "one connection only"
+        );
+    }
+
+    #[test]
+    fn pending_note_transport_after_connect_writes_nothing_until_ready() {
+        let directory = crate::process::SessionDirectory::create().unwrap();
+        let socket = directory.path.join("note.sock");
+        let listener = Arc::new(UnixListener::bind(&socket).unwrap());
+        listener.set_nonblocking(true).unwrap();
+        let accepted = Arc::new(AtomicBool::new(false));
+        let server = Arc::new(Mutex::new(None));
+        let state = Arc::new(std::sync::atomic::AtomicU8::new(0));
+        let (observed, seeing) = sync_channel(1);
+        let basic = pending_transport_permission(state.clone(), observed);
+        let permission: NotePermission = {
+            let (listener, accepted, server, state) = (
+                listener.clone(),
+                accepted.clone(),
+                server.clone(),
+                state.clone(),
+            );
+            Arc::new(move || {
+                if !accepted.load(Ordering::Acquire) {
+                    match listener.accept() {
+                        Ok((stream, _)) => {
+                            *server.lock().unwrap() = Some(stream);
+                            accepted.store(true, Ordering::Release);
+                            state.store(1, Ordering::Release);
+                        }
+                        Err(error) if error.kind() == io::ErrorKind::WouldBlock => (),
+                        Err(error) => panic!("unexpected local accept: {error}"),
+                    }
+                }
+                basic()
+            })
+        };
+        let (finished, finishing) = sync_channel(1);
+        let reading = std::thread::spawn(move || {
+            finished
+                .send(bounded_exchange_permitted(
+                    &socket,
+                    &json!({"op":"kept"}),
+                    Duration::from_secs(3),
+                    Some(&permission),
+                ))
+                .unwrap();
+        });
+        seeing.recv_timeout(Duration::from_secs(2)).unwrap();
+        assert!(accepted.load(Ordering::Acquire));
+        let mut stream = server.lock().unwrap().take().unwrap();
+        stream.set_nonblocking(true).unwrap();
+        let mut byte = [0];
+        assert_eq!(
+            stream.read(&mut byte).unwrap_err().kind(),
+            io::ErrorKind::WouldBlock,
+            "no request byte before Ready"
+        );
+        stream.set_nonblocking(false).unwrap();
+        stream
+            .set_read_timeout(Some(Duration::from_secs(3)))
+            .unwrap();
+        stream
+            .set_write_timeout(Some(Duration::from_secs(3)))
+            .unwrap();
+        state.store(0, Ordering::Release);
+        let mut request = String::new();
+        BufReader::new(stream.try_clone().unwrap())
+            .read_line(&mut request)
+            .unwrap();
+        assert_eq!(
+            serde_json::from_str::<Value>(&request).unwrap(),
+            json!({"op":"kept"})
+        );
+        stream.write_all(b"{\"ok\":true}\n").unwrap();
+        assert_eq!(
+            finishing.recv_timeout(Duration::from_secs(2)).unwrap(),
+            Some(json!({"ok":true}))
+        );
+        reading.join().unwrap();
+        assert_eq!(
+            listener.accept().unwrap_err().kind(),
+            io::ErrorKind::WouldBlock
+        );
+    }
+
+    #[test]
+    fn pending_note_legacy_transport_never_waits_while_the_session_is_held() {
+        let directory = crate::process::SessionDirectory::create().unwrap();
+        let socket = directory.path.join("note.sock");
+        let listener = Arc::new(UnixListener::bind(&socket).unwrap());
+        listener.set_nonblocking(true).unwrap();
+        let accepted = Arc::new(AtomicBool::new(false));
+        let server = Arc::new(Mutex::new(None));
+        let state = Arc::new(std::sync::atomic::AtomicU8::new(0));
+        let (observed, seeing) = sync_channel(1);
+        let basic = pending_transport_permission(state.clone(), observed);
+        let permission: NotePermission = {
+            let (listener, accepted, server, state) = (
+                listener.clone(),
+                accepted.clone(),
+                server.clone(),
+                state.clone(),
+            );
+            Arc::new(move || {
+                if !accepted.load(Ordering::Acquire) {
+                    match listener.accept() {
+                        Ok((stream, _)) => {
+                            *server.lock().unwrap() = Some(stream);
+                            accepted.store(true, Ordering::Release);
+                            state.store(1, Ordering::Release);
+                        }
+                        Err(error) if error.kind() == io::ErrorKind::WouldBlock => (),
+                        Err(error) => panic!("unexpected local accept: {error}"),
+                    }
+                }
+                basic()
+            })
+        };
+        let original_permission = permission.clone();
+        let permission = legacy_note_permission(&permission);
+        let session = Arc::new(Mutex::new(()));
+        let session_in_read = session.clone();
+        let (finished, finishing) = sync_channel(1);
+        let reading = std::thread::spawn(move || {
+            let _held = session_in_read.lock().unwrap();
+            finished
+                .send(bounded_exchange_permitted(
+                    &socket,
+                    &json!({"op":"kept"}),
+                    Duration::from_secs(5),
+                    Some(&permission),
+                ))
+                .unwrap();
+        });
+        seeing.recv_timeout(Duration::from_secs(2)).unwrap();
+        assert!(accepted.load(Ordering::Acquire));
+        let mut stream = server.lock().unwrap().take().unwrap();
+        // The actual accepted socket establishes the transport boundary;
+        // no timing-based absence inference or callback-count selector.
+        assert_eq!(
+            finishing.recv_timeout(Duration::from_secs(2)).unwrap(),
+            None,
+            "legacy transport cannot hold Sessions through a Pending wait"
+        );
+        assert!(
+            matches!(original_permission(), PermissionState::Pending),
+            "transport-only refusal must not turn the source decision into Lost"
+        );
+        stream.set_nonblocking(true).unwrap();
+        let mut byte = [0];
+        assert_eq!(
+            stream.read(&mut byte).unwrap(),
+            0,
+            "closed without a private request byte"
+        );
+        reading.join().unwrap();
+        assert!(session.try_lock().is_ok());
+        assert_eq!(
+            listener.accept().unwrap_err().kind(),
+            io::ErrorKind::WouldBlock
+        );
+    }
+
+    #[test]
+    fn pending_note_transport_retains_the_reply_until_ready_without_reissuing() {
+        let directory = crate::process::SessionDirectory::create().unwrap();
+        let socket = directory.path.join("note.sock");
+        let listener = UnixListener::bind(&socket).unwrap();
+        listener.set_nonblocking(true).unwrap();
+        let state = Arc::new(std::sync::atomic::AtomicU8::new(0));
+        let (observed, seeing) = sync_channel(1);
+        let permission = pending_transport_permission(state.clone(), observed);
+        let (finished, finishing) = sync_channel(1);
+        let reading = std::thread::spawn(move || {
+            finished
+                .send(bounded_exchange_permitted(
+                    &socket,
+                    &json!({"op":"kept"}),
+                    Duration::from_secs(3),
+                    Some(&permission),
+                ))
+                .unwrap();
+        });
+        let mut stream = pending_transport_accept(&listener);
+        let mut request = String::new();
+        BufReader::new(stream.try_clone().unwrap())
+            .read_line(&mut request)
+            .unwrap();
+        assert_eq!(
+            serde_json::from_str::<Value>(&request).unwrap(),
+            json!({"op":"kept"})
+        );
+        state.store(1, Ordering::Release);
+        seeing.recv_timeout(Duration::from_secs(2)).unwrap();
+        stream.write_all(b"{\"ok\":true}\n").unwrap();
+        assert!(
+            matches!(
+                finishing.try_recv(),
+                Err(std::sync::mpsc::TryRecvError::Empty)
+            ),
+            "no reply disclosure during Pending"
+        );
+        state.store(0, Ordering::Release);
+        assert_eq!(
+            finishing.recv_timeout(Duration::from_secs(2)).unwrap(),
+            Some(json!({"ok":true}))
+        );
+        reading.join().unwrap();
+        assert_eq!(
+            listener.accept().unwrap_err().kind(),
+            io::ErrorKind::WouldBlock,
+            "no second RPC"
+        );
+    }
+
+    #[test]
+    fn pending_note_transport_lost_or_original_deadline_never_sends_or_returns_a_reply() {
+        for (after_send, lose) in [(false, true), (false, false), (true, true), (true, false)] {
+            let directory = crate::process::SessionDirectory::create().unwrap();
+            let socket = directory.path.join("note.sock");
+            let listener = UnixListener::bind(&socket).unwrap();
+            listener.set_nonblocking(true).unwrap();
+            let state = Arc::new(std::sync::atomic::AtomicU8::new(u8::from(!after_send)));
+            let (observed, seeing) = sync_channel(1);
+            let permission = pending_transport_permission(state.clone(), observed);
+            let (finished, finishing) = sync_channel(1);
+            let reading = std::thread::spawn(move || {
+                finished
+                    .send(bounded_exchange_permitted(
+                        &socket,
+                        &json!({"op":"kept"}),
+                        Duration::from_secs(2),
+                        Some(&permission),
+                    ))
+                    .unwrap();
+            });
+            // Keep an accepted socket alive for the post-write controls.
+            let _server = if after_send {
+                let stream = pending_transport_accept(&listener);
+                let mut request = String::new();
+                BufReader::new(stream.try_clone().unwrap())
+                    .read_line(&mut request)
+                    .unwrap();
+                assert_eq!(
+                    serde_json::from_str::<Value>(&request).unwrap(),
+                    json!({"op":"kept"})
+                );
+                state.store(1, Ordering::Release);
+                Some(stream)
+            } else {
+                None
+            };
+            seeing.recv_timeout(Duration::from_secs(2)).unwrap();
+            if lose {
+                state.store(2, Ordering::Release);
+            }
+            // A permanently Pending decision must still finish by the ONE
+            // original 2s deadline; every acceptance/read/channel is bounded.
+            assert_eq!(
+                finishing.recv_timeout(Duration::from_secs(3)).unwrap(),
+                None,
+                "after_send={after_send}, lose={lose}"
+            );
+            reading.join().unwrap();
+            assert_eq!(
+                listener.accept().unwrap_err().kind(),
+                io::ErrorKind::WouldBlock
+            );
+            state.store(0, Ordering::Release);
+            assert_eq!(
+                listener.accept().unwrap_err().kind(),
+                io::ErrorKind::WouldBlock,
+                "Ready cannot revive a completed exchange"
+            );
+        }
     }
 
     /// #2850: "forget my face" with its person's memory emptied says so;
@@ -18136,7 +19081,15 @@ mod tests {
         assert_eq!((note.complete, note.cause), (false, Some(NoteCause::Busy)));
         drop(held);
         let elsewhere = socket.with_extension("elsewhere");
-        let read = fresh_note_read(&elsewhere, 1, None, FIRST_READ, false);
+        let read = fresh_note_read(
+            &elsewhere,
+            1,
+            None,
+            FIRST_READ,
+            false,
+            // Raw no-client control: no request or private scope is present.
+            Arc::new(|| PermissionState::Ready),
+        );
         assert_eq!(
             (read.complete(), read.cause()),
             (false, Some(NoteCause::NoClient))
@@ -19319,5 +20272,94 @@ mod tests {
             );
             assert!(forget_said_told(None).contains("could not be removed"));
         }
+    }
+
+    /// Real Days event state and mutex, with a writer-less queue whose jobs
+    /// can be inspected after Engine continuation. No production policy copy.
+    pub(crate) struct EventReadFixture {
+        client: DaysClient,
+        work: Mutex<std::sync::mpsc::Receiver<DaysJob>>,
+    }
+    pub(crate) fn event_read_fixture(name: &str) -> EventReadFixture {
+        let (client, work) = offered_an_event(name, true, true);
+        EventReadFixture {
+            client,
+            work: Mutex::new(work),
+        }
+    }
+    impl EventReadFixture {
+        pub(crate) fn with_context_held(&self, held: impl FnOnce()) {
+            let _context = self.client.context.lock().unwrap();
+            held();
+        }
+        pub(crate) fn read(&self, heard: &str, permitted: &NotePermission) -> EventNote {
+            self.client
+                .event_turn_checked(Some(ASKED_OF), heard, Some(permitted))
+        }
+        pub(crate) fn decision(&self) -> Option<&'static str> {
+            self.client
+                .context
+                .lock()
+                .unwrap()
+                .event_turn
+                .as_ref()
+                .and_then(|event| {
+                    event.decided.map(|decided| match decided {
+                        Decided::Greeted => "greeted",
+                        Decided::Withheld => "withheld",
+                        Decided::Asked => "asked",
+                    })
+                })
+        }
+        pub(crate) fn taken_back(&self) -> usize {
+            let work = self.work.lock().unwrap();
+            let taken = taken_back(&work);
+            assert!(
+                taken
+                    .iter()
+                    .all(|(person, id)| person == ASKED_OF && *id == 12)
+            );
+            taken.len()
+        }
+    }
+
+    #[test]
+    fn an_event_pending_at_the_first_fence_stays_undecided_and_public_options_stay_compatible() {
+        let fixture = event_read_fixture("event-first-fence-pending");
+        let pending: NotePermission = Arc::new(|| PermissionState::Pending);
+        assert!(matches!(
+            fixture.read("Good evening!", &pending),
+            EventNote::Pending
+        ));
+        assert_eq!(fixture.decision(), None);
+        assert_eq!(fixture.taken_back(), 0);
+        let lost: NotePermission = Arc::new(|| PermissionState::Lost);
+        assert!(matches!(
+            fixture.read("Good evening!", &lost),
+            EventNote::Lost
+        ));
+        assert_eq!(fixture.decision(), None);
+        assert_eq!(fixture.client.event_turn(None, "Good evening!"), None);
+        assert_eq!(fixture.decision(), None);
+        fixture.client.events.store(false, Ordering::Release);
+        assert_eq!(
+            fixture.client.event_turn(Some(ASKED_OF), "Good evening!"),
+            None
+        );
+        assert_eq!(fixture.decision(), None);
+        fixture.client.events.store(true, Ordering::Release);
+        assert_eq!(
+            fixture
+                .client
+                .event_turn(Some(ASKED_OF), "Good evening!")
+                .as_deref(),
+            Some(EVENT_LINE)
+        );
+        assert_eq!(fixture.decision(), Some("greeted"));
+        assert_eq!(
+            fixture.client.event_turn(Some(ASKED_OF), "Hello again"),
+            None
+        );
+        assert_eq!(fixture.taken_back(), 0);
     }
 }

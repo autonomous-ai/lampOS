@@ -934,6 +934,95 @@ this room" until someone asks to be recognised.
   The voice reads it as it reads `known`, so whatever access a deploy gives
   the voice to `known` it needs to `known-face` too (the voice runs as root
   on lamp-4ace and in the product unit).
+- **Explicit speaker observation** (#3014): with the same tracking switches,
+  `known-speaker` beside `known` publishes one atomic JSON record. A positive
+  record has `state: "seen"`, `name`, optional `id`, the actual faces-publisher
+  `boot`, passing `face`, a random 32-hex `publisher` lifecycle and a nonzero
+  `generation`. A successful empty detection may publish `state: "absent"`
+  with only boot, publisher and generation. It carries no new identity and
+  can only continue a request that Voice already pinned from a positive record.
+  A detected return after absence, even with the same passing face ID, or a
+  changed visible track first publishes identity-free `state: "checking"`.
+  Recognition runs immediately for that candidate, before the ordinary 2 s
+  refresh is due; an unchanged unmatched candidate then keeps that ordinary
+  cadence. Checking grants no personal output and is not ordinary absence.
+  The full-crop visual hold does not extend this proof: only the current
+  completed recognition can publish a person. A held visual name after a
+  missed match or an unprintable near face cannot authorize private speech.
+  Every successful raw empty detection publishes absence immediately, before
+  still-face filtering, mesh or recognition work and independently of the 2 s
+  recognition cadence. It also clears the legacy known files and the in-memory
+  visual hold, so a short gap cannot leave the old name available to a returning
+  face with the same tracking ID. A skipped detector does not create absence;
+  a failed look or a visible face removed by filtering still revokes instead.
+  Continuous visible observations keep the existing recognition cadence;
+  recognition errors still revoke the speaker source.
+  Voice may pause only an already pinned v2 request for that exact epoch and
+  person. A completed positive match for the same name, optional stable ID,
+  boot, publisher and generation returns that request to Ready, even with a
+  new passing face ID, resuming held work without duplicate delivery. Its
+  original grant and audio-end-plus-30-second maximum deadline do not change;
+  the source still expires after 3 s. Initial/legacy Checking never grants or
+  pauses authority. Missing/stale source, another epoch/person, hard revocation,
+  forget, privacy or an error is terminal, not a resumable wait. A fresh proved
+  ask may use a later positive observation.
+  Disappearance before recognition completes advances the generation before
+  another absence is published, so a reader cannot miss the unresolved return.
+  Visible unaligned/unmatched faces and model/decode/camera errors hard-revoke,
+  not ordinary absence. A `revoked` record advances the generation before
+  forgetting, privacy loss, store mutation or teardown; a later `seen` keeps
+  that generation. A new publisher lifecycle cannot continue an old request.
+  Generation exhaustion or publication failure disables the source.
+  Recognition captures the camera-permission hold when it reads a frame and
+  checks the driver's monotonic capture time against the start of that hold.
+  A queued pre-regrant frame cannot acquire a new hold. The loop observes hold
+  changes before using a frame and after inference, clears the visual/legacy
+  name and advances the disclosure epoch. Final typed and legacy publication
+  checks the captured token/time under the permission listener's lock; only
+  bounded local publication runs there. A fresh frame and recognition are
+  required after regrant even if the geometric tracking ID is unchanged.
+  The same frame guard runs after mesh and before face-bus/answered
+  observations, withdrawing old identity before any fresh observation is
+  published. A delayed mesh cannot publish a second pre-loss frame after
+  permission expires. Missing or non-monotonic capture timestamps refuse
+  face-observation publication even without recognition; with recognition
+  configured, they drop the look before inference. The supported camera
+  timestamp behavior still requires lamp validation.
+  A typed source must satisfy both its original 3 s recognition age and
+  its receipt-derived camera-permission deadline, at most 1.5 s after the
+  permission was received. Equality is expired. Both first grants and
+  continuations reject an expired deadline, even while inference is blocked;
+  pre-expiry audio cannot obtain a later first grant from that expired Seen.
+  Fresh observed frames within the same hold may extend only the permission
+  deadline; they never restamp recognition or revive a lost request. Explicit
+  close before that deadline while the publishing loop is blocked still needs
+  independently observable revocation and remains HOLD. Coordinator privacy
+  cancellation is a separate fence.
+  The file stays in the existing volatile `/run` folder, mode 0600 and owned
+  by the Eyes writer. Linux checks the canonical parent is on tmpfs, owned by
+  that writer and not group/other writable. An existing legacy `known` must
+  also be a regular 0600 file owned by the writer; its ordinary removal does
+  not prevent an explicit absence record. Persistent custom locations cannot
+  enable this source. Publication uses an exclusive temporary file and atomic
+  rename. Startup and orderly exit invalidate it; abrupt death leaves no fresh
+  look and the source expires. No heartbeat invents a successful camera look.
+  A skipped empty-room inference cannot refresh the record. The active source
+  must ask for a real detection at its recognition refresh cadence instead of
+  turning the empty-room optimization into either fabricated absence or a
+  routine revocation; this work stays in the independent Eyes process.
+  Readers require the opened record's own freshness (3 s), with metadata and
+  content from the same bounded FD. Wall time is sampled after open metadata;
+  monotonic expiry remains anchored before I/O. Future/stale/missing/invalid
+  records refuse, never imply absence. Legacy `known` and `known-face` stay
+  compatible for their existing readers. Private disclosure requires the typed
+  source's permission and observation timestamps; older positive-only sources
+  grant neither initial authority nor continuation.
+  Voice requires request-owned positive speaking evidence and an exact initial
+  face/person match. Neither the file nor a geometric passing ID proves
+  physical identity, acoustic authentication or liveness. No frame, print,
+  audio, durable history, extra model tool or RPC is added. This source change
+  does not activate the product's second-route name switch; #3014 and its
+  physical owner checks remain separate. The Live route is unchanged.
 - **Named in Who was here, only with their yes** (#1997, the lead's yes on
   20 Oct; nothing asks it until the voice's question is built):
   - `{"visits_yes":NAME}` keeps a remembered person's yes to being named to
@@ -1585,6 +1674,12 @@ remember. New Eyes with the switch off also refuses it. With the switch on,
 Eyes refuses legacy live `remember` operations with `speaker_required`, so
 an older Voice cannot silently bypass the check. Photo enrollment retains
 its separate confirmation path.
+
+Admitting a guarded capture also revokes the atomic known-speaker disclosure
+source before collecting prints, as ordinary live capture does. The capture's
+own speaker/permission guard stays independent: it may collect its five fresh
+prints without granting private memory disclosure or renewing an earlier
+request's speaker deadline.
 
 Eyes reuses its already-computed SFace prints, only when exactly one near
 face is seen speaking in that same look. At most 16 prints, less than
@@ -2313,6 +2408,15 @@ with the known face's id the eyes keep beside the known file
   350 ms on the 10 fps camera (`main.rs`), so 2 s holds 5 to 8 looks. With
   `--steady-rate` a still face is looked at 500 to 600 ms apart, 4 looks a
   window, under the 5 the score needs, so in practice `unknown` (below).
+- **Lamp-4ace source preparation (#3064):** the repository units enable
+  `LAMP_EYES_SPEAKING=on` in Eyes and Voice, with `--steady-rate off` for
+  the regular speaking window. The exact retained Eyes pin accepts all
+  16 unit flags, including this argument's on/off syntax
+  ([receipt](verification/common-checking-20261023/README.md)). Its extra
+  detector work, CPU, temperature and voice-latency cost are unmeasured here. Compatible qualified Voice/Eyes
+  artifact pins, installation and a new known-person lamp run remain owed.
+  The source choice changes neither the classifier's thresholds nor the
+  historical measurements below, and is not a physical qualification.
 - **How fast it answers** (looks every 250 to 350 ms): `yes` on the first
   look after talking starts (0.06 to 0.18 s), and held 1.3 to 1.8 s after
   it stops, the 2 s window emptying.
@@ -2646,3 +2750,117 @@ to 46%) and V2 took on 2026-10-14 without anyone in front of this lamp; how the
 detector fares with a face lit from behind, in profile or with glasses, where
 the old runtime's notes say it struggles; anything about the camera's lock and
 identity check on the lamp itself.
+
+
+### Private speaker permission expiry (source preparation)
+
+The typed private speaker source carries `permission_until_us` in the host
+monotonic clock domain and `observed_us` from the original recognized camera
+frame. Private disclosure checks both at the final source-read boundary: camera
+permission expires at equality with its 1.5-second receipt deadline; identity
+expires at three seconds. Publication mtime is still bounded, but cannot renew
+identity age. Old producers without this evidence fail closed for private
+context; older consumers reject the added fields. No switch is activated.
+
+A successful same-track raw look in the same camera hold may refresh only the
+permission deadline, preserving the recognized frame time, identity and epoch.
+This allows the normal two-second recognition cadence without manufacturing a
+new recognition on each raw look. Skipped, failed, filtered, changed-track or
+camera-loss observations cannot refresh the old identity. An expired publication
+requires recognition again; a request that lost authority never revives.
+
+The permit listener performs no filesystem or network work. The publishing loop
+computes a conservative monotonic deadline under the receipt lock: monotonic time
+is sampled before measuring receipt age, then only the remaining lease is added
+with overflow checks. Waiting for that lock never restamps the receipt.
+
+Empty and returning-track looks carry their original camera timestamp too.
+Before publishing Absent or Checking, the loop refuses a zero, future or
+three-seconds-old capture (equality is expired), clears legacy/held identity and
+revokes the typed epoch. A still-fresh delayed frame keeps its capture time in
+`observed_us`, so permission renewal and file mtime cannot grant it another
+freshness window. Fresh benign absence and unresolved recognition keep their
+existing same-epoch policy.
+
+Qualification as of 27 October 2026: the 26 October frozen d9f10adf3/2a827
+host checkpoint passed 8,440 cases with 58 declared ignores, including all 33
+required boundaries. The later b7195bfce/e672 affected-source gate passed 2,083
+cases with all 33 boundaries. Those are source-specific host results, not a
+qualification of subsequent review repairs or a physical lamp result.
+
+This closes timeout expiry while the Eyes loop is blocked. It does **not** close
+the separate interval after an explicit `camera:false` received before that
+deadline while the loop is blocked. That requires independently observable
+revocation and remains HOLD. Current-base and later review-repair gates are
+reported separately in the verification note; physical privacy acceptance
+remains unshown.
+
+### Camera-hold FD authority (source preparation, unqualified)
+
+The prepared Eyes runtime requires V3 private-speaker sources. It retains the
+recognition `generation` and original `observed_us`/`permission_until_us`, and
+adds `version: 3`, a separate `camera_hold` and `camera_began_us`. Its random
+publisher incarnation is shared with the camera-hold authority; recognition
+retries cannot substitute for a camera reopen. Old private readers refuse V3;
+there is no runtime V2 fallback. Ordinary camera opening and face processing
+remain independent when the private grant server is unavailable.
+
+For a configured `known` basename, the service derives the sibling directory
+`known.authority.d` (without a UTF-8 conversion), mode 0700, and `hold.sock`,
+mode 0600. It refuses oversized, symlinked, foreign or existing socket paths;
+it never unlinks an existing path at startup. Normal service teardown removes
+only its original socket inode. A stale path after an unclean stop keeps this
+private feature unavailable until the owned runtime directory is cleared by
+service lifecycle/maintenance; it does not relax the path policy. Product Eyes
+runs as `lampos`; root Voice can access that private directory. The server checks
+the connected client's kernel UID: root or its own UID only. Credentials prove
+an account boundary, not source freshness or a unique process identity.
+
+One worker, four accepted connection slots, kernel backlog four, a 300 ms accepted
+request/reply deadline and fixed 48-byte V3/token/nonce envelopes bound grant
+work. Requests half-close their control write side after the exact frame;
+replies use the IPC primitive and pass one observer FD. No pair is created on
+capture/stream polling paths or inside the authority mutex. Original source
+age, accepted audio and request ownership still require independent validation.
+
+`camera:false` denies new snapshots, then shuts the one revoker endpoint before
+waiting for the existing permit/publication lock. Every duplicated observer sees
+the same terminal kernel endpoint. Successful shutdown is the linearization,
+not datagram receipt or physical camera teardown. The short authority mutex
+contains scalar/Arc operations only; shutdown, last-Arc drop, pair creation,
+grant I/O and the publication mutex stay outside it. The owner records successful
+kernel shutdown separately from the primitive's early revoked flag. Concurrent
+expiry/explicit closes compare the same witness identity; a delayed completion
+cannot retire a newer pair, and repeated NotConnected alone is never accepted
+as a completed shutdown. A grant pinned before close
+can only deliver the old terminal observer. Reopen installs a different pair
+only for the still-current legacy permit hold, after prior revocation; fresh
+capture at/after that hold's start is required. Renewals never move identity age.
+The worker also expires the witness, while source deadlines remain mandatory.
+
+At the producer-only checkpoint, this was an Eyes-only source chunk stacked
+on the standalone IPC primitive; Voice integration and its HTTP/TTS/memory
+boundary tests were still pending. The current Common source includes the
+Voice client and request-owned ticket checks at those boundaries. Current
+source-scoped results and remaining holds are tracked on
+[#3064](https://github.com/autonomous-ai/lampOS/pull/3064); this does not release
+independent privacy or device holds or activate a feature. Producer controls
+cover two real exec consumers while Eyes' publication lock is held, old/new
+holds, wrong incarnation, original-age binding, partial-peer expiry and shutdown
+cleanup. Their old UNRUN label belongs to the producer-only checkpoint, not a
+claim about later gate results. Target first/repeat grant, single-shutdown and
+hot-check latency are UNMEASURED; bounded nonblocking work is not a wall-time
+or acoustic proof.
+
+A retired equal legacy hold requests `NeedNewHold` rather than poisoning the
+service or recreating the old token. A stale expiry snapshot that did nothing
+is not completed retirement: if another close still owns the live witness, the
+handoff remains unavailable until actual shutdown completes. Only completed
+retirement can authorize a new capture floor. The permit handoff revalidates the same
+original receipt and rolls the logical capture hold once, without closing the
+physical camera or extending the original permission deadline. Its NEW capture
+floor is sampled after completed old shutdown at logical activation, separately
+from the original receipt time: a V4L2 image buffered before that floor is refused
+even if dequeued/tagged after the roll. Fresh post-roll capture can restore
+private service under continuous true heartbeats. Deterministic handoff and
+queued-frame negative/fresh positive controls are authored, still UNRUN.

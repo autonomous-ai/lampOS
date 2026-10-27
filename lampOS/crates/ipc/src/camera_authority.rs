@@ -183,7 +183,7 @@ impl Grant {
     }
     fn send_step(&mut self, control: &UnixStream) -> io::Result<bool> {
         within(self.deadline)?;
-        validate_unix_stream(control)?;
+        validate_unix_stream_kind(control)?;
         // Darwin MSG_DONTWAIT alone does not bound the send-buffer space wait.
         // This endpoint is dedicated to control, never the shared observer.
         control.set_nonblocking(true)?;
@@ -271,7 +271,7 @@ impl ReceiveGrant {
         within(self.deadline)?;
         // The Darwin upper bound below is for native AF_UNIX stream control,
         // not arbitrary descriptors safely wrapped in a UnixStream Rust type.
-        validate_unix_stream(control)?;
+        validate_unix_stream_kind(control)?;
         let mut storage =
             [MaybeUninit::uninit(); rustix::cmsg_space!(ScmRights(CONTROL_FD_CAPACITY))];
         let mut ancillary = RecvAncillaryBuffer::new(&mut storage);
@@ -338,12 +338,20 @@ impl ReceiveGrant {
         Ok(Some(ticket))
     }
 }
-fn validate_unix_stream(fd: &impl AsFd) -> io::Result<()> {
+// CONTROL deliberately ends with EOF: both write halves may already be
+// closed when queued bytes/rights are read. Its caller authenticated the peer
+// before the challenge. Native family/type must still protect the UNIX parser.
+fn validate_unix_stream_kind(fd: &impl AsFd) -> io::Result<()> {
     if sockopt::socket_type(fd)? != SocketType::STREAM
         || getsockname(fd)?.address_family() != AddressFamily::UNIX
     {
         return Err(invalid("ticket FD is not a Unix stream"));
     }
+    Ok(())
+}
+fn validate_unix_stream(fd: &impl AsFd) -> io::Result<()> {
+    validate_unix_stream_kind(fd)?;
+    // OBSERVER connection is authority, unlike completed CONTROL framing.
     // A successful getpeername on Darwin's unnamed socketpair is normalized
     // to None by rustix. Unconnected sockets still return ENOTCONN, propagated
     // by `?`; None after a successful syscall is not that error.

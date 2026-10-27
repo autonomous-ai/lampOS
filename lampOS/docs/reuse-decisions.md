@@ -255,6 +255,14 @@ People mutation path and its actual result, without a V1 runtime bridge,
 new inference dependency or automatic privacy opening. Guarded renaming
 waits for a future same-speaker confirmation design; it fails closed here.
 
+Keep this enrollment authority independent of request-owned private memory
+disclosure. Its three-positive-look requirement does not borrow the narrower
+two-original-look disclosure case, and disclosure's Checking pause does not
+renew enrollment proof. The shared bounded socket implementation retains the
+tri-state private-read fence and the enrollment lifetime fence separately.
+Admitting either live capture withdraws known-speaker disclosure before prints
+are collected; this does not revoke the valid enrollment guard itself.
+
 The distinct internal `remember_speaker` operation makes mixed-version
 Voice/Eyes pairs refuse unsupported proof instead of ignoring an added
 field and enrolling unguarded. The switch is off by default on both sides.
@@ -1917,6 +1925,77 @@ multi-generation output interrupted after an earlier generation retired;
 no whole-turn completion or Ack is inferred. The live same-pump final-retirement
 control stays held, while accepted/unretired audio still retries after fencing.
 
+### Request speaker continuity and short lines (23 October 2026, #3064)
+
+V1 inspected: `hal/drivers/voice/_internal/realtime_turn.py`,
+`build_turn_context` and `build_speaker_correction`, distinguishes an actual
+voice identity from its fallback perception user and can correct one turn.
+Keep the per-turn distinction; do not use the fallback visible person to
+prove an unseen current speaker. The FaceID recognizer's authorized-bank
+selection and unsure stranger band
+(`hal/drivers/sensing/perceptions/processors/faceid/recognizer.py`) retain
+uncertainty instead of using whichever identity score is highest. Its
+corroboration ticks do not establish an error rate for visual speech frames.
+
+Reuse the existing Rust request owner, sealed original microphone intervals,
+clock bounds, final private-output guards, bounded atomic Eyes source and
+existing `getrandom` dependency. Change only initial proof and continuation:
+exactly two looks require the same sole positive face in both original
+frames; three-or-more and legacy narrowing retain their existing rules.
+A request already pinned from typed positive evidence may continue through
+explicit fresh successful no-detection at the same publisher lifecycle and
+revocation generation. Missing/error/unaligned/unmatched source never supplies
+that continuation. A returning or changed track publishes identity-free
+`checking` before recognition and asks for recognition immediately, rather
+than leaving a stale absence or waiting for the ordinary 2 s refresh. The same
+unmatched candidate then retains that ordinary cadence; disappearing before
+recognition completes advances the epoch before later absence. Checking
+grants no disclosure. Only an already pinned v2 request at the exact same
+epoch and person may pause in Pending; completed recognition of the same name
+and optional raw stable ID, under the same boot/publisher/generation, can
+return it to Ready across a new geometric track. Its original speaker, scope
+and audio-end-plus-30-second maximum deadline do not change; the source still
+expires after 3 s. Initial/legacy Checking cannot grant authority, and Lost
+remains terminal. Pending holds private bytes, RPC/fallback sends and speech
+IPC. Async and off-loop read checks use at most 20 ms intervals, with the
+existing 2 ms worker ticker for queued output; no Sessions/Days lock is held
+while waiting.
+Forget/privacy/unmatched or changed identity advances the generation;
+a later positive cannot revive a request that observed loss. A new proved
+ask may proceed after recognition. No new memory service,
+identity fallback, heartbeat-generated look or model RPC is introduced.
+Recognition waits spend existing proof and read deadlines, never a new grace
+or renewed admission.
+The added work stays in the independent Eyes process; capture does not wait
+for recognition. The local bounded-source guard target remains under 5 ms;
+return-to-recognition CPU cost and device timing are not established by host
+controls. This conservative source contract still needs real-person refusal/false-admission
+and acoustic latency measurements; it does not establish liveness or every
+lowered-face case. Live's visible-person name note remains outside this fix.
+
+## Eyes-owned single-hold publisher (2026-10-27, source preparation)
+
+Keep V1 privacy.py's publish-denial-before-teardown and post-capture recheck.
+Reuse the standalone IPC stream witness and safe rustix OwnedFd transfer,
+not an Arc shared across exec or per-poll request/reply. A separate short Eyes
+authority mutex guards only scalar/Arc snapshots; source publication, grant
+I/O, pair creation, shutdown and last-owner drop occur outside it. One worker
+and fixed slots serve exact V3 token/nonce requests; the existing permit/capture
+hold remains independent of recognition generation and original source age.
+
+Reuse cached rustix 1.1.5 `net` feature on Eyes for Linux peer credentials and
+safe ancillary FDs. Mac uses the already-locked nix 0.29.0 `user`+`socket` features' safe
+getpeereid; `socket` adds an edge to already-locked memoffset0.9.1. The existing
+rustix1.1.5 dependency is common to Linux/Mac for safe owned-FD transport. These
+are manifest/lock edges, not a new package/version or unsafe ownership code. UID is account trust, not a
+freshness proof. The private sibling directory needs no broad group or new
+switch/CLI argument. Existing socket paths are refused rather than unlinked.
+
+The Eyes-half implementation and its actual-exec fixture controls are UNRUN;
+Voice wiring, current native gates, target latency and physical proof remain
+pending. Successful shutdown is the authority boundary; recv-return and
+already-sent-byte recall are not promised. No default activation or HOLD waiver.
+
 ## Darwin unnamed peers and bounded ancillary records (2026-10-27)
 
 The first real Mac IPC gate failed: valid unnamed socketpair tickets were
@@ -2012,6 +2091,104 @@ No production syscall, protocol or caller changes in this correction. The
 receiver still relies on caller peer authentication. Eyes/Voice integration,
 wrong-peer credential controls, Linux/current-head gates and device latency
 remain separate acceptance evidence.
+
+## Voice camera-ticket client reuse (2026-10-27, source only)
+
+Reuse the existing single-hold IPC primitive, RequestScope ownership and
+Second PrivateContext Pending/Ready/Lost guards, not a per-poll RPC or shared
+memory protocol. A typed V3 envelope keeps camera hold/capture floor separate
+from recognition generation without extending legacy KnownSpeaker initializers.
+The existing source read remains bounded to4096bytes; the new FD open refuses
+symlinks/FIFOs, and mixed null identity keys remain malformed on identity-free
+states. No V1/V2 private Second fallback.
+
+One startup client thread owns a single coalesced pending job/current-hold
+cache. Bounded nonblocking UNIX connect and readiness reuse rustix1.1.5's safe
+APIs; Mac peer UID uses the same cached nix0.29 socket/user getpeereid as Eyes.
+No package/version/unsafe change; Voice already has the lock's nix0.29 edge.
+Configured parent UID/dev/inode is anchored before worker startup, checked at
+connect, and the received V3 source owner must match it. Private sibling0700
+directory, socket0600, no symlink/foreign socket are required; peer credentials
+are not capture freshness. Acquisition's original deadline is never renewed.
+Hot polling never connects/handshakes or waits for a mutex: it checks request
+state, existing source validity and the primitive observer's nonblocking PEEK.
+Delayed completion cannot overwrite a previously observed Lost result. All
+current Voice/Eyes composition tests and target latency remain UNRUN.
+
+
+
+### Composed exec controls (authored, UNRUN)
+
+Voice adds an existing lamp-eyes path DEV-dependency and one lock edge only;
+production dependencies/package versions stay unchanged. The composed test
+execs one real Eyes Service/Permit producer and two Voice consumers. Each
+consumer proves positive local Net chatHTTP, Net TTSHTTP, private Memory hits
+UDS and credited provider IPC first, retaining an already queued private entry.
+The producer then holds the ACTUAL Permit publication lock and receivesfalse;
+an independent parent Voice witness must observe Lost while source bytes and
+permission expiry remain unchanged. Both consumers must show no additional
+HTTP/TTS/Memory sends and no final IPC bytes. Owned child processes have bounded
+exit/kill/wait plus reader joins on success/unwind; test data stays in fresh
+private namespaces/loopback endpoints. No camera, inference/model, physical
+lamp, global env change or Live session. This authored composition is UNRUN.
+The inherited same-poll TTS fallback permission gap is separately being repaired;
+these preclosed controls alone do not prove that retry/fallback boundary.
+
+The exec producer is the native Voice UNIT-TEST DRIVER hosting production Eyes
+library APIs, not the shipping lamp-eyes binary/main or deployed units. The two
+auxiliary test identities are entrypoints for one composed scenario, not two
+additional independent scenarios. The consumers likewise host actual Voice
+Engine/Net/guards in that driver. Whole-device bootstrap, physical policy and
+installation/credential/account proof remain outside this test. Proxy exclusion
+is set only in owned child environments; HTTP stays on local fixture targets.
+
+Permission checks still open/read the existing mandatory bounded regular source
+file; only grant socket connection/authentication/handshake is moved off the
+interaction path. Startup also reads its configured parent anchor. O_NONBLOCK
+helps refuse FIFO input and controls socket operations; it does not establish
+a hard regular-file/filesystem latency bound. Device timing remains unverified.
+
+
+### Current authored TTS/fixture composition (UNRUN)
+
+The per-send TTS permission path is now authored: the SAME callback reaches
+near/own retries, Gemini/configured POST and every relevant WebSocket send.
+The initial private first-result ceiling is anchored at synchronous construction;
+its clock is polled outside Pending gating. Net guards returned audio after
+the timed first result, and Engine polls the contractually guarded service
+stream directly so no opaque outer Pending gate can hide that clock. Engine
+keeps its initial Lost check, synchronous ordering, after-next permission check,
+reserve/send and final credited-output fences. Raw/legacy calls retain their
+explicit compatibility path; this is not a Live-route qualification.
+
+Five authored transport test identities/27 mode rows plus the real exec
+composition and migrated positive fixtures remain UNRUN. Source corrections
+preserve duplicate-key rejection, initial capture/permission/audio deadlines,
+failed-request isolation with later-request acquisition recovery, and genuine
+Room behavior when scoped-context/late-look is off. Pure boolean/policy/parser
+unit contracts are retained explicitly and are not evidence of real transport
+privacy. No default activation, physical origin, device bootstrap or latency
+qualification is inferred from this prepared source.
+
+
+### Credential-negative and NONBLOCK assertion precision (source only)
+
+The exact production connected-peer UID comparison is factored into one small
+helper, still called after all source/path checks and BEFORE any request/nonce
+construction or rights receive. A portable real-kernel control connects private
+UNIX sockets, accepts the actual trusted expected UID, refuses a deliberately
+different expected UID, and verifies no grant/challenge bytes were sent. Source
+and path stay valid, so source validation alone cannot satisfy this control.
+No users, credentials, process UIDs or filesystem owners are changed; fresh
+fixture directories/sockets use their required private modes. This
+is actual connected-peer helper coverage; a separate cross-UID-process complete
+client scenario is still unperformed, and the new control remains UNRUN.
+
+IPC's18th recovery test now compares only the shared NONBLOCK bit, matching
+its intended invariant. Whole OFlags equality was too broad because Darwin's
+kernel can mutate FMARK during SCM_RIGHTS GC. All17 original controls, the
+original1s case and recovery/FD/deadline assertions remain exact. The reviewer
+finding and prior source epochs remain preserved, not reclassified as passes.
 
 ## Updater output reader completion (27 October 2026)
 

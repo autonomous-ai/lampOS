@@ -13,6 +13,244 @@ use futures_util::{
 use std::sync::{Arc, Mutex};
 use tokio::sync::mpsc;
 
+/// Which existing function selection a chat must retain across every fallback.
+#[derive(Clone, Copy, Debug)]
+pub enum ChatFunctions {
+    All,
+    Only(&'static [&'static str]),
+    Without(&'static [&'static str]),
+}
+
+/// Disclosure readiness for one already admitted request. Pending carries no
+/// authority: only the request's validator may preserve a prior proof while its
+/// original deadline and the source's freshness limit still hold.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum PermissionState {
+    Ready,
+    Pending,
+    Lost,
+}
+
+impl From<bool> for PermissionState {
+    fn from(ready: bool) -> Self {
+        if ready { Self::Ready } else { Self::Lost }
+    }
+}
+
+/// Request-owned send permission; private requests retain the same sticky guard.
+pub type ChatPermission = Arc<dyn Fn() -> PermissionState + Send + Sync>;
+
+pub(super) const PERMISSION_POLL: std::time::Duration = std::time::Duration::from_millis(20);
+
+/// Waits on the task already doing the work. The validator retains the original
+/// proof/source deadlines; callers keep their own timeout around this future.
+pub(super) async fn wait_permitted(permitted: &ChatPermission) -> bool {
+    loop {
+        match permitted() {
+            PermissionState::Ready => return true,
+            PermissionState::Lost => return false,
+            PermissionState::Pending => tokio::time::sleep(PERMISSION_POLL).await,
+        }
+    }
+}
+
+/// Pending never polls the child or discards a result produced by a synchronous
+/// poll that changed permission. One result (including EOF) is kept until Ready.
+/// Lost drops both permanently. A timer also observes loss when the child has no
+/// wakeup of its own, without a task or a busy self-wake loop.
+pub(super) fn while_permitted<'a, T: Send + 'a>(
+    stream: BoxStream<'a, T>,
+    permitted: ChatPermission,
+) -> BoxStream<'a, T> {
+    while_permitted_clock(stream, permitted, None)
+}
+
+/// The default guarded speech stream has no backend-specific retry clock. Its
+/// first-result clock is observed outside Pending gating; ordinary
+/// Ready/Room streams retain their prior behavior. After the first packet the
+/// original request/audio permission remains the continuing boundary.
+fn while_speech_permitted<'a, T: Send + 'a>(
+    stream: BoxStream<'a, T>,
+    permitted: ChatPermission,
+) -> BoxStream<'a, T> {
+    while_permitted_clock(
+        stream,
+        permitted,
+        Some(tokio::time::Instant::now() + START_WITHIN),
+    )
+}
+
+fn while_permitted_clock<'a, T: Send + 'a>(
+    stream: BoxStream<'a, T>,
+    permitted: ChatPermission,
+    mut first_until: Option<tokio::time::Instant>,
+) -> BoxStream<'a, T> {
+    use std::{future::Future, task::Poll};
+    let mut stream = Some(stream);
+    let mut kept = None;
+    let mut paused = false;
+    let mut deadline = first_until.map(|until| Box::pin(tokio::time::sleep_until(until)));
+    let mut wake: Option<std::pin::Pin<Box<tokio::time::Sleep>>> = None;
+    stream::poll_fn(move |cx| {
+        if stream.is_none() {
+            return Poll::Ready(None);
+        }
+        let timer = wake.get_or_insert_with(|| Box::pin(tokio::time::sleep(PERMISSION_POLL)));
+        if timer.as_mut().poll(cx).is_ready() {
+            timer
+                .as_mut()
+                .reset(tokio::time::Instant::now() + PERMISSION_POLL);
+            let _ = timer.as_mut().poll(cx);
+        }
+        let state = permitted();
+        paused |= state == PermissionState::Pending;
+        // This clock MUST be polled even when the child cannot be. A generic
+        // outer Pending wrapper would hide it and is not part of this API.
+        let expired = deadline
+            .as_mut()
+            .is_some_and(|clock| clock.as_mut().poll(cx).is_ready())
+            || first_until.is_some_and(|until| tokio::time::Instant::now() >= until);
+        if state == PermissionState::Lost || (paused && expired) {
+            stream = None;
+            kept = None;
+            return Poll::Ready(None);
+        }
+        if state == PermissionState::Pending {
+            return Poll::Pending;
+        }
+        let next = match kept.take() {
+            Some(next) => Poll::Ready(next),
+            None => stream.as_mut().unwrap().as_mut().poll_next(cx),
+        };
+        let state = permitted();
+        paused |= state == PermissionState::Pending;
+        if state == PermissionState::Lost
+            || (paused && first_until.is_some_and(|until| tokio::time::Instant::now() >= until))
+        {
+            stream = None;
+            kept = None;
+            return Poll::Ready(None);
+        }
+        match state {
+            PermissionState::Lost => unreachable!("terminal state handled above"),
+            PermissionState::Pending => {
+                if let Poll::Ready(next) = next {
+                    kept = Some(next);
+                }
+                Poll::Pending
+            }
+            PermissionState::Ready => {
+                if matches!(next, Poll::Ready(Some(_))) {
+                    first_until = None;
+                    deadline = None;
+                }
+                if matches!(next, Poll::Ready(None)) {
+                    stream = None;
+                }
+                next
+            }
+        }
+    })
+    .boxed()
+}
+
+/// The same typed gate for one deferred operation, including its first and
+/// resumed polls. Pending retains one completed result; Lost is not an error
+/// that a backend may interpret as permission to try another endpoint.
+pub(super) async fn permitted_result<F>(
+    future: F,
+    permitted: Option<&ChatPermission>,
+) -> Option<F::Output>
+where
+    F: std::future::Future + Send,
+    F::Output: Send,
+{
+    match permitted {
+        Some(permitted) => {
+            while_permitted(stream::once(future).boxed(), permitted.clone())
+                .next()
+                .await
+        }
+        None => Some(future.await),
+    }
+}
+
+/// Retains the operation's original absolute clock across Pending. Tokio's
+/// timeout may poll a ready child first, so private timed work checks the clock
+/// before each poll and again after a held result becomes deliverable. A pause
+/// that uses up the budget is not a transport failure authorizing another send.
+pub(super) async fn permitted_until<F>(
+    future: F,
+    permitted: Option<&ChatPermission>,
+    until: tokio::time::Instant,
+) -> Option<Result<F::Output, ()>>
+where
+    F: std::future::Future + Send,
+    F::Output: Send,
+{
+    use std::{future::Future, task::Poll};
+    let Some(permitted) = permitted else {
+        return Some(tokio::time::timeout_at(until, future).await.map_err(|_| ()));
+    };
+    let permitted = permitted.clone();
+    let mut future = Box::pin(future);
+    let mut clock = Box::pin(tokio::time::sleep_until(until));
+    let mut wake = Box::pin(tokio::time::sleep(PERMISSION_POLL));
+    let mut kept = None;
+    let mut paused = false;
+    std::future::poll_fn(move |cx| {
+        let state = permitted();
+        paused |= state == PermissionState::Pending;
+        if state == PermissionState::Lost {
+            return Poll::Ready(None);
+        }
+        // The deadline is OUTSIDE the authority branch, not a child of it.
+        // Thus continuous Checking can end this operation without either
+        // polling private work or marking the original request Lost.
+        if clock.as_mut().poll(cx).is_ready() || tokio::time::Instant::now() >= until {
+            return Poll::Ready(if paused { None } else { Some(Err(())) });
+        }
+        if wake.as_mut().poll(cx).is_ready() {
+            wake.as_mut()
+                .reset(tokio::time::Instant::now() + PERMISSION_POLL);
+            let _ = wake.as_mut().poll(cx);
+        }
+        if state == PermissionState::Pending {
+            return Poll::Pending;
+        }
+        let next = match kept.take() {
+            Some(value) => Poll::Ready(value),
+            None => future.as_mut().poll(cx),
+        };
+        let state = permitted();
+        paused |= state == PermissionState::Pending;
+        if state == PermissionState::Lost {
+            return Poll::Ready(None);
+        }
+        if tokio::time::Instant::now() >= until {
+            return Poll::Ready(if paused { None } else { Some(Err(())) });
+        }
+        match state {
+            PermissionState::Lost => unreachable!("terminal state handled above"),
+            PermissionState::Pending => {
+                if let Poll::Ready(value) = next {
+                    kept = Some(value);
+                }
+                Poll::Pending
+            }
+            PermissionState::Ready => next.map(|value| Some(Ok(value))),
+        }
+    })
+    .await
+}
+
+fn while_chat_permitted(
+    stream: BoxStream<'static, net::Result<ChatEvent>>,
+    permitted: ChatPermission,
+) -> BoxStream<'static, net::Result<ChatEvent>> {
+    while_permitted(stream, permitted)
+}
+
 /// Speech-to-text, a chat model and text-to-speech.
 pub trait Services: Send + Sync + 'static {
     /// Open speech-to-text for one utterance.
@@ -47,6 +285,26 @@ pub trait Services: Send + Sync + 'static {
         let _ = without;
         self.chat(messages)
     }
+    /// A request-owned chat. Real backends must also check immediately before
+    /// every deferred network send within one poll, including internal fallbacks.
+    /// Legacy implementations retain their selection methods and gain entry and
+    /// stream-poll checks; the guard is never encoded in model messages.
+    fn chat_guarded(
+        &self,
+        messages: Vec<Message>,
+        functions: ChatFunctions,
+        permitted: ChatPermission,
+    ) -> BoxStream<'static, net::Result<ChatEvent>> {
+        if permitted() == PermissionState::Lost {
+            return stream::empty().boxed();
+        }
+        let chat = match functions {
+            ChatFunctions::All => self.chat(messages),
+            ChatFunctions::Only(only) => self.chat_only(messages, only),
+            ChatFunctions::Without(without) => self.chat_without(messages, without),
+        };
+        while_chat_permitted(chat, permitted)
+    }
     /// Whether a chat on `messages`, told without the functions named in
     /// `without`, declares the function `name` ([`Self::chat_without`]), for
     /// a turn's journal line (`LAMP_MEMORY_REPLACES`, #2510). None, from
@@ -66,6 +324,23 @@ pub trait Services: Send + Sync + 'static {
     ) -> BoxStream<'static, net::Result<Vec<i16>>> {
         let _ = turn;
         self.speak(text)
+    }
+    /// A request-owned speech piece. Construction stays synchronous and in
+    /// piece order. Pending/Lost MUST NOT poll a backend child or initiate a
+    /// send, including internal fallbacks. The guarded stream itself must stay
+    /// pollable to observe its original clock; callers must not hide that clock
+    /// behind another generic Pending gate. The default gates lazy child polls;
+    /// Net carries the exact permission to every internal deferred text send.
+    fn speak_for_guarded(
+        &self,
+        text: String,
+        turn: net::Turn,
+        permitted: ChatPermission,
+    ) -> BoxStream<'static, net::Result<Vec<i16>>> {
+        if permitted() == PermissionState::Lost {
+            return stream::empty().boxed();
+        }
+        while_speech_permitted(self.speak_for(text, turn), permitted)
     }
     /// `request`'s turn is over: the voice's line on its pieces, if it
     /// keeps one ([`net::Tts::told`]).
@@ -150,6 +425,9 @@ impl Listener for SttStream {
 
 /// The real services, from the route's configuration.
 pub struct Net {
+    /// Per-instance test probe; counts first polls of concrete HTTP sends.
+    #[cfg(test)]
+    first_send_poll: Option<Arc<std::sync::atomic::AtomicUsize>>,
     config: Arc<SecondConfig>,
     chat: Arc<Chat>,
     tts: Arc<Tts>,
@@ -359,6 +637,8 @@ impl Net {
     /// `declare` gives the lamp's tools as they stand, at each chat request.
     pub fn new(config: SecondConfig, declare: net::Declare) -> net::Result<Self> {
         Ok(Self {
+            #[cfg(test)]
+            first_send_poll: None,
             chat: Arc::new(Chat::new(&config, declare.clone())?),
             tts: Arc::new(Tts::new(&config)?),
             gemini_tts: None,
@@ -616,41 +896,115 @@ impl Net {
         Ok(self)
     }
 
-    /// A chat told every function, or only those named.
+    /// A chat told every function, or only those named, for legacy callers.
     fn chat_told(
         &self,
         messages: Vec<Message>,
         only: Option<&'static [&'static str]>,
     ) -> BoxStream<'static, net::Result<ChatEvent>> {
+        self.chat_selected(
+            messages,
+            only.map_or(ChatFunctions::All, ChatFunctions::Only),
+            None,
+        )
+    }
+
+    /// One selection and one permission survive near/own/key-refusal fallbacks.
+    fn chat_selected(
+        &self,
+        messages: Vec<Message>,
+        functions: ChatFunctions,
+        permitted: Option<ChatPermission>,
+    ) -> BoxStream<'static, net::Result<ChatEvent>> {
         let chat = self.chat.clone();
         let refused_to = self.refused_to.clone();
         let near = self.near_chat();
-        stream::once(async move {
-            // Near, unless it fails on the link: then the same request goes
-            // to the chat's own address (#2882).
+        let permission = permitted.clone();
+        #[cfg(test)]
+        let first_send_poll = self.first_send_poll.clone();
+        let answer = stream::once(async move {
+            let (only, without, key_fallback) = match functions {
+                ChatFunctions::All => (None, &[][..], true),
+                ChatFunctions::Only(only) => (Some(only), &[][..], true),
+                // This path historically falls back near->own only. Do not add
+                // an own-key->relay request when unifying selection plumbing.
+                ChatFunctions::Without(without) => (None, without, false),
+            };
+            let allowed = || async {
+                match &permission {
+                    Some(permission) => wait_permitted(permission).await,
+                    None => true,
+                }
+            };
             if let Some((near_chat, taken, service)) = near {
-                let answer = near_chat.send_only(&messages, only).await;
+                if !allowed().await {
+                    return Ok(None);
+                }
+                let answer = near_chat
+                    .send_without_guarded(
+                        &messages,
+                        only,
+                        without,
+                        permission.as_ref(),
+                        #[cfg(test)]
+                        first_send_poll.as_deref(),
+                    )
+                    .await;
                 match answer.as_ref().err().and_then(routes::fallback_why) {
                     Some(why) => taken.fell(service, &why),
                     None => return answer,
                 }
             }
-            let answer = chat.send_only(&messages, only).await;
-            if let (Err(error), Some(refused)) = (&answer, &refused_to)
+            if !allowed().await {
+                return Ok(None);
+            }
+            let answer = chat
+                .send_without_guarded(
+                    &messages,
+                    only,
+                    without,
+                    permission.as_ref(),
+                    #[cfg(test)]
+                    first_send_poll.as_deref(),
+                )
+                .await;
+            if key_fallback
+                && let (Err(error), Some(refused)) = (&answer, &refused_to)
                 && let Some(status) = key_refused(error)
             {
                 (refused.told)(status);
-                return refused.relay.send_only(&messages, only).await;
+                // The notification itself may invalidate permission.
+                if !allowed().await {
+                    return Ok(None);
+                }
+                return refused
+                    .relay
+                    .send_without_guarded(
+                        &messages,
+                        only,
+                        without,
+                        permission.as_ref(),
+                        #[cfg(test)]
+                        first_send_poll.as_deref(),
+                    )
+                    .await;
             }
             answer
         })
         .map_ok(|answer| {
-            stream::try_unfold(answer, |mut answer| async move {
-                Ok(answer.next().await?.map(|event| (event, answer)))
+            stream::try_unfold(answer, |answer| async move {
+                let Some(mut answer) = answer else {
+                    return Ok(None);
+                };
+                Ok(answer.next().await?.map(|event| (event, Some(answer))))
             })
         })
         .try_flatten()
-        .boxed()
+        .boxed();
+        match permitted {
+            Some(permitted) => while_chat_permitted(answer, permitted),
+            None => answer,
+        }
     }
 
     /// Speech is Gemini's, in `voice` (`LAMP_SECOND_SPEECH=gemini`); a
@@ -677,16 +1031,19 @@ impl Net {
 async fn gemini_first(
     tts: &GeminiTts,
     text: &str,
-) -> net::Result<BoxStream<'static, net::Result<Vec<i16>>>> {
-    let mut speech = tts.speak(text).await?;
-    let first = speech
-        .next()
-        .await?
-        .ok_or(net::Error::Protocol("speech with no sound"))?;
+    permitted: Option<&ChatPermission>,
+) -> net::Result<Option<BoxStream<'static, net::Result<Vec<i16>>>>> {
+    let Some(mut speech) = tts.speak_permitted(text, permitted).await? else {
+        return Ok(None);
+    };
+    let Some(first) = permitted_result(speech.next(), permitted).await else {
+        return Ok(None);
+    };
+    let first = first?.ok_or(net::Error::Protocol("speech with no sound"))?;
     let rest = stream::try_unfold(speech, |mut speech| async move {
         Ok(speech.next().await?.map(|packet| (packet, speech)))
     });
-    Ok(stream::iter([Ok(first)]).chain(rest).boxed())
+    Ok(Some(stream::iter([Ok(first)]).chain(rest).boxed()))
 }
 
 /// The lamp's one voice ([`Net`]): Gemini's or the configured one.
@@ -709,19 +1066,22 @@ impl Voice {
         &self,
         text: &str,
         turn: Option<net::Turn>,
-    ) -> net::Result<BoxStream<'static, net::Result<Vec<i16>>>> {
+        permitted: Option<&ChatPermission>,
+    ) -> net::Result<Option<BoxStream<'static, net::Result<Vec<i16>>>>> {
         match self {
-            Self::Gemini(gemini) => gemini_first(gemini, text).await,
+            Self::Gemini(gemini) => gemini_first(gemini, text, permitted).await,
             Self::Configured(tts, _) => {
-                let mut speech = match turn {
-                    Some(turn) => tts.speak_for(text, turn).await?,
-                    None => tts.speak(text).await?,
+                let Some(mut speech) = tts.speak_permitted(text, turn, permitted).await? else {
+                    return Ok(None);
                 };
-                let first = speech.next().await?;
+                let Some(first) = permitted_result(speech.next(), permitted).await else {
+                    return Ok(None);
+                };
+                let first = first?;
                 let rest = stream::try_unfold(speech, |mut speech| async move {
                     Ok(speech.next().await?.map(|packet| (packet, speech)))
                 });
-                Ok(stream::iter(first.map(Ok)).chain(rest).boxed())
+                Ok(Some(stream::iter(first.map(Ok)).chain(rest).boxed()))
             }
         }
     }
@@ -757,21 +1117,67 @@ fn in_one_voice_near(
     text: String,
     turn: Option<net::Turn>,
 ) -> BoxStream<'static, net::Result<Vec<i16>>> {
+    in_one_voice_near_guarded(
+        voice,
+        own,
+        text,
+        turn,
+        None,
+        #[cfg(test)]
+        None,
+    )
+}
+
+fn in_one_voice_near_guarded(
+    voice: Voice,
+    own: Option<(Voice, Taken, Service)>,
+    text: String,
+    turn: Option<net::Turn>,
+    permitted: Option<ChatPermission>,
+    #[cfg(test)] after_attempt: Option<Arc<dyn Fn() + Send + Sync>>,
+) -> BoxStream<'static, net::Result<Vec<i16>>> {
+    // A private piece's initial recognition wait consumes the first attempt's
+    // ceiling from synchronous construction, not a fresh clock at resume.
+    let mut first_until = permitted
+        .as_ref()
+        .map(|_| tokio::time::Instant::now() + START_WITHIN);
     stream::once(async move {
         if !GeminiTts::speaks(&text) {
             return Ok(stream::empty().boxed());
         }
-        let first = |voice: &Voice| {
+        let mut first = |voice: &Voice| {
+            let until = first_until.take().unwrap_or_else(|| tokio::time::Instant::now() + START_WITHIN);
             let text = text.clone();
             let voice = voice.clone();
+            let permitted = permitted.clone();
+            #[cfg(test)]
+            let after_attempt = after_attempt.clone();
             async move {
-                tokio::time::timeout(START_WITHIN, voice.first(&text, turn))
-                    .await
-                    .unwrap_or(Err(net::Error::Timeout("speech's first sound")))
+                if permitted.is_some() && tokio::time::Instant::now() >= until {
+                    return Ok(None);
+                }
+                let attempting = async {
+                    let answer = voice.first(&text, turn, permitted.as_ref()).await;
+                    #[cfg(test)]
+                    if let Some(after_attempt) = after_attempt {
+                        // A fixture closes the actual kernel FD after a real
+                        // transport result, before a fallback can be polled.
+                        after_attempt();
+                    }
+                    answer
+                };
+                match permitted_until(attempting, permitted.as_ref(), until).await {
+                    Some(Ok(result)) => result,
+                    None => Ok(None),
+                    Some(Err(())) => Err(net::Error::Timeout("speech's first sound")),
+                }
             }
         };
         let mut voice = voice;
         let mut tried = first(&voice).await;
+        if matches!(tried, Ok(None)) {
+            return Ok(stream::empty().boxed());
+        }
         let why = tried.as_ref().err().and_then(routes::fallback_why);
         if let (Some(why), Some((own, taken, service))) = (why, own) {
             taken.fell(service, &why);
@@ -779,14 +1185,22 @@ fn in_one_voice_near(
             tried = first(&voice).await;
         }
         match tried {
-            Ok(speech) => Ok(speech),
+            Ok(Some(speech)) => Ok(match &permitted {
+                Some(permitted) => while_permitted(speech, permitted.clone()),
+                None => speech,
+            }),
+            Ok(None) => Ok(stream::empty().boxed()),
             Err(error) => {
                 eprintln!(
                     "lamp-voice second: {} failed to start a sentence ({error}); asked once more",
                     voice.name()
                 );
                 match first(&voice).await {
-                    Ok(speech) => Ok(speech),
+                    Ok(Some(speech)) => Ok(match &permitted {
+                        Some(permitted) => while_permitted(speech, permitted.clone()),
+                        None => speech,
+                    }),
+                    Ok(None) => Ok(stream::empty().boxed()),
                     Err(again) => {
                         eprintln!(
                             "lamp-voice second: {} failed again ({again}); the sentence is not said, and the turn goes on",
@@ -881,25 +1295,16 @@ impl Services for Net {
         messages: Vec<Message>,
         without: &'static [&'static str],
     ) -> BoxStream<'static, net::Result<ChatEvent>> {
-        let chat = self.chat.clone();
-        let near = self.near_chat();
-        stream::once(async move {
-            if let Some((near_chat, taken, service)) = near {
-                let answer = near_chat.send_without(&messages, None, without).await;
-                match answer.as_ref().err().and_then(routes::fallback_why) {
-                    Some(why) => taken.fell(service, &why),
-                    None => return answer,
-                }
-            }
-            chat.send_without(&messages, None, without).await
-        })
-        .map_ok(|answer| {
-            stream::try_unfold(answer, |mut answer| async move {
-                Ok(answer.next().await?.map(|event| (event, answer)))
-            })
-        })
-        .try_flatten()
-        .boxed()
+        self.chat_selected(messages, ChatFunctions::Without(without), None)
+    }
+
+    fn chat_guarded(
+        &self,
+        messages: Vec<Message>,
+        functions: ChatFunctions,
+        permitted: ChatPermission,
+    ) -> BoxStream<'static, net::Result<ChatEvent>> {
+        self.chat_selected(messages, functions, Some(permitted))
     }
 
     fn declares(&self, messages: &[Message], without: &[&str], name: &str) -> Option<bool> {
@@ -918,6 +1323,27 @@ impl Services for Net {
     ) -> BoxStream<'static, net::Result<Vec<i16>>> {
         let (voice, own) = self.turn_voice();
         in_one_voice_near(voice, own, text, Some(turn))
+    }
+
+    fn speak_for_guarded(
+        &self,
+        text: String,
+        turn: net::Turn,
+        permitted: ChatPermission,
+    ) -> BoxStream<'static, net::Result<Vec<i16>>> {
+        if permitted() == PermissionState::Lost {
+            return stream::empty().boxed();
+        }
+        let (voice, own) = self.turn_voice();
+        in_one_voice_near_guarded(
+            voice,
+            own,
+            text,
+            Some(turn),
+            Some(permitted),
+            #[cfg(test)]
+            None,
+        )
     }
 
     fn spoken(&self, request: u64) {
@@ -2019,4 +2445,728 @@ pub(crate) mod tests {
         assert!(asked(2).await, "{:?}", relay.seen());
         task.abort();
     }
+
+    /// Actual Net HTTP fallback happens inside the first
+    /// stream poll, before Prepared gets an event to recheck private authority.
+    #[tokio::test]
+    async fn private_prepared_http_fallback_rechecks_request_and_fresh_proof() {
+        use crate::memory_scope::{RequestKey, RequestScope, ScopeSnapshot};
+        use crate::second_provider::{Engine, Prepared, Told};
+        use std::sync::atomic::{AtomicBool, Ordering};
+        use std::time::Duration;
+
+        async fn body(socket: &mut tokio::net::TcpStream) -> Vec<u8> {
+            let mut raw = head_of(socket).await.expect("complete HTTP head");
+            let end = raw.windows(4).position(|w| w == b"\r\n\r\n").unwrap() + 4;
+            let length: usize = String::from_utf8_lossy(&raw[..end])
+                .lines()
+                .find_map(|line| {
+                    line.to_ascii_lowercase()
+                        .strip_prefix("content-length:")
+                        .map(|n| n.trim().parse().unwrap())
+                })
+                .expect("bounded test request has content-length");
+            assert!(length < 64 * 1024);
+            while raw.len() - end < length {
+                let mut chunk = [0; 4096];
+                let n = socket.read(&mut chunk).await.unwrap();
+                assert!(n > 0);
+                raw.extend_from_slice(&chunk[..n]);
+            }
+            raw[end..end + length].to_vec()
+        }
+
+        // Every mode gets actual near->own and own-key->relay HTTP paths.
+        // No Script chat implementation or simulated fallback is used.
+        let mut violations = Vec::new();
+        for key_refusal in [false, true] {
+            for mode in ["alive", "proof-lost", "scope-revoked", "room", "neutral"] {
+                let private = !matches!(mode, "room" | "neutral");
+                let first = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+                let fallback = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+                let first_url = format!("http://{}", first.local_addr().unwrap());
+                let fallback_url = format!("http://{}", fallback.local_addr().unwrap());
+                let (arrived, arrival) = tokio::sync::oneshot::channel();
+                let (release, released) = tokio::sync::oneshot::channel();
+                let first_task = tokio::spawn(async move {
+                    tokio::time::timeout(Duration::from_secs(3), async move {
+                        let (mut socket, _) = first.accept().await.unwrap();
+                        let sent = body(&mut socket).await;
+                        arrived.send(sent).unwrap();
+                        released.await.unwrap();
+                        socket
+                            .write_all(if key_refusal {
+                                UNAUTHORIZED.as_bytes()
+                            } else {
+                                UNAVAILABLE.as_bytes()
+                            })
+                            .await
+                            .unwrap();
+                    })
+                    .await
+                    .expect("first HTTP barrier bounded");
+                });
+                let seen: Arc<Mutex<Vec<Vec<u8>>>> = Arc::default();
+                let observed = seen.clone();
+                let fallback_task = tokio::spawn(async move {
+                    let (mut socket, _) = fallback.accept().await.unwrap();
+                    let sent = body(&mut socket).await;
+                    observed.lock().unwrap().push(sent);
+                    let (head, answer) = answered("public fixture answer").unwrap();
+                    socket.write_all(head.as_bytes()).await.unwrap();
+                    socket.write_all(&answer).await.unwrap();
+                });
+                let key = "k-private-fallback-boundary";
+                let net = if key_refusal {
+                    Net::new(
+                        config_at("private-key", key, &first_url, &first_url),
+                        Arc::new(Vec::new),
+                    )
+                    .unwrap()
+                    .falling_back_to_the_relay(&fallback_url, Arc::new(|_| {}))
+                    .unwrap()
+                } else {
+                    let net = routed(
+                        config_at("private-near", key, &fallback_url, &fallback_url),
+                        THREE,
+                    );
+                    kept(&net).set(Routes {
+                        chat: Some(format!("{first_url}{BASE}/deepseek")),
+                        ..Routes::default()
+                    });
+                    net.turn_begins();
+                    net
+                };
+                let valid = Arc::new(AtomicBool::new(true));
+                let fresh = valid.clone();
+                let text = if private {
+                    "PRIVATE_CONTEXT_CANARY"
+                } else {
+                    "PUBLIC_CONTEXT"
+                };
+                let engine = Engine::new(
+                    Arc::new(net),
+                    move || Told {
+                        text: text.into(),
+                        requires_speaker: private,
+                        ..Told::default()
+                    },
+                    Arc::new(|_, _, _, _| Box::pin(async { panic!("no tools in fixture") })),
+                )
+                .guarding_private_context(Arc::new(move |_| fresh.load(Ordering::Acquire).into()));
+                let owner = RequestScope::new(
+                    RequestKey {
+                        worker: lamp_turn_owner::BootId::new([39; 16]).unwrap(),
+                        session: 1,
+                        request: 2,
+                    },
+                    if mode == "room" {
+                        ScopeSnapshot::room()
+                    } else {
+                        ScopeSnapshot::of("Fixture owner")
+                    },
+                );
+                let lease = owner.lease();
+                let mut prepared = Prepared::begin(
+                    &engine.shared,
+                    Some(&lease),
+                    "question".into(),
+                    &[],
+                    None,
+                    false,
+                );
+                let first_body = tokio::time::timeout(Duration::from_secs(2), arrival)
+                    .await
+                    .unwrap()
+                    .unwrap();
+                assert_eq!(
+                    String::from_utf8_lossy(&first_body).contains("PRIVATE_CONTEXT_CANARY"),
+                    private
+                );
+                if mode == "proof-lost" {
+                    valid.store(false, Ordering::Release);
+                    assert!(
+                        lease.is_current(),
+                        "fresh proof loss must not fake lease revocation"
+                    );
+                } else if mode == "scope-revoked" {
+                    owner.revoke();
+                    assert!(!lease.is_current());
+                } else if matches!(mode, "room" | "neutral") {
+                    valid.store(false, Ordering::Release);
+                    assert!(lease.is_current());
+                }
+                release.send(()).unwrap();
+                tokio::time::timeout(Duration::from_secs(2), async {
+                    while prepared.events.recv().await.is_some() {}
+                })
+                .await
+                .expect("prepared HTTP stream completes");
+                first_task.await.unwrap();
+                // A bad fallback has already read its complete body before answering;
+                // stream completion is therefore a deterministic observation barrier.
+                let bodies = seen.lock().unwrap().clone();
+                let allowed = !matches!(mode, "proof-lost" | "scope-revoked");
+                if bodies.len() != usize::from(allowed) {
+                    violations.push((key_refusal, mode, bodies.len(), usize::from(allowed)));
+                }
+                if allowed {
+                    assert_eq!(bodies.len(), 1);
+                    assert_eq!(
+                        String::from_utf8_lossy(&bodies[0]).contains("PRIVATE_CONTEXT_CANARY"),
+                        private
+                    );
+                }
+                fallback_task.abort();
+            }
+        }
+        assert!(
+            violations.is_empty(),
+            "HTTP fallback escaped authority: {violations:?}"
+        );
+    }
+
+    struct PermissionFixture {
+        selected: Arc<Mutex<Vec<ChatFunctions>>>,
+        polled: Arc<std::sync::atomic::AtomicUsize>,
+        expire: Option<Arc<std::sync::atomic::AtomicBool>>,
+    }
+
+    impl PermissionFixture {
+        fn selected(&self, functions: ChatFunctions) -> BoxStream<'static, net::Result<ChatEvent>> {
+            self.selected.lock().unwrap().push(functions);
+            let polled = self.polled.clone();
+            let expire = self.expire.clone();
+            stream::poll_fn(move |_| {
+                polled.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                if let Some(expire) = &expire {
+                    expire.store(false, std::sync::atomic::Ordering::Release);
+                }
+                std::task::Poll::Ready(Some(Ok(ChatEvent::Text("fixture".into()))))
+            })
+            .boxed()
+        }
+    }
+
+    impl Services for PermissionFixture {
+        fn listen(&self) -> BoxFuture<'static, net::Result<Box<dyn Listener>>> {
+            Box::pin(async { panic!("chat-only fixture") })
+        }
+        fn chat(&self, _: Vec<Message>) -> BoxStream<'static, net::Result<ChatEvent>> {
+            self.selected(ChatFunctions::All)
+        }
+        fn chat_only(
+            &self,
+            _: Vec<Message>,
+            only: &'static [&'static str],
+        ) -> BoxStream<'static, net::Result<ChatEvent>> {
+            self.selected(ChatFunctions::Only(only))
+        }
+        fn chat_without(
+            &self,
+            _: Vec<Message>,
+            without: &'static [&'static str],
+        ) -> BoxStream<'static, net::Result<ChatEvent>> {
+            self.selected(ChatFunctions::Without(without))
+        }
+        fn speak(&self, _: String) -> BoxStream<'static, net::Result<Vec<i16>>> {
+            panic!("chat-only fixture")
+        }
+    }
+
+    #[tokio::test]
+    async fn default_chat_permission_preserves_each_legacy_function_selection() {
+        let net = PermissionFixture {
+            selected: Arc::default(),
+            polled: Arc::default(),
+            expire: None,
+        };
+        for functions in [
+            ChatFunctions::All,
+            ChatFunctions::Only(&["allowed"]),
+            ChatFunctions::Without(&["withheld"]),
+        ] {
+            let mut chat = net.chat_guarded(
+                vec![Message::user("question")],
+                functions,
+                Arc::new(|| PermissionState::Ready),
+            );
+            assert!(matches!(chat.next().await, Some(Ok(ChatEvent::Text(_)))));
+        }
+        let selected = net.selected.lock().unwrap();
+        assert!(
+            matches!(selected.as_slice(), [ChatFunctions::All, ChatFunctions::Only(only), ChatFunctions::Without(without)] if *only == ["allowed"] && *without == ["withheld"])
+        );
+        assert_eq!(net.polled.load(std::sync::atomic::Ordering::Relaxed), 3);
+    }
+
+    #[tokio::test]
+    async fn default_chat_permission_checks_before_construction_and_first_poll() {
+        use std::sync::atomic::{AtomicBool, Ordering};
+        let net = PermissionFixture {
+            selected: Arc::default(),
+            polled: Arc::default(),
+            expire: None,
+        };
+        let mut denied = net.chat_guarded(
+            Vec::new(),
+            ChatFunctions::All,
+            Arc::new(|| PermissionState::Lost),
+        );
+        assert!(denied.next().await.is_none());
+        assert!(net.selected.lock().unwrap().is_empty());
+        let valid = Arc::new(AtomicBool::new(true));
+        let permission = valid.clone();
+        let mut delayed = net.chat_guarded(
+            Vec::new(),
+            ChatFunctions::Only(&[]),
+            Arc::new(move || permission.load(Ordering::Acquire).into()),
+        );
+        assert_eq!(net.selected.lock().unwrap().len(), 1);
+        valid.store(false, Ordering::Release);
+        assert!(delayed.next().await.is_none());
+        valid.store(true, Ordering::Release);
+        assert!(
+            delayed.next().await.is_none(),
+            "a denied stream cannot revive"
+        );
+        assert_eq!(net.polled.load(Ordering::Relaxed), 0);
+    }
+
+    #[tokio::test]
+    async fn default_chat_permission_discards_a_poll_that_expires_and_never_revives() {
+        use std::sync::atomic::{AtomicBool, Ordering};
+        let valid = Arc::new(AtomicBool::new(true));
+        let net = PermissionFixture {
+            selected: Arc::default(),
+            polled: Arc::default(),
+            expire: Some(valid.clone()),
+        };
+        let permission = valid.clone();
+        let mut chat = net.chat_guarded(
+            Vec::new(),
+            ChatFunctions::Without(&["private"]),
+            Arc::new(move || permission.load(Ordering::Acquire).into()),
+        );
+        assert!(
+            chat.next().await.is_none(),
+            "the child expired during its poll"
+        );
+        valid.store(true, Ordering::Release);
+        assert!(chat.next().await.is_none());
+        assert_eq!(net.polled.load(Ordering::Relaxed), 1);
+    }
+
+    #[tokio::test]
+    async fn without_chat_keeps_its_existing_fallback_contract_when_guarded() {
+        let key = "k-guarded-without-fallback";
+        let near = stub(key, vec![(CHAT, Some((UNAVAILABLE, Vec::new())))]).await;
+        let own = stub(key, vec![(CHAT, Some((UNAUTHORIZED, Vec::new())))]).await;
+        let relay = stub(key, vec![(CHAT, answered("relay"))]).await;
+        for guarded in [false, true] {
+            let net = routed(config_at("guarded-without", key, &own.url, &own.url), THREE)
+                .falling_back_to_the_relay(
+                    &relay.url,
+                    Arc::new(|_| panic!("Without never used own-key fallback")),
+                )
+                .unwrap();
+            kept(&net).set(near_chat(&near));
+            net.turn_begins();
+            let messages = vec![Message::user("question")];
+            let mut chat = if guarded {
+                net.chat_guarded(
+                    messages,
+                    ChatFunctions::Without(&["private"]),
+                    Arc::new(|| PermissionState::Ready),
+                )
+            } else {
+                net.chat_without(messages, &["private"])
+            };
+            assert!(matches!(
+                chat.next().await,
+                Some(Err(net::Error::Status(401)))
+            ));
+        }
+        assert_eq!(near.asked(CHAT), 2);
+        assert_eq!(own.asked(CHAT), 2);
+        assert_eq!(relay.asked(CHAT), 0);
+    }
+
+    /// Real Net declaration blocks before serialization; revoke at that exact
+    /// boundary and require zero HTTP requests to the selected endpoint.
+    #[tokio::test]
+    async fn declaration_barrier_rechecks_permission_before_each_http_attempt() {
+        use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+        for attempt in 1..=3 {
+            for revoke in [false, true] {
+                let key = "k-declaration-authority-boundary";
+                let near = stub(
+                    key,
+                    vec![(
+                        CHAT,
+                        if attempt == 1 {
+                            answered("near")
+                        } else {
+                            Some((UNAVAILABLE, Vec::new()))
+                        },
+                    )],
+                )
+                .await;
+                let own = stub(
+                    key,
+                    vec![(
+                        CHAT,
+                        if attempt == 2 {
+                            answered("own")
+                        } else {
+                            Some((UNAUTHORIZED, Vec::new()))
+                        },
+                    )],
+                )
+                .await;
+                let relay = stub(key, vec![(CHAT, answered("relay"))]).await;
+                let valid = Arc::new(AtomicBool::new(true));
+                let calls = Arc::new(AtomicUsize::new(0));
+                let (entered, waiting) = std::sync::mpsc::sync_channel(1);
+                let (release, released) = std::sync::mpsc::sync_channel(1);
+                let released = std::sync::Mutex::new(released);
+                let counted = calls.clone();
+                let declare = Arc::new(move || {
+                    if counted.fetch_add(1, Ordering::AcqRel) + 1 == attempt {
+                        entered.send(()).unwrap();
+                        released
+                            .lock()
+                            .unwrap()
+                            .recv_timeout(std::time::Duration::from_secs(2))
+                            .unwrap();
+                    }
+                    Vec::new()
+                });
+                let sends = Arc::new(AtomicUsize::new(0));
+                let mut net = Net::new(
+                    config_at("declaration-authority", key, &own.url, &own.url),
+                    declare,
+                )
+                .unwrap()
+                .routing_through_the_relay(THREE)
+                .falling_back_to_the_relay(&relay.url, Arc::new(|_| {}))
+                .unwrap();
+                net.first_send_poll = Some(sends.clone());
+                kept(&net).set(near_chat(&near));
+                net.turn_begins();
+                let changed = valid.clone();
+                let controller = std::thread::spawn(move || {
+                    waiting
+                        .recv_timeout(std::time::Duration::from_secs(2))
+                        .unwrap();
+                    changed.store(!revoke, Ordering::Release);
+                    release.send(()).unwrap();
+                });
+                let permission = valid.clone();
+                let mut chat = net.chat_guarded(
+                    vec![Message::system("PRIVATE_DECLARATION_CANARY")],
+                    ChatFunctions::All,
+                    Arc::new(move || permission.load(Ordering::Acquire).into()),
+                );
+                let outcome = tokio::time::timeout(std::time::Duration::from_secs(5), async {
+                    while let Some(event) = chat.next().await {
+                        event.unwrap();
+                    }
+                })
+                .await;
+                controller.join().unwrap();
+                outcome.expect("bounded declaration control");
+                assert_eq!(calls.load(Ordering::Acquire), attempt);
+                assert_eq!(
+                    sends.load(Ordering::Acquire),
+                    attempt - usize::from(revoke),
+                    "revoked declaration must never poll its concrete HTTP send"
+                );
+                assert_eq!(near.asked(CHAT), usize::from(attempt > 1 || !revoke));
+                assert_eq!(
+                    own.asked(CHAT),
+                    usize::from(attempt > 2 || (attempt == 2 && !revoke))
+                );
+                assert_eq!(relay.asked(CHAT), usize::from(attempt == 3 && !revoke));
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn pending_after_declaration_keeps_one_prepared_http_request() {
+        use std::sync::atomic::{AtomicU8, AtomicUsize, Ordering};
+        let key = "k-pending-declaration-boundary";
+        let own = stub(key, vec![(CHAT, answered("own"))]).await;
+        let state = Arc::new(AtomicU8::new(0));
+        let declarations = Arc::new(AtomicUsize::new(0));
+        let (noticed, pending) = std::sync::mpsc::sync_channel(1);
+        let pause = state.clone();
+        let counted = declarations.clone();
+        let net = Net::new(
+            config_at("pending-declaration", key, &own.url, &own.url),
+            Arc::new(move || {
+                counted.fetch_add(1, Ordering::AcqRel);
+                pause.store(1, Ordering::Release);
+                Vec::new()
+            }),
+        )
+        .unwrap();
+        let resume = state.clone();
+        let controller = std::thread::spawn(move || {
+            pending
+                .recv_timeout(std::time::Duration::from_secs(2))
+                .unwrap();
+            resume.store(0, Ordering::Release);
+        });
+        let permission = state.clone();
+        let mut chat = net.chat_guarded(
+            vec![Message::system("PRIVATE_PENDING_CANARY")],
+            ChatFunctions::All,
+            Arc::new(move || match permission.load(Ordering::Acquire) {
+                0 => PermissionState::Ready,
+                _ => {
+                    let _ = noticed.try_send(());
+                    PermissionState::Pending
+                }
+            }),
+        );
+        let outcome = tokio::time::timeout(std::time::Duration::from_secs(5), async {
+            while let Some(event) = chat.next().await {
+                event.unwrap();
+            }
+        })
+        .await;
+        controller.join().unwrap();
+        outcome.expect("pending retained the original bounded request");
+        assert_eq!(declarations.load(Ordering::Acquire), 1);
+        assert_eq!(own.asked(CHAT), 1);
+    }
+
+    #[tokio::test]
+    async fn key_refusal_notification_cannot_authorize_a_later_relay_send() {
+        use std::sync::atomic::{AtomicBool, Ordering};
+        let key = "k-guarded-refusal-callback";
+        let own = stub(key, vec![(CHAT, Some((UNAUTHORIZED, Vec::new())))]).await;
+        let relay = stub(key, vec![(CHAT, answered("relay"))]).await;
+        let valid = Arc::new(AtomicBool::new(true));
+        let expire = valid.clone();
+        let net = Net::new(
+            config_at("guarded-refusal", key, &own.url, &own.url),
+            Arc::new(Vec::new),
+        )
+        .unwrap()
+        .falling_back_to_the_relay(
+            &relay.url,
+            Arc::new(move |status| {
+                assert_eq!(status, 401);
+                expire.store(false, Ordering::Release);
+            }),
+        )
+        .unwrap();
+        let permission = valid.clone();
+        let mut chat = net.chat_guarded(
+            vec![Message::system("PRIVATE_CONTEXT_CANARY")],
+            ChatFunctions::Only(&[]),
+            Arc::new(move || permission.load(Ordering::Acquire).into()),
+        );
+        assert!(chat.next().await.is_none());
+        valid.store(true, Ordering::Release);
+        assert!(
+            chat.next().await.is_none(),
+            "a denied fallback cannot revive"
+        );
+        assert_eq!(own.asked(CHAT), 1);
+        assert_eq!(relay.asked(CHAT), 0);
+    }
+
+    #[tokio::test]
+    async fn chat_permission_rechecks_a_resumed_pending_poll_and_stays_stopped() {
+        use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+        let valid = Arc::new(AtomicBool::new(true));
+        let polls = Arc::new(AtomicUsize::new(0));
+        let observed = polls.clone();
+        let pending = stream::poll_fn(move |_| {
+            observed.fetch_add(1, Ordering::Relaxed);
+            std::task::Poll::Pending
+        })
+        .boxed();
+        let permission = valid.clone();
+        let mut chat = while_chat_permitted(
+            pending,
+            Arc::new(move || permission.load(Ordering::Acquire).into()),
+        );
+        std::future::poll_fn(|cx| {
+            assert!(futures_util::Stream::poll_next(chat.as_mut(), cx).is_pending());
+            std::task::Poll::Ready(())
+        })
+        .await;
+        valid.store(false, Ordering::Release);
+        assert!(chat.next().await.is_none());
+        valid.store(true, Ordering::Release);
+        assert!(chat.next().await.is_none());
+        assert_eq!(polls.load(Ordering::Relaxed), 1);
+    }
+
+    fn pending_state(value: &std::sync::atomic::AtomicU8) -> PermissionState {
+        use std::sync::atomic::Ordering;
+        match value.load(Ordering::Acquire) {
+            0 => PermissionState::Ready,
+            1 => PermissionState::Pending,
+            _ => PermissionState::Lost,
+        }
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn permission_pending_retains_the_childs_item_without_repolling() {
+        use std::sync::atomic::{AtomicU8, AtomicUsize, Ordering};
+        for resume in [true, false] {
+            let value = Arc::new(AtomicU8::new(0));
+            let polls = Arc::new(AtomicUsize::new(0));
+            let (changed, counted) = (value.clone(), polls.clone());
+            let inner = stream::poll_fn(move |_| {
+                let poll = counted.fetch_add(1, Ordering::Relaxed);
+                if poll == 0 {
+                    changed.store(1, Ordering::Release);
+                }
+                std::task::Poll::Ready((poll == 0).then_some(41_u8))
+            })
+            .boxed();
+            let observed = value.clone();
+            let mut held = while_permitted(inner, Arc::new(move || pending_state(&observed)));
+            assert!(
+                tokio::time::timeout(std::time::Duration::from_millis(60), held.next())
+                    .await
+                    .is_err()
+            );
+            assert_eq!(polls.load(Ordering::Relaxed), 1);
+            value.store(if resume { 0 } else { 2 }, Ordering::Release);
+            assert_eq!(held.next().await, resume.then_some(41));
+            value.store(0, Ordering::Release);
+            assert!(held.next().await.is_none());
+            assert_eq!(polls.load(Ordering::Relaxed), if resume { 2 } else { 1 });
+        }
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn permission_pending_retains_eof_and_timer_observes_loss_without_child_wake() {
+        use std::sync::atomic::{AtomicU8, AtomicUsize, Ordering};
+        let value = Arc::new(AtomicU8::new(0));
+        let polls = Arc::new(AtomicUsize::new(0));
+        let (changed, counted) = (value.clone(), polls.clone());
+        let inner = stream::poll_fn(move |_| {
+            counted.fetch_add(1, Ordering::Relaxed);
+            changed.store(1, Ordering::Release);
+            std::task::Poll::Ready(None::<u8>)
+        })
+        .boxed();
+        let observed = value.clone();
+        let mut held = while_permitted(inner, Arc::new(move || pending_state(&observed)));
+        assert!(
+            tokio::time::timeout(std::time::Duration::from_millis(60), held.next())
+                .await
+                .is_err()
+        );
+        assert_eq!(polls.load(Ordering::Relaxed), 1);
+        value.store(0, Ordering::Release);
+        assert!(held.next().await.is_none());
+        assert_eq!(
+            polls.load(Ordering::Relaxed),
+            1,
+            "EOF is retained, not fetched twice"
+        );
+
+        let deadline = tokio::time::Instant::now() + std::time::Duration::from_millis(45);
+        let mut never = while_permitted(
+            stream::pending::<u8>().boxed(),
+            Arc::new(move || {
+                if tokio::time::Instant::now() < deadline {
+                    PermissionState::Ready
+                } else {
+                    PermissionState::Lost
+                }
+            }),
+        );
+        assert!(
+            tokio::time::timeout(std::time::Duration::from_millis(80), never.next())
+                .await
+                .unwrap()
+                .is_none()
+        );
+    }
+
+    #[tokio::test]
+    async fn key_refusal_waits_for_ready_before_relay_and_lost_never_retries() {
+        use std::sync::atomic::{AtomicU8, Ordering};
+        use std::time::Duration;
+        for resume in [true, false] {
+            let key = "k-pending-refusal-callback";
+            let own = stub(key, vec![(CHAT, Some((UNAUTHORIZED, Vec::new())))]).await;
+            let relay = stub(key, vec![(CHAT, answered("fixture answer"))]).await;
+            let value = Arc::new(AtomicU8::new(0));
+            let changed = value.clone();
+            let (arrived, arrival) = tokio::sync::oneshot::channel();
+            let arrived = Mutex::new(Some(arrived));
+            let net = Net::new(
+                config_at("pending-refusal", key, &own.url, &own.url),
+                Arc::new(Vec::new),
+            )
+            .unwrap()
+            .falling_back_to_the_relay(
+                &relay.url,
+                Arc::new(move |status| {
+                    assert_eq!(status, 401);
+                    changed.store(1, Ordering::Release);
+                    arrived.lock().unwrap().take().unwrap().send(()).unwrap();
+                }),
+            )
+            .unwrap();
+            let observed = value.clone();
+            let mut chat = net.chat_guarded(
+                vec![Message::system("PRIVATE_CONTEXT_CANARY")],
+                ChatFunctions::Only(&[]),
+                Arc::new(move || pending_state(&observed)),
+            );
+            let task = tokio::spawn(async move {
+                let mut events = Vec::new();
+                while let Some(event) = chat.next().await {
+                    events.push(event);
+                }
+                events
+            });
+            tokio::time::timeout(Duration::from_secs(2), arrival)
+                .await
+                .unwrap()
+                .unwrap();
+            assert_eq!(own.asked(CHAT), 1);
+            assert_eq!(
+                relay.asked(CHAT),
+                0,
+                "Pending before the fallback's actual send"
+            );
+            // The callback is an exact in-poll barrier. Additional timer polls
+            // must still leave the lazy relay unsent and the stream alive.
+            tokio::time::sleep(Duration::from_millis(60)).await;
+            assert!(!task.is_finished());
+            assert_eq!(relay.asked(CHAT), 0);
+            value.store(if resume { 0 } else { 2 }, Ordering::Release);
+            let events = tokio::time::timeout(Duration::from_secs(2), task)
+                .await
+                .unwrap()
+                .unwrap();
+            assert_eq!(relay.asked(CHAT), usize::from(resume));
+            assert_eq!(
+                events
+                    .iter()
+                    .any(|event| matches!(event, Ok(ChatEvent::Text(_)))),
+                resume
+            );
+            assert!(events.iter().all(Result::is_ok));
+            value.store(0, Ordering::Release);
+            assert_eq!(relay.asked(CHAT), usize::from(resume));
+        }
+    }
 }
+
+#[cfg(test)]
+#[path = "services/tts_authority_tests.rs"]
+pub(crate) mod tts_authority_tests;

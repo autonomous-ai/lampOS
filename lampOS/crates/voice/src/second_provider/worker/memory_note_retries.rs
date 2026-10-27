@@ -251,6 +251,8 @@ fn authority_lost_during_a_note_read_discards_the_whole_context() {
                 entered.send(()).unwrap();
                 released.recv_timeout(Duration::from_secs(2)).unwrap();
                 Told {
+                    requires_speaker: false,
+                    pending_private_context: false,
                     text: "personal note".into(),
                     after: Some("private thread".into()),
                     history: vec![super::Message::user("private exchange")],
@@ -970,14 +972,24 @@ impl Drop for Paced {
 /// uses them, against `memory`, with the process's one thread set aside
 /// (a turn's context opens it) and put back after.
 struct Turns {
+    authority: Option<crate::camera_authority::fixture::Fixture>,
     sessions: Arc<Mutex<Sessions>>,
     ahead: super::Ahead,
     client: Arc<DaysClient>,
+    directory: crate::process::SessionDirectory,
     kept: Option<crate::thread::Thread>,
     _one: crate::provider_worker::tests::OneThread,
 }
 impl Turns {
     fn new(memory: &Paced) -> Self {
+        Self::starting(memory, false)
+    }
+
+    fn with_camera(memory: &Paced) -> Self {
+        Self::starting(memory, true)
+    }
+
+    fn starting(memory: &Paced, camera: bool) -> Self {
         let one = crate::provider_worker::tests::one_thread();
         let kept = std::mem::take(
             &mut *crate::thread::THREAD
@@ -986,27 +998,112 @@ impl Turns {
         );
         let client = Arc::new(DaysClient::new(memory.socket.clone()).unwrap());
         let sessions = Arc::new(Mutex::new(Sessions::default()));
+        let mut directory = crate::process::SessionDirectory::create().unwrap();
+        let authority = camera.then(|| {
+            directory.path = directory.path.canonicalize().unwrap();
+            crate::camera_authority::fixture::Fixture::start(
+                directory.path.join("known"),
+                [
+                    0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef, 0x01, 0x23, 0x45, 0x67, 0x89,
+                    0xab, 0xcd, 0xef,
+                ],
+                1,
+            )
+        });
         let reading = client.clone();
         let ahead = super::Ahead::asking(
             sessions.clone(),
-            None,
-            Arc::new(move |session, person, within, follow_up| {
-                reading.read_note_within(session, person, false, within, (true, follow_up))
+            Some(directory.path.join("known")),
+            Arc::new(move |session, person, within, follow_up, permitted| {
+                reading.read_note_permitted(
+                    session,
+                    person,
+                    false,
+                    within,
+                    (true, follow_up, &permitted),
+                )
             }),
         );
         Self {
+            authority,
             sessions,
             ahead,
             client,
+            directory,
             kept: Some(kept),
             _one: one,
         }
     }
 
+    /// The original private scope/seal with a real camera client attached.
+    /// Room-only and scope-policy units keep their original scoped() helper.
+    fn camera_scope(&self, request: u64, snapshot: ScopeSnapshot) -> RequestScope {
+        let prove = snapshot.person().is_some() && !snapshot.held();
+        let mut owner = RequestScope::looking_later(
+            RequestKey {
+                worker: lamp_turn_owner::BootId::new([9; 16]).unwrap(),
+                session: 1,
+                request,
+            },
+            snapshot,
+            self.authority.as_ref().unwrap().cache(),
+        );
+        if prove {
+            let key = owner.lease().key();
+            assert!(owner.speaker_recorder().unwrap().seal(
+                key,
+                &["0123456789abcdef/f7".into()],
+                Instant::now() + Duration::from_secs(20)
+            ));
+        }
+        owner
+    }
+
     /// A line begins in `scope`, and nothing more is done with it: it is
     /// someone's talk in the room, never answered.
     fn begins(&self, scope: &RequestScope) {
+        self.observed(scope);
         self.ahead.begin(Some(&scope.lease()), Instant::now());
+    }
+
+    /// Publish actual matching atomic Eyes evidence for the synthetic private
+    /// fixture. Original Room and narrowed private remain distinct admissions.
+    fn observed(&self, scope: &RequestScope) {
+        let Some(person) = scope
+            .lease()
+            .admitted_scope()
+            .and_then(|scope| scope.person())
+            .map(str::to_owned)
+        else {
+            return;
+        };
+        let name = ["Scope P", "Scope Q", "Scope A"]
+            .into_iter()
+            .find(|name| crate::remember::person_id(name) == person)
+            .unwrap();
+        let known = self.directory.path.join("known");
+        std::fs::write(&known, name).unwrap();
+        if let Some(authority) = &self.authority {
+            // Explicit V3 at the original observation boundary; acquiring the
+            // real ticket never refreshes capture time or its source ceiling.
+            std::fs::write(
+                crate::speaking_faces::known_speaker_of(&known),
+                json!({"version":3,"camera_hold":1,"camera_began_us":1,
+                    "state":"seen","publisher":"0123456789abcdef0123456789abcdef","generation":1,
+                    "observed_us":lamp_ipc::monotonic_us(),
+                    "permission_until_us":lamp_ipc::monotonic_us().checked_add(1_500_000).unwrap(),"name":name,"id":null,"boot":"0123456789abcdef","face":"f7"}).to_string(),
+            )
+            .unwrap();
+            let _ = authority.ready(&scope.lease());
+        } else {
+            std::fs::write(
+            crate::speaking_faces::known_speaker_of(&known),
+            json!({"state":"seen","publisher":"0123456789abcdef0123456789abcdef","generation":1,
+            "observed_us":lamp_ipc::monotonic_us(),
+            "permission_until_us":lamp_ipc::monotonic_us().checked_add(1_500_000).unwrap(),"name":name,"id":null,"boot":"0123456789abcdef","face":"f7"}).to_string(),
+        )
+        .unwrap();
+        }
     }
 
     /// The memory note a turn told in `scope` is given, as the worker's
@@ -1016,9 +1113,9 @@ impl Turns {
         let context = super::memory_context(
             self.sessions.clone(),
             socket,
-            None,
+            Some(self.directory.path.join("known")),
             true,
-            |_, _, _, note| Told::from(note),
+            |_, _, note, _, _| Told::from(note),
         );
         context(Some(&scope.lease()), super::Chosen::ByLease).text
     }
@@ -1026,6 +1123,7 @@ impl Turns {
     /// The line's end, for a line that is answered: waited for as the
     /// engine waits, then told.
     async fn answered(&self, scope: &RequestScope) -> String {
+        self.observed(scope);
         self.ahead.clone().ready(Some(scope.lease())).await;
         self.told(scope)
     }
@@ -1039,14 +1137,24 @@ impl Drop for Turns {
 }
 
 fn scoped(request: u64, snapshot: ScopeSnapshot) -> RequestScope {
-    RequestScope::new(
+    let prove = snapshot.person().is_some() && !snapshot.held();
+    let mut owner = RequestScope::new(
         RequestKey {
             worker: lamp_turn_owner::BootId::new([9; 16]).unwrap(),
             session: 1,
             request,
         },
         snapshot,
-    )
+    );
+    if prove {
+        let key = owner.lease().key();
+        assert!(owner.speaker_recorder().unwrap().seal(
+            key,
+            &["0123456789abcdef/f7".into()],
+            Instant::now() + Duration::from_secs(20)
+        ));
+    }
+    owner
 }
 
 fn runtime() -> tokio::runtime::Runtime {
@@ -1125,12 +1233,12 @@ fn a_note_asked_as_the_line_begins_is_in_by_its_end_and_the_loop_never_waits() {
 #[test]
 fn lines_never_answered_open_and_close_no_session_and_spend_no_follow_up() {
     let memory = Paced::new("unanswered", |_| Reply::After(0));
-    let turns = Turns::new(&memory);
+    let turns = Turns::with_camera(&memory);
     turns.client.following_up();
     let p = crate::remember::person_id("Scope P");
     let (theirs, next) = (
-        scoped(1, ScopeSnapshot::of("Scope P")),
-        scoped(6, ScopeSnapshot::of("Scope P")),
+        turns.camera_scope(1, ScopeSnapshot::of("Scope P")),
+        turns.camera_scope(6, ScopeSnapshot::of("Scope P")),
     );
     let (first, counts, later) = runtime().block_on(async {
         turns.begins(&theirs);
@@ -1149,7 +1257,7 @@ fn lines_never_answered_open_and_close_no_session_and_spend_no_follow_up() {
             (4, ScopeSnapshot::of("Scope Q")),
             (5, ScopeSnapshot::held_of("Scope P")),
         ] {
-            turns.begins(&scoped(request, snapshot));
+            turns.begins(&turns.camera_scope(request, snapshot));
             tokio::time::sleep(Duration::from_millis(100)).await;
         }
         assert_eq!(counts(&memory), before, "unanswered lines asked the memory");
@@ -1170,20 +1278,21 @@ fn lines_never_answered_open_and_close_no_session_and_spend_no_follow_up() {
 
 /// Reviewer-two's P2 on #3016: the memory counts a follow-up's offer as it
 /// gives one, so a note read as a line begins asks none. The person's first
-/// turn, answered, reads it with its note; a retry read as their next line
-/// begins, a line never answered, asks the memory none; their next answered
-/// turn takes that read, and only then is its follow-up read, and told.
+/// turn, answered with real sealed proof, stages the note then reads its
+/// follow-up. A private Start asks neither again; its next proved answered
+/// turn reads exactly one retry and spends its offer only at the checked
+/// follow-up boundary.
 #[test]
 fn a_follow_up_is_read_only_once_its_turn_is_answered() {
-    // Their first personal snapshot is refused, so their next line asks
-    // again as it begins.
+    // Their first personal snapshot is refused. Private Start cannot retry;
+    // the next positively proved answered turn asks again.
     let memory = Paced::new("follow", |count| match count {
         1 => Reply::RefusedAfter(0),
         _ => Reply::After(0),
     });
-    let turns = Turns::new(&memory);
+    let turns = Turns::with_camera(&memory);
     turns.client.following_up();
-    let line = |request| scoped(request, ScopeSnapshot::of("Scope P"));
+    let line = |request| turns.camera_scope(request, ScopeSnapshot::of("Scope P"));
     let (first, unanswered, last) = runtime().block_on(async {
         let first_line = line(1);
         turns.begins(&first_line);
@@ -1200,13 +1309,17 @@ fn a_follow_up_is_read_only_once_its_turn_is_answered() {
         first.contains(THREAD),
         "the answered turn's own read: {first}"
     );
-    assert_eq!(unanswered, (4, 0), "read ahead, and no follow-up asked");
+    assert_eq!(
+        unanswered,
+        (2, 0),
+        "private Start reads neither a note nor a follow-up"
+    );
     assert!(
         last.contains(THREAD) && last.contains("fact 3 of"),
         "{last}"
     );
     assert_eq!(memory.count("follow_up"), 2);
-    assert_eq!(memory.opens(), 4, "the read ahead is the one taken");
+    assert_eq!(memory.opens(), 4, "exactly one final proved retry is read");
 }
 
 /// A note not in by what is left of its wait from the ask is late: the
@@ -1265,33 +1378,40 @@ fn a_late_note_is_the_next_turns_and_a_failed_one_is_asked_again_on_the_next_tur
 }
 
 /// A line begun as one person's and found by its end to be someone else's
-/// (a face not theirs seen speaking it): the early answer is let go, and
-/// the note asked again for the room.
+/// (a face not theirs seen speaking it): private Start asks nothing, and
+/// narrowing that private admission cannot authorize a Room read.
 #[test]
 fn a_person_change_during_the_line_asks_again_for_whoever_it_is_at_its_end() {
-    // Their own first snapshot is refused, so their next line asks again
-    // as it begins.
+    // Their own first snapshot is refused. The next private Start still
+    // cannot read, and its narrowed final admission must stay neutral.
     let memory = Paced::new("change", |count| match count {
         1 => Reply::RefusedAfter(0),
         _ => Reply::After(0),
     });
-    let turns = Turns::new(&memory);
+    let turns = Turns::with_camera(&memory);
     let a = crate::remember::person_id("Scope A");
     let (first_line, line) = (
-        scoped(1, ScopeSnapshot::of("Scope A")),
-        scoped(2, ScopeSnapshot::of("Scope A")),
+        turns.camera_scope(1, ScopeSnapshot::of("Scope A")),
+        turns.camera_scope(2, ScopeSnapshot::of("Scope A")),
     );
     let note = runtime().block_on(async {
         turns.begins(&first_line);
         turns.answered(&first_line).await;
         turns.begins(&line);
         tokio::time::sleep(Duration::from_millis(300)).await;
-        assert_eq!(memory.opens(), 4, "asked ahead as the line began");
+        assert_eq!(
+            memory.opens(),
+            2,
+            "private Start cannot ask before final proof"
+        );
         line.lease().narrow_to_room();
         turns.answered(&line).await
     });
     assert!(!note.contains(&a), "{note}");
-    assert!(note.contains("fact 4 of the room"), "{note}");
+    assert!(
+        !note.contains("fact") && !note.contains("the room"),
+        "narrowed private stays neutral: {note}"
+    );
     let opens: Vec<Value> = memory
         .requests
         .lock()
@@ -1300,10 +1420,12 @@ fn a_person_change_during_the_line_asks_again_for_whoever_it_is_at_its_end() {
         .filter(|request| request["op"] == "session_open")
         .cloned()
         .collect();
-    assert_eq!(opens.len(), 5);
-    assert_eq!(opens[3]["person"], a);
-    assert!(opens[4]["person"].is_null());
-    assert_ne!(opens[2]["session"], opens[4]["session"]);
+    assert_eq!(
+        opens.len(),
+        2,
+        "narrowing cannot cause a new private or Room RPC"
+    );
+    assert_eq!(opens[1]["person"], a);
 }
 
 /// A read still going on when the camera or the microphone closes or opens
@@ -1319,9 +1441,9 @@ fn a_voided_read_is_never_told_and_holds_the_next_until_it_ends() {
         2 => Reply::After(2_200),
         _ => Reply::After(0),
     });
-    let turns = Turns::new(&memory);
+    let turns = Turns::with_camera(&memory);
     let a = crate::remember::person_id("Scope A");
-    let line = |request| scoped(request, ScopeSnapshot::of("Scope A"));
+    let line = |request| turns.camera_scope(request, ScopeSnapshot::of("Scope A"));
     let (first, held, still, after) = runtime().block_on(async {
         let first_line = line(1);
         turns.begins(&first_line);
@@ -1329,6 +1451,12 @@ fn a_voided_read_is_never_told_and_holds_the_next_until_it_ends() {
         let start = Instant::now();
         let voided = line(2);
         turns.begins(&voided);
+        assert!(
+            turns
+                .ahead
+                .ready_now(Some(&voided.lease()), Instant::now())
+                .is_some()
+        );
         tokio::time::sleep(Duration::from_millis(50)).await;
         turns.ahead.forget();
         let ended = Instant::now();
@@ -1366,11 +1494,11 @@ fn a_held_line_and_a_revoked_scope_never_get_another_scopes_note() {
     // Held.
     {
         let memory = Paced::new("held", |_| Reply::After(0));
-        let turns = Turns::new(&memory);
+        let turns = Turns::with_camera(&memory);
         let (theirs, held, room) = (
-            scoped(1, ScopeSnapshot::of("Scope A")),
-            scoped(2, ScopeSnapshot::held_of("Scope A")),
-            scoped(3, ScopeSnapshot::room()),
+            turns.camera_scope(1, ScopeSnapshot::of("Scope A")),
+            turns.camera_scope(2, ScopeSnapshot::held_of("Scope A")),
+            turns.camera_scope(3, ScopeSnapshot::room()),
         );
         let (told, during, after) = runtime().block_on(async {
             turns.begins(&theirs);
@@ -1391,11 +1519,11 @@ fn a_held_line_and_a_revoked_scope_never_get_another_scopes_note() {
     // Revoked.
     {
         let memory = Paced::new("revoked", |_| Reply::After(0));
-        let turns = Turns::new(&memory);
+        let turns = Turns::with_camera(&memory);
         let (theirs, again, room) = (
-            scoped(1, ScopeSnapshot::of("Scope A")),
-            scoped(2, ScopeSnapshot::of("Scope A")),
-            scoped(3, ScopeSnapshot::room()),
+            turns.camera_scope(1, ScopeSnapshot::of("Scope A")),
+            turns.camera_scope(2, ScopeSnapshot::of("Scope A")),
+            turns.camera_scope(3, ScopeSnapshot::room()),
         );
         let (revoked, after) = runtime().block_on(async {
             turns.begins(&theirs);
@@ -1412,4 +1540,134 @@ fn a_held_line_and_a_revoked_scope_never_get_another_scopes_note() {
             "{after}"
         );
     }
+}
+
+#[test]
+fn pending_note_adoption_preserves_the_completed_read_and_original_ask() {
+    for resume in [true, false] {
+        let memory = Paced::new(if resume { "adopt-resume" } else { "adopt-lost" }, |_| {
+            Reply::After(0)
+        });
+        let turns = Turns::with_camera(&memory);
+        let scope = turns.camera_scope(1, ScopeSnapshot::of("Scope P"));
+        turns.observed(&scope);
+        runtime().block_on(turns.ahead.clone().ready(Some(scope.lease())));
+        let person = scope.lease().scope().unwrap().person().unwrap().to_owned();
+        let before_opens = memory.opens();
+        let mut sessions = turns.sessions.lock().unwrap();
+        let asked = sessions.asked.as_ref().expect("completed read retained");
+        assert!(asked.complete() && asked.waited);
+        let original = (asked.at, asked.line, asked.late);
+        let calls = Arc::new(AtomicUsize::new(0));
+        let observed = calls.clone();
+        let pending: super::NotePermission = Arc::new(move || {
+            if observed.fetch_add(1, Ordering::AcqRel) == 0 {
+                super::PermissionState::Ready
+            } else {
+                super::PermissionState::Pending
+            }
+        });
+        // The first context check is Ready. The adoption boundary sees
+        // Checking, after the completed read has left its answer slot.
+        assert_eq!(
+            sessions.taken_permitted(true, false, Some(&person), &pending),
+            None
+        );
+        assert!(calls.load(Ordering::Acquire) >= 2);
+        let asked = sessions
+            .asked
+            .as_ref()
+            .expect("pending must retain its ask");
+        assert_eq!((asked.at, asked.line, asked.late), original);
+        assert!(asked.complete() && asked.waited);
+        assert!(!asked.denied.load(Ordering::Acquire));
+        assert!(sessions.note.is_none() && sessions.note_stamp.is_none());
+        assert_eq!(memory.opens(), before_opens, "no replacement RPC");
+        let permitted: super::NotePermission = Arc::new(move || {
+            if resume {
+                super::PermissionState::Ready
+            } else {
+                super::PermissionState::Lost
+            }
+        });
+        let told = sessions
+            .taken_permitted(false, false, Some(&person), &permitted)
+            .unwrap();
+        assert!(sessions.asked.is_none());
+        if resume {
+            assert!(told.contains("fact 0 of the room") && told.contains(&person));
+            assert_eq!(sessions.note.as_deref(), Some(told.as_str()));
+            assert_eq!(
+                sessions.taken_permitted(false, false, Some(&person), &permitted),
+                Some(told)
+            );
+            assert_eq!(memory.opens(), before_opens, "adopt and reuse exactly once");
+        } else {
+            assert_eq!(told, SessionNote::unavailable().text);
+            assert!(sessions.note.is_none() && sessions.note_stamp.is_none());
+            let later: super::NotePermission = Arc::new(|| super::PermissionState::Ready);
+            assert_eq!(
+                sessions.taken_permitted(false, false, Some(&person), &later),
+                Some(SessionNote::unavailable().text)
+            );
+        }
+    }
+}
+/// A completed, retained note is not an active RPC. Its old 300 ms deadline
+/// cannot suppress the separately bounded offer on its first answered turn.
+#[test]
+fn a_completed_old_note_reads_its_follow_up_once_after_recognition_is_ready() {
+    let memory = Paced::new("retained-follow", |_| Reply::After(0));
+    let turns = Turns::with_camera(&memory);
+    turns.client.following_up();
+    let line = turns.camera_scope(71, ScopeSnapshot::of("Scope P"));
+    let note = runtime().block_on(async {
+        turns.observed(&line);
+        let (mut done, _, _, _) = turns
+            .ahead
+            .ready_now(Some(&line.lease()), Instant::now())
+            .expect("a proved private turn stages its actual note");
+        tokio::time::timeout(Duration::from_secs(2), done.wait_for(|done| *done))
+            .await
+            .expect("the local memory read completes")
+            .unwrap();
+        {
+            let mut sessions = turns.sessions.lock().unwrap();
+            let asked = sessions.asked.as_mut().unwrap();
+            assert!(!asked.reading());
+            assert!(
+                asked
+                    .answer
+                    .lock()
+                    .unwrap()
+                    .as_ref()
+                    .unwrap()
+                    .wants_follow_up()
+            );
+            // Advance only the retained ask's age, not its I/O or permission.
+            // No real-clock sleep determines whether this control hits the gap.
+            asked.at = Instant::now() - turns.ahead.within.0 - Duration::from_secs(1);
+        }
+        assert_eq!(memory.opens(), 2);
+        assert_eq!(memory.count("follow_up"), 0);
+        turns.ahead.clone().ready(Some(line.lease())).await;
+        let note = turns.told(&line);
+        assert_eq!(memory.count("follow_up"), 1);
+        assert_eq!(
+            turns.answered(&line).await,
+            note,
+            "the adopted cache stands"
+        );
+        note
+    });
+    assert!(
+        note.contains(THREAD),
+        "the first answered turn gets its offer"
+    );
+    assert!(
+        note.contains("fact 1 of"),
+        "the retained personal snapshot is kept"
+    );
+    assert_eq!(memory.opens(), 2, "no replacement initial read");
+    assert_eq!(memory.count("follow_up"), 1, "no second offer");
 }

@@ -11,6 +11,7 @@ mod name_carries;
 mod name_near;
 mod not_for_me_words;
 mod person_scope_seen;
+mod private_context;
 mod remember_speaker;
 mod short_done;
 mod unplayed_join;
@@ -2838,6 +2839,14 @@ fn early_words_stand_only_for_the_same_line_asked_the_same_way() {
         words: "lamp what time is it".to_owned(),
         notes: Vec::new(),
         remembered: None,
+        remembered_requires_speaker: false,
+        private_context: PrivateContext {
+            scope: None,
+            validate: None,
+            required: Arc::new(AtomicBool::new(false)),
+            lost: Arc::new(AtomicBool::new(false)),
+            public_face_receipt: false,
+        },
         messages: vec![
             Message::system("SYSTEM".to_owned()),
             Message::user("lamp what time is it".to_owned()),
@@ -4097,6 +4106,8 @@ async fn the_chat_is_given_the_exchanges_it_is_told_between_the_system_and_the_q
     let mut engine = Engine::with_clock(
         script.clone(),
         Arc::new(|| Told {
+            requires_speaker: false,
+            pending_private_context: false,
             text: "SYSTEM".into(),
             after: None,
             history: vec![
@@ -4134,6 +4145,8 @@ async fn what_changes_is_told_after_the_exchanges_and_before_the_notes_and_words
     let mut engine = Engine::with_clock(
         script.clone(),
         Arc::new(|| Told {
+            requires_speaker: false,
+            pending_private_context: false,
             text: "CHARACTER".into(),
             after: Some("IT IS NOON".into()),
             history: vec![
@@ -6393,6 +6406,97 @@ async fn a_request_of_no_words_neither_starts_nor_uses_up_a_held_gap() {
     std::fs::remove_file(&path).unwrap();
 }
 
+const GAP_OWNER_SPEAKER: &str = "0123456789abcdef/f1";
+
+/// A real atomic Eyes observation, published after the fixture opens its
+/// memory camera. The ordinary known file still supplies admission identity.
+fn gap_owner_observation(path: &std::path::Path) {
+    use std::io::Write;
+    use std::os::unix::fs::OpenOptionsExt;
+    std::fs::write(crate::speaking_faces::known_face_of(path), "f1").unwrap();
+    let mut source = std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .mode(0o600)
+        .open(crate::speaking_faces::known_speaker_of(path))
+        .unwrap();
+    write!(
+        source,
+        "{}",
+        json!({"state":"seen","publisher":"0123456789abcdef0123456789abcdef","generation":1,
+            "permission_until_us":lamp_ipc::monotonic_us().checked_add(1_500_000).unwrap(),
+            "observed_us":lamp_ipc::monotonic_us(),
+            "name":"A","id":null,"boot":"0123456789abcdef","face":"f1"})
+    )
+    .unwrap();
+}
+
+/// Explicit V3 publication for actual ticket-backed private Engine controls.
+/// Keep the legacy helper above unchanged for its compatibility callers.
+fn gap_owner_observation_v3(path: &std::path::Path) {
+    use std::io::Write;
+    use std::os::unix::fs::OpenOptionsExt;
+    std::fs::write(crate::speaking_faces::known_face_of(path), "f1").unwrap();
+    let mut source = std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .mode(0o600)
+        .open(crate::speaking_faces::known_speaker_of(path))
+        .unwrap();
+    write!(
+        source,
+        "{}",
+        json!({"version":3,"camera_hold":1,"camera_began_us":1,"state":"seen","publisher":"0123456789abcdef0123456789abcdef","generation":1,
+            "permission_until_us":lamp_ipc::monotonic_us().checked_add(1_500_000).unwrap(),
+            "observed_us":lamp_ipc::monotonic_us(),
+            "name":"A","id":null,"boot":"0123456789abcdef","face":"f1"})
+    )
+    .unwrap();
+}
+
+/// Original controlled host-read clocks, not acoustic playback: one current
+/// half-second piece contains three distinct positive Eyes observations.
+fn gap_owner_microphone(
+    engine: &mut Engine,
+    eyes: &crate::speaking_faces::SpeakingFaces,
+    request: u64,
+) {
+    let from = Instant::now() - Duration::from_secs(1);
+    let from_us = monotonic_us().checked_sub(1_000_000).unwrap();
+    let faces = lamp_msgs::Faces {
+        faces: vec![lamp_msgs::Face {
+            id: "f1".into(),
+            xmin: 0.1,
+            ymin: 0.1,
+            xmax: 0.3,
+            ymax: 0.4,
+            confidence: 1.0,
+            yaw: None,
+            facing: Some(true),
+            speaking: Some(lamp_msgs::Speaking {
+                state: lamp_msgs::SpeakingState::Yes,
+                score: 0.9,
+                from: None,
+            }),
+        }],
+    };
+    for (index, millis) in [100, 250, 400].into_iter().enumerate() {
+        eyes.look(
+            from + Duration::from_millis(millis),
+            Some((("0123456789abcdef", request * 3 + index as u64 + 1), &faces)),
+        );
+    }
+    for sequence in 1..=50 {
+        engine.submit(ProviderInput::Audio {
+            request,
+            privacy_generation: 1,
+            sequence,
+            read_completed_at_us: from_us + sequence * 10_000,
+            samples: vec![0; lamp_audio::CAPTURE_SAMPLES],
+        });
+    }
+}
+
 /// The first builder's 22:10 and 01:43 on #2265 (`LAMP_FACE_GAP_HOLD`):
 /// someone known answered aloud, then lost with no face in view, and a line
 /// comes within the gap. That line's scope is held only by the gap, so its
@@ -6401,9 +6505,21 @@ async fn a_request_of_no_words_neither_starts_nor_uses_up_a_held_gap() {
 #[tokio::test]
 async fn a_line_held_only_by_a_gap_is_told_no_memory_reads_or_hits() {
     use crate::memory_scope::{FaceCache, GAP, ScopeLease};
-    let path = std::env::temp_dir().join(format!("twelve-gap-told-{}", std::process::id()));
+    let directory = crate::process::SessionDirectory::create().unwrap();
+    let path = directory.path.canonicalize().unwrap().join("known");
     std::fs::write(&path, "A").unwrap();
+    let authority = crate::camera_authority::fixture::Fixture::start(
+        path.clone(),
+        [
+            0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef, 0x01, 0x23, 0x45, 0x67, 0x89, 0xab,
+            0xcd, 0xef,
+        ],
+        1,
+    );
     let cache = Arc::new(FaceCache::holding_gaps(Some(GAP)));
+    assert!(cache.set_camera_client(authority.client.clone()));
+    let eyes = Arc::new(crate::speaking_faces::SpeakingFaces::default());
+    let proof_path = path.clone();
     let script = Arc::new(Script {
         heard: Mutex::new(
             [
@@ -6435,18 +6551,33 @@ async fn a_line_held_only_by_a_gap_is_told_no_memory_reads_or_hits() {
             lamp_turn_owner::BootId::new([9; 16]).unwrap(),
             cache.clone(),
             runner,
-            None,
-        );
+            Some(Arc::new(|_| Told::default())),
+        )
+        .seeing_who_speaks(eyes.clone(), path.clone())
+        .guarding_private_context(Arc::new(move |lease| {
+            super::worker::private_context_state(Some(&proof_path), lease)
+        }));
     engine.memory_camera(true, 1);
+    gap_owner_observation_v3(&path);
     let seen = crate::known_faces::FaceObservation::read(&path).unwrap();
     cache.replace_seen(cache.begin_refresh(), Some(seen), Some(1));
     engine.submit(start(1));
     let seen_scope = engine.memory_lease().unwrap();
     assert!(!seen_scope.scope().unwrap().held());
     assert!(super::forget_asker(Some(&seen_scope)).is_some());
-    engine.submit(audio(1, 1));
+    gap_owner_microphone(&mut engine, &eyes, 1);
     engine.submit(end(1));
-    turn(&mut engine).await;
+    let first = turn(&mut engine).await;
+    assert_eq!(first.last().map(String::as_str), Some("complete"));
+    assert!(first.iter().any(|event| event.starts_with("audio:")));
+    let seen = engine.memory_lease().unwrap();
+    assert_eq!(seen.speaker(), Some(GAP_OWNER_SPEAKER));
+    assert!(super::worker::private_context_current(Some(&path), &seen));
+    assert_eq!(
+        hits.load(Ordering::Relaxed),
+        1,
+        "the proved seen turn read once"
+    );
     engine.memory_answered(1, Instant::now());
     // Lost, with no face in view: the next line is held by the gap alone.
     cache.replace_seen(cache.begin_refresh(), None, Some(0));
@@ -6461,6 +6592,7 @@ async fn a_line_held_only_by_a_gap_is_told_no_memory_reads_or_hits() {
         super::forget_asker(Some(&held)).is_none(),
         "no one's forget"
     );
+    assert_eq!(engine.memory_lease().unwrap().speaker(), None);
     engine.submit(audio(2, 1));
     engine.submit(end(2));
     turn(&mut engine).await;
@@ -6478,6 +6610,8 @@ async fn a_line_held_only_by_a_gap_is_told_no_memory_reads_or_hits() {
         1,
         "hits for the seen line only"
     );
+    std::fs::remove_file(crate::speaking_faces::known_speaker_of(&path)).unwrap();
+    std::fs::remove_file(crate::speaking_faces::known_face_of(&path)).unwrap();
     std::fs::remove_file(&path).unwrap();
 }
 
@@ -6774,12 +6908,12 @@ impl Drop for AheadMemory {
 
 /// What each of `lines` was asked with, each said by the person the eyes
 /// know at the lamp, through the engine with the worker's own note asked
-/// ahead and context callback (`worker::reading_ahead`: asked as a line
-/// begins for the scope the last answered turn was told in, otherwise as
-/// the turn is told, and taken only by an answered turn), from an
+/// ahead and context callback (`worker::reading_ahead`: private notes begin
+/// only after actual current-piece/combined proof and fresh known source,
+/// and are taken only by an answered turn), from an
 /// [`AheadMemory`] (`failing` as it says), with `LAMP_MEMORY_EVENTS`. Each
-/// request in `ahead` has its note's open reach the memory once its line
-/// has begun and before it ends: asked as the line began. The memory, for
+/// request in `ahead` verifies that its private Start has no read; the final
+/// positively proved turn asks it. The memory, for
 /// what it was asked after.
 async fn asked_with_the_note_ahead(
     name: &str,
@@ -6798,10 +6932,36 @@ async fn asked_with_the_note_ahead(
     let client = Arc::new(crate::remember::DaysClient::new(memory.socket.clone()).unwrap());
     client.following_up();
     client.telling_events();
-    let (note_ahead, scoped) = super::worker::reading_ahead(client.clone(), AHEAD_WAIT);
-    let face = std::env::temp_dir().join(format!("lv-ahead-event-{name}-{}", std::process::id()));
-    std::fs::write(&face, "Synthetic owner").unwrap();
+    let face_directory = crate::process::SessionDirectory::create().unwrap();
+    let face = face_directory.path.canonicalize().unwrap().join("known");
+    let observed = || {
+        std::fs::write(&face, "A").unwrap();
+        std::fs::write(crate::speaking_faces::known_face_of(&face), "f1").unwrap();
+        std::fs::write(
+            crate::speaking_faces::known_speaker_of(&face),
+            json!({"version":3,"camera_hold":1,"camera_began_us":1,"state":"seen","publisher":"0123456789abcdef0123456789abcdef","generation":1,
+            "permission_until_us":lamp_ipc::monotonic_us().checked_add(1_500_000).unwrap(),
+            "observed_us":lamp_ipc::monotonic_us(),
+            "name":"A","id":null,"boot":"0123456789abcdef","face":"f1"})
+            .to_string(),
+        )
+        .unwrap();
+    };
+    observed();
+    let (note_ahead, scoped) =
+        super::worker::reading_ahead(client.clone(), AHEAD_WAIT, Some(face.clone()));
+    let eyes = Arc::new(crate::speaking_faces::SpeakingFaces::default());
+    let proof_path = face.clone();
+    let authority = crate::camera_authority::fixture::Fixture::start(
+        face.clone(),
+        [
+            0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef, 0x01, 0x23, 0x45, 0x67, 0x89, 0xab,
+            0xcd, 0xef,
+        ],
+        1,
+    );
     let cache = Arc::new(FaceCache::holding_gaps(Some(GAP)));
+    assert!(cache.set_camera_client(authority.client.clone()));
     let script = Arc::new(Script {
         heard: Mutex::new(lines.iter().map(|line| Ok((*line).to_owned())).collect()),
         chats: Mutex::new(
@@ -6829,6 +6989,10 @@ async fn asked_with_the_note_ahead(
         Some(scoped),
     )
     .asking_the_note_ahead(note_ahead)
+    .seeing_who_speaks(eyes.clone(), face.clone())
+    .guarding_private_context(Arc::new(move |lease| {
+        super::worker::private_context_state(Some(&proof_path), lease)
+    }))
     .asking_after_events(
         Arc::new(move |_, heard: &str, lease: Option<&ScopeLease>| {
             let person = lease
@@ -6844,18 +7008,34 @@ async fn asked_with_the_note_ahead(
     for request in 1..=lines.len() as u64 {
         // Every read before this line has ended: its turn waited for it.
         while memory.opens.try_recv().is_ok() {}
+        observed();
+        cache.replace_seen(
+            cache.begin_refresh(),
+            crate::known_faces::FaceObservation::read(&face),
+            Some(1),
+        );
         engine.submit(start(request));
+        assert!(engine.memory_lease().unwrap().speaker().is_none());
         if ahead.contains(&request) {
-            memory
-                .opens
-                .recv_timeout(AHEAD_WAIT)
-                .expect("the note was asked as the line began");
+            assert!(
+                matches!(
+                    memory.opens.try_recv(),
+                    Err(std::sync::mpsc::TryRecvError::Empty)
+                ),
+                "private Start cannot dispatch a note before actual sealed proof"
+            );
         }
-        engine.submit(audio(request, 1));
+        gap_owner_microphone(&mut engine, &eyes, request);
         engine.submit(end(request));
         turn_within(&mut engine, AHEAD_WAIT).await;
+        assert_eq!(
+            engine.memory_lease().unwrap().speaker(),
+            Some(GAP_OWNER_SPEAKER)
+        );
     }
     drop(engine);
+    std::fs::remove_file(crate::speaking_faces::known_face_of(&face)).unwrap();
+    std::fs::remove_file(crate::speaking_faces::known_speaker_of(&face)).unwrap();
     std::fs::remove_file(&face).unwrap();
     *crate::thread::THREAD
         .lock()
@@ -6945,9 +7125,21 @@ async fn a_note_read_ahead_withholds_its_dated_follow_up_after_a_first_request()
 #[tokio::test]
 async fn a_gap_held_greeting_is_not_asked_for_a_dated_follow_up_s_line() {
     use crate::memory_scope::{FaceCache, GAP, ScopeLease};
-    let path = std::env::temp_dir().join(format!("twelve-gap-event-{}", std::process::id()));
+    let directory = crate::process::SessionDirectory::create().unwrap();
+    let path = directory.path.canonicalize().unwrap().join("known");
     std::fs::write(&path, "A").unwrap();
+    let authority = crate::camera_authority::fixture::Fixture::start(
+        path.clone(),
+        [
+            0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef, 0x01, 0x23, 0x45, 0x67, 0x89, 0xab,
+            0xcd, 0xef,
+        ],
+        1,
+    );
     let cache = Arc::new(FaceCache::holding_gaps(Some(GAP)));
+    assert!(cache.set_camera_client(authority.client.clone()));
+    let eyes = Arc::new(crate::speaking_faces::SpeakingFaces::default());
+    let proof_path = path.clone();
     let script = Arc::new(Script {
         heard: Mutex::new([Ok("Hi!".to_owned()), Ok("Hello!".to_owned())].into()),
         chats: Mutex::new(
@@ -6976,19 +7168,35 @@ async fn a_gap_held_greeting_is_not_asked_for_a_dated_follow_up_s_line() {
             lamp_turn_owner::BootId::new([9; 16]).unwrap(),
             cache.clone(),
             runner,
-            None,
-        );
+            Some(Arc::new(|_| Told::default())),
+        )
+        .seeing_who_speaks(eyes.clone(), path.clone())
+        .guarding_private_context(Arc::new(move |lease| {
+            super::worker::private_context_state(Some(&proof_path), lease)
+        }));
     engine.memory_camera(true, 1);
+    gap_owner_observation_v3(&path);
     let seen = crate::known_faces::FaceObservation::read(&path).unwrap();
     cache.replace_seen(cache.begin_refresh(), Some(seen), Some(1));
     engine.submit(start(1));
-    engine.submit(audio(1, 1));
+    gap_owner_microphone(&mut engine, &eyes, 1);
     engine.submit(end(1));
-    turn(&mut engine).await;
+    let first = turn(&mut engine).await;
+    assert_eq!(first.last().map(String::as_str), Some("complete"));
+    assert!(first.iter().any(|event| event.starts_with("audio:")));
+    let seen = engine.memory_lease().unwrap();
+    assert_eq!(seen.speaker(), Some(GAP_OWNER_SPEAKER));
+    assert!(super::worker::private_context_current(Some(&path), &seen));
+    assert_eq!(
+        lines.load(Ordering::Relaxed),
+        1,
+        "the proved seen turn read once"
+    );
     engine.memory_answered(1, Instant::now());
     cache.replace_seen(cache.begin_refresh(), None, Some(0));
     engine.submit(start(2));
     assert!(engine.memory_lease().unwrap().scope().unwrap().held());
+    assert_eq!(engine.memory_lease().unwrap().speaker(), None);
     engine.submit(audio(2, 1));
     engine.submit(end(2));
     turn(&mut engine).await;
@@ -6997,6 +7205,8 @@ async fn a_gap_held_greeting_is_not_asked_for_a_dated_follow_up_s_line() {
     let ask_first = Message::system("ASK FIRST".to_owned());
     assert!(asked[0].contains(&ask_first));
     assert!(!asked[1].contains(&ask_first));
+    std::fs::remove_file(crate::speaking_faces::known_speaker_of(&path)).unwrap();
+    std::fs::remove_file(crate::speaking_faces::known_face_of(&path)).unwrap();
     std::fs::remove_file(&path).unwrap();
 }
 
@@ -10680,6 +10890,8 @@ async fn a_line_that_cuts_the_story_is_asked_with_the_story_as_heard() {
     let mut engine = Engine::with_clock(
         script.clone(),
         Arc::new(move || Told {
+            requires_speaker: false,
+            pending_private_context: false,
             text: "SYSTEM".to_owned(),
             after: None,
             history: told

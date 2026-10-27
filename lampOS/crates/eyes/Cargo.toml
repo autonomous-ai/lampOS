@@ -51,6 +51,9 @@ jpeg-encoder = "=0.7.1"
 # driver's timestamp (`photo::frame_us`); the Linux backend is used on Linux.
 lamp-camera = { path = "../camera" }
 
+# Safe filesystem/UID and owned-FD transport on Linux and Mac.
+rustix = { version = "=1.1.5", features = ["fs", "process", "net"] }
+
 [dev-dependencies]
 # Decodes the recorded bus messages a replay test reads.
 base64 = "0.22"
@@ -60,3 +63,7 @@ lamp-turn-owner = { path = "../turn-owner" }
 
 [lints]
 workspace = true
+
+# Safe peer credentials for the authenticated local grant service on Mac.
+[target.'cfg(target_os = "macos")'.dependencies]
+nix = { version = "=0.29.0", default-features = false, features = ["user", "socket"] }

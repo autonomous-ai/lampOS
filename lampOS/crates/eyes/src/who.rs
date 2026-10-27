@@ -66,6 +66,486 @@ pub fn known_face_of(known: &Path) -> PathBuf {
     PathBuf::from(beside)
 }
 
+/// One observation tying the known person's name and optional memory id to
+/// the eyes publisher's boot and the passing face id from that same look.
+pub fn known_speaker_of(known: &Path) -> PathBuf {
+    let mut beside = known.as_os_str().to_owned();
+    beside.push("-speaker");
+    PathBuf::from(beside)
+}
+
+/// Legacy positive observation only: it cannot establish typed continuity.
+/// Runtime uses one `KnownSpeakerPublisher` owner instead.
+/// Publish one whole source observation, never fields paired across files.
+/// Missing or invalid source data removes any older observation. This is
+/// visual speaking evidence, not proof of a live person or their identity.
+pub fn keep_known_speaker(
+    known: &Path,
+    name: Option<&str>,
+    id: Option<&str>,
+    boot: Option<&str>,
+    face: Option<&str>,
+) {
+    if valid_speaker_fields(name, id, boot, face) {
+        let _ = write_speaker(
+            known,
+            &serde_json::json!({"name":name, "id":id, "boot":boot, "face":face}),
+        );
+    } else {
+        remove_speaker(known);
+    }
+}
+
+/// One non-cloneable lifecycle owns typed disclosure observations. The caller
+/// checks private runtime storage before publishing; legacy writers cannot
+/// manufacture this publisher's nonce or continue a typed grant through absence.
+pub struct KnownSpeakerPublisher {
+    known: PathBuf,
+    publisher: Option<String>,
+    ticket_required: std::cell::Cell<bool>,
+    camera_ticket: std::cell::Cell<Option<crate::camera_authority::Binding>>,
+    enabled: std::cell::Cell<bool>,
+    generation: std::cell::Cell<u64>,
+    state: std::cell::Cell<SpeakerState>,
+    boot: std::cell::RefCell<Option<String>>,
+    subject: std::cell::RefCell<Option<(String, Option<String>)>>,
+    /// Retained across failed recognition so the same unresolved candidate
+    /// does not force another inference on every raw frame.
+    observed_face: std::cell::RefCell<Option<String>>,
+    permission_until_us: std::cell::Cell<Option<u64>>,
+    published_until_us: std::cell::Cell<Option<u64>>,
+    observed_us: std::cell::Cell<Option<u64>>,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum SpeakerState {
+    Seen,
+    Absent,
+    Checking,
+    Revoked,
+}
+
+impl KnownSpeakerPublisher {
+    pub fn new(known: PathBuf) -> Self {
+        Self::with_random(known, |bytes| getrandom::fill(bytes).map_err(|_| ()))
+    }
+
+    fn with_random(
+        known: PathBuf,
+        fill: impl FnOnce(&mut [u8]) -> std::result::Result<(), ()>,
+    ) -> Self {
+        remove_speaker(&known);
+        let mut bytes = [0; 16];
+        let publisher = fill(&mut bytes)
+            .ok()
+            .map(|()| bytes.iter().map(|byte| format!("{byte:02x}")).collect());
+        Self {
+            known,
+            enabled: std::cell::Cell::new(publisher.is_some()),
+            publisher,
+            ticket_required: std::cell::Cell::new(false),
+            camera_ticket: std::cell::Cell::new(None),
+            generation: std::cell::Cell::new(1),
+            state: std::cell::Cell::new(SpeakerState::Revoked),
+            boot: std::cell::RefCell::new(None),
+            subject: std::cell::RefCell::new(None),
+            observed_face: std::cell::RefCell::new(None),
+            permission_until_us: std::cell::Cell::new(None),
+            published_until_us: std::cell::Cell::new(None),
+            observed_us: std::cell::Cell::new(None),
+        }
+    }
+
+    /// Runtime source requires V3 even when the server is unavailable. The
+    /// legacy constructor remains for existing standalone protocol fixtures;
+    /// runtime must call this before any source publication, with no fallback.
+    pub fn require_camera_ticket(&self) {
+        self.ticket_required.set(true);
+        self.camera_ticket.set(None);
+        self.revoke();
+    }
+
+    pub fn publisher_id(&self) -> Option<[u8; 16]> {
+        let text = self.publisher.as_deref()?;
+        let mut bytes = [0; 16];
+        for (index, byte) in bytes.iter_mut().enumerate() {
+            *byte = u8::from_str_radix(text.get(index * 2..index * 2 + 2)?, 16).ok()?;
+        }
+        (bytes != [0; 16]).then_some(bytes)
+    }
+
+    /// Captured-frame binding, never a recognition-generation substitute.
+    pub fn camera_ticket(&self, binding: Option<crate::camera_authority::Binding>) {
+        let previous = self.camera_ticket.replace(binding);
+        if previous.map(|b| (b.publisher, b.hold)) != binding.map(|b| (b.publisher, b.hold)) {
+            self.camera_changed();
+        }
+    }
+
+    /// Supplied only inside the captured-frame permission lock.
+    pub fn permission_until(&self, until_us: Option<u64>) {
+        self.permission_until_us.set(until_us);
+    }
+
+    /// A successful same-track raw look may renew camera authority, never
+    /// identity age. False asks for a new recognition instead of reviving an
+    /// expired publication. Skipped/error/changed-track looks never call this.
+    pub fn refresh_authority(&self, now_us: u64) -> bool {
+        if self.state.get() != SpeakerState::Seen {
+            return true;
+        }
+        let fresh = self
+            .observed_us
+            .get()
+            .is_some_and(|at| at > 0 && at <= now_us && now_us - at < 3_000_000)
+            && self
+                .published_until_us
+                .get()
+                .is_some_and(|until| now_us < until)
+            && self
+                .permission_until_us
+                .get()
+                .is_some_and(|until| now_us < until);
+        if !fresh {
+            self.revoke();
+            return false;
+        }
+        // Release RefCell guards before write: publication failure disables
+        // the source and clears these same cells.
+        let boot = self.boot.borrow().clone();
+        let face = self.observed_face.borrow().clone();
+        let subject = self.subject.borrow().clone();
+        if let (Some(boot), Some(face), Some((name, id))) =
+            (boot.as_deref(), face.as_deref(), subject.as_ref())
+        {
+            self.write(boot, "seen", Some((name, id.as_deref(), face)));
+        }
+        self.enabled.get()
+    }
+
+    pub fn enabled(&self) -> bool {
+        self.enabled.get()
+    }
+
+    pub fn revoked(&self) -> bool {
+        self.state.get() == SpeakerState::Revoked
+    }
+
+    pub fn disable(&self) {
+        self.enabled.set(false);
+        self.generation.set(0);
+        self.state.set(SpeakerState::Revoked);
+        self.subject.borrow_mut().take();
+        self.observed_face.borrow_mut().take();
+        remove_speaker(&self.known);
+    }
+
+    /// Invalidate before slow camera/store work. Repeated revoked-loop checks
+    /// cannot admit anything and need no new generation or status record.
+    pub fn revoke(&self) {
+        if !self.enabled.get() {
+            return;
+        }
+        if self.revoked() {
+            // Also clear any foreign legacy write without advancing an epoch
+            // in which no grant could have been admitted.
+            remove_speaker(&self.known);
+            return;
+        }
+        let Some(next) = self.generation.get().checked_add(1) else {
+            self.disable();
+            return;
+        };
+        self.generation.set(next);
+        self.state.set(SpeakerState::Revoked);
+        self.subject.borrow_mut().take();
+        let boot = self.boot.borrow().clone();
+        match boot {
+            Some(boot) => {
+                self.write(&boot, "revoked", None);
+            }
+            None => remove_speaker(&self.known),
+        }
+    }
+
+    /// A different camera hold needs a fresh recognition even when the
+    /// geometric track ID survives. Ordinary failed recognition keeps its
+    /// cadence; a permission boundary does not keep that candidate cache.
+    pub fn camera_changed(&self) {
+        self.observed_face.borrow_mut().take();
+        self.revoke();
+    }
+
+    /// Withhold identity before recognizing a returning or changed track.
+    /// Checking grants nothing; only a completed same-person match can keep
+    /// the epoch. True asks the caller to recognize now, without its cadence.
+    pub fn candidate(&self, detected: bool, boot: Option<&str>, face: Option<&str>) -> bool {
+        let now = lamp_ipc::monotonic_us();
+        self.candidate_at(detected, boot, face, now, now)
+    }
+
+    fn candidate_at(
+        &self,
+        detected: bool,
+        boot: Option<&str>,
+        face: Option<&str>,
+        frame_us: u64,
+        now_us: u64,
+    ) -> bool {
+        if !detected || !self.enabled.get() {
+            return false;
+        }
+        if !fresh_speaker_frame(frame_us, now_us) {
+            self.revoke();
+            return false;
+        }
+        let Some((boot, face)) = boot
+            .zip(face)
+            .filter(|(boot, face)| valid_boot(boot) && valid_passing_face(face))
+        else {
+            self.observed_face.borrow_mut().take();
+            self.revoke();
+            return false;
+        };
+        let changed_boot = self.boot.borrow().as_deref().is_some_and(|was| was != boot);
+        if changed_boot {
+            self.revoke();
+        }
+        let needs_recognition = changed_boot
+            || self.state.get() == SpeakerState::Absent
+            || self.observed_face.borrow().as_deref() != Some(face);
+        if needs_recognition {
+            *self.boot.borrow_mut() = Some(boot.to_owned());
+            *self.observed_face.borrow_mut() = Some(face.to_owned());
+            self.state.set(SpeakerState::Checking);
+            self.observed_us.set(Some(frame_us));
+            self.write(boot, "checking", None);
+        }
+        needs_recognition && self.enabled.get()
+    }
+
+    pub fn seen(&self, name: &str, id: Option<&str>, boot: &str, face: &str) {
+        self.seen_at(name, id, boot, face, lamp_ipc::monotonic_us());
+    }
+
+    /// Completed recognition retains the original camera capture age, never
+    /// the time a slow inference returned. Caller holds the frame permit lock.
+    pub fn seen_frame(&self, name: &str, id: Option<&str>, boot: &str, face: &str, frame_us: u64) {
+        self.seen_frame_at(name, id, boot, face, (frame_us, lamp_ipc::monotonic_us()));
+    }
+
+    fn seen_frame_at(
+        &self,
+        name: &str,
+        id: Option<&str>,
+        boot: &str,
+        face: &str,
+        (frame_us, now): (u64, u64),
+    ) {
+        if !fresh_speaker_frame(frame_us, now) {
+            self.revoke();
+            return;
+        }
+        self.seen_at(name, id, boot, face, frame_us);
+    }
+
+    fn seen_at(&self, name: &str, id: Option<&str>, boot: &str, face: &str, now_us: u64) {
+        if !valid_speaker_fields(Some(name), id, Some(boot), Some(face)) {
+            self.revoke();
+            return;
+        }
+        let subject = (name.to_owned(), id.map(str::to_owned));
+        let changed = self
+            .subject
+            .borrow()
+            .as_ref()
+            .is_some_and(|was| was != &subject)
+            || self.boot.borrow().as_deref().is_some_and(|was| was != boot);
+        if changed {
+            self.revoke();
+        }
+        if !self.enabled.get() {
+            return;
+        }
+        *self.boot.borrow_mut() = Some(boot.to_owned());
+        *self.subject.borrow_mut() = Some(subject);
+        *self.observed_face.borrow_mut() = Some(face.to_owned());
+        self.state.set(SpeakerState::Seen);
+        self.observed_us.set(Some(now_us));
+        self.write(boot, "seen", Some((name, id, face)));
+    }
+
+    /// Only the caller's successful raw empty-face look may call this. Missing,
+    /// filtered/unaligned/unmatched observations and errors must revoke instead.
+    pub fn no_detection(&self, boot: &str) {
+        let now = lamp_ipc::monotonic_us();
+        self.no_detection_at(boot, now, now);
+    }
+
+    fn no_detection_at(&self, boot: &str, frame_us: u64, now_us: u64) {
+        if !valid_boot(boot) || !fresh_speaker_frame(frame_us, now_us) {
+            self.revoke();
+            return;
+        }
+        // An unresolved visible return is not benign absence. Even a reader
+        // that missed Checking must see a new epoch after it disappears.
+        if self.state.get() == SpeakerState::Checking {
+            self.revoke();
+        }
+        if self.boot.borrow().as_deref().is_some_and(|was| was != boot) {
+            self.revoke();
+        }
+        if !self.enabled.get() {
+            return;
+        }
+        *self.boot.borrow_mut() = Some(boot.to_owned());
+        self.observed_face.borrow_mut().take();
+        self.state.set(SpeakerState::Absent);
+        self.observed_us.set(Some(frame_us));
+        self.write(boot, "absent", None);
+    }
+
+    fn write(&self, boot: &str, state: &str, subject: Option<(&str, Option<&str>, &str)>) {
+        if !self.enabled.get() {
+            return;
+        }
+        let Some(publisher) = self.publisher.as_deref() else {
+            self.disable();
+            return;
+        };
+        let mut source = serde_json::json!({
+            "state":state, "boot":boot, "publisher":publisher, "generation":self.generation.get(),
+        });
+        if self.ticket_required.get() {
+            source["version"] = 3.into();
+            match self.camera_ticket.get() {
+                Some(binding) if self.publisher_id() == Some(binding.publisher) => {
+                    source["camera_hold"] = binding.hold.into();
+                    source["camera_began_us"] = binding.began_us.into();
+                }
+                _ if state == "revoked" => {}
+                _ => {
+                    self.state.set(SpeakerState::Revoked);
+                    self.subject.borrow_mut().take();
+                    remove_speaker(&self.known);
+                    return;
+                }
+            }
+        }
+        if self.ticket_required.get()
+            && state != "revoked"
+            && self.camera_ticket.get().is_none_or(|binding| {
+                self.observed_us
+                    .get()
+                    .is_none_or(|observed| observed < binding.began_us)
+            })
+        {
+            self.state.set(SpeakerState::Revoked);
+            self.subject.borrow_mut().take();
+            remove_speaker(&self.known);
+            return;
+        }
+        if state != "revoked"
+            && let (Some(until), Some(observed)) =
+                (self.permission_until_us.get(), self.observed_us.get())
+        {
+            let until = self
+                .camera_ticket
+                .get()
+                .filter(|_| self.ticket_required.get())
+                .map_or(until, |binding| until.min(binding.until_us));
+            source["permission_until_us"] = until.into();
+            source["observed_us"] = observed.into();
+            self.published_until_us.set(Some(until));
+        }
+        if let Some((name, id, face)) = subject {
+            source["name"] = name.into();
+            source["id"] = serde_json::json!(id);
+            source["face"] = face.into();
+        }
+        if !write_speaker(&self.known, &source) {
+            self.disable();
+        }
+    }
+}
+
+impl Drop for KnownSpeakerPublisher {
+    fn drop(&mut self) {
+        remove_speaker(&self.known);
+    }
+}
+
+fn fresh_speaker_frame(frame_us: u64, now_us: u64) -> bool {
+    frame_us > 0 && frame_us <= now_us && now_us - frame_us < 3_000_000
+}
+
+fn valid_boot(boot: &str) -> bool {
+    boot.len() == 16
+        && boot
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
+fn valid_passing_face(face: &str) -> bool {
+    face.strip_prefix('f').is_some_and(|digits| {
+        !digits.is_empty()
+            && digits.len() <= 10
+            && digits.bytes().all(|byte| byte.is_ascii_digit())
+            && digits.parse::<u32>().is_ok_and(|id| id > 0)
+    })
+}
+
+fn valid_speaker_fields(
+    name: Option<&str>,
+    id: Option<&str>,
+    boot: Option<&str>,
+    face: Option<&str>,
+) -> bool {
+    name.zip(boot)
+        .zip(face)
+        .is_some_and(|((name, boot), face)| {
+            plain_name(name).as_deref() == Some(name)
+                && id.is_none_or(lamp_msgs::known::is_person_id)
+                && valid_boot(boot)
+                && valid_passing_face(face)
+        })
+}
+
+fn speaker_temporary(path: &Path) -> PathBuf {
+    let mut temporary = path.as_os_str().to_owned();
+    temporary.push(".new");
+    PathBuf::from(temporary)
+}
+
+fn remove_speaker(known: &Path) {
+    let path = known_speaker_of(known);
+    let _ = std::fs::remove_file(speaker_temporary(&path));
+    let _ = std::fs::remove_file(path);
+}
+
+fn write_speaker(known: &Path, source: &serde_json::Value) -> bool {
+    let path = known_speaker_of(known);
+    let temporary = speaker_temporary(&path);
+    let _ = std::fs::remove_file(&temporary);
+    let write = || -> io::Result<()> {
+        let mut file = std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .mode(0o600)
+            .open(&temporary)?;
+        serde_json::to_writer(&mut file, source)?;
+        file.write_all(b"\n")?;
+        drop(file);
+        std::fs::rename(&temporary, &path)
+    };
+    if write().is_err() {
+        remove_speaker(known);
+        false
+    } else {
+        true
+    }
+}
+
 /// The name of the one known at the lamp (`--known-file`), replaced whole,
 /// or no file; and while speaking is judged, their face's passing id in
 /// [`known_face_of`], which goes with the name. With
@@ -73,6 +553,15 @@ pub fn known_face_of(known: &Path) -> PathBuf {
 /// id on the line after the name ([`lamp_msgs::known::known_text`]);
 /// without it, the name alone, as before.
 pub fn keep_known(path: &Path, name: Option<&str>, id: Option<&str>, face: Option<&str>) {
+    if name.is_none() {
+        remove_speaker(path);
+    }
+    keep_known_legacy(path, name, id, face);
+}
+
+/// Update legacy files under the main loop's separate typed-source owner.
+/// Other callers use `keep_known`, whose absence still clears any old source.
+pub fn keep_known_legacy(path: &Path, name: Option<&str>, id: Option<&str>, face: Option<&str>) {
     let beside = known_face_of(path);
     let Some(name) = name else {
         let _ = std::fs::remove_file(&beside);
@@ -1776,6 +2265,149 @@ pub fn recognise_due(looked_for: Option<Instant>, taking: bool, now: Instant) ->
     taking || looked_for.is_none_or(|at| now.saturating_duration_since(at) >= RECOGNISE_EVERY)
 }
 
+/// A detector result before any still-face filtering. A skipped or failed
+/// look is not fresh evidence that the room is empty.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RecognitionObservation {
+    Skipped,
+    Failed,
+    Empty,
+    Visible,
+}
+
+impl RecognitionObservation {
+    pub fn detected(ran: bool, raw_faces: usize) -> Self {
+        if !ran {
+            Self::Skipped
+        } else if raw_faces == 0 {
+            Self::Empty
+        } else {
+            Self::Visible
+        }
+    }
+}
+
+/// Main's last observed permission hold. It catches expiry/regrant even
+/// when both loop samples say the camera is currently permitted.
+#[derive(Default)]
+pub struct DisclosureHold {
+    held: Option<u64>,
+}
+
+impl DisclosureHold {
+    /// Observe the hold and reject a stale frame before publishing from it.
+    /// `valid` is computed under Permit's lock from capture token/time; the
+    /// caller keeps that lock through its bounded local publication.
+    pub fn frame(
+        &mut self,
+        valid: bool,
+        current: Option<u64>,
+        publisher: Option<&KnownSpeakerPublisher>,
+        known_file: Option<&Path>,
+        known: &mut Option<(String, f32, Instant)>,
+        held: &mut Held,
+    ) -> bool {
+        let changed = self.held != current;
+        self.held = current;
+        if changed || current.is_none() || !valid {
+            if let Some(publisher) = publisher {
+                publisher.camera_changed();
+            }
+            *known = None;
+            held.let_go();
+            if let Some(path) = known_file {
+                keep_known_legacy(path, None, None, None);
+            }
+        }
+        valid && current.is_some()
+    }
+}
+
+/// Inputs at the actual loop boundary, before activity or identity printing.
+pub struct RecognitionLook<'a> {
+    pub observation: RecognitionObservation,
+    /// Original capture time and the current host monotonic time. Publication
+    /// must not turn a queued empty/returning frame into a fresh observation.
+    pub frame_us: u64,
+    pub now_us: u64,
+    pub camera_open: bool,
+    pub boot: Option<&'a str>,
+    pub face: Option<&'a str>,
+    pub looked_for: Option<Instant>,
+    pub taking: bool,
+    pub now: Instant,
+}
+
+/// Withdraw a real empty look immediately, even between recognition checks.
+/// The returned decision is the loop's recognition gate. Only a successful
+/// raw empty look preserves an absence epoch; filtering and failures do not.
+/// The caller supplies a publisher only after checking its runtime storage.
+pub fn begin_recognition_look(
+    publisher: Option<&KnownSpeakerPublisher>,
+    known_file: Option<&Path>,
+    known: &mut Option<(String, f32, Instant)>,
+    held: &mut Held,
+    look: RecognitionLook<'_>,
+) -> bool {
+    if matches!(
+        look.observation,
+        RecognitionObservation::Empty | RecognitionObservation::Visible
+    ) && !fresh_speaker_frame(look.frame_us, look.now_us)
+    {
+        if let Some(publisher) = publisher {
+            publisher.revoke();
+        }
+        *known = None;
+        held.let_go();
+        if let Some(path) = known_file {
+            keep_known_legacy(path, None, None, None);
+        }
+        return false;
+    }
+    match look.observation {
+        RecognitionObservation::Skipped => return false,
+        RecognitionObservation::Failed => {
+            if let Some(publisher) = publisher {
+                publisher.revoke();
+            }
+            return false;
+        }
+        RecognitionObservation::Empty => {
+            // Both legacy readers and the visual hold must lose the old name.
+            // Otherwise an unprinted same-ID return can republish that name.
+            *known = None;
+            held.let_go();
+            if let Some(path) = known_file {
+                keep_known_legacy(path, None, None, None);
+            }
+            if let Some(publisher) = publisher {
+                if let Some(boot) = look.boot.filter(|_| look.camera_open) {
+                    publisher.no_detection_at(boot, look.frame_us, look.now_us);
+                } else {
+                    publisher.revoke();
+                }
+            }
+        }
+        RecognitionObservation::Visible => {
+            if let Some(publisher) = publisher {
+                if !look.camera_open {
+                    publisher.revoke();
+                } else if publisher.candidate_at(
+                    true,
+                    look.boot,
+                    look.face,
+                    look.frame_us,
+                    look.now_us,
+                ) {
+                    // Checking has already been written without any identity.
+                    return true;
+                }
+            }
+        }
+    }
+    recognise_due(look.looked_for, look.taking, look.now)
+}
+
 /// After a remembering at the lamp: kept, the next look asks at once, so the
 /// known file names the person within one look, not two seconds later
 /// (#3108). Refused or failed, the wait stands. A face from a photo is not
@@ -3352,6 +3984,880 @@ mod tests {
         keep_known(&known, Some("Minh"), None, Some("f4"));
         keep_known(&known, None, None, Some("f4"));
         assert!(!known.exists() && !beside.exists());
+        std::fs::remove_dir_all(known.parent().unwrap()).unwrap();
+    }
+
+    #[test]
+    fn raw_look_permission_refresh_keeps_identity_age_and_never_revives_expiry() {
+        let known = file("permission-refresh").with_file_name("known");
+        let source = KnownSpeakerPublisher::new(known.clone());
+        source.permission_until(Some(2_500_000));
+        source.seen_at("Alpha", None, "0123456789abcdef", "f1", 1_000_000);
+        let original = typed_source(&known);
+        for now in [1_500_000u64, 2_000_000, 2_500_000, 3_000_000, 3_500_000] {
+            source.permission_until(now.checked_add(1_500_000));
+            assert!(source.refresh_authority(now));
+            let refreshed = typed_source(&known);
+            assert_eq!(refreshed["observed_us"], original["observed_us"]);
+            assert_eq!(refreshed["generation"], original["generation"]);
+            assert_eq!(refreshed["name"], original["name"]);
+            assert_eq!(refreshed["permission_until_us"], now + 1_500_000);
+        }
+        source.permission_until(Some(5_500_000));
+        assert!(
+            !source.refresh_authority(4_000_000),
+            "identity expires at equality"
+        );
+        assert_eq!(typed_source(&known)["state"], "revoked");
+        source.seen_at("Alpha", None, "0123456789abcdef", "f1", 6_000_000);
+        source.permission_until(Some(8_000_000));
+        assert!(
+            !source.refresh_authority(6_000_001),
+            "a new permit cannot revive expired publication"
+        );
+        std::fs::remove_dir_all(known.parent().unwrap()).unwrap();
+    }
+
+    #[test]
+    fn failed_authority_refresh_disables_without_borrowing_through_write() {
+        let known = file("permission-refresh-write-failure").with_file_name("known");
+        let source = KnownSpeakerPublisher::new(known.clone());
+        source.permission_until(Some(2_500_000));
+        source.seen_at("Alpha", None, "0123456789abcdef", "f1", 1_000_000);
+        let path = known_speaker_of(&known);
+        std::fs::remove_file(&path).unwrap();
+        std::fs::create_dir(&path).unwrap();
+        source.permission_until(Some(3_000_000));
+        assert!(!source.refresh_authority(1_500_000));
+        assert!(!source.enabled());
+        assert!(source.subject.borrow().is_none());
+        std::fs::remove_dir_all(known.parent().unwrap()).unwrap();
+    }
+
+    #[test]
+    fn slow_recognition_keeps_capture_age_even_while_permission_is_renewed() {
+        let known = file("permission-slow-recognition").with_file_name("known");
+        let source = KnownSpeakerPublisher::new(known.clone());
+        source.permission_until(Some(5_500_000));
+        source.seen_frame_at(
+            "Alpha",
+            None,
+            "0123456789abcdef",
+            "f1",
+            (1_000_000, 3_999_999),
+        );
+        assert_eq!(typed_source(&known)["observed_us"], 1_000_000);
+        source.seen_frame_at(
+            "Alpha",
+            None,
+            "0123456789abcdef",
+            "f1",
+            (1_000_000, 4_000_000),
+        );
+        assert_eq!(typed_source(&known)["state"], "revoked");
+        std::fs::remove_dir_all(known.parent().unwrap()).unwrap();
+    }
+
+    #[test]
+    fn stale_empty_and_checking_captures_revoke_before_publication() {
+        const BOOT: &str = "0123456789abcdef";
+        for observation in [
+            RecognitionObservation::Empty,
+            RecognitionObservation::Visible,
+        ] {
+            for frame_us in [0, 4_000_001, 1_000_000, 999_999] {
+                let known =
+                    file(&format!("stale-loop-{observation:?}-{frame_us}")).with_file_name("known");
+                let source = KnownSpeakerPublisher::new(known.clone());
+                source.permission_until(Some(5_500_000));
+                source.seen_at("Alpha", None, BOOT, "f1", 1_000_000);
+                let generation = typed_source(&known)["generation"].as_u64().unwrap();
+                keep_known_legacy(&known, Some("Alpha"), None, Some("f1"));
+                let now = Instant::now();
+                let mut visual = Some(("Alpha".to_owned(), 1.0, now));
+                let mut held = Held::new(true);
+                held.matched(now, Some("f1".into()));
+                assert!(!begin_recognition_look(
+                    Some(&source),
+                    Some(&known),
+                    &mut visual,
+                    &mut held,
+                    RecognitionLook {
+                        observation,
+                        frame_us,
+                        now_us: 4_000_000,
+                        camera_open: true,
+                        boot: Some(BOOT),
+                        face: Some("f2"),
+                        looked_for: Some(now),
+                        taking: false,
+                        now,
+                    },
+                ));
+                let revoked = typed_source(&known);
+                assert_eq!(revoked["state"], "revoked");
+                assert!(revoked["generation"].as_u64().unwrap() > generation);
+                assert!(revoked.get("name").is_none());
+                assert!(visual.is_none() && !held.keeps(now));
+                assert!(!known.exists() && !known_face_of(&known).exists());
+                drop(source);
+                std::fs::remove_dir_all(known.parent().unwrap()).unwrap();
+            }
+        }
+    }
+
+    #[test]
+    fn fresh_empty_and_checking_captures_keep_original_age_and_epoch() {
+        const BOOT: &str = "0123456789abcdef";
+        for observation in [
+            RecognitionObservation::Empty,
+            RecognitionObservation::Visible,
+        ] {
+            let known = file(&format!("fresh-loop-{observation:?}")).with_file_name("known");
+            let source = KnownSpeakerPublisher::new(known.clone());
+            source.permission_until(Some(5_500_000));
+            source.seen_at("Alpha", None, BOOT, "f1", 1_000_000);
+            let generation = typed_source(&known)["generation"].clone();
+            let now = Instant::now();
+            let mut visual = Some(("Alpha".to_owned(), 1.0, now));
+            let mut held = Held::new(true);
+            held.matched(now, Some("f1".into()));
+            let recognise = begin_recognition_look(
+                Some(&source),
+                Some(&known),
+                &mut visual,
+                &mut held,
+                RecognitionLook {
+                    observation,
+                    frame_us: 1_000_001,
+                    now_us: 4_000_000,
+                    camera_open: true,
+                    boot: Some(BOOT),
+                    face: Some("f2"),
+                    looked_for: Some(now),
+                    taking: false,
+                    now,
+                },
+            );
+            assert_eq!(recognise, observation == RecognitionObservation::Visible);
+            let published = typed_source(&known);
+            assert_eq!(
+                published["state"],
+                if recognise { "checking" } else { "absent" }
+            );
+            assert_eq!(published["observed_us"], 1_000_001);
+            assert_eq!(published["permission_until_us"], 5_500_000);
+            assert_eq!(published["generation"], generation);
+            for field in ["name", "id", "face"] {
+                assert!(published.get(field).is_none());
+            }
+            drop(source);
+            std::fs::remove_dir_all(known.parent().unwrap()).unwrap();
+        }
+    }
+
+    fn typed_source(known: &Path) -> serde_json::Value {
+        serde_json::from_slice(&std::fs::read(known_speaker_of(known)).unwrap()).unwrap()
+    }
+
+    #[test]
+    fn a_short_raw_empty_look_withdraws_identity_before_a_same_id_return() {
+        const BOOT: &str = "0123456789abcdef";
+        for (returned, hold_on) in [("Beta", true), ("Alpha", true), ("Beta", false)] {
+            let known =
+                file(&format!("raw-empty-return-{returned}-{hold_on}")).with_file_name("known");
+            let source = KnownSpeakerPublisher::new(known.clone());
+            let start = Instant::now();
+            let mut ids = crate::bus_out::Ids::default();
+            let bounds = [[0.2, 0.2, 0.6, 0.8]];
+            let first = ids.of(&bounds, 1_000_000);
+            let face = format!("f{}", first[0]);
+            source.seen("Alpha", None, BOOT, &face);
+            keep_known_legacy(&known, Some("Alpha"), None, Some(&face));
+            let initial = typed_source(&known);
+            let mut visual = Some(("Alpha".to_owned(), 1.0, start));
+            let mut held = Held::new(hold_on);
+            held.matched(start, Some(face.clone()));
+
+            // The real tracker intentionally retains its ID through this gap.
+            let empty = ids.of(&[], 1_250_000);
+            assert!(empty.is_empty());
+            let recognise = begin_recognition_look(
+                Some(&source),
+                Some(&known),
+                &mut visual,
+                &mut held,
+                RecognitionLook {
+                    frame_us: 1_000_000,
+                    now_us: 1_000_000,
+                    observation: RecognitionObservation::detected(true, empty.len()),
+                    camera_open: true,
+                    boot: Some(BOOT),
+                    face: None,
+                    looked_for: Some(start),
+                    taking: false,
+                    now: start + Duration::from_millis(250),
+                },
+            );
+            assert!(!recognise, "absence must withdraw before the print is due");
+            assert!(visual.is_none() && !held.keeps(start + Duration::from_millis(250)));
+            assert!(!known.exists() && !known_face_of(&known).exists());
+            let absent = typed_source(&known);
+            assert_eq!(absent["state"], "absent");
+            assert_eq!(absent["generation"], initial["generation"]);
+            for field in ["name", "id", "face"] {
+                assert!(absent.get(field).is_none());
+            }
+
+            let next = ids.of(&bounds, 1_500_000);
+            assert_eq!(
+                next, first,
+                "reproduce the same passing ID, not a new track"
+            );
+            let returning_face = format!("f{}", next[0]);
+            let recognise = begin_recognition_look(
+                Some(&source),
+                Some(&known),
+                &mut visual,
+                &mut held,
+                RecognitionLook {
+                    frame_us: 1_000_000,
+                    now_us: 1_000_000,
+                    observation: RecognitionObservation::detected(true, next.len()),
+                    camera_open: true,
+                    boot: Some(BOOT),
+                    face: Some(&returning_face),
+                    looked_for: Some(start),
+                    taking: false,
+                    now: start + Duration::from_millis(500),
+                },
+            );
+            assert!(
+                recognise,
+                "a same-ID return forces recognition before two seconds"
+            );
+            let checking = typed_source(&known);
+            assert_eq!(checking["state"], "checking");
+            for field in ["name", "id", "face"] {
+                assert!(
+                    checking.get(field).is_none(),
+                    "no identity before inference"
+                );
+            }
+            assert!(!known.exists() && !known_face_of(&known).exists());
+            assert!(visual.is_none() && !held.keeps_unprinted(start, true, Some(&face)));
+
+            // A completed same-person match may resume the old epoch; a
+            // different match must start a new one. No tracker identity is
+            // used as the recognition result.
+            source.seen(returned, None, BOOT, &returning_face);
+            let seen = typed_source(&known);
+            assert_eq!(seen["state"], "seen");
+            assert_eq!(seen["name"], returned);
+            assert_eq!(
+                seen["generation"].as_u64().unwrap(),
+                initial["generation"].as_u64().unwrap() + u64::from(returned != "Alpha")
+            );
+            drop(source);
+            std::fs::remove_dir_all(known.parent().unwrap()).unwrap();
+        }
+    }
+
+    #[test]
+    fn a_continuous_visible_identity_keeps_the_existing_recognition_cadence() {
+        const BOOT: &str = "0123456789abcdef";
+        let known = file("continuous-recognition-cadence").with_file_name("known");
+        let source = KnownSpeakerPublisher::new(known.clone());
+        let start = Instant::now();
+        source.seen("Alpha", None, BOOT, "f1");
+        keep_known_legacy(&known, Some("Alpha"), None, Some("f1"));
+        let initial = typed_source(&known);
+        let mut visual = Some(("Alpha".to_owned(), 1.0, start));
+        let mut held = Held::new(true);
+        held.matched(start, Some("f1".into()));
+        for (after, due) in [(Duration::from_millis(250), false), (RECOGNISE_EVERY, true)] {
+            assert_eq!(
+                begin_recognition_look(
+                    Some(&source),
+                    Some(&known),
+                    &mut visual,
+                    &mut held,
+                    RecognitionLook {
+                        frame_us: 1_000_000,
+                        now_us: 1_000_000,
+                        observation: RecognitionObservation::detected(true, 1),
+                        camera_open: true,
+                        boot: Some(BOOT),
+                        face: Some("f1"),
+                        looked_for: Some(start),
+                        taking: false,
+                        now: start + after,
+                    },
+                ),
+                due,
+            );
+            assert_eq!(typed_source(&known), initial);
+            assert!(known.exists() && known_face_of(&known).exists());
+            assert!(visual.is_some());
+        }
+        drop(source);
+        std::fs::remove_dir_all(known.parent().unwrap()).unwrap();
+    }
+
+    #[test]
+    fn skipped_failed_filtered_and_closed_looks_are_not_benign_absence() {
+        const BOOT: &str = "0123456789abcdef";
+        for (label, observation, camera_open, expected) in [
+            (
+                "skipped",
+                RecognitionObservation::detected(false, 0),
+                true,
+                "seen",
+            ),
+            ("failed", RecognitionObservation::Failed, true, "revoked"),
+            (
+                "filtered",
+                RecognitionObservation::detected(true, 1),
+                true,
+                "revoked",
+            ),
+            (
+                "closed",
+                RecognitionObservation::detected(true, 0),
+                false,
+                "revoked",
+            ),
+        ] {
+            let known = file(&format!("non-absence-loop-{label}")).with_file_name("known");
+            let source = KnownSpeakerPublisher::new(known.clone());
+            let start = Instant::now();
+            source.seen("Alpha", None, BOOT, "f1");
+            let initial = typed_source(&known);
+            let mut visual = Some(("Alpha".to_owned(), 1.0, start));
+            let mut held = Held::new(true);
+            held.matched(start, Some("f1".into()));
+            assert!(!begin_recognition_look(
+                Some(&source),
+                Some(&known),
+                &mut visual,
+                &mut held,
+                RecognitionLook {
+                    frame_us: 1_000_000,
+                    now_us: 1_000_000,
+                    observation,
+                    camera_open,
+                    boot: Some(BOOT),
+                    face: None,
+                    looked_for: Some(start),
+                    taking: false,
+                    now: start + Duration::from_millis(250),
+                },
+            ));
+            let actual = typed_source(&known);
+            assert_eq!(actual["state"], expected);
+            if expected == "seen" {
+                assert_eq!(actual, initial, "a skipped detector refreshes nothing");
+            } else {
+                assert!(actual.get("name").is_none());
+                assert!(actual["generation"].as_u64() > initial["generation"].as_u64());
+            }
+            drop(source);
+            std::fs::remove_dir_all(known.parent().unwrap()).unwrap();
+        }
+    }
+
+    #[test]
+    fn typed_no_detection_keeps_only_the_same_publisher_generation() {
+        use std::os::unix::fs::PermissionsExt;
+        let known = file("typed-absence").with_file_name("known");
+        keep_known(&known, Some("Alpha"), None, Some("f3"));
+        let source = KnownSpeakerPublisher::new(known.clone());
+        source.seen("Alpha", None, "0123456789abcdef", "f3");
+        let seen = typed_source(&known);
+        assert_eq!(seen["state"], "seen");
+        assert_eq!(seen["generation"], 1);
+        assert_eq!(seen["name"], "Alpha");
+        assert_eq!(seen["publisher"].as_str().unwrap().len(), 32);
+        assert!(
+            seen["publisher"]
+                .as_str()
+                .unwrap()
+                .bytes()
+                .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+        );
+        source.no_detection("0123456789abcdef");
+        let absent = typed_source(&known);
+        assert_eq!(
+            absent,
+            serde_json::json!({
+                "state":"absent", "boot":"0123456789abcdef",
+                "publisher":seen["publisher"], "generation":1
+            })
+        );
+        let source_bytes = std::fs::read(known_speaker_of(&known)).unwrap();
+        let modified = std::fs::metadata(known_speaker_of(&known))
+            .unwrap()
+            .modified()
+            .unwrap();
+        assert!(!source.candidate(false, None, None));
+        assert_eq!(
+            std::fs::read(known_speaker_of(&known)).unwrap(),
+            source_bytes
+        );
+        assert_eq!(
+            std::fs::metadata(known_speaker_of(&known))
+                .unwrap()
+                .modified()
+                .unwrap(),
+            modified,
+            "a skipped inference neither refreshes nor revokes typed status"
+        );
+        // Main alone owns typed source: clearing only legacy files preserves
+        // this explicit status. Other legacy callers still fail closed.
+        keep_known_legacy(&known, None, None, None);
+        assert!(!known.exists());
+        assert_eq!(typed_source(&known), absent);
+        assert_eq!(
+            std::fs::metadata(known_speaker_of(&known))
+                .unwrap()
+                .permissions()
+                .mode()
+                & 0o777,
+            0o600
+        );
+        keep_known(&known, None, None, None);
+        assert!(!known_speaker_of(&known).exists());
+        std::fs::remove_dir_all(known.parent().unwrap()).unwrap();
+    }
+
+    #[test]
+    fn hard_source_invalidation_advances_before_any_same_subject_can_return() {
+        let known = file("typed-revocation").with_file_name("known");
+        let source = KnownSpeakerPublisher::new(known.clone());
+        source.seen("Alpha", None, "0123456789abcdef", "f3");
+        let publisher = typed_source(&known)["publisher"].clone();
+        source.revoke();
+        let revoked = typed_source(&known);
+        assert_eq!(
+            revoked,
+            serde_json::json!({
+                "state":"revoked", "boot":"0123456789abcdef", "publisher":publisher, "generation":2
+            })
+        );
+        source.revoke();
+        assert!(
+            !known_speaker_of(&known).exists(),
+            "repeated hard clear also removes a foreign/legacy source"
+        );
+        source.seen("Alpha", None, "0123456789abcdef", "f3");
+        assert_eq!(typed_source(&known)["generation"], 2);
+        source.no_detection("0123456789abcdef");
+        source.revoke();
+        assert_eq!(
+            typed_source(&known)["generation"],
+            3,
+            "absence never hides a hard invalidation"
+        );
+        source.seen("Alpha", None, "0123456789abcdef", "f3");
+        assert_eq!(typed_source(&known)["generation"], 3);
+        std::fs::remove_dir_all(known.parent().unwrap()).unwrap();
+    }
+
+    #[test]
+    fn returning_candidate_is_checking_before_recognition_without_identity() {
+        for (suffix, absent, face) in [
+            ("same-id", true, "f3"),
+            ("new-id", true, "f4"),
+            ("changed-visible", false, "f4"),
+        ] {
+            let known = file(&format!("returning-checking-{suffix}")).with_file_name("known");
+            let source = KnownSpeakerPublisher::new(known.clone());
+            source.seen("Alpha", None, "0123456789abcdef", "f3");
+            let seen = typed_source(&known);
+            assert!(
+                !source.candidate(true, Some("0123456789abcdef"), Some("f3")),
+                "a continuously seen unchanged track keeps the ordinary cadence"
+            );
+            assert_eq!(typed_source(&known), seen);
+            if absent {
+                source.no_detection("0123456789abcdef");
+            }
+            // This is the boundary before the caller runs any recognizer.
+            assert!(
+                source.candidate(true, Some("0123456789abcdef"), Some(face)),
+                "a return must bypass even a just-completed recognition cadence"
+            );
+            assert_eq!(
+                typed_source(&known),
+                serde_json::json!({
+                    "state":"checking", "boot":"0123456789abcdef",
+                    "publisher":seen["publisher"], "generation":seen["generation"]
+                }),
+                "an unresolved returning candidate exposes no identity or absence grant"
+            );
+            source.seen("Alpha", None, "0123456789abcdef", face);
+            let returned = typed_source(&known);
+            assert_eq!(returned["state"], "seen");
+            assert_eq!(returned["face"], face);
+            assert_eq!(returned["publisher"], seen["publisher"]);
+            assert_eq!(returned["generation"], seen["generation"]);
+            std::fs::remove_dir_all(known.parent().unwrap()).unwrap();
+        }
+    }
+
+    #[test]
+    fn returning_unmatched_candidate_does_not_force_recognition_every_frame() {
+        let known = file("returning-unmatched-cadence").with_file_name("known");
+        let source = KnownSpeakerPublisher::new(known.clone());
+        assert!(source.candidate(true, Some("0123456789abcdef"), Some("f3")));
+        let checking = typed_source(&known);
+        assert!(!source.candidate(true, Some("0123456789abcdef"), Some("f3")));
+        assert_eq!(typed_source(&known), checking);
+        source.revoke(); // The forced recognizer found no known person.
+        let revoked = typed_source(&known);
+        for _ in 0..8 {
+            assert!(
+                !source.candidate(true, Some("0123456789abcdef"), Some("f3")),
+                "unmatched, unaligned and error outcomes retain the normal retry cadence"
+            );
+            assert_eq!(typed_source(&known), revoked);
+        }
+        assert!(source.candidate(true, Some("0123456789abcdef"), Some("f4")));
+        source.revoke();
+        source.no_detection("0123456789abcdef");
+        assert!(source.candidate(true, Some("0123456789abcdef"), Some("f4")));
+        std::fs::remove_dir_all(known.parent().unwrap()).unwrap();
+    }
+
+    #[test]
+    fn returning_unresolved_checking_cannot_restore_absence_in_the_old_epoch() {
+        let known = file("returning-unresolved-absence").with_file_name("known");
+        let source = KnownSpeakerPublisher::new(known.clone());
+        source.seen("Alpha", None, "0123456789abcdef", "f3");
+        let original = typed_source(&known);
+        source.no_detection("0123456789abcdef");
+        assert_eq!(typed_source(&known)["generation"], original["generation"]);
+        assert!(source.candidate(true, Some("0123456789abcdef"), Some("f4")));
+        source.no_detection("0123456789abcdef");
+        assert_eq!(
+            typed_source(&known),
+            serde_json::json!({
+                "state":"absent", "boot":"0123456789abcdef",
+                "publisher":original["publisher"],
+                "generation":original["generation"].as_u64().unwrap() + 1
+            }),
+            "disappearing before a positive match cannot restore the old grant"
+        );
+        source.seen("Alpha", None, "0123456789abcdef", "f4");
+        assert_ne!(typed_source(&known)["generation"], original["generation"]);
+        std::fs::remove_dir_all(known.parent().unwrap()).unwrap();
+    }
+
+    #[test]
+    fn returning_same_person_new_track_preserves_epoch_only_after_positive_match() {
+        let known = file("returning-positive-id").with_file_name("known");
+        let source = KnownSpeakerPublisher::new(known.clone());
+        let id = lamp_msgs::known::person_id("Alpha");
+        source.seen("Alpha", Some(&id), "0123456789abcdef", "f3");
+        let original = typed_source(&known);
+        source.no_detection("0123456789abcdef");
+        source.candidate(true, Some("0123456789abcdef"), Some("f4"));
+        source.seen("Alpha", Some(&id), "0123456789abcdef", "f4");
+        let returned = typed_source(&known);
+        assert_eq!(returned["generation"], original["generation"]);
+        assert_eq!(returned["publisher"], original["publisher"]);
+        assert_eq!(returned["face"], "f4");
+        assert_eq!(returned["id"], id);
+
+        let other_id = lamp_msgs::known::person_id("Beta");
+        source.seen("Alpha", Some(&other_id), "0123456789abcdef", "f4");
+        assert_eq!(
+            typed_source(&known)["generation"],
+            original["generation"].as_u64().unwrap() + 1,
+            "a display name does not conceal a changed stable person id"
+        );
+        std::fs::remove_dir_all(known.parent().unwrap()).unwrap();
+    }
+
+    #[test]
+    fn returning_other_or_unmatched_candidate_hard_revokes_the_retained_epoch() {
+        for outcome in ["other", "unmatched", "privacy", "error"] {
+            let known = file(&format!("returning-revoke-{outcome}")).with_file_name("known");
+            let source = KnownSpeakerPublisher::new(known.clone());
+            source.seen("Alpha", None, "0123456789abcdef", "f3");
+            let generation = typed_source(&known)["generation"].as_u64().unwrap();
+            source.no_detection("0123456789abcdef");
+            source.candidate(true, Some("0123456789abcdef"), Some("f4"));
+            assert_eq!(typed_source(&known)["state"], "checking");
+            if outcome == "other" {
+                source.seen("Beta", None, "0123456789abcdef", "f4");
+                assert_eq!(typed_source(&known)["state"], "seen");
+            } else {
+                // Main uses this same hard clear for failed recognition,
+                // privacy/forget and inference errors, never no_detection.
+                source.revoke();
+                assert_eq!(typed_source(&known)["state"], "revoked");
+            }
+            assert_eq!(typed_source(&known)["generation"], generation + 1);
+            source.seen("Alpha", None, "0123456789abcdef", "f4");
+            assert!(
+                typed_source(&known)["generation"].as_u64().unwrap() > generation,
+                "a later positive match cannot restore the old epoch"
+            );
+            std::fs::remove_dir_all(known.parent().unwrap()).unwrap();
+        }
+    }
+
+    #[test]
+    fn another_candidate_person_or_publisher_boot_revokes_typed_continuity() {
+        let known = file("typed-candidate").with_file_name("known");
+        let source = KnownSpeakerPublisher::new(known.clone());
+        source.seen("Alpha", None, "0123456789abcdef", "f3");
+        source.no_detection("0123456789abcdef");
+        assert!(source.candidate(true, Some("0123456789abcdef"), Some("f3")));
+        assert_eq!(typed_source(&known)["state"], "checking");
+        assert!(source.candidate(true, Some("0123456789abcdef"), Some("f4")));
+        assert_eq!(typed_source(&known)["state"], "checking");
+        assert_eq!(typed_source(&known)["generation"], 1);
+        source.seen("Beta", None, "0123456789abcdef", "f4");
+        assert_eq!(typed_source(&known)["generation"], 2);
+        source.seen("Alpha", None, "0123456789abcdef", "f4");
+        assert_eq!(
+            typed_source(&known)["generation"],
+            3,
+            "same geometry is not person authority"
+        );
+        source.no_detection("fedcba9876543210");
+        assert_eq!(typed_source(&known)["generation"], 4);
+        assert_eq!(typed_source(&known)["boot"], "fedcba9876543210");
+        source.seen("Alpha", None, "fedcba9876543210", "f4");
+        assert_eq!(typed_source(&known)["generation"], 4);
+        std::fs::remove_dir_all(known.parent().unwrap()).unwrap();
+    }
+
+    #[test]
+    fn missing_visible_candidate_and_unmatched_source_never_become_absence() {
+        let known = file("typed-visible-uncertain").with_file_name("known");
+        let source = KnownSpeakerPublisher::new(known.clone());
+        for missing in [
+            (None, Some("f3")),
+            (Some("0123456789abcdef"), None),
+            (Some("not-a-boot"), Some("f3")),
+            (Some("0123456789abcdef"), Some("f0")),
+            (Some("0123456789abcdef"), Some("f4294967296")),
+        ] {
+            source.seen("Alpha", None, "0123456789abcdef", "f3");
+            assert!(!source.candidate(true, missing.0, missing.1));
+            assert_eq!(typed_source(&known)["state"], "revoked");
+        }
+        for invalid in ["", "Alpha\nBeta"] {
+            source.seen("Alpha", None, "0123456789abcdef", "f3");
+            let generation = typed_source(&known)["generation"].as_u64().unwrap();
+            source.seen(invalid, None, "0123456789abcdef", "f3");
+            assert_eq!(typed_source(&known)["state"], "revoked");
+            assert_eq!(typed_source(&known)["generation"], generation + 1);
+        }
+        source.seen("Alpha", None, "0123456789abcdef", "f3");
+        source.disable();
+        assert!(
+            !known_speaker_of(&known).exists(),
+            "a failed producer cannot publish benign status"
+        );
+        source.no_detection("0123456789abcdef");
+        assert!(!known_speaker_of(&known).exists());
+        assert!(!source.candidate(true, Some("0123456789abcdef"), Some("f4")));
+        assert!(!known_speaker_of(&known).exists());
+        std::fs::remove_dir_all(known.parent().unwrap()).unwrap();
+    }
+
+    #[test]
+    fn typed_source_entropy_failure_and_generation_overflow_disable_without_revival() {
+        let known = file("typed-disabled").with_file_name("known");
+        keep_known_speaker(
+            &known,
+            Some("Alpha"),
+            None,
+            Some("0123456789abcdef"),
+            Some("f3"),
+        );
+        let no_entropy = KnownSpeakerPublisher::with_random(known.clone(), |_| Err(()));
+        assert!(!known_speaker_of(&known).exists());
+        no_entropy.seen("Alpha", None, "0123456789abcdef", "f3");
+        no_entropy.no_detection("0123456789abcdef");
+        assert!(!known_speaker_of(&known).exists());
+        drop(no_entropy);
+        let source = KnownSpeakerPublisher::new(known.clone());
+        source.seen("Alpha", None, "0123456789abcdef", "f3");
+        source.generation.set(u64::MAX);
+        source.revoke();
+        assert!(!known_speaker_of(&known).exists());
+        source.seen("Alpha", None, "0123456789abcdef", "f3");
+        assert!(!known_speaker_of(&known).exists());
+        std::fs::remove_dir_all(known.parent().unwrap()).unwrap();
+    }
+
+    #[test]
+    fn typed_source_write_failure_cannot_restore_the_previous_generation() {
+        for state in ["absent", "checking"] {
+            let known = file(&format!("typed-write-failure-{state}")).with_file_name("known");
+            let source = KnownSpeakerPublisher::new(known.clone());
+            source.seen("Alpha", None, "0123456789abcdef", "f3");
+            let temporary = speaker_temporary(&known_speaker_of(&known));
+            std::fs::create_dir(&temporary).unwrap();
+            if state == "absent" {
+                source.no_detection("0123456789abcdef");
+            } else {
+                assert!(!source.candidate(true, Some("0123456789abcdef"), Some("f4")));
+            }
+            assert!(!known_speaker_of(&known).exists());
+            std::fs::remove_dir(&temporary).unwrap();
+            source.seen("Alpha", None, "0123456789abcdef", "f3");
+            assert!(
+                !known_speaker_of(&known).exists(),
+                "repairing storage must not revive a failed publisher"
+            );
+            std::fs::remove_dir_all(known.parent().unwrap()).unwrap();
+        }
+    }
+
+    #[test]
+    fn typed_source_new_lifecycle_uses_new_entropy_and_never_follows_old_links() {
+        use std::os::unix::fs::symlink;
+        let known = file("typed-lifecycle").with_file_name("known");
+        let old = {
+            let source = KnownSpeakerPublisher::new(known.clone());
+            source.seen("Alpha", None, "0123456789abcdef", "f3");
+            typed_source(&known)["publisher"].clone()
+        };
+        assert!(!known_speaker_of(&known).exists());
+        let outside = known.with_file_name("outside");
+        std::fs::write(&outside, b"sentinel").unwrap();
+        symlink(&outside, known_speaker_of(&known)).unwrap();
+        let source = KnownSpeakerPublisher::new(known.clone());
+        assert!(!known_speaker_of(&known).exists());
+        symlink(&outside, speaker_temporary(&known_speaker_of(&known))).unwrap();
+        source.seen("Alpha", None, "0123456789abcdef", "f3");
+        assert_ne!(typed_source(&known)["publisher"], old);
+        assert_eq!(typed_source(&known)["generation"], 1);
+        assert_eq!(std::fs::read(outside).unwrap(), b"sentinel");
+        std::fs::remove_dir_all(known.parent().unwrap()).unwrap();
+    }
+
+    #[test]
+    fn the_known_speaker_is_one_private_source_observation_and_keeps_legacy_files() {
+        use std::os::unix::fs::PermissionsExt;
+        let known = file("known-speaker-source").with_file_name("known.custom");
+        let path = known_speaker_of(&known);
+        assert_eq!(path.file_name().unwrap(), "known.custom-speaker");
+        let id = lamp_msgs::known::person_id("Alpha");
+        keep_known(&known, Some("Alpha"), Some(&id), Some("f3"));
+        let legacy = std::fs::read(&known).unwrap();
+        let legacy_face = std::fs::read(known_face_of(&known)).unwrap();
+        keep_known_speaker(
+            &known,
+            Some("Alpha"),
+            Some(&id),
+            Some("0123456789abcdef"),
+            Some("f3"),
+        );
+        assert_eq!(
+            serde_json::from_slice::<serde_json::Value>(&std::fs::read(&path).unwrap()).unwrap(),
+            serde_json::json!({"name": "Alpha", "id": id, "boot": "0123456789abcdef", "face": "f3"})
+        );
+        assert_eq!(
+            std::fs::metadata(&path).unwrap().permissions().mode() & 0o777,
+            0o600
+        );
+        // Replacement is a whole new observation, including an explicit null id.
+        keep_known_speaker(
+            &known,
+            Some("Beta"),
+            None,
+            Some("fedcba9876543210"),
+            Some("f4"),
+        );
+        assert_eq!(
+            serde_json::from_slice::<serde_json::Value>(&std::fs::read(&path).unwrap()).unwrap(),
+            serde_json::json!({"name": "Beta", "id": null, "boot": "fedcba9876543210", "face": "f4"})
+        );
+        assert_eq!(std::fs::read(&known).unwrap(), legacy);
+        assert_eq!(std::fs::read(known_face_of(&known)).unwrap(), legacy_face);
+        assert!(!path.with_file_name("known.custom-speaker.new").exists());
+        keep_known(&known, None, None, None);
+        assert!(
+            !path.exists(),
+            "clearing the known name retained its speaker proof"
+        );
+        std::fs::remove_dir_all(known.parent().unwrap()).unwrap();
+    }
+
+    #[test]
+    fn an_interrupted_known_speaker_write_never_reuses_a_temporary_or_old_proof() {
+        let known = file("known-speaker-write-failure").with_file_name("known");
+        let path = known_speaker_of(&known);
+        let mut temporary = path.as_os_str().to_owned();
+        temporary.push(".new");
+        let temporary = PathBuf::from(temporary);
+        keep_known_speaker(
+            &known,
+            Some("Alpha"),
+            None,
+            Some("0123456789abcdef"),
+            Some("f3"),
+        );
+        assert!(path.exists());
+        // A leftover regular temporary is replaced, never read as a source.
+        std::fs::write(&temporary, b"interrupted").unwrap();
+        keep_known_speaker(
+            &known,
+            Some("Beta"),
+            None,
+            Some("fedcba9876543210"),
+            Some("f4"),
+        );
+        let source: serde_json::Value =
+            serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+        assert_eq!(source["name"], "Beta");
+        assert!(!temporary.exists());
+        // A temporary that cannot be removed/opened fails closed.
+        std::fs::create_dir(&temporary).unwrap();
+        keep_known_speaker(
+            &known,
+            Some("Alpha"),
+            None,
+            Some("0123456789abcdef"),
+            Some("f3"),
+        );
+        assert!(!path.exists());
+        std::fs::remove_dir_all(known.parent().unwrap()).unwrap();
+    }
+
+    #[test]
+    fn a_known_speaker_is_removed_for_missing_or_invalid_source_fields() {
+        let known = file("known-speaker-invalid").with_file_name("known");
+        let path = known_speaker_of(&known);
+        let valid = (Some("Alpha"), None, Some("0123456789abcdef"), Some("f3"));
+        for fields in [
+            (None, valid.1, valid.2, valid.3),
+            (valid.0, valid.1, None, valid.3),
+            (valid.0, valid.1, valid.2, None),
+            (Some(""), valid.1, valid.2, valid.3),
+            (Some("Alpha\nBeta"), valid.1, valid.2, valid.3),
+            (valid.0, Some("not-an-id"), valid.2, valid.3),
+            (valid.0, valid.1, Some("0123456789abcde"), valid.3),
+            (valid.0, valid.1, Some("0123456789abcdeg"), valid.3),
+            (valid.0, valid.1, Some("0123456789ABCDEF"), valid.3),
+            (valid.0, valid.1, valid.2, Some("f")),
+            (valid.0, valid.1, valid.2, Some("f0")),
+            (valid.0, valid.1, valid.2, Some("f-3")),
+            (valid.0, valid.1, valid.2, Some("f3\n")),
+            (valid.0, valid.1, valid.2, Some("f4294967296")),
+        ] {
+            keep_known_speaker(&known, valid.0, valid.1, valid.2, valid.3);
+            assert!(path.exists());
+            keep_known_speaker(&known, fields.0, fields.1, fields.2, fields.3);
+            assert!(!path.exists(), "invalid source observation survived");
+        }
         std::fs::remove_dir_all(known.parent().unwrap()).unwrap();
     }
 

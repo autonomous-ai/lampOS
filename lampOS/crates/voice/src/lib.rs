@@ -45,6 +45,7 @@ pub mod body_link;
 pub mod body_motion;
 pub mod bus_out;
 pub mod called;
+pub(crate) mod camera_authority;
 pub mod camera_config;
 pub mod camera_inspect;
 pub mod camera_worker;

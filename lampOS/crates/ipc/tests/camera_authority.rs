@@ -680,3 +680,98 @@ fn full_control_recovers_one_grant_after_exact_drain_without_renewing_deadline()
     drop(witness);
     assert!(!received.is_open() && !existing.is_open());
 }
+
+#[test]
+fn named_control_eof_after_both_write_halves_close_delivers_live_observers() {
+    use std::{
+        fs::{self, DirBuilder, Permissions},
+        io::Read,
+        os::unix::{
+            fs::{DirBuilderExt, PermissionsExt},
+            net::UnixListener,
+        },
+        path::PathBuf,
+    };
+    struct Directory(PathBuf);
+    impl Drop for Directory {
+        fn drop(&mut self) {
+            let _ = fs::remove_file(self.0.join("grant.sock"));
+            let _ = fs::remove_dir(&self.0);
+        }
+    }
+    let root = PathBuf::from("/tmp").join(format!(
+        "ct-{}-{}",
+        std::process::id(),
+        lamp_ipc::monotonic_ns()
+    ));
+    DirBuilder::new().mode(0o700).create(&root).unwrap();
+    let directory = Directory(root);
+    let path = directory.0.canonicalize().unwrap().join("grant.sock");
+    let listener = UnixListener::bind(&path).unwrap();
+    fs::set_permissions(&path, Permissions::from_mode(0o600)).unwrap();
+    listener.set_nonblocking(true).unwrap();
+    let witness = HoldWitness::new(token()).unwrap();
+    let until = deadline();
+    let remaining = || {
+        until
+            .checked_duration_since(Instant::now())
+            .filter(|left| !left.is_zero())
+            .expect("original fixture deadline expired")
+    };
+    let mut tickets = Vec::new();
+    for value in [17, 18] {
+        let mut client = UnixStream::connect(&path).unwrap();
+        assert!(client.local_addr().unwrap().as_pathname().is_none());
+        let (mut server, _) = listener.accept().unwrap();
+        server.set_nonblocking(false).unwrap();
+        client.set_write_timeout(Some(remaining())).unwrap();
+        client.write_all(b"Q").unwrap();
+        client.shutdown(Shutdown::Write).unwrap();
+        server.set_read_timeout(Some(remaining())).unwrap();
+        let mut request = [0];
+        server.read_exact(&mut request).unwrap();
+        assert_eq!(request, [b'Q']);
+        server.set_read_timeout(Some(remaining())).unwrap();
+        assert_eq!(server.read(&mut request).unwrap(), 0);
+        let nonce = NonZeroU64::new(value).unwrap();
+        let mut grant = witness.grant(nonce, until).unwrap();
+        while !grant.try_send(&server).unwrap() {
+            // A legitimate Pending step never starts a new transfer budget.
+            std::thread::sleep(Duration::from_millis(1).min(remaining()));
+        }
+        // Grant already half-closed CONTROL write. Both halves are closed,
+        // then the server disappears BEFORE the receiver's very first poll.
+        drop(server);
+        let mut receiver = ReceiveGrant::new(token(), nonce, until);
+        let ticket = loop {
+            if let Some(ticket) = receiver.try_receive(&client).unwrap() {
+                break ticket;
+            }
+            assert!(lamp_ipc::readable(&client, remaining()).unwrap());
+        };
+        assert!(ticket.is_open(), "control EOF is not observer revocation");
+        tickets.push(ticket);
+    }
+    assert_eq!(tickets.len(), 2);
+    assert!(tickets.iter().all(Ticket::is_open));
+    for wrong in [
+        socket(AddressFamily::UNIX, SocketType::STREAM, None).unwrap(),
+        socket(AddressFamily::INET, SocketType::STREAM, None).unwrap(),
+        socket(AddressFamily::UNIX, SocketType::DGRAM, None).unwrap(),
+    ] {
+        let control = UnixStream::from(wrong);
+        let mut receiver = ReceiveGrant::new(token(), nonce(), until);
+        let error = receiver.try_receive(&control).unwrap_err();
+        assert_ne!(error.kind(), io::ErrorKind::TimedOut);
+        let mut grant = witness.grant(nonce(), until).unwrap();
+        let error = grant.try_send(&control).unwrap_err();
+        assert_ne!(error.kind(), io::ErrorKind::TimedOut);
+        assert!(tickets.iter().all(Ticket::is_open));
+    }
+    witness.revoke().unwrap();
+    assert!(tickets.iter().all(|ticket| !ticket.is_open()));
+    assert!(
+        Instant::now() < until,
+        "the original two-second bound stays"
+    );
+}

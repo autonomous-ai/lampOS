@@ -645,6 +645,13 @@ impl BusOut {
         self.ids.last.get(index).map(|id| format!("f{id}"))
     }
 
+    /// The exact publisher boot used by the tracked-face observations,
+    /// available only while the same mouth judge supplies their passing ids.
+    pub fn speaking_boot(&self) -> Option<&str> {
+        self.ids.mouths.as_ref()?;
+        Some(self.faces.boot())
+    }
+
     /// The faces publisher's boot: a passing id means a face only under it
     /// (`boot/f3`, as the voice keeps it).
     pub fn faces_boot(&self) -> &str {
@@ -883,6 +890,43 @@ mod tests {
         out.saw(&[], &[], PICTURE, 7);
         out.tick(2_000_000);
         out.report(Camera::Open, 0, 0, 2_000_000);
+    }
+
+    #[test]
+    fn the_known_speaker_boot_is_the_same_face_publishers_boot_only_with_a_judge() {
+        let root = std::env::temp_dir().join(format!("eyes-speaker-boot-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        let bus = Bus::new(&root).unwrap();
+        let mut out = BusOut::on(&bus).unwrap();
+        out.ids.mouths = None;
+        assert_eq!(out.speaking_boot(), None);
+        assert_eq!(out.speaking_id(0), None);
+        out.ids.mouths = Some(speaking::Mouths::default());
+        out.saw(&[face(240.0, 120.0, 160.0, 200.0, 0.0)], &[], PICTURE, 5);
+        let latest = bus.latest(Faces::TOPIC).unwrap().unwrap();
+        let faces: Faces = latest.parse().unwrap();
+        assert_eq!(out.speaking_boot(), Some(latest.header.boot.as_str()));
+        assert_eq!(
+            out.speaking_id(0).as_deref(),
+            Some(faces.faces[0].id.as_str())
+        );
+        let known = root.join("known");
+        crate::who::keep_known_speaker(
+            &known,
+            Some("Alpha"),
+            None,
+            out.speaking_boot(),
+            out.speaking_id(0).as_deref(),
+        );
+        let source: serde_json::Value =
+            serde_json::from_slice(&std::fs::read(crate::who::known_speaker_of(&known)).unwrap())
+                .unwrap();
+        assert_eq!(source["boot"], latest.header.boot);
+        assert_eq!(source["face"], faces.faces[0].id);
+        out.ids.mouths = None;
+        crate::who::keep_known_speaker(&known, Some("Alpha"), None, out.speaking_boot(), None);
+        assert!(!crate::who::known_speaker_of(&known).exists());
+        std::fs::remove_dir_all(root).unwrap();
     }
 
     #[test]
