@@ -28,8 +28,10 @@ use std::collections::BTreeSet;
 
 pub const HEAD_SETTLE_US: u64 = 500_000;
 pub const HEAD_QUALIFY_US: u64 = 20_000;
-/// A tap is let go before this, from its first acquisition.
-pub const HEAD_TAP_US: u64 = 500_000;
+/// A tap is let go before this, from its first acquisition: up to the
+/// stroke, so no length between a tap and a stroke asks nothing (#3747, the
+/// lead: nobody can tell a 400 ms touch from a 600 ms one).
+pub const HEAD_TAP_US: u64 = HEAD_STROKE_US;
 /// The default shortest tap: just above the lone 117 ms edge lamp-4ace's
 /// journal showed with nobody known at the lamp (#711, 2026-10-15 19:25).
 pub const HEAD_TAP_MIN_US: u64 = 120_000;
@@ -170,7 +172,9 @@ impl TouchConfig {
         }
         let timing = self.head_timing();
         if !(20_000..=200_000).contains(&timing.qualify_us)
-            || !(timing.qualify_us..HEAD_TAP_US).contains(&timing.tap_min_us)
+            // Its old range: the tap's window grew to the stroke (#3747), not
+            // how short a tap may be set.
+            || !(timing.qualify_us..500_000).contains(&timing.tap_min_us)
             || timing.gap_us > 500_000
         {
             return Err(error(
@@ -912,12 +916,24 @@ impl TouchEngine {
                 event.active_mask = self.head.mask;
                 event.active_names = self.head_names(self.head.mask);
                 event.released_us = released;
+                // Any contact of at least the shortest tap wakes a sleeping
+                // lamp (#3747, the lead's table), at its letting go under a
+                // second or at the stroke if kept, so a person who holds it
+                // longer to bring it back still does. The touch alone never
+                // wakes it: a lone edge under the shortest tap is noise
+                // (`HEAD_TAP_MIN_US`). A hand kept three seconds still asks
+                // for sleep (the lead, #1711), the owner deciding whether it
+                // may (not while onboarding is under way).
                 let (speaking, quiet, asleep) = match gesture {
                     TouchGesture::Tap => (
                         TouchIntent::Attend,
                         TouchIntent::Attend,
                         Some(TouchIntent::Wake),
                     ),
+                    // A Stroke asks nothing more of a lamp asleep, in the form
+                    // every reader takes, older ones too (Third's P2 on #3767):
+                    // the voice and Expression wake on a head Stroke whose
+                    // contact began asleep by their own rule.
                     TouchGesture::Stroke => (TouchIntent::Stroke, TouchIntent::Stroke, None),
                     TouchGesture::Hold => (TouchIntent::Sleep, TouchIntent::Sleep, None),
                     _ => (TouchIntent::Stop, TouchIntent::Notice, None),

@@ -399,6 +399,9 @@ pub struct HandControls {
     /// that did, until the next conversation takes it for its "hm?"
     /// ([`Self::take_woken`]).
     woken: Option<u64>,
+    /// The onboarding walk is under way ([`Self::set_onboarding`]): a hold
+    /// on the head asks no sleep.
+    onboarding: bool,
     /// Inputs a test has queue later, each when the poll's clock reaches
     /// its time, through the sender kept here.
     #[cfg(test)]
@@ -867,6 +870,7 @@ impl HandControls {
             #[cfg(test)]
             while_held: None,
             woken: None,
+            onboarding: false,
             #[cfg(test)]
             scheduled: Vec::new(),
             #[cfg(test)]
@@ -924,6 +928,19 @@ impl HandControls {
     /// the durable mute (#711).
     pub fn head_sleep(&self) -> bool {
         self.options.head_sleep()
+    }
+
+    /// Whether the onboarding walk is under way, from its start until every
+    /// step has ended, as the coordinator last said before a poll (#3747,
+    /// the lead on #1711). Kept until said again: between conversations
+    /// there is no walk to ask. False until first said.
+    pub fn set_onboarding(&mut self, under_way: bool) {
+        self.onboarding = under_way;
+    }
+
+    /// What [`Self::set_onboarding`] last said.
+    pub fn onboarding(&self) -> bool {
+        self.onboarding
     }
 
     /// When the person woke a hand's sleep, if they did within
@@ -1189,10 +1206,11 @@ impl HandControls {
     }
 
     /// One accepted head request (#711): a touch for the coordinator to stop
-    /// on or note, a tap, and with the durable mute a hold's sleep and a
-    /// tap's wake. Sleep is the software mute with the reason `sleep`: it is
-    /// revoked and persisted as any mute. A wake only makes the clear
-    /// pending; the quiescent owner saves it before the latch opens.
+    /// on or note, a tap, and with the durable mute a hold's sleep and the
+    /// wake of a tap or a hand kept a second (#3747). Sleep is the software
+    /// mute with the reason `sleep`: it is revoked and persisted as any mute.
+    /// A wake only makes the clear pending; the quiescent owner saves it
+    /// before the latch opens.
     fn head_event(&mut self, now_us: u64, event: &TouchEvent, observation: &mut Observation) {
         if event.source != TouchSource::Head {
             return;
@@ -1200,7 +1218,11 @@ impl HandControls {
         let mute = self.options.mute_record.is_some();
         match event.gesture {
             TouchGesture::Touch => earlier(&mut observation.head_touch_at_us, event.observed_us),
-            TouchGesture::Hold if mute => {
+            // Not while the walk is under way (#3747, the lead on #1711):
+            // giving way tells the person to hold the head, and the hold
+            // already counted as the touch at 20 ms. The latch stays open,
+            // and is said so, so Expression doesn't fold either.
+            TouchGesture::Hold if mute && !self.onboarding => {
                 match self
                     .receiver
                     .request_sleep(now_us, event.began_us, event.observed_us)
@@ -1217,25 +1239,41 @@ impl HandControls {
             TouchGesture::Tap => {
                 earlier(&mut observation.head_tap_at_us, event.observed_us);
                 earlier(&mut observation.head_tap_began_us, event.began_us);
-                // A mute left by the restart guard wakes by a tap as sleep
-                // does (#960); a person's own mute stays until their hold.
-                let after_fault = self.restored_after_fault();
-                if mute
-                    && let Some(released_us) = event.released_us
-                    && if after_fault {
-                        self.receiver
-                            .request_wake_after_fault(now_us, event.began_us, released_us)
-                    } else {
-                        self.receiver
-                            .request_wake(now_us, event.began_us, released_us)
-                    }
-                    .is_err()
-                {
-                    add(&self.shared.rejected, 1);
+                if let Some(released_us) = event.released_us {
+                    self.head_wake(now_us, event.began_us, released_us);
                 }
+            }
+            // A hand kept a second wakes a sleeping lamp at the stroke, as a
+            // tap does at its letting go (#3747): no meaning by how long a
+            // hand stays, so a person who holds it to bring it back does.
+            // Its time is the wake's, for the "hm?" (#1362).
+            // Controls' Stroke keeps the form older readers take (Third's P2
+            // on #3767), so the wake is this reader's own rule: the receiver
+            // wakes only a lamp asleep when the contact began.
+            TouchGesture::Stroke if self.head_wake(now_us, event.began_us, event.observed_us) => {
+                earlier(&mut observation.acquired_at_us, event.observed_us);
             }
             _ => {}
         }
+    }
+
+    /// A head tap's or kept hand's wake, asked at `at_us`: of a hand's sleep,
+    /// and of a mute left by the restart guard as sleep is (#960); a
+    /// person's own mute stays until their hold. Whether it is pending.
+    fn head_wake(&mut self, now_us: u64, began_us: u64, at_us: u64) -> bool {
+        if self.options.mute_record.is_none() {
+            return false;
+        }
+        let asked = if self.restored_after_fault() {
+            self.receiver
+                .request_wake_after_fault(now_us, began_us, at_us)
+        } else {
+            self.receiver.request_wake(now_us, began_us, at_us)
+        };
+        asked.unwrap_or_else(|_| {
+            add(&self.shared.rejected, 1);
+            false
+        })
     }
 
     /// Discard any queued/previous clear before an active runtime transition.
