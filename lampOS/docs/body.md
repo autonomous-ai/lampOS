@@ -1904,7 +1904,24 @@ code reads it): a rest pitch within `poses::HOME_PITCH_TOLERANCE` (20) counts
 outside it is the head resting on its stop and takes the nearest edge, said
 in a comment line of the file (lamp-0c89, #2396, rests at 1755 and gets the
 low edge). Farther out it is refused, a head off its stop, and the refusal
-says to fold the head onto its stop and measure again. The body's own start
+says to fold the head onto its stop and measure again. A hand-moved head is
+never taken as home (#3504): instead, **`lamp-body-measure head-home`** brings
+a head found over the range (tipped up) by more than the 20 and at most
+`WAKE_REACH` (400) down to the range's high edge (2020), and the rest read is
+taken again after it. It does what the hardware team's bench tool
+`robots/lamp/hardware/test/tools/head-nudge.py` does, for the head pitch only
+(`lamp_body::body::head_home`): RAM registers only (torque limit 48, goal 42,
+torque enable 40), the torque capped at 50%, 3 counts every 80 ms, stopped on
+45% load, 40 counts of lag, 55 C, 30 s, SIGINT or SIGTERM, arrival within 4
+counts or settling still for a second; then torque off and the torque limit
+put back, on every path, errors included (tried five times). It never moves a
+head under the range, one over by more than 400, or one whose torque is
+already on (something else holds it), and says why. It takes the port and the
+motor lock as `lamp-body` does. Measured on lamp-52e6: a falling pitch count
+tips the head down (forward), so over the range is the head tipped up; there
+is no mechanical stop near home (2013 to 1893 under the 50% cap peaked at 8%
+load), and let go, the head stays where it is put (friction), so the read
+after it reads where it was brought; a hand-moved head read 2213. The body's own start
 check is unchanged: it also reads the live pitch, which lies outside the
 range, and lets it through only to wake it home, so the clamp helps a body
 that wakes. `lamp-body` wakes unless given `--wake off`, so the product unit,

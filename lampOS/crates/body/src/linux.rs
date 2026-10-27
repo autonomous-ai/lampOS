@@ -291,6 +291,46 @@ pub fn run_body(
     BodyResult { port, body }
 }
 
+/// Own the servo port, as [`run_body`] does (the motor lock, then the tty
+/// held exclusively), and bring a head tipped up by hand home under a torque
+/// cap ([`crate::body::head_home`], #3504). Each step is said to `say`.
+/// `Ok(true)` when it got home; see `head_home` for the rest.
+pub fn head_home_once(
+    config: &InspectionConfig,
+    mut cancelled: impl FnMut() -> io::Result<bool>,
+    say: &mut dyn FnMut(String),
+) -> Result<bool, String> {
+    let origin = Instant::now();
+    let mut port = empty_result(config);
+    let mut owner = Owner::default();
+    let result = match owner.prepare(config, None, &mut port, origin, &mut cancelled) {
+        Ok(()) => {
+            let mut runtime = HostRuntime {
+                origin,
+                cancelled: &mut cancelled,
+                recovery_inhibited: None,
+            };
+            let mut io = LinuxPort {
+                fd: owner.fd.as_ref().expect("prepared tty"),
+            };
+            crate::body::head_home::head_home(&mut io, &mut runtime, say)
+        }
+        Err(error) => Err(format!(
+            "the servo port ({}): {}",
+            error.operation, error.detail
+        )),
+    };
+    let cleanup = owner.finish(origin, result.is_err());
+    // An error of the move itself says more than one closing the port.
+    result.and_then(|home| match cleanup.errors.first() {
+        Some(error) => Err(format!(
+            "closing the servo port ({}): {}",
+            error.operation, error.detail
+        )),
+        None => Ok(home),
+    })
+}
+
 fn inspect_once_with(
     config: &InspectionConfig,
     mut cancelled: impl FnMut() -> io::Result<bool>,

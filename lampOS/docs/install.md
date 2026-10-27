@@ -613,7 +613,14 @@ units stopped:
    a little outside the body's home range is a head on its stop: `--home`
    takes the nearest edge and the file says so; one farther out is refused,
    a head off its stop (the range and how far, as the code reads them:
-   [body.md](body.md), on `lamp-body-measure`). The body starts from such a
+   [body.md](body.md), on `lamp-body-measure`). A head refused as over the
+   range (tipped up by hand; a falling pitch count tips the head down) is,
+   in a written step 1 and after a yes, brought home once by
+   `lamp-body-measure head-home`: down to the range's high edge, slowly
+   under a 50% torque cap, then let go (hands off the lamp; there is no stop
+   near home, and the head stays where it is let go); then the read is
+   taken again, and a second refusal stands. A head under the range is
+   never moved, and dry, step 1 only says it would. The body starts from such a
    head by waking it home, as it does unless given `--wake off`. It refuses, with why, where the body would refuse the
    poses, and when any joint has torque on (the lamp is then held, not at
    rest). `--gaze` is not in it: it is measured with a face and the camera

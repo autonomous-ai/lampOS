@@ -5,7 +5,7 @@
 use lamp_body::calibration::UnitId;
 use std::{ffi::OsString, path::PathBuf};
 
-const USAGE: &str = "lamp-body-measure --device ABSOLUTE_PATH --unit-id EXPLICIT_ID --lock-directory PRIVATE_ABSOLUTE_DIRECTORY [--write ABSOLUTE_FILE] [--seated]\n\nThe factory's per-lamp body step: reads the lamp at rest with torque off (lamp-body-inspect's\nread-only plan: no register writes, no torque, no motion) and prints this lamp's own\nlamp.env (BODY_POSES: --home, --folded-arm, --stand, --pitch-window, --torque). With --write\nit also writes that file, which must not exist yet (/etc/lampOS/body/lamp.env on the product).\nRefused, with why, where the body would refuse the poses. {home}--gaze is not measured here (body.md).\nWith --seated the file holds only --home, --pitch-window and --torque on: a lamp whose first stand\nno person has confirmed yet, whose body then holds and moves the head and base only, never the arm (#2163).\nStop the body and every other bus owner first. Linux only.\n\nlamp-body-measure first-stand --device ABSOLUTE_PATH --unit-id EXPLICIT_ID --lock-directory PRIVATE_ABSOLUTE_DIRECTORY --body-user USER [--bus-root DIR] [--presence-file FILE] [--say-socket FILE] [--lamp-env FILE] [--record FILE]\n\nA seated lamp's first stand, confirmed at the lamp (lamp_body::first_stand, #2396): once someone is near\nit asks through the voice's say service, and a touch on the head or a button held a second, or a short\nspoken yes with a face near, is the yes;\nthen the body is stopped, the arm stood at 30% and 100% as the factory's steps stand it, this arm's\nstand written into --lamp-env (/etc/lampOS/body/lamp.env), and the body started again. A second touch\nwhile it moves stops it, and nothing is written. Nothing moves without the yes. As root.\n";
+const USAGE: &str = "lamp-body-measure --device ABSOLUTE_PATH --unit-id EXPLICIT_ID --lock-directory PRIVATE_ABSOLUTE_DIRECTORY [--write ABSOLUTE_FILE] [--seated]\n\nThe factory's per-lamp body step: reads the lamp at rest with torque off (lamp-body-inspect's\nread-only plan: no register writes, no torque, no motion) and prints this lamp's own\nlamp.env (BODY_POSES: --home, --folded-arm, --stand, --pitch-window, --torque). With --write\nit also writes that file, which must not exist yet (/etc/lampOS/body/lamp.env on the product).\nRefused, with why, where the body would refuse the poses. {home}--gaze is not measured here (body.md).\nWith --seated the file holds only --home, --pitch-window and --torque on: a lamp whose first stand\nno person has confirmed yet, whose body then holds and moves the head and base only, never the arm (#2163).\nStop the body and every other bus owner first. Linux only.\n\nlamp-body-measure first-stand --device ABSOLUTE_PATH --unit-id EXPLICIT_ID --lock-directory PRIVATE_ABSOLUTE_DIRECTORY --body-user USER [--bus-root DIR] [--presence-file FILE] [--say-socket FILE] [--lamp-env FILE] [--record FILE]\n\nA seated lamp's first stand, confirmed at the lamp (lamp_body::first_stand, #2396): once someone is near\nit asks through the voice's say service, and a touch on the head or a button held a second, or a short\nspoken yes with a face near, is the yes;\nthen the body is stopped, the arm stood at 30% and 100% as the factory's steps stand it, this arm's\nstand written into --lamp-env (/etc/lampOS/body/lamp.env), and the body started again. A second touch\nwhile it moves stops it, and nothing is written. Nothing moves without the yes. As root.\n\nlamp-body-measure head-home --device ABSOLUTE_PATH --unit-id EXPLICIT_ID --lock-directory PRIVATE_ABSOLUTE_DIRECTORY\n\nA head tipped up by hand, brought home before the rest read (#3504): only a head pitch over the\nbody's home range by more than the rest read takes, and at most 400 counts (WAKE_REACH), is moved,\ndown to the range's high edge, as the hardware team's head-nudge.py moves it: RAM registers only,\na 50% torque cap, 3 counts every 80 ms, stopped on 45% load, 40 counts of lag, 55 C, 30 s, arrival\nor settling; then torque off and the torque limit put back on every path. Never a head under the\nrange, nor one whose torque is already on. Each step is printed. Exits 0 once the head is home.\nStop the body and every other bus owner first. Linux only.\n";
 
 /// [`USAGE`] with the home pitch clamp said from the code's own numbers
 /// (`Limits::FOLDED.pitch_home`, `poses::HOME_PITCH_TOLERANCE`), never a
@@ -216,6 +216,25 @@ fn first_stand_options(
 
 fn main() -> std::process::ExitCode {
     let mut args = std::env::args_os().skip(1).peekable();
+    if args.peek().is_some_and(|first| first == "head-home") {
+        args.next();
+        return match parse(args) {
+            Ok(Some(arguments)) if arguments.write.is_none() && !arguments.seated => {
+                head_home(&arguments)
+            }
+            Ok(None) => {
+                print!("{}", usage());
+                std::process::ExitCode::SUCCESS
+            }
+            _ => {
+                eprintln!(
+                    "head-home takes --device, --unit-id and --lock-directory only\n{}",
+                    usage()
+                );
+                std::process::ExitCode::from(2)
+            }
+        };
+    }
     if args.peek().is_some_and(|first| first == "first-stand") {
         args.next();
         return match first_stand_options(args) {
@@ -260,6 +279,60 @@ fn first_stand(options: &lamp_body::first_stand::Options) -> std::process::ExitC
 #[cfg(not(target_os = "linux"))]
 fn first_stand(_: &lamp_body::first_stand::Options) -> std::process::ExitCode {
     eprintln!("lamp-body-measure: first-stand is Linux only");
+    std::process::ExitCode::FAILURE
+}
+
+/// `head-home`: SIGINT and SIGTERM end the move the way its own stops do,
+/// torque off and the limit put back (read from a signalfd, as lamp-body
+/// reads them).
+#[cfg(target_os = "linux")]
+fn head_home(arguments: &Arguments) -> std::process::ExitCode {
+    use nix::sys::{
+        signal::{SigSet, Signal},
+        signalfd::{SfdFlags, SignalFd},
+    };
+    let run = || -> Result<bool, Box<dyn std::error::Error>> {
+        let mut mask = SigSet::empty();
+        mask.add(Signal::SIGINT);
+        mask.add(Signal::SIGTERM);
+        mask.thread_block()?;
+        let signals = SignalFd::with_flags(&mask, SfdFlags::SFD_CLOEXEC | SfdFlags::SFD_NONBLOCK)?;
+        let config = lamp_body::linux::InspectionConfig::new(
+            arguments.device.clone(),
+            arguments.unit_id.clone(),
+            arguments.lock_directory.clone(),
+        )?;
+        let mut cancelled = false;
+        Ok(lamp_body::linux::head_home_once(
+            &config,
+            || {
+                if !cancelled {
+                    cancelled = signals
+                        .read_signal()
+                        .map_err(|error| std::io::Error::from_raw_os_error(error as i32))?
+                        .is_some();
+                }
+                Ok(cancelled)
+            },
+            &mut |line| println!("lamp-body-measure: {line}"),
+        )?)
+    };
+    match run() {
+        Ok(true) => std::process::ExitCode::SUCCESS,
+        Ok(false) => {
+            eprintln!("lamp-body-measure: the head did not get home");
+            std::process::ExitCode::FAILURE
+        }
+        Err(error) => {
+            eprintln!("lamp-body-measure: {error}");
+            std::process::ExitCode::FAILURE
+        }
+    }
+}
+
+#[cfg(not(target_os = "linux"))]
+fn head_home(_: &Arguments) -> std::process::ExitCode {
+    eprintln!("lamp-body-measure: head-home is Linux only");
     std::process::ExitCode::FAILURE
 }
 

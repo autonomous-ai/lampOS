@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # The factory's per-lamp steps for one lamp (#1682), in install.md's order:
-#   1. the body's poses: lamp-body-measure at rest, then (with --write) the
+#   1. the body's poses: lamp-body-measure at rest (with --write, a head
+#      found tipped up by hand first brought home under a torque cap by
+#      lamp-body-measure head-home), then (with --write) the
 #      arm stood at 30% and 100% to take where this arm stops, into
 #      /etc/lampOS/body/lamp.env
 #   2. the touch pads: on GPIO head pads, which lines this unit's pads are on
@@ -287,6 +289,24 @@ rest_read() {
   return "$status"
 }
 
+# The rest read, and for a head tipped up off its rest by hand (refused as
+# over the home range, a head off its stop) on a written run, with a yes:
+# lamp-body-measure head-home brings it down to the range's edge under a
+# torque cap, once, and lets it go; then the read again, whose refusal
+# stands (#3504). A head under the range is never moved here.
+rest_read_home() {
+  rest_read "$1" && return 0
+  [[ $READ_SAID == *"over the body's home range"*"a head off its stop"* ]] || return 1
+  if [[ $WRITE != 1 ]]; then
+    say "the head is tipped up off its rest: a written run brings it home slowly under a torque cap first (dry)"
+    return 1
+  fi
+  ask "the head is tipped up off its rest: it is brought home slowly under a torque cap, then let go; keep hands off the lamp." || return 1
+  say "bringing the head home slowly, keep hands off"
+  as_body "$MEASURE_BIN" head-home --device "$DEVICE" --unit-id "$UNIT_ID" --lock-directory "$LOCKS" 2>&1
+  rest_read "$1"
+}
+
 # Where the arm stopped standing: the last body line at its full stand,
 # "arm goals [..] positions [SHOULDER, ELBOW]". Empty if it never stood.
 stood_at() {
@@ -309,7 +329,7 @@ step_body() {
     return 1
   fi
   local read_file=${ROOT:-}/tmp/factory-lamp-env-$STAMP
-  if ! rest_read "$read_file"; then
+  if ! rest_read_home "$read_file"; then
     # Any run of the body leaves the lamp held, torque on, until the power
     # goes (body.md); only a run with --let-go-at-stop lets it go.
     if [[ $READ_SAID != *"has torque on"* ]]; then
@@ -328,7 +348,7 @@ step_body() {
     # The folded counts must come from a read the person confirmed was
     # folded, never from this run's own read of where the arm is now.
     body_once "" "" || { fail "the body would not run to let the lamp go (its lines are above)"; return 1; }
-    rest_read "$read_file" || { fail "lamp-body-measure still refused after the lamp was let go (its reason is above)"; return 1; }
+    rest_read_home "$read_file" || { fail "lamp-body-measure still refused after the lamp was let go (its reason is above)"; return 1; }
   fi
   if [[ $WRITE != 1 ]]; then
     say "would stand the arm at 30% and 100%, with a person's hand on it, to take where it stops into --stand (dry)"

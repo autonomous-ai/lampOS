@@ -7074,5 +7074,7 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
     report
 }
 
+pub mod head_home;
+
 #[cfg(test)]
 mod tests;

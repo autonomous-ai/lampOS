@@ -46,6 +46,18 @@ cat >"$T/bin/measure" <<'EOF'
 echo "measure $*" >>"$FAKE_LOG"
 [[ -n ${FAKE_MEASURE_FAIL:-} ]] && { echo "joint 2 could not be read" >&2; exit 1; }
 [[ -n ${FAKE_HELD:-} && ! -e $FAKE_LOG.let-go ]] && { echo "lamp-body-measure: joint 1 has torque on: read the lamp at rest with torque off on all five" >&2; exit 1; }
+# FAKE_TIPPED: the head rests tipped up off its stop until head-home brings it
+# home; "stays", head-home does not; "under", tipped down instead (#3504).
+if [[ $1 == head-home ]]; then
+  echo "lamp-body-measure: stopped: reached 2020; peak load 8%"
+  [[ ${FAKE_TIPPED:-} != stays ]] && touch "$FAKE_LOG.head-home"
+  exit 0
+fi
+if [[ -n ${FAKE_TIPPED:-} && ! -e $FAKE_LOG.head-home ]]; then
+  side=over; [[ $FAKE_TIPPED == under ]] && side=under
+  echo "lamp-body-measure: home pitch 2213 is 193 $side the body's home range 1760..2020, more than 20: a head off its stop, not a rest reading." >&2
+  exit 1
+fi
 text='BODY_POSES="--home 1774,2054,2033 --folded-arm 2049,2047 --stand 1772,2054,2033,2657,2602 --pitch-window 1740,2030 --torque on"'
 comment="# home, folded-arm: found at rest. stand: lamp-4ace's with this lamp's roll and yaw. pitch-window: the default, checked."
 echo "$text"
@@ -137,7 +149,7 @@ lamp() {
   printf '{"chip":"/dev/gpiochip0","head_pads":[{"name":"head-1","line":37}]}\n' \
     >"$T/root/etc/lampOS/controls/controls-pins.json"
   : >"$T/log"
-  rm -f "$T/log.let-go" "$T/log.body-started"
+  rm -f "$T/log.let-go" "$T/log.body-started" "$T/log.head-home"
 }
 run() {
   ETC_ROOT=$T/root MEASURE_BIN=$T/bin/measure BODY_BIN=$T/bin/body MOOD_BIN=$T/bin/mood STAND_WAIT=0 HEAD_STAND_WAIT=0 QUIET_WAIT=0 \
@@ -285,6 +297,19 @@ lamp; FAKE_HELD=1 run --to 1; status=$?
 check "a held lamp, dry: says a written run lets it go first, and moves nothing" '[[ $status == 1 ]] && grep -q "a written run lets it go first" "$T/out" && ! grep -q "^body" "$T/log"'
 lamp; FAKE_HELD=1 ASK_ANSWER=n run --write --to 1; status=$?
 check "a held lamp with no yes is not let go" '[[ $status == 1 ]] && ! grep -q "^body" "$T/log"'
+# A head tipped up off its rest by hand (#3504): written, with a yes, brought
+# home once by head-home and read again; the second refusal stands; dry, or
+# a head tipped down, nothing moves.
+lamp; FAKE_TIPPED=1 ASK_ANSWER=y run --write --to 1; status=$?
+check "a head tipped up is brought home once, then read and stood" '[[ $status == 0 ]] && grep -q "bringing the head home slowly, keep hands off" "$T/out" && [[ $(grep "^measure" "$T/log" | cut -d" " -f2 | tr "\n" " ") == "--device head-home --device " ]] && [[ -e $T/root/$ENV ]]'
+lamp; FAKE_TIPPED=stays ASK_ANSWER=y run --write --to 1; status=$?
+check "a head still tipped up after head-home stops step 1, nothing written" '[[ $status == 1 ]] && [[ $(grep -c "^measure head-home" "$T/log") == 1 ]] && [[ $(grep -c "^measure --device" "$T/log") == 2 ]] && ! grep -q "^body" "$T/log" && [[ ! -e $T/root/$ENV ]]'
+lamp; FAKE_TIPPED=1 run --to 1; status=$?
+check "a head tipped up, dry: says a written run brings it home, and moves nothing" '[[ $status == 1 ]] && grep -q "a written run brings it home slowly under a torque cap first" "$T/out" && ! grep -q "^measure head-home" "$T/log"'
+lamp; FAKE_TIPPED=1 ASK_ANSWER=n run --write --to 1; status=$?
+check "a head tipped up with no yes is not moved" '[[ $status == 1 ]] && ! grep -q "^measure head-home" "$T/log"'
+lamp; FAKE_TIPPED=under ASK_ANSWER=y run --write --to 1; status=$?
+check "a head tipped down is never moved" '[[ $status == 1 ]] && ! grep -q "^measure head-home" "$T/log" && [[ $(grep -c "^measure" "$T/log") == 1 ]]'
 lamp; mkdir -p "$T/root/etc/lampOS/body"; echo old >"$T/root/$ENV"; ASK_ANSWER=y run --write --update-key "$KEYFILE"; status=$?
 check "lamp.env already there is never measured over" '[[ $status == 1 ]] && grep -q "already there" "$T/out" && [[ $(cat "$T/root/$ENV") == old ]] && ! grep -q "^measure" "$T/log"'
 

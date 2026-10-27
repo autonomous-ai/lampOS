@@ -89,6 +89,9 @@ struct Lamp {
     /// Torque and a goal by itself may be written to any joint, as a body
     /// told to take hold does. Off, only to the shoulder or the elbow.
     may_take_hold: bool,
+    /// The head pitch's force limit may be written too, as head-home caps
+    /// it (#3504). Off, only the three joints that carry the lamp's.
+    may_cap_head: bool,
     /// One servo acknowledges the next goal written to it by itself and
     /// keeps the goal it had.
     drops_goal: Option<usize>,
@@ -174,6 +177,7 @@ fn folded(cancel_at: Duration) -> (Lamp, Clock) {
             arm_moves: false,
             overload_clears: 0,
             may_take_hold: false,
+            may_cap_head: false,
             drops_goal: None,
             deaf: None,
             hand: None,
@@ -424,6 +428,7 @@ impl Lamp {
                     let (address, data) = (parameters[0], parameters[1..].to_vec());
                     let clears = self.overload_clears;
                     let arm_or_held = id == 2 || id == 3 || self.may_take_hold;
+                    let capped = (1..=3).contains(&id) || (id == 5 && self.may_cap_head);
                     let dropped = address == 42 && self.drops_goal == Some(usize::from(id) - 1);
                     if dropped {
                         self.drops_goal = None;
@@ -450,7 +455,7 @@ impl Lamp {
                         }
                         // The force limit: only ever to the three joints
                         // that carry the lamp.
-                        (48, [low, high]) if (1..=3).contains(&id) => {
+                        (48, [low, high]) if capped => {
                             if servo.keeps_force {
                                 servo.force = u16::from_le_bytes([*low, *high]);
                             }
@@ -14063,4 +14068,168 @@ fn own_ranges_check_every_pose_and_leave_a_full_turn_alone() {
         outside_own_ranges(&full, Some([0, 4_095, 0]), (0, 4_095), Some(far)),
         None
     );
+}
+
+/// #3504: a head tipped up by hand at rest, as lamp-52e6's read 2213,
+/// torque off, its own force limit 600: the lamp head-home is given.
+fn tipped_up(pitch: f32, cancel_at: Duration) -> (Lamp, Clock) {
+    let (mut lamp, clock) = folded(cancel_at);
+    lamp.may_take_hold = true;
+    lamp.may_cap_head = true;
+    for servo in &mut lamp.servos {
+        servo.torque = 0;
+    }
+    let head = &mut lamp.servos[PITCH];
+    head.position = pitch;
+    head.goal = pitch as u16;
+    head.force = 600;
+    (lamp, clock)
+}
+
+fn bring_home(lamp: &mut Lamp, clock: &mut Clock) -> (Result<bool, String>, Vec<String>) {
+    let mut said = Vec::new();
+    let result = head_home::head_home(lamp, clock, &mut |line| said.push(line));
+    (result, said)
+}
+
+/// What every head-home run that wrote anything leaves: only the head
+/// pitch's limit, goal and torque written, the cap first, and at the end
+/// torque off with its own limit back.
+fn let_go_capped(lamp: &Lamp) -> bool {
+    let head = &lamp.servos[PITCH];
+    lamp.goals.is_empty()
+        && lamp
+            .registers
+            .iter()
+            .all(|(id, address, _)| *id == 5 && [40, 42, 48].contains(address))
+        && lamp.registers.first() == Some(&(5, 48, 500u16.to_le_bytes().to_vec()))
+        && head.torque == 0
+        && head.force == 600
+}
+
+#[test]
+fn only_a_head_tipped_up_within_wake_reach_is_brought_home_to_the_ranges_high_edge() {
+    let (low, high) = Limits::FOLDED.pitch_home;
+    let tolerance = crate::poses::HOME_PITCH_TOLERANCE;
+    for pitch in [high + tolerance + 1, 2_213, high + WAKE_REACH] {
+        assert_eq!(head_home::head_home_target(pitch), Ok(high), "{pitch}");
+    }
+    for (pitch, why) in [
+        (low - 1, "under"),
+        (1_700, "under"),
+        (low, "within"),
+        (1_900, "within"),
+        (high + tolerance, "within"),
+        (high + WAKE_REACH + 1, "not a head tipped up by hand"),
+        (4_095, "not a head tipped up by hand"),
+    ] {
+        let refused = head_home::head_home_target(pitch).unwrap_err();
+        assert!(
+            refused.contains(why) && refused.contains("nothing moved"),
+            "{pitch}: {refused}"
+        );
+    }
+}
+
+#[test]
+fn a_head_tipped_up_by_hand_comes_down_slowly_under_the_cap_and_is_let_go() {
+    let (mut lamp, mut clock) = tipped_up(2_213.0, Duration::from_secs(3_600));
+    let (result, said) = bring_home(&mut lamp, &mut clock);
+    assert_eq!(result, Ok(true), "{said:#?}");
+    assert!(let_go_capped(&lamp), "{:?}", lamp.registers);
+    let at = lamp.servos[PITCH].position;
+    assert!((2_016.0..=2_024.0).contains(&at), "{at}");
+    // 3 counts a step, never more.
+    let goals: Vec<u16> = lamp
+        .registers
+        .iter()
+        .filter(|(_, address, _)| *address == 42)
+        .map(|(_, _, bytes)| u16::from_le_bytes([bytes[0], bytes[1]]))
+        .collect();
+    assert_eq!(goals.first(), Some(&2_213));
+    assert!(
+        goals.windows(2).all(|pair| pair[0].abs_diff(pair[1]) <= 3),
+        "{goals:?}"
+    );
+    assert_eq!(goals.last(), Some(&2_020));
+    assert!(
+        said.iter()
+            .any(|line| line.starts_with("stopped: reached 2020")),
+        "{said:#?}"
+    );
+    assert!(
+        said.last()
+            .unwrap()
+            .starts_with("after letting go: head pitch")
+    );
+}
+
+#[test]
+fn a_head_that_meets_something_stops_there_and_is_let_go_with_its_limit_back() {
+    let (mut lamp, mut clock) = tipped_up(2_213.0, Duration::from_secs(3_600));
+    lamp.strains = vec![(
+        Duration::from_millis(500),
+        Duration::from_secs(60),
+        PITCH,
+        460,
+    )];
+    let (result, said) = bring_home(&mut lamp, &mut clock);
+    assert_eq!(result, Ok(false), "{said:#?}");
+    assert!(let_go_capped(&lamp), "{:?}", lamp.registers);
+    assert!(lamp.servos[PITCH].position > 2_150.0);
+    assert!(
+        said.iter().any(|line| line.contains("it met something")),
+        "{said:#?}"
+    );
+}
+
+#[test]
+fn a_wire_that_fails_mid_move_still_ends_with_torque_off_and_the_limit_back() {
+    let (mut lamp, mut clock) = tipped_up(2_213.0, Duration::from_secs(3_600));
+    // Silent for longer than a step, so one step's read falls in it, and
+    // the first torque-off tries after it too.
+    lamp.silent_from = Some(Duration::from_millis(500));
+    lamp.silent_until = Some(Duration::from_millis(600));
+    let (result, said) = bring_home(&mut lamp, &mut clock);
+    assert!(result.is_err(), "{said:#?}");
+    assert!(let_go_capped(&lamp), "{:?}", lamp.registers);
+    assert!(
+        said.iter().any(|line| line.starts_with("stopped: error:")),
+        "{said:#?}"
+    );
+    // Torque off was tried more than once while the wire was silent.
+    let offs = lamp
+        .registers
+        .iter()
+        .filter(|write| **write == (5, 40, vec![0]))
+        .count();
+    assert!(offs > 1, "{offs}");
+}
+
+#[test]
+fn asked_to_stop_mid_move_it_lets_go_where_it_is() {
+    let (mut lamp, mut clock) = tipped_up(2_213.0, Duration::from_millis(400));
+    let (result, said) = bring_home(&mut lamp, &mut clock);
+    assert_eq!(result, Ok(false), "{said:#?}");
+    assert!(let_go_capped(&lamp), "{:?}", lamp.registers);
+    assert!(
+        said.iter()
+            .any(|line| line.starts_with("stopped: cancelled")),
+        "{said:#?}"
+    );
+}
+
+#[test]
+fn a_head_held_already_or_not_tipped_up_is_never_moved() {
+    let (mut lamp, mut clock) = tipped_up(2_213.0, Duration::from_secs(3_600));
+    lamp.servos[PITCH].torque = 1;
+    let (result, _) = bring_home(&mut lamp, &mut clock);
+    assert!(result.unwrap_err().contains("torque is already on"));
+    assert!(lamp.nothing_was_written());
+    for pitch in [1_700.0, 1_900.0, 2_700.0] {
+        let (mut lamp, mut clock) = tipped_up(pitch, Duration::from_secs(3_600));
+        let (result, _) = bring_home(&mut lamp, &mut clock);
+        assert!(result.unwrap_err().contains("nothing moved"), "{pitch}");
+        assert!(lamp.nothing_was_written(), "{pitch}");
+    }
 }
