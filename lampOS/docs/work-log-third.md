@@ -1,3 +1,9 @@
+## 2026-10-27 15:12 — reminder current carry pushed; Controls landed
+
+#3525 is pushed as 6bb730471 on f725, two equal patches/authors/messages preserved. [Fresh qualification](verification/reminder-pending-present-20261026/current-6bb-selected-audit.json): four compiler gates and sixteen selected commands pass 1,316/0/12; all 179 active witnesses once, two expected caught Skills hooks and stable source/raw/133 executable guards. New source-derived coverage includes six Install policies, twelve carrier cases, thirty-nine affected Voice module cases and twenty exact readers, with whole Body 463 passes. Twelve docs sections contain no cases. No timeout, retry or forced cleanup, no full Voice/twelve-package claim. Current original native and renewed reads are next.
+
+#3757 landed unchanged through train 215 at 661fe1012; current Main's authored Controls test bytes equal the qualified e6 carry. Original exact-tree ARM/Linux and current host receipts are retained. Took the separately reported Expression breath fixture timing fault on current 75571bd0a; source timing audit is underway before any change, preserving the numerical tolerance and product behavior.
+
 ## 2026-10-27 15:08 — control contract drift-test read
 
 READ-OK #3759 at bce4c004e after [independent host and schema checks](verification/control-doc-read-3759-20261027/receipt.json): fmt, strict control all-target Clippy and seventeen tests pass, no failures/ignored. Actual schema regexes reject all 64 C1 combinations (two fields times 32 code points); four ordinary/newline controls pass. Documentation matches current client-owned lease and same-client busy behavior, optional light pattern and numerical parser bounds. Nonblocking P3: the static every-op list omits supported play and sound, so the test doesn't cover those missing examples. No server, real client, network, actuator or lamp acceptance.

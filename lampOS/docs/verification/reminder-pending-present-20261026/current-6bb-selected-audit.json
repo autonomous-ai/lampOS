@@ -1,0 +1,28 @@
+{
+  "head": "6bb73047156334a5bfba2cd94c771c976bdd1016",
+  "base": "f7252d81dc2e72494afc6ea842bd8b0445f1991c",
+  "tree": "98c77cf3cae4402a5a37edab09b0272368978be1",
+  "status": "VERIFIED_SELECTED_REMINDER_SCOPE",
+  "holds": [],
+  "selected_direct_counts": {
+    "failed": 0,
+    "ignored": 12,
+    "passed": 1316
+  },
+  "tests_retried": 0,
+  "limits": [
+    "Selected Skills/Update, six exact install policy cases, whole carrier module, seven switch and one Welcome cases, full Body library, made/app/task-news and affected Voice modules/exact readers plus twelve-package docs;179requiredwitnesses;not current full Voice or twelve-package runtime. Eight comfort corpus inputs are source-bound, not eight independently observed passes. Current clean two-commit source tree is bound; prior staged execution keeps its original identity.",
+    "Historical b490 full-suite privacy failure remains failed and separate.",
+    "No native, device or latency qualification."
+  ],
+  "full_private_audit_sha256": "df37bdbc8e36584cc395c340db3d802faa5b8268dbef8bd56ed05c84a57bb258",
+  "required_active_witnesses": 179,
+  "required_pass_once": 179,
+  "expected_caught_hooks": 2,
+  "unknown_hooks": 0,
+  "artifact_pairs": 133,
+  "source_files": 7303,
+  "raw_entries": 8777,
+  "scope": "Sixteen selected commands: previous floor plus current carrier, installer-switch and affected Voice readers; not full twelve-package or Voice runtime.",
+  "integrity": "All source/raw/artifact guards stable; metadata unchanged, groups absent, no timeout or cleanup."
+}
