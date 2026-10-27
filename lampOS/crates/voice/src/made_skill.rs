@@ -645,15 +645,29 @@ pub(crate) fn ensure_private(directory: &Path) -> io::Result<()> {
 }
 
 /// A package a crash left half moved in (`.NAME.tar.new`), deleted.
+/// How old a half-moved package must be to be a crash's: older than any
+/// keep takes from writing it to moving it in, its check included. Two
+/// readers keep the same answers, so a younger one may be another keep's,
+/// named in the index a moment before it is moved in (Fourteen's P2 on
+/// #3662).
+const UNFINISHED_AFTER: Duration = Duration::from_secs(3 * PACK_WITHIN.as_secs());
+
 fn drop_unfinished(directory: &Path) {
     let Ok(entries) = fs::read_dir(directory) else {
         return;
     };
     for entry in entries.flatten() {
         let name = entry.file_name();
-        if name
-            .to_str()
-            .is_some_and(|name| name.starts_with('.') && name.ends_with(".tar.new"))
+        let old = entry
+            .metadata()
+            .and_then(|metadata| metadata.modified())
+            .ok()
+            .and_then(|modified| modified.elapsed().ok())
+            .is_some_and(|age| age > UNFINISHED_AFTER);
+        if old
+            && name
+                .to_str()
+                .is_some_and(|name| name.starts_with('.') && name.ends_with(".tar.new"))
         {
             let _ = fs::remove_file(entry.path());
         }
@@ -739,22 +753,52 @@ pub fn claim_repair(directory: &Path, key: &str) -> bool {
     })
 }
 
-/// The claimed repair of the answer `key` was handed over (`sent`) or not.
-pub fn repaired(directory: &Path, key: &str, sent: bool) -> io::Result<()> {
+/// The claimed repair of the answer `key` was handed over as the task
+/// `to` (`store:id`), or, with none, not sent. The task is kept so the
+/// app's ask can follow the repair on a later read, should the voice stop
+/// before it does (Fourteen's P3 on #3662).
+pub fn repaired_to(directory: &Path, key: &str, to: Option<&str>) -> io::Result<()> {
     repairs_transact(directory, |entries| {
         for entry in entries.iter_mut().filter(|entry| entry["key"] == key) {
-            entry["sent"] = json!(sent);
+            entry["sent"] = json!(to.is_some());
+            if let Some(to) = to {
+                entry["task"] = json!(to);
+            }
         }
         (true, ())
     })
 }
 
-/// Whether the claimed repair of the answer `key` was not sent: then the
-/// answer is told not kept, as with no repair.
-pub fn repair_not_sent(directory: &Path, key: &str) -> bool {
+/// The task the repair of the answer `key` was handed over as, if it was.
+pub fn repair_task(directory: &Path, key: &str) -> Option<String> {
     repairs(directory)
-        .iter()
-        .any(|entry| entry["key"] == key && entry["sent"] == false)
+        .into_iter()
+        .find(|entry| entry["key"] == key)
+        .and_then(|entry| entry["task"].as_str().map(str::to_owned))
+}
+
+/// How long a claim may stand with no outcome: far past the hand-over's
+/// own 5 s wait. Older, the voice stopped between the claim and the
+/// hand-over's end, and nothing can say whether it was sent.
+pub const CLAIM_STALE_MS: u64 = 120_000;
+
+/// Whether the claimed repair of the answer `key` was not sent, as at
+/// `now_unix_ms`: marked so, or claimed and left with no outcome past
+/// [`CLAIM_STALE_MS`]. Then the answer is told not kept, as with no repair,
+/// once (the reviewer-lead's P3 on #3662).
+pub fn repair_not_sent_at(directory: &Path, key: &str, now_unix_ms: u64) -> bool {
+    repairs(directory).iter().any(|entry| {
+        entry["key"] == key
+            && (entry["sent"] == false
+                || entry["sent"].is_null()
+                    && now_unix_ms.saturating_sub(entry["at_unix_ms"].as_u64().unwrap_or(0))
+                        > CLAIM_STALE_MS)
+    })
+}
+
+/// [`repair_not_sent_at`] now.
+pub fn repair_not_sent(directory: &Path, key: &str) -> bool {
+    repair_not_sent_at(directory, key, now_ms())
 }
 
 /// What is kept, oldest first.
@@ -1491,6 +1535,30 @@ light = { dim = 1 }
 
     /// The ask waits [`PUT_ON_WITHIN`], the newest ask alone, and the note
     /// says which skill a yes would put on.
+    /// A package left half moved in by a crash is deleted, but never one
+    /// another keep is moving in right now: only one older than any keep
+    /// takes (Fourteen's P2 on #3662: two readers keep the same answers).
+    #[test]
+    fn only_a_package_left_long_ago_is_dropped_as_unfinished() {
+        let dir = std::env::temp_dir().join(format!("made-unfinished-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        let fresh = dir.join(".evening-dim-1.0.0-abc.tar.new");
+        let left = dir.join(".evening-dim-1.0.0-def.tar.new");
+        fs::write(&fresh, b"x").unwrap();
+        fs::write(&left, b"x").unwrap();
+        fs::File::options()
+            .write(true)
+            .open(&left)
+            .unwrap()
+            .set_modified(SystemTime::now() - UNFINISHED_AFTER - Duration::from_secs(1))
+            .unwrap();
+        drop_unfinished(&dir);
+        assert!(fresh.exists(), "another keep's package, moving in now");
+        assert!(!left.exists(), "a crash's, long ago");
+        let _ = fs::remove_dir_all(&dir);
+    }
+
     #[test]
     fn only_the_newest_ask_waits_and_only_for_two_minutes() {
         let dir = scratch("mk-wait");
