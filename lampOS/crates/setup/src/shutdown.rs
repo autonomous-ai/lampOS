@@ -34,7 +34,7 @@ pub const SAY_WITHIN: Duration = Duration::from_secs(10);
 /// a spoken yes), which later changes add. Off unless `on`. The runner
 /// itself, `lamp-setup shutdown-now`, is not behind it: it is only ever
 /// started by one of those, or by hand.
-pub const SWITCH: &str = "LAMP_SHUTDOWN";
+pub const SWITCH: &str = lamp_msgs::SHUTDOWN_SWITCH;
 
 /// Whether [`SWITCH`] is on.
 pub fn switched_on(value: Option<&str>) -> bool {

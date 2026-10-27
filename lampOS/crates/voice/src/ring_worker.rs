@@ -69,6 +69,20 @@ pub struct Senses {
     /// ([`crate::ring_mood`]).
     pub mood: Option<crate::ring_mood::RingMood>,
     pub unplug: Option<crate::ring_unplug::RingUnplug>,
+    /// The primary button held, for the shutdown's warning (#3697): with
+    /// `LAMP_SHUTDOWN=on`, held 5 to 15 s ([`lamp_msgs::shutdown_hold`]),
+    /// the ring shows [`shutdown_warning`] in place of its face.
+    pub button: Option<crate::ring_head::RingHead>,
+}
+
+/// The shutdown's warning while the primary button is held in its window
+/// (#3697, `docs/shutdown.md`): the whole ring in the setup light's amber
+/// ([`SetupLook::Failed`]), steady, no brighter than the setup light. Released
+/// there, the lamp turns off; held past it, the warning goes and nothing is
+/// asked.
+pub fn shutdown_warning() -> [lamp_ring::Rgb; PIXEL_COUNT] {
+    use lamp_ring::setup::{SetupLook, setup_pixels};
+    setup_pixels(SetupLook::Failed, SetupLook::Failed, 1.0, 1.0)
 }
 
 /// Startup Ready is emitted only after the sink accepted its initial black frame.
@@ -248,9 +262,15 @@ pub fn run_continuous(
         .filter(|_| lamp_body::unplug::enabled())
         .map(crate::ring_unplug::RingUnplug::on)
         .transpose()?;
+    // Only with the switch on, which the voice hands this worker (#3697).
+    let button = bus_root
+        .filter(|_| lamp_msgs::shutdown_switched_on())
+        .map(|root| crate::ring_head::RingHead::on_source(root, lamp_msgs::TouchSource::Primary))
+        .transpose()?;
     let senses = Senses {
         caps,
         unplug,
+        button,
         light,
         eye,
         eye_strong,
@@ -547,6 +567,7 @@ fn service(
         mut head,
         mut mood,
         mut unplug,
+        mut button,
     } = senses;
     let mut light = light.map(|(light, begins)| {
         face.light(begins);
@@ -676,14 +697,17 @@ fn service(
                         }
                         face.accent(frame.accent, frame.accent_at_us);
                         let at = monotonic_us();
+                        let warning = warning(button.as_mut().and_then(|button| button.tick(at)));
                         let presentation = unplug
                             .as_ref()
-                            .filter(|_| face.lit().on)
+                            .filter(|_| face.lit().on && warning.is_none())
                             .and_then(|unplug| unplug.prepare(at));
-                        let pixels = presentation.as_ref().map_or_else(
-                            || draw(&mut face, &frame, at, ceiling.get()),
-                            |presentation| presentation.pixels,
-                        );
+                        let pixels = warning.unwrap_or_else(|| {
+                            presentation.as_ref().map_or_else(
+                                || draw(&mut face, &frame, at, ceiling.get()),
+                                |presentation| presentation.pixels,
+                            )
+                        });
                         match ring.show(&pixels, ceiling, frame.permit) {
                             Ok(write) => {
                                 if let (Some(unplug), Some(presentation)) =
@@ -742,11 +766,17 @@ fn service(
             rested_at = at;
             let ceiling = ChannelCeiling::new(u16::from(ceiling.get()).min(cap_ceiling))
                 .map_err(io::Error::other)?;
+            let warning = warning(button.as_mut().and_then(|button| button.tick(at)));
             let presentation = unplug
                 .as_ref()
-                .filter(|_| face.lit().on)
+                .filter(|_| face.lit().on && warning.is_none())
                 .and_then(|unplug| unplug.prepare(at));
-            if let (Some(unplug), Some(presentation)) = (unplug.as_mut(), presentation.as_ref()) {
+            if let Some(pixels) = warning {
+                ring.show_resting(&pixels, ceiling)
+                    .map_err(io::Error::other)?;
+            } else if let (Some(unplug), Some(presentation)) =
+                (unplug.as_mut(), presentation.as_ref())
+            {
                 if let Some(receipt) = ring
                     .show_resting(&presentation.pixels, ceiling)
                     .map_err(io::Error::other)?
@@ -764,6 +794,13 @@ fn service(
             std::thread::sleep(Duration::from_micros(wait));
         }
     }
+}
+
+/// [`shutdown_warning`] while the primary button is held (`held`, as
+/// Controls last said) in the shutdown's window, or `None`.
+fn warning(held: Option<u64>) -> Option<[lamp_ring::Rgb; PIXEL_COUNT]> {
+    held.filter(|&held| lamp_msgs::shutdown_hold(held))
+        .map(|_| shutdown_warning())
 }
 
 /// Late writes are said at most this often.
@@ -1096,5 +1133,85 @@ mod lifetime_tests {
         assert!(check_authority(1, late, None).is_err());
         assert!(check_authority(1, INITIAL_AUTHORITY_US + 1, None).is_err());
         assert!(!check_authority(1, INITIAL_AUTHORITY_US, None).unwrap());
+    }
+}
+
+#[cfg(test)]
+mod shutdown_warning_tests {
+    use super::*;
+    use lamp_controls::{input::Level, touch::*};
+    use lamp_msgs::{ClockStamp, TouchSource, TouchState};
+
+    #[test]
+    fn the_warning_shows_only_while_the_button_is_held_in_the_shutdown_window() {
+        for (held, shows) in [
+            (None, false),
+            (Some(1_000_000), false),
+            (Some(3_000_000), false),
+            (Some(4_999_999), false),
+            (Some(5_000_000), true),
+            (Some(6_000_000), true),
+            (Some(15_000_000), true),
+            (Some(15_000_001), false),
+            (Some(20_000_000), false),
+        ] {
+            assert_eq!(warning(held).is_some(), shows, "{held:?}");
+        }
+        // The setup light's amber, the whole ring, no brighter than it.
+        let amber = shutdown_warning();
+        assert!(
+            amber
+                .iter()
+                .all(|pixel| *pixel == amber[0] && pixel.red == 24 && pixel.blue == 0),
+            "{:?}",
+            amber[0]
+        );
+    }
+
+    /// The ring reads the primary button's time from Controls' own touch
+    /// state, as Controls' touch engine says it while the button is held.
+    #[test]
+    fn the_primary_buttons_time_is_read_from_controls_touch_state() {
+        let mut engine = TouchEngine::new(
+            TouchConfig {
+                enabled: true,
+                primary: Some("primary99".into()),
+                ..TouchConfig::default()
+            },
+            "boot",
+            "controls",
+        )
+        .unwrap();
+        let mut state = None;
+        for (sequence, at) in (0..=6_000_000u64).step_by(50_000).enumerate() {
+            let sample = GpioSample {
+                stamp: ClockStamp {
+                    clock_id: "boot".into(),
+                    at_us: at,
+                    sequence: sequence as u64 + 1,
+                },
+                session_id: "gpio".into(),
+                primary: Some(at > 0),
+                reset: None,
+                head_pads: Vec::<Level>::new(),
+            };
+            engine.ingest_gpio(at, sample).unwrap();
+            state = Some(engine.tick(at).state);
+        }
+        let state: TouchState = state.unwrap();
+        let root = std::path::PathBuf::from(format!("/tmp/lrw-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        let bus = lamp_bus::Bus::new(&root).unwrap();
+        let mut said = bus
+            .publisher_declared(TouchState::TOPIC, &TouchState::declaration(), "controls")
+            .unwrap();
+        said.publish_json(1, &state).unwrap();
+        let message = bus.latest(TouchState::TOPIC).unwrap().unwrap();
+        let held = crate::ring_head::held_of(&message, TouchSource::Primary).map(|(held, _)| held);
+        assert_eq!(held, Some(5_950_000));
+        assert!(warning(held).is_some());
+        assert_eq!(crate::ring_head::held_of(&message, TouchSource::Head), None);
+        drop(said);
+        std::fs::remove_dir_all(root).unwrap();
     }
 }

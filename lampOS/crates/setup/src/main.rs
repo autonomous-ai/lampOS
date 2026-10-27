@@ -296,6 +296,8 @@ fn run() -> Result<bool, Box<dyn std::error::Error>> {
                 return Ok(true);
             }
             let mut touch = bus.subscribe_typed(TouchEvent::TOPIC, NAME, TouchEvent::TYPE)?;
+            let mut requests = shutdown_requests(&bus)?;
+            let mut start = start_shutdown_asked;
             let watched = lamp_setup::watch(
                 &mut touch,
                 &clock,
@@ -303,6 +305,7 @@ fn run() -> Result<bool, Box<dyn std::error::Error>> {
                 until,
                 lamp_ipc::monotonic_us,
                 |line| eprintln!("lamp-setup: {line}"),
+                shutdown_watch(&mut requests, &mut start),
                 act,
             )?;
             println!(
@@ -814,6 +817,8 @@ fn watch_refused(
     let (bus, clock, until) = watch_options(&mut options)?;
     let mut touch = bus.subscribe_typed(TouchEvent::TOPIC, NAME, TouchEvent::TYPE)?;
     let mouth = lamp_setup::wifi_change::SayService::product();
+    let mut requests = shutdown_requests(&bus)?;
+    let mut start = start_shutdown_asked;
     let watched = lamp_setup::watch_refused(
         &mut touch,
         &clock,
@@ -821,6 +826,7 @@ fn watch_refused(
         until,
         lamp_ipc::monotonic_us,
         |line| eprintln!("lamp-setup: {line}"),
+        shutdown_watch(&mut requests, &mut start),
         || mouth.say_as("reset", reset::SAY_REFUSED),
     )?;
     println!(
@@ -848,6 +854,35 @@ fn start_reset(plan: &Plan, plan_path: &Path) -> io::Result<()> {
         "--enable".to_owned(),
     ]);
     System.run(&argv)
+}
+
+/// The watcher's subscription to the requests to turn the lamp off (#3697).
+fn shutdown_requests(bus: &Bus) -> io::Result<lamp_bus::Subscriber> {
+    bus.subscribe_typed(
+        lamp_msgs::ShutdownRequest::TOPIC,
+        NAME,
+        lamp_msgs::ShutdownRequest::TYPE,
+    )
+}
+
+/// The watcher's shutdown (#3697): the requests always watched, and `start`
+/// only with `LAMP_SHUTDOWN` on in this process's environment; off, a valid
+/// request is only logged.
+fn shutdown_watch<'a>(
+    requests: &'a mut lamp_bus::Subscriber,
+    start: &'a mut dyn FnMut() -> io::Result<()>,
+) -> lamp_setup::Shutdown<'a> {
+    Some(lamp_setup::ShutdownWatch {
+        requests,
+        start: lamp_msgs::shutdown_switched_on().then_some(start),
+    })
+}
+
+/// A request to turn off, accepted: `lamp-setup shutdown`, as by hand.
+fn start_shutdown_asked() -> io::Result<()> {
+    start_shutdown(false)
+        .map(|_| ())
+        .map_err(|error| io::Error::other(error.to_string()))
 }
 
 /// Hand the shutdown to a unit of its own, outside `lampos.target`, as the

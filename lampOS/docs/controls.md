@@ -103,6 +103,7 @@ of the lamp's current state or of an action applied.
 | Moving base contact | Slide; an eligible slow movement also emits Stroke | No further request |
 | Optional primary button, short release | Stop | Stop |
 | Optional primary button, release after two seconds | One-way SoftwareMute | One-way SoftwareMute |
+| Optional primary button, release after 5 to 15 s, only with `LAMP_SHUTDOWN=on` | Shutdown (no mute), and a `lamp/shutdown_request` for setup ([shutdown.md](shutdown.md#the-button-held)); released after 15 s, nothing | the same |
 | Optional reset button, release after five seconds | FactoryReset only | FactoryReset only |
 
 **Easy to wake, and never asleep in onboarding (#3747, the lead, 27 Oct).**
@@ -786,6 +787,7 @@ means neither a stopped speaker nor a closed microphone.
 | Mechanical button | Short release, under 2 s | Stop speech/playback/following through their owners |
 | Mechanical button | Double or further short releases | Another Stop; no reboot and no unmute |
 | Mechanical button | Release after at least 2 s, including 5 s and longer | One-way software mute |
+| Mechanical button, with `LAMP_SHUTDOWN=on` | Release after 2 s to under 5 s | One-way software mute; from 5 s none here: 5 to 15 s is the touch path's shutdown, later nothing ([shutdown.md](shutdown.md#the-button-held)) |
 | MPR121 base | Qualified stationary short release | Stop |
 | MPR121 base | Second short contact | Stop, with double-tap classification |
 | MPR121 base | Qualified stationary hold, released after at least 2 s | One-way software mute |
@@ -795,7 +797,9 @@ Stop and software mute are separate from physical privacy. No gesture opens
 capture. There is no implicit wake, unmute, voice-mode toggle, Harness entry,
 shutdown or reset. This deliberately changes V1's wake-on-tap and long-hold
 actions. The 2 s and 5 s feedback tiers both mean mute on release; the 5 s
-tier does not arm shutdown. Feedback carries duration and intent, not an old
+tier does not arm shutdown, unless `LAMP_SHUTDOWN=on`, when a release from
+5 to 15 s asks to turn the lamp off instead (#3697,
+[shutdown.md](shutdown.md#the-button-held)). Feedback carries duration and intent, not an old
 red shutdown cue. First must provide a separate explicit owner-side clear
 action before enabling software mute; the tested transaction is described
 below. Repeated panic taps remain safe while muted.

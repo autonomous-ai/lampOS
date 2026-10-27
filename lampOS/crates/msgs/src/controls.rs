@@ -1,6 +1,6 @@
 //! Hand gestures ask the existing owners to stop, close software input, or
 //! acknowledge petting. No controls message is a microphone/camera permit.
-use crate::{ClockStamp, Invalid};
+use crate::{ClockStamp, Invalid, shutdown_hold};
 use lamp_bus::{Declaration, Kind};
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
@@ -402,6 +402,11 @@ pub enum TouchIntent {
     Slide,
     FactoryReset,
     SoftwareMute,
+    /// The primary button released after a hold in the shutdown window
+    /// ([`shutdown_hold`]), only with [`crate::SHUTDOWN_SWITCH`] on: turn the
+    /// lamp off. Never with the mute. Controls then asks on
+    /// [`crate::ShutdownRequest::TOPIC`], which setup's watcher acts on.
+    Shutdown,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -455,8 +460,13 @@ impl TouchEvent {
             Some(self.when_quiet)
         }
     }
+    /// Whether the state's `latest` keeps it. Not a Shutdown: nobody acts on
+    /// it from here (setup acts on its [`crate::ShutdownRequest`]).
     pub fn retained(&self) -> bool {
-        !matches!(self.when_speaking, TouchIntent::Stroke | TouchIntent::Slide)
+        !matches!(
+            self.when_speaking,
+            TouchIntent::Stroke | TouchIntent::Slide | TouchIntent::Shutdown
+        )
     }
     pub fn check(&self) -> Result<(), Invalid> {
         self.stamp.check()?;
@@ -494,10 +504,10 @@ impl TouchEvent {
                     && age < 2_000_000
             }
             (TouchSource::Primary, TouchGesture::Hold) => {
-                pair == (TouchIntent::SoftwareMute, TouchIntent::SoftwareMute)
+                (pair == (TouchIntent::SoftwareMute, TouchIntent::SoftwareMute) && age >= 2_000_000
+                    || pair == (TouchIntent::Shutdown, TouchIntent::Shutdown) && shutdown_hold(age))
                     && self.active_mask == 0
                     && self.released_us == Some(self.observed_us)
-                    && age >= 2_000_000
             }
             (TouchSource::Reset, TouchGesture::Hold) => {
                 pair == (TouchIntent::FactoryReset, TouchIntent::FactoryReset)
@@ -565,7 +575,7 @@ impl TouchEvent {
         };
         let asleep = match (self.source, self.gesture) {
             (TouchSource::Primary, TouchGesture::Tap) => Some(TouchIntent::Stop),
-            (TouchSource::Primary, TouchGesture::Hold) => Some(TouchIntent::SoftwareMute),
+            (TouchSource::Primary, TouchGesture::Hold) => Some(self.when_quiet),
             (TouchSource::Reset, TouchGesture::Hold) => Some(TouchIntent::FactoryReset),
             // Asleep, a tap or a hand kept a second on the head wakes it,
             // never its first touch alone: a lone edge is noise (#3747).
