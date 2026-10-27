@@ -1844,7 +1844,11 @@ Said unasked when it changes:
   hand on a joint, the body let go under load or by a hand (its torque
   off) or let go waiting for a hand to set its pose right
   (`--refused-let-go`), the person's privacy mute, a pause, a hand's sleep,
-  or a hold not renewed within its `for_ms`. It is not taken back when that
+  or a hold not renewed within its `for_ms`. These six are a closed set
+  (`lease::LOST_WHYS`: `Said::lost` asserts each why is in it, so a
+  seventh fails the first test that says it): a new one is added to
+  lamp-control's `LeaseWhy` in the same change, or the door would keep a
+  lease the body has lost (Fourteen on #3900). It is not taken back when that
   ends; the holder asks again. A hold asked while one of these lasts is
   answered `lost` with why. A run that ends with a holder connected tells
   it `lost`/`slumped` first when the body gave out (an overload a second
