@@ -1,0 +1,71 @@
+{
+  "alltarget_static_reverse_closure": [
+    "lamp-body",
+    "lamp-cloud",
+    "lamp-expression",
+    "lamp-keeper",
+    "lamp-lean",
+    "lamp-memory",
+    "lamp-peek",
+    "lamp-setup",
+    "lamp-skills",
+    "lamp-update",
+    "lamp-voice",
+    "lamp-voice-eval"
+  ],
+  "base_changed_files": 5,
+  "base_tree": "cf281bfe6b33f2d7e4dd6879ecf9f833fb835892",
+  "branch": "third/ownkeys-current-82a",
+  "compiler_test_native_commands_run": 0,
+  "extra_normal_roots_not_yet_authorized_or_built": true,
+  "fresh_new_worktree_boundary": "Old6a source fully archived before this physical sourcepath advanced. Old6a ref/archive,old4d WT/bank unchanged. Natural checkout retains exact unchanged-path/mode/byte mtimes; modified files fresh, no manualmtime import,targetcopy,clean or forcefresh.",
+  "identity": {
+    "base": "82a62867cc1bcbbc4b0848519c6757f623d112ce",
+    "head": "fb5846a1d3c3a80f6db384291c3a44762e097712",
+    "tree": "293bb0243f5acbecb7bca05287bacaf9de901df4"
+  },
+  "integrated_owned_paths": [
+    "lampOS/docs/install.md"
+  ],
+  "manual_doc_conflicts": 0,
+  "manual_rows_unchanged": true,
+  "modified_new_inputs_mtimes_not_restored": true,
+  "mtime_eligible": 10930,
+  "mtime_restored_only_exact_path_mode_bytes": 0,
+  "no_Memory_or_Friday_semantic_review": true,
+  "no_compiled_binary_copy_or_forcefresh": true,
+  "normal_static_reverse_closure": [
+    "lamp-body",
+    "lamp-cloud",
+    "lamp-expression",
+    "lamp-skills",
+    "lamp-voice",
+    "lamp-voice-eval"
+  ],
+  "only_conflict_file": null,
+  "owned_blobs_exact": 37,
+  "owned_total": 38,
+  "previous_qualifiedDad8_ref": {
+    "head": "be86f79eba4f58399fc6c9743c8dd7b8663f292c",
+    "ref": "refs/heads/third/ownkeys-current-dad",
+    "unchanged": true
+  },
+  "raw7_author_message_payloads_preserved_against_all10_epochs": true,
+  "receipt_sha256": {
+    "../prep-f0f6/old-6a/git-data/bundle-verification.json": "cccb6e6cb1cadae25e98eacb08a81e763874e8c02c79d803f77dfdae66b2ac38",
+    "../prep-f0f6/old-6a/proof-preservation.json": "d07ba71a811ea9b5d4b2dfb779538bdbfe3c04ae4b7afbd031b0fb4dd826e79c",
+    "../prep-f0f6/old-6a/source-snapshot-complete.json": "03d31d29f566a7fb7a04b9414debe5c468cc8443913db05063c65f65b46e8a89",
+    "cargo-source-closure.json": "d4a3c71245f28ef184f8a5aaa61ce5c9d5b62db41699e00cfb25cf46b04ed01b",
+    "inherited-base-files.json": "799247741d158ee5bd3283d1b9237b93d099a501dc023477eff84dc00c76afb3",
+    "mtime-preservation.json": "8177bd3065ee7c3d66485111d097f9ea7603f9a7e593e2c9176a3d9fc196f6c2",
+    "owned38-blobs.json": "c4aa2aa4b065702ee11a1a0f9f0a081e31699c41f484e62a5de59bf79ed2704b",
+    "raw-authored-preservation.json": "755201dd10598e004fdbf97db64afee2c9b0bd0e702516579a1b3a5c573bda03",
+    "source-after-audit.json": "173d31180f69fb010b6a21482aff139500079bc3a096218be3ebeb40828159f8",
+    "source-before-audit.json": "173d31180f69fb010b6a21482aff139500079bc3a096218be3ebeb40828159f8"
+  },
+  "source_guard_files": 7555,
+  "source_guard_unchanged": true,
+  "status": "SOURCE_AUDIT_PASSED_FRESH_GATE_PROPOSAL_PENDING_ROOT",
+  "worktree": "<own-source-worktree>",
+  "private_original_receipt_sha256": "f1807b98d32b1baf964c931f7e9020cd65a005b3751f96fb539be2003a5d06c6"
+}

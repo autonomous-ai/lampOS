@@ -1,0 +1,186 @@
+{
+  "Linux_previous8_and_newmeasure1_not_executed": true,
+  "all_source_raw_helper_lock_depinfo_actual_saved_guards_match": true,
+  "caught_Round_hooks_current_scope": 0,
+  "compiler_features_opaqueIDs_actual": true,
+  "counts": {
+    "failed": 0,
+    "ignored": 0,
+    "passed": 7
+  },
+  "current_executable_paths": 16,
+  "discovery_drivers": 7,
+  "discovery_required": 27,
+  "drivers": 3,
+  "expected_should_panic": 0,
+  "hashes": {
+    "audit-82a.py": "e30dead90856dd36d826ff68e9d4fdc16c7d1e2e5ee1bb7f84e9d88157bb7c48",
+    "compiler-artifact-records.json": "eb868e189c78fc3d9bb6f574a54380e2ecfbfe47ecac1357cc52a1109789a064",
+    "compiler-plan.json": "6b748cc315204d7b84fa07a17f3369327b71931ed5428f4ac73a7ed32139c682",
+    "compiler.terminal.json": "ebeabe15edc633df2abbff10c7ec373e80d7032437bc61a862e36c389393347e",
+    "current-artifacts.json": "a00b4a0e12c13941c840f9b6a09ae29afeae1eb7cf53bb3fbf7bd7090a9881cf",
+    "current-unit-switch-hashes.json": "fcc3d29c9af515500085ec13d46081396892c5748c69c6b6b05e1ae8577056ef",
+    "emitted-features.json": "807b1645f82187949e6c2f4f38104b37de821750e2323e4a1afe35684614d80d",
+    "expected-results.json": "c8d706c9da1eb0558beb515613c9312ad82574ebfaeb6e499a91e7a5f49e625d",
+    "expected-should-panic.json": "d8bff422f481b034e4ca65c39ed1357f3f570c5da44ffb0a07aaaddb238589df",
+    "immutable-saved168.json": "6dea73c66fde4e71b2183bac60bbc9fde466caa16a2a67373dbec704c8c8a45b",
+    "metadata.json": "1fa9740222eca7c074222ba9e6bc1754864bd60c5665874c7e2e46846880c71c",
+    "normal-child-current-admission.json": "aa40eb2f50109ccf4d28fbb6ba88d5f9712736bc23558e0c64f52e4a16c44aef",
+    "required-cases.json": "9a20bb2b82d302526db7f187a5d669088ac3e44c745152e69c203db58d5e6267",
+    "root-approval.json": "e1b20c8d24557e099acb8190c2ee186f01aefaa34124b598c8b8316ddc8bfc5f",
+    "runtime-plan.json": "161903a9f60a2260213b0369844c1d1b6ecf5a16ef58854963456827da245025",
+    "scope-plan.json": "6f148518d424445db671ebb82584545278c6ec946d27ae2cc3e0e2dfe1521589",
+    "source-audit-receipt.json": "f1807b98d32b1baf964c931f7e9020cd65a005b3751f96fb539be2003a5d06c6",
+    "unit-switch-current-bindings.json": "021cfa27aaf8bfd0481d5fffb3e5aafceb16f253c7b3dd2c2f0f0c62b79f4f47"
+  },
+  "historical318_current_credit_transferred": false,
+  "historical44_caught4_not_imported": true,
+  "historical_holds": [
+    "Own3646 DRAFT broker2094; no activation/device/provider",
+    "539Reader failure remains unexplained/unwaived",
+    "#3890 parallelreport not rerun/repaired/waived"
+  ],
+  "holds": [],
+  "host_required": 7,
+  "identity": {
+    "base": "82a62867cc1bcbbc4b0848519c6757f623d112ce",
+    "head": "fb5846a1d3c3a80f6db384291c3a44762e097712",
+    "tree": "293bb0243f5acbecb7bca05287bacaf9de901df4"
+  },
+  "independent_saved_paths": 16,
+  "metadata_local_packages": 49,
+  "metadata_workspace_members": 47,
+  "no_Memory_semantic_or_feature_expansion": true,
+  "normal_build_roots": 5,
+  "normal_runtime_children": [
+    "lamp-skills"
+  ],
+  "observed_should_panic": [],
+  "own_selected": 0,
+  "phase": "final",
+  "prior168_saved_match": true,
+  "results": [
+    {
+      "cases": {
+        "format::the_schemas_lists_are_the_codes": [
+          {
+            "line": 3,
+            "status": "ok"
+          }
+        ],
+        "made::a_made_skill_that_does_more_than_it_declares_or_may_is_not_kept": [
+          {
+            "line": 4,
+            "status": "ok"
+          }
+        ],
+        "package::a_packages_signature_is_carried_and_not_checked": [
+          {
+            "line": 6,
+            "status": "ok"
+          }
+        ],
+        "shared::an_authors_package_carries_their_key_and_names_them": [
+          {
+            "line": 7,
+            "status": "ok"
+          }
+        ],
+        "shared::unsigned_store_signed_changed_or_misnamed_packages_are_refused": [
+          {
+            "line": 8,
+            "status": "ok"
+          }
+        ]
+      },
+      "label": "runtime-05-lamp-skills-it",
+      "log_sha256": "07ff895fc70484071200bdf1b85907bef45ce521ba175120f9cc917f28a41816",
+      "summaries": [
+        {
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 5,
+          "status": "ok"
+        }
+      ]
+    },
+    {
+      "cases": {
+        "every_part_of_the_lamp_waits_for_setups_marker_itself": [
+          {
+            "line": 3,
+            "status": "ok"
+          }
+        ]
+      },
+      "label": "runtime-06-lamp-update-install",
+      "log_sha256": "1a145d452fae6210092076b3fc2e2addf9821fef723b8ded2e3afbed2c8ef30a",
+      "summaries": [
+        {
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1,
+          "status": "ok"
+        }
+      ]
+    },
+    {
+      "cases": {
+        "ci_paths::every_doc_a_crate_reads_is_named_back_in_the_workflows_pull_request_paths": [
+          {
+            "line": 3,
+            "status": "ok"
+          }
+        ]
+      },
+      "label": "runtime-07-lamp-update-it",
+      "log_sha256": "94811e81cb5bdb1716097793219236298552dbfeae2e02883e066a75440589fb",
+      "summaries": [
+        {
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1,
+          "status": "ok"
+        }
+      ]
+    }
+  ],
+  "selected_case_unrun": 0,
+  "status": "VERIFIED_82A_RUNTIME7",
+  "strict_roots": 5,
+  "unique_actual_discovery": 27,
+  "unknown_panics": [],
+  "witnesses": {
+    "lamp-skills::it::format::the_schemas_lists_are_the_codes": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-skills::it::made::a_made_skill_that_does_more_than_it_declares_or_may_is_not_kept": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-skills::it::package::a_packages_signature_is_carried_and_not_checked": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-skills::it::shared::an_authors_package_carries_their_key_and_names_them": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-skills::it::shared::unsigned_store_signed_changed_or_misnamed_packages_are_refused": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-update::install::every_part_of_the_lamp_waits_for_setups_marker_itself": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-update::it::ci_paths::every_doc_a_crate_reads_is_named_back_in_the_workflows_pull_request_paths": {
+      "own": false,
+      "pass_once": true
+    }
+  }
+}
