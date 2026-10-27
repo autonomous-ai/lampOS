@@ -25,9 +25,11 @@ use std::fs;
 use std::io::{self, Read, Write};
 use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt};
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+use std::process::Command;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+
+mod query;
 
 /// `on` sends reports, with `LAMP_CLOUD=on` and the person's yes. Anything
 /// else: nothing of this runs.
@@ -582,40 +584,17 @@ impl UnitStates {
     }
 }
 
-/// `program args…`'s output, within [`SYSTEMCTL_WITHIN`], or nothing:
-/// killed when late.
+/// `program args…`'s complete UTF-8 output, at most 256 KiB, within
+/// [`SYSTEMCTL_WITHIN`], or nothing. Failed queries stop their owned group.
 pub fn bounded_output(program: &Path, args: &[&str]) -> Option<String> {
     bounded_output_within(program, args, SYSTEMCTL_WITHIN)
 }
 
 /// [`bounded_output`] within `within`.
 pub fn bounded_output_within(program: &Path, args: &[&str], within: Duration) -> Option<String> {
-    let mut child = Command::new(program)
-        .args(args)
-        .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::null())
-        .spawn()
-        .ok()?;
-    let mut stdout = child.stdout.take()?;
-    let reader = std::thread::spawn(move || {
-        let mut out = String::new();
-        let _ = stdout.by_ref().take(256 * 1_024).read_to_string(&mut out);
-        out
-    });
-    let deadline = Instant::now() + within;
-    loop {
-        match child.try_wait() {
-            Ok(Some(status)) if status.success() => return reader.join().ok(),
-            Ok(Some(_)) => return None,
-            Ok(None) if Instant::now() < deadline => std::thread::sleep(Duration::from_millis(10)),
-            _ => {
-                let _ = child.kill();
-                let _ = child.wait();
-                return None;
-            }
-        }
-    }
+    let until = Instant::now().checked_add(within)?;
+    let bytes = query::output_within(Command::new(program).args(args), until).ok()?;
+    String::from_utf8(bytes).ok()
 }
 
 /// What the lamp's bus says now, for a health report.
