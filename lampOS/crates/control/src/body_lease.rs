@@ -18,6 +18,7 @@
 
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::time::Duration;
 
 use serde_json::Value;
@@ -75,13 +76,23 @@ impl Holding {
     }
 }
 
-/// A line from the body, as what the door does with it.
+/// A line from the body, as what the door does with it. A `lost` ends the
+/// computer's `body` lease with the body's why; one the door doesn't know
+/// ends it too, as `released`, the safe direction (Fourteen's P3 on #3900).
+/// A `refused` ends it as `released` as well: the door can't hold the body,
+/// so the computer must not think the lamp's own life stands back (Sixth's
+/// P3 on #3900).
 pub fn heard(line: &str) -> Option<Out> {
     let said: Value = serde_json::from_str(line).ok()?;
-    match said["lease"].as_str()? {
-        "lost" => Some(Out::Lose(Some(Part::Body), why_of(said["why"].as_str()?)?)),
-        _ => None,
-    }
+    let why = match said["lease"].as_str()? {
+        "lost" => said["why"]
+            .as_str()
+            .and_then(why_of)
+            .unwrap_or(LeaseWhy::Released),
+        "refused" => LeaseWhy::Released,
+        _ => return None,
+    };
+    Some(Out::Lose(Some(Part::Body), why))
 }
 
 /// The body's why in the protocol's words.
@@ -106,15 +117,25 @@ fn line_of(say: &Say) -> String {
 }
 
 /// Holds the body at `path` while a computer holds `body`, and hands its
-/// ends to the door's leases.
+/// ends to the door's leases. Each connection's reader is told apart by a
+/// generation, so a late line from one the door has dropped never ends a
+/// newer holder's lease; and its end (the body restarted) is seen at the
+/// next check, so the door asks again within [`CHECK_EVERY`], not at the
+/// next renewal (Sixth's and Fourteen's P3s on #3900).
 pub async fn hold(path: PathBuf, shared: Arc<Shared>) {
     let mut holding = Holding::default();
     let mut writer: Option<tokio::net::unix::OwnedWriteHalf> = None;
+    let current = Arc::new(AtomicU64::new(0));
+    let mut ended = Arc::new(AtomicBool::new(false));
     let mut told_unreachable = false;
     let mut check = tokio::time::interval(CHECK_EVERY);
     check.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
     loop {
         check.tick().await;
+        if writer.is_some() && ended.load(Ordering::Acquire) {
+            writer = None;
+            holding.gone();
+        }
         let wanted = shared.body_held();
         let Some(say) = holding.step(wanted, lamp_ipc::monotonic_us()) else {
             continue;
@@ -125,10 +146,15 @@ pub async fn hold(path: PathBuf, shared: Arc<Shared>) {
                     told_unreachable = false;
                     let (read, write) = stream.into_split();
                     writer = Some(write);
-                    let shared = shared.clone();
+                    let generation = current.fetch_add(1, Ordering::AcqRel) + 1;
+                    ended = Arc::new(AtomicBool::new(false));
+                    let (shared, current, ended) = (shared.clone(), current.clone(), ended.clone());
                     tokio::spawn(async move {
                         let mut lines = BufReader::new(read).lines();
                         while let Ok(Some(line)) = lines.next_line().await {
+                            if current.load(Ordering::Acquire) != generation {
+                                break;
+                            }
                             if line.contains("\"refused\"") {
                                 eprintln!("lamp-control: the body refused its lease: {line}");
                             }
@@ -136,6 +162,7 @@ pub async fn hold(path: PathBuf, shared: Arc<Shared>) {
                                 shared.deliver(vec![out]);
                             }
                         }
+                        ended.store(true, Ordering::Release);
                     });
                 }
                 Err(error) => {
@@ -156,8 +183,10 @@ pub async fn hold(path: PathBuf, shared: Arc<Shared>) {
         };
         let sent = write.write_all(line_of(&say).as_bytes()).await;
         if sent.is_err() || say == Say::LetGo {
-            // Closed: the body ends its lease at once.
+            // Closed: the body ends its lease at once, and anything its
+            // reader still hears is from a connection gone.
             writer = None;
+            current.fetch_add(1, Ordering::AcqRel);
             holding.gone();
         }
     }
@@ -204,13 +233,27 @@ mod tests {
                 "{line}"
             );
         }
+        // A why the door doesn't know, none at all, or a refused hold: the
+        // computer's lease ends, as released (Fourteen's and Sixth's P3s on
+        // #3900).
+        for line in [
+            r#"{"lease":"lost","why":"something new"}"#,
+            r#"{"lease":"lost"}"#,
+            r#"{"lease":"refused","why":"one of hold or let_go"}"#,
+        ] {
+            assert!(
+                matches!(
+                    heard(line),
+                    Some(Out::Lose(Some(Part::Body), LeaseWhy::Released))
+                ),
+                "{line}"
+            );
+        }
         // Told already from the bus, or nothing to do.
         for line in [
             r#"{"lease":"held"}"#,
             r#"{"lease":"suspended","why":"conversation"}"#,
             r#"{"lease":"free"}"#,
-            r#"{"lease":"refused","why":"one holder"}"#,
-            r#"{"lease":"lost","why":"something new"}"#,
             "not json",
         ] {
             assert!(heard(line).is_none(), "{line}");
