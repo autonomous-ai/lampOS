@@ -111,6 +111,7 @@ fn observe(store: &mut Days, conversation: &str, sources: &[u64], text: &str) ->
             category: Category::Preference,
             source_ids: sources.to_vec(),
             supersedes: None,
+            replaces: None,
             on: None,
         }],
     };

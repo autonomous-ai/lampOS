@@ -393,6 +393,7 @@ fn forget_my_favourite_colour_leaves_the_wedding_kept_in_the_same_conversation()
         category: Category::Preference,
         source_ids: vec![said],
         supersedes: None,
+        replaces: None,
         on: None,
     };
     let applied = raw(

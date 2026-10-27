@@ -1319,6 +1319,23 @@ passed. Tests: the notes' exact texts in `remember::tests`.
     that says "papers" for "bakery" denies nothing shown.
     Tests: `remember::tests::an_explicit_correction_selects_only_one_shown_old_fact`
     and `remember::tests::a_clear_correction_without_a_model_id_replaces_one_shown_fact`.
+  - **A correction the observation pass keeps** (finding N11 on #3504:
+    lamp-06c1, 27 Oct, "Works at a library now, not the bakery." was kept
+    as an observation and "works at a bakery" stayed current): with
+    `LAMP_MEMORY_OBSERVE` too, the pass's proposals are held against the
+    kept things of that person's the session was shown, by the same matcher
+    on the proposal's text (`remember::observations_replacing`,
+    `correction_candidates`). One that clearly corrects exactly one goes to
+    `tidy_apply` with `"replaces"`: that id, and the memory retires it with a
+    replacement edge as a `remember` correction does
+    ([memory-days.md](memory-days.md)). "Not just tea" retires nothing;
+    more than one candidate, or two proposals naming the same kept thing,
+    retire nothing; a proposal superseding an observation is left as it is.
+    A `"replaces"` the model writes itself is always dropped before
+    (`observations_for_memory`, the reviewer-lead's P2 on #3853), so only
+    this matcher sets one, and never with the switch off.
+    Tests: `remember::tests::an_observation_correcting_one_shown_kept_thing_replaces_it`,
+    `remember::tests::an_event_s_day_reaches_the_memory_only_with_the_switch`.
   - **With `LAMP_MEMORY_KEEP_HEARD`:** a heard line kept instead is sent
     without the call's `replaces`, so the old fact stays active and the
     heard line is kept beside it: "They said: it's green now" may lack the
@@ -1661,7 +1678,10 @@ passed. Tests: the notes' exact texts in `remember::tests`.
       apart, another person, or 64 sources). Each goes through the lamp's own
       path: the store's `conversation_end`, the pass's prompt and DeepSeek
       client (`second_provider::worker::observer_at`), and the store's
-      `tidy_apply`, which keeps or refuses as on the lamp.
+      `tidy_apply`, which keeps or refuses as on the lamp. A `replaces` the
+      model writes is dropped first, as the lamp drops it, and with no
+      session shown nothing is retired (`as_the_lamp_sends`, the
+      reviewer-lead's P3 on #3853).
     - **What it prints:** counts (conversations, proposed, kept by category,
       refused by code, the model giving nothing) and the model's median and
       p90 ms. It prints no words.

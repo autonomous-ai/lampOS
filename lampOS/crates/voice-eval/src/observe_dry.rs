@@ -169,6 +169,17 @@ pub fn run(args: &[String]) -> Result<i32> {
 
 /// [`run`] with its model given: the lamp's own (`observer_at`), or a
 /// scripted one in a test.
+/// What the model proposed as the lamp sends it: a `replaces` the model
+/// wrote is dropped, as `observations_for_memory` drops it (the
+/// reviewer-lead's P3 on #3853). This run has no session shown, so it
+/// retires nothing.
+fn as_the_lamp_sends(mut output: tidy::Output) -> tidy::Output {
+    for observation in &mut output.observations {
+        observation.replaces = None;
+    }
+    output
+}
+
 fn run_with(args: &Arguments, observer: &lamp_voice::remember::Observer) -> Result<Value> {
     DirBuilder::new().mode(0o700).create(&args.out)?;
     let copy = args.out.join("store");
@@ -224,7 +235,8 @@ fn run_with(args: &Arguments, observer: &lamp_voice::remember::Observer) -> Resu
             };
             let started = Instant::now();
             let proposed = observer(&serde_json::to_value(&input)?)
-                .and_then(|output| serde_json::from_value::<tidy::Output>(output).ok());
+                .and_then(|output| serde_json::from_value::<tidy::Output>(output).ok())
+                .map(as_the_lamp_sends);
             asked_ms.push(started.elapsed().as_millis() as u64);
             let output = proposed.clone().unwrap_or(tidy::Output {
                 observations: vec![],
@@ -494,11 +506,12 @@ mod tests {
         )
         .unwrap();
         // The scripted model: one preference cited from the conversation's
-        // own exchange when there is one to keep, and nothing otherwise.
+        // own exchange when there is one to keep, with a `replaces` of its
+        // own (dropped, [`as_the_lamp_sends`]), and nothing otherwise.
         let observer: lamp_voice::remember::Observer = Box::new(|input: &Value| {
             let first = &input["records"][0];
             Some(if first["heard"].as_str()?.contains("sugar") {
-                json!({"observations":[{"text":"They take their tea with no sugar","category":"preference","source_ids":[first["id"]],"supersedes":null}]})
+                json!({"observations":[{"text":"They take their tea with no sugar","category":"preference","source_ids":[first["id"]],"supersedes":null,"replaces":1}]})
             } else {
                 json!({"observations":[]})
             })
@@ -521,6 +534,20 @@ mod tests {
         // its files is byte for byte as it was.
         assert_eq!(lamp_files(), before);
         let _ = fs::remove_dir_all(&root);
+    }
+
+    /// The reviewer-lead's P3 on #3853: a model's own `replaces` is dropped
+    /// before `tidy_apply`, as the lamp drops it.
+    #[test]
+    fn a_models_own_replaces_is_dropped_as_on_the_lamp() {
+        let output: tidy::Output = serde_json::from_value(json!({"observations":[
+            {"text":"Works at a library","category":"preference","source_ids":[2],"supersedes":null,"replaces":1}
+        ]}))
+        .unwrap();
+        assert_eq!(output.observations[0].replaces, Some(1));
+        let sent = as_the_lamp_sends(output);
+        assert_eq!(sent.observations[0].replaces, None);
+        assert_eq!(sent.observations[0].text, "Works at a library");
     }
 
     /// A copy that fails partway, its `-wal` unreadable after the main file

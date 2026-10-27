@@ -106,6 +106,7 @@ fn an_unknown_guests_room_observation_is_forgettable() {
                         source_ids: vec![evidence],
                         supersedes: None,
                         on: None,
+                        replaces: None,
                     }],
                 },
             )

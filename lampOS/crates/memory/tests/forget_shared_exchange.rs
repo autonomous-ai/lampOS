@@ -76,6 +76,7 @@ fn conversation(store: &mut Days, mai: &Person) -> (u64, u64, u64) {
                     category: Category::Preference,
                     source_ids: vec![said],
                     supersedes: None,
+                    replaces: None,
                     on: None,
                 }],
             },

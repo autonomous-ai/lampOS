@@ -2017,6 +2017,27 @@ impl Days {
                     ));
                 }
             }
+            // Finding N11 on #3504: a kept thing of this scope the
+            // observation corrects is retired, as a `remember` with
+            // `replaces` retires it: a replacement edge and the old one
+            // inactive, its event day gone. One that is gone, not kept,
+            // already replaced or newer than the evidence is left as it is,
+            // and the observation is kept plainly beside it.
+            let mut supersedes = proposal.supersedes;
+            if let Some(old) = proposal.replaces {
+                match read_record(&tx, person, old)? {
+                    Some(kept) if kept.kind == "kept" && kept.active && kept.at_unix_ms <= at => {
+                        tx.execute(
+                            "DELETE FROM event_days WHERE rid IN (SELECT rid FROM entries WHERE person=?1 AND id=?2)",
+                            params![person.as_str(), old],
+                        )?;
+                        supersedes = Some(old);
+                    }
+                    _ => eprintln!(
+                        "lamp-memory: tidy_apply kept an observation beside a kept thing it can no longer replace"
+                    ),
+                }
+            }
             let id = next_id(&tx, person)?;
             insert_record(
                 &tx,
@@ -2030,7 +2051,7 @@ impl Days {
                     text: proposal.text.clone(),
                     category: Some(proposal.category),
                     source_ids: proposal.source_ids.clone(),
-                    supersedes: proposal.supersedes,
+                    supersedes,
                     active: true,
                 },
                 &self.local,
