@@ -198,8 +198,8 @@ bytes, install a guard, copy a helper, execute restoration or activate a
 service. Its external-effect acknowledgments require verified caller
 results. An existing private stable store directory is a caller
 precondition; privileged ancestor/ownership confinement belongs to the
-later bootstrap. No CLI or round currently calls this module. Fourteen
-focused tests cover the admission and record boundaries; broader gates and
+later bootstrap. No CLI or round currently calls this module. Eighteen
+focused tests cover admission, records and recovery inputs; broader gates and
 original native qualification are recorded separately on the PR.
 
 The local recovery-input follow-up adds `Session::recovery_inputs`, a
