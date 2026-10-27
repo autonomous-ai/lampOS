@@ -1,5 +1,13 @@
 # Tests work log
 
+## 2026-10-27 07:52 — Sentinel current native checks pass; Carrier runtime starts
+
+Ready for lamp-voice: no (#3543 second current peer clearance pending)
+
+[Current Sentinel native proof](verification/tests-sentinel-59a-native-20261027/) records original ARM64 **40427034839** and Linux **40427035003** success, attempt one, actual preview `8d8e17f85` with ordered 4bff/59a parents and tracked tree exactly equal to offered59a. The actual twelve-package selected run has **7,551 unique PASS / 0 FAIL / 0 LEAK / 0 TIMEOUT**, **53** aggregate skips, all **14** ordinary Reader cases including the changed Linux sentinel once. The 34 configured final-output reprints are separate, as are promoter25/docs4/process13 and relay results. Isolated-root DAC remains ignored/unrun. All **48** collection-manifest entries passed a post-close hash/bytes check, zero mismatches or verification exclusions; the producer manifest explicitly omits its own manifest and audit files. No artifact archive or binary was downloaded.
+
+Reviewer-three’s current READ-OK is6430728281; second current clearance is being requested with this published proof. Carrier runtime-only gate is now active on its independent target: full Round195/Install101/Functions5 plus two changed-input source readers and promoter25 are scheduled after fresh inventories. Explicit old139PASS/6IGNORE carry requires current byte/profile/helper/input proof and preserves old source scope; it is not a fresh448 run. Restart’s current21-case gate continues on the separate warm target. No device action.
+
 ## 2026-10-27 07:44 — Carrier current compile comparison passes; changed drivers require fresh runs
 
 Ready for lamp-voice: no (#3466 current runtime/native/read gates pending)
