@@ -1,0 +1,191 @@
+{
+  "candidate": {
+    "candidate_base": "2b73dd03073947c62b3d10593f293aa9ab954410",
+    "candidate_head": "c9712cea2f8a5df027b1f2a1ba4e67c618c986df",
+    "candidate_tree": "a8625be9b421ae73c1a8f76d101d49e1e40c27cf",
+    "preserved_qualified_commit": "b561f786004e698b2709d273e24d93290121cee1"
+  },
+  "carry": {
+    "all_358_compared_paths_equal": true,
+    "all_upstream_changes": "Update projection code plus three docs; no manifest/lock/config or Voice input changes.",
+    "direct_depinfo_inputs": 300,
+    "doc_result_only_added_after_execution": true,
+    "no_changed_path_overlap": true,
+    "no_replay_after_carry": true,
+    "owned_patch_blobs_modes_identical": true
+  },
+  "changed_files": [
+    "lampOS/crates/voice/src/service_privacy_controls.rs",
+    "lampOS/docs/service-privacy.md"
+  ],
+  "host": {
+    "actual_fresh_lib_emission": true,
+    "bank_released": true,
+    "child_observations": [
+      {
+        "command": "exit 0",
+        "pid": 55226,
+        "pid_after": "absent",
+        "status_receipt": "privacy exit fixture observed: command=\"exit 0\", caller=crates/voice/src/service_privacy_controls.rs:707, pid=55226, polls=3, wait_us=5377, total_us=11808, status=exit status: 0, code=Some(0), signal=None, core_dumped=false"
+      },
+      {
+        "command": "exit 101",
+        "pid": 55238,
+        "pid_after": "absent",
+        "status_receipt": "privacy exit fixture observed: command=\"exit 101\", caller=crates/voice/src/service_privacy_controls.rs:733, pid=55238, polls=3, wait_us=5867, total_us=11586, status=exit status: 101, code=Some(101), signal=None, core_dumped=false"
+      },
+      {
+        "command": "exit 101",
+        "pid": 55249,
+        "pid_after": "absent",
+        "status_receipt": "privacy exit fixture observed: command=\"exit 101\", caller=crates/voice/src/service_privacy_controls.rs:738, pid=55249, polls=3, wait_us=5669, total_us=11257, status=exit status: 101, code=Some(101), signal=None, core_dumped=false"
+      },
+      {
+        "command": "kill -SEGV $$",
+        "pid": 55260,
+        "pid_after": "absent",
+        "status_receipt": "privacy exit fixture observed: command=\"kill -SEGV $$\", caller=crates/voice/src/service_privacy_controls.rs:733, pid=55260, polls=3, wait_us=6114, total_us=11409, status=signal: 11 (SIGSEGV), code=None, signal=Some(11), core_dumped=false"
+      },
+      {
+        "command": "kill -SEGV $$",
+        "pid": 55271,
+        "pid_after": "absent",
+        "status_receipt": "privacy exit fixture observed: command=\"kill -SEGV $$\", caller=crates/voice/src/service_privacy_controls.rs:738, pid=55271, polls=3, wait_us=5924, total_us=11215, status=signal: 11 (SIGSEGV), code=None, signal=Some(11), core_dumped=false"
+      },
+      {
+        "command": "exit 0",
+        "pid": 55287,
+        "pid_after": "absent",
+        "status_receipt": "privacy exit fixture observed: command=\"exit 0\", caller=crates/voice/src/coordinator/service.rs:979, pid=55287, polls=3, wait_us=5599, total_us=11877, status=exit status: 0, code=Some(0), signal=None, core_dumped=false"
+      },
+      {
+        "command": "exit 0",
+        "pid": 55298,
+        "pid_after": "absent",
+        "status_receipt": "privacy exit fixture observed: command=\"exit 0\", caller=crates/voice/src/coordinator/service.rs:983, pid=55298, polls=3, wait_us=5766, total_us=11671, status=exit status: 0, code=Some(0), signal=None, core_dumped=false"
+      },
+      {
+        "command": "exit 101",
+        "pid": 55309,
+        "pid_after": "absent",
+        "status_receipt": "privacy exit fixture observed: command=\"exit 101\", caller=crates/voice/src/coordinator/service.rs:987, pid=55309, polls=3, wait_us=6173, total_us=11620, status=exit status: 101, code=Some(101), signal=None, core_dumped=false"
+      },
+      {
+        "command": "kill -SEGV $$",
+        "pid": 55320,
+        "pid_after": "absent",
+        "status_receipt": "privacy exit fixture observed: command=\"kill -SEGV $$\", caller=crates/voice/src/coordinator/service.rs:991, pid=55320, polls=3, wait_us=5549, total_us=12570, status=signal: 11 (SIGSEGV), code=None, signal=Some(11), core_dumped=false"
+      },
+      {
+        "command": "exit 0",
+        "pid": 55331,
+        "pid_after": "absent",
+        "status_receipt": "privacy exit fixture observed: command=\"exit 0\", caller=crates/voice/src/coordinator/service.rs:999, pid=55331, polls=3, wait_us=6047, total_us=12360, status=exit status: 0, code=Some(0), signal=None, core_dumped=false"
+      }
+    ],
+    "counts": {
+      "FAIL": 0,
+      "PASS": 3,
+      "ignored": 0,
+      "retries": 0,
+      "unrun": 0
+    },
+    "executable_sha256": "ae395bb705492b5f4a5a156e44a6ab5f70c9e83525f37eadc1af50c953e79d8c",
+    "frozen_base": "fc9c781afaed38dc976f650484c30f65bf5db57a",
+    "guards": {
+      "current_driver": true,
+      "helpers": true,
+      "saved192": true,
+      "source": true,
+      "stage_groups_absent": true,
+      "tools": true
+    },
+    "native_exit": 0,
+    "native_handle": 5580,
+    "platform": "macOS x86_64",
+    "preserved_prior_driver_count": 192,
+    "selected_names": [
+      "service_privacy_controls::tests::only_a_privacy_worker_that_ended_cleanly_at_its_start_is_an_unreadable_switch",
+      "coordinator::service::tests::a_conversations_privacy_worker_ended_at_its_start_goes_back_to_the_wait",
+      "service_privacy_controls::tests::an_unreadable_switch_is_read_again_and_never_ends_the_service"
+    ],
+    "source_binding": "source-before.json and source-after.json equal; helper source SHA256 8625bb3c87fac7854e2811927f1b0ce91b00761762efd928efb106ca91bb3157",
+    "stages": [
+      {
+        "cleanup_signals": [],
+        "elapsed_seconds": 12.309,
+        "exit": 0,
+        "group": "absent",
+        "pgid": 49801,
+        "stage": "fmt",
+        "timeout": false
+      },
+      {
+        "cleanup_signals": [],
+        "elapsed_seconds": 113.4773,
+        "exit": 0,
+        "group": "absent",
+        "pgid": 49918,
+        "stage": "strict-voice",
+        "timeout": false
+      },
+      {
+        "cleanup_signals": [],
+        "elapsed_seconds": 161.8647,
+        "exit": 0,
+        "group": "absent",
+        "pgid": 52342,
+        "stage": "compile",
+        "timeout": false
+      },
+      {
+        "cleanup_signals": [],
+        "elapsed_seconds": 2.1387,
+        "exit": 0,
+        "group": "absent",
+        "pgid": 55172,
+        "stage": "discovery",
+        "timeout": false
+      },
+      {
+        "cleanup_signals": [],
+        "elapsed_seconds": 0.1038,
+        "exit": 0,
+        "group": "absent",
+        "pgid": 55215,
+        "stage": "runtime-1",
+        "timeout": false
+      },
+      {
+        "cleanup_signals": [],
+        "elapsed_seconds": 0.0989,
+        "exit": 0,
+        "group": "absent",
+        "pgid": 55276,
+        "stage": "runtime-2",
+        "timeout": false
+      },
+      {
+        "cleanup_signals": [],
+        "elapsed_seconds": 0.0393,
+        "exit": 0,
+        "group": "absent",
+        "pgid": 55332,
+        "stage": "runtime-3",
+        "timeout": false
+      }
+    ]
+  },
+  "limits": [
+    "No original Linux cause established; piped Linux core collectors may ignore RLIMIT_CORE.",
+    "Three selected local host cases only; no full suite, Linux CI, device, publish or release performed.",
+    "Original Fourth failure remains failed; this candidate adds fixture observability and regular core-file hygiene."
+  ],
+  "proof_hashes": {
+    "carry-proof.json": "8d46c515de6a62a393c6c0c1b9fc0b4634ba8f783ecac633fec0fe9e5851ff83",
+    "depinfo-capture.json": "639ec11865ff48c6c28de5a41f2144d9c1ae44eff0d900c925b5b2e79e8e6014",
+    "pre-carry-input-proof.json": "e6e9459979d1c73eac39bc2185879c4c51393a14fe60bb9ed4c0a5c70d9f7f62",
+    "qualified.json": "3916bda9eb0a476f41afa13047870b2b99cfd09ab1314b05583896f8c0dde338"
+  },
+  "schema": "third-privacy-exit-fixture-host-receipt-v1"
+}
