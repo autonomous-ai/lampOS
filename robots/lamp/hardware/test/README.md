@@ -156,6 +156,7 @@ The person answers nothing: each question is said, then "Starting in five second
 
 **The self-test (step 4)** runs on set-up lamps in parallel.
 - **The ring:** the hardware process accepts a colour drawn **within 4 s**; lamp-selftest allows 1 s, which can't be changed. When the ring is the self-test's only failed part, `ring-check.py` decides it. Any other failed part fails the lamp.
+- **Not checked:** only `touch_by_hand` and `storage` may be not checked (#3530; `ALLOWED_NOT_CHECKED`). Any other part not checked (`head_move` while the lamp listens or a joint is warm, the speaker, the camera) fails the step, to be run again, and the lamp is never reset.
 - **The reset:** with `RESET=yes`, a passed lamp is reset for packing the way `steps.sh` resets it. Its record is written first; then the lamp is stopped and each part waited on, then `lamp-setup reset-now` runs as `lamp-setup-wipe`.
 
 **On the lamp, in `/var/lib/lamp-test`** (outside the reset's wipe list, so it survives the 5 s reset):

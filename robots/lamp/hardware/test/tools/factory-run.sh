@@ -10,7 +10,9 @@
 #                                (input-check.py: head pads, button, reset,
 #                                privacy), step 3 (the key), 4d (--gaze)
 #   factory-run.sh selftest ID   lamp set up from the app: step 4 (4c4), the
-#                                ring judged within 4 s; with RESET=yes a
+#                                ring judged within 4 s, not checked allowed
+#                                only for touch_by_hand and storage (#3530);
+#                                with RESET=yes a
 #                                passed lamp is reset for packing, after its
 #                                record is written, as steps.sh resets it
 #   factory-run.sh note ID K=V…  set keys in the record (used before a reset)
@@ -90,6 +92,15 @@ if [[ $MODE == selftest ]]; then
     [[ $rc == 0 ]] && failed="" || fail "ring: $(sed -n 's/^RECORD RING=//p' <<<"$out")"
   fi
   [[ -z $failed ]] || fail "self-test failed: $failed"
+  # Not checked counts as a pass only for the parts #3530 allows (no person
+  # touched in its own window: input-check.py recorded the inputs; the
+  # kernel's log rotated). Any other part not checked (head_move while the
+  # lamp listens or a joint is warm, the speaker, the camera) is run again,
+  # never reset and packed (hw-agent2nd on gray, 27 Oct).
+  allowed=",${ALLOWED_NOT_CHECKED:-touch_by_hand,storage},"
+  other=""; IFS=, read -ra seen_parts <<<"$unchecked"
+  for part in ${seen_parts[@]+"${seen_parts[@]}"}; do [[ $allowed == *",$part,"* ]] || other="${other:+$other,}$part"; done
+  [[ -z $other ]] || fail "not checked: $other (only ${ALLOWED_NOT_CHECKED:-touch_by_hand,storage} may be): let the lamp rest and run step 4 again"
   rec "FACTORY_4C4=PASS" "RESULT_SELFTEST=PASS" "RESULT_SELFTEST_AT=$(date '+%F %T %z')"
   if [[ ${RESET:-no} != yes ]]; then
     status "PASS selftest (not reset: RESET=yes resets it for packing)"; exit 0
