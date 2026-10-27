@@ -26,10 +26,14 @@ build's `privacy` section when it has none, with everything else in it kept
 (`install::own_pins_follow_build`; the reviewer's P1 on #2143). Without it the
 units would select the route with no switch evidence, and the lamp would
 never hear. New lamps keep the section through the factory's steps, which
-change only the head pads or calibrate through the typed profile. On an update, Controls
-starts after the voice (`After=lamp-voice.service`). Until the voice's
-route-on worker has let the line go, Controls asks for it again each second
-(below), so the microphones stay closed meanwhile.
+change only the head pads or calibrate through the typed profile. The voice
+starts after Controls and so, at a shutdown or reboot, stops before it
+(`After=lamp-controls.service` and `Wants=` in the voice's unit; #3697:
+with the old order, Controls after the voice, every reboot stopped Controls
+first, the voice saw the switch go unreadable, ended with 1, and the lamp
+came back muted by the restart guard). A voice still holding the line on
+its direct route is no obstacle: Controls asks for the line again each
+second (below), so the microphones stay closed meanwhile.
 
 Controls takes the single GPIO request for `/dev/gpiochip1`, line 9, pull-up,
 electrical LOW = muted. A line it cannot take (another process still holds
@@ -76,8 +80,26 @@ reads again with a fresh worker each second instead of exiting (#795). So
 it does when the worker ends cleanly before the voice has read its start, as
 it does at once while Controls restarts (an update round that switches the
 voice before Controls, #1396), and the health says the microphones are off
-until the switch can be read. Any other failure of the worker, a crash at
-its start included, is still an abnormal exit that ends the service.
+until the switch can be read. So it does too while Controls' publisher is
+not yet up, as at a cold boot where the voice starts first (#3697): the
+worker closes its socket as it ends, so the voice's Stop to it is refused
+before its exit can be read. That refusal is no cleanup failure by itself:
+the worker's clean exit within the wait's 300 ms grace is the verification,
+and only a worker still running then is forced and ends the service. Before
+the fix lamp-52e6's cold boot of 27 Oct logged `privacy switch unreadable:
+privacy publisher unavailable; verified cleanup failed: privacy.c.p:
+Connection refused (os error 111)`, exited 1, and came back muted by the
+restart guard. The unit's order (above) only orders the starts, not
+Controls' publisher being up, so this wait is what holds. Likewise in a
+conversation: a privacy worker that closed its socket and has not yet
+exited (a refused authority send, a receive on its closed socket at the
+run's shutdown) is the switch unreadable, never a fault by itself, its exit
+still verified within the shutdown's 300 ms (lamp-52e6's reboot of 27 Oct
+16:37: `privacy.c.p: Connection refused; verified cleanup failed: ...
+Transport endpoint is not connected`). With a stop already asked for, the
+voice then ends with 0. Any other
+failure of the worker, a crash at its start included, is still an abnormal
+exit that ends the service.
 Source acquisition sequence can advance several times between publications;
 it must advance, but need not be consecutive at the consumer.
 

@@ -181,6 +181,38 @@ mod tests {
         );
     }
 
+    /// lamp-52e6's reboot, 27 Oct 16:37 (#3697): Controls was ordered after
+    /// the voice, so systemd stopped it first and the voice, its privacy
+    /// switch gone, ended with 1 and came back muted by the restart guard.
+    /// The voice now starts after Controls, so it stops before it, in the
+    /// product's units and the template alike, with no cycle.
+    #[test]
+    fn the_voice_starts_after_controls_so_it_stops_first() {
+        for (voice, controls) in [
+            (
+                include_str!("../../../../deploy/product/lamp-voice.service"),
+                include_str!("../../../../deploy/product/lamp-controls.service"),
+            ),
+            (
+                include_str!("../../../../deploy/units/lamp-voice.service"),
+                include_str!("../../../../deploy/units/lamp-controls.service"),
+            ),
+        ] {
+            let order = start_order([
+                ("lamp-voice.service", voice),
+                ("lamp-controls.service", controls),
+            ])
+            .unwrap();
+            assert_eq!(order, ["lamp-controls.service", "lamp-voice.service"]);
+            assert!(
+                voice.lines().any(
+                    |line| line.starts_with("Wants=") && line.contains("lamp-controls.service")
+                ),
+                "{voice}"
+            );
+        }
+    }
+
     #[test]
     fn a_path_through_an_unchanged_unit_still_orders_its_ends() {
         let order = start_order([
