@@ -1,0 +1,33 @@
+# lampOS ears: the room microphone: how loud the room is, and a rise, on the bus.
+# The product unit (lampOS/docs/install.md).
+[Unit]
+Description=lampOS ears (lamp-ears)
+PartOf=lampos.target
+# Not before setup has finished (#806). The target's own condition holds back none of its parts.
+ConditionPathExists=/var/lib/lampos-setup/done
+After=sound.target local-fs.target lamp-voice.service
+StartLimitIntervalSec=600
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=lampos
+Group=lampos
+Slice=lampos-parts.slice
+SupplementaryGroups=audio
+Nice=5
+ExecStart=/opt/lampOS/ears/current/lamp-ears --device plug:device_micro1 --rise-db 30 --bus-root /run/lampos-bus
+Restart=on-failure
+RestartSec=5s
+StandardInput=null
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=lamp-ears
+NoNewPrivileges=yes
+ProtectSystem=strict
+ReadWritePaths=/run/lampos-bus
+ProtectHome=yes
+PrivateTmp=yes
+
+[Install]
+WantedBy=lampos.target

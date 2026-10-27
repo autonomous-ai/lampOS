@@ -1,0 +1,49 @@
+# lampOS skills: physical skills, each a folder in /var/lib/lampOS/skills (lampOS/docs/skills.md).
+# The product unit (lampOS/docs/install.md); install puts every product skill in that folder
+# (lamp-update's install::PRODUCT_SKILLS: Welcome back, Reminders, Task news, Stretch break,
+# Stuffy air and Dance). A skill speaks only through the voice's say service (LAMP_SAY=on in
+# lamp-voice.service, its socket in the group lampos); the voice's own hello is off there, so only
+# Welcome back greets, and its reminders and task news wait for their skills' asks (=skill).
+# LAMP_SKILLS_ASK=skip acts without asking the Policy, whose gate is not built yet (#939);
+# without it every skill is asked about and refused, and nothing is done.
+[Unit]
+Description=lampOS skills (lamp-skills)
+PartOf=lampos.target
+# Not before setup has finished (#806). The target's own condition holds back none of its parts.
+ConditionPathExists=/var/lib/lampos-setup/done
+After=local-fs.target lamp-voice.service lamp-body.service lamp-actions.service
+StartLimitIntervalSec=600
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=lampos
+Group=lampos
+Slice=lampos-parts.slice
+Nice=10
+Environment=LAMP_SKILLS_ASK=skip
+# A skill's light is asked of the ring (#1132): the ring's half is the voice's LAMP_LIGHT_REQUESTS (17 Oct).
+Environment=LAMP_LIGHT_REQUESTS=on
+# --zone system: the lamp's zone from /etc/localtime, which setup points at the person's (#820), for a skill's
+# [quiet] hours, which without it never start themselves (docs/skills.md); across summer time (#1384).
+ExecStart=/opt/lampOS/skills/current/lamp-skills --dir /var/lib/lampOS/skills --bus-root /run/lampos-bus --gaze-socket /run/lampos-body/gaze.sock --mood-socket /run/lampos-body/mood.sock --actions-socket /run/lampos-actions/call.sock --say-socket /run/lampos-say/say.sock --tools-dir /run/lampos-skills --zone system
+Restart=on-failure
+RestartSec=5s
+StandardInput=null
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=lamp-skills
+NoNewPrivileges=yes
+# Its tools for the voice, in a folder of its own (writable under ProtectSystem=strict): inside
+# the actions part's, systemd removed them at each restart of actions, and the voice had no skill
+# functions until this restarted (lamp-4ace, 19 Oct 04:33).
+RuntimeDirectory=lampos-skills
+RuntimeDirectoryMode=0755
+ProtectSystem=strict
+# The bus.
+ReadWritePaths=/run/lampos-bus
+ProtectHome=yes
+PrivateTmp=yes
+
+[Install]
+WantedBy=lampos.target

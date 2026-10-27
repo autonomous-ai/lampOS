@@ -1,0 +1,144 @@
+# lampOS voice: listens, talks with the model, speaks and drives the light ring (lampOS/docs/serve-runtime.md).
+# The product unit (lampOS/docs/install.md): every lamp's, with the office lamp's options and switches of
+# 2026-10-17 (lamp-4ace's unit that day, without what only the office has). A lamp that needs a switch off says so in lamp-voice.service.d/, never here.
+# Root: it reads /etc/lampOS/voice (the credential) and runs its microphone and speaker real-time.
+[Unit]
+Description=lampOS voice (lamp-voice serve)
+PartOf=lampos.target
+# Not before setup has finished (#806). The target's own condition holds back none of its parts.
+ConditionPathExists=/var/lib/lampos-setup/done
+# Memory, actions, schedule and tasks answer its calls from the first turn: all first.
+After=network-online.target sound.target lamp-memory.service lamp-actions.service lamp-schedule.service lamp-tasks.service
+# The image's speaker level, set by udev when the C-Media card appears (lampOS/docs/install.md): after it, so the
+# first word is at its level. Not Wanted: a lamp without that card or unit starts the voice all the same.
+After=lamp-cmedia-speaker.service
+Wants=network-online.target
+StartLimitIntervalSec=600
+StartLimitBurst=10
+
+[Service]
+Type=exec
+User=root
+Group=root
+Slice=lampos-voice.slice
+WorkingDirectory=/
+UMask=0077
+ExecStart=/opt/lampOS/voice/current/lamp-voice serve /etc/lampOS/voice/provider.json /var/lib/lampOS/voice/sessions/${INVOCATION_ID} --noise-suppression off --turn-taking duplex --faint-floor-db -28 --microphone mic2 --reference-clock capture --reference-recovery bounded --provider-continuation kept-start --playout-start-ms 350 --ring-channel-ceiling 24 --end-silence-ms 600 --controls-stop --endpoint smart-turn-fast --call-wait-ms 2000
+# Microphone and speaker threads may not wait behind other work (lamp-4ace, 2026-10-13).
+CPUSchedulingPolicy=rr
+CPUSchedulingPriority=20
+Restart=on-failure
+RestartSec=4s
+KillMode=mixed
+KillSignal=SIGTERM
+FinalKillSignal=SIGKILL
+SendSIGKILL=yes
+TimeoutStopSec=5s
+StandardInput=null
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=lamp-voice
+NoNewPrivileges=yes
+RuntimeDirectory=lampos-voice
+RuntimeDirectoryMode=0700
+RuntimeDirectoryPreserve=yes
+Environment=LAMP_THREAD_FILE=/run/lampos-voice/thread.json
+Environment=LAMP_BUS=on
+Environment=LAMP_BUS_ROOT=/run/lampos-bus
+Environment=LAMP_BUS_AUDIO=on
+Environment=LAMP_ATTENTION=busy-near
+Environment=LAMP_AIR_FACTS=on
+Environment=LAMP_RING_EYE=strong
+Environment=LAMP_SHORT_SOUNDS=quiet-room-checked
+Environment=LAMP_FIRST_OUTPUT=/var/lib/lampOS/voice/first-output
+Environment=LAMP_SECOND_LOOK=on
+Environment=LAMP_NAME_NOTE=on
+Environment=LAMP_NAME_NOTE_BUSY=face
+Environment=LAMP_EXPRESSION_OUT=on
+Environment=LAMP_FAINT_HOLD_MS=400
+Environment=LAMP_TOOLS=on
+Environment=LAMP_CLOCK=on
+# The time of another place, named, and the lamp's own beside it (#1547; lamp-4ace 18 Oct 19:41, 8 of 8 right).
+Environment=LAMP_TIME_PLACES=on
+# Tell the time only once the kernel says the clock is set: no battery clock (#811, #830).
+Environment=LAMP_KERNEL_CLOCK=on
+Environment=LAMP_SESSION_FACT=on
+# Switched on lamp-4ace through 16 and 17 October and run there all day; several only in the groups of #1238's
+# census, so their lamp record is that day's running, not a run of their own (install.md).
+# Not here: those that need the second voice's configuration (stop words, the second voice's down-line and wait
+# cue, the voice link: a product lamp has none), the office's own (its Harness target, its say group), and
+# head touch, which needs Controls' and Expression's flags too (#711); those that need another part's flag the product
+# doesn't pass (the Policy holding actions, its hello and progress news, the full look, a restored mute); and "that
+# was weird", a builder's review tool whose marks the reset doesn't wipe (#1332's review).
+Environment=LAMP_TOOL_LEAD_IN=on
+Environment=LAMP_WAIT_KEEPS_ANSWER=on
+Environment=LAMP_STOP_TOLD=on
+Environment=LAMP_ASKER_FIRST=record
+Environment=LAMP_NAMES=checked
+Environment=LAMP_STAFF_NOTE=on
+Environment=LAMP_TASK_NEWS_AT_PAUSE=on
+Environment=LAMP_MEMORY_RULES=on
+Environment=LAMP_LIGHT_REQUESTS=on
+Environment=LAMP_QUIET_PACE=on
+# A silent service costs no connection and no line waiting on it: the provider file's unset
+# waits become assume_over, 8 s with no output = unanswered, 12 s for a first output (#705).
+Environment=LAMP_PROVIDER_PATIENCE=on
+Environment=LAMP_START_OFFLINE=on
+# No link: the offline line once, the amber breath, and "back online" after (lampOS/docs/offline.md; #830), on
+# lamp-health's lamp/online. The line is silent until recordings are given (--failure-notice-dir). Without
+# LAMP_REACH_PROBE: with no second route here, a relay outage is said as no link too, never dropped in silence.
+Environment=LAMP_OFFLINE_VOICE=on
+Environment=LAMP_RING_ASLEEP=on
+Environment=LAMP_OTHER_LANGUAGE=sorry
+Environment=LAMP_NAME_IN_PASSING=ignored
+# An answer plays only when the lamp was spoken to, and the reply to its own news (outside a busy room), a question
+# about its own work and its name heard with no face are played: without it a busy room holds every line nobody calls it in, and a held line
+# starts no conversation (lamp-4ace, 17 Oct 19:08: 6 of 12 day lines without it, 11 of 12 with it; #828).
+Environment=LAMP_SPOKEN_TO=on
+Environment=LAMP_FIRST_WORDS=kept
+Environment=LAMP_TASKS_ASKED=on
+Environment=LAMP_TASKS_WHO=on
+Environment=LAMP_CUT_KEEPS_NAME=on
+Environment=LAMP_SELFTEST_SPEAKER=on
+# Each stall of 50 ms or more in the voice's loops, with what held it, in /run/lampos-voice (#1179): cheap, and
+# what support reads first after a voice ends (#1178).
+Environment=LAMP_STALLS=on
+Environment=LAMP_ROOM_FACTS=on
+# The hello on arrival is the Welcome back skill's (lamp-skills.service, #811), spoken through the
+# say service below; with the voice's own hello on as well the lamp would greet twice.
+# Environment=LAMP_SPEAK_FIRST=on
+Environment=LAMP_SAY=on
+Environment=LAMP_SAY_GROUP=lampos
+Environment=LAMP_ACTIONS_DIR=/run/lampos-actions
+# The skills' functions, in lamp-skills' own folder; the old one inside the actions part's is still
+# read after it for one release.
+Environment=LAMP_SKILLS_DIR=/run/lampos-skills
+Environment=LAMP_TASKS_DIR=/run/lampos-tasks
+# The tasks part runs only with Harness (its unit's condition): without it the voice says work
+# can't be handed on yet, not that a part failed (#811).
+Environment=LAMP_TASKS_NEEDS=/usr/local/bin/harness
+# News of work handed over is timed by the Task news skill (lampOS/skills/task-news): the voice keeps the
+# words and tells each task once, with the skill's ask, or itself when no ask has come within 10 s (#1038).
+# News of a task that stopped or asks something has no skill yet: the voice tells it after those 10 s.
+Environment=LAMP_TASK_NEWS=skill
+Environment=LAMP_SCHEDULE_TOOLS=on
+# A due reminder is timed by the Reminders skill (lampOS/skills/reminders): the voice keeps its words and
+# its acknowledgement, and says it itself when no ask has come within 10 s, so none is lost (#939).
+Environment=LAMP_SCHEDULE_SPEAK=skill
+Environment=LAMP_SCHEDULE_SOCKET=/run/lampos-schedule/call.sock
+Environment=LAMP_SCHEDULE_DELIVERY_DIR=/var/lib/lampOS/voice/schedule-delivery
+Environment=LAMP_MEMORY_SOCKET=/run/lampos-memory/memory.sock
+Environment=LAMP_MEMORY_DAYS=on
+Environment=LAMP_BODY_MOOD_SOCKET=/run/lampos-body/mood.sock
+Environment=LAMP_EYES_PERMIT_SOCKET=/run/lampos-eyes/permit.sock
+Environment=LAMP_EYES_PRESENCE_FILE=/run/lampos-eyes/present
+Environment=LAMP_EYES_WHO_SOCKET=/run/lampos-eyes/who.sock
+# The name typed at setup (lamp-setup writes it; a reset wipes it), told to the model with its character
+# and used for the hello when no face is known (docs/setup.md, #806). No file, no name.
+Environment=LAMP_PERSON_NAME=/etc/lampOS/person/name
+Environment=LAMP_EYES_LOOK_FILE=/run/lampos-eyes/sight.jpg
+# Only the body opens the servo port. Defence in depth, not a mechanical stop.
+InaccessiblePaths=/dev/ttyACM0
+
+[Install]
+WantedBy=lampos.target

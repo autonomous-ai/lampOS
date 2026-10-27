@@ -1,0 +1,41 @@
+# lampOS schedule: durable reminders and timers (lampOS/docs/schedule.md).
+# The product unit (lampOS/docs/install.md).
+[Unit]
+Description=lampOS schedule (lamp-schedule)
+PartOf=lampos.target
+# Not before setup has finished (#806). The target's own condition holds back none of its parts.
+ConditionPathExists=/var/lib/lampos-setup/done
+# No battery clock: until chrony sets it (30 to 70 s after boot) the wall clock is its last
+# saved time. --kernel-clock trusts it only once the kernel says it is set; until then nothing
+# calendar-timed is made or falls due (#811). The ordering below alone waits for nothing.
+After=local-fs.target time-sync.target
+StartLimitIntervalSec=600
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=lampos
+Group=lampos
+Slice=lampos-parts.slice
+StateDirectory=lampos-schedule
+StateDirectoryMode=0700
+RuntimeDirectory=lampos-schedule
+RuntimeDirectoryMode=0700
+Nice=5
+# LAMP_ZONE: the lamp's zone name, written by the install and by setup.
+EnvironmentFile=/etc/lampOS/zone.env
+ExecStart=/opt/lampOS/schedule/current/lamp-schedule serve --enable --dir /var/lib/lampos-schedule/store --socket /run/lampos-schedule/call.sock --zone ${LAMP_ZONE} --bus-root /run/lampos-bus --kernel-clock
+Restart=on-failure
+RestartSec=5s
+StandardInput=null
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=lamp-schedule
+NoNewPrivileges=yes
+ProtectSystem=strict
+ReadWritePaths=/run/lampos-bus
+ProtectHome=yes
+PrivateTmp=yes
+
+[Install]
+WantedBy=lampos.target

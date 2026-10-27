@@ -1,0 +1,32 @@
+[Unit]
+Description=Bound closed lamp voice diagnostic sessions
+ConditionPathExists=/etc/lampOS/records.json
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+UMask=0077
+# The product unit (lampOS/docs/install.md): the build lamp-update installed, through its current link.
+ExecStart=/opt/lampOS/records/current/lamp-records check /etc/lampOS/records.json --apply --report /run/lamp-records/last.json
+RuntimeDirectory=lamp-records
+RuntimeDirectoryMode=0700
+RuntimeDirectoryPreserve=yes
+TimeoutStartSec=60
+TimeoutStopSec=5
+Nice=19
+IOSchedulingClass=idle
+CPUWeight=5
+IOWeight=10
+MemoryMax=256M
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/lampOS/voice/sessions /run/lamp-records
+RestrictAddressFamilies=AF_UNIX
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=lamp-records
+
+# Do not add ProtectProc, PrivateUsers, or a private PID namespace: the
+# cleanup guard needs complete host process visibility. No voice dependency
+# starts, stops, freezes, or restarts that service.

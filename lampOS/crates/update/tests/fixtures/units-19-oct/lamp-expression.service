@@ -1,0 +1,33 @@
+# lampOS expression: plans what the lamp shows while it listens, thinks and speaks (lampOS/docs/expression.md).
+# The product unit (lampOS/docs/install.md).
+[Unit]
+Description=lampOS expression (lamp-expression)
+PartOf=lampos.target
+# Not before setup has finished (#806). The target's own condition holds back none of its parts.
+ConditionPathExists=/var/lib/lampos-setup/done
+After=lamp-voice.service lamp-body.service
+StartLimitIntervalSec=600
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=lampos
+Group=lampos
+Slice=lampos-parts.slice
+Nice=5
+# --zone system: the lamp's zone from /etc/localtime, which setup points at the person's (#820), across summer time.
+ExecStart=/opt/lampOS/expression/current/lamp-expression serve --enable --bus-root /run/lampos-bus --catalogue /etc/lampOS/expression/expression.json --zone system --kernel-clock
+Restart=on-failure
+RestartSec=5s
+StandardInput=null
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=lamp-expression
+NoNewPrivileges=yes
+ProtectSystem=strict
+ReadWritePaths=/run/lampos-bus
+ProtectHome=yes
+PrivateTmp=yes
+
+[Install]
+WantedBy=lampos.target

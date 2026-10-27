@@ -1126,6 +1126,19 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
    "nothing to undo". `harnessd` was gone too, though `harness-off` never
    stops it: linger off ended `lampos`'s user manager, which stopped it.
 
+**An install that ends before its units says so** (#3733). Steps 1 to 4
+(no build or a wrong one, the updater lock held by another lamp-update, a
+refused head reader, a user that cannot be made, a part the build does not
+carry or whose file does not match, a link or `lamp-update-back` that
+cannot be written) end it with exit 1 and a last line
+`lamp-update: units not written: <why>`, and so does a failure to record
+the systemd debt just before the first unit. Every unit is then as it was,
+which may be an older build's. A unit that fails within step 5 ends it
+with `units not all written: <why>`: those before it are the build's, the
+rest as they were, none half-written. A run killed by a signal says
+nothing; its units are each whole, old or new, and `check-units` names
+each that differs.
+
 Run again with nothing new and nothing owed, it writes nothing and asks
 nothing of systemd.
 With a newer build, it installs the new folders beside the old and moves
@@ -1138,6 +1151,12 @@ unit or setting takes effect when its part next starts, at a reboot or a
 The product units and settings are carried inside the program
 (`include_str!` of `deploy/product/`), so they are those of the commit the
 program was built from; the binaries are the channel's newest build.
+An install run by an older `lamp-update` therefore writes that build's
+units around the newest build's binaries: any lamp-voice build up to 3505
+(19 Oct, before #1815 at `fe277b92a`) writes the `lamp-cloud.service` that
+is off unless a drop-in turns it on, the state lamp-c0a4 was found in on
+27 Oct (#3733; which `lamp-update` ran there is not known). Install with
+the newest build's own `lamp-update`.
 
 So a unit can meet a binary older than itself. `lamp-actions` and
 `lamp-skills` exit 2 on an option they don't know, and with
@@ -1211,7 +1230,11 @@ lamp-update check-units --cat units.txt --image robots/lamp --variant pro
 ```
 
 - **Each product unit** is `same`, `missing on the lamp`, or `differs` with
-  each differing line, `-` the product's and `+` the lamp's. Install writes
+  each differing line, `-` the product's and `+` the lamp's. One that
+  differs and does not set a switch its product unit sets `on` says so
+  after its lines, as an older build's base unit does (#3733, lamp-c0a4's
+  19 Oct `lamp-cloud.service`, with no drop-in):
+  `unit /etc/systemd/system/lamp-cloud.service leaves LAMP_CLOUD off; the product sets it on`. Install writes
   every unit whole into `/etc/systemd/system/`, with no `@…@` placeholder
   (`install::tests::no_product_unit_names_a_lamp`), so units are compared
   byte for byte, comments included: a changed comment is a file that isn't

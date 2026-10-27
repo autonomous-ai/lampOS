@@ -1,0 +1,37 @@
+# lampOS self-test, the passive check (#812, lampOS/docs/selftest.md): every part judged from what it already says
+# on the bus and in the kernel's log, with nothing lit, played or moved (`--occasion first-boot`). Started only by
+# lamp-selftest.timer, a few minutes after the lamp has started and every six hours after, so that a part that
+# dies later is said in lamp/health (lamp-health carries the newest run). The factory's and an on-demand run light
+# the ring and read the speaker, and are started by hand. CAP_SYSLOG, and only that, so that its storage part can
+# read /dev/kmsg. It never begins inside a conversation: it waits up to two minutes for voice/state to rest five
+# seconds in a row (420 s of timeout covers that, its own two, and checking a failed part again half a minute
+# later). Exit 3 (a part not checked, as a passive run often has) is no failure of the unit; 1 is: a part failed,
+# or the run could not be made. Its runs are kept in its own /var/lib/lamp-selftest: /var/lib/lampOS is root's
+# alone, and lampos could not reach a directory made inside it (lampOS/docs/selftest.md, as on lamp-4ace).
+[Unit]
+Description=lampOS self-test, passive (lamp-selftest)
+After=lampos.target
+
+[Service]
+Type=oneshot
+Slice=lampos-parts.slice
+User=lampos
+Group=lampos
+# The product unit (lampOS/docs/install.md): the build lamp-update installed, through its current link.
+ExecStart=/opt/lampOS/selftest/current/lamp-selftest --occasion first-boot --bus-root /run/lampos-bus --dir /var/lib/lamp-selftest
+SuccessExitStatus=3
+AmbientCapabilities=CAP_SYSLOG
+CapabilityBoundingSet=CAP_SYSLOG
+NoNewPrivileges=yes
+# Its own device only: lampos is in audio, video and dialout, and this unit opens no microphone, camera or
+# servo port (the reviewer on #1245). The pseudo devices stay open.
+DeviceAllow=/dev/kmsg r
+StateDirectory=lamp-selftest
+StateDirectoryMode=0750
+TimeoutStartSec=420
+Nice=10
+ProtectSystem=strict
+ReadWritePaths=/run/lampos-bus
+ProtectHome=yes
+PrivateTmp=yes
+SyslogIdentifier=lamp-selftest
