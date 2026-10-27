@@ -1393,7 +1393,10 @@ for it.
     `--state-dir` is `/var/lib/lampos-skills-state` by default; or a skill
     made here, `{"install_made": …}`) takes that yes away under the
     folder's lock, before the rename, so the skill there now asks again;
-    a record that can't be read or written installs nothing. A skill put
+    a record that can't be read or written installs nothing, so a hand
+    install by a user who can't read that folder (not root) is refused
+    with why; run it as root, or give `--state-dir` a folder of your own
+    on a development machine. A skill put
     on by hand or made here is not refused at install, and doesn't see the
     picture without a yes given to it (Desk tutor and Look for my keys,
     installable, among them). Tests:
