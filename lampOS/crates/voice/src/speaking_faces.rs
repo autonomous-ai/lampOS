@@ -678,6 +678,28 @@ pub fn not_theirs(
     }
 }
 
+/// The journal's words for who was seen speaking a line admitted as a known
+/// person's, given whether it stayed `theirs` ([`not_theirs`]): the passing
+/// face ids only, never a name or the line's words. `None` when no face was
+/// seen speaking it and it stayed theirs (the switch off): nothing to tell.
+pub fn seen_speaking_note(speakers: &[String], theirs: bool) -> Option<String> {
+    match (speakers, theirs) {
+        ([], true) => None,
+        ([], false) => Some("no face was seen speaking it (LAMP_PERSON_SCOPE_SEEN)".to_owned()),
+        ([id], true) => Some(format!(
+            "seen speaking it: the known person's face (id {id})"
+        )),
+        ([id], false) => Some(format!(
+            "seen speaking it: a face not the known person's (id {id})"
+        )),
+        (ids, _) => Some(format!(
+            "seen speaking it: {} faces (ids {})",
+            ids.len(),
+            ids.join(", ")
+        )),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -702,6 +724,40 @@ mod tests {
                     someone_elses(&ids(speakers), &lan, pair),
                 );
             }
+        }
+    }
+
+    #[test]
+    fn seen_speaking_note_names_face_ids_only() {
+        let name = "Alex";
+        let known = || Some((name.to_owned(), "b/f1".to_owned()));
+        let lan = crate::known_faces::memory_person(name);
+        let ids = |ids: &[&str]| ids.iter().map(|id| (*id).to_owned()).collect::<Vec<_>>();
+        let note = |speakers: &[&str]| {
+            let speakers = ids(speakers);
+            seen_speaking_note(&speakers, !not_theirs(&speakers, &lan, known(), true))
+        };
+        assert_eq!(
+            note(&["b/f1"]).as_deref(),
+            Some("seen speaking it: the known person's face (id b/f1)")
+        );
+        assert_eq!(
+            note(&["b/f2"]).as_deref(),
+            Some("seen speaking it: a face not the known person's (id b/f2)")
+        );
+        assert_eq!(
+            note(&["b/f1", "b/f2"]).as_deref(),
+            Some("seen speaking it: 2 faces (ids b/f1, b/f2)")
+        );
+        assert_eq!(
+            note(&[]).as_deref(),
+            Some("no face was seen speaking it (LAMP_PERSON_SCOPE_SEEN)")
+        );
+        // Off, no face seen leaves it theirs: nothing to tell.
+        assert_eq!(seen_speaking_note(&[], true), None);
+        for speakers in [&[][..], &["b/f1"], &["b/f2"], &["b/f1", "b/f2"]] {
+            let note = note(speakers).unwrap_or_default();
+            assert!(!note.contains(name) && !note.contains(&lan), "{note}");
         }
     }
 
