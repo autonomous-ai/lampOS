@@ -136,6 +136,7 @@ mod tests {
             attention: None,
             familiarity: Familiarity::Unknown,
             familiar: None,
+            felt: None,
             breath: Some(MoodBreath { phase, pace }),
         }
     }
