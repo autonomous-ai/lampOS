@@ -1017,49 +1017,215 @@ fn a_hand_held_on_the_head_puts_it_to_sleep_and_a_tap_wakes_it_once_saved() {
     assert!(!saved.muted && saved.reason.is_none());
 }
 
+/// #3747 (the lead on #1711): while the onboarding walk is under way, a
+/// hand kept 3.5 s on the head asks no sleep: no mute, nothing saved, the
+/// latch open, so the voice keeps saying it is open and Expression doesn't
+/// fold. Once the walk is over, the same hold sleeps as before.
+#[test]
+fn a_hold_while_onboarding_is_under_way_asks_no_sleep() {
+    let directory = Directory::new();
+    let (mut owner, sender) = fixture(head_options(Some(&directory)));
+    owner.set_onboarding(true);
+    let mut head = TestHead::new(CLOCK, START);
+    feed(&mut owner, &sender, head.run(START + 500_000, false), false);
+    // A hand from 1.51 s, kept 3.5 s: Controls asks for sleep at 4.51 s.
+    let held = feed(
+        &mut owner,
+        &sender,
+        head.run(START + 4_000_000, true),
+        false,
+    );
+    assert!(
+        held.iter().all(|(_, seen, _)| !seen.mute_changed
+            && !seen.muted
+            && !seen.asleep
+            && seen.acquired_at_us.is_none()),
+        "{held:?}"
+    );
+    assert!(
+        held.iter()
+            .any(|(_, seen, _)| seen.head_touch_at_us.is_some())
+    );
+    assert_eq!(owner.shared.latch.load(Ordering::Acquire), LATCH_OPEN);
+    assert_eq!(
+        latch_message(owner.shared.latch.load(Ordering::Acquire)),
+        Some(VoiceMute {
+            muted: false,
+            reason: None
+        }),
+        "said open"
+    );
+    owner.persist_muted().unwrap();
+    assert!(!directory.file().exists(), "no mute to save");
+    let lifted = feed(
+        &mut owner,
+        &sender,
+        head.run(START + 5_000_000, false),
+        true,
+    );
+    assert!(
+        lifted
+            .iter()
+            .all(|(_, seen, allowed)| *allowed && !seen.muted)
+    );
+    // The walk over: the same hold sleeps at its three seconds.
+    owner.set_onboarding(false);
+    let held = feed(
+        &mut owner,
+        &sender,
+        head.run(START + 8_500_000, true),
+        false,
+    );
+    let (slept_at, seen, _) = held
+        .iter()
+        .find(|(_, seen, _)| seen.mute_changed)
+        .copied()
+        .expect("the hold puts it to sleep");
+    assert!(seen.muted && seen.asleep);
+    assert_eq!(slept_at, START + 5_010_000 + 3_000_000);
+    assert_eq!(owner.shared.latch.load(Ordering::Acquire), LATCH_ASLEEP);
+}
+
+/// #3747: a sleeping lamp wakes at a hand kept a second on its head, at the
+/// stroke, not at its letting go, once the clear is saved, so a person who
+/// holds it to bring it back does; and the same hand, kept past three
+/// seconds, never sends it back to sleep. Its first touch alone (20 ms)
+/// never wakes it: a lone edge is noise.
+#[test]
+fn a_hand_kept_on_a_sleeping_lamp_wakes_it_at_the_stroke_once_saved() {
+    let directory = Directory::new();
+    let mut record = MuteRecord::new(CLOCK).unwrap();
+    assert!(record.request_sleep(START / 2));
+    record.save(&directory.file()).unwrap();
+    let (mut owner, sender) = from_record(head_options(Some(&directory)), record, START);
+    assert_eq!(owner.shared.latch.load(Ordering::Acquire), LATCH_ASLEEP);
+    let mut head = TestHead::new(CLOCK, START);
+    let settled = feed(&mut owner, &sender, head.run(START + 500_000, false), true);
+    assert!(
+        settled
+            .iter()
+            .all(|(_, seen, allowed)| seen.asleep && !allowed)
+    );
+    // A hand from 1.51 s, kept 3.5 s: its touch at 1.53 s, its stroke at
+    // 2.51 s, its hold at 4.51 s, its letting go at 5.01 s.
+    let mut ticks = head.run(START + 4_000_000, true);
+    ticks.extend(head.run(START + 4_500_000, false));
+    let kept = feed(&mut owner, &sender, ticks, true);
+    let touched = kept
+        .iter()
+        .find(|(_, seen, _)| seen.head_touch_at_us.is_some())
+        .expect("the touch is taken");
+    assert_eq!(touched.0, START + 530_000);
+    assert!(
+        touched.1.asleep && !touched.2,
+        "the touch alone: still asleep"
+    );
+    let (woke_at, seen, _) = kept
+        .iter()
+        .find(|(_, _, allowed)| *allowed)
+        .copied()
+        .expect("the kept hand wakes it");
+    let stroke = START + 510_000 + 1_000_000;
+    assert_eq!(woke_at, stroke, "at the stroke, the hand still there");
+    assert!(!seen.muted && !seen.asleep);
+    assert_eq!(seen.acquired_at_us, Some(stroke));
+    assert!(seen.head_tap_at_us.is_none());
+    assert!(
+        kept.iter()
+            .all(|(at, seen, allowed)| (*at < stroke) == (seen.asleep && !*allowed)),
+        "awake from the stroke on, through the hold: {kept:?}"
+    );
+    assert_eq!(owner.shared.latch.load(Ordering::Acquire), LATCH_OPEN);
+    let saved = MuteRecord::load(&directory.file(), CLOCK, START + 4_600_000).unwrap();
+    assert!(!saved.muted && saved.reason.is_none());
+    // The person woke it: the next conversation's "hm?" (#1362), once.
+    assert_eq!(owner.take_woken(woke_at), Some(stroke));
+    assert_eq!(owner.take_woken(woke_at), None, "once");
+}
+
 /// #960, `LAMP_RESTORED_MUTE=on`: a lamp brought up muted by its restart
 /// guard after a crash wakes by a head tap, as sleep does; a person's own
 /// mute does not, and without the switch neither does the guard's.
 #[test]
 fn a_tap_wakes_a_mute_left_by_the_restart_guard_but_never_a_persons() {
     let tapped = |guard: bool, mark_guard: bool| {
-        let directory = Directory::new();
-        let mut record = MuteRecord::new(CLOCK).unwrap();
-        if guard {
-            // As `arm_active` writes it: the live record, muted.
-            record.muted = true;
-            fs::write(
-                directory.0.join(format!("mute.json{GUARD_MARKER_SUFFIX}")),
-                format!("{CLOCK}\n{}\n", record.through_us),
-            )
-            .unwrap();
-        } else {
-            assert!(record.request_mute(START / 2));
-        }
-        record.save(&directory.file()).unwrap();
-        let (mut owner, sender) = from_record(head_options(Some(&directory)), record, START);
-        owner.mark_guard = mark_guard;
-        owner.restore_guard_marker(stored_identity(&directory.file()));
-        assert_eq!(owner.restored_after_fault(), guard && mark_guard);
-        let mut head = TestHead::new(CLOCK, START);
-        feed(&mut owner, &sender, head.run(START + 500_000, false), true);
-        let mut ticks = head.run(START + 700_000, true);
-        ticks.extend(head.run(START + 1_200_000, false));
-        let seen = feed(&mut owner, &sender, ticks, true);
+        let (opened, restored, seen) = a_hand_on_a_muted_lamp(guard, mark_guard, START + 700_000);
         assert!(
             seen.iter()
                 .any(|(_, seen, _)| seen.head_tap_at_us.is_some())
         );
-        let opened = seen.iter().any(|(_, _, allowed)| *allowed);
-        let saved = MuteRecord::load(&directory.file(), CLOCK, START + 1_300_000).unwrap();
-        assert_eq!(saved.muted, !opened);
-        // Not a hand's sleep: no "hm?" for it (#1362).
-        assert_eq!(owner.take_woken(START + 1_300_000), None);
-        (opened, owner.restored_after_fault())
+        (opened.is_some(), restored)
     };
     assert_eq!(tapped(true, true), (true, false), "the guard's mute wakes");
     assert_eq!(tapped(false, true), (false, false), "a person's mute stays");
     assert_eq!(tapped(true, false), (false, false), "off: as before");
+}
+
+/// #3747 (the Reviewer-lead on #3767): a hand kept a second wakes the
+/// restart guard's mute at its stroke, as it wakes sleep, the hand still
+/// there; a person's mute still stays, and without the switch the guard's.
+#[test]
+fn a_hand_kept_a_second_wakes_a_mute_left_by_the_restart_guard_but_never_a_persons() {
+    let kept = |guard: bool, mark_guard: bool| {
+        let (opened, restored, seen) = a_hand_on_a_muted_lamp(guard, mark_guard, START + 2_000_000);
+        assert!(
+            seen.iter()
+                .all(|(_, seen, _)| seen.head_tap_at_us.is_none())
+        );
+        (opened, restored)
+    };
+    let stroke = START + 510_000 + 1_000_000;
+    assert_eq!(
+        kept(true, true),
+        (Some(stroke), false),
+        "the guard's mute wakes"
+    );
+    assert_eq!(kept(false, true), (None, false), "a person's mute stays");
+    assert_eq!(kept(true, false), (None, false), "off: as before");
+}
+
+/// A lamp brought up muted, by its restart guard (`guard`) or by a person,
+/// with `LAMP_RESTORED_MUTE` as `mark_guard`, and a hand on its head from
+/// 1.51 s to `lifted_us`, then off for half a second, through the
+/// quiescent wait: when it opened, if it did, saved; whether it still says
+/// it was restored after a fault; and each step's observation.
+fn a_hand_on_a_muted_lamp(
+    guard: bool,
+    mark_guard: bool,
+    lifted_us: u64,
+) -> (Option<u64>, bool, Vec<(u64, Observation, bool)>) {
+    let directory = Directory::new();
+    let mut record = MuteRecord::new(CLOCK).unwrap();
+    if guard {
+        // As `arm_active` writes it: the live record, muted.
+        record.muted = true;
+        fs::write(
+            directory.0.join(format!("mute.json{GUARD_MARKER_SUFFIX}")),
+            format!("{CLOCK}\n{}\n", record.through_us),
+        )
+        .unwrap();
+    } else {
+        assert!(record.request_mute(START / 2));
+    }
+    record.save(&directory.file()).unwrap();
+    let (mut owner, sender) = from_record(head_options(Some(&directory)), record, START);
+    owner.mark_guard = mark_guard;
+    owner.restore_guard_marker(stored_identity(&directory.file()));
+    assert_eq!(owner.restored_after_fault(), guard && mark_guard);
+    let mut head = TestHead::new(CLOCK, START);
+    feed(&mut owner, &sender, head.run(START + 500_000, false), true);
+    let mut ticks = head.run(lifted_us, true);
+    ticks.extend(head.run(lifted_us + 500_000, false));
+    let seen = feed(&mut owner, &sender, ticks, true);
+    let opened = seen
+        .iter()
+        .find(|(_, _, allowed)| *allowed)
+        .map(|(at, _, _)| *at);
+    let saved = MuteRecord::load(&directory.file(), CLOCK, lifted_us + 600_000).unwrap();
+    assert_eq!(saved.muted, opened.is_none());
+    // Not a hand's sleep: no "hm?" for it (#1362).
+    assert_eq!(owner.take_woken(lifted_us + 600_000), None);
+    (opened, owner.restored_after_fault(), seen)
 }
 
 /// The reviewer's probe on #997 (P1): a person mutes with the button while

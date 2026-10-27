@@ -89,10 +89,10 @@ head": nobody remembers which pad does what.
 | You | It | Status |
 |---|---|---|
 | Tap its head while it talks | Stops at once (under 150 ms) and turns its eye to you: you have its attention | #711 |
-| Tap its head while it is quiet: a short, deliberate tap (under half a second, the head not being moved) | Looks up, the eye opens bright, a soft "hm?", and it listens for a few seconds without needing its name; if nothing is said it settles again quietly | #711 + voice |
+| Tap its head while it is quiet: a touch let go within a second, the head not being moved | Looks up, the eye opens bright, a soft "hm?", and it listens for a few seconds without needing its name; if nothing is said it settles again quietly | #711 + voice |
 | Keep your hand on its head, about a second | Leans a little into your hand, the eye warms and breathes slowly: pleased | #711, Expression, body |
-| Keep holding | The eye dims slowly, a visible countdown; at three seconds it goes to sleep: eye closes to a thin red line, head bows, microphones off. Let go before three seconds and it was only affection | #711, voice, Expression, body |
-| Tap its head while it sleeps | Wakes | #711 |
+| Keep holding | The eye dims slowly, a visible countdown; at three seconds it goes to sleep: eye closes to a thin red line, head bows, microphones off. Let go before three seconds and it was only affection | #711, voice, Expression, body; never while onboarding is under way (#3747) |
+| Touch its head while it sleeps: a tap, or a hand that stays | Wakes: at the letting go, or after a second if the hand stays | #711, #3747 |
 | The base strip | Nothing, for now; brightness is asked for by voice ("dimmer, please") | after the MVP |
 | Move its head by hand | Gives way, stays where you put it (it is lighting what you need), and only drifts back after a long while or when asked. A touch on the head pads while the body feels the head being pushed means nothing: no stop, no listening | #702-#703 (give-way), body, #711 |
 

@@ -94,15 +94,30 @@ of the lamp's current state or of an action applied.
 | Observation | While awake | Contact began asleep |
 |---|---|---|
 | Qualified head touch (20 ms) | Stop if speaking, Notice (nothing asked) if quiet | No request |
-| Head tap: qualified, let go before 0.5 s from its first acquisition | Attend | Wake |
-| Head hand kept 1 s | Stroke | No request |
-| Head hand kept 3 s | Sleep | No request |
+| Head tap: qualified, let go from 120 ms to 1 s after its first acquisition | Attend | Wake |
+| Head hand kept 1 s | Stroke | Wake |
+| Head hand kept 3 s | Sleep, except while onboarding is under way | No request |
 | Qualified three-pad base touch | Stop if speaking, Attend if quiet | Wake |
 | Stationary qualified base held two seconds | Sleep | Wake |
 | Moving base contact | Slide; an eligible slow movement also emits Stroke | No further request |
 | Optional primary button, short release | Stop | Stop |
 | Optional primary button, release after two seconds | One-way SoftwareMute | One-way SoftwareMute |
 | Optional reset button, release after five seconds | FactoryReset only | FactoryReset only |
+
+**Easy to wake, and never asleep in onboarding (#3747, the lead, 27 Oct).**
+A sleeping lamp wakes at any contact of at least the shortest tap (120 ms):
+at its letting go under a second, or at the stroke if it stays. The touch
+alone, at 20 ms, never wakes it, since a lone edge under 120 ms is noise
+(4ace, #711). The 3 s hold still puts the lamp to sleep, but never while
+onboarding is under way, from its first step to its last and between them.
+There the hold already counted as the touch, and giving way tells the person
+to hold the head. The voice declines that hold and plays no sigh, and
+Expression follows the voice's word. The ring's countdown doesn't know about
+onboarding: it dims under the hand and brightens at the letting go. A hand
+kept a second also clears the restart guard's mute (#960), as a tap did,
+since that mute wakes as sleep does. A pad that drifts high on a level read
+(#1764), or something resting on the head, now wakes a sleeping lamp after a
+second. Before, a drift held 3 s would have put an awake one to sleep.
 
 Sleep and Wake are separate, idempotent requested transitions. They never
 toggle microphone mute. First's 18:23 decision in
@@ -341,7 +356,8 @@ whether a pad whose rest drifts later, after the factory, is told.
 A lone short edge can therefore stop speech at 20 ms, as any touch does,
 but never asks the lamp to listen or wake. The contact's time,
 through such gaps, is `touch_state.held_us`, the countdown readers use;
-Stroke comes at 1 s and Hold (Sleep) at 3 s of it. A tap is confirmed only
+Stroke comes at 1 s and Hold (Sleep) at 3 s of it. A tap is let go under 1 s
+(#3747), so no length between a tap and a stroke asks nothing. A tap is confirmed only
 when the gap has passed with the head released, so Attend and Wake come
 one gap after the hand leaves; Stop comes at qualification, not at
 the release. After a Stroke the letting go asks nothing: it was affection.
