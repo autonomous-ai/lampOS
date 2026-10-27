@@ -127,7 +127,8 @@ Environment=LAMP_SECOND_NAME_CARRIES=on
 Environment=LAMP_CALL_TAKES_NEXT_LINE=on
 # Right after a start the room is not known yet, and with nobody in view a bare "Lamp.", a pause, then the request
 # never joined: on lamp-4ace on 26 Oct the request had to be said twice (#3711). The ears' quiet room, with no talk
-# left alone and no other voice since the start, shows the room quiet for that join.
+# left alone and no other voice since the start, shows the room quiet for that join: the ears' own stream near its
+# own quiet outside the lines, never one level for every lamp (lamp-c0a4's quiet room read -45 dBFS, 27 Oct).
 Environment=LAMP_FIRST_SECONDS_QUIET=on
 Environment=LAMP_SECOND_OPEN_NAME=on
 Environment=LAMP_NAME_NEAR=on
