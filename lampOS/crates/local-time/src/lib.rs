@@ -22,6 +22,18 @@ use std::{
     sync::{Mutex, PoisonError},
 };
 
+/// The lamp's quiet hours, 22:00 to 07:00 local (`docs/control.md`,
+/// "Limits, rates and quiet hours"): the one definition every part that
+/// holds a computer to them reads (Fourteen and Nine on #3504), until the
+/// app has an owner's setting.
+pub const QUIET_FROM_MINUTE: u16 = 22 * 60;
+pub const QUIET_TO_MINUTE: u16 = 7 * 60;
+
+/// Whether the local `minute_of_day` (0 to 1439) is in the quiet hours.
+pub fn quiet_hours(minute_of_day: u16) -> bool {
+    !(QUIET_TO_MINUTE..QUIET_FROM_MINUTE).contains(&minute_of_day)
+}
+
 /// The system's zone file, or a link to one.
 pub const SYSTEM_LOCALTIME: &str = "/etc/localtime";
 /// The system's zone by name, read when the zone file cannot be.
