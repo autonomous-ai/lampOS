@@ -2345,6 +2345,15 @@ fn marked(mut answer: Value) -> Value {
 /// ([`answer_for`]).
 pub const ALREADY_KEPT: &str = "Already kept: tell them you already knew it.";
 
+/// What the model is told beside a `remember` kept in a known person's own
+/// scope ([`answer_for`]): it is theirs alone, and the reply must never say
+/// it is kept for everyone. On lamp-06c1 (27 Oct, #3504, Friday's N7) "keep
+/// this for everyone" from a known face was kept in their scope, as the
+/// docs say a known person's keep is, while the lamp said "for everyone in
+/// the office", and another person could not find it. In the room's scope
+/// (nobody known) nothing is added: what is kept there is everyone's.
+pub const KEPT_FOR_THEM: &str = "Kept for them alone: nobody else here can recall it. If they asked to keep it for everyone or the room, say it is kept for them; never say it is kept for everyone.";
+
 /// `remember`'s kept answer as the model is told it: with `replaces`
 /// ([`REPLACES_ENVIRONMENT`], #2510), also the kept thing's `id` (the new
 /// one, or the one kept already), so a correction in a later turn of the
@@ -2378,14 +2387,21 @@ pub(crate) fn answer_for(
                 // thing kept already may be another person's room entry:
                 // told as a plain keep, so a visitor is never told the lamp
                 // knew it, nor that someone here said it.
-                if answer["existing"] == true && person.is_some() {
+                let mut told = if answer["existing"] == true && person.is_some() {
                     json!({"remembered": true, "note": ALREADY_KEPT})
                 } else if let Some(old) = answer.get("replaced").and_then(Value::as_u64) {
                     // #2510: no note, so a kept heard line still says its own.
                     json!({"remembered": true, "replaced": old})
                 } else {
                     json!({"remembered": true})
+                };
+                // A known person's keep is theirs alone, even when they
+                // asked for everyone (#3504, Friday's N7): told so in a
+                // field of its own, beside any note.
+                if person.is_some() {
+                    told["kept_for"] = json!(KEPT_FOR_THEM);
                 }
+                told
             }
             FORGET => match answer.get("removed")? {
                 Value::Null => {
@@ -14710,12 +14726,14 @@ mod tests {
             )
         };
         assert!(!client.remember_once.load(Ordering::Acquire));
-        assert_eq!(remember(), (json!({"remembered": true}), true));
+        assert_eq!(remember(), (theirs(json!({"remembered": true})), true));
         client.remember_once.store(true, Ordering::Release);
         assert_eq!(
             remember(),
             (
-                json!({"remembered": true, "note": "Already kept: tell them you already knew it."}),
+                theirs(
+                    json!({"remembered": true, "note": "Already kept: tell them you already knew it."})
+                ),
                 true
             )
         );
@@ -14752,12 +14770,14 @@ mod tests {
                 Some(MAI),
             )
         };
-        assert_eq!(remember(), (json!({"remembered": true}), true));
+        assert_eq!(remember(), (theirs(json!({"remembered": true})), true));
         let (told, kept) = remember();
         assert_eq!(
             (told.clone(), kept),
             (
-                json!({"remembered": true, "note": "Already kept: tell them you already knew it."}),
+                theirs(
+                    json!({"remembered": true, "note": "Already kept: tell them you already knew it."})
+                ),
                 true
             )
         );
@@ -14817,7 +14837,10 @@ mod tests {
                 Some(&EAST),
                 Some(MAI)
             ),
-            (json!({"remembered": true, "note": ALREADY_KEPT}), true)
+            (
+                theirs(json!({"remembered": true, "note": ALREADY_KEPT})),
+                true
+            )
         );
         served.join().unwrap();
         drop(client);
@@ -14842,7 +14865,12 @@ mod tests {
             let args = json!({"text":"takes coffee black"});
             assert_eq!(
                 client.run_at(&call(REMEMBER, args), FIRST_READ, NOW, Some(&EAST), person),
-                (json!({"remembered": true}), true),
+                (
+                    person.map_or(json!({"remembered": true}), |_| theirs(
+                        json!({"remembered": true})
+                    )),
+                    true
+                ),
                 "{person:?}"
             );
         }
@@ -14979,7 +15007,7 @@ mod tests {
             deadline,
             Some(MINH),
         );
-        assert_eq!(remembered, (json!({"remembered":true}), true));
+        assert_eq!(remembered, (theirs(json!({"remembered":true})), true));
         let (told, answered) = run_for(
             &socket,
             &call(RECALL, json!({"about":"coffee"})),
@@ -15158,6 +15186,52 @@ mod tests {
             ],
             [0, 1, 4, 9, 21, 100].map(when)
         );
+    }
+
+    /// A known person's `remember` answer: `told` with [`KEPT_FOR_THEM`].
+    pub(super) fn theirs(mut told: Value) -> Value {
+        told["kept_for"] = json!(KEPT_FOR_THEM);
+        told
+    }
+
+    /// lamp-06c1, 27 Oct (#3504, Friday's N7): "keep this for everyone"
+    /// from a known face was kept in their scope while the lamp said "for
+    /// everyone in the office". A known person's keep is told as theirs
+    /// alone, beside a note or a replacement; the room's is told as before.
+    #[test]
+    fn a_known_persons_keep_is_told_as_theirs_never_for_everyone() {
+        let person = Some("p-1");
+        let told = |answer: Value, person| answer_for(REMEMBER, &answer, NOW, Some(&EAST), person);
+        assert_eq!(
+            told(json!({"ok":true,"id":4}), person),
+            Some(json!({"remembered":true,"kept_for":KEPT_FOR_THEM}))
+        );
+        assert_eq!(
+            told(json!({"ok":true,"id":4,"existing":true}), person),
+            Some(json!({"remembered":true,"note":ALREADY_KEPT,"kept_for":KEPT_FOR_THEM}))
+        );
+        assert_eq!(
+            told(json!({"ok":true,"id":5,"replaced":4}), person),
+            Some(json!({"remembered":true,"replaced":4,"kept_for":KEPT_FOR_THEM}))
+        );
+        // The room's: everyone's, so nothing is added.
+        assert_eq!(
+            told(json!({"ok":true,"id":4}), None),
+            Some(json!({"remembered":true}))
+        );
+        assert_eq!(
+            told(json!({"ok":true,"id":4,"existing":true}), None),
+            Some(json!({"remembered":true}))
+        );
+        assert!(KEPT_FOR_THEM.contains("never say it is kept for everyone"));
+        // Kept as heard (`LAMP_MEMORY_KEEP_HEARD`): the field stays beside
+        // the heard line's note.
+        let heard = heard::told(
+            told(json!({"ok":true,"id":4}), person).unwrap(),
+            "They said: x",
+        );
+        assert_eq!(heard["kept_for"], KEPT_FOR_THEM);
+        assert_eq!(heard["kept"], "They said: x");
     }
 
     #[test]
@@ -16764,7 +16838,10 @@ mod tests {
         );
         assert_eq!(
             result,
-            (json!({"remembered":true,"replaced":26,"id":27}), true)
+            (
+                theirs(json!({"remembered":true,"replaced":26,"id":27})),
+                true
+            )
         );
         served.join().unwrap();
         std::fs::remove_file(&socket).unwrap();
@@ -17253,12 +17330,14 @@ mod tests {
                 Some(MAI),
             )
         };
-        assert_eq!(run(), (json!({"remembered": true}), true));
+        assert_eq!(run(), (theirs(json!({"remembered": true})), true));
         client.remember_once.store(true, Ordering::Release);
         assert_eq!(
             run(),
             (
-                json!({"remembered": true, "note": "Already kept: tell them you already knew it."}),
+                theirs(
+                    json!({"remembered": true, "note": "Already kept: tell them you already knew it."})
+                ),
                 true
             )
         );
@@ -17290,7 +17369,7 @@ mod tests {
         };
         assert_eq!(
             run(json!({"text":"Her favourite colour is violet."}), Some(MAI)),
-            (json!({"remembered":true,"id":8}), true)
+            (theirs(json!({"remembered":true,"id":8})), true)
         );
         assert_eq!(
             run(json!({"text":"The spare key is in the drawer."}), None),
