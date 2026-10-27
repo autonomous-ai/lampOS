@@ -1,0 +1,104 @@
+{
+  "actual_checkout": "b3e06181c2cc5dcecc82b5e5b50338c46f62e9b6",
+  "arm": {
+    "attempt": 1,
+    "bad_statuses": [],
+    "conclusion": "success",
+    "docs_and_custom": {
+      "failed": 0,
+      "headings": 47,
+      "incomplete_group": null,
+      "interleaved_groups": [],
+      "passed": 4,
+      "process13_0": true,
+      "relay_ok": true,
+      "step": "success",
+      "summaries": 47
+    },
+    "job": 122123988298,
+    "own23_once_PASS": 23,
+    "run": 40484856805,
+    "summary_skipped": 106,
+    "unique_PASS": 11634,
+    "verified_post_summary_reprints": 35
+  },
+  "handles": {
+    "arm_collector": 21511,
+    "linux_collector": 93750,
+    "watch": 78963
+  },
+  "hashes": {
+    "arm-job.log": "ebf96d7c87e5a4467e8fe797a32e7df8642d5eb47bda2356947d27bc3b59e537",
+    "arm-receipt.json": "c199a8b12eba5661d0c589d6a6ed51a76d3f8ea5d8734d23be75f8c7166b8603",
+    "audit-arm.py": "a39c482dbaa446a763be72d0d854f9e570327e5e1a37638aa69a3a51e819bfec",
+    "collect-original.py": "5a636cf9afa07ae7597a877d9fd6f177a93a86590d60048b37eccdec2a29985e",
+    "linux-job.log": "f6fc798c761488948b9ecd358be0bafd128da94ef8b4c1c49e4abec5150a87d3",
+    "linux-receipt.json": "6976dc49d8c868d6ef00b79bb59ec682c7a833a020f3e955677cce240d04a1bf",
+    "own23-cases.json": "a8e90550a90fc1f9a32916830ed473897de7e4e6dfd30c3a24c8eb9e986417aa",
+    "source-bindings.json": "fc81cbcec3d7de49e2d09473275c3a3b15f73294e91ccd193d66797967bda3ce",
+    "watch-original.py": "117661c55f0fd9687cf4ecbbc0a1c881d10a28412fba62c61d668924be8a44b7"
+  },
+  "head": "5a01229e704dc40d278c887c722eb8bac775102b",
+  "limits": [
+    "Original attempt1 CI only, no rerun/cancel/binary download or source/branch/Cargo mutation.",
+    "Counts are actual workflow observations, with23 scoped required witnesses; no296/prior-floor qualification inferred.",
+    "106 summary skips retain workflow scope without named-pass inference; no device/release/latency acceptance."
+  ],
+  "linux": {
+    "attempt": 1,
+    "conclusion": "success",
+    "job": 122123988596,
+    "run": 40484856803,
+    "strict_clippy_source_verified": true
+  },
+  "ordered_parents": [
+    "1fb93206e4a6c26d35c801b3472a5af179231881",
+    "5a01229e704dc40d278c887c722eb8bac775102b"
+  ],
+  "source_binding": "Exact whole preview tree equals authored5a; all three own23 source blobs match.",
+  "status": "ORIGINAL_NATIVE_5A_PASSED_EXACT_AUTHORED_TREE_OWN23_OBSERVED",
+  "tree": "e85ec88cba03ace20ca1b7df9099af6cbb38ee1f",
+  "watch_closure": {
+    "arm": {
+      "argv": [
+        "gh",
+        "run",
+        "watch",
+        "40484856805",
+        "--repo",
+        "autonomous-ai/lampOS",
+        "--exit-status",
+        "--interval",
+        "30"
+      ],
+      "cleanup_actions": [],
+      "finished": 1793096250.796202,
+      "process_group": "absent",
+      "reaped": true,
+      "returncode": 0,
+      "started": 1793095350.823831,
+      "timed_out": false
+    },
+    "linux": {
+      "argv": [
+        "gh",
+        "run",
+        "watch",
+        "40484856803",
+        "--repo",
+        "autonomous-ai/lampOS",
+        "--exit-status",
+        "--interval",
+        "30"
+      ],
+      "cleanup_actions": [],
+      "finished": 1793095897.409736,
+      "process_group": "absent",
+      "reaped": true,
+      "returncode": 0,
+      "started": 1793095350.823952,
+      "timed_out": false
+    }
+  },
+  "private_receipt_sha256": "50b9f0c126263b3c4c90b9e59c023927715510cb9a38ef68745b064f6a1027d4"
+}

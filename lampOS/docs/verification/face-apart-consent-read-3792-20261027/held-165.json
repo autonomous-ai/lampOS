@@ -1,0 +1,98 @@
+{
+  "all_handles_terminal_reaped_group_absent": true,
+  "clean_worktree": true,
+  "evidence": {
+    "consent-finding.json": "d432c7bb405f58e74973ca614ed9f65136c1ddc34b2aa8002b339a86c8142842",
+    "consent-probe-extraction.json": "82b973adcb224456bb840070d91e558bbae5749bb2262627d57ff670b5d3d4c8",
+    "consent-probe-run.log": "bbc6c903a6fc4e5103a5fa7cf79ea82aa837fb6196ab36cfefb5a13eee841526",
+    "consent-probe.rs": "e334b1753da8ebb03959bda57ab310f7689c6384ece62f6049167cf12ab4e433",
+    "scope.json": "6a0b9e3d761733c66fab026693dc0f0e45252f7f2e779020c2f6fe3f09b5ba1e",
+    "source-review.json": "d08457cd0f3ca0fa1dd108a3f190accb9188885d5f51db9631de9ae037f654bd"
+  },
+  "head": "165f44f88d72f0e0fdbc3e041d32a041cdf08971",
+  "limits": [
+    "No full Eyes/Voice run, real model or TTS, camera/device, acoustic/face threshold calibration, composed-current-main execution.",
+    "Old withdrawn267 never checked out or executed.",
+    "New/old wire compatibility source audit; no mixed-binary executable integration.",
+    "consent-probe exact helper execution; persistence consequence source traced, no fullroute/socket execution."
+  ],
+  "native_handles": {
+    "clippy": 36900,
+    "eyes-who": 76705,
+    "fmt": 84461,
+    "probe-compile": 82365,
+    "probe-run": 92029,
+    "voice-known-faces": 57233
+  },
+  "result": "P2 consent HOLD passed to Root; old disclosure/takeover repair source confirmed",
+  "stages": {
+    "consent-probe-compile": {
+      "cleanup": [],
+      "controller_error": null,
+      "elapsed_seconds": 1.528461721,
+      "log_sha256": "e28ec7e7904e2fe6c31327a43a251efb9e8c894d8e7de2dce07a1081f6b4823e",
+      "process_group": "absent",
+      "reaped": true,
+      "returncode": 0,
+      "source_unchanged": true,
+      "timed_out": false
+    },
+    "consent-probe-run": {
+      "cleanup": [],
+      "controller_error": null,
+      "elapsed_seconds": 1.6726793959999997,
+      "log_sha256": "bbc6c903a6fc4e5103a5fa7cf79ea82aa837fb6196ab36cfefb5a13eee841526",
+      "process_group": "absent",
+      "reaped": true,
+      "returncode": 0,
+      "source_unchanged": true,
+      "timed_out": false
+    },
+    "eyes-voice-clippy": {
+      "cleanup": [],
+      "controller_error": null,
+      "elapsed_seconds": 126.233943243,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "process_group": "absent",
+      "reaped": true,
+      "returncode": 0,
+      "source_unchanged": true,
+      "timed_out": false
+    },
+    "eyes-who": {
+      "cleanup": [],
+      "controller_error": null,
+      "elapsed_seconds": 139.660650555,
+      "log_sha256": "ac276ad61bb84eabd06c8766aa6bc5efc09a888aec82b0013c37f7c0347594e2",
+      "process_group": "absent",
+      "reaped": true,
+      "returncode": 0,
+      "source_unchanged": true,
+      "timed_out": false
+    },
+    "fmt": {
+      "cleanup": [],
+      "controller_error": null,
+      "elapsed_seconds": 13.178781268,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "process_group": "absent",
+      "reaped": true,
+      "returncode": 0,
+      "source_unchanged": true,
+      "timed_out": false
+    },
+    "voice-known-faces": {
+      "cleanup": [],
+      "controller_error": null,
+      "elapsed_seconds": 167.514995039,
+      "log_sha256": "3af6aa9505a4b31edcfeeea8c5a0930faf53f3dfa7061547cabbdc5ad72f99be",
+      "process_group": "absent",
+      "reaped": true,
+      "returncode": 0,
+      "source_unchanged": true,
+      "timed_out": false
+    }
+  },
+  "tracked_source_files_unchanged": 7282,
+  "private_receipt_sha256": "3a814d52dfc72e91dfee7d7a25595b9ed37dc46365b335b109898420d0138a23"
+}

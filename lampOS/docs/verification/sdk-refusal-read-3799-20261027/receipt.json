@@ -1,0 +1,41 @@
+{
+  "head": "a2b9741d6f7729937cab5c8e5cd8cf6ed9606507",
+  "python": "3.12.2",
+  "pytest_counts": {
+    "passed": 25,
+    "failed": 0
+  },
+  "source_unchanged": true,
+  "source_files_hashed": 18,
+  "all_jobs_terminal_groups_absent": true,
+  "P1": [],
+  "P2": [],
+  "P3": {
+    "source": "lampOS/sdk/python/src/lampos/client.py:276",
+    "finding": "wait_closed creates a websocket wait task but does not cancel/reap it if its caller is cancelled. Repeated cancellation retains one task per call until connection close.",
+    "actual_fake_connection_observation": {
+      "cancelled_public_wait_calls": 8,
+      "client_websocket_waiters_before": 0,
+      "after_caller_cancellation": 8,
+      "after_socket_close": 0,
+      "observation": "Spawned wait tasks outlive cancelled public wait calls until the connection closes."
+    },
+    "suggestion": "Use finally to cancel and await the local closed task, preserving the shared refusal future."
+  },
+  "commands": {
+    "test": "PYTHONPATH=src PYTHONDONTWRITEBYTECODE=1 <SDK_VENV>/bin/python -m pytest -q -p no:cacheprovider tests",
+    "probe": "<SDK_VENV>/bin/python <PRIVATE_EVIDENCE>/cancel-probe.py"
+  },
+  "hashes": {
+    "pytest.log": "aa78c50801fe70279138c95340469617d73db99f86a442a3b7ab0d37fbd0484b",
+    "cancel-probe.log": "aec33fc8293ef600d30b639ce60746652b1a9df8de51864ef6209246c0cf6179",
+    "cancel-probe.py": "cd85cf564357dcb2cd15e7271b8558ea33e752ef41d5288fa4a78c53dd1063cd"
+  },
+  "limits": [
+    "Python3.9 preflight was unsupported and had no pytest; used isolated supported3.12 environment with declared dependencies.",
+    "Local TLS FakeLamp only; no real lamp-control/server or device qualification.",
+    "The existing refused-handler registration P3 remains separately tracked by the author.",
+    "No SDK source edits or project dependency/lockfile changes."
+  ],
+  "private_receipt_sha256": "2da510da5b587c9bff8f80ee4de294d4f61ceb2db578b9bc4f2d4013cd7a8e11"
+}

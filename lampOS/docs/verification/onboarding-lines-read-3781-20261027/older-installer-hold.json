@@ -1,0 +1,215 @@
+{
+  "execution": {
+    "mixed_installer_probe": false,
+    "public_posts": false,
+    "rust_tests": false,
+    "source_or_branch_changes": false,
+    "target_or_worktree_taken": false
+  },
+  "head": "c6d3276d914df1431c2c5f67e6df00f7890d88cb",
+  "limits": [
+    "Source-only corroboration; shape matrix is not executed typed-serde/Definition validation.",
+    "No heavy gate or target acquired while owner fix remains unpublished.",
+    "No Memory implementation/device/CI rerun activity."
+  ],
+  "old_supported_installer": "1fb93206e4a6c26d35c801b3472a5af179231881",
+  "owner_fix_status": "Latest public head remainsc6 required fields; no Eighth answer/fallback fix afterR2 in the final comments snapshot. Lead explicitly requested response at17:25; unpublished local work unknown.",
+  "pr": 3781,
+  "recommendation": "Keep existing R2 installer P2 open until new reader accepts exact prior embedded schema safely or installer ships matching data, with older-installer/new-build regression. Scope Round clearance separately.",
+  "scope_correction": "Prior Third READ-OK546 matching normal Round/write-before-restart and rollback evidence remains; it did not establish old-installer/new-build compatibility. This corroborates R2, not a new finding.",
+  "snapshot_utc": "2026-10-27T10:29:59.219802+00:00",
+  "source_chain": [
+    {
+      "fact": "Install calls install::install directly; selecting/copying a new updater does not re-exec it.",
+      "lines": "343-377",
+      "path": "lampOS/crates/update/src/main.rs",
+      "ref": "1fb93206e4a6c26d35c801b3472a5af179231881"
+    },
+    {
+      "fact": "SETTINGS embeds onboarding skill through include_str! at compile time.",
+      "lines": "454-459,478-508",
+      "path": "lampOS/crates/update/src/install.rs",
+      "ref": "1fb93206e4a6c26d35c801b3472a5af179231881"
+    },
+    {
+      "fact": "Selected signed build binary folders/links are placed, then defaults come from this old updater own SETTINGS, not selected product-skills bundle.",
+      "lines": "1355-1381,1430-1465",
+      "path": "lampOS/crates/update/src/install.rs",
+      "ref": "1fb93206e4a6c26d35c801b3472a5af179231881"
+    },
+    {
+      "fact": "Old installer and new build both remain updater/product-units level6.",
+      "lines": "35-39",
+      "path": "lampOS/crates/update/src/manifest.rs",
+      "ref": "1fb93206e4a6c26d35c801b3472a5af179231881"
+    },
+    {
+      "fact": "Three added Words fields are required String, no serde defaults; old embeddedfile lacks all3.",
+      "lines": "46-70,201-231",
+      "path": "lampOS/crates/voice/src/onboarding/skill.rs",
+      "ref": "c6d3276d914df1431c2c5f67e6df00f7890d88cb"
+    },
+    {
+      "fact": "Read_installed failure sets onboarding_definition None and says walk disabled until Voice restarts.",
+      "lines": "56-69",
+      "path": "lampOS/crates/voice/src/coordinator/service.rs",
+      "ref": "c6d3276d914df1431c2c5f67e6df00f7890d88cb"
+    },
+    {
+      "fact": "Product service config enables onboarding. Install itself starts nothing; mismatch disables the walk on configured service start.",
+      "lines": "51,56",
+      "path": "lampOS/deploy/product/lamp-voice.service",
+      "ref": "1fb93206e4a6c26d35c801b3472a5af179231881"
+    },
+    {
+      "fact": "Install saves selected new Build sequence/commit in shared update records.",
+      "lines": "1598-1621",
+      "path": "lampOS/crates/update/src/install.rs",
+      "ref": "1fb93206e4a6c26d35c801b3472a5af179231881"
+    },
+    {
+      "fact": "Same selected sequence returns UpToDate before product-skills placement, so a same-build Round does not repair this install mismatch.",
+      "lines": "735-738",
+      "path": "lampOS/crates/update/src/round.rs",
+      "ref": "1fb93206e4a6c26d35c801b3472a5af179231881"
+    }
+  ],
+  "source_only_schema_shape_matrix": [
+    {
+      "file": "old",
+      "missing_required_fields": [],
+      "reader": "old",
+      "shape_only_compatible": true,
+      "unknown_fields_rejected_by_deny_unknown_fields": []
+    },
+    {
+      "file": "new",
+      "missing_required_fields": [],
+      "reader": "old",
+      "shape_only_compatible": false,
+      "unknown_fields_rejected_by_deny_unknown_fields": [
+        "give_again",
+        "touch_done",
+        "touch_failed"
+      ]
+    },
+    {
+      "file": "old",
+      "missing_required_fields": [
+        "give_again",
+        "touch_done",
+        "touch_failed"
+      ],
+      "reader": "new",
+      "shape_only_compatible": false,
+      "unknown_fields_rejected_by_deny_unknown_fields": []
+    },
+    {
+      "file": "new",
+      "missing_required_fields": [],
+      "reader": "new",
+      "shape_only_compatible": true,
+      "unknown_fields_rejected_by_deny_unknown_fields": []
+    }
+  ],
+  "source_pins": [
+    {
+      "git_blob": "11cfa5754d0775d0459e5c37953b1d14d8104aee",
+      "path": "lampOS/crates/update/src/main.rs",
+      "ref": "1fb93206e4a6c26d35c801b3472a5af179231881",
+      "sha256": "fb00394e145afbcc795a0230aad8956308a7cef05445e72e444c813fffce4217"
+    },
+    {
+      "git_blob": "574c55687c192dec296fea47004f6685662ab179",
+      "path": "lampOS/crates/update/src/install.rs",
+      "ref": "1fb93206e4a6c26d35c801b3472a5af179231881",
+      "sha256": "b950ae9388c87551b6768d50c55c187b15b67715d042f15f4882250fd4db43ea"
+    },
+    {
+      "git_blob": "25ef60f91246d6e1f2792f946506cb541adaf059",
+      "path": "lampOS/crates/update/src/manifest.rs",
+      "ref": "1fb93206e4a6c26d35c801b3472a5af179231881",
+      "sha256": "f259fcea155adaf6e45d707441c059f168eb044349107b804d6325d456c5f54c"
+    },
+    {
+      "git_blob": "29600b0212aba314fcc55a9582503736c6aa58cb",
+      "path": "lampOS/crates/update/src/round.rs",
+      "ref": "1fb93206e4a6c26d35c801b3472a5af179231881",
+      "sha256": "f7f02ae54d2c7b700f165645a0382cd6195c3d6fa02b8b7fbe8938f842520610"
+    },
+    {
+      "git_blob": "b915e79cdcdfe815bde6fd1c63090e21e4230e97",
+      "path": "lampOS/crates/voice/src/onboarding/skill.rs",
+      "ref": "1fb93206e4a6c26d35c801b3472a5af179231881",
+      "sha256": "b1b67cebb55138e9ed706a91c0356be15ee7adfcd8c2d382eb4e53377406cd1f"
+    },
+    {
+      "git_blob": "6cc36705748afd7d28608326f9c542570fe34dca",
+      "path": "lampOS/crates/voice/src/coordinator/service.rs",
+      "ref": "1fb93206e4a6c26d35c801b3472a5af179231881",
+      "sha256": "786fc43058c65ca7fb8f4c3e451745b2a85f13b45f57021e34b67a69f318a3fa"
+    },
+    {
+      "git_blob": "7319c18931c699dd43a36957ed792fcd2c027daf",
+      "path": "lampOS/skills/onboarding/skill.toml",
+      "ref": "1fb93206e4a6c26d35c801b3472a5af179231881",
+      "sha256": "61f0144725c03e015ea155eee723b331ae09a6912bfae42a66f4692a8bf07c6f"
+    },
+    {
+      "git_blob": "574625efdd9cf94f46b27c11bed20357fae0f4c6",
+      "path": "lampOS/deploy/product/lamp-voice.service",
+      "ref": "1fb93206e4a6c26d35c801b3472a5af179231881",
+      "sha256": "54f269ac84f566e66628e35c85b610a510a5b2467be725328a5952acbe47f5cd"
+    },
+    {
+      "git_blob": "11cfa5754d0775d0459e5c37953b1d14d8104aee",
+      "path": "lampOS/crates/update/src/main.rs",
+      "ref": "c6d3276d914df1431c2c5f67e6df00f7890d88cb",
+      "sha256": "fb00394e145afbcc795a0230aad8956308a7cef05445e72e444c813fffce4217"
+    },
+    {
+      "git_blob": "574c55687c192dec296fea47004f6685662ab179",
+      "path": "lampOS/crates/update/src/install.rs",
+      "ref": "c6d3276d914df1431c2c5f67e6df00f7890d88cb",
+      "sha256": "b950ae9388c87551b6768d50c55c187b15b67715d042f15f4882250fd4db43ea"
+    },
+    {
+      "git_blob": "25ef60f91246d6e1f2792f946506cb541adaf059",
+      "path": "lampOS/crates/update/src/manifest.rs",
+      "ref": "c6d3276d914df1431c2c5f67e6df00f7890d88cb",
+      "sha256": "f259fcea155adaf6e45d707441c059f168eb044349107b804d6325d456c5f54c"
+    },
+    {
+      "git_blob": "29600b0212aba314fcc55a9582503736c6aa58cb",
+      "path": "lampOS/crates/update/src/round.rs",
+      "ref": "c6d3276d914df1431c2c5f67e6df00f7890d88cb",
+      "sha256": "f7f02ae54d2c7b700f165645a0382cd6195c3d6fa02b8b7fbe8938f842520610"
+    },
+    {
+      "git_blob": "56c52083cd656c3c73559ed57f4d9e53abbd45ae",
+      "path": "lampOS/crates/voice/src/onboarding/skill.rs",
+      "ref": "c6d3276d914df1431c2c5f67e6df00f7890d88cb",
+      "sha256": "1697b1cea1350111120027ef7b3d3ce1a2b511957501fb51de5881166fd34f25"
+    },
+    {
+      "git_blob": "6cc36705748afd7d28608326f9c542570fe34dca",
+      "path": "lampOS/crates/voice/src/coordinator/service.rs",
+      "ref": "c6d3276d914df1431c2c5f67e6df00f7890d88cb",
+      "sha256": "786fc43058c65ca7fb8f4c3e451745b2a85f13b45f57021e34b67a69f318a3fa"
+    },
+    {
+      "git_blob": "071a2e5d54c257bfab4c9cc23369d546836082a9",
+      "path": "lampOS/skills/onboarding/skill.toml",
+      "ref": "c6d3276d914df1431c2c5f67e6df00f7890d88cb",
+      "sha256": "232b6e069bd41a66b7e1108a746f8d443067571b4e4fadf82b27a0b69de20cdb"
+    },
+    {
+      "git_blob": "574625efdd9cf94f46b27c11bed20357fae0f4c6",
+      "path": "lampOS/deploy/product/lamp-voice.service",
+      "ref": "c6d3276d914df1431c2c5f67e6df00f7890d88cb",
+      "sha256": "54f269ac84f566e66628e35c85b610a510a5b2467be725328a5952acbe47f5cd"
+    }
+  ],
+  "status": "SOURCE_CONFIRMED_EXISTING_R2_P2_NO_PUBLISHED_FIX",
+  "private_receipt_sha256": "724b8e9623093273d72714cad2ac95cde56c6bc164c25c275a1daf5583296122"
+}
