@@ -34,7 +34,8 @@ Voice cancels its completion reply if the body's proof is lost. This feature
 does not add a new revocation protocol or change ordinary skill lifetimes.
 
 This prepares the arm; it does not run an operating-system shutdown or cut
-power. An ordinary bedtime request belongs to the bedtime skill.
+power. Turning the lamp off safely, with the body let go and a light that says
+it may be unplugged, is shutdown.md. An ordinary bedtime request belongs to the bedtime skill.
 
 ## From the request to the answer
 

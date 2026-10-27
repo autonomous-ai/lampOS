@@ -17,6 +17,9 @@ pub enum SetupLook {
     Joining,
     /// The last join failed and the hotspot is back for another try: amber.
     Failed,
+    /// The lamp has shut down and may be unplugged (#3697): soft green,
+    /// steady, left on as the power goes.
+    Unplug,
 }
 
 /// The brightest any channel gets: the product voice's own ring ceiling
@@ -30,6 +33,7 @@ impl SetupLook {
             Self::Waiting => Rgb::new(24, 20, 14),
             Self::Joining => Rgb::new(4, 12, 24),
             Self::Failed => Rgb::new(24, 8, 0),
+            Self::Unplug => Rgb::new(2, 16, 6),
         }
     }
 }
@@ -84,13 +88,22 @@ impl<S: FrameSink> SetupRing<S> {
     pub fn shutdown(mut self) -> io::Result<()> {
         self.sink.write_frame(&EncodedFrame::black())
     }
+
+    /// The writer goes and its last frame stays on the ring: the
+    /// safe-to-unplug light after the shutdown (#3697).
+    pub fn leave(self) {}
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    const LOOKS: [SetupLook; 3] = [SetupLook::Waiting, SetupLook::Joining, SetupLook::Failed];
+    const LOOKS: [SetupLook; 4] = [
+        SetupLook::Waiting,
+        SetupLook::Joining,
+        SetupLook::Failed,
+        SetupLook::Unplug,
+    ];
 
     #[test]
     fn the_whole_ring_is_one_colour_no_brighter_than_the_peak() {
@@ -133,6 +146,8 @@ mod tests {
         assert!(blue > green && green > red, "blue");
         let Rgb { red, green, blue } = SetupLook::Failed.colour();
         assert!(red > 2 * green && blue == 0, "amber");
+        let Rgb { red, green, blue } = SetupLook::Unplug.colour();
+        assert!(green > 2 * blue && blue > red, "green");
     }
 
     struct Frames(Vec<EncodedFrame>);
