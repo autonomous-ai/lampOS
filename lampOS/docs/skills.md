@@ -390,7 +390,7 @@ As built on 2026-10-16 (#938, `crates/skills`, not yet run on a lamp):
 
     lamp-skills [--dir DIR] [--bus-root DIR] [--gaze-socket PATH] [--mood-socket PATH] [--actions-socket PATH] [--say-socket PATH] [--tools-dir DIR] [--state-dir DIR] [--clock-control PATH] [--known-file PATH] [--zone system|NAME | --utc-offset-minutes N]
     lamp-skills test SKILL_DIR...
-    lamp-skills install [--dir DIR] SKILL_DIR|PACKAGE.tar
+    lamp-skills install [--dir DIR] [--state-dir DIR] SKILL_DIR|PACKAGE.tar
     lamp-skills remove [--dir DIR] [--state-dir DIR] NAME
     lamp-skills list [--dir DIR]
     lamp-skills pack [--out DIR] [--key-file PRIVATE] SKILL_DIR
@@ -1209,7 +1209,7 @@ with it, including while disabled. `kind` and `enabled` are separate: disabled f
 product's skills folder is root's; the part itself only reads it, under
 `ProtectSystem=strict`):
 
-    lamp-skills install [--dir DIR] SKILL_DIR|PACKAGE.tar
+    lamp-skills install [--dir DIR] [--state-dir DIR] SKILL_DIR|PACKAGE.tar
     lamp-skills remove [--dir DIR] [--state-dir DIR] NAME
     lamp-skills list [--dir DIR]
     lamp-skills pack [--out DIR] [--key-file PRIVATE] SKILL_DIR
@@ -1382,12 +1382,27 @@ for it.
     `lamp-skills remove`, whose `--state-dir` is
     `/var/lib/lampos-skills-state` by default), under the same lock and
     before the folder goes, so a skill put on again by that name asks
-    again; a yes that can't be taken back removes nothing. This holds for a skill put on by hand or made here too:
-    neither is refused at install, and neither sees the picture without the
-    yes (Desk tutor and Look for my keys, installable, among them). Tests:
-    `the_owners_camera_yes_is_kept_read_at_each_call_and_taken_back`
-    (`tests/it/package.rs`) and, through the running program,
-    `a_skills_picture_waits_for_the_owners_yes_read_at_each_call`
+    again; a yes that can't be taken back removes nothing. **Only the
+    Store keeps a name's yes across an install:** a Store package
+    (`install_from_url`, signed with the Store's key) that puts the same
+    name in place keeps it, as an update of the same catalogue entry. Any
+    other install that puts a skill in place under a name with a yes (by
+    hand, `lamp-skills install` of a folder or a package, whose
+    `--state-dir` is `/var/lib/lampos-skills-state` by default; or a skill
+    made here, `{"install_made": …}`) takes that yes away under the
+    folder's lock, before the rename, so the skill there now asks again;
+    a record that can't be read or written installs nothing. A skill put
+    on by hand or made here is not refused at install, and doesn't see the
+    picture without a yes given to it (Desk tutor and Look for my keys,
+    installable, among them). Tests:
+    `the_owners_camera_yes_is_kept_read_at_each_call_and_taken_back` and
+    `a_hand_install_under_a_granted_name_takes_its_camera_yes_away`
+    (`tests/it/package.rs`),
+    `a_made_skill_never_takes_the_place_of_one_put_on_another_way`
+    (`tests/it/made.rs`),
+    `a_package_that_asks_the_camera_installs_only_once_the_owner_said_yes`
+    (`tests/it/store.rs`, a Store update keeps the yes) and, through the
+    running program, `a_skills_picture_waits_for_the_owners_yes_read_at_each_call`
     (`tests/it/skills.rs`).
 
   Anything else is refused, `a request is one line, {"remove": NAME},

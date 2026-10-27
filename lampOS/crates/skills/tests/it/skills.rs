@@ -12223,7 +12223,7 @@ fn an_installable_or_addon_declaring_a_core_grant_is_refused() {
         );
         let installed = dir.path().join("installed");
         fs::create_dir_all(&installed).unwrap();
-        assert!(lamp_skills::package::install(&installed, &source).is_err());
+        assert!(lamp_skills::package::install(&installed, None, &source).is_err());
         assert!(!installed.join("greeter").exists());
     }
 }
@@ -12273,7 +12273,7 @@ fn unplug_requires_core_kind_and_each_declared_permission() {
     let source = skill_with(&root, "prepare-unplug", valid);
     let installed = dir.path().join("installed");
     fs::create_dir(&installed).unwrap();
-    let why = lamp_skills::package::install(&installed, &source).unwrap_err();
+    let why = lamp_skills::package::install(&installed, None, &source).unwrap_err();
     assert!(why.contains("core"), "{why}");
     copy(&source, &installed.join("prepare-unplug"));
     assert!(

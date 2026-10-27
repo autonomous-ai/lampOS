@@ -446,7 +446,7 @@ fn a_package_that_asks_the_camera_installs_only_once_the_owner_said_yes() {
     let channel = key(1);
     let key_file = key_file(dir.path(), &channel);
     let bytes = packed(dir.path(), Some(&channel));
-    let (port, store) = serve(vec![ok(&bytes), ok(&bytes), ok(&bytes)]);
+    let (port, store) = serve(vec![ok(&bytes), ok(&bytes), ok(&bytes), ok(&bytes)]);
     let (answer, done) = ask(&skills, &key_file, port, install(URL));
     assert!(!done);
     assert_eq!(
@@ -464,6 +464,16 @@ fn a_package_that_asks_the_camera_installs_only_once_the_owner_said_yes() {
     let (answer, done) = ask(&skills, &key_file, port, install(URL));
     assert!(done, "{answer}");
     assert_eq!(left(&skills), ["dance", "desk-tutor"]);
+    // A Store update of the same skill keeps its yes.
+    let (answer, done) = ask(&skills, &key_file, port, install(URL));
+    assert!(
+        answer["done"]
+            .as_str()
+            .is_some_and(|said| said.starts_with("replaced desk-tutor")),
+        "{answer}"
+    );
+    assert!(done);
+    assert_eq!(fs::read_to_string(&camera).unwrap(), "desk-tutor\n");
     // Removed, its yes goes with it: put on again by the same name, it
     // asks again.
     let (answer, done) = ask(
@@ -481,7 +491,7 @@ fn a_package_that_asks_the_camera_installs_only_once_the_owner_said_yes() {
         "not installed: desk-tutor: it asks the camera, and the owner hasn't said yes"
     );
     assert_eq!(left(&skills), ["dance"]);
-    assert_eq!(store.join().unwrap(), 3);
+    assert_eq!(store.join().unwrap(), 4);
 }
 
 /// Unsigned, signed with another key, a signature that is not one, a
@@ -875,7 +885,7 @@ fn the_real_helper_refuses_on_its_own() {
     }
     assert_eq!(served.join().unwrap(), 0);
     // Removal still works with an invalid key and Store explicitly on.
-    package::install(&skills, &tutor(&dir.path().join("keyless-remove"))).unwrap();
+    package::install(&skills, None, &tutor(&dir.path().join("keyless-remove"))).unwrap();
     let (answer, success) = ask_binary(
         format!("{}\n", serde_json::json!({ "remove": "desk-tutor" })),
         Some("on"),
@@ -900,7 +910,7 @@ fn the_real_helper_refuses_on_its_own() {
         assert_eq!(refused(&answer), package::STORE_OFF, "{store:?}");
     }
     assert_eq!(served.join().unwrap(), 0);
-    package::install(&skills, &tutor(&dir.path().join("by-hand"))).unwrap();
+    package::install(&skills, None, &tutor(&dir.path().join("by-hand"))).unwrap();
     assert_eq!(left(&skills), ["dance", "desk-tutor"]);
     let (answer, success) = ask_binary(
         format!("{}\n", serde_json::json!({ "remove": "desk-tutor" })),
