@@ -1,3 +1,9 @@
+## 2026-10-27 12:26 — current own-keys host gate pushed
+
+#3646 is pushed as 083536db6 on 3d5, with all seven patches/authors/messages equal. [Fresh selected host proof](verification/ownkeys-third-carry-20261027/current-083-selected-audit.json): 1,932 passed, zero failed and nine existing ignored, all 108 witnesses including the current camera-unit assertion. Raw 1,933 excludes one source-proved nested Memory child. Eleven caught hooks are expected, none unknown; fourteen doc sections contain zero cases. All source/raw/140 actual/saved executable guards and metadata stay stable; no timeout or forced cleanup. Scope remains selected twenty whole drivers plus six exact groups, not full fourteen-package or whole Round. Original fcc native preview exactly matches this tree, with 11,469 clean passes, all 71 own-key controls, eighteen IPC camera-authority cases and three separate doctests. Physical #2094 remains held.
+
+Latest fetched Main 5cf adds the Body hand fix and made-skill repair follow-ups. The next own-keys carry will retain all 65 controls and propose a source-derived current scope; unchanged long installer coverage will not be replayed blindly. Fixture is also carrying 5cf; Reminder's active 70b runtime stays frozen until its audit closes. No device action.
+
 ## 2026-10-27 12:16 — bounded light-off documentation read
 
 READ-OK #3675 at e87181d81: [documentation consistency receipt](verification/light-off-doc-read-3675-20261027/receipt.json). The single lamp-runs row matches the holder's #2530 report for date, lamp-75c9, build 5900, seven reported drops and returning the person's orange light. Diff whitespace, one-line scope, table columns and strikethrough pass; no code tests apply. This is not an independent journal recount, binary-provenance check, device run or current-product acceptance. Other say/move rows remain open. The own PR host/native gates continue separately.

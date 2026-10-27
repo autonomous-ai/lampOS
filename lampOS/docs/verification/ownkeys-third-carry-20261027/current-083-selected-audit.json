@@ -1,0 +1,105 @@
+{
+  "head": "083536db6ce4379ead3b147b24db136a7f42aa16",
+  "base": "3d5ea2dd792d42fd52f26b978daf5ddbe9c68487",
+  "status": "VERIFIED_CURRENT_SELECTED_SCOPE",
+  "holds": [],
+  "limits": [
+    "Only this 083536db6/3d5 selected scope; no newer Main, old count composition, all77 or full14 claim.",
+    "Known nested exclusion requires exact pinned source and two bounded successful child/outer summaries.",
+    "Unknown summaries, unrecognized completions, assertion failures and hooks remain holds; no old interleaving normalization.",
+    "Raw snapshots and captured executable guards are observations, not exhaustive syscall/host dependency tracing.",
+    "Temporary rustdoc executables are outside the77 captured-driver count. No ignored/native/provider/device case was forced.",
+    "Current native full Voice/Body/Camera/Eyes/affected packages and IPC18 remain required before Ready; physical2094 stays held."
+  ],
+  "scope": {
+    "all77_current_drivers_executed": false,
+    "commands_completed": 27,
+    "distinct_direct_driver_targets": 26,
+    "exact_group_invocations": 6,
+    "exact_primary_cases": 58,
+    "historical_counts_reused": false,
+    "planned_commands": 27,
+    "separate_doc_headings": 14,
+    "unique_required_host_witnesses": 108,
+    "whole_driver_invocations": 20
+  },
+  "integrity": {
+    "actual_rehashed": 140,
+    "independent_saved_rehashed": 140,
+    "raw_entries": 8768,
+    "source_files": 7292
+  },
+  "metadata": {
+    "after": [],
+    "before": [],
+    "current": []
+  },
+  "controller_sha256": "38b78eeb0d8a6220e618d2ee71b7a2bad893e9208bb45d49233395394da7bbb0",
+  "auditor_sha256": "d33a880365c95b4cb2d83654a6d9660c1c6a290e46733918a6ca15075de0420e",
+  "log_sha256": {
+    "selected-01-lamp-expression-lamp_expression.log": "b68b7bde0be47afbdd9bbca3a9edea9df17ffe03497a15b32d6feed7695ad163",
+    "selected-02-lamp-expression-lamp-expression.log": "758b279cd90ff5336c34fc9cf4df2a3a50ce7f7dfe7da18e3e5a7a6eddcac313",
+    "selected-03-lamp-expression-it.log": "aba41bc354c5cb0fac823f0a369c9cf1a73439dba16c78a5f42840d3ed2075a0",
+    "selected-04-lamp-expression-runtime.log": "dcee5420f0a8680be89cee95e4d04228db534e640d47dddbbdc0b3b6380d5c40",
+    "selected-05-lamp-update-it.log": "c7420e8fa7a04edfea4ce930ebad872aabb270640cd0564be70d0e24cf4d92f5",
+    "selected-06-lamp-memory-it.log": "ed5457e9e994400cb813b2ad882fd1653fabc3c3ff7770c89eb4ebb21afbc725",
+    "selected-07-lamp-memory-voice_observe.log": "4e51dce284058733228e98bc806a081d3fb45034c79ba5aea18781bde3363969",
+    "selected-08-lamp-memory-voice_observe_room.log": "dbc0f0a550b15f7c9cd038f89bd605298e21c9da8413145f5a76a3f93694aa5c",
+    "selected-09-lamp-memory-voice_observe_forget.log": "2e209bb60b2c12eb1abf2235e9cafa6700d76e8b478444d5c2d4378864c5e72d",
+    "selected-10-lamp-memory-voice_observe_named_forget.log": "2e6aaea178584cdadd03aabebed13646d6f49b0df7893239fcbda6891dcfbf23",
+    "selected-11-lamp-memory-voice_link_used.log": "3db684328464f988ecb64cecf736c60552254904361eda3657beb4c0872c2d64",
+    "selected-12-lamp-memory-voice_forget.log": "a35ea8d098d87eb22f0f886a214effcdae9500ce687d1f5b5ddf5cc0332b79c0",
+    "selected-13-lamp-memory-voice_forget_named.log": "0ff67040b7ea3fb8f3acd17d791121c42c6a61cf808c1e428abaa3654a81e4b5",
+    "selected-14-lamp-memory-forget_shared_exchange.log": "fd4d7cfa21041b50fc135e87bc8920c0b7b81c514a2ae754d96725a7f6730444",
+    "selected-15-lamp-body-lamp_body.log": "a23ea5a0e0056eb4b8790bece1b2ec24f5777e78ab43024900090cba71c01f6c",
+    "selected-16-lamp-update-lamp_update.log": "443d89d75f3d786dec9a42ee158247f38c0fb957d2f8b035f47e1cdc5d890b4b",
+    "selected-17-lamp-setup-it.log": "084e89cd10d77e87dff89bd047d4a7ab16318a83887726b693647b03e19d6ee3",
+    "selected-18-lamp-skills-lamp_skills.log": "07a0e2460de803c76933f31b9c89fc00438ceba9105e19618234989ef4eb05b4",
+    "selected-19-lamp-update-install.log": "7ede161a2baffc95112615ae9fa62d52de84309c8a137fbcc8a0f3390542d633",
+    "selected-20-lamp-skills-it.log": "79741e613adaedf96c5625d2f22f09be5fea733c1c919c85404364ae254b7dc5",
+    "selected-21-lamp-controls-it.log": "de05f7df3ce50df45ce52d18f988696c4d21a2d89375408f30c2926068cff24c",
+    "selected-22-lamp-memory-lamp_memory.log": "1be38dff13f6dd1e5d59428547542707d0d112275c5f8b558d5f03d91b97d2d3",
+    "selected-23-lamp-selftest-lamp_selftest.log": "a6149b4900e1bbba7172f9b4f7eb31d6352fb6335cb45c9ab41c75617f6df706",
+    "selected-24-lamp-voice-lamp_voice.log": "0ef295df28fd1619f22955aee8ee2741dc6802f2a63f1a2a8fd618502a9fb5b6",
+    "selected-25-lamp-voice-eval-it.log": "8cf705271870a7425d7da952a9958fb22fc771eb0e49884e42e00b2932226bfa",
+    "selected-26-lamp-update-round.log": "84dabd764ee394e06446774b68250b8a674d74e4238920eb73c181169fec7a73",
+    "selected-27-all14-doc-only.log": "5874dae9b7ccdab36453d09cd5d8a57a5e1b99714120094b0d9fa0f0e791e738"
+  },
+  "terminal_sha256": "014e6a8ed5f7ddf10a0329e34d98253d08294741b6e89d7d966daa7368b690f2",
+  "source_map_sha256": "f34d72355b0c641fdd53be5bb8f6ac6510984b4edbfac5cc07b6841f3d5c92fb",
+  "counts": {
+    "current_selected_nonoverlap": {
+      "failed": 0,
+      "ignored": 9,
+      "passed": 1932
+    },
+    "not_a_full14_count": true,
+    "raw_direct_summary_totals": {
+      "failed": 0,
+      "ignored": 9,
+      "passed": 1933
+    },
+    "separate_doc_cases": {
+      "failed": 0,
+      "ignored": 0,
+      "passed": 0
+    }
+  },
+  "nested_child_exclusions": 1,
+  "controls": {
+    "additional_43_once_passed": 43,
+    "all108_once_passed": 108,
+    "own_65_once_passed": 65
+  },
+  "linux_only_excluded_count": 6,
+  "panic_hooks": {
+    "classification_counts": {
+      "caught_fault_injection": 11
+    },
+    "expected_selected_occurrences": 11,
+    "source_map_sha256": "f34d72355b0c641fdd53be5bb8f6ac6510984b4edbfac5cc07b6841f3d5c92fb",
+    "unknown": []
+  },
+  "full_private_receipt_sha256": "3acb09f72d7a2d1b154036543b5a84a6a3a81a5356bc286b8162902b55609daa",
+  "comfort_break_limit": "Source/input-derived library coverage only; no observed8-case aggregate, zero-unrecorded assertion or CLI claim."
+}
