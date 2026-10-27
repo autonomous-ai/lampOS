@@ -662,6 +662,10 @@ pub enum LeaseWhy {
     Revoked,
     /// Released by the client, or its connection closed.
     Released,
+    /// The body gave way under load and let go (its torque off after a
+    /// slump): moves stopped, and taking the lease straight back is no help
+    /// (Ten's #3820, agreed on #3504 at 16:3x).
+    Slumped,
 }
 
 /// A lease's event to its holder.

@@ -200,6 +200,18 @@ impl Shared {
         u64::try_from(self.started.elapsed().as_micros()).unwrap_or(u64::MAX)
     }
 
+    /// Whether a computer holds the protocol's `body` lease now: the door
+    /// then holds the body's own (`crate::body_lease`).
+    pub fn body_held(&self) -> bool {
+        let now = self.now_us();
+        self.door
+            .lock()
+            .expect("door")
+            .leases()
+            .holder(crate::protocol::Part::Body, now)
+            .is_some()
+    }
+
     /// What the bus said, handed on: each event to every connection that
     /// subscribed to it and holds its grant; words heard only as the
     /// phrases each connection listens for, never the words; the lamp's own
