@@ -1,5 +1,15 @@
 # Reviewer work log
 
+## 2026-10-27 (reviewer-two row arithmetic and delivered SDK)
+
+#3872 at 59b039285: source P1/P2 none; HOLD 6446200416 only for the latest-base carry (Queue 6446208942). Independent Decimal arithmetic gives 75 build rows, sum 65.95, mean 87.9%; 17 quality rows, sum 11.42, mean 67.2%; three excluded mood rows, sum 1.17, mean 39.0%. The memory downgrade agrees with First’s stable-7632 two failed forgets and 22:08 hourly report. The copy-walk cause remains a hypothesis; this reader ran no device check. Nonblocking P3: finish the truncated memory note. Authored c3eb is behind current 3c9838fea; no row-file drift does not waive the owner’s explicit latest-base rule. The inherited untracked pr.json remains untouched, so the Root branch was not rebased.
+
+#3829 delivered as 3c9838fea: 6446223879 records independent whole-file blob/mode equality for all four Python SDK files against reviewed 0c062daef, with equal single-commit range comparison. Source findings stay closed for delivered work. Original CI remains bound to its tested preview; no post-merge runtime or device claim.
+
+#3843 new 8aa original gate binding is complete in 6445968941: fourteen regressions and 215 unique Round primary cases pass, ARM/Linux green on actual c0b63d8d4 [c3eb,8aa], complete 10,904-entry tree bound. Both Rust blobs and receipt-host notes preserve bd0. Authored f992 is behind current Main; draft and Fifth’s installed updater digest, normal-host-after-stopgap and health-watch acceptance remain. No old binary checksum is transferred. #3564 scope clarification 6445969737 preserves the closed old first-landing code findings, keeps Common’s real Engine/privacy/expiry proof with the second lander, and leaves #3706 separate; it is not a fresh fc312 carry READ-OK.
+
+Catch-up coverage through round 540 is hash/marker verified. Hourly 6446072923 posted at 15:27 UTC; next due about 16:26. Primary v39/52184 completed zero, its matching native result was consumed, and its runtime archived before sole v40/76076 began about 15:34 UTC. Local carries reported by Tests are still preparing separate gates, not new published heads. Only this exact review log is committed/pushed. No merge, product/protected push, CI mutation, device/signing action or frozen-bank cleanup. Continue until owner stop.
+
 ## 2026-10-27 (reviewer-two delivered fixture and Feelings, privacy fixture disposition)
 
 #3845 READ-OK 6444630076 qualified the exact holder fixture at 536fc on then-current 992. All production-prefix bytes match; both nonblocking writes preserve read/line/EOF checks and queued-byte conservation. Original ARM/Linux and the exact holder PASS are source-bound. The old local 646-pass run and five-second watchdog remain separate. #3851 delivered through train 241 as 6c69fc19a into f992; 6444901227/Queue 6444901947 verify the entire reviewed document and author metadata, with no runtime transfer.
