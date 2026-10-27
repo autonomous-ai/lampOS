@@ -45,6 +45,7 @@ pub struct SleepIn {
     looked: Option<Instant>,
     asleep: bool,
     woken: bool,
+    private: bool,
 }
 
 impl SleepIn {
@@ -54,6 +55,7 @@ impl SleepIn {
             looked: None,
             asleep: false,
             woken: false,
+            private: false,
         }
     }
 
@@ -66,8 +68,15 @@ impl SleepIn {
             let said = said(&self.bus);
             self.woken |= self.asleep && said == Some(Said::Open);
             self.asleep = said == Some(Said::Asleep);
+            self.private = said == Some(Said::Other);
         }
         self.asleep
+    }
+
+    /// Whether the voice is muted for the person's privacy, as the last
+    /// [`SleepIn::asleep`] read it: the body's lease ends on it (#3504).
+    pub fn private(&self) -> bool {
+        self.private
     }
 
     /// Whether the voice said it is open again after a sleep since this
@@ -132,14 +141,17 @@ mod tests {
         assert!(sleep.asleep());
         assert!(!sleep.woken());
         // The person's privacy mute is not a sleep, nor a wake.
+        assert!(!sleep.private());
         out.publish_json(2, &said(true, None)).unwrap();
         sleep.look_now();
         assert!(!sleep.asleep());
         assert!(!sleep.woken());
+        assert!(sleep.private());
         out.publish_json(3, &said(true, Some(MuteReason::Sleep)))
             .unwrap();
         sleep.look_now();
         assert!(sleep.asleep());
+        assert!(!sleep.private(), "a sleep is not privacy");
         // Open again after the sleep: woken, told once.
         out.publish_json(4, &said(false, None)).unwrap();
         sleep.look_now();

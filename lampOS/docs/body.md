@@ -1821,6 +1821,46 @@ taken as before. The gaze socket takes a sight only from `lamp-eyes` or
 a minute. A datagram too long for the body's buffer is refused whole. No
 product unit passes it yet.
 
+#### Held by lamp-control: `--lease-socket` (#3504, phase 0)
+
+The lamp programming protocol's server, `lamp-control`, keeps its own
+leases, clients and the 10-minute cap. The body knows one holder only.
+With `--lease-socket PATH` the body listens there for one stream at a time,
+and lets one in only if the kernel names it `lamp-control.service` run as
+`lampos`, or root (`lamp_ipc::caller`). A second, or anyone else, is
+answered `refused` with why and closed. Lines of JSON each way
+(`lamp_body::lease`):
+
+| Asked | Answered |
+|-------|----------|
+| `{"hold":{"for_ms":N}}`, N from 1 to 30000: taken or renewed | `{"lease":"held"}`, or `suspended` or `lost` as below |
+| `{"let_go":true}` | `{"lease":"free"}` |
+| anything else, or a line over 1024 bytes | `{"lease":"refused","why":...}` |
+
+Said unasked when it changes:
+- `{"lease":"suspended","why":"conversation"}` while the mood is listening,
+  thinking or speaking, and `{"lease":"held"}` again after.
+- `{"lease":"lost","why":"hand|private|paused|asleep|lapsed"}`: a hand on a
+  joint, the person's privacy mute, a pause, a hand's sleep, or a hold not
+  renewed within its `for_ms`. It is not taken back when that ends; the
+  holder asks again. A hold asked while one of these lasts is answered
+  `lost` with why.
+
+Its holder gone, the lease ends at once, so the lamp's own life is back
+within a step if `lamp-control` stops, and within 30 s if it hangs. A
+holder that doesn't read its answers is taken as gone too: an answer that
+can't be written at once ends the lease. The door never holds the body's
+step: each step lets in or refuses at most 4 new callers and reads at most
+4 KiB of its holder, and a line past 1024 bytes ends the lease with
+`refused`. The socket is mode 0660. Without the bus, the person's privacy
+mute can't end a lease, and the body says so at start. While
+held, the body takes no shift at rest and nothing from Expression (its
+offsets and the rest glance), and a standing lamp stays up past its
+`--awake-seconds`, as with someone in front of it. A hold never stands a
+folded lamp up by itself: a gesture asked does that, as any gesture does.
+Gestures and moves still come on the mood socket, at the caps above. No
+product unit passes it yet.
+
 ## Not tipping over (V1's anti-tip rule)
 
 The body keeps V1's anti-tip rule (#641, #642 in the first lamp software;
@@ -1921,6 +1961,7 @@ four rows, "Without it" is what `off` leaves.
 | `--idle on` (default) | a standing lamp at rest shifts a little now and then | off | on or off |
 | `--arbitration on` | a gesture or a move may say who asks (`source`, `priority`), and one asked higher ends the one playing (see "Who may ask over whom") | as before: `source` and `priority` are ignored, and a gesture asked while another plays is dropped | on or off |
 | `--caller-caps on` | who asks is the kernel's word: a gesture or a move is held to its unit's most, and the gaze socket takes sights from the eyes, skills or root only (see "Who asks, from the kernel") | as before: any process in group `lampos` may ask at any priority and send a sight | on or off |
+| `--lease-socket ABSOLUTE_PATH` | lamp-control may hold the body for up to 30 s at a time, renewed, while the lamp's own life stands back (see "Held by lamp-control") | no lease: nobody can ask the lamp's own life to stand back | a short absolute path |
 | `--hold-from ABSOLUTE_FILE` | a test input, for tests on a lamp only: while the file's first word is `held`, the head's pitch is taken as held by a hand (see "Test input: --hold-from" under "Giving way to a hand") | off: only a joint that gave way is a hand. No product unit passes it | an absolute file; `held`, or anything else for no hand |
 | `--stand-roll N` | the head's tilt reach once the lamp has stood up, where that is more than the roll of `--reach` | no more than folded | 200 |
 | `--pitch-window LOW,HIGH` | the window the head's pitch goal is kept in while the head is beside the base, this lamp's own; checked at start against the head pitch servo's own limits (registers 9 and 11), and the run refused with nothing written if it is not inside them | lamp-4ace's, 1,740 to 2,030, and the servo's limits are not read | LOW at least 1,670 (the head's floor) and under HIGH, and around `--home`'s pitch |

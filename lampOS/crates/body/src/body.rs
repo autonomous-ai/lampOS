@@ -479,6 +479,10 @@ pub struct Asked {
     /// waiting or asked is dropped as held), and the joint's goal stays
     /// where it is, without the give-way path, torque or a read judged.
     pub held_by_test: bool,
+    /// Held by `lamp-control`'s lease (`lamp-body --lease-socket`, #3504):
+    /// a standing lamp stays up while it lasts, as with someone in front of
+    /// it. It never stands a folded lamp up by itself.
+    pub held: bool,
 }
 
 impl Asked {
@@ -498,6 +502,7 @@ impl Asked {
         toward: None,
         unplug: false,
         held_by_test: false,
+        held: false,
     };
 
     /// What a lamp a hand put to sleep is asked (#1362): as paused, it sees
@@ -517,6 +522,7 @@ impl Asked {
         toward: None,
         unplug: false,
         held_by_test: false,
+        held: false,
     };
 }
 
@@ -3458,6 +3464,7 @@ pub(crate) fn run_looking(
         toward: None,
         unplug: false,
         held_by_test: false,
+        held: false,
     };
     run_alive(
         io, runtime, limits, home, standing, looking, news, asked, watch,
@@ -5087,6 +5094,11 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                     .filter(|(clip, _)| from_outside(clip))
                     .map(|(clip, began)| began + Duration::from_micros(clip.duration_us()));
             } else if mood != Mood::Resting || company || asked_now.woken {
+                awake_until = Some(now + up.awake);
+            } else if asked_now.held && awake_until.is_some_and(|until| now < until) {
+                // Held by lamp-control's lease (#3504): a lamp that is up
+                // stays up while a program moves it; a folded one is not
+                // stood up by a hold alone.
                 awake_until = Some(now + up.awake);
             }
             // Paused after a gesture was taken: one still waiting is
