@@ -1065,6 +1065,94 @@ fn the_step_is_the_sentences_whatever_the_name_part_came_to() {
     assert!(progress.check().is_err());
 }
 
+/// lamp-52e6, 27 October (#3504): the person at the seat answered every
+/// name prompt as the lamp finished, and lamp-name heard "Lamp" four times
+/// at 0.98 to 1.00. None could be measured (three over the prompt's last
+/// word, one in its tail; the fifth prompt's call was missed), so the name
+/// part made no bar. The sentence was then held to the near rule's 18 dB
+/// call bar, which a sentence from the seat (9.2 dB on this lamp) never
+/// reaches, and the whole step failed. Now each try says why in its record
+/// (the journal line), with every name heard as ms from the prompt's end,
+/// and with no call accepted the sentence's bar is 6 dB: the seat's
+/// sentence passes, after an "okay" with no words that does not spend the
+/// try. Twice as far, or the lamp's own voice (no rise), it is still short.
+#[test]
+fn calls_answered_at_the_prompts_end_leave_no_bar_and_the_seats_sentence_still_passes() {
+    for (rise_db, accepted) in [(Some(9.2), true), (Some(4.5), false), (None, false)] {
+        let store = Store::new(None);
+        let mut walk = store.cycle(S);
+        let mut whys = Vec::new();
+        for (turn, at, score, early) in [
+            (1, 10 * S, 0.98, true),
+            (2, 30 * S, 1.0, true),
+            (3, 50 * S, 0.99, true),
+            (4, 70 * S, 0.99, false),
+        ] {
+            let prompt = play(&mut walk, at, 1_760_000_000_000 + at / 1_000, turn);
+            room(&mut walk, &prompt, 7_000, 2.0);
+            if early {
+                over(&mut walk, &prompt, 300, 150, score);
+            } else {
+                name(&mut walk, &prompt, 300, score);
+            }
+            let judged = judge(&mut walk, &prompt);
+            assert_eq!(judged["accepted"], false, "{judged}");
+            let heard = &judged["heard"][0];
+            assert_eq!(
+                heard[0].as_i64(),
+                Some(if early { -300 } else { 300 }),
+                "{judged}"
+            );
+            assert!((heard[1].as_f64().unwrap() as f32 - score).abs() < 1e-6);
+            whys.push(judged["why"].as_str().unwrap().to_owned());
+        }
+        assert_eq!(
+            whys,
+            [
+                "answered_early",
+                "answered_early",
+                "answered_early",
+                "the lamp was speaking"
+            ]
+        );
+        // The last prompt's call was missed.
+        let prompt = play(&mut walk, 90 * S, 1_760_000_090_000, 5);
+        let judged = judge(&mut walk, &prompt);
+        assert_eq!(judged["why"], "the name wasn't heard");
+        assert_eq!(walk.kept().near_call_prompts, 3);
+        assert_eq!(settle(&mut walk, 110 * S), [NEAR_FAILED]);
+        assert!(!store.near_file().exists());
+        ask(&mut walk, 120 * S, 6);
+        // "Okay": a line whose words came back none does not close the try.
+        walk.sentence_line(600, Some(9.0), 122 * S);
+        walk.sentence_words(0);
+        walk.tick(123 * S, START_QUIET_US, true, false, face(), true);
+        assert!(
+            !walk
+                .take_records()
+                .iter()
+                .any(|row| row["kind"] == "onboarding_sentence_try")
+        );
+        // Then the sentence: 6 words in 2 s.
+        walk.sentence_line(2_000, rise_db, 124 * S);
+        walk.sentence_words(6);
+        walk.tick(125 * S, START_QUIET_US, true, false, face(), true);
+        let judged = walk
+            .take_records()
+            .into_iter()
+            .rfind(|row| row["kind"] == "onboarding_sentence_try")
+            .expect("judged");
+        assert_eq!(judged["accepted"], accepted, "{judged}");
+        assert_eq!(judged["bar_db"].as_f64().unwrap() as f32, 6.0);
+        if accepted {
+            assert_eq!(settle(&mut walk, 130 * S), [SENTENCE_DONE]);
+            assert_eq!(outcome(&walk), Some(Outcome::Done));
+        } else {
+            assert_eq!(judged["short"], "level");
+        }
+    }
+}
+
 /// The window and the words' wait pass with no line.
 fn sentence_none(walk: &mut Onboarding, at: u64) -> Value {
     walk.tick(at + 18 * S - 1, START_QUIET_US, true, false, face(), true);

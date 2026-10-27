@@ -23,7 +23,8 @@
 //! evidence: a line ended in the window ([`SENTENCE_WINDOW_US`]) with words
 //! come back for it, said close (the room microphone rose over its quiet
 //! during the line as far as this person's own calls from the seat did, less
-//! 3 dB, never over the near rule's bar nor under 3 dB: `sentence_bar`), and
+//! 3 dB, or 6 dB with no call accepted, never over the near rule's bar nor
+//! under 3 dB: `sentence_bar`), and
 //! its words covering it (at
 //! least one for each second of the line's speech, [`MS_A_WORD`]). Short of
 //! that it is coached once, "a little louder" for the level, "a little
@@ -87,6 +88,14 @@ const MOST_REOFFERS: u8 = 2;
 /// calls rose only 3.9 dB (lamp-52e6, row 10), a line under it is not told
 /// from the room's own swing.
 const SENTENCE_LOWEST_DB: f32 = 3.0;
+/// The sentence's level bar when no call from the seat was accepted, in place
+/// of the near rule's 18 dB, which is a call's bar: a sentence said from the
+/// seat rose 9.2 dB on lamp-52e6 (row 10, 20 October) and 10.7 to 11.0 dB on
+/// lamp-c0a4 (#2844), so at 18 dB a person whose calls were all refused
+/// failed the whole step on their sentence (lamp-52e6, 27 October, #3504).
+/// It is 52e6's seat sentence less `UNDER_QUIETEST_DB`, as a bar is made from
+/// calls; the same voice from twice as far rises about 4.5 dB, under it.
+const SENTENCE_NO_CALL_DB: f32 = 6.0;
 /// The sentence part's prompts: the first, and one coached.
 pub(crate) const SENTENCE_PROMPTS: u8 = 2;
 /// A line said for the sentence ends within this long of the prompt's end:
@@ -655,7 +664,7 @@ impl Onboarding {
             // Someone spoke over it (an office's voices, or the person
             // answering early).
             let again = self.offer_again(offer.sentence, offer.prompt);
-            self.records.push(json!({"kind":kind,"prompt":offer.prompt,
+            self.note_try(json!({"kind":kind,"prompt":offer.prompt,
                 "accepted":false,"why":"the prompt was not played whole",
                 "offered_again":again,"at_us":now_us}));
             return;
@@ -710,12 +719,12 @@ impl Onboarding {
 
     /// The rise a sentence said close reaches: this person's quietest
     /// accepted call from the seat less `UNDER_QUIETEST_DB`, as their bar is
-    /// made, so it is relative to this room's quiet at this hour; never over
-    /// the near rule's bar (`crate::attention::near_rise_db`, 18 dB unless
-    /// calibrated), which also stands with no call accepted, and never under
-    /// [`SENTENCE_LOWEST_DB`]. People farther off rose 9.8 to 15.1 dB in a
-    /// quiet room, under a quiet room's bar of 18 dB and under the calls'
-    /// own less 3 dB.
+    /// made, so it is relative to this room's quiet at this hour; with no
+    /// call accepted, [`SENTENCE_NO_CALL_DB`]; never over the near rule's bar
+    /// (`crate::attention::near_rise_db`, 18 dB unless calibrated), and never
+    /// under [`SENTENCE_LOWEST_DB`]. People farther off rose 9.8 to 15.1 dB
+    /// in a quiet room, under a quiet room's bar of 18 dB and under the
+    /// calls' own less 3 dB.
     fn sentence_bar(&self) -> f32 {
         let bar = crate::attention::near_rise_db();
         self.desired
@@ -723,7 +732,7 @@ impl Onboarding {
             .iter()
             .map(|done| done.rise_db)
             .reduce(f32::min)
-            .map_or(bar, |quietest| {
+            .map_or(SENTENCE_NO_CALL_DB.min(bar), |quietest| {
                 (quietest - lamp_near_call::UNDER_QUIETEST_DB)
                     .min(bar)
                     .max(SENTENCE_LOWEST_DB)
@@ -751,7 +760,12 @@ impl Onboarding {
         let Some(listening) = self.near.listening.as_ref() else {
             return;
         };
-        let worded = self.near.line.is_some_and(|line| line.words.is_some());
+        // A line whose words came back none ("okay", a hum, the room) is not
+        // the sentence: the window stays open for one with words.
+        let worded = self
+            .near
+            .line
+            .is_some_and(|line| line.words.is_some_and(|words| words > 0));
         if !worded && now_us < listening.ended_us + SENTENCE_WINDOW_US + WORDS_WAIT_US {
             return;
         }
@@ -775,7 +789,7 @@ impl Onboarding {
                 }
             }
         };
-        self.records.push(json!({"kind":"onboarding_sentence_try",
+        self.note_try(json!({"kind":"onboarding_sentence_try",
             "prompt":listening.prompt,"accepted":short.is_none(),
             "short":short.map(Short::name),"words":line.and_then(|line| line.words),
             "speech_ms":line.map(|line| line.speech_ms),
@@ -824,6 +838,18 @@ impl Onboarding {
             return;
         }
         let listening = self.near.listening.take().expect("due");
+        let from_end = |ms: u64| ms as i64 - listening.ended_ms as i64;
+        // Every name heard, as (ms from the prompt's end, score), for the
+        // try's record and journal line.
+        let heard: Vec<(i64, f32)> = self
+            .near
+            .seen
+            .iter()
+            .filter_map(|seen| match seen {
+                Seen::Hearing(hearing, _) => Some((from_end(hearing.began_ms), hearing.score)),
+                _ => None,
+            })
+            .collect();
         // A name begun over the prompt's last word ([`OVER_PROMPT_MS`]).
         let early = self.near.seen.iter().any(|seen| match seen {
             Seen::Hearing(hearing, heard_ms) => {
@@ -846,25 +872,40 @@ impl Onboarding {
             Err(why.to_owned())
         } else if early {
             let again = self.offer_again(false, listening.prompt);
-            self.records.push(json!({"kind":"onboarding_near_try",
+            self.note_try(json!({"kind":"onboarding_near_try",
                 "prompt":listening.prompt,"accepted":false,"why":"answered_early",
-                "offered_again":again,"at_us":now_us}));
+                "offered_again":again,"heard":heard,"at_us":now_us}));
             return;
         } else {
             near_try(listening.ended_ms, &hearings, &levels, &spoke).map_err(|why| why.to_string())
         };
+        // When the lamp spoke, as ms from the prompt's end (none: still).
+        let spoke: Vec<(i64, Option<i64>)> = spoke
+            .iter()
+            .map(|span| (from_end(span.began_ms), span.ended_ms.map(from_end)))
+            .collect();
         match judged {
             Ok(done) => {
                 self.desired.near_call_tries.push(done);
                 self.save();
-                self.records.push(
+                self.note_try(
                     json!({"kind":"onboarding_near_try","prompt":listening.prompt,
-                    "accepted":true,"rise_db":done.rise_db,"score":done.score,"at_us":now_us}),
+                    "accepted":true,"rise_db":done.rise_db,"score":done.score,
+                    "heard":heard,"at_us":now_us}),
                 );
             }
-            Err(why) => self.records.push(json!({"kind":"onboarding_near_try",
-                "prompt":listening.prompt,"accepted":false,"why":why,"at_us":now_us})),
+            Err(why) => self.note_try(json!({"kind":"onboarding_near_try",
+                "prompt":listening.prompt,"accepted":false,"why":why,"heard":heard,
+                "spoke":spoke,"at_us":now_us})),
         }
+    }
+
+    /// One journal line for each try, accepted or refused (#3504): the
+    /// session's record of it, with the reason and the numbers that decided
+    /// it. Numbers only: nothing of the sound or the words.
+    fn note_try(&mut self, record: serde_json::Value) {
+        eprintln!("lamp-voice onboarding: how_you_sound try: {record}");
+        self.records.push(record);
     }
 
     /// The bar's write or removal completed on the storage worker in this
