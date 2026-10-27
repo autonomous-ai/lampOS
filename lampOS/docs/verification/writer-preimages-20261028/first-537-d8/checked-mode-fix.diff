@@ -1,0 +1,24 @@
+--- failed-formatted.rs
++++ checked-mode.rs
+@@ -272,8 +272,19 @@
+         } else {
+             FileType::RegularFile
+         };
+-        if self.mode & !0o177777 != 0
+-            || FileType::from_raw_mode(self.mode) != kind
++        if self.mode & !0o177777 != 0 {
++            return Err(invalid("invalid preimage identity"));
++        }
++        // Apple RawMode is u16; Linux RawMode is already u32. Check the
++        // narrowing conversion without a lossy cast or an identity conversion.
++        #[cfg(target_os = "linux")]
++        let mode = self.mode;
++        #[cfg(not(target_os = "linux"))]
++        let mode = self
++            .mode
++            .try_into()
++            .map_err(|_| invalid("invalid preimage identity"))?;
++        if FileType::from_raw_mode(mode) != kind
+             || self.links == 0
+             || (!directory && self.links != 1)
+             || !(0..1_000_000_000).contains(&self.modified_nanos)

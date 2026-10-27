@@ -1,0 +1,1329 @@
+Diff in <preimage-tree>/lampOS/crates/update/src/writer_preimages/tests.rs:4:
+ use std::{collections::BTreeMap, fs, os::unix::fs::symlink};
+ 
+ const PREFIX: &str = "/etc/lampOS/expression/";
+-fn transaction() -> String { manifest::sha256_hex(b"one fresh private transaction") }
++fn transaction() -> String {
++    manifest::sha256_hex(b"one fresh private transaction")
++}
+ fn directory() -> tempfile::TempDir {
+-    tempfile::Builder::new().permissions(Permissions::from_mode(0o700)).tempdir().unwrap()
++    tempfile::Builder::new()
++        .permissions(Permissions::from_mode(0o700))
++        .tempdir()
++        .unwrap()
+ }
+-fn fixture() -> (tempfile::TempDir, Vec<Setting>, BTreeMap<String, String>, BTreeMap<String, String>) {
++fn fixture() -> (
++    tempfile::TempDir,
++    Vec<Setting>,
++    BTreeMap<String, String>,
++    BTreeMap<String, String>,
++) {
+     let root = directory();
+-    let settings: Vec<_> = ["binary", "empty", "noop", "custom", "absent/deep", "missing"]
+-        .iter().map(|name| Setting::new(&format!("{PREFIX}{name}"), "new")).collect();
++    let settings: Vec<_> = [
++        "binary",
++        "empty",
++        "noop",
++        "custom",
++        "absent/deep",
++        "missing",
++    ]
++    .iter()
++    .map(|name| Setting::new(&format!("{PREFIX}{name}"), "new"))
++    .collect();
+     fs::create_dir_all(root.path().join("etc/lampOS/expression")).unwrap();
+-    for (index, bytes) in [(0, &[0, 255, 17][..]), (1, b""), (2, b"new"), (3, b"private-old")] {
+-        fs::write(root.path().join(settings[index].path.trim_start_matches('/')), bytes).unwrap();
++    for (index, bytes) in [
++        (0, &[0, 255, 17][..]),
++        (1, b""),
++        (2, b"new"),
++        (3, b"private-old"),
++    ] {
++        fs::write(
++            root.path()
++                .join(settings[index].path.trim_start_matches('/')),
++            bytes,
++        )
++        .unwrap();
+     }
+     let recorded = BTreeMap::from([
+-        (settings[0].path.clone(), manifest::sha256_hex(&[0, 255, 17])),
++        (
++            settings[0].path.clone(),
++            manifest::sha256_hex(&[0, 255, 17]),
++        ),
+         (settings[2].path.clone(), manifest::sha256_hex(b"new")),
+         (settings[4].path.clone(), install::SET_ASIDE.to_owned()),
+     ]);
+Diff in <preimage-tree>/lampOS/crates/update/src/writer_preimages/tests.rs:29:
+     let raw = writer_settings::capture(root.path(), &settings, &recorded, &writing).unwrap();
+     Bundle::from_capture(&transaction(), &raw).unwrap()
+ }
+-fn document() -> Value { serde_json::from_slice(bundle().encoded()).unwrap() }
++fn document() -> Value {
++    serde_json::from_slice(bundle().encoded()).unwrap()
++}
+ fn refuses(bytes: &[u8]) -> io::Error {
+     let folder = directory();
+     let at = folder.path().join(FILE);
+Diff in <preimage-tree>/lampOS/crates/update/src/writer_preimages/tests.rs:36:
+     fs::write(&at, bytes).unwrap();
+     fs::set_permissions(&at, Permissions::from_mode(0o600)).unwrap();
+-    let result = Store::open(folder.path()).unwrap().load(&transaction(), &Artifact::of(bytes));
++    let result = Store::open(folder.path())
++        .unwrap()
++        .load(&transaction(), &Artifact::of(bytes));
+     assert_eq!(fs::read(&at).unwrap(), bytes);
+     assert!(!folder.path().join(STAGE).exists());
+     result.unwrap_err()
+Diff in <preimage-tree>/lampOS/crates/update/src/writer_preimages/tests.rs:43:
+ fn same_observation(a: &Observation, b: &Observation) {
+     assert_eq!(a.ancestors, b.ancestors);
+     match (&a.entry, &b.entry) {
+-        (Entry::Present { bytes: x, identity: i }, Entry::Present { bytes: y, identity: j }) => {
+-            assert_eq!(x, y); assert_eq!(i, j);
++        (
++            Entry::Present {
++                bytes: x,
++                identity: i,
++            },
++            Entry::Present {
++                bytes: y,
++                identity: j,
++            },
++        ) => {
++            assert_eq!(x, y);
++            assert_eq!(i, j);
+         }
+         (Entry::MissingLeaf, Entry::MissingLeaf) => {}
+-        (Entry::MissingAncestor { component: x }, Entry::MissingAncestor { component: y }) => assert_eq!(x, y),
++        (Entry::MissingAncestor { component: x }, Entry::MissingAncestor { component: y }) => {
++            assert_eq!(x, y)
++        }
+         _ => panic!("before-image kind changed"),
+     }
+ }
+Diff in <preimage-tree>/lampOS/crates/update/src/writer_preimages/tests.rs:57:
+     let (root, settings, recorded, writing) = fixture();
+     let raw = writer_settings::capture(root.path(), &settings, &recorded, &writing).unwrap();
+     assert!(raw.entries()[2].act().is_none());
+-    assert!(matches!(raw.entries()[3].act(), Some(crate::apply::Act::Keep(_))));
++    assert!(matches!(
++        raw.entries()[3].act(),
++        Some(crate::apply::Act::Keep(_))
++    ));
+     let bundle = Bundle::from_capture(&transaction(), &raw).unwrap();
+     let folder = directory();
+     let store = Store::open(folder.path()).unwrap();
+Diff in <preimage-tree>/lampOS/crates/update/src/writer_preimages/tests.rs:68:
+     assert_eq!(loaded.entries().len(), settings.len());
+     for (old, kept) in raw.entries().iter().zip(loaded.entries()) {
+         assert_eq!(old.setting().path, kept.path());
+-        assert_eq!(old.recorded(), kept.recorded()); assert_eq!(old.writing(), kept.writing());
++        assert_eq!(old.recorded(), kept.recorded());
++        assert_eq!(old.writing(), kept.writing());
+         same_observation(old.before(), kept.before());
+     }
+-    assert_eq!(fs::metadata(folder.path().join(FILE)).unwrap().mode() & 0o7777, 0o600);
++    assert_eq!(
++        fs::metadata(folder.path().join(FILE)).unwrap().mode() & 0o7777,
++        0o600
++    );
+     assert!(!folder.path().join(STAGE).exists());
+-    assert_eq!(fs::read(folder.path().join(FILE)).unwrap(), bundle.encoded());
++    assert_eq!(
++        fs::read(folder.path().join(FILE)).unwrap(),
++        bundle.encoded()
++    );
+     // No desired text/action is serialized and no live setting is changed.
+     let text = std::str::from_utf8(bundle.encoded()).unwrap();
+     assert!(!text.contains("\"text\"") && !text.contains("\"act\""));
+Diff in <preimage-tree>/lampOS/crates/update/src/writer_preimages/tests.rs:87:
+     doc["entries"][0]["future_entry"] = json!(true);
+     doc["entries"][0]["before"]["future_before"] = json!([{"later": [1,2,3]}]);
+     doc["entries"][0]["ancestors"][0]["future_stamp"] = json!("later");
+-    let mut bytes = serde_json::to_vec_pretty(&doc).unwrap(); bytes.extend_from_slice(b" \n\t");
++    let mut bytes = serde_json::to_vec_pretty(&doc).unwrap();
++    bytes.extend_from_slice(b" \n\t");
+     let artifact = Artifact::of(&bytes);
+     let decoded = Bundle::decode(bytes.clone(), &transaction(), &artifact).unwrap();
+-    let folder = directory(); let store = Store::open(folder.path()).unwrap();
++    let folder = directory();
++    let store = Store::open(folder.path()).unwrap();
+     store.publish(&decoded).unwrap();
+-    assert_eq!(store.load(&transaction(), &artifact).unwrap().encoded(), bytes);
++    assert_eq!(
++        store.load(&transaction(), &artifact).unwrap().encoded(),
++        bytes
++    );
+ }
+ 
+ #[test]
+Diff in <preimage-tree>/lampOS/crates/update/src/writer_preimages/tests.rs:99:
+ fn expected_identity_and_size_are_checked_before_parse_and_every_failed_load_retains_the_file() {
+-    let valid = bundle(); let folder = directory(); let store = Store::open(folder.path()).unwrap();
+-    store.publish(&valid).unwrap(); let before = fs::read(folder.path().join(FILE)).unwrap();
+-    let mut wrong = valid.artifact().clone(); wrong.sha256 = "0".repeat(64);
++    let valid = bundle();
++    let folder = directory();
++    let store = Store::open(folder.path()).unwrap();
++    store.publish(&valid).unwrap();
++    let before = fs::read(folder.path().join(FILE)).unwrap();
++    let mut wrong = valid.artifact().clone();
++    wrong.sha256 = "0".repeat(64);
+     assert!(store.load(&transaction(), &wrong).is_err());
+-    wrong = valid.artifact().clone(); wrong.size += 1;
++    wrong = valid.artifact().clone();
++    wrong.size += 1;
+     assert!(store.load(&transaction(), &wrong).is_err());
+     assert!(store.load(&"a".repeat(64), valid.artifact()).is_err());
+     assert_eq!(fs::read(folder.path().join(FILE)).unwrap(), before);
+Diff in <preimage-tree>/lampOS/crates/update/src/writer_preimages/tests.rs:108:
+-    fs::write(folder.path().join(FILE), &before[..before.len()-1]).unwrap();
++    fs::write(folder.path().join(FILE), &before[..before.len() - 1]).unwrap();
+     assert!(store.load(&transaction(), valid.artifact()).is_err());
+-    assert_eq!(fs::read(folder.path().join(FILE)).unwrap(), &before[..before.len()-1]);
+-    let file = fs::OpenOptions::new().write(true).open(folder.path().join(FILE)).unwrap();
++    assert_eq!(
++        fs::read(folder.path().join(FILE)).unwrap(),
++        &before[..before.len() - 1]
++    );
++    let file = fs::OpenOptions::new()
++        .write(true)
++        .open(folder.path().join(FILE))
++        .unwrap();
+     file.set_len(MOST_BUNDLE_BYTES as u64 + 1).unwrap();
+-    let mut expected = valid.artifact().clone(); expected.size = MOST_BUNDLE_BYTES as u64 + 1;
++    let mut expected = valid.artifact().clone();
++    expected.size = MOST_BUNDLE_BYTES as u64 + 1;
+     assert!(store.load(&transaction(), &expected).is_err());
+     assert_eq!(file.metadata().unwrap().len(), MOST_BUNDLE_BYTES as u64 + 1);
+     let invalid = b"not JSON: private-value".to_vec();
+Diff in <preimage-tree>/lampOS/crates/update/src/writer_preimages/tests.rs:117:
+-    assert!(Bundle::decode(invalid, &transaction(), valid.artifact()).unwrap_err().to_string().contains("identity mismatch"));
++    assert!(
++        Bundle::decode(invalid, &transaction(), valid.artifact())
++            .unwrap_err()
++            .to_string()
++            .contains("identity mismatch")
++    );
+ }
+ 
+ #[test]
+Diff in <preimage-tree>/lampOS/crates/update/src/writer_preimages/tests.rs:121:
+ fn unknown_semantics_known_duplicates_duplicate_paths_and_invalid_records_block_without_deletion() {
+-    for (field, value) in [("version", json!(2)), ("op", json!("future-operation")), ("transaction", json!("a".repeat(64)))] {
+-        let mut doc = document(); doc[field] = value; refuses(&serde_json::to_vec(&doc).unwrap());
++    for (field, value) in [
++        ("version", json!(2)),
++        ("op", json!("future-operation")),
++        ("transaction", json!("a".repeat(64))),
++    ] {
++        let mut doc = document();
++        doc[field] = value;
++        refuses(&serde_json::to_vec(&doc).unwrap());
+     }
+-    let mut doc = document(); doc["entries"][0]["before"]["kind"] = json!("future-kind");
++    let mut doc = document();
++    doc["entries"][0]["before"]["kind"] = json!("future-kind");
+     refuses(&serde_json::to_vec(&doc).unwrap());
+     let original = String::from_utf8(bundle().encoded().to_owned()).unwrap();
+-    for (old, duplicate) in [("\"version\":1", "\"version\":1,\"version\":1"), ("\"records\":[", "\"records\":[null,null],\"records\":["), ("\"device\":", "\"device\":0,\"device\":")] {
+-        assert!(original.contains(old)); refuses(original.replacen(old, duplicate, 1).as_bytes());
++    for (old, duplicate) in [
++        ("\"version\":1", "\"version\":1,\"version\":1"),
++        ("\"records\":[", "\"records\":[null,null],\"records\":["),
++        ("\"device\":", "\"device\":0,\"device\":"),
++    ] {
++        assert!(original.contains(old));
++        refuses(original.replacen(old, duplicate, 1).as_bytes());
+     }
+-    refuses(original.replacen("\"kind\":\"present\"", "\"kind\":\"present\",\"kind\":\"present\"",1).as_bytes());
+-    let mut doc = document(); doc["entries"][5]["before"]["identity"] = doc["entries"][0]["before"]["identity"].clone();
++    refuses(
++        original
++            .replacen(
++                "\"kind\":\"present\"",
++                "\"kind\":\"present\",\"kind\":\"present\"",
++                1,
++            )
++            .as_bytes(),
++    );
++    let mut doc = document();
++    doc["entries"][5]["before"]["identity"] = doc["entries"][0]["before"]["identity"].clone();
+     refuses(&serde_json::to_vec(&doc).unwrap());
+-    let mut doc = document(); doc["entries"][1]["path"] = doc["entries"][0]["path"].clone();
++    let mut doc = document();
++    doc["entries"][1]["path"] = doc["entries"][0]["path"].clone();
+     refuses(&serde_json::to_vec(&doc).unwrap());
+-    for path in ["/etc/lampOS/update/key.pub", "/etc/lampOS/expression/../private", "/etc/lampOS/expression/.hidden", "/etc/lampOS/expression/a//b", "relative", "/etc/lampOS/expression/a\u{0}b"] {
+-        let mut doc = document(); doc["entries"][0]["path"] = json!(path); refuses(&serde_json::to_vec(&doc).unwrap());
++    for path in [
++        "/etc/lampOS/update/key.pub",
++        "/etc/lampOS/expression/../private",
++        "/etc/lampOS/expression/.hidden",
++        "/etc/lampOS/expression/a//b",
++        "relative",
++        "/etc/lampOS/expression/a\u{0}b",
++    ] {
++        let mut doc = document();
++        doc["entries"][0]["path"] = json!(path);
++        refuses(&serde_json::to_vec(&doc).unwrap());
+     }
+-    for path in [format!("{PREFIX}{}", "a".repeat(512)), format!("{PREFIX}{}leaf", "a/".repeat(62))] {
+-        let mut doc = document(); doc["entries"][0]["path"] = json!(path); refuses(&serde_json::to_vec(&doc).unwrap());
++    for path in [
++        format!("{PREFIX}{}", "a".repeat(512)),
++        format!("{PREFIX}{}leaf", "a/".repeat(62)),
++    ] {
++        let mut doc = document();
++        doc["entries"][0]["path"] = json!(path);
++        refuses(&serde_json::to_vec(&doc).unwrap());
+     }
+-    for records in [json!(["private-value", null]), json!([null, install::SET_ASIDE]), json!([null])] {
+-        let mut doc = document(); doc["entries"][0]["records"] = records; refuses(&serde_json::to_vec(&doc).unwrap());
++    for records in [
++        json!(["private-value", null]),
++        json!([null, install::SET_ASIDE]),
++        json!([null]),
++    ] {
++        let mut doc = document();
++        doc["entries"][0]["records"] = records;
++        refuses(&serde_json::to_vec(&doc).unwrap());
+     }
+ }
+ 
+Diff in <preimage-tree>/lampOS/crates/update/src/writer_preimages/tests.rs:147:
+ #[test]
+ fn shape_stamp_base64_and_collection_bounds_are_checked_before_old_byte_allocations() {
+-    for (field, value) in [("mode", json!(0)), ("mode", json!(0o300600)), ("links", json!(2)), ("length", json!(2)), ("length", json!(MOST_FILE_BYTES+1)), ("changed_nanos", json!(1_000_000_000))] {
+-        let mut doc = document(); doc["entries"][0]["before"]["identity"][field] = value; refuses(&serde_json::to_vec(&doc).unwrap());
++    for (field, value) in [
++        ("mode", json!(0)),
++        ("mode", json!(0o300600)),
++        ("links", json!(2)),
++        ("length", json!(2)),
++        ("length", json!(MOST_FILE_BYTES + 1)),
++        ("changed_nanos", json!(1_000_000_000)),
++    ] {
++        let mut doc = document();
++        doc["entries"][0]["before"]["identity"][field] = value;
++        refuses(&serde_json::to_vec(&doc).unwrap());
+     }
+-    let mut doc = document(); doc["entries"][0]["before"]["bytes"] = json!("!!!!");
++    let mut doc = document();
++    doc["entries"][0]["before"]["bytes"] = json!("!!!!");
+     refuses(&serde_json::to_vec(&doc).unwrap());
+-    let mut doc = document(); doc["entries"][0]["before"]["bytes"] = json!("A".repeat(MOST_BASE64+4));
++    let mut doc = document();
++    doc["entries"][0]["before"]["bytes"] = json!("A".repeat(MOST_BASE64 + 4));
+     refuses(&serde_json::to_vec(&doc).unwrap());
+-    let mut doc = document(); doc["entries"][1]["ancestors"][0]["inode"] = json!(0);
++    let mut doc = document();
++    doc["entries"][1]["ancestors"][0]["inode"] = json!(0);
+     refuses(&serde_json::to_vec(&doc).unwrap());
+-    let mut doc = document(); doc["entries"][4]["before"]["component"] = json!(0);
++    let mut doc = document();
++    doc["entries"][4]["before"]["component"] = json!(0);
+     refuses(&serde_json::to_vec(&doc).unwrap());
+-    let mut doc = document(); doc["entries"][0]["ancestors"] = json!([]);
++    let mut doc = document();
++    doc["entries"][0]["ancestors"] = json!([]);
+     refuses(&serde_json::to_vec(&doc).unwrap());
+-    let mut doc = document(); let entry = doc["entries"][0].clone();
+-    doc["entries"] = Value::Array(vec![entry;129]); refuses(&serde_json::to_vec(&doc).unwrap());
+-    let mut doc = document(); let stamp = doc["entries"][0]["ancestors"][0].clone();
+-    doc["entries"][0]["ancestors"] = Value::Array(vec![stamp;65]); refuses(&serde_json::to_vec(&doc).unwrap());
++    let mut doc = document();
++    let entry = doc["entries"][0].clone();
++    doc["entries"] = Value::Array(vec![entry; 129]);
++    refuses(&serde_json::to_vec(&doc).unwrap());
++    let mut doc = document();
++    let stamp = doc["entries"][0]["ancestors"][0].clone();
++    doc["entries"][0]["ancestors"] = Value::Array(vec![stamp; 65]);
++    refuses(&serde_json::to_vec(&doc).unwrap());
+     // Each claimed file is within cap, but the sum must fail BEFORE base64
+     // decoding notices that the deliberately tiny payloads do not match.
+-    let mut doc = document(); let mut entries = Vec::new();
++    let mut doc = document();
++    let mut entries = Vec::new();
+     for n in 0..5 {
+-        let mut entry = doc["entries"][0].clone(); entry["path"] = json!(format!("{PREFIX}budget{n}"));
+-        entry["before"]["identity"]["length"] = json!(MOST_FILE_BYTES); entries.push(entry);
++        let mut entry = doc["entries"][0].clone();
++        entry["path"] = json!(format!("{PREFIX}budget{n}"));
++        entry["before"]["identity"]["length"] = json!(MOST_FILE_BYTES);
++        entries.push(entry);
+     }
+     doc["entries"] = Value::Array(entries);
+-    assert_eq!(refuses(&serde_json::to_vec(&doc).unwrap()).to_string(), "preimage old byte budget exceeded");
++    assert_eq!(
++        refuses(&serde_json::to_vec(&doc).unwrap()).to_string(),
++        "preimage old byte budget exceeded"
++    );
+ }
+ 
+ #[test]
+Diff in <preimage-tree>/lampOS/crates/update/src/writer_preimages/tests.rs:178:
+ fn publication_never_replaces_existing_final_or_unknown_stage_and_load_never_follows_links() {
+-    let valid = bundle(); let witness = directory(); let outside = witness.path().join("untouched");
++    let valid = bundle();
++    let witness = directory();
++    let outside = witness.path().join("untouched");
+     fs::write(&outside, b"outside-private-value").unwrap();
+     for name in [FILE, STAGE] {
+-        for link in [false,true] {
+-            let folder = directory(); let at = folder.path().join(name);
+-            if link { symlink(&outside, &at).unwrap(); } else { fs::write(&at, b"retained-private-value").unwrap(); }
+-            let store = Store::open(folder.path()).unwrap(); assert!(store.publish(&valid).is_err());
++        for link in [false, true] {
++            let folder = directory();
++            let at = folder.path().join(name);
++            if link {
++                symlink(&outside, &at).unwrap();
++            } else {
++                fs::write(&at, b"retained-private-value").unwrap();
++            }
++            let store = Store::open(folder.path()).unwrap();
++            assert!(store.publish(&valid).is_err());
+             assert!(store.load(&transaction(), valid.artifact()).is_err());
+-            if link { assert_eq!(fs::read_link(&at).unwrap(), outside); }
+-            else { assert_eq!(fs::read(&at).unwrap(), b"retained-private-value"); }
++            if link {
++                assert_eq!(fs::read_link(&at).unwrap(), outside);
++            } else {
++                assert_eq!(fs::read(&at).unwrap(), b"retained-private-value");
++            }
+             assert_eq!(fs::read(&outside).unwrap(), b"outside-private-value");
+         }
+     }
+Diff in <preimage-tree>/lampOS/crates/update/src/writer_preimages/tests.rs:192:
+-    let public_folder = directory(); fs::set_permissions(public_folder.path(), Permissions::from_mode(0o755)).unwrap();
++    let public_folder = directory();
++    fs::set_permissions(public_folder.path(), Permissions::from_mode(0o755)).unwrap();
+     assert!(Store::open(public_folder.path()).is_err());
+     assert_eq!(fs::read_dir(public_folder.path()).unwrap().count(), 0);
+-    let folder = directory(); let store = Store::open(folder.path()).unwrap(); store.publish(&valid).unwrap();
++    let folder = directory();
++    let store = Store::open(folder.path()).unwrap();
++    store.publish(&valid).unwrap();
+     fs::set_permissions(folder.path().join(FILE), Permissions::from_mode(0o644)).unwrap();
+-    assert!(store.load(&transaction(),valid.artifact()).is_err());
++    assert!(store.load(&transaction(), valid.artifact()).is_err());
+     assert_eq!(fs::read(folder.path().join(FILE)).unwrap(), valid.encoded());
+-    let folder = directory(); fs::create_dir(folder.path().join(FILE)).unwrap();
+-    assert!(Store::open(folder.path()).unwrap().load(&transaction(), valid.artifact()).is_err());
++    let folder = directory();
++    fs::create_dir(folder.path().join(FILE)).unwrap();
++    assert!(
++        Store::open(folder.path())
++            .unwrap()
++            .load(&transaction(), valid.artifact())
++            .is_err()
++    );
+     assert!(folder.path().join(FILE).is_dir());
+-    let folder = directory(); let store = Store::open(folder.path()).unwrap(); store.publish(&valid).unwrap();
++    let folder = directory();
++    let store = Store::open(folder.path()).unwrap();
++    store.publish(&valid).unwrap();
+     fs::hard_link(folder.path().join(FILE), folder.path().join("other-link")).unwrap();
+     assert!(store.load(&transaction(), valid.artifact()).is_err());
+     assert_eq!(fs::read(folder.path().join(FILE)).unwrap(), valid.encoded());
+Diff in <preimage-tree>/lampOS/crates/update/src/writer_preimages/tests.rs:206:
+-    let link = witness.path().join("directory-link"); symlink(folder.path(), &link).unwrap();
++    let link = witness.path().join("directory-link");
++    symlink(folder.path(), &link).unwrap();
+     assert!(Store::open(&link).is_err());
+ }
+ 
+Diff in <preimage-tree>/lampOS/crates/update/src/writer_preimages/tests.rs:211:
+ fn durable_prefix_and_lost_ack_failures_keep_bytes_without_admitting_retry_or_cleanup() {
+     let valid = bundle();
+     for cut in 0..3 {
+-        let folder = directory(); let store = Store::open(folder.path()).unwrap();
++        let folder = directory();
++        let store = Store::open(folder.path()).unwrap();
+         let mut seen = 0;
+-        assert!(store.publish_inner(&valid, |_| {
+-            let here = seen; seen += 1;
+-            if here == cut { Err(io::Error::other("private test acknowledgement failure")) } else { Ok(()) }
+-        }).is_err());
+-        assert_eq!(seen, cut+1);
+-        let at = folder.path().join(if cut==0 { STAGE } else { FILE });
++        assert!(
++            store
++                .publish_inner(&valid, |_| {
++                    let here = seen;
++                    seen += 1;
++                    if here == cut {
++                        Err(io::Error::other("private test acknowledgement failure"))
++                    } else {
++                        Ok(())
++                    }
++                })
++                .is_err()
++        );
++        assert_eq!(seen, cut + 1);
++        let at = folder.path().join(if cut == 0 { STAGE } else { FILE });
+         assert_eq!(fs::read(&at).unwrap(), valid.encoded());
+         assert_eq!(fs::metadata(&at).unwrap().mode() & 0o7777, 0o600);
+-        assert!(store.publish(&valid).is_err()); assert_eq!(fs::read(&at).unwrap(), valid.encoded());
+-        if cut==0 { assert!(store.load(&transaction(), valid.artifact()).is_err()); }
+-        else { assert_eq!(store.load(&transaction(), valid.artifact()).unwrap().encoded(), valid.encoded()); }
++        assert!(store.publish(&valid).is_err());
++        assert_eq!(fs::read(&at).unwrap(), valid.encoded());
++        if cut == 0 {
++            assert!(store.load(&transaction(), valid.artifact()).is_err());
++        } else {
++            assert_eq!(
++                store
++                    .load(&transaction(), valid.artifact())
++                    .unwrap()
++                    .encoded(),
++                valid.encoded()
++            );
++        }
+     }
+ }
+ 
+Diff in <preimage-tree>/lampOS/crates/update/src/writer_preimages/tests.rs:230:
+ #[test]
+ fn diagnostic_surfaces_hide_values_and_empty_selection_observes_no_live_root() {
+-    let valid = bundle(); let debug = format!("{valid:?} {:?}",valid.entries());
++    let valid = bundle();
++    let debug = format!("{valid:?} {:?}", valid.entries());
+     let private_transaction = transaction();
+-    for private in [PREFIX,"private-old",private_transaction.as_str()] { assert!(!debug.contains(private)); }
++    for private in [PREFIX, "private-old", private_transaction.as_str()] {
++        assert!(!debug.contains(private));
++    }
+     let error = refuses(b"{\"version\":\"private-future-value\"}").to_string();
+     assert!(!error.contains("private-future-value"));
+-    let empty: Vec<Setting> = Vec::new(); let recorded = BTreeMap::new(); let writing = BTreeMap::new();
+-    let raw = writer_settings::capture(Path::new("/not-read-private-root"), &empty, &recorded, &writing).unwrap();
+-    let bundle = Bundle::from_capture(&transaction(), &raw).unwrap(); assert!(bundle.entries().is_empty());
+-    let folder = directory(); let store = Store::open(folder.path()).unwrap(); store.publish(&bundle).unwrap();
+-    assert!(store.load(&transaction(),bundle.artifact()).unwrap().entries().is_empty());
++    let empty: Vec<Setting> = Vec::new();
++    let recorded = BTreeMap::new();
++    let writing = BTreeMap::new();
++    let raw = writer_settings::capture(
++        Path::new("/not-read-private-root"),
++        &empty,
++        &recorded,
++        &writing,
++    )
++    .unwrap();
++    let bundle = Bundle::from_capture(&transaction(), &raw).unwrap();
++    assert!(bundle.entries().is_empty());
++    let folder = directory();
++    let store = Store::open(folder.path()).unwrap();
++    store.publish(&bundle).unwrap();
++    assert!(
++        store
++            .load(&transaction(), bundle.artifact())
++            .unwrap()
++            .entries()
++            .is_empty()
++    );
+ }
+ 
+ #[test]
+Diff in <preimage-tree>/lampOS/crates/update/src/writer_preimages/tests.rs:245:
+ fn exact_four_mib_of_binary_old_bytes_and_empty_files_survive_without_truncation() {
+-    let root = directory(); let mut settings = Vec::new();
++    let root = directory();
++    let mut settings = Vec::new();
+     fs::create_dir_all(root.path().join("etc/lampOS/expression")).unwrap();
+     for n in 0..5 {
+         let setting = Setting::new(&format!("{PREFIX}exact{n}"), "new");
+Diff in <preimage-tree>/lampOS/crates/update/src/writer_preimages/tests.rs:250:
+-        let bytes = if n < 4 { vec![n as u8; MOST_FILE_BYTES] } else { Vec::new() };
+-        fs::write(root.path().join(setting.path.trim_start_matches('/')), bytes).unwrap();
++        let bytes = if n < 4 {
++            vec![n as u8; MOST_FILE_BYTES]
++        } else {
++            Vec::new()
++        };
++        fs::write(
++            root.path().join(setting.path.trim_start_matches('/')),
++            bytes,
++        )
++        .unwrap();
+         settings.push(setting);
+     }
+-    let recorded = BTreeMap::new(); let writing = BTreeMap::new();
++    let recorded = BTreeMap::new();
++    let writing = BTreeMap::new();
+     let raw = writer_settings::capture(root.path(), &settings, &recorded, &writing).unwrap();
+     assert_eq!(raw.old_bytes(), MOST_OLD_BYTES);
+     let bundle = Bundle::from_capture(&transaction(), &raw).unwrap();
+Diff in <preimage-tree>/lampOS/crates/update/src/writer_preimages/tests.rs:258:
+-    let loaded = Bundle::decode(bundle.encoded().to_owned(), &transaction(),bundle.artifact()).unwrap();
+-    for (n,entry) in loaded.entries().iter().enumerate() {
+-        let Entry::Present { bytes, identity } = &entry.before().entry else { panic!("present before-image lost"); };
+-        assert_eq!(bytes.len(), if n<4 { MOST_FILE_BYTES } else { 0 });
+-        assert!(bytes.iter().all(|byte| *byte==n as u8));
++    let loaded = Bundle::decode(
++        bundle.encoded().to_owned(),
++        &transaction(),
++        bundle.artifact(),
++    )
++    .unwrap();
++    for (n, entry) in loaded.entries().iter().enumerate() {
++        let Entry::Present { bytes, identity } = &entry.before().entry else {
++            panic!("present before-image lost");
++        };
++        assert_eq!(bytes.len(), if n < 4 { MOST_FILE_BYTES } else { 0 });
++        assert!(bytes.iter().all(|byte| *byte == n as u8));
+         assert_eq!(identity.length, bytes.len() as u64);
+     }
+ }
+Diff in <preimage-tree>/lampOS/crates/update/src/writer_preimages.rs:11:
+ };
+ use base64::{Engine, engine::general_purpose::STANDARD};
+ use rustix::fs::{AtFlags, FileType, Mode, OFlags, RenameFlags, Stat};
+-use serde::{Deserialize, Deserializer, Serialize, de::{self, MapAccess, SeqAccess, Visitor}};
++use serde::{
++    Deserialize, Deserializer, Serialize,
++    de::{self, MapAccess, SeqAccess, Visitor},
++};
+ use std::{
+-    collections::BTreeSet, fmt,
++    collections::BTreeSet,
++    fmt,
+     fs::{File, Permissions},
+     io::{self, Read, Write},
+     os::unix::fs::{MetadataExt, PermissionsExt},
+Diff in <preimage-tree>/lampOS/crates/update/src/writer_preimages.rs:33:
+     io::Error::new(error.into().kind(), message)
+ }
+ fn digest(value: &str) -> bool {
+-    value.len() == 64 && value.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
++    value.len() == 64
++        && value
++            .bytes()
++            .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+ }
+ 
+ #[derive(Serialize)]
+Diff in <preimage-tree>/lampOS/crates/update/src/writer_preimages.rs:48:
+                 f.write_str("bounded text")
+             }
+             fn visit_str<E: de::Error>(self, value: &str) -> Result<Self::Value, E> {
+-                if value.len() > N { return Err(E::custom("text bound exceeded")); }
++                if value.len() > N {
++                    return Err(E::custom("text bound exceeded"));
++                }
+                 Ok(Text(value.to_owned()))
+             }
+         }
+Diff in <preimage-tree>/lampOS/crates/update/src/writer_preimages.rs:85:
+ }
+ 
+ #[derive(Serialize, Deserialize)]
+-enum Op { #[serde(rename = "ordinary_preimages")] Ordinary }
++enum Op {
++    #[serde(rename = "ordinary_preimages")]
++    Ordinary,
++}
+ #[derive(Serialize, Deserialize)]
+ struct Document {
+     version: u32,
+Diff in <preimage-tree>/lampOS/crates/update/src/writer_preimages.rs:105:
+ #[derive(Serialize)]
+ #[serde(tag = "kind", rename_all = "snake_case")]
+ enum Before {
+-    Present { bytes: Text<MOST_BASE64>, identity: Stamp },
++    Present {
++        bytes: Text<MOST_BASE64>,
++        identity: Stamp,
++    },
+     MissingLeaf,
+-    MissingAncestor { component: usize },
++    MissingAncestor {
++        component: usize,
++    },
+ }
+ 
+ // A streaming tagged reader avoids serde's internal-tag Content buffering
+Diff in <preimage-tree>/lampOS/crates/update/src/writer_preimages.rs:116:
+     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+         #[derive(Deserialize)]
+         #[serde(field_identifier, rename_all = "snake_case")]
+-        enum Field { Kind, Bytes, Identity, Component, #[serde(other)] Other }
++        enum Field {
++            Kind,
++            Bytes,
++            Identity,
++            Component,
++            #[serde(other)]
++            Other,
++        }
+         #[derive(Deserialize)]
+         #[serde(rename_all = "snake_case")]
+-        enum Kind { Present, MissingLeaf, MissingAncestor }
++        enum Kind {
++            Present,
++            MissingLeaf,
++            MissingAncestor,
++        }
+         struct Tagged;
+         impl<'de> Visitor<'de> for Tagged {
+             type Value = Before;
+Diff in <preimage-tree>/lampOS/crates/update/src/writer_preimages.rs:134:
+                 while let Some(field) = map.next_key()? {
+                     match field {
+                         Field::Kind => {
+-                            if kind.is_some() { return Err(de::Error::duplicate_field("kind")); }
++                            if kind.is_some() {
++                                return Err(de::Error::duplicate_field("kind"));
++                            }
+                             kind = Some(map.next_value()?);
+                         }
+                         Field::Bytes => {
+Diff in <preimage-tree>/lampOS/crates/update/src/writer_preimages.rs:141:
+-                            if bytes.is_some() { return Err(de::Error::duplicate_field("bytes")); }
++                            if bytes.is_some() {
++                                return Err(de::Error::duplicate_field("bytes"));
++                            }
+                             bytes = Some(map.next_value()?);
+                         }
+                         Field::Identity => {
+Diff in <preimage-tree>/lampOS/crates/update/src/writer_preimages.rs:145:
+-                            if identity.is_some() { return Err(de::Error::duplicate_field("identity")); }
++                            if identity.is_some() {
++                                return Err(de::Error::duplicate_field("identity"));
++                            }
+                             identity = Some(map.next_value()?);
+                         }
+                         Field::Component => {
+Diff in <preimage-tree>/lampOS/crates/update/src/writer_preimages.rs:149:
+-                            if component.is_some() { return Err(de::Error::duplicate_field("component")); }
++                            if component.is_some() {
++                                return Err(de::Error::duplicate_field("component"));
++                            }
+                             component = Some(map.next_value()?);
+                         }
+-                        Field::Other => { let _: de::IgnoredAny = map.next_value()?; }
++                        Field::Other => {
++                            let _: de::IgnoredAny = map.next_value()?;
++                        }
+                     }
+                 }
+                 match kind.ok_or_else(|| de::Error::missing_field("kind"))? {
+Diff in <preimage-tree>/lampOS/crates/update/src/writer_preimages.rs:157:
+                         bytes: bytes.ok_or_else(|| de::Error::missing_field("bytes"))?,
+                         identity: identity.ok_or_else(|| de::Error::missing_field("identity"))?,
+                     }),
+-                    Kind::MissingLeaf if bytes.is_none() && identity.is_none() && component.is_none() => Ok(Before::MissingLeaf),
+-                    Kind::MissingAncestor if bytes.is_none() && identity.is_none() => Ok(Before::MissingAncestor {
+-                        component: component.ok_or_else(|| de::Error::missing_field("component"))?,
+-                    }),
+-                    _ => Err(de::Error::custom("unsupported before-image field combination")),
++                    Kind::MissingLeaf
++                        if bytes.is_none() && identity.is_none() && component.is_none() =>
++                    {
++                        Ok(Before::MissingLeaf)
++                    }
++                    Kind::MissingAncestor if bytes.is_none() && identity.is_none() => {
++                        Ok(Before::MissingAncestor {
++                            component: component
++                                .ok_or_else(|| de::Error::missing_field("component"))?,
++                        })
++                    }
++                    _ => Err(de::Error::custom(
++                        "unsupported before-image field combination",
++                    )),
+                 }
+             }
+         }
+Diff in <preimage-tree>/lampOS/crates/update/src/writer_preimages.rs:172:
+ // Private wire representation: the observer gains no serde or mutation API.
+ #[derive(Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+ struct Stamp {
+-    device: u64, inode: u64, links: u64, length: u64, mode: u32,
+-    uid: u32, gid: u32,
+-    modified_seconds: i64, modified_nanos: i64,
+-    changed_seconds: i64, changed_nanos: i64,
++    device: u64,
++    inode: u64,
++    links: u64,
++    length: u64,
++    mode: u32,
++    uid: u32,
++    gid: u32,
++    modified_seconds: i64,
++    modified_nanos: i64,
++    changed_seconds: i64,
++    changed_nanos: i64,
+ }
+ impl From<Identity> for Stamp {
+     fn from(i: Identity) -> Self {
+Diff in <preimage-tree>/lampOS/crates/update/src/writer_preimages.rs:182:
+-        Self { device: i.device, inode: i.inode, links: i.links, length: i.length,
+-            mode: i.mode, uid: i.uid, gid: i.gid, modified_seconds: i.modified_seconds,
+-            modified_nanos: i.modified_nanos, changed_seconds: i.changed_seconds,
+-            changed_nanos: i.changed_nanos }
++        Self {
++            device: i.device,
++            inode: i.inode,
++            links: i.links,
++            length: i.length,
++            mode: i.mode,
++            uid: i.uid,
++            gid: i.gid,
++            modified_seconds: i.modified_seconds,
++            modified_nanos: i.modified_nanos,
++            changed_seconds: i.changed_seconds,
++            changed_nanos: i.changed_nanos,
++        }
+     }
+ }
+ impl From<Stamp> for Identity {
+Diff in <preimage-tree>/lampOS/crates/update/src/writer_preimages.rs:189:
+     fn from(i: Stamp) -> Self {
+-        Self { device: i.device, inode: i.inode, links: i.links, length: i.length,
+-            mode: i.mode, uid: i.uid, gid: i.gid, modified_seconds: i.modified_seconds,
+-            modified_nanos: i.modified_nanos, changed_seconds: i.changed_seconds,
+-            changed_nanos: i.changed_nanos }
++        Self {
++            device: i.device,
++            inode: i.inode,
++            links: i.links,
++            length: i.length,
++            mode: i.mode,
++            uid: i.uid,
++            gid: i.gid,
++            modified_seconds: i.modified_seconds,
++            modified_nanos: i.modified_nanos,
++            changed_seconds: i.changed_seconds,
++            changed_nanos: i.changed_nanos,
++        }
+     }
+ }
+ impl Stamp {
+Diff in <preimage-tree>/lampOS/crates/update/src/writer_preimages.rs:197:
+     fn check(&self, directory: bool) -> io::Result<()> {
+-        let kind = if directory { FileType::Directory } else { FileType::RegularFile };
+-        if self.mode & !0o177777 != 0 || FileType::from_raw_mode(self.mode) != kind || self.links == 0
++        let kind = if directory {
++            FileType::Directory
++        } else {
++            FileType::RegularFile
++        };
++        if self.mode & !0o177777 != 0
++            || FileType::from_raw_mode(self.mode) != kind
++            || self.links == 0
+             || (!directory && self.links != 1)
+             || !(0..1_000_000_000).contains(&self.modified_nanos)
+-            || !(0..1_000_000_000).contains(&self.changed_nanos) {
++            || !(0..1_000_000_000).contains(&self.changed_nanos)
++        {
+             return Err(invalid("invalid preimage identity"));
+         }
+         Ok(())
+Diff in <preimage-tree>/lampOS/crates/update/src/writer_preimages.rs:208:
+ 
+ /// Owned immutable selected input, not an approved action or desired text.
+ pub struct Preimage {
+-    path: String, recorded: Option<String>, writing: Option<String>, before: Observation,
++    path: String,
++    recorded: Option<String>,
++    writing: Option<String>,
++    before: Observation,
+ }
+ impl Preimage {
+-    pub fn path(&self) -> &str { &self.path }
+-    pub fn recorded(&self) -> Option<&str> { self.recorded.as_deref() }
+-    pub fn writing(&self) -> Option<&str> { self.writing.as_deref() }
+-    pub fn before(&self) -> &Observation { &self.before }
++    pub fn path(&self) -> &str {
++        &self.path
++    }
++    pub fn recorded(&self) -> Option<&str> {
++        self.recorded.as_deref()
++    }
++    pub fn writing(&self) -> Option<&str> {
++        self.writing.as_deref()
++    }
++    pub fn before(&self) -> &Observation {
++        &self.before
++    }
+ }
+ impl fmt::Debug for Preimage {
+     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+Diff in <preimage-tree>/lampOS/crates/update/src/writer_preimages.rs:221:
+-        f.debug_struct("Preimage").field("ancestor_count", &self.before.ancestors.len())
+-            .field("old_byte_count", &match &self.before.entry {
+-                Entry::Present { bytes, .. } => bytes.len(), _ => 0,
+-            }).finish()
++        f.debug_struct("Preimage")
++            .field("ancestor_count", &self.before.ancestors.len())
++            .field(
++                "old_byte_count",
++                &match &self.before.entry {
++                    Entry::Present { bytes, .. } => bytes.len(),
++                    _ => 0,
++                },
++            )
++            .finish()
+     }
+ }
+ 
+Diff in <preimage-tree>/lampOS/crates/update/src/writer_preimages.rs:228:
+ /// Retains original encoded bytes, including unknown nonsemantic fields.
+ /// No field/record mutation or reserialization interface is provided.
+ pub struct Bundle {
+-    transaction: String, entries: Vec<Preimage>, encoded: Vec<u8>, artifact: Artifact,
++    transaction: String,
++    entries: Vec<Preimage>,
++    encoded: Vec<u8>,
++    artifact: Artifact,
+ }
+ impl fmt::Debug for Bundle {
+     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+Diff in <preimage-tree>/lampOS/crates/update/src/writer_preimages.rs:235:
+-        f.debug_struct("PreimageBundle").field("entry_count", &self.entries.len())
+-            .field("encoded_byte_count", &self.encoded.len()).finish()
++        f.debug_struct("PreimageBundle")
++            .field("entry_count", &self.entries.len())
++            .field("encoded_byte_count", &self.encoded.len())
++            .finish()
+     }
+ }
+ impl Bundle {
+Diff in <preimage-tree>/lampOS/crates/update/src/writer_preimages.rs:249:
+             let before = entry.before();
+             let encoded = match &before.entry {
+                 Entry::Present { bytes, identity } => {
+-                    old_bytes = old_bytes.checked_add(bytes.len())
++                    old_bytes = old_bytes
++                        .checked_add(bytes.len())
+                         .filter(|n| *n <= MOST_OLD_BYTES)
+                         .ok_or_else(|| invalid("preimage old byte budget exceeded"))?;
+-                    if bytes.len() > MOST_FILE_BYTES { return Err(invalid("preimage file bound exceeded")); }
+-                    Before::Present { bytes: Text(STANDARD.encode(bytes)), identity: (*identity).into() }
++                    if bytes.len() > MOST_FILE_BYTES {
++                        return Err(invalid("preimage file bound exceeded"));
++                    }
++                    Before::Present {
++                        bytes: Text(STANDARD.encode(bytes)),
++                        identity: (*identity).into(),
++                    }
+                 }
+                 Entry::MissingLeaf => Before::MissingLeaf,
+-                Entry::MissingAncestor { component } => Before::MissingAncestor { component: *component },
++                Entry::MissingAncestor { component } => Before::MissingAncestor {
++                    component: *component,
++                },
+             };
+             entries.push(Encoded {
+                 path: Text(entry.setting().path.clone()),
+Diff in <preimage-tree>/lampOS/crates/update/src/writer_preimages.rs:263:
+-                records: [entry.recorded().map(|s| Text(s.to_owned())), entry.writing().map(|s| Text(s.to_owned()))],
+-                ancestors: List(before.ancestors.iter().copied().map(Stamp::from).collect()), before: encoded,
++                records: [
++                    entry.recorded().map(|s| Text(s.to_owned())),
++                    entry.writing().map(|s| Text(s.to_owned())),
++                ],
++                ancestors: List(before.ancestors.iter().copied().map(Stamp::from).collect()),
++                before: encoded,
+             });
+         }
+-        let doc = Document { version: 1, op: Op::Ordinary, transaction: Text(transaction.to_owned()), entries: List(entries) };
++        let doc = Document {
++            version: 1,
++            op: Op::Ordinary,
++            transaction: Text(transaction.to_owned()),
++            entries: List(entries),
++        };
+         let mut output = Capped(Vec::new());
+-        serde_json::to_writer(&mut output, &doc).map_err(|_| invalid("preimage encoding exceeds its bound"))?;
++        serde_json::to_writer(&mut output, &doc)
++            .map_err(|_| invalid("preimage encoding exceeds its bound"))?;
+         let expected = Artifact::of(&output.0);
+         Self::decode(output.0, transaction, &expected)
+     }
+Diff in <preimage-tree>/lampOS/crates/update/src/writer_preimages.rs:273:
+-    pub fn transaction(&self) -> &str { &self.transaction }
+-    pub fn entries(&self) -> &[Preimage] { &self.entries }
+-    pub fn encoded(&self) -> &[u8] { &self.encoded }
+-    pub fn artifact(&self) -> &Artifact { &self.artifact }
++    pub fn transaction(&self) -> &str {
++        &self.transaction
++    }
++    pub fn entries(&self) -> &[Preimage] {
++        &self.entries
++    }
++    pub fn encoded(&self) -> &[u8] {
++        &self.encoded
++    }
++    pub fn artifact(&self) -> &Artifact {
++        &self.artifact
++    }
+ 
+     /// Verify exact identity/size BEFORE parsing; identity is not authentication.
+     pub fn decode(encoded: Vec<u8>, transaction: &str, expected: &Artifact) -> io::Result<Self> {
+Diff in <preimage-tree>/lampOS/crates/update/src/writer_preimages.rs:280:
+         check_expected(transaction, expected)?;
+-        if encoded.len() as u64 != expected.size || manifest::sha256_hex(&encoded) != expected.sha256 {
++        if encoded.len() as u64 != expected.size
++            || manifest::sha256_hex(&encoded) != expected.sha256
++        {
+             return Err(invalid("preimage artifact identity mismatch"));
+         }
+-        let doc: Document = serde_json::from_slice(&encoded).map_err(|_| invalid("invalid preimage encoding"))?;
++        let doc: Document =
++            serde_json::from_slice(&encoded).map_err(|_| invalid("invalid preimage encoding"))?;
+         if doc.version != 1 || doc.transaction.0 != transaction {
+             return Err(invalid("unsupported preimage version or transaction"));
+         }
+Diff in <preimage-tree>/lampOS/crates/update/src/writer_preimages.rs:293:
+         for entry in &doc.entries.0 {
+             let path = &entry.path.0;
+             let parts = path.strip_prefix('/').map_or(0, |s| s.split('/').count());
+-            if path.len() > 511 || parts > 64 || !manifest::is_setting_path(path) || !paths.insert(path.clone()) {
++            if path.len() > 511
++                || parts > 64
++                || !manifest::is_setting_path(path)
++                || !paths.insert(path.clone())
++            {
+                 return Err(invalid("invalid or duplicate preimage path"));
+             }
+             for (n, value) in entry.records.iter().enumerate() {
+Diff in <preimage-tree>/lampOS/crates/update/src/writer_preimages.rs:300:
+-                if value.as_ref().is_some_and(|v| !digest(&v.0) && !(n == 0 && v.0 == install::SET_ASIDE)) {
++                if value
++                    .as_ref()
++                    .is_some_and(|v| !digest(&v.0) && !(n == 0 && v.0 == install::SET_ASIDE))
++                {
+                     return Err(invalid("invalid selected preimage record"));
+                 }
+             }
+Diff in <preimage-tree>/lampOS/crates/update/src/writer_preimages.rs:304:
+-            let first = entry.ancestors.0.first().ok_or_else(|| invalid("preimage lacks root identity"))?;
+-            if root.is_some_and(|r| r != *first) { return Err(invalid("preimage roots disagree")); }
++            let first = entry
++                .ancestors
++                .0
++                .first()
++                .ok_or_else(|| invalid("preimage lacks root identity"))?;
++            if root.is_some_and(|r| r != *first) {
++                return Err(invalid("preimage roots disagree"));
++            }
+             root = Some(*first);
+-            for stamp in &entry.ancestors.0 { stamp.check(true)?; }
++            for stamp in &entry.ancestors.0 {
++                stamp.check(true)?;
++            }
+             let count = match &entry.before {
+                 Before::Present { bytes, identity } => {
+                     identity.check(false)?;
+Diff in <preimage-tree>/lampOS/crates/update/src/writer_preimages.rs:311:
+                     if identity.length > MOST_FILE_BYTES as u64 || bytes.0.len() > MOST_BASE64 {
+                         return Err(invalid("preimage file bound exceeded"));
+                     }
+-                    total = total.checked_add(identity.length as usize).filter(|n| *n <= MOST_OLD_BYTES)
++                    total = total
++                        .checked_add(identity.length as usize)
++                        .filter(|n| *n <= MOST_OLD_BYTES)
+                         .ok_or_else(|| invalid("preimage old byte budget exceeded"))?;
+                     parts
+                 }
+Diff in <preimage-tree>/lampOS/crates/update/src/writer_preimages.rs:318:
+                 Before::MissingLeaf => parts,
+                 Before::MissingAncestor { component } => {
+-                    if *component >= parts.saturating_sub(1) { return Err(invalid("invalid missing preimage component")); }
++                    if *component >= parts.saturating_sub(1) {
++                        return Err(invalid("invalid missing preimage component"));
++                    }
+                     component + 1
+                 }
+             };
+Diff in <preimage-tree>/lampOS/crates/update/src/writer_preimages.rs:324:
+-            if entry.ancestors.0.len() != count { return Err(invalid("invalid preimage ancestor count")); }
++            if entry.ancestors.0.len() != count {
++                return Err(invalid("invalid preimage ancestor count"));
++            }
+         }
+         let mut entries = Vec::with_capacity(doc.entries.0.len());
+         for entry in doc.entries.0 {
+Diff in <preimage-tree>/lampOS/crates/update/src/writer_preimages.rs:334:
+                     // The library's documented conservative decode buffer is
+                     // bounded to the claimed length plus at most two bytes.
+                     let mut decoded = vec![0; base64::decoded_len_estimate(bytes.0.len())];
+-                    let length = STANDARD.decode_slice(bytes.0.as_bytes(), &mut decoded)
++                    let length = STANDARD
++                        .decode_slice(bytes.0.as_bytes(), &mut decoded)
+                         .map_err(|_| invalid("invalid preimage base64 or length"))?;
+-                    if length != wanted { return Err(invalid("invalid preimage byte length")); }
++                    if length != wanted {
++                        return Err(invalid("invalid preimage byte length"));
++                    }
+                     decoded.truncate(length);
+-                    Entry::Present { bytes: decoded, identity: identity.into() }
++                    Entry::Present {
++                        bytes: decoded,
++                        identity: identity.into(),
++                    }
+                 }
+                 Before::MissingLeaf => Entry::MissingLeaf,
+                 Before::MissingAncestor { component } => Entry::MissingAncestor { component },
+Diff in <preimage-tree>/lampOS/crates/update/src/writer_preimages.rs:345:
+             };
+             let [recorded, writing] = entry.records;
+-            entries.push(Preimage { path: entry.path.0, recorded: recorded.map(|s| s.0), writing: writing.map(|s| s.0),
+-                before: Observation { ancestors: entry.ancestors.0.into_iter().map(Identity::from).collect(), entry: before } });
++            entries.push(Preimage {
++                path: entry.path.0,
++                recorded: recorded.map(|s| s.0),
++                writing: writing.map(|s| s.0),
++                before: Observation {
++                    ancestors: entry.ancestors.0.into_iter().map(Identity::from).collect(),
++                    entry: before,
++                },
++            });
+         }
+-        Ok(Self { transaction: doc.transaction.0, artifact: Artifact::of(&encoded), encoded, entries })
++        Ok(Self {
++            transaction: doc.transaction.0,
++            artifact: Artifact::of(&encoded),
++            encoded,
++            entries,
++        })
+     }
+ }
+ fn check_expected(transaction: &str, artifact: &Artifact) -> io::Result<()> {
+Diff in <preimage-tree>/lampOS/crates/update/src/writer_preimages.rs:354:
+-    if !digest(transaction) || !digest(&artifact.sha256) || artifact.size == 0 || artifact.size > MOST_BUNDLE_BYTES as u64 {
++    if !digest(transaction)
++        || !digest(&artifact.sha256)
++        || artifact.size == 0
++        || artifact.size > MOST_BUNDLE_BYTES as u64
++    {
+         return Err(invalid("invalid preimage artifact expectation"));
+     }
+     Ok(())
+Diff in <preimage-tree>/lampOS/crates/update/src/writer_preimages.rs:359:
+ struct Capped(Vec<u8>);
+ impl Write for Capped {
+     fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+-        if self.0.len().checked_add(bytes.len()).is_none_or(|n| n > MOST_BUNDLE_BYTES) {
++        if self
++            .0
++            .len()
++            .checked_add(bytes.len())
++            .is_none_or(|n| n > MOST_BUNDLE_BYTES)
++        {
+             return Err(invalid("preimage encoded byte bound exceeded"));
+         }
+-        self.0.extend_from_slice(bytes); Ok(bytes.len())
++        self.0.extend_from_slice(bytes);
++        Ok(bytes.len())
+     }
+-    fn flush(&mut self) -> io::Result<()> { Ok(()) }
++    fn flush(&mut self) -> io::Result<()> {
++        Ok(())
++    }
+ }
+ 
+ /// Fixed-name private artifact I/O, anchored to an already trusted directory.
+Diff in <preimage-tree>/lampOS/crates/update/src/writer_preimages.rs:371:
+ /// Leaf owner/mode checks do not authenticate privileged ancestors or callers.
+-pub struct Store { directory: File }
++pub struct Store {
++    directory: File,
++}
+ impl fmt::Debug for Store {
+-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result { f.debug_struct("PreimageStore").finish_non_exhaustive() }
++    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
++        f.debug_struct("PreimageStore").finish_non_exhaustive()
++    }
+ }
+ #[derive(Clone, Copy)]
+-enum Published { StageSynced, Renamed, DirectorySynced }
++enum Published {
++    StageSynced,
++    Renamed,
++    DirectorySynced,
++}
+ impl Store {
+     pub fn open(folder: &Path) -> io::Result<Self> {
+-        let directory = File::from(rustix::fs::open(folder, OFlags::RDONLY | OFlags::DIRECTORY | OFlags::NOFOLLOW | OFlags::CLOEXEC, Mode::empty())
+-            .map_err(|e| failure(e, "cannot open private preimage directory"))?);
+-        let meta = directory.metadata().map_err(|e| failure(e, "cannot inspect private preimage directory"))?;
+-        if !meta.is_dir() || meta.mode() & 0o7777 != 0o700 || meta.uid() != rustix::process::geteuid().as_raw() {
+-            return Err(invalid("preimage directory is not private and caller-owned"));
++        let directory = File::from(
++            rustix::fs::open(
++                folder,
++                OFlags::RDONLY | OFlags::DIRECTORY | OFlags::NOFOLLOW | OFlags::CLOEXEC,
++                Mode::empty(),
++            )
++            .map_err(|e| failure(e, "cannot open private preimage directory"))?,
++        );
++        let meta = directory
++            .metadata()
++            .map_err(|e| failure(e, "cannot inspect private preimage directory"))?;
++        if !meta.is_dir()
++            || meta.mode() & 0o7777 != 0o700
++            || meta.uid() != rustix::process::geteuid().as_raw()
++        {
++            return Err(invalid(
++                "preimage directory is not private and caller-owned",
++            ));
+         }
+         Ok(Self { directory })
+     }
+Diff in <preimage-tree>/lampOS/crates/update/src/writer_preimages.rs:397:
+     pub fn publish(&self, bundle: &Bundle) -> io::Result<Artifact> {
+         self.publish_inner(bundle, |_| Ok(()))
+     }
+-    fn publish_inner(&self, bundle: &Bundle, mut checkpoint: impl FnMut(Published) -> io::Result<()>) -> io::Result<Artifact> {
+-        self.absent(FILE)?; self.absent(STAGE)?;
+-        let mut file = File::from(rustix::fs::openat(&self.directory, STAGE,
+-            OFlags::WRONLY | OFlags::CREATE | OFlags::EXCL | OFlags::NOFOLLOW | OFlags::NONBLOCK | OFlags::CLOEXEC,
+-            Mode::RUSR | Mode::WUSR).map_err(|e| failure(e, "cannot create private preimage stage"))?);
+-        file.set_permissions(Permissions::from_mode(0o600)).map_err(|e| failure(e, "cannot protect private preimage stage"))?;
+-        file.write_all(bundle.encoded()).map_err(|e| failure(e, "cannot write private preimage stage"))?;
+-        file.sync_all().map_err(|e| failure(e, "cannot sync private preimage stage"))?;
+-        self.directory.sync_all().map_err(|e| failure(e, "cannot sync private preimage stage directory"))?;
++    fn publish_inner(
++        &self,
++        bundle: &Bundle,
++        mut checkpoint: impl FnMut(Published) -> io::Result<()>,
++    ) -> io::Result<Artifact> {
++        self.absent(FILE)?;
++        self.absent(STAGE)?;
++        let mut file = File::from(
++            rustix::fs::openat(
++                &self.directory,
++                STAGE,
++                OFlags::WRONLY
++                    | OFlags::CREATE
++                    | OFlags::EXCL
++                    | OFlags::NOFOLLOW
++                    | OFlags::NONBLOCK
++                    | OFlags::CLOEXEC,
++                Mode::RUSR | Mode::WUSR,
++            )
++            .map_err(|e| failure(e, "cannot create private preimage stage"))?,
++        );
++        file.set_permissions(Permissions::from_mode(0o600))
++            .map_err(|e| failure(e, "cannot protect private preimage stage"))?;
++        file.write_all(bundle.encoded())
++            .map_err(|e| failure(e, "cannot write private preimage stage"))?;
++        file.sync_all()
++            .map_err(|e| failure(e, "cannot sync private preimage stage"))?;
++        self.directory
++            .sync_all()
++            .map_err(|e| failure(e, "cannot sync private preimage stage directory"))?;
+         checkpoint(Published::StageSynced)?;
+-        rustix::fs::renameat_with(&self.directory, STAGE, &self.directory, FILE, RenameFlags::NOREPLACE)
+-            .map_err(|e| failure(e, "cannot publish private preimage artifact"))?;
++        rustix::fs::renameat_with(
++            &self.directory,
++            STAGE,
++            &self.directory,
++            FILE,
++            RenameFlags::NOREPLACE,
++        )
++        .map_err(|e| failure(e, "cannot publish private preimage artifact"))?;
+         checkpoint(Published::Renamed)?;
+-        self.directory.sync_all().map_err(|e| failure(e, "cannot sync private preimage directory"))?;
++        self.directory
++            .sync_all()
++            .map_err(|e| failure(e, "cannot sync private preimage directory"))?;
+         checkpoint(Published::DirectorySynced)?;
+         Ok(bundle.artifact().clone())
+     }
+Diff in <preimage-tree>/lampOS/crates/update/src/writer_preimages.rs:418:
+     /// success is not a new durability or admission acknowledgement. The future
+     /// caller must separately reconcile and sync/journal before any grant.
+     pub fn load(&self, transaction: &str, expected: &Artifact) -> io::Result<Bundle> {
+-        check_expected(transaction, expected)?; self.absent(STAGE)?;
++        check_expected(transaction, expected)?;
++        self.absent(STAGE)?;
+         let before = rustix::fs::statat(&self.directory, FILE, AtFlags::SYMLINK_NOFOLLOW)
+             .map_err(|e| failure(e, "cannot inspect private preimage artifact"))?;
+-        if FileType::from_raw_mode(before.st_mode) != FileType::RegularFile || before.st_nlink != 1
+-            || before.st_mode & 0o7777 != 0o600 || before.st_uid != rustix::process::geteuid().as_raw()
+-            || before.st_size < 0 || before.st_size as u64 != expected.size {
++        if FileType::from_raw_mode(before.st_mode) != FileType::RegularFile
++            || before.st_nlink != 1
++            || before.st_mode & 0o7777 != 0o600
++            || before.st_uid != rustix::process::geteuid().as_raw()
++            || before.st_size < 0
++            || before.st_size as u64 != expected.size
++        {
+             return Err(invalid("invalid private preimage artifact metadata"));
+         }
+-        let file = File::from(rustix::fs::openat(&self.directory, FILE, OFlags::RDONLY | OFlags::NOFOLLOW | OFlags::NONBLOCK | OFlags::CLOEXEC, Mode::empty())
+-            .map_err(|e| failure(e, "cannot open private preimage artifact"))?);
+-        let opened = rustix::fs::fstat(&file).map_err(|e| failure(e, "cannot inspect opened preimage artifact"))?;
+-        if !same_stat(&before, &opened) { return Err(invalid("preimage artifact changed before reading")); }
++        let file = File::from(
++            rustix::fs::openat(
++                &self.directory,
++                FILE,
++                OFlags::RDONLY | OFlags::NOFOLLOW | OFlags::NONBLOCK | OFlags::CLOEXEC,
++                Mode::empty(),
++            )
++            .map_err(|e| failure(e, "cannot open private preimage artifact"))?,
++        );
++        let opened = rustix::fs::fstat(&file)
++            .map_err(|e| failure(e, "cannot inspect opened preimage artifact"))?;
++        if !same_stat(&before, &opened) {
++            return Err(invalid("preimage artifact changed before reading"));
++        }
+         let mut bytes = vec![0; expected.size as usize + 1];
+-        let mut used = 0; let mut reader = &file;
++        let mut used = 0;
++        let mut reader = &file;
+         while used < bytes.len() {
+             match reader.read(&mut bytes[used..]) {
+-                Ok(0) => break, Ok(n) => used += n,
++                Ok(0) => break,
++                Ok(n) => used += n,
+                 Err(e) if e.kind() == io::ErrorKind::Interrupted => continue,
+                 Err(e) => return Err(failure(e, "cannot read private preimage artifact")),
+             }
+Diff in <preimage-tree>/lampOS/crates/update/src/writer_preimages.rs:441:
+         }
+-        let after = rustix::fs::fstat(&file).map_err(|e| failure(e, "cannot inspect read preimage artifact"))?;
+-        if !same_stat(&opened, &after) || used as u64 != expected.size { return Err(invalid("preimage artifact changed while reading")); }
+-        bytes.truncate(used); Bundle::decode(bytes, transaction, expected)
++        let after = rustix::fs::fstat(&file)
++            .map_err(|e| failure(e, "cannot inspect read preimage artifact"))?;
++        if !same_stat(&opened, &after) || used as u64 != expected.size {
++            return Err(invalid("preimage artifact changed while reading"));
++        }
++        bytes.truncate(used);
++        Bundle::decode(bytes, transaction, expected)
+     }
+ }
+ fn same_stat(a: &Stat, b: &Stat) -> bool {
+Diff in <preimage-tree>/lampOS/crates/update/src/writer_preimages.rs:448:
+-    a.st_dev == b.st_dev && a.st_ino == b.st_ino && a.st_mode == b.st_mode
+-        && a.st_nlink == b.st_nlink && a.st_size == b.st_size && a.st_uid == b.st_uid && a.st_gid == b.st_gid
+-        && a.st_mtime == b.st_mtime && a.st_mtime_nsec == b.st_mtime_nsec
+-        && a.st_ctime == b.st_ctime && a.st_ctime_nsec == b.st_ctime_nsec
++    a.st_dev == b.st_dev
++        && a.st_ino == b.st_ino
++        && a.st_mode == b.st_mode
++        && a.st_nlink == b.st_nlink
++        && a.st_size == b.st_size
++        && a.st_uid == b.st_uid
++        && a.st_gid == b.st_gid
++        && a.st_mtime == b.st_mtime
++        && a.st_mtime_nsec == b.st_mtime_nsec
++        && a.st_ctime == b.st_ctime
++        && a.st_ctime_nsec == b.st_ctime_nsec
+ }
+ 
+ #[cfg(test)]

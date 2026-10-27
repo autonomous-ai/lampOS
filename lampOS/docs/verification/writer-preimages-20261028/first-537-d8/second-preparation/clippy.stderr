@@ -1,0 +1,12 @@
+    Checking lamp-update v0.1.0 (<preimage-tree>/lampOS/crates/update)
+error: this boolean expression can be simplified
+   --> crates/update/src/writer_preimages.rs:447:38
+    |
+447 |                     .is_some_and(|v| !digest(&v.0) && !(n == 0 && v.0 == install::SET_ASIDE))
+    |                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: try: `!(digest(&v.0) || n == 0 && v.0 == install::SET_ASIDE)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.96.0/index.html#nonminimal_bool
+    = note: `-D clippy::nonminimal-bool` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::nonminimal_bool)]`
+
+error: could not compile `lamp-update` (lib) due to 1 previous error

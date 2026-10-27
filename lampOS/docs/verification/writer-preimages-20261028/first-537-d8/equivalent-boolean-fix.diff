@@ -1,0 +1,11 @@
+--- v2-lint-failed.rs
++++ equivalent-predicate.rs
+@@ -444,7 +444,7 @@
+             for (n, value) in entry.records.iter().enumerate() {
+                 if value
+                     .as_ref()
+-                    .is_some_and(|v| !digest(&v.0) && !(n == 0 && v.0 == install::SET_ASIDE))
++                    .is_some_and(|v| !(digest(&v.0) || n == 0 && v.0 == install::SET_ASIDE))
+                 {
+                     return Err(invalid("invalid selected preimage record"));
+                 }

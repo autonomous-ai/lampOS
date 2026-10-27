@@ -1,0 +1,104 @@
+{
+  "initial_fmt_exit": 1,
+  "preserved_initial_source": true,
+  "explicitly_allowed_owned_formatting_only": true,
+  "changed_paths": [
+    "lampOS/crates/update/src/writer_preimages.rs",
+    "lampOS/crates/update/src/writer_preimages/tests.rs"
+  ],
+  "before": {
+    "lampOS/crates/update/src/writer_preimages.rs": {
+      "git_mode": null,
+      "git_blob": null,
+      "sha256": "d0f604085cb1abffe2c63ce787d1a028e495ed57b3dc44713a38f45c7a4cce2d",
+      "actual_mode": 420,
+      "kind": 32768,
+      "untracked_owned_source": true
+    },
+    "lampOS/crates/update/src/writer_preimages/tests.rs": {
+      "git_mode": null,
+      "git_blob": null,
+      "sha256": "d277184b7aa12f8d96fe411fc35255b29377be3b6614dc2aef8c614657f33a29",
+      "actual_mode": 420,
+      "kind": 32768,
+      "untracked_owned_source": true
+    },
+    "lampOS/docs/reuse-decisions.md": {
+      "git_mode": "100644",
+      "git_blob": "a41755ffd97d653e52cda21a77e52f422dba661e",
+      "sha256": "c3925c5c6465db836cd8c3d287f1b3b3fb9a196329f16fa7ba5d5c3e1c568539",
+      "actual_mode": 420,
+      "kind": 32768
+    },
+    "lampOS/docs/writer-preimages.md": {
+      "git_mode": null,
+      "git_blob": null,
+      "sha256": "aaf450855a8cd84c257d2e64ffbf9577935cc45a1c751cbf64900467922beab9",
+      "actual_mode": 420,
+      "kind": 32768,
+      "untracked_owned_source": true
+    },
+    "lampOS/docs/updates.md": {
+      "git_mode": "100644",
+      "git_blob": "a349db54517ccdf056a567d1ddcda12476fe8b73",
+      "sha256": "4e24ea01c6fae2087c91dee1fb3b73ee18d95d2dc13a40cca868ce76bfcd5a15",
+      "actual_mode": 420,
+      "kind": 32768
+    },
+    "lampOS/crates/update/src/lib.rs": {
+      "git_mode": "100644",
+      "git_blob": "d10a9823678d0a044f126c120b394a11147cf25d",
+      "sha256": "bc0e2fef71dcb019d47de21df012bba6caffbce404648632e8a57eec2932bdec",
+      "actual_mode": 420,
+      "kind": 32768
+    }
+  },
+  "after": {
+    "lampOS/crates/update/src/writer_preimages.rs": {
+      "git_mode": null,
+      "git_blob": null,
+      "sha256": "7e27a8f7e10288ab9db31d6810b58fa20b1fc31066cb732d13e565d86b53618d",
+      "actual_mode": 420,
+      "kind": 32768,
+      "untracked_owned_source": true
+    },
+    "lampOS/crates/update/src/writer_preimages/tests.rs": {
+      "git_mode": null,
+      "git_blob": null,
+      "sha256": "6d06b27283543a308d4d4b1ada60406235a10c2ccf28eadc05aa1ac82ea3270f",
+      "actual_mode": 420,
+      "kind": 32768,
+      "untracked_owned_source": true
+    },
+    "lampOS/docs/reuse-decisions.md": {
+      "git_mode": "100644",
+      "git_blob": "a41755ffd97d653e52cda21a77e52f422dba661e",
+      "sha256": "c3925c5c6465db836cd8c3d287f1b3b3fb9a196329f16fa7ba5d5c3e1c568539",
+      "actual_mode": 420,
+      "kind": 32768
+    },
+    "lampOS/docs/writer-preimages.md": {
+      "git_mode": null,
+      "git_blob": null,
+      "sha256": "aaf450855a8cd84c257d2e64ffbf9577935cc45a1c751cbf64900467922beab9",
+      "actual_mode": 420,
+      "kind": 32768,
+      "untracked_owned_source": true
+    },
+    "lampOS/docs/updates.md": {
+      "git_mode": "100644",
+      "git_blob": "a349db54517ccdf056a567d1ddcda12476fe8b73",
+      "sha256": "4e24ea01c6fae2087c91dee1fb3b73ee18d95d2dc13a40cca868ce76bfcd5a15",
+      "actual_mode": 420,
+      "kind": 32768
+    },
+    "lampOS/crates/update/src/lib.rs": {
+      "git_mode": "100644",
+      "git_blob": "d10a9823678d0a044f126c120b394a11147cf25d",
+      "sha256": "bc0e2fef71dcb019d47de21df012bba6caffbce404648632e8a57eec2932bdec",
+      "actual_mode": 420,
+      "kind": 32768
+    }
+  },
+  "no_tests_or_compile_in_format_phase": true
+}

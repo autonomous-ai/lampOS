@@ -1,0 +1,20 @@
+{
+  "old_base": "0d1d1f2b944581169c9f96adba9f40ab88adba92",
+  "new_base": "d8ca71f4dc6e65b00564afb1e67c1a33311aeab8",
+  "changed": [
+    "M\tlampOS/crates/voice/src/coordinator.rs",
+    "M\tlampOS/crates/voice/src/known_faces.rs",
+    "M\tlampOS/crates/voice/src/memory_scope.rs",
+    "M\tlampOS/crates/voice/src/policy_holds.rs",
+    "M\tlampOS/crates/voice/src/provider_worker.rs",
+    "M\tlampOS/crates/voice/src/remember.rs",
+    "M\tlampOS/crates/voice/src/second_provider.rs",
+    "M\tlampOS/crates/voice/src/second_provider/tests/held_forget.rs",
+    "M\tlampOS/crates/voice/src/tools.rs",
+    "M\tlampOS/docs/memory.md",
+    "M\tlampOS/docs/switches.md",
+    "M\tlampOS/tools/played/make-skill-test.sh",
+    "M\tlampOS/tools/played/make-skill.sh"
+  ],
+  "runtime_equivalence_not_inferred": true
+}

@@ -1,0 +1,27 @@
+{
+  "donor_manifest": "<private-path>",
+  "manifest_sha256": "47aa7bb55c59b312f2482be114d0a82deb1e5ec115c34211993ef3b0d431df4f",
+  "closure_sha256": "1e42f11aad7c5c6a31b5abba54b0cabfdb91474216c060ecd130839a2c18031e",
+  "donor_closure": {
+    "head_unchanged": true,
+    "status_unchanged": true,
+    "working_patch_unchanged": true,
+    "source_unchanged": true,
+    "source_count": 7505,
+    "configuration_unchanged": true,
+    "controller_unchanged": true,
+    "nextest_tool_unchanged": true,
+    "nextest_config_unchanged": true,
+    "retained_failed_driver_unchanged": true,
+    "receipt_selectors_unchanged": true,
+    "all_stages_passed": false,
+    "controller_error": null,
+    "preparation_failed": true,
+    "failure": "strict Clippy nonminimal_bool; runtime UNRUN",
+    "ten_preexisting_actual_and_preserved_outputs_verified_unchanged": true,
+    "runtime_equivalence_claimed": false
+  },
+  "actual_and_preserved_count": 10,
+  "artifact_boundary_only_no_runtime_equivalence": true,
+  "explicit_slot_release_required": true
+}

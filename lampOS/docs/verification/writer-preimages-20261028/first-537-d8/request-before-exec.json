@@ -1,0 +1,20 @@
+{
+  "approved": true,
+  "head": "6f0677b8ecb1db563f8f015d03d28b4190647faf",
+  "base": "d8ca71f4dc6e65b00564afb1e67c1a33311aeab8",
+  "scope": "full Update first preimages gate",
+  "donor": "<private-path>",
+  "request_source": "Root explicit local slot release in collaboration message before execution",
+  "root_instruction": "Root authorizes routine own compile/lint fixes with all failed source/stages retained, exact equivalent De Morgan fix, sole LOCAL slot until full new-source closure; no semantic/runtime changes without distinct review.",
+  "source_unrun_v2_manifest": "<private-path>",
+  "original_snapshot": "<private-path>",
+  "controller_sha256": "7d8e40184cc33acf0817b221fa2ec55c2fa89bbce18060bbe2d8cf55a73b32d2",
+  "must_preserve_first_failures": true,
+  "fixture_execution_requires_escalated": true,
+  "native_handle_recorded_after_start": true,
+  "no_local_ARM_or_workspace_gate": true,
+  "retained_first_preparation_failure": "<private-path>",
+  "corrected_source_fix": "<private-path>",
+  "retained_second_preparation_failure": "<private-path>",
+  "equivalent_boolean_fix": "<private-path>"
+}

@@ -1,0 +1,27 @@
+{
+  "head": "6f0677b8ecb1db563f8f015d03d28b4190647faf",
+  "base": "d8ca71f4dc6e65b00564afb1e67c1a33311aeab8",
+  "tree": "29cec7be2b6708fa5a0b5ecca6e36a3b23ca46b0",
+  "own_branch": "second/writer-preimages-current",
+  "working_patch_sha256": "a97734c9169d4216199f8b3f7a70c6a15991dc3b5b3f8848f4a2e784288795c0",
+  "dirty_files": [
+    "lampOS/crates/update/src/lib.rs",
+    "lampOS/crates/update/src/writer_preimages.rs",
+    "lampOS/crates/update/src/writer_preimages/tests.rs",
+    "lampOS/docs/reuse-decisions.md",
+    "lampOS/docs/updates.md",
+    "lampOS/docs/writer-preimages.md"
+  ],
+  "uncommitted_source_gate": true,
+  "source_count": 7505,
+  "controller_sha256": "cbe906bc3a97d564af8207bfd2210363d92f6db7afd43691a0c68f2eb5a5c88b",
+  "nextest_tool_sha256": "aad9d409cd2f0a81fcaed49d7672a133254179458436c1e957505e4a11655329",
+  "nextest_version": "0.9.150",
+  "earlier_CI_runner_version": "0.9.149",
+  "verified_tool_proof_sha256": "5563f2b54904be2611512496701b75cb5d11f8a60fe3e60773a1579b82286c1f",
+  "merged_receipt_selector_sha256": "ecf2c70720c3f1c14b5ba960123cea0e3ae0764777f4906992a989c58ee80c23",
+  "config_sha256": "c4992da8d157df279011a424b5feb4833f001fd1d46ce3edd0a56992c848bb33",
+  "preferred_runner_scope": "FIRST full Update gate on currentRaw6f/d8c plus6preimage WIP; original format1 retained and owned-only formatter allowed; old failed libtest and both inconclusive writer cohorts separate",
+  "earlier_failure_unwaived": true,
+  "baseline_198_pass_INCONCLUSIVE": true
+}

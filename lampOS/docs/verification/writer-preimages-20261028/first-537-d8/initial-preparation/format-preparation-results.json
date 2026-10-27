@@ -1,0 +1,27 @@
+[
+  {
+    "stage": "fmt-initial",
+    "argv": [
+      "<cargo-home>/bin/cargo",
+      "+1.96.0",
+      "fmt",
+      "--all",
+      "--check"
+    ],
+    "exit_code": 1,
+    "elapsed_seconds": 5.693
+  },
+  {
+    "stage": "owned-format",
+    "argv": [
+      "<cargo-home>/bin/rustfmt",
+      "+1.96.0",
+      "--edition",
+      "2024",
+      "<preimage-tree>/lampOS/crates/update/src/writer_preimages.rs",
+      "<preimage-tree>/lampOS/crates/update/src/writer_preimages/tests.rs"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.031
+  }
+]

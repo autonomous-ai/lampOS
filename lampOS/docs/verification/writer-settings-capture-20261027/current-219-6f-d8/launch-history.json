@@ -1,0 +1,46 @@
+{
+  "handle": 88398,
+  "matching_handle_drained": true,
+  "no_fail_fast": true,
+  "old_failures_unwaived": true,
+  "prior_counts_separate": {
+    "10ae_0d_local": 220,
+    "6490_3c_local": 219,
+    "dd76_197_local": 352,
+    "dd76_197_original_ARM": 7798,
+    "earlier_c3_full": 528
+  },
+  "processes": 4,
+  "receipts": [
+    {
+      "chunk_id": "3ccc5d",
+      "raw_sha256": "87e70a827fba45961f0cfb151907fdfc02f14357f5c1b1ad6700cc8bdd87765c",
+      "receipt": "continuation-1.json",
+      "session_id": 88398,
+      "wall_time_seconds": 30.003723542
+    },
+    {
+      "chunk_id": "fa68d5",
+      "exit_code": 0,
+      "raw_sha256": "ead730f9c59ddd496d4de00be76efbe71dc33a253494337d039f034e7a6d3768",
+      "receipt": "continuation-2.json",
+      "wall_time_seconds": 14.45923175
+    },
+    {
+      "chunk_id": "700088",
+      "raw_sha256": "d1d7fd4d71c5a185e615c44b8ff4a1f3b43351a3e3b7850731ffcd838a155243",
+      "receipt": "initial-result.json",
+      "session_id": 88398,
+      "wall_time_seconds": 1.000845417
+    },
+    {
+      "raw_sha256": "5e768e250eb63c286220b77d6e2a20efbebdfbe77c4f5523f53eeb9240984079",
+      "receipt": "request-before-exec.json",
+      "sandbox_permissions": "require_escalated",
+      "saved_before_exec": true
+    }
+  ],
+  "retries": 0,
+  "terminal_exit_code": 0,
+  "test_executions": 1
+}

@@ -1,0 +1,53 @@
+{
+  "worktree": "<preimage-tree>",
+  "branch": "second/writer-preimages-current",
+  "head": "6f0677b8ecb1db563f8f015d03d28b4190647faf",
+  "base": "d8ca71f4dc6e65b00564afb1e67c1a33311aeab8",
+  "tree": "29cec7be2b6708fa5a0b5ecca6e36a3b23ca46b0",
+  "raw_prerequisite_carry_proof": "<private-path>",
+  "original_unrun_snapshot": "<private-path>",
+  "original_head": "b2661e0a1743be7f8f639022bf6374b296ce9b40",
+  "three_new_files_full_bytes_and_modes_equal": true,
+  "three_modified_files_authored_hunks_equal": true,
+  "stable_patch_id": "a71d74b7acda14c08fe92cc537c041659f330d3f",
+  "all_other_tracked_prerequisite_files_unmodified": true,
+  "all_six_files": {
+    "lampOS/crates/update/src/writer_preimages.rs": {
+      "sha256": "d0f604085cb1abffe2c63ce787d1a028e495ed57b3dc44713a38f45c7a4cce2d",
+      "mode": 420,
+      "original_unrun_sha256": "d0f604085cb1abffe2c63ce787d1a028e495ed57b3dc44713a38f45c7a4cce2d",
+      "complete_blob_equal_to_original_unrun": true
+    },
+    "lampOS/crates/update/src/writer_preimages/tests.rs": {
+      "sha256": "d277184b7aa12f8d96fe411fc35255b29377be3b6614dc2aef8c614657f33a29",
+      "mode": 420,
+      "original_unrun_sha256": "d277184b7aa12f8d96fe411fc35255b29377be3b6614dc2aef8c614657f33a29",
+      "complete_blob_equal_to_original_unrun": true
+    },
+    "lampOS/crates/update/src/lib.rs": {
+      "sha256": "bc0e2fef71dcb019d47de21df012bba6caffbce404648632e8a57eec2932bdec",
+      "mode": 420,
+      "original_unrun_sha256": "bc0e2fef71dcb019d47de21df012bba6caffbce404648632e8a57eec2932bdec",
+      "complete_blob_equal_to_original_unrun": true
+    },
+    "lampOS/docs/writer-preimages.md": {
+      "sha256": "aaf450855a8cd84c257d2e64ffbf9577935cc45a1c751cbf64900467922beab9",
+      "mode": 420,
+      "original_unrun_sha256": "aaf450855a8cd84c257d2e64ffbf9577935cc45a1c751cbf64900467922beab9",
+      "complete_blob_equal_to_original_unrun": true
+    },
+    "lampOS/docs/updates.md": {
+      "sha256": "4e24ea01c6fae2087c91dee1fb3b73ee18d95d2dc13a40cca868ce76bfcd5a15",
+      "mode": 420,
+      "original_unrun_sha256": "4e24ea01c6fae2087c91dee1fb3b73ee18d95d2dc13a40cca868ce76bfcd5a15",
+      "complete_blob_equal_to_original_unrun": true
+    },
+    "lampOS/docs/reuse-decisions.md": {
+      "sha256": "c3925c5c6465db836cd8c3d287f1b3b3fb9a196329f16fa7ba5d5c3e1c568539",
+      "mode": 420,
+      "original_unrun_sha256": "c3925c5c6465db836cd8c3d287f1b3b3fb9a196329f16fa7ba5d5c3e1c568539",
+      "complete_blob_equal_to_original_unrun": true
+    }
+  },
+  "format_compiler_runtime_unrun": true
+}

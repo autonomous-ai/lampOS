@@ -1,0 +1,8 @@
+{
+  "source_before_raw_sha256": "6787baea270464eaeb83c996c2ba1d9c6f6f819020bdbd450845693d55a5201e",
+  "source_after_raw_sha256": "6787baea270464eaeb83c996c2ba1d9c6f6f819020bdbd450845693d55a5201e",
+  "source_snapshots_equal": true,
+  "source_count": 7505,
+  "runtime": "UNRUN: strict Clippy compilation stopped preparation",
+  "full_original_source_snapshots_retained_private": true
+}

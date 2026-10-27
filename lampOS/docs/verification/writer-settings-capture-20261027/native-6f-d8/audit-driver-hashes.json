@@ -1,0 +1,11 @@
+{
+  "private_retained_drivers": {
+    "watch.py": "4ac2c3673b03d812aaa4bf01e49bd79eb80744e118d2040358587d45df0207ed",
+    "audit.py": "c7272ea2984a9ca15ab4f49a1a9b6147b71ebe5046a961743bc3afc466324317",
+    "artifact-audit.py": "b673f9dc5eca031d234b2f984f4542a92ce99276957e31080f7cfd8693597b14"
+  },
+  "original_watchers_drained": true,
+  "reruns": 0,
+  "local_Cargo_or_runtime_executions_issued_by_this_audit": 0,
+  "failure_retry_scan": "No TRY/RETRY/FAIL/LEAK/TIMEOUT lines found in original ARM job log."
+}

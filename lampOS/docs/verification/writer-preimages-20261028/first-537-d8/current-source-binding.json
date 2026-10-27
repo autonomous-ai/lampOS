@@ -1,0 +1,13 @@
+{
+  "actual_source": "6f0677b8ecb1db563f8f015d03d28b4190647faf / d8ca71f4dc6e65b00564afb1e67c1a33311aeab8 plus six frozen WIP paths",
+  "head_alone_execution_claimed": false,
+  "commit_after_gate": null,
+  "raw_source_before_sha256": "353216787e98728bae6ef95509fd32de4cdd35def49b43c780e72c5176145b84",
+  "raw_source_after_sha256": "353216787e98728bae6ef95509fd32de4cdd35def49b43c780e72c5176145b84",
+  "all_7505_source_modes_status_index_guards_close": true,
+  "raw_compile_stdout_sha256": "7acbde1ca8936eaef665e345da209f1938fe212a1f370f7ca204b434f3c66344",
+  "raw_nextest_stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "raw_nextest_stderr_sha256": "79b04d9f203d98ac1705f9e6f7e98dd17af8ce3d72f411e929dc2a424843b6e1",
+  "current_target_reuse_after_release_expected": true,
+  "no_postrelease_actual_target_hash_claim": true
+}

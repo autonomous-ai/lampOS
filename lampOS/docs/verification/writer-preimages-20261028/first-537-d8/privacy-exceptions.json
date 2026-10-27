@@ -1,0 +1,7 @@
+[
+  {
+    "file": "source-before.json",
+    "literal": "lamp-voice.service@5521000000.json",
+    "reason": "Existing tracked synthetic exit-note fixture filename; not personal email."
+  }
+]
