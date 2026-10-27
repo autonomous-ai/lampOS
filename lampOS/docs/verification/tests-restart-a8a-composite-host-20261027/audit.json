@@ -1,0 +1,382 @@
+{
+  "schema": "tests.restart.composite-host.v1",
+  "source": {
+    "head": "a8a55c00fa359b754b2514a58b5c92c3dda00863",
+    "base": "9e0ccb206ee796ef46929bf463c5176f3a493ed9",
+    "tracked_files": 10679,
+    "same_voice_source_sha256": "151acd1d793723ba2ed1ac78ed9ca9517e376f52cf9119839de990107394ec72",
+    "clean": true,
+    "compiled_and_runtime_source_equal": true
+  },
+  "host_qualification": {
+    "status": "COMPOSITE_PASS",
+    "scope": "Five earlier Cargo0 stages plus four complete listings and first complete Mac SameVoice module runtime, across two controllers",
+    "full_voice_runtime_claim": false,
+    "native_arm64_current_head_claim": false,
+    "idle_host_or_performance_claim": false,
+    "new_runtime_attempts": 1,
+    "new_Cargo_commands": 0,
+    "counts": {
+      "passed": 21,
+      "failed": 0,
+      "ignored": 0
+    },
+    "inventory": {
+      "all_unique": 3832,
+      "declared_ignored": 15,
+      "selected_module": 21,
+      "selected_module_ignored": 0,
+      "ordinary_filtered_out": 3811
+    },
+    "case_outcomes": [
+      {
+        "ordinal_within_selected_module": 1,
+        "case": "same_voice::tests::a_call_takes_no_late_voice_from_before_it_at_its_verdict",
+        "outcome": "PASS"
+      },
+      {
+        "ordinal_within_selected_module": 2,
+        "case": "same_voice::tests::a_child_that_hangs_after_it_is_ready_is_killed_and_started_again",
+        "outcome": "PASS"
+      },
+      {
+        "ordinal_within_selected_module": 3,
+        "case": "same_voice::tests::a_child_that_never_gets_ready_is_started_three_times_and_then_the_check_is_off",
+        "outcome": "PASS"
+      },
+      {
+        "ordinal_within_selected_module": 4,
+        "case": "same_voice::tests::a_late_print_from_too_little_speech_is_unsure",
+        "outcome": "PASS"
+      },
+      {
+        "ordinal_within_selected_module": 5,
+        "case": "same_voice::tests::a_late_print_is_compared_before_it_becomes_the_conversations_voice",
+        "outcome": "PASS"
+      },
+      {
+        "ordinal_within_selected_module": 6,
+        "case": "same_voice::tests::a_line_is_judged_from_its_first_1_8_s_when_it_is_long_enough_and_said_with_the_lamp_quiet",
+        "outcome": "PASS"
+      },
+      {
+        "ordinal_within_selected_module": 7,
+        "case": "same_voice::tests::a_line_judged_without_the_check_says_which_print_was_missing",
+        "outcome": "PASS"
+      },
+      {
+        "ordinal_within_selected_module": 8,
+        "case": "same_voice::tests::a_mixed_print_among_the_conversations_does_not_make_its_own_voice_another",
+        "outcome": "PASS"
+      },
+      {
+        "ordinal_within_selected_module": 9,
+        "case": "same_voice::tests::a_new_conversation_ends_any_late_voice_of_the_one_before",
+        "outcome": "PASS"
+      },
+      {
+        "ordinal_within_selected_module": 10,
+        "case": "same_voice::tests::a_print_is_coming_from_its_first_sample_until_it_comes",
+        "outcome": "PASS"
+      },
+      {
+        "ordinal_within_selected_module": 11,
+        "case": "same_voice::tests::a_print_that_comes_after_its_answer_still_becomes_the_conversations",
+        "outcome": "PASS"
+      },
+      {
+        "ordinal_within_selected_module": 12,
+        "case": "same_voice::tests::a_short_call_takes_its_voice_from_the_callers_first_follow_up_seen_spoken",
+        "outcome": "PASS"
+      },
+      {
+        "ordinal_within_selected_module": 13,
+        "case": "same_voice::tests::a_voice_at_0_20_against_the_conversations_is_another",
+        "outcome": "PASS"
+      },
+      {
+        "ordinal_within_selected_module": 14,
+        "case": "same_voice::tests::a_voice_at_0_35_was_another_at_0_45_and_is_the_conversations_at_0_30",
+        "outcome": "PASS"
+      },
+      {
+        "ordinal_within_selected_module": 15,
+        "case": "same_voice::tests::an_unsure_print_let_out_is_not_the_conversations_voice",
+        "outcome": "PASS"
+      },
+      {
+        "ordinal_within_selected_module": 16,
+        "case": "same_voice::tests::another_voice_is_known_only_against_the_conversation_the_lamp_last_answered_in",
+        "outcome": "PASS"
+      },
+      {
+        "ordinal_within_selected_module": 17,
+        "case": "same_voice::tests::each_line_the_check_says_is_said_to_its_journal",
+        "outcome": "PASS"
+      },
+      {
+        "ordinal_within_selected_module": 18,
+        "case": "same_voice::tests::the_childs_answers_are_read_as_its_serving_writes_them",
+        "outcome": "PASS"
+      },
+      {
+        "ordinal_within_selected_module": 19,
+        "case": "same_voice::tests::the_conversation_keeps_its_last_prints_and_a_new_one_begins_afresh",
+        "outcome": "PASS"
+      },
+      {
+        "ordinal_within_selected_module": 20,
+        "case": "same_voice::tests::the_model_path_is_absolute_and_its_flag_follows_the_spoken_to_one",
+        "outcome": "PASS"
+      },
+      {
+        "ordinal_within_selected_module": 21,
+        "case": "same_voice::tests::with_the_caller_only_a_going_on_line_never_becomes_the_conversations_voice",
+        "outcome": "PASS"
+      }
+    ],
+    "five_earlier_Cargo_stages": [
+      {
+        "stage": "fmt",
+        "exit": 0,
+        "elapsed_seconds": 13.242030766996322,
+        "receipt_sha256": "b0d60d132c095b6acb0cb4e6e78e14e4959cfbe4fdfa251f0462e79a2417272b",
+        "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "stage": "metadata",
+        "exit": 0,
+        "elapsed_seconds": 1.4366548760153819,
+        "receipt_sha256": "b014037fca0fba7441e21369947dd2a8ee9f1b299660019be75acfe84ffcacc1",
+        "stdout_sha256": "c27031aa0813dc09d5d307a36b02c131515c05c409ec20aed3dba813916b531a",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "stage": "strict",
+        "exit": 0,
+        "elapsed_seconds": 181.76655359502183,
+        "receipt_sha256": "85ec89c0b1abbaad52e9f7ca668e08184f4fe87d9e37bcdeec01d6237bc7b0b3",
+        "stdout_sha256": "63c5b53e55b2a00eb9d82a7c17d9ab2d1411cf3625200d76257e31d23d5fc5f8",
+        "stderr_sha256": "bb7d96d31aa91a3b7343178d5a3f67b66c16a14e8a2f2c8f8263acb83a97fac9"
+      },
+      {
+        "stage": "workspace",
+        "exit": 0,
+        "elapsed_seconds": 107.00437743100338,
+        "receipt_sha256": "23afae304670fe1baced198ca6c1872f3d6018d7fa4d129a6e7ce7a51cb35429",
+        "stdout_sha256": "e338afbc7e6580b73e2a5c03b186e9d8784655e2b4c96922e6d3c09920684f99",
+        "stderr_sha256": "11b4f14f16f772851e26b8629b5208b398155d94550f9a63700fc785d736bffc"
+      },
+      {
+        "stage": "compile-Voice-lib",
+        "exit": 0,
+        "elapsed_seconds": 154.31824488099664,
+        "receipt_sha256": "02abc9383ea8a11d8224e96495e42b012f43ce278be1380013070468f90bef48",
+        "stdout_sha256": "630bf52c7e3954efc761fb01d611338a5685f8554039ee958795dd555a236148",
+        "stderr_sha256": "9c3955fe1028a6cc368ff5c22b51ce43f6b222efaaa1bf2971d51d3c9a20f3e7"
+      }
+    ],
+    "new_compile_free_commands": [
+      {
+        "stage": "inventory-all",
+        "exit": 0,
+        "elapsed_seconds": 0.141159,
+        "watchdog_seconds": 300,
+        "receipt_sha256": "bfa6b2ea2ea3b9b0a4192794721262bcbf6da9abb7e52bdc20bdf1e78d9c7d52",
+        "stdout_sha256": "6889ee596302435a835e12e63b22f6e0aa0c1384961038f971f4ce29f239e75f",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "owned_group_closed": true
+      },
+      {
+        "stage": "inventory-ignored",
+        "exit": 0,
+        "elapsed_seconds": 0.111493,
+        "watchdog_seconds": 60,
+        "receipt_sha256": "9ac1c6befc2320a5888b2513ddffe8c2633b11f9f8cc738d3b1d8b74bcbbf7d8",
+        "stdout_sha256": "5460a54eff06379661a554db4840fe29e11c241e26db2b69cb181abaff998dcf",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "owned_group_closed": true
+      },
+      {
+        "stage": "inventory-module",
+        "exit": 0,
+        "elapsed_seconds": 0.15795,
+        "watchdog_seconds": 60,
+        "receipt_sha256": "ded06a60c369eaf5477bd72e6a5eea885235b7722063aeb20fd9e4a09be5f605",
+        "stdout_sha256": "e2819f4e3b8e41d7ee8708d4e71a9558004ddc96ecaf45daead18f985c617287",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "owned_group_closed": true
+      },
+      {
+        "stage": "inventory-module_ignored",
+        "exit": 0,
+        "elapsed_seconds": 0.150547,
+        "watchdog_seconds": 60,
+        "receipt_sha256": "b67c8d25266ae646231c57aacce4a73e89a06299bbb4f4648b251b4d3c05bc67",
+        "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "owned_group_closed": true
+      },
+      {
+        "stage": "module-runtime",
+        "exit": 0,
+        "elapsed_seconds": 5.028682,
+        "watchdog_seconds": 120,
+        "receipt_sha256": "6d0bb4ffdde63772b8d3965b39c90179d4063aa820da04e879243974f0d1c6c5",
+        "stdout_sha256": "966b4997e8c70c2710ad0c2e3cc7863acbfea28d88a7a25f64247752f96c30db",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "owned_group_closed": true
+      }
+    ],
+    "strict_packages": [
+      "lamp-body",
+      "lamp-cloud",
+      "lamp-expression",
+      "lamp-keeper",
+      "lamp-lean",
+      "lamp-memory",
+      "lamp-peek",
+      "lamp-setup",
+      "lamp-skills",
+      "lamp-update",
+      "lamp-voice",
+      "lamp-voice-eval"
+    ]
+  },
+  "artifact": {
+    "sha256": "7d07b7bcf060a9d754025d33b26c176a7ae571a9c55b58d71a7e4c5d666d7697",
+    "bytes": 116069816,
+    "mode": 493,
+    "target_name": "lamp_voice",
+    "target_kind": [
+      "lib"
+    ],
+    "features": [],
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "Cargo_fresh": false
+  },
+  "current_native": {
+    "controller_exit": 0,
+    "wrapper_exit": 0,
+    "exit_code": 0,
+    "terminal_status": "COMPOSITE_PASS",
+    "started_at": "2026-10-27T03:28:36.638159+00:00",
+    "finished_at": "2026-10-27T03:29:40.911624+00:00",
+    "elapsed_s": 64.27601237600902,
+    "controller_sha256": "979aa0d9c191e590a25c87b8dfb70af1f52e7aa2070a82e45bfdc25abe77f709",
+    "plan_sha256": "0851f8974d182a24c22ff48da270af181c4ea0143488d6bc9b0ef510a0009c24",
+    "wrapper_sha256": "e1513e64bc59d28fb0dc12592d62bb90427abf4a051c3cba7a6b6ce2a475461a",
+    "stdout_sha256": "711db6e2fa80bbb675c99c71f7a752da533bbca38910d47730cab720afd2de9a",
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "guard_scope": {
+    "source_and_official_owner_unchanged": true,
+    "sealed_witnesses": 244,
+    "sealed_witnesses_unchanged": true,
+    "actual_executable_unchanged": true,
+    "full_content_hash_checkpoints": [
+      "initial",
+      "final"
+    ],
+    "intermediate_checks": "Whole tracked file-set/stat6, official owner metadata, all sealed bound metadata, actual module SHA; consumed module/copy SHA before and after each direct command",
+    "consumed_SHA_checkpoints": 10,
+    "all_owned_groups_closed": true,
+    "no_detached_descendant_claim": true,
+    "disk_reserve_breached": false,
+    "OS_write_protection_claim": false
+  },
+  "retained_failed_controllers": [
+    {
+      "phase": "admission before first Cargo command",
+      "controller_exit": 1,
+      "terminal": "FAIL",
+      "Cargo_commands_launched": 0,
+      "runtime_attempts": 0,
+      "source_guards_preserved": true
+    },
+    {
+      "phase": "compile controller after five Cargo0 stages; first all-list incomplete",
+      "controller_exit": 1,
+      "terminal": "FAIL",
+      "runtime_attempts": 0,
+      "listing_exit": -15,
+      "listing_watchdog_seconds": 60,
+      "listing_elapsed_seconds": 60.76940996097983,
+      "complete_partial_names": 3238,
+      "partial_names_match_new_complete_prefix": true,
+      "cause": "unknown",
+      "owned_group_closed": true,
+      "disk_reserve_breached": false
+    }
+  ],
+  "administrative_retry": {
+    "scope": "One complete all-list retry only, no test-body retry",
+    "watchdog_seconds": 300,
+    "actual_elapsed_seconds": 0.141159,
+    "does_not_rewrite_old_failure": true
+  },
+  "separate_original_ARM_leak_witness": {
+    "PR": 3644,
+    "run_id": 40439732017,
+    "job_id": 121976926287,
+    "actual_checkout": "ac5bd8f6fe70eb181152a8c65639b23420f754b1",
+    "parents_from_checkout_merge_message": [
+      "5982e4b7fa465177f55697ddb362d78b964809b7",
+      "553e0d653eb9557a7b804e8fb6c469c102159808"
+    ],
+    "selected_unique": 11459,
+    "counts": {
+      "PASS": 11458,
+      "LEAK": 1
+    },
+    "summary_skipped": 106,
+    "selected_unrun": 0,
+    "nonpassing_case": {
+      "status": "LEAK",
+      "seconds": "0.436",
+      "ordinal": 9202,
+      "total": 11459,
+      "binary": "lamp-voice",
+      "case": "same_voice::tests::a_child_that_hangs_after_it_is_ready_is_killed_and_started_again"
+    },
+    "relationship": "Same case identity passed in this Mac module; different source/platform. Original ARM LEAK retained and not waived. Cause unknown; no byte-identical source or executable claim.",
+    "source_ancestry_evidence": "Actual checkout merge message in immutable original job log; local commit object unavailable during this audit"
+  },
+  "receipt_sha256": {
+    "compile_terminal": "de8d014b7da85a26ff32b5451920d6b04433a25a4cf4f485db2376cce0bd526a",
+    "compile_native": "d1be7240d7814a747207d13bde1700c7a415f54ee12565a39a1978c645c343d5",
+    "compile_plan": "65f4142531204a2835b738f902ea259f8a60c47eadde924e2b6a128ac80c501b",
+    "compile_controller": "b3b46b479bb95558f654d7b734302c8492bc614da43834504c511086807a6945",
+    "current_terminal": "e0cc0718f10fc26f68174035e916300971c242e3223fe44a91a2ded836989ecf",
+    "current_native": "8b73fd9568d7d1f597eb80d0367019007e9bcc94944531ffd5ed36fd5dc3b3e9",
+    "current_plan": "0851f8974d182a24c22ff48da270af181c4ea0143488d6bc9b0ef510a0009c24",
+    "current_controller": "979aa0d9c191e590a25c87b8dfb70af1f52e7aa2070a82e45bfdc25abe77f709",
+    "current_wrapper": "e1513e64bc59d28fb0dc12592d62bb90427abf4a051c3cba7a6b6ce2a475461a",
+    "source_before": "43904386e337a0d6757cf50936e83bcefbde5ab8d57e07b94bc24f15e89c7244",
+    "source_after": "43904386e337a0d6757cf50936e83bcefbde5ab8d57e07b94bc24f15e89c7244",
+    "official_before": "94b91969e3819c3707cbf142cfcad7bdaa48cb4904f82bf0c83355526dca86f2",
+    "official_after": "94b91969e3819c3707cbf142cfcad7bdaa48cb4904f82bf0c83355526dca86f2",
+    "source_stat_before": "24fd73bd778bb9c1765e72d4e14b92f8df32a439dd3bf2f7f686b049e662978a",
+    "source_stat_after": "24fd73bd778bb9c1765e72d4e14b92f8df32a439dd3bf2f7f686b049e662978a",
+    "official_stat_before": "a56e0e62c040e6875b5e5b37005b4cc4cb4fb99a2498d0859304521a48574118",
+    "official_stat_after": "a56e0e62c040e6875b5e5b37005b4cc4cb4fb99a2498d0859304521a48574118",
+    "protected_before": "1eed01afa43498d57a6c4977a26feb660db81fad12d6f1ff8963a3edf50efdbb",
+    "protected_after": "1eed01afa43498d57a6c4977a26feb660db81fad12d6f1ff8963a3edf50efdbb",
+    "actual_artifact": "85c9d5818203ad47efbae1da8f35cb77e0a6f21b01b1afa5ffdb6c2c20f68c70",
+    "inventory": "faf62903489b593d54e387c3272705ef4b199b88ec7499c3f859480f62736b5a",
+    "case_census": "2380c97167249c183892c463f8d32bfd416e8d1192dad76b55fab49559a512a7",
+    "admission_terminal": "7c1f150ea24207d29397e4bc8380fe84195850694c7d451af0176243c409f043",
+    "admission_native": "9599a98be25b53266f145293204cfc54b7e718a446462e6ffba5bb2985a681be",
+    "partial_inventory_result": "fe14823f462a0b812c6b6763a62b308adb109324cf3d77e07d2ba81397c635a6",
+    "partial_inventory_stdout": "6ca3661e910df88fb4f7c8a261aa94a4faec0405889bd5132de759053b6c7ad3",
+    "cloud_census": "fbd22477defc0af1388e40d953fec421b22d6f1397a2929c46fb979758cc2220",
+    "cloud_job_log": "208d1f5f5895f024407970ca066f7c19aad3ecaa66fb04fd38a9f890129ea88d"
+  }
+}

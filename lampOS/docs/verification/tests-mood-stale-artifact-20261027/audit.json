@@ -1,0 +1,288 @@
+{
+  "subject": "Mood wrong-source executable disposition; original failed receipts preserved",
+  "head": "75d5f845ab211f67a1ded39f20285ddb86beea2c",
+  "base": "9e0ccb206ee796ef46929bf463c5176f3a493ed9",
+  "classification": "STALE_CONTROLLED_EXECUTABLE_NOT_CURRENT_SOURCE_QUALIFICATION",
+  "original_attempt": {
+    "controller_status": "FAIL",
+    "native_controller_exit": 1,
+    "wrapper_exit": 1,
+    "Cargo_exit": 101,
+    "raw_counts": {
+      "passed": 338,
+      "failed": 2,
+      "ignored": 0
+    },
+    "failed_rows": [
+      {
+        "executable": "runtime-f9b92bb4002b831f",
+        "test": "sleep_name::a_clock_found_not_set_forgets_the_time_of_day_it_had",
+        "status": "FAILED"
+      },
+      {
+        "executable": "runtime-f9b92bb4002b831f",
+        "test": "sleep_name::an_expired_sleeping_name_is_journaled_once_by_the_service",
+        "status": "FAILED"
+      }
+    ],
+    "doctests": "one zero-case success block, separate from ordinary counts",
+    "raw_command_completed_once": true,
+    "original_terminal_overwritten": false,
+    "current75d5_plain_runtime_qualification": false
+  },
+  "source_and_binary": {
+    "source_file": "lampOS/crates/expression/tests/runtime.rs",
+    "current_source_sha256": "e6d2dd7aeb19addfc1b83faf2049da5b0d38d73945a6b16b17166748abbcb4ce",
+    "current_source_original_assert_line": 791,
+    "current_source_diagnostic_marker_present": false,
+    "executed_runtime_file": "runtime-f9b92bb4002b831f",
+    "executed_runtime_sha256": "ba989769d5911b1ee91c70d871d525651d72663b8c0589193a1d845d6eb8a337",
+    "executed_runtime_bytes": 6438312,
+    "executed_runtime_diagnostic_marker_present": true,
+    "raw_output_literal_marker": "SHARED_INPUT_PAUSE",
+    "raw_output_diagnostic_assert_line": 824,
+    "exact_SHA_matches_retained_controlled_candidate_witness": true,
+    "controlled_match_receipt_sha256": "879aa261eb0e6ae9001b1ae98bfd2c86b0247f95a19f7e609d7449d9a8589e08",
+    "checked_by_reading_bytes_not_launch": true,
+    "mtime_evidence": {
+      "restored_source_mtime_ns": 1793053791339385048,
+      "cached_runtime_mtime_ns": 1793069543584130579
+    },
+    "Cargo_fingerprint": {
+      "local_CheckDepInfo_checksum_false": true,
+      "files": [
+        {
+          "file": "dep-test-integration-test-runtime",
+          "sha256": "7d3b7fe7a9ace3aa1e018eb0e5ee948c08e9f62d6cdf5a456f08eac5c7f7dcca",
+          "bytes": 63,
+          "mtime_ns": 1793069542343345327
+        },
+        {
+          "file": "test-integration-test-runtime.json",
+          "sha256": "84d3a1d2fa874aa0e6d0a833a9b84a0a8b0a8bdc71eff5d3b6292792bf5ac84c",
+          "bytes": 1034,
+          "mtime_ns": 1793069543596476212
+        },
+        {
+          "file": "test-integration-test-runtime",
+          "sha256": "515ca2bacfa009e7966d571224c615a7e7d0439b805078a956f28e3ad945ebc6",
+          "bytes": 16,
+          "mtime_ns": 1793069543596320224
+        },
+        {
+          "file": "invoked.timestamp",
+          "sha256": "5a109e6643e8d3e88642e3f35e85d2a83e639d07523aa6e99166c48178e965c3",
+          "bytes": 48,
+          "mtime_ns": 1793069542343345327
+        }
+      ]
+    },
+    "interpretation": "Restoring source bytes/timestamps left a controlled executable in Cargo cache; fresh:true reused those exact bytes. Source and executable do not match. This is validation-artifact invalidity, not evidence of a current product behavior regression."
+  },
+  "freshness_inventory": {
+    "Expression_compiler_artifacts": 9,
+    "all_Expression_artifacts_fresh_true": true,
+    "emitted_executables": 8,
+    "test_drivers": 4,
+    "actual_inventory_cases": 340,
+    "scope": "Compilation/inventory did not establish correspondence with the restored current test source"
+  },
+  "readonly_guards": {
+    "tracked_source_files_each_root": 10679,
+    "private_full_SHA_and_all_bound_metadata_equal_prepared": true,
+    "official_owner_full_SHA_and_all_bound_metadata_equal_before_after": true,
+    "private_owner_semantic_equal_to_committed75d5": true,
+    "official_owner_clean": true,
+    "all_independent_frozen_witnesses_verified": 292,
+    "all_frozen_SHA_size_mode_mtime_device_inode_match": true,
+    "frozen_mode_census_octal": {
+      "0o555": 284,
+      "0o755": 8
+    },
+    "four_test_driver_SHA_and_all_metadata_unchanged": true,
+    "four_non_test_alias_inode_only_changes": [
+      {
+        "path_under_old_target": "debug/examples/replay_cost",
+        "differences": {
+          "inode": {
+            "before": 485493974,
+            "after": 485494213
+          }
+        },
+        "all_other_bound_fields_and_SHA_equal": true
+      },
+      {
+        "path_under_old_target": "debug/lamp-expression",
+        "differences": {
+          "inode": {
+            "before": 485493975,
+            "after": 485494212
+          }
+        },
+        "all_other_bound_fields_and_SHA_equal": true
+      },
+      {
+        "path_under_old_target": "debug/examples/recent_playout_cost",
+        "differences": {
+          "inode": {
+            "before": 485493976,
+            "after": 485494211
+          }
+        },
+        "all_other_bound_fields_and_SHA_equal": true
+      },
+      {
+        "path_under_old_target": "debug/examples/rest_cost",
+        "differences": {
+          "inode": {
+            "before": 485493977,
+            "after": 485494210
+          }
+        },
+        "all_other_bound_fields_and_SHA_equal": true
+      }
+    ],
+    "alias_disposition": "Administrative republication separate from Rust failures/source mismatch. All other fields strict; original successful-only policy rejected these after Cargo101. This disposition does not change that FAIL or qualify the wrong binary.",
+    "no_OS_filesystem_write_protection_claim": true
+  },
+  "earlier_failure_separate": {
+    "head": "a364a97dc1dd6c0a711d0bb81d3a4f4e04da9500",
+    "base": "99b5161531791de7ed57ce57f6cacf988d509f25",
+    "original_status": "FAIL",
+    "raw_counts": {
+      "passed": 337,
+      "failed": 3,
+      "ignored": 0
+    },
+    "scope": "Earlier337/3 remains retained on its original source. This audit does not reclassify it, explain its cases, or waive it."
+  },
+  "corrective_qualification": {
+    "status": "PENDING_DISABLED",
+    "canonical_source": "Own canonical Git alias at exact75d5 after previous warm owner closes; officialowner and privatecopy retained unchanged",
+    "target": "Existing warm compiler lane, not a new cold target",
+    "requirements": [
+      "Root retires closed stale Mood mutable cache only after independent292 witnesses/source verified",
+      "Root binds fresh canonical physical epoch and exact source/Git metadata after checkout",
+      "Supported cargo clean -p lamp-expression on the exact allocated warm target BEFORE current compilation",
+      "Each first current Expression output must be fresh:false; later identical workspace-helper consumption may honestly be fresh:true",
+      "Source tests and selected runtime bytes must lack SHARED_INPUT_PAUSE before any list/runtime executable launch",
+      "Formatting/actual reverse closure strict12/workspace before no-run/freeze/derived4drivers8outputs/full340 plus separate docs once",
+      "Keep raw runtime census before administrative alias guards and retain any genuine current-source Rust failure"
+    ],
+    "current_passed340_claim": false,
+    "runtime_reuse": false,
+    "valid_failed_test_replay": false
+  },
+  "private_receipt_digests": {
+    "wrong-source-attempt/terminal.json": {
+      "sha256": "88e423aaed841727f5b8564851e4e4e100170e67ec8985ea267dbc39bc840942",
+      "bytes": 2953
+    },
+    "wrong-source-attempt/native-controller-result.json": {
+      "sha256": "6bfed9b04a56305ae76af248c4c04c4b0238aaa13302f7919b9083ba4d35f428",
+      "bytes": 758
+    },
+    "wrong-source-attempt/cmd-tests.json": {
+      "sha256": "5f2379ae29fa6d23b678df22eb39d598d1f9e79a3199bd32eaecbce35ab86aa7",
+      "bytes": 2024
+    },
+    "wrong-source-attempt/cmd-tests.stdout.txt": {
+      "sha256": "cf7869942f736114162f95578ca8bec3f2eab377cf6ab13a9cde01aa2878d935",
+      "bytes": 32975
+    },
+    "wrong-source-attempt/cmd-tests.stderr.txt": {
+      "sha256": "446ddad6a9803d23e059ce413c573bb55d4048c207db504f22d450634edb67d9",
+      "bytes": 956
+    },
+    "wrong-source-attempt/test-compiler-artifacts.json": {
+      "sha256": "4b2058c049964b061db3446567fd8b5167c7b831b16cc305b0f3c0be257270a0",
+      "bytes": 73470
+    },
+    "wrong-source-attempt/inventory.json": {
+      "sha256": "fec6b43ec3ca02bdfbec964181c188d04e6fa11c95b5079cdf9f83b1f2bf986a",
+      "bytes": 29750
+    },
+    "wrong-source-attempt/post-no-run-current-actual-binding.json": {
+      "sha256": "7bd8022c678b192ef3c95d33a7623f46aa9c00f048a594d8db81cb8c0fd35af9",
+      "bytes": 2884
+    },
+    "wrong-source-attempt/new-frozen.json": {
+      "sha256": "6d38ee2432d8869ebb122a96b9a06b43abbd08a488e948a1c49661eec978e18d",
+      "bytes": 3149
+    },
+    "wrong-source-attempt/source-before.json": {
+      "sha256": "3eec37a632aa9a320d8271b0254cb81ae8902708b5ab73526e1c6b67adf29d81",
+      "bytes": 3186129
+    },
+    "wrong-source-attempt/owner-source-before.json": {
+      "sha256": "8c7cc64088791626fd019e231560270f0fa531f84146c98d13f96383ac46346d",
+      "bytes": 3186129
+    },
+    "wrong-source-attempt/owner-source-after.json": {
+      "sha256": "8c7cc64088791626fd019e231560270f0fa531f84146c98d13f96383ac46346d",
+      "bytes": 3186129
+    },
+    "wrong-source-attempt/canonical-source-manifest.json": {
+      "sha256": "e150897fb67e3442b7d06c1c9faef8591865d2be6760ca7dc0ad119b104243f0",
+      "bytes": 2278414
+    },
+    "readonly-forensics/audit.json": {
+      "sha256": "5b923cec76864d97afb6d0a2c1108ba3e0beeec9dea5ccba565ee7ee0a953ca9",
+      "bytes": 3040
+    },
+    "readonly-forensics/sealed292-verified.json": {
+      "sha256": "3de86e678ae62ff672f8c45d18e743bce60d82840b0adf168718923da459da92",
+      "bytes": 129613
+    },
+    "readonly-forensics/source-private-after.json": {
+      "sha256": "3eec37a632aa9a320d8271b0254cb81ae8902708b5ab73526e1c6b67adf29d81",
+      "bytes": 3186129
+    },
+    "readonly-forensics/source-owner-after.json": {
+      "sha256": "8c7cc64088791626fd019e231560270f0fa531f84146c98d13f96383ac46346d",
+      "bytes": 3186129
+    },
+    "readonly-forensics/current8-post-readonly.json": {
+      "sha256": "04c33cf8bfa73b903f3dc781f08688d9847dd70d34469cecb5c444ca669b7bbf",
+      "bytes": 2884
+    },
+    "readonly-forensics/four-alias-inode-differences.json": {
+      "sha256": "69b63cf51e3369d9db8800cd24fd9dff06e865a6a9fde848c882ee9962c6ddb0",
+      "bytes": 1064
+    },
+    "readonly-forensics/controlled-fingerprint-match.json": {
+      "sha256": "879aa261eb0e6ae9001b1ae98bfd2c86b0247f95a19f7e609d7449d9a8589e08",
+      "bytes": 938
+    },
+    "readonly-forensics/runtime-Cargo-fingerprint-readonly.json": {
+      "sha256": "d4df92123cd6a230fedba19e0480ba550e3003c2bad1cf02e7c47b0d5cb87789",
+      "bytes": 3306
+    },
+    "earlier-separate337-3/terminal.json": {
+      "sha256": "043320513d397c2d89767c8732eedde922c5eba69b4cd57ba9cec502ac0d9560",
+      "bytes": 2608
+    },
+    "earlier-separate337-3/native-controller-result.json": {
+      "sha256": "34368c6c09b72a027de526f5d1724830597376828b45bc45c8fc4f15e15899da",
+      "bytes": 757
+    },
+    "earlier-separate337-3/cmd-tests.json": {
+      "sha256": "17c1ae92770eca3bf5b5835ac41004e37e2caafa96c0a888acf6b0ae7a0648c7",
+      "bytes": 2026
+    },
+    "earlier-separate337-3/cmd-tests.stdout.txt": {
+      "sha256": "168150824d42884b5714a44e22c4f401b01d5a0cfac07cfaf5eb5f72e560dac6",
+      "bytes": 32158
+    },
+    "earlier-separate337-3/cmd-tests.stderr.txt": {
+      "sha256": "c56206cd4776d0936efcb453a299903daba70a69c5b97f06ec933636d34e75ba",
+      "bytes": 956
+    }
+  },
+  "limits": [
+    "No source, target, executable or GitHub mutation by the read-only forensic audit; no executable launch for byte searches",
+    "This packet makes no completed cache-retirement, corrected-gate, native ARM64 or device claim",
+    "Original raw338/2 and nativeFAIL1 remain immutable; classification changes their source applicability, not their recorded outcomes",
+    "No historical-case cause, inheritance or general scheduler-load explanation is inferred"
+  ]
+}

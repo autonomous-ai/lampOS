@@ -1,0 +1,2811 @@
+{
+  "schema": 1,
+  "subject": "Original a8a Restart native CI with separately sourced host composite and Cloud leak witness",
+  "pull_request": 3572,
+  "head": "a8a55c00fa359b754b2514a58b5c92c3dda00863",
+  "authored_base": "9e0ccb206ee796ef46929bf463c5176f3a493ed9",
+  "immediate_head_parent": "9e0ccb206ee796ef46929bf463c5176f3a493ed9",
+  "status": "PASS within recorded actual preview/check scopes",
+  "collected_at_utc": "2026-10-27T03:55:01.161820+00:00",
+  "original_runs": [
+    {
+      "id": 40444802059,
+      "name": "lampOS on ARM64",
+      "event": "pull_request",
+      "status": "completed",
+      "conclusion": "success",
+      "head_sha": "a8a55c00fa359b754b2514a58b5c92c3dda00863",
+      "run_attempt": 1,
+      "html_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40444802059",
+      "created_at": "2026-10-27T03:33:13Z",
+      "updated_at": "2026-10-27T03:48:20Z"
+    },
+    {
+      "id": 40444802082,
+      "name": "lampOS clippy",
+      "event": "pull_request",
+      "status": "completed",
+      "conclusion": "success",
+      "head_sha": "a8a55c00fa359b754b2514a58b5c92c3dda00863",
+      "run_attempt": 1,
+      "html_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40444802082",
+      "created_at": "2026-10-27T03:33:13Z",
+      "updated_at": "2026-10-27T03:36:59Z"
+    }
+  ],
+  "actual_checkout": {
+    "preview_commit": "2080c98e5e11c07a3c6af8d7c20993e96284a2bf",
+    "tree": "ebb4efddf479266f532a4eadb33bd77cd2c13650",
+    "ordered_parents": [
+      "e70da415d928d6b03664b90d3074c295609ae820",
+      "a8a55c00fa359b754b2514a58b5c92c3dda00863"
+    ],
+    "both_job_logs_match_preview": true,
+    "offered_head_tree": "9905fca1239d05d3ac04c617c4bb2fdaa9a681f6",
+    "tracked_tree_equals_offered_head": false,
+    "offered_tracked_entries": 10679,
+    "preview_tracked_entries": 10679,
+    "delta_paths": [
+      {
+        "path": "lampOS/crates/body/src/body.rs",
+        "head": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "5adaf0ef367a6343ec89547caddca68424a0210d"
+        },
+        "preview": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "84ac802d2d0b1767d70f2166f8d32ef44b0129ba"
+        }
+      },
+      {
+        "path": "lampOS/crates/body/src/body/tests.rs",
+        "head": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "f31399cc75e3462e5f30f2912bb7402da2f504b6"
+        },
+        "preview": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "d8eb38f4b1c5c2780544d0ed7f8f23bc5b236154"
+        }
+      },
+      {
+        "path": "lampOS/crates/setup/src/main.rs",
+        "head": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "9d456e8edb5b538b71f6d3daea1f54195a3e43eb"
+        },
+        "preview": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "fe59e4e0f2c8f6d45bde3063abd8fa1405a48519"
+        }
+      },
+      {
+        "path": "lampOS/crates/setup/tests/it/recover.rs",
+        "head": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "3878e29e2d283fedbd00554ef263c64831f0ecb3"
+        },
+        "preview": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "9b22b510dcb8b0bd285a57877839e279775c8d80"
+        }
+      },
+      {
+        "path": "lampOS/crates/update/src/install.rs",
+        "head": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "75c7fad7f51162b0aad21a6ad0ea30c79b386c9f"
+        },
+        "preview": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "6bef1bd0d936865eb0684059d7cdfa91bca1419d"
+        }
+      },
+      {
+        "path": "lampOS/crates/update/src/world.rs",
+        "head": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "49759a44ff9279479939e41a6e5f5a5af05bfcd2"
+        },
+        "preview": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "943528fb063573c79e69de405053d4f69edeaad5"
+        }
+      },
+      {
+        "path": "lampOS/crates/update/src/world/query.rs",
+        "head": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "17ba545604d5e685153a2c6401ab0a19505d0999"
+        },
+        "preview": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "a6239466ad417f6f6c0b40c8107c38268972100f"
+        }
+      },
+      {
+        "path": "lampOS/crates/update/tests/install.rs",
+        "head": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "65a48de0ca9f82ad366a241e51f03ca4fc3a8e5b"
+        },
+        "preview": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "96d2baf97d183f599de3f4902498e6a1e729260e"
+        }
+      },
+      {
+        "path": "lampOS/crates/voice/src/made_skill.rs",
+        "head": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "055a39ee535fee442bc2562680e909712314b426"
+        },
+        "preview": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "bd1e9566d0791c9f83055cf2c90e0fb10dfa29e2"
+        }
+      },
+      {
+        "path": "lampOS/docs/body.md",
+        "head": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "ea2fd0f74035e964bf22dc2e00d52bb340d5d88c"
+        },
+        "preview": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "2a1085a213faae9fa0046f16078b73762ca20d62"
+        }
+      },
+      {
+        "path": "lampOS/docs/build-rows.md",
+        "head": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "07bc6518809c7da98ef5fc3349ebe195bfeba122"
+        },
+        "preview": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "f79b5a2497edd0e495cb20075c0417037c90945d"
+        }
+      },
+      {
+        "path": "lampOS/docs/install.md",
+        "head": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "1f55c516eacca543dbf06ef75848c9db6ade42dd"
+        },
+        "preview": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "d3828cc1034fb9bfc5a7f7afa22be56f09745f82"
+        }
+      },
+      {
+        "path": "lampOS/docs/skills.md",
+        "head": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "0fa33b0f5691d669835c5d2b75021bb4e64f6371"
+        },
+        "preview": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "bfcfedc9bc993e56fb8c6ec6a9b64c37b7ba320c"
+        }
+      },
+      {
+        "path": "lampOS/docs/switches.md",
+        "head": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "c8021651ea1ecbf5fc103c0b25db1d58319d97a3"
+        },
+        "preview": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "55bb83a9a995f16412225b8e196d5a563139c3a4"
+        }
+      },
+      {
+        "path": "lampOS/docs/updates.md",
+        "head": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "ed98cbaaa893f235c21c76f429690042af86aa32"
+        },
+        "preview": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "c8a32e929949fea74073c88a2d926dc46d19222a"
+        }
+      }
+    ],
+    "authored_path_bindings": [
+      {
+        "path": "lampOS/crates/voice/src/same_voice.rs",
+        "head": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "84d681f66371c607157ab4c1840b5e2d5f70c13b"
+        },
+        "preview": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "84d681f66371c607157ab4c1840b5e2d5f70c13b"
+        },
+        "equal": true
+      },
+      {
+        "path": "lampOS/docs/same-voice.md",
+        "head": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "8923730e5353e76be0ffeee0f395ff57327a53e0"
+        },
+        "preview": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "8923730e5353e76be0ffeee0f395ff57327a53e0"
+        },
+        "equal": true
+      }
+    ],
+    "bound_text_sources": [
+      {
+        "path": ".github/scripts/lampos-pr-crates.py",
+        "git_blob_sha": "2213782569c8e9130dc40d6d632ffc04a78e0081",
+        "sha256": "c89f3cc802c1f385793f7a800142ae235ef7b09c00e38f1661427eecffcf2671",
+        "bytes": 5493,
+        "also_equal_offered_head_blob": true
+      },
+      {
+        "path": "lampOS/.config/nextest.toml",
+        "git_blob_sha": "3463c6682e8126b0c02cedda3d67cfc5bc081169",
+        "sha256": "c4992da8d157df279011a424b5feb4833f001fd1d46ce3edd0a56992c848bb33",
+        "bytes": 5157,
+        "also_equal_offered_head_blob": true
+      },
+      {
+        "path": "lampOS/crates/voice/src/session_reader/tests.rs",
+        "git_blob_sha": "2b3ea62843a2f8534d4c8a6532ddf167805ab227",
+        "sha256": "794a44b35d1025ee9f66035099d3fe1facc8233eb39f7d17878e08a7ea7f3e49",
+        "bytes": 36539,
+        "also_equal_offered_head_blob": true
+      },
+      {
+        "path": "lampOS/docs/same-voice.md",
+        "git_blob_sha": "8923730e5353e76be0ffeee0f395ff57327a53e0",
+        "sha256": "774451da969bbd1271f6ad143def758b0b1bb6acf0bd74e36ca3db104c1a5b0d",
+        "bytes": 40112,
+        "also_equal_offered_head_blob": true
+      },
+      {
+        "path": "lampOS/crates/voice/src/same_voice.rs",
+        "git_blob_sha": "84d681f66371c607157ab4c1840b5e2d5f70c13b",
+        "sha256": "151acd1d793723ba2ed1ac78ed9ca9517e376f52cf9119839de990107394ec72",
+        "bytes": 78068,
+        "also_equal_offered_head_blob": true
+      },
+      {
+        "path": ".github/workflows/lampos-arm64.yml",
+        "git_blob_sha": "70afefeaec5a28c8e5aff539dd1d8d537d098560",
+        "sha256": "43a7eef7907d272904f975d7ee65b456ec3bc4eba63505bee596d1bf196a6e74",
+        "bytes": 20675,
+        "also_equal_offered_head_blob": true
+      },
+      {
+        "path": ".github/workflows/lampos-clippy.yml",
+        "git_blob_sha": "907ef8ccd6d32d96d60887d56ca0fac84a41d67a",
+        "sha256": "f979a9e8d87e8f9db255c4a9e81a51ecf7164b6b48118627578ce83722a3db92",
+        "bytes": 4688,
+        "also_equal_offered_head_blob": true
+      }
+    ],
+    "binary_equivalence_inferred_from_source": false
+  },
+  "ARM64": {
+    "run": 40444802059,
+    "runner": "ubuntu-22.04-arm",
+    "release": true,
+    "profile": "pr",
+    "partition": "hash:1/1",
+    "selected_packages": [
+      "lamp-body",
+      "lamp-cloud",
+      "lamp-expression",
+      "lamp-keeper",
+      "lamp-lean",
+      "lamp-memory",
+      "lamp-peek",
+      "lamp-setup",
+      "lamp-skills",
+      "lamp-update",
+      "lamp-voice",
+      "lamp-voice-eval"
+    ],
+    "filter_excludes_only_custom_harness_binaries": [
+      "lamp-ipc::relay_signals",
+      "lamp-turn-end-wire::process"
+    ],
+    "realtime_group_included": true,
+    "selected_tests": 7572,
+    "unique_PASS": 7572,
+    "FAIL": 0,
+    "LEAK": 0,
+    "TIMEOUT": 0,
+    "unrun_selected": 0,
+    "aggregate_skipped": 53,
+    "individual_SKIP_records": 0,
+    "individual_skipped_identities_emitted": false,
+    "skipped_binaries": 115,
+    "reported_selected_binaries": 70,
+    "nonempty_execution_binary_labels": 62,
+    "nextest_seconds": 176.639,
+    "per_binary": [
+      {
+        "binary": "lamp-body",
+        "PASS": 456,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-body::bin/lamp-body",
+        "PASS": 32,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-body::bin/lamp-body-inspect",
+        "PASS": 2,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-body::bin/lamp-body-measure",
+        "PASS": 5,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-body::bin/lamp-body-mood",
+        "PASS": 3,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-body::bin/lamp-body-worker",
+        "PASS": 1,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-body::it",
+        "PASS": 125,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-cloud",
+        "PASS": 166,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-cloud::it",
+        "PASS": 30,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-expression",
+        "PASS": 27,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-expression::bin/lamp-expression",
+        "PASS": 4,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-expression::it",
+        "PASS": 281,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-expression::runtime",
+        "PASS": 28,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-keeper",
+        "PASS": 40,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-keeper::bin/lamp-keeper",
+        "PASS": 2,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-lean",
+        "PASS": 10,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-lean::it",
+        "PASS": 51,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-memory",
+        "PASS": 101,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-memory::bin/lamp-memory",
+        "PASS": 8,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-memory::bin/lamp-memory-eval",
+        "PASS": 8,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-memory::forget_person",
+        "PASS": 3,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-memory::forget_shared_exchange",
+        "PASS": 4,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-memory::forgot",
+        "PASS": 1,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-memory::health_control",
+        "PASS": 23,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-memory::it",
+        "PASS": 168,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-memory::paraphrase_fixture",
+        "PASS": 1,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-memory::voice_early_words",
+        "PASS": 1,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-memory::voice_follows_face",
+        "PASS": 1,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-memory::voice_forget",
+        "PASS": 5,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-memory::voice_forget_about",
+        "PASS": 2,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-memory::voice_forget_named",
+        "PASS": 2,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-memory::voice_link_used",
+        "PASS": 2,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-memory::voice_observe",
+        "PASS": 1,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-memory::voice_observe_forget",
+        "PASS": 1,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-memory::voice_observe_named_forget",
+        "PASS": 1,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-memory::voice_observe_room",
+        "PASS": 1,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-memory::voice_since_until",
+        "PASS": 2,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-peek",
+        "PASS": 15,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-peek::peek",
+        "PASS": 11,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-setup",
+        "PASS": 16,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-setup::it",
+        "PASS": 164,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-setup::wake",
+        "PASS": 6,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-skills",
+        "PASS": 158,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-skills::bin/lamp-skills",
+        "PASS": 23,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-skills::it",
+        "PASS": 314,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-skills::release_pair",
+        "PASS": 2,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-skills::requested_audio",
+        "PASS": 31,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-update",
+        "PASS": 137,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-update::functions",
+        "PASS": 5,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-update::install",
+        "PASS": 102,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-update::it",
+        "PASS": 13,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-update::round",
+        "PASS": 184,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-update::self-cli-exec",
+        "PASS": 1,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-update::self-process-cuts",
+        "PASS": 1,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-voice",
+        "PASS": 3849,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-voice-eval",
+        "PASS": 378,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-voice-eval::bin/lamp-voice-eval",
+        "PASS": 7,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-voice-eval::it",
+        "PASS": 238,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-voice::bin/lamp-voice",
+        "PASS": 1,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-voice::example/render_line_second",
+        "PASS": 4,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-voice::example/stop_words_stt_replay",
+        "PASS": 6,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      },
+      {
+        "binary": "lamp-voice::it",
+        "PASS": 307,
+        "FAIL": 0,
+        "LEAK": 0,
+        "TIMEOUT": 0,
+        "SKIP": 0
+      }
+    ]
+  },
+  "execution_accounting": {
+    "window": {
+      "start_line": 827,
+      "summary_line": 8401,
+      "following_step_line": 8819,
+      "start": "2026-10-27T03:44:59.0354207Z     Starting 7572 tests across 70 binaries (53 tests and 115 binaries skipped)",
+      "summary": "2026-10-27T03:47:55.6740358Z      Summary [ 176.639s] 7572 tests run: 7572 passed, 53 skipped"
+    },
+    "records": 7572,
+    "unique_identities": 7572,
+    "unique_ordinals": 7572,
+    "execution_duplicates": 0,
+    "nextest_retry_flaky_records": 0,
+    "post_summary_reprints": 34,
+    "reprint_classification": {
+      "realtime_success_output_final": 22,
+      "privacy_worker_success_output_final": 12
+    },
+    "reprint_scope": "Every post-summary record matches an earlier execution identity/status/duration/ordinal and actual configuration success-output=final rule; excluded by boundary, not blind identity deduplication.",
+    "internal_fixture_retries_not_ruled_out": true
+  },
+  "required_case_groups": {
+    "SameVoice_module": [
+      {
+        "line": 6128,
+        "timestamp": "2026-10-27T03:47:20.6884124Z",
+        "status": "PASS",
+        "seconds": 0.008,
+        "ordinal": 5301,
+        "total": 7572,
+        "binary": "lamp-voice",
+        "test": "same_voice::tests::a_print_is_coming_from_its_first_sample_until_it_comes"
+      },
+      {
+        "line": 6125,
+        "timestamp": "2026-10-27T03:47:20.6623171Z",
+        "status": "PASS",
+        "seconds": 0.006,
+        "ordinal": 5298,
+        "total": 7572,
+        "binary": "lamp-voice",
+        "test": "same_voice::tests::a_line_judged_without_the_check_says_which_print_was_missing"
+      },
+      {
+        "line": 6124,
+        "timestamp": "2026-10-27T03:47:20.6560001Z",
+        "status": "PASS",
+        "seconds": 0.006,
+        "ordinal": 5297,
+        "total": 7572,
+        "binary": "lamp-voice",
+        "test": "same_voice::tests::a_line_is_judged_from_its_first_1_8_s_when_it_is_long_enough_and_said_with_the_lamp_quiet"
+      },
+      {
+        "line": 6121,
+        "timestamp": "2026-10-27T03:47:20.6369866Z",
+        "status": "PASS",
+        "seconds": 0.158,
+        "ordinal": 5294,
+        "total": 7572,
+        "binary": "lamp-voice",
+        "test": "same_voice::tests::a_child_that_never_gets_ready_is_started_three_times_and_then_the_check_is_off"
+      },
+      {
+        "line": 6151,
+        "timestamp": "2026-10-27T03:47:20.9345499Z",
+        "status": "PASS",
+        "seconds": 0.22,
+        "ordinal": 5324,
+        "total": 7572,
+        "binary": "lamp-voice",
+        "test": "same_voice::tests::each_line_the_check_says_is_said_to_its_journal"
+      },
+      {
+        "line": 6132,
+        "timestamp": "2026-10-27T03:47:20.7093349Z",
+        "status": "PASS",
+        "seconds": 0.236,
+        "ordinal": 5305,
+        "total": 7572,
+        "binary": "lamp-voice",
+        "test": "same_voice::tests::a_child_that_hangs_after_it_is_ready_is_killed_and_started_again"
+      },
+      {
+        "line": 6136,
+        "timestamp": "2026-10-27T03:47:20.7209830Z",
+        "status": "PASS",
+        "seconds": 0.008,
+        "ordinal": 5309,
+        "total": 7572,
+        "binary": "lamp-voice",
+        "test": "same_voice::tests::another_voice_is_known_only_against_the_conversation_the_lamp_last_answered_in"
+      },
+      {
+        "line": 6126,
+        "timestamp": "2026-10-27T03:47:20.6717338Z",
+        "status": "PASS",
+        "seconds": 0.009,
+        "ordinal": 5299,
+        "total": 7572,
+        "binary": "lamp-voice",
+        "test": "same_voice::tests::a_mixed_print_among_the_conversations_does_not_make_its_own_voice_another"
+      },
+      {
+        "line": 6138,
+        "timestamp": "2026-10-27T03:47:20.7294654Z",
+        "status": "PASS",
+        "seconds": 0.008,
+        "ordinal": 5311,
+        "total": 7572,
+        "binary": "lamp-voice",
+        "test": "same_voice::tests::the_conversation_keeps_its_last_prints_and_a_new_one_begins_afresh"
+      },
+      {
+        "line": 6127,
+        "timestamp": "2026-10-27T03:47:20.6800720Z",
+        "status": "PASS",
+        "seconds": 0.008,
+        "ordinal": 5300,
+        "total": 7572,
+        "binary": "lamp-voice",
+        "test": "same_voice::tests::a_new_conversation_ends_any_late_voice_of_the_one_before"
+      },
+      {
+        "line": 6120,
+        "timestamp": "2026-10-27T03:47:20.4787696Z",
+        "status": "PASS",
+        "seconds": 0.006,
+        "ordinal": 5293,
+        "total": 7572,
+        "binary": "lamp-voice",
+        "test": "same_voice::tests::a_call_takes_no_late_voice_from_before_it_at_its_verdict"
+      },
+      {
+        "line": 6123,
+        "timestamp": "2026-10-27T03:47:20.6498489Z",
+        "status": "PASS",
+        "seconds": 0.006,
+        "ordinal": 5296,
+        "total": 7572,
+        "binary": "lamp-voice",
+        "test": "same_voice::tests::a_late_print_is_compared_before_it_becomes_the_conversations_voice"
+      },
+      {
+        "line": 6122,
+        "timestamp": "2026-10-27T03:47:20.6438010Z",
+        "status": "PASS",
+        "seconds": 0.007,
+        "ordinal": 5295,
+        "total": 7572,
+        "binary": "lamp-voice",
+        "test": "same_voice::tests::a_late_print_from_too_little_speech_is_unsure"
+      },
+      {
+        "line": 6135,
+        "timestamp": "2026-10-27T03:47:20.7174001Z",
+        "status": "PASS",
+        "seconds": 0.008,
+        "ordinal": 5308,
+        "total": 7572,
+        "binary": "lamp-voice",
+        "test": "same_voice::tests::an_unsure_print_let_out_is_not_the_conversations_voice"
+      },
+      {
+        "line": 6140,
+        "timestamp": "2026-10-27T03:47:20.7383750Z",
+        "status": "PASS",
+        "seconds": 0.009,
+        "ordinal": 5313,
+        "total": 7572,
+        "binary": "lamp-voice",
+        "test": "same_voice::tests::with_the_caller_only_a_going_on_line_never_becomes_the_conversations_voice"
+      },
+      {
+        "line": 6130,
+        "timestamp": "2026-10-27T03:47:20.7045913Z",
+        "status": "PASS",
+        "seconds": 0.008,
+        "ordinal": 5303,
+        "total": 7572,
+        "binary": "lamp-voice",
+        "test": "same_voice::tests::a_short_call_takes_its_voice_from_the_callers_first_follow_up_seen_spoken"
+      },
+      {
+        "line": 6133,
+        "timestamp": "2026-10-27T03:47:20.7128531Z",
+        "status": "PASS",
+        "seconds": 0.008,
+        "ordinal": 5306,
+        "total": 7572,
+        "binary": "lamp-voice",
+        "test": "same_voice::tests::a_voice_at_0_20_against_the_conversations_is_another"
+      },
+      {
+        "line": 6134,
+        "timestamp": "2026-10-27T03:47:20.7147906Z",
+        "status": "PASS",
+        "seconds": 0.008,
+        "ordinal": 5307,
+        "total": 7572,
+        "binary": "lamp-voice",
+        "test": "same_voice::tests::a_voice_at_0_35_was_another_at_0_45_and_is_the_conversations_at_0_30"
+      },
+      {
+        "line": 6129,
+        "timestamp": "2026-10-27T03:47:20.6964695Z",
+        "status": "PASS",
+        "seconds": 0.008,
+        "ordinal": 5302,
+        "total": 7572,
+        "binary": "lamp-voice",
+        "test": "same_voice::tests::a_print_that_comes_after_its_answer_still_becomes_the_conversations"
+      },
+      {
+        "line": 6139,
+        "timestamp": "2026-10-27T03:47:20.7349646Z",
+        "status": "PASS",
+        "seconds": 0.009,
+        "ordinal": 5312,
+        "total": 7572,
+        "binary": "lamp-voice",
+        "test": "same_voice::tests::the_model_path_is_absolute_and_its_flag_follows_the_spoken_to_one"
+      },
+      {
+        "line": 6137,
+        "timestamp": "2026-10-27T03:47:20.7258863Z",
+        "status": "PASS",
+        "seconds": 0.009,
+        "ordinal": 5310,
+        "total": 7572,
+        "binary": "lamp-voice",
+        "test": "same_voice::tests::the_childs_answers_are_read_as_its_serving_writes_them"
+      }
+    ],
+    "changed_hung_child_case": [
+      {
+        "line": 6132,
+        "timestamp": "2026-10-27T03:47:20.7093349Z",
+        "status": "PASS",
+        "seconds": 0.236,
+        "ordinal": 5305,
+        "total": 7572,
+        "binary": "lamp-voice",
+        "test": "same_voice::tests::a_child_that_hangs_after_it_is_ready_is_killed_and_started_again"
+      }
+    ],
+    "journal_worker_case": [
+      {
+        "line": 6151,
+        "timestamp": "2026-10-27T03:47:20.9345499Z",
+        "status": "PASS",
+        "seconds": 0.22,
+        "ordinal": 5324,
+        "total": 7572,
+        "binary": "lamp-voice",
+        "test": "same_voice::tests::each_line_the_check_says_is_said_to_its_journal"
+      }
+    ]
+  },
+  "ordinary_Reader_controls": [
+    {
+      "line": 7092,
+      "timestamp": "2026-10-27T03:47:37.7186302Z",
+      "status": "PASS",
+      "seconds": 0.007,
+      "ordinal": 6265,
+      "total": 7572,
+      "binary": "lamp-voice",
+      "test": "session_reader::tests::local_session_reader_group_is_exact_unique_and_bounded"
+    },
+    {
+      "line": 7078,
+      "timestamp": "2026-10-27T03:47:37.6588581Z",
+      "status": "PASS",
+      "seconds": 0.006,
+      "ordinal": 6251,
+      "total": 7572,
+      "binary": "lamp-voice",
+      "test": "session_reader::tests::finite_and_unset_service_never_resolve_a_reader_group"
+    },
+    {
+      "line": 7081,
+      "timestamp": "2026-10-27T03:47:37.6685738Z",
+      "status": "PASS",
+      "seconds": 0.01,
+      "ordinal": 6254,
+      "total": 7572,
+      "binary": "lamp-voice",
+      "test": "session_reader::tests::group_lookup_failure_retains_private_logging_without_writer_failure"
+    },
+    {
+      "line": 7087,
+      "timestamp": "2026-10-27T03:47:37.6986271Z",
+      "status": "PASS",
+      "seconds": 0.012,
+      "ordinal": 6260,
+      "total": 7572,
+      "binary": "lamp-voice",
+      "test": "session_reader::tests::linux::only_the_new_session_is_shared_after_one_pinned_lookup"
+    },
+    {
+      "line": 7091,
+      "timestamp": "2026-10-27T03:47:37.7134748Z",
+      "status": "PASS",
+      "seconds": 0.007,
+      "ordinal": 6264,
+      "total": 7572,
+      "binary": "lamp-voice",
+      "test": "session_reader::tests::linux::unprepared_or_wrong_group_parent_never_grants_or_changes_ancestors"
+    },
+    {
+      "line": 7088,
+      "timestamp": "2026-10-27T03:47:37.6991986Z",
+      "status": "PASS",
+      "seconds": 0.007,
+      "ordinal": 6261,
+      "total": 7572,
+      "binary": "lamp-voice",
+      "test": "session_reader::tests::linux::readable_or_linked_voice_siblings_deny_preparation_and_late_grant"
+    },
+    {
+      "line": 7085,
+      "timestamp": "2026-10-27T03:47:37.6866644Z",
+      "status": "PASS",
+      "seconds": 0.011,
+      "ordinal": 6258,
+      "total": 7572,
+      "binary": "lamp-voice",
+      "test": "session_reader::tests::linux::every_grant_failure_restores_private_modes_and_original_groups"
+    },
+    {
+      "line": 7086,
+      "timestamp": "2026-10-27T03:47:37.6916286Z",
+      "status": "PASS",
+      "seconds": 0.007,
+      "ordinal": 6259,
+      "total": 7572,
+      "binary": "lamp-voice",
+      "test": "session_reader::tests::linux::failed_private_rollback_disables_only_metadata"
+    },
+    {
+      "line": 7084,
+      "timestamp": "2026-10-27T03:47:37.6845927Z",
+      "status": "PASS",
+      "seconds": 0.01,
+      "ordinal": 6257,
+      "total": 7572,
+      "binary": "lamp-voice",
+      "test": "session_reader::tests::linux::an_earlier_reader_refusal_keeps_a_verified_private_writer"
+    },
+    {
+      "line": 7080,
+      "timestamp": "2026-10-27T03:47:37.6662855Z",
+      "status": "PASS",
+      "seconds": 0.007,
+      "ordinal": 6253,
+      "total": 7572,
+      "binary": "lamp-voice",
+      "test": "session_reader::tests::linux::a_fixture_root_retains_ancestor_mode_acl_and_path_checks"
+    },
+    {
+      "line": 7082,
+      "timestamp": "2026-10-27T03:47:37.6748980Z",
+      "status": "PASS",
+      "seconds": 0.006,
+      "ordinal": 6255,
+      "total": 7572,
+      "binary": "lamp-voice",
+      "test": "session_reader::tests::linux::access_and_default_acl_are_refused_without_stripping_or_widening_them"
+    },
+    {
+      "line": 7089,
+      "timestamp": "2026-10-27T03:47:37.7058522Z",
+      "status": "PASS",
+      "seconds": 0.007,
+      "ordinal": 6262,
+      "total": 7572,
+      "binary": "lamp-voice",
+      "test": "session_reader::tests::linux::replaced_record_never_changes_an_outside_sentinel"
+    },
+    {
+      "line": 7090,
+      "timestamp": "2026-10-27T03:47:37.7113115Z",
+      "status": "PASS",
+      "seconds": 0.012,
+      "ordinal": 6263,
+      "total": 7572,
+      "binary": "lamp-voice",
+      "test": "session_reader::tests::linux::shared_session_writer_projects_every_segment_without_private_values"
+    },
+    {
+      "line": 7083,
+      "timestamp": "2026-10-27T03:47:37.6752649Z",
+      "status": "PASS",
+      "seconds": 0.009,
+      "ordinal": 6256,
+      "total": 7572,
+      "binary": "lamp-voice",
+      "test": "session_reader::tests::linux::a_verified_failed_grant_keeps_private_original_records"
+    }
+  ],
+  "known_unrun": [
+    {
+      "test": "session_reader::tests::unsupported_acl_verification_degrades_to_private_metadata",
+      "reason": "non-Linux-only, not compiled in Linux run"
+    },
+    {
+      "test": "session_reader::tests::linux::dedicated_reader_can_only_read_new_events_under_dropped_identity",
+      "reason": "explicit isolated-root/setpriv DAC test ignored; not enabled"
+    }
+  ],
+  "auxiliary_results_separate": {
+    "promotion_groups": [
+      {
+        "line": 491,
+        "passed": 2,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 496,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 524,
+        "passed": 22,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 531,
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 537,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      }
+    ],
+    "workspace_doc_groups": [
+      {
+        "line": 8830,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 8836,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 8842,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 8848,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 8854,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 8862,
+        "passed": 2,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 8869,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 8875,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 8881,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 8887,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 8893,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 8899,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 8905,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 8911,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 8917,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 8924,
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 8931,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 8937,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 8943,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 8949,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 8955,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 8962,
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 8969,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 8975,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 8981,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 8987,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 8993,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 8999,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 9005,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 9011,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 9017,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 9023,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 9029,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 9035,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 9041,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 9047,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 9053,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 9059,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 9065,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 9071,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 9077,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 9083,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 9089,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 9095,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 9101,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 9107,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      }
+    ],
+    "promotion_counts": {
+      "passed": 25,
+      "failed": 0,
+      "ignored": 0
+    },
+    "workspace_doc_counts": {
+      "passed": 4,
+      "failed": 0,
+      "ignored": 0
+    },
+    "relay_signals": "ok once",
+    "process": {
+      "passed": 13,
+      "failed": 0,
+      "rows": [
+        "test an_idle_worker_stays_ready_across_a_long_quiet ... ok (2015 ms)",
+        "test a_worker_reporting_another_model_is_refused_before_any_request ... ok (2 ms)",
+        "test no_outcome_is_delivered_after_close_even_for_an_answer_on_its_way ... ok (4 ms)",
+        "test verdict_carries_identity_and_one_request_at_a_time ... ok (56 ms)",
+        "test missing_model_is_final_and_never_restarted ... ok (162 ms)",
+        "test missing_executable_fails_at_once ... ok (2 ms)",
+        "test spawn_returns_while_worker_startup_is_held ... ok (6 ms)",
+        "test startup_failures_are_final ... ok (409 ms)",
+        "test serving_failures_are_replaced_within_budget ... ok (514 ms)",
+        "test protocol_violations_are_replaced ... ok (177 ms)",
+        "test cancelled_answers_are_never_delivered ... ok (155 ms)",
+        "test close_during_inference_never_waits ... ok (233 ms)",
+        "test sustained_requests_stay_bounded ... ok (693 ms)"
+      ]
+    },
+    "not_added_to_nextest": true
+  },
+  "Linux_Clippy": {
+    "run": 40444802082,
+    "status": "success",
+    "scope": "Whole-workspace formatting and strict all-targets Clippy plus separate promoter fmt/Clippy at same actual preview",
+    "strict_command": "cargo clippy --locked --workspace --all-targets -- -D warnings"
+  },
+  "exact_head_checks": {
+    "head": "a8a55c00fa359b754b2514a58b5c92c3dda00863",
+    "total_records": 5,
+    "success": 2,
+    "skipped": 3,
+    "checks": [
+      {
+        "name": "report-full-run-failure",
+        "status": "completed",
+        "conclusion": "skipped",
+        "url": "https://github.com/autonomous-ai/lampOS/actions/runs/40444802059/job/121997966752"
+      },
+      {
+        "name": "lampOS \u2014 sign and publish the tested lamp-voice artifact",
+        "status": "completed",
+        "conclusion": "skipped",
+        "url": "https://github.com/autonomous-ai/lampOS/actions/runs/40444802059/job/121997966252"
+      },
+      {
+        "name": "lampOS \u2014 promote a tested release to the stable feed",
+        "status": "completed",
+        "conclusion": "skipped",
+        "url": "https://github.com/autonomous-ai/lampOS/actions/runs/40444802059/job/121993406537"
+      },
+      {
+        "name": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/autonomous-ai/lampOS/actions/runs/40444802059/job/121993405011"
+      },
+      {
+        "name": "lampOS \u2014 clippy, every crate and target (x86 Linux)",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/autonomous-ai/lampOS/actions/runs/40444802082/job/121993404734"
+      }
+    ]
+  },
+  "artifact": {
+    "id": 12708311624,
+    "name": "lampos-arm64-a8a55c00fa359b754b2514a58b5c92c3dda00863",
+    "size_in_bytes": 116160940,
+    "digest": "sha256:9dc84420075b9268c93e444e1128dd153c0413380a563ec38e9c5980b9f3d023",
+    "upload_log_digest": "9dc84420075b9268c93e444e1128dd153c0413380a563ec38e9c5980b9f3d023",
+    "API_and_upload_digest_agree": true,
+    "export_report": {
+      "current_workspace_binaries": 47,
+      "selected_examples": 2,
+      "checksum_file": "SHA256SUMS"
+    },
+    "expired_at_collection": false,
+    "binary_archive_downloaded": false,
+    "ARM64_binary_executed_locally": false,
+    "individual_payload_binary_hashes_independently_verified": false
+  },
+  "new_comment_findings": {
+    "cutoff_id": 6432324760,
+    "cutoff_time": "2026-10-27T02:34:42Z",
+    "new_comment_count": 3,
+    "summary": "Discussion timeline is source-scoped; newer author status comments do not add qualification."
+  },
+  "limits": [
+    "Actual preview includes newer Main e70 changes; offered head tree is different. Authored path bindings and all tree differences are explicit.",
+    "Unique PASS and no nextest retry records apply to actual execution window; internal fixture retry loops are not excluded.",
+    "Ordinary selected nextest totals do not include separately reported promoter/docs/custom harness counts.",
+    "Privileged DAC Reader case remains ignored; non-Linux fallback is not compiled.",
+    "Artifact API/upload zip digest agrees; archive/payload bytes were not downloaded or verified independently.",
+    "No CI writes/reruns, source/target/compiler/runtime action, installed/device acceptance or historical failure waiver is performed.",
+    "Separate current Mac composite remains at authoreda8a/9e0, not the nativee70/a8a tree; original whole-controller/list timeout native1 remains failed.",
+    "Independent Cloud success metadata contains one rawLEAK at553e/598 preview; neither that leak nor historical11356PASS+1LEAK is erased or assigned a cause."
+  ],
+  "separate_host_composite": {
+    "source_head": "a8a55c00fa359b754b2514a58b5c92c3dda00863",
+    "base": "9e0ccb206ee796ef46929bf463c5176f3a493ed9",
+    "status": "COMPOSITE_PASS",
+    "upstream_controller_status": "FAIL",
+    "upstream_native_exit": 1,
+    "upstream_completed_Cargo_stages": [
+      {
+        "label": "fmt",
+        "exit": 0,
+        "seconds": 13.242030766996322
+      },
+      {
+        "label": "metadata",
+        "exit": 0,
+        "seconds": 1.4366548760153819
+      },
+      {
+        "label": "strict",
+        "exit": 0,
+        "seconds": 181.76655359502183
+      },
+      {
+        "label": "workspace",
+        "exit": 0,
+        "seconds": 107.00437743100338
+      },
+      {
+        "label": "compile-Voice-lib",
+        "exit": 0,
+        "seconds": 154.31824488099664
+      }
+    ],
+    "upstream_listing_timeout": {
+      "timeout_seconds": 60,
+      "exit": -15,
+      "runtime_attempts": 0,
+      "retained": true
+    },
+    "continuation_native_exit": 0,
+    "continuation_Cargo_commands": 0,
+    "module_runtime_counts": {
+      "passed": 21,
+      "failed": 0,
+      "ignored": 0
+    },
+    "module_runtime_invocations": 1,
+    "administrative_inventory_retry": true,
+    "test_body_retry": false,
+    "actual_Voice_lib_inventory": 3832,
+    "protected_count": 244,
+    "source_and_protected_before_after_exact": true,
+    "guard_scope": "Full canonical/official source and all frozen SHA initial/final; exact file set/stat6/owner and frozen metadata plus actual module SHA otherwise; consumed module/new copy SHA adjacent to list/runtime. No all-boundary whole-source SHA claim.",
+    "claim_limits": [
+      "SameVoice module only, not fullVoice/package/reverse-dependent runtime",
+      "One source-specific composite across separate controllers; originalFAIL/list timeout retained",
+      "No source or current target rehash by this read-only audit; hashes bind closed producer receipts"
+    ],
+    "receipt_manifest": [
+      {
+        "receipt": "restart-9e0-unstarted-gates-continuation/fmt-result.json",
+        "sha256": "b0d60d132c095b6acb0cb4e6e78e14e4959cfbe4fdfa251f0462e79a2417272b",
+        "bytes": 1446
+      },
+      {
+        "receipt": "restart-9e0-unstarted-gates-continuation/fmt.stdout",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0
+      },
+      {
+        "receipt": "restart-9e0-unstarted-gates-continuation/fmt.stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0
+      },
+      {
+        "receipt": "restart-9e0-unstarted-gates-continuation/metadata-result.json",
+        "sha256": "b014037fca0fba7441e21369947dd2a8ee9f1b299660019be75acfe84ffcacc1",
+        "bytes": 1489
+      },
+      {
+        "receipt": "restart-9e0-unstarted-gates-continuation/metadata.stdout",
+        "sha256": "c27031aa0813dc09d5d307a36b02c131515c05c409ec20aed3dba813916b531a",
+        "bytes": 2304787
+      },
+      {
+        "receipt": "restart-9e0-unstarted-gates-continuation/metadata.stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0
+      },
+      {
+        "receipt": "restart-9e0-unstarted-gates-continuation/strict-result.json",
+        "sha256": "85ec89c0b1abbaad52e9f7ca668e08184f4fe87d9e37bcdeec01d6237bc7b0b3",
+        "bytes": 1910
+      },
+      {
+        "receipt": "restart-9e0-unstarted-gates-continuation/strict.stdout",
+        "sha256": "63c5b53e55b2a00eb9d82a7c17d9ab2d1411cf3625200d76257e31d23d5fc5f8",
+        "bytes": 388110
+      },
+      {
+        "receipt": "restart-9e0-unstarted-gates-continuation/strict.stderr",
+        "sha256": "bb7d96d31aa91a3b7343178d5a3f67b66c16a14e8a2f2c8f8263acb83a97fac9",
+        "bytes": 1271
+      },
+      {
+        "receipt": "restart-9e0-unstarted-gates-continuation/workspace-result.json",
+        "sha256": "23afae304670fe1baced198ca6c1872f3d6018d7fa4d129a6e7ce7a51cb35429",
+        "bytes": 1524
+      },
+      {
+        "receipt": "restart-9e0-unstarted-gates-continuation/workspace.stdout",
+        "sha256": "e338afbc7e6580b73e2a5c03b186e9d8784655e2b4c96922e6d3c09920684f99",
+        "bytes": 419858
+      },
+      {
+        "receipt": "restart-9e0-unstarted-gates-continuation/workspace.stderr",
+        "sha256": "11b4f14f16f772851e26b8629b5208b398155d94550f9a63700fc785d736bffc",
+        "bytes": 1073
+      },
+      {
+        "receipt": "restart-9e0-unstarted-gates-continuation/compile-Voice-lib-result.json",
+        "sha256": "02abc9383ea8a11d8224e96495e42b012f43ce278be1380013070468f90bef48",
+        "bytes": 1561
+      },
+      {
+        "receipt": "restart-9e0-unstarted-gates-continuation/compile-Voice-lib.stdout",
+        "sha256": "630bf52c7e3954efc761fb01d611338a5685f8554039ee958795dd555a236148",
+        "bytes": 287816
+      },
+      {
+        "receipt": "restart-9e0-unstarted-gates-continuation/compile-Voice-lib.stderr",
+        "sha256": "9c3955fe1028a6cc368ff5c22b51ce43f6b222efaaa1bf2971d51d3c9a20f3e7",
+        "bytes": 161
+      },
+      {
+        "receipt": "restart-9e0-unstarted-gates-continuation/inventory-all-result.json",
+        "sha256": "fe14823f462a0b812c6b6763a62b308adb109324cf3d77e07d2ba81397c635a6",
+        "bytes": 1639
+      },
+      {
+        "receipt": "restart-9e0-unstarted-gates-continuation/inventory-all.stdout",
+        "sha256": "6ca3661e910df88fb4f7c8a261aa94a4faec0405889bd5132de759053b6c7ad3",
+        "bytes": 303725
+      },
+      {
+        "receipt": "restart-9e0-unstarted-gates-continuation/inventory-all.stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0
+      },
+      {
+        "receipt": "restart-9e0-list-runtime-continuation-prep/cmd-inventory-all.json",
+        "sha256": "bfa6b2ea2ea3b9b0a4192794721262bcbf6da9abb7e52bdc20bdf1e78d9c7d52",
+        "bytes": 2028
+      },
+      {
+        "receipt": "restart-9e0-list-runtime-continuation-prep/cmd-inventory-all.stdout.txt",
+        "sha256": "6889ee596302435a835e12e63b22f6e0aa0c1384961038f971f4ce29f239e75f",
+        "bytes": 356950
+      },
+      {
+        "receipt": "restart-9e0-list-runtime-continuation-prep/cmd-inventory-all.stderr.txt",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0
+      },
+      {
+        "receipt": "restart-9e0-list-runtime-continuation-prep/cmd-inventory-ignored.json",
+        "sha256": "9ac1c6befc2320a5888b2513ddffe8c2633b11f9f8cc738d3b1d8b74bcbbf7d8",
+        "bytes": 2050
+      },
+      {
+        "receipt": "restart-9e0-list-runtime-continuation-prep/cmd-inventory-ignored.stdout.txt",
+        "sha256": "5460a54eff06379661a554db4840fe29e11c241e26db2b69cb181abaff998dcf",
+        "bytes": 1015
+      },
+      {
+        "receipt": "restart-9e0-list-runtime-continuation-prep/cmd-inventory-ignored.stderr.txt",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0
+      },
+      {
+        "receipt": "restart-9e0-list-runtime-continuation-prep/cmd-inventory-module.json",
+        "sha256": "ded06a60c369eaf5477bd72e6a5eea885235b7722063aeb20fd9e4a09be5f605",
+        "bytes": 2057
+      },
+      {
+        "receipt": "restart-9e0-list-runtime-continuation-prep/cmd-inventory-module.stdout.txt",
+        "sha256": "e2819f4e3b8e41d7ee8708d4e71a9558004ddc96ecaf45daead18f985c617287",
+        "bytes": 1885
+      },
+      {
+        "receipt": "restart-9e0-list-runtime-continuation-prep/cmd-inventory-module.stderr.txt",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0
+      },
+      {
+        "receipt": "restart-9e0-list-runtime-continuation-prep/cmd-inventory-module_ignored.json",
+        "sha256": "b67c8d25266ae646231c57aacce4a73e89a06299bbb4f4648b251b4d3c05bc67",
+        "bytes": 2088
+      },
+      {
+        "receipt": "restart-9e0-list-runtime-continuation-prep/cmd-inventory-module_ignored.stdout.txt",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0
+      },
+      {
+        "receipt": "restart-9e0-list-runtime-continuation-prep/cmd-inventory-module_ignored.stderr.txt",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0
+      },
+      {
+        "receipt": "restart-9e0-list-runtime-continuation-prep/cmd-module-runtime.json",
+        "sha256": "6d0bb4ffdde63772b8d3965b39c90179d4063aa820da04e879243974f0d1c6c5",
+        "bytes": 2036
+      },
+      {
+        "receipt": "restart-9e0-list-runtime-continuation-prep/cmd-module-runtime.stdout.txt",
+        "sha256": "966b4997e8c70c2710ad0c2e3cc7863acbfea28d88a7a25f64247752f96c30db",
+        "bytes": 2129
+      },
+      {
+        "receipt": "restart-9e0-list-runtime-continuation-prep/cmd-module-runtime.stderr.txt",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0
+      },
+      {
+        "receipt": "restart-9e0-unstarted-gates-continuation/terminal.json",
+        "sha256": "de8d014b7da85a26ff32b5451920d6b04433a25a4cf4f485db2376cce0bd526a",
+        "bytes": 4202
+      },
+      {
+        "receipt": "restart-9e0-unstarted-gates-continuation/native-controller-result.json",
+        "sha256": "d1be7240d7814a747207d13bde1700c7a415f54ee12565a39a1978c645c343d5",
+        "bytes": 754
+      },
+      {
+        "receipt": "restart-9e0-unstarted-gates-continuation/source-after.json",
+        "sha256": "43904386e337a0d6757cf50936e83bcefbde5ab8d57e07b94bc24f15e89c7244",
+        "bytes": 2406773
+      },
+      {
+        "receipt": "restart-9e0-unstarted-gates-continuation/protected-after.json",
+        "sha256": "1eed01afa43498d57a6c4977a26feb660db81fad12d6f1ff8963a3edf50efdbb",
+        "bytes": 101590
+      },
+      {
+        "receipt": "restart-9e0-unstarted-gates-continuation/actual-executable.json",
+        "sha256": "85c9d5818203ad47efbae1da8f35cb77e0a6f21b01b1afa5ffdb6c2c20f68c70",
+        "bytes": 1355
+      },
+      {
+        "receipt": "restart-9e0-unstarted-gates-continuation/new-frozen.json",
+        "sha256": "367df9adb6c9c38cbd3938e439b63886c8e5a4e82e82bde226227a5b4af27a57",
+        "bytes": 405
+      },
+      {
+        "receipt": "restart-9e0-unstarted-gates-continuation/native-controller.stdout",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0
+      },
+      {
+        "receipt": "restart-9e0-unstarted-gates-continuation/native-controller.stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0
+      },
+      {
+        "receipt": "restart-9e0-list-runtime-continuation-prep/terminal.json",
+        "sha256": "e0cc0718f10fc26f68174035e916300971c242e3223fe44a91a2ded836989ecf",
+        "bytes": 3662
+      },
+      {
+        "receipt": "restart-9e0-list-runtime-continuation-prep/native-controller-result.json",
+        "sha256": "8b73fd9568d7d1f597eb80d0367019007e9bcc94944531ffd5ed36fd5dc3b3e9",
+        "bytes": 769
+      },
+      {
+        "receipt": "restart-9e0-list-runtime-continuation-prep/source-before.json",
+        "sha256": "43904386e337a0d6757cf50936e83bcefbde5ab8d57e07b94bc24f15e89c7244",
+        "bytes": 2406773
+      },
+      {
+        "receipt": "restart-9e0-list-runtime-continuation-prep/source-after.json",
+        "sha256": "43904386e337a0d6757cf50936e83bcefbde5ab8d57e07b94bc24f15e89c7244",
+        "bytes": 2406773
+      },
+      {
+        "receipt": "restart-9e0-list-runtime-continuation-prep/official-source-initial.json",
+        "sha256": "94b91969e3819c3707cbf142cfcad7bdaa48cb4904f82bf0c83355526dca86f2",
+        "bytes": 2406785
+      },
+      {
+        "receipt": "restart-9e0-list-runtime-continuation-prep/official-source-final.json",
+        "sha256": "94b91969e3819c3707cbf142cfcad7bdaa48cb4904f82bf0c83355526dca86f2",
+        "bytes": 2406785
+      },
+      {
+        "receipt": "restart-9e0-list-runtime-continuation-prep/protected-before.json",
+        "sha256": "1eed01afa43498d57a6c4977a26feb660db81fad12d6f1ff8963a3edf50efdbb",
+        "bytes": 101590
+      },
+      {
+        "receipt": "restart-9e0-list-runtime-continuation-prep/protected-after.json",
+        "sha256": "1eed01afa43498d57a6c4977a26feb660db81fad12d6f1ff8963a3edf50efdbb",
+        "bytes": 101590
+      },
+      {
+        "receipt": "restart-9e0-list-runtime-continuation-prep/inventory.json",
+        "sha256": "faf62903489b593d54e387c3272705ef4b199b88ec7499c3f859480f62736b5a",
+        "bytes": 363797
+      },
+      {
+        "receipt": "restart-9e0-list-runtime-continuation-prep/observed-census.json",
+        "sha256": "2380c97167249c183892c463f8d32bfd416e8d1192dad76b55fab49559a512a7",
+        "bytes": 2596
+      },
+      {
+        "receipt": "restart-9e0-list-runtime-continuation-prep/native-controller.stdout",
+        "sha256": "711db6e2fa80bbb675c99c71f7a752da533bbca38910d47730cab720afd2de9a",
+        "bytes": 1647
+      },
+      {
+        "receipt": "restart-9e0-list-runtime-continuation-prep/native-controller.stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0
+      }
+    ],
+    "affected_source_byte_bindings": [
+      {
+        "source": "lampOS/crates/voice/src/same_voice.rs",
+        "SHA256": "151acd1d793723ba2ed1ac78ed9ca9517e376f52cf9119839de990107394ec72",
+        "bytes": 78068,
+        "host_recorded_source_equals_native_preview_and_authored_blob": true
+      },
+      {
+        "source": "lampOS/docs/same-voice.md",
+        "SHA256": "774451da969bbd1271f6ad143def758b0b1bb6acf0bd74e36ca3db104c1a5b0d",
+        "bytes": 40112,
+        "host_recorded_source_equals_native_preview_and_authored_blob": true
+      }
+    ]
+  },
+  "separate_cloud_leak_witness": {
+    "source_scope": "Independent Cloud pull-request run, not current Restarta8a/9e0 host or native result",
+    "run": 40439732017,
+    "head": "553e0d653eb9557a7b804e8fb6c469c102159808",
+    "branch": "second/cloud-query-bounds",
+    "event": "pull_request",
+    "attempt": 1,
+    "GitHub_conclusion": "success",
+    "actual_preview": "ac5bd8f6fe70eb181152a8c65639b23420f754b1",
+    "ordered_parents": [
+      "5982e4b7fa465177f55697ddb362d78b964809b7",
+      "553e0d653eb9557a7b804e8fb6c469c102159808"
+    ],
+    "tree": "7d25d6fcae8daf56384108fdb610c85c6640667a",
+    "source_same_voice_blob": "7c9b7231d8106c9d356d9f409612c296a3cfc7a8",
+    "execution_window": {
+      "start_line": 845,
+      "summary_line": 12306,
+      "starting": "2026-10-27T02:51:15.7344466Z     Starting 11459 tests across 183 binaries (106 tests and 2 binaries skipped)",
+      "summary": "2026-10-27T02:54:51.7305079Z      Summary [ 215.995s] 11459 tests run: 11459 passed (1 leaky), 106 skipped"
+    },
+    "unique_records": 11459,
+    "counts": {
+      "PASS": 11458,
+      "LEAK": 1
+    },
+    "aggregate_skipped": 106,
+    "selected_unrun": 0,
+    "leak_record": {
+      "line": 10047,
+      "timestamp": "2026-10-27T02:54:17.6302563Z",
+      "status": "LEAK",
+      "seconds": "0.436",
+      "ordinal": 9202,
+      "total": 11459,
+      "binary": "lamp-voice",
+      "case": "same_voice::tests::a_child_that_hangs_after_it_is_ready_is_killed_and_started_again"
+    },
+    "source_fixture_fact": "The Cloud snapshot still declares JournalWorker and uses a bare Prints::timed local in the hung-child case; current Restart adds FixtureWorker ownership. This is source differentiation, not causal proof.",
+    "no_causal_or_no_regression_proof": true,
+    "no_clean_PASS_relabel": true,
+    "raw_receipts": [
+      {
+        "receipt": "restart-cloud-leak-witness-20261027/arm-job.log",
+        "sha256": "208d1f5f5895f024407970ca066f7c19aad3ecaa66fb04fd38a9f890129ea88d",
+        "bytes": 1964635
+      },
+      {
+        "receipt": "restart-cloud-leak-witness-20261027/census.json",
+        "sha256": "fbd22477defc0af1388e40d953fec421b22d6f1397a2929c46fb979758cc2220",
+        "bytes": 2699733
+      },
+      {
+        "receipt": "restart-a8a-original-ci-20261027/cloud-witness-run-metadata.json",
+        "sha256": "f79d1bf2593b3788cf39f2e4568224cb986aab9ca1db787647807794cb83bdff",
+        "bytes": 12711
+      },
+      {
+        "receipt": "restart-a8a-original-ci-20261027/cloud-witness-jobs.json",
+        "sha256": "5c590c23b5676e979476ef10730cac0e10a880e11a2ba8319af710770ab255e9",
+        "bytes": 8130
+      },
+      {
+        "receipt": "restart-a8a-original-ci-20261027/cloud-witness-preview-commit.json",
+        "sha256": "682b5a70eff3f4709c4f9fdc683de5d61347dfd1249608074115f75fe27bb802",
+        "bytes": 2603
+      },
+      {
+        "receipt": "restart-a8a-original-ci-20261027/cloud-witness-same_voice-contents-metadata.json",
+        "sha256": "72330f44d056bc34c91fa3dacc076694e8e74e236620bb55d33f3ca7636f90a9",
+        "bytes": 108561
+      },
+      {
+        "receipt": "restart-a8a-original-ci-20261027/cloud-witness-same_voice.rs",
+        "sha256": "50305d296f5560272af70a42f8271447eb6d0983d4c86f5866a1df657b513fd0",
+        "bytes": 77970
+      }
+    ]
+  },
+  "watch": {
+    "status": "TERMINAL_METADATA_COLLECTED",
+    "maximum_seconds": 900,
+    "elapsed_seconds": 649.7320827099902,
+    "metadata_original_attempt1_only": true,
+    "rerun_or_dispatch": false
+  },
+  "publication_state": "Prepared privately for Root review; offered-source/actual-preview distinctions retained.",
+  "collection_manifest": {
+    "receipt": "restart-a8a-original-ci-20261027/collection-manifest.json",
+    "sha256": "7c8b1c41c7388132a5b9df79594b4ca481e35776b9551d2687fe43220495cd5d",
+    "bytes": 22828,
+    "entry_count": 112,
+    "entries": [
+      {
+        "receipt": "restart-9e0-list-runtime-continuation-prep/cmd-inventory-all.json",
+        "sha256": "bfa6b2ea2ea3b9b0a4192794721262bcbf6da9abb7e52bdc20bdf1e78d9c7d52",
+        "bytes": 2028
+      },
+      {
+        "receipt": "restart-9e0-list-runtime-continuation-prep/cmd-inventory-all.stderr.txt",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0
+      },
+      {
+        "receipt": "restart-9e0-list-runtime-continuation-prep/cmd-inventory-all.stdout.txt",
+        "sha256": "6889ee596302435a835e12e63b22f6e0aa0c1384961038f971f4ce29f239e75f",
+        "bytes": 356950
+      },
+      {
+        "receipt": "restart-9e0-list-runtime-continuation-prep/cmd-inventory-ignored.json",
+        "sha256": "9ac1c6befc2320a5888b2513ddffe8c2633b11f9f8cc738d3b1d8b74bcbbf7d8",
+        "bytes": 2050
+      },
+      {
+        "receipt": "restart-9e0-list-runtime-continuation-prep/cmd-inventory-ignored.stderr.txt",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0
+      },
+      {
+        "receipt": "restart-9e0-list-runtime-continuation-prep/cmd-inventory-ignored.stdout.txt",
+        "sha256": "5460a54eff06379661a554db4840fe29e11c241e26db2b69cb181abaff998dcf",
+        "bytes": 1015
+      },
+      {
+        "receipt": "restart-9e0-list-runtime-continuation-prep/cmd-inventory-module.json",
+        "sha256": "ded06a60c369eaf5477bd72e6a5eea885235b7722063aeb20fd9e4a09be5f605",
+        "bytes": 2057
+      },
+      {
+        "receipt": "restart-9e0-list-runtime-continuation-prep/cmd-inventory-module.stderr.txt",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0
+      },
+      {
+        "receipt": "restart-9e0-list-runtime-continuation-prep/cmd-inventory-module.stdout.txt",
+        "sha256": "e2819f4e3b8e41d7ee8708d4e71a9558004ddc96ecaf45daead18f985c617287",
+        "bytes": 1885
+      },
+      {
+        "receipt": "restart-9e0-list-runtime-continuation-prep/cmd-inventory-module_ignored.json",
+        "sha256": "b67c8d25266ae646231c57aacce4a73e89a06299bbb4f4648b251b4d3c05bc67",
+        "bytes": 2088
+      },
+      {
+        "receipt": "restart-9e0-list-runtime-continuation-prep/cmd-inventory-module_ignored.stderr.txt",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0
+      },
+      {
+        "receipt": "restart-9e0-list-runtime-continuation-prep/cmd-inventory-module_ignored.stdout.txt",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0
+      },
+      {
+        "receipt": "restart-9e0-list-runtime-continuation-prep/cmd-module-runtime.json",
+        "sha256": "6d0bb4ffdde63772b8d3965b39c90179d4063aa820da04e879243974f0d1c6c5",
+        "bytes": 2036
+      },
+      {
+        "receipt": "restart-9e0-list-runtime-continuation-prep/cmd-module-runtime.stderr.txt",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0
+      },
+      {
+        "receipt": "restart-9e0-list-runtime-continuation-prep/cmd-module-runtime.stdout.txt",
+        "sha256": "966b4997e8c70c2710ad0c2e3cc7863acbfea28d88a7a25f64247752f96c30db",
+        "bytes": 2129
+      },
+      {
+        "receipt": "restart-9e0-list-runtime-continuation-prep/inventory.json",
+        "sha256": "faf62903489b593d54e387c3272705ef4b199b88ec7499c3f859480f62736b5a",
+        "bytes": 363797
+      },
+      {
+        "receipt": "restart-9e0-list-runtime-continuation-prep/native-controller-result.json",
+        "sha256": "8b73fd9568d7d1f597eb80d0367019007e9bcc94944531ffd5ed36fd5dc3b3e9",
+        "bytes": 769
+      },
+      {
+        "receipt": "restart-9e0-list-runtime-continuation-prep/native-controller.stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0
+      },
+      {
+        "receipt": "restart-9e0-list-runtime-continuation-prep/native-controller.stdout",
+        "sha256": "711db6e2fa80bbb675c99c71f7a752da533bbca38910d47730cab720afd2de9a",
+        "bytes": 1647
+      },
+      {
+        "receipt": "restart-9e0-list-runtime-continuation-prep/observed-census.json",
+        "sha256": "2380c97167249c183892c463f8d32bfd416e8d1192dad76b55fab49559a512a7",
+        "bytes": 2596
+      },
+      {
+        "receipt": "restart-9e0-list-runtime-continuation-prep/official-source-final.json",
+        "sha256": "94b91969e3819c3707cbf142cfcad7bdaa48cb4904f82bf0c83355526dca86f2",
+        "bytes": 2406785
+      },
+      {
+        "receipt": "restart-9e0-list-runtime-continuation-prep/official-source-initial.json",
+        "sha256": "94b91969e3819c3707cbf142cfcad7bdaa48cb4904f82bf0c83355526dca86f2",
+        "bytes": 2406785
+      },
+      {
+        "receipt": "restart-9e0-list-runtime-continuation-prep/protected-after.json",
+        "sha256": "1eed01afa43498d57a6c4977a26feb660db81fad12d6f1ff8963a3edf50efdbb",
+        "bytes": 101590
+      },
+      {
+        "receipt": "restart-9e0-list-runtime-continuation-prep/protected-before.json",
+        "sha256": "1eed01afa43498d57a6c4977a26feb660db81fad12d6f1ff8963a3edf50efdbb",
+        "bytes": 101590
+      },
+      {
+        "receipt": "restart-9e0-list-runtime-continuation-prep/source-after.json",
+        "sha256": "43904386e337a0d6757cf50936e83bcefbde5ab8d57e07b94bc24f15e89c7244",
+        "bytes": 2406773
+      },
+      {
+        "receipt": "restart-9e0-list-runtime-continuation-prep/source-before.json",
+        "sha256": "43904386e337a0d6757cf50936e83bcefbde5ab8d57e07b94bc24f15e89c7244",
+        "bytes": 2406773
+      },
+      {
+        "receipt": "restart-9e0-list-runtime-continuation-prep/terminal.json",
+        "sha256": "e0cc0718f10fc26f68174035e916300971c242e3223fe44a91a2ded836989ecf",
+        "bytes": 3662
+      },
+      {
+        "receipt": "restart-9e0-unstarted-gates-continuation/actual-executable.json",
+        "sha256": "85c9d5818203ad47efbae1da8f35cb77e0a6f21b01b1afa5ffdb6c2c20f68c70",
+        "bytes": 1355
+      },
+      {
+        "receipt": "restart-9e0-unstarted-gates-continuation/compile-Voice-lib-result.json",
+        "sha256": "02abc9383ea8a11d8224e96495e42b012f43ce278be1380013070468f90bef48",
+        "bytes": 1561
+      },
+      {
+        "receipt": "restart-9e0-unstarted-gates-continuation/compile-Voice-lib.stderr",
+        "sha256": "9c3955fe1028a6cc368ff5c22b51ce43f6b222efaaa1bf2971d51d3c9a20f3e7",
+        "bytes": 161
+      },
+      {
+        "receipt": "restart-9e0-unstarted-gates-continuation/compile-Voice-lib.stdout",
+        "sha256": "630bf52c7e3954efc761fb01d611338a5685f8554039ee958795dd555a236148",
+        "bytes": 287816
+      },
+      {
+        "receipt": "restart-9e0-unstarted-gates-continuation/fmt-result.json",
+        "sha256": "b0d60d132c095b6acb0cb4e6e78e14e4959cfbe4fdfa251f0462e79a2417272b",
+        "bytes": 1446
+      },
+      {
+        "receipt": "restart-9e0-unstarted-gates-continuation/fmt.stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0
+      },
+      {
+        "receipt": "restart-9e0-unstarted-gates-continuation/fmt.stdout",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0
+      },
+      {
+        "receipt": "restart-9e0-unstarted-gates-continuation/inventory-all-result.json",
+        "sha256": "fe14823f462a0b812c6b6763a62b308adb109324cf3d77e07d2ba81397c635a6",
+        "bytes": 1639
+      },
+      {
+        "receipt": "restart-9e0-unstarted-gates-continuation/inventory-all.stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0
+      },
+      {
+        "receipt": "restart-9e0-unstarted-gates-continuation/inventory-all.stdout",
+        "sha256": "6ca3661e910df88fb4f7c8a261aa94a4faec0405889bd5132de759053b6c7ad3",
+        "bytes": 303725
+      },
+      {
+        "receipt": "restart-9e0-unstarted-gates-continuation/metadata-result.json",
+        "sha256": "b014037fca0fba7441e21369947dd2a8ee9f1b299660019be75acfe84ffcacc1",
+        "bytes": 1489
+      },
+      {
+        "receipt": "restart-9e0-unstarted-gates-continuation/metadata.stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0
+      },
+      {
+        "receipt": "restart-9e0-unstarted-gates-continuation/metadata.stdout",
+        "sha256": "c27031aa0813dc09d5d307a36b02c131515c05c409ec20aed3dba813916b531a",
+        "bytes": 2304787
+      },
+      {
+        "receipt": "restart-9e0-unstarted-gates-continuation/native-controller-result.json",
+        "sha256": "d1be7240d7814a747207d13bde1700c7a415f54ee12565a39a1978c645c343d5",
+        "bytes": 754
+      },
+      {
+        "receipt": "restart-9e0-unstarted-gates-continuation/native-controller.stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0
+      },
+      {
+        "receipt": "restart-9e0-unstarted-gates-continuation/native-controller.stdout",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0
+      },
+      {
+        "receipt": "restart-9e0-unstarted-gates-continuation/new-frozen.json",
+        "sha256": "367df9adb6c9c38cbd3938e439b63886c8e5a4e82e82bde226227a5b4af27a57",
+        "bytes": 405
+      },
+      {
+        "receipt": "restart-9e0-unstarted-gates-continuation/protected-after.json",
+        "sha256": "1eed01afa43498d57a6c4977a26feb660db81fad12d6f1ff8963a3edf50efdbb",
+        "bytes": 101590
+      },
+      {
+        "receipt": "restart-9e0-unstarted-gates-continuation/source-after.json",
+        "sha256": "43904386e337a0d6757cf50936e83bcefbde5ab8d57e07b94bc24f15e89c7244",
+        "bytes": 2406773
+      },
+      {
+        "receipt": "restart-9e0-unstarted-gates-continuation/strict-result.json",
+        "sha256": "85ec89c0b1abbaad52e9f7ca668e08184f4fe87d9e37bcdeec01d6237bc7b0b3",
+        "bytes": 1910
+      },
+      {
+        "receipt": "restart-9e0-unstarted-gates-continuation/strict.stderr",
+        "sha256": "bb7d96d31aa91a3b7343178d5a3f67b66c16a14e8a2f2c8f8263acb83a97fac9",
+        "bytes": 1271
+      },
+      {
+        "receipt": "restart-9e0-unstarted-gates-continuation/strict.stdout",
+        "sha256": "63c5b53e55b2a00eb9d82a7c17d9ab2d1411cf3625200d76257e31d23d5fc5f8",
+        "bytes": 388110
+      },
+      {
+        "receipt": "restart-9e0-unstarted-gates-continuation/terminal.json",
+        "sha256": "de8d014b7da85a26ff32b5451920d6b04433a25a4cf4f485db2376cce0bd526a",
+        "bytes": 4202
+      },
+      {
+        "receipt": "restart-9e0-unstarted-gates-continuation/workspace-result.json",
+        "sha256": "23afae304670fe1baced198ca6c1872f3d6018d7fa4d129a6e7ce7a51cb35429",
+        "bytes": 1524
+      },
+      {
+        "receipt": "restart-9e0-unstarted-gates-continuation/workspace.stderr",
+        "sha256": "11b4f14f16f772851e26b8629b5208b398155d94550f9a63700fc785d736bffc",
+        "bytes": 1073
+      },
+      {
+        "receipt": "restart-9e0-unstarted-gates-continuation/workspace.stdout",
+        "sha256": "e338afbc7e6580b73e2a5c03b186e9d8784655e2b4c96922e6d3c09920684f99",
+        "bytes": 419858
+      },
+      {
+        "receipt": "restart-a8a-original-ci-20261027/40444802059-jobs-first-connector.json",
+        "sha256": "a63f5e53f30d9d50c90eff4c09184aaf74a0c83272fb24de6febfe3b9bbdb639",
+        "bytes": 2946
+      },
+      {
+        "receipt": "restart-a8a-original-ci-20261027/40444802082-jobs-first-connector.json",
+        "sha256": "59a916145eb100585befe228db3c32b1756e3d4e1945d6b0c3f74e060459d6db",
+        "bytes": 1408
+      },
+      {
+        "receipt": "restart-a8a-original-ci-20261027/ARM64-artifacts.json",
+        "sha256": "31b08adbb821c243faf3d191beb3b74468364247d6e363faac897141b527ee63",
+        "bytes": 786
+      },
+      {
+        "receipt": "restart-a8a-original-ci-20261027/ARM64-job.log",
+        "sha256": "4eefa6a1a64f18e869ce0060c53e6a49665be1545db3fd8ea094cbc5b33b9bf6",
+        "bytes": 1338973
+      },
+      {
+        "receipt": "restart-a8a-original-ci-20261027/ARM64-jobs.json",
+        "sha256": "c5127e6e9c74177d369c3215ffbd8f582947ca7ad1213849eded48843352cf6e",
+        "bytes": 8166
+      },
+      {
+        "receipt": "restart-a8a-original-ci-20261027/ARM64-logs-connector.json",
+        "sha256": "731f739eaf7d21a291d59130262eee991afeb488dac4530383380ef6ae652597",
+        "bytes": 1348939
+      },
+      {
+        "receipt": "restart-a8a-original-ci-20261027/ARM64-metadata-final.json",
+        "sha256": "167f8850671cb0c374e5b9206a684307bae0a668a83a0b37091590a21d28b1f9",
+        "bytes": 12715
+      },
+      {
+        "receipt": "restart-a8a-original-ci-20261027/ARM64-metadata-first.json",
+        "sha256": "f185bc4263d1353f78a237e09a517ae57844895244f5908795f4137dcd9a25e7",
+        "bytes": 12712
+      },
+      {
+        "receipt": "restart-a8a-original-ci-20261027/ARM64-metadata-latest.json",
+        "sha256": "167f8850671cb0c374e5b9206a684307bae0a668a83a0b37091590a21d28b1f9",
+        "bytes": 12715
+      },
+      {
+        "receipt": "restart-a8a-original-ci-20261027/Linux-clippy-artifacts.json",
+        "sha256": "244563f989470892c537c9a4622920af0d228ee4528f7d00c64a06d6cd95856c",
+        "bytes": 32
+      },
+      {
+        "receipt": "restart-a8a-original-ci-20261027/Linux-clippy-job.log",
+        "sha256": "7d9e603b51972ac901bfa0eada791e4e77b0429db07bac686c67f006f6c78098",
+        "bytes": 46724
+      },
+      {
+        "receipt": "restart-a8a-original-ci-20261027/Linux-clippy-jobs.json",
+        "sha256": "70b777b2c2a915b3f47e1db8aa01fce1674b38adbc986028caa5c2b4d02ba005",
+        "bytes": 3009
+      },
+      {
+        "receipt": "restart-a8a-original-ci-20261027/Linux-clippy-logs-connector.json",
+        "sha256": "29bc93e852e3164c32b7e18c17d33a60a92cda2bdc551e6e5e4369066c40736d",
+        "bytes": 47596
+      },
+      {
+        "receipt": "restart-a8a-original-ci-20261027/Linux-clippy-metadata-final.json",
+        "sha256": "bc6e94483db8a13ba3feb1a11030b91ffa77f3c5ee00d8c0d345c3b6637fb081",
+        "bytes": 12714
+      },
+      {
+        "receipt": "restart-a8a-original-ci-20261027/Linux-clippy-metadata-first.json",
+        "sha256": "bc6e94483db8a13ba3feb1a11030b91ffa77f3c5ee00d8c0d345c3b6637fb081",
+        "bytes": 12714
+      },
+      {
+        "receipt": "restart-a8a-original-ci-20261027/Linux-clippy-metadata-latest.json",
+        "sha256": "bc6e94483db8a13ba3feb1a11030b91ffa77f3c5ee00d8c0d345c3b6637fb081",
+        "bytes": 12714
+      },
+      {
+        "receipt": "restart-a8a-original-ci-20261027/PR-connector-raw.json",
+        "sha256": "4b1ab2b09fdbc96244b8925f517256bca1da50ee2f65773551c1705708d3207f",
+        "bytes": 50904
+      },
+      {
+        "receipt": "restart-a8a-original-ci-20261027/auxiliary-audit.json",
+        "sha256": "0d3762ad1c324942c4e9eaa407978512ee38c41f0c3c5ec3b974c5f024dcf082",
+        "bytes": 8029
+      },
+      {
+        "receipt": "restart-a8a-original-ci-20261027/carrier-new-comments-readonly.json",
+        "sha256": "8d6679ad28400e5dcd3320ca04807bccdcfdd066067ae4ebe4221d1659c28b3d",
+        "bytes": 312369
+      },
+      {
+        "receipt": "restart-a8a-original-ci-20261027/cloud-witness-jobs.json",
+        "sha256": "5c590c23b5676e979476ef10730cac0e10a880e11a2ba8319af710770ab255e9",
+        "bytes": 8130
+      },
+      {
+        "receipt": "restart-a8a-original-ci-20261027/cloud-witness-preview-commit.json",
+        "sha256": "682b5a70eff3f4709c4f9fdc683de5d61347dfd1249608074115f75fe27bb802",
+        "bytes": 2603
+      },
+      {
+        "receipt": "restart-a8a-original-ci-20261027/cloud-witness-run-metadata.json",
+        "sha256": "f79d1bf2593b3788cf39f2e4568224cb986aab9ca1db787647807794cb83bdff",
+        "bytes": 12711
+      },
+      {
+        "receipt": "restart-a8a-original-ci-20261027/cloud-witness-same_voice-contents-metadata.json",
+        "sha256": "72330f44d056bc34c91fa3dacc076694e8e74e236620bb55d33f3ca7636f90a9",
+        "bytes": 108561
+      },
+      {
+        "receipt": "restart-a8a-original-ci-20261027/cloud-witness-same_voice.rs",
+        "sha256": "50305d296f5560272af70a42f8271447eb6d0983d4c86f5866a1df657b513fd0",
+        "bytes": 77970
+      },
+      {
+        "receipt": "restart-a8a-original-ci-20261027/comment-cutoff-anchor.json",
+        "sha256": "bcd57157496c57fa696ec199d08900b09f149ebe5eb45dc760ebb897d4d8fd59",
+        "bytes": 2640
+      },
+      {
+        "receipt": "restart-a8a-original-ci-20261027/discussion-timeline-connector.json",
+        "sha256": "643cfa54389889091b9c56134b5f5fc51814636c94a1f4818a2faf8e71522779",
+        "bytes": 19471
+      },
+      {
+        "receipt": "restart-a8a-original-ci-20261027/exact-head-check-runs.json",
+        "sha256": "1051303e51a41dc2452a9e256828cea134939d67eb5b181595105eb8ce19e6be",
+        "bytes": 17901
+      },
+      {
+        "receipt": "restart-a8a-original-ci-20261027/exact-head-status.json",
+        "sha256": "1382db0d672251ef28171a41f72c072bc79583b8768444f545dd0cc38180dfe7",
+        "bytes": 4613
+      },
+      {
+        "receipt": "restart-a8a-original-ci-20261027/execution-identities.json",
+        "sha256": "51c094551439bcd17bda2ea84596b457a3edb0babb07b81ff57c2a00b58cd0d9",
+        "bytes": 2160059
+      },
+      {
+        "receipt": "restart-a8a-original-ci-20261027/execution-window.json",
+        "sha256": "0e455050fbb006141ac753edd5cc2cd11c45652e15367e90a12fc01959d04436",
+        "bytes": 311
+      },
+      {
+        "receipt": "restart-a8a-original-ci-20261027/final-output-reprints.json",
+        "sha256": "90d2522acb2c9b7be223c21e7b118a828a3c60b693ebac100d55acf096eab617",
+        "bytes": 23747
+      },
+      {
+        "receipt": "restart-a8a-original-ci-20261027/head-commit.json",
+        "sha256": "155a939ff79125563fb7a02618827d7b65f00bcda287610056f118ef5d2ce4b3",
+        "bytes": 1125
+      },
+      {
+        "receipt": "restart-a8a-original-ci-20261027/head-tree.json",
+        "sha256": "40108c3a85cf95f513fb2d20a91c2bd4f1124de25725268e922b1287284bf5d8",
+        "bytes": 3433962
+      },
+      {
+        "receipt": "restart-a8a-original-ci-20261027/lampos-pr-crates.py",
+        "sha256": "c89f3cc802c1f385793f7a800142ae235ef7b09c00e38f1661427eecffcf2671",
+        "bytes": 5493
+      },
+      {
+        "receipt": "restart-a8a-original-ci-20261027/lampos-pr-crates.py-contents-metadata.json",
+        "sha256": "feeb70a494c9c2c9f5345c81786f03f86edc496b707efe9590135603fb3fd51c",
+        "bytes": 8698
+      },
+      {
+        "receipt": "restart-a8a-original-ci-20261027/new-comments-audit.json",
+        "sha256": "96255cb5a01a63accebeba6eea56cfaa0b24de6a1c3f2fd0cb12128a554e3041",
+        "bytes": 3357
+      },
+      {
+        "receipt": "restart-a8a-original-ci-20261027/nextest.toml",
+        "sha256": "c4992da8d157df279011a424b5feb4833f001fd1d46ce3edd0a56992c848bb33",
+        "bytes": 5157
+      },
+      {
+        "receipt": "restart-a8a-original-ci-20261027/nextest.toml-contents-metadata.json",
+        "sha256": "3a2b0000a68c8423ebd93fb8930200585c1175d47286be835f0f1e95e52ee035",
+        "bytes": 8179
+      },
+      {
+        "receipt": "restart-a8a-original-ci-20261027/original-runs-connector.json",
+        "sha256": "988da1cef494c25da0b31100b1fd663b804531d0f4977c210630b63315a9cfb3",
+        "bytes": 737
+      },
+      {
+        "receipt": "restart-a8a-original-ci-20261027/preview-commit.json",
+        "sha256": "1742335657de5193830f2b557f9fa715b27ae7324f546c2b3911fdc156051b77",
+        "bytes": 2603
+      },
+      {
+        "receipt": "restart-a8a-original-ci-20261027/preview-tree.json",
+        "sha256": "e63569f05927a2cca78b3a6b485d88167c5dcbd426883651744045e7b32710c7",
+        "bytes": 3433963
+      },
+      {
+        "receipt": "restart-a8a-original-ci-20261027/preview-vs-offered-tree-delta.json",
+        "sha256": "4433be6d088ffab68677c76c253ba9c80f5dbd8cc1bfd6a99641fb27b5f728e5",
+        "bytes": 4547
+      },
+      {
+        "receipt": "restart-a8a-original-ci-20261027/reader-tests.rs",
+        "sha256": "794a44b35d1025ee9f66035099d3fe1facc8233eb39f7d17878e08a7ea7f3e49",
+        "bytes": 36539
+      },
+      {
+        "receipt": "restart-a8a-original-ci-20261027/reader-tests.rs-contents-metadata.json",
+        "sha256": "8e65811e4d69ac58df341ee89b55d2da61edb91578c168e2db3dd17bfa415ab1",
+        "bytes": 51534
+      },
+      {
+        "receipt": "restart-a8a-original-ci-20261027/required-case-source-audit.json",
+        "sha256": "f2fd79cd68713d59a23cdc209bc0da14e37d7d34c4eecc4537db9642658180d1",
+        "bytes": 12473
+      },
+      {
+        "receipt": "restart-a8a-original-ci-20261027/same-voice.md",
+        "sha256": "774451da969bbd1271f6ad143def758b0b1bb6acf0bd74e36ca3db104c1a5b0d",
+        "bytes": 40112
+      },
+      {
+        "receipt": "restart-a8a-original-ci-20261027/same-voice.md-contents-metadata.json",
+        "sha256": "1321eaf4eee45898a09bdfa7740c7f168b48c9e260bf9f1ac784129b2e19f7df",
+        "bytes": 56331
+      },
+      {
+        "receipt": "restart-a8a-original-ci-20261027/same_voice.rs",
+        "sha256": "151acd1d793723ba2ed1ac78ed9ca9517e376f52cf9119839de990107394ec72",
+        "bytes": 78068
+      },
+      {
+        "receipt": "restart-a8a-original-ci-20261027/same_voice.rs-contents-metadata.json",
+        "sha256": "3b2cbda8192e2e56c2e0825d328e683eaf6dd449881c9301a3739ed17ae9ca62",
+        "bytes": 108697
+      },
+      {
+        "receipt": "restart-a8a-original-ci-20261027/separate-cloud-leak-audit.json",
+        "sha256": "0b190f155aa1bd5e045317b40e1274381245f37fa19558b55e0560fae941827f",
+        "bytes": 3111
+      },
+      {
+        "receipt": "restart-a8a-original-ci-20261027/separate-host-composite-audit.json",
+        "sha256": "0f94e98343e22326e7c9097eca52218d4dd99d2401e5c94565eb607b7217319a",
+        "bytes": 12551
+      },
+      {
+        "receipt": "restart-a8a-original-ci-20261027/watch-events.jsonl",
+        "sha256": "ca3e2cfc41913c6c8078f088e381e8199e9cd29205f6545a0d0fbda04280136d",
+        "bytes": 4842
+      },
+      {
+        "receipt": "restart-a8a-original-ci-20261027/watch-result.json",
+        "sha256": "353865ece9b98dcc3a34c9f3c1ad0b86ad86a83dea2346e806159441b1625c31",
+        "bytes": 517
+      },
+      {
+        "receipt": "restart-a8a-original-ci-20261027/workflow-ARM64.yml",
+        "sha256": "43a7eef7907d272904f975d7ee65b456ec3bc4eba63505bee596d1bf196a6e74",
+        "bytes": 20675
+      },
+      {
+        "receipt": "restart-a8a-original-ci-20261027/workflow-ARM64.yml-contents-metadata.json",
+        "sha256": "b58606d4cbe2d2a2c837234cb1efa578cb000d77502913e3599dfe3bb40fa261",
+        "bytes": 29608
+      },
+      {
+        "receipt": "restart-a8a-original-ci-20261027/workflow-Linux-clippy.yml",
+        "sha256": "f979a9e8d87e8f9db255c4a9e81a51ecf7164b6b48118627578ce83722a3db92",
+        "bytes": 4688
+      },
+      {
+        "receipt": "restart-a8a-original-ci-20261027/workflow-Linux-clippy.yml-contents-metadata.json",
+        "sha256": "b40ce2c95f796dc4f1f34927187e89bb7e9d9928cc6ca20d3d8b4b6cb1f89577",
+        "bytes": 7588
+      },
+      {
+        "receipt": "restart-cloud-leak-witness-20261027/arm-job.log",
+        "sha256": "208d1f5f5895f024407970ca066f7c19aad3ecaa66fb04fd38a9f890129ea88d",
+        "bytes": 1964635
+      },
+      {
+        "receipt": "restart-cloud-leak-witness-20261027/census.json",
+        "sha256": "fbd22477defc0af1388e40d953fec421b22d6f1397a2929c46fb979758cc2220",
+        "bytes": 2699733
+      }
+    ],
+    "explicit_output_exclusions": [
+      "audit.json and public-packet outputs",
+      "collection-manifest.json itself",
+      "post-close-manifest-verification.json",
+      "producer stdout (not an input file)"
+    ],
+    "silent_entry_exclusions": 0
+  },
+  "post_close_manifest_verification": {
+    "status": "PASS",
+    "all_entries_verified": 112,
+    "failed": 0,
+    "excluded_manifest_entries": 0,
+    "producer_closed_exit": 0,
+    "recorded_at_utc": "2026-10-27T03:58:22.495853+00:00",
+    "receipt": "restart-a8a-original-ci-20261027/post-close-manifest-verification.json",
+    "sha256": "f038303e46e01f2e6e795e60e8901c39747fd2308dc8414564c687e31ce2f963",
+    "bytes": 43936
+  }
+}

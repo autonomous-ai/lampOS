@@ -1,5 +1,15 @@
 # Tests work log
 
+## 2026-10-27 11:43 — Restart native proof and corrected cache disposition
+
+Ready for lamp-voice: #3466 offered 4fd is ready by the lead's release order; current dd5/e70 gate continues.
+
+[Restart a8a host qualification](verification/tests-restart-a8a-composite-host-20261027/) is a composite: five earlier Cargo stages passed, the original 60 s inventory timeout remains FAIL/native 1, then a compile-free administrative inventory continuation and the first complete SameVoice runtime passed **21/0/0**, native 0, all 244 witnesses/source/actual guards. The current a8a/9e0 head is pushed. [Original native proof](verification/tests-restart-a8a-native-20261027/) records ARM40444802059/Linux40444802082 green, **7,572 unique PASS / zero bad/unrun / 53 skips**, all 21 SameVoice and fourteen Reader cases once. Its actual e70/a8a preview has fifteen upstream paths beyond authored a8a/9e0. The separate Cloud553/5982 witness keeps **11,458 PASS plus one LEAK** in the hung-after-ready case; neither the new pass nor source differences establish its cause.
+
+[Mood stale executable disposition](verification/tests-mood-stale-artifact-20261027/) preserves the attempted 338/2 result and native failure while identifying it as wrong-source execution: current pristine75d5 lacked the diagnostic pause, but cached runtime bytes exactly matched the earlier controlled executable and all eight outputs reported fresh. Original a364/99b337/3 stays separate. All292 independent frozen copies and both10679-file sources verified. Supported clean retired only the closed stale Mood cache; corrected qualification requires scoped Expression invalidation, fresh driver emissions and marker absence on the existing warm lane, queued behind OTA.
+
+Carrier's clean dd5/e70 carry preserves all six patches and exactly matches Reviewer-three's independently tested merged tree428ba4b3c (139 library plus89 Round passes). Own current strict/workspace/promoter compiler gates passed; focused serial observations continue without weakening bounds. All three offered4fd reads are clear; First owns the nonblocking docs correction and the merge/promotion. The user authorized posting the existing public SSH key, and the lead installed it. The verified new host pin and key now work: a lease-guarded read-only7071 baseline observed active Voice/body/eyes and a USB camera, with the known setup-recover loop. Correct state.json/trust paths and a coherent on-lamp recovery snapshot precede GOOD. The already qualified4fd/c43 updater artifact is separately verified for this rehearsal; it is not labelled dd5. No GOOD/BAD, restore, later-base gate or new device pass is claimed yet.
+
 ## 2026-10-27 10:09 — Native drafts pass and input controls close
 
 Ready for lamp-voice: no (current authored-base gates and reads pending)
