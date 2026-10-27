@@ -1,3 +1,13 @@
+## 2026-10-27 07:18 — unstarted-driver continuations closed; failures retained
+
+Ready for lamp-voice: no. These observations remain tied to their old sources.
+
+Ownkeys a775/a3 finished its 57 unstarted drivers and one fourteen-package docs cohort: **6,400 passed, 0 failed, 48 ignored**. The nonoverlapping 77-driver observed union remains **8,067/1/55**, including the original Expression journal failure. [Independent terminal audit](verification/ownkeys-third-carry-20261027/current-a775-unrun-audit.json) verifies all 65 host controls once, six Linux-only controls unrun here, stable source/raw inputs and all 140 actual/saved executables, no forced cleanup or replay. The first audit's wrong-worktree identity refusal is retained; its corrected wrapper checks the actual a775 worktree. This is not a passing full fourteen-package gate.
+
+Reminder b490/a3 finished its eight unstarted drivers and one twelve-package docs cohort: **909/0/6**. The 70-driver observed union remains **7,485/1/52**, including the original privacy resync failure. [Independent terminal audit](verification/reminder-pending-present-20261026/current-b490-unrun-audit.json) verifies all 21 reminder and three mock controls once, source/raw inputs and all 133 actual/saved executables unchanged, no forced cleanup or replay. Original inode metadata holds remain recorded separately; neither continuation waives its original command failure.
+
+Ownkeys has since carried to 3a97/b234 and its captured full Voice library is active. Reminder is now locally 7a5347f84/4bff with an equal patch, unqualified on that base. The separate privacy diagnostic is active; it proves no historical cause or shipping result until closed and audited. No ARM64 link, real key, provider, installation or device action.
+
 ## 2026-10-27 06:07 — reminder partial gate exposes privacy resync fixture
 
 Ready for lamp-voice: no (current fixture failure and latest-base gates pending)
