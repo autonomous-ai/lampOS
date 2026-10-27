@@ -1,0 +1,1876 @@
+{
+  "Root_independent_audit": {
+    "all_receipt_hashes_match": 32,
+    "exact_post_summary_reprints": 35,
+    "independent_unique_PASS": 11790,
+    "raw_log_sha256": "72ceedd5cb645c433f77835e0ee90c8d490a11ac6e4ce2860aa1f0aa0050ad72",
+    "scope": "Root independent ordinal/status and file-hash reconciliation. Stderr observations are separate, not inferred absent from PASS statuses."
+  },
+  "raw_private_sha256": "179bdb7b32fc7468f82313524bae69c69ba4ba5be7d93e460e6c3ee7d77ce899",
+  "receipt": {
+    "all_native_phase_handles_closed": {
+      "23236": "Linux collection0",
+      "39433": "ARM collection0",
+      "54200": "census0",
+      "84277": "sourcebinding0",
+      "85692": "watch controller0",
+      "93040": "rawfunction/payloadbinding0",
+      "auditors_inventory_finish": "synchronous closed0"
+    },
+    "attempt_inventory": {
+      "nextest_execution_phase_retry_failure_word_markers": 0,
+      "nextest_failure_attempt_events": 0,
+      "observed_status_events": 11790,
+      "prefix_counts": {
+        "PASS": 11790
+      },
+      "raw_complete_logs_retained": true,
+      "scope": "Zero observed actual-nextest retry/failure status markers is not a disabled-policy assumption or zero-stderr claim. All stdout/stderr sections remain in unchanged original complete text logs.",
+      "stderr_heading_count_whole_job": 21,
+      "stderr_headings_by_context": {
+        "nextest post-summary rendered-output context": 21
+      },
+      "stderr_indices_names_hashes_only_sha256": "7f3dec08ff9d884dea3a3b4fe70de479fb38688686cfe8292fe93980cd7205bb",
+      "workflow_automatic_retry_observed": false
+    },
+    "custom_harness_separate": {
+      "process13_0": true,
+      "relay_signals_ok": true
+    },
+    "docs_separate": {
+      "failed": 0,
+      "headings": 47,
+      "ignored": 0,
+      "incomplete_group": null,
+      "interleaved_groups": [],
+      "passed": 4,
+      "step_conclusion": "success",
+      "summaries": 47
+    },
+    "frozen_authored_host308_proof_sha256": "eb501087fb605c2d949057de843a63402d142d1c37fb5d013f40c0fc6d4b3a45",
+    "hashes": {
+      "arm-checkout.json": "4b07241eac89bd4f47c328eaabe8dda4788df264111c66e882772cf3607fd88e",
+      "arm-job.log": "72ceedd5cb645c433f77835e0ee90c8d490a11ac6e4ce2860aa1f0aa0050ad72",
+      "arm-jobs.json": "7a0d2df5e7a863fe32099369fe5fe461d8faf625fefbc549da4f6801fc43a886",
+      "arm-original-attempt.json": "98ebc95513bcf855f9061a1dab01ec6bcc66c4720d5fef81351116268554e17d",
+      "arm-receipt.json": "ee766234fd2ce7f4fe229da6d592f79817552aa82cecd15d34a663951422383a",
+      "arm-run.json": "fa964d08a54fa01258a8f7fd8d712cb92d3b7d6ac9db45b76ef2f6f7efdaad8a",
+      "audit-arm.py": "5c43c2908d7f318a9b84c4cc240655210fa7243b455f1f685e3ae33b81658be0",
+      "audit-linux.py": "a6d7846d084376e4866f7d3a2152ca7e4920f9e331f8786bf213611bd6130642",
+      "authored-census.json": "671814011cec4bd1076686513751085fbad236729285bb5f85c6776914e69b7e",
+      "bind-overlay-payloads.py": "1503525476d0f5fa17413c3a6bded15afb8c8fd953a013c5700044f54a0f6c90",
+      "bind-preview-source.py": "5e0b033124679c89898b4e1154eafa79711d48b0ec6ad4550765c871379ffc4a",
+      "collect-original.py": "5d56f581b93569c264b5a356c3ef576f28b86020082d387db848a5ba70d60d57",
+      "finish-native-packet.py": "a23ba29e6b5783d7658236b13ac4da4f60034e878f77a7d44523a65438fb1320",
+      "historical-f43-stderr-marker-note.json": "d8c46f30fb40e0714ee5b4fffc4522adf191520d9eb7ec6299873cfd30f9f224",
+      "inventory-attempts.py": "38d71e68a99481582b1944d1c7bf02885ebf9fc6c847c78c84c5105b97643127",
+      "linux-checkout.json": "2eb3556fa564036cec98cae94d72557624dcd8ffa45fa052e3f98aabe4ad9ae2",
+      "linux-job.log": "4e62b9a6e23f1522bcd38c3bb364f74ca53890e819df9028b09f1ab920b44e23",
+      "linux-jobs.json": "e884a935ad7f632df9ca7074af77d23e6ee7116ea5cbbea4cefd3490d15baa5b",
+      "linux-original-attempt.json": "84832d2a1addb57871b3b1bab8036d6a73823de22b5b211fbba48a3b2fddc5d7",
+      "linux-receipt.json": "6a248516b2728077cb972ec15feb89bcc6a9ed6a7cbb1097913345b74d9026d8",
+      "linux-run.json": "99ad56070ad6ee1cab9711ffc4b696f07264fb17087c58ac8e87b879b64c077f",
+      "native-attempt-inventory.json": "b6798a66c91140379cd5ee500545da43d528cac2116020109c00a98840e6f6db",
+      "overlay-raw-payload-bindings.json": "b8739af4d8af1af50d5987f90f74594d45d80714865ceb46e41d732902fcf117",
+      "prepare-census.py": "2aa5a1b39e8ea08c9ff5840e6c3d9bf8b849975b2f6b45caa1cf4b625be58f59",
+      "preview-a35e972a436a7a63872f794bf38eeeb994856e67-fetch.json": "aa18622f0d9a6e6f88bce6533c34d96307b28c712ff3fcdfc445effca5a0728f",
+      "preview-a35e972a436a7a63872f794bf38eeeb994856e67-source-bindings.json": "01788ae4fc811a467a0e28e752f68e9d921264d27e829ce0a9f68562b375fa39",
+      "rust-test-function-bytes.py": "8d1f424af375e58076c49a33cf76cbc86f4c1651d8ac0fe4789e08403f8d9d2d",
+      "scope-stderr.py": "6690673dd6cbcbe39a59c951da38f16fe98fedf30603dc8df9d4b3aaaabf4a4a",
+      "source-bindings-summary.json": "5754fcf21544b2442ed2adf2c2dc4a48be12787b0f7d7ced795255e0f187b687",
+      "stderr-context-inventory.json": "7f3dec08ff9d884dea3a3b4fe70de479fb38688686cfe8292fe93980cd7205bb",
+      "watch-controller.terminal.json": "8e1d30da15716d4dde0141b6760f462833050f8c1436f686ef443ad3161d8f5a",
+      "watch-original.py": "ba7a623d715989c47eb9a1714788e2f37365e1b61e021635e9845271e7ca2669"
+    },
+    "historical_f43_stderr_marker_correction": {
+      "corrected_case_insensitive_stderr_marker_count": 21,
+      "historical_epoch": "f43 native original ARM40539307194",
+      "historical_original_receipt_sha256": "62345e0b3d582d29b055922aba0ecc13d053e24445957a583fc8632541b71bb6",
+      "historical_raw_log_sha256": "0e780d417d76d59634f1da9ba955e36a629035188c42c5f25ef30c24169044dc",
+      "marker_lines": [
+        12605,
+        12621,
+        12647,
+        12662,
+        12684,
+        12709,
+        12744,
+        12757,
+        12769,
+        12781,
+        12792,
+        12804,
+        12815,
+        12827,
+        12839,
+        12850,
+        12861,
+        12872,
+        12884,
+        12898,
+        13001
+      ],
+      "native_PASS_failure_retry_source_counts_unchanged": true,
+      "new_public_sanitized_note_sha256": "d8c46f30fb40e0714ee5b4fffc4522adf191520d9eb7ec6299873cfd30f9f224",
+      "old_raw_logs_and_receipt_not_modified": true,
+      "prior_marker_predicate_limit": "Old inventory matched uppercase STDERR or separator-first headings; it missed lowercase stderr followed by Unicode separator.",
+      "scope": "Metadata marker-count correction only; all original raw stderr was preserved. No old539 explanation/waiver or native rerun."
+    },
+    "holds": [],
+    "known3890_report_unwaived": {
+      "current_gate": "Once-only serial exact selection, --test-threads=1",
+      "no_source_or_test_fix_authorized": true,
+      "on_current_failure": "Preserve once-only observation, no retry.",
+      "parallel_report_repaired_or_waived_by_serial_pass": false,
+      "report": "#3890",
+      "reported_condition": "Global THREAD cross-test interference under parallel test execution; not attributed to clock by Root.",
+      "selected_case": "second_provider::worker::tests::right_after_a_start_the_ears_quiet_room_lets_a_bare_name_join_its_request",
+      "source": "Root approval and direct instruction, not re-investigated by this helper"
+    },
+    "literal_native_package_filter": {
+      "command_and_filter_lines": [
+        {
+          "line": 801,
+          "text": "##[group]Run echo \"cores: $(nproc)\""
+        },
+        {
+          "line": 802,
+          "text": "echo \"cores: $(nproc)\""
+        },
+        {
+          "line": 803,
+          "text": "filter='not (binary_id(lamp-ipc::relay_signals) | binary_id(lamp-turn-end-wire::process))'"
+        },
+        {
+          "line": 804,
+          "text": "if [ -n \"$PICKED\" ]; then filter=\"$filter & ($PICKED)\"; fi"
+        },
+        {
+          "line": 805,
+          "text": "cargo nextest run --locked --release --workspace \\"
+        },
+        {
+          "line": 806,
+          "text": "  --profile pr \\"
+        },
+        {
+          "line": 807,
+          "text": "  --no-tests=pass -j num-cpus \\"
+        },
+        {
+          "line": 808,
+          "text": "  --partition hash:1/1 \\"
+        },
+        {
+          "line": 809,
+          "text": "  -E \"$filter\""
+        },
+        {
+          "line": 810,
+          "text": "shell: /usr/bin/bash -e {0}"
+        },
+        {
+          "line": 811,
+          "text": "env:"
+        },
+        {
+          "line": 812,
+          "text": "  PICKED: "
+        },
+        {
+          "line": 813,
+          "text": "##[endgroup]"
+        }
+      ],
+      "scope": "Literal actual command/filter/PICKED/partition lines only; no assumed package filter or retry policy."
+    },
+    "nextest": {
+      "bad_statuses": [],
+      "executed_ordinal_unrun": 0,
+      "named_skips": [],
+      "per_package_PASS": {
+        "lamp-actions": 123,
+        "lamp-addons": 50,
+        "lamp-air": 27,
+        "lamp-audio": 193,
+        "lamp-body": 656,
+        "lamp-bus": 107,
+        "lamp-camera": 90,
+        "lamp-cloud": 207,
+        "lamp-control": 55,
+        "lamp-controls": 517,
+        "lamp-ears": 76,
+        "lamp-environment": 12,
+        "lamp-expression": 341,
+        "lamp-eyes": 355,
+        "lamp-gemini": 285,
+        "lamp-health": 91,
+        "lamp-ipc": 52,
+        "lamp-keeper": 42,
+        "lamp-lean": 61,
+        "lamp-local-time": 11,
+        "lamp-memory": 338,
+        "lamp-mood": 124,
+        "lamp-msgs": 180,
+        "lamp-name": 44,
+        "lamp-near-call": 9,
+        "lamp-observer": 46,
+        "lamp-peek": 26,
+        "lamp-policy": 286,
+        "lamp-records": 193,
+        "lamp-ring": 53,
+        "lamp-same-voice": 5,
+        "lamp-schedule": 215,
+        "lamp-selftest": 85,
+        "lamp-settings": 49,
+        "lamp-setup": 197,
+        "lamp-skills": 558,
+        "lamp-sound-fixtures": 15,
+        "lamp-station": 69,
+        "lamp-surround": 268,
+        "lamp-tasks": 226,
+        "lamp-turn-end": 32,
+        "lamp-turn-end-wire": 5,
+        "lamp-turn-owner": 37,
+        "lamp-update": 521,
+        "lamp-voice": 4233,
+        "lamp-voice-eval": 623,
+        "lamp-voice-processes": 2
+      },
+      "selection_and_profile_evidence": [
+        {
+          "line": 805,
+          "text": "cargo nextest run --locked --release --workspace \\"
+        },
+        {
+          "line": 812,
+          "text": "  PICKED: "
+        },
+        {
+          "line": 854,
+          "text": " Nextest run ID 6e634c38-e2c6-45ad-8cb6-adb1a70458be with nextest profile: pr"
+        },
+        {
+          "line": 855,
+          "text": "    Starting 11790 tests across 188 binaries (106 tests and 2 binaries skipped)"
+        }
+      ],
+      "status_counts": {
+        "PASS": 11790
+      },
+      "summary": {
+        "executed": 11790,
+        "failed": 0,
+        "line": 12647,
+        "passed": 11790,
+        "raw_suffix": "11790 passed, 106 skipped",
+        "selected": 11790,
+        "skipped": 106
+      },
+      "summary_skips_not_named_or_unrun_inferred": 106,
+      "unique_executed": 11790,
+      "unmatched_post_summary_rows": [],
+      "verified_post_summary_reprints": 35
+    },
+    "offline_publication_steps_separate_not_signature_claims": [
+      {
+        "conclusion": "success",
+        "name": "publication failure tests (offline, no signing secret)"
+      },
+      {
+        "conclusion": "success",
+        "name": "artifact provenance regression (offline, disposable Cargo workspace)"
+      },
+      {
+        "conclusion": "success",
+        "name": "stable promotion tests (offline, disposable test key)"
+      },
+      {
+        "conclusion": "skipped",
+        "name": "record fresh source times for a cold publication build"
+      },
+      {
+        "conclusion": "success",
+        "name": "publication CLI rehearsal (local test key and simulated GitHub only)"
+      }
+    ],
+    "old539_Reader_current_observation_only": {
+      "rows": [
+        {
+          "binary": "lamp-voice",
+          "duration": "0.010s",
+          "line": 11327,
+          "name": "session_reader::tests::linux::shared_session_writer_projects_every_segment_without_private_values",
+          "ordinal": 10472,
+          "status": "PASS",
+          "total": 11790
+        }
+      ],
+      "scope": "Current original4d observation only; no cause, repair, or waiver inferred for original539 failure."
+    },
+    "raw_logged_compiler_test_host_triples": {
+      "arm": [
+        {
+          "line": 345,
+          "text": "info: default host tuple is aarch64-unknown-linux-gnu"
+        },
+        {
+          "line": 349,
+          "text": "info: default toolchain set to 1.96.0-aarch64-unknown-linux-gnu"
+        },
+        {
+          "line": 351,
+          "text": "  1.96.0-aarch64-unknown-linux-gnu installed - rustc 1.96.0 (ac68faa20 2026-05-25)"
+        },
+        {
+          "line": 646,
+          "text": "host: aarch64-unknown-linux-gnu"
+        }
+      ],
+      "linux": [
+        {
+          "line": 285,
+          "text": "info: default host tuple is x86_64-unknown-linux-gnu"
+        },
+        {
+          "line": 289,
+          "text": "info: default toolchain set to 1.96.0-x86_64-unknown-linux-gnu"
+        },
+        {
+          "line": 291,
+          "text": "  1.96.0-x86_64-unknown-linux-gnu installed - rustc 1.96.0 (ac68faa20 2026-05-25)"
+        }
+      ]
+    },
+    "required_current_name_coverage": {
+      "Linux_once_PASS": 8,
+      "Linux_required": 8,
+      "active_required": 316,
+      "host_once_PASS": 308,
+      "host_required": 308,
+      "once_PASS": 316,
+      "ownLinux6_once_PASS": 6,
+      "own_once_PASS": 71,
+      "own_required": 71,
+      "required_selected_missing_or_nonpass": 0,
+      "upstreamBodyLinux2_once_PASS": 2
+    },
+    "runs": {
+      "arm": {
+        "all_jobs": [
+          {
+            "conclusion": "success",
+            "id": 122352559434,
+            "name": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+            "status": "completed"
+          },
+          {
+            "conclusion": "skipped",
+            "id": 122352562382,
+            "name": "lampOS \u2014 promote a tested release to the stable feed",
+            "status": "completed"
+          },
+          {
+            "conclusion": "skipped",
+            "id": 122361900623,
+            "name": "lampOS \u2014 sign and publish the tested lamp-voice artifact",
+            "status": "completed"
+          },
+          {
+            "conclusion": "skipped",
+            "id": 122361900641,
+            "name": "report-full-run-failure",
+            "status": "completed"
+          }
+        ],
+        "complete_raw_text_job_log_sha256": "72ceedd5cb645c433f77835e0ee90c8d490a11ac6e4ce2860aa1f0aa0050ad72",
+        "event": "pull_request",
+        "event_head": "4d786be864a2a7a83ed4d48de12a6de12c3c620e",
+        "job_conclusion": "success",
+        "job_count": 4,
+        "job_id": 122352559434,
+        "job_name": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+        "job_status": "completed",
+        "original_attempt_endpoint_conclusion": "success",
+        "original_attempt_endpoint_status": "completed",
+        "run_attempt": 1,
+        "run_id": 40550488846,
+        "shard_scope": "1/1",
+        "watcher": {
+          "at": "2026-10-27T17:42:42.232320+00:00",
+          "driver_reaped": true,
+          "elapsed_seconds": 935.6601686209906,
+          "error": null,
+          "job": 122352559434,
+          "process_group": "absent",
+          "returncode": 0,
+          "run": 40550488846,
+          "timed_out": false,
+          "watcher_only_cleanup": [],
+          "workflow_modified": false
+        },
+        "workflow_aggregate_conclusion": "success",
+        "workflow_aggregate_status": "completed"
+      },
+      "linux": {
+        "all_jobs": [
+          {
+            "conclusion": "success",
+            "id": 122352562229,
+            "name": "lampOS \u2014 clippy, every crate and target (x86 Linux)",
+            "status": "completed"
+          }
+        ],
+        "complete_raw_text_job_log_sha256": "4e62b9a6e23f1522bcd38c3bb364f74ca53890e819df9028b09f1ab920b44e23",
+        "event": "pull_request",
+        "event_head": "4d786be864a2a7a83ed4d48de12a6de12c3c620e",
+        "job_conclusion": "success",
+        "job_count": 1,
+        "job_id": 122352562229,
+        "job_name": "lampOS \u2014 clippy, every crate and target (x86 Linux)",
+        "job_status": "completed",
+        "original_attempt_endpoint_conclusion": "success",
+        "original_attempt_endpoint_status": "completed",
+        "run_attempt": 1,
+        "run_id": 40550489392,
+        "shard_scope": "single observed required Linux job",
+        "watcher": {
+          "at": "2026-10-27T17:30:22.207545+00:00",
+          "driver_reaped": true,
+          "elapsed_seconds": 195.72432939399732,
+          "error": null,
+          "job": 122352562229,
+          "process_group": "absent",
+          "returncode": 0,
+          "run": 40550489392,
+          "timed_out": false,
+          "watcher_only_cleanup": [],
+          "workflow_modified": false
+        },
+        "workflow_aggregate_conclusion": "success",
+        "workflow_aggregate_status": "completed"
+      }
+    },
+    "scope_limits": [
+      "Actual integration preview a35 only, not blanket authored4d source/runtime equivalence. All316 required names/body flags refer to exact observed source/rows.",
+      "11790 uniquePASS/0bad and106summary skips/35exactreprints are separate inventories; skips have no inferred named mapping and reprints are not executions.",
+      "All actualnextest attempt/status rows and21 post-summary stderr sections retained; no policy assumption, no zero-stderr claim. Whole-job offline publication/doc/custom-harness results remain separate.",
+      "7550 committed guarded source entries are not all claimed consumed by authored308 selection. Private host helpers/depinfos/35actual+35saved never map to preview Git source entries.",
+      "Only raw function/test bytes, named declarations/cfg, opaque hashes and raw diff-hunk supersets; no Memory/Friday semantics or new product review.",
+      "Checkout source binding only; no independently attested live CI worktree or downloaded/executed/signed artifact claim. No artifact binary downloads, device actions, Cargo, rebase, push, public posts, CI rerun/cancel/manualdispatch by helper.",
+      "Completed4d/f43/cd288 host/native epochs and35+34+30 independent saved copies preserved; no historical execution or artifact admission credit transferred."
+    ],
+    "source_comparison": {
+      "Linux_cfg_bound": 8,
+      "changed_control_declaration_files": [
+        "lampOS/crates/voice/src/remember.rs",
+        "lampOS/crates/voice/src/second_provider/worker.rs"
+      ],
+      "changed_file_function_and_raw_hunk_superset_bindings": [
+        {
+          "Memory_scope": "Opaque bytes/raw hunk metadata and only existing named protocol fixture bodies, no implementation semantics.",
+          "actual_preview_sha256": "a3eba22d4b8fb39895a12809160ce0af04692491afc187b75ca75f4ea71df018",
+          "authored_sha256": "a248d2d47f8b18683d300b7de8ab678c472cce4879b3ed49c9721f4d39345360",
+          "delete_only_new_inserted_lines_reconstructs_all_authored_bytes": false,
+          "diff_only_insertions": false,
+          "exact_body_equal": 12,
+          "exact_function_equal": 12,
+          "helper_or_other_source_changes": "All raw hunk supersets are explicit. Additions/replacements outside required tests remain whole-file/helper differences; no helper/transitive/runtime equivalence inferred.",
+          "path": "lampOS/crates/voice/src/remember.rs",
+          "raw_diff_hunk_supersets": [
+            {
+              "header": "@@ -150 +150 @@ pub const HELD_DESCRIBED: &str = \" If they didn't ask in their own words, the la",
+              "new_count": 1,
+              "new_start": 150,
+              "old_count": 1,
+              "old_start": 150,
+              "raw_function_context": "pub const HELD_DESCRIBED: &str = \" If they didn't ask in their own words, the la",
+              "required_test_range_overlaps": []
+            },
+            {
+              "header": "@@ -565,0 +566,110 @@ pub const FACE_MEMORY_KEPT: &str = \"Their face is forgotten, but what they told",
+              "new_count": 110,
+              "new_start": 566,
+              "old_count": 0,
+              "old_start": 565,
+              "raw_function_context": "pub const FACE_MEMORY_KEPT: &str = \"Their face is forgotten, but what they told",
+              "required_test_range_overlaps": []
+            },
+            {
+              "header": "@@ -1518 +1628 @@ fn tools_for(rules: bool, forget_all: bool, forget_about: bool) -> Vec<Tool> {",
+              "new_count": 1,
+              "new_start": 1628,
+              "old_count": 1,
+              "old_start": 1518,
+              "raw_function_context": "fn tools_for(rules: bool, forget_all: bool, forget_about: bool) -> Vec<Tool> {",
+              "required_test_range_overlaps": []
+            },
+            {
+              "header": "@@ -8618,0 +8729,14 @@ fn exchange_within(",
+              "new_count": 14,
+              "new_start": 8729,
+              "old_count": 0,
+              "old_start": 8618,
+              "raw_function_context": "fn exchange_within(",
+              "required_test_range_overlaps": []
+            },
+            {
+              "header": "@@ -8941,0 +9066,348 @@ mod tests {",
+              "new_count": 348,
+              "new_start": 9066,
+              "old_count": 0,
+              "old_start": 8941,
+              "raw_function_context": "mod tests {",
+              "required_test_range_overlaps": []
+            }
+          ],
+          "raw_git_diff_sha256": "fead350cdf379e938ed3145914ebebe254dac72b6246d1e4d4e366f5de37e251",
+          "required_functions": 12,
+          "rows": [
+            {
+              "authored_body_sha256": "3a6b51684af9e80606e4eb96387a28fa789bba3f80370a9146c91f7f121f8e4d",
+              "authored_function_sha256": "35f931b70dc02fc352a7364a831bfd09a0c18aeb4fa66171a8487864bee5e85f",
+              "authored_lines": [
+                17339,
+                17373
+              ],
+              "binary": "lamp-voice",
+              "exact_body_equal": true,
+              "exact_function_signature_and_body_equal": true,
+              "name": "remember::tests::a_clear_correction_without_a_model_id_replaces_one_shown_fact",
+              "preview_body_sha256": "3a6b51684af9e80606e4eb96387a28fa789bba3f80370a9146c91f7f121f8e4d",
+              "preview_function_sha256": "35f931b70dc02fc352a7364a831bfd09a0c18aeb4fa66171a8487864bee5e85f",
+              "preview_lines": [
+                17811,
+                17845
+              ],
+              "raw_parser_limit": null,
+              "role": "own"
+            },
+            {
+              "authored_body_sha256": "cbb4201b549496ee0bb62491d8ba551b793c59876fabb22d09ed11cdccd75495",
+              "authored_function_sha256": "3f4bf41ac3d8f6b617a3a3446a8b629708ceaa4dd6c3ddd172fcd0e4c0718b07",
+              "authored_lines": [
+                12673,
+                12689
+              ],
+              "binary": "lamp-voice",
+              "exact_body_equal": true,
+              "exact_function_signature_and_body_equal": true,
+              "name": "remember::tests::a_dated_search_result_says_whether_its_event_is_still_coming",
+              "preview_body_sha256": "cbb4201b549496ee0bb62491d8ba551b793c59876fabb22d09ed11cdccd75495",
+              "preview_function_sha256": "3f4bf41ac3d8f6b617a3a3446a8b629708ceaa4dd6c3ddd172fcd0e4c0718b07",
+              "preview_lines": [
+                13145,
+                13161
+              ],
+              "raw_parser_limit": null,
+              "role": "own"
+            },
+            {
+              "authored_body_sha256": "fdf36baa9c2f0a70786f5aa657fffc9abe59833aae7d650f72bc5b5b9c630885",
+              "authored_function_sha256": "db8e5ca752e58664d6d669fb8a1333934053830d4782db9c24eff4414e29c897",
+              "authored_lines": [
+                8891,
+                8940
+              ],
+              "binary": "lamp-voice",
+              "exact_body_equal": true,
+              "exact_function_signature_and_body_equal": true,
+              "name": "remember::tests::an_explicit_correction_selects_only_one_shown_old_fact",
+              "preview_body_sha256": "fdf36baa9c2f0a70786f5aa657fffc9abe59833aae7d650f72bc5b5b9c630885",
+              "preview_function_sha256": "db8e5ca752e58664d6d669fb8a1333934053830d4782db9c24eff4414e29c897",
+              "preview_lines": [
+                9015,
+                9064
+              ],
+              "raw_parser_limit": null,
+              "role": "own"
+            },
+            {
+              "authored_body_sha256": "6508b0750a233eaa4a12185f117a69c15d509fa7aa889be617d7342a1b508aad",
+              "authored_function_sha256": "9b410bff7957756bfd8b201409110d3793015c9bc5961a3d6a5313131114ea9f",
+              "authored_lines": [
+                10552,
+                10576
+              ],
+              "binary": "lamp-voice",
+              "exact_body_equal": true,
+              "exact_function_signature_and_body_equal": true,
+              "name": "remember::tests::asking_about_a_misheard_forget_adds_to_forget_alone",
+              "preview_body_sha256": "6508b0750a233eaa4a12185f117a69c15d509fa7aa889be617d7342a1b508aad",
+              "preview_function_sha256": "9b410bff7957756bfd8b201409110d3793015c9bc5961a3d6a5313131114ea9f",
+              "preview_lines": [
+                11024,
+                11048
+              ],
+              "raw_parser_limit": null,
+              "role": "own"
+            },
+            {
+              "authored_body_sha256": "56900cb042baecac7aaa554c6656c56baf07248d91016b4862f5af97a34dd40c",
+              "authored_function_sha256": "e79fca3e235b2aedaca7ddc0fe846554db7d2fda52820977d8097b2098ab1727",
+              "authored_lines": [
+                18173,
+                18205
+              ],
+              "binary": "lamp-voice",
+              "exact_body_equal": true,
+              "exact_function_signature_and_body_equal": true,
+              "name": "remember::tests::session_note_refused_and_malformed_room_reads_can_recover",
+              "preview_body_sha256": "56900cb042baecac7aaa554c6656c56baf07248d91016b4862f5af97a34dd40c",
+              "preview_function_sha256": "e79fca3e235b2aedaca7ddc0fe846554db7d2fda52820977d8097b2098ab1727",
+              "preview_lines": [
+                18645,
+                18677
+              ],
+              "raw_parser_limit": null,
+              "role": "additional"
+            },
+            {
+              "authored_body_sha256": "08cd22d7bc8d32fabb5cc8bc657373f826820d0ff14e4ad0bde154df28474f0f",
+              "authored_function_sha256": "6a73a643dd90c9ec801b3be60ebef4c8e2267b863142166a6adccf2270dd22f1",
+              "authored_lines": [
+                16162,
+                16176
+              ],
+              "binary": "lamp-voice",
+              "exact_body_equal": true,
+              "exact_function_signature_and_body_equal": true,
+              "name": "remember::tests::the_note_says_there_is_a_memory_and_lists_what_is_kept",
+              "preview_body_sha256": "08cd22d7bc8d32fabb5cc8bc657373f826820d0ff14e4ad0bde154df28474f0f",
+              "preview_function_sha256": "6a73a643dd90c9ec801b3be60ebef4c8e2267b863142166a6adccf2270dd22f1",
+              "preview_lines": [
+                16634,
+                16648
+              ],
+              "raw_parser_limit": null,
+              "role": "additional"
+            },
+            {
+              "authored_body_sha256": "7d97243fc933ba1d78e568dbd3645f5ce9af69b482039dcccffbc26515c36b84",
+              "authored_function_sha256": "f9b396c4b92eb064b63f424bb4e4fbec2038dfa4823a2ebc5cedde316cf1b3fa",
+              "authored_lines": [
+                14485,
+                14516
+              ],
+              "binary": "lamp-voice",
+              "exact_body_equal": true,
+              "exact_function_signature_and_body_equal": true,
+              "name": "remember::tests::the_observation_pass_reads_only_the_models_one_json_object",
+              "preview_body_sha256": "7d97243fc933ba1d78e568dbd3645f5ce9af69b482039dcccffbc26515c36b84",
+              "preview_function_sha256": "f9b396c4b92eb064b63f424bb4e4fbec2038dfa4823a2ebc5cedde316cf1b3fa",
+              "preview_lines": [
+                14957,
+                14988
+              ],
+              "raw_parser_limit": null,
+              "role": "additional"
+            },
+            {
+              "authored_body_sha256": "d8cdf9bb2f5d37cfd6f6da339aa3d7a475461c0f35256376e2d98f42379d250d",
+              "authored_function_sha256": "d87497d73ff8f38ec85b90b5c3ac7692c0427a1f099770f4d79c0f2d724b558e",
+              "authored_lines": [
+                11038,
+                11088
+              ],
+              "binary": "lamp-voice",
+              "exact_body_equal": true,
+              "exact_function_signature_and_body_equal": true,
+              "name": "remember::tests::with_events_the_observe_job_has_its_day_and_the_prompt_asks_for_one",
+              "preview_body_sha256": "d8cdf9bb2f5d37cfd6f6da339aa3d7a475461c0f35256376e2d98f42379d250d",
+              "preview_function_sha256": "d87497d73ff8f38ec85b90b5c3ac7692c0427a1f099770f4d79c0f2d724b558e",
+              "preview_lines": [
+                11510,
+                11560
+              ],
+              "raw_parser_limit": null,
+              "role": "additional"
+            },
+            {
+              "authored_body_sha256": "ca4d34e9bf5151d6b172f18ebfe0def9374f8f6523adb5e300d2c16fe5ddb503",
+              "authored_function_sha256": "e61d3cbdfd4e6992b8158a42e9e186666cd87d8c87974bdf1e2d1b56fc63dd87",
+              "authored_lines": [
+                10827,
+                10847
+              ],
+              "binary": "lamp-voice",
+              "exact_body_equal": true,
+              "exact_function_signature_and_body_equal": true,
+              "name": "remember::tests::with_the_switch_a_known_person_s_own_kept_name_is_still_theirs",
+              "preview_body_sha256": "ca4d34e9bf5151d6b172f18ebfe0def9374f8f6523adb5e300d2c16fe5ddb503",
+              "preview_function_sha256": "e61d3cbdfd4e6992b8158a42e9e186666cd87d8c87974bdf1e2d1b56fc63dd87",
+              "preview_lines": [
+                11299,
+                11319
+              ],
+              "raw_parser_limit": null,
+              "role": "own"
+            },
+            {
+              "authored_body_sha256": "9e5f3b210380fb55c35361b4bdf52047e7c3bb59f3014c6c8807bc5482c9470b",
+              "authored_function_sha256": "8e57edabdec2f988645124121f642b6cfdfad3c2d37a0b85a7c5c94f8416e35a",
+              "authored_lines": [
+                10796,
+                10822
+              ],
+              "binary": "lamp-voice",
+              "exact_body_equal": true,
+              "exact_function_signature_and_body_equal": true,
+              "name": "remember::tests::with_the_switch_a_room_kept_name_is_told_only_as_someone_in_the_room_s",
+              "preview_body_sha256": "9e5f3b210380fb55c35361b4bdf52047e7c3bb59f3014c6c8807bc5482c9470b",
+              "preview_function_sha256": "8e57edabdec2f988645124121f642b6cfdfad3c2d37a0b85a7c5c94f8416e35a",
+              "preview_lines": [
+                11268,
+                11294
+              ],
+              "raw_parser_limit": null,
+              "role": "own"
+            },
+            {
+              "authored_body_sha256": "f3f5515400258c30f106124f464154c90a1a7389bb507e6da9d3a004b625a57a",
+              "authored_function_sha256": "87bd85d29b52c0de1b93771d23146fbad122b24864c1c533e21abc7aea9e0ca2",
+              "authored_lines": [
+                10691,
+                10758
+              ],
+              "binary": "lamp-voice",
+              "exact_body_equal": true,
+              "exact_function_signature_and_body_equal": true,
+              "name": "remember::tests::with_the_switch_recall_asks_a_span_of_days_and_the_second_version",
+              "preview_body_sha256": "f3f5515400258c30f106124f464154c90a1a7389bb507e6da9d3a004b625a57a",
+              "preview_function_sha256": "87bd85d29b52c0de1b93771d23146fbad122b24864c1c533e21abc7aea9e0ca2",
+              "preview_lines": [
+                11163,
+                11230
+              ],
+              "raw_parser_limit": null,
+              "role": "additional"
+            },
+            {
+              "authored_body_sha256": "35b6e39d9f21eef4a314dd13d46fd37f287592b7eccad52cec083bf2e6f91e7d",
+              "authored_function_sha256": "fa5ada3cb31d17c20d94ea0314a809aed6d7b2e81b2b74d9cb2bd9ec30010be3",
+              "authored_lines": [
+                10852,
+                10890
+              ],
+              "binary": "lamp-voice",
+              "exact_body_equal": true,
+              "exact_function_signature_and_body_equal": true,
+              "name": "remember::tests::without_the_switch_the_note_is_byte_identical",
+              "preview_body_sha256": "35b6e39d9f21eef4a314dd13d46fd37f287592b7eccad52cec083bf2e6f91e7d",
+              "preview_function_sha256": "fa5ada3cb31d17c20d94ea0314a809aed6d7b2e81b2b74d9cb2bd9ec30010be3",
+              "preview_lines": [
+                11324,
+                11362
+              ],
+              "raw_parser_limit": null,
+              "role": "own"
+            }
+          ],
+          "whole_file_equal": false
+        },
+        {
+          "Memory_scope": null,
+          "actual_preview_sha256": "683e00a87c740b7f721c375b1dac305691a6257052e66b092a126dd19cb1603e",
+          "authored_sha256": "f70e299da98ecebd2d43f7f50d78cf4adfcf848bc70ac22715a3b5fc93475c74",
+          "delete_only_new_inserted_lines_reconstructs_all_authored_bytes": true,
+          "diff_only_insertions": true,
+          "exact_body_equal": 3,
+          "exact_function_equal": 3,
+          "helper_or_other_source_changes": "All raw hunk supersets are explicit. Additions/replacements outside required tests remain whole-file/helper differences; no helper/transitive/runtime equivalence inferred.",
+          "path": "lampOS/crates/voice/src/second_provider/worker.rs",
+          "raw_diff_hunk_supersets": [
+            {
+              "header": "@@ -2953,0 +2954,7 @@ pub fn serve(",
+              "new_count": 7,
+              "new_start": 2954,
+              "old_count": 0,
+              "old_start": 2953,
+              "raw_function_context": "pub fn serve(",
+              "required_test_range_overlaps": []
+            },
+            {
+              "header": "@@ -4322,0 +4330,3 @@ pub(crate) struct Heeding {",
+              "new_count": 3,
+              "new_start": 4330,
+              "old_count": 0,
+              "old_start": 4322,
+              "raw_function_context": "pub(crate) struct Heeding {",
+              "required_test_range_overlaps": []
+            },
+            {
+              "header": "@@ -5125,0 +5136 @@ impl Heeding {",
+              "new_count": 1,
+              "new_start": 5136,
+              "old_count": 0,
+              "old_start": 5125,
+              "raw_function_context": "impl Heeding {",
+              "required_test_range_overlaps": []
+            },
+            {
+              "header": "@@ -6400,0 +6412,6 @@ impl Heeding {",
+              "new_count": 6,
+              "new_start": 6412,
+              "old_count": 0,
+              "old_start": 6400,
+              "raw_function_context": "impl Heeding {",
+              "required_test_range_overlaps": []
+            },
+            {
+              "header": "@@ -7493,0 +7511,13 @@ impl Heeding {",
+              "new_count": 13,
+              "new_start": 7511,
+              "old_count": 0,
+              "old_start": 7493,
+              "raw_function_context": "impl Heeding {",
+              "required_test_range_overlaps": []
+            },
+            {
+              "header": "@@ -12709,0 +12740,65 @@ mod tests {",
+              "new_count": 65,
+              "new_start": 12740,
+              "old_count": 0,
+              "old_start": 12709,
+              "raw_function_context": "mod tests {",
+              "required_test_range_overlaps": []
+            }
+          ],
+          "raw_git_diff_sha256": "4c329f1692529429e3039a1e660a38b7fb79d3c974058d3440d2dfb5e659fa41",
+          "required_functions": 3,
+          "rows": [
+            {
+              "authored_body_sha256": "1acab30b53d71a4ae3328a8e5e64e76744c452ce168494ba56cafe769c383cda",
+              "authored_function_sha256": "c6bf97271995f3694687ea829ecfe050a89d3bc0204f78266b79105438a60543",
+              "authored_lines": [
+                21524,
+                21572
+              ],
+              "binary": "lamp-voice",
+              "exact_body_equal": true,
+              "exact_function_signature_and_body_equal": true,
+              "name": "second_provider::worker::memory_observer::a_pass_asks_deepseek_without_thinking_and_reads_its_streamed_json",
+              "preview_body_sha256": "1acab30b53d71a4ae3328a8e5e64e76744c452ce168494ba56cafe769c383cda",
+              "preview_function_sha256": "c6bf97271995f3694687ea829ecfe050a89d3bc0204f78266b79105438a60543",
+              "preview_lines": [
+                21619,
+                21667
+              ],
+              "raw_parser_limit": null,
+              "role": "additional"
+            },
+            {
+              "authored_body_sha256": "eebe7c37db64f70d90277812cd5982797ddb35deb492c927ea4bc4ff39422fb6",
+              "authored_function_sha256": "af53bb02a73412384a6ffe24748ff31f7f1a0f8b16f3ebd5d2eaf6745c5b1925",
+              "authored_lines": [
+                18371,
+                18420
+              ],
+              "binary": "lamp-voice",
+              "exact_body_equal": true,
+              "exact_function_signature_and_body_equal": true,
+              "name": "second_provider::worker::tests::the_levels_thread_reads_the_eyes_for_addressed_started_before_it",
+              "preview_body_sha256": "eebe7c37db64f70d90277812cd5982797ddb35deb492c927ea4bc4ff39422fb6",
+              "preview_function_sha256": "af53bb02a73412384a6ffe24748ff31f7f1a0f8b16f3ebd5d2eaf6745c5b1925",
+              "preview_lines": [
+                18466,
+                18515
+              ],
+              "raw_parser_limit": null,
+              "role": "additional-current-guard"
+            },
+            {
+              "authored_body_sha256": "e921638f4296f90adcbd08bcabf9d812bfe2226916f8b9b25fc5a5c5d09b9fe6",
+              "authored_function_sha256": "6fc61d07bde382f4cc82758b25308bd91cb414413be22871d9c569f1285d03bd",
+              "authored_lines": [
+                18769,
+                19053
+              ],
+              "binary": "lamp-voice",
+              "exact_body_equal": true,
+              "exact_function_signature_and_body_equal": true,
+              "name": "second_provider::worker::tests::right_after_a_start_the_ears_quiet_room_lets_a_bare_name_join_its_request",
+              "preview_body_sha256": "e921638f4296f90adcbd08bcabf9d812bfe2226916f8b9b25fc5a5c5d09b9fe6",
+              "preview_function_sha256": "6fc61d07bde382f4cc82758b25308bd91cb414413be22871d9c569f1285d03bd",
+              "preview_lines": [
+                18864,
+                19148
+              ],
+              "raw_parser_limit": null,
+              "role": "additional-current-guard"
+            }
+          ],
+          "whole_file_equal": false
+        }
+      ],
+      "changed_qualified_guarded_source_paths": [
+        "lampOS/crates/control/src/lib.rs",
+        "lampOS/crates/control/src/main.rs",
+        "lampOS/crates/control/src/pairing.rs",
+        "lampOS/crates/control/src/parts.rs",
+        "lampOS/crates/control/src/protocol.rs",
+        "lampOS/crates/control/src/rate.rs",
+        "lampOS/crates/control/src/server.rs",
+        "lampOS/crates/control/src/session.rs",
+        "lampOS/crates/control/tests/door.rs",
+        "lampOS/crates/eyes/src/yawn.rs",
+        "lampOS/crates/voice/src/coordinator.rs",
+        "lampOS/crates/voice/src/known_faces.rs",
+        "lampOS/crates/voice/src/lib.rs",
+        "lampOS/crates/voice/src/memory_scope.rs",
+        "lampOS/crates/voice/src/policy_holds.rs",
+        "lampOS/crates/voice/src/provider_worker.rs",
+        "lampOS/crates/voice/src/provider_worker/tests/going_on_asks.rs",
+        "lampOS/crates/voice/src/remember.rs",
+        "lampOS/crates/voice/src/second_provider.rs",
+        "lampOS/crates/voice/src/second_provider/tests/held_forget.rs",
+        "lampOS/crates/voice/src/second_provider/worker.rs",
+        "lampOS/crates/voice/src/tools.rs",
+        "lampOS/docs/control.md",
+        "lampOS/docs/control.schema.json",
+        "lampOS/docs/memory.md",
+        "lampOS/docs/second-voice.md",
+        "lampOS/docs/switches.md",
+        "lampOS/sdk/js/src/client.js",
+        "lampOS/sdk/js/src/control.schema.json",
+        "lampOS/sdk/python/src/lampos/client.py",
+        "lampOS/sdk/python/src/lampos/control.schema.json",
+        "lampOS/tools/played/make-skill-test.sh",
+        "lampOS/tools/played/make-skill.sh"
+      ],
+      "control_declaration_files": 60,
+      "control_files_blob_mode_equal": 58,
+      "exact_OwnKeys_unit_and_switch_payloads": {
+        "LAMP_OWN_KEYS_on_preserved": true,
+        "added_environment_names": [],
+        "all_authored_added_unit_payload_lines_retained_exact_in_order": true,
+        "all_parsed_environment_deltas_match_Main": true,
+        "authored_LAMP_OWN_KEYS": "on",
+        "authored_OwnKeys_row_count": 1,
+        "authored_OwnKeys_row_sha256": "c203f2cbd3c1c3db32f124e41df4ae4ece206794ea9c66165b24691deb0b0b20",
+        "authored_net_added_unit_payload_lines": 9,
+        "authored_unit_payload_sha256": "2caf8805b7a46aecdc6a2576d32950fb727046054b65427b898d309af249ce18",
+        "exact_OwnKeys_row_equal": true,
+        "existing_value_changed_environment_names": [],
+        "preview_LAMP_OWN_KEYS": "on",
+        "preview_OwnKeys_row_count": 1,
+        "removed_environment_names": [],
+        "switches_path": "lampOS/docs/switches.md",
+        "unit_path": "lampOS/deploy/product/lamp-voice.service",
+        "unit_whole_file_equal": true
+      },
+      "helper_wholefile_runtime_equivalence_inferred": false,
+      "owned38_blob_mode_equal": 37,
+      "owned38_total": 38,
+      "owned_changed_paths": [
+        "lampOS/docs/switches.md"
+      ],
+      "private_host_only_guard_partition": {
+        "actual_executable_paths": 35,
+        "depinfo_file_paths": 35,
+        "private_runtime_helper_pin_count": 30,
+        "saved_executable_paths": 35,
+        "scope": "Host-only private helper/dep-info/artifact evidence counts; none mapped to or claimed as preview Git source entries. Raw physical source guard metadata remains host-only too."
+      },
+      "qualified_guarded_source_partition": {
+        "blob_and_mode_equal": 7517,
+        "committed_absent_in_preview": 0,
+        "committed_present_in_preview": 7550,
+        "qualified_guarded_source_paths_total": 7550,
+        "scope": "Metadata comparison of guarded source inventory; not all paths claimed consumed by selected308. Only committed source paths are preview Git entries; no private raw/helper/dep-info target inputs are included.",
+        "total": 7550,
+        "uncommitted_or_unmatched_count": 0
+      },
+      "required_changed_file_raw_function_bodies_equal": 15,
+      "required_declarations_present": 316,
+      "required_function_bodies_equal_or_equal_file_bytes": 316,
+      "required_functions_in_changed_files": 15
+    },
+    "source_identity": {
+      "actual_Main_base": "3aa752f73914d0f29fc90edb010a3a7fa1cf526b",
+      "actual_preview_tree_API_and_fetched_Git": "2134de8d94f121ce3ebf866684cc0d1421af89e1",
+      "authored_head": "4d786be864a2a7a83ed4d48de12a6de12c3c620e",
+      "authored_to_preview_delta_paths": [
+        {
+          "actual": {
+            "mode": "100644",
+            "sha": "9c8d4cdd853dc7925785ad6808f8d975a66c7a55",
+            "type": "blob"
+          },
+          "authored": {
+            "mode": "100644",
+            "sha": "858ce6b4b74c99179ee33b1174d86aabb833c524",
+            "type": "blob"
+          },
+          "path": "lampOS/crates/control/src/lib.rs"
+        },
+        {
+          "actual": {
+            "mode": "100644",
+            "sha": "d20ebdde87eb12e9d29c4e3238133f795d9f1398",
+            "type": "blob"
+          },
+          "authored": {
+            "mode": "100644",
+            "sha": "b1d99d0cdfe10c53b6838beea5d52c64e3af92bb",
+            "type": "blob"
+          },
+          "path": "lampOS/crates/control/src/main.rs"
+        },
+        {
+          "actual": {
+            "mode": "100644",
+            "sha": "d835b92c0c606fdcf51792e094845aa1978b79f9",
+            "type": "blob"
+          },
+          "authored": {
+            "mode": "100644",
+            "sha": "d95a680048deffbd93583c1f9c3de1b36b634370",
+            "type": "blob"
+          },
+          "path": "lampOS/crates/control/src/pairing.rs"
+        },
+        {
+          "actual": {
+            "mode": "100644",
+            "sha": "ee41118a1e8e52410e1bc657670eeb8298c912f4",
+            "type": "blob"
+          },
+          "authored": {
+            "mode": "100644",
+            "sha": "5b9a0fece71c681c631ea34982fdfbd466ed5ec6",
+            "type": "blob"
+          },
+          "path": "lampOS/crates/control/src/parts.rs"
+        },
+        {
+          "actual": {
+            "mode": "100644",
+            "sha": "267ce7b1dcabba656be73e112d5d385b0dc941ce",
+            "type": "blob"
+          },
+          "authored": {
+            "mode": "100644",
+            "sha": "86f5bf08ae42037c75ea47158433f50c2b4cac5c",
+            "type": "blob"
+          },
+          "path": "lampOS/crates/control/src/protocol.rs"
+        },
+        {
+          "actual": {
+            "mode": "100644",
+            "sha": "7599d4f6b9d33065630f1fd945300c4542a7e21d",
+            "type": "blob"
+          },
+          "authored": {
+            "mode": "100644",
+            "sha": "407276bba975e73302eaf1ee33671627c3df7499",
+            "type": "blob"
+          },
+          "path": "lampOS/crates/control/src/rate.rs"
+        },
+        {
+          "actual": {
+            "mode": "100644",
+            "sha": "a29cd106097a919645b05debb7df1b0615f183d6",
+            "type": "blob"
+          },
+          "authored": {
+            "mode": "100644",
+            "sha": "b95476fd78fc80fffdd310cc9c488beeca08a352",
+            "type": "blob"
+          },
+          "path": "lampOS/crates/control/src/server.rs"
+        },
+        {
+          "actual": {
+            "mode": "100644",
+            "sha": "aaadc1c9b8c9683c651c785712fbc6d0f0c3c0f5",
+            "type": "blob"
+          },
+          "authored": {
+            "mode": "100644",
+            "sha": "fa9ad33c7981be61db3f1d3addd0b23aff50d1d0",
+            "type": "blob"
+          },
+          "path": "lampOS/crates/control/src/session.rs"
+        },
+        {
+          "actual": {
+            "mode": "100644",
+            "sha": "73dc29319b74a6f13a616b4ca6d9b42667a39311",
+            "type": "blob"
+          },
+          "authored": null,
+          "path": "lampOS/crates/control/src/watch.rs"
+        },
+        {
+          "actual": {
+            "mode": "100644",
+            "sha": "3a13604e54c0609f4ff397d463185203101b4078",
+            "type": "blob"
+          },
+          "authored": {
+            "mode": "100644",
+            "sha": "7fe29820a7cf64cb7ddbe1e4b3af0c745b912bbf",
+            "type": "blob"
+          },
+          "path": "lampOS/crates/control/tests/door.rs"
+        },
+        {
+          "actual": {
+            "mode": "100644",
+            "sha": "e4f050ed4d61baaae2c70328429a89229077b085",
+            "type": "blob"
+          },
+          "authored": null,
+          "path": "lampOS/crates/control/tests/event_schema.rs"
+        },
+        {
+          "actual": {
+            "mode": "100644",
+            "sha": "e2c1051cb77b0ca0a2dd5a0b0e06d9c046f7cb15",
+            "type": "blob"
+          },
+          "authored": {
+            "mode": "100644",
+            "sha": "9086f964d30be7c721d2110e28bf37b3e223653e",
+            "type": "blob"
+          },
+          "path": "lampOS/crates/eyes/src/yawn.rs"
+        },
+        {
+          "actual": {
+            "mode": "100644",
+            "sha": "484c5316dbed9436c851f1849edc8af76bcd8f20",
+            "type": "blob"
+          },
+          "authored": {
+            "mode": "100644",
+            "sha": "442a561811aff2257c1b910bf6007c0ef6564738",
+            "type": "blob"
+          },
+          "path": "lampOS/crates/voice/src/coordinator.rs"
+        },
+        {
+          "actual": {
+            "mode": "100644",
+            "sha": "9ed0d56f0fba99cc5eca74ea6cb2f7046b977203",
+            "type": "blob"
+          },
+          "authored": {
+            "mode": "100644",
+            "sha": "0287f0cfc5a09136122d3927646e60f35c22a4bb",
+            "type": "blob"
+          },
+          "path": "lampOS/crates/voice/src/known_faces.rs"
+        },
+        {
+          "actual": {
+            "mode": "100644",
+            "sha": "bb924518301e324ebc1d22fd1407854b09406501",
+            "type": "blob"
+          },
+          "authored": {
+            "mode": "100644",
+            "sha": "97bb12a8560eea027f19830c35b3daf4abf940d1",
+            "type": "blob"
+          },
+          "path": "lampOS/crates/voice/src/lib.rs"
+        },
+        {
+          "actual": {
+            "mode": "100644",
+            "sha": "0d922ac8414f16ee7d45fd94963617e91c534d57",
+            "type": "blob"
+          },
+          "authored": {
+            "mode": "100644",
+            "sha": "36366150666b6a92f1c890181d6b9ef04ce19f6b",
+            "type": "blob"
+          },
+          "path": "lampOS/crates/voice/src/memory_scope.rs"
+        },
+        {
+          "actual": {
+            "mode": "100644",
+            "sha": "76a00a120948180fdceba6f04f58749115f6ada0",
+            "type": "blob"
+          },
+          "authored": {
+            "mode": "100644",
+            "sha": "39840a5941bf5ac67863535cc18bd5aac7ea68f5",
+            "type": "blob"
+          },
+          "path": "lampOS/crates/voice/src/policy_holds.rs"
+        },
+        {
+          "actual": {
+            "mode": "100644",
+            "sha": "1f0d8464626de61ff30f0c91dad6ac4920a27be8",
+            "type": "blob"
+          },
+          "authored": {
+            "mode": "100644",
+            "sha": "d69d9d21bd3ea8e8e9157bdfc53e4741d10315ff",
+            "type": "blob"
+          },
+          "path": "lampOS/crates/voice/src/provider_worker.rs"
+        },
+        {
+          "actual": {
+            "mode": "100644",
+            "sha": "588c2a5cf2eb38566803816795c89d84aa2651f8",
+            "type": "blob"
+          },
+          "authored": {
+            "mode": "100644",
+            "sha": "876651f8930411f0ab80c1cd997804bf5f7c249c",
+            "type": "blob"
+          },
+          "path": "lampOS/crates/voice/src/provider_worker/tests/going_on_asks.rs"
+        },
+        {
+          "actual": {
+            "mode": "100644",
+            "sha": "b1e1b56fbcfe49c50050188d3408492f8043f8f2",
+            "type": "blob"
+          },
+          "authored": {
+            "mode": "100644",
+            "sha": "7b409c183bc25ae14d7cc80bdc453a1bb0f9e578",
+            "type": "blob"
+          },
+          "path": "lampOS/crates/voice/src/remember.rs"
+        },
+        {
+          "actual": {
+            "mode": "100644",
+            "sha": "ef40de58ab1ad39e413ed42b6d986af734e226f9",
+            "type": "blob"
+          },
+          "authored": {
+            "mode": "100644",
+            "sha": "29a865ce0a2c4de543131bdce0b37f1ffe805757",
+            "type": "blob"
+          },
+          "path": "lampOS/crates/voice/src/second_provider.rs"
+        },
+        {
+          "actual": {
+            "mode": "100644",
+            "sha": "adb765f7e6c8fd3673cff2a0b81daccd90025b3a",
+            "type": "blob"
+          },
+          "authored": {
+            "mode": "100644",
+            "sha": "afafceac99e725a6d73bbec78b5939b77c93f2d0",
+            "type": "blob"
+          },
+          "path": "lampOS/crates/voice/src/second_provider/tests/held_forget.rs"
+        },
+        {
+          "actual": {
+            "mode": "100644",
+            "sha": "590bd5843397470cd6012d121e9c7c21337e96f7",
+            "type": "blob"
+          },
+          "authored": {
+            "mode": "100644",
+            "sha": "bc00f8b1d8cc89caf696a283e9c9bcc97e54dd34",
+            "type": "blob"
+          },
+          "path": "lampOS/crates/voice/src/second_provider/worker.rs"
+        },
+        {
+          "actual": {
+            "mode": "100644",
+            "sha": "023d3fb6de1e8ff8ce13445b8b62f1c4efd02759",
+            "type": "blob"
+          },
+          "authored": {
+            "mode": "100644",
+            "sha": "8997838a017e48982fbaf818e92c59751aac1d7b",
+            "type": "blob"
+          },
+          "path": "lampOS/crates/voice/src/tools.rs"
+        },
+        {
+          "actual": {
+            "mode": "100644",
+            "sha": "4290c4b342b62e798c4908537494a7a24115fe07",
+            "type": "blob"
+          },
+          "authored": null,
+          "path": "lampOS/crates/voice/src/turned_away.rs"
+        },
+        {
+          "actual": {
+            "mode": "100644",
+            "sha": "fdde09f16237c9675e0d663bccec825f75dd2392",
+            "type": "blob"
+          },
+          "authored": {
+            "mode": "100644",
+            "sha": "38436bf52cef746e1263921d1720ffe583cc1a4c",
+            "type": "blob"
+          },
+          "path": "lampOS/docs/control.md"
+        },
+        {
+          "actual": {
+            "mode": "100644",
+            "sha": "a2c6732919aae93e7f65dfdf7acc7c4113b5ad97",
+            "type": "blob"
+          },
+          "authored": {
+            "mode": "100644",
+            "sha": "b7c9714ca3676bff5581efa9698c8241ced6f821",
+            "type": "blob"
+          },
+          "path": "lampOS/docs/control.schema.json"
+        },
+        {
+          "actual": {
+            "mode": "100644",
+            "sha": "f14077b9bb34288a4d5b4ee440c66f59bf830043",
+            "type": "blob"
+          },
+          "authored": {
+            "mode": "100644",
+            "sha": "ebd1819985483cb3ec15b689e4725fe528216a54",
+            "type": "blob"
+          },
+          "path": "lampOS/docs/memory.md"
+        },
+        {
+          "actual": {
+            "mode": "100644",
+            "sha": "a1bb441b9ba49750ece626d43dc83de4e1a9b8cd",
+            "type": "blob"
+          },
+          "authored": {
+            "mode": "100644",
+            "sha": "2f05c12aa3924729346b02c17e9ac0ca3ac5ab67",
+            "type": "blob"
+          },
+          "path": "lampOS/docs/second-voice.md"
+        },
+        {
+          "actual": {
+            "mode": "100644",
+            "sha": "ae67abcc8352e4e6929198a80cd5d1148dc4d99b",
+            "type": "blob"
+          },
+          "authored": {
+            "mode": "100644",
+            "sha": "a5081b299e487c24dbd143dafa3870bff44b8128",
+            "type": "blob"
+          },
+          "path": "lampOS/docs/switches.md"
+        },
+        {
+          "actual": {
+            "mode": "100644",
+            "sha": "9a7219a66493252d275395e3e4dabf4fdad0c76b",
+            "type": "blob"
+          },
+          "authored": {
+            "mode": "100644",
+            "sha": "9117c19130996b3848766485d72e63170f8fbb91",
+            "type": "blob"
+          },
+          "path": "lampOS/sdk/js/src/client.js"
+        },
+        {
+          "actual": {
+            "mode": "100644",
+            "sha": "a2c6732919aae93e7f65dfdf7acc7c4113b5ad97",
+            "type": "blob"
+          },
+          "authored": {
+            "mode": "100644",
+            "sha": "b7c9714ca3676bff5581efa9698c8241ced6f821",
+            "type": "blob"
+          },
+          "path": "lampOS/sdk/js/src/control.schema.json"
+        },
+        {
+          "actual": {
+            "mode": "100644",
+            "sha": "d05ec553b5ef3841787a872aad4bd0e8da83ed05",
+            "type": "blob"
+          },
+          "authored": {
+            "mode": "100644",
+            "sha": "d3058af41df63c72facf5604cac94c47fef96068",
+            "type": "blob"
+          },
+          "path": "lampOS/sdk/python/src/lampos/client.py"
+        },
+        {
+          "actual": {
+            "mode": "100644",
+            "sha": "a2c6732919aae93e7f65dfdf7acc7c4113b5ad97",
+            "type": "blob"
+          },
+          "authored": {
+            "mode": "100644",
+            "sha": "b7c9714ca3676bff5581efa9698c8241ced6f821",
+            "type": "blob"
+          },
+          "path": "lampOS/sdk/python/src/lampos/control.schema.json"
+        },
+        {
+          "actual": {
+            "mode": "100755",
+            "sha": "95cf56eae1f1c822bee010cfa159dc944f4b806c",
+            "type": "blob"
+          },
+          "authored": {
+            "mode": "100755",
+            "sha": "9ecc5b5f198d4a4372d029cf971be65fe90c9123",
+            "type": "blob"
+          },
+          "path": "lampOS/tools/played/make-skill-test.sh"
+        },
+        {
+          "actual": {
+            "mode": "100755",
+            "sha": "475e3bf0f050c5be405045614ed4f4313b5466b1",
+            "type": "blob"
+          },
+          "authored": {
+            "mode": "100755",
+            "sha": "8cd16c3381f4aac0413a5aca0a93e8611a22915a",
+            "type": "blob"
+          },
+          "path": "lampOS/tools/played/make-skill.sh"
+        }
+      ],
+      "authored_tree": "79352dd96974e9ce4a91849262bac99d304c9540",
+      "frozen_authored_base": "0d1d1f2b944581169c9f96adba9f40ab88adba92",
+      "log_attribution": "Full checkout SHA logged. Ordered parents/tree are source-API and fetched-Git bound, not invented as logged.",
+      "logged_actual_checkout": "a35e972a436a7a63872f794bf38eeeb994856e67",
+      "ordered_parents_API_and_fetched_Git": [
+        "3aa752f73914d0f29fc90edb010a3a7fa1cf526b",
+        "4d786be864a2a7a83ed4d48de12a6de12c3c620e"
+      ],
+      "whole_authored_tree_equal": false
+    },
+    "standing_holds": [
+      "PR3646 remains DRAFT behind broker prerequisite2094.",
+      "Authored308 serial pass and this actual-preview native result do not repair or waive #3890 parallel THREAD report.",
+      "Original539 Reader failure remains unexplained/unwaived even though the current row passes.",
+      "No physical/device/provider/key activation/latency acceptance granted."
+    ],
+    "status": "ORIGINAL_NATIVE_GATES_PASSED_INTEGRATION_PREVIEW_ONLY",
+    "supplemental_IPC_separate": {
+      "cases": [
+        {
+          "name": "one_revocation_closes_two_independently_transferred_observers",
+          "once_PASS": true,
+          "rows": [
+            {
+              "binary": "lamp-ipc::camera_authority",
+              "duration": "0.004s",
+              "line": 4083,
+              "name": "one_revocation_closes_two_independently_transferred_observers",
+              "ordinal": 3228,
+              "status": "PASS",
+              "total": 11790
+            }
+          ]
+        },
+        {
+          "name": "dropping_one_client_does_not_shutdown_the_shared_endpoint",
+          "once_PASS": true,
+          "rows": [
+            {
+              "binary": "lamp-ipc::camera_authority",
+              "duration": "0.003s",
+              "line": 4078,
+              "name": "dropping_one_client_does_not_shutdown_the_shared_endpoint",
+              "ordinal": 3223,
+              "status": "PASS",
+              "total": 11790
+            }
+          ]
+        },
+        {
+          "name": "old_ticket_never_revives_with_a_new_hold",
+          "once_PASS": true,
+          "rows": [
+            {
+              "binary": "lamp-ipc::camera_authority",
+              "duration": "0.004s",
+              "line": 4082,
+              "name": "old_ticket_never_revives_with_a_new_hold",
+              "ordinal": 3227,
+              "status": "PASS",
+              "total": 11790
+            }
+          ]
+        },
+        {
+          "name": "revoke_before_grant_refuses_and_pinned_arc_does_not_delay_explicit_revoke",
+          "once_PASS": true,
+          "rows": [
+            {
+              "binary": "lamp-ipc::camera_authority",
+              "duration": "0.004s",
+              "line": 4086,
+              "name": "revoke_before_grant_refuses_and_pinned_arc_does_not_delay_explicit_revoke",
+              "ordinal": 3231,
+              "status": "PASS",
+              "total": 11790
+            }
+          ]
+        },
+        {
+          "name": "revoke_during_prepared_grant_transfers_only_a_terminal_observer",
+          "once_PASS": true,
+          "rows": [
+            {
+              "binary": "lamp-ipc::camera_authority",
+              "duration": "0.004s",
+              "line": 4087,
+              "name": "revoke_during_prepared_grant_transfers_only_a_terminal_observer",
+              "ordinal": 3232,
+              "status": "PASS",
+              "total": 11790
+            }
+          ]
+        },
+        {
+          "name": "witness_drop_revokes_even_when_a_prepared_grant_keeps_an_observer",
+          "once_PASS": true,
+          "rows": [
+            {
+              "binary": "lamp-ipc::camera_authority",
+              "duration": "0.004s",
+              "line": 4091,
+              "name": "witness_drop_revokes_even_when_a_prepared_grant_keeps_an_observer",
+              "ordinal": 3236,
+              "status": "PASS",
+              "total": 11790
+            }
+          ]
+        },
+        {
+          "name": "incremental_frame_retains_fd_until_exact_frame_and_control_eof",
+          "once_PASS": true,
+          "rows": [
+            {
+              "binary": "lamp-ipc::camera_authority",
+              "duration": "0.004s",
+              "line": 4080,
+              "name": "incremental_frame_retains_fd_until_exact_frame_and_control_eof",
+              "ordinal": 3225,
+              "status": "PASS",
+              "total": 11790
+            }
+          ]
+        },
+        {
+          "name": "wrong_binding_magic_reserved_size_and_trailing_bytes_refuse_and_close_rights",
+          "once_PASS": true,
+          "rows": [
+            {
+              "binary": "lamp-ipc::camera_authority",
+              "duration": "0.004s",
+              "line": 4092,
+              "name": "wrong_binding_magic_reserved_size_and_trailing_bytes_refuse_and_close_rights",
+              "ordinal": 3237,
+              "status": "PASS",
+              "total": 11790
+            }
+          ]
+        },
+        {
+          "name": "missing_extra_and_truncated_rights_refuse_without_leaking_descriptors",
+          "once_PASS": true,
+          "rows": [
+            {
+              "binary": "lamp-ipc::camera_authority",
+              "duration": "0.004s",
+              "line": 4081,
+              "name": "missing_extra_and_truncated_rights_refuse_without_leaking_descriptors",
+              "ordinal": 3226,
+              "status": "PASS",
+              "total": 11790
+            }
+          ]
+        },
+        {
+          "name": "wrong_fd_kinds_and_unconnected_stream_refuse",
+          "once_PASS": true,
+          "rows": [
+            {
+              "binary": "lamp-ipc::camera_authority",
+              "duration": "0.004s",
+              "line": 4093,
+              "name": "wrong_fd_kinds_and_unconnected_stream_refuse",
+              "ordinal": 3238,
+              "status": "PASS",
+              "total": 11790
+            }
+          ]
+        },
+        {
+          "name": "cancellation_drops_a_retained_partial_frame_fd",
+          "once_PASS": true,
+          "rows": [
+            {
+              "binary": "lamp-ipc::camera_authority",
+              "duration": "0.004s",
+              "line": 4075,
+              "name": "cancellation_drops_a_retained_partial_frame_fd",
+              "ordinal": 3220,
+              "status": "PASS",
+              "total": 11790
+            }
+          ]
+        },
+        {
+          "name": "deadline_does_not_renew_while_waiting_for_reply",
+          "once_PASS": true,
+          "rows": [
+            {
+              "binary": "lamp-ipc::camera_authority",
+              "duration": "0.004s",
+              "line": 4077,
+              "name": "deadline_does_not_renew_while_waiting_for_reply",
+              "ordinal": 3222,
+              "status": "PASS",
+              "total": 11790
+            }
+          ]
+        },
+        {
+          "name": "unexpected_data_never_disappears_between_observers",
+          "once_PASS": true,
+          "rows": [
+            {
+              "binary": "lamp-ipc::camera_authority",
+              "duration": "0.003s",
+              "line": 4089,
+              "name": "unexpected_data_never_disappears_between_observers",
+              "ordinal": 3234,
+              "status": "PASS",
+              "total": 11790
+            }
+          ]
+        },
+        {
+          "name": "token_refuses_empty_incarnation_zero_hold_and_wraparound",
+          "once_PASS": true,
+          "rows": [
+            {
+              "binary": "lamp-ipc::camera_authority",
+              "duration": "0.003s",
+              "line": 4088,
+              "name": "token_refuses_empty_incarnation_zero_hold_and_wraparound",
+              "ordinal": 3233,
+              "status": "PASS",
+              "total": 11790
+            }
+          ]
+        },
+        {
+          "name": "completed_frame_with_closed_or_nonsilent_observer_never_exposes_ready",
+          "once_PASS": true,
+          "rows": [
+            {
+              "binary": "lamp-ipc::camera_authority",
+              "duration": "0.004s",
+              "line": 4076,
+              "name": "completed_frame_with_closed_or_nonsilent_observer_never_exposes_ready",
+              "ordinal": 3221,
+              "status": "PASS",
+              "total": 11790
+            }
+          ]
+        },
+        {
+          "name": "full_control_socket_keeps_grant_pending_until_its_original_deadline",
+          "once_PASS": true,
+          "rows": [
+            {
+              "binary": "lamp-ipc::camera_authority",
+              "duration": "1.004s",
+              "line": 4085,
+              "name": "full_control_socket_keeps_grant_pending_until_its_original_deadline",
+              "ordinal": 3230,
+              "status": "PASS",
+              "total": 11790
+            }
+          ]
+        },
+        {
+          "name": "partial_receive_deadline_immediately_closes_retained_rights",
+          "once_PASS": true,
+          "rows": [
+            {
+              "binary": "lamp-ipc::camera_authority",
+              "duration": "1.004s",
+              "line": 4090,
+              "name": "partial_receive_deadline_immediately_closes_retained_rights",
+              "ordinal": 3235,
+              "status": "PASS",
+              "total": 11790
+            }
+          ]
+        },
+        {
+          "name": "full_control_recovers_one_grant_after_exact_drain_without_renewing_deadline",
+          "once_PASS": true,
+          "rows": [
+            {
+              "binary": "lamp-ipc::camera_authority",
+              "duration": "0.004s",
+              "line": 4079,
+              "name": "full_control_recovers_one_grant_after_exact_drain_without_renewing_deadline",
+              "ordinal": 3224,
+              "status": "PASS",
+              "total": 11790
+            }
+          ]
+        }
+      ],
+      "once_PASS": 18,
+      "required": 18,
+      "selected": true
+    }
+  },
+  "summary": {
+    "IPC_once_PASS": 18,
+    "actual_checkout": "a35e972a436a7a63872f794bf38eeeb994856e67",
+    "actual_preview_tree": "2134de8d94f121ce3ebf866684cc0d1421af89e1",
+    "attempt_and_stderr": {
+      "nextest_execution_phase_retry_failure_word_markers": 0,
+      "nextest_failure_attempt_events": 0,
+      "observed_status_events": 11790,
+      "prefix_counts": {
+        "PASS": 11790
+      },
+      "raw_complete_logs_retained": true,
+      "scope": "Zero observed actual-nextest retry/failure status markers is not a disabled-policy assumption or zero-stderr claim. All stdout/stderr sections remain in unchanged original complete text logs.",
+      "stderr_heading_count_whole_job": 21,
+      "stderr_headings_by_context": {
+        "nextest post-summary rendered-output context": 21
+      },
+      "stderr_indices_names_hashes_only_sha256": "7f3dec08ff9d884dea3a3b4fe70de479fb38688686cfe8292fe93980cd7205bb",
+      "workflow_automatic_retry_observed": false
+    },
+    "bad_statuses": 0,
+    "custom_harness": {
+      "process13_0": true,
+      "relay_signals_ok": true
+    },
+    "docs": {
+      "failed": 0,
+      "headings": 47,
+      "ignored": 0,
+      "incomplete_group": null,
+      "interleaved_groups": [],
+      "passed": 4,
+      "step_conclusion": "success",
+      "summaries": 47
+    },
+    "exact_OwnKeys_payloads": {
+      "LAMP_OWN_KEYS_on_preserved": true,
+      "added_environment_names": [],
+      "all_authored_added_unit_payload_lines_retained_exact_in_order": true,
+      "all_parsed_environment_deltas_match_Main": true,
+      "authored_LAMP_OWN_KEYS": "on",
+      "authored_OwnKeys_row_count": 1,
+      "authored_OwnKeys_row_sha256": "c203f2cbd3c1c3db32f124e41df4ae4ece206794ea9c66165b24691deb0b0b20",
+      "authored_net_added_unit_payload_lines": 9,
+      "authored_unit_payload_sha256": "2caf8805b7a46aecdc6a2576d32950fb727046054b65427b898d309af249ce18",
+      "exact_OwnKeys_row_equal": true,
+      "existing_value_changed_environment_names": [],
+      "preview_LAMP_OWN_KEYS": "on",
+      "preview_OwnKeys_row_count": 1,
+      "removed_environment_names": [],
+      "switches_path": "lampOS/docs/switches.md",
+      "unit_path": "lampOS/deploy/product/lamp-voice.service",
+      "unit_whole_file_equal": true
+    },
+    "exact_reprints": 35,
+    "historical_f43_stderr_correction_note_sha256": "d8c46f30fb40e0714ee5b4fffc4522adf191520d9eb7ec6299873cfd30f9f224",
+    "ordered_parents": [
+      "3aa752f73914d0f29fc90edb010a3a7fa1cf526b",
+      "4d786be864a2a7a83ed4d48de12a6de12c3c620e"
+    ],
+    "private_host_partition": {
+      "actual_executable_paths": 35,
+      "depinfo_file_paths": 35,
+      "private_runtime_helper_pin_count": 30,
+      "saved_executable_paths": 35,
+      "scope": "Host-only private helper/dep-info/artifact evidence counts; none mapped to or claimed as preview Git source entries. Raw physical source guard metadata remains host-only too."
+    },
+    "qualified_source_partition": {
+      "blob_and_mode_equal": 7517,
+      "committed_absent_in_preview": 0,
+      "committed_present_in_preview": 7550,
+      "qualified_guarded_source_paths_total": 7550,
+      "scope": "Metadata comparison of guarded source inventory; not all paths claimed consumed by selected308. Only committed source paths are preview Git entries; no private raw/helper/dep-info target inputs are included.",
+      "total": 7550,
+      "uncommitted_or_unmatched_count": 0
+    },
+    "receipt_sha256": "179bdb7b32fc7468f82313524bae69c69ba4ba5be7d93e460e6c3ee7d77ce899",
+    "required": {
+      "Linux_once_PASS": 8,
+      "Linux_required": 8,
+      "active_required": 316,
+      "host_once_PASS": 308,
+      "host_required": 308,
+      "once_PASS": 316,
+      "ownLinux6_once_PASS": 6,
+      "own_once_PASS": 71,
+      "own_required": 71,
+      "required_selected_missing_or_nonpass": 0,
+      "upstreamBodyLinux2_once_PASS": 2
+    },
+    "runs": {
+      "arm": {
+        "job_conclusion": "success",
+        "job_id": 122352559434,
+        "run_attempt": 1,
+        "run_id": 40550488846,
+        "shard_scope": "1/1",
+        "workflow_aggregate_conclusion": "success"
+      },
+      "linux": {
+        "job_conclusion": "success",
+        "job_id": 122352562229,
+        "run_attempt": 1,
+        "run_id": 40550489392,
+        "shard_scope": "single observed required Linux job",
+        "workflow_aggregate_conclusion": "success"
+      }
+    },
+    "source_equality": {
+      "Linux_cfg_bound": 8,
+      "control_declaration_files": 60,
+      "control_files_blob_mode_equal": 58,
+      "helper_wholefile_runtime_equivalence_inferred": false,
+      "owned38_blob_mode_equal": 37,
+      "required_changed_file_raw_function_bodies_equal": 15,
+      "required_declarations_present": 316,
+      "required_function_bodies_equal_or_equal_file_bytes": 316,
+      "required_functions_in_changed_files": 15
+    },
+    "standing_holds": [
+      "PR3646 remains DRAFT behind broker prerequisite2094.",
+      "Authored308 serial pass and this actual-preview native result do not repair or waive #3890 parallel THREAD report.",
+      "Original539 Reader failure remains unexplained/unwaived even though the current row passes.",
+      "No physical/device/provider/key activation/latency acceptance granted."
+    ],
+    "status": "ORIGINAL_NATIVE_GATES_PASSED_INTEGRATION_PREVIEW_ONLY",
+    "summary_skips": 106,
+    "unique_nextest_PASS": 11790,
+    "whole_authored_tree_equal": false
+  }
+}

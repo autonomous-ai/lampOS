@@ -1,0 +1,32 @@
+{
+  "corrected_case_insensitive_stderr_marker_count": 21,
+  "historical_epoch": "f43 native original ARM40539307194",
+  "historical_raw_log_sha256": "0e780d417d76d59634f1da9ba955e36a629035188c42c5f25ef30c24169044dc",
+  "marker_lines": [
+    12605,
+    12621,
+    12647,
+    12662,
+    12684,
+    12709,
+    12744,
+    12757,
+    12769,
+    12781,
+    12792,
+    12804,
+    12815,
+    12827,
+    12839,
+    12850,
+    12861,
+    12872,
+    12884,
+    12898,
+    13001
+  ],
+  "native_PASS_failure_retry_source_counts_unchanged": true,
+  "old_raw_logs_and_receipt_not_modified": true,
+  "prior_marker_predicate_limit": "Old inventory matched uppercase STDERR or separator-first headings; it missed lowercase stderr followed by Unicode separator.",
+  "scope": "Metadata marker-count correction only; all original raw stderr was preserved. No old539 explanation/waiver or native rerun."
+}
