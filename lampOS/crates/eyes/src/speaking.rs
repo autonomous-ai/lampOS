@@ -45,7 +45,11 @@ pub const WINDOW_US: u64 = 2_000_000;
 /// The looks a window needs before it says anything.
 pub const LEAST_LOOKS: usize = 5;
 /// Eyes closer than this, in the detector's pixels, have mouth corners whose
-/// jitter is as large as the lips' movement.
+/// jitter is as large as the lips' movement. A window the mesh read on every
+/// look counts it in the pixels the mesh saw ([`Mouths::set_mesh_scale`]):
+/// with `--full-look` the frame at its own size, four times the detector's
+/// at 1280 by 960, so a face seated at the desk (eyes about 20 detector
+/// pixels apart, `unknown (small)` on every look before) is read.
 pub const LEAST_EYES_PX: f32 = 24.0;
 /// A face turned further than this hides one corner behind the other.
 pub const MOST_TURN_DEG: f32 = 30.0;
@@ -91,9 +95,10 @@ pub fn shape(marks: &[(f32, f32); 5]) -> Option<(f32, f32, f32)> {
 
 #[derive(Debug)]
 struct Mouth {
-    /// When, the shape, the eye distance in pixels, the eye line's angle
-    /// and the mesh's `mouth_open`, if it was read.
-    looks: VecDeque<(u64, f32, f32, f32, Option<f32>)>,
+    /// When, the shape, the eye distance in pixels, the eye line's angle,
+    /// the mesh's `mouth_open`, if it was read, and the eye distance in the
+    /// pixels the mesh saw (the detector's when it was not read).
+    looks: VecDeque<(u64, f32, f32, f32, Option<f32>, f32)>,
     /// The eye line's squared bend, averaged over this face's looks (about
     /// the last ten): its jitter at rest, steadier than one window's.
     rest: Option<f32>,
@@ -105,6 +110,8 @@ pub struct Mouths {
     faces: HashMap<u32, Mouth>,
     /// [`OUTLIER_ENVIRONMENT`].
     drop_outliers: bool,
+    /// [`Mouths::set_mesh_scale`]; `None` is 1.
+    mesh_scale: Option<f32>,
 }
 
 const UNKNOWN: Speaking = Speaking {
@@ -134,7 +141,10 @@ pub enum Reason {
 /// Numeric, ephemeral diagnostics only: no face id, marks, image or name.
 #[derive(Clone, Debug, Serialize)]
 pub struct MouthDiagnostic {
+    /// This look's, in the detector's pixels.
     pub eyes_px: Option<f32>,
+    /// What [`LEAST_EYES_PX`] was held to: in the mesh's pixels for a window
+    /// meshed on every look, else the detector's.
     pub window_mean_eyes_px: Option<f32>,
     pub window_looks: Option<usize>,
     pub window_span_us: Option<u64>,
@@ -150,6 +160,15 @@ pub struct MouthDiagnostic {
 }
 
 impl Mouths {
+    /// The frame's pixels the mesh read this look's mouths from, per
+    /// detector pixel: 1 (as without it) unless the mouth is cut from the
+    /// frame at its own size (`--full-look`, `mesh::crop_full`), then the
+    /// frame's width over the picture's. Set once a look, before its faces
+    /// are judged.
+    pub fn set_mesh_scale(&mut self, scale: f32) {
+        self.mesh_scale = Some(scale);
+    }
+
     /// This look of the face `id`: its marks in the detector's pixels, how
     /// far it is turned, in degrees, if that was measured, and how open the
     /// mesh read its mouth, if it was read ([`MESH_SPEAKING_AT`]).
@@ -214,7 +233,10 @@ impl Mouths {
             looks: VecDeque::new(),
             rest: None,
         });
-        mouth.looks.push_back((now_us, shape, eyes, angle, open));
+        let mesh_eyes = open.map_or(eyes, |_| eyes * self.mesh_scale.unwrap_or(1.0));
+        mouth
+            .looks
+            .push_back((now_us, shape, eyes, angle, open, mesh_eyes));
         while mouth
             .looks
             .front()
@@ -244,7 +266,15 @@ impl Mouths {
         let looks: Vec<_> = kept.iter().flatten().copied().collect();
         let outliers = mouth.looks.len() - looks.len();
         let turned = turn_deg.is_none_or(|degrees| degrees > MOST_TURN_DEG);
-        let mean_eyes = looks.iter().map(|look| look.2).sum::<f32>() / (looks.len().max(1) as f32);
+        // A window the mesh read on every look is judged by the mesh, so
+        // its eyes are counted in the pixels the mesh saw; any other, by the
+        // corners, in the detector's.
+        let all_meshed = looks.iter().all(|look| look.4.is_some());
+        let mean_eyes = looks
+            .iter()
+            .map(|look| if all_meshed { look.5 } else { look.2 })
+            .sum::<f32>()
+            / (looks.len().max(1) as f32);
         let small = mean_eyes < LEAST_EYES_PX;
         if let Some(detail) = diagnostic.as_deref_mut() {
             detail.eyes_px = Some(eyes);
@@ -312,7 +342,7 @@ impl Mouths {
         mouth.rest = Some(rest);
         // The mesh read every look of the window: its inner lips, not the
         // corners, and its own steadiness is not the eye line's.
-        if looks.iter().all(|look| look.4.is_some()) {
+        if all_meshed {
             if let Some(detail) = diagnostic {
                 detail.reason = Reason::Mesh;
             }
@@ -807,6 +837,51 @@ mod diagnostic_tests {
                 assert!(detail.jitter_rad.unwrap() > MOST_JITTER);
             }
         }
+    }
+
+    /// A face seated at the desk in a 1280 by 960 frame (#3126's lamp-52e6):
+    /// its box 0.22 of the height, 53 of the picture's 240 rows, its eyes
+    /// about 21 picture pixels apart. Meshed from the picture it is `small`
+    /// on every look; meshed from the frame at its own size (four of its
+    /// pixels a picture pixel) it is read, and a talking mouth is `yes`. A
+    /// window the mesh missed a look of stays on the detector's pixels.
+    #[test]
+    fn a_seated_face_meshed_from_the_full_frame_passes_the_eye_distance_gate() {
+        let tall = 0.22 * 240.0;
+        let eyes = 0.4 * tall;
+        assert!(
+            eyes < LEAST_EYES_PX && eyes * 4.0 >= LEAST_EYES_PX,
+            "{eyes}"
+        );
+        let run = |scale: Option<f32>, missed: Option<u64>| {
+            let mut judge = Mouths::default();
+            if let Some(scale) = scale {
+                judge.set_mesh_scale(scale);
+            }
+            let mut last = None;
+            for look in 0..6u64 {
+                let open = (Some(look) != missed).then_some(0.04 * (look % 2) as f32);
+                last = Some(judge.judge_with_diagnostics(
+                    1,
+                    &marks(eyes, 0.0),
+                    Some(0.0),
+                    open,
+                    look * 250_000,
+                ));
+            }
+            last.unwrap()
+        };
+        for scale in [None, Some(1.0)] {
+            let (said, detail) = run(scale, None);
+            assert_eq!((said, detail.reason), (UNKNOWN, Reason::Small));
+        }
+        let (said, detail) = run(Some(1_280.0 / 320.0), None);
+        assert_eq!(detail.reason, Reason::Mesh);
+        assert_eq!(said.state, SpeakingState::Yes);
+        assert_eq!(detail.eyes_px, Some(eyes));
+        assert!((detail.window_mean_eyes_px.unwrap() - 4.0 * eyes).abs() < 1e-3);
+        let (said, detail) = run(Some(4.0), Some(3));
+        assert_eq!((said, detail.reason), (UNKNOWN, Reason::Small));
     }
 
     #[test]

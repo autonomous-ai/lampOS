@@ -583,6 +583,14 @@ impl BusOut {
         Ok(())
     }
 
+    /// The frame's pixels this look's mouths were meshed from, per
+    /// detector pixel (`speaking::Mouths::set_mesh_scale`).
+    pub fn set_mesh_scale(&mut self, scale: f32) {
+        if let Some(mouths) = self.ids.mouths.as_mut() {
+            mouths.set_mesh_scale(scale);
+        }
+    }
+
     /// One look: what the detector found in it.
     pub fn saw(
         &mut self,
