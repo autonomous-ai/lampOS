@@ -3458,7 +3458,14 @@ after a take-over, but now for every turn:
   restart a reused `f1` is not the known person's (Second's P1 on #3437),
   else the room's: `request
   N: no face was seen speaking it (LAMP_PERSON_SCOPE_SEEN): told and kept as
-  the room's`. Every person scope taken from a line reads the lease this
+  the room's`. A face seen speaking it gets one line too, by passing id
+  only, never a name or the words (`speaking_faces::seen_speaking_note`):
+  `request N: seen speaking it: the known person's face (id K): told and
+  kept as theirs`, `request N: seen speaking it: a face not the known
+  person's (id F): told and kept as the room's`, or with more than one,
+  `request N: seen speaking it: 2 faces (ids F, K): told and kept as the
+  room's`, so with two faces in view the journal says which one a line
+  went to (#3699). Every person scope taken from a line reads the lease this
   narrows (`remember::forget_everything` and `forget_face_memory`, the
   thread's exchanges, `tools.rs`' `keeper_within` and `run_scoped_for`), and
   a narrowed lease never widens (`ScopeLease::late_open`). Risk: an owner
