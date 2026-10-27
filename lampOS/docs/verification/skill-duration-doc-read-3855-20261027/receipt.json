@@ -1,0 +1,50 @@
+{
+  "pr": 3855,
+  "head": "b96e6889f137debcb790273856d7f2e3c10c5e0e",
+  "base": "992303fc8d72322bab46cdb18801c853ea43bb81",
+  "tree": "af041f47d382ec160ea6f242542a5454a81f7fc5",
+  "scope": "Six added prose lines in docs/skill-format.md only",
+  "diff_check": 0,
+  "findings": "No P1/P2/P3 found in these added lines",
+  "source": [
+    {
+      "path": "lampOS/crates/control/src/protocol.rs",
+      "blob": "86f5bf08ae42037c75ea47158433f50c2b4cac5c",
+      "unchanged_from_base": true
+    },
+    {
+      "path": "lampOS/crates/skills/src/lib.rs",
+      "blob": "9b2116d7246f4e7c66c57afa4195c445fa3c099f",
+      "unchanged_from_base": true
+    },
+    {
+      "path": "lampOS/crates/skills/tests/it/format.rs",
+      "blob": "8e7c0f3ab84f1ed4e6adfb871b9a27bac184d277",
+      "unchanged_from_base": true
+    },
+    {
+      "path": "lampOS/docs/skill-format.schema.json",
+      "blob": "bc7d5602b82b02fe4fe720e33669c5e7e3044476",
+      "unchanged_from_base": true
+    },
+    {
+      "path": "lampOS/docs/control.md",
+      "blob": "d3ac1c4c4447ea2bcc5bf443774e0622b5d8871e",
+      "unchanged_from_base": true
+    }
+  ],
+  "conclusions": [
+    "Express requires Body and Light; the format table correctly has no direct action equivalent and references the feelings skill.",
+    "Relative and ordinary skill light for values reject durations above 600000000 microseconds; protocol Light validates for_ms with the 30000 millisecond bound.",
+    "Existing protocol/control page agrees; docs now distinguish lamp-owned rule duration from renewable own-computer requests."
+  ],
+  "verification": [
+    "git diff --check",
+    "git diff --name-only and --numstat",
+    "Source inspection of Op::needs, Light validate, held_for, skills::light_call, protocol page and unchanged format/schema inputs"
+  ],
+  "limits": [
+    "Prose-only source review; no local Cargo/format runtime rerun, new tests, native CI, lamp execution, expiry timing or physical behavior acceptance.",
+    "Author reported format3/0 separately; not counted as Third runtime execution."
+  ]
+}

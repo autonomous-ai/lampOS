@@ -1,0 +1,45 @@
+{
+  "PR_state_before_post": "OPEN",
+  "claim_comment": "https://github.com/autonomous-ai/lampOS/pull/3851#issuecomment-6443978004",
+  "deletions": 2,
+  "diff_check": 0,
+  "doc_mode": "100644",
+  "hashes": {
+    "claim-body.txt": "4ee4b94de3ce472c4eb2c6db55cd735d3871f67ccfd41d14e41991b7e5b22f8a",
+    "claim-post.json": "c352d93f02fcc268cf9270c80a8ad72c89988e322151b5ffe6611a25023bbc6c",
+    "complete-doc.patch": "7450059d2724e841c4a87b6755ee6428b4b90d8df3a1ea8342742bb03d4001c7",
+    "current097-proof.json": "bb5a26c588c3025538d0e830758957fe1a535a6b9e10e8ac01b379d66c936938",
+    "initial-proof.json": "6d74b90bb546eae719bd34552d580a45e6f28cb4219ffd9865cbb268680bb109",
+    "initial-readme.txt": "87c855bebb8b86ea41f5c51b9441840490ac98fd8f3ac90d670b9a1b171081ed",
+    "integration-proof.json": "c6e0df88aa545193b62bf2a7efd9002d492eadf152132665a188073cfee2ad3a",
+    "integration-readme.txt": "3f46b3448104ed7c457cdc5f577974b8e5ea8b1afb0ce6398d4e01f72948e0f6",
+    "pr-before-readok.json": "cf98f2150ab3022359cba5163a0021918a10efb3a928279914d44619d6f3861a",
+    "pr-initial.json": "1f9cc30156a825d95e21c715ae732c2d24eeeaaddc2ed170894bb6d741d21366",
+    "preferred-054.json": "f9161b2c7e321471ae8c47838e1c36c458f02c32fe9b2e85effec6148e809d27"
+  },
+  "head": "5fdc61e2a647ad3c8e9097e38de4e33ebd89d9cc",
+  "historical_Intel_heading_unchanged": true,
+  "host_evidence_scope": {
+    "Apple_Silicon_architecture": "Corroborated by published original Darwin/arm64 receipt proof and author preserved-header audit.",
+    "all48_raw_header_reverification": false,
+    "exact_OS_point_release_and_target_triple": "Current author firsthand PR documentation identifies macOS26.6.2/aarch64-apple-darwin/Rust1.96.0; no new host execution performed.",
+    "raw_preserved_headers_locally_available": false,
+    "reason": "No Second/receipt worktree available locally; published text provenance checked without downloading binaries. Author private48-header audit remains separately attributed."
+  },
+  "insertions": 5,
+  "limits": [
+    "Narrow prose/source review only; no Cargo/Rust/Nextest/native/device rerun or full CI watcher.",
+    "No code/default/helper change, historical Intel result relabeling or runtime qualification transfer.",
+    "No product edits or branch/log commits; Root owns evidence publication."
+  ],
+  "one_path": "lampOS/docs/updates.md",
+  "parent": "992303fc8d72322bab46cdb18801c853ea43bb81",
+  "published_original_host": {
+    "architecture": "arm64",
+    "os": "Darwin"
+  },
+  "published_toolchain_evidence": "Initial-e362 README records cargo +1.96.0 commands and exact original receipt counts.",
+  "receipt_Rust_blobs_modes_equal_parent": true,
+  "result": "SCOPED_DOCS_READ_OK",
+  "result_counts_source_labels_and_limits_unchanged": true
+}
