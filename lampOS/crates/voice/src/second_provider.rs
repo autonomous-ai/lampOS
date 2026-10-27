@@ -4627,16 +4627,21 @@ async fn spoken(
             Some((eyes, known)) => {
                 let (speakers, pair) =
                     line_sight(eyes, known, begun, finishing, shared.scope_seen).await;
-                crate::speaking_faces::not_theirs(&speakers, &person, pair, shared.scope_seen)
-                    .then_some(if speakers.is_empty() {
-                        "no face was seen speaking it (LAMP_PERSON_SCOPE_SEEN)"
-                    } else {
-                        "a face not the known person's was seen speaking it"
-                    })
+                let theirs =
+                    !crate::speaking_faces::not_theirs(&speakers, &person, pair, shared.scope_seen);
+                let note = crate::speaking_faces::seen_speaking_note(&speakers, theirs);
+                // Kept as theirs: one line saying whose face it was, so a
+                // journal with two faces in view tells which one it went to.
+                if theirs && let Some(note) = &note {
+                    eprintln!(
+                        "lamp-voice second: request {request}: {note}: told and kept as theirs"
+                    );
+                }
+                note.filter(|_| !theirs)
             }
             None => shared
                 .scope_seen
-                .then_some("no eyes read who spoke it (LAMP_PERSON_SCOPE_SEEN)"),
+                .then(|| "no eyes read who spoke it (LAMP_PERSON_SCOPE_SEEN)".to_owned()),
         }
     {
         scope.narrow_to_room();
