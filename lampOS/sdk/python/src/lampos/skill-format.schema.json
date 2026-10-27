@@ -776,6 +776,23 @@
             }
           }
         },
+        "follows": {
+          "description": "Holds only within `within` (10s to 1h) after another of the skill's triggers, named by `trigger`, ran, once for each of its runs (#3694): a word after a nudge. Needs `rearm` or `when = \"appears\"`, on the whole topic.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "trigger",
+            "within"
+          ],
+          "properties": {
+            "trigger": {
+              "type": "string"
+            },
+            "within": {
+              "$ref": "#/$defs/duration"
+            }
+          }
+        },
         "sooner": {
           "description": "A shorter `for` while another topic's field is above a line (#3709); kept only with LAMP_YAWN_SOONER=on. The trigger needs a `for`, and sooner's `for` is shorter.",
           "type": "object",

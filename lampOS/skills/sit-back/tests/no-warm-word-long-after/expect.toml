@@ -1,0 +1,14 @@
+# 11:00, a word at 13, still leaned in until 33: sat back past the quarter of an hour after it, so no warm word.
+clock = "11:00"
+
+[[expect]]
+at = "13m"
+within = "1m"
+call = "body.gaze"
+args = { look_at = "face" }
+
+[[expect]]
+at = "13m"
+within = "1m"
+call = "say"
+args = { note = "They have been leaning in toward the desk for a while. In one short, kind line, the way a friend would, say it might be a good moment to sit back for a bit. Say nothing about their body, back, neck or looks, and nothing about health." }

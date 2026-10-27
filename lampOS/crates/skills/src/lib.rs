@@ -609,6 +609,9 @@ struct TriggerFile {
     yields_to: Option<YieldFile>,
     /// A shorter `for` while another topic's field is above a line (#3709).
     sooner: Option<SoonerFile>,
+    /// Holds only within a while after another of the skill's triggers
+    /// ran, once for each of its runs: a word after a nudge (#3504).
+    follows: Option<FollowsFile>,
 }
 
 /// `sooner = { topic = "room/activity", field = "yawns", above = 0, for = "30m" }`.
@@ -620,6 +623,14 @@ struct SoonerFile {
     above: f64,
     #[serde(rename = "for")]
     lasting: String,
+}
+
+/// `follows = { trigger = "slouch", within = "15m" }`.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct FollowsFile {
+    trigger: String,
+    within: String,
 }
 
 /// `yields_to = { skill = "bedtime-morning", trigger = "morning" }`.
@@ -2135,6 +2146,9 @@ pub struct Trigger {
     /// Its shorter `for` while another topic's field is above a line
     /// ([`SOONER_ENVIRONMENT`], #3709).
     pub sooner: Option<Sooner>,
+    /// Another trigger of the skill, by name, and how long after its run
+    /// this one may hold (#3504, `follows`): once for each of its runs.
+    pub follows: Option<(String, u64)>,
 }
 
 /// A trigger's `sooner` (#3709): while `test` holds on `topic`'s newest
@@ -2767,6 +2781,37 @@ fn trigger(file: TriggerFile) -> Result<Trigger, String> {
             Some((to.skill, to.trigger))
         }
     };
+    // A word after another trigger's run (#3504): once each time it holds,
+    // on the whole topic, and only for a while after that run.
+    let follows = match file.follows {
+        None => None,
+        Some(_)
+            if !(rearm || when == When::Appears)
+                || file.each.is_some()
+                || file.once_per_day
+                || file.unless_heard
+                || yields_to.is_some() =>
+        {
+            return Err(
+                "follows goes with rearm or when = \"appears\", on the whole topic, \
+                 without once_per_day, unless_heard or yields_to"
+                    .into(),
+            );
+        }
+        Some(follows) => {
+            if !plain_name(&follows.trigger) || follows.trigger.contains('-') {
+                return Err(format!(
+                    "follows.trigger {:?} is not a trigger's name",
+                    follows.trigger
+                ));
+            }
+            let within_us = duration_us(&follows.within)?;
+            if !(FOLLOWS_LEAST_US..=FOLLOWS_MOST_US).contains(&within_us) {
+                return Err("follows.within is 10s to 1h".into());
+            }
+            Some((follows.trigger, within_us))
+        }
+    };
     let each = match (file.each, file.key) {
         (None, None) => None,
         (Some(list), Some(key)) if !list.is_empty() && !key.is_empty() => {
@@ -2914,8 +2959,14 @@ fn trigger(file: TriggerFile) -> Result<Trigger, String> {
         unless_heard: file.unless_heard,
         yields_to,
         sooner,
+        follows,
     })
 }
+
+/// A trigger's `follows.within` (#3504): long enough for a person to sit
+/// back after a nudge, short enough that the word still answers it.
+const FOLLOWS_LEAST_US: u64 = 10_000_000;
+const FOLLOWS_MOST_US: u64 = HOUR_US;
 
 /// One skill folder, or why it cannot be loaded.
 pub fn load(dir: &Path) -> Result<Skill, String> {
@@ -3519,6 +3570,15 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
         .collect();
     if (1..names.len()).any(|at| names[..at].contains(&names[at])) {
         return Err("two triggers have one name".into());
+    }
+    for trigger in &triggers {
+        if let Some((other, _)) = &trigger.follows
+            && (!names.contains(&other) || trigger.name.as_ref() == Some(other))
+        {
+            return Err(format!(
+                "follows.trigger {other:?} names none of the skill's other triggers"
+            ));
+        }
     }
     let any_on = file.steps.iter().any(|step| step.on.is_some());
     // A tool alone starts it: a person asked, so what it does may be kept
@@ -6224,6 +6284,24 @@ impl Engine {
                     .yields_to
                     .as_ref()
                     .map_or(Yield::No, |to| self.yield_state(to, now_us));
+                // A word after another trigger's run (#3504): it holds only
+                // within `within` of that run, and only once for it.
+                let followed = trigger.follows.as_ref().is_none_or(|(other, within_us)| {
+                    let ran = |at: usize| {
+                        self.watches
+                            .get(&(skill.name.clone(), at))
+                            .and_then(|watch| watch.ran_us)
+                    };
+                    let theirs = skill
+                        .triggers
+                        .iter()
+                        .position(|named| named.name.as_ref() == Some(other))
+                        .and_then(ran);
+                    theirs.is_some_and(|at| {
+                        now_us.saturating_sub(at) <= *within_us
+                            && ran(index).is_none_or(|mine| mine < at)
+                    })
+                });
                 let watch = self.watches.entry((skill.name.clone(), index)).or_default();
                 if let Some(why) = out_of_window(trigger, moment.as_ref()) {
                     if trigger.once_per_day
@@ -6338,7 +6416,7 @@ impl Engine {
                         watch.disarmed = false;
                     }
                 }
-                let holds = trigger.test.holds(&value);
+                let holds = trigger.test.holds(&value) && followed;
                 if !(rose && holds && chooses(skill, &value)) {
                     if watch
                         .last_held_us
@@ -6533,10 +6611,16 @@ impl Engine {
                 // in the quiet hours: taken at the trigger's first message
                 // once they allow it, while it still holds.
                 let day = day_of(self.clock, now_us);
+                // A word after a run is that run's, not a nudge of its own
+                // (#3504): the day's most, the rest and the group's hour
+                // count and hold back the nudges only.
+                let nudge = trigger.follows.is_none();
                 if let Some(most) = skill.most_a_day.filter(|most| {
-                    self.day_runs
-                        .get(&skill.name)
-                        .is_some_and(|(on, count)| *on == day && count >= most)
+                    nudge
+                        && self
+                            .day_runs
+                            .get(&skill.name)
+                            .is_some_and(|(on, count)| *on == day && count >= most)
                 }) {
                     dropped(
                         &mut self.dropped,
@@ -6548,12 +6632,12 @@ impl Engine {
                     );
                     continue;
                 }
-                if let Some(nudge) = self
+                if let Some(resting) = self
                     .nudges
                     .get(&skill.name)
-                    .filter(|nudge| now_us < nudge.resting_until_us)
+                    .filter(|resting| nudge && now_us < resting.resting_until_us)
                 {
-                    let rest = nudge.resting_until_us - now_us;
+                    let rest = resting.resting_until_us - now_us;
                     dropped(
                         &mut self.dropped,
                         watch,
@@ -6620,37 +6704,46 @@ impl Engine {
                 let outside = skill
                     .active
                     .is_some_and(|active| minute.is_none_or(|minute| !within(minute, active)));
-                let hour_spent = skill.budget.as_ref().is_some_and(|(group, _)| {
-                    let limit = self
-                        .skills
-                        .iter()
-                        .filter_map(|other| other.budget.as_ref())
-                        .filter(|(named, _)| named == group)
-                        .map(|(_, per_hour)| *per_hour)
-                        .min()
-                        .unwrap_or(u32::MAX);
-                    self.group_runs.get(group).is_some_and(|began| {
-                        began
-                            .iter()
-                            .filter(|at| now_us.saturating_sub(**at) < HOUR_US)
-                            .count() as u64
-                            >= u64::from(limit)
-                    })
-                });
+                let hour_spent =
+                    skill
+                        .budget
+                        .as_ref()
+                        .filter(|_| nudge)
+                        .is_some_and(|(group, _)| {
+                            let limit = self
+                                .skills
+                                .iter()
+                                .filter_map(|other| other.budget.as_ref())
+                                .filter(|(named, _)| named == group)
+                                .map(|(_, per_hour)| *per_hour)
+                                .min()
+                                .unwrap_or(u32::MAX);
+                            self.group_runs.get(group).is_some_and(|began| {
+                                began
+                                    .iter()
+                                    .filter(|at| now_us.saturating_sub(**at) < HOUR_US)
+                                    .count() as u64
+                                    >= u64::from(limit)
+                            })
+                        });
                 // First come, first served: with the hour free, a member
                 // that has waited for it longer, and still waits, goes first,
                 // so the first of the group in folder order never takes
                 // every hour (#1685's wellbeing skills).
-                let behind = skill.budget.as_ref().is_some_and(|(group, _)| {
-                    self.budget_waits.get(group).is_some_and(|waits| {
-                        let mine = waits.get(&skill.name).map_or(now_us, |(first, _)| *first);
-                        waits.iter().any(|(name, (first, last))| {
-                            *name != skill.name
-                                && now_us.saturating_sub(*last) < BUDGET_WAIT_LIVE_US
-                                && *first < mine
+                let behind = skill
+                    .budget
+                    .as_ref()
+                    .filter(|_| nudge)
+                    .is_some_and(|(group, _)| {
+                        self.budget_waits.get(group).is_some_and(|waits| {
+                            let mine = waits.get(&skill.name).map_or(now_us, |(first, _)| *first);
+                            waits.iter().any(|(name, (first, last))| {
+                                *name != skill.name
+                                    && now_us.saturating_sub(*last) < BUDGET_WAIT_LIVE_US
+                                    && *first < mine
+                            })
                         })
-                    })
-                });
+                    });
                 if (hour_spent || behind)
                     && !outside
                     && let Some((group, _)) = &skill.budget
@@ -6946,14 +7039,14 @@ impl Engine {
                     watch.said.clear();
                     // Counted as the cooldown is: when the run is started,
                     // or asked of the Policy (#1685).
-                    if skill.most_a_day.is_some() {
+                    if nudge && skill.most_a_day.is_some() {
                         let count = self.day_runs.entry(skill.name.clone()).or_insert((day, 0));
                         if count.0 != day {
                             *count = (day, 0);
                         }
                         count.1 += 1;
                     }
-                    if let Some((group, _)) = &skill.budget {
+                    if let Some((group, _)) = skill.budget.as_ref().filter(|_| nudge) {
                         let began = self.group_runs.entry(group.clone()).or_default();
                         began.retain(|at| now_us.saturating_sub(*at) < HOUR_US);
                         began.push_back(now_us);
@@ -6967,7 +7060,7 @@ impl Engine {
                     }
                     // Asked of the Policy, a run is watched for once it is
                     // made ([`Engine::made`]): a no shows nothing to ignore.
-                    if !self.ask_policy {
+                    if nudge && !self.ask_policy {
                         nudged(&mut self.nudges, &self.latest, skill, now_us);
                     }
                     // Its end is told even if the Policy says no: with no
