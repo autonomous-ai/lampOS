@@ -278,7 +278,7 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 64,
-            "pattern": "^[^\\u0000-\\u001f\\u007f]+$"
+            "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]+$"
           },
           "maxItems": 16,
           "uniqueItems": true
@@ -734,7 +734,7 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 300,
-          "pattern": "^[^\\u0000-\\u0009\\u000b-\\u001f\\u007f]+$"
+          "pattern": "^[^\\u0000-\\u0009\\u000b-\\u001f\\u007f-\\u009f]+$"
         }
       },
       "required": [
