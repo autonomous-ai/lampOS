@@ -1,0 +1,51 @@
+{
+  "head": "af49aed12f4ee28a6c58deb4fed64a66f6b059fd",
+  "old_reader_head": "74f563606186fd48f3a062976fc6178fc68148d3",
+  "command": "cargo +1.96.0 run -q --offline --locked --manifest-path <PRIVATE_PROBE>/Cargo.toml",
+  "exit": 0,
+  "observations": [
+    {
+      "case": "old Stroke None",
+      "old_accepts": true,
+      "new_accepts": true
+    },
+    {
+      "case": "new Stroke Wake",
+      "old_accepts": false,
+      "new_accepts": true
+    },
+    {
+      "case": "900 ms Tap Wake",
+      "old_accepts": false,
+      "new_accepts": true
+    },
+    {
+      "case": "400 ms Tap Wake positive control",
+      "old_accepts": true,
+      "new_accepts": true
+    }
+  ],
+  "source_bindings": [
+    {
+      "label": "old",
+      "head": "74f563606186fd48f3a062976fc6178fc68148d3",
+      "controls_sha256": "33ce8ce455a7dfeac9cc5050951146ff16e409d202c6c78452b6634d95f96a62"
+    },
+    {
+      "label": "new",
+      "head": "af49aed12f4ee28a6c58deb4fed64a66f6b059fd",
+      "controls_sha256": "08447f956d242ec8f3c80a349285f5d32236186268802e445a15370aade9687e"
+    },
+    {
+      "limit": "Exact full controls.rs files share ClockStamp, Invalid and Bus types from current PR. Pure validator check only; no real Bus, Controls, Voice, Expression or lamp execution."
+    }
+  ],
+  "hashes": {
+    "main.rs": "551f3587eb8478558b0181cd7aa5642f8c62ca2a227a830bb0642f49865a6979",
+    "old_controls.rs": "33ce8ce455a7dfeac9cc5050951146ff16e409d202c6c78452b6634d95f96a62",
+    "new_controls.rs": "08447f956d242ec8f3c80a349285f5d32236186268802e445a15370aade9687e",
+    "run.log": "84d180ba84a675807d3551bcbabaae527b67014327cf3fbb5551393f2c9b710f"
+  },
+  "limit": "Executable pure validator probe, not Bus/process/updater/device or full four-crate tests. No source edits. Old 6e13 evidence is preserved separately.",
+  "hold_comment": 6437840895
+}

@@ -1,0 +1,200 @@
+{
+  "all_jobs_terminal_exit0_groups_absent": true,
+  "base": "74f563606186fd48f3a062976fc6178fc68148d3",
+  "commands": {
+    "fmt": [
+      "cargo",
+      "+1.96.0",
+      "fmt",
+      "--all",
+      "--check"
+    ],
+    "schema-lock": [
+      "cargo",
+      "+1.96.0",
+      "generate-lockfile",
+      "--offline"
+    ],
+    "schema-matrix": [
+      "cargo",
+      "+1.96.0",
+      "test",
+      "-q",
+      "--offline",
+      "--locked",
+      "--",
+      "--nocapture",
+      "--test-threads=1"
+    ],
+    "skills-onboarding": [
+      "cargo",
+      "+1.96.0",
+      "test",
+      "-q",
+      "--offline",
+      "--locked",
+      "-p",
+      "lamp-skills",
+      "--test",
+      "it",
+      "--",
+      "onboarding",
+      "--nocapture",
+      "--test-threads=1"
+    ],
+    "voice-onboarding": [
+      "cargo",
+      "+1.96.0",
+      "test",
+      "-q",
+      "--offline",
+      "--locked",
+      "-p",
+      "lamp-voice",
+      "--lib",
+      "--",
+      "onboarding",
+      "--nocapture",
+      "--test-threads=1"
+    ],
+    "voice-skills-clippy": [
+      "cargo",
+      "+1.96.0",
+      "clippy",
+      "-q",
+      "--offline",
+      "--locked",
+      "-p",
+      "lamp-voice",
+      "-p",
+      "lamp-skills",
+      "--all-targets",
+      "--message-format=short",
+      "--",
+      "-D",
+      "warnings"
+    ]
+  },
+  "final_pr_head": "5460473572245d2f546994417ceba4f892c9692b",
+  "final_pr_state": "OPEN",
+  "findings": {
+    "P1": [],
+    "P2": [],
+    "P3": [
+      {
+        "finding": "Second-try wording keys only on persisted attempt>1, so a later re-offer/interrupted claimed invitation can say it did not feel a move even when nothing was just tried. This is wording, not weakened physical proof; already raised by peers and author follow-up planned.",
+        "location": "lampOS/crates/voice/src/onboarding/giving_way.rs:342",
+        "verification": "Source read plus existing scoped flow tests; no independent new reproduction of every interrupted/re-offer schedule."
+      }
+    ],
+    "migration_note": {
+      "classification": "P3 custom-directory migration limitation, not a default rollout HOLD.",
+      "correction": "Supersedes earlier mistaken inference that PutBack preserved an edited old product file. product_skills.rs:225,233,497\u2013509 prove replacement.",
+      "finding": "Exact typed schema rejects both version-skew directions. Managed product bundles, including edited product files, are staged/written before restart; PutBack is a WRITE action. Own/custom --dir remains outside that bundle and its older schema can make new Skills preflight refuse the build before switching. Direct mixed installations disable the walk; no unprotected normal managed-upgrade failure demonstrated.",
+      "locations": [
+        "lampOS/crates/voice/src/onboarding/skill.rs:47",
+        "lampOS/crates/voice/src/onboarding/skill.rs:56",
+        "lampOS/crates/voice/src/onboarding/skill.rs:70",
+        "lampOS/crates/update/src/round.rs:860",
+        "lampOS/crates/update/src/round.rs:1521",
+        "lampOS/crates/update/src/round.rs:1610"
+      ]
+    }
+  },
+  "gates": {
+    "fmt": 0,
+    "strict_voice_skills_all_targets_clippy": 0
+  },
+  "hashes": {
+    "fmt.exit": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+    "fmt.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "fmt.started.json": "c47e8566b63ddd61dc0fca68b3b3eaae5515113e02304a6911a307a580be59d9",
+    "fmt.terminal.json": "402984be37b46d70ee156c219b3cd7646d329d96b563e78de7a67e603f17b4e6",
+    "pr-after-tests.json": "7bee7dfac7268af6ef2a8998cc3a4eae4b17492a3e10fd53f11c9757ec90d8c9",
+    "pr-before-tests.json": "ce55480ccb75558a2f578cc090a74289dfdc4073d648fac2837566195f17424b",
+    "prepare.py": "16994d99c9c7bdbf138d956007d7a34a6df7a0ac6383aa482da0fce4f1f0c5e5",
+    "run-supervised.py": "ca8bb0e7b7b156e8609a2f9dfeadebd72c03570fe3c2419edd2a6c9cdc7a037b",
+    "schema-extraction.json": "8f0a134c29d4b4f6131c5442af69f871e3024a55facf65970a454ebf0bfe42f9",
+    "schema-lock.exit": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+    "schema-lock.log": "0721b648f229b234e2c1b1d68fa962429a421d4a2258d681e7029f94da943fd8",
+    "schema-lock.started.json": "b48952e28b7d7b5ee5fd26b9d37fc589bee7080eb5f7c5ba09ed1c9a811dcfbd",
+    "schema-lock.terminal.json": "6733d8accf367ee5b072eccfb7ea1fa7514fb8b43b01160b5948d82b8f4257ff",
+    "schema-matrix.exit": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+    "schema-matrix.log": "8fd8a158ea9e335c4e1b48f35160b34a89f756b3d16defe4f3cd0defe2bb8e2a",
+    "schema-matrix.started.json": "504d281d3dd442c1135ce6c6640060b9e79af46fd3fe877f0569c14803192a81",
+    "schema-matrix.terminal.json": "d028d42e12a7e860b58ff3c773e26cd1de8c3abb10987667017b10010b97bd54",
+    "schema-probe/Cargo.lock": "8ff8d3183a3b5a7456a739a7126e94650f704ee8ae5dfc97e8e8cd841319766c",
+    "schema-probe/Cargo.toml": "e905009e5a899d044e0b35cb8b534fbcf6d311e32a2326fe92bc8e69a7eca94b",
+    "schema-probe/new.toml": "232b6e069bd41a66b7e1108a746f8d443067571b4e4fadf82b27a0b69de20cdb",
+    "schema-probe/old.toml": "61f0144725c03e015ea155eee723b331ae09a6912bfae42a66f4692a8bf07c6f",
+    "schema-probe/src/lib.rs": "66ae27fbfb6f0d073776b4216decde8b174432c8da802a6eab26876d828967a5",
+    "schema-probe/src/new_types.rs": "f1531990f51bcc996ea95a98dac692a5884989750d13acce9379f772086139e0",
+    "schema-probe/src/old_types.rs": "f3642d7ca1af4ef64784ed52e046b4cb7d0b5f5c1d513da82c4a99a2bddecca6",
+    "scope.json": "54b75853a79427e2635553f82043e88f4cff8528ec1e1a11093f0edf57ea9871",
+    "skills-onboarding.exit": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+    "skills-onboarding.log": "c3e6060f8edb026d36ef1b31f8fc30ab0e7c72209036e9c4bf687f5379f4b5e9",
+    "skills-onboarding.started.json": "6c4911b5d6f74bcfa21ea3b066c3c2e8d861d4408afc8cddd5994fe9e834fe7a",
+    "skills-onboarding.terminal.json": "95d0cab93dbf83886e947e21dc38dea4c4b6f2874592c107313dbc5a531a29e7",
+    "source-before.json": "d209e66aaa1af82b903a97cff142acfee580fcab405391ea498098a1fe0365ca",
+    "voice-onboarding.exit": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+    "voice-onboarding.log": "d0fb138dbfd2c0e919754c9f78059582cccfb04a8c22ec32e5887aa5fe8b794d",
+    "voice-onboarding.started.json": "88ff5b45287f8a3c54de22bd2fee28177d8aadb7282221bab129a5abbf20b571",
+    "voice-onboarding.terminal.json": "1be33488fd0c996b1a8a4ea8d07c5f74cdf1492a39c3a92bb2ba4b063836fc8d",
+    "voice-skills-clippy.exit": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+    "voice-skills-clippy.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "voice-skills-clippy.started.json": "e22cea141dbd0c920d6a9e217b5cd89e3b624c2d73faa8b433c698d79a2ccea9",
+    "voice-skills-clippy.terminal.json": "d867073a648ec11016a95c911cc4b40bfe64e8323fa81c8a35ec9412beaf7fe8"
+  },
+  "head": "5460473572245d2f546994417ceba4f892c9692b",
+  "limits": [
+    "Private matrix exercises exact shared Deserialize structs and exact manifest blobs, before checked(); it is not a live update/install test.",
+    "No full Voice, full Skills, whole-workspace runtime, realTTS/provider, device/played/new-person or acoustic latency qualification.",
+    "Queued exact notes and their order were checked; generated speech adherence was not measured.",
+    "Warm exclusive target reused; no cold build claim. No product edits, posts, commits or pushes.",
+    "Train comments report conflicts with later Main; this evidence applies only to546047357 and is not a rebase clearance."
+  ],
+  "schema_matrix": {
+    "new_reader_new_manifest": "ACCEPT",
+    "new_reader_old_manifest": "REJECT missing touch_done",
+    "old_reader_new_manifest": "REJECT unknown give_again",
+    "old_reader_old_manifest": "ACCEPT"
+  },
+  "scoped_tests": {
+    "skills_onboarding_it": {
+      "failed": 0,
+      "filtered": 313,
+      "ignored": 0,
+      "passed": 5
+    },
+    "typed_schema_observation_matrix": {
+      "failed": 0,
+      "ignored": 0,
+      "passed": 4
+    },
+    "voice_onboarding": {
+      "failed": 0,
+      "filtered": 3710,
+      "ignored": 0,
+      "passed": 137
+    }
+  },
+  "sessions": {
+    "fmt": 6791,
+    "schema_lock": 39222,
+    "schema_matrix": 40546,
+    "skills_onboarding": 64457,
+    "voice_onboarding": 30858,
+    "voice_skills_clippy": 23104
+  },
+  "source_files_hashed": 7284,
+  "source_safety": [
+    "Touch success/failure owe a line only after finish; storage_idle and owed.take precede selecting the next step; existing tests pin ordered touch_done/preferences and touch_remind/touch_failed/preferences.",
+    "Giving-way physical evidence, attempt budget, skip-only outcome authority, privacy/storage invalidation and redo remain mechanism-owned; changed lines do not grant actuator or sensor authority.",
+    "Matching current skill passes current shared validator, invalid/mismatched skills fail closed; Voice snapshots once per service invocation."
+  ],
+  "source_unchanged": true,
+  "status": "BOUNDED_READ_COMPLETE_NO_P1_P2_DEMONSTRATED",
+  "worktree_clean": true,
+  "private_summary_sha256": "ea216faaedd6011db02fbd19d34a790fc482961adf65f7fe08f9c8c1663e515b",
+  "public_normalization": "Workspace prefixes normalized; original private receipt retained."
+}
