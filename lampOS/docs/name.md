@@ -65,6 +65,21 @@ whom it answers, its 0.999 and 0.95) keeps reading `name/heard`. A first
 sign with no final word was a near miss. `Hearings::rising` in `said.rs`;
 its test is `a_hearing_is_first_signed_as_it_begins_and_said_when_it_falls`.
 
+**Under its bars (#3923).** A line that starts with "Lamp" is sometimes
+heard as "Ma'am, …" or "Blake, …", and its run of scores reaches neither
+bar. Whatever the switches are, a run of scores from 0.05
+(`UNDER_BARS_LEAST`) whose best stayed under `--near` (under `--least`
+without it) is one journal line when it is over, never published:
+`under its bars: best=0.310 began_ms_ago=240`, beside `near its name:
+score=… began_ms_ago=…` for a run that reached the near bar. So a missed
+call shows whether it scored about 0.3 or about 0. Runs are held off for
+1 s after each, as hearings are, which in a room that talks all day is
+still a line about every 1.1 s: so at most 10 are written a minute
+(`UNDER_BARS_A_MINUTE`), and the next line written after some were not
+ends `not_written_before=N`. `UnderBars` in `main.rs`; its tests are
+`a_run_under_both_bars_is_one_line_and_one_at_the_near_bar_is_none` and
+`under_its_bars_is_ten_lines_a_minute_at_most`.
+
 **It keeps no sound.** Samples are held for about a fifth of a second,
 until they have been turned into the numbers its models work on, and of
 those it holds the last two seconds' worth. With `--quiet-below` it also

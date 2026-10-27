@@ -63,6 +63,16 @@ const DEFAULT_NEAR: f32 = 0.5;
 /// Sound that stops coming for this long is a gap: what the models held
 /// is forgotten, and a hearing that was going on is said.
 const GAP: Duration = Duration::from_millis(500);
+/// The floor of a run of scores that stayed under both bars and is still
+/// worth a journal line (#3923): a "Lamp" misheard as "Ma'am" or "Blake"
+/// is lost under the near bar, and the line tells about 0.3 from about 0.
+/// Lower than this is any line with no name in it.
+const UNDER_BARS_LEAST: f32 = 0.05;
+/// At most this many "under its bars" lines a minute. `HOLD_OFF` alone
+/// lets one through about every 1.1 s, so a room that talks all day (a
+/// television) would write some 3,000 an hour; ten a minute still shows
+/// what a person's test call scored.
+const UNDER_BARS_A_MINUTE: u32 = 10;
 
 #[derive(Debug, PartialEq)]
 struct Arguments {
@@ -531,6 +541,8 @@ fn run(arguments: &Arguments) -> io::Result<()> {
         bus.root().display(),
     ));
     let mut hearings = Hearings::new(arguments.least);
+    // Whatever the switches are: a missed call shows how near it came.
+    let mut under_bars = UnderBars::new(arguments.near.unwrap_or(arguments.least));
     let mut counted = Counted::default();
     let (mut total_heard, mut total_steps) = (0u64, 0u64);
     let mut source = Source::default();
@@ -604,6 +616,9 @@ fn run(arguments: &Arguments) -> io::Result<()> {
                         }
                         name_said = hearings.cut(now);
                         near_said = nears.as_mut().and_then(|nears| nears.cut(now));
+                        if let Some(line) = under_bars.cut(now) {
+                            log(&line);
+                        }
                     }
                     last_sound = Some(now);
                     let block: Vec<i16> = samples
@@ -639,6 +654,9 @@ fn run(arguments: &Arguments) -> io::Result<()> {
                                 if let Some(nears) = nears.as_mut() {
                                     near_said = near_said.or(nears.score(judged, now));
                                 }
+                                if let Some(line) = under_bars.score(judged, now) {
+                                    log(&line);
+                                }
                                 // A step only the rescue brought to the bar,
                                 // in a hearing (not one passed over after one).
                                 if judged >= arguments.least
@@ -662,6 +680,9 @@ fn run(arguments: &Arguments) -> io::Result<()> {
                                 if let Some(nears) = nears.as_mut() {
                                     near_said = near_said.or(nears.cut(now));
                                 }
+                                if let Some(line) = under_bars.cut(now) {
+                                    log(&line);
+                                }
                             }
                         }
                         Err(why) => {
@@ -675,6 +696,9 @@ fn run(arguments: &Arguments) -> io::Result<()> {
             }
         }
         let name_said = name_said.or_else(|| hearings.tick(now));
+        if let Some(line) = under_bars.tick(now) {
+            log(&line);
+        }
         // A hearing that reached the lower bar, said as it is over: never
         // one begun while the lamp spoke, as for the name.
         if let (Some(near), Some(publisher)) = (
@@ -790,6 +814,76 @@ fn judged(rescue: &mut Option<Rescue>, step: u64, score: &lamp_name::hear::Score
 }
 
 /// The samples of a file of sound: raw, or after a WAV file's 44 bytes.
+/// Runs of scores that stayed under both bars (#3923), for the journal
+/// only: never published. A run from [`UNDER_BARS_LEAST`] whose best
+/// stayed under `--near` (or `--least` without it) is one line, at most
+/// [`UNDER_BARS_A_MINUTE`] a minute; those not written are counted on the
+/// next line written.
+struct UnderBars {
+    hearings: Hearings,
+    /// The lowest bar it says: `--near`, else `--least`.
+    bar: f32,
+    /// When this minute's lines began, and how many were written in it.
+    minute: Option<(Instant, u32)>,
+    not_written: u64,
+}
+
+impl UnderBars {
+    fn new(bar: f32) -> Self {
+        Self {
+            hearings: Hearings::new(UNDER_BARS_LEAST),
+            bar,
+            minute: None,
+            not_written: 0,
+        }
+    }
+
+    /// A judged score, as the name's hearings are given it.
+    fn score(&mut self, score: f32, now: Instant) -> Option<String> {
+        let over = self.hearings.score(score, now);
+        self.line(over, now)
+    }
+
+    /// Sound lost or rested: a run going on is over.
+    fn cut(&mut self, now: Instant) -> Option<String> {
+        let over = self.hearings.cut(now);
+        self.line(over, now)
+    }
+
+    fn tick(&mut self, now: Instant) -> Option<String> {
+        let over = self.hearings.tick(now);
+        self.line(over, now)
+    }
+
+    fn line(&mut self, over: Option<NameHeard>, now: Instant) -> Option<String> {
+        let run = over.filter(|run| run.score < self.bar)?;
+        let written = match &mut self.minute {
+            Some((began, written))
+                if now.saturating_duration_since(*began) < Duration::from_secs(60) =>
+            {
+                written
+            }
+            minute => &mut minute.insert((now, 0)).1,
+        };
+        if *written >= UNDER_BARS_A_MINUTE {
+            self.not_written += 1;
+            return None;
+        }
+        *written += 1;
+        let not_written = std::mem::take(&mut self.not_written);
+        Some(format!(
+            "under its bars: best={:.3} began_ms_ago={}{}",
+            run.score,
+            run.ago_ms,
+            if not_written == 0 {
+                String::new()
+            } else {
+                format!(" not_written_before={not_written}")
+            }
+        ))
+    }
+}
+
 fn samples_of(bytes: &[u8]) -> Vec<i16> {
     let sound = if bytes.starts_with(b"RIFF") && bytes.len() >= 44 {
         &bytes[44..]
@@ -1098,6 +1192,50 @@ mod tests {
                 score: 0.62,
                 ago_ms: 240
             }]
+        );
+    }
+
+    /// #3923: a run that stayed under both bars is one journal line with
+    /// its best; one that reached the near bar is said as near, not here.
+    #[test]
+    fn a_run_under_both_bars_is_one_line_and_one_at_the_near_bar_is_none() {
+        let start = Instant::now();
+        let at = |step: u64| start + Duration::from_millis(80 * step);
+        let mut under = UnderBars::new(DEFAULT_NEAR);
+        let lines: Vec<String> = [0.01, 0.12, 0.31, 0.22, 0.02]
+            .into_iter()
+            .zip(0..)
+            .filter_map(|(score, step)| under.score(score, at(step)))
+            .collect();
+        assert_eq!(lines, ["under its bars: best=0.310 began_ms_ago=240"]);
+        let mut under = UnderBars::new(DEFAULT_NEAR);
+        let lines: Vec<String> = [0.01, 0.2, 0.5, 0.3, 0.02]
+            .into_iter()
+            .zip(0..)
+            .filter_map(|(score, step)| under.score(score, at(step)))
+            .collect();
+        assert!(lines.is_empty(), "{lines:?}");
+    }
+
+    /// A room that talks all day writes ten lines a minute, not one a
+    /// second; the next line written says how many were not.
+    #[test]
+    fn under_its_bars_is_ten_lines_a_minute_at_most() {
+        let start = Instant::now();
+        let mut under = UnderBars::new(DEFAULT_NEAR);
+        let mut lines = Vec::new();
+        // A run of 0.3 every 1.2 s for two minutes.
+        for run in 0..100u64 {
+            let began = start + Duration::from_millis(1_200 * run);
+            lines.extend(under.score(0.3, began));
+            lines.extend(under.score(0.01, began + Duration::from_millis(80)));
+        }
+        assert_eq!(lines.len(), 20, "{lines:?}");
+        assert!(!lines[9].contains("not_written_before"));
+        assert!(
+            lines[10].ends_with(" not_written_before=40"),
+            "{}",
+            lines[10]
         );
     }
 
