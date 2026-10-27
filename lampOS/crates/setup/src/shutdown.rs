@@ -20,8 +20,9 @@ use std::{
 };
 
 /// What the lamp says before anything stops (the owner at the lamp: a
-/// silent shutdown reads wrong). The ring's unplug light is soft green.
-pub const GOING_TO_SLEEP: &str = "Going to sleep now. Unplug me when my light turns green.";
+/// silent shutdown reads wrong): one text with the voice's speech cache,
+/// which renders it ahead (`lamp_msgs::GOING_TO_SLEEP`).
+pub use lamp_msgs::GOING_TO_SLEEP;
 
 /// The longest the shutdown waits for [`GOING_TO_SLEEP`] to be played:
 /// a second of quiet at priority 9, about a second to the model's first
@@ -238,14 +239,36 @@ pub fn run(host: &mut impl Host, dry_run: bool, say: &mut impl FnMut(&str)) -> V
 }
 
 /// The voice's say service on `socket` (`docs/speaking-first.md`, "the
-/// say service"): `line` as `text`, from the skill `shutdown`, priority 9,
-/// expiring at `within`; `Ok` only on its `{"outcome":"spoken"}`, played
-/// whole. Not there, refused, dropped, expired or no outcome within
-/// `within`: why. Muted, paused or busy is the say service's own to judge.
+/// say service"): first `line` as `text` with `"cache": true`, played from
+/// the voice's speech cache (rendered ahead at its start, so no network is
+/// needed), then, if it was not played, `line` as `text` for the model,
+/// each from the skill `shutdown` at priority 9, both within `within`
+/// together; `Ok` only on a `{"outcome":"spoken"}`, played whole. Neither:
+/// why, for each. Muted, paused or busy is the say service's own to judge.
 pub fn say_through(socket: &Path, line: &str, within: Duration) -> Result<(), String> {
     let until = Instant::now() + within;
-    let ask = serde_json::json!({"skill": "shutdown", "text": line, "priority": 9,
-        "expires_in_ms": within.as_millis() as u64});
+    let cached = ask_once(
+        socket,
+        serde_json::json!({"text": line, "cache": true}),
+        until,
+    );
+    let Err(why) = cached else {
+        return Ok(());
+    };
+    ask_once(socket, serde_json::json!({"text": line}), until)
+        .map_err(|then| format!("the cached line: {why}; the words: {then}"))
+}
+
+/// One ask of the say service, `words` with the skill, priority and expiry
+/// added, waited for until `until`.
+fn ask_once(socket: &Path, mut ask: serde_json::Value, until: Instant) -> Result<(), String> {
+    let within = until.saturating_duration_since(Instant::now());
+    if within.is_zero() {
+        return Err("no time left".into());
+    }
+    ask["skill"] = "shutdown".into();
+    ask["priority"] = 9.into();
+    ask["expires_in_ms"] = (within.as_millis() as u64).into();
     let mut stream = UnixStream::connect(socket)
         .map_err(|why| format!("the voice's say service is not there: {why}"))?;
     stream
@@ -255,7 +278,7 @@ pub fn say_through(socket: &Path, line: &str, within: Duration) -> Result<(), St
     loop {
         let left = until.saturating_duration_since(Instant::now());
         if left.is_zero() {
-            return Err(format!("not played within {} ms", within.as_millis()));
+            return Err("not played in time".into());
         }
         reader
             .get_ref()
@@ -271,7 +294,7 @@ pub fn say_through(socket: &Path, line: &str, within: Duration) -> Result<(), St
                     io::ErrorKind::WouldBlock | io::ErrorKind::TimedOut
                 ) =>
             {
-                return Err(format!("not played within {} ms", within.as_millis()));
+                return Err("not played in time".into());
             }
             Err(why) => return Err(why.to_string()),
         }
@@ -585,54 +608,74 @@ mod tests {
         assert_eq!(names(&fake).last(), Some(&"power off"));
     }
 
-    /// The say service's answers as the voice writes them: spoken, refused,
-    /// and begun with no outcome, the stream held open past the bound.
+    /// The say service's answers as the voice writes them: the cached line
+    /// is asked first and, played, is all (a warm cache with no network);
+    /// refused, the words follow; the two together are bounded by `within`,
+    /// whatever the voice does.
     #[test]
-    fn say_through_is_ok_only_on_spoken_and_bounded_otherwise() {
+    fn say_through_asks_the_cached_line_first_then_the_words_within_one_bound() {
         use std::os::unix::net::UnixListener;
         let dir = std::env::temp_dir().join(format!("lss-say-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         let socket = dir.join("say.sock");
         let within = Duration::from_millis(300);
-        assert!(
-            say_through(&socket, GOING_TO_SLEEP, within)
-                .unwrap_err()
-                .contains("not there")
-        );
+        let gone = say_through(&socket, GOING_TO_SLEEP, within).unwrap_err();
+        assert!(gone.starts_with("the cached line: the voice's say service is not there"));
+        assert!(gone.contains("; the words: the voice's say service is not there"));
         let listener = UnixListener::bind(&socket).unwrap();
-        for (answer, said) in [
+        let spoken = "{\"event\":\"begun\",\"at_us\":1}\n{\"outcome\":\"spoken\"}\n";
+        let refused = "{\"outcome\":\"refused\",\"why\":\"the speech cache is off\"}\n";
+        let hangs = "{\"event\":\"begun\",\"at_us\":1}\n";
+        for (answers, said) in [
+            // Played from the cache: no words for the model.
+            (vec![spoken], Ok(())),
+            // No cache (an older voice, no speech service): the words, for
+            // a voice that can still reach its model.
+            (vec![refused, spoken], Ok(())),
             (
-                "{\"event\":\"begun\",\"at_us\":1}\n{\"outcome\":\"spoken\"}\n",
-                Ok(()),
+                vec![refused, refused],
+                Err("the cached line: refused: the speech cache is off; \
+                     the words: refused: the speech cache is off"
+                    .to_owned()),
             ),
+            // Begun and never ended: the bound, and no time left for words.
             (
-                "{\"outcome\":\"refused\",\"why\":\"the lamp is paused\"}\n",
-                Err("refused: the lamp is paused".to_owned()),
-            ),
-            (
-                "{\"event\":\"begun\",\"at_us\":1}\n",
-                Err("not played within 300 ms".to_owned()),
+                vec![hangs],
+                Err("the cached line: not played in time; the words: no time left".to_owned()),
             ),
         ] {
             let asked = std::thread::scope(|scope| {
                 let server = scope.spawn(|| {
-                    let (stream, _) = listener.accept().unwrap();
-                    let mut asked = String::new();
-                    BufReader::new(&stream).read_line(&mut asked).unwrap();
-                    (&stream).write_all(answer.as_bytes()).unwrap();
+                    let mut held = Vec::new();
+                    let mut asked = Vec::new();
+                    for answer in &answers {
+                        let (stream, _) = listener.accept().unwrap();
+                        let mut line = String::new();
+                        BufReader::new(&stream).read_line(&mut line).unwrap();
+                        (&stream).write_all(answer.as_bytes()).unwrap();
+                        asked.push(serde_json::from_str::<serde_json::Value>(&line).unwrap());
+                        held.push(stream);
+                    }
                     std::thread::sleep(within * 2);
                     asked
                 });
                 let started = Instant::now();
                 assert_eq!(say_through(&socket, GOING_TO_SLEEP, within), said);
-                assert!(started.elapsed() < within * 2);
+                assert!(started.elapsed() < within + Duration::from_millis(100));
                 server.join().unwrap()
             });
-            let asked: serde_json::Value = serde_json::from_str(&asked).unwrap();
-            assert_eq!(asked["text"], GOING_TO_SLEEP);
-            assert_eq!(asked["skill"], "shutdown");
-            assert_eq!(asked["priority"], 9);
+            assert_eq!(asked.len(), answers.len());
+            assert_eq!(asked[0]["cache"], true);
+            if let Some(words) = asked.get(1) {
+                assert!(words.get("cache").is_none());
+            }
+            for ask in &asked {
+                assert_eq!(ask["text"], GOING_TO_SLEEP);
+                assert_eq!(ask["skill"], "shutdown");
+                assert_eq!(ask["priority"], 9);
+                assert!(ask["expires_in_ms"].as_u64().unwrap() <= 300);
+            }
         }
         let _ = std::fs::remove_dir_all(dir);
     }

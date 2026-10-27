@@ -501,6 +501,28 @@ request or extra actuator writer. It is an alternative to every other
 content field; other cue values are refused. Its acoustic result remains
 part of [Bedtime and Morning's lamp comparison](bedtime-morning.md).
 
+**A cached line** (#3697, V1's `_TTS_CACHE_DIR`): `{"skill": "shutdown",
+"text": "…", "cache": true, …}`, from root's helpers only (the peer is
+root by `SO_PEERCRED`; anyone else is refused `cache is asked by root's
+helpers only`), and with `text` only (`cache goes only with text`). It is
+not given to the model: on the client's thread the words are looked up in
+the speech cache (`say::tts_cache`), `/var/lib/lampOS/voice/tts-cache`, a
+24 kHz mono 16-bit WAV per line named by the SHA-256 of `voice|model|language|text`
+(the second route's speech voice and model, `LAMP_SECOND_SPEECH_MODEL`
+applied, and its speech-to-text language). A hit is played with no
+network. A miss is rendered once through the speech service the voice
+already speaks with (`Tts::speak`, ElevenLabs through the relay), within
+5 s, written whole (a temporary file, fsync, rename, the folder fsynced:
+the lamp is unplugged after a shutdown) and played; at most 16 lines and
+20 s each are kept, a line past that is played but not kept. Without the
+second route's configuration, or offline on a miss, it is refused at once
+with why (`the speech cache is off`, `not in the speech cache, and not
+rendered: …`), and the asker says the words another way. Its samples are
+played as a skill's sound is, with the same gates. At start the voice
+renders the cache's fixed lines, the shutdown's `lamp_msgs::GOING_TO_SLEEP`
+alone, on a thread of its own, tried again each minute until kept, so
+the first shutdown is said from the cache even with no network then.
+
 **When it is said.** After a due reminder and before the news, through a reminder's gates: no reply owed or queued, the speaker
 free, nobody's utterance pending, the microphone's capture fresh and a
 second since the last speech, the playback mask free, a ready session and
