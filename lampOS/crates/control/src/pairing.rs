@@ -6,7 +6,8 @@
 //! - **Pair, once per computer:** the owner's app gets a one-time code of 8
 //!   digits from the lamp ([`Codes::issue`], 5 minutes), **with the pin of
 //!   the lamp's own certificate** (its SHA-256). The computer checks the
-//!   TLS certificate against that pin **before it sends anything**, then
+//!   TLS certificate against that pin **before it sends any frame** (only
+//!   the TLS handshake and the WebSocket's upgrade request go first), then
 //!   proves it holds the code without sending it: `proof` is HMAC-SHA256,
 //!   keyed with the code's 8 ASCII digits, over [`PAIR_CONTEXT`], the pin's
 //!   32 bytes, its Ed25519 public key's 32 bytes and the nonce

@@ -170,7 +170,8 @@ export class Lamp {
 
   // Pair this computer with the lamp at `host`, with the owner's one-time code
   // and the pin the app shows with it (the certificate's full SHA-256, 64 hex).
-  // The certificate is checked against the pin before anything is sent, so the
+  // The certificate is checked against the pin before any frame is sent (only
+  // the TLS handshake and the WebSocket's upgrade request go first), so the
   // code's proof never reaches another host; there is no pairing without a pin.
   static async pair(code, host, { pin, port = schema.PORT, name, keyring = new Keyring() } = {}) {
     pin = String(pin ?? '').replaceAll(' ', '').replaceAll(':', '').toLowerCase();
