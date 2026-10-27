@@ -1400,8 +1400,8 @@ for it.
   ([tools.md](tools.md), "Many skills").
 
 - **`pack`** makes a package of an installable skill folder, below; with
-  `--key-file`, the update channel's private key (as `lamp-update sign`
-  takes it), signed for the Skills Store.
+  `--key-file`, the Store's private key (in the form `lamp-update sign`
+  takes a key), signed for the Skills Store.
 
 Nothing else is restarted. The running `lamp-skills` looks at its folder
 every 2 s, loads every skill again when one changed (cooldowns kept), and

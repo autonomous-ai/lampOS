@@ -846,6 +846,58 @@ fn the_real_helper_refuses_on_its_own() {
     assert_eq!(left(&skills), ["dance"]);
 }
 
+/// Only the key in the Store's own file is taken: a package signed with the
+/// update key is refused as any other key's, and a new `store-key.pub` (a
+/// rotation) moves which key is taken at the next install, nothing
+/// restarted.
+#[test]
+fn only_the_store_key_in_its_file_is_taken_and_a_new_file_rotates_it() {
+    let dir = tempfile::tempdir().unwrap();
+    let skills = skills(dir.path());
+    let (update, old, new) = (key(1), key(2), key(3));
+    let fingerprint = |key: &Ed25519KeyPair| {
+        lamp_update::manifest::fingerprint(key.public_key().as_ref().try_into().unwrap())
+    };
+    let store_file = key_file(dir.path(), &old);
+    let install_signed = |key: &Ed25519KeyPair, at: &str| {
+        let bytes = packed(&dir.path().join(at), Some(key));
+        let (port, _) = serve(vec![ok(&bytes)]);
+        ask(&skills, &store_file, port, install(URL))
+    };
+    let refused_as_other =
+        |answer: serde_json::Value, done: bool, signer: &Ed25519KeyPair, store: &Ed25519KeyPair| {
+            assert!(!done, "{answer}");
+            assert!(
+                refused(&answer).contains(&format!(
+                    "signed with key {}, and this lamp takes skills signed with the Store's key {}",
+                    fingerprint(signer),
+                    fingerprint(store)
+                )),
+                "{answer}"
+            );
+        };
+    let (answer, done) = install_signed(&update, "update-1");
+    refused_as_other(answer, done, &update, &old);
+    assert_eq!(left(&skills), ["dance"]);
+    let (answer, done) = install_signed(&old, "old-1");
+    assert!(done, "{answer}");
+    // The Store's key rotated: a new file in the same place.
+    assert_eq!(key_file(dir.path(), &new), store_file);
+    let (answer, done) = install_signed(&old, "old-2");
+    refused_as_other(answer, done, &old, &new);
+    let (answer, done) = install_signed(&update, "update-2");
+    refused_as_other(answer, done, &update, &new);
+    let (answer, done) = install_signed(&new, "new");
+    assert!(done, "{answer}");
+    assert!(
+        answer["done"].as_str().unwrap().contains(&format!(
+            "signed with the Store's key {}",
+            fingerprint(&new)
+        )),
+        "{answer}"
+    );
+}
+
 /// A Store package never puts a skill back to an older version, so an old
 /// package the channel once signed can't be replayed onto a lamp: the
 /// older is refused with the folder as it was; the same version (a
