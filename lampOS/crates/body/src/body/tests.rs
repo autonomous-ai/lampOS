@@ -13919,6 +13919,99 @@ fn with_own_ranges_a_roll_resting_near_its_stop_is_taken_hold_of_at_start() {
     assert_eq!(lamp.servos[ROLL].position, 2_410.0);
 }
 
+/// #3558: the head and base held where they are in one write (`send_holds`)
+/// are checked against their own ranges, as a hold of one joint is; the same
+/// goals sent as motion (`send_goals`) are still refused.
+#[test]
+fn with_own_ranges_a_hold_of_the_head_near_its_stop_is_written_and_motion_is_not() {
+    let (mut lamp, mut clock) = folded(Duration::from_secs(8));
+    let mut bus = Bus::new(&mut lamp, &mut clock, None);
+    bus.windows = LAMP_52E6_RANGES.map(own_window);
+    bus.ranges = LAMP_52E6_RANGES;
+    let hold = [2_000, 2_410, 2_015];
+    assert!(bus.send_goals(hold, None).is_err());
+    assert!(matches!(
+        bus.refused.take(),
+        Some(Stop::Window { goal: 2_410, .. })
+    ));
+    assert_eq!(bus.send_holds(hold, None), Ok(()));
+    assert_eq!(bus.goals[Joint::WristRoll.index()], Some(2_410));
+    assert_eq!(bus.refused, None);
+}
+
+/// A roll whose own stored max is 2064, home's 2044 plus the margin, kept
+/// at 2060 by a hand while its goal stays home: past the inset window,
+/// inside the servo, and within `REST_SLACK` of its goal.
+fn roll_near_its_stop(cancel_at: Duration) -> (Lamp, Clock) {
+    let mut ranges = LAMP_52E6_RANGES;
+    ranges[Joint::WristRoll.index()] = (1_065, 2_064);
+    let (mut lamp, clock) = ranged(ranges, cancel_at);
+    lamp.servos[ROLL].position = 2_044.0;
+    lamp.servos[ROLL].goal = 2_044;
+    lamp.hand = Some((Duration::ZERO, cancel_at, ROLL, 2_060.0));
+    (lamp, clock)
+}
+
+/// #3558: a joint that has arrived and rests near its goal is given where
+/// it is, so nothing pushes; a roll resting inside its own range but past
+/// the inset window is rested there, not refused. A motion goal from there
+/// (the eased way home at the end) is still refused on the window.
+#[test]
+fn with_own_ranges_a_joint_arrived_near_a_stop_rests_there() {
+    let (mut lamp, mut clock) = roll_near_its_stop(Duration::from_secs(4));
+    let report = run(
+        &mut lamp,
+        &mut clock,
+        own(),
+        Some(HOME),
+        || Some((Mood::Resting, 0)),
+        |_| {},
+    );
+    assert_eq!(
+        lamp.goals
+            .first()
+            .map(|write| write.contains(&(Joint::WristRoll.id(), 2_060))),
+        Some(true),
+        "{:?}",
+        lamp.goals
+    );
+    // It rested until the end, not stopped at once.
+    assert!(lamp.goal_times[0] < Duration::from_secs(1));
+    assert!(clock.time.get() >= Duration::from_secs(4));
+    assert!(
+        matches!(
+            report.stop,
+            Stop::Window {
+                goal: 2_059,
+                window: (1_085, 2_044),
+                from: 2_060,
+                ..
+            }
+        ),
+        "{:?}",
+        report.stop
+    );
+}
+
+/// #3558: a run that ends stops pushing where each joint is; a roll there,
+/// inside its own range but past the inset window, is held there and the
+/// run ends on what ended it, not on `Stop::Window`.
+#[test]
+fn with_own_ranges_a_stop_pushing_hold_near_a_stop_is_written() {
+    let (mut lamp, mut clock) = roll_near_its_stop(Duration::from_secs(8));
+    lamp.event = Some((Duration::from_millis(500), 1, Event::Flag(0x20)));
+    let report = run(
+        &mut lamp,
+        &mut clock,
+        own(),
+        Some(HOME),
+        || Some((Mood::Resting, 0)),
+        |_| {},
+    );
+    assert!(matches!(report.stop, Stop::Status { .. }), "{report:?}");
+    assert_eq!(report.held_at.map(|held| held[1]), Some(2_060));
+}
+
 /// #3558: the folded arm, the stand and the pitch window are each checked
 /// against their joints' own limits; a joint storing 0..=4095 (lamp-52e6's
 /// elbow) is never checked, and its goals keep 0..=4095.

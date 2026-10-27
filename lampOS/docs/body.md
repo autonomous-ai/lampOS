@@ -219,11 +219,15 @@ which V1's calibration wrote on its lamps), says them in its report
   counts either side (`OWN_RANGE_MARGIN`), or the run ends on `Stop::Window`
   as for an arm goal;
 - a hold where a head or base joint already is (taking hold of it, the
-  write-back after, telling it to stop pushing) is checked against the
-  servo's own range itself, not that window: holding is not motion, so a
-  roll resting at 2,410 under a stored 2,413 still takes hold, and is not
-  clamped, which would move it
-  (`with_own_ranges_a_roll_resting_near_its_stop_is_taken_hold_of_at_start`);
+  write-back after, a joint that has arrived or settled at rest given where
+  it is, every stop-pushing hold when a wake, a lowering or the run ends)
+  is checked against the servo's own range itself, not that window:
+  holding is not motion, so a roll resting at 2,410 under a stored 2,413
+  still takes hold, and is not clamped, which would move it
+  (`with_own_ranges_a_roll_resting_near_its_stop_is_taken_hold_of_at_start`,
+  `with_own_ranges_a_stop_pushing_hold_near_a_stop_is_written`); a motion
+  goal from there is still refused on the window
+  (`with_own_ranges_a_joint_arrived_near_a_stop_rests_there`);
 - a `--home`, a pitch window or a `--stand` pitch, roll or yaw outside that
   same window, or a `--folded-arm` or `--stand` shoulder or elbow outside
   the servo's own range, is refused at start, writing nothing (a folded arm
