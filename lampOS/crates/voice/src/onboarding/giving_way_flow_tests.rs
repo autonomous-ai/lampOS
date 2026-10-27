@@ -128,13 +128,21 @@ fn offer(walk: &mut Onboarding, now: u64) -> u64 {
 
 /// The invitation is offered, taken, bound and played whole.
 fn play(walk: &mut Onboarding, now: u64, turn: u64) -> Played {
-    let token = offer(walk, now);
     // A second try says what didn't work (#3769).
-    let asked = if walk.desired.giving_way_tries > 1 {
-        GIVE_AGAIN
-    } else {
-        GIVE_ASK
-    };
+    play_saying(walk, now, turn, |tries| {
+        if tries > 1 { GIVE_AGAIN } else { GIVE_ASK }
+    })
+}
+
+/// As `play`, the invitation's words being `asked(tries)`.
+fn play_saying(
+    walk: &mut Onboarding,
+    now: u64,
+    turn: u64,
+    asked: impl Fn(u8) -> &'static str,
+) -> Played {
+    let token = offer(walk, now);
+    let asked = asked(walk.desired.giving_way_tries);
     assert_eq!(walk.take_invitation(token, now).unwrap(), asked);
     let boot = BootId::new([4; 16]).unwrap();
     assert!(walk.bind_invitation(token, boot, turn));
@@ -269,6 +277,25 @@ fn a_hand_still_on_the_head_is_not_done_and_two_tries_unfelt_fail() {
     assert_eq!(settle(&mut walk, now), [GIVE_FAILED]);
     assert_eq!(outcome(&walk), Some(Outcome::Failed));
     assert_eq!(walk.take_gesture(), None);
+}
+
+/// With the onboarding file an older updater's `install` writes (before
+/// #3769, no `give_again`), the second try asks as the first did, and two
+/// tries unfelt still fail (the Reviewer-lead's P3 on #3781).
+#[test]
+fn with_the_file_from_before_3769_a_second_try_asks_as_the_first() {
+    let store = Store::new(None);
+    let mut walk = store.cycle(S);
+    let before = skill::parse(skill::tests::BEFORE_3769).unwrap();
+    let first: &'static str = before.note(Step::GivingWay, false).to_owned().leak();
+    walk.definition = Arc::new(before);
+    let played = play_saying(&mut walk, 10 * S, 1, |_| first);
+    let now = played.at(60_000);
+    walk.tick(now, START_QUIET_US, true, false, face(), true);
+    let played = play_saying(&mut walk, now + 2 * S, 2, |_| first);
+    let now = played.at(60_000);
+    assert_eq!(settle(&mut walk, now).len(), 1);
+    assert_eq!(outcome(&walk), Some(Outcome::Failed));
 }
 
 #[test]
