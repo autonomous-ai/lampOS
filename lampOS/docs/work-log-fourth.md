@@ -9328,3 +9328,9 @@ Ready for lamp-voice: no
 ## 27 October — memory plan handed to Friday
 
 First assigned the memory rows to Friday at Queue comment6423786977; Friday requested the plan at6428874956. Handed over the current0.65-to0.90 plan at ebf0a13d0 in6428948488. Friday owns its next edit and row updates. Fourth continues Common #3064 private authority, its dependent Name/callback/Photo work and source-bound gates; this handover changes no product score or acceptance.
+
+## 27 October, 07:02 ICT — IPC review correction published
+
+Ready for lamp-voice: no (#3632)
+
+Pushed one-commit e6587ddb9, folding the reviewer's Mac FMARK test correction. [Selected correction/native receipts](verification/ipc-camera-review-fix-20261027/README.md) bind Mac IPC44/0/0, separate default-thread camera18/0/0, relay1/0 and doctest1/0 to nine successful operations; the unchanged production baseline retains f417's workspace Clippy/build. Original612 native preview39f has11,429 unique passes,45 Linux IPC controls including18 camera,106 summary skips with no invented identities, docs4/process13 and matching upload/API artifact digests. That older native result does not qualify the correction. All failures remain recorded. Current8049 carry onto4bff preserves all six authored blobs; its full host gate is active, and new exact-head CI/read/current-base readiness remains pending. Common integration is prepared on8049 as source-only5fe335d, with both fixture patches and the folded integration patch equal; no runtime, physical or activation acceptance. Friday owns memory plan/row edits; Third keeps current resync fixture qualification.
