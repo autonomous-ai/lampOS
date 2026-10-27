@@ -650,3 +650,4 @@ Ready for lamp-voice: yes (#2553), once its ARM64 run is green
 - 22:05: #3869 HOLDs (Fourteen P2 privacy: hear/sound as topics read everything; Eighth P2: format 1 look = true is the picture) fixed with all P3s in e773d1192; re-reads asked. #3840: reviewer-lead no P1/P2 on c727057e8 (P3: warning wording "presence is the topics"), harness-reviewer re-test. #3847: reviewer-lead no finding on c3faf2150; ARM64 pending.
 - 22:09: harness-reviewer READ-OK #3847 c3faf2150 (pure rebase). ARM64 pending on #3840 and #3847; NEXT TRAINs follow when green. #3869 re-reads pending.
 - 22:10: the coordinator: lampOS docs are English only (lampOS/AGENTS.md:110). Dropped the Vietnamese paragraph from #3869 (now f357f9cd1, control.md only; body updated); memory saved.
+- 22:14: NEXT TRAIN #3840 c727057e8 (harness READ-OK, reviewer-lead no P1/P2, ARM64 green). Eighth READ-OK #3869 f357f9cd1 (its HOLD closed); Fourteen's re-read pending. #3847 ARM64 pending.
