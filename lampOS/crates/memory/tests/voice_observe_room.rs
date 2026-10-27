@@ -136,12 +136,22 @@ fn with_the_switch_a_room_conversation_is_not_observed_and_a_known_persons_is() 
     // The switch is read from the environment, which this crate's tests may
     // not set in their own process: the test runs itself again with it set.
     if std::env::var("LAMP_MEMORY_PERSONAL_NEEDS_FACE").as_deref() != Ok("on") {
-        let status = Command::new(std::env::current_exe().unwrap())
+        let ran = Command::new(std::env::current_exe().unwrap())
             .args(["--exact", TEST, "--nocapture"])
             .env("LAMP_MEMORY_PERSONAL_NEEDS_FACE", "on")
-            .status()
+            .output()
             .unwrap();
-        assert!(status.success(), "{status}");
+        let (stdout, stderr) = (
+            String::from_utf8_lossy(&ran.stdout),
+            String::from_utf8_lossy(&ran.stderr),
+        );
+        assert!(ran.status.success(), "{}\n{stdout}{stderr}", ran.status);
+        // `--exact` with a name that matches nothing exits 0 having run
+        // nothing.
+        assert!(
+            stdout.contains("test result: ok. 1 passed;"),
+            "{TEST} did not run\n{stdout}{stderr}"
+        );
         return;
     }
     // The scripted model proposes, in words no pronoun list catches, what
