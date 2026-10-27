@@ -1,0 +1,121 @@
+{
+  "status": "COMPLETE_RUNTIME_PASS_ORIGINAL_POST_RUN_GUARD_FAILED",
+  "source": {
+    "head": "ed9aff39b609676535343f8979631c909e2a430a",
+    "tree": "8cfcb464b38b74a83eac86438f4bf36a725e6ad5"
+  },
+  "scope": "Local full Eyes, Voice, Memory and Skills plus IPC camera authority; no native ARM64/Linux or device acceptance",
+  "actual_parent": {
+    "native_session": 36537,
+    "native_exit": 125,
+    "native_chunk": "d3ec8c",
+    "actual_native_tool_completion_observed": true,
+    "actual_runtime_exit": 0,
+    "post_run_artifact_guard_failed": true,
+    "original_failure_not_relabelled": true
+  },
+  "actual_commands": {
+    "count": 6,
+    "all_actual_exits": 0,
+    "labels": [
+      "fmt",
+      "metadata",
+      "clippy",
+      "workspace-build",
+      "integration-list",
+      "integration-run"
+    ],
+    "normal_compiler_profiles": true,
+    "host_test_only_DEBUG0": true
+  },
+  "runtime": {
+    "selected_unique": 5538,
+    "clean_passed": 5538,
+    "failed": 0,
+    "leaks": 0,
+    "timeouts": 0,
+    "retries": 0,
+    "all_selected_terminal_once": true,
+    "natural_ignored_not_executed": 43,
+    "natural_ignored_JSON_terminals": 27,
+    "natural_ignored_start_only_with_human_SKIP": 16
+  },
+  "source_scoped_control_ledgers": {
+    "required_passed": 112,
+    "required_failed": 0,
+    "preserved_contracts_passed": 525,
+    "preserved_contracts_failed": 0,
+    "overlap_not_added": 25,
+    "all_named_terminal_positions_bound": true,
+    "controls_not_added_to_runtime_unique_count": true
+  },
+  "post_run_captured_input_audit": {
+    "captured_files": 46,
+    "survives_unchanged": 33,
+    "missing_at_audit": 13,
+    "missing_binaries_with_selected_cases": 5,
+    "missing_inputs_selected_cases_passed": 405,
+    "missing_inputs_natural_ignored_not_executed": 5,
+    "missing_files_without_selected_cases": 8,
+    "remaining_selected_passes": 5133,
+    "remaining_natural_ignored": 38,
+    "actor_or_exact_deletion_time": "UNPROVEN",
+    "full_post_run_artifact_stability_claimed": false
+  },
+  "original_final_guards": {
+    "source_stable": true,
+    "protected_files_full_byte_verified": 7890,
+    "small_evidence_pins": 47,
+    "protected_initial_and_final_bytes_verified": true,
+    "all_owned_sessions_groups_closed": true,
+    "offline_derivation_does_not_repeat_physical_full_guard": true
+  },
+  "original_50ms_control": {
+    "passed_once_in_this_full_runtime": true,
+    "assertion_unchanged": true,
+    "old_failed_epoch_explained_or_waived": false,
+    "device_or_acoustic_latency_claim": false
+  },
+  "docs_and_own_harnesses": "UNRUN",
+  "offline_derivation": {
+    "compiler_test_or_gate_launches": 0,
+    "original_inputs_unchanged": true,
+    "runtime_case_replay": false
+  },
+  "restoration_at_preparation": {
+    "native_session": 24093,
+    "state": "ACTIVE_BUILD_AND_LIST_ONLY",
+    "runtime_case_replay": false,
+    "root_release_observed": false,
+    "ready_claim": false
+  },
+  "target_release_permitted": false,
+  "ready_for_lamp_voice": false,
+  "native_ARM64_Linux_or_device_acceptance": false,
+  "evidence_sha256": {
+    "offline_accounting_receipt": "99baaef4f7328c0310fff87145019b6653a73816ff506a5240d8565c9584d311",
+    "actual_parent_terminal": "13a5c8578333ea3dddecb1e0726d68ef78035ec6832032ae9e128850c96faa3c",
+    "all_selected_terminal_ledger": "d047eb3adb441ff9692a1108329463772aa3143da6e98325de756d82a08af6bf",
+    "required112_terminal_ledger": "b18547b2b26eb39f88034b230b0316ddc537b2b5bf61c9ba4797b2e866e91dec",
+    "preserved525_terminal_ledger": "3af147bf5b89a331b77308f5e38d10efb149571f2eddde6fb9591e1a4508e723",
+    "captured_input_audit": "0f36aaa8fea7b5c022a008215d39a61fde8b8c6f0768510fea7b5fc7518f0a64",
+    "actual_restoration_release": "5b11499ab05e64bb5f7f2034ba28a365cef4e11a05dbb2e9c83e63804d64c645"
+  },
+  "actual_restoration_result": {
+    "actual_native_session": 24093,
+    "actual_native_exit": 0,
+    "actual_native_chunk": "3e303d",
+    "all46_bytes_exact_to_original_capture": true,
+    "source_stable": true,
+    "owned_sessions_closed": true,
+    "test_bodies_executed": 0,
+    "original_native36537_exit125_preserved": true,
+    "original_runtime_exit0_preserved": true
+  },
+  "only_unrun_continuation": {
+    "native_session": 14924,
+    "stage": "workspace-doctests",
+    "status": "ACTIVE_NO_FINAL_RESULT",
+    "runtime_union_replayed": 0
+  }
+}

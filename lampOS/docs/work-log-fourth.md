@@ -1,3 +1,20 @@
+## 2026-10-27 10:43 UTC — Common full runtime passes; artifact guard remains failed
+
+Ready for lamp-voice: no
+
+[8cf runtime/artifact receipt](verification/common-8cf-runtime-artifact-loss-20261027/receipt.json):
+actual runtime exit 0 gives 5,538 unique PASS, all 112 / all 525 with named ordinals,
+zero leaks/timeouts/retries; 43 natural ignores split 27 JSON / 16 start-only.
+The 25 overlaps are not added. Original native 36537 / exit 125 remains failed after
+13 captured inputs disappear; 33/46 remain exact. Five affected binaries account
+for 405 of those passes and five ignores. Source / all 7,890 protected bytes and
+owned closure hold, but full post-artifact stability is not claimed. The original
+50 ms assertion passes here; its earlier miss remains unexplained. Docs/custom
+are UNRUN. Restoration 24093 is active build/list only, no case replay or release.
+
+Restoration24093 now exits0, all46 input hashes byte-exact, no body replay.
+Only-unrun14924 is active for docs/relay/process; no final result or ready claim.
+
 ## 2026-10-27 09:50 UTC — Common expiry latch discriminated; fresh gates active
 
 Ready for lamp-voice: no
