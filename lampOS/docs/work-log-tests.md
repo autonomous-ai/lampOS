@@ -1,5 +1,13 @@
 # Tests work log
 
+## 2026-10-28 06:26 — Mood 29f original native proof and next event fixture
+
+Ready for lamp-voice: no (current source reads and latest-base/current-train conditions remain).
+
+[Mood 29f originals](verification/tests-mood-29f-native-20261028/) both pass: ARM40600407828/Linux40600407841, **7,856 unique passes, zero bad or selected unrun, 54 skips**. All341 Expression/required2, Reader14/Trace7 and Doc3 pass once in their stated scopes. Actual a109b8ecf [898,29f] differs by four played-tool paths; both owned blobs/modes/all47 fetched/94 CI inputs match. Raw logs and selected case audits are byte-equal captures. Configured34 reprints/auxiliary counts stay separate; no archive/payload/device action.
+
+[Taken](https://github.com/autonomous-ai/lampOS/issues/3504#issuecomment-6455732584) before code: #1806 quoted-say journal follow-up, separate from #3545. Only addon.rs and English Skills docs change on tests/1806-quoted-say-journal (Main898). The fixture owns its listener, waits for its exact proposal's complete journal outcome and preserves all original caller assertions, the two-second request bound and full2.2-second negative envelope. Static formatting/diff checks pass. Controlled350ms stand-in reply variants are prepared but unrun; no commit/push or runtime qualification claimed yet. CurrentSkills913's inventory/full-suite continuation runs first; its capacity stop retains five completed compiler stages and zero test executions.
+
 ## 2026-10-28 06:19 — Reader current native and Mood current host proof
 
 Ready for lamp-voice: no (current reads and latest-base/train-member disposition remain; both PRs stay draft).

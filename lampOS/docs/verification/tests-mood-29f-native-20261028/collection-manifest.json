@@ -1,0 +1,31 @@
+{
+  "files": {
+    "audit.json": {
+      "sha256": "305494338440af486ab495c3e69676b5aa3a4c3eb0db27f0fceb632535b250a5",
+      "bytes": 56590
+    },
+    "subject-case-audit.json": {
+      "sha256": "89ffe9b9221e771de70492d7048e29ac74cbe740a7252241a63b6acc854d225f",
+      "bytes": 120599
+    },
+    "Doc3-native-case-audit.json": {
+      "sha256": "f3db46e2c4f10247ac25b86cb3f4094a7791193d68fa7395128e9adb1d7f2f5f",
+      "bytes": 1672
+    },
+    "Linux-clippy-job-122526812838.log": {
+      "sha256": "e6c4670ce719a9d6fa800232b54e8bfcf169409a91e850c64c44da422703b949",
+      "bytes": 41319
+    },
+    "ARM64-job-122526813264.log": {
+      "sha256": "9b9982caa45a0d58e18a656b2fc76a67480f8d82c22449b83cddc1ada5513949",
+      "bytes": 1385209
+    },
+    "README.md": {
+      "sha256": "d5969d80e8295fc9ddaf5b4a276176c888b8f82178cbd9b0d8aff9a20de2840e",
+      "bytes": 1994
+    }
+  },
+  "raw_captures_verbatim": true,
+  "private_source_directory": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/mood-29f-original-native-20261028",
+  "private_collection_manifest_sha256": "0134968bcadc2ca4d9704eda6f07fea6d5fc6c4fbcc400c4e325dc9e1469ead9"
+}

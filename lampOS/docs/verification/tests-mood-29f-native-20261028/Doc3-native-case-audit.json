@@ -1,0 +1,57 @@
+{
+  "cases": [
+    {
+      "binary": "lamp-update::install",
+      "identity": "every_part_of_the_lamp_waits_for_setups_marker_itself",
+      "records": [
+        {
+          "line": 3561,
+          "timestamp": "2026-10-27T23:16:06.1233742Z",
+          "status": "PASS",
+          "seconds": 0.004,
+          "ordinal": 2724,
+          "total": 7856,
+          "binary": "lamp-update::install",
+          "test": "every_part_of_the_lamp_waits_for_setups_marker_itself"
+        }
+      ],
+      "PASS_once": true
+    },
+    {
+      "binary": "lamp-update::it",
+      "identity": "ci_paths::every_doc_a_crate_reads_is_named_back_in_the_workflows_pull_request_paths",
+      "records": [
+        {
+          "line": 3633,
+          "timestamp": "2026-10-27T23:16:09.2118324Z",
+          "status": "PASS",
+          "seconds": 0.171,
+          "ordinal": 2796,
+          "total": 7856,
+          "binary": "lamp-update::it",
+          "test": "ci_paths::every_doc_a_crate_reads_is_named_back_in_the_workflows_pull_request_paths"
+        }
+      ],
+      "PASS_once": true
+    },
+    {
+      "binary": "lamp-update::it",
+      "identity": "ci_paths::the_scan_sees_paths_in_strings_and_not_in_comments_or_prose",
+      "records": [
+        {
+          "line": 3632,
+          "timestamp": "2026-10-27T23:16:09.1988937Z",
+          "status": "PASS",
+          "seconds": 0.004,
+          "ordinal": 2795,
+          "total": 7856,
+          "binary": "lamp-update::it",
+          "test": "ci_paths::the_scan_sees_paths_in_strings_and_not_in_comments_or_prose"
+        }
+      ],
+      "PASS_once": true
+    }
+  ],
+  "all3_PASS_once": true,
+  "separate_from_Expression341": true
+}
