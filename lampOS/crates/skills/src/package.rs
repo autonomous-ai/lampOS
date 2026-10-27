@@ -1381,9 +1381,12 @@ fn moved_in(
 }
 
 /// Removes the installable skill `name` from `skills` and says so. A core
-/// skill is refused: it comes with the lamp.
-pub fn remove(skills: &Path, name: &str) -> Result<String, String> {
-    match taken_off(skills, name, None)? {
+/// skill is refused: it comes with the lamp. With `state`, the running
+/// program's state folder, the owner's yes to its camera is taken back
+/// first ([`super::CAMERA_FILE`]), so a skill put on again by that name
+/// asks again.
+pub fn remove(skills: &Path, state: Option<&Path>, name: &str) -> Result<String, String> {
+    match taken_off(skills, state, name, None)? {
         None => Ok(removed_said(name)),
         Some(left) => Err(format!("removed {name}, but {left}")),
     }
@@ -1548,7 +1551,12 @@ fn turned_off(toml: &str) -> String {
 /// when `None`). Once the skill is renamed aside it is gone for the running
 /// program: `Some` says where it was set aside and why that was not then
 /// deleted (the next install deletes it, [`left_by_a_run`]).
-fn taken_off(skills: &Path, name: &str, wait: Option<Duration>) -> Result<Option<String>, String> {
+fn taken_off(
+    skills: &Path,
+    state: Option<&Path>,
+    name: &str,
+    wait: Option<Duration>,
+) -> Result<Option<String>, String> {
     if !skill_name_ok(name) {
         return Err(format!(
             "{name:?} is not a skill's name: 1 to 64 lowercase letters, digits and hyphens"
@@ -1576,6 +1584,18 @@ fn taken_off(skills: &Path, name: &str, wait: Option<Duration>) -> Result<Option
         return Err(format!(
             "{name} is a core skill: it comes with the lamp and can't be removed"
         ));
+    }
+    // The owner's yes to its camera goes with it, under the same lock and
+    // before the folder: a skill put on again by this name, from the Store
+    // or by hand, never inherits it (#3504's piece C). Not taken back,
+    // nothing is removed.
+    if let Some(state) = state {
+        let file = state.join(super::CAMERA_FILE);
+        let failed = |error: io::Error| format!("not removed: {}: {error}", file.display());
+        let mut yes = super::read_names(&file).map_err(failed)?;
+        if yes.remove(name) {
+            super::keep_names(&file, &yes).map_err(failed)?;
+        }
     }
     // Gone at once for the running program, then deleted.
     let old = hidden_place(skills, "removed", name);
@@ -1990,7 +2010,7 @@ pub fn asked(
         // Renamed aside is removed: where it was set aside, and why it
         // was not then deleted, go to the journal alone.
         (Some(serde_json::Value::String(name)), _) => {
-            taken_off(skills, name, Some(lock_wait)).map(|left| {
+            taken_off(skills, Some(state), name, Some(lock_wait)).map(|left| {
                 if let Some(left) = left {
                     eprintln!("lamp-skills: asked: removed {name}, but {left}");
                 }

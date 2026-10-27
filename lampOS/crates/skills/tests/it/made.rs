@@ -327,7 +327,7 @@ fn a_made_skill_never_takes_the_place_of_one_put_on_another_way() {
         "the store's stays"
     );
     // One made here before is the person's own: the new one replaces it.
-    package::remove(&skills, "evening-dim").unwrap();
+    package::remove(&skills, None, "evening-dim").unwrap();
     install_made(&skills, &keeping.directory, &made.sha256, wait).unwrap();
     let again = keep(
         &answer(&TOML.replace("1.0.0", "1.0.1"), "evening-dim"),

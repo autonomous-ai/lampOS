@@ -652,6 +652,9 @@ the voice has no function for it and the model can't ask for it (the
 cloud's kinds come only from the app, over the broker). Whether the voice
 should ever remove one is a separate decision, not taken.
 
+- **Its camera yes goes with it.** The helper takes the name out of
+  `lamp-skills`' `camera` first, under the same lock, so a skill put on
+  again by that name asks again (`skills.camera` below).
 - **Who may be removed.** An `installed` or `made_here` skill, whether it
   loads or not. A `core` skill is refused, `dance is a core skill: it comes
   with the lamp, so it can't be removed`, and `lamp-skills` refuses it
@@ -794,12 +797,16 @@ itself, and replies with `skills.list`'s page, the skill's
   which a round never touches. The name need not be on the lamp yet: a
   Store package that asks the camera is refused until its yes is kept
   (`not installed: NAME: it asks the camera, and the owner hasn't said
-  yes`), so the app says yes before `skills.install`.
-- **What it does.** The running `lamp-skills` reads the file at every call
-  that would give the model the picture: a skill that is not core sees it
-  only while its name is there, and a yes taken back holds from the next
-  call, nothing restarted ([skills.md](skills.md), "The manage helper").
-  A core skill needs no yes.
+  yes`), so the app says yes before `skills.install`. `skills.remove`
+  takes the name out with the skill, so one put on again by that name
+  asks again.
+- **What it does.** The running `lamp-skills` reads the file at every
+  call to a skill that asks the picture: a skill that is not core runs only
+  while its name is there. Without it the whole call is refused, nothing
+  moved, and the model is told `The owner hasn't allowed this skill's
+  camera; they can allow it in the app.`. A yes taken back holds from the
+  next call, nothing restarted ([skills.md](skills.md), "The manage
+  helper"). A core skill needs no yes.
 - Without `LAMP_SKILLS_PAGE=on`, `not on this lamp: skills.camera`.
 
 ### Installing from the Skills Store (`skills.install`)
