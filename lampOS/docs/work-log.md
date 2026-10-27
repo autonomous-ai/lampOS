@@ -1,3 +1,11 @@
+## 27 October 2026, 20:52 +07 — head-pair input seam qualified; receipt delivered
+
+[Head-pair qualification](verification/head-touch-inputs-20261027/initial-and-026/README.md) records two separate Update-only Mac executions: first Main `36a` plus five frozen files, later committed unchanged as `8c5`; then clean `8e2/026`. Each passes fmt, strict all-target Clippy and **499 unique PASS / zero bad or selected unrun / six ignored**, with four new controls plus eighteen foundation controls and the existing mask case once. Doctests report zero cases; overlapping Mac skip contracts add no passes. Source, tool, controller and ten actual/preserved executable guards close.
+
+The first runtime itself exits 0; its original bookkeeping controller exits 1 on six skipped ordinal placeholders. Offline correction is explicit and repeats no test. The separately executed `026` controller closes 0. The current `d962/bf6` carry is UNRUN: four full blobs remain equal, all five modes and authored hunks match, and upstream shared-document changes are retained. No earlier counts qualify that carry.
+
+Train 238/#3841 delivered receipt #3808 as `1891c56ec/3d4cdc228`; no implementation is reapplied. The host-prose follow-up is docs-only [#3851](https://github.com/autonomous-ai/lampOS/pull/3851). Raw settings capture is in its distinct preferred-runner gate on `86ad/bf6`; its old normal-libtest 509/1/6 failure and the inconclusive 198-pass baseline remain unwaived. A read-only raw-observation recheck has source review but no runtime yet. No authenticated executable plan, independent restore, root bootstrap or attended 7071 acceptance is claimed; #3689 remains open.
+
 ## 27 October 2026, 20:03 +07 — baseline lock control is inconclusive
 
 [Unmodified Main36a baseline](verification/writer-settings-capture-20261027/baseline-round-36a/README.md): exactly one complete round cohort at four threads, 198 passed / 0 failed / 0 ignored, 314.202 seconds. All source, configuration, driver and preserved-executable guards close. The target case passes in this execution; that does not establish the cause of, waive or relabel Root raw4f25/3f4's retained509/1/6 failure. Its failed preserved driver was rehashed unchanged and never executed again. No production or fixture patch was made for this control.

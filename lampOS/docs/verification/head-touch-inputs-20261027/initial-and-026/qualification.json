@@ -1,0 +1,1159 @@
+{
+  "issue": 3689,
+  "scope": "Head-pair input seam; no runtime collector/authentication/freshness/restoration",
+  "executions": [
+    {
+      "name": "first-36a",
+      "actual_head": "36a42f30a756b6fd6f31c9b6102cb66e5008416c",
+      "actual_base": "36a42f30a756b6fd6f31c9b6102cb66e5008416c",
+      "actual_git_tree": "191995496d67ff83817227b759eba95b734d61a1",
+      "source_shape": "base plus exactly five frozen WIP files",
+      "owned": {
+        "lampOS/crates/update/src/head_touch.rs": {
+          "sha256": "0703bf2d4ddbba946b365240f44bcb79b5edcfc28fd2c31c34e92d8e82d41334",
+          "mode": 420
+        },
+        "lampOS/crates/update/src/head_touch/input_tests.rs": {
+          "sha256": "f5a761bd56600c56173f87a647e6e2cf39c2e8bf8d83883f6d56efe3538cae43",
+          "mode": 420
+        },
+        "lampOS/docs/head-touch-inputs.md": {
+          "sha256": "a69da4104f21fe0e8614c11c9edbba72f98312564e6dc473f543942c758b6014",
+          "mode": 420
+        },
+        "lampOS/docs/reuse-decisions.md": {
+          "sha256": "228ad14d843abc457b5ffb7e20e4171f448c2c8803447ed330810efcca21a0be",
+          "mode": 420
+        },
+        "lampOS/docs/updates.md": {
+          "sha256": "2f9352be709447ea340e0009643cd9729e14ad4b3e4699a96a1512f79a1b11bd",
+          "mode": 420
+        }
+      },
+      "runner": {
+        "nextest": "0.9.150",
+        "rust": "1.96.0",
+        "host_platform": "macOS aarch64",
+        "nextest_sha256": "aad9d409cd2f0a81fcaed49d7672a133254179458436c1e957505e4a11655329",
+        "nextest_config_sha256": "c4992da8d157df279011a424b5feb4833f001fd1d46ce3edd0a56992c848bb33",
+        "profile": "pr",
+        "filter": "all()",
+        "test_processes": 4,
+        "retries": 0,
+        "no_fail_fast": true,
+        "user_config_disabled": true,
+        "prior_ci149_not_identical": true
+      },
+      "commands": [
+        {
+          "stage": "fmt",
+          "argv": [
+            "cargo",
+            "+1.96.0",
+            "fmt",
+            "--all",
+            "--check"
+          ],
+          "exit_code": 0,
+          "elapsed_seconds": 5.861
+        },
+        {
+          "stage": "clippy",
+          "argv": [
+            "cargo",
+            "+1.96.0",
+            "clippy",
+            "--locked",
+            "-p",
+            "lamp-update",
+            "--all-targets",
+            "--",
+            "-D",
+            "warnings"
+          ],
+          "exit_code": 0,
+          "elapsed_seconds": 17.69
+        },
+        {
+          "stage": "compile",
+          "argv": [
+            "cargo",
+            "+1.96.0",
+            "test",
+            "--locked",
+            "-p",
+            "lamp-update",
+            "--no-run",
+            "--message-format=json"
+          ],
+          "exit_code": 0,
+          "elapsed_seconds": 26.185
+        },
+        {
+          "stage": "list",
+          "argv": [
+            "cargo-nextest",
+            "nextest",
+            "list",
+            "--locked",
+            "-p",
+            "lamp-update",
+            "--profile",
+            "pr",
+            "-E",
+            "all()",
+            "--config-file",
+            "lampOS/.config/nextest.toml",
+            "--user-config-file",
+            "none",
+            "--message-format",
+            "json"
+          ],
+          "exit_code": 0,
+          "elapsed_seconds": 6.371
+        },
+        {
+          "stage": "nextest",
+          "argv": [
+            "cargo-nextest",
+            "nextest",
+            "run",
+            "--locked",
+            "-p",
+            "lamp-update",
+            "--profile",
+            "pr",
+            "-E",
+            "all()",
+            "--config-file",
+            "lampOS/.config/nextest.toml",
+            "--user-config-file",
+            "none",
+            "--test-threads",
+            "4",
+            "--retries",
+            "0",
+            "--no-fail-fast",
+            "--status-level",
+            "all",
+            "--final-status-level",
+            "none",
+            "--color",
+            "never"
+          ],
+          "exit_code": 0,
+          "elapsed_seconds": 428.354
+        },
+        {
+          "stage": "doctests",
+          "argv": [
+            "cargo",
+            "+1.96.0",
+            "test",
+            "--locked",
+            "-p",
+            "lamp-update",
+            "--doc",
+            "--",
+            "--test-threads=4"
+          ],
+          "exit_code": 0,
+          "elapsed_seconds": 1.172
+        },
+        {
+          "stage": "mac-contract-self-cli-exec",
+          "argv": [
+            "target/debug/deps/self_cli_exec-25113342c679f525",
+            "--exact",
+            "actual_cli_exec_confirms_before_the_next_round",
+            "--test-threads=1"
+          ],
+          "exit_code": 0,
+          "elapsed_seconds": 0.171
+        },
+        {
+          "stage": "mac-contract-self-process-cuts",
+          "argv": [
+            "target/debug/deps/self_process_cuts-8ce1b6350e2ac329",
+            "--exact",
+            "persisted_self_switches_survive_sigkill",
+            "--test-threads=1"
+          ],
+          "exit_code": 0,
+          "elapsed_seconds": 0.251
+        }
+      ],
+      "nextest": {
+        "exit_code": 0,
+        "discovered_cases": 505,
+        "selected": 499,
+        "unique_pass": 499,
+        "fail": 0,
+        "leak": 0,
+        "timeout": 0,
+        "selected_unrun": 0,
+        "ignored": 6,
+        "listed_binaries": 9,
+        "selected_case_binaries": 6,
+        "required_new": [
+          "head_touch::input_tests::an_uncaptured_key_never_becomes_a_captured_absence",
+          "head_touch::input_tests::ordinary_inputs_keep_regular_links_null_masks_and_directory_aliases",
+          "head_touch::input_tests::projection_and_verification_replay_closed_inputs_without_filesystem_fallback",
+          "head_touch::input_tests::rejecting_an_early_override_does_not_consume_a_later_directory_error"
+        ],
+        "required_foundation": [
+          "writer_refresh::tests::a_restart_at_every_unqualified_prefix_requires_recovery_and_never_reissues_the_grant",
+          "writer_refresh::tests::a_stale_or_modified_first_apply_cannot_consume_the_single_grant",
+          "writer_refresh::tests::diagnostics_hide_unknown_values_and_known_duplicate_or_shadowed_fields_are_refused",
+          "writer_refresh::tests::failed_persist_after_publication_poisons_the_live_session_until_actual_disk_state_is_recovered",
+          "writer_refresh::tests::first_apply_binds_its_own_later_envelope_and_sequence_without_replacing_the_refresh_identity",
+          "writer_refresh::tests::future_nonsemantic_metadata_is_preserved_without_becoming_admission_authority",
+          "writer_refresh::tests::guard_lock_is_exclusive_and_independent_of_the_product_lock",
+          "writer_refresh::tests::identity_substitution_never_changes_or_admits_the_saved_transaction",
+          "writer_refresh::tests::live_or_poisoned_sessions_cannot_expose_stale_recovery_inputs",
+          "writer_refresh::tests::missing_and_nonregular_records_do_not_turn_into_a_fresh_transaction",
+          "writer_refresh::tests::no_apply_does_not_qualify_but_one_exact_apply_can_enter_without_an_ordinary_round",
+          "writer_refresh::tests::qualified_and_closed_inputs_keep_the_compatible_writer_and_bound_product_receipts",
+          "writer_refresh::tests::qualified_writer_and_preimages_survive_a_restart_until_the_product_journal_closes",
+          "writer_refresh::tests::recovery_views_retain_later_metadata_in_the_bound_inputs_without_reparsing",
+          "writer_refresh::tests::reloaded_inputs_keep_the_exact_origin_and_distinguish_writer_from_apply_restoration",
+          "writer_refresh::tests::restoring_an_apply_requires_its_original_grant_and_preimage_identity",
+          "writer_refresh::tests::unsupported_or_malformed_journals_are_retained_and_block_every_admission",
+          "writer_refresh::tests::write_bound_and_invalid_identities_leave_no_journal_or_partial_acceptance"
+        ],
+        "existing_mask_control": "head_touch::tests::null_masks_do_not_admit_other_character_devices",
+        "required_controls": [
+          {
+            "binary": "lamp-update",
+            "name": "head_touch::input_tests::an_uncaptured_key_never_becomes_a_captured_absence",
+            "status": "PASS"
+          },
+          {
+            "binary": "lamp-update",
+            "name": "head_touch::input_tests::ordinary_inputs_keep_regular_links_null_masks_and_directory_aliases",
+            "status": "PASS"
+          },
+          {
+            "binary": "lamp-update",
+            "name": "head_touch::input_tests::rejecting_an_early_override_does_not_consume_a_later_directory_error",
+            "status": "PASS"
+          },
+          {
+            "binary": "lamp-update",
+            "name": "head_touch::tests::null_masks_do_not_admit_other_character_devices",
+            "status": "PASS"
+          },
+          {
+            "binary": "lamp-update",
+            "name": "head_touch::input_tests::projection_and_verification_replay_closed_inputs_without_filesystem_fallback",
+            "status": "PASS"
+          },
+          {
+            "binary": "lamp-update",
+            "name": "writer_refresh::tests::a_restart_at_every_unqualified_prefix_requires_recovery_and_never_reissues_the_grant",
+            "status": "PASS"
+          },
+          {
+            "binary": "lamp-update",
+            "name": "writer_refresh::tests::a_stale_or_modified_first_apply_cannot_consume_the_single_grant",
+            "status": "PASS"
+          },
+          {
+            "binary": "lamp-update",
+            "name": "writer_refresh::tests::diagnostics_hide_unknown_values_and_known_duplicate_or_shadowed_fields_are_refused",
+            "status": "PASS"
+          },
+          {
+            "binary": "lamp-update",
+            "name": "writer_refresh::tests::first_apply_binds_its_own_later_envelope_and_sequence_without_replacing_the_refresh_identity",
+            "status": "PASS"
+          },
+          {
+            "binary": "lamp-update",
+            "name": "writer_refresh::tests::failed_persist_after_publication_poisons_the_live_session_until_actual_disk_state_is_recovered",
+            "status": "PASS"
+          },
+          {
+            "binary": "lamp-update",
+            "name": "writer_refresh::tests::guard_lock_is_exclusive_and_independent_of_the_product_lock",
+            "status": "PASS"
+          },
+          {
+            "binary": "lamp-update",
+            "name": "writer_refresh::tests::identity_substitution_never_changes_or_admits_the_saved_transaction",
+            "status": "PASS"
+          },
+          {
+            "binary": "lamp-update",
+            "name": "writer_refresh::tests::future_nonsemantic_metadata_is_preserved_without_becoming_admission_authority",
+            "status": "PASS"
+          },
+          {
+            "binary": "lamp-update",
+            "name": "writer_refresh::tests::missing_and_nonregular_records_do_not_turn_into_a_fresh_transaction",
+            "status": "PASS"
+          },
+          {
+            "binary": "lamp-update",
+            "name": "writer_refresh::tests::live_or_poisoned_sessions_cannot_expose_stale_recovery_inputs",
+            "status": "PASS"
+          },
+          {
+            "binary": "lamp-update",
+            "name": "writer_refresh::tests::no_apply_does_not_qualify_but_one_exact_apply_can_enter_without_an_ordinary_round",
+            "status": "PASS"
+          },
+          {
+            "binary": "lamp-update",
+            "name": "writer_refresh::tests::qualified_and_closed_inputs_keep_the_compatible_writer_and_bound_product_receipts",
+            "status": "PASS"
+          },
+          {
+            "binary": "lamp-update",
+            "name": "writer_refresh::tests::recovery_views_retain_later_metadata_in_the_bound_inputs_without_reparsing",
+            "status": "PASS"
+          },
+          {
+            "binary": "lamp-update",
+            "name": "writer_refresh::tests::qualified_writer_and_preimages_survive_a_restart_until_the_product_journal_closes",
+            "status": "PASS"
+          },
+          {
+            "binary": "lamp-update",
+            "name": "writer_refresh::tests::restoring_an_apply_requires_its_original_grant_and_preimage_identity",
+            "status": "PASS"
+          },
+          {
+            "binary": "lamp-update",
+            "name": "writer_refresh::tests::write_bound_and_invalid_identities_leave_no_journal_or_partial_acceptance",
+            "status": "PASS"
+          },
+          {
+            "binary": "lamp-update",
+            "name": "writer_refresh::tests::unsupported_or_malformed_journals_are_retained_and_block_every_admission",
+            "status": "PASS"
+          },
+          {
+            "binary": "lamp-update",
+            "name": "writer_refresh::tests::reloaded_inputs_keep_the_exact_origin_and_distinguish_writer_from_apply_restoration",
+            "status": "PASS"
+          }
+        ],
+        "ignored_cases": [
+          {
+            "binary": "lamp-update",
+            "name": "fetch::tests::a_release_file_from_github"
+          },
+          {
+            "binary": "lamp-update",
+            "name": "records::tests::write_records_fixtures"
+          },
+          {
+            "binary": "lamp-update::release_pair",
+            "name": "release_6408_recovers_a_cut_written_by_release_6449"
+          },
+          {
+            "binary": "lamp-update::release_pair",
+            "name": "release_6449_recovers_a_cut_written_by_release_6408"
+          },
+          {
+            "binary": "lamp-update::self-cli-exec",
+            "name": "actual_cli_exec_confirms_before_the_next_round"
+          },
+          {
+            "binary": "lamp-update::self-process-cuts",
+            "name": "persisted_self_switches_survive_sigkill"
+          }
+        ],
+        "raw_summary": [
+          " Nextest run ID d354bc82-7343-4760-bb46-66d2daeb45d7 with nextest profile: pr",
+          "    Starting 499 tests across 9 binaries (6 tests skipped)",
+          "     Summary [ 427.937s] 499 tests run: 499 passed (1 slow), 6 skipped"
+        ]
+      },
+      "separate_doctests": {
+        "exit_code": 0,
+        "summaries": [
+          {
+            "passed": 0,
+            "failed": 0,
+            "ignored": 0
+          }
+        ],
+        "totals": {
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        }
+      },
+      "overlapping_mac_skip_contracts": [
+        {
+          "binary": "lamp-update::self-cli-exec",
+          "name": "actual_cli_exec_confirms_before_the_next_round",
+          "exit_code": 0,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 1,
+          "already_counted_in_nextest_ignored": true
+        },
+        {
+          "binary": "lamp-update::self-process-cuts",
+          "name": "persisted_self_switches_survive_sigkill",
+          "exit_code": 0,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 1,
+          "already_counted_in_nextest_ignored": true
+        }
+      ],
+      "source_count": 7393,
+      "guards": {
+        "head_unchanged": true,
+        "status_unchanged": true,
+        "source_unchanged": true,
+        "source_count": 7393,
+        "runtime_controller_unchanged": true,
+        "preparation_controller_unchanged": true,
+        "nextest_tool_unchanged": true,
+        "actual_preserved_executable_hashes_match": true
+      },
+      "compiled_executables": [
+        {
+          "target": "lamp-update",
+          "kind": [
+            "bin"
+          ],
+          "profile_test": false,
+          "relative_path": "target/debug/lamp-update",
+          "bytes": 13776240,
+          "sha256": "72804f6d261e33bf8e1958aac65da66f69c7473e1925ac09a91664783dfd350c",
+          "preserved_sha256": "72804f6d261e33bf8e1958aac65da66f69c7473e1925ac09a91664783dfd350c",
+          "post_runtime_sha256": "72804f6d261e33bf8e1958aac65da66f69c7473e1925ac09a91664783dfd350c"
+        },
+        {
+          "target": "self-process-cuts",
+          "kind": [
+            "test"
+          ],
+          "profile_test": true,
+          "relative_path": "target/debug/deps/self_process_cuts-8ce1b6350e2ac329",
+          "bytes": 566176,
+          "sha256": "d8a236e3184b58982d83647400037400c3e439281598894a7acf4c1a8bdbd3dd",
+          "preserved_sha256": "d8a236e3184b58982d83647400037400c3e439281598894a7acf4c1a8bdbd3dd",
+          "post_runtime_sha256": "d8a236e3184b58982d83647400037400c3e439281598894a7acf4c1a8bdbd3dd"
+        },
+        {
+          "target": "self-cli-exec",
+          "kind": [
+            "test"
+          ],
+          "profile_test": true,
+          "relative_path": "target/debug/deps/self_cli_exec-25113342c679f525",
+          "bytes": 565616,
+          "sha256": "f7d7f70ca8616a04717f6236c848167b6787409a3367e8a689e18708acd14369",
+          "preserved_sha256": "f7d7f70ca8616a04717f6236c848167b6787409a3367e8a689e18708acd14369",
+          "post_runtime_sha256": "f7d7f70ca8616a04717f6236c848167b6787409a3367e8a689e18708acd14369"
+        },
+        {
+          "target": "lamp-update",
+          "kind": [
+            "bin"
+          ],
+          "profile_test": true,
+          "relative_path": "target/debug/deps/lamp_update-1c2005188bf8e5ab",
+          "bytes": 1282768,
+          "sha256": "404e178d8804b66004699b294e8b22454bebab5fe21328e582ce43b06673673a",
+          "preserved_sha256": "404e178d8804b66004699b294e8b22454bebab5fe21328e582ce43b06673673a",
+          "post_runtime_sha256": "404e178d8804b66004699b294e8b22454bebab5fe21328e582ce43b06673673a"
+        },
+        {
+          "target": "release_pair",
+          "kind": [
+            "test"
+          ],
+          "profile_test": true,
+          "relative_path": "target/debug/deps/release_pair-2447bcdc916504d4",
+          "bytes": 3348704,
+          "sha256": "400cb31e205e105f56a432e71f913d23125ee1df7535f25565cd3e86d8940ebd",
+          "preserved_sha256": "400cb31e205e105f56a432e71f913d23125ee1df7535f25565cd3e86d8940ebd",
+          "post_runtime_sha256": "400cb31e205e105f56a432e71f913d23125ee1df7535f25565cd3e86d8940ebd"
+        },
+        {
+          "target": "it",
+          "kind": [
+            "test"
+          ],
+          "profile_test": true,
+          "relative_path": "target/debug/deps/it-ae5bcab57f15def3",
+          "bytes": 2008784,
+          "sha256": "32196ae695e44ca3aab0b5b9ee1e8424f3d325f7643c880c16ccd82f9bec01c2",
+          "preserved_sha256": "32196ae695e44ca3aab0b5b9ee1e8424f3d325f7643c880c16ccd82f9bec01c2",
+          "post_runtime_sha256": "32196ae695e44ca3aab0b5b9ee1e8424f3d325f7643c880c16ccd82f9bec01c2"
+        },
+        {
+          "target": "functions",
+          "kind": [
+            "test"
+          ],
+          "profile_test": true,
+          "relative_path": "target/debug/deps/functions-9e56cee2cd1d1695",
+          "bytes": 23094040,
+          "sha256": "5e72df317c9e5388267f39ccfe9891f7d1afd5b531e8c386856e7491c4aa78f5",
+          "preserved_sha256": "5e72df317c9e5388267f39ccfe9891f7d1afd5b531e8c386856e7491c4aa78f5",
+          "post_runtime_sha256": "5e72df317c9e5388267f39ccfe9891f7d1afd5b531e8c386856e7491c4aa78f5"
+        },
+        {
+          "target": "install",
+          "kind": [
+            "test"
+          ],
+          "profile_test": true,
+          "relative_path": "target/debug/deps/install-7739a60369055fbf",
+          "bytes": 16796056,
+          "sha256": "47945a5b9df4eeffa6b2b42da500658e4e6a35a09a347f9a2df2fa75e6450fb8",
+          "preserved_sha256": "47945a5b9df4eeffa6b2b42da500658e4e6a35a09a347f9a2df2fa75e6450fb8",
+          "post_runtime_sha256": "47945a5b9df4eeffa6b2b42da500658e4e6a35a09a347f9a2df2fa75e6450fb8"
+        },
+        {
+          "target": "round",
+          "kind": [
+            "test"
+          ],
+          "profile_test": true,
+          "relative_path": "target/debug/deps/round-f8d7f0920c4648fb",
+          "bytes": 20690600,
+          "sha256": "6120759e06491dcf107818eedd2c0ee503f4ca9ff7b7fb6f0e59ef7b461c2eb8",
+          "preserved_sha256": "6120759e06491dcf107818eedd2c0ee503f4ca9ff7b7fb6f0e59ef7b461c2eb8",
+          "post_runtime_sha256": "6120759e06491dcf107818eedd2c0ee503f4ca9ff7b7fb6f0e59ef7b461c2eb8"
+        },
+        {
+          "target": "lamp_update",
+          "kind": [
+            "lib"
+          ],
+          "profile_test": true,
+          "relative_path": "target/debug/deps/lamp_update-2fc2e5180de6bc32",
+          "bytes": 15439360,
+          "sha256": "b23dc4e07dc75545e5ff367b27e7f37cadc21e5a6a9b9db1e19753b97f7bf5d6",
+          "preserved_sha256": "b23dc4e07dc75545e5ff367b27e7f37cadc21e5a6a9b9db1e19753b97f7bf5d6",
+          "post_runtime_sha256": "b23dc4e07dc75545e5ff367b27e7f37cadc21e5a6a9b9db1e19753b97f7bf5d6"
+        }
+      ],
+      "original_runtime_controller_exit_code": 1,
+      "original_controller_closure_all_stages_passed": false,
+      "original_controller_error": {
+        "category": "AssertionError",
+        "message": "runtime or separate-scope gate did not pass; retain every witness"
+      },
+      "raw_hashes": {
+        "fmt.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "fmt.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "clippy.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "clippy.stderr": "0fede15b2ae7185158d77d81cb30f638af6b23549994c75d91dbacfd26658ca6",
+        "compile.stdout": "c4eff6d29539dcf36043c9a0f43ee3f4ddcefe3c9216fdd12d252ceaf49cac7b",
+        "compile.stderr": "1692802dcadaead06ed33692948f7014eed24b8817aa9f06a4613d08a61de66b",
+        "list.stdout": "fb85a4bc90399c8353a32ae713737cf229c9960763700dcb86df38121d5c5c47",
+        "list.stderr": "99042cf5e7b4cee4afcff3f41854b35318c1399135a3531d1f6f511446369ce3",
+        "nextest.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "nextest.stderr": "d47ff2735505dd7f0a968fb0d0e79a1859536664afbf81a2da8637382e709964",
+        "doctests.stdout": "df166913f47ff1f04202cae9b31df67ed272d692d99a0023a8117dc3029100dd",
+        "doctests.stderr": "58a549048be0453518aeb8cfe2ca189ece7888a589208e188a6773bf79798ed3",
+        "mac-contract-self-cli-exec.stdout": "e609e31d833c415938d8a7a8277dc0b2e0a8d53afe374bb841bb16552a1bfe8b",
+        "mac-contract-self-cli-exec.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "mac-contract-self-process-cuts.stdout": "b2b5dec35eeaf5a469e308f8f57aec00eb02df2c34be190680b12c217c484609",
+        "mac-contract-self-process-cuts.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "source-before.json": "16daf2835a617c4a76f6434d76e348d729aa92895bdfe0a50df97e71fd89e975",
+        "source-after.json": "16daf2835a617c4a76f6434d76e348d729aa92895bdfe0a50df97e71fd89e975",
+        "source-after-runtime.json": "16daf2835a617c4a76f6434d76e348d729aa92895bdfe0a50df97e71fd89e975",
+        "closure.json": "f8b0eaffb96ba595a179d1827a3fff5c7c29a226584ab14ca9efc627aba06c4f",
+        "runtime-census.json": "4174b3898aa40208ffc3a7cef02f9f1a3a4291204996f7cf48afa6a2803fba61",
+        "executables-final.json": "f45da4a369376fa4a9a7eec9d62f2d1aefefa7d04057f9fe46d8815142874c20",
+        "discovery.json": "df3215f94842e8a351b45d781b419018ced160d53b9d2641b1df620e14da05df",
+        "offline-correction-receipt.json": "31734964e78babeacaab02f6d33a681db26cf0ddc331f2fdec15bf21350f0a6e",
+        "offline-corrected-analysis.json": "08ef6057c0791e1b98783add54097cee764749a1df66a6c9621988595f07faf6"
+      },
+      "offline_correction": {
+        "no_new_execution": true,
+        "original_controller_status_preserved": true,
+        "exact_false_condition": "Six SKIP (\u2500\u2500\u2500\u2500\u2500\u2500\u2500) placeholder ordinals parsed as binary IDs caused unknown_terminal_rows and final not-unknown assertion to fail.",
+        "unknown_after_independent_parse": 0,
+        "duplicate_terminal_rows": 0,
+        "complete_pass_ordinals": true,
+        "correction_receipt_sha256": "31734964e78babeacaab02f6d33a681db26cf0ddc331f2fdec15bf21350f0a6e"
+      }
+    },
+    {
+      "name": "current-8e2-026",
+      "actual_head": "8e2adbbbc0c8051b90c6095509f157cf3a3914f1",
+      "actual_base": "02677931d67d8bd171ef9ea2e5f58f448eea029e",
+      "actual_git_tree": "5b26aa1bcea87de107dd331600bb81253ad9feac",
+      "source_shape": "clean committed carry",
+      "owned": {
+        "lampOS/crates/update/src/head_touch.rs": {
+          "sha256": "0703bf2d4ddbba946b365240f44bcb79b5edcfc28fd2c31c34e92d8e82d41334",
+          "mode": 420
+        },
+        "lampOS/crates/update/src/head_touch/input_tests.rs": {
+          "sha256": "f5a761bd56600c56173f87a647e6e2cf39c2e8bf8d83883f6d56efe3538cae43",
+          "mode": 420
+        },
+        "lampOS/docs/head-touch-inputs.md": {
+          "sha256": "a69da4104f21fe0e8614c11c9edbba72f98312564e6dc473f543942c758b6014",
+          "mode": 420
+        },
+        "lampOS/docs/reuse-decisions.md": {
+          "sha256": "228ad14d843abc457b5ffb7e20e4171f448c2c8803447ed330810efcca21a0be",
+          "mode": 420
+        },
+        "lampOS/docs/updates.md": {
+          "sha256": "2f9352be709447ea340e0009643cd9729e14ad4b3e4699a96a1512f79a1b11bd",
+          "mode": 420
+        }
+      },
+      "runner": {
+        "nextest": "0.9.150",
+        "rust": "1.96.0",
+        "host_platform": "macOS aarch64",
+        "nextest_sha256": "aad9d409cd2f0a81fcaed49d7672a133254179458436c1e957505e4a11655329",
+        "nextest_config_sha256": "c4992da8d157df279011a424b5feb4833f001fd1d46ce3edd0a56992c848bb33",
+        "profile": "pr",
+        "filter": "all()",
+        "test_processes": 4,
+        "retries": 0,
+        "no_fail_fast": true,
+        "user_config_disabled": true,
+        "prior_ci149_not_identical": true
+      },
+      "commands": [
+        {
+          "stage": "fmt",
+          "argv": [
+            "cargo",
+            "+1.96.0",
+            "fmt",
+            "--all",
+            "--check"
+          ],
+          "exit_code": 0,
+          "elapsed_seconds": 5.759
+        },
+        {
+          "stage": "clippy",
+          "argv": [
+            "cargo",
+            "+1.96.0",
+            "clippy",
+            "--locked",
+            "-p",
+            "lamp-update",
+            "--all-targets",
+            "--",
+            "-D",
+            "warnings"
+          ],
+          "exit_code": 0,
+          "elapsed_seconds": 17.317
+        },
+        {
+          "stage": "compile",
+          "argv": [
+            "cargo",
+            "+1.96.0",
+            "test",
+            "--locked",
+            "-p",
+            "lamp-update",
+            "--no-run",
+            "--message-format=json"
+          ],
+          "exit_code": 0,
+          "elapsed_seconds": 25.456
+        },
+        {
+          "stage": "list",
+          "argv": [
+            "cargo-nextest",
+            "nextest",
+            "list",
+            "--locked",
+            "-p",
+            "lamp-update",
+            "--profile",
+            "pr",
+            "-E",
+            "all()",
+            "--config-file",
+            "lampOS/.config/nextest.toml",
+            "--user-config-file",
+            "none",
+            "--message-format",
+            "json"
+          ],
+          "exit_code": 0,
+          "elapsed_seconds": 6.702
+        },
+        {
+          "stage": "nextest",
+          "argv": [
+            "cargo-nextest",
+            "nextest",
+            "run",
+            "--locked",
+            "-p",
+            "lamp-update",
+            "--profile",
+            "pr",
+            "-E",
+            "all()",
+            "--config-file",
+            "lampOS/.config/nextest.toml",
+            "--user-config-file",
+            "none",
+            "--test-threads",
+            "4",
+            "--retries",
+            "0",
+            "--no-fail-fast",
+            "--status-level",
+            "all",
+            "--final-status-level",
+            "none",
+            "--color",
+            "never"
+          ],
+          "exit_code": 0,
+          "elapsed_seconds": 448.606
+        },
+        {
+          "stage": "doctests",
+          "argv": [
+            "cargo",
+            "+1.96.0",
+            "test",
+            "--locked",
+            "-p",
+            "lamp-update",
+            "--doc",
+            "--",
+            "--test-threads=4"
+          ],
+          "exit_code": 0,
+          "elapsed_seconds": 0.405
+        },
+        {
+          "stage": "mac-contract-self-cli-exec",
+          "argv": [
+            "target/debug/deps/self_cli_exec-25113342c679f525",
+            "--exact",
+            "actual_cli_exec_confirms_before_the_next_round",
+            "--test-threads=1"
+          ],
+          "exit_code": 0,
+          "elapsed_seconds": 0.004
+        },
+        {
+          "stage": "mac-contract-self-process-cuts",
+          "argv": [
+            "target/debug/deps/self_process_cuts-8ce1b6350e2ac329",
+            "--exact",
+            "persisted_self_switches_survive_sigkill",
+            "--test-threads=1"
+          ],
+          "exit_code": 0,
+          "elapsed_seconds": 0.003
+        }
+      ],
+      "nextest": {
+        "exit_code": 0,
+        "discovered_cases": 505,
+        "selected": 499,
+        "unique_pass": 499,
+        "fail": 0,
+        "leak": 0,
+        "timeout": 0,
+        "selected_unrun": 0,
+        "ignored": 6,
+        "listed_binaries": 9,
+        "selected_case_binaries": 6,
+        "required_new": [
+          "head_touch::input_tests::an_uncaptured_key_never_becomes_a_captured_absence",
+          "head_touch::input_tests::ordinary_inputs_keep_regular_links_null_masks_and_directory_aliases",
+          "head_touch::input_tests::projection_and_verification_replay_closed_inputs_without_filesystem_fallback",
+          "head_touch::input_tests::rejecting_an_early_override_does_not_consume_a_later_directory_error"
+        ],
+        "required_foundation": [
+          "writer_refresh::tests::a_restart_at_every_unqualified_prefix_requires_recovery_and_never_reissues_the_grant",
+          "writer_refresh::tests::a_stale_or_modified_first_apply_cannot_consume_the_single_grant",
+          "writer_refresh::tests::diagnostics_hide_unknown_values_and_known_duplicate_or_shadowed_fields_are_refused",
+          "writer_refresh::tests::failed_persist_after_publication_poisons_the_live_session_until_actual_disk_state_is_recovered",
+          "writer_refresh::tests::first_apply_binds_its_own_later_envelope_and_sequence_without_replacing_the_refresh_identity",
+          "writer_refresh::tests::future_nonsemantic_metadata_is_preserved_without_becoming_admission_authority",
+          "writer_refresh::tests::guard_lock_is_exclusive_and_independent_of_the_product_lock",
+          "writer_refresh::tests::identity_substitution_never_changes_or_admits_the_saved_transaction",
+          "writer_refresh::tests::live_or_poisoned_sessions_cannot_expose_stale_recovery_inputs",
+          "writer_refresh::tests::missing_and_nonregular_records_do_not_turn_into_a_fresh_transaction",
+          "writer_refresh::tests::no_apply_does_not_qualify_but_one_exact_apply_can_enter_without_an_ordinary_round",
+          "writer_refresh::tests::qualified_and_closed_inputs_keep_the_compatible_writer_and_bound_product_receipts",
+          "writer_refresh::tests::qualified_writer_and_preimages_survive_a_restart_until_the_product_journal_closes",
+          "writer_refresh::tests::recovery_views_retain_later_metadata_in_the_bound_inputs_without_reparsing",
+          "writer_refresh::tests::reloaded_inputs_keep_the_exact_origin_and_distinguish_writer_from_apply_restoration",
+          "writer_refresh::tests::restoring_an_apply_requires_its_original_grant_and_preimage_identity",
+          "writer_refresh::tests::unsupported_or_malformed_journals_are_retained_and_block_every_admission",
+          "writer_refresh::tests::write_bound_and_invalid_identities_leave_no_journal_or_partial_acceptance"
+        ],
+        "existing_mask_control": "head_touch::tests::null_masks_do_not_admit_other_character_devices",
+        "required_controls": [
+          {
+            "binary": "lamp-update",
+            "name": "head_touch::input_tests::an_uncaptured_key_never_becomes_a_captured_absence",
+            "status": "PASS"
+          },
+          {
+            "binary": "lamp-update",
+            "name": "head_touch::input_tests::ordinary_inputs_keep_regular_links_null_masks_and_directory_aliases",
+            "status": "PASS"
+          },
+          {
+            "binary": "lamp-update",
+            "name": "head_touch::input_tests::rejecting_an_early_override_does_not_consume_a_later_directory_error",
+            "status": "PASS"
+          },
+          {
+            "binary": "lamp-update",
+            "name": "head_touch::tests::null_masks_do_not_admit_other_character_devices",
+            "status": "PASS"
+          },
+          {
+            "binary": "lamp-update",
+            "name": "head_touch::input_tests::projection_and_verification_replay_closed_inputs_without_filesystem_fallback",
+            "status": "PASS"
+          },
+          {
+            "binary": "lamp-update",
+            "name": "writer_refresh::tests::a_restart_at_every_unqualified_prefix_requires_recovery_and_never_reissues_the_grant",
+            "status": "PASS"
+          },
+          {
+            "binary": "lamp-update",
+            "name": "writer_refresh::tests::a_stale_or_modified_first_apply_cannot_consume_the_single_grant",
+            "status": "PASS"
+          },
+          {
+            "binary": "lamp-update",
+            "name": "writer_refresh::tests::diagnostics_hide_unknown_values_and_known_duplicate_or_shadowed_fields_are_refused",
+            "status": "PASS"
+          },
+          {
+            "binary": "lamp-update",
+            "name": "writer_refresh::tests::first_apply_binds_its_own_later_envelope_and_sequence_without_replacing_the_refresh_identity",
+            "status": "PASS"
+          },
+          {
+            "binary": "lamp-update",
+            "name": "writer_refresh::tests::failed_persist_after_publication_poisons_the_live_session_until_actual_disk_state_is_recovered",
+            "status": "PASS"
+          },
+          {
+            "binary": "lamp-update",
+            "name": "writer_refresh::tests::guard_lock_is_exclusive_and_independent_of_the_product_lock",
+            "status": "PASS"
+          },
+          {
+            "binary": "lamp-update",
+            "name": "writer_refresh::tests::identity_substitution_never_changes_or_admits_the_saved_transaction",
+            "status": "PASS"
+          },
+          {
+            "binary": "lamp-update",
+            "name": "writer_refresh::tests::future_nonsemantic_metadata_is_preserved_without_becoming_admission_authority",
+            "status": "PASS"
+          },
+          {
+            "binary": "lamp-update",
+            "name": "writer_refresh::tests::missing_and_nonregular_records_do_not_turn_into_a_fresh_transaction",
+            "status": "PASS"
+          },
+          {
+            "binary": "lamp-update",
+            "name": "writer_refresh::tests::live_or_poisoned_sessions_cannot_expose_stale_recovery_inputs",
+            "status": "PASS"
+          },
+          {
+            "binary": "lamp-update",
+            "name": "writer_refresh::tests::no_apply_does_not_qualify_but_one_exact_apply_can_enter_without_an_ordinary_round",
+            "status": "PASS"
+          },
+          {
+            "binary": "lamp-update",
+            "name": "writer_refresh::tests::qualified_and_closed_inputs_keep_the_compatible_writer_and_bound_product_receipts",
+            "status": "PASS"
+          },
+          {
+            "binary": "lamp-update",
+            "name": "writer_refresh::tests::recovery_views_retain_later_metadata_in_the_bound_inputs_without_reparsing",
+            "status": "PASS"
+          },
+          {
+            "binary": "lamp-update",
+            "name": "writer_refresh::tests::qualified_writer_and_preimages_survive_a_restart_until_the_product_journal_closes",
+            "status": "PASS"
+          },
+          {
+            "binary": "lamp-update",
+            "name": "writer_refresh::tests::restoring_an_apply_requires_its_original_grant_and_preimage_identity",
+            "status": "PASS"
+          },
+          {
+            "binary": "lamp-update",
+            "name": "writer_refresh::tests::unsupported_or_malformed_journals_are_retained_and_block_every_admission",
+            "status": "PASS"
+          },
+          {
+            "binary": "lamp-update",
+            "name": "writer_refresh::tests::write_bound_and_invalid_identities_leave_no_journal_or_partial_acceptance",
+            "status": "PASS"
+          },
+          {
+            "binary": "lamp-update",
+            "name": "writer_refresh::tests::reloaded_inputs_keep_the_exact_origin_and_distinguish_writer_from_apply_restoration",
+            "status": "PASS"
+          }
+        ],
+        "ignored_cases": [
+          {
+            "binary": "lamp-update",
+            "name": "fetch::tests::a_release_file_from_github"
+          },
+          {
+            "binary": "lamp-update",
+            "name": "records::tests::write_records_fixtures"
+          },
+          {
+            "binary": "lamp-update::release_pair",
+            "name": "release_6408_recovers_a_cut_written_by_release_6449"
+          },
+          {
+            "binary": "lamp-update::release_pair",
+            "name": "release_6449_recovers_a_cut_written_by_release_6408"
+          },
+          {
+            "binary": "lamp-update::self-cli-exec",
+            "name": "actual_cli_exec_confirms_before_the_next_round"
+          },
+          {
+            "binary": "lamp-update::self-process-cuts",
+            "name": "persisted_self_switches_survive_sigkill"
+          }
+        ],
+        "raw_summary": [
+          " Nextest run ID 84aae01b-0999-4413-ad2e-94e183e1e087 with nextest profile: pr",
+          "    Starting 499 tests across 9 binaries (6 tests skipped)",
+          "     Summary [ 448.229s] 499 tests run: 499 passed (1 slow), 6 skipped"
+        ]
+      },
+      "separate_doctests": {
+        "exit_code": 0,
+        "summaries": [
+          {
+            "passed": 0,
+            "failed": 0,
+            "ignored": 0
+          }
+        ],
+        "totals": {
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0
+        }
+      },
+      "overlapping_mac_skip_contracts": [
+        {
+          "binary": "lamp-update::self-cli-exec",
+          "name": "actual_cli_exec_confirms_before_the_next_round",
+          "exit_code": 0,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 1,
+          "already_counted_in_nextest_ignored": true
+        },
+        {
+          "binary": "lamp-update::self-process-cuts",
+          "name": "persisted_self_switches_survive_sigkill",
+          "exit_code": 0,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 1,
+          "already_counted_in_nextest_ignored": true
+        }
+      ],
+      "source_count": 7396,
+      "guards": {
+        "head_unchanged": true,
+        "status_unchanged": true,
+        "source_unchanged": true,
+        "source_count": 7396,
+        "runtime_controller_unchanged": true,
+        "preparation_controller_unchanged": true,
+        "nextest_tool_unchanged": true,
+        "actual_preserved_executable_hashes_match": true
+      },
+      "compiled_executables": [
+        {
+          "target": "lamp-update",
+          "kind": [
+            "bin"
+          ],
+          "profile_test": false,
+          "relative_path": "target/debug/lamp-update",
+          "bytes": 13776240,
+          "sha256": "0cf5c0653a6e0059badc62dc52348d0e249392eabe9aff5b22be24c16f73fbec",
+          "preserved_sha256": "0cf5c0653a6e0059badc62dc52348d0e249392eabe9aff5b22be24c16f73fbec",
+          "post_runtime_sha256": "0cf5c0653a6e0059badc62dc52348d0e249392eabe9aff5b22be24c16f73fbec"
+        },
+        {
+          "target": "self-cli-exec",
+          "kind": [
+            "test"
+          ],
+          "profile_test": true,
+          "relative_path": "target/debug/deps/self_cli_exec-25113342c679f525",
+          "bytes": 565616,
+          "sha256": "0af6be4d72f17d41bb88ae3f3b3f9d58fa15be6719a65a517c4928f4f128265e",
+          "preserved_sha256": "0af6be4d72f17d41bb88ae3f3b3f9d58fa15be6719a65a517c4928f4f128265e",
+          "post_runtime_sha256": "0af6be4d72f17d41bb88ae3f3b3f9d58fa15be6719a65a517c4928f4f128265e"
+        },
+        {
+          "target": "self-process-cuts",
+          "kind": [
+            "test"
+          ],
+          "profile_test": true,
+          "relative_path": "target/debug/deps/self_process_cuts-8ce1b6350e2ac329",
+          "bytes": 566176,
+          "sha256": "57d8e9563b4b1276dcab32d3f4c4f18983a84f6741e4a94888356478d0e46ccf",
+          "preserved_sha256": "57d8e9563b4b1276dcab32d3f4c4f18983a84f6741e4a94888356478d0e46ccf",
+          "post_runtime_sha256": "57d8e9563b4b1276dcab32d3f4c4f18983a84f6741e4a94888356478d0e46ccf"
+        },
+        {
+          "target": "lamp-update",
+          "kind": [
+            "bin"
+          ],
+          "profile_test": true,
+          "relative_path": "target/debug/deps/lamp_update-1c2005188bf8e5ab",
+          "bytes": 1282768,
+          "sha256": "7ebff5a899c551a9af5aef9c9bea291b6b53ae9f038dc616709f5b5c62eec383",
+          "preserved_sha256": "7ebff5a899c551a9af5aef9c9bea291b6b53ae9f038dc616709f5b5c62eec383",
+          "post_runtime_sha256": "7ebff5a899c551a9af5aef9c9bea291b6b53ae9f038dc616709f5b5c62eec383"
+        },
+        {
+          "target": "release_pair",
+          "kind": [
+            "test"
+          ],
+          "profile_test": true,
+          "relative_path": "target/debug/deps/release_pair-2447bcdc916504d4",
+          "bytes": 3348704,
+          "sha256": "e85824b7e39168313c37e6983a2f90530f85f5e3ab1df6eff10586c978fb2473",
+          "preserved_sha256": "e85824b7e39168313c37e6983a2f90530f85f5e3ab1df6eff10586c978fb2473",
+          "post_runtime_sha256": "e85824b7e39168313c37e6983a2f90530f85f5e3ab1df6eff10586c978fb2473"
+        },
+        {
+          "target": "functions",
+          "kind": [
+            "test"
+          ],
+          "profile_test": true,
+          "relative_path": "target/debug/deps/functions-9e56cee2cd1d1695",
+          "bytes": 23094040,
+          "sha256": "92bff849febb5d7d45274850e79834b0cc38752fa8f897d0328f1308e05e4c8e",
+          "preserved_sha256": "92bff849febb5d7d45274850e79834b0cc38752fa8f897d0328f1308e05e4c8e",
+          "post_runtime_sha256": "92bff849febb5d7d45274850e79834b0cc38752fa8f897d0328f1308e05e4c8e"
+        },
+        {
+          "target": "it",
+          "kind": [
+            "test"
+          ],
+          "profile_test": true,
+          "relative_path": "target/debug/deps/it-ae5bcab57f15def3",
+          "bytes": 2008784,
+          "sha256": "7baa626035ac0a6d191b235b03001dee4375e3956d5a63842f9f7e88034c7208",
+          "preserved_sha256": "7baa626035ac0a6d191b235b03001dee4375e3956d5a63842f9f7e88034c7208",
+          "post_runtime_sha256": "7baa626035ac0a6d191b235b03001dee4375e3956d5a63842f9f7e88034c7208"
+        },
+        {
+          "target": "install",
+          "kind": [
+            "test"
+          ],
+          "profile_test": true,
+          "relative_path": "target/debug/deps/install-7739a60369055fbf",
+          "bytes": 16796056,
+          "sha256": "7e131aba1759749367ae38dd16560b790629b65ef54af392869631e8d09df72e",
+          "preserved_sha256": "7e131aba1759749367ae38dd16560b790629b65ef54af392869631e8d09df72e",
+          "post_runtime_sha256": "7e131aba1759749367ae38dd16560b790629b65ef54af392869631e8d09df72e"
+        },
+        {
+          "target": "round",
+          "kind": [
+            "test"
+          ],
+          "profile_test": true,
+          "relative_path": "target/debug/deps/round-f8d7f0920c4648fb",
+          "bytes": 20690600,
+          "sha256": "62e62e7626a345bbabbe1d81ce2dbf8a12bad93a06c2a7cafa5aa20bdf3c4d9c",
+          "preserved_sha256": "62e62e7626a345bbabbe1d81ce2dbf8a12bad93a06c2a7cafa5aa20bdf3c4d9c",
+          "post_runtime_sha256": "62e62e7626a345bbabbe1d81ce2dbf8a12bad93a06c2a7cafa5aa20bdf3c4d9c"
+        },
+        {
+          "target": "lamp_update",
+          "kind": [
+            "lib"
+          ],
+          "profile_test": true,
+          "relative_path": "target/debug/deps/lamp_update-2fc2e5180de6bc32",
+          "bytes": 15439360,
+          "sha256": "d8a06702e6969f1236479967942875bf6a051854fe551ef71f060a95d7292a0a",
+          "preserved_sha256": "d8a06702e6969f1236479967942875bf6a051854fe551ef71f060a95d7292a0a",
+          "post_runtime_sha256": "d8a06702e6969f1236479967942875bf6a051854fe551ef71f060a95d7292a0a"
+        }
+      ],
+      "original_runtime_controller_exit_code": 0,
+      "original_controller_closure_all_stages_passed": true,
+      "original_controller_error": null,
+      "raw_hashes": {
+        "fmt.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "fmt.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "clippy.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "clippy.stderr": "5c6dcfed22deadc134f065360ad3bb5b81cfd956f22d037e169707300d61ba85",
+        "compile.stdout": "0bf45da10e64dee5c517031810068c688903f6a8f266575c37b36edf00c04e24",
+        "compile.stderr": "de182a431b9711636d7bc2eb715a75950ae3276b5953493d9b237318b6ebdfeb",
+        "list.stdout": "fb85a4bc90399c8353a32ae713737cf229c9960763700dcb86df38121d5c5c47",
+        "list.stderr": "aef8a17b266e1fb64abc458aacc0e245ff0d20fb652ebe99f40e4368df3bc98b",
+        "nextest.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "nextest.stderr": "99c6fccacd3c0e2581ffdbd7c0861ddc8ec45bb2cc8c7b0c62d99d1a5f1a8969",
+        "doctests.stdout": "df166913f47ff1f04202cae9b31df67ed272d692d99a0023a8117dc3029100dd",
+        "doctests.stderr": "fbf397066aec241dd13b692eae097b2f662224e34be86ce8fca985493c1713fc",
+        "mac-contract-self-cli-exec.stdout": "e609e31d833c415938d8a7a8277dc0b2e0a8d53afe374bb841bb16552a1bfe8b",
+        "mac-contract-self-cli-exec.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "mac-contract-self-process-cuts.stdout": "b2b5dec35eeaf5a469e308f8f57aec00eb02df2c34be190680b12c217c484609",
+        "mac-contract-self-process-cuts.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "source-before.json": "0bc0297d850863f09d8e2e3a60c87edd3e2069046d61be436c5b14c7f5886c10",
+        "source-after.json": "0bc0297d850863f09d8e2e3a60c87edd3e2069046d61be436c5b14c7f5886c10",
+        "source-after-runtime.json": "0bc0297d850863f09d8e2e3a60c87edd3e2069046d61be436c5b14c7f5886c10",
+        "closure.json": "8920d7b853b6e48e5d46fbf0e78f69b6efcfe0a907643d87f7dafaaf42d99002",
+        "runtime-census.json": "a99b96d55db1455b1d47374556916548a064c543cbcaa9428f041726fbe84e8d",
+        "executables-final.json": "16bc07165a73d05ad0505f8c9ff032855409874829a3de87015f370240ec1e01",
+        "discovery.json": "df3215f94842e8a351b45d781b419018ced160d53b9d2641b1df620e14da05df"
+      }
+    }
+  ],
+  "limits": [
+    "Update-only Mac qualification, not whole-workspace runtime, native ARM or device acceptance.",
+    "Both completed runtimes selected499 cases once; counts retain their actual source, never transfer onto a newer carry.",
+    "Two Mac custom harness checks overlap the six ignored nextest cases and add no passes.",
+    "First controller exit1 remains preserved; its six-SKIP parsing correction was offline analysis, not a runtime replay.",
+    "Separate Raw normal-libtest509/1/6 and inconclusive baseline cohort are not waived and establish no cause."
+  ]
+}

@@ -1,0 +1,60 @@
+{
+  "head": "d962703cac97db2588c2dd88b0ffeeeedc88da16",
+  "base": "bf6f7bbdf5e936c2ef82621e1bb7592d511c1453",
+  "qualified_old_head": "8e2adbbbc0c8051b90c6095509f157cf3a3914f1",
+  "qualified_old_base": "02677931d67d8bd171ef9ea2e5f58f448eea029e",
+  "tree": "51e1045ad3e72bb9895973bdeb4b203bfeb3f836",
+  "clean": true,
+  "bindings": [
+    {
+      "path": "lampOS/crates/update/src/head_touch.rs",
+      "ls_tree": "100644 blob eabce9979706dd25226a36a1720f366351ed3263\tlampOS/crates/update/src/head_touch.rs",
+      "sha256": "0703bf2d4ddbba946b365240f44bcb79b5edcfc28fd2c31c34e92d8e82d41334",
+      "full_blob_equal": true,
+      "mode_equal": true,
+      "authored_added_deleted_payload_equal": true,
+      "payload_sha256": "c489a4a89a82f54cf30438183b7ab0e6fb864011463bb2fb2aaf8bb2c1f130b3"
+    },
+    {
+      "path": "lampOS/crates/update/src/head_touch/input_tests.rs",
+      "ls_tree": "100644 blob 721cd928ac6e537a3a9d3461ea6dbd2e4e691954\tlampOS/crates/update/src/head_touch/input_tests.rs",
+      "sha256": "f5a761bd56600c56173f87a647e6e2cf39c2e8bf8d83883f6d56efe3538cae43",
+      "full_blob_equal": true,
+      "mode_equal": true,
+      "authored_added_deleted_payload_equal": true,
+      "payload_sha256": "41fe71646db7a7aeaf6fe360c43691f359cd3798b30ca93fccab26cd180cddec"
+    },
+    {
+      "path": "lampOS/docs/head-touch-inputs.md",
+      "ls_tree": "100644 blob 9c937e3dbfad026de7f7dfa882992d1ae7f5cbdc\tlampOS/docs/head-touch-inputs.md",
+      "sha256": "a69da4104f21fe0e8614c11c9edbba72f98312564e6dc473f543942c758b6014",
+      "full_blob_equal": true,
+      "mode_equal": true,
+      "authored_added_deleted_payload_equal": true,
+      "payload_sha256": "c14f6fd234a8721774c2f8a57be8d1f292c4dfe0d8d0352b8f573a34fb97ecb0"
+    },
+    {
+      "path": "lampOS/docs/reuse-decisions.md",
+      "ls_tree": "100644 blob 050d3e9eab4bc54a7af2197e7b036f99681316c6\tlampOS/docs/reuse-decisions.md",
+      "sha256": "228ad14d843abc457b5ffb7e20e4171f448c2c8803447ed330810efcca21a0be",
+      "full_blob_equal": true,
+      "mode_equal": true,
+      "authored_added_deleted_payload_equal": true,
+      "payload_sha256": "4b8940415def4543887000ab2de2ba0389b74baa3584aa4a568777f32ce93822"
+    },
+    {
+      "path": "lampOS/docs/updates.md",
+      "ls_tree": "100644 blob fbe7044fca4a1cb9e7c467b61c4caac488288da4\tlampOS/docs/updates.md",
+      "sha256": "05f904a4d651e33a5c1318acd9fd392c67fc593832cc43a54c3ad6d71364256a",
+      "full_blob_equal": false,
+      "mode_equal": true,
+      "authored_added_deleted_payload_equal": true,
+      "payload_sha256": "6c8aaa4f21b61ceb78e83788ea21bd59450ef938287240b055ae93486d4235d1"
+    }
+  ],
+  "whole_equal_count": 4,
+  "all_five_modes_and_authored_payloads_equal": true,
+  "shared_updates_document": "Preserves current Main product-carrier and receipt-identity prose, plus exact authored Head appendix.",
+  "gate_unrun": true,
+  "push": false
+}
