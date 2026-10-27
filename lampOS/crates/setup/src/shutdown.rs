@@ -106,9 +106,11 @@ pub trait Host {
 /// Why the ring is not lit green after a let-go that did not let go.
 pub const NOT_LET_GO: &str = "not let go: keep it plugged in";
 
-/// Whether lamp-body-measure's let-go report says every joint was let go.
+/// Whether lamp-body-measure's let-go report says every joint was let go:
+/// `{"port": …, "let_go": {"down": …, "let_go": true, "joints": […]}}`.
 fn let_go_said(report: &str) -> bool {
-    serde_json::from_str::<serde_json::Value>(report).is_ok_and(|report| report["let_go"] == true)
+    serde_json::from_str::<serde_json::Value>(report)
+        .is_ok_and(|report| report["let_go"]["let_go"] == true)
 }
 
 /// Each step as it went, in order.
@@ -425,6 +427,10 @@ mod tests {
 
     /// A lamp in a test: its clock, its joints read by read, and every
     /// call in order with when it came.
+    /// lamp-body-measure let-go's line as lamp-52e6 printed it, the port
+    /// shortened: the let-go nested under the port's report.
+    const LET_GO_REPORT: &str = r#"{"port":{"schema_version":2,"unit_id":"lamp-52e6"},"let_go":{"down":true,"let_go":true,"joints":[{"joint":"base_yaw","position":2020,"torque":0}]}}"#;
+
     #[derive(Default)]
     struct Fake {
         now: Duration,
@@ -502,7 +508,7 @@ mod tests {
             self.calls.push((self.now, "let go"));
             self.let_go
                 .clone()
-                .unwrap_or_else(|| Ok(r#"{"down":true,"let_go":true,"joints":[]}"#.into()))
+                .unwrap_or_else(|| Ok(LET_GO_REPORT.into()))
         }
         fn light(&mut self) -> io::Result<()> {
             self.calls.push((self.now, "light"));
@@ -588,7 +594,12 @@ mod tests {
     #[test]
     fn a_lamp_not_let_go_never_turns_the_ring_green() {
         for answer in [
-            Ok(r#"{"down":false,"let_go":false,"joints":[]}"#.to_owned()),
+            Ok(LET_GO_REPORT.replace(
+                r#""down":true,"let_go":true"#,
+                r#""down":false,"let_go":false"#,
+            )),
+            // A flat report, as no measure prints: not read as let go.
+            Ok(r#"{"down":true,"let_go":true}"#.to_owned()),
             Err("lamp-body-measure: the port is busy".to_owned()),
         ] {
             let mut fake = Fake {
