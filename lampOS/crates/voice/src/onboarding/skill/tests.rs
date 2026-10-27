@@ -135,6 +135,9 @@ fn shipped_definition_matches_the_original_order_words_and_reoffers_byte_for_byt
         definition.words.sentence_failed.as_bytes(),
         SENTENCE_FAILED.as_bytes()
     );
+    assert_eq!(definition.words.touch_done.as_deref(), Some(TOUCH_DONE));
+    assert_eq!(definition.words.touch_failed.as_deref(), Some(TOUCH_FAILED));
+    assert_eq!(definition.words.give_again.as_deref(), Some(GIVE_AGAIN));
     assert_eq!(definition.words.give_done.as_bytes(), GIVE_DONE.as_bytes());
     assert_eq!(
         definition.words.give_failed.as_bytes(),
@@ -201,6 +204,37 @@ fn invalid_sequence_bounds_words_and_slots_are_refused() {
     }
     assert!(parse(&SHIPPED.repeat(10)).is_err());
     assert!(parse("kind = \"core\"").is_err());
+}
+
+/// The onboarding file as lamp-voice shipped it before #3769, which an
+/// older updater's `install` still writes from its own built-in copy.
+pub(crate) const BEFORE_3769: &str = include_str!("before_3769.toml");
+
+/// Reviewer-two's P2 on #3781: an older updater's `install` writes its own
+/// built-in onboarding file, without #3769's lines. The new voice still
+/// loads it, and the shipped file with only those lines removed, so the
+/// walk is never turned off by them.
+#[test]
+fn a_file_without_the_3769_lines_still_loads() {
+    let removed: String = SHIPPED
+        .lines()
+        .filter(|line| {
+            !["touch_done = ", "touch_failed = ", "give_again = "]
+                .iter()
+                .any(|field| line.starts_with(field))
+        })
+        .map(|line| format!("{line}\n"))
+        .collect();
+    for (what, file) in [
+        ("lines removed", removed.as_str()),
+        ("before #3769", BEFORE_3769),
+    ] {
+        assert_ne!(file, SHIPPED, "{what}");
+        let definition = parse(file).unwrap_or_else(|why| panic!("{what}: {why}"));
+        assert_eq!(definition.words.touch_done, None, "{what}");
+        assert_eq!(definition.words.touch_failed, None, "{what}");
+        assert_eq!(definition.words.give_again, None, "{what}");
+    }
 }
 
 #[test]

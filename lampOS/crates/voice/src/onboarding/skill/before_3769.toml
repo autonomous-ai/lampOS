@@ -1,0 +1,96 @@
+# The runner publishes only an eligible, nonpersonal invitation identity.
+# No authority to open either sensor, no body move, and no additional tool.
+# The core grant "onboarding" is what lets it say from the invitations.
+kind = "core"
+version = "1.0.0"
+needs = ["voice"]
+
+[permissions]
+topics = ["onboarding/pending"]
+core = ["onboarding"]
+speak = true
+
+[trigger]
+topic = "onboarding/pending"
+each = "invitations"
+key = "invitation"
+field = "ready"
+equals = true
+when = "appears"
+
+[ask]
+policy = "unprompted"
+
+[[do]]
+say = { from = "onboarding" }
+
+# The walk reads this checked data once when Voice starts. Physical proof stays in Voice.
+[onboarding]
+order = ["where_you_sit", "who_you_are", "how_you_sound", "touch", "privacy", "giving_way", "room_sounds", "face_expressions", "preferences"]
+reoffer_after_s = 86400
+
+[onboarding.steps.where_you_sit]
+first = "(Nobody has spoken. You are meeting the person you will live with for the first time. Say hello in a few warm words, then ask them to sit where they usually sit and look at you, so you learn where they are. Nothing more.)"
+reoffer = "(Nobody has spoken. You are meeting the person you will live with for the first time. Say hello in a few warm words, then ask them to sit where they usually sit and look at you, so you learn where they are. Nothing more.)"
+
+[onboarding.steps.who_you_are]
+first = "(Nobody has spoken. Ask them, in a few words, what you should call them. When they have told you, and only if you have remember_my_face, ask whether you may remember their face, and only after a clear yes call remember_my_face with their name. Never use remember for this. Then, as soon as that is settled, call setup_step with step \"who_you_are\": done once you know their name, skipped if they would rather not say, or failed if it could not be done, and then tell them in a few words what they can try later.)"
+reoffer = "(Nobody has spoken. Ask them, in a few words, what you should call them. When they have told you, and only if you have remember_my_face, ask whether you may remember their face, and only after a clear yes call remember_my_face with their name. Never use remember for this. Then, as soon as that is settled, call setup_step with step \"who_you_are\": done once you know their name, skipped if they would rather not say, or failed if it could not be done, and then tell them in a few words what they can try later.)"
+[onboarding.steps.who_you_are.nudge]
+after_answers = 1
+words = "(If you asked whether you may remember their face and they have not answered yet, wait for their answer. Otherwise call setup_step with step \"who_you_are\" now, before you say anything else: done once you know their name, skipped if they would rather not.)"
+
+[onboarding.steps.how_you_sound]
+first = "(Nobody has spoken. Tell them in a few words that you would like to learn how they call you from where they usually sit. Ask them to stay in their seat and call your name once, the way they would to get your attention, and then stay quiet yourself. Do not say your own name, and do not claim anything was measured.)"
+reoffer = "(Nobody has spoken. Tell them in a few words that you would like to learn how they call you from where they usually sit. Ask them to stay in their seat and call your name once, the way they would to get your attention, and then stay quiet yourself. Do not say your own name, and do not claim anything was measured.)"
+
+[onboarding.steps.touch]
+first = "(Nobody has spoken. Ask them, in a few words, to touch the top of your head gently, then stay quiet.)"
+reoffer = "(Nobody has spoken. Tell them in a few words that there is one more thing you can do now: feel a touch on the top of your head. Ask them to touch it gently, then stay quiet.)"
+
+[onboarding.steps.privacy]
+first = "(Say only this one short sentence, nothing before or after it: \"Try my privacy switch {location}: close it, then open it again.\" Do not explain it, claim success or ask a tool to mark privacy done.)"
+reoffer = "(Say only this one short sentence, nothing before or after it: \"Try my privacy switch {location}: close it, then open it again.\" Do not explain it, claim success or ask a tool to mark privacy done.)"
+
+[onboarding.steps.giving_way]
+first = "(Nobody has spoken. Tell them in a few words that your head gives way to a hand: ask them to take it gently and move it a little, then let go. Do not claim anything has been felt yet.)"
+reoffer = "(Nobody has spoken. Tell them in a few words that your head gives way to a hand: ask them to take it gently and move it a little, then let go. Do not claim anything has been felt yet.)"
+
+[onboarding.steps.room_sounds]
+first = "(Nobody has spoken. Ask them once, in a few words, whether you may notice music and laughter in the room, and say just this about it: the lamp notices music and laughter, nothing is recorded. Then call setup_step with step \"room_sounds\": done only after a clear yes, skipped if they say no or are unsure. Nothing more.)"
+reoffer = "(Nobody has spoken. Ask them once, in a few words, whether you may notice music and laughter in the room, and say just this about it: the lamp notices music and laughter, nothing is recorded. Then call setup_step with step \"room_sounds\": done only after a clear yes, skipped if they say no or are unsure. Nothing more.)"
+
+[onboarding.steps.face_expressions]
+first = "(Nobody has spoken. Ask them once, in a few words, whether you may notice whether people look happy or upset, so you can answer more warmly, and say just this about it: a yes covers everyone at this lamp, you never say it aloud, and no picture of a face is kept. Then call setup_step with step \"face_expressions\": done only after a clear yes, skipped if they say no or are unsure. Nothing more.)"
+reoffer = "(Nobody has spoken. Ask them once, in a few words, whether you may notice whether people look happy or upset, so you can answer more warmly, and say just this about it: a yes covers everyone at this lamp, you never say it aloud, and no picture of a face is kept. Then call setup_step with step \"face_expressions\": done only after a clear yes, skipped if they say no or are unsure. Nothing more.)"
+
+[onboarding.steps.preferences]
+first = "(Nobody has spoken. Ask them two short things, one at a time: whether there are hours when you should keep quiet, and whether you may say hello when they sit down. Keep each answer as a rule if you can. As soon as you have heard the second answer, call setup_step with step \"preferences\" before you say anything else, then tell them in a few words that is everything, and that they can ask you to redo the setup any time.)"
+reoffer = "(Nobody has spoken. Ask them two short things, one at a time: whether there are hours when you should keep quiet, and whether you may say hello when they sit down. Keep each answer as a rule if you can. As soon as you have heard the second answer, call setup_step with step \"preferences\" before you say anything else, then tell them in a few words that is everything, and that they can ask you to redo the setup any time.)"
+[onboarding.steps.preferences.nudge]
+after_answers = 2
+words = "(They have answered. Call setup_step with step \"preferences\" now, before you say anything else.)"
+
+[onboarding.words]
+sit_no_face = "(You cannot see their face. Ask them in a few words to sit where they usually sit and look at you.)"
+sit_closer = "(You can see them, but they are far from you. Ask them in a few words to bring you a bit closer if they like, and that where they are is fine too.)"
+sit_turn = "(You can see them, but at the edge of what you see. Ask them in a few words to turn you a little toward them if they like, and that where they are is fine too.)"
+sit_done = "(Now you can see them well where they sit. Tell them so in a few words.)"
+sit_failed = "(You still cannot see them well where they sit. Tell them in a few light words that it is fine: they can turn you toward their seat later, or ask you to redo the setup.)"
+who_again = "(That was not their name. Ask them once more, in a few words, what you should call them.)"
+touch_remind = "(You have not felt a touch yet. Ask them once more, in a few words, to touch the top of your head gently, then stay quiet.)"
+privacy_done = "(Their physical switch closed the microphones, and they opened it again. Briefly confirm that the switch works. Nothing more.)"
+privacy_done_camera = "(Their physical switch closed the microphones and the camera, and they opened it again. Briefly confirm that the switch works. Nothing more.)"
+privacy_failed = "(The privacy-switch check was not completed. Briefly say they can try it again later by redoing setup. Do not claim the switch was tested.)"
+near_again = "(Ask them in a few words to call your name once more from their seat, the same way, and then stay quiet yourself. Do not say your own name.)"
+near_done = "(You have learned how they call you from their seat. Tell them so in a few words. Nothing more.)"
+near_failed = "(You could not learn how they call you from their seat this time. Tell them in a few light words that it is fine and that they can redo the setup later. Do not claim anything was measured.)"
+sentence_first = "(Nobody has spoken. Ask them in a few words to say a sentence to you from where they sit, anything at all in their own words, so you can get used to their voice, and then stay quiet yourself while they speak. Do not claim anything was measured.)"
+sentence_louder = "(Ask them in a few words to say another sentence from their seat, a little louder, and then stay quiet yourself.)"
+sentence_closer = "(Ask them in a few words to come a little closer and say another sentence, and then stay quiet yourself.)"
+sentence_again = "(Ask them in a few words to say another sentence from their seat, and then stay quiet yourself.)"
+sentence_done = "(You heard them well from where they sit. Tell them so in a few words. Nothing more.)"
+sentence_failed = "(You could not hear them well enough from where they sit this time. Tell them in a few light words: I'll get used to your voice as we talk. Do not claim anything was measured.)"
+give_done = "(You felt their hand move your head, gave way, and they let go. Tell them so in a few warm words. Nothing more.)"
+give_failed = "(You did not feel your head moved by a hand this time. Tell them in a few light words that it is fine and that they can redo the setup later. Do not claim anything was felt.)"
+who_confirm = "(If you asked whether you may remember their face and they have not answered yet, wait for their answer. Otherwise ask them, in a few words: \"Did I get that right, {name}?\" Nothing more.)"
