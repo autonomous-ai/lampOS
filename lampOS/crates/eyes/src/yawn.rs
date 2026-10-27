@@ -131,6 +131,67 @@ impl Yawns {
     }
 }
 
+/// What a look offered to the `eyes-yawn` thread was taken under, and what
+/// its count carries back (Fourth and Fourteen on #3898): the camera's hold
+/// at the frame's capture (`Permit::held`, which moves at every close and
+/// every permission after one ran out, on the permit's own thread), and the
+/// epoch of the face-expressions yes, which the look moves on at every look
+/// without it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Grant {
+    pub hold: u64,
+    pub yes: u64,
+}
+
+/// A count from a frame older than this is dropped, however its hold
+/// stands: the thread reads a mouth in under 300 ms on a small core.
+pub const MOST_LATE_US: u64 = 2_000_000;
+
+/// The `eyes-yawn` thread's yawns: a look under another [`Grant`] than the
+/// last starts a fresh hold, so nothing held before a close or a
+/// withdrawal finishes after it; a count goes back with its grant and its
+/// frame's time.
+#[derive(Debug, Default)]
+pub struct Generations {
+    yawns: Yawns,
+    grant: Option<Grant>,
+}
+
+impl Generations {
+    /// One look, captured at `frame_us` under `grant`.
+    pub fn look(
+        &mut self,
+        grant: Grant,
+        mouth: Option<Mouth>,
+        frame_us: u64,
+    ) -> Option<(Grant, u64)> {
+        if self.grant != Some(grant) {
+            self.yawns = Yawns::default();
+            self.grant = Some(grant);
+        }
+        self.yawns
+            .look(mouth, frame_us)
+            .then_some((grant, frame_us))
+    }
+}
+
+/// The counts among the thread's `results` that still stand at `now_us`:
+/// under the grant the look holds now (`None`: the camera is not permitted,
+/// so none), from a frame no older than [`MOST_LATE_US`].
+pub fn current_counts(
+    results: impl IntoIterator<Item = Option<(Grant, u64)>>,
+    now: Option<Grant>,
+    now_us: u64,
+) -> usize {
+    results
+        .into_iter()
+        .flatten()
+        .filter(|(grant, frame_us)| {
+            Some(*grant) == now && now_us.saturating_sub(*frame_us) <= MOST_LATE_US
+        })
+        .count()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -294,6 +355,68 @@ mod tests {
         for nth in 0..7 {
             assert_eq!(yawns.look(yawn(0.15), 4_000_000 + nth * LOOK_US), nth == 6);
         }
+    }
+
+    /// Through the real permit (Fourth and Fourteen on #3898): a close and
+    /// a regrant between two looks are another hold, so a hold begun under
+    /// the first starts afresh, and its count, delayed past the regrant, is
+    /// dropped while the new hold's counts once.
+    #[test]
+    fn a_close_and_regrant_starts_a_fresh_hold_and_drops_the_old_hold_count() {
+        use crate::permit::Permit;
+        use std::os::unix::net::UnixDatagram;
+        use std::time::{Duration, Instant};
+        let (voice, eyes) = UnixDatagram::pair().unwrap();
+        let permit = Permit::listen(eyes).unwrap();
+        let held = |wanted: bool| {
+            let waited = Instant::now();
+            while permit.held().is_some() != wanted {
+                assert!(waited.elapsed() < Duration::from_secs(1), "never heard");
+                std::thread::sleep(Duration::from_millis(1));
+            }
+            permit.held()
+        };
+        voice.send(br#"{"camera":true}"#).unwrap();
+        let first = Grant {
+            hold: held(true).unwrap(),
+            yes: 0,
+        };
+        let mut thread = Generations::default();
+        for nth in 0..6 {
+            assert_eq!(thread.look(first, yawn(0.15), nth * LOOK_US), None);
+        }
+        // Closed and given again while the thread was busy.
+        voice.send(br#"{"camera":false}"#).unwrap();
+        held(false);
+        voice.send(br#"{"camera":true}"#).unwrap();
+        let second = Grant {
+            hold: held(true).unwrap(),
+            yes: 0,
+        };
+        assert_ne!(first, second);
+        // The seventh look is under the new hold: nothing of the old counts.
+        assert_eq!(thread.look(second, yawn(0.15), 6 * LOOK_US), None);
+        let new: Vec<_> = (7..14)
+            .filter_map(|nth| thread.look(second, yawn(0.15), nth * LOOK_US))
+            .collect();
+        // Seven looks of its own, from the sixth: counted at the twelfth.
+        assert_eq!(new, [(second, 12 * LOOK_US)]);
+        let now = permit.held().map(|hold| Grant { hold, yes: 0 });
+        let at = 13 * LOOK_US;
+        // A count of the first hold, delayed past the second's: dropped.
+        let late_old = Some((first, 5 * LOOK_US));
+        assert_eq!(current_counts([late_old, None, Some(new[0])], now, at), 1);
+        // The same hold, but the yes withdrawn and given again: another grant.
+        assert_eq!(
+            current_counts([Some(new[0])], Some(Grant { yes: 1, ..second }), at),
+            0
+        );
+        // The camera not permitted now, or a frame too old: none.
+        assert_eq!(current_counts([Some(new[0])], None, at), 0);
+        assert_eq!(
+            current_counts([Some(new[0])], now, at + MOST_LATE_US + 1),
+            0
+        );
     }
 
     #[test]
