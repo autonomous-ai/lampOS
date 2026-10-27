@@ -3001,7 +3001,14 @@ from where it first gave way, reads a load over its own bound or, under
 in a glance, under the glance's 700), or, pinned under `--limp on`, is
 pushed as the slump judges it (a load over the lower of its bound and its
 contact floor, or more than 11 counts, `LIMP_LAG`, off where it gave), so
-a push that slumps the lamp is always said. Once started, it stays while
+a push that slumps the lamp is always said. Being moved that far is a
+push even under the joint's load bound and contact floor, and "where it
+first gave" is kept across the holds of one push: a joint that gives way
+again within a hold's length (`EASE_STEPS`, 2 s) of its last hold keeps
+where it first gave. A hand on lamp-52e6 (2026-10-27) turned the base about
+30 counts a hold, each a stop-pushing of its own at loads of 104 to 160
+under its 220; from where each hold began it never moved 15 counts, and
+`pushed` was never said. Once started, it stays while
 the joint is more than 15 counts off where it first gave, or reads over
 half its bound and over its own resting load by a quarter of its bound (a
 press at 300 easing to 130 on a pitch bound 240, that read 25 before, is
@@ -3022,14 +3029,16 @@ over 100 (a light hand on the base) and a hand that keeps it held. Without
 `--give-way` a hand still on the joint after it gave way ends the run
 (`load`), so `pushed` lasts until then. The shoulder and the elbow are not
 in it: a hand on the arm makes the lamp sit down, which the body's report
-says. Six tests: steps say a hand only while one is on a joint, and never
+says. Eight tests: steps say a hand only while one is on a joint, and never
 without one; a resting joint jittering inside that band, at any rest and
 resting load, never says one, while a hand moving it or pressing past its
 bound still does; a hand keeping a joint 40 counts off where it gave,
 pressing under its bound, says one on every step of the hold and none
 once it lets go (pitch and base); a pitch pressed over its contact floor
-in a glance says one until it slumps; the bus says it with each step passed on and keeps when the
-push began.
+in a glance says one until it slumps; a base turned 33 counts a hold over
+two holds, pressed under its bound, says one in the second hold and none
+once the hand has gone, while one such turn held still does not; the bus
+says it with each step passed on and keeps when the push began.
 
 ## Preparing to unplug (#1674)
 
