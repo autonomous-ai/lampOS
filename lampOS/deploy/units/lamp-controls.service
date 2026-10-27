@@ -6,7 +6,7 @@
 Description=lampOS controls (lamp-controls)
 ConditionHost=@UNIT_ID@
 PartOf=lampos.target
-After=lamp-voice.service
+# Not after the voice: the voice is after Controls, so it stops first at a shutdown (#3697).
 StartLimitIntervalSec=600
 StartLimitBurst=5
 

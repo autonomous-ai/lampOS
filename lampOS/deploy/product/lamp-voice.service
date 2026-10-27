@@ -14,6 +14,12 @@ After=network-online.target sound.target lamp-memory.service lamp-actions.servic
 # first word is at its level. Not Wanted: a lamp without that card or unit starts the voice all the same.
 After=lamp-cmedia-speaker.service
 Wants=network-online.target
+# Controls publishes the privacy switch the voice leases the microphones by (docs/privacy-switch.md): the voice
+# starts after it and, at a shutdown or reboot, stops before it. Stopped after Controls, the voice saw the switch
+# go unreadable, ended with 1, and the next boot came up muted by the restart guard (lamp-52e6, 27 Oct, #3697).
+# A publisher not yet up at start is waited for with the microphones closed, never an exit.
+After=lamp-controls.service
+Wants=lamp-controls.service
 StartLimitIntervalSec=600
 StartLimitBurst=10
 

@@ -12,6 +12,9 @@ PartOf=lampos.target
 # With them Type=simple this orders only the forks; the voice does without either if it is late.
 After=network-online.target sound.target lamp-memory.service lamp-actions.service
 Wants=network-online.target
+# After Controls, which publishes the privacy switch: at a shutdown the voice stops first (#3697).
+After=lamp-controls.service
+Wants=lamp-controls.service
 StartLimitIntervalSec=600
 StartLimitBurst=10
 
