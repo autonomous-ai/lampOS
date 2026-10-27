@@ -5182,6 +5182,66 @@ fn the_second_workers_link_is_ready_before_any_service_is_asked() {
     assert_eq!(services.asked.load(Ordering::SeqCst), 0);
 }
 
+/// #3755 part 3, the Reviewer-lead's P3 on #3790: with the wait sounds and
+/// the down line on, as the product runs, the worker still says Ready and
+/// its link Ready before any service is asked; then it renders those lines
+/// at once, before any turn, and a Stop while they're in flight still ends
+/// it inside the budget.
+#[test]
+fn the_second_worker_renders_its_lines_at_the_start_after_its_link_is_ready() {
+    let directory = SessionDirectory::create().unwrap();
+    let (mut parent, worker) = super::pair(&directory, "second");
+    let services = Arc::new(Refusing::default());
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+    let engine_services = services.clone();
+    let worker_thread = std::thread::spawn(move || {
+        runtime.block_on(async move {
+            let engine = crate::second_provider::Engine::new(
+                engine_services,
+                || crate::second_provider::Told::from(String::new()),
+                Arc::new(|_, _, _, _| Box::pin(async { serde_json::json!({}) })),
+            )
+            .waiting_with_a_sound(true)
+            .saying_when_down(true);
+            crate::second_provider::worker::run(worker, new_boot().unwrap(), engine, None, None)
+                .await
+        })
+    });
+    // `receive` doesn't wait: poll for each of the worker's first events.
+    let mut first = || {
+        let asked = Instant::now();
+        loop {
+            if let Some(event) = parent.control.receive::<WorkerEvent>().unwrap() {
+                return event;
+            }
+            assert!(asked.elapsed() < Duration::from_secs(2), "no event");
+            std::thread::sleep(Duration::from_millis(1));
+        }
+    };
+    assert!(matches!(first(), WorkerEvent::Ready));
+    assert!(matches!(first(), WorkerEvent::ProviderLink { .. }));
+    // No turn: only the start's renders ask the voice.
+    let started = Instant::now();
+    while services.asked.load(Ordering::SeqCst) == 0 && started.elapsed() < Duration::from_secs(2) {
+        std::thread::sleep(Duration::from_millis(5));
+    }
+    assert!(
+        services.asked.load(Ordering::SeqCst) > 0,
+        "nothing rendered at the start"
+    );
+    parent.control.send(Control::Stop).unwrap();
+    let stopping = Instant::now();
+    worker_thread.join().unwrap().unwrap();
+    assert!(
+        stopping.elapsed() < Duration::from_millis(300),
+        "{:?}",
+        stopping.elapsed()
+    );
+}
+
 /// #1620 on the second route, the gap this closes: the second worker's
 /// process (`worker::serve`) runs on a current-thread tokio runtime, ended
 /// when `run` returns on Stop. Its async network I/O (the
