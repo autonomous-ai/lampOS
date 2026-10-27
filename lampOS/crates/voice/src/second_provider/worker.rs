@@ -9105,6 +9105,9 @@ pub async fn run(
 ) -> io::Result<()> {
     let started_us = monotonic_us();
     channels.control.send(WorkerEvent::Ready)?;
+    // The wait sounds and down lines rendered at the start, not at the
+    // first line: the first turn after a restart had none (#3755).
+    engine.render_lines();
     let (mut link, ready) = super::link::Watch::new(probe_targets, started_us, monotonic_us());
     ready.validate(monotonic_us())?;
     channels

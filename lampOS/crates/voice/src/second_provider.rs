@@ -3141,6 +3141,19 @@ impl Engine {
     /// Take one input. Must run inside a tokio runtime: a turn is a task.
     /// Input for a retired request, or for a request other than the
     /// current one, is dropped; the worker loop has checked authority.
+    /// The wait sounds and the down lines rendered now, as the worker
+    /// starts, so the first turn after a restart has its "hmm" ready and
+    /// the speech connection is warm (#3755). Each renders once; one that
+    /// fails is tried again at the next line. In a runtime only.
+    pub fn render_lines(&self) {
+        if let Some(cues) = &self.shared.cues {
+            cues.render(&self.shared.services);
+        }
+        if let Some(down) = &self.shared.down {
+            down.render(&self.shared.services);
+        }
+    }
+
     pub fn submit(&mut self, input: ProviderInput) {
         match input {
             ProviderInput::Start {
@@ -3238,6 +3251,12 @@ impl Engine {
                 // render can overlap a turn.
                 if let Some(down) = &self.shared.down {
                     down.render(&self.shared.services);
+                }
+                // The wait sounds too, as the line begins, not only once its
+                // words are heard: one rendered by the time the chat is due
+                // makes its "hmm" (#3755).
+                if let Some(cues) = &self.shared.cues {
+                    cues.render(&self.shared.services);
                 }
                 // A new line is not the sentence unless it is said to be.
                 crate::thread::count_only(None);
@@ -7774,7 +7793,13 @@ async fn answer(
                                 cue(shared, request, clip).await?;
                                 shared.cue_after + BEGIN_WITHIN_AFTER_CUE
                             }
-                            None => shared.cue_after.max(BEGIN_WITHIN),
+                            // No sound ready yet (the first turn after a
+                            // start, its clips still rendering): the same
+                            // time a ready sound gives, not less, so a cold
+                            // chat that begins late is answered (#3755: the
+                            // first turn after a restart had 3 s, the rest
+                            // 4.5 s, while its chat was coldest).
+                            None => shared.cue_after + BEGIN_WITHIN_AFTER_CUE,
                         };
                         next = tokio::time::timeout_at(at(bound), stream.next()).await;
                     }
