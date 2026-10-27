@@ -1,0 +1,17 @@
+{
+  "name": "lampos",
+  "version": "0.1.0",
+  "description": "Program a lampOS lamp from your own computer: the v1 control protocol (docs/control.md)",
+  "type": "module",
+  "license": "Apache-2.0",
+  "engines": { "node": ">=18" },
+  "exports": {
+    ".": "./src/index.js",
+    "./testing": "./src/testing.js"
+  },
+  "bin": { "lamp": "./src/cli.js", "lampos": "./src/cli.js" },
+  "files": ["src"],
+  "dependencies": { "ws": "^8.18.3" },
+  "optionalDependencies": { "bonjour-service": "^1.2.1" },
+  "scripts": { "test": "node --test --test-timeout=20000 test/*.test.js" }
+}
