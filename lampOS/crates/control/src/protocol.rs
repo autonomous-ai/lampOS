@@ -49,6 +49,15 @@ pub const FRAMES: std::ops::RangeInclusive<usize> = 2..=500;
 pub const WITHIN_MAX_MS: u32 = 5_000;
 /// The longest name a client gives itself at pairing, in characters.
 pub const CLIENT_NAME_MAX_CHARS: usize = 64;
+/// A pushed skill package's largest size, in bytes.
+pub const SKILL_PACKAGE_MAX: usize = 1 << 20;
+/// One `skill.push` part's largest `data`, in base64 characters (36 KiB of
+/// the package), so a frame stays under 64 KiB.
+pub const SKILL_PART_MAX_CHARS: usize = 48 * 1024;
+/// The most parts one push is sent in.
+pub const SKILL_PARTS_MAX: u32 = 32;
+/// The longest skill name, as the skill format has it.
+pub const SKILL_NAME_MAX_CHARS: usize = 64;
 
 /// A part a lease holds.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
@@ -76,6 +85,28 @@ pub enum Grant {
     Hear,
     /// Sound classes heard.
     Sound,
+    /// Its own skills put on the lamp (`skill.push`, `skill.list`,
+    /// `skill.remove`), which run on their own after it goes, never beyond
+    /// its other grants (docs/control.md, "Skills pushed from a computer").
+    Skills,
+}
+
+impl Grant {
+    /// What the pairing screen says the owner is granting, word for word:
+    /// the owner's admin socket gives these with the code, and the app
+    /// shows them. `skills` says that what it puts on keeps running after
+    /// the computer goes (docs/control.md, "Skills pushed from a computer").
+    pub fn shown(self) -> &'static str {
+        match self {
+            Self::Body => "can move the lamp's body",
+            Self::Light => "can change the light",
+            Self::Speak => "can speak and play sounds",
+            Self::Look => "can tell when someone is there, never who",
+            Self::Hear => "can hear its own phrases, never the words around them",
+            Self::Sound => "can hear kinds of sound, never words",
+            Self::Skills => "can put skills on the lamp that run on their own",
+        }
+    }
 }
 
 /// An event a client may subscribe to.
@@ -290,6 +321,23 @@ pub enum Op {
     /// Ends the client's own actions now. Needs no lease.
     #[serde(rename = "stop")]
     Stop {},
+    /// One part of a skill package, `lamp-skills pack`'s shape, sent in
+    /// order from 0; the last part's answer comes once it is installed.
+    #[serde(rename = "skill.push")]
+    SkillPush {
+        name: String,
+        sha256: String,
+        size: usize,
+        part: u32,
+        parts: u32,
+        data: String,
+    },
+    /// The client's own pushed skills.
+    #[serde(rename = "skill.list")]
+    SkillList {},
+    /// One of the client's own pushed skills, taken off.
+    #[serde(rename = "skill.remove")]
+    SkillRemove { name: String },
 }
 
 impl Op {
@@ -322,6 +370,9 @@ impl Op {
             },
             Self::Light { .. } => vec![Grant::Light],
             Self::Say { .. } | Self::Sound { .. } => vec![Grant::Speak],
+            Self::SkillPush { .. } | Self::SkillList {} | Self::SkillRemove { .. } => {
+                vec![Grant::Skills]
+            }
         };
         needs.sort();
         needs.dedup();
@@ -403,6 +454,33 @@ impl Op {
                     }
                 }
             }
+            Self::SkillPush {
+                name,
+                sha256,
+                size,
+                part,
+                parts,
+                data,
+            } => {
+                skill_name(name)?;
+                if sha256.len() != 64 || !sha256.bytes().all(|b| b.is_ascii_hexdigit()) {
+                    return Err("sha256: the package's SHA-256, 64 hex".to_owned());
+                }
+                if *size == 0 || *size > SKILL_PACKAGE_MAX {
+                    return Err(format!("size: 1 to {SKILL_PACKAGE_MAX} bytes"));
+                }
+                if *parts == 0 || *parts > SKILL_PARTS_MAX || part >= parts {
+                    return Err(format!(
+                        "parts: 1 to {SKILL_PARTS_MAX}, and part from 0 to parts - 1"
+                    ));
+                }
+                if data.is_empty() || data.len() > SKILL_PART_MAX_CHARS {
+                    return Err(format!(
+                        "data: 1 to {SKILL_PART_MAX_CHARS} characters of base64"
+                    ));
+                }
+            }
+            Self::SkillRemove { name } => skill_name(name)?,
             Self::Unsubscribe { events } => {
                 if events.is_empty() {
                     return Err("events: at least one".to_owned());
@@ -518,7 +596,7 @@ impl Op {
                     return Err(format!("text: words, at most {SAY_MAX_CHARS} characters"));
                 }
             }
-            Self::Stop {} => {}
+            Self::Stop {} | Self::SkillList {} => {}
         }
         Ok(())
     }
@@ -684,6 +762,22 @@ pub fn lease_event(lease: &str, state: LeaseState, why: Option<LeaseWhy>) -> Val
 }
 
 /// Whether `text` is standard base64 of exactly `bytes` bytes, padded.
+/// A skill's name as the skill format has it: 1 to 64 of `a-z`, `0-9`
+/// and `-`.
+fn skill_name(name: &str) -> Result<(), String> {
+    if name.is_empty()
+        || name.len() > SKILL_NAME_MAX_CHARS
+        || !name
+            .bytes()
+            .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
+    {
+        return Err(format!(
+            "name: a skill's, 1 to {SKILL_NAME_MAX_CHARS} of a-z, 0-9 and -"
+        ));
+    }
+    Ok(())
+}
+
 fn base64_of(text: &str, bytes: usize) -> bool {
     let length = bytes.div_ceil(3) * 4;
     let padding = (3 - bytes % 3) % 3;
@@ -902,6 +996,42 @@ mod tests {
         ] {
             assert!(parse(&subscribe(fine)).is_ok(), "{fine}");
         }
+    }
+
+    /// Fourteen's note on #3869: the pairing screen's words are pinned,
+    /// `skills`' above all, which says what it puts on keeps running.
+    #[test]
+    fn the_pairing_screen_says_each_grant_as_pinned() {
+        let shown: Vec<(Value, &str)> = [
+            Grant::Body,
+            Grant::Light,
+            Grant::Speak,
+            Grant::Look,
+            Grant::Hear,
+            Grant::Sound,
+            Grant::Skills,
+        ]
+        .into_iter()
+        .map(|grant| (json!(grant), grant.shown()))
+        .collect();
+        assert_eq!(
+            shown,
+            [
+                (json!("body"), "can move the lamp's body"),
+                (json!("light"), "can change the light"),
+                (json!("speak"), "can speak and play sounds"),
+                (json!("look"), "can tell when someone is there, never who"),
+                (
+                    json!("hear"),
+                    "can hear its own phrases, never the words around them"
+                ),
+                (json!("sound"), "can hear kinds of sound, never words"),
+                (
+                    json!("skills"),
+                    "can put skills on the lamp that run on their own"
+                ),
+            ]
+        );
     }
 
     #[test]
