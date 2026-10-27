@@ -1,3 +1,24 @@
+## 2026-10-27 17:20 UTC — Current hand fixture passes and is pushed
+
+Ready for lamp-voice: no
+
+#3544 is pushed as `4084e4e1d`, one metadata-preserving commit on frozen
+`7400e4b95`, exact tested tree `29fb356e`. [Current proof](verification/hand-7400-current-20261028/README.md):
+compiler88229/0; runtime7553/0 gives 4,163 unique PASS, no failure/leak/timeout,
+all22 host-required controls, four bounded direct controls and a disjoint
+4,159-case full Voice/Update remainder. Four doctests are separate. One
+Linux-only control remains for native CI. Original zero-body125 and older
+full/isolated failures stay recorded; the exact kept-resync fixture hold has
+an accepted narrow disposition on matching patched source. Fresh native and
+reader carry remain gates. Child #3577 fresh compiler78777 is running next.
+
+#3898 `918e76b22` received a source-only HOLD: its main-loop counter can miss
+an actual camera permission cycle while busy; original frame/receipt lifetime
+is absent. The new realYawns reset/filtering is retained as useful work.
+Ten owns repair; Fourth stopped duplicate design before writing feature code.
+The #3472 older-updater note is prepared, verified to require newer-updater
+installation and Voice restart rather than setup alone, for its next carry.
+
 ## 2026-10-27 16:53 UTC — Onboarding native run fails at the upstream journal fixture
 
 Ready for lamp-voice: no

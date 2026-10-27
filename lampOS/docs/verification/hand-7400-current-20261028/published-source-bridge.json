@@ -1,0 +1,49 @@
+{
+  "new_head": "4084e4e1dde24ea17d6c88d944256f78904579c0",
+  "tree": "29fb356e324483a4d2c08ab2e68a53e2da865d12",
+  "base": "7400e4b951a3ad23552cbb73b4c271796a5876ec",
+  "original": "c97dae33396a45657641c719794d162ca2d9c581",
+  "one_commit": true,
+  "owned_paths": [
+    "lampOS/crates/voice/src/hand_controls.rs",
+    "lampOS/crates/voice/src/hand_controls/tests.rs",
+    "lampOS/docs/realtime-tests.md"
+  ],
+  "author_committer_message_exact": true,
+  "full_source_and_mtimes_unchanged": true,
+  "own_branch_CAS_updated": true,
+  "post_doctest_runtime_metadata_changes": [
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/build/lamp-camera-3b932f7397b2694a/build-script-build",
+      "runtime_metadata": {
+        "device": 16777222,
+        "inode": 488978668,
+        "mtime_ns": 1793097012444345309,
+        "ctime_ns": 1793119387567981232,
+        "size": 549320,
+        "mode": 493,
+        "nlink": 1,
+        "no_symlink": true
+      },
+      "post_doctest_metadata": {
+        "device": 16777222,
+        "inode": 489168339,
+        "mtime_ns": 1793097012444345309,
+        "ctime_ns": 1793121295446320569,
+        "size": 549320,
+        "mode": 493,
+        "nlink": 1,
+        "no_symlink": true
+      },
+      "bytes_equal": true
+    }
+  ],
+  "runtime_input_full_bytes_equal": true,
+  "postcommit_range_diff_sha256": "f281048be638c140bf5e121b51dd10a1de268b1dd680b67e5fa1de25632378d4",
+  "compiler_release_sha256": "7a1f57d1628f63ef2d7d02d088412e57e0fd82474a45e8e070c04040f864fabc",
+  "runtime_release_sha256": "a6cb9732f2d3961941e0014132c7866297cef16b7653ed19530ac4cf421d4cf2",
+  "push_destination": "refs/heads/fourth/hand-pump-wait-boundary-20261026",
+  "force_with_lease_expected": "c97dae33396a45657641c719794d162ca2d9c581",
+  "pushed": false,
+  "ready": false
+}

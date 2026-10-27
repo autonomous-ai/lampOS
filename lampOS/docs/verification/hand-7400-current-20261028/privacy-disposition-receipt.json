@@ -1,0 +1,26 @@
+{
+  "status": "READ_ONLY_SOURCE_DISPOSITION_AUDIT",
+  "original_full_hold_comments": [
+    6409765029,
+    6414642474
+  ],
+  "original_isolated_failure_comment": 6414731429,
+  "parent_latest_hold_comment": 6414993238,
+  "dependent_inherited_hold_comment": 6415270150,
+  "acceptance_comments": [
+    6444805122,
+    6444805857,
+    6444979085
+  ],
+  "accepted_public_log": "68f15891ae9706f33fefe431d1665b3b452e90a0",
+  "whole_files_each": 11,
+  "controls_each": 16,
+  "local_source_rows_verified": 55,
+  "control_hash_rows_verified": 80,
+  "all_match": true,
+  "scope": "same kept-resync fixture HOLD only; reader carry requested for current head, no whole3315 waiver",
+  "source_proof_sha256": "03df7653078dabbda18cab6cb37a28532b6ec482d886b781b63d2299b0e117a7",
+  "proposed_comment_sha256": "23b066d6cc9541aeb2d5e886750e7035f3ae1408da6ffc65df72b82ddcdb8b82",
+  "no_Cargo_target_source_ref_or_public_mutations": true,
+  "runtime_executions": 0
+}

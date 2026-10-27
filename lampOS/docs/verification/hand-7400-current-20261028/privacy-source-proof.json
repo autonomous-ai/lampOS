@@ -1,0 +1,953 @@
+{
+  "references": {
+    "merged3637": "c7c197f986e870577ef2af34043d92a52b882160",
+    "acceptedCommon": "28af4573a66c2844cdd0a91936d2eca8c566fd5b",
+    "frozenMain": "7400e4b951a3ad23552cbb73b4c271796a5876ec",
+    "parent3544": "29fb356e324483a4d2c08ab2e68a53e2da865d12",
+    "child3577": "cd040a50001a660b402e886d791643d7db91bcb1"
+  },
+  "sources": [
+    {
+      "reference": "merged3637",
+      "ref": "c7c197f986e870577ef2af34043d92a52b882160",
+      "path": "lampOS/crates/voice/src/privacy_bus.rs",
+      "git_blob": "d94b9f8dc4b372a3a7518d69aa20f0945c18d292",
+      "sha256": "0f376c76bc9409f9d41c07187d4a58de553bfb5b49a6d600342bcd90714a67df",
+      "matches_accepted_native": true
+    },
+    {
+      "reference": "merged3637",
+      "ref": "c7c197f986e870577ef2af34043d92a52b882160",
+      "path": "lampOS/crates/msgs/src/privacy.rs",
+      "git_blob": "8c491f4ed8f71f230a2baed38d8e8bbe2b53333e",
+      "sha256": "32ec32a89137fc6e39e5fb9b66314f0349069d1321e63d7e0cd5fc2ce0b8e8a1",
+      "matches_accepted_native": true
+    },
+    {
+      "reference": "merged3637",
+      "ref": "c7c197f986e870577ef2af34043d92a52b882160",
+      "path": "lampOS/crates/msgs/tests/it/privacy.rs",
+      "git_blob": "928b84419c17db8678b3805982801b38bd62de00",
+      "sha256": "49877816630df846011d0c3a9fe3239e4bbdac0cdfffa31478a38c159ca03356",
+      "matches_accepted_native": true
+    },
+    {
+      "reference": "merged3637",
+      "ref": "c7c197f986e870577ef2af34043d92a52b882160",
+      "path": "lampOS/crates/bus/tests/it/bus.rs",
+      "git_blob": "f7eda7431cf06877921b6b889a10b8957d2e6205",
+      "sha256": "7040765d6d856c9e228a1211da736b8a891680a5bf90d4b0a3a6ced064a1f76a",
+      "matches_accepted_native": true
+    },
+    {
+      "reference": "merged3637",
+      "ref": "c7c197f986e870577ef2af34043d92a52b882160",
+      "path": "lampOS/crates/bus/src/subscribe.rs",
+      "git_blob": "cb70bd3b17dce6c6909c3e8e94fb9102d40f54df",
+      "sha256": "0404a4e881ee06ba41c4f5874d31dcf773a9aba818d2b4df410e6a05bf396e28",
+      "matches_accepted_native": true
+    },
+    {
+      "reference": "merged3637",
+      "ref": "c7c197f986e870577ef2af34043d92a52b882160",
+      "path": "lampOS/crates/bus/src/wire.rs",
+      "git_blob": "163e6a31afd997dd305de616954799df83dd1d17",
+      "sha256": "2773cbc3f2dd0fe5accd28e1e940b57dc579dc48c922821e4b66e5b80abf6920",
+      "matches_accepted_native": true
+    },
+    {
+      "reference": "merged3637",
+      "ref": "c7c197f986e870577ef2af34043d92a52b882160",
+      "path": "lampOS/crates/bus/src/publish.rs",
+      "git_blob": "e77ff9701bd60af6102913e8acde45ac33582931",
+      "sha256": "3b760ef2169d8561750c0bf28f8bea176f729c8ba18de45354067068814016c1",
+      "matches_accepted_native": true
+    },
+    {
+      "reference": "merged3637",
+      "ref": "c7c197f986e870577ef2af34043d92a52b882160",
+      "path": "lampOS/crates/bus/src/live.rs",
+      "git_blob": "d0cdfbcccd2d232544310d51a42cba715b56c58f",
+      "sha256": "b0a04b4b0a58ab8ca01a38de39931bf3657fc985187caee6db43499b2b6b6291",
+      "matches_accepted_native": true
+    },
+    {
+      "reference": "merged3637",
+      "ref": "c7c197f986e870577ef2af34043d92a52b882160",
+      "path": "lampOS/crates/bus/src/declare.rs",
+      "git_blob": "27597f2bddc465db1459d97880ef180e2ac55999",
+      "sha256": "60183bfa717674edc75d709417c7cb4f8366900bb598a8db627240a2a96c5995",
+      "matches_accepted_native": true
+    },
+    {
+      "reference": "merged3637",
+      "ref": "c7c197f986e870577ef2af34043d92a52b882160",
+      "path": "lampOS/crates/ipc/src/lib.rs",
+      "git_blob": "ed70b4552127e008540f46baaf01be629a1fa473",
+      "sha256": "f64aa5070b79991a58ed0fe772c6697c3d52f4c58b48e793046c753358703c44",
+      "matches_accepted_native": true
+    },
+    {
+      "reference": "merged3637",
+      "ref": "c7c197f986e870577ef2af34043d92a52b882160",
+      "path": "lampOS/crates/controls/src/privacy.rs",
+      "git_blob": "11271c06626b2f6c97d88429b8981b6da80dbf6e",
+      "sha256": "3a22d4b087a9f6cf68b3fbcc753bed367d53354d2660c6c1057b7bdb04a60a2d",
+      "matches_accepted_native": true
+    },
+    {
+      "reference": "acceptedCommon",
+      "ref": "28af4573a66c2844cdd0a91936d2eca8c566fd5b",
+      "path": "lampOS/crates/voice/src/privacy_bus.rs",
+      "git_blob": "d94b9f8dc4b372a3a7518d69aa20f0945c18d292",
+      "sha256": "0f376c76bc9409f9d41c07187d4a58de553bfb5b49a6d600342bcd90714a67df",
+      "matches_accepted_native": true
+    },
+    {
+      "reference": "acceptedCommon",
+      "ref": "28af4573a66c2844cdd0a91936d2eca8c566fd5b",
+      "path": "lampOS/crates/msgs/src/privacy.rs",
+      "git_blob": "8c491f4ed8f71f230a2baed38d8e8bbe2b53333e",
+      "sha256": "32ec32a89137fc6e39e5fb9b66314f0349069d1321e63d7e0cd5fc2ce0b8e8a1",
+      "matches_accepted_native": true
+    },
+    {
+      "reference": "acceptedCommon",
+      "ref": "28af4573a66c2844cdd0a91936d2eca8c566fd5b",
+      "path": "lampOS/crates/msgs/tests/it/privacy.rs",
+      "git_blob": "928b84419c17db8678b3805982801b38bd62de00",
+      "sha256": "49877816630df846011d0c3a9fe3239e4bbdac0cdfffa31478a38c159ca03356",
+      "matches_accepted_native": true
+    },
+    {
+      "reference": "acceptedCommon",
+      "ref": "28af4573a66c2844cdd0a91936d2eca8c566fd5b",
+      "path": "lampOS/crates/bus/tests/it/bus.rs",
+      "git_blob": "f7eda7431cf06877921b6b889a10b8957d2e6205",
+      "sha256": "7040765d6d856c9e228a1211da736b8a891680a5bf90d4b0a3a6ced064a1f76a",
+      "matches_accepted_native": true
+    },
+    {
+      "reference": "acceptedCommon",
+      "ref": "28af4573a66c2844cdd0a91936d2eca8c566fd5b",
+      "path": "lampOS/crates/bus/src/subscribe.rs",
+      "git_blob": "cb70bd3b17dce6c6909c3e8e94fb9102d40f54df",
+      "sha256": "0404a4e881ee06ba41c4f5874d31dcf773a9aba818d2b4df410e6a05bf396e28",
+      "matches_accepted_native": true
+    },
+    {
+      "reference": "acceptedCommon",
+      "ref": "28af4573a66c2844cdd0a91936d2eca8c566fd5b",
+      "path": "lampOS/crates/bus/src/wire.rs",
+      "git_blob": "163e6a31afd997dd305de616954799df83dd1d17",
+      "sha256": "2773cbc3f2dd0fe5accd28e1e940b57dc579dc48c922821e4b66e5b80abf6920",
+      "matches_accepted_native": true
+    },
+    {
+      "reference": "acceptedCommon",
+      "ref": "28af4573a66c2844cdd0a91936d2eca8c566fd5b",
+      "path": "lampOS/crates/bus/src/publish.rs",
+      "git_blob": "e77ff9701bd60af6102913e8acde45ac33582931",
+      "sha256": "3b760ef2169d8561750c0bf28f8bea176f729c8ba18de45354067068814016c1",
+      "matches_accepted_native": true
+    },
+    {
+      "reference": "acceptedCommon",
+      "ref": "28af4573a66c2844cdd0a91936d2eca8c566fd5b",
+      "path": "lampOS/crates/bus/src/live.rs",
+      "git_blob": "d0cdfbcccd2d232544310d51a42cba715b56c58f",
+      "sha256": "b0a04b4b0a58ab8ca01a38de39931bf3657fc985187caee6db43499b2b6b6291",
+      "matches_accepted_native": true
+    },
+    {
+      "reference": "acceptedCommon",
+      "ref": "28af4573a66c2844cdd0a91936d2eca8c566fd5b",
+      "path": "lampOS/crates/bus/src/declare.rs",
+      "git_blob": "27597f2bddc465db1459d97880ef180e2ac55999",
+      "sha256": "60183bfa717674edc75d709417c7cb4f8366900bb598a8db627240a2a96c5995",
+      "matches_accepted_native": true
+    },
+    {
+      "reference": "acceptedCommon",
+      "ref": "28af4573a66c2844cdd0a91936d2eca8c566fd5b",
+      "path": "lampOS/crates/ipc/src/lib.rs",
+      "git_blob": "ed70b4552127e008540f46baaf01be629a1fa473",
+      "sha256": "f64aa5070b79991a58ed0fe772c6697c3d52f4c58b48e793046c753358703c44",
+      "matches_accepted_native": true
+    },
+    {
+      "reference": "acceptedCommon",
+      "ref": "28af4573a66c2844cdd0a91936d2eca8c566fd5b",
+      "path": "lampOS/crates/controls/src/privacy.rs",
+      "git_blob": "11271c06626b2f6c97d88429b8981b6da80dbf6e",
+      "sha256": "3a22d4b087a9f6cf68b3fbcc753bed367d53354d2660c6c1057b7bdb04a60a2d",
+      "matches_accepted_native": true
+    },
+    {
+      "reference": "frozenMain",
+      "ref": "7400e4b951a3ad23552cbb73b4c271796a5876ec",
+      "path": "lampOS/crates/voice/src/privacy_bus.rs",
+      "git_blob": "d94b9f8dc4b372a3a7518d69aa20f0945c18d292",
+      "sha256": "0f376c76bc9409f9d41c07187d4a58de553bfb5b49a6d600342bcd90714a67df",
+      "matches_accepted_native": true
+    },
+    {
+      "reference": "frozenMain",
+      "ref": "7400e4b951a3ad23552cbb73b4c271796a5876ec",
+      "path": "lampOS/crates/msgs/src/privacy.rs",
+      "git_blob": "8c491f4ed8f71f230a2baed38d8e8bbe2b53333e",
+      "sha256": "32ec32a89137fc6e39e5fb9b66314f0349069d1321e63d7e0cd5fc2ce0b8e8a1",
+      "matches_accepted_native": true
+    },
+    {
+      "reference": "frozenMain",
+      "ref": "7400e4b951a3ad23552cbb73b4c271796a5876ec",
+      "path": "lampOS/crates/msgs/tests/it/privacy.rs",
+      "git_blob": "928b84419c17db8678b3805982801b38bd62de00",
+      "sha256": "49877816630df846011d0c3a9fe3239e4bbdac0cdfffa31478a38c159ca03356",
+      "matches_accepted_native": true
+    },
+    {
+      "reference": "frozenMain",
+      "ref": "7400e4b951a3ad23552cbb73b4c271796a5876ec",
+      "path": "lampOS/crates/bus/tests/it/bus.rs",
+      "git_blob": "f7eda7431cf06877921b6b889a10b8957d2e6205",
+      "sha256": "7040765d6d856c9e228a1211da736b8a891680a5bf90d4b0a3a6ced064a1f76a",
+      "matches_accepted_native": true
+    },
+    {
+      "reference": "frozenMain",
+      "ref": "7400e4b951a3ad23552cbb73b4c271796a5876ec",
+      "path": "lampOS/crates/bus/src/subscribe.rs",
+      "git_blob": "cb70bd3b17dce6c6909c3e8e94fb9102d40f54df",
+      "sha256": "0404a4e881ee06ba41c4f5874d31dcf773a9aba818d2b4df410e6a05bf396e28",
+      "matches_accepted_native": true
+    },
+    {
+      "reference": "frozenMain",
+      "ref": "7400e4b951a3ad23552cbb73b4c271796a5876ec",
+      "path": "lampOS/crates/bus/src/wire.rs",
+      "git_blob": "163e6a31afd997dd305de616954799df83dd1d17",
+      "sha256": "2773cbc3f2dd0fe5accd28e1e940b57dc579dc48c922821e4b66e5b80abf6920",
+      "matches_accepted_native": true
+    },
+    {
+      "reference": "frozenMain",
+      "ref": "7400e4b951a3ad23552cbb73b4c271796a5876ec",
+      "path": "lampOS/crates/bus/src/publish.rs",
+      "git_blob": "e77ff9701bd60af6102913e8acde45ac33582931",
+      "sha256": "3b760ef2169d8561750c0bf28f8bea176f729c8ba18de45354067068814016c1",
+      "matches_accepted_native": true
+    },
+    {
+      "reference": "frozenMain",
+      "ref": "7400e4b951a3ad23552cbb73b4c271796a5876ec",
+      "path": "lampOS/crates/bus/src/live.rs",
+      "git_blob": "d0cdfbcccd2d232544310d51a42cba715b56c58f",
+      "sha256": "b0a04b4b0a58ab8ca01a38de39931bf3657fc985187caee6db43499b2b6b6291",
+      "matches_accepted_native": true
+    },
+    {
+      "reference": "frozenMain",
+      "ref": "7400e4b951a3ad23552cbb73b4c271796a5876ec",
+      "path": "lampOS/crates/bus/src/declare.rs",
+      "git_blob": "27597f2bddc465db1459d97880ef180e2ac55999",
+      "sha256": "60183bfa717674edc75d709417c7cb4f8366900bb598a8db627240a2a96c5995",
+      "matches_accepted_native": true
+    },
+    {
+      "reference": "frozenMain",
+      "ref": "7400e4b951a3ad23552cbb73b4c271796a5876ec",
+      "path": "lampOS/crates/ipc/src/lib.rs",
+      "git_blob": "ed70b4552127e008540f46baaf01be629a1fa473",
+      "sha256": "f64aa5070b79991a58ed0fe772c6697c3d52f4c58b48e793046c753358703c44",
+      "matches_accepted_native": true
+    },
+    {
+      "reference": "frozenMain",
+      "ref": "7400e4b951a3ad23552cbb73b4c271796a5876ec",
+      "path": "lampOS/crates/controls/src/privacy.rs",
+      "git_blob": "11271c06626b2f6c97d88429b8981b6da80dbf6e",
+      "sha256": "3a22d4b087a9f6cf68b3fbcc753bed367d53354d2660c6c1057b7bdb04a60a2d",
+      "matches_accepted_native": true
+    },
+    {
+      "reference": "parent3544",
+      "ref": "29fb356e324483a4d2c08ab2e68a53e2da865d12",
+      "path": "lampOS/crates/voice/src/privacy_bus.rs",
+      "git_blob": "d94b9f8dc4b372a3a7518d69aa20f0945c18d292",
+      "sha256": "0f376c76bc9409f9d41c07187d4a58de553bfb5b49a6d600342bcd90714a67df",
+      "matches_accepted_native": true
+    },
+    {
+      "reference": "parent3544",
+      "ref": "29fb356e324483a4d2c08ab2e68a53e2da865d12",
+      "path": "lampOS/crates/msgs/src/privacy.rs",
+      "git_blob": "8c491f4ed8f71f230a2baed38d8e8bbe2b53333e",
+      "sha256": "32ec32a89137fc6e39e5fb9b66314f0349069d1321e63d7e0cd5fc2ce0b8e8a1",
+      "matches_accepted_native": true
+    },
+    {
+      "reference": "parent3544",
+      "ref": "29fb356e324483a4d2c08ab2e68a53e2da865d12",
+      "path": "lampOS/crates/msgs/tests/it/privacy.rs",
+      "git_blob": "928b84419c17db8678b3805982801b38bd62de00",
+      "sha256": "49877816630df846011d0c3a9fe3239e4bbdac0cdfffa31478a38c159ca03356",
+      "matches_accepted_native": true
+    },
+    {
+      "reference": "parent3544",
+      "ref": "29fb356e324483a4d2c08ab2e68a53e2da865d12",
+      "path": "lampOS/crates/bus/tests/it/bus.rs",
+      "git_blob": "f7eda7431cf06877921b6b889a10b8957d2e6205",
+      "sha256": "7040765d6d856c9e228a1211da736b8a891680a5bf90d4b0a3a6ced064a1f76a",
+      "matches_accepted_native": true
+    },
+    {
+      "reference": "parent3544",
+      "ref": "29fb356e324483a4d2c08ab2e68a53e2da865d12",
+      "path": "lampOS/crates/bus/src/subscribe.rs",
+      "git_blob": "cb70bd3b17dce6c6909c3e8e94fb9102d40f54df",
+      "sha256": "0404a4e881ee06ba41c4f5874d31dcf773a9aba818d2b4df410e6a05bf396e28",
+      "matches_accepted_native": true
+    },
+    {
+      "reference": "parent3544",
+      "ref": "29fb356e324483a4d2c08ab2e68a53e2da865d12",
+      "path": "lampOS/crates/bus/src/wire.rs",
+      "git_blob": "163e6a31afd997dd305de616954799df83dd1d17",
+      "sha256": "2773cbc3f2dd0fe5accd28e1e940b57dc579dc48c922821e4b66e5b80abf6920",
+      "matches_accepted_native": true
+    },
+    {
+      "reference": "parent3544",
+      "ref": "29fb356e324483a4d2c08ab2e68a53e2da865d12",
+      "path": "lampOS/crates/bus/src/publish.rs",
+      "git_blob": "e77ff9701bd60af6102913e8acde45ac33582931",
+      "sha256": "3b760ef2169d8561750c0bf28f8bea176f729c8ba18de45354067068814016c1",
+      "matches_accepted_native": true
+    },
+    {
+      "reference": "parent3544",
+      "ref": "29fb356e324483a4d2c08ab2e68a53e2da865d12",
+      "path": "lampOS/crates/bus/src/live.rs",
+      "git_blob": "d0cdfbcccd2d232544310d51a42cba715b56c58f",
+      "sha256": "b0a04b4b0a58ab8ca01a38de39931bf3657fc985187caee6db43499b2b6b6291",
+      "matches_accepted_native": true
+    },
+    {
+      "reference": "parent3544",
+      "ref": "29fb356e324483a4d2c08ab2e68a53e2da865d12",
+      "path": "lampOS/crates/bus/src/declare.rs",
+      "git_blob": "27597f2bddc465db1459d97880ef180e2ac55999",
+      "sha256": "60183bfa717674edc75d709417c7cb4f8366900bb598a8db627240a2a96c5995",
+      "matches_accepted_native": true
+    },
+    {
+      "reference": "parent3544",
+      "ref": "29fb356e324483a4d2c08ab2e68a53e2da865d12",
+      "path": "lampOS/crates/ipc/src/lib.rs",
+      "git_blob": "ed70b4552127e008540f46baaf01be629a1fa473",
+      "sha256": "f64aa5070b79991a58ed0fe772c6697c3d52f4c58b48e793046c753358703c44",
+      "matches_accepted_native": true
+    },
+    {
+      "reference": "parent3544",
+      "ref": "29fb356e324483a4d2c08ab2e68a53e2da865d12",
+      "path": "lampOS/crates/controls/src/privacy.rs",
+      "git_blob": "11271c06626b2f6c97d88429b8981b6da80dbf6e",
+      "sha256": "3a22d4b087a9f6cf68b3fbcc753bed367d53354d2660c6c1057b7bdb04a60a2d",
+      "matches_accepted_native": true
+    },
+    {
+      "reference": "child3577",
+      "ref": "cd040a50001a660b402e886d791643d7db91bcb1",
+      "path": "lampOS/crates/voice/src/privacy_bus.rs",
+      "git_blob": "d94b9f8dc4b372a3a7518d69aa20f0945c18d292",
+      "sha256": "0f376c76bc9409f9d41c07187d4a58de553bfb5b49a6d600342bcd90714a67df",
+      "matches_accepted_native": true
+    },
+    {
+      "reference": "child3577",
+      "ref": "cd040a50001a660b402e886d791643d7db91bcb1",
+      "path": "lampOS/crates/msgs/src/privacy.rs",
+      "git_blob": "8c491f4ed8f71f230a2baed38d8e8bbe2b53333e",
+      "sha256": "32ec32a89137fc6e39e5fb9b66314f0349069d1321e63d7e0cd5fc2ce0b8e8a1",
+      "matches_accepted_native": true
+    },
+    {
+      "reference": "child3577",
+      "ref": "cd040a50001a660b402e886d791643d7db91bcb1",
+      "path": "lampOS/crates/msgs/tests/it/privacy.rs",
+      "git_blob": "928b84419c17db8678b3805982801b38bd62de00",
+      "sha256": "49877816630df846011d0c3a9fe3239e4bbdac0cdfffa31478a38c159ca03356",
+      "matches_accepted_native": true
+    },
+    {
+      "reference": "child3577",
+      "ref": "cd040a50001a660b402e886d791643d7db91bcb1",
+      "path": "lampOS/crates/bus/tests/it/bus.rs",
+      "git_blob": "f7eda7431cf06877921b6b889a10b8957d2e6205",
+      "sha256": "7040765d6d856c9e228a1211da736b8a891680a5bf90d4b0a3a6ced064a1f76a",
+      "matches_accepted_native": true
+    },
+    {
+      "reference": "child3577",
+      "ref": "cd040a50001a660b402e886d791643d7db91bcb1",
+      "path": "lampOS/crates/bus/src/subscribe.rs",
+      "git_blob": "cb70bd3b17dce6c6909c3e8e94fb9102d40f54df",
+      "sha256": "0404a4e881ee06ba41c4f5874d31dcf773a9aba818d2b4df410e6a05bf396e28",
+      "matches_accepted_native": true
+    },
+    {
+      "reference": "child3577",
+      "ref": "cd040a50001a660b402e886d791643d7db91bcb1",
+      "path": "lampOS/crates/bus/src/wire.rs",
+      "git_blob": "163e6a31afd997dd305de616954799df83dd1d17",
+      "sha256": "2773cbc3f2dd0fe5accd28e1e940b57dc579dc48c922821e4b66e5b80abf6920",
+      "matches_accepted_native": true
+    },
+    {
+      "reference": "child3577",
+      "ref": "cd040a50001a660b402e886d791643d7db91bcb1",
+      "path": "lampOS/crates/bus/src/publish.rs",
+      "git_blob": "e77ff9701bd60af6102913e8acde45ac33582931",
+      "sha256": "3b760ef2169d8561750c0bf28f8bea176f729c8ba18de45354067068814016c1",
+      "matches_accepted_native": true
+    },
+    {
+      "reference": "child3577",
+      "ref": "cd040a50001a660b402e886d791643d7db91bcb1",
+      "path": "lampOS/crates/bus/src/live.rs",
+      "git_blob": "d0cdfbcccd2d232544310d51a42cba715b56c58f",
+      "sha256": "b0a04b4b0a58ab8ca01a38de39931bf3657fc985187caee6db43499b2b6b6291",
+      "matches_accepted_native": true
+    },
+    {
+      "reference": "child3577",
+      "ref": "cd040a50001a660b402e886d791643d7db91bcb1",
+      "path": "lampOS/crates/bus/src/declare.rs",
+      "git_blob": "27597f2bddc465db1459d97880ef180e2ac55999",
+      "sha256": "60183bfa717674edc75d709417c7cb4f8366900bb598a8db627240a2a96c5995",
+      "matches_accepted_native": true
+    },
+    {
+      "reference": "child3577",
+      "ref": "cd040a50001a660b402e886d791643d7db91bcb1",
+      "path": "lampOS/crates/ipc/src/lib.rs",
+      "git_blob": "ed70b4552127e008540f46baaf01be629a1fa473",
+      "sha256": "f64aa5070b79991a58ed0fe772c6697c3d52f4c58b48e793046c753358703c44",
+      "matches_accepted_native": true
+    },
+    {
+      "reference": "child3577",
+      "ref": "cd040a50001a660b402e886d791643d7db91bcb1",
+      "path": "lampOS/crates/controls/src/privacy.rs",
+      "git_blob": "11271c06626b2f6c97d88429b8981b6da80dbf6e",
+      "sha256": "3a22d4b087a9f6cf68b3fbcc753bed367d53354d2660c6c1057b7bdb04a60a2d",
+      "matches_accepted_native": true
+    }
+  ],
+  "controls": [
+    {
+      "reference": "merged3637",
+      "test": "bus::a_subscriber_is_told_once_that_the_source_has_gone_and_once_that_it_is_back",
+      "sha256": "89edc0de92d0b338d3e8e40544e11f5de13c27751f5a9f150235ca395ccffa5e",
+      "matches_accepted_control": true
+    },
+    {
+      "reference": "merged3637",
+      "test": "bus::a_topic_that_promised_a_period_is_late_after_twice_that_and_on_time_with_the_next",
+      "sha256": "dd5de5e0af7e9be8443cf4d49b1185bade7f4b388f75d67e593aef0f1e1d0117",
+      "matches_accepted_control": true
+    },
+    {
+      "reference": "merged3637",
+      "test": "privacy::a_lamp_with_no_slide_permits_only_with_its_marker_and_a_fresh_observation",
+      "sha256": "ff17ba2d06b24fad65cd019224b385e0339c538d9a916d1f93c1ee6f3a073e94",
+      "matches_accepted_control": true
+    },
+    {
+      "reference": "merged3637",
+      "test": "privacy::envelope_must_name_voice_and_match_payload_clock_time_session_and_sequence",
+      "sha256": "c59f67776d357dbcf82f128e958fab4694b62121778af59c2c7b9a26baac4417",
+      "matches_accepted_control": true
+    },
+    {
+      "reference": "merged3637",
+      "test": "privacy::freshness_is_original_acquisition_bounded_and_boot_scoped",
+      "sha256": "97d62cea7602ac76aca56567b67acddd4981fca86d831136c6037a7d936fa18a",
+      "matches_accepted_control": true
+    },
+    {
+      "reference": "merged3637",
+      "test": "privacy::permission_requires_known_open_switch_and_bounded_valid_lineage",
+      "sha256": "bcbe66ad91a7d14b51837fc6b09eca5ce553e7038a027cd1a9b3e10bebbf6055",
+      "matches_accepted_control": true
+    },
+    {
+      "reference": "merged3637",
+      "test": "privacy::topic_is_additive_and_json_roundtrips",
+      "sha256": "97883fcb31ed1c8040010b8d01336b8cb085652c90e35024be43860128df6eee",
+      "matches_accepted_control": true
+    },
+    {
+      "reference": "merged3637",
+      "test": "privacy_bus::tests::a_receipt_comes_only_with_a_slides_reading",
+      "sha256": "9ad4be77bacbdc11127a7ccf3337264e52dbfc86a2da0cd71d1f87efe2d8401f",
+      "matches_accepted_control": true
+    },
+    {
+      "reference": "merged3637",
+      "test": "privacy_bus::tests::after_a_datagram_a_gap_ends_the_lease_reader_inside_its_first_second",
+      "sha256": "7c9399ca4a9d9b1115c36b709976d2900a870e1bc6707df28c261be2d05cd6e7",
+      "matches_accepted_control": true
+    },
+    {
+      "reference": "merged3637",
+      "test": "privacy_bus::tests::only_recovery_finishes_the_source_episode_and_allows_a_new_one",
+      "sha256": "607589d9cbeafdaefda0edf42231be3837d70981d5669fa387e038b01a71dd6b",
+      "matches_accepted_control": true
+    },
+    {
+      "reference": "merged3637",
+      "test": "privacy_bus::tests::recovery_queued_after_a_source_stall_reports_the_old_expiry_first",
+      "sha256": "fe17c83da97b309442c7109a4beabced378584fdcfa2bd440ece0c6f07d028ad",
+      "matches_accepted_control": true
+    },
+    {
+      "reference": "merged3637",
+      "test": "privacy_bus::tests::selected_endpoints_bind_and_read_a_real_bus",
+      "sha256": "1a24bf9adc9393a83fa11c1270549fb4bf2afd2c9b5ac7ef6fae2abb421815e8",
+      "matches_accepted_control": true
+    },
+    {
+      "reference": "merged3637",
+      "test": "privacy_bus::tests::source_expiry_is_ridden_only_when_enabled_after_permission",
+      "sha256": "a0a906100b5dc487098054d4ac0fea6899be72a5e6f6b2f9075a92b1e09cce7c",
+      "matches_accepted_control": true
+    },
+    {
+      "reference": "merged3637",
+      "test": "privacy_bus::tests::the_lease_reader_resyncs_on_kept_leases_only_before_its_first_datagram_in_its_first_second",
+      "sha256": "f34687d997f096135af9cd394cc42e5eee32f7e578291b091f6d134e41fd2ca1",
+      "matches_accepted_control": true
+    },
+    {
+      "reference": "merged3637",
+      "test": "privacy_bus::tests::the_lease_watch_answers_at_once_through_refused_input_and_lets_a_lease_expire",
+      "sha256": "4d1292faf0ea9a38213d757fe83383dfac8a4e1779a4ba3c111c96a032bcbbdf",
+      "matches_accepted_control": true
+    },
+    {
+      "reference": "merged3637",
+      "test": "privacy_bus::tests::the_order_begins_again_only_before_the_first_datagram_in_the_first_second",
+      "sha256": "772e499262122852fa487a000c8a7f5292319c5f2236fabca5126163f51ba7de",
+      "matches_accepted_control": true
+    },
+    {
+      "reference": "acceptedCommon",
+      "test": "bus::a_subscriber_is_told_once_that_the_source_has_gone_and_once_that_it_is_back",
+      "sha256": "89edc0de92d0b338d3e8e40544e11f5de13c27751f5a9f150235ca395ccffa5e",
+      "matches_accepted_control": true
+    },
+    {
+      "reference": "acceptedCommon",
+      "test": "bus::a_topic_that_promised_a_period_is_late_after_twice_that_and_on_time_with_the_next",
+      "sha256": "dd5de5e0af7e9be8443cf4d49b1185bade7f4b388f75d67e593aef0f1e1d0117",
+      "matches_accepted_control": true
+    },
+    {
+      "reference": "acceptedCommon",
+      "test": "privacy::a_lamp_with_no_slide_permits_only_with_its_marker_and_a_fresh_observation",
+      "sha256": "ff17ba2d06b24fad65cd019224b385e0339c538d9a916d1f93c1ee6f3a073e94",
+      "matches_accepted_control": true
+    },
+    {
+      "reference": "acceptedCommon",
+      "test": "privacy::envelope_must_name_voice_and_match_payload_clock_time_session_and_sequence",
+      "sha256": "c59f67776d357dbcf82f128e958fab4694b62121778af59c2c7b9a26baac4417",
+      "matches_accepted_control": true
+    },
+    {
+      "reference": "acceptedCommon",
+      "test": "privacy::freshness_is_original_acquisition_bounded_and_boot_scoped",
+      "sha256": "97d62cea7602ac76aca56567b67acddd4981fca86d831136c6037a7d936fa18a",
+      "matches_accepted_control": true
+    },
+    {
+      "reference": "acceptedCommon",
+      "test": "privacy::permission_requires_known_open_switch_and_bounded_valid_lineage",
+      "sha256": "bcbe66ad91a7d14b51837fc6b09eca5ce553e7038a027cd1a9b3e10bebbf6055",
+      "matches_accepted_control": true
+    },
+    {
+      "reference": "acceptedCommon",
+      "test": "privacy::topic_is_additive_and_json_roundtrips",
+      "sha256": "97883fcb31ed1c8040010b8d01336b8cb085652c90e35024be43860128df6eee",
+      "matches_accepted_control": true
+    },
+    {
+      "reference": "acceptedCommon",
+      "test": "privacy_bus::tests::a_receipt_comes_only_with_a_slides_reading",
+      "sha256": "9ad4be77bacbdc11127a7ccf3337264e52dbfc86a2da0cd71d1f87efe2d8401f",
+      "matches_accepted_control": true
+    },
+    {
+      "reference": "acceptedCommon",
+      "test": "privacy_bus::tests::after_a_datagram_a_gap_ends_the_lease_reader_inside_its_first_second",
+      "sha256": "7c9399ca4a9d9b1115c36b709976d2900a870e1bc6707df28c261be2d05cd6e7",
+      "matches_accepted_control": true
+    },
+    {
+      "reference": "acceptedCommon",
+      "test": "privacy_bus::tests::only_recovery_finishes_the_source_episode_and_allows_a_new_one",
+      "sha256": "607589d9cbeafdaefda0edf42231be3837d70981d5669fa387e038b01a71dd6b",
+      "matches_accepted_control": true
+    },
+    {
+      "reference": "acceptedCommon",
+      "test": "privacy_bus::tests::recovery_queued_after_a_source_stall_reports_the_old_expiry_first",
+      "sha256": "fe17c83da97b309442c7109a4beabced378584fdcfa2bd440ece0c6f07d028ad",
+      "matches_accepted_control": true
+    },
+    {
+      "reference": "acceptedCommon",
+      "test": "privacy_bus::tests::selected_endpoints_bind_and_read_a_real_bus",
+      "sha256": "1a24bf9adc9393a83fa11c1270549fb4bf2afd2c9b5ac7ef6fae2abb421815e8",
+      "matches_accepted_control": true
+    },
+    {
+      "reference": "acceptedCommon",
+      "test": "privacy_bus::tests::source_expiry_is_ridden_only_when_enabled_after_permission",
+      "sha256": "a0a906100b5dc487098054d4ac0fea6899be72a5e6f6b2f9075a92b1e09cce7c",
+      "matches_accepted_control": true
+    },
+    {
+      "reference": "acceptedCommon",
+      "test": "privacy_bus::tests::the_lease_reader_resyncs_on_kept_leases_only_before_its_first_datagram_in_its_first_second",
+      "sha256": "f34687d997f096135af9cd394cc42e5eee32f7e578291b091f6d134e41fd2ca1",
+      "matches_accepted_control": true
+    },
+    {
+      "reference": "acceptedCommon",
+      "test": "privacy_bus::tests::the_lease_watch_answers_at_once_through_refused_input_and_lets_a_lease_expire",
+      "sha256": "4d1292faf0ea9a38213d757fe83383dfac8a4e1779a4ba3c111c96a032bcbbdf",
+      "matches_accepted_control": true
+    },
+    {
+      "reference": "acceptedCommon",
+      "test": "privacy_bus::tests::the_order_begins_again_only_before_the_first_datagram_in_the_first_second",
+      "sha256": "772e499262122852fa487a000c8a7f5292319c5f2236fabca5126163f51ba7de",
+      "matches_accepted_control": true
+    },
+    {
+      "reference": "frozenMain",
+      "test": "bus::a_subscriber_is_told_once_that_the_source_has_gone_and_once_that_it_is_back",
+      "sha256": "89edc0de92d0b338d3e8e40544e11f5de13c27751f5a9f150235ca395ccffa5e",
+      "matches_accepted_control": true
+    },
+    {
+      "reference": "frozenMain",
+      "test": "bus::a_topic_that_promised_a_period_is_late_after_twice_that_and_on_time_with_the_next",
+      "sha256": "dd5de5e0af7e9be8443cf4d49b1185bade7f4b388f75d67e593aef0f1e1d0117",
+      "matches_accepted_control": true
+    },
+    {
+      "reference": "frozenMain",
+      "test": "privacy::a_lamp_with_no_slide_permits_only_with_its_marker_and_a_fresh_observation",
+      "sha256": "ff17ba2d06b24fad65cd019224b385e0339c538d9a916d1f93c1ee6f3a073e94",
+      "matches_accepted_control": true
+    },
+    {
+      "reference": "frozenMain",
+      "test": "privacy::envelope_must_name_voice_and_match_payload_clock_time_session_and_sequence",
+      "sha256": "c59f67776d357dbcf82f128e958fab4694b62121778af59c2c7b9a26baac4417",
+      "matches_accepted_control": true
+    },
+    {
+      "reference": "frozenMain",
+      "test": "privacy::freshness_is_original_acquisition_bounded_and_boot_scoped",
+      "sha256": "97d62cea7602ac76aca56567b67acddd4981fca86d831136c6037a7d936fa18a",
+      "matches_accepted_control": true
+    },
+    {
+      "reference": "frozenMain",
+      "test": "privacy::permission_requires_known_open_switch_and_bounded_valid_lineage",
+      "sha256": "bcbe66ad91a7d14b51837fc6b09eca5ce553e7038a027cd1a9b3e10bebbf6055",
+      "matches_accepted_control": true
+    },
+    {
+      "reference": "frozenMain",
+      "test": "privacy::topic_is_additive_and_json_roundtrips",
+      "sha256": "97883fcb31ed1c8040010b8d01336b8cb085652c90e35024be43860128df6eee",
+      "matches_accepted_control": true
+    },
+    {
+      "reference": "frozenMain",
+      "test": "privacy_bus::tests::a_receipt_comes_only_with_a_slides_reading",
+      "sha256": "9ad4be77bacbdc11127a7ccf3337264e52dbfc86a2da0cd71d1f87efe2d8401f",
+      "matches_accepted_control": true
+    },
+    {
+      "reference": "frozenMain",
+      "test": "privacy_bus::tests::after_a_datagram_a_gap_ends_the_lease_reader_inside_its_first_second",
+      "sha256": "7c9399ca4a9d9b1115c36b709976d2900a870e1bc6707df28c261be2d05cd6e7",
+      "matches_accepted_control": true
+    },
+    {
+      "reference": "frozenMain",
+      "test": "privacy_bus::tests::only_recovery_finishes_the_source_episode_and_allows_a_new_one",
+      "sha256": "607589d9cbeafdaefda0edf42231be3837d70981d5669fa387e038b01a71dd6b",
+      "matches_accepted_control": true
+    },
+    {
+      "reference": "frozenMain",
+      "test": "privacy_bus::tests::recovery_queued_after_a_source_stall_reports_the_old_expiry_first",
+      "sha256": "fe17c83da97b309442c7109a4beabced378584fdcfa2bd440ece0c6f07d028ad",
+      "matches_accepted_control": true
+    },
+    {
+      "reference": "frozenMain",
+      "test": "privacy_bus::tests::selected_endpoints_bind_and_read_a_real_bus",
+      "sha256": "1a24bf9adc9393a83fa11c1270549fb4bf2afd2c9b5ac7ef6fae2abb421815e8",
+      "matches_accepted_control": true
+    },
+    {
+      "reference": "frozenMain",
+      "test": "privacy_bus::tests::source_expiry_is_ridden_only_when_enabled_after_permission",
+      "sha256": "a0a906100b5dc487098054d4ac0fea6899be72a5e6f6b2f9075a92b1e09cce7c",
+      "matches_accepted_control": true
+    },
+    {
+      "reference": "frozenMain",
+      "test": "privacy_bus::tests::the_lease_reader_resyncs_on_kept_leases_only_before_its_first_datagram_in_its_first_second",
+      "sha256": "f34687d997f096135af9cd394cc42e5eee32f7e578291b091f6d134e41fd2ca1",
+      "matches_accepted_control": true
+    },
+    {
+      "reference": "frozenMain",
+      "test": "privacy_bus::tests::the_lease_watch_answers_at_once_through_refused_input_and_lets_a_lease_expire",
+      "sha256": "4d1292faf0ea9a38213d757fe83383dfac8a4e1779a4ba3c111c96a032bcbbdf",
+      "matches_accepted_control": true
+    },
+    {
+      "reference": "frozenMain",
+      "test": "privacy_bus::tests::the_order_begins_again_only_before_the_first_datagram_in_the_first_second",
+      "sha256": "772e499262122852fa487a000c8a7f5292319c5f2236fabca5126163f51ba7de",
+      "matches_accepted_control": true
+    },
+    {
+      "reference": "parent3544",
+      "test": "bus::a_subscriber_is_told_once_that_the_source_has_gone_and_once_that_it_is_back",
+      "sha256": "89edc0de92d0b338d3e8e40544e11f5de13c27751f5a9f150235ca395ccffa5e",
+      "matches_accepted_control": true
+    },
+    {
+      "reference": "parent3544",
+      "test": "bus::a_topic_that_promised_a_period_is_late_after_twice_that_and_on_time_with_the_next",
+      "sha256": "dd5de5e0af7e9be8443cf4d49b1185bade7f4b388f75d67e593aef0f1e1d0117",
+      "matches_accepted_control": true
+    },
+    {
+      "reference": "parent3544",
+      "test": "privacy::a_lamp_with_no_slide_permits_only_with_its_marker_and_a_fresh_observation",
+      "sha256": "ff17ba2d06b24fad65cd019224b385e0339c538d9a916d1f93c1ee6f3a073e94",
+      "matches_accepted_control": true
+    },
+    {
+      "reference": "parent3544",
+      "test": "privacy::envelope_must_name_voice_and_match_payload_clock_time_session_and_sequence",
+      "sha256": "c59f67776d357dbcf82f128e958fab4694b62121778af59c2c7b9a26baac4417",
+      "matches_accepted_control": true
+    },
+    {
+      "reference": "parent3544",
+      "test": "privacy::freshness_is_original_acquisition_bounded_and_boot_scoped",
+      "sha256": "97d62cea7602ac76aca56567b67acddd4981fca86d831136c6037a7d936fa18a",
+      "matches_accepted_control": true
+    },
+    {
+      "reference": "parent3544",
+      "test": "privacy::permission_requires_known_open_switch_and_bounded_valid_lineage",
+      "sha256": "bcbe66ad91a7d14b51837fc6b09eca5ce553e7038a027cd1a9b3e10bebbf6055",
+      "matches_accepted_control": true
+    },
+    {
+      "reference": "parent3544",
+      "test": "privacy::topic_is_additive_and_json_roundtrips",
+      "sha256": "97883fcb31ed1c8040010b8d01336b8cb085652c90e35024be43860128df6eee",
+      "matches_accepted_control": true
+    },
+    {
+      "reference": "parent3544",
+      "test": "privacy_bus::tests::a_receipt_comes_only_with_a_slides_reading",
+      "sha256": "9ad4be77bacbdc11127a7ccf3337264e52dbfc86a2da0cd71d1f87efe2d8401f",
+      "matches_accepted_control": true
+    },
+    {
+      "reference": "parent3544",
+      "test": "privacy_bus::tests::after_a_datagram_a_gap_ends_the_lease_reader_inside_its_first_second",
+      "sha256": "7c9399ca4a9d9b1115c36b709976d2900a870e1bc6707df28c261be2d05cd6e7",
+      "matches_accepted_control": true
+    },
+    {
+      "reference": "parent3544",
+      "test": "privacy_bus::tests::only_recovery_finishes_the_source_episode_and_allows_a_new_one",
+      "sha256": "607589d9cbeafdaefda0edf42231be3837d70981d5669fa387e038b01a71dd6b",
+      "matches_accepted_control": true
+    },
+    {
+      "reference": "parent3544",
+      "test": "privacy_bus::tests::recovery_queued_after_a_source_stall_reports_the_old_expiry_first",
+      "sha256": "fe17c83da97b309442c7109a4beabced378584fdcfa2bd440ece0c6f07d028ad",
+      "matches_accepted_control": true
+    },
+    {
+      "reference": "parent3544",
+      "test": "privacy_bus::tests::selected_endpoints_bind_and_read_a_real_bus",
+      "sha256": "1a24bf9adc9393a83fa11c1270549fb4bf2afd2c9b5ac7ef6fae2abb421815e8",
+      "matches_accepted_control": true
+    },
+    {
+      "reference": "parent3544",
+      "test": "privacy_bus::tests::source_expiry_is_ridden_only_when_enabled_after_permission",
+      "sha256": "a0a906100b5dc487098054d4ac0fea6899be72a5e6f6b2f9075a92b1e09cce7c",
+      "matches_accepted_control": true
+    },
+    {
+      "reference": "parent3544",
+      "test": "privacy_bus::tests::the_lease_reader_resyncs_on_kept_leases_only_before_its_first_datagram_in_its_first_second",
+      "sha256": "f34687d997f096135af9cd394cc42e5eee32f7e578291b091f6d134e41fd2ca1",
+      "matches_accepted_control": true
+    },
+    {
+      "reference": "parent3544",
+      "test": "privacy_bus::tests::the_lease_watch_answers_at_once_through_refused_input_and_lets_a_lease_expire",
+      "sha256": "4d1292faf0ea9a38213d757fe83383dfac8a4e1779a4ba3c111c96a032bcbbdf",
+      "matches_accepted_control": true
+    },
+    {
+      "reference": "parent3544",
+      "test": "privacy_bus::tests::the_order_begins_again_only_before_the_first_datagram_in_the_first_second",
+      "sha256": "772e499262122852fa487a000c8a7f5292319c5f2236fabca5126163f51ba7de",
+      "matches_accepted_control": true
+    },
+    {
+      "reference": "child3577",
+      "test": "bus::a_subscriber_is_told_once_that_the_source_has_gone_and_once_that_it_is_back",
+      "sha256": "89edc0de92d0b338d3e8e40544e11f5de13c27751f5a9f150235ca395ccffa5e",
+      "matches_accepted_control": true
+    },
+    {
+      "reference": "child3577",
+      "test": "bus::a_topic_that_promised_a_period_is_late_after_twice_that_and_on_time_with_the_next",
+      "sha256": "dd5de5e0af7e9be8443cf4d49b1185bade7f4b388f75d67e593aef0f1e1d0117",
+      "matches_accepted_control": true
+    },
+    {
+      "reference": "child3577",
+      "test": "privacy::a_lamp_with_no_slide_permits_only_with_its_marker_and_a_fresh_observation",
+      "sha256": "ff17ba2d06b24fad65cd019224b385e0339c538d9a916d1f93c1ee6f3a073e94",
+      "matches_accepted_control": true
+    },
+    {
+      "reference": "child3577",
+      "test": "privacy::envelope_must_name_voice_and_match_payload_clock_time_session_and_sequence",
+      "sha256": "c59f67776d357dbcf82f128e958fab4694b62121778af59c2c7b9a26baac4417",
+      "matches_accepted_control": true
+    },
+    {
+      "reference": "child3577",
+      "test": "privacy::freshness_is_original_acquisition_bounded_and_boot_scoped",
+      "sha256": "97d62cea7602ac76aca56567b67acddd4981fca86d831136c6037a7d936fa18a",
+      "matches_accepted_control": true
+    },
+    {
+      "reference": "child3577",
+      "test": "privacy::permission_requires_known_open_switch_and_bounded_valid_lineage",
+      "sha256": "bcbe66ad91a7d14b51837fc6b09eca5ce553e7038a027cd1a9b3e10bebbf6055",
+      "matches_accepted_control": true
+    },
+    {
+      "reference": "child3577",
+      "test": "privacy::topic_is_additive_and_json_roundtrips",
+      "sha256": "97883fcb31ed1c8040010b8d01336b8cb085652c90e35024be43860128df6eee",
+      "matches_accepted_control": true
+    },
+    {
+      "reference": "child3577",
+      "test": "privacy_bus::tests::a_receipt_comes_only_with_a_slides_reading",
+      "sha256": "9ad4be77bacbdc11127a7ccf3337264e52dbfc86a2da0cd71d1f87efe2d8401f",
+      "matches_accepted_control": true
+    },
+    {
+      "reference": "child3577",
+      "test": "privacy_bus::tests::after_a_datagram_a_gap_ends_the_lease_reader_inside_its_first_second",
+      "sha256": "7c9399ca4a9d9b1115c36b709976d2900a870e1bc6707df28c261be2d05cd6e7",
+      "matches_accepted_control": true
+    },
+    {
+      "reference": "child3577",
+      "test": "privacy_bus::tests::only_recovery_finishes_the_source_episode_and_allows_a_new_one",
+      "sha256": "607589d9cbeafdaefda0edf42231be3837d70981d5669fa387e038b01a71dd6b",
+      "matches_accepted_control": true
+    },
+    {
+      "reference": "child3577",
+      "test": "privacy_bus::tests::recovery_queued_after_a_source_stall_reports_the_old_expiry_first",
+      "sha256": "fe17c83da97b309442c7109a4beabced378584fdcfa2bd440ece0c6f07d028ad",
+      "matches_accepted_control": true
+    },
+    {
+      "reference": "child3577",
+      "test": "privacy_bus::tests::selected_endpoints_bind_and_read_a_real_bus",
+      "sha256": "1a24bf9adc9393a83fa11c1270549fb4bf2afd2c9b5ac7ef6fae2abb421815e8",
+      "matches_accepted_control": true
+    },
+    {
+      "reference": "child3577",
+      "test": "privacy_bus::tests::source_expiry_is_ridden_only_when_enabled_after_permission",
+      "sha256": "a0a906100b5dc487098054d4ac0fea6899be72a5e6f6b2f9075a92b1e09cce7c",
+      "matches_accepted_control": true
+    },
+    {
+      "reference": "child3577",
+      "test": "privacy_bus::tests::the_lease_reader_resyncs_on_kept_leases_only_before_its_first_datagram_in_its_first_second",
+      "sha256": "f34687d997f096135af9cd394cc42e5eee32f7e578291b091f6d134e41fd2ca1",
+      "matches_accepted_control": true
+    },
+    {
+      "reference": "child3577",
+      "test": "privacy_bus::tests::the_lease_watch_answers_at_once_through_refused_input_and_lets_a_lease_expire",
+      "sha256": "4d1292faf0ea9a38213d757fe83383dfac8a4e1779a4ba3c111c96a032bcbbdf",
+      "matches_accepted_control": true
+    },
+    {
+      "reference": "child3577",
+      "test": "privacy_bus::tests::the_order_begins_again_only_before_the_first_datagram_in_the_first_second",
+      "sha256": "772e499262122852fa487a000c8a7f5292319c5f2236fabca5126163f51ba7de",
+      "matches_accepted_control": true
+    }
+  ],
+  "runtime_executions": 0,
+  "no_gate_waiver": true,
+  "actual_accepted_native_binding": {
+    "commit": "0bacfde9a344c1b7cd07d21cde6a23b1967daaa5",
+    "source": "Published direct-native-source-proof.json at68f15891ae9706f33fefe431d1665b3b452e90a0",
+    "git_object_not_present_locally": true,
+    "new_native_runtime_or_API_download": false,
+    "whole_file_hashes_compared_to_accepted_direct_API_proof": 11
+  },
+  "source_production_prefix_sha256": "377f840f7868d2b8c7c028681b33ee085f41de92ee4fcb2fb39edb4389bc67dc",
+  "current_refs_whole_files_each": 11,
+  "current_refs_controls_each": 16,
+  "conclusion": {
+    "same_original_kept_resync_hold": true,
+    "accepted_narrow_fixture_disposition_substantively_applies_to_verified_sources": true,
+    "explicit_reader_carry_on_current_3544_and_inherited3577_still_to_request": true,
+    "other_3315_rows_or_historical_failures_cleared": false,
+    "fresh_current_parent_gate_not_claimed_by_this_audit": true,
+    "test_executions": 0
+  }
+}

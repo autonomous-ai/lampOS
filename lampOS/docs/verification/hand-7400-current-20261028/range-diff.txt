@@ -1,0 +1,1 @@
+1:  c97dae3339 = 1:  4084e4e1dd lampOS: observe hand-pump readiness and requested idle waits
