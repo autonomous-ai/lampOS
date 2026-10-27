@@ -1,0 +1,92 @@
+{
+  "api_sha256": {
+    "authored-commit.json": "8a117fd713e3d7c07e7316ffa101f6dd987929d826caa221f57bd3bae3d3ce1b",
+    "linux-jobs-final.json": "957886cf578ed805b67b433fe4b7b1af7de5939f9a9096eea3a281d480d98e7d",
+    "linux-preview-commit.json": "de93abf6ea822d508e7acdbf05cf54905ec48835ff663c37a4d489aeaf48aa94",
+    "linux-run-final.json": "34f4daf1c1cc11e0934eb84d486794c0354f8ce5667633a1ec91671e148b8863"
+  },
+  "attempt": 1,
+  "authored_base": "c1fa2bc9f327f5d553bb3dcc355053d8e7e94bfa",
+  "authored_preview_full_tree_equal": true,
+  "authored_tree": "75ff0497c9d6221ef929fac44bee493587d95751",
+  "commands_present": [
+    "cargo +1.96.0 fmt --all --check",
+    "cargo clippy --locked --workspace --all-targets -- -D warnings"
+  ],
+  "head": "ced0122094c570589711af0faad2a7ed1537f027",
+  "job_id": 122485952799,
+  "ordered_preview_parents": [
+    "c1fa2bc9f327f5d553bb3dcc355053d8e7e94bfa",
+    "ced0122094c570589711af0faad2a7ed1537f027"
+  ],
+  "pr": 3913,
+  "preview": "810dff437952827a477b8ded5364f666a90c62f8",
+  "preview_tree": "75ff0497c9d6221ef929fac44bee493587d95751",
+  "raw_log_sha256": "dc514fa6886b65095c868c03a1f0c88e919101a4dc80f4b008734dd492eac079",
+  "required_job_conclusion": "success",
+  "run_id": 40588412056,
+  "steps": [
+    {
+      "conclusion": "success",
+      "name": "Set up job",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "system packages",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "Run actions/checkout@v4",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "Rust 1.96.0",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "stable promotion formatting and strict Clippy",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "formatting (whole workspace, pinned Rust)",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "restore the cache",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "unchanged source files get the cached build's times back",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "clippy (every crate and target, warnings as errors)",
+      "status": "completed"
+    },
+    {
+      "conclusion": "skipped",
+      "name": "save the cache",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "Post Run actions/checkout@v4",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "Complete job",
+      "status": "completed"
+    }
+  ],
+  "workflow_conclusion": "success",
+  "workflow_status": "completed"
+}

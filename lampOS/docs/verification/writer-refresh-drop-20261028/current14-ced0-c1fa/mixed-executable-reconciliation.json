@@ -1,0 +1,34 @@
+{
+  "all10_new_or_current_source_claimed": false,
+  "current_emitted": 3,
+  "current_install": 1,
+  "current_it": 1,
+  "current_production_bins": 1,
+  "current_target_keys": [
+    [
+      "install",
+      [
+        "test"
+      ],
+      true
+    ],
+    [
+      "it",
+      [
+        "test"
+      ],
+      true
+    ],
+    [
+      "lamp-update",
+      [
+        "bin"
+      ],
+      false
+    ]
+  ],
+  "donor_manifest_sha256": "3038c3d12b36bcfc72353846972e5943eb64d9a5e3c841dc1a4ebe020308c922",
+  "retained_donor_executables": 7,
+  "runtime_scope": "Current IT13 plus one install-doc reader; retained binaries never executed",
+  "total_outputs": 10
+}

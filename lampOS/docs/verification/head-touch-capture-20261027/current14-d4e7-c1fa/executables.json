@@ -1,0 +1,162 @@
+[
+  {
+    "bytes": 1976800,
+    "current_source_qualified": true,
+    "post_list_check": "Actual assertion-flow rehash before runtime; no invented named output field",
+    "post_runtime_sha256": "8e2055fe633868431b9763930dd69afe98b3abb3a37cbde36f0b41e9297e187e",
+    "preserved_sha256": "8e2055fe633868431b9763930dd69afe98b3abb3a37cbde36f0b41e9297e187e",
+    "sha256": "8e2055fe633868431b9763930dd69afe98b3abb3a37cbde36f0b41e9297e187e",
+    "source_qualification": "CURRENT_TARGETED_IT_AND_INSTALL_BUILD_NO_OTHER_RUNTIME_CLAIM",
+    "target": {
+      "kind": [
+        "test"
+      ],
+      "name": "it"
+    },
+    "test_profile": true
+  },
+  {
+    "bytes": 17252600,
+    "current_source_qualified": true,
+    "post_list_check": "Actual assertion-flow rehash before runtime; no invented named output field",
+    "post_runtime_sha256": "99dc1f747beb812b556ee895c103c22ba19a28449667675314f95973403c2085",
+    "preserved_sha256": "99dc1f747beb812b556ee895c103c22ba19a28449667675314f95973403c2085",
+    "sha256": "99dc1f747beb812b556ee895c103c22ba19a28449667675314f95973403c2085",
+    "source_qualification": "CURRENT_TARGETED_IT_AND_INSTALL_BUILD_NO_OTHER_RUNTIME_CLAIM",
+    "target": {
+      "kind": [
+        "test"
+      ],
+      "name": "install"
+    },
+    "test_profile": true
+  },
+  {
+    "bytes": 13556896,
+    "current_source_qualified": true,
+    "post_list_check": "Actual assertion-flow rehash before runtime; no invented named output field",
+    "post_runtime_sha256": "d12037f4fe56ea37d90db023026e8748fdef5128f4718947b0c72ab737174c75",
+    "preserved_sha256": "d12037f4fe56ea37d90db023026e8748fdef5128f4718947b0c72ab737174c75",
+    "sha256": "d12037f4fe56ea37d90db023026e8748fdef5128f4718947b0c72ab737174c75",
+    "source_qualification": "CURRENT_TARGETED_IT_AND_INSTALL_BUILD_NO_OTHER_RUNTIME_CLAIM",
+    "target": {
+      "kind": [
+        "bin"
+      ],
+      "name": "lamp-update"
+    },
+    "test_profile": false
+  },
+  {
+    "bytes": 16953024,
+    "current_source_qualified": false,
+    "post_list_check": "Actual assertion-flow rehash before runtime; no invented named output field",
+    "post_runtime_sha256": "2286c0afaaee747cd92cf84949425b9fc6dbc4b1a0d8f4086449c6bc9850607f",
+    "preserved_sha256": "2286c0afaaee747cd92cf84949425b9fc6dbc4b1a0d8f4086449c6bc9850607f",
+    "sha256": "2286c0afaaee747cd92cf84949425b9fc6dbc4b1a0d8f4086449c6bc9850607f",
+    "source_qualification": "RETAINED_DONOR_EXECUTABLE_NOT_CURRENT_SOURCE",
+    "target": {
+      "kind": [
+        "lib"
+      ],
+      "name": "lamp_update"
+    },
+    "test_profile": true
+  },
+  {
+    "bytes": 550112,
+    "current_source_qualified": false,
+    "post_list_check": "Actual assertion-flow rehash before runtime; no invented named output field",
+    "post_runtime_sha256": "44bfa06e8adae149221b7eb285adce2c3a7bd23da14e4bd09696e7d164c079da",
+    "preserved_sha256": "44bfa06e8adae149221b7eb285adce2c3a7bd23da14e4bd09696e7d164c079da",
+    "sha256": "44bfa06e8adae149221b7eb285adce2c3a7bd23da14e4bd09696e7d164c079da",
+    "source_qualification": "RETAINED_DONOR_EXECUTABLE_NOT_CURRENT_SOURCE",
+    "target": {
+      "kind": [
+        "test"
+      ],
+      "name": "self-process-cuts"
+    },
+    "test_profile": true
+  },
+  {
+    "bytes": 1276832,
+    "current_source_qualified": false,
+    "post_list_check": "Actual assertion-flow rehash before runtime; no invented named output field",
+    "post_runtime_sha256": "235545e4ff2ab77f23dce561d66ba106b1fb538c5b56485d55f5dfc1b428f5d6",
+    "preserved_sha256": "235545e4ff2ab77f23dce561d66ba106b1fb538c5b56485d55f5dfc1b428f5d6",
+    "sha256": "235545e4ff2ab77f23dce561d66ba106b1fb538c5b56485d55f5dfc1b428f5d6",
+    "source_qualification": "RETAINED_DONOR_EXECUTABLE_NOT_CURRENT_SOURCE",
+    "target": {
+      "kind": [
+        "bin"
+      ],
+      "name": "lamp-update"
+    },
+    "test_profile": true
+  },
+  {
+    "bytes": 3295728,
+    "current_source_qualified": false,
+    "post_list_check": "Actual assertion-flow rehash before runtime; no invented named output field",
+    "post_runtime_sha256": "1e1e41e3636b37033c724a22c93f778eeffa60c9cbf47114fab8c6ef37f2e4e2",
+    "preserved_sha256": "1e1e41e3636b37033c724a22c93f778eeffa60c9cbf47114fab8c6ef37f2e4e2",
+    "sha256": "1e1e41e3636b37033c724a22c93f778eeffa60c9cbf47114fab8c6ef37f2e4e2",
+    "source_qualification": "RETAINED_DONOR_EXECUTABLE_NOT_CURRENT_SOURCE",
+    "target": {
+      "kind": [
+        "test"
+      ],
+      "name": "release_pair"
+    },
+    "test_profile": true
+  },
+  {
+    "bytes": 21012808,
+    "current_source_qualified": false,
+    "post_list_check": "Actual assertion-flow rehash before runtime; no invented named output field",
+    "post_runtime_sha256": "6547af8bbe132b4c2683d26a733466f05d78011498bdf97b5c96e0ea4f6ff743",
+    "preserved_sha256": "6547af8bbe132b4c2683d26a733466f05d78011498bdf97b5c96e0ea4f6ff743",
+    "sha256": "6547af8bbe132b4c2683d26a733466f05d78011498bdf97b5c96e0ea4f6ff743",
+    "source_qualification": "RETAINED_DONOR_EXECUTABLE_NOT_CURRENT_SOURCE",
+    "target": {
+      "kind": [
+        "test"
+      ],
+      "name": "round"
+    },
+    "test_profile": true
+  },
+  {
+    "bytes": 22852456,
+    "current_source_qualified": false,
+    "post_list_check": "Actual assertion-flow rehash before runtime; no invented named output field",
+    "post_runtime_sha256": "52ebf01cf927e4e66af57daf25d7fad140e2cfc4a9b705dc26a6593cac39857b",
+    "preserved_sha256": "52ebf01cf927e4e66af57daf25d7fad140e2cfc4a9b705dc26a6593cac39857b",
+    "sha256": "52ebf01cf927e4e66af57daf25d7fad140e2cfc4a9b705dc26a6593cac39857b",
+    "source_qualification": "RETAINED_DONOR_EXECUTABLE_NOT_CURRENT_SOURCE",
+    "target": {
+      "kind": [
+        "test"
+      ],
+      "name": "functions"
+    },
+    "test_profile": true
+  },
+  {
+    "bytes": 550064,
+    "current_source_qualified": false,
+    "post_list_check": "Actual assertion-flow rehash before runtime; no invented named output field",
+    "post_runtime_sha256": "0f184f9c869d665557e1a832ee35bbfc95817293d0cbb56140c4f7bc21b11947",
+    "preserved_sha256": "0f184f9c869d665557e1a832ee35bbfc95817293d0cbb56140c4f7bc21b11947",
+    "sha256": "0f184f9c869d665557e1a832ee35bbfc95817293d0cbb56140c4f7bc21b11947",
+    "source_qualification": "RETAINED_DONOR_EXECUTABLE_NOT_CURRENT_SOURCE",
+    "target": {
+      "kind": [
+        "test"
+      ],
+      "name": "self-cli-exec"
+    },
+    "test_profile": true
+  }
+]

@@ -1,0 +1,21 @@
+{
+  "all_owned_full_blobs_modes_equal": true,
+  "backup_ref": "refs/heads/second/pid-prepared-a808-20261028",
+  "files": {
+    "lampOS/crates/update/src/writer_refresh.rs": "100644 blob 2dc0a4d026be3190755fc8b66793960648a381f1\tlampOS/crates/update/src/writer_refresh.rs",
+    "lampOS/crates/update/src/writer_refresh/tests.rs": "100644 blob c25d33e511f161f638595bccc36886f0f4a81698\tlampOS/crates/update/src/writer_refresh/tests.rs",
+    "lampOS/docs/settings-writer-refresh.md": "100644 blob 3932a4fa5195a15d94d4ee23d93122b566f2000c\tlampOS/docs/settings-writer-refresh.md"
+  },
+  "full_blobs_modes_equal": [
+    "lampOS/crates/update/src/writer_refresh.rs",
+    "lampOS/crates/update/src/writer_refresh/tests.rs",
+    "lampOS/docs/settings-writer-refresh.md"
+  ],
+  "gate": "UNRUN c1fa; prior a808 guard stop BEFORE Cargo, actual82 counts remain separate",
+  "new_base": "c1fa2bc9f327f5d553bb3dcc355053d8e7e94bfa",
+  "new_head": "ced0122094c570589711af0faad2a7ed1537f027",
+  "new_tree": "75ff0497c9d6221ef929fac44bee493587d95751",
+  "old_base": "a808ef04b5885ccb35e8e7693eee16ae331e3a7f",
+  "old_head": "18b333667a249edca88257d457d8a306c04102c6",
+  "range_diff": "1:  18b333667a = 1:  ced0122094 lampOS: release writer leases when their acquiring owner drops"
+}

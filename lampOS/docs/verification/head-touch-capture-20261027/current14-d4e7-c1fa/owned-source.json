@@ -1,0 +1,35 @@
+{
+  "all_source_guards_close": true,
+  "base": "c1fa2bc9f327f5d553bb3dcc355053d8e7e94bfa",
+  "carried_source_preserved": true,
+  "files": {
+    "lampOS/crates/update/src/head_touch.rs": {
+      "mode": 420,
+      "sha256": "2e9bcd134f16744e622f813cc3f5e71fe55c1b2a7bb64a5bd14d63d157b3638c"
+    },
+    "lampOS/crates/update/src/head_touch/capture.rs": {
+      "mode": 420,
+      "sha256": "4137a729709ccfb1ad5a9653fd570daa38a46d2c2988cbd767595bddac7bdf59"
+    },
+    "lampOS/crates/update/src/head_touch/capture/tests.rs": {
+      "mode": 420,
+      "sha256": "ae5af4ed21941b278391c7412706b36f352c28fb20453426df55ff59e65b7855"
+    },
+    "lampOS/docs/head-touch-capture.md": {
+      "mode": 420,
+      "sha256": "295e987588d23a25eac0fb8155dd65fef718195e536760a08e1bff8058442bde"
+    },
+    "lampOS/docs/reuse-decisions.md": {
+      "mode": 420,
+      "sha256": "a996f87675004d9330f3e8d3d45b76969cdc31cfafaff45cd23f66774848a40b"
+    },
+    "lampOS/docs/updates.md": {
+      "mode": 420,
+      "sha256": "78bcf0d5f91a417b615f2865e78e1d0a2743b74061b510dbf3670b688dc6968c"
+    }
+  },
+  "head": "d4e7e75aee14feacb39a68e871057f5c1a75e53f",
+  "source_after_sha256": "53f780312dde80e1ded68ac80bb07e9c3f9fe065729a5e07630bf94c425dc114",
+  "source_before_sha256": "53f780312dde80e1ded68ac80bb07e9c3f9fe065729a5e07630bf94c425dc114",
+  "source_guard_files": 7504
+}

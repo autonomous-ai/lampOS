@@ -1,0 +1,27 @@
+{
+  "pr": 3892,
+  "head": "356791e0370c2ea45669362dc77383429a3ec338",
+  "authored_base": "a808ef04b5885ccb35e8e7693eee16ae331e3a7f",
+  "run": 40584879345,
+  "job": 122473581701,
+  "attempt": 1,
+  "actual_checkout": "94b8e4d39dea1f19e3898e5a36570a2eea398404",
+  "ordered_parents": [
+    "a808ef04b5885ccb35e8e7693eee16ae331e3a7f",
+    "356791e0370c2ea45669362dc77383429a3ec338"
+  ],
+  "authored_tree": "d080573148f2b08d24e0d774f9930a98c3d7b4cf",
+  "actual_tree": "d080573148f2b08d24e0d774f9930a98c3d7b4cf",
+  "whole_tree_equal": true,
+  "expected_base_parents": true,
+  "stages": {
+    "Rust 1.96.0": "success",
+    "stable promotion formatting and strict Clippy": "success",
+    "formatting (whole workspace, pinned Rust)": "success",
+    "clippy (every crate and target, warnings as errors)": "success"
+  },
+  "actual_Update_marker": true,
+  "terminal": "success",
+  "full_log_sha256": "666920b4671a62c1ea7bb4809b0e8835a568b7ae7e6771e45fe6cf9dc7cf9b3d",
+  "no_runtime_or_later_source_transfer": true
+}

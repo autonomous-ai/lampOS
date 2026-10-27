@@ -1,0 +1,14 @@
+{
+  "all6_full_blobs_modes_equal_prior": true,
+  "all78_current_source_preserved_not_reexecuted": true,
+  "base": "c1fa2bc9f327f5d553bb3dcc355053d8e7e94bfa",
+  "docs_and_custom": "UNRUN unchanged scopes; earlier exact-source qualifications separate",
+  "earlier_CI_runner": "0.9.149",
+  "head": "2fa602a0a84164fd74d1d944830cd4a3257e389b",
+  "nextest_version": "0.9.150",
+  "old_negative_driver_sha256": "dda9c34c9552474010a0a1e6e904f1b8d91607b79552d9ab81afc6ef89dda8a9",
+  "scope": "Codec currentc1fa IT13 plus one install-doc reader; codec82_249/all78 and first557af remain separate exact source qualifications; no currentfull runtime transfer",
+  "source_count": 7507,
+  "tree": "f8cd61e30b52a84ad75ea78144387355f5e43a49",
+  "working_patch_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+}

@@ -1,0 +1,14 @@
+{
+  "all_complete_owned_blobs_modes_equal": true,
+  "base": "c1fa2bc9f327f5d553bb3dcc355053d8e7e94bfa",
+  "dirty_paths": [],
+  "docs_and_custom": "UNRUN unchanged scopes; earlier exact-source qualifications separate",
+  "earlier_CI_runner": "0.9.149",
+  "head": "ced0122094c570589711af0faad2a7ed1537f027",
+  "nextest_version": "0.9.150",
+  "old_negative_driver_sha256": "dda9c34c9552474010a0a1e6e904f1b8d91607b79552d9ab81afc6ef89dda8a9",
+  "scope": "Current PID c1fa targeted14 only; actual82a6 broader affected scope remains separate; no full current package runtime transfer",
+  "source_count": 7501,
+  "tree": "75ff0497c9d6221ef929fac44bee493587d95751",
+  "working_patch_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+}

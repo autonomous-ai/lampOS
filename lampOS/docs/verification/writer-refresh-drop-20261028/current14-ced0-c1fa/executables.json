@@ -1,0 +1,192 @@
+[
+  {
+    "current_source_qualified": true,
+    "post_runtime_sha256": "939d97157ae2e2882d0b4a1adb032f2e48a09b65c07e0e8e508941b1b7cc564c",
+    "preserved_sha256": "939d97157ae2e2882d0b4a1adb032f2e48a09b65c07e0e8e508941b1b7cc564c",
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "sha256": "939d97157ae2e2882d0b4a1adb032f2e48a09b65c07e0e8e508941b1b7cc564c",
+    "size": 17252344,
+    "source_qualification": "CURRENT_TARGETED_IT_BUILD_NO_OTHER_RUNTIME_CLAIM",
+    "target": "install",
+    "target_kinds": [
+      "test"
+    ]
+  },
+  {
+    "current_source_qualified": true,
+    "post_runtime_sha256": "c09bdee086b77d1ec716e58323978d84e350e0c5bc4cba2a981ed48a949d70bc",
+    "preserved_sha256": "c09bdee086b77d1ec716e58323978d84e350e0c5bc4cba2a981ed48a949d70bc",
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "sha256": "c09bdee086b77d1ec716e58323978d84e350e0c5bc4cba2a981ed48a949d70bc",
+    "size": 1976720,
+    "source_qualification": "CURRENT_TARGETED_IT_BUILD_NO_OTHER_RUNTIME_CLAIM",
+    "target": "it",
+    "target_kinds": [
+      "test"
+    ]
+  },
+  {
+    "current_source_qualified": true,
+    "post_runtime_sha256": "d12037f4fe56ea37d90db023026e8748fdef5128f4718947b0c72ab737174c75",
+    "preserved_sha256": "d12037f4fe56ea37d90db023026e8748fdef5128f4718947b0c72ab737174c75",
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": false
+    },
+    "sha256": "d12037f4fe56ea37d90db023026e8748fdef5128f4718947b0c72ab737174c75",
+    "size": 13556896,
+    "source_qualification": "CURRENT_TARGETED_IT_BUILD_NO_OTHER_RUNTIME_CLAIM",
+    "target": "lamp-update",
+    "target_kinds": [
+      "bin"
+    ]
+  },
+  {
+    "current_source_qualified": false,
+    "post_runtime_sha256": "2286c0afaaee747cd92cf84949425b9fc6dbc4b1a0d8f4086449c6bc9850607f",
+    "preserved_sha256": "2286c0afaaee747cd92cf84949425b9fc6dbc4b1a0d8f4086449c6bc9850607f",
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "sha256": "2286c0afaaee747cd92cf84949425b9fc6dbc4b1a0d8f4086449c6bc9850607f",
+    "size": 16953024,
+    "source_qualification": "RETAINED_DONOR_EXECUTABLE_NOT_CURRENT_SOURCE",
+    "target": "lamp_update",
+    "target_kinds": [
+      "lib"
+    ]
+  },
+  {
+    "current_source_qualified": false,
+    "post_runtime_sha256": "44bfa06e8adae149221b7eb285adce2c3a7bd23da14e4bd09696e7d164c079da",
+    "preserved_sha256": "44bfa06e8adae149221b7eb285adce2c3a7bd23da14e4bd09696e7d164c079da",
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "sha256": "44bfa06e8adae149221b7eb285adce2c3a7bd23da14e4bd09696e7d164c079da",
+    "size": 550112,
+    "source_qualification": "RETAINED_DONOR_EXECUTABLE_NOT_CURRENT_SOURCE",
+    "target": "self-process-cuts",
+    "target_kinds": [
+      "test"
+    ]
+  },
+  {
+    "current_source_qualified": false,
+    "post_runtime_sha256": "235545e4ff2ab77f23dce561d66ba106b1fb538c5b56485d55f5dfc1b428f5d6",
+    "preserved_sha256": "235545e4ff2ab77f23dce561d66ba106b1fb538c5b56485d55f5dfc1b428f5d6",
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "sha256": "235545e4ff2ab77f23dce561d66ba106b1fb538c5b56485d55f5dfc1b428f5d6",
+    "size": 1276832,
+    "source_qualification": "RETAINED_DONOR_EXECUTABLE_NOT_CURRENT_SOURCE",
+    "target": "lamp-update",
+    "target_kinds": [
+      "bin"
+    ]
+  },
+  {
+    "current_source_qualified": false,
+    "post_runtime_sha256": "1e1e41e3636b37033c724a22c93f778eeffa60c9cbf47114fab8c6ef37f2e4e2",
+    "preserved_sha256": "1e1e41e3636b37033c724a22c93f778eeffa60c9cbf47114fab8c6ef37f2e4e2",
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "sha256": "1e1e41e3636b37033c724a22c93f778eeffa60c9cbf47114fab8c6ef37f2e4e2",
+    "size": 3295728,
+    "source_qualification": "RETAINED_DONOR_EXECUTABLE_NOT_CURRENT_SOURCE",
+    "target": "release_pair",
+    "target_kinds": [
+      "test"
+    ]
+  },
+  {
+    "current_source_qualified": false,
+    "post_runtime_sha256": "6547af8bbe132b4c2683d26a733466f05d78011498bdf97b5c96e0ea4f6ff743",
+    "preserved_sha256": "6547af8bbe132b4c2683d26a733466f05d78011498bdf97b5c96e0ea4f6ff743",
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "sha256": "6547af8bbe132b4c2683d26a733466f05d78011498bdf97b5c96e0ea4f6ff743",
+    "size": 21012808,
+    "source_qualification": "RETAINED_DONOR_EXECUTABLE_NOT_CURRENT_SOURCE",
+    "target": "round",
+    "target_kinds": [
+      "test"
+    ]
+  },
+  {
+    "current_source_qualified": false,
+    "post_runtime_sha256": "52ebf01cf927e4e66af57daf25d7fad140e2cfc4a9b705dc26a6593cac39857b",
+    "preserved_sha256": "52ebf01cf927e4e66af57daf25d7fad140e2cfc4a9b705dc26a6593cac39857b",
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "sha256": "52ebf01cf927e4e66af57daf25d7fad140e2cfc4a9b705dc26a6593cac39857b",
+    "size": 22852456,
+    "source_qualification": "RETAINED_DONOR_EXECUTABLE_NOT_CURRENT_SOURCE",
+    "target": "functions",
+    "target_kinds": [
+      "test"
+    ]
+  },
+  {
+    "current_source_qualified": false,
+    "post_runtime_sha256": "0f184f9c869d665557e1a832ee35bbfc95817293d0cbb56140c4f7bc21b11947",
+    "preserved_sha256": "0f184f9c869d665557e1a832ee35bbfc95817293d0cbb56140c4f7bc21b11947",
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "sha256": "0f184f9c869d665557e1a832ee35bbfc95817293d0cbb56140c4f7bc21b11947",
+    "size": 550064,
+    "source_qualification": "RETAINED_DONOR_EXECUTABLE_NOT_CURRENT_SOURCE",
+    "target": "self-cli-exec",
+    "target_kinds": [
+      "test"
+    ]
+  }
+]
