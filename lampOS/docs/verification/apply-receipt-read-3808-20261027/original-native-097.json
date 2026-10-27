@@ -1,0 +1,499 @@
+{
+  "artifact_summary": {
+    "all50checksums_and_AArch64_headers_verified": true,
+    "api_and_upload_log_digest_match": true,
+    "archive_bytes": 117935242,
+    "archive_members": 51,
+    "archive_sha256": "b8a7f88ac96d53d663f10110e5b73ebf796fc2cd9ec2cf0ea5585c40f23e1f31",
+    "artifact_authored_head": "09762d1a2a24cbb17c452512db09861715c7d6cc",
+    "checksum_manifest_entries": 50,
+    "id": 12732560917,
+    "limits": "Separate release-artifact integrity proof. No execution or extraction, no per-nextest executable-byte hash, helper authentication, stable-feed publication, signing or device qualification claim. CI publisher/signing jobs skipped for this PR.",
+    "run_id": 40498250259
+  },
+  "collectors_terminal0": [
+    46960,
+    62890,
+    33105,
+    96990,
+    23881,
+    56566,
+    9692
+  ],
+  "file_hashes": {
+    "arm.json": "8f45f147ec3181eed4b257c319d8294c0e8076dab767b8ecf9003f87f0d7ac23",
+    "arm.log": "234257f83ae7d915db5b242468dadd6c74da1a18f1dcde4010775b8952e20db9",
+    "artifact-audit.json": "cd0616aa837ca75c3c3dd4a6655e1a02b99cd4f8620da8f2e34b72a4ec43899a",
+    "artifacts.json": "d67d372e373574d0f0ad0a6d95252762616ead6f616d81803464df4ecc72a223",
+    "linux.json": "9ff9ca956fbcfee9a5c4929cdf0fe0e2c1171eceab72418d9c9004b0e546f799",
+    "linux.log": "5684b7e1ec5e0fddbe34d1b5c7ff71d4e87a7e03d67fbf4d8a7584b197eb09ea",
+    "parsed-tests.json": "7b0899e8cdd761910c09cea6fd3b08e5b46871c3e279f83106b09949d9f7c419",
+    "pr-final.json": "1d37c0987a17ff1713d72f4f70f84c11f89b93977e4106ed847a1a59d084c83d",
+    "source-bindings.json": "f6b7fa110c635e70be3883ec746b2df3d7d19c01eafdff6a6ba56039a051b3f3"
+  },
+  "head": "09762d1a2a24cbb17c452512db09861715c7d6cc",
+  "limits": [
+    "7742testPRprofile12of47crates,53testsand118binaries skipped; no full/realtime suite or currentMaincomposition inference.",
+    "4doctests,relaycustomharness and13processcontrols are separate from nextest totals; auxiliarypublication/provenance tests are not added to7742.",
+    "Artifact50checksums+ELFheaders do not provide per-nextest executable hashes, signing/stablepromotion, roothelper, powercut or device proof.",
+    "NoMemoryimplementationorPRsemanticread; CI logs processed only for metadata/status/test identities."
+  ],
+  "local_source_guard_unchanged": 7371,
+  "local_worktree_clean": true,
+  "no_Rustbuild_or_device_execution": true,
+  "no_ci_rerun_or_cancel": true,
+  "pr_draft": true,
+  "pr_state": "OPEN",
+  "result": "Original native SUCCESS on attempt1 and exact complete authored tree; PR-selected runtime scope only. Release artifact integrity verified separately.",
+  "runs": {
+    "arm": {
+      "attempt": 1,
+      "conclusion": "success",
+      "id": 40498250259,
+      "jobs": [
+        {
+          "conclusion": "success",
+          "id": 122169100738,
+          "name": "lampOS \u2014 build and test on Linux ARM64 (1/1)"
+        },
+        {
+          "conclusion": "skipped",
+          "id": 122169102863,
+          "name": "lampOS \u2014 promote a tested release to the stable feed"
+        },
+        {
+          "conclusion": "skipped",
+          "id": 122175539442,
+          "name": "report-full-run-failure"
+        },
+        {
+          "conclusion": "skipped",
+          "id": 122175539583,
+          "name": "lampOS \u2014 sign and publish the tested lamp-voice artifact"
+        }
+      ],
+      "status": "completed"
+    },
+    "linux": {
+      "attempt": 1,
+      "conclusion": "success",
+      "id": 40498250762,
+      "jobs": [
+        {
+          "conclusion": "success",
+          "id": 122169102437,
+          "name": "lampOS \u2014 clippy, every crate and target (x86 Linux)"
+        }
+      ],
+      "status": "completed"
+    }
+  },
+  "source_binding": {
+    "all_changed_files_equal": true,
+    "authored": "09762d1a2a24cbb17c452512db09861715c7d6cc",
+    "authored_tree": "adcfb8aa245c1ae6e5f9d1e2476ac031c461a180",
+    "changed_files": {
+      "lampOS/crates/update/src/apply.rs": {
+        "09762d1a2a24cbb17c452512db09861715c7d6cc": {
+          "blob": "23233e73bed97907a4d3b9cf84d5a5a8616f6542",
+          "sha256": "c0f4fb9f6cdfb5b2d175e8c554c5b60cc6261a335cf295fdf639ef6b6b7d3fda"
+        },
+        "339edd90fcdc85a48971f93c703efeab6a388d05": {
+          "blob": "23233e73bed97907a4d3b9cf84d5a5a8616f6542",
+          "sha256": "c0f4fb9f6cdfb5b2d175e8c554c5b60cc6261a335cf295fdf639ef6b6b7d3fda"
+        }
+      },
+      "lampOS/crates/update/src/round.rs": {
+        "09762d1a2a24cbb17c452512db09861715c7d6cc": {
+          "blob": "2ae7fa83504c7162c59b3fa279d517b35a579994",
+          "sha256": "7a712870ef8ef107f15810b526e2ce3ee02dc66a904c6c9914c5cedfa988b6aa"
+        },
+        "339edd90fcdc85a48971f93c703efeab6a388d05": {
+          "blob": "2ae7fa83504c7162c59b3fa279d517b35a579994",
+          "sha256": "7a712870ef8ef107f15810b526e2ce3ee02dc66a904c6c9914c5cedfa988b6aa"
+        }
+      },
+      "lampOS/crates/update/tests/round.rs": {
+        "09762d1a2a24cbb17c452512db09861715c7d6cc": {
+          "blob": "2b9cf68c94a0cb30ba30f68002e2a37f541c832c",
+          "sha256": "a9afd0629cf3c0e5b1c5ffe3bca655e1f49a9d3301d3f6f62b3f10386f778422"
+        },
+        "339edd90fcdc85a48971f93c703efeab6a388d05": {
+          "blob": "2b9cf68c94a0cb30ba30f68002e2a37f541c832c",
+          "sha256": "a9afd0629cf3c0e5b1c5ffe3bca655e1f49a9d3301d3f6f62b3f10386f778422"
+        }
+      },
+      "lampOS/docs/updates.md": {
+        "09762d1a2a24cbb17c452512db09861715c7d6cc": {
+          "blob": "9f81c6150204e890f2b9d529f3d8f393d90a561d",
+          "sha256": "f1731cc4bb326da611ec005c1b0d6476f649204f9b96110467f09257b6ef9a7b"
+        },
+        "339edd90fcdc85a48971f93c703efeab6a388d05": {
+          "blob": "9f81c6150204e890f2b9d529f3d8f393d90a561d",
+          "sha256": "f1731cc4bb326da611ec005c1b0d6476f649204f9b96110467f09257b6ef9a7b"
+        }
+      }
+    },
+    "parents": [
+      "3b9bfb628e1c416926b958fecf56f65c539dc533",
+      "09762d1a2a24cbb17c452512db09861715c7d6cc"
+    ],
+    "preview": "339edd90fcdc85a48971f93c703efeab6a388d05",
+    "preview_tree": "adcfb8aa245c1ae6e5f9d1e2476ac031c461a180",
+    "whole_trees_equal": true
+  },
+  "test_audit": {
+    "bad_terminal_statuses": [],
+    "custom_harness": {
+      "process13passed0failed": true,
+      "relay_signals_ok": true
+    },
+    "docs": {
+      "crate_summaries": 47,
+      "failed": 0,
+      "ignored": 0,
+      "passed": 4
+    },
+    "duplicates": [
+      {
+        "binary": "lamp-skills::it",
+        "occurrences": 2,
+        "test": "skills::a_reading_pose_is_held_on_the_mood_socket_for_its_for_and_then_let_go"
+      },
+      {
+        "binary": "lamp-skills::it",
+        "occurrences": 2,
+        "test": "skills::asking_the_policy_a_hello_made_and_not_noticed_rests"
+      },
+      {
+        "binary": "lamp-skills::it",
+        "occurrences": 2,
+        "test": "skills::asking_the_policy_on_the_hosts_clock_gives_up_after_its_wait"
+      },
+      {
+        "binary": "lamp-skills::it",
+        "occurrences": 2,
+        "test": "skills::the_program_forgets_a_snooze_at_a_restart"
+      },
+      {
+        "binary": "lamp-skills::it",
+        "occurrences": 2,
+        "test": "skills::the_program_keeps_a_skill_off_across_a_restart"
+      },
+      {
+        "binary": "lamp-voice",
+        "occurrences": 2,
+        "test": "coordinator::tests::endpoint_session::endpoint_fixture_reaps_on_panic_before_and_after_handoff"
+      },
+      {
+        "binary": "lamp-voice",
+        "occurrences": 2,
+        "test": "hand_controls::tests::with_the_wait_an_idle_pump_wakes_five_times_a_second_and_stops_at_once"
+      },
+      {
+        "binary": "lamp-voice",
+        "occurrences": 2,
+        "test": "hand_controls::tests::with_the_wait_an_owner_polling_every_2_ms_does_not_wake_the_pump"
+      },
+      {
+        "binary": "lamp-voice::it",
+        "occurrences": 2,
+        "test": "capture_hold_worker::a_microphone_busy_for_a_moment_at_start_is_opened_once_it_is_free"
+      },
+      {
+        "binary": "lamp-voice::it",
+        "occurrences": 2,
+        "test": "capture_hold_worker::a_microphone_gone_for_a_moment_at_start_is_opened_once_it_is_back"
+      },
+      {
+        "binary": "lamp-voice::it",
+        "occurrences": 2,
+        "test": "capture_hold_worker::a_mute_while_a_busy_microphone_is_waited_for_opens_nothing"
+      },
+      {
+        "binary": "lamp-voice::it",
+        "occurrences": 2,
+        "test": "capture_hold_worker::a_mute_while_the_microphone_is_waited_for_opens_nothing"
+      },
+      {
+        "binary": "lamp-voice::it",
+        "occurrences": 2,
+        "test": "capture_hold_worker::a_speaker_held_up_ends_the_capture_worker_unless_recovery_is_bounded"
+      },
+      {
+        "binary": "lamp-voice::it",
+        "occurrences": 2,
+        "test": "capture_hold_worker::a_stop_is_read_though_the_worker_has_gone_when_authority_falls_due"
+      },
+      {
+        "binary": "lamp-voice::it",
+        "occurrences": 2,
+        "test": "capture_hold_worker::another_microphone_is_handed_on_at_once_and_its_early_sound_is_not_accounted_for"
+      },
+      {
+        "binary": "lamp-voice::it",
+        "occurrences": 2,
+        "test": "capture_hold_worker::mic1_frames_wait_four_blocks_with_their_own_times_and_a_stop_drops_what_is_held"
+      },
+      {
+        "binary": "lamp-voice::it",
+        "occurrences": 2,
+        "test": "capture_hold_worker::mic1_muted_while_frames_are_held_hands_none_of_them_on"
+      },
+      {
+        "binary": "lamp-voice::it",
+        "occurrences": 2,
+        "test": "capture_hold_worker::mic1_with_a_recording_keeps_the_held_steps_before_the_first_block"
+      },
+      {
+        "binary": "lamp-voice::it",
+        "occurrences": 2,
+        "test": "capture_hold_worker::stalls_in_a_row_each_reopen_the_microphone_while_the_reference_goes_on"
+      },
+      {
+        "binary": "lamp-voice::it",
+        "occurrences": 2,
+        "test": "capture_hold_worker::stop_words_blocks_carry_what_was_asked_only_when_asked"
+      },
+      {
+        "binary": "lamp-voice::it",
+        "occurrences": 2,
+        "test": "capture_hold_worker::the_loop_waits_on_the_microphone_only_with_the_switch"
+      },
+      {
+        "binary": "lamp-voice::it",
+        "occurrences": 2,
+        "test": "capture_hold_worker::with_the_render_5_ms_after_each_block_all_but_a_few_blocks_are_read_within_a_ms"
+      },
+      {
+        "binary": "lamp-voice::it",
+        "occurrences": 2,
+        "test": "privacy_worker::a_producer_kept_up_only_if_its_samples_span_the_scenario"
+      },
+      {
+        "binary": "lamp-voice::it",
+        "occurrences": 2,
+        "test": "privacy_worker::after_its_first_datagram_a_gap_ends_the_worker_as_discontinuous"
+      },
+      {
+        "binary": "lamp-voice::it",
+        "occurrences": 2,
+        "test": "privacy_worker::allowed_authority_without_a_first_observation_cannot_start_a_gap_ride"
+      },
+      {
+        "binary": "lamp-voice::it",
+        "occurrences": 2,
+        "test": "privacy_worker::a_gap_ride_survives_controls_late_and_restabilizes_before_reopening"
+      },
+      {
+        "binary": "lamp-voice::it",
+        "occurrences": 2,
+        "test": "privacy_worker::before_any_datagram_the_worker_reads_the_kept_value_past_gaps_until_controls_is_late"
+      },
+      {
+        "binary": "lamp-voice::it",
+        "occurrences": 2,
+        "test": "privacy_worker::expiry_without_the_opt_in_or_allowed_authority_still_ends_the_worker"
+      },
+      {
+        "binary": "lamp-voice::it",
+        "occurrences": 2,
+        "test": "privacy_worker::a_gap_ride_recovers_short_repeated_publication_gaps_in_the_same_worker"
+      },
+      {
+        "binary": "lamp-voice::it",
+        "occurrences": 2,
+        "test": "privacy_worker::fresh_low_during_a_gap_ride_never_grants_the_same_worker_again"
+      },
+      {
+        "binary": "lamp-voice::it",
+        "occurrences": 2,
+        "test": "privacy_worker::losing_controls_ends_the_real_worker_cleanly_and_expires_its_lease"
+      },
+      {
+        "binary": "lamp-voice::it",
+        "occurrences": 2,
+        "test": "privacy_worker::the_real_worker_with_no_slide_grants_from_its_controller_alone"
+      },
+      {
+        "binary": "lamp-voice::it",
+        "occurrences": 2,
+        "test": "privacy_worker::selected_worker_requires_authority_latches_low_and_recovers_only_after_verified_stop"
+      },
+      {
+        "binary": "lamp-voice::it",
+        "occurrences": 2,
+        "test": "privacy_worker::an_isolated_fresh_high_does_not_extend_the_real_workers_gap_ride"
+      }
+    ],
+    "nextest_binaries_run": 70,
+    "pass_lines": 7776,
+    "preview": "339edd90fcdc85a48971f93c703efeab6a388d05",
+    "qualifications": "PR profile selects12of47crates and skips realtime; auxiliary promotion/provenance checks are separate.34duplicatePASSdetail rows are not extra test executions. Terminalbadstatuses empty, not a raw panic-free assertion.",
+    "required": [
+      {
+        "binary": "lamp-update",
+        "group": "receipt_library",
+        "occurrences": 1,
+        "test": "apply::tests::a_done_for_another_operation_does_not_change_any_setting_record"
+      },
+      {
+        "binary": "lamp-update",
+        "group": "receipt_library",
+        "occurrences": 1,
+        "test": "apply::tests::a_done_for_another_sequence_does_not_change_any_setting_record"
+      },
+      {
+        "binary": "lamp-update",
+        "group": "receipt_library",
+        "occurrences": 1,
+        "test": "apply::tests::an_explicit_expected_identity_does_not_follow_a_rewritten_staged_request"
+      },
+      {
+        "binary": "lamp-update",
+        "group": "receipt_library",
+        "occurrences": 1,
+        "test": "apply::tests::a_matching_done_keeps_the_permanent_forward_read_contract"
+      },
+      {
+        "binary": "lamp-update",
+        "group": "receipt_library",
+        "occurrences": 1,
+        "test": "apply::tests::an_unknown_done_operation_is_refused_without_changing_any_setting_record"
+      },
+      {
+        "binary": "lamp-update",
+        "group": "foundation_library",
+        "occurrences": 1,
+        "test": "writer_refresh::tests::no_apply_does_not_qualify_but_one_exact_apply_can_enter_without_an_ordinary_round"
+      },
+      {
+        "binary": "lamp-update",
+        "group": "foundation_library",
+        "occurrences": 1,
+        "test": "writer_refresh::tests::a_restart_at_every_unqualified_prefix_requires_recovery_and_never_reissues_the_grant"
+      },
+      {
+        "binary": "lamp-update",
+        "group": "foundation_library",
+        "occurrences": 1,
+        "test": "writer_refresh::tests::qualified_writer_and_preimages_survive_a_restart_until_the_product_journal_closes"
+      },
+      {
+        "binary": "lamp-update",
+        "group": "foundation_library",
+        "occurrences": 1,
+        "test": "writer_refresh::tests::identity_substitution_never_changes_or_admits_the_saved_transaction"
+      },
+      {
+        "binary": "lamp-update",
+        "group": "foundation_library",
+        "occurrences": 1,
+        "test": "writer_refresh::tests::a_stale_or_modified_first_apply_cannot_consume_the_single_grant"
+      },
+      {
+        "binary": "lamp-update",
+        "group": "foundation_library",
+        "occurrences": 1,
+        "test": "writer_refresh::tests::unsupported_or_malformed_journals_are_retained_and_block_every_admission"
+      },
+      {
+        "binary": "lamp-update",
+        "group": "foundation_library",
+        "occurrences": 1,
+        "test": "writer_refresh::tests::missing_and_nonregular_records_do_not_turn_into_a_fresh_transaction"
+      },
+      {
+        "binary": "lamp-update",
+        "group": "foundation_library",
+        "occurrences": 1,
+        "test": "writer_refresh::tests::future_nonsemantic_metadata_is_preserved_without_becoming_admission_authority"
+      },
+      {
+        "binary": "lamp-update",
+        "group": "foundation_library",
+        "occurrences": 1,
+        "test": "writer_refresh::tests::write_bound_and_invalid_identities_leave_no_journal_or_partial_acceptance"
+      },
+      {
+        "binary": "lamp-update",
+        "group": "foundation_library",
+        "occurrences": 1,
+        "test": "writer_refresh::tests::diagnostics_hide_unknown_values_and_known_duplicate_or_shadowed_fields_are_refused"
+      },
+      {
+        "binary": "lamp-update",
+        "group": "foundation_library",
+        "occurrences": 1,
+        "test": "writer_refresh::tests::guard_lock_is_exclusive_and_independent_of_the_product_lock"
+      },
+      {
+        "binary": "lamp-update",
+        "group": "foundation_library",
+        "occurrences": 1,
+        "test": "writer_refresh::tests::failed_persist_after_publication_poisons_the_live_session_until_actual_disk_state_is_recovered"
+      },
+      {
+        "binary": "lamp-update",
+        "group": "foundation_library",
+        "occurrences": 1,
+        "test": "writer_refresh::tests::first_apply_binds_its_own_later_envelope_and_sequence_without_replacing_the_refresh_identity"
+      },
+      {
+        "binary": "lamp-update",
+        "group": "foundation_library",
+        "occurrences": 1,
+        "test": "writer_refresh::tests::restoring_an_apply_requires_its_original_grant_and_preimage_identity"
+      },
+      {
+        "binary": "lamp-update",
+        "group": "foundation_library",
+        "occurrences": 1,
+        "test": "writer_refresh::tests::reloaded_inputs_keep_the_exact_origin_and_distinguish_writer_from_apply_restoration"
+      },
+      {
+        "binary": "lamp-update",
+        "group": "foundation_library",
+        "occurrences": 1,
+        "test": "writer_refresh::tests::qualified_and_closed_inputs_keep_the_compatible_writer_and_bound_product_receipts"
+      },
+      {
+        "binary": "lamp-update",
+        "group": "foundation_library",
+        "occurrences": 1,
+        "test": "writer_refresh::tests::live_or_poisoned_sessions_cannot_expose_stale_recovery_inputs"
+      },
+      {
+        "binary": "lamp-update",
+        "group": "foundation_library",
+        "occurrences": 1,
+        "test": "writer_refresh::tests::recovery_views_retain_later_metadata_in_the_bound_inputs_without_reparsing"
+      },
+      {
+        "binary": "lamp-update::round",
+        "group": "receipt_round",
+        "occurrences": 1,
+        "test": "a_rejected_apply_receipt_runs_real_back_and_restores_written_settings_modes_and_records"
+      },
+      {
+        "binary": "lamp-update::round",
+        "group": "receipt_round",
+        "occurrences": 1,
+        "test": "a_rejected_back_receipt_keeps_the_journal_until_real_back_is_acknowledged"
+      },
+      {
+        "binary": "lamp-update::round",
+        "group": "receipt_round",
+        "occurrences": 1,
+        "test": "the_round_rejects_a_done_matching_a_rewritten_request_instead_of_its_own_request"
+      }
+    ],
+    "selection": "Changed: lamp-update. With the crates that depend on them and the three that read other crates' files (lamp-cloud, lamp-voice-eval, lamp-update): 12 of 47 crates.",
+    "skipped_binaries": 118,
+    "skipped_tests": 53,
+    "summary": [
+      "Summary [ 167.750s] 7742 tests run: 7742 passed, 53 skipped"
+    ],
+    "unique_passes": 7742
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "head": "60f0bc20448f4ca12e916f06ad7e5a491bcf2168",
+  "scope": "Exact extracted LeaseDoor::ended body with actual committed lease.rs via path module; minimal two-field container and local UnixStream pairs; not whole binary or physical overload execution",
+  "native_exec_handle": 15011,
+  "exit": 0,
+  "observations": {
+    "prior_lost_then_ended_lines": 2,
+    "active_ended_lines": 1,
+    "free_connected_ended_lines": 1,
+    "normal_close_lines": 0
+  },
+  "finding": "P3 duplicate loss after prior loss; unsolicited terminal loss to connected free lease",
+  "source_trace": "Normal let_go can already notify loss before take_hold returns Stop::Overload; ended only checks connection, not whether lease remains active.",
+  "suggestion": "Report terminal loss only for still-existing lease, including suspended; holds alone excludes suspended leases.",
+  "hashes": {
+    "extracted-ended.rs": "ed753b9b857f46a71a13cfaae8432cee71036ef94fea725548f43cbe23c31c98",
+    "probe/src/main.rs": "598e6e887b566c2aa17f5f1e3f7d8af5934ad9f44957fe7801745d2b972a773b",
+    "probe/Cargo.toml": "8e94a903f63de45675d64fd68a841fbed5d5d96bcc6adb6680a572440bf32c3f",
+    "probe/Cargo.lock": "50e8f7249825d27702c28e5b209650353ace72edee7297fae696e222947c319f",
+    "ended-probe.log": "62b5ac4b08c2901e9f6a413cabb3ad5cf5e2c51f64eaa2dcd67116a279bb6d5a"
+  },
+  "actual_lease_source_sha256": "a585bf4bdfec32870a38ae91e654c8a9cb417522e54e4074874636b74581fcff",
+  "limits": [
+    "Four successful observational assertions confirm current behavior, not product acceptance",
+    "Only cached Serde dependencies, no body/voice inference build or device",
+    "No original current Linux test result inferred; native audit separate"
+  ]
+}
