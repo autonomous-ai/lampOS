@@ -1,4 +1,6 @@
 //! Bounded read-only reset queries. Stop commands keep their own allowances.
+//! Setup's hotspot and station reads (`serve::phones`, `serve::station_ip`)
+//! use the same bound.
 use std::{
     io::{self, Read},
     os::unix::process::CommandExt,
@@ -7,7 +9,7 @@ use std::{
 };
 
 // The updater's setup-unit query uses JOURNAL_WITHIN (five seconds) too.
-const QUERY_WITHIN: Duration = Duration::from_secs(5);
+pub(crate) const QUERY_WITHIN: Duration = Duration::from_secs(5);
 const MAX_OUTPUT: usize = 64 * 1024;
 
 pub(super) fn read(argv: &[String]) -> io::Result<String> {
@@ -60,7 +62,7 @@ fn time_left(until: Instant) -> io::Result<()> {
     }
 }
 
-fn output_within(command: &mut Command, until: Instant) -> io::Result<Vec<u8>> {
+pub(crate) fn output_within(command: &mut Command, until: Instant) -> io::Result<Vec<u8>> {
     time_left(until)?;
     let mut owned = OwnedChild {
         child: command

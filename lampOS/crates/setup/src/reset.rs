@@ -22,7 +22,7 @@ use std::{
     process::Command,
 };
 
-mod query;
+pub(crate) mod query;
 
 /// The product plan's journal, read by Wi-Fi's restore of an old network
 /// ([`wifi_restore_allowed`]).
