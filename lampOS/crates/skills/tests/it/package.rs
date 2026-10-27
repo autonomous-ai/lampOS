@@ -1434,6 +1434,98 @@ fn the_apps_off_and_on_are_kept_and_a_skill_of_the_lamp_itself_is_refused() {
     assert_eq!(answer["refused"], package::NOT_A_REQUEST);
 }
 
+/// #3504's piece C: the owner's yes to a skill's camera, asked of the
+/// manage helper, is kept in the state folder's `camera`, a name a line,
+/// and taken back. A running lamp-skills reads it at each call that would
+/// give the picture: a skill that is not core sees it only while its yes is
+/// kept, and a yes taken back holds from the next call, nothing restarted.
+/// A core skill that asks the camera is the lamp's own and needs none. A
+/// package that asks the camera, installed by hand, is not refused.
+#[test]
+fn the_owners_camera_yes_is_kept_read_at_each_call_and_taken_back() {
+    let dir = tempfile::tempdir().unwrap();
+    let skills = dir.path().join("skills");
+    let state = dir.path().join("state");
+    fs::create_dir_all(&state).unwrap();
+    copy(
+        &skills_root().join("point-light"),
+        &skills.join("point-light"),
+    );
+    // By hand, with no yes kept: put on all the same.
+    let packed = package::pack(
+        &tutor(&dir.path().join("src"), "1.0.0"),
+        &dir.path().join("out"),
+    )
+    .unwrap();
+    package::install(&skills, &packed).unwrap();
+    let ask = |line: &str| {
+        let mut answer = Vec::new();
+        let ok = package::asked(
+            &skills,
+            &skills.join("no-made"),
+            &state,
+            package::ASKED_LOCK_WAIT,
+            None,
+            line.as_bytes(),
+            &mut answer,
+        )
+        .unwrap();
+        (
+            serde_json::from_slice::<serde_json::Value>(&answer).unwrap(),
+            ok,
+        )
+    };
+    let camera = state.join(lamp_skills::CAMERA_FILE);
+    let (loaded, _) = lamp_skills::load_all(&skills);
+    let mut running = lamp_skills::Engine::new(loaded, true);
+    running.keep_off_in(&state).unwrap();
+    let not_yet = Some("the owner hasn't said yes to its camera");
+    assert_eq!(running.picture_refused("desk-tutor").as_deref(), not_yet);
+    assert_eq!(running.picture_refused("point-light"), None);
+
+    let (answer, ok) = ask("{\"camera\": \"desk-tutor\"}\n");
+    assert!(ok, "{answer}");
+    assert_eq!(answer["done"], "desk-tutor may see the camera's picture");
+    assert_eq!(fs::read_to_string(&camera).unwrap(), "desk-tutor\n");
+    assert_eq!(running.picture_refused("desk-tutor"), None);
+    // Given twice is kept once; a name not on the lamp yet is kept too, as
+    // the Store installs a package that asks the camera only after it.
+    assert!(ask("{\"camera\": \"desk-tutor\"}\n").1);
+    assert!(ask("{\"camera\": \"from-the-store\"}\n").1);
+    assert_eq!(
+        fs::read_to_string(&camera).unwrap(),
+        "desk-tutor\nfrom-the-store\n"
+    );
+
+    let (answer, ok) = ask("{\"camera_off\": \"desk-tutor\"}\n");
+    assert!(ok, "{answer}");
+    assert_eq!(
+        answer["done"],
+        "desk-tutor may not see the camera's picture"
+    );
+    assert_eq!(fs::read_to_string(&camera).unwrap(), "from-the-store\n");
+    assert_eq!(running.picture_refused("desk-tutor").as_deref(), not_yet);
+    assert_eq!(running.picture_refused("point-light"), None);
+
+    let (answer, ok) = ask("{\"camera\": \"../off\"}\n");
+    assert!(!ok);
+    assert!(
+        answer["refused"]
+            .as_str()
+            .unwrap()
+            .contains("is not a skill's name"),
+        "{answer}"
+    );
+    let (answer, _) = ask("{\"camera\": true}\n");
+    assert_eq!(answer["refused"], package::NOT_A_REQUEST);
+    assert_eq!(fs::read_to_string(&camera).unwrap(), "from-the-store\n");
+    // With no state folder no yes is kept, so none is given.
+    let (loaded, _) = lamp_skills::load_all(&skills);
+    let bare = lamp_skills::Engine::new(loaded, true);
+    assert_eq!(bare.picture_refused("desk-tutor").as_deref(), not_yet);
+    assert_eq!(bare.picture_refused("point-light"), None);
+}
+
 /// The reviewer's P2 on #2878: root's helper writes `off` in a folder the
 /// skills' user owns, so a link planted where the file beside goes is
 /// refused and its target untouched, and a link at `off` is not read

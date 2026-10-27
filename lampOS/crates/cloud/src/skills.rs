@@ -339,6 +339,12 @@ pub struct Listed {
     /// snoozed until the morning, which is not kept where this reads);
     /// null otherwise, or when the off file can't be read.
     pub off: Option<bool>,
+    /// When it asks the camera's picture: true when it may see it (a core
+    /// skill, or one the owner said yes to, `skills.camera`, kept in
+    /// `lamp-skills`' `camera` beside the off file), false when not, or
+    /// when that file can't be read (#3504's piece C); null when it
+    /// doesn't ask the picture.
+    pub camera_allowed: Option<bool>,
     /// Whether the running `lamp-skills` loads it.
     pub loads: bool,
     /// Why not, in the lamp's words, when it does not; else null.
@@ -351,9 +357,23 @@ pub struct Listed {
 pub fn list(places: &Places) -> Result<Value, String> {
     fs::read_dir(&places.folder).map_err(|_| "the lamp's skills can't be read now".to_owned())?;
     let off = read_off(&places.off);
+    let camera = read_off(&places.off.with_file_name(lamp_skills::CAMERA_FILE));
     let mut rows: Vec<Listed> = lamp_skills::load_each(&places.folder)
         .into_iter()
-        .map(|(folder, loaded)| row(&folder, loaded, off.as_ref(), places.addons))
+        .map(|(folder, loaded)| {
+            let mut listed = row(&folder, loaded, off.as_ref(), places.addons);
+            listed.camera_allowed = listed
+                .may_use
+                .iter()
+                .any(|used| used.name == "camera")
+                .then(|| {
+                    listed.group == Group::Core
+                        || camera
+                            .as_ref()
+                            .is_some_and(|yes| yes.contains(&listed.name))
+                });
+            listed
+        })
         .collect();
     rows.sort_by(|a, b| (a.group, &a.name).cmp(&(b.group, &b.name)));
     let left_out = rows.len().saturating_sub(MOST_SKILLS);
@@ -422,6 +442,27 @@ pub fn turn(places: &Places, data: &Value, off: bool) -> Result<Value, String> {
         ("skills.on", "on")
     };
     changed(places, kind, &json!({ way: name }), ASK_TIMEOUT)
+}
+
+/// `skills.camera {"name", "allow"}` (#3504's piece C): the owner's yes to
+/// the skill seeing the camera's picture, given (`allow` true) or taken
+/// back, on their tap past the app's warning. As off and on, asked of the
+/// manage helper, which keeps it in `lamp-skills`' `camera`
+/// ([`lamp_skills::package::camera`]); the name need not be on the lamp
+/// yet, as a Store package that asks the camera installs only once it is
+/// given. The reply is the page as it now is, [`list`]'s.
+pub fn camera(places: &Places, data: &Value) -> Result<Value, String> {
+    let name = data
+        .get("name")
+        .and_then(Value::as_str)
+        .filter(|name| lamp_skills::package::skill_name_ok(name))
+        .ok_or(NOT_A_NAME)?;
+    let allow = data
+        .get("allow")
+        .and_then(Value::as_bool)
+        .ok_or("allow must be true or false")?;
+    let way = if allow { "camera" } else { "camera_off" };
+    changed(places, "skills.camera", &json!({ way: name }), ASK_TIMEOUT)
 }
 
 /// `request` asked of the manage helper for the app's `kind`, waiting at
@@ -626,6 +667,7 @@ fn row(
         off: can_turn_off
             .then(|| off.map(|off| disabled || off.contains(&name)))
             .flatten(),
+        camera_allowed: None,
         loads,
         why,
         may_use: may_use(&permissions),
@@ -825,6 +867,7 @@ pub mod tests {
                 "can_remove": false,
                 "can_turn_off": true,
                 "off": false,
+                "camera_allowed": null,
                 "loads": true,
                 "why": null,
                 "may_use": [{"name": "body", "says": "moves the lamp", "privacy": null}],
@@ -1292,6 +1335,58 @@ pub mod tests {
         assert_eq!(
             turn(&places, &json!({"name": "../tutor"}), true),
             Err(NOT_A_NAME.to_owned())
+        );
+    }
+
+    /// #3504's piece C: the owner's yes to a skill's camera given and taken
+    /// back through the manage helper, the page as it now is each time: a
+    /// skill that asks the camera is not allowed until the yes is kept, a
+    /// core one is allowed with none, and one that doesn't ask says nothing.
+    #[test]
+    fn a_skills_camera_is_allowed_and_taken_back_and_the_page_says_so() {
+        let places = three("camera");
+        skill(
+            &places,
+            "eyes",
+            "Eyes",
+            "",
+            "kind = \"installable\"\n[permissions]\ncamera = true",
+        );
+        skill(
+            &places,
+            "seer",
+            "Seer",
+            "",
+            "kind = \"core\"\n[permissions]\ncamera = true",
+        );
+        let allowed = |reply: &Value, name: &str| {
+            reply["skills"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|row| row["name"] == name)
+                .unwrap()["camera_allowed"]
+                .clone()
+        };
+        let page = list(&places).unwrap();
+        assert_eq!(allowed(&page, "eyes"), json!(false));
+        assert_eq!(allowed(&page, "seer"), json!(true));
+        assert_eq!(allowed(&page, "tutor"), Value::Null);
+        let reply = camera(&places, &json!({"name": "eyes", "allow": true})).unwrap();
+        assert_eq!(reply, list(&places).unwrap());
+        assert_eq!(allowed(&reply, "eyes"), json!(true));
+        let kept = places.off.with_file_name(lamp_skills::CAMERA_FILE);
+        assert_eq!(fs::read_to_string(&kept).unwrap(), "eyes\n");
+        let reply = camera(&places, &json!({"name": "eyes", "allow": false})).unwrap();
+        assert_eq!(allowed(&reply, "eyes"), json!(false));
+        assert_eq!(fs::read_to_string(&kept).unwrap(), "");
+        assert_eq!(
+            camera(&places, &json!({"name": "../eyes", "allow": true})),
+            Err(NOT_A_NAME.to_owned())
+        );
+        assert_eq!(
+            camera(&places, &json!({"name": "eyes"})),
+            Err("allow must be true or false".to_owned())
         );
     }
 
