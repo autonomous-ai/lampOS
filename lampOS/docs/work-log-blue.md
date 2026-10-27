@@ -641,3 +641,4 @@ Ready for lamp-voice: yes (#2553), once its ARM64 run is green
 - 21:29: Ten's #3859 (camera piece A) changes skill-format.schema.json; camera is skills only (no SDK grant change). Posted the order note on #3859: whichever of #3840/#3859 lands second syncs the SDK copy; I'll update the look warning.
 - 21:34: #3848 merged in train 241 (f9926922d). #3859 has READ-OKs (Fourteen) and no P1/P2 from the reviewer-lead; it'll likely land near #3840. Still waiting: #3829, #3836, #3840 for a train; #3847 after #3805. #3840's follow-up will flip until-3840 to required.
 - 21:39: quiet tick; nothing on my PRs or #3859.
+- 21:44: quiet tick; nothing on my PRs or #3859.
