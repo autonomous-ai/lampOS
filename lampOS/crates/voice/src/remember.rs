@@ -9494,6 +9494,27 @@ mod tests {
         assert!(told.get("setup_name").is_none());
     }
 
+    /// Reviewer-two (17:38 on the queue): #3625's preference, #3627's span
+    /// and #3629's room history composed, `recall` stays a valid function
+    /// under every switch, both on included.
+    #[test]
+    fn recall_composed_is_a_valid_function_under_every_switch() {
+        for second in [false, true] {
+            for replaces in [false, true] {
+                let mut tools = vec![recall_tool(second)];
+                if replaces {
+                    tools = replaces_described(tools);
+                }
+                let bytes = tools[0].description.len();
+                eprintln!("recall second={second} replaces={replaces}: {bytes} bytes");
+                assert!(
+                    tools[0].validate().is_ok(),
+                    "second {second} replaces {replaces}: {bytes} bytes"
+                );
+            }
+        }
+    }
+
     /// Reviewer-two's P2 on #3625: `recall` stays a valid function, its
     /// description within 1,024 bytes, with and without its second version
     /// and `LAMP_MEMORY_REPLACES`, so no switch set drops it.
