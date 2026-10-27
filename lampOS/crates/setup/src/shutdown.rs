@@ -103,6 +103,14 @@ pub trait Host {
     fn power_off(&mut self) -> io::Result<()>;
 }
 
+/// Why the ring is not lit green after a let-go that did not let go.
+pub const NOT_LET_GO: &str = "not let go: keep it plugged in";
+
+/// Whether lamp-body-measure's let-go report says every joint was let go.
+fn let_go_said(report: &str) -> bool {
+    serde_json::from_str::<serde_json::Value>(report).is_ok_and(|report| report["let_go"] == true)
+}
+
 /// Each step as it went, in order.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case", tag = "step", content = "why")]
@@ -209,21 +217,49 @@ pub fn run(host: &mut impl Host, dry_run: bool, say: &mut impl FnMut(&str)) -> V
         say(&format!("the pause is left kept ({why})"));
     }
     host.sleep(LET_GO_AFTER);
-    match host.let_go() {
-        Ok(report) => step(Step::LetGo, format!("let go: {report}"), say),
-        Err(why) => step(
-            Step::NotLetGo(why.clone()),
-            format!("not let go: {why}"),
+    let let_go = match host.let_go() {
+        // Its report's own word, not only its exit: a lamp found up keeps
+        // its torque and says `"let_go": false`.
+        Ok(report) if let_go_said(&report) => {
+            step(Step::LetGo, format!("let go: {report}"), say);
+            true
+        }
+        Ok(report) => {
+            step(
+                Step::NotLetGo(report.clone()),
+                format!("not let go: {report}"),
+                say,
+            );
+            false
+        }
+        Err(why) => {
+            step(
+                Step::NotLetGo(why.clone()),
+                format!("not let go: {why}"),
+                say,
+            );
+            false
+        }
+    };
+    // Green says "safe to unplug", after "Unplug me when my light turns
+    // green.": only for a lamp let go. One still held up by its torque
+    // would fall when the plug is pulled (the Reviewer-lead's and
+    // Fourteen's P2 on #3713).
+    if !let_go {
+        step(
+            Step::NotLit(NOT_LET_GO.into()),
+            format!("the ring is not lit: {NOT_LET_GO}"),
             say,
-        ),
-    }
-    match host.light() {
-        Ok(()) => step(Step::Lit, "the ring says it is safe to unplug".into(), say),
-        Err(why) => step(
-            Step::NotLit(why.to_string()),
-            format!("the ring is not lit ({why})"),
-            say,
-        ),
+        );
+    } else {
+        match host.light() {
+            Ok(()) => step(Step::Lit, "the ring says it is safe to unplug".into(), say),
+            Err(why) => step(
+                Step::NotLit(why.to_string()),
+                format!("the ring is not lit ({why})"),
+                say,
+            ),
+        }
     }
     host.sync();
     step(Step::Synced, "synced".into(), say);
@@ -403,6 +439,8 @@ mod tests {
         /// Each read of the active units in turn; none after.
         active: Vec<Vec<&'static str>>,
         started: Vec<String>,
+        /// What the let-go answers; a lamp let go when `None`.
+        let_go: Option<Result<String, String>>,
         calls: Vec<(Duration, &'static str)>,
     }
 
@@ -462,7 +500,9 @@ mod tests {
         }
         fn let_go(&mut self) -> Result<String, String> {
             self.calls.push((self.now, "let go"));
-            Ok("{}".into())
+            self.let_go
+                .clone()
+                .unwrap_or_else(|| Ok(r#"{"down":true,"let_go":true,"joints":[]}"#.into()))
         }
         fn light(&mut self) -> io::Result<()> {
             self.calls.push((self.now, "light"));
@@ -540,6 +580,36 @@ mod tests {
         );
         // The let-go waits 0.4 s from the end of the stop.
         assert!(at(&fake, "let go") - (stop + Duration::from_secs(3)) >= LET_GO_AFTER);
+    }
+
+    /// A lamp found up keeps its torque; one whose let-go failed may be up
+    /// too. Neither is told "safe to unplug": the ring is never lit green,
+    /// and the power still goes, as every other failed step lets it.
+    #[test]
+    fn a_lamp_not_let_go_never_turns_the_ring_green() {
+        for answer in [
+            Ok(r#"{"down":false,"let_go":false,"joints":[]}"#.to_owned()),
+            Err("lamp-body-measure: the port is busy".to_owned()),
+        ] {
+            let mut fake = Fake {
+                let_go: Some(answer.clone()),
+                ..Fake::default()
+            };
+            let mut lines = Vec::new();
+            let steps = run(&mut fake, false, &mut |line| lines.push(line.to_owned()));
+            assert!(
+                !names(&fake).contains(&"light"),
+                "{answer:?}: {:?}",
+                names(&fake)
+            );
+            assert!(matches!(steps[4], Step::NotLetGo(_)), "{steps:?}");
+            assert_eq!(steps[5], Step::NotLit(NOT_LET_GO.into()));
+            assert!(
+                lines.iter().any(|line| line.contains(NOT_LET_GO)),
+                "{lines:?}"
+            );
+            assert_eq!(steps.last(), Some(&Step::PoweringOff));
+        }
     }
 
     #[test]
