@@ -53,3 +53,15 @@ cho tới khi voice khởi động lại (lamp-06c1, 27/10, N13 của Friday, #3
 sản phẩm nay bật công tắc này cạnh `LAMP_MEMORY_OBSERVE`: phiên kế tiếp được mở
 mới, không tiếp nối phiên cũ, ghi nhật ký trở lại, và cuộc trò chuyện kế tiếp có
 lượt quan sát của nó. Vẫn còn nợ một lần kiểm tra trên lamp.
+
+## Kết thúc cuộc trò chuyện sau một lệnh quên
+
+Khi một cuộc trò chuyện còn mở mà có lệnh quên hoặc `forget_everything`,
+`conversation_end` của nó có thể nêu những lượt đã bị xóa. Memory bỏ qua các id
+đó và kết thúc với những lượt còn lại (#2176 hàng 13): ba lượt, quên một, thì
+lượt quan sát chạy trên hai lượt. Khi mọi lượt đều đã bị quên, memory không bao
+giờ từ chối (`bad_request`) nữa mà đóng cuộc trò chuyện, không có gì để quan
+sát và không giữ job nào: `{ok:true,reason:"forgotten"}`, hoặc với `submit`
+là `{ok:true,submitted:false,reason:"forgotten"}`; voice ghi
+`memory conversation end had nothing left to observe` (N12 của Friday, #3504).
+Một lệnh kết thúc không nêu nguồn nào vẫn bị từ chối như trước.

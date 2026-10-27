@@ -1370,8 +1370,12 @@ passed. Tests: the notes' exact texts in `remember::tests`.
     preference (the session had been shown it), so forgetting it removed
     them too. The writer then ended its conversation naming exchanges the
     store no longer had, and the store refused. That conversation is not
-    tidied, which is right: its evidence was forgotten. #2176 does not
-    change this.
+    tidied, which is right: its evidence was forgotten. Since #2176 row 13
+    an end passes over the ids it no longer has and goes on with the rest,
+    and since Friday's N12 on #3504 (lamp-06c1, 27 Oct: refused right after
+    a `forget_everything`) one whose every exchange was forgotten closes
+    with nothing to observe, `{ok:true,reason:"forgotten"}`, never
+    `bad_request`.
 
 - **An exchange linked to what its turn used** (#2176 finding 14,
   `LAMP_MEMORY_LINK_USED=on`, with the Days client only; off unless set;

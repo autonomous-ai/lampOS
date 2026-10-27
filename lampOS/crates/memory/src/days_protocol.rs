@@ -496,14 +496,29 @@ fn extra(store: &mut Days, request: Extra) -> Result<Value> {
         } => {
             let person = one(person)?;
             // Ids it no longer has (a forget since) are passed over and
-            // counted, never the end refused for them (#2176 row 13).
+            // counted, never the end refused for them (#2176 row 13), not
+            // even when none is left (N12).
             let (source_ids, unknown) = store.known_sources(&person, &source_ids)?;
-            if unknown > 0 {
+            if unknown > 0 && source_ids.is_empty() {
+                eprintln!(
+                    "lamp-memory: conversation_end named {unknown} source(s) it no longer has; closed with nothing to observe"
+                );
+            } else if unknown > 0 {
                 eprintln!(
                     "lamp-memory: conversation_end named {unknown} source(s) it no longer has; ended with the rest"
                 );
             }
-            if submit {
+            if unknown > 0 && source_ids.is_empty() {
+                // Every exchange it named was forgotten since (a forget or
+                // forget_everything in the open conversation, Friday's N12
+                // on #3504): it closes, with nothing to observe and no job,
+                // never refused. Nothing of it is stored.
+                if submit {
+                    json!({"ok":true,"submitted":false,"reason":"forgotten"})
+                } else {
+                    json!({"ok":true,"reason":"forgotten"})
+                }
+            } else if submit {
                 store.validate_conversation_submission(
                     &person,
                     &conversation,
@@ -1095,7 +1110,7 @@ mod tests {
     /// #2176 row 13 (the first builder, 18:20): a conversation's end that
     /// names an exchange this store no longer has (a forget since) goes on
     /// with the rest, prepared or submitted, rather than being refused; one
-    /// with nothing left it has is refused as before.
+    /// with nothing left it has closes with nothing to observe (N12).
     #[test]
     fn a_conversation_end_passes_over_sources_it_no_longer_has() {
         let (_scratch, mut store) = Scratch::new("end-unknown");
@@ -1121,7 +1136,13 @@ mod tests {
             &mut store,
             json!({"op":"conversation_end","conversation":"gone","source_ids":[998,999]}),
         );
-        assert_eq!(nothing["ok"], false, "{nothing}");
+        assert_eq!(nothing, json!({"ok":true,"reason":"forgotten"}));
+        // No sources at all is still the caller's mistake.
+        let none = ended(
+            &mut store,
+            json!({"op":"conversation_end","conversation":"empty","source_ids":[]}),
+        );
+        assert_eq!(none["ok"], false, "{none}");
         // Another person's exchange is refused as before, never passed over
         // as if it were forgotten (the reviewer-lead's P3 on #2226). Each
         // person's records are numbered apart: their third is an id the
@@ -1140,6 +1161,74 @@ mod tests {
             json!({"op":"conversation_end","conversation":"foreign","source_ids":[1, 3]}),
         );
         assert_eq!(foreign["ok"], false, "{foreign}");
+    }
+
+    /// Friday's N12 on #3504: a forget, or a forget_everything, in an open
+    /// conversation never gets its end refused. Three exchanges, one
+    /// forgotten: the end is prepared on the other two. Then everything
+    /// forgotten: the next end closes with nothing to observe, prepared or
+    /// submitted, and keeps no job.
+    #[test]
+    fn a_conversation_end_after_a_forget_in_it_is_never_refused() {
+        const MAI: &str = "p-0123456789abcdef";
+        let (_scratch, mut store) = Scratch::new("end-after-forget");
+        let ask = |store: &mut Days, request: Value| -> Value {
+            serde_json::from_str(&answer(store, request.to_string().as_bytes(), NOW).line).unwrap()
+        };
+        let mut ids = vec![];
+        for heard in ["one", "two", "three"] {
+            let line = ask(
+                &mut store,
+                json!({"op":"append","person":MAI,"at_unix_ms":NOW,"heard":heard}),
+            );
+            ids.push(line["id"].as_u64().unwrap());
+        }
+        let forgot = ask(&mut store, json!({"op":"forget","person":MAI,"id":ids[1]}));
+        assert_eq!(forgot["ok"], true, "{forgot}");
+        let prepared = ask(
+            &mut store,
+            json!({"op":"conversation_end","person":MAI,"conversation":"talk","source_ids":ids}),
+        );
+        assert_eq!(prepared["ok"], true, "{prepared}");
+        assert_eq!(prepared["input"]["source_ids"], json!([ids[0], ids[2]]));
+        let heard: Vec<_> = prepared["input"]["records"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|record| record["heard"].clone())
+            .collect();
+        assert_eq!(heard, [json!("one"), json!("three")]);
+
+        let mut later = vec![];
+        for heard in ["four", "five"] {
+            let line = ask(
+                &mut store,
+                json!({"op":"append","person":MAI,"at_unix_ms":NOW,"heard":heard}),
+            );
+            later.push(line["id"].as_u64().unwrap());
+        }
+        let emptied = ask(&mut store, json!({"op":"forget_all","person":MAI}));
+        assert_eq!(emptied["ok"], true, "{emptied}");
+        let closed = ask(
+            &mut store,
+            json!({"op":"conversation_end","person":MAI,"conversation":"later","source_ids":later}),
+        );
+        assert_eq!(closed, json!({"ok":true,"reason":"forgotten"}));
+        let submitted = ask(
+            &mut store,
+            json!({"op":"conversation_end","person":MAI,"conversation":"later2",
+                "source_ids":later,"submit":true}),
+        );
+        assert_eq!(
+            submitted,
+            json!({"ok":true,"submitted":false,"reason":"forgotten"})
+        );
+        // No job was kept: the same end again closes the same way.
+        let again = ask(
+            &mut store,
+            json!({"op":"conversation_end","person":MAI,"conversation":"later","source_ids":later}),
+        );
+        assert_eq!(again, closed);
     }
 
     #[test]
