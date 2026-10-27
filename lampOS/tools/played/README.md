@@ -50,7 +50,11 @@ These you can run on their own:
   nothing is played. Give `TASKS=` an ARM64 `lamp-tasks` from the same
   artifact, and it's used for the run only. The lamp side is
   `stand-in.sh`, run as root, giving lamp-tasks an empty store of its own for the run (the real one is never touched), with the stand-in's HOME given to
-  lamp-tasks' own user. If a setup step fails, it says which, and nothing
+  lamp-tasks' own user. It runs on a lamp with no Harness CLI too
+  (lamp-06c1): the product unit's `ConditionPathExists=/usr/local/bin/harness`
+  would have systemd skip lamp-tasks, so nothing could be handed over, and the
+  stand-in's drop-in clears it, needing its own wrapper instead; the put-back
+  leaves lamp-tasks skipped again. If a setup step fails, it says which, and nothing
   is played. `stand-in-test.sh` runs that setup against a stand-in
   `systemctl`, with no lamp and no root: run it after changing the setup.
 - `addon-say.sh LABEL ["the kept text"]`, about 2 minutes (#2675): an

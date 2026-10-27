@@ -13,6 +13,9 @@
 #   PLAYED_VOICE_ENV  more NAME=VALUE for the voice's drop-in, space-separated (calendar.sh: LAMP_TASKS_ACCOUNTS=on,
 #                     make-skill.sh: LAMP_MAKE_SKILL=on)
 #   PLAYED_TASKS      a lamp-tasks for this run only, in place of the unit's own (ask-again.sh's TASKS=)
+# It runs on a lamp with no Harness CLI too (lamp-06c1): lamp-tasks' drop-in clears the unit's
+# ConditionPathExists=/usr/local/bin/harness, which would have systemd skip it, and needs the stand-in's wrapper
+# instead; the restart starts a lamp-tasks that was skipped, and `out`'s restart leaves it skipped again.
 # lamp-tasks always gets a store of its own for the run ($PLAYED_REMOTE/store, in place of --dir): the real one is
 # never touched.
 #   PLAYED_REMOTE     the stand-in's folder (default /usr/local/lib/played-stand-in; /run may be noexec)
@@ -55,8 +58,15 @@ in)
   [ -x "$REMOTE/harness-fixture" ] || fail "no stand-in at $REMOTE/harness-fixture"
   # lamp-tasks' own ExecStart, and the lamp-tasks to run: the unit's own, or PLAYED_TASKS for this run only. It
   # must know --sign-in-by-code (#1676): lamp-4ace's lamp-tasks didn't, and crash-looped on the flag (22 Oct 03:1x).
-  exec_line=$($SYSTEMCTL cat lamp-tasks | awk '/^ExecStart=./ { line = substr($0, 11) } END { print line }')
+  unit=$($SYSTEMCTL cat lamp-tasks) || fail "systemctl cat lamp-tasks failed"
+  exec_line=$(printf '%s\n' "$unit" | awk '/^ExecStart=./ { line = substr($0, 11) } END { print line }')
   case "$exec_line" in *"--harness "*) ;; *) fail "lamp-tasks' ExecStart has no --harness";; esac
+  # The unit's ConditionPathExists, but the one on its real Harness (#811): on a lamp with no Harness CLI (lamp-06c1)
+  # systemd would skip lamp-tasks, a condition not met, and nothing would be handed over. The drop-in resets the list
+  # and puts these back, with the stand-in's own wrapper in place of the real Harness.
+  real_harness=${exec_line#*--harness }
+  real_harness=${real_harness%% *}
+  conditions=$(printf '%s\n' "$unit" | sed -n 's/^ConditionPathExists=\(..*\)$/\1/p' | grep -vxF -- "$real_harness")
   tasks=${PLAYED_TASKS:-${exec_line%% *}}
   [ -x "$tasks" ] || fail "no lamp-tasks at $tasks"
   # lamp-tasks has no --help (anything but serve or request is "expected serve or request"), so the flag is
@@ -113,7 +123,10 @@ in)
     "rm -f $TASKS_DROP $VOICE_DROP; systemctl daemon-reload; systemctl restart lamp-tasks lamp-voice; rm -rf $REMOTE" \
     >/dev/null || fail "arming the lamp's guard (systemd-run) failed"
   mkdir -p "$UNITS/lamp-tasks.service.d" "$UNITS/lamp-voice.service.d" || { unguard; fail "mkdir of the drop-in folders failed"; }
-  printf '[Service]\nExecStart=\nExecStart=%s\n' "$exec_line" > "$TASKS_DROP" || { unguard; fail "writing lamp-tasks' drop-in failed"; }
+  { printf '[Unit]\nConditionPathExists=\n'
+    [ -z "$conditions" ] || printf '%s\n' "$conditions" | sed 's/^/ConditionPathExists=/'
+    printf 'ConditionPathExists=%s\n[Service]\nExecStart=\nExecStart=%s\n' "$REMOTE/harness" "$exec_line"
+  } > "$TASKS_DROP" || { unguard; fail "writing lamp-tasks' drop-in failed"; }
   { printf '[Service]\nEnvironment=LAMP_TASKS_SIGN_IN=on\n'
     for setting in ${PLAYED_VOICE_ENV:-}; do printf 'Environment=%s\n' "$setting"; done
   } > "$VOICE_DROP" || {
