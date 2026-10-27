@@ -278,3 +278,28 @@ fn a_zone_file_handed_in_is_read_past_its_listed_changes() {
     assert_eq!(lamp_local_time::offset_seconds_in(b"", 0), None);
     assert_eq!(lamp_local_time::offset_seconds_in(&saigon[..60], 0), None);
 }
+
+/// The lamp's quiet hours, 22:00 to 07:00 local, one definition (#3504).
+#[test]
+fn the_quiet_hours_are_ten_at_night_to_seven_in_the_morning() {
+    use lamp_local_time::quiet_hours;
+    for (minute, quiet) in [
+        (21 * 60 + 59, false),
+        (22 * 60, true),
+        (23 * 60 + 59, true),
+        (0, true),
+        (7 * 60 - 1, true),
+        (7 * 60, false),
+        (12 * 60, false),
+    ] {
+        assert_eq!(quiet_hours(minute), quiet, "{minute}");
+    }
+    // In Saigon (UTC+7), 22:30 local is 15:30 UTC.
+    let saigon = LocalTime::Offset(7 * 60);
+    assert!(quiet_hours(
+        saigon.minute_of_day(ms("2026-10-28T15:30:00Z"))
+    ));
+    assert!(!quiet_hours(
+        saigon.minute_of_day(ms("2026-10-28T05:00:00Z"))
+    ));
+}
