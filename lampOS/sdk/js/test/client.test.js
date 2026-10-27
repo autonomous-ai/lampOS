@@ -123,6 +123,28 @@ test('phrases go with their subscription, and events carry only the phrase', asy
   });
 });
 
+// The lamp's floor and its words (lamp-control's PHRASE_MIN_LETTERS, #3901),
+// with the phrases Fourteen tried there: a short one never leaves the computer.
+test('a phrase under the lamp\'s floor is refused before sending', async () => {
+  const short = ['is a', 'it is', 'ok lamp', 'you are', 'i want to', 't\u00f4i mu\u1ed1n'];
+  // The Hindi lines have vowel signs, which the lamp counts as letters: the
+  // SDK must never be stricter than the lamp (Nine's and harness-reviewer's P2).
+  const long = ['thank you', 'what is the', "i don't know", 't\u00f4i kh\u00f4ng', '12345678', 'नमस्ते दोस्त', 'सुनो लैंप'];
+  await withLamp({ grants: ['body', 'light', 'speak', 'hear'] }, async (lamp, fake) => {
+    for (const phrase of short) {
+      const refused = (error) => error.code === 'bad_request' && error.why === `phrases: "${phrase}" is too short: 8 letters at least`;
+      assert.throws(() => lamp.on('phrase.heard', () => {}, { phrases: [phrase, 'good night lamp'] }), refused);
+      await assert.rejects(lamp.subscribe(['phrase.heard'], [phrase]), refused);
+    }
+    assert.deepEqual(fake.asked('subscribe'), []);
+    await lamp.subscribe(['phrase.heard'], long);
+    assert.deepEqual(fake.asked('subscribe'), [{ events: ['phrase.heard'], phrases: long }]);
+    // The refused on() kept no handler and no phrase.
+    assert.deepEqual(lamp.phrases, []);
+    assert.equal(lamp.handlers.get('phrase.heard'), undefined);
+  });
+});
+
 test('actions send the schema\'s fields and wait for done', async () => {
   await withLamp({}, async (lamp, fake) => {
     await lamp.light('warm', 3, 10_000, 'breathe');
