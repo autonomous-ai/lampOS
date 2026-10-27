@@ -1,0 +1,20 @@
+[package]
+name = "lamp-control"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+# The lamp's local programming door (docs/control.md, #3504): paired
+# developer computers, and later script skills, drive expression and the body
+# through one protocol, each action routed to the part that already does it
+# and held to that part's limits. This first part is the protocol, the lease
+# rules and the rates, with no network: nothing listens yet.
+
+[dependencies]
+lamp-msgs = { path = "../msgs" }
+serde.workspace = true
+serde_json.workspace = true
+
+[lints]
+workspace = true
