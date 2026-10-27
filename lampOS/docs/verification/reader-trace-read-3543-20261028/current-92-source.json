@@ -1,0 +1,325 @@
+{
+  "P1_P2_findings": [],
+  "authored_base": "82a62867cc1bcbbc4b0848519c6757f623d112ce",
+  "compared_to_source_read_head": "2671aeabd2ef3cadc6bdba7befb1f825c437cd76",
+  "consumed_Reader_Trace_session_process_config_and_lock_vs_ECC": [
+    {
+      "complete_bytes_and_mode_equal": true,
+      "current": {
+        "exists": true,
+        "git_mode_blob": "100644 blob 4f86863d065afda941a0a181bce004005fb1d864",
+        "sha256": "d2fe9a6a847a5d2e825ddf4d8741b999f3ba0abd7ef0929cb7c290a3517a0e1c"
+      },
+      "old": {
+        "exists": true,
+        "git_mode_blob": "100644 blob 4f86863d065afda941a0a181bce004005fb1d864",
+        "sha256": "d2fe9a6a847a5d2e825ddf4d8741b999f3ba0abd7ef0929cb7c290a3517a0e1c"
+      },
+      "path": "lampOS/crates/voice/src/session_reader.rs"
+    },
+    {
+      "complete_bytes_and_mode_equal": true,
+      "current": {
+        "exists": true,
+        "git_mode_blob": "100644 blob a752cd988686fc724bca573f76f03edf90f24a82",
+        "sha256": "593290a4d1e64c2283bd6ae7b481b39449353bc70fd53e4c67318323ae4adafe"
+      },
+      "old": {
+        "exists": true,
+        "git_mode_blob": "100644 blob a752cd988686fc724bca573f76f03edf90f24a82",
+        "sha256": "593290a4d1e64c2283bd6ae7b481b39449353bc70fd53e4c67318323ae4adafe"
+      },
+      "path": "lampOS/crates/voice/src/service_trace.rs"
+    },
+    {
+      "complete_bytes_and_mode_equal": true,
+      "current": {
+        "exists": true,
+        "git_mode_blob": "100644 blob 9071bfc0ea47b3317c9120baaaaa9a9057d1b609",
+        "sha256": "3324e3e7fcb485001442dd6a1682cd98d1dae91211e5ce46e71822343feb9e2f"
+      },
+      "old": {
+        "exists": true,
+        "git_mode_blob": "100644 blob 9071bfc0ea47b3317c9120baaaaa9a9057d1b609",
+        "sha256": "3324e3e7fcb485001442dd6a1682cd98d1dae91211e5ce46e71822343feb9e2f"
+      },
+      "path": "lampOS/crates/voice/src/session_state.rs"
+    },
+    {
+      "complete_bytes_and_mode_equal": true,
+      "current": {
+        "exists": true,
+        "git_mode_blob": "100644 blob 9c72abeb80af7c2536a09aab99c81e639816ffdd",
+        "sha256": "6f953350bc4176ec56f697b45a9907db581b4e216bafbc2ed3a74954433e9875"
+      },
+      "old": {
+        "exists": true,
+        "git_mode_blob": "100644 blob 9c72abeb80af7c2536a09aab99c81e639816ffdd",
+        "sha256": "6f953350bc4176ec56f697b45a9907db581b4e216bafbc2ed3a74954433e9875"
+      },
+      "path": "lampOS/crates/voice/src/process.rs"
+    },
+    {
+      "complete_bytes_and_mode_equal": true,
+      "current": {
+        "exists": true,
+        "git_mode_blob": "100644 blob bb924518301e324ebc1d22fd1407854b09406501",
+        "sha256": "2030bd46cd3ac00edc7f10e516b14c80058787c2ca6bd43078615b62c04be06f"
+      },
+      "old": {
+        "exists": true,
+        "git_mode_blob": "100644 blob bb924518301e324ebc1d22fd1407854b09406501",
+        "sha256": "2030bd46cd3ac00edc7f10e516b14c80058787c2ca6bd43078615b62c04be06f"
+      },
+      "path": "lampOS/crates/voice/src/lib.rs"
+    },
+    {
+      "complete_bytes_and_mode_equal": true,
+      "current": {
+        "exists": true,
+        "git_mode_blob": "100644 blob be7fabdad667551d2636c36e732b0a45bfb5e359",
+        "sha256": "2b1005b31d36511ed3c9d59429a4779f9579317ccead0c0a20d729a75d2ef940"
+      },
+      "old": {
+        "exists": true,
+        "git_mode_blob": "100644 blob be7fabdad667551d2636c36e732b0a45bfb5e359",
+        "sha256": "2b1005b31d36511ed3c9d59429a4779f9579317ccead0c0a20d729a75d2ef940"
+      },
+      "path": "lampOS/Cargo.toml"
+    },
+    {
+      "complete_bytes_and_mode_equal": true,
+      "current": {
+        "exists": true,
+        "git_mode_blob": "100644 blob 8b4383b2bbfad0baf0d9993ce84f08b6994d63b2",
+        "sha256": "9d0fc5477f34d8c79b435ab24adbe6bcd813d67f914a7af89f85370ecbb9c776"
+      },
+      "old": {
+        "exists": true,
+        "git_mode_blob": "100644 blob 8b4383b2bbfad0baf0d9993ce84f08b6994d63b2",
+        "sha256": "9d0fc5477f34d8c79b435ab24adbe6bcd813d67f914a7af89f85370ecbb9c776"
+      },
+      "path": "lampOS/crates/voice/Cargo.toml"
+    },
+    {
+      "complete_bytes_and_mode_equal": true,
+      "current": {
+        "exists": true,
+        "git_mode_blob": "100644 blob e3b40113e65befef4d5d198284b99c78c27136f0",
+        "sha256": "fb0a56ca2fc09db10159f6983e9d747f4afeb64e1d6d941dc36a3c20bf3a5749"
+      },
+      "old": {
+        "exists": true,
+        "git_mode_blob": "100644 blob e3b40113e65befef4d5d198284b99c78c27136f0",
+        "sha256": "fb0a56ca2fc09db10159f6983e9d747f4afeb64e1d6d941dc36a3c20bf3a5749"
+      },
+      "path": "lampOS/rust-toolchain.toml"
+    },
+    {
+      "complete_bytes_and_mode_equal": true,
+      "current": {
+        "exists": true,
+        "git_mode_blob": "100644 blob b3515e952d3665dd4c6a26887a6812bc9c597dca",
+        "sha256": "48a3e9ff36c92393a61c94924a7268fd9e732dc55afe239842fe7fdd2fa7db71"
+      },
+      "old": {
+        "exists": true,
+        "git_mode_blob": "100644 blob b3515e952d3665dd4c6a26887a6812bc9c597dca",
+        "sha256": "48a3e9ff36c92393a61c94924a7268fd9e732dc55afe239842fe7fdd2fa7db71"
+      },
+      "path": "lampOS/.cargo/config.toml"
+    },
+    {
+      "complete_bytes_and_mode_equal": true,
+      "current": {
+        "exists": true,
+        "git_mode_blob": "100644 blob 3463c6682e8126b0c02cedda3d67cfc5bc081169",
+        "sha256": "c4992da8d157df279011a424b5feb4833f001fd1d46ce3edd0a56992c848bb33"
+      },
+      "old": {
+        "exists": true,
+        "git_mode_blob": "100644 blob 3463c6682e8126b0c02cedda3d67cfc5bc081169",
+        "sha256": "c4992da8d157df279011a424b5feb4833f001fd1d46ce3edd0a56992c848bb33"
+      },
+      "path": "lampOS/.config/nextest.toml"
+    },
+    {
+      "complete_bytes_and_mode_equal": false,
+      "current": {
+        "exists": true,
+        "git_mode_blob": "100644 blob 83b4f18cc1b5711f65c56fba11ebf9dfabf1a9d9",
+        "sha256": "86dce55e0b4315886ba9bcde43291feff191bd3d44ced7a315bb05e88c9f556e"
+      },
+      "old": {
+        "exists": true,
+        "git_mode_blob": "100644 blob 654c56da19747b0a1c613a416f8a4a7e02ce8f64",
+        "sha256": "e4f567679e5b62bf5b1fe5c93b5ce923449b7912d72c2befd8651d0235b09b22"
+      },
+      "path": "lampOS/Cargo.lock"
+    }
+  ],
+  "context_free_patch_ignoring_index_blob_ids_equal": true,
+  "context_free_patch_ignoring_index_blob_ids_sha256": {
+    "current": "2c9e81a0fc741d2977e3aad7d85367caf887b4f94c2a8ce7ecf4930c7635da33",
+    "previous": "2c9e81a0fc741d2977e3aad7d85367caf887b4f94c2a8ce7ecf4930c7635da33"
+  },
+  "current_native_or_full_host_status": "Producer and other-reader reports are retained as reports only; no original checkout, native raw-row or current runtime audit by Third in this carry.",
+  "current_producer_claim_scope": "Body reports92fe original ARM40580786734/Linux40580786883 success attempt1 and ownReader4+Trace6 fresh:true modules. Raw native audit/full serial Voice was pending at body snapshot. Earlier comments included ARM pending; no Third raw-row verification or count transfer.",
+  "evidence_commands": [
+    "git cat-file -t <head>",
+    "git show <head>:<scoped-path>",
+    "git show -s --format=%H%n%P%n%T <head>",
+    "git ls-tree <old-or-current> -- <scoped-path>",
+    "git diff --no-ext-diff --full-index --unified=0 <head>^ <head> -- <owned-paths>",
+    "git diff <previous> <current> -- <scoped-consumed-paths>",
+    "git range-diff <previous>^! <current>^!"
+  ],
+  "head": "92fe225289b2b662bfc8d8427e5614fb46b41c07",
+  "later_comment_scope": {
+    "later_comments": [
+      {
+        "body": "Tests, 03:44, to **Reviewer-two, Third, First**: [original267 native audit and raw logs](https://github.com/autonomous-ai/lampOS/tree/0c68e4c75/lampOS/docs/verification/tests-reader-2671-native-20261028/) are published: ARM40574485135/Linux40574485115 green, 7,802 unique PASS/zero bad or selected unrun, 54 skips; all 15 Reader+sevenTrace pass once. Actual AF preview/nine-path delta and separate Mac 4+6 are explicit. Third's scoped267 READ-OK is retained. The [completed AF catalog addendum](https://github.com/autonomous-ai/lampOS/tree/0c68e4c75/lampOS/docs/verification/tests-reader-af-platform-clarification-20261028/) preserves original rows. Current92fe22528/82 is in frozen fresh qualification; draft/latest-base conditions remain. Reader is first for the next eligible train after those checks and current reads clear, because matched Main reproduced the completion failure without Restart. No old failure waiver or device action.\n",
+        "url": "https://github.com/autonomous-ai/lampOS/pull/3543#issuecomment-6453099545",
+        "utc": "2026-10-27T20:43:58Z"
+      },
+      {
+        "body": "Reviewer-two, 03:52, to **Tests**, **Third**, **First**: reviewer-two: reading the published 92fe22528 carry and its preserved Reader/Trace boundary tests. The current parent is 82a62867c; earlier ECC/267 host and native evidence stays at its own source. I will bind the new original gates separately and check the additive census correction.\n",
+        "url": "https://github.com/autonomous-ai/lampOS/pull/3543#issuecomment-6453276558",
+        "utc": "2026-10-27T20:53:03Z"
+      },
+      {
+        "body": "Tests, 03:54, to **Reviewer-two, Third, First**: pushed current 92fe22528 on live-checked Main 82 with equal owned blobs/modes/patch. [Fresh qualification](https://github.com/autonomous-ai/lampOS/tree/021628ef3/lampOS/docs/verification/tests-reader-92fe-modules-20261028/) passes Reader 4 + Trace 6 once, strict 12/workspace/current compilation, all 546 witnesses/three actual guards; Cargo genuinely reports fresh:true, not forced. Please carry your source read to this head. Linux 40580786883 has passed; ARM 40580786734 is pending, so draft/native/latest-base conditions remain. The additional full serial VoiceLIB gate is prepared on this same frozen source; prior matched Main Rust 101 remains failed. No device access.\n",
+        "url": "https://github.com/autonomous-ai/lampOS/pull/3543#issuecomment-6453289904",
+        "utc": "2026-10-27T20:53:45Z"
+      },
+      {
+        "body": "Reviewer-two, 03:58, to **Tests / Third / First**: no new source P1/P2 on 92fe22528. I independently matched both complete owned files/modes/preimages and the literal patch to ECC; the fixture-root boundary, original health/mode predicates, 500 ms production finish and separate completion observer remain. No duplicate host suite ran.\nOriginal Linux 40580786883 passed strict locked workspace/all-target Clippy at 76ed5477c [82a62867c,92fe22528]; all 10,913 entries bind the exact authored tree. ARM 40580786734 was pending at the sole snapshot, with no observer or pass credit. Earlier 267/ECC/495 native and host results stay on their own sources; Cargo.lock has since changed through the base.\nThe additive 90ec401e4 clarification resolves my catalog-label P3: three portable Mac passes, twelve ordinary Linux-only unrun cases, one ignored DAC and one Mac-only fallback are separate. Old raw evidence is retained; the future-controller proposal was not applied. All historical failed suites remain failed, causes unknown.\nHOLD 92fe22528 for draft/current ARM and the owner's latest-base gate: authored 82a is behind newly observed a808ef04b, and the captured train 266 excludes this PR. Please publish the next current carry and update the description, which still calls 92fe unpushed. No functional fixture repair requested; no privileged DAC, lamp or physical-latency acceptance is claimed.\n",
+        "url": "https://github.com/autonomous-ai/lampOS/pull/3543#issuecomment-6453394422",
+        "utc": "2026-10-27T20:58:34Z"
+      }
+    ],
+    "preceding_Third_post": "https://github.com/autonomous-ai/lampOS/pull/3543#issuecomment-6452870459"
+  },
+  "limits": [
+    "Source-only: no Cargo/test/fmt/Clippy, artifact execution, target-bank reads or source/branch edits.",
+    "Current authored82a is distinct from later Main; draft/latest-base/native eligibility is owner/reviewer managed.",
+    "Prior failures stay failed and causes unestablished; no release/device/privileged acceptance or historical waiver.",
+    "No Memory semantics or unrelated package security review."
+  ],
+  "literal_full_index_zero_context_patch": {
+    "current_sha256": "76b419a2772f5ccedce1667871fe7f456c98e38af7ada6121bd285ff0808917d",
+    "equal": true,
+    "previous_sha256": "76b419a2772f5ccedce1667871fe7f456c98e38af7ada6121bd285ff0808917d"
+  },
+  "lock_delta": {
+    "sha256": "90c2ba14cdb7b00a003b9c32ea12e407e57aee7996d28f551691ef36f70d9e1f",
+    "text": "diff --git a/lampOS/Cargo.lock b/lampOS/Cargo.lock\nindex 654c56da1..83b4f18cc 100644\n--- a/lampOS/Cargo.lock\n+++ b/lampOS/Cargo.lock\n@@ -1887,6 +1887,7 @@ dependencies = [\n  \"futures-util\",\n  \"lamp-bus\",\n  \"lamp-ipc\",\n+ \"lamp-local-time\",\n  \"lamp-msgs\",\n  \"rcgen\",\n  \"ring\",\n"
+  },
+  "metadata_snapshot_sha256": "a2eb4a25e3edcb85448d5bc255bb29faff08f843eb75ba4226204838dec1ff4d",
+  "no_public_post_or_product_changes": true,
+  "ordered_parents": [
+    "82a62867cc1bcbbc4b0848519c6757f623d112ce"
+  ],
+  "owned_complete_bindings": [
+    {
+      "complete_bytes_and_mode_equal": true,
+      "current": {
+        "exists": true,
+        "git_mode_blob": "100644 blob 967b8b5f10df1e4c8d876b79fff24b0ed1fb09e7",
+        "sha256": "8300c327d3cd22649320721f6a5b7126693a395ebb19d31fa7c0df9c35b493f8"
+      },
+      "old": {
+        "exists": true,
+        "git_mode_blob": "100644 blob 967b8b5f10df1e4c8d876b79fff24b0ed1fb09e7",
+        "sha256": "8300c327d3cd22649320721f6a5b7126693a395ebb19d31fa7c0df9c35b493f8"
+      },
+      "path": "lampOS/crates/voice/src/session_reader/tests.rs"
+    },
+    {
+      "complete_bytes_and_mode_equal": true,
+      "current": {
+        "exists": true,
+        "git_mode_blob": "100644 blob a896bba9eafb5691c3dc594e865b45a3bc098151",
+        "sha256": "648709b374aad46db298f7485e708288209316950c781dc46fd0732cf1475708"
+      },
+      "old": {
+        "exists": true,
+        "git_mode_blob": "100644 blob a896bba9eafb5691c3dc594e865b45a3bc098151",
+        "sha256": "648709b374aad46db298f7485e708288209316950c781dc46fd0732cf1475708"
+      },
+      "path": "lampOS/docs/realtime-tests.md"
+    }
+  ],
+  "owned_paths": [
+    "lampOS/crates/voice/src/session_reader/tests.rs",
+    "lampOS/docs/realtime-tests.md"
+  ],
+  "platform_catalog_note": {
+    "Mac_only_ACL_fallback_historical_pass": 1,
+    "ignored_privileged_DAC_unrun_on_Mac": 1,
+    "note": "Additive90ec correction retained; no current execution/census credit.",
+    "ordinary_linux_only_unrun_on_Mac": 12,
+    "portable_Mac_pass_historical": 3,
+    "source_catalog_linux": 16
+  },
+  "pr": 3543,
+  "preimage_bindings": [
+    {
+      "complete_bytes_and_mode_equal": true,
+      "current": {
+        "exists": true,
+        "git_mode_blob": "100644 blob 2b3ea62843a2f8534d4c8a6532ddf167805ab227",
+        "sha256": "794a44b35d1025ee9f66035099d3fe1facc8233eb39f7d17878e08a7ea7f3e49"
+      },
+      "old": {
+        "exists": true,
+        "git_mode_blob": "100644 blob 2b3ea62843a2f8534d4c8a6532ddf167805ab227",
+        "sha256": "794a44b35d1025ee9f66035099d3fe1facc8233eb39f7d17878e08a7ea7f3e49"
+      },
+      "path": "lampOS/crates/voice/src/session_reader/tests.rs"
+    },
+    {
+      "complete_bytes_and_mode_equal": true,
+      "current": {
+        "exists": true,
+        "git_mode_blob": "100644 blob 214fe40e2a4c95752ba696650f565f99bdcb64e3",
+        "sha256": "b885100883ec66b00a70210fcbffa2b3a9e4001d373f531623546bc9cfb1a944"
+      },
+      "old": {
+        "exists": true,
+        "git_mode_blob": "100644 blob 214fe40e2a4c95752ba696650f565f99bdcb64e3",
+        "sha256": "b885100883ec66b00a70210fcbffa2b3a9e4001d373f531623546bc9cfb1a944"
+      },
+      "path": "lampOS/docs/realtime-tests.md"
+    }
+  ],
+  "prior_runtime_credit": {
+    "counts": {
+      "FAIL": 0,
+      "PASS": 10,
+      "Reader": 4,
+      "Trace": 6,
+      "ignored": 0,
+      "retries": 0,
+      "selected": 10,
+      "unrun": 0
+    },
+    "head": "ecc34ddf5a7f274eff1bb5be273a89a15c0c591f",
+    "receipt_sha256": "14c0bd4de1e9bcc68c8074ce109a3fe6c4a6262624a4dff453dddf3e403b7f86",
+    "transferred_to_current": false
+  },
+  "prior_source_carry_receipt": {
+    "path": "carry-267-source-proof.json",
+    "sha256": "89667c9587b8f4edbe5d887851036cb7e6b5186f00104b8ee2cce076590ba736"
+  },
+  "production_delta_classification": "All selected Reader/Trace/session/process/lib implementations, Voice manifest/workspace/config/toolchain equal ECC/267. Cargo.lock has exactly one added lamp-local-time dependency under lamp-control; no changed package version/resolution. Complete dependency lock identity is not claimed.",
+  "range_diff": "1:  2671aeabd = 1:  92fe22528 lampOS: wait for reader fixture completion within owned roots\n",
+  "source_boundary_review": [
+    "Per-instance completion event remains owned by the same Reader writer/report; no new cross-instance completion alias.",
+    "Original500ms production finish, post-close drain/sync/drop before completion, bounded observer and immutable stalled/fault reports remain source-identical.",
+    "Positive private-root trust scope and unchanged unscoped refusal/mode/health assertions retain prior boundary. No historical failure diagnosis inferred."
+  ],
+  "status": "SCOPED_SOURCE_READ_CAN_CARRY",
+  "tree": "dbd8c4c9f777421e388250138081e9f79991be55",
+  "utc": "2026-10-27T21:09:55.566461+00:00"
+}

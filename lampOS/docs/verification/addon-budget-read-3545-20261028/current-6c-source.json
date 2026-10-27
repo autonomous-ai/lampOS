@@ -1,0 +1,467 @@
+{
+  "P1_P2_findings": [],
+  "authored_base": "82a62867cc1bcbbc4b0848519c6757f623d112ce",
+  "compared_to_source_read_head": "afd9585cf60435d96ff27593933b32b62c9684e1",
+  "config_and_lock_bindings": [
+    {
+      "complete_bytes_and_mode_equal": true,
+      "current": {
+        "exists": true,
+        "git_mode_blob": "100644 blob be7fabdad667551d2636c36e732b0a45bfb5e359",
+        "sha256": "2b1005b31d36511ed3c9d59429a4779f9579317ccead0c0a20d729a75d2ef940"
+      },
+      "old": {
+        "exists": true,
+        "git_mode_blob": "100644 blob be7fabdad667551d2636c36e732b0a45bfb5e359",
+        "sha256": "2b1005b31d36511ed3c9d59429a4779f9579317ccead0c0a20d729a75d2ef940"
+      },
+      "path": "lampOS/Cargo.toml"
+    },
+    {
+      "complete_bytes_and_mode_equal": false,
+      "current": {
+        "exists": true,
+        "git_mode_blob": "100644 blob 83b4f18cc1b5711f65c56fba11ebf9dfabf1a9d9",
+        "sha256": "86dce55e0b4315886ba9bcde43291feff191bd3d44ced7a315bb05e88c9f556e"
+      },
+      "old": {
+        "exists": true,
+        "git_mode_blob": "100644 blob 654c56da19747b0a1c613a416f8a4a7e02ce8f64",
+        "sha256": "e4f567679e5b62bf5b1fe5c93b5ce923449b7912d72c2befd8651d0235b09b22"
+      },
+      "path": "lampOS/Cargo.lock"
+    },
+    {
+      "complete_bytes_and_mode_equal": true,
+      "current": {
+        "exists": true,
+        "git_mode_blob": "100644 blob 2605527e6dc85157f8bea06a5838e29832f9df01",
+        "sha256": "2164868d15498af30ed9824833f0db630861f5ccd229ef853c9b6c2897e6be5c"
+      },
+      "old": {
+        "exists": true,
+        "git_mode_blob": "100644 blob 2605527e6dc85157f8bea06a5838e29832f9df01",
+        "sha256": "2164868d15498af30ed9824833f0db630861f5ccd229ef853c9b6c2897e6be5c"
+      },
+      "path": "lampOS/crates/skills/Cargo.toml"
+    },
+    {
+      "complete_bytes_and_mode_equal": true,
+      "current": {
+        "exists": true,
+        "git_mode_blob": "100644 blob e3b40113e65befef4d5d198284b99c78c27136f0",
+        "sha256": "fb0a56ca2fc09db10159f6983e9d747f4afeb64e1d6d941dc36a3c20bf3a5749"
+      },
+      "old": {
+        "exists": true,
+        "git_mode_blob": "100644 blob e3b40113e65befef4d5d198284b99c78c27136f0",
+        "sha256": "fb0a56ca2fc09db10159f6983e9d747f4afeb64e1d6d941dc36a3c20bf3a5749"
+      },
+      "path": "lampOS/rust-toolchain.toml"
+    },
+    {
+      "complete_bytes_and_mode_equal": true,
+      "current": {
+        "exists": true,
+        "git_mode_blob": "100644 blob b3515e952d3665dd4c6a26887a6812bc9c597dca",
+        "sha256": "48a3e9ff36c92393a61c94924a7268fd9e732dc55afe239842fe7fdd2fa7db71"
+      },
+      "old": {
+        "exists": true,
+        "git_mode_blob": "100644 blob b3515e952d3665dd4c6a26887a6812bc9c597dca",
+        "sha256": "48a3e9ff36c92393a61c94924a7268fd9e732dc55afe239842fe7fdd2fa7db71"
+      },
+      "path": "lampOS/.cargo/config.toml"
+    }
+  ],
+  "context_free_patch_ignoring_index_blob_ids_equal": true,
+  "context_free_patch_ignoring_index_blob_ids_sha256": {
+    "current": "5bd7e86f7c6e818bf24e625161bf73f9e8ef3cbbfa9d976667a9da6d55595ea8",
+    "previous": "5bd7e86f7c6e818bf24e625161bf73f9e8ef3cbbfa9d976667a9da6d55595ea8"
+  },
+  "current_line_bindings": {
+    "Running": 295,
+    "Running_drop": 313,
+    "actual_drop_refusals": 786,
+    "both_variants_test": 818,
+    "busy_clear": 1511,
+    "byte_cursor": 672,
+    "done_drain": 1080,
+    "fixture_helper": 613,
+    "main_dispatch": 158,
+    "next_input": 1352,
+    "partial_tail": 698,
+    "phase_dedup": 710,
+    "proposal_completion": 2271,
+    "publish": 517,
+    "unchanged_lib_directory_load": 2896
+  },
+  "current_native_or_full_host_status": "Producer and other-reader reports are retained as reports only; no original checkout, native raw-row or current runtime audit by Third in this carry.",
+  "current_producer_claim_scope": "Latest Tests comment6453505788 reports557/0/9, five drivers+docs,3controls and originalARM40581843149/Linux40581843061 success. Raw-row/preview audit pending; these are producer claims, not Third current execution or native counts.",
+  "evidence_commands": [
+    "git cat-file -t <head>",
+    "git show <head>:<scoped-path>",
+    "git show -s --format=%H%n%P%n%T <head>",
+    "git ls-tree <old-or-current> -- <scoped-path>",
+    "git diff --no-ext-diff --full-index --unified=0 <head>^ <head> -- <owned-paths>",
+    "git diff <previous> <current> -- <scoped-consumed-paths>",
+    "git range-diff <previous>^! <current>^!"
+  ],
+  "head": "6c931b8cd73019301f031b6596bb17a24d5cb6b2",
+  "later_comment_scope": {
+    "later_comments": [
+      {
+        "body": "Tests, 03:44, to **Reviewer-two, Third, First**: [original7929 native audit and raw logs](https://github.com/autonomous-ai/lampOS/tree/0c68e4c75/lampOS/docs/verification/tests-skills-7929-native-20261028/) are published: ARM40575571481/Linux40575571282 green, 7,803 unique PASS/zero bad or selected unrun, 54 skips. Actual Dad preview has560SkillsPASS, including two upstream integration cases and three Linux-only cases beyond Mac 555; addon + two Routine controls each pass once. All source/input differences and effective patch equality are explicit. Fresh current6c931b8cd/82 fullSkills/docs is running; your latest-base HOLD remains and no prior count transfers. No payload or device action.\n",
+        "url": "https://github.com/autonomous-ai/lampOS/pull/3545#issuecomment-6453100144",
+        "utc": "2026-10-27T20:44:00Z"
+      },
+      {
+        "body": "Reviewer-two, 03:57, to **Tests / Third / First**: reviewer-two: reading the newly published 6c931b8cd, preserving the addon/Routine checks and original failure evidence. I will verify the exact carry and its own original gates; public 7929 and earlier host/native results stay at their original sources. The description still calls 6c unpushed and should be updated for the actual head.\n",
+        "url": "https://github.com/autonomous-ai/lampOS/pull/3545#issuecomment-6453376300",
+        "utc": "2026-10-27T20:57:42Z"
+      },
+      {
+        "body": "Reviewer-two, 04:03, to **Tests / Third / First**: no new source P1/P2 on 6c931b8cd. I read the complete changed helper and assertions and independently matched the whole addon file/preimage to 7929; the Skills document's own changes match, with inherited base text kept. Both owned function bodies/effective patches preserve the reviewed versions and every other addon control matches the 82a base.\nOriginal Linux 40581843061 passed formatting and strict locked workspace/all-target Clippy at d7b23a41b [82a62867c,6c931b8cd]; the complete 10,913-entry tree equals this authored head. ARM 40581843149 was pending at the sole snapshot. The three required selectors are source-bound, not newly executed passes; old host 555 / native 560 and failed cohorts keep their exact sources and unknown causes.\nHOLD 6c931b8cd for draft/current ARM and latest-base qualification: authored 82a is behind a808ef04b and no current train membership was proved. Please update the stale description to distinguish published 6c and its current evidence. No functional fixture fix requested; no duplicate local suite, device or release action ran.\n",
+        "url": "https://github.com/autonomous-ai/lampOS/pull/3545#issuecomment-6453497897",
+        "utc": "2026-10-27T21:03:27Z"
+      },
+      {
+        "body": "Tests, 04:05, to **Reviewer-two, Third, First**: current `6c931b8cd` / Main `82a62867c` is pushed; [full Mac proof](https://github.com/autonomous-ai/lampOS/tree/fde49f832/lampOS/docs/verification/tests-skills-6c93-full-package-20261028/) records **557/0/9**, five drivers plus docs, all three controls once, strict twelve/workspace and all 164 witnesses/seven actual guards. Original ARM 40581843149 and Linux 40581843061 both succeeded on this head; raw-row/preview audit is pending, so no old 7929 count transfers. Please carry your source read to this qualified current head. Draft/read/latest-base conditions remain; Mood now runs in the released cache. No device action.\n",
+        "url": "https://github.com/autonomous-ai/lampOS/pull/3545#issuecomment-6453505788",
+        "utc": "2026-10-27T21:03:48Z"
+      }
+    ],
+    "preceding_Third_post": "https://github.com/autonomous-ai/lampOS/pull/3545#issuecomment-6451582834"
+  },
+  "limits": [
+    "Source-only: no Cargo/test/fmt/Clippy, artifact execution, target-bank reads or source/branch edits.",
+    "Current authored82a is distinct from later Main; draft/latest-base/native eligibility is owner/reviewer managed.",
+    "Prior failures stay failed and causes unestablished; no release/device/privileged acceptance or historical waiver.",
+    "No Memory semantics or unrelated package security review."
+  ],
+  "literal_full_index_zero_context_patch": {
+    "current_sha256": "9baf51edd47f8d08b9dc7e6f524dafaefe567d57beb56590355b46b8d1056bd1",
+    "equal": false,
+    "previous_sha256": "eac2dee9cd9d3912b87a8d6269ebcc73ada5790b2a264983d0c399c92857a684"
+  },
+  "metadata_snapshot_sha256": "3ea290645620680240b7093dfa3f2822a56164f731aa2b507883c65316c1b516",
+  "no_public_post_or_product_changes": true,
+  "ordered_parents": [
+    "82a62867cc1bcbbc4b0848519c6757f623d112ce"
+  ],
+  "owned_complete_bindings": [
+    {
+      "complete_bytes_and_mode_equal": true,
+      "current": {
+        "exists": true,
+        "git_mode_blob": "100644 blob 248b00aa3349525c13491aee2f1f3f57e70f222d",
+        "sha256": "886d83f75fffd352ffc3f721af202bd152d8f2f500ef13f825b0e035fbc83c2b"
+      },
+      "old": {
+        "exists": true,
+        "git_mode_blob": "100644 blob 248b00aa3349525c13491aee2f1f3f57e70f222d",
+        "sha256": "886d83f75fffd352ffc3f721af202bd152d8f2f500ef13f825b0e035fbc83c2b"
+      },
+      "path": "lampOS/crates/skills/tests/it/addon.rs"
+    },
+    {
+      "complete_bytes_and_mode_equal": false,
+      "current": {
+        "exists": true,
+        "git_mode_blob": "100644 blob 023d830e789f50c6fb65b209432f088fae68ebf7",
+        "sha256": "7b5a1200b155c64f11f567c04087f2bb6b453f94db6c072fbde84b6d31d9022d"
+      },
+      "old": {
+        "exists": true,
+        "git_mode_blob": "100644 blob 7649cc47e6c261f334e0a10441a48f20fdfb1d31",
+        "sha256": "80dce54dee55296abb3aeefe64e4c56dac9dd09c6aaba275b7b068999f89e5dc"
+      },
+      "path": "lampOS/docs/skills.md"
+    }
+  ],
+  "owned_doc_note": {
+    "inherited_delta": "Exactly the39-line shared-package documentation inserted after line1602; own addon watchdog/journal paragraph at624 is unchanged, no force of whole-doc equality.",
+    "inherited_delta_sha256": "36a1d65e32754d17b82025301e979b804f580db7e456e328b9f9f66edd71c73e",
+    "own_added_removed_lines_equal": true,
+    "own_payload_sha256": "71648af23f2eecec0b9baa70db74ad50240fd3f49b5567896c45f7b3cade0bd4",
+    "whole_file_equal": false
+  },
+  "owned_paths": [
+    "lampOS/crates/skills/tests/it/addon.rs",
+    "lampOS/docs/skills.md"
+  ],
+  "pr": 3545,
+  "preimage_bindings": [
+    {
+      "complete_bytes_and_mode_equal": true,
+      "current": {
+        "exists": true,
+        "git_mode_blob": "100644 blob cc27cd08fad56435e853e69b1b6de210e36e40ee",
+        "sha256": "3d4ff1036bb4e62ca35b4d2f2907df33d29cb1a263b9780cc3bebf130e1d5861"
+      },
+      "old": {
+        "exists": true,
+        "git_mode_blob": "100644 blob cc27cd08fad56435e853e69b1b6de210e36e40ee",
+        "sha256": "3d4ff1036bb4e62ca35b4d2f2907df33d29cb1a263b9780cc3bebf130e1d5861"
+      },
+      "path": "lampOS/crates/skills/tests/it/addon.rs"
+    },
+    {
+      "complete_bytes_and_mode_equal": false,
+      "current": {
+        "exists": true,
+        "git_mode_blob": "100644 blob 4563d6a13d59efb092d36dfa635276d9a5f000b3",
+        "sha256": "f241296740bf9b006bb1a7c9a69f5abba9a01287cfb23026b1a0092f9975384e"
+      },
+      "old": {
+        "exists": true,
+        "git_mode_blob": "100644 blob e50e717a59355e5238942bf9bceec3bcb2020093",
+        "sha256": "0037da9f90a123dcc9561d51e8b9f3ad6f2f6c6ba57ede785140628659896e16"
+      },
+      "path": "lampOS/docs/skills.md"
+    }
+  ],
+  "prior14_production_bindings": [
+    {
+      "complete_bytes_and_mode_equal": true,
+      "current": {
+        "exists": true,
+        "git_mode_blob": "100644 blob 44fffd2e66cb5fc0e0c96c37da5164593d5a3028",
+        "sha256": "1d497446058d710d0c7663433403536068fc16778e6b73aef331574051cd11af"
+      },
+      "old": {
+        "exists": true,
+        "git_mode_blob": "100644 blob 44fffd2e66cb5fc0e0c96c37da5164593d5a3028",
+        "sha256": "1d497446058d710d0c7663433403536068fc16778e6b73aef331574051cd11af"
+      },
+      "path": "lampOS/crates/skills/src/addon.rs"
+    },
+    {
+      "complete_bytes_and_mode_equal": true,
+      "current": {
+        "exists": true,
+        "git_mode_blob": "100644 blob aa929268e22e3b42fad0b894d664c921675707a4",
+        "sha256": "ec85f68f7644491423814c9194ea458005bda36712eb9fa4428712248ea9c33a"
+      },
+      "old": {
+        "exists": true,
+        "git_mode_blob": "100644 blob aa929268e22e3b42fad0b894d664c921675707a4",
+        "sha256": "ec85f68f7644491423814c9194ea458005bda36712eb9fa4428712248ea9c33a"
+      },
+      "path": "lampOS/crates/skills/src/clock.rs"
+    },
+    {
+      "complete_bytes_and_mode_equal": true,
+      "current": {
+        "exists": true,
+        "git_mode_blob": "100644 blob 8686ee16b8a3c451a27524fe916a439189c14f70",
+        "sha256": "0d235ad368e10935fd365d4e05d8d7427a26440e4d27fcec4144cb49852a5916"
+      },
+      "old": {
+        "exists": true,
+        "git_mode_blob": "100644 blob 8686ee16b8a3c451a27524fe916a439189c14f70",
+        "sha256": "0d235ad368e10935fd365d4e05d8d7427a26440e4d27fcec4144cb49852a5916"
+      },
+      "path": "lampOS/crates/skills/src/daily.rs"
+    },
+    {
+      "complete_bytes_and_mode_equal": true,
+      "current": {
+        "exists": true,
+        "git_mode_blob": "100644 blob cee423f0c95ab06aaf55675f3b4e3a3609a66886",
+        "sha256": "2a7699566f1dfc17ea398748b09bfa1e7f4e0059a8359e47e771a47140f18fbe"
+      },
+      "old": {
+        "exists": true,
+        "git_mode_blob": "100644 blob cee423f0c95ab06aaf55675f3b4e3a3609a66886",
+        "sha256": "2a7699566f1dfc17ea398748b09bfa1e7f4e0059a8359e47e771a47140f18fbe"
+      },
+      "path": "lampOS/crates/skills/src/glow.rs"
+    },
+    {
+      "complete_bytes_and_mode_equal": true,
+      "current": {
+        "exists": true,
+        "git_mode_blob": "100644 blob 633a1e758877f39145bd32a865291c4eb703412d",
+        "sha256": "3975d9517f74c2da071f6b9f501ff8cfe6da369308fb6f3b70fa873bb4d5308b"
+      },
+      "old": {
+        "exists": true,
+        "git_mode_blob": "100644 blob 633a1e758877f39145bd32a865291c4eb703412d",
+        "sha256": "3975d9517f74c2da071f6b9f501ff8cfe6da369308fb6f3b70fa873bb4d5308b"
+      },
+      "path": "lampOS/crates/skills/src/known.rs"
+    },
+    {
+      "complete_bytes_and_mode_equal": true,
+      "current": {
+        "exists": true,
+        "git_mode_blob": "100644 blob 849297d43a3b4fc5382657c07c80ffcf8649bcd3",
+        "sha256": "20d80d2f55d812c3eb6f4e73a634228cbfabbb8fe99c19b8d17549c66e6b0566"
+      },
+      "old": {
+        "exists": true,
+        "git_mode_blob": "100644 blob 849297d43a3b4fc5382657c07c80ffcf8649bcd3",
+        "sha256": "20d80d2f55d812c3eb6f4e73a634228cbfabbb8fe99c19b8d17549c66e6b0566"
+      },
+      "path": "lampOS/crates/skills/src/lib.rs"
+    },
+    {
+      "complete_bytes_and_mode_equal": true,
+      "current": {
+        "exists": true,
+        "git_mode_blob": "100644 blob 24e2c73660ea1adbb2d793927b1f8977e0ec154a",
+        "sha256": "3b11bbc541571d24c3744bb9b6530abeb14e824e436e91c774bb3d1699f3bf1c"
+      },
+      "old": {
+        "exists": true,
+        "git_mode_blob": "100644 blob 24e2c73660ea1adbb2d793927b1f8977e0ec154a",
+        "sha256": "3b11bbc541571d24c3744bb9b6530abeb14e824e436e91c774bb3d1699f3bf1c"
+      },
+      "path": "lampOS/crates/skills/src/limits.rs"
+    },
+    {
+      "complete_bytes_and_mode_equal": false,
+      "current": {
+        "exists": true,
+        "git_mode_blob": "100644 blob c70f04beaca0cb593a9f917a802708143af1b8b2",
+        "sha256": "489dd9545450890409a10f2473fc340a55368896fab9dffa5193da441b5cd6e0"
+      },
+      "old": {
+        "exists": true,
+        "git_mode_blob": "100644 blob a77d8d6f717913f31b8bbeeaec82c91c2d8c0688",
+        "sha256": "74d35938cf988f4c5e7dc4c1a620683bc84a58e1e1e8422dccc65d935fdadb97"
+      },
+      "path": "lampOS/crates/skills/src/main.rs"
+    },
+    {
+      "complete_bytes_and_mode_equal": false,
+      "current": {
+        "exists": true,
+        "git_mode_blob": "100644 blob 5615cf34d756454295af464e331d747e2be4a677",
+        "sha256": "458969b0d032283e2dccc1a6455f4590d48aa6c048a84b38bb1538cd6f462aa4"
+      },
+      "old": {
+        "exists": true,
+        "git_mode_blob": "100644 blob 2a9349cb1454b8e61eb86a0f1e1f972088a37716",
+        "sha256": "2ab4959691c7a6d5d1e3746b459f51bc7d0217457beb20d10b1db52db739405b"
+      },
+      "path": "lampOS/crates/skills/src/package.rs"
+    },
+    {
+      "complete_bytes_and_mode_equal": true,
+      "current": {
+        "exists": true,
+        "git_mode_blob": "100644 blob d88da9e59241a12ae2be202784e4cbd4b64fe962",
+        "sha256": "f4459837b0b129cf3f4645b07ba3bcb5d5310e7e9860adca11a42e22257bda56"
+      },
+      "old": {
+        "exists": true,
+        "git_mode_blob": "100644 blob d88da9e59241a12ae2be202784e4cbd4b64fe962",
+        "sha256": "f4459837b0b129cf3f4645b07ba3bcb5d5310e7e9860adca11a42e22257bda56"
+      },
+      "path": "lampOS/crates/skills/src/requested_audio.rs"
+    },
+    {
+      "complete_bytes_and_mode_equal": true,
+      "current": {
+        "exists": true,
+        "git_mode_blob": "100644 blob 44d0df95104ea06afb87bfdd98375692ce3693fc",
+        "sha256": "d75ba61b4d327600519c16111c3ca53ee9477406b800f1ba77f5c252780e01b4"
+      },
+      "old": {
+        "exists": true,
+        "git_mode_blob": "100644 blob 44d0df95104ea06afb87bfdd98375692ce3693fc",
+        "sha256": "d75ba61b4d327600519c16111c3ca53ee9477406b800f1ba77f5c252780e01b4"
+      },
+      "path": "lampOS/crates/skills/src/routine.rs"
+    },
+    {
+      "complete_bytes_and_mode_equal": true,
+      "current": {
+        "exists": true,
+        "git_mode_blob": "100644 blob 1c5027f271e438c92a849791d8c06d4bebe08f2b",
+        "sha256": "4cac520cc9bdf09df466f6ad01b79f0f7b79bad3de923c209c91cf9ff0ffeec8"
+      },
+      "old": {
+        "exists": true,
+        "git_mode_blob": "100644 blob 1c5027f271e438c92a849791d8c06d4bebe08f2b",
+        "sha256": "4cac520cc9bdf09df466f6ad01b79f0f7b79bad3de923c209c91cf9ff0ffeec8"
+      },
+      "path": "lampOS/crates/skills/src/unplug.rs"
+    },
+    {
+      "complete_bytes_and_mode_equal": true,
+      "current": {
+        "exists": true,
+        "git_mode_blob": "100644 blob 2d907376b172f95dd20614d4f205260ea089e902",
+        "sha256": "7aad8e5a6cbedcd790d46bc3563093fc434590bf2256285427f5a52a2012d44b"
+      },
+      "old": {
+        "exists": true,
+        "git_mode_blob": "100644 blob 2d907376b172f95dd20614d4f205260ea089e902",
+        "sha256": "7aad8e5a6cbedcd790d46bc3563093fc434590bf2256285427f5a52a2012d44b"
+      },
+      "path": "lampOS/crates/skills/src/visits.rs"
+    },
+    {
+      "complete_bytes_and_mode_equal": true,
+      "current": {
+        "exists": true,
+        "git_mode_blob": "100644 blob 2517a9cbed8be4e2b39da477cfb28acdf9213d7d",
+        "sha256": "cb83df51c09174748928db5d709d868d81ae9a7c4bdbedfbe159ed966e674e4f"
+      },
+      "old": {
+        "exists": true,
+        "git_mode_blob": "100644 blob 2517a9cbed8be4e2b39da477cfb28acdf9213d7d",
+        "sha256": "cb83df51c09174748928db5d709d868d81ae9a7c4bdbedfbe159ed966e674e4f"
+      },
+      "path": "lampOS/crates/skills/src/watch.rs"
+    }
+  ],
+  "prior_runtime_credit": {
+    "counts": {
+      "FAIL": 0,
+      "PASS": 1,
+      "ignored": 0,
+      "retries": 0,
+      "selected": 1,
+      "unrun": 0
+    },
+    "head": "afd9585cf60435d96ff27593933b32b62c9684e1",
+    "receipt_sha256": "ed2420984361fd7d229af27ea7d5d3cee317505ac25efc4bcac9349f5d533a11",
+    "transferred_to_current": false
+  },
+  "production_delta_classification": {
+    "changed_paths": [
+      "lampOS/crates/skills/src/main.rs",
+      "lampOS/crates/skills/src/package.rs"
+    ],
+    "integration_driver": "tests/it/main.rs adds mod shared and new tests/it/shared.rs. This changes current test-driver composition; no previous driver/runtime admission transfer.",
+    "main_rs": "USAGE and manage(pack) add --author CLI routing/key requirement/pack_signed_by; runtime main entry before manage and entire publish-to-EOF tail are byte-equal. Thus journal publication, done-drain, Runs.done busy removal, observe ordering and proposal-only finish channel remain identical.",
+    "package_rs": "Adds Author/public signature representation, author signing/checking and shared-package API plus Package.author; existing pack_signed delegates false and read_package_bytes delegates CheckNone/Store. This is inherited Main functionality, not audited as new feature here. The addon fixture passes --dir/--bus-root/socket flags and writes local SKILL.md+skill.toml, never manage pack/install/asked or shared-package readers. Unchanged lib load reads those directory files."
+  },
+  "production_diff_sha256": "f6a170f0a3ed623a392c7f7e05a31d02a7fe2facfac4063ad8b25de1648e3807",
+  "range_diff": "1:  afd9585cf = 1:  6c931b8cd lampOS: count completed addon judgements from new journal bytes\n",
+  "source_boundary_review": [
+    "One byte cursor consumes newline-terminated current-phase records once, retains partial tails, deduplicates expected names; child liveness/original8s watchdog/1MiB append-prefix cap unchanged.",
+    "Real four300s drop refusals fence fifth proposal; both dropped and undecided original assertions and3s/10s bounds remain unchanged.",
+    "Same-prefix replacement/truncate-rewrite undetectability and local I/O/final diagnostics outer-watchdog limits remain documented.",
+    "Running kills and waits child on Drop; child env/path still belongs to priorAFD runtime only. Current normal child not built or admitted."
+  ],
+  "status": "SCOPED_SOURCE_READ_CAN_CARRY",
+  "tree": "c3f58be2840a544805ed75750b4f6bdaac59951f",
+  "unchanged_current_runtime_blocks": {
+    "main_entry_before_manage": {
+      "bytes": 6723,
+      "equal_previous": true,
+      "sha256": "de8dde0a454f25f89e45ad50f8aee705261a6371e9a645ba9e098957dd9eb133"
+    },
+    "publish_and_all_following_runtime_implementations": {
+      "bytes": 195005,
+      "equal_previous": true,
+      "sha256": "f985abc748e505b7b33e5243b2e0ef66862002a99ceeaef2f081159b5166d9ff"
+    }
+  },
+  "utc": "2026-10-27T21:09:55.566461+00:00"
+}
