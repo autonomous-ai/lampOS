@@ -414,6 +414,122 @@ lamp.on("person.arrived", lambda e: lamp.gesture("greeting"))
 They run on the developer's computer, never on a lamp. Until `lamp-control`
 is built they are tested against a fake server that speaks this schema.
 
+## Skills pushed from a computer (planned)
+
+**Not built yet** (Eighth's proposal on #3504, 21:5x, agreed by Nine and
+blue). A paired computer can put a rules skill of its own on its own lamp,
+with no Store, the way a skill the owner makes by voice is installed today.
+The ops below are the agreed wire; `lamp-control` serves them once Nine's
+piece is in, and the schema and the SDKs take them then.
+
+**What is different about it:** every other grant ends with the
+connection or the lease. **A pushed skill keeps running after the computer
+goes**, as a skill: under lamp-skills' own caps and at a skill's priority,
+not held to this page's rates. The pairing screen says so: "can put skills
+on the lamp that run on their own".
+
+- **The grant, `skills`,** a seventh, ticked by the owner at pairing. A
+  pushed skill may ask only for what the pairing grants, mapped onto the
+  skill format's `[permissions]` ([skill-format.md](skill-format.md)):
+  `body`, `light` and `speak`, and `look` as the presence topics alone. So a
+  computer can't push a skill that does more than it may do live.
+- **`hear` and `sound` are refused by a push** (`no_grant`, "waits for
+  format 2's phrase and class lists"). In format 1 they are topics
+  (`voice/heard`, `ears/classes`), which give a skill every phrase or class
+  heard in the room, where the live door gives a computer only its own
+  listed phrases (skill-format.md's gaps 2 and 3). A pushed skill would
+  read it all, and keep reading after the computer goes.
+- **The picture is never granted by a push.** A pushed skill that sees the
+  picture, `camera = true` or format 1's `look = true` (lamp-skills'
+  `sees_picture`), is installed off, held for the owner's yes in the app,
+  and the answer says so.
+- **Refused outright:** anything outside the grants above (raw topics,
+  `actions`, `messages`, `known_faces`, `who`, `output_limits`,
+  `propose`, `core`), and `kind = "core"` or `"addon"`: a pushed skill is
+  installable.
+- **Always held to the computer's current grants:** a pushed skill's
+  permissions are the pairing's grants now, not at the push. If the owner
+  takes a grant back from a computer that stays paired, its pushed skills
+  that ask it turn off; a revoke, or the `skills` grant taken back,
+  turns them all off.
+- **A ceiling the skill can't raise:** `skill.toml`'s `[budget]` and
+  `[quiet]` are written by the computer, so the lamp holds a pushed skill
+  to the live door's rates at most (`say` 6 a minute and 60 an hour) and to
+  the person's quiet hours, whatever the skill declares. lamp-skills holds
+  it, for every skill it loaded as pushed (Eighth and Nine, #3504).
+- **The package** is the shape `lamp-skills pack` makes: ustar,
+  `lamp-skill.json` first (format, name, version, and each file's path,
+  size and SHA-256), then each file as `NAME/path`, sorted, mode 0644,
+  mtime 0, owner 0, with no folder entries and no links. It needs a
+  `version`, and is at most 1 MiB. The lamp checks the bytes against
+  `sha256`, then each file against the manifest.
+
+```text
+→ {"id":7,"op":"skill.push","name":"desk-wave","sha256":"<64 hex>","size":81920,"part":0,"parts":3,"data":"<base64>"}
+← {"re":7,"ok":true,"got":1}
+… the last part's answer comes once the lamp has checked and installed it:
+← {"re":9,"ok":true,"skill":{"name":"desk-wave","version":"0.1.0","sha256":"…","on":true,"held":null,
+    "asks":["body","light"],"shown":["moves the lamp's body","changes the light"]}}
+→ {"id":10,"op":"skill.list"}
+← {"re":10,"ok":true,"skills":[{"name":"desk-wave","version":"0.1.0","sha256":"…","on":true,"held":null,"pushed_at":"…"}]}
+→ {"id":11,"op":"skill.remove","name":"desk-wave"}
+← {"re":11,"ok":true}
+```
+
+- **Parts:** `data` is at most 48 KiB of base64 (36 KiB of the package),
+  so a frame stays under 64 KiB; at most 32 parts, in order from 0. One push
+  in flight on the lamp: a second, from any computer, is `busy` until the
+  first is answered. A push not finished within 60 s is dropped. A broken
+  push is sent again from part 0, never resumed; `got` is progress only.
+- **Rates:** one push every 10 s and 20 an hour per computer, a push
+  counting once whatever its parts. At most 16 pushed skills on a lamp, all
+  computers together.
+- **Errors**, the codes above: `no_grant` (`skills`, or a permission beyond
+  the pairing's, `why` naming it); `bad_request` (sizes, parts out of order,
+  a SHA-256 that doesn't match); `refused`, with the loader's own why ("run.sh:
+  a skill has no scripts"; "another computer's skill has that name"); `busy`;
+  `rate`.
+- **`skill.list` and `skill.remove`** need `skills` too, and see only this
+  computer's own pushes. The owner turns any of them off or removes it in
+  the app.
+- **On the lamp:** `lamp-control` keeps the parts in its own state folder,
+  with `push.json` beside them: the SHA-256, the computer, the name, and
+  the pairing's grants at that moment. It asks the manage helper to install
+  by SHA-256. The helper trusts `push.json` because only `lamp-control` may
+  ask it (by unit and cgroup, as for `lamp-cloud` and `lamp-voice`). It
+  takes only the newest push, within 60 s, reads its bytes once and hashes
+  them, so a kept package can never be installed later by any path. It then
+  loads it with every check a load makes (the same ones the SDKs'
+  `lamp skill check` mirrors), holds it to those grants, and installs it
+  into a developer folder of its own, apart from the Store's and the core
+  skills. A pushed skill never takes a core or Store skill's name or tool,
+  nor another computer's pushed name ("another computer's skill has that
+  name"). A push of a name the same computer pushed before replaces it, and
+  any picture yes it had goes: the owner's yes is kept for that computer and
+  that SHA-256. It is shown and journaled as
+  "pushed by" the computer's name. On a revoke or a grant taken back,
+  `lamp-control` asks the helper to turn that computer's pushed skills off
+  (`{"off_pushed_by": CLIENT}`); they aren't deleted.
+- **The SDKs:** `lamp skill push FOLDER` runs `lamp skill check`, compares
+  what the skill asks with the pairing's grants and the rules above
+  (refusing on the computer with the lamp's own `no_grant` why, before any
+  byte is sent), packs, sends the parts and prints the answer; also
+  `lamp skill list` and `lamp skill remove NAME`, and `push_skill(folder)`
+  in code.
+- **Consent** (decided by blue's person through the coordinator on #3504,
+  27 Oct, as no answer had come; the first builder may still change it):
+  the `skills` grant the owner ticks at pairing **is** the consent for that
+  computer to push, list and remove its own skills, within these limits:
+  - a pushed skill never uses more than the computer's current grants, and
+    revoking the computer, or taking back its `skills` grant, turns its
+    pushed skills off;
+  - nothing beyond those grants is ever taken from a push: a skill that
+    sees the picture is held off until the owner says yes in the app for
+    that one skill, and one that asks any other grant the computer doesn't
+    hold is refused;
+  - the lamp keeps the list of pushed skills, which the owner sees in the
+    app and can turn off or remove one by one.
+
 ## Versioning
 
 The path carries the version, `/v1`. New fields are additive; a client
