@@ -1496,3 +1496,198 @@ fn a_lines_tone_keeps_a_nudges_deadline_and_the_shared_caps() {
     mood.advance(until + SECOND_US, DAY).unwrap();
     close(state(&mood).energy, 0.30);
 }
+
+/// A face the eyes keep seeing, its lease the longest an event may have.
+fn felt_near(mood: &mut Engine, at: u64) {
+    mood.apply(
+        at,
+        leased(
+            at,
+            MAX_EVENT_LEASE_US,
+            EventKind::Faces(Some(face(BOOT, "a"))),
+        ),
+    )
+    .unwrap();
+}
+
+fn felt(kind: lamp_msgs::FeltKind, until_us: u64) -> Option<lamp_msgs::Felt> {
+    Some(lamp_msgs::Felt { kind, until_us })
+}
+
+/// #3691: each evidence says what the lamp felt. A smile, a glad line or a
+/// kindly touch is glad, a surely lively line lively, each held
+/// [`FELT_HOLD_US`] from when it was seen; someone low with a face near is
+/// low, for the two-minute low spell.
+#[test]
+fn each_evidence_says_what_the_lamp_felt() {
+    use lamp_mood::engine::{FELT_HOLD_US, QUIET_US, ToneKind};
+    use lamp_msgs::FeltKind::{Glad, Lively, Low};
+    use lamp_msgs::SeemsKind::{Negative, Positive};
+    assert_eq!(FELT_HOLD_US, 20 * SECOND_US);
+
+    // A smile: on its second positive read, not its first.
+    let mut mood = engine(DAY);
+    felt_near(&mut mood, SECOND_US);
+    send(&mut mood, 2 * SECOND_US, EventKind::Seems(Some(Positive)));
+    assert_eq!(state(&mood).felt, None);
+    send(&mut mood, 4 * SECOND_US, EventKind::Seems(Some(Positive)));
+    assert_eq!(state(&mood).felt, felt(Glad, 4 * SECOND_US + FELT_HOLD_US));
+
+    // A glad line, and a lively one.
+    for (kind, feeling) in [(ToneKind::Glad, Glad), (ToneKind::Lively, Lively)] {
+        let mut mood = engine(DAY);
+        send(&mut mood, SECOND_US, EventKind::Tone(kind));
+        assert_eq!(state(&mood).felt, felt(feeling, SECOND_US + FELT_HOLD_US));
+    }
+
+    // A kindly touch is glad; an attending tap is nothing.
+    let mut mood = engine(DAY);
+    send(&mut mood, SECOND_US, EventKind::Touch { kind: false });
+    assert_eq!(state(&mood).felt, None);
+    send(&mut mood, 2 * SECOND_US, EventKind::Touch { kind: true });
+    assert_eq!(state(&mood).felt, felt(Glad, 2 * SECOND_US + FELT_HOLD_US));
+
+    // Low by the face's three reads, or by a down line, with a face near.
+    let mut mood = engine(DAY);
+    felt_near(&mut mood, SECOND_US);
+    for at in [2, 4] {
+        send(&mut mood, at * SECOND_US, EventKind::Seems(Some(Negative)));
+        assert_eq!(state(&mood).felt, None);
+    }
+    send(&mut mood, 6 * SECOND_US, EventKind::Seems(Some(Negative)));
+    assert_eq!(state(&mood).felt, felt(Low, 6 * SECOND_US + QUIET_US));
+    let mut mood = engine(DAY);
+    felt_near(&mut mood, SECOND_US);
+    send(&mut mood, 2 * SECOND_US, EventKind::Tone(ToneKind::Low));
+    assert_eq!(state(&mood).felt, felt(Low, 2 * SECOND_US + QUIET_US));
+
+    // A down line with nobody near is nothing.
+    let mut mood = engine(DAY);
+    send(&mut mood, SECOND_US, EventKind::Tone(ToneKind::Low));
+    assert_eq!(state(&mood).felt, None);
+}
+
+/// A bang or stuffy air moves energy but is no feeling (#3691).
+#[test]
+fn a_bang_or_stuffy_air_is_no_feeling() {
+    let mut mood = engine(DAY);
+    send(&mut mood, SECOND_US, EventKind::SuddenSound);
+    assert!(state(&mood).energy > 0.50);
+    assert_eq!(state(&mood).felt, None);
+
+    let mut mood = engine(DAY);
+    let mut at = 0;
+    while at <= AIR_QUALIFY_US + 2 * MINUTE_US {
+        mood.apply(
+            at,
+            leased(at, MAX_EVENT_LEASE_US, EventKind::Air(Some(2_000))),
+        )
+        .unwrap();
+        assert_eq!(state(&mood).felt, None, "at {at}");
+        at += 10 * SECOND_US;
+    }
+    assert!(state(&mood).energy < 0.29, "the air lowered energy");
+}
+
+/// The hold runs out: glad and lively at [`FELT_HOLD_US`], low with its
+/// spell, or sooner when nobody is near or the lamp sleeps.
+#[test]
+fn a_feeling_runs_out_with_its_hold() {
+    use lamp_mood::engine::{FELT_HOLD_US, QUIET_US, ToneKind};
+    use lamp_msgs::FeltKind::{Glad, Low};
+
+    let mut mood = engine(DAY);
+    send(&mut mood, SECOND_US, EventKind::Tone(ToneKind::Glad));
+    let until = SECOND_US + FELT_HOLD_US;
+    assert!(mood.advance(until - 1, DAY).is_ok());
+    assert_eq!(state(&mood).felt, felt(Glad, until));
+    // Its end is a change, so Mood says it at once.
+    assert!(mood.advance(until, DAY).unwrap());
+    assert_eq!(state(&mood).felt, None);
+
+    // Low lasts its two minutes while the face stays...
+    let mut mood = engine(DAY);
+    felt_near(&mut mood, SECOND_US);
+    send(&mut mood, 2 * SECOND_US, EventKind::Tone(ToneKind::Low));
+    let until = 2 * SECOND_US + QUIET_US;
+    let mut at = 10 * SECOND_US;
+    while at < until {
+        felt_near(&mut mood, at);
+        at += 10 * SECOND_US;
+    }
+    mood.advance(until - 1, DAY).unwrap();
+    assert_eq!(state(&mood).felt, felt(Low, until));
+    mood.advance(until, DAY).unwrap();
+    assert_eq!(state(&mood).felt, None);
+
+    // ...and ends when nobody is near, and doesn't come back with the face.
+    let mut mood = engine(DAY);
+    felt_near(&mut mood, SECOND_US);
+    send(&mut mood, 2 * SECOND_US, EventKind::Tone(ToneKind::Low));
+    send(&mut mood, 3 * SECOND_US, EventKind::Faces(None));
+    assert_eq!(state(&mood).felt, None);
+    felt_near(&mut mood, 4 * SECOND_US);
+    assert_eq!(state(&mood).felt, None);
+
+    // Sleep ends any feeling.
+    let mut mood = engine(DAY);
+    send(&mut mood, SECOND_US, EventKind::Tone(ToneKind::Glad));
+    send(&mut mood, 2 * SECOND_US, EventKind::Sleep);
+    assert!(state(&mood).asleep);
+    assert_eq!(state(&mood).felt, None);
+}
+
+/// A newer feeling replaces an older one, even inside the smile's cooldown,
+/// when the energy doesn't move again.
+#[test]
+fn a_newer_feeling_replaces_an_older_one() {
+    use lamp_mood::engine::{FELT_HOLD_US, QUIET_US, ToneKind};
+    use lamp_msgs::FeltKind::{Glad, Lively, Low};
+
+    let mut mood = engine(DAY);
+    felt_near(&mut mood, SECOND_US);
+    send(&mut mood, 2 * SECOND_US, EventKind::Tone(ToneKind::Glad));
+    send(&mut mood, 3 * SECOND_US, EventKind::Tone(ToneKind::Lively));
+    assert_eq!(
+        state(&mood).felt,
+        felt(Lively, 3 * SECOND_US + FELT_HOLD_US)
+    );
+    send(&mut mood, 4 * SECOND_US, EventKind::Tone(ToneKind::Low));
+    assert_eq!(state(&mood).felt, felt(Low, 4 * SECOND_US + QUIET_US));
+    send(&mut mood, 5 * SECOND_US, EventKind::Touch { kind: true });
+    assert_eq!(state(&mood).felt, felt(Glad, 5 * SECOND_US + FELT_HOLD_US));
+}
+
+/// A lively line in a low spell doesn't replace low: keeping someone low
+/// company wins, and that voice may not be theirs (the reviewer-lead's P3
+/// on #3725). Three low reads at 0 and a lively line at 30 s stay low to
+/// the spell's end.
+#[test]
+fn a_lively_line_does_not_end_low_company() {
+    use lamp_mood::engine::{QUIET_US, ToneKind};
+    use lamp_msgs::FeltKind::Low;
+    use lamp_msgs::SeemsKind::Negative;
+
+    let mut mood = engine(DAY);
+    felt_near(&mut mood, 0);
+    // Three reads at 0, a microsecond apart as their stream needs.
+    for at in 0..3 {
+        send(&mut mood, at, EventKind::Seems(Some(Negative)));
+    }
+    let until = 2 + QUIET_US;
+    assert_eq!(state(&mood).felt, felt(Low, until));
+    let mut at = 10 * SECOND_US;
+    while at < QUIET_US + 20 * SECOND_US {
+        felt_near(&mut mood, at);
+        if at == 30 * SECOND_US {
+            send(&mut mood, at, EventKind::Tone(ToneKind::Lively));
+        }
+        mood.advance(at, DAY).unwrap();
+        if at < until {
+            assert_eq!(state(&mood).felt, felt(Low, until), "at {at}");
+        } else {
+            assert_eq!(state(&mood).felt, None, "at {at}");
+        }
+        at += 10 * SECOND_US;
+    }
+}

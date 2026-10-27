@@ -62,6 +62,7 @@ no history of anyone.
 | Someone low (#1671, `LAMP_MOOD_SEEMS=on`) | Three `negative` reads in a row (about 6 s) let go energy's transient and lower energy 0.10 for two minutes while a face is near: a slower breath and fewer idle moves, keeping them company quietly. A smile, or nobody near (said, or the face's lease lapsing), ends it, and it doesn't come back with the face. It doesn't renew while they stay low: after two minutes the lamp is its usual self beside them. A change of near face doesn't end it or a run of reads, since one person's passing id changes often; a second person who sits down beside someone low finds the lamp quiet for the rest of those two minutes. |
 | How a line sounded (#1722, `LAMP_MOOD_TONE=on`) | From the voice's `voice/tone`, once a line, counted against bars (`tone_kind`). **Glad words** (valence 0.5 or over), unless the voice was surely flat (arousal under -0.3 with sure 0.6 or over), are a smile: 0.10 energy and 0.03 warmth, and they end a quiet. **Down words** (valence -0.5 or under) are someone low: energy's transient let go and 0.10 lower for two minutes while a face is near. With no face near, a down line does nothing, and isn't kept for a face that comes after. **A surely lively voice** (arousal 0.6 or over, sure 0.6 or over) with no glad or down words adds 0.05 energy and no warmth. Every brightening, a smile's included, shares the smile's 120-second cooldown, so a smile and a glad line together add once. A calm line alone is nothing: calm isn't sad. Asleep, a line changes nothing. Only the kind is kept, never the numbers, the request or the words. |
 | Air | Fresh CO2 at or above 1,200 ppm must remain uninterrupted for ten minutes before an energy offset can grow toward -0.08, with a five-minute half-life. Freshness loss or clear air ends the sustained qualification. |
+| What it felt (#3691) | Mood names the feeling behind the numbers in `mood/state`'s optional `felt`. A smile, a glad line or a kindly touch is `glad`, and a surely lively line is `lively`; each holds 20 seconds (`FELT_HOLD_US`) from when it was seen. Someone low with a face near, by the face's three reads or a down line, is `low` for the two-minute low spell, and it ends with the spell when nobody is near. A newer feeling replaces an older one, also inside the smile's cooldown, when the energy doesn't move again. A lively line doesn't replace `low` while its spell is on: keeping someone low company wins over a lively voice, which may not be theirs. A smile or a glad line still ends the spell. A bang and the air move energy only and are no feeling. Sleep ends any feeling. |
 
 These values are authored starting values, not thresholds fitted to this
 lamp, a health standard or a claim about human feelings. Quiet returns warmth
@@ -150,6 +151,15 @@ head at no more than twice its breath's speed. Starting never jumps: Mood
 begins its phase where the plain breath is. Face attention carries only the
 publisher's 16-character lowercase-hex boot token and a passing ID bounded
 to 128 bytes; sound and touch add no invented geometry.
+
+Optional `felt` (#3691) is what the lamp felt while it holds: `kind`
+(`glad`, `lively` or `low`, as the table above says) and `until_us`, on the
+stamp's monotonic clock. `check()` takes it only when `until_us` is after the
+stamp and no more than two minutes after it (`MOOD_FELT_MOST_US`). A state
+without it felt nothing to name. Mood publishes a state at once, within its
+20 ms floor, when a feeling begins, changes or ends. An older reader ignores
+the field, and Expression and the ring read the state as before. Its first
+reader is to be the `feelings` skill.
 
 The timestamp belongs to state computation, not a successful publication
 receipt. A future consumer must check the payload clock, session, sequence
