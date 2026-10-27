@@ -939,6 +939,23 @@ by name, plus `skills` and `cloud`. Units: the product's `lamp-*.service`
 files, held the same by a test. Self-test parts: those `lamp-selftest`
 names.
 
+**Manager query bounds.** The health queries and exit-note metadata query
+accept a complete UTF-8 response through 256 KiB within two seconds. Closed
+stdout does not end the deadline while the command still runs, and an exited
+leader does not end it while a descendant holds stdout. A timeout, oversized
+response, invalid UTF-8 or failed command supplies no observation; a prefix is
+never interpreted as a successful complete response. Unit-query failures still
+cache empty states for 60 seconds, recovery-query failures still omit `waits`,
+and unavailable exit metadata still allows the exit note and service stop.
+No report consent gate, text filtering or stop/restart allowance changes.
+
+The private nonblocking reader retains the unreaped leader through output
+validation and stops its owned group on failure. It never signals a group
+after losing that identity to another reaper. A successful response does not
+promise cleanup of detached descendants or descendants that closed stdout.
+Kernel spawn/reap and filesystem operations have no new hard deadline, and
+this per-query limit is not an overall health-report deadline.
+
 `failed_units` is a current observation, not a count or a crash history. A
 failed oneshot appears even with `NRestarts=0`; after it recovers, it leaves
 the list on the next fresh successful systemd sample. The usual health
