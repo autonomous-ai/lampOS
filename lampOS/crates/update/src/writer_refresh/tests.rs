@@ -59,6 +59,62 @@ fn probe(session: &mut Session<'_>) {
     session.probed().unwrap();
 }
 
+/// A retained duplicate models a descriptor held between fork and exec. It
+/// does not reproduce an actual spawn or establish a reported failure's cause.
+#[test]
+fn dropping_the_session_releases_its_lease_despite_a_retained_duplicate() {
+    let (_folder, store) = fixture();
+    let binding = binding();
+    let session = store.prepare(binding.clone()).unwrap();
+    let retained = session._lock.try_clone().unwrap();
+    let before = bytes(&store);
+    assert_eq!(
+        store.inspect(&binding).unwrap_err().kind(),
+        io::ErrorKind::WouldBlock
+    );
+    drop(session);
+    let reopened = Store::open(store.folder.clone()).unwrap();
+    assert_eq!(
+        reopened.inspect(&binding).unwrap(),
+        Admission::RecoveryNeeded
+    );
+    let recovery = reopened.recover(&binding).unwrap();
+    // Closing the old description must not release the independently opened
+    // recovery session's lease.
+    drop(retained);
+    assert_eq!(
+        store.inspect(&binding).unwrap_err().kind(),
+        io::ErrorKind::WouldBlock
+    );
+    assert_eq!(bytes(&store), before);
+    drop(recovery);
+    assert_eq!(store.inspect(&binding).unwrap(), Admission::RecoveryNeeded);
+}
+
+/// Model an inherited descriptor being closed by a process that did not
+/// acquire the lease. No real fork or child-side journal operation is run.
+#[test]
+fn a_nonowner_guard_drop_cannot_unlock_the_acquiring_process_lease() {
+    let (_folder, store) = fixture();
+    let binding = binding();
+    let session = store.prepare(binding.clone()).unwrap();
+    let retained = session._lock.try_clone().unwrap();
+    let other_pid = std::process::id().wrapping_add(1);
+    assert_ne!(other_pid, std::process::id());
+    let inherited = OwnedLockGuard {
+        file: session._lock.try_clone().unwrap(),
+        owner_pid: other_pid,
+    };
+    drop(inherited);
+    assert_eq!(
+        store.inspect(&binding).unwrap_err().kind(),
+        io::ErrorKind::WouldBlock
+    );
+    drop(session);
+    assert_eq!(store.inspect(&binding).unwrap(), Admission::RecoveryNeeded);
+    drop(retained);
+}
+
 #[test]
 fn no_apply_does_not_qualify_but_one_exact_apply_can_enter_without_an_ordinary_round() {
     let (_folder, store) = fixture();
