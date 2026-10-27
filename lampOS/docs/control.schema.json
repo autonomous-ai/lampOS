@@ -27,14 +27,15 @@
       "format": "date-time"
     },
     "grant": {
-      "description": "What a paired client may do. body: gestures, moves, look, joints; light; speak: say and sound; look: presence events; hear: registered phrases; sound: sound classes.",
+      "description": "What a paired client may do. body: gestures, moves, look, joints; light; speak: say and sound; look: presence events; hear: registered phrases; sound: sound classes; skills: its own skills put on the lamp, which run on their own after it goes.",
       "enum": [
         "body",
         "light",
         "speak",
         "look",
         "hear",
-        "sound"
+        "sound",
+        "skills"
       ]
     },
     "part": {
@@ -788,7 +789,7 @@
     "reply": {
       "oneOf": [
         {
-          "description": "Taken. A pair reply carries client and grants; hello carries lamp, grants and limits; lease.take and lease.renew carry lease and until; get carries the states asked for.",
+          "description": "Taken. A pair reply carries client and grants; hello carries lamp, grants and limits; lease.take and lease.renew carry lease and until; get carries the states asked for; skill.push carries got for each part but the last, and skill for the last; skill.list carries skills.",
           "type": "object",
           "properties": {
             "re": {
@@ -854,6 +855,19 @@
             },
             "lamp_state": {
               "$ref": "#/$defs/lamp_state"
+            },
+            "got": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "skill": {
+              "type": "object"
+            },
+            "skills": {
+              "type": "array",
+              "items": {
+                "type": "object"
+              }
             }
           },
           "required": [
@@ -1078,6 +1092,46 @@
         },
         "say_max_chars": {
           "type": "integer"
+        },
+        "push": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "most": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "within_ms": {
+                "type": "integer",
+                "minimum": 1
+              }
+            },
+            "required": [
+              "most",
+              "within_ms"
+            ]
+          }
+        },
+        "manage": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "most": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "within_ms": {
+                "type": "integer",
+                "minimum": 1
+              }
+            },
+            "required": [
+              "most",
+              "within_ms"
+            ]
+          }
         }
       }
     },

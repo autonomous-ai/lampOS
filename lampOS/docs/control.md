@@ -15,6 +15,7 @@ SDKs generate from.
 - **piece 4**: the routing (`parts.rs`). `gesture` and `move` go to the body's mood socket, `light` is a `light/request` on the bus, and `say` goes to the voice's say socket with its outcome as a `done` event. Each is at `skill` priority as `lamp-control`, held to the part's own checks. `look` and `joints` (the body's lease socket), `express`, `play` and `sound` are refused with what they wait for. A computer's last connection closing, or a revoke, stops what it asked for, and actions a part refuses are bounded at 20 a second.
 - **piece 5**: the bus as events, lease signals and state (`watch.rs`, with `--bus-root`). Events go out by edge, never per message: someone arrived or left, turned to or from the lamp, or stood up; the lamp's name heard; a sound class past its bar (never `speech`); a touch or the button; the lamp talking, paused, private or asleep. Each goes only to a connection subscribed to it that holds its grant. Words heard are matched on the lamp against each connection's own phrases, and only the phrase leaves it. Talking suspends every lease and resting holds them again; a hand on the body, a stop, a pause, privacy or sleep loses them. `get` answers presence (counts, never who), the light, the inner state and the lamp's own.
 - **piece 6**: the body's lease (`body_lease.rs`): with `--lease-socket`, a computer's `body` lease holds lamp-body's own, so the lamp's own life stands back, and the body's end of it is the computer's (`slumped` added to the whys).
+- **piece 7**: skills pushed from a computer (`push.rs`, with `--manage-socket`): the `skills` grant, `skill.push` in parts, `skill.list` and `skill.remove`, each asked of root's manage helper off the door's lock, and a revoke turning the computer's pushed skills off. The helper's side is lamp-skills' (Eighth's piece B); until it is in, the helper refuses what it doesn't know.
 
 **No unit carries it yet**, so nothing listens on a lamp; discovery is the next piece, off unless `LAMP_CONTROL=on`, and the owner turns developer
 access on in the app. This
@@ -62,6 +63,7 @@ owner ticked. An unpaired caller gets `unpaired` and the connection closes.
 | `look` | presence events and state: arrivals, leavings, facing, standing up. Positions, never who |
 | `hear` | `phrase.heard` for the client's own phrases (never the words around them), `name.heard` |
 | `sound` | `sound.heard`, by class |
+| `skills` | `skill.push`, `skill.list`, `skill.remove`: its own skills put on the lamp, which run on their own after it goes, never beyond its other grants ("Skills pushed from a computer") |
 
 **Events**, pushed to a client that subscribed:
 
@@ -132,7 +134,7 @@ own consent screen.
 ```text
 lamp-control serve [--state-dir DIR] [--listen ADDR] [--admin-socket PATH] [--name NAME]
                    [--mood-socket PATH] [--say-socket PATH] [--bus-root DIR] [--boot-id ID]
-                   [--lease-socket PATH] [--zone ZONE]
+                   [--lease-socket PATH] [--zone ZONE] [--manage-socket PATH]
 lamp-control code --grants body,light,speak,look  # the owner's side: a pairing code and the pin; look for presence events
 lamp-control revoke c_…
 lamp-control clients
@@ -142,6 +144,7 @@ lamp-control clients
 - **The parts it reaches:** `--mood-socket` (the body's gestures and moves), `--say-socket` (the voice), `--bus-root` (light requests out; events and state in) and `--boot-id` (the clock a light request names, `/proc/sys/kernel/random/boot_id` by default). A part not given is refused with "not reachable from lamp-control here".
 - **The body's lease:** with `--lease-socket` (lamp-body's, docs/body.md "Held by lamp-control"), while a computer holds `body` the door holds the body too, so the lamp's own life (the rest glance, Expression's offsets, a stand timing out) stands back. It holds for 30 s, renewed every 10 s, and lets go when no computer holds `body`. The body's own end of it (`lost` for a hand, privacy, a pause, a sleep, a slump or a lapse) ends the computer's `body` lease with that why, a lapse as `expired`; a why the door doesn't know, or a hold the body refuses, ends it as `released`, so a computer never thinks the lamp's own life stands back when it doesn't. A body that restarts is held again at the next 250 ms check, and a line from a connection the door has dropped is ignored. A body that can't be reached is journaled once, and the lamp's own life goes on.
 - **The quiet hours:** `--zone` (an IANA name, or `system`, the default) is the lamp's local time for the quiet hours below. A zone that can't be read is journaled, and every computer's `say` and `sound` is refused as quiet until it can, never a silent UTC.
+- **Skill push:** with `--manage-socket` (root's manage helper, `/run/lampos-skills-manage/manage.sock`), the skill ops are served and a pushed package is kept in `--state-dir`'s `push/` for the helper ("Skills pushed from a computer" below). Without it, each is refused with "skill push is not on this lamp".
 - **The certificate:** made on first start in `--state-dir` (`/var/lib/lampos-control`): P-256, valid to 2100, `cert.der` and `key.der`, the key 0600. Its pin, the certificate's SHA-256 in hex, is journaled at start and returned with every pairing code.
 - **Listening:** `--listen`, `0.0.0.0:7731` by default. TLS 1.3 only, and only `/v1`: any other path is 404 before the WebSocket opens.
   - Frames are capped at 64 KiB, text only.
@@ -150,7 +153,7 @@ lamp-control clients
   - A connection that hasn't said `hello` within 30 s of its welcome is closed, a `pair` first included, and other frames before it buy no more time. One quiet for 2 minutes after `hello` is closed too. A WebSocket ping or pong counts, so a client that only listens stays open on its keepalive.
   - Lease changes (a lapse, a conversation, a hand) go to every connection of the computer that held the lease.
 - **The owner's side:** `--admin-socket`, `/run/lampos-control/admin.sock`, 0600 in a 0700 folder, one JSON object a line:
-  - `{"code": {"grants": [...]}}` → `{"code", "pin"}`;
+  - `{"code": {"grants": [...]}}` → `{"code", "pin", "shown"}`, `shown` the pairing screen's words for each grant, in the grants' order, from `Grant::shown()` (the `skills` one: "can put skills on the lamp that run on their own");
   - `{"revoke": "c_…"}` → `{"revoked": true, "saved": true}`. The revoke takes effect at once either way. If the file can't take it yet, the answer is `"saved": false` with an `error`, because a restart before a save succeeds brings the key back; the next save that succeeds writes it out;
   - `{"clients": true}` → the list.
 
@@ -348,6 +351,9 @@ which back. An SDK's wait for them returns at the answer.
 | `say` | `text`: words, ≤ 300 chars | `speak` | — |
 | `sound` | `name` (a clip of the client's package, ≤ 3 s) | `speak` | — |
 | `stop` | — | — | — |
+| `skill.push` | `name` (a skill's, `a-z0-9-`, ≤ 64), `sha256` (64 hex), `size` 1–1,048,576, `part` from 0, `parts` 1–32, `data` (base64, ≤ 49,152 chars) | `skills` | — |
+| `skill.list` | — | `skills` | — |
+| `skill.remove` | `name` | `skills` | — |
 
 `move`'s shape is checked here, and the body's move check
 (`crates/body/src/moves.rs`) judges the rest.
@@ -391,6 +397,8 @@ Rates a client is held to:
 | `light` | 5 a second |
 | `say`, `sound` | 6 a minute and 60 an hour |
 | `express` | 1 a minute |
+| `skill.push` | 1 every 10 s and 20 an hour, counted once at part 0 |
+| `skill.list`, `skill.remove` | 6 a minute; one at a time for a computer, and 4 with the helper at once on the lamp (`busy` past either) |
 | actions a part refused | 20 a second, then the connection closes |
 | registered phrases | 16 a computer, across all its connections; each of 64 characters at most and 8 letters at least, so no short word or pair ("is a"; "ok lamp" too, at 6 letters: "okay lamp" passes). The floor is friction, not a guard: what keeps `hear` narrow is the owner's grant, this cap, the rate on changing them, and that only the registered phrase leaves the lamp |
 | changing the phrases | 6 a minute; the same phrases again cost nothing |
@@ -428,13 +436,13 @@ lamp.on("person.arrived", lambda e: lamp.gesture("greeting"))
 They run on the developer's computer, never on a lamp. Until `lamp-control`
 is built they are tested against a fake server that speaks this schema.
 
-## Skills pushed from a computer (planned)
+## Skills pushed from a computer (piece 7)
 
-**Not built yet** (Eighth's proposal on #3504, 21:5x, agreed by Nine and
-blue). A paired computer can put a rules skill of its own on its own lamp,
-with no Store, the way a skill the owner makes by voice is installed today.
-The ops below are the agreed wire; `lamp-control` serves them once Nine's
-piece is in, and the schema and the SDKs take them then.
+Eighth's proposal on #3504, agreed by Nine and blue. A paired computer can
+put a rules skill of its own on its own lamp, with no Store, the way a skill
+the owner makes by voice is installed today. `lamp-control` serves the ops
+below with `--manage-socket`; the manage helper's side (lamp-skills, piece
+B), the SDK calls and the schema's three request ops follow.
 
 **What is different about it:** every other grant ends with the
 connection or the lease. **A pushed skill keeps running after the computer
@@ -495,7 +503,10 @@ on the lamp that run on their own".
   so a frame stays under 64 KiB; at most 32 parts, in order from 0. One push
   in flight on the lamp: a second, from any computer, is `busy` until the
   first is answered. A push not finished within 60 s is dropped. A broken
-  push is sent again from part 0, never resumed; `got` is progress only.
+  push is sent again from part 0, never resumed; `got` is progress only. A
+  computer that keeps starting again from part 0 keeps the lamp's one slot
+  for as long (each part 0 at most once in 10 s); it is a computer the owner
+  gave `skills`, so the owner revokes it if it misbehaves.
 - **Rates:** one push every 10 s and 20 an hour per computer, a push
   counting once whatever its parts. At most 16 pushed skills on a lamp, all
   computers together.
@@ -505,12 +516,22 @@ on the lamp that run on their own".
   a skill has no scripts"; "another computer's skill has that name"); `busy`;
   `rate`.
 - **`skill.list` and `skill.remove`** need `skills` too, and see only this
-  computer's own pushes. The owner turns any of them off or removes it in
+  computer's own pushes. Each is a request to root's helper, so each is
+  bounded before it is asked: 6 a minute (`limits.manage`), one at a time
+  for a computer, and 4 at once on the lamp; past either, `busy`. The owner turns any of them off or removes it in
   the app.
-- **On the lamp:** `lamp-control` keeps the parts in its own state folder,
-  with `push.json` beside them: the SHA-256, the computer, the name, and
-  the pairing's grants at that moment. It asks the manage helper to install
-  by SHA-256. The helper trusts `push.json` because only `lamp-control` may
+- **On the lamp:** `lamp-control` gathers the parts in memory (one push
+  on the lamp at a time, so 1 MiB at most) and, once whole and matching its
+  SHA-256, keeps the package in its state folder as `push/package.tar`,
+  with `push/push.json` beside it: `sha256`, `name`, `client`,
+  `client_name`, the pairing's `grants` at that moment, and `at_unix_ms`.
+  Each is written aside, synced and renamed, 0600, the package first. It
+  asks the manage helper `{"install_pushed": SHA256}`, and for the others
+  `{"list_pushed_by": CLIENT}` and `{"remove_pushed": {"client", "name"}}`,
+  off the door's lock, and removes the package and `push.json` once the
+  install is answered; the helper's `{"done": …}` is the client's answer,
+  and its `{"refused": WHY}` a `refused` with that why (`no_grant` when the
+  helper says `"code": "no_grant"`). The helper trusts `push.json` because only `lamp-control` may
   ask it (by unit and cgroup, as for `lamp-cloud` and `lamp-voice`). It
   takes only the newest push, within 60 s, reads its bytes once and hashes
   them, so a kept package can never be installed later by any path. It then
@@ -522,9 +543,21 @@ on the lamp that run on their own".
   name"). A push of a name the same computer pushed before replaces it, and
   any picture yes it had goes: the owner's yes is kept for that computer and
   that SHA-256. It is shown and journaled as
-  "pushed by" the computer's name. On a revoke or a grant taken back,
-  `lamp-control` asks the helper to turn that computer's pushed skills off
-  (`{"off_pushed_by": CLIENT}`); they aren't deleted.
+  "pushed by" the computer's name. On a revoke, `lamp-control` asks the
+  helper to turn that computer's pushed skills off (`{"off_pushed_by":
+  CLIENT}`); they aren't deleted. When the same key is paired again with
+  other grants, it asks the helper to hold that computer's pushed skills to
+  them (`{"grants_pushed_by": {"client", "grants"}}`), turning off any that
+  asks a grant taken back. These go to the helper one at a time, in the
+  order they happened, so a later change is never served first.
+- **A pairing that changes during an install:** each computer's pairing has
+  a generation, raised at its every pair, re-pair and revoke (the same key
+  gets the same id back, so "still paired" can't tell). An install answered
+  under another generation than it was asked under is followed by the
+  computer's state now: `off_pushed_by` if it's no longer paired,
+  `grants_pushed_by` with its grants if it is. The last word the helper has
+  for that computer is its pairing now, whatever order it serves requests
+  in.
 - **The SDKs:** `lamp skill push FOLDER` runs `lamp skill check`, compares
   what the skill asks with the pairing's grants and the rules above
   (refusing on the computer with the lamp's own `no_grant` why, before any
