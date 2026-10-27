@@ -1,10 +1,10 @@
 //! #2176 finding 14: an exchange is linked only to the kept things its turn
 //! used, through Voice's production Days client against the real socket and
 //! store, with `LAMP_MEMORY_LINK_USED` and `LAMP_MEMORY_FORGET_ALL` on for
-//! this test process. Forgetting a kept thing takes the talk that used it
-//! and the follow-ups after it in the session, never the unrelated talk
-//! before it nor what was observed of that. All
-//! content is synthetic; the model of the observation pass is scripted; no
+//! each test's own process ([`alone`]). Forgetting a kept thing takes the
+//! talk that used it and the follow-ups after it in the session, never the
+//! unrelated talk before it nor what was observed of that. All content is
+//! synthetic; the model of the observation pass is scripted; no
 //! provider, credentials, hardware or network are involved.
 use lamp_gemini::ToolCall;
 use lamp_memory::{
@@ -21,8 +21,10 @@ use rusqlite::{Connection, OpenFlags};
 use serde_json::{Value, json};
 use std::{
     fs::{self, DirBuilder},
+    io::Read,
     os::unix::fs::DirBuilderExt,
     path::PathBuf,
+    process::{Command, Stdio},
     sync::{
         atomic::{AtomicU64, Ordering},
         mpsc::{self, Receiver, Sender},
@@ -32,6 +34,12 @@ use std::{
 };
 
 const BUDGET: Duration = Duration::from_millis(1500);
+/// Set in the process a test runs itself again in ([`alone`]): the
+/// directory its parent made for it, removed by the parent even when the
+/// child had to be killed.
+const ALONE: &str = "LAMP_MEMORY_TEST_ALONE";
+/// How long a test's own process may take before it is killed.
+const ALONE_FOR: Duration = Duration::from_secs(90);
 static NEXT: AtomicU64 = AtomicU64::new(0);
 
 struct Traced {
@@ -61,11 +69,8 @@ struct Fixture {
 
 impl Fixture {
     fn new() -> Self {
-        let root = std::env::temp_dir().join(format!(
-            "lamp-mlu-{}-{}",
-            std::process::id(),
-            NEXT.fetch_add(1, Ordering::Relaxed)
-        ));
+        let root = PathBuf::from(std::env::var_os(ALONE).unwrap())
+            .join(format!("f{}", NEXT.fetch_add(1, Ordering::Relaxed)));
         let _ = fs::remove_dir_all(&root);
         DirBuilder::new().mode(0o700).create(&root).unwrap();
         let now = SystemTime::now()
@@ -148,6 +153,68 @@ fn call(name: &str, args: Value) -> ToolCall {
     }
 }
 
+/// Whether this is the test's own process: if not, the test runs itself
+/// again in one and says how that went. The switches, the scripted model,
+/// the observation thread (bound to the first socket it is given) and the
+/// count of forgets it checks a job against are all Voice's process-wide
+/// statics, and no test can reset them: run side by side, one test's forget
+/// closed the other's observation job unsent, and a forget's conversation
+/// end could bind the thread to a socket already gone (the Tests audit on #3504).
+fn alone(test: &str) -> bool {
+    if std::env::var_os(ALONE).is_some() {
+        return true;
+    }
+    let dir = std::env::temp_dir().join(format!(
+        "lamp-mlu-{}-{}",
+        std::process::id(),
+        NEXT.fetch_add(1, Ordering::Relaxed)
+    ));
+    let _ = fs::remove_dir_all(&dir);
+    DirBuilder::new().mode(0o700).create(&dir).unwrap();
+    let mut child = Command::new(std::env::current_exe().unwrap())
+        .args(["--exact", test, "--test-threads=1"])
+        .env(ALONE, &dir)
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    let read = |mut from: Box<dyn Read + Send>| {
+        std::thread::spawn(move || {
+            let mut text = Vec::new();
+            let _ = from.read_to_end(&mut text);
+            String::from_utf8_lossy(&text).into_owned()
+        })
+    };
+    let stdout = read(Box::new(child.stdout.take().unwrap()));
+    let stderr = read(Box::new(child.stderr.take().unwrap()));
+    let until = Instant::now() + ALONE_FOR;
+    let status = loop {
+        if let Some(status) = child.try_wait().unwrap() {
+            break Some(status);
+        }
+        if Instant::now() >= until {
+            let _ = child.kill();
+            let _ = child.wait();
+            break None;
+        }
+        std::thread::sleep(Duration::from_millis(20));
+    };
+    // Exited or reaped: both pipes are at their end.
+    let (stdout, stderr) = (stdout.join().unwrap(), stderr.join().unwrap());
+    let _ = fs::remove_dir_all(&dir);
+    assert!(
+        status.is_some_and(|status| status.success()),
+        "{status:?} (killed after {ALONE_FOR:?} if None)\n{stdout}{stderr}"
+    );
+    // `--exact` with a name that matches nothing exits 0 having run nothing.
+    assert!(
+        stdout.contains("test result: ok. 1 passed;"),
+        "{test} did not run alone\n{stdout}{stderr}"
+    );
+    false
+}
+
 fn switches() {
     assert!(switch_forget_all(true));
     assert!(switch_link_used(true));
@@ -196,13 +263,16 @@ fn forget(client: &DaysClient, id: u64) {
 /// linked to teal, and the forget took them and the observation.
 ///
 /// Then the reviewer's P2 on #2511, on the same store: the observation
-/// pass's thread is the process's own, bound to the first socket, so every
-/// test that observes shares this one. A fresh client recalls teal again,
+/// pass's thread is the process's own, bound to the first socket, so the
+/// follow-ups share this one. A fresh client recalls teal again,
 /// and the follow-ups that say "it", with no word of it among them, go with
 /// the turn they follow; so "forget teal" takes all three exchanges and
 /// what was observed of them, as it did with the switch off.
 #[test]
 fn forgetting_a_kept_thing_leaves_the_talk_that_did_not_use_it() {
+    if !alone("forgetting_a_kept_thing_leaves_the_talk_that_did_not_use_it") {
+        return;
+    }
     switches();
     let fixture = Fixture::new();
     let client = DaysClient::new(fixture.socket.clone()).unwrap();
@@ -240,6 +310,9 @@ fn forgetting_a_kept_thing_leaves_the_talk_that_did_not_use_it() {
 /// forgotten; one about something else before it stays.
 #[test]
 fn the_talk_that_used_a_kept_thing_goes_with_it() {
+    if !alone("the_talk_that_used_a_kept_thing_goes_with_it") {
+        return;
+    }
     switches();
     let fixture = Fixture::new();
     let client = DaysClient::new(fixture.socket.clone()).unwrap();
