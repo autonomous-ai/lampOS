@@ -43,6 +43,7 @@ pub mod first_stand;
 pub mod gaze;
 pub mod gesture;
 pub mod idle;
+pub mod lease;
 pub mod moves;
 #[cfg(any(target_os = "linux", test))]
 pub mod poses;
