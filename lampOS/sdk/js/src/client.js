@@ -8,13 +8,25 @@
 import { hostname } from 'node:os';
 import WebSocket from 'ws';
 import * as schema from './schema.js';
-import { LampError, NotPaired, WrongLamp, fromReply } from './errors.js';
+import { LampError, NotPaired, WrongLamp, byCode, fromReply } from './errors.js';
 import { Keyring, b64, isPin, pinOf, proof, unb64 } from './keys.js';
 
 // The actions lamp-control answers `{"to":"body"}` with no `done` after
 // (docs/control.md): a wait for them ends at that answer. `say` answers
 // `{"to":"voice"}` and its `done` does follow.
 export const ENDS_AT_REPLY = new Set(['gesture', 'move']);
+// A phrase's floor in letters and digits, lamp-control's PHRASE_MIN_LETTERS.
+// The SDK's check is a pre-check: it may let through what the lamp refuses,
+// never the other way.
+export const PHRASE_MIN_LETTERS = 8;
+
+// The lamp's refusal of a phrase under the floor, or undefined; the lamp
+// checks it again.
+function shortPhrase(phrases) {
+  const short = (phrases ?? []).find((p) => (p.match(/[\p{Alphabetic}\p{N}]/gu) ?? []).length < PHRASE_MIN_LETTERS);
+  if (short === undefined) return undefined;
+  return new byCode.bad_request(`phrases: ${JSON.stringify(short)} is too short: ${PHRASE_MIN_LETTERS} letters at least`);
+}
 
 // One connection: its frames as they come, and the first frame, which must be
 // the lamp's welcome. The certificate is checked against `pin` before any
@@ -291,6 +303,8 @@ export class Lamp {
     if (!schema.events.includes(event) && event !== 'lease' && event !== 'done') {
       throw new LampError(`no event ${event}`, { code: 'bad_request' });
     }
+    const short = shortPhrase(phrases);
+    if (short) throw short;
     this.handlers.set(event, [...(this.handlers.get(event) ?? []), handler]);
     if (phrases) this.phrases = [...new Set([...this.phrases, ...phrases])].sort();
     if (!schema.events.includes(event)) return Promise.resolve();
@@ -321,6 +335,8 @@ export class Lamp {
   }
 
   subscribe(events, phrases) {
+    const short = shortPhrase(phrases);
+    if (short) return Promise.reject(short);
     const wanted = phrases ?? (events.includes('phrase.heard') && this.phrases.length ? this.phrases : undefined);
     return this.request('subscribe', { events, ...(wanted ? { phrases: wanted } : {}) });
   }

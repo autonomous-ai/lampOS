@@ -16,6 +16,7 @@ import inspect
 import json
 import socket
 import ssl
+import unicodedata
 from collections import defaultdict
 from typing import Any, Callable
 
@@ -23,7 +24,7 @@ from websockets.asyncio.client import ClientConnection, connect as ws_connect
 from websockets.exceptions import ConnectionClosed
 
 from . import schema
-from .errors import LampError, NotPaired, WrongLamp, from_reply
+from .errors import BY_CODE, LampError, NotPaired, WrongLamp, from_reply
 from .keys import Keyring, Pairing, b64, is_pin, pin_of, proof, unb64
 
 Handler = Callable[[dict], Any]
@@ -35,6 +36,23 @@ KEEPALIVE_S = 20.0
 # (docs/control.md): a wait for them ends at that answer. `say` answers
 # `{"to":"voice"}` and its `done` does follow.
 ENDS_AT_REPLY = frozenset({"gesture", "move"})
+# A phrase's floor in letters and digits, lamp-control's PHRASE_MIN_LETTERS.
+# The SDK's check is a pre-check: it may let through what the lamp refuses,
+# never the other way.
+PHRASE_MIN_LETTERS = 8
+
+
+def _short_phrase(phrases: list[str] | None) -> None:
+    """Refuse a phrase under the lamp's floor before it leaves the computer,
+    in the lamp's words; the lamp checks it again."""
+    for phrase in phrases or ():
+        # The lamp counts Unicode Alphabetic or Numeric, which takes in marks
+        # such as Devanagari's vowel signs; the stdlib has no Alphabetic, so
+        # count letters, marks and numbers, a superset (Nine's and
+        # harness-reviewer's P2 on #3914).
+        if sum(unicodedata.category(c)[0] in "LMN" for c in phrase) < PHRASE_MIN_LETTERS:
+            shown = json.dumps(phrase, ensure_ascii=False)
+            raise BY_CODE["bad_request"](f"phrases: {shown} is too short: {PHRASE_MIN_LETTERS} letters at least")
 
 
 def _tls() -> ssl.SSLContext:
@@ -421,6 +439,7 @@ class Lamp:
         `wait_closed` instead, never lost."""
         if event not in schema.events() and event not in ("lease", "done"):
             raise LampError(f"no event {event!r}", code="bad_request")
+        _short_phrase(phrases)
         self._handlers[event].append(handler)
         if phrases:
             self._phrases = sorted(set(self._phrases) | set(phrases))
@@ -471,6 +490,7 @@ class Lamp:
                 task.add_done_callback(self._tasks.discard)
 
     async def subscribe(self, events: list[str], phrases: list[str] | None = None) -> dict:
+        _short_phrase(phrases)
         fields: dict[str, Any] = {"events": events}
         wanted = phrases or (self._phrases if "phrase.heard" in events else None)
         if wanted:
