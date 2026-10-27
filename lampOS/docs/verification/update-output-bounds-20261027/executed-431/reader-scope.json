@@ -1,0 +1,17 @@
+{
+  "direct_readers": [
+    "world::Systemctl::setup_unit_properties",
+    "world::Systemctl::self_recovery_ready",
+    "world::Systemctl::restart PID query",
+    "world::Systemctl::last_line",
+    "tests/round.rs::a_command_is_read_within_its_bound_and_killed_after"
+  ],
+  "homonyms_not_readers": [
+    "Setup private reset::query::output_within",
+    "Cloud reports::bounded_output_within"
+  ],
+  "note": "Eight new helper/public-wrapper controls and existing round 300000-byte positive counted once; custom harness results separate.",
+  "packages": [
+    "lamp-update"
+  ]
+}

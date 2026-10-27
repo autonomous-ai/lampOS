@@ -1,0 +1,202 @@
+[
+  {
+    "fresh": false,
+    "package_id": "path+file://<source>/lampOS/crates/update#lamp-update@0.1.0",
+    "path": "<target>/debug/deps/self_cli_exec-7a8efcc313003c4d",
+    "sha256": "8487600a2473063e70567861ca42fc4f97dd2c20faf529f0f0e915d55806ddb4",
+    "target": {
+      "crate_types": [
+        "bin"
+      ],
+      "doc": false,
+      "doctest": false,
+      "edition": "2024",
+      "kind": [
+        "test"
+      ],
+      "name": "self-cli-exec",
+      "src_path": "<source>/lampOS/crates/update/tests/self_cli_exec.rs",
+      "test": true
+    }
+  },
+  {
+    "fresh": false,
+    "package_id": "path+file://<source>/lampOS/crates/update#lamp-update@0.1.0",
+    "path": "<target>/debug/deps/round-42e77f9cbb014d5a",
+    "sha256": "5d74d98ea4984a72cc5a05938c4c8be16e9584d2bd24f050970f24673a9294f5",
+    "target": {
+      "crate_types": [
+        "bin"
+      ],
+      "doc": false,
+      "doctest": false,
+      "edition": "2024",
+      "kind": [
+        "test"
+      ],
+      "name": "round",
+      "src_path": "<source>/lampOS/crates/update/tests/round.rs",
+      "test": true
+    }
+  },
+  {
+    "fresh": false,
+    "package_id": "path+file://<source>/lampOS/crates/update#lamp-update@0.1.0",
+    "path": "<target>/debug/deps/install-08004915d5b421f7",
+    "sha256": "4ef219a273bdc1d6cd1c26f2effee6468095e7e412709bbc3e9bbb12999b6d81",
+    "target": {
+      "crate_types": [
+        "bin"
+      ],
+      "doc": false,
+      "doctest": false,
+      "edition": "2024",
+      "kind": [
+        "test"
+      ],
+      "name": "install",
+      "src_path": "<source>/lampOS/crates/update/tests/install.rs",
+      "test": true
+    }
+  },
+  {
+    "fresh": false,
+    "package_id": "path+file://<source>/lampOS/crates/update#lamp-update@0.1.0",
+    "path": "<target>/debug/deps/functions-781cb61db13f0261",
+    "sha256": "338d7627f9d7de9c74f70da79997ed8fe273de2dbb597eeacfb11b8f0113f522",
+    "target": {
+      "crate_types": [
+        "bin"
+      ],
+      "doc": false,
+      "doctest": false,
+      "edition": "2024",
+      "kind": [
+        "test"
+      ],
+      "name": "functions",
+      "src_path": "<source>/lampOS/crates/update/tests/functions.rs",
+      "test": true
+    }
+  },
+  {
+    "fresh": false,
+    "package_id": "path+file://<source>/lampOS/crates/update#lamp-update@0.1.0",
+    "path": "<target>/debug/deps/it-7f2b1cc47b1a8b67",
+    "sha256": "7b35d584c62d676ceeb5a6c8e8faf4277f5e29c306afef9acafa84394eb5705f",
+    "target": {
+      "crate_types": [
+        "bin"
+      ],
+      "doc": false,
+      "doctest": false,
+      "edition": "2024",
+      "kind": [
+        "test"
+      ],
+      "name": "it",
+      "src_path": "<source>/lampOS/crates/update/tests/it/main.rs",
+      "test": true
+    }
+  },
+  {
+    "fresh": false,
+    "package_id": "path+file://<source>/lampOS/crates/update#lamp-update@0.1.0",
+    "path": "<target>/debug/deps/lamp_update-e14d54c83f68ff7f",
+    "sha256": "0a8cf4d6bf70211bc5a2ff1f6a416bf052a3a60084f4e9098aba67e5e9d89a62",
+    "target": {
+      "crate_types": [
+        "lib"
+      ],
+      "doc": true,
+      "doctest": true,
+      "edition": "2024",
+      "kind": [
+        "lib"
+      ],
+      "name": "lamp_update",
+      "src_path": "<source>/lampOS/crates/update/src/lib.rs",
+      "test": true
+    }
+  },
+  {
+    "fresh": false,
+    "package_id": "path+file://<source>/lampOS/crates/update#lamp-update@0.1.0",
+    "path": "<target>/debug/deps/release_pair-587942a3dc3808c8",
+    "sha256": "348d8b19fa7e6adb7e20d224e7bf27807e3e9eb29777a9c384620a0d5ad38f24",
+    "target": {
+      "crate_types": [
+        "bin"
+      ],
+      "doc": false,
+      "doctest": false,
+      "edition": "2024",
+      "kind": [
+        "test"
+      ],
+      "name": "release_pair",
+      "src_path": "<source>/lampOS/crates/update/tests/release_pair.rs",
+      "test": true
+    }
+  },
+  {
+    "fresh": false,
+    "package_id": "path+file://<source>/lampOS/crates/update#lamp-update@0.1.0",
+    "path": "<target>/debug/deps/lamp_update-93805432291f4475",
+    "sha256": "7b0db742e4363cc043cdd7c98597016c79574a19a7f31fcad7795cb5617eb5e5",
+    "target": {
+      "crate_types": [
+        "bin"
+      ],
+      "doc": true,
+      "doctest": false,
+      "edition": "2024",
+      "kind": [
+        "bin"
+      ],
+      "name": "lamp-update",
+      "src_path": "<source>/lampOS/crates/update/src/main.rs",
+      "test": true
+    }
+  },
+  {
+    "fresh": false,
+    "package_id": "path+file://<source>/lampOS/crates/update#lamp-update@0.1.0",
+    "path": "<target>/debug/deps/self_process_cuts-9807238ddc4f9970",
+    "sha256": "492f51288cec501ae5dc1574b7dd6332aeb11cd1bb3388716c23edd4da2a2c5f",
+    "target": {
+      "crate_types": [
+        "bin"
+      ],
+      "doc": false,
+      "doctest": false,
+      "edition": "2024",
+      "kind": [
+        "test"
+      ],
+      "name": "self-process-cuts",
+      "src_path": "<source>/lampOS/crates/update/tests/self_process_cuts.rs",
+      "test": true
+    }
+  },
+  {
+    "fresh": false,
+    "package_id": "path+file://<source>/lampOS/crates/update#lamp-update@0.1.0",
+    "path": "<target>/debug/lamp-update",
+    "sha256": "172cfa2715837b1c8d5340cec603877c29527116c1b0beb5a8201a0cd68c1b1f",
+    "target": {
+      "crate_types": [
+        "bin"
+      ],
+      "doc": true,
+      "doctest": false,
+      "edition": "2024",
+      "kind": [
+        "bin"
+      ],
+      "name": "lamp-update",
+      "src_path": "<source>/lampOS/crates/update/src/main.rs",
+      "test": true
+    }
+  }
+]

@@ -1,0 +1,9 @@
+{
+  "case": "world::query::tests::public_output_accepts_one_mib_and_refuses_one_byte_more",
+  "failure": "public reader accepted output beyond 1 MiB",
+  "observed_once": true,
+  "original_source_unchanged": true,
+  "raw_runtime_log_sha256": "14fea6e67d19570c938fe1b382d1e83979ef74f1fbd7b94f70b881f3dab95fd8",
+  "reason": "Only public world::output_within restored from b234; private query, eight tests and Cargo unchanged. Existing public reader accepted output above 1 MiB despite the new helper remaining present.",
+  "summary": "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 132 filtered out; finished in 0.15s"
+}

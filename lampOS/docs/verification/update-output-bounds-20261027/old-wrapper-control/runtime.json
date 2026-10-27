@@ -1,0 +1,25 @@
+{
+  "cleanup_actions": [],
+  "cleanup_errors": [],
+  "cleanup_seconds": 15,
+  "command": [
+    "cargo",
+    "+1.96.0",
+    "test",
+    "--locked",
+    "--offline",
+    "-p",
+    "lamp-update",
+    "--lib",
+    "world::query::tests::public_output_accepts_one_mib_and_refuses_one_byte_more",
+    "--",
+    "--exact",
+    "--test-threads=1"
+  ],
+  "deadline_seconds": 120,
+  "elapsed_seconds": 1.48,
+  "error": null,
+  "exit_code": 101,
+  "log_sha256": "14fea6e67d19570c938fe1b382d1e83979ef74f1fbd7b94f70b881f3dab95fd8",
+  "source_unchanged": true
+}

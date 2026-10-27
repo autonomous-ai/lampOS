@@ -1,0 +1,4119 @@
+{
+  "case_rows": [
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "apply::tests::a_request_with_a_field_it_does_not_know_is_read",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "apply::tests::the_apply_unit_can_write_every_carried_path_and_never_names_journald",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "apply::tests::a_path_both_a_setting_and_an_image_file_is_refused_with_nothing_written",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "apply::tests::the_tmpfiles_install_writes_is_one_it_shipped",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "apply::tests::a_setting_the_lamp_removed_stays_removed_and_one_never_there_is_written",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "apply::tests::a_signed_image_file_outside_the_list_is_refused_with_nothing_written",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "apply::tests::an_envelope_signed_with_another_key_or_of_another_build_writes_nothing",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "apply::tests::without_a_request_nothing_is_done",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "check_units::tests::a_masked_unit_fails_an_implicit_slice_does_not_and_white_space_shows",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "check_units::tests::a_units_own_path_line_is_its_text_and_hides_nothing",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "check_units::tests::exactly_the_product_passes_and_a_unit_from_elsewhere_does_not",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "check_units::tests::same_changed_drop_in_extra_and_missing_are_each_said_and_fail_the_check",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "check_units::tests::systemctl_cat_is_read_file_by_file_and_a_comment_with_a_path_is_no_file",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "check_units::tests::the_images_unit_is_the_images_not_extra_and_compared_with_its_variant",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "check_units::tests::the_product_as_install_writes_it_passes",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "fetch::tests::a_chunked_file_and_one_to_the_end",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "apply::tests::a_unit_systemd_cannot_load_writes_nothing",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "fetch::tests::a_file_by_its_length_after_a_redirect",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "apply::tests::a_new_skills_folder_is_removed_when_it_is_put_back_and_a_folder_in_use_stays",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "apply::tests::a_removed_setting_goes_only_where_it_is_still_the_builds",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "fetch::tests::a_release_file_from_github",
+      "status": "ignored"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "fetch::tests::an_answered_lookup_is_counted_out_before_its_answer_arrives",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "fetch::tests::a_folder_on_the_lamp",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "fetch::tests::missing_too_large_short_and_other_answers",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "fetch::tests::a_name_lookup_that_hangs_is_given_up_and_no_round_starts_another_until_it_ends",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "fetch::tests::no_network_is_unreachable",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "apply::tests::a_setting_still_the_builds_is_written_and_one_the_lamp_changed_is_kept",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "fetch::tests::urls_and_redirects",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "head_touch::tests::null_masks_do_not_admit_other_character_devices",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "image::tests::a_file_not_listed_as_shipped_is_refused",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "image::tests::a_unit_reloads_systemd_a_rule_reloads_udev_and_asound_restarts_the_voice",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "apply::tests::a_put_back_asked_again_after_being_cut_short_puts_every_record_back",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "apply::tests::put_back_keeps_a_file_changed_since_and_a_stale_back_file_is_not_used",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "image::tests::every_image_file_of_every_variant_is_listed_as_shipped",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "image::tests::journald_is_never_restarted_nor_signalled",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "install::tests::a_timed_service_is_never_enabled_and_its_timer_is",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "install::tests::a_unit_through_current_is_read",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "install::tests::every_deploy_product_unit_is_installed_or_named_left_out",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "install::tests::every_product_part_starts_through_its_current_link",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "install::tests::every_tool_the_factory_steps_run_is_installed_where_they_look",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "install::tests::no_product_unit_names_a_lamp",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "image::tests::the_variant_is_the_images_and_none_is_standard",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "install::tests::offsets_are_read",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "install::tests::the_cloud_is_enabled_with_the_lamp",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "install::tests::the_eyes_camera_helper_socket_is_enabled_and_names_the_eyes_camera",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "apply::tests::without_the_image_asked_or_from_an_older_copy_none_is_written",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "install::tests::the_skills_manage_socket_is_enabled_and_its_template_is_not",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "install::tests::the_wifi_helper_is_never_listed_without_its_restore_at_boot",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "judge::tests::a_part_that_stays_up_with_one_process_and_says_it_is_well_is_well",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "judge::tests::restarted_failed_or_another_process_is_not_well",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "apply::tests::put_back_restores_each_file_byte_for_byte_and_its_mode",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "judge::tests::the_part_s_own_word_counts_against_what_it_said_before",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "manifest::tests::a_build_for_a_newer_updater_is_refused_by_an_older_one_only",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "manifest::tests::a_key_made_by_openssl_signs_as_well",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "manifest::tests::a_manifest_without_min_updater_is_written_and_read_as_before",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "manifest::tests::a_newer_manifest_this_updater_cannot_read_is_refused_for_its_updater",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "manifest::tests::a_sealed_manifest_opens_with_its_key_and_gives_back_its_bytes",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "apply::tests::the_images_files_are_written_where_the_lamp_has_one_the_image_shipped",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "apply::tests::the_variants_file_is_written_and_none_of_another",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "manifest::tests::an_image_file_outside_the_list_listed_twice_or_not_its_sha_is_refused",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "manifest::tests::a_setting_with_a_field_it_does_not_know_is_still_read",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "manifest::tests::another_key_a_changed_byte_or_a_changed_signature_is_refused",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "manifest::tests::min_updater_is_signed_with_the_rest",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "manifest::tests::models_are_read_only_with_the_updater_they_need_and_plain_paths",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "manifest::tests::names_are_plain",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "manifest::tests::min_updater_raised_under_the_same_signature_is_a_bad_signature",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "manifest::tests::settings_are_read_only_with_the_updater_they_need_and_their_own_paths",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "manifest::tests::nothing_but_a_plain_manifest_is_signed_or_taken",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "manifest::tests::the_reset_plan_is_read_only_with_its_updater_and_its_own_path",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "models::tests::a_link_into_the_store_is_relative_and_a_unit_reads_by_path_or_folder",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "product_skills::tests::only_plain_paths_in_the_skills_it_names_are_taken",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "quiet::tests::a_voice_that_says_nothing_is_never_quiet",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "quiet::tests::forty_five_seconds_of_nothing_after_the_last_word",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "quiet::tests::hearing_thinking_or_speaking_is_a_turn",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "quiet::tests::quiet_needs_as_long_a_watch",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "records::tests::a_state_from_before_the_settings_reads_and_writes_as_before",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "product_skills::tests::the_bundle_of_the_repository_is_what_install_writes",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "apply::tests::unrecorded_tmpfiles_an_install_shipped_are_the_builds_and_others_the_lamps",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "records::tests::a_state_that_cannot_be_read_is_kept_aside",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "records::tests::one_at_a_time",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "records::tests::write_records_fixtures",
+      "status": "ignored, writes records fixtures: run by hand with LAMP_UPDATE_RECORDS_FIXTURE set"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "setup_lifecycle::tests::incomplete_duplicate_or_malformed_manager_records_are_unknown",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "apply::tests::the_tmpfiles_are_created_only_when_they_are_there",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "setup_lifecycle::tests::manager_identity_requires_the_exact_loaded_product_with_known_dropins",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "records::tests::a_link_left_beside_is_replaced_and_never_written_through",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "status::tests::the_value_lasts_three_periods_so_a_dead_updater_reads_stale",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "unit::restart_order::tests::a_declared_socket_precedes_its_service",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "apply::tests::put_back_restores_the_images_files_and_reloads_again",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "unit::restart_order::tests::a_path_through_an_unchanged_unit_still_orders_its_ends",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "unit::restart_order::tests::cycles_including_self_edges_are_refused",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "unit::restart_order::tests::repeated_and_folded_declarations_keep_each_edge",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "unit::restart_order::tests::requirements_and_directives_in_other_sections_do_not_order_units",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "unit::restart_order::tests::unsupported_ordering_cannot_silently_lose_a_dependency",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "unit::restart_order::tests::the_shipped_managed_services_have_a_valid_startup_graph",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "unit::tests::comments_do_not_make_a_unit_another",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "unit::tests::a_new_build_is_written_everywhere_the_folder_is_named",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "unit::tests::lamp_4aces_own_units_are_read",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "unit::tests::only_a_part_installed_by_build_is_a_program",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "records::tests::a_state_from_a_later_build_keeps_its_fields_across_a_save",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "records::tests::each_kept_state_and_journal_reads_as_saved",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "unit::tests::the_generic_package_sets_up_and_resets_as_the_product_does",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "publish::tests::the_images_files_are_carried_with_the_updater_they_need",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "unit::tests::the_generic_voice_runs_the_ring_as_the_product_does",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "unit::tests::the_generic_voice_says_its_failures_as_the_product_does",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "unit::tests::the_generic_voice_has_the_product_clock_and_session_context",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "product_skills::tests::a_link_in_place_of_a_core_file_is_put_back_and_never_read",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "unit::tests::the_generic_voice_answers_whom_the_product_does",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "publish::tests::the_products_settings_are_carried_with_the_updater_they_need",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "world::query::tests::public_output_refuses_invalid_utf8_instead_of_a_partial_string",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "world::query::tests::query_reads_output_with_closed_stdin_and_discarded_stderr",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "world::tests::self_recovery_accepts_an_armed_timer_and_an_inactive_service",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "world::tests::self_recovery_refuses_a_timer_not_armed_persistently",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "world::query::tests::query_refuses_nonzero_exit_and_spawn_failure",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "world::tests::self_recovery_refuses_malformed_or_unexpected_query_records",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "world::tests::self_recovery_refuses_an_unloaded_masked_or_ephemeral_service",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "world::tests::systemctl_show_is_read_unit_by_unit",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "world::tests::self_recovery_requires_one_of_each_record_and_required_property",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "publish::tests::models_are_carried_with_the_updater_they_need",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "world::tests::the_real_disk_has_room",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "status::tests::the_status_is_the_records_build_the_phase_and_the_last_end_without_its_reason",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "product_skills::tests::each_file_is_one_of_three",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "records::tests::state_journal_and_previous_units_are_kept",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "product_skills::tests::what_is_written_is_put_back_and_a_file_changed_since_is_left",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "apply::tests::a_reload_that_fails_fails_the_apply_and_a_speaker_that_fails_is_said",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "publish::tests::binaries_and_each_lamps_units_but_nothing_else",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "world::query::tests::public_output_accepts_one_mib_and_refuses_one_byte_more",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "apply::tests::the_apply_path_never_restarts_or_signals_journald",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "status::tests::a_restart_keeps_the_last_result_each_end_is_said_and_it_is_said_again",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "world::tests::the_bus_hears_the_voice_and_not_an_old_state",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "world::query::tests::a_failed_query_cleans_its_same_group_child_even_after_output_closes",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "world::query::tests::invalid_utf8_cleans_closed_output_child",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "world::query::tests::query_deadline_applies_after_stdout_closes",
+      "status": "ok"
+    },
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "name": "world::query::tests::query_timeout_cleans_the_exited_leaders_pipe_holding_descendant",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/functions.rs (<target>/debug/deps/functions-781cb61db13f0261)",
+      "name": "the_product_voice_s_functions_in_a_process_of_their_own",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/functions.rs (<target>/debug/deps/functions-781cb61db13f0261)",
+      "name": "the_generic_voice_declares_the_clock_and_receives_time_and_session_context",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/functions.rs (<target>/debug/deps/functions-781cb61db13f0261)",
+      "name": "with_reports_on_dance_stays_at_the_bound",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/functions.rs (<target>/debug/deps/functions-781cb61db13f0261)",
+      "name": "a_product_chat_request_offers_dance_at_the_bound",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/functions.rs (<target>/debug/deps/functions-781cb61db13f0261)",
+      "name": "a_product_lamp_declares_every_function_it_has_within_the_bound",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "a_build_without_a_part_is_refused_before_anything_is_written",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "a_file_left_beside_by_a_run_cut_off_does_not_lend_its_mode_to_the_key",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "a_file_that_does_not_match_installs_nothing_of_it",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "a_moved_lamp_is_given_the_product_voices_five_lines",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "a_newer_default_replaces_only_a_setting_nobody_changed",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "a_product_lamp_without_a_link_says_so_once_and_never_drops_speech_in_silence",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "a_blank_lamp_runs_every_product_skill_as_the_skill",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "a_build_without_the_bodys_factory_tools_still_installs",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "a_device_key_found_open_is_narrowed_and_never_said",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "a_blank_lamp_gets_every_part_its_units_and_nothing_started",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "a_key_a_reset_removed_is_never_put_back_from_v1s_config",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "a_closed_etc_lampos_is_said_and_left_as_it_is",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "a_failed_exit_note_write_keeps_reload_debt_for_the_next_install",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "a_default_found_closed_is_opened_and_a_lamps_own_found_closed_is_said",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "a_setting_written_but_not_yet_recorded_is_still_installs",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "a_disabled_core_skill_turned_on_stays_on_through_an_install",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "every_part_of_the_brain_has_a_product_unit",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "every_part_of_the_lamp_waits_for_setups_marker_itself",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "every_skill_folder_is_in_the_product_or_says_why_not",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "a_lamp_set_up_before_setup_wrote_zone_env_gets_its_saved_zone_at_the_next_install",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "a_missing_store_drop_in_is_repaired_and_failed_reload_is_retried",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "a_refused_service_install_records_nothing_and_keeps_the_drop_in",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "a_newer_build_moves_each_link_and_keeps_the_old_folders",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "a_lamps_own_pins_gain_the_privacy_section_and_keep_the_rest",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "a_lamps_own_pins_on_the_old_guess_get_every_head_line",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "a_reset_then_prepare_does_not_restore_the_old_key",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "an_install_stopped_after_writing_its_units_enables_at_the_next_run",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "harness_versions_are_read_as_harness_prints_them",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "head_touch_comes_whole_and_never_beside_the_old_engines_head",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "a_setting_changed_on_the_lamp_is_kept_when_install_runs_again",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "an_install_whose_enable_failed_enables_at_the_next_run_and_keeps_its_settings_record",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "a_setting_in_the_way_stops_the_install_before_any_is_written",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "head_touch_preflight_files::directory_drop_in_is_refused_before_mutation",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "an_install_puts_a_core_skills_changed_file_back_and_says_so",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "head_touch_preflight_files::fifo_body_calibration_is_refused_before_mutation",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "harness_at_boot_gives_lamposs_manager_its_home_first",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "harness_off_after_a_first_install_leaves_no_linger",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "a_set_aside_holds_for_keys_there_and_after_a_mark_that_was_not_saved",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "harness_off_runs_uninstall_stop_status_then_the_linger_then_pgrep",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "head_touch_preflight_files::fifo_drop_in_is_refused_before_mutation",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "head_touch_preflight_files::fifo_without_a_writer_is_refused_before_mutation",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "install_places_the_voices_recorded_lines_where_the_product_voice_reads_them",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "harness_on_installs_with_harnesss_own_installer_then_sets_it_at_boot",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "install_head_body_refuses_calibration_environment_overrides_before_mutation",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "harness_on_keeps_a_harness_already_there",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "harness_on_stops_at_a_failing_step_and_leaves_no_link",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "install_review_head_pair_refuses_a_disabling_drop_in_before_mutation",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "install_review_head_pair_refuses_a_removed_mute_before_mutation",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "install_review_head_pair_refusal_precedes_state_and_host_mutation",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "head_touch_preflight_files::dev_null_drop_in_mask_is_preserved",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "lamp_update_back_waits_for_its_binary_rather_than_failing",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "head_touch_preflight_files::dangling_drop_in_keeps_missing_file_compatibility",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "corrupt_records_are_set_aside_and_never_bring_back_a_key_a_reset_removed",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "prepare_places_the_recorded_lines_a_moved_lamps_voice_reads",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "head_touch_preflight_files::missing_local_files_keep_install_compatibility",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "head_touch_preflight_files::symlink_to_regular_drop_in_is_preserved",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "head_touch_preflight_files::regular_benign_drop_in_is_preserved",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "product_units_pass_only_options_an_older_binary_takes",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "install_head_body_keeps_factory_calibration",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "prepare_sets_corrupt_records_aside_and_leaves_unreadable_ones_alone",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "install_places_every_exit_note_hook_and_keeps_other_drop_ins",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "install_prepares_store_off_and_keeps_the_lamps_store_choice",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "second_review_body_head_off_refuses_before_bundle_mutation",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "settings_written_before_one_that_fails_are_still_installs",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "the_exit_note_allowlist_is_exactly_clouds_product_services",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "the_device_key_is_provisioned_private_and_only_where_missing",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "the_parts_that_keep_local_time_read_the_zone_setup_saves",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "install_review_head_pair_keeps_a_benign_drop_in",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "the_pinned_models_are_the_ones_their_parts_check",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "the_plans_install_shipped_are_listed",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "the_product_full_look_is_on_in_both_units_with_one_file",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "the_product_keeps_nothing_personal_while_nobody_is_known",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "the_product_sees_who_speaks",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "the_product_skills_are_exactly_the_core_skills",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "the_skills_tools_are_in_their_own_folder_which_the_voice_reads",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "the_tasks_part_closes_the_harness_a_told_task_started",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "install_records_the_tmpfiles_it_writes",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "install_review_head_pair_retry_keeps_calibration_and_is_idempotent",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "time_of_day_parts_wait_for_the_kernel_to_say_the_clock_is_set",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "tmpfiles_make_lock_folders_the_parts_accept_and_the_voices_sessions_folder",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "two_failed_runs_in_a_row_keep_a_written_setting_as_installs",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "music_sway_and_watch_you_leave_are_on_in_the_product",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "what_harness_service_status_still_has_is_read_from_its_json",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "missing_models_are_fetched_checked_and_placed_and_a_lamps_own_is_kept",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "run_twice_it_changes_nothing",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "without_a_usable_key_nothing_is_written_and_the_key_is_never_said",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "prepare_then_reset_then_install_does_not_restore_the_old_key",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "product_routine_state_is_private_persistent_and_keeps_new_switches_off",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "the_builds_plan_already_there_is_no_change_and_no_backup",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "the_installed_bedtime_skill_is_disabled_and_absent_from_live_catalogs",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "the_tasks_part_waits_for_harness_rather_than_failing",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "the_second_route_gets_its_services_on_the_voices_key_and_a_lamps_own_is_kept",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "unreadable_records_stop_install_rather_than_being_written_over",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "install_setup_on_replaces_a_hand_placed_plan_and_keeps_the_old_in_the_records",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "harness_is_set_to_start_at_boot_once_when_it_is_there",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "setup_settings_are_written_only_with_setup_on_and_kept_once_changed",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "the_voice_gets_its_service_and_the_lamps_device_key_from_v1s_config",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "what_harness_still_has_is_said_and_without_harness_the_record_is_kept",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "harness_on_updates_its_own_older_harness_and_says_one_too_old",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "without_setup_on_a_plan_there_follows_the_build_and_none_is_never_added",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "name": "a_failing_step_keeps_the_record_and_a_later_run_finishes",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/it/main.rs (<target>/debug/deps/it-7f2b1cc47b1a8b67)",
+      "name": "ci_paths::the_scan_sees_paths_in_strings_and_not_in_comments_or_prose",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/it/main.rs (<target>/debug/deps/it-7f2b1cc47b1a8b67)",
+      "name": "image_journal::the_journal_is_kept_well_inside_the_ram_disk",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/it/main.rs (<target>/debug/deps/it-7f2b1cc47b1a8b67)",
+      "name": "image_ramlog::logrotate_runs_the_lamps_copy_back_in_place_of_the_bases",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/it/main.rs (<target>/debug/deps/it-7f2b1cc47b1a8b67)",
+      "name": "image_ramlog::ramlogs_stop_keeps_the_journal_before_its_own_stop",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/it/main.rs (<target>/debug/deps/it-7f2b1cc47b1a8b67)",
+      "name": "image_ramlog::the_defaults_keep_the_bases_settings",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/it/main.rs (<target>/debug/deps/it-7f2b1cc47b1a8b67)",
+      "name": "scratch_paths::the_names_read_are_the_scratch_folders_only",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/it/main.rs (<target>/debug/deps/it-7f2b1cc47b1a8b67)",
+      "name": "image_journal::systemd_reads_it_last_beside_another_drop_in",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/it/main.rs (<target>/debug/deps/it-7f2b1cc47b1a8b67)",
+      "name": "image_ramlog::ramlogs_copies_leave_the_journal_out",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/it/main.rs (<target>/debug/deps/it-7f2b1cc47b1a8b67)",
+      "name": "image_ramlog::the_copy_back_leaves_the_journal_alone",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/it/main.rs (<target>/debug/deps/it-7f2b1cc47b1a8b67)",
+      "name": "scratch_paths::no_two_files_of_a_test_binary_build_the_same_scratch_folder",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/it/main.rs (<target>/debug/deps/it-7f2b1cc47b1a8b67)",
+      "name": "image_ramlog::the_last_two_boots_are_kept_at_shutdown_only",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/it/main.rs (<target>/debug/deps/it-7f2b1cc47b1a8b67)",
+      "name": "ci_paths::every_doc_a_crate_reads_is_named_back_in_the_workflows_pull_request_paths",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/it/main.rs (<target>/debug/deps/it-7f2b1cc47b1a8b67)",
+      "name": "image_ramlog::a_failed_move_keeps_the_kept_boots_and_says_so",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/release_pair.rs (<target>/debug/deps/release_pair-587942a3dc3808c8)",
+      "name": "release_6408_recovers_a_cut_written_by_release_6449",
+      "status": "ignored, needs the two pinned ARM64 artifacts and the owned offline Docker context"
+    },
+    {
+      "header": "Running tests/release_pair.rs (<target>/debug/deps/release_pair-587942a3dc3808c8)",
+      "name": "release_6449_recovers_a_cut_written_by_release_6408",
+      "status": "ignored, needs the two pinned ARM64 artifacts and the owned offline Docker context"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "a_command_is_read_within_its_bound_and_killed_after",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "a_disk_too_full_for_a_second_copy_is_refused_before_anything_is_written",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "a_lamp_short_of_room_for_the_models_refuses_before_fetching",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "a_bad_signature_or_a_bad_checksum_is_refused_with_nothing_installed",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "a_build_for_a_newer_updater_is_refused_and_taken_once_the_updater_can",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "a_lamp_update_back_from_before_the_plan_writes_the_rest_and_the_round_says_so",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "a_build_of_only_new_product_skills_places_them_and_restarts_nothing",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "a_changed_model_is_fetched_checked_and_switched_with_its_part",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "a_build_put_back_puts_its_settings_back_byte_for_byte",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "a_hardware_profile_that_cannot_be_read_never_fails_the_round",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "a_build_put_back_puts_the_old_reset_plan_back",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "a_build_put_back_puts_the_images_files_back",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "a_lamp_without_lamp_update_apply_puts_the_build_back_with_nothing_written",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "a_lamp_with_no_reset_plan_gets_none_from_a_round",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "a_folder_made_two_builds_ago_is_removed_and_one_never_made_is_kept",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "a_lamps_own_asound_is_kept_and_the_voice_not_restarted_for_it",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "a_link_switch_cut_short_is_put_back_at_the_next_start",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "a_model_fetch_cut_by_the_network_is_unreachable_not_refused",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "a_model_that_does_not_match_its_sha_refuses_the_build_with_nothing_switched",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "a_model_only_switch_cut_short_restarts_the_part_that_reads_it",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "a_model_switch_cut_short_is_put_back_at_the_next_start",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "a_linked_part_that_dies_is_put_back_by_its_link",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "a_model_that_cannot_be_put_back_leaves_the_others_put_back_and_the_journal_kept",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "a_model_switch_whose_part_dies_puts_the_model_back",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "a_core_skill_turned_on_stays_on_through_a_round",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "a_new_build_is_installed_beside_the_old_and_switched",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "a_linked_part_keeps_its_build_and_the_one_before",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "a_lamp_with_an_old_reset_plan_updated_by_a_round_ends_with_the_builds_and_a_backup",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "a_new_worker_beside_an_unchanged_voice_gets_a_folder_named_by_its_list",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "a_part_that_says_it_is_in_error_is_put_back_after_its_minute",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "a_part_whose_folder_is_gone_is_installed_afresh",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "a_build_put_back_puts_the_product_skills_back",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "a_part_put_back_says_its_restarts_and_last_line_in_the_outcome_only",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "a_part_that_dies_is_put_back_and_its_build_refused",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "a_product_lamp_without_a_tmpfiles_record_takes_the_builds_tmpfiles",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "a_reset_plan_changed_on_the_lamp_is_replaced_by_a_round_never_kept",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "a_round_that_cannot_place_second_json_writes_no_unit",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "a_round_places_second_json_before_a_voice_unit_that_needs_it",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "a_round_with_nothing_to_change_only_checks",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "a_round_does_not_switch_lamp_skills_onto_checks_its_old_folders_fail",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "a_round_puts_a_core_skills_files_back_and_keeps_the_persons_own",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "a_switch_cut_short_is_put_back_at_the_next_start",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "a_round_that_sets_damaged_records_aside_keeps_the_keys_marked",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "a_switch_cut_short_after_its_settings_puts_them_back_at_the_next_start",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "a_unit_the_build_carries_is_carried_with_the_build_written_in",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "a_skill_the_build_removes_leaves_the_turned_on_record_with_one_line",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "a_self_json_the_disk_cannot_give_is_tried_again_next_round",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "a_voice_that_is_well_is_put_back_between_two_turns",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "an_older_build_is_not_taken",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "an_older_lamp_update_back_ignores_the_images_files_and_the_round_says_so",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "a_new_updater_that_confirms_keeps_its_switch",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "an_unchanged_model_is_not_fetched_and_its_file_stays",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "a_round_by_hand_keeps_the_folder_it_runs_from",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "a_self_json_from_a_later_version_still_reads",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "a_round_after_install_keeps_lamp_updates_own_folder",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "a_new_updater_not_confirmed_by_the_deadline_is_put_back",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "a_round_keeping_second_json_still_reaches_deepseek_through_the_relay",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "both_kinds_of_part_switch_in_one_round_each_its_own_way",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "asound_waits_for_a_quiet_moment_within_the_bound_and_then_for_the_next_round",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "an_updater_too_old_for_a_build_not_newer_than_installed_takes_nothing_it_carries",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "an_updater_too_old_for_a_build_without_an_updater_is_refused_with_nothing_written",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "an_unreadable_journal_is_set_aside_and_the_round_goes_on",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "a_new_updater_that_refuses_every_manifest_is_put_back",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "a_new_updater_that_exits_at_once_is_put_back",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "a_round_after_its_own_switch_keeps_the_old_binarys_folder",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "an_unreadable_self_json_with_the_builds_unknown_is_set_aside",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "an_old_updater_climbs_one_updater_a_round",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "an_updater_too_old_for_a_build_takes_only_the_updater_it_carries_then_the_rest",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "an_unreadable_self_json_with_both_builds_known_is_put_back",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "a_cut_inside_the_put_back_of_an_unreadable_self_json_never_turns_it_around",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "head_touch::body_head_on_an_isolated_bus_is_refused_before_writes",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "head_touch::body_head_repeated_exec_start_is_refused_before_writes",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "head_touch::cut_after_pins_apply_restarts_unchanged_controls_after_restoring_old_pins",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "head_touch::custom_head_wiring_is_kept_or_the_reader_transition_is_refused",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "head_touch::head_pins_cannot_change_without_restarting_their_controls_reader",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "head_touch::body_head_calibration_cannot_override_the_sleep_reader",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "head_touch::body_head_mode_and_bus_dropins_are_refused_before_writes",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "head_touch::isolated_voice_controls_bus_is_refused_before_any_write",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "head_touch::failed_head_reader_candidate_restores_exact_old_pins_and_units",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "head_touch::body_head_complete_bundle_preserves_literal_factory_calibration",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "head_touch::paired_head_bus_cannot_diverge_from_voices_enabled_privacy_bus",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "head_touch::body_head_requires_an_enabled_carried_or_installed_sleep_reader",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "head_touch::malformed_environment_quotes_are_not_reader_evidence",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "head_touch::paired_head_readers_without_controls_mute_are_refused_before_writes",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "head_touch::old_apply_helper_pins_mismatch_is_put_back_before_readers_restart",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "head_touch::paired_head_readers_disable_legacy_even_when_signed_pins_enable_it",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "head_touch::environment_only_head_bus_mismatch_is_refused_before_any_write",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "head_touch::head_bus_root_dropins_are_not_guessed_from_base_units",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "head_touch::mixed_head_readers_are_refused_before_settings_or_units_are_written",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "head_touch::invalid_mute_path_and_unknown_reader_are_refused",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "head_touch::pr2948_settings_off_preserves_the_old_head_reader",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "head_touch::settings_off_refuses_paired_head_readers_with_legacy_pins",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "no_line_is_asked_when_systemd_itself_cannot_be_asked",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "head_touch::pr2948_settings_on_keeps_a_head_reader_available",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "no_line_is_asked_of_a_good_switch_and_none_is_said_when_there_is_none",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "head_touch::textually_equal_expanded_head_bus_roots_are_not_a_verified_pair",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "no_network_changes_nothing_and_says_so",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "head_touch::matching_explicit_or_default_head_bus_roots_allow_the_paired_transition",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "head_touch::repeated_projected_pins_keep_their_actual_hash_without_restarting_controls",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "product_skills_written_by_a_switch_cut_short_are_put_back_at_the_next_start",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "only_a_skill_that_would_stop_loading_holds_lamp_skills_back",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "product_skills_go_only_into_installs_folder_and_only_when_it_can_be_written",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "head_touch::third_review_paired_head_readers_on_different_buses_are_refused",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "head_touch::expression_or_controls_bus_mismatch_is_refused_before_any_write",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "restart_order::a_cycle_in_an_older_recovery_journal_is_retained_without_arbitrary_restarts",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "prune_keeps_what_a_model_path_links_to_when_the_state_was_set_aside",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "restart_order::a_cut_at_reload_saves_the_full_old_projection_before_recovery",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "prune_keeps_the_models_of_the_kept_builds",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "restart_order::a_cycle_in_either_candidate_or_rollback_plan_refuses_before_mutation",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "restart_order::a_legacy_journal_uses_saved_declarations_and_unchanged_transitive_dependencies",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "restart_order::empty_saved_order_recovers_files_and_keeps_live_builds_when_inventory_is_unreadable",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "restart_order::after_and_before_order_the_forward_restarts_instead_of_unit_names",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "restart_order::interrupted_recovery_orders_saved_units_despite_a_shuffled_partial_journal",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "restart_order::ordering_does_not_start_inactive_or_restart_unchanged_dependencies",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "restart_order::saved_rollback_order_keeps_transitive_edges_after_an_unchanged_unit_drifts",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "restart_order::rollback_uses_the_saved_old_dependencies_not_the_new_graph_or_its_reverse",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "restart_order::saved_rollback_order_survives_a_newly_unreadable_installed_unit",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "restart_order::saved_rollback_order_survives_an_interrupted_put_back_and_keeps_inactive_units_off",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "restart_quiet::continuous_speech_puts_prerequisites_back_without_restarting_voice",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "restart_quiet::queued_speech_during_a_prerequisite_is_heard_before_restarting_voice",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "head_touch::custom_active_pins_are_kept_and_checked_against_the_reader_pair",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "restart_order::the_product_voices_declared_managed_prerequisites_restart_before_it",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "head_touch::third_review_binary_update_checks_active_build_local_head_pins",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "head_touch::absent_unused_product_pins_do_not_block_active_build_pins_updates",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "install_writes_the_fallback_and_no_round_touches_it",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "self_cuts::runnable_events::controls::a_never_released_first_output_gate_hits_the_startup_watchdog",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "self_cuts::runnable_events::controls::a_partial_first_output_also_starts_the_finish_watchdog",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "self_cuts::runnable_events::controls::a_read_error_restores_flags_and_leaves_the_direct_child_owned",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "self_cuts::runnable_events::controls::an_exited_leader_does_not_make_a_held_output_descriptor_complete",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "head_touch::head_reader_mode_overrides_are_not_guessed_from_base_units",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "self_cuts::runnable_events::controls::first_output_can_follow_a_gate_longer_than_the_old_spawn_watchdog",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "self_cuts::runnable_events::controls::full_output_without_exit_hits_the_absolute_finish_watchdog",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "self_cuts::runnable_events::controls::later_bytes_do_not_renew_the_first_byte_finish_deadline",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "self_cuts::runnable_events::controls::no_output_is_not_readiness",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "self_cuts::runnable_events::controls::output_beyond_the_previous_capture_limit_fails_explicitly",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "lamp_update_back_puts_back_an_unreadable_self_json",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "self_cuts::runnable_events::controls::wrong_payload_nonzero_status_and_non_utf8_cannot_satisfy_the_fixture",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "setup_lifecycle::an_alias_outside_the_lamp_prefix_cannot_bypass_the_product_check",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "setup_lifecycle::a_different_failed_part_still_rolls_back_without_restarting_completed_setup",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "setup_lifecycle::completed_product_setup_keeps_serving_without_restart_or_false_rollback",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "setup_lifecycle::completion_after_the_activity_snapshot_is_rechecked_before_restart",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "setup_lifecycle::chained_and_loaded_aliases_retain_normal_restart_even_without_alias_files",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "setup_lifecycle::completion_removed_during_the_manager_query_is_not_used",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "head_touch::semantic_head_reader_paths_cannot_expand_invocation_variables",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "self_recovery::missing_recovery_also_defers_an_updater_first_climb_without_touching_parts",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "restart_order::malformed_present_rollback_orders_retain_the_prefix_and_do_not_fetch",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "setup_lifecycle::custom_base_units_and_candidate_changes_keep_normal_watch_rules",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "no_second_round_begins_while_lamp_updates_own_switch_waits",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "setup_lifecycle::recovery_rechecks_effective_aliases_after_restoring_the_old_unit",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "setup_lifecycle::reset_removing_completion_before_restart_retains_the_normal_watch",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "setup_lifecycle::reset_removing_completion_before_recovery_restarts_the_old_setup",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "setup_lifecycle::the_exact_product_exit_note_and_merged_usr_layout_keep_the_exception",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "setup_lifecycle::incomplete_product_setup_still_restarts_and_is_watched",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "setup_lifecycle::recovery_keeps_the_true_active_journal_but_does_not_restart_completed_setup",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "the_apps_off_and_on_hold_through_a_round_and_a_restart",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "the_journal_line_is_the_units_own_last_cleaned_and_cut",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "self_recovery::unavailable_recovery_keeps_the_parts_and_can_be_retried_when_armed",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "self_recovery::an_absent_or_unrunnable_fallback_keeps_the_completed_parts_and_old_updater",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "self_recovery::an_unchanged_or_refused_updater_needs_no_recovery_query",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "the_guard_still_refuses_a_persons_skill_the_new_lamp_skills_will_not_load",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "the_old_build_not_well_either_says_the_first_unit_not_wells_line",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "the_fallback_reads_a_self_json_written_by_a_later_updater",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "the_voice_is_not_switched_while_someone_talks_to_the_lamp",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "with_image_on_the_images_files_are_written_and_asound_restarts_the_voice_at_a_quiet_moment",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "with_apply_off_a_builds_settings_are_not_written_and_that_is_said",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "setup_lifecycle::unknown_manager_identity_and_custom_loaded_paths_keep_normal_watch",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "with_apply_on_a_builds_settings_are_written_at_the_switch_and_the_part_reading_one_restarted",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "with_image_off_the_images_files_are_not_written_and_that_is_said",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "without_apply_nothing_is_written_and_what_would_change_is_said",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "with_the_switch_off_a_build_with_other_models_is_refused",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "with_the_switch_off_a_lamps_own_model_is_kept_as_with_it_on",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "setup_lifecycle::uncertain_override_files_do_not_hang_or_grant_the_exception",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "with_the_switch_off_an_updater_too_old_for_a_build_takes_nothing_it_carries",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "self_cuts::without_self_opt_in_parts_update_but_no_handover_prefix_is_written",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "with_the_switch_off_lamp_update_never_switches_itself",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "head_touch::stale_unused_product_pins_do_not_block_active_build_pins_updates",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "setup_lifecycle::unknown_dropins_at_each_scope_keep_normal_watch_rules",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "self_cuts::cut_after_candidate_is_synced_keeps_old_runnable_and_reuses_candidate",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "self_cuts::cut_after_confirmation_clears_pending_keeps_new_runnable_on_restart",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "with_models_off_a_new_updater_confirms_and_the_build_waits_for_models",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "self_cuts::cut_after_pending_is_saved_keeps_old_runnable_and_recovers_before_next_round",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "self_cuts::cut_after_current_moves_keeps_new_runnable_and_can_confirm_or_put_back",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "name": "self_cuts::interrupted_put_back_keeps_a_runnable_current_and_finishes_on_restart",
+      "status": "ok"
+    },
+    {
+      "header": "Running tests/self_cli_exec.rs (<target>/debug/deps/self_cli_exec-7a8efcc313003c4d)",
+      "name": "actual_cli_exec_confirms_before_the_next_round",
+      "status": "ignored, requires Linux ARM64/x86-64 ptrace"
+    },
+    {
+      "header": "Running tests/self_process_cuts.rs (<target>/debug/deps/self_process_cuts-9807238ddc4f9970)",
+      "name": "persisted_self_switches_survive_sigkill",
+      "status": "ignored, requires Linux syscall tracing"
+    }
+  ],
+  "cases": [
+    [
+      "apply::tests::a_request_with_a_field_it_does_not_know_is_read",
+      "ok"
+    ],
+    [
+      "apply::tests::the_apply_unit_can_write_every_carried_path_and_never_names_journald",
+      "ok"
+    ],
+    [
+      "apply::tests::a_path_both_a_setting_and_an_image_file_is_refused_with_nothing_written",
+      "ok"
+    ],
+    [
+      "apply::tests::the_tmpfiles_install_writes_is_one_it_shipped",
+      "ok"
+    ],
+    [
+      "apply::tests::a_setting_the_lamp_removed_stays_removed_and_one_never_there_is_written",
+      "ok"
+    ],
+    [
+      "apply::tests::a_signed_image_file_outside_the_list_is_refused_with_nothing_written",
+      "ok"
+    ],
+    [
+      "apply::tests::an_envelope_signed_with_another_key_or_of_another_build_writes_nothing",
+      "ok"
+    ],
+    [
+      "apply::tests::without_a_request_nothing_is_done",
+      "ok"
+    ],
+    [
+      "check_units::tests::a_masked_unit_fails_an_implicit_slice_does_not_and_white_space_shows",
+      "ok"
+    ],
+    [
+      "check_units::tests::a_units_own_path_line_is_its_text_and_hides_nothing",
+      "ok"
+    ],
+    [
+      "check_units::tests::exactly_the_product_passes_and_a_unit_from_elsewhere_does_not",
+      "ok"
+    ],
+    [
+      "check_units::tests::same_changed_drop_in_extra_and_missing_are_each_said_and_fail_the_check",
+      "ok"
+    ],
+    [
+      "check_units::tests::systemctl_cat_is_read_file_by_file_and_a_comment_with_a_path_is_no_file",
+      "ok"
+    ],
+    [
+      "check_units::tests::the_images_unit_is_the_images_not_extra_and_compared_with_its_variant",
+      "ok"
+    ],
+    [
+      "check_units::tests::the_product_as_install_writes_it_passes",
+      "ok"
+    ],
+    [
+      "fetch::tests::a_chunked_file_and_one_to_the_end",
+      "ok"
+    ],
+    [
+      "apply::tests::a_unit_systemd_cannot_load_writes_nothing",
+      "ok"
+    ],
+    [
+      "fetch::tests::a_file_by_its_length_after_a_redirect",
+      "ok"
+    ],
+    [
+      "apply::tests::a_new_skills_folder_is_removed_when_it_is_put_back_and_a_folder_in_use_stays",
+      "ok"
+    ],
+    [
+      "apply::tests::a_removed_setting_goes_only_where_it_is_still_the_builds",
+      "ok"
+    ],
+    [
+      "fetch::tests::a_release_file_from_github",
+      "ignored"
+    ],
+    [
+      "fetch::tests::an_answered_lookup_is_counted_out_before_its_answer_arrives",
+      "ok"
+    ],
+    [
+      "fetch::tests::a_folder_on_the_lamp",
+      "ok"
+    ],
+    [
+      "fetch::tests::missing_too_large_short_and_other_answers",
+      "ok"
+    ],
+    [
+      "fetch::tests::a_name_lookup_that_hangs_is_given_up_and_no_round_starts_another_until_it_ends",
+      "ok"
+    ],
+    [
+      "fetch::tests::no_network_is_unreachable",
+      "ok"
+    ],
+    [
+      "apply::tests::a_setting_still_the_builds_is_written_and_one_the_lamp_changed_is_kept",
+      "ok"
+    ],
+    [
+      "fetch::tests::urls_and_redirects",
+      "ok"
+    ],
+    [
+      "head_touch::tests::null_masks_do_not_admit_other_character_devices",
+      "ok"
+    ],
+    [
+      "image::tests::a_file_not_listed_as_shipped_is_refused",
+      "ok"
+    ],
+    [
+      "image::tests::a_unit_reloads_systemd_a_rule_reloads_udev_and_asound_restarts_the_voice",
+      "ok"
+    ],
+    [
+      "apply::tests::a_put_back_asked_again_after_being_cut_short_puts_every_record_back",
+      "ok"
+    ],
+    [
+      "apply::tests::put_back_keeps_a_file_changed_since_and_a_stale_back_file_is_not_used",
+      "ok"
+    ],
+    [
+      "image::tests::every_image_file_of_every_variant_is_listed_as_shipped",
+      "ok"
+    ],
+    [
+      "image::tests::journald_is_never_restarted_nor_signalled",
+      "ok"
+    ],
+    [
+      "install::tests::a_timed_service_is_never_enabled_and_its_timer_is",
+      "ok"
+    ],
+    [
+      "install::tests::a_unit_through_current_is_read",
+      "ok"
+    ],
+    [
+      "install::tests::every_deploy_product_unit_is_installed_or_named_left_out",
+      "ok"
+    ],
+    [
+      "install::tests::every_product_part_starts_through_its_current_link",
+      "ok"
+    ],
+    [
+      "install::tests::every_tool_the_factory_steps_run_is_installed_where_they_look",
+      "ok"
+    ],
+    [
+      "install::tests::no_product_unit_names_a_lamp",
+      "ok"
+    ],
+    [
+      "image::tests::the_variant_is_the_images_and_none_is_standard",
+      "ok"
+    ],
+    [
+      "install::tests::offsets_are_read",
+      "ok"
+    ],
+    [
+      "install::tests::the_cloud_is_enabled_with_the_lamp",
+      "ok"
+    ],
+    [
+      "install::tests::the_eyes_camera_helper_socket_is_enabled_and_names_the_eyes_camera",
+      "ok"
+    ],
+    [
+      "apply::tests::without_the_image_asked_or_from_an_older_copy_none_is_written",
+      "ok"
+    ],
+    [
+      "install::tests::the_skills_manage_socket_is_enabled_and_its_template_is_not",
+      "ok"
+    ],
+    [
+      "install::tests::the_wifi_helper_is_never_listed_without_its_restore_at_boot",
+      "ok"
+    ],
+    [
+      "judge::tests::a_part_that_stays_up_with_one_process_and_says_it_is_well_is_well",
+      "ok"
+    ],
+    [
+      "judge::tests::restarted_failed_or_another_process_is_not_well",
+      "ok"
+    ],
+    [
+      "apply::tests::put_back_restores_each_file_byte_for_byte_and_its_mode",
+      "ok"
+    ],
+    [
+      "judge::tests::the_part_s_own_word_counts_against_what_it_said_before",
+      "ok"
+    ],
+    [
+      "manifest::tests::a_build_for_a_newer_updater_is_refused_by_an_older_one_only",
+      "ok"
+    ],
+    [
+      "manifest::tests::a_key_made_by_openssl_signs_as_well",
+      "ok"
+    ],
+    [
+      "manifest::tests::a_manifest_without_min_updater_is_written_and_read_as_before",
+      "ok"
+    ],
+    [
+      "manifest::tests::a_newer_manifest_this_updater_cannot_read_is_refused_for_its_updater",
+      "ok"
+    ],
+    [
+      "manifest::tests::a_sealed_manifest_opens_with_its_key_and_gives_back_its_bytes",
+      "ok"
+    ],
+    [
+      "apply::tests::the_images_files_are_written_where_the_lamp_has_one_the_image_shipped",
+      "ok"
+    ],
+    [
+      "apply::tests::the_variants_file_is_written_and_none_of_another",
+      "ok"
+    ],
+    [
+      "manifest::tests::an_image_file_outside_the_list_listed_twice_or_not_its_sha_is_refused",
+      "ok"
+    ],
+    [
+      "manifest::tests::a_setting_with_a_field_it_does_not_know_is_still_read",
+      "ok"
+    ],
+    [
+      "manifest::tests::another_key_a_changed_byte_or_a_changed_signature_is_refused",
+      "ok"
+    ],
+    [
+      "manifest::tests::min_updater_is_signed_with_the_rest",
+      "ok"
+    ],
+    [
+      "manifest::tests::models_are_read_only_with_the_updater_they_need_and_plain_paths",
+      "ok"
+    ],
+    [
+      "manifest::tests::names_are_plain",
+      "ok"
+    ],
+    [
+      "manifest::tests::min_updater_raised_under_the_same_signature_is_a_bad_signature",
+      "ok"
+    ],
+    [
+      "manifest::tests::settings_are_read_only_with_the_updater_they_need_and_their_own_paths",
+      "ok"
+    ],
+    [
+      "manifest::tests::nothing_but_a_plain_manifest_is_signed_or_taken",
+      "ok"
+    ],
+    [
+      "manifest::tests::the_reset_plan_is_read_only_with_its_updater_and_its_own_path",
+      "ok"
+    ],
+    [
+      "models::tests::a_link_into_the_store_is_relative_and_a_unit_reads_by_path_or_folder",
+      "ok"
+    ],
+    [
+      "product_skills::tests::only_plain_paths_in_the_skills_it_names_are_taken",
+      "ok"
+    ],
+    [
+      "quiet::tests::a_voice_that_says_nothing_is_never_quiet",
+      "ok"
+    ],
+    [
+      "quiet::tests::forty_five_seconds_of_nothing_after_the_last_word",
+      "ok"
+    ],
+    [
+      "quiet::tests::hearing_thinking_or_speaking_is_a_turn",
+      "ok"
+    ],
+    [
+      "quiet::tests::quiet_needs_as_long_a_watch",
+      "ok"
+    ],
+    [
+      "records::tests::a_state_from_before_the_settings_reads_and_writes_as_before",
+      "ok"
+    ],
+    [
+      "product_skills::tests::the_bundle_of_the_repository_is_what_install_writes",
+      "ok"
+    ],
+    [
+      "apply::tests::unrecorded_tmpfiles_an_install_shipped_are_the_builds_and_others_the_lamps",
+      "ok"
+    ],
+    [
+      "records::tests::a_state_that_cannot_be_read_is_kept_aside",
+      "ok"
+    ],
+    [
+      "records::tests::one_at_a_time",
+      "ok"
+    ],
+    [
+      "records::tests::write_records_fixtures",
+      "ignored, writes records fixtures: run by hand with LAMP_UPDATE_RECORDS_FIXTURE set"
+    ],
+    [
+      "setup_lifecycle::tests::incomplete_duplicate_or_malformed_manager_records_are_unknown",
+      "ok"
+    ],
+    [
+      "apply::tests::the_tmpfiles_are_created_only_when_they_are_there",
+      "ok"
+    ],
+    [
+      "setup_lifecycle::tests::manager_identity_requires_the_exact_loaded_product_with_known_dropins",
+      "ok"
+    ],
+    [
+      "records::tests::a_link_left_beside_is_replaced_and_never_written_through",
+      "ok"
+    ],
+    [
+      "status::tests::the_value_lasts_three_periods_so_a_dead_updater_reads_stale",
+      "ok"
+    ],
+    [
+      "unit::restart_order::tests::a_declared_socket_precedes_its_service",
+      "ok"
+    ],
+    [
+      "apply::tests::put_back_restores_the_images_files_and_reloads_again",
+      "ok"
+    ],
+    [
+      "unit::restart_order::tests::a_path_through_an_unchanged_unit_still_orders_its_ends",
+      "ok"
+    ],
+    [
+      "unit::restart_order::tests::cycles_including_self_edges_are_refused",
+      "ok"
+    ],
+    [
+      "unit::restart_order::tests::repeated_and_folded_declarations_keep_each_edge",
+      "ok"
+    ],
+    [
+      "unit::restart_order::tests::requirements_and_directives_in_other_sections_do_not_order_units",
+      "ok"
+    ],
+    [
+      "unit::restart_order::tests::unsupported_ordering_cannot_silently_lose_a_dependency",
+      "ok"
+    ],
+    [
+      "unit::restart_order::tests::the_shipped_managed_services_have_a_valid_startup_graph",
+      "ok"
+    ],
+    [
+      "unit::tests::comments_do_not_make_a_unit_another",
+      "ok"
+    ],
+    [
+      "unit::tests::a_new_build_is_written_everywhere_the_folder_is_named",
+      "ok"
+    ],
+    [
+      "unit::tests::lamp_4aces_own_units_are_read",
+      "ok"
+    ],
+    [
+      "unit::tests::only_a_part_installed_by_build_is_a_program",
+      "ok"
+    ],
+    [
+      "records::tests::a_state_from_a_later_build_keeps_its_fields_across_a_save",
+      "ok"
+    ],
+    [
+      "records::tests::each_kept_state_and_journal_reads_as_saved",
+      "ok"
+    ],
+    [
+      "unit::tests::the_generic_package_sets_up_and_resets_as_the_product_does",
+      "ok"
+    ],
+    [
+      "publish::tests::the_images_files_are_carried_with_the_updater_they_need",
+      "ok"
+    ],
+    [
+      "unit::tests::the_generic_voice_runs_the_ring_as_the_product_does",
+      "ok"
+    ],
+    [
+      "unit::tests::the_generic_voice_says_its_failures_as_the_product_does",
+      "ok"
+    ],
+    [
+      "unit::tests::the_generic_voice_has_the_product_clock_and_session_context",
+      "ok"
+    ],
+    [
+      "product_skills::tests::a_link_in_place_of_a_core_file_is_put_back_and_never_read",
+      "ok"
+    ],
+    [
+      "unit::tests::the_generic_voice_answers_whom_the_product_does",
+      "ok"
+    ],
+    [
+      "publish::tests::the_products_settings_are_carried_with_the_updater_they_need",
+      "ok"
+    ],
+    [
+      "world::query::tests::public_output_refuses_invalid_utf8_instead_of_a_partial_string",
+      "ok"
+    ],
+    [
+      "world::query::tests::query_reads_output_with_closed_stdin_and_discarded_stderr",
+      "ok"
+    ],
+    [
+      "world::tests::self_recovery_accepts_an_armed_timer_and_an_inactive_service",
+      "ok"
+    ],
+    [
+      "world::tests::self_recovery_refuses_a_timer_not_armed_persistently",
+      "ok"
+    ],
+    [
+      "world::query::tests::query_refuses_nonzero_exit_and_spawn_failure",
+      "ok"
+    ],
+    [
+      "world::tests::self_recovery_refuses_malformed_or_unexpected_query_records",
+      "ok"
+    ],
+    [
+      "world::tests::self_recovery_refuses_an_unloaded_masked_or_ephemeral_service",
+      "ok"
+    ],
+    [
+      "world::tests::systemctl_show_is_read_unit_by_unit",
+      "ok"
+    ],
+    [
+      "world::tests::self_recovery_requires_one_of_each_record_and_required_property",
+      "ok"
+    ],
+    [
+      "publish::tests::models_are_carried_with_the_updater_they_need",
+      "ok"
+    ],
+    [
+      "world::tests::the_real_disk_has_room",
+      "ok"
+    ],
+    [
+      "status::tests::the_status_is_the_records_build_the_phase_and_the_last_end_without_its_reason",
+      "ok"
+    ],
+    [
+      "product_skills::tests::each_file_is_one_of_three",
+      "ok"
+    ],
+    [
+      "records::tests::state_journal_and_previous_units_are_kept",
+      "ok"
+    ],
+    [
+      "product_skills::tests::what_is_written_is_put_back_and_a_file_changed_since_is_left",
+      "ok"
+    ],
+    [
+      "apply::tests::a_reload_that_fails_fails_the_apply_and_a_speaker_that_fails_is_said",
+      "ok"
+    ],
+    [
+      "publish::tests::binaries_and_each_lamps_units_but_nothing_else",
+      "ok"
+    ],
+    [
+      "world::query::tests::public_output_accepts_one_mib_and_refuses_one_byte_more",
+      "ok"
+    ],
+    [
+      "apply::tests::the_apply_path_never_restarts_or_signals_journald",
+      "ok"
+    ],
+    [
+      "status::tests::a_restart_keeps_the_last_result_each_end_is_said_and_it_is_said_again",
+      "ok"
+    ],
+    [
+      "world::tests::the_bus_hears_the_voice_and_not_an_old_state",
+      "ok"
+    ],
+    [
+      "world::query::tests::a_failed_query_cleans_its_same_group_child_even_after_output_closes",
+      "ok"
+    ],
+    [
+      "world::query::tests::invalid_utf8_cleans_closed_output_child",
+      "ok"
+    ],
+    [
+      "world::query::tests::query_deadline_applies_after_stdout_closes",
+      "ok"
+    ],
+    [
+      "world::query::tests::query_timeout_cleans_the_exited_leaders_pipe_holding_descendant",
+      "ok"
+    ],
+    [
+      "the_product_voice_s_functions_in_a_process_of_their_own",
+      "ok"
+    ],
+    [
+      "the_generic_voice_declares_the_clock_and_receives_time_and_session_context",
+      "ok"
+    ],
+    [
+      "with_reports_on_dance_stays_at_the_bound",
+      "ok"
+    ],
+    [
+      "a_product_chat_request_offers_dance_at_the_bound",
+      "ok"
+    ],
+    [
+      "a_product_lamp_declares_every_function_it_has_within_the_bound",
+      "ok"
+    ],
+    [
+      "a_build_without_a_part_is_refused_before_anything_is_written",
+      "ok"
+    ],
+    [
+      "a_file_left_beside_by_a_run_cut_off_does_not_lend_its_mode_to_the_key",
+      "ok"
+    ],
+    [
+      "a_file_that_does_not_match_installs_nothing_of_it",
+      "ok"
+    ],
+    [
+      "a_moved_lamp_is_given_the_product_voices_five_lines",
+      "ok"
+    ],
+    [
+      "a_newer_default_replaces_only_a_setting_nobody_changed",
+      "ok"
+    ],
+    [
+      "a_product_lamp_without_a_link_says_so_once_and_never_drops_speech_in_silence",
+      "ok"
+    ],
+    [
+      "a_blank_lamp_runs_every_product_skill_as_the_skill",
+      "ok"
+    ],
+    [
+      "a_build_without_the_bodys_factory_tools_still_installs",
+      "ok"
+    ],
+    [
+      "a_device_key_found_open_is_narrowed_and_never_said",
+      "ok"
+    ],
+    [
+      "a_blank_lamp_gets_every_part_its_units_and_nothing_started",
+      "ok"
+    ],
+    [
+      "a_key_a_reset_removed_is_never_put_back_from_v1s_config",
+      "ok"
+    ],
+    [
+      "a_closed_etc_lampos_is_said_and_left_as_it_is",
+      "ok"
+    ],
+    [
+      "a_failed_exit_note_write_keeps_reload_debt_for_the_next_install",
+      "ok"
+    ],
+    [
+      "a_default_found_closed_is_opened_and_a_lamps_own_found_closed_is_said",
+      "ok"
+    ],
+    [
+      "a_setting_written_but_not_yet_recorded_is_still_installs",
+      "ok"
+    ],
+    [
+      "a_disabled_core_skill_turned_on_stays_on_through_an_install",
+      "ok"
+    ],
+    [
+      "every_part_of_the_brain_has_a_product_unit",
+      "ok"
+    ],
+    [
+      "every_part_of_the_lamp_waits_for_setups_marker_itself",
+      "ok"
+    ],
+    [
+      "every_skill_folder_is_in_the_product_or_says_why_not",
+      "ok"
+    ],
+    [
+      "a_lamp_set_up_before_setup_wrote_zone_env_gets_its_saved_zone_at_the_next_install",
+      "ok"
+    ],
+    [
+      "a_missing_store_drop_in_is_repaired_and_failed_reload_is_retried",
+      "ok"
+    ],
+    [
+      "a_refused_service_install_records_nothing_and_keeps_the_drop_in",
+      "ok"
+    ],
+    [
+      "a_newer_build_moves_each_link_and_keeps_the_old_folders",
+      "ok"
+    ],
+    [
+      "a_lamps_own_pins_gain_the_privacy_section_and_keep_the_rest",
+      "ok"
+    ],
+    [
+      "a_lamps_own_pins_on_the_old_guess_get_every_head_line",
+      "ok"
+    ],
+    [
+      "a_reset_then_prepare_does_not_restore_the_old_key",
+      "ok"
+    ],
+    [
+      "an_install_stopped_after_writing_its_units_enables_at_the_next_run",
+      "ok"
+    ],
+    [
+      "harness_versions_are_read_as_harness_prints_them",
+      "ok"
+    ],
+    [
+      "head_touch_comes_whole_and_never_beside_the_old_engines_head",
+      "ok"
+    ],
+    [
+      "a_setting_changed_on_the_lamp_is_kept_when_install_runs_again",
+      "ok"
+    ],
+    [
+      "an_install_whose_enable_failed_enables_at_the_next_run_and_keeps_its_settings_record",
+      "ok"
+    ],
+    [
+      "a_setting_in_the_way_stops_the_install_before_any_is_written",
+      "ok"
+    ],
+    [
+      "head_touch_preflight_files::directory_drop_in_is_refused_before_mutation",
+      "ok"
+    ],
+    [
+      "an_install_puts_a_core_skills_changed_file_back_and_says_so",
+      "ok"
+    ],
+    [
+      "head_touch_preflight_files::fifo_body_calibration_is_refused_before_mutation",
+      "ok"
+    ],
+    [
+      "harness_at_boot_gives_lamposs_manager_its_home_first",
+      "ok"
+    ],
+    [
+      "harness_off_after_a_first_install_leaves_no_linger",
+      "ok"
+    ],
+    [
+      "a_set_aside_holds_for_keys_there_and_after_a_mark_that_was_not_saved",
+      "ok"
+    ],
+    [
+      "harness_off_runs_uninstall_stop_status_then_the_linger_then_pgrep",
+      "ok"
+    ],
+    [
+      "head_touch_preflight_files::fifo_drop_in_is_refused_before_mutation",
+      "ok"
+    ],
+    [
+      "head_touch_preflight_files::fifo_without_a_writer_is_refused_before_mutation",
+      "ok"
+    ],
+    [
+      "install_places_the_voices_recorded_lines_where_the_product_voice_reads_them",
+      "ok"
+    ],
+    [
+      "harness_on_installs_with_harnesss_own_installer_then_sets_it_at_boot",
+      "ok"
+    ],
+    [
+      "install_head_body_refuses_calibration_environment_overrides_before_mutation",
+      "ok"
+    ],
+    [
+      "harness_on_keeps_a_harness_already_there",
+      "ok"
+    ],
+    [
+      "harness_on_stops_at_a_failing_step_and_leaves_no_link",
+      "ok"
+    ],
+    [
+      "install_review_head_pair_refuses_a_disabling_drop_in_before_mutation",
+      "ok"
+    ],
+    [
+      "install_review_head_pair_refuses_a_removed_mute_before_mutation",
+      "ok"
+    ],
+    [
+      "install_review_head_pair_refusal_precedes_state_and_host_mutation",
+      "ok"
+    ],
+    [
+      "head_touch_preflight_files::dev_null_drop_in_mask_is_preserved",
+      "ok"
+    ],
+    [
+      "lamp_update_back_waits_for_its_binary_rather_than_failing",
+      "ok"
+    ],
+    [
+      "head_touch_preflight_files::dangling_drop_in_keeps_missing_file_compatibility",
+      "ok"
+    ],
+    [
+      "corrupt_records_are_set_aside_and_never_bring_back_a_key_a_reset_removed",
+      "ok"
+    ],
+    [
+      "prepare_places_the_recorded_lines_a_moved_lamps_voice_reads",
+      "ok"
+    ],
+    [
+      "head_touch_preflight_files::missing_local_files_keep_install_compatibility",
+      "ok"
+    ],
+    [
+      "head_touch_preflight_files::symlink_to_regular_drop_in_is_preserved",
+      "ok"
+    ],
+    [
+      "head_touch_preflight_files::regular_benign_drop_in_is_preserved",
+      "ok"
+    ],
+    [
+      "product_units_pass_only_options_an_older_binary_takes",
+      "ok"
+    ],
+    [
+      "install_head_body_keeps_factory_calibration",
+      "ok"
+    ],
+    [
+      "prepare_sets_corrupt_records_aside_and_leaves_unreadable_ones_alone",
+      "ok"
+    ],
+    [
+      "install_places_every_exit_note_hook_and_keeps_other_drop_ins",
+      "ok"
+    ],
+    [
+      "install_prepares_store_off_and_keeps_the_lamps_store_choice",
+      "ok"
+    ],
+    [
+      "second_review_body_head_off_refuses_before_bundle_mutation",
+      "ok"
+    ],
+    [
+      "settings_written_before_one_that_fails_are_still_installs",
+      "ok"
+    ],
+    [
+      "the_exit_note_allowlist_is_exactly_clouds_product_services",
+      "ok"
+    ],
+    [
+      "the_device_key_is_provisioned_private_and_only_where_missing",
+      "ok"
+    ],
+    [
+      "the_parts_that_keep_local_time_read_the_zone_setup_saves",
+      "ok"
+    ],
+    [
+      "install_review_head_pair_keeps_a_benign_drop_in",
+      "ok"
+    ],
+    [
+      "the_pinned_models_are_the_ones_their_parts_check",
+      "ok"
+    ],
+    [
+      "the_plans_install_shipped_are_listed",
+      "ok"
+    ],
+    [
+      "the_product_full_look_is_on_in_both_units_with_one_file",
+      "ok"
+    ],
+    [
+      "the_product_keeps_nothing_personal_while_nobody_is_known",
+      "ok"
+    ],
+    [
+      "the_product_sees_who_speaks",
+      "ok"
+    ],
+    [
+      "the_product_skills_are_exactly_the_core_skills",
+      "ok"
+    ],
+    [
+      "the_skills_tools_are_in_their_own_folder_which_the_voice_reads",
+      "ok"
+    ],
+    [
+      "the_tasks_part_closes_the_harness_a_told_task_started",
+      "ok"
+    ],
+    [
+      "install_records_the_tmpfiles_it_writes",
+      "ok"
+    ],
+    [
+      "install_review_head_pair_retry_keeps_calibration_and_is_idempotent",
+      "ok"
+    ],
+    [
+      "time_of_day_parts_wait_for_the_kernel_to_say_the_clock_is_set",
+      "ok"
+    ],
+    [
+      "tmpfiles_make_lock_folders_the_parts_accept_and_the_voices_sessions_folder",
+      "ok"
+    ],
+    [
+      "two_failed_runs_in_a_row_keep_a_written_setting_as_installs",
+      "ok"
+    ],
+    [
+      "music_sway_and_watch_you_leave_are_on_in_the_product",
+      "ok"
+    ],
+    [
+      "what_harness_service_status_still_has_is_read_from_its_json",
+      "ok"
+    ],
+    [
+      "missing_models_are_fetched_checked_and_placed_and_a_lamps_own_is_kept",
+      "ok"
+    ],
+    [
+      "run_twice_it_changes_nothing",
+      "ok"
+    ],
+    [
+      "without_a_usable_key_nothing_is_written_and_the_key_is_never_said",
+      "ok"
+    ],
+    [
+      "prepare_then_reset_then_install_does_not_restore_the_old_key",
+      "ok"
+    ],
+    [
+      "product_routine_state_is_private_persistent_and_keeps_new_switches_off",
+      "ok"
+    ],
+    [
+      "the_builds_plan_already_there_is_no_change_and_no_backup",
+      "ok"
+    ],
+    [
+      "the_installed_bedtime_skill_is_disabled_and_absent_from_live_catalogs",
+      "ok"
+    ],
+    [
+      "the_tasks_part_waits_for_harness_rather_than_failing",
+      "ok"
+    ],
+    [
+      "the_second_route_gets_its_services_on_the_voices_key_and_a_lamps_own_is_kept",
+      "ok"
+    ],
+    [
+      "unreadable_records_stop_install_rather_than_being_written_over",
+      "ok"
+    ],
+    [
+      "install_setup_on_replaces_a_hand_placed_plan_and_keeps_the_old_in_the_records",
+      "ok"
+    ],
+    [
+      "harness_is_set_to_start_at_boot_once_when_it_is_there",
+      "ok"
+    ],
+    [
+      "setup_settings_are_written_only_with_setup_on_and_kept_once_changed",
+      "ok"
+    ],
+    [
+      "the_voice_gets_its_service_and_the_lamps_device_key_from_v1s_config",
+      "ok"
+    ],
+    [
+      "what_harness_still_has_is_said_and_without_harness_the_record_is_kept",
+      "ok"
+    ],
+    [
+      "harness_on_updates_its_own_older_harness_and_says_one_too_old",
+      "ok"
+    ],
+    [
+      "without_setup_on_a_plan_there_follows_the_build_and_none_is_never_added",
+      "ok"
+    ],
+    [
+      "a_failing_step_keeps_the_record_and_a_later_run_finishes",
+      "ok"
+    ],
+    [
+      "ci_paths::the_scan_sees_paths_in_strings_and_not_in_comments_or_prose",
+      "ok"
+    ],
+    [
+      "image_journal::the_journal_is_kept_well_inside_the_ram_disk",
+      "ok"
+    ],
+    [
+      "image_ramlog::logrotate_runs_the_lamps_copy_back_in_place_of_the_bases",
+      "ok"
+    ],
+    [
+      "image_ramlog::ramlogs_stop_keeps_the_journal_before_its_own_stop",
+      "ok"
+    ],
+    [
+      "image_ramlog::the_defaults_keep_the_bases_settings",
+      "ok"
+    ],
+    [
+      "scratch_paths::the_names_read_are_the_scratch_folders_only",
+      "ok"
+    ],
+    [
+      "image_journal::systemd_reads_it_last_beside_another_drop_in",
+      "ok"
+    ],
+    [
+      "image_ramlog::ramlogs_copies_leave_the_journal_out",
+      "ok"
+    ],
+    [
+      "image_ramlog::the_copy_back_leaves_the_journal_alone",
+      "ok"
+    ],
+    [
+      "scratch_paths::no_two_files_of_a_test_binary_build_the_same_scratch_folder",
+      "ok"
+    ],
+    [
+      "image_ramlog::the_last_two_boots_are_kept_at_shutdown_only",
+      "ok"
+    ],
+    [
+      "ci_paths::every_doc_a_crate_reads_is_named_back_in_the_workflows_pull_request_paths",
+      "ok"
+    ],
+    [
+      "image_ramlog::a_failed_move_keeps_the_kept_boots_and_says_so",
+      "ok"
+    ],
+    [
+      "release_6408_recovers_a_cut_written_by_release_6449",
+      "ignored, needs the two pinned ARM64 artifacts and the owned offline Docker context"
+    ],
+    [
+      "release_6449_recovers_a_cut_written_by_release_6408",
+      "ignored, needs the two pinned ARM64 artifacts and the owned offline Docker context"
+    ],
+    [
+      "a_command_is_read_within_its_bound_and_killed_after",
+      "ok"
+    ],
+    [
+      "a_disk_too_full_for_a_second_copy_is_refused_before_anything_is_written",
+      "ok"
+    ],
+    [
+      "a_lamp_short_of_room_for_the_models_refuses_before_fetching",
+      "ok"
+    ],
+    [
+      "a_bad_signature_or_a_bad_checksum_is_refused_with_nothing_installed",
+      "ok"
+    ],
+    [
+      "a_build_for_a_newer_updater_is_refused_and_taken_once_the_updater_can",
+      "ok"
+    ],
+    [
+      "a_lamp_update_back_from_before_the_plan_writes_the_rest_and_the_round_says_so",
+      "ok"
+    ],
+    [
+      "a_build_of_only_new_product_skills_places_them_and_restarts_nothing",
+      "ok"
+    ],
+    [
+      "a_changed_model_is_fetched_checked_and_switched_with_its_part",
+      "ok"
+    ],
+    [
+      "a_build_put_back_puts_its_settings_back_byte_for_byte",
+      "ok"
+    ],
+    [
+      "a_hardware_profile_that_cannot_be_read_never_fails_the_round",
+      "ok"
+    ],
+    [
+      "a_build_put_back_puts_the_old_reset_plan_back",
+      "ok"
+    ],
+    [
+      "a_build_put_back_puts_the_images_files_back",
+      "ok"
+    ],
+    [
+      "a_lamp_without_lamp_update_apply_puts_the_build_back_with_nothing_written",
+      "ok"
+    ],
+    [
+      "a_lamp_with_no_reset_plan_gets_none_from_a_round",
+      "ok"
+    ],
+    [
+      "a_folder_made_two_builds_ago_is_removed_and_one_never_made_is_kept",
+      "ok"
+    ],
+    [
+      "a_lamps_own_asound_is_kept_and_the_voice_not_restarted_for_it",
+      "ok"
+    ],
+    [
+      "a_link_switch_cut_short_is_put_back_at_the_next_start",
+      "ok"
+    ],
+    [
+      "a_model_fetch_cut_by_the_network_is_unreachable_not_refused",
+      "ok"
+    ],
+    [
+      "a_model_that_does_not_match_its_sha_refuses_the_build_with_nothing_switched",
+      "ok"
+    ],
+    [
+      "a_model_only_switch_cut_short_restarts_the_part_that_reads_it",
+      "ok"
+    ],
+    [
+      "a_model_switch_cut_short_is_put_back_at_the_next_start",
+      "ok"
+    ],
+    [
+      "a_linked_part_that_dies_is_put_back_by_its_link",
+      "ok"
+    ],
+    [
+      "a_model_that_cannot_be_put_back_leaves_the_others_put_back_and_the_journal_kept",
+      "ok"
+    ],
+    [
+      "a_model_switch_whose_part_dies_puts_the_model_back",
+      "ok"
+    ],
+    [
+      "a_core_skill_turned_on_stays_on_through_a_round",
+      "ok"
+    ],
+    [
+      "a_new_build_is_installed_beside_the_old_and_switched",
+      "ok"
+    ],
+    [
+      "a_linked_part_keeps_its_build_and_the_one_before",
+      "ok"
+    ],
+    [
+      "a_lamp_with_an_old_reset_plan_updated_by_a_round_ends_with_the_builds_and_a_backup",
+      "ok"
+    ],
+    [
+      "a_new_worker_beside_an_unchanged_voice_gets_a_folder_named_by_its_list",
+      "ok"
+    ],
+    [
+      "a_part_that_says_it_is_in_error_is_put_back_after_its_minute",
+      "ok"
+    ],
+    [
+      "a_part_whose_folder_is_gone_is_installed_afresh",
+      "ok"
+    ],
+    [
+      "a_build_put_back_puts_the_product_skills_back",
+      "ok"
+    ],
+    [
+      "a_part_put_back_says_its_restarts_and_last_line_in_the_outcome_only",
+      "ok"
+    ],
+    [
+      "a_part_that_dies_is_put_back_and_its_build_refused",
+      "ok"
+    ],
+    [
+      "a_product_lamp_without_a_tmpfiles_record_takes_the_builds_tmpfiles",
+      "ok"
+    ],
+    [
+      "a_reset_plan_changed_on_the_lamp_is_replaced_by_a_round_never_kept",
+      "ok"
+    ],
+    [
+      "a_round_that_cannot_place_second_json_writes_no_unit",
+      "ok"
+    ],
+    [
+      "a_round_places_second_json_before_a_voice_unit_that_needs_it",
+      "ok"
+    ],
+    [
+      "a_round_with_nothing_to_change_only_checks",
+      "ok"
+    ],
+    [
+      "a_round_does_not_switch_lamp_skills_onto_checks_its_old_folders_fail",
+      "ok"
+    ],
+    [
+      "a_round_puts_a_core_skills_files_back_and_keeps_the_persons_own",
+      "ok"
+    ],
+    [
+      "a_switch_cut_short_is_put_back_at_the_next_start",
+      "ok"
+    ],
+    [
+      "a_round_that_sets_damaged_records_aside_keeps_the_keys_marked",
+      "ok"
+    ],
+    [
+      "a_switch_cut_short_after_its_settings_puts_them_back_at_the_next_start",
+      "ok"
+    ],
+    [
+      "a_unit_the_build_carries_is_carried_with_the_build_written_in",
+      "ok"
+    ],
+    [
+      "a_skill_the_build_removes_leaves_the_turned_on_record_with_one_line",
+      "ok"
+    ],
+    [
+      "a_self_json_the_disk_cannot_give_is_tried_again_next_round",
+      "ok"
+    ],
+    [
+      "a_voice_that_is_well_is_put_back_between_two_turns",
+      "ok"
+    ],
+    [
+      "an_older_build_is_not_taken",
+      "ok"
+    ],
+    [
+      "an_older_lamp_update_back_ignores_the_images_files_and_the_round_says_so",
+      "ok"
+    ],
+    [
+      "a_new_updater_that_confirms_keeps_its_switch",
+      "ok"
+    ],
+    [
+      "an_unchanged_model_is_not_fetched_and_its_file_stays",
+      "ok"
+    ],
+    [
+      "a_round_by_hand_keeps_the_folder_it_runs_from",
+      "ok"
+    ],
+    [
+      "a_self_json_from_a_later_version_still_reads",
+      "ok"
+    ],
+    [
+      "a_round_after_install_keeps_lamp_updates_own_folder",
+      "ok"
+    ],
+    [
+      "a_new_updater_not_confirmed_by_the_deadline_is_put_back",
+      "ok"
+    ],
+    [
+      "a_round_keeping_second_json_still_reaches_deepseek_through_the_relay",
+      "ok"
+    ],
+    [
+      "both_kinds_of_part_switch_in_one_round_each_its_own_way",
+      "ok"
+    ],
+    [
+      "asound_waits_for_a_quiet_moment_within_the_bound_and_then_for_the_next_round",
+      "ok"
+    ],
+    [
+      "an_updater_too_old_for_a_build_not_newer_than_installed_takes_nothing_it_carries",
+      "ok"
+    ],
+    [
+      "an_updater_too_old_for_a_build_without_an_updater_is_refused_with_nothing_written",
+      "ok"
+    ],
+    [
+      "an_unreadable_journal_is_set_aside_and_the_round_goes_on",
+      "ok"
+    ],
+    [
+      "a_new_updater_that_refuses_every_manifest_is_put_back",
+      "ok"
+    ],
+    [
+      "a_new_updater_that_exits_at_once_is_put_back",
+      "ok"
+    ],
+    [
+      "a_round_after_its_own_switch_keeps_the_old_binarys_folder",
+      "ok"
+    ],
+    [
+      "an_unreadable_self_json_with_the_builds_unknown_is_set_aside",
+      "ok"
+    ],
+    [
+      "an_old_updater_climbs_one_updater_a_round",
+      "ok"
+    ],
+    [
+      "an_updater_too_old_for_a_build_takes_only_the_updater_it_carries_then_the_rest",
+      "ok"
+    ],
+    [
+      "an_unreadable_self_json_with_both_builds_known_is_put_back",
+      "ok"
+    ],
+    [
+      "a_cut_inside_the_put_back_of_an_unreadable_self_json_never_turns_it_around",
+      "ok"
+    ],
+    [
+      "head_touch::body_head_on_an_isolated_bus_is_refused_before_writes",
+      "ok"
+    ],
+    [
+      "head_touch::body_head_repeated_exec_start_is_refused_before_writes",
+      "ok"
+    ],
+    [
+      "head_touch::cut_after_pins_apply_restarts_unchanged_controls_after_restoring_old_pins",
+      "ok"
+    ],
+    [
+      "head_touch::custom_head_wiring_is_kept_or_the_reader_transition_is_refused",
+      "ok"
+    ],
+    [
+      "head_touch::head_pins_cannot_change_without_restarting_their_controls_reader",
+      "ok"
+    ],
+    [
+      "head_touch::body_head_calibration_cannot_override_the_sleep_reader",
+      "ok"
+    ],
+    [
+      "head_touch::body_head_mode_and_bus_dropins_are_refused_before_writes",
+      "ok"
+    ],
+    [
+      "head_touch::isolated_voice_controls_bus_is_refused_before_any_write",
+      "ok"
+    ],
+    [
+      "head_touch::failed_head_reader_candidate_restores_exact_old_pins_and_units",
+      "ok"
+    ],
+    [
+      "head_touch::body_head_complete_bundle_preserves_literal_factory_calibration",
+      "ok"
+    ],
+    [
+      "head_touch::paired_head_bus_cannot_diverge_from_voices_enabled_privacy_bus",
+      "ok"
+    ],
+    [
+      "head_touch::body_head_requires_an_enabled_carried_or_installed_sleep_reader",
+      "ok"
+    ],
+    [
+      "head_touch::malformed_environment_quotes_are_not_reader_evidence",
+      "ok"
+    ],
+    [
+      "head_touch::paired_head_readers_without_controls_mute_are_refused_before_writes",
+      "ok"
+    ],
+    [
+      "head_touch::old_apply_helper_pins_mismatch_is_put_back_before_readers_restart",
+      "ok"
+    ],
+    [
+      "head_touch::paired_head_readers_disable_legacy_even_when_signed_pins_enable_it",
+      "ok"
+    ],
+    [
+      "head_touch::environment_only_head_bus_mismatch_is_refused_before_any_write",
+      "ok"
+    ],
+    [
+      "head_touch::head_bus_root_dropins_are_not_guessed_from_base_units",
+      "ok"
+    ],
+    [
+      "head_touch::mixed_head_readers_are_refused_before_settings_or_units_are_written",
+      "ok"
+    ],
+    [
+      "head_touch::invalid_mute_path_and_unknown_reader_are_refused",
+      "ok"
+    ],
+    [
+      "head_touch::pr2948_settings_off_preserves_the_old_head_reader",
+      "ok"
+    ],
+    [
+      "head_touch::settings_off_refuses_paired_head_readers_with_legacy_pins",
+      "ok"
+    ],
+    [
+      "no_line_is_asked_when_systemd_itself_cannot_be_asked",
+      "ok"
+    ],
+    [
+      "head_touch::pr2948_settings_on_keeps_a_head_reader_available",
+      "ok"
+    ],
+    [
+      "no_line_is_asked_of_a_good_switch_and_none_is_said_when_there_is_none",
+      "ok"
+    ],
+    [
+      "head_touch::textually_equal_expanded_head_bus_roots_are_not_a_verified_pair",
+      "ok"
+    ],
+    [
+      "no_network_changes_nothing_and_says_so",
+      "ok"
+    ],
+    [
+      "head_touch::matching_explicit_or_default_head_bus_roots_allow_the_paired_transition",
+      "ok"
+    ],
+    [
+      "head_touch::repeated_projected_pins_keep_their_actual_hash_without_restarting_controls",
+      "ok"
+    ],
+    [
+      "product_skills_written_by_a_switch_cut_short_are_put_back_at_the_next_start",
+      "ok"
+    ],
+    [
+      "only_a_skill_that_would_stop_loading_holds_lamp_skills_back",
+      "ok"
+    ],
+    [
+      "product_skills_go_only_into_installs_folder_and_only_when_it_can_be_written",
+      "ok"
+    ],
+    [
+      "head_touch::third_review_paired_head_readers_on_different_buses_are_refused",
+      "ok"
+    ],
+    [
+      "head_touch::expression_or_controls_bus_mismatch_is_refused_before_any_write",
+      "ok"
+    ],
+    [
+      "restart_order::a_cycle_in_an_older_recovery_journal_is_retained_without_arbitrary_restarts",
+      "ok"
+    ],
+    [
+      "prune_keeps_what_a_model_path_links_to_when_the_state_was_set_aside",
+      "ok"
+    ],
+    [
+      "restart_order::a_cut_at_reload_saves_the_full_old_projection_before_recovery",
+      "ok"
+    ],
+    [
+      "prune_keeps_the_models_of_the_kept_builds",
+      "ok"
+    ],
+    [
+      "restart_order::a_cycle_in_either_candidate_or_rollback_plan_refuses_before_mutation",
+      "ok"
+    ],
+    [
+      "restart_order::a_legacy_journal_uses_saved_declarations_and_unchanged_transitive_dependencies",
+      "ok"
+    ],
+    [
+      "restart_order::empty_saved_order_recovers_files_and_keeps_live_builds_when_inventory_is_unreadable",
+      "ok"
+    ],
+    [
+      "restart_order::after_and_before_order_the_forward_restarts_instead_of_unit_names",
+      "ok"
+    ],
+    [
+      "restart_order::interrupted_recovery_orders_saved_units_despite_a_shuffled_partial_journal",
+      "ok"
+    ],
+    [
+      "restart_order::ordering_does_not_start_inactive_or_restart_unchanged_dependencies",
+      "ok"
+    ],
+    [
+      "restart_order::saved_rollback_order_keeps_transitive_edges_after_an_unchanged_unit_drifts",
+      "ok"
+    ],
+    [
+      "restart_order::rollback_uses_the_saved_old_dependencies_not_the_new_graph_or_its_reverse",
+      "ok"
+    ],
+    [
+      "restart_order::saved_rollback_order_survives_a_newly_unreadable_installed_unit",
+      "ok"
+    ],
+    [
+      "restart_order::saved_rollback_order_survives_an_interrupted_put_back_and_keeps_inactive_units_off",
+      "ok"
+    ],
+    [
+      "restart_quiet::continuous_speech_puts_prerequisites_back_without_restarting_voice",
+      "ok"
+    ],
+    [
+      "restart_quiet::queued_speech_during_a_prerequisite_is_heard_before_restarting_voice",
+      "ok"
+    ],
+    [
+      "head_touch::custom_active_pins_are_kept_and_checked_against_the_reader_pair",
+      "ok"
+    ],
+    [
+      "restart_order::the_product_voices_declared_managed_prerequisites_restart_before_it",
+      "ok"
+    ],
+    [
+      "head_touch::third_review_binary_update_checks_active_build_local_head_pins",
+      "ok"
+    ],
+    [
+      "head_touch::absent_unused_product_pins_do_not_block_active_build_pins_updates",
+      "ok"
+    ],
+    [
+      "install_writes_the_fallback_and_no_round_touches_it",
+      "ok"
+    ],
+    [
+      "self_cuts::runnable_events::controls::a_never_released_first_output_gate_hits_the_startup_watchdog",
+      "ok"
+    ],
+    [
+      "self_cuts::runnable_events::controls::a_partial_first_output_also_starts_the_finish_watchdog",
+      "ok"
+    ],
+    [
+      "self_cuts::runnable_events::controls::a_read_error_restores_flags_and_leaves_the_direct_child_owned",
+      "ok"
+    ],
+    [
+      "self_cuts::runnable_events::controls::an_exited_leader_does_not_make_a_held_output_descriptor_complete",
+      "ok"
+    ],
+    [
+      "head_touch::head_reader_mode_overrides_are_not_guessed_from_base_units",
+      "ok"
+    ],
+    [
+      "self_cuts::runnable_events::controls::first_output_can_follow_a_gate_longer_than_the_old_spawn_watchdog",
+      "ok"
+    ],
+    [
+      "self_cuts::runnable_events::controls::full_output_without_exit_hits_the_absolute_finish_watchdog",
+      "ok"
+    ],
+    [
+      "self_cuts::runnable_events::controls::later_bytes_do_not_renew_the_first_byte_finish_deadline",
+      "ok"
+    ],
+    [
+      "self_cuts::runnable_events::controls::no_output_is_not_readiness",
+      "ok"
+    ],
+    [
+      "self_cuts::runnable_events::controls::output_beyond_the_previous_capture_limit_fails_explicitly",
+      "ok"
+    ],
+    [
+      "lamp_update_back_puts_back_an_unreadable_self_json",
+      "ok"
+    ],
+    [
+      "self_cuts::runnable_events::controls::wrong_payload_nonzero_status_and_non_utf8_cannot_satisfy_the_fixture",
+      "ok"
+    ],
+    [
+      "setup_lifecycle::an_alias_outside_the_lamp_prefix_cannot_bypass_the_product_check",
+      "ok"
+    ],
+    [
+      "setup_lifecycle::a_different_failed_part_still_rolls_back_without_restarting_completed_setup",
+      "ok"
+    ],
+    [
+      "setup_lifecycle::completed_product_setup_keeps_serving_without_restart_or_false_rollback",
+      "ok"
+    ],
+    [
+      "setup_lifecycle::completion_after_the_activity_snapshot_is_rechecked_before_restart",
+      "ok"
+    ],
+    [
+      "setup_lifecycle::chained_and_loaded_aliases_retain_normal_restart_even_without_alias_files",
+      "ok"
+    ],
+    [
+      "setup_lifecycle::completion_removed_during_the_manager_query_is_not_used",
+      "ok"
+    ],
+    [
+      "head_touch::semantic_head_reader_paths_cannot_expand_invocation_variables",
+      "ok"
+    ],
+    [
+      "self_recovery::missing_recovery_also_defers_an_updater_first_climb_without_touching_parts",
+      "ok"
+    ],
+    [
+      "restart_order::malformed_present_rollback_orders_retain_the_prefix_and_do_not_fetch",
+      "ok"
+    ],
+    [
+      "setup_lifecycle::custom_base_units_and_candidate_changes_keep_normal_watch_rules",
+      "ok"
+    ],
+    [
+      "no_second_round_begins_while_lamp_updates_own_switch_waits",
+      "ok"
+    ],
+    [
+      "setup_lifecycle::recovery_rechecks_effective_aliases_after_restoring_the_old_unit",
+      "ok"
+    ],
+    [
+      "setup_lifecycle::reset_removing_completion_before_restart_retains_the_normal_watch",
+      "ok"
+    ],
+    [
+      "setup_lifecycle::reset_removing_completion_before_recovery_restarts_the_old_setup",
+      "ok"
+    ],
+    [
+      "setup_lifecycle::the_exact_product_exit_note_and_merged_usr_layout_keep_the_exception",
+      "ok"
+    ],
+    [
+      "setup_lifecycle::incomplete_product_setup_still_restarts_and_is_watched",
+      "ok"
+    ],
+    [
+      "setup_lifecycle::recovery_keeps_the_true_active_journal_but_does_not_restart_completed_setup",
+      "ok"
+    ],
+    [
+      "the_apps_off_and_on_hold_through_a_round_and_a_restart",
+      "ok"
+    ],
+    [
+      "the_journal_line_is_the_units_own_last_cleaned_and_cut",
+      "ok"
+    ],
+    [
+      "self_recovery::unavailable_recovery_keeps_the_parts_and_can_be_retried_when_armed",
+      "ok"
+    ],
+    [
+      "self_recovery::an_absent_or_unrunnable_fallback_keeps_the_completed_parts_and_old_updater",
+      "ok"
+    ],
+    [
+      "self_recovery::an_unchanged_or_refused_updater_needs_no_recovery_query",
+      "ok"
+    ],
+    [
+      "the_guard_still_refuses_a_persons_skill_the_new_lamp_skills_will_not_load",
+      "ok"
+    ],
+    [
+      "the_old_build_not_well_either_says_the_first_unit_not_wells_line",
+      "ok"
+    ],
+    [
+      "the_fallback_reads_a_self_json_written_by_a_later_updater",
+      "ok"
+    ],
+    [
+      "the_voice_is_not_switched_while_someone_talks_to_the_lamp",
+      "ok"
+    ],
+    [
+      "with_image_on_the_images_files_are_written_and_asound_restarts_the_voice_at_a_quiet_moment",
+      "ok"
+    ],
+    [
+      "with_apply_off_a_builds_settings_are_not_written_and_that_is_said",
+      "ok"
+    ],
+    [
+      "setup_lifecycle::unknown_manager_identity_and_custom_loaded_paths_keep_normal_watch",
+      "ok"
+    ],
+    [
+      "with_apply_on_a_builds_settings_are_written_at_the_switch_and_the_part_reading_one_restarted",
+      "ok"
+    ],
+    [
+      "with_image_off_the_images_files_are_not_written_and_that_is_said",
+      "ok"
+    ],
+    [
+      "without_apply_nothing_is_written_and_what_would_change_is_said",
+      "ok"
+    ],
+    [
+      "with_the_switch_off_a_build_with_other_models_is_refused",
+      "ok"
+    ],
+    [
+      "with_the_switch_off_a_lamps_own_model_is_kept_as_with_it_on",
+      "ok"
+    ],
+    [
+      "setup_lifecycle::uncertain_override_files_do_not_hang_or_grant_the_exception",
+      "ok"
+    ],
+    [
+      "with_the_switch_off_an_updater_too_old_for_a_build_takes_nothing_it_carries",
+      "ok"
+    ],
+    [
+      "self_cuts::without_self_opt_in_parts_update_but_no_handover_prefix_is_written",
+      "ok"
+    ],
+    [
+      "with_the_switch_off_lamp_update_never_switches_itself",
+      "ok"
+    ],
+    [
+      "head_touch::stale_unused_product_pins_do_not_block_active_build_pins_updates",
+      "ok"
+    ],
+    [
+      "setup_lifecycle::unknown_dropins_at_each_scope_keep_normal_watch_rules",
+      "ok"
+    ],
+    [
+      "self_cuts::cut_after_candidate_is_synced_keeps_old_runnable_and_reuses_candidate",
+      "ok"
+    ],
+    [
+      "self_cuts::cut_after_confirmation_clears_pending_keeps_new_runnable_on_restart",
+      "ok"
+    ],
+    [
+      "with_models_off_a_new_updater_confirms_and_the_build_waits_for_models",
+      "ok"
+    ],
+    [
+      "self_cuts::cut_after_pending_is_saved_keeps_old_runnable_and_recovers_before_next_round",
+      "ok"
+    ],
+    [
+      "self_cuts::cut_after_current_moves_keeps_new_runnable_and_can_confirm_or_put_back",
+      "ok"
+    ],
+    [
+      "self_cuts::interrupted_put_back_keeps_a_runnable_current_and_finishes_on_restart",
+      "ok"
+    ],
+    [
+      "actual_cli_exec_confirms_before_the_next_round",
+      "ignored, requires Linux ARM64/x86-64 ptrace"
+    ],
+    [
+      "persisted_self_switches_survive_sigkill",
+      "ignored, requires Linux syscall tracing"
+    ]
+  ],
+  "driver_bindings": [
+    {
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "path": "<target>/debug/deps/lamp_update-e14d54c83f68ff7f",
+      "sha256": "0a8cf4d6bf70211bc5a2ff1f6a416bf052a3a60084f4e9098aba67e5e9d89a62"
+    },
+    {
+      "header": "Running unittests src/main.rs (<target>/debug/deps/lamp_update-93805432291f4475)",
+      "path": "<target>/debug/deps/lamp_update-93805432291f4475",
+      "sha256": "7b0db742e4363cc043cdd7c98597016c79574a19a7f31fcad7795cb5617eb5e5"
+    },
+    {
+      "header": "Running tests/functions.rs (<target>/debug/deps/functions-781cb61db13f0261)",
+      "path": "<target>/debug/deps/functions-781cb61db13f0261",
+      "sha256": "338d7627f9d7de9c74f70da79997ed8fe273de2dbb597eeacfb11b8f0113f522"
+    },
+    {
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "path": "<target>/debug/deps/install-08004915d5b421f7",
+      "sha256": "4ef219a273bdc1d6cd1c26f2effee6468095e7e412709bbc3e9bbb12999b6d81"
+    },
+    {
+      "header": "Running tests/it/main.rs (<target>/debug/deps/it-7f2b1cc47b1a8b67)",
+      "path": "<target>/debug/deps/it-7f2b1cc47b1a8b67",
+      "sha256": "7b35d584c62d676ceeb5a6c8e8faf4277f5e29c306afef9acafa84394eb5705f"
+    },
+    {
+      "header": "Running tests/release_pair.rs (<target>/debug/deps/release_pair-587942a3dc3808c8)",
+      "path": "<target>/debug/deps/release_pair-587942a3dc3808c8",
+      "sha256": "348d8b19fa7e6adb7e20d224e7bf27807e3e9eb29777a9c384620a0d5ad38f24"
+    },
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "path": "<target>/debug/deps/round-42e77f9cbb014d5a",
+      "sha256": "5d74d98ea4984a72cc5a05938c4c8be16e9584d2bd24f050970f24673a9294f5"
+    },
+    {
+      "header": "Running tests/self_cli_exec.rs (<target>/debug/deps/self_cli_exec-7a8efcc313003c4d)",
+      "path": "<target>/debug/deps/self_cli_exec-7a8efcc313003c4d",
+      "sha256": "8487600a2473063e70567861ca42fc4f97dd2c20faf529f0f0e915d55806ddb4"
+    },
+    {
+      "header": "Running tests/self_process_cuts.rs (<target>/debug/deps/self_process_cuts-9807238ddc4f9970)",
+      "path": "<target>/debug/deps/self_process_cuts-9807238ddc4f9970",
+      "sha256": "492f51288cec501ae5dc1574b7dd6332aeb11cd1bb3388716c23edd4da2a2c5f"
+    }
+  ],
+  "nested_summary_count": 0,
+  "note": "Literal summaries preserve nested child outputs separately; audit before aggregate counts.",
+  "scope": "update",
+  "separate_counts": {
+    "custom_harnesses": {
+      "failed": 0,
+      "ignored": 2,
+      "passed": 0,
+      "summaries": 2
+    },
+    "doctests": {
+      "failed": 0,
+      "ignored": 0,
+      "passed": 0,
+      "summaries": 1
+    },
+    "ordinary_test_drivers": {
+      "failed": 0,
+      "ignored": 4,
+      "passed": 433,
+      "summaries": 7
+    }
+  },
+  "summaries": [
+    {
+      "failed": 0,
+      "filtered": 0,
+      "header": "Running unittests src/lib.rs (<target>/debug/deps/lamp_update-e14d54c83f68ff7f)",
+      "ignored": 2,
+      "literal": "test result: ok. 131 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 5.03s",
+      "passed": 131,
+      "status": "ok"
+    },
+    {
+      "failed": 0,
+      "filtered": 0,
+      "header": "Running unittests src/main.rs (<target>/debug/deps/lamp_update-93805432291f4475)",
+      "ignored": 0,
+      "literal": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "passed": 0,
+      "status": "ok"
+    },
+    {
+      "failed": 0,
+      "filtered": 0,
+      "header": "Running tests/functions.rs (<target>/debug/deps/functions-781cb61db13f0261)",
+      "ignored": 0,
+      "literal": "test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s",
+      "passed": 5,
+      "status": "ok"
+    },
+    {
+      "failed": 0,
+      "filtered": 0,
+      "header": "Running tests/install.rs (<target>/debug/deps/install-08004915d5b421f7)",
+      "ignored": 0,
+      "literal": "test result: ok. 101 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 109.26s",
+      "passed": 101,
+      "status": "ok"
+    },
+    {
+      "failed": 0,
+      "filtered": 0,
+      "header": "Running tests/it/main.rs (<target>/debug/deps/it-7f2b1cc47b1a8b67)",
+      "ignored": 0,
+      "literal": "test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.73s",
+      "passed": 13,
+      "status": "ok"
+    },
+    {
+      "failed": 0,
+      "filtered": 0,
+      "header": "Running tests/release_pair.rs (<target>/debug/deps/release_pair-587942a3dc3808c8)",
+      "ignored": 2,
+      "literal": "test result: ok. 0 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "passed": 0,
+      "status": "ok"
+    },
+    {
+      "failed": 0,
+      "filtered": 0,
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "ignored": 0,
+      "literal": "test result: ok. 183 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 276.27s",
+      "passed": 183,
+      "status": "ok"
+    },
+    {
+      "failed": 0,
+      "filtered": 0,
+      "header": "Running tests/self_cli_exec.rs (<target>/debug/deps/self_cli_exec-7a8efcc313003c4d)",
+      "ignored": 1,
+      "literal": "test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out",
+      "passed": 0,
+      "status": "ok"
+    },
+    {
+      "failed": 0,
+      "filtered": 0,
+      "header": "Running tests/self_process_cuts.rs (<target>/debug/deps/self_process_cuts-9807238ddc4f9970)",
+      "ignored": 1,
+      "literal": "test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out",
+      "passed": 0,
+      "status": "ok"
+    },
+    {
+      "failed": 0,
+      "filtered": 0,
+      "header": "Doc-tests lamp_update",
+      "ignored": 0,
+      "literal": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "passed": 0,
+      "status": "ok"
+    }
+  ]
+}

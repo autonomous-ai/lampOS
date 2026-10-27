@@ -1,0 +1,7 @@
+{
+  "original-source-before.json": "1130953ca1504ad7bd99751c70709594177ab1c13dd789dfba922c11a0fe6afe",
+  "mutant-source.json": "6bad5c367ee0ddb706c6db853de7dd81218dfe335474dc91ccbd040c14eeb048",
+  "mutant.patch": "89373b70c7daf5e5807f3fc8c5fa416a267ca1b4572e013006543342e972fa27",
+  "compile.log": "63cdb1857df955e539bc13d121fed4c4fc085a9fc7ddd559dd6174f55cfcf494",
+  "runtime.log": "14fea6e67d19570c938fe1b382d1e83979ef74f1fbd7b94f70b881f3dab95fd8"
+}

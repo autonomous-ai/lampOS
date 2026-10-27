@@ -1,0 +1,17 @@
+{
+  "archive_sha256": "8935c2b77c68d2250d351c0ff6f4c48589656689265332f15465ad679c4ecb92",
+  "mutant_patch_sha256": "89373b70c7daf5e5807f3fc8c5fa416a267ca1b4572e013006543342e972fa27",
+  "original_head": "431b784c4b9e911575f79e7ad3ce879e61c2b8b9",
+  "selection": [
+    "cargo",
+    "+1.96.0",
+    "test",
+    "--locked",
+    "--offline",
+    "-p",
+    "lamp-update",
+    "--lib",
+    "world::query::tests::public_output_accepts_one_mib_and_refuses_one_byte_more"
+  ],
+  "target_absent_and_atomically_empty_before_compile": true
+}

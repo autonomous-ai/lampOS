@@ -1,0 +1,21 @@
+[
+  {
+    "fresh": false,
+    "path": "<control-target>/debug/deps/lamp_update-e14d54c83f68ff7f",
+    "sha256": "f83ec64d727c59c3282fc45ba9e027dd6b8fac15fdd022288b551dfadf4a31dc",
+    "target": {
+      "crate_types": [
+        "lib"
+      ],
+      "doc": true,
+      "doctest": true,
+      "edition": "2024",
+      "kind": [
+        "lib"
+      ],
+      "name": "lamp_update",
+      "src_path": "<mutant-source>/lampOS/crates/update/src/lib.rs",
+      "test": true
+    }
+  }
+]

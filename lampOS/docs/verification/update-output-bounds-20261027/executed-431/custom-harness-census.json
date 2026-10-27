@@ -1,0 +1,33 @@
+{
+  "cases": [
+    [
+      "actual_cli_exec_confirms_before_the_next_round",
+      "ignored, requires Linux ARM64/x86-64 ptrace"
+    ],
+    [
+      "persisted_self_switches_survive_sigkill",
+      "ignored, requires Linux syscall tracing"
+    ]
+  ],
+  "note": "Separate custom drivers; Linux process-cut/CLI-exec controls are ignored on this Mac, never passes.",
+  "summaries": [
+    {
+      "failed": 0,
+      "filtered": 0,
+      "header": "Running tests/self_cli_exec.rs (<target>/debug/deps/self_cli_exec-7a8efcc313003c4d)",
+      "ignored": 1,
+      "literal": "test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out",
+      "passed": 0,
+      "status": "ok"
+    },
+    {
+      "failed": 0,
+      "filtered": 0,
+      "header": "Running tests/self_process_cuts.rs (<target>/debug/deps/self_process_cuts-9807238ddc4f9970)",
+      "ignored": 1,
+      "literal": "test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out",
+      "passed": 0,
+      "status": "ok"
+    }
+  ]
+}

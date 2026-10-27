@@ -1,5 +1,17 @@
 Ready for lamp-voice: no
 
+## Current checkpoint: 2026-10-27 07:26 +07, updater output-reader host gate complete
+
+[Exact 431b784c4/4bff proof](verification/update-output-bounds-20261027/executed-431/README.md): fmt and strict all-target Update Clippy pass; ordinary package drivers **433 passed / 0 failed / 4 ignored**, separate custom self-cut/CLI-exec drivers **0/0/2** on Mac, docs **0/0/0**. All nine controls pass once, including the unchanged 300,000-byte positive and public API pipe-deadline control. Runtime 397.538 s; round **183/0/0** took 276.27 s. Source and ten executables, 59 local outputs and 413 depfiles pass actual/preserved guards. The compilation target was absent/empty before its first compiler use. Linux-only controls remain unrun locally; no retries or implementation-suite failure.
+
+[Old public-wrapper control](verification/update-output-bounds-20261027/old-wrapper-control/README.md) restores only the b234 public function, keeping the private helper, manifest and tests: compile 0, sole expected failure **0/1/0, 132 filtered**, at the short overflow assertion, runtime 1.480 s. Original source/head stay unchanged; one driver, 50 local outputs and 220 depfiles are guarded. The earlier std-only diagnostic's final ps collection failure remains partial evidence, not a measured timing result or this control's source.
+
+The six-file piece returns complete valid UTF-8 through 1 MiB or none, preserving the 300,000-byte contract. UTF-8 is validated before reaping so invalid responses retain cleanup ownership. States and stop/restart policies stay outside this piece; no new service or public executor API. Source-only review found no P1/P2. Original ARM64/Linux and independent peer reads are still required before readiness. #3631's current e19/4bff host/native are green, with exact-head carry dispositions requested. No device or release action.
+
+---
+
+Ready for lamp-voice: no
+
 ## Current checkpoint: 2026-10-27 07:16 +07, actual-ref carry fully qualified
 
 #3631 is **e19e98a7f/4bff5f2c5**, one equal patch from 220251, with query SHA 5c0d9bcc unchanged. The earlier PR-base metadata was stale; the actual public branch ref was verified directly before the carry push. [Current full host proof](verification/reset-query-bounds-20261026/current-e19/README.md): fmt, strict Setup/Cloud Clippy and **193/0/1 + 196/0/4 = 389/0/5**, all eight query controls once; runtime 22.512 s and actual/preserved guards close. The old-prefix negative stays at its original source and is not rerun or relabelled.
