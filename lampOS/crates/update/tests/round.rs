@@ -4034,6 +4034,63 @@ fn publish_settings(lamp: &mut Lamp, sequence: u64, settings: Vec<Setting>) {
 }
 
 #[test]
+fn the_round_rejects_a_done_matching_a_rewritten_request_instead_of_its_own_request() {
+    for (op, sequence) in [(apply::Op::Back, 2), (apply::Op::Apply, 99)] {
+        let (mut lamp, _) = lamp_with_settings();
+        let before = lamp.state()["settings"].clone();
+        let records = lamp.root.join("var/lib/lampos-update/apply");
+        lamp.systemd.applier = Some(Box::new(move || {
+            // A helper's mutable request and receipt agree with each other,
+            // but neither names what the waiting parent actually asked.
+            let request = apply::Request {
+                version: apply::VERSION,
+                op,
+                sequence,
+                image: false,
+            };
+            let done = apply::Done {
+                version: apply::VERSION,
+                op,
+                sequence,
+                records: [
+                    (CONTROLS_JSON.to_owned(), Some(sha("wrong build"))),
+                    (RECORDS_JSON.to_owned(), None),
+                ]
+                .into(),
+            };
+            fs::write(
+                records.join("request.json"),
+                serde_json::to_vec(&request).unwrap(),
+            )
+            .unwrap();
+            fs::write(
+                records.join("done.json"),
+                serde_json::to_vec(&done).unwrap(),
+            )
+            .unwrap();
+            Ok(())
+        }));
+        publish_settings(
+            &mut lamp,
+            2,
+            vec![Setting::new(CONTROLS_JSON, "controls 2")],
+        );
+
+        let outcome = lamp.round();
+
+        assert!(
+            matches!(outcome, Outcome::RolledBack { sequence: 2, .. }),
+            "{outcome:?}"
+        );
+        assert_eq!(lamp.state()["settings"], before);
+        assert_eq!(lamp.read(CONTROLS_JSON), "controls 1");
+        assert_eq!(lamp.read(RECORDS_JSON), "records 1");
+        assert_eq!(lamp.state()["installed"]["sequence"], 1);
+        assert_eq!(lamp.state()["refused"][0]["sequence"], 2);
+    }
+}
+
+#[test]
 fn with_apply_on_a_builds_settings_are_written_at_the_switch_and_the_part_reading_one_restarted() {
     let (mut lamp, tmpfiles) = lamp_with_settings();
     // The lamp's own records bound, changed since install wrote it.

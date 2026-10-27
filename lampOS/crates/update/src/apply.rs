@@ -367,12 +367,42 @@ fn remove(path: &Path) -> io::Result<()> {
     }
 }
 
-/// What the last request's `done.json` records, taken into `state`.
-/// Whether there was one. The caller saves the state, then [`finish`]es.
+/// What the staged request's matching `done.json` records, taken into `state`.
+/// Whether there was a receipt. The caller saves the state, then [`finish`]es.
+/// A waiting parent that already knows what it asked uses [`merge_for`], so
+/// a rewritten staged request cannot change the identity it expects.
 pub fn merge(records: &Path, state: &mut State) -> io::Result<bool> {
     let Some(done) = read_json::<Done>(&folder(records).join(DONE))? else {
         return Ok(false);
     };
+    let request = read_json::<Request>(&folder(records).join(REQUEST))?.ok_or_else(|| {
+        io::Error::new(
+            io::ErrorKind::InvalidData,
+            "done.json has no staged settings request",
+        )
+    })?;
+    merge_done(state, done, request.op, request.sequence)
+}
+
+/// Merge only a receipt for the operation and build the waiting caller asked.
+/// Neither `state` nor the staged files change on a mismatch. This binds the
+/// identity; it does not authenticate the helper or verify its record values.
+pub fn merge_for(records: &Path, state: &mut State, op: Op, sequence: u64) -> io::Result<bool> {
+    let Some(done) = read_json::<Done>(&folder(records).join(DONE))? else {
+        return Ok(false);
+    };
+    merge_done(state, done, op, sequence)
+}
+
+fn merge_done(state: &mut State, done: Done, op: Op, sequence: u64) -> io::Result<bool> {
+    // These fields keep their meaning across versions of the permanent
+    // apply contract. A newer version or extra field is still read past.
+    if done.op != op || done.sequence != sequence {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            "done.json is not for the requested settings operation and build",
+        ));
+    }
     for (path, record) in done.records {
         match record {
             Some(sha) => state.settings.insert(path, sha),
@@ -1038,6 +1068,154 @@ mod tests {
             finish(&self.records).unwrap();
             result
         }
+    }
+
+    fn assert_mismatched_receipt_is_not_merged(op: Op, sequence: u64) {
+        let lamp = Lamp::new();
+        stage(&lamp.records, Op::Apply, 41, None, false).unwrap();
+        write_json(
+            &folder(&lamp.records).join(DONE),
+            &Done {
+                version: VERSION,
+                op,
+                sequence,
+                records: [
+                    (EXPRESSION.to_owned(), Some("wrong new record".into())),
+                    (CONTROLS.to_owned(), None),
+                ]
+                .into(),
+            },
+        )
+        .unwrap();
+        let mut state = State::default();
+        state
+            .settings
+            .insert(EXPRESSION.into(), "old expression".into());
+        state
+            .settings
+            .insert(CONTROLS.into(), "old controls".into());
+        state
+            .later
+            .insert("future_state".into(), serde_json::json!({"kept": true}));
+        let before = state.clone();
+        let request = fs::read(folder(&lamp.records).join(REQUEST)).unwrap();
+        let done = fs::read(folder(&lamp.records).join(DONE)).unwrap();
+
+        let result = merge(&lamp.records, &mut state);
+
+        assert_eq!(state, before, "a mismatched receipt changed the state");
+        assert_eq!(result.unwrap_err().kind(), io::ErrorKind::InvalidData);
+        assert_eq!(
+            fs::read(folder(&lamp.records).join(REQUEST)).unwrap(),
+            request
+        );
+        assert_eq!(fs::read(folder(&lamp.records).join(DONE)).unwrap(), done);
+    }
+
+    #[test]
+    fn a_done_for_another_operation_does_not_change_any_setting_record() {
+        assert_mismatched_receipt_is_not_merged(Op::Back, 41);
+    }
+
+    #[test]
+    fn a_done_for_another_sequence_does_not_change_any_setting_record() {
+        assert_mismatched_receipt_is_not_merged(Op::Apply, 40);
+    }
+
+    #[test]
+    fn an_explicit_expected_identity_does_not_follow_a_rewritten_staged_request() {
+        let lamp = Lamp::new();
+        stage(&lamp.records, Op::Back, 99, None, false).unwrap();
+        write_json(
+            &folder(&lamp.records).join(DONE),
+            &Done {
+                version: VERSION,
+                op: Op::Apply,
+                sequence: 41,
+                records: [(EXPRESSION.to_owned(), Some("correct record".into()))].into(),
+            },
+        )
+        .unwrap();
+        let mut state = State::default();
+        let before = state.clone();
+        assert!(merge(&lamp.records, &mut state).is_err());
+        assert_eq!(state, before);
+        assert!(merge_for(&lamp.records, &mut state, Op::Apply, 41).unwrap());
+        assert_eq!(state.settings[EXPRESSION], "correct record");
+    }
+
+    #[test]
+    fn a_matching_done_keeps_the_permanent_forward_read_contract() {
+        let lamp = Lamp::new();
+        stage(&lamp.records, Op::Back, 41, None, false).unwrap();
+        let mut request: serde_json::Value =
+            serde_json::from_slice(&fs::read(folder(&lamp.records).join(REQUEST)).unwrap())
+                .unwrap();
+        request["version"] = serde_json::json!(VERSION + 1);
+        request["later"] = serde_json::json!({"retained_meaning": true});
+        write_json(&folder(&lamp.records).join(REQUEST), &request).unwrap();
+        write_json(
+            &folder(&lamp.records).join(DONE),
+            &serde_json::json!({
+                "version": VERSION + 1,
+                "op": "back",
+                "sequence": 41,
+                "records": {EXPRESSION: "restored record", CONTROLS: null},
+                "later": [1, 2, 3],
+            }),
+        )
+        .unwrap();
+        let mut state = State::default();
+        state
+            .settings
+            .insert(CONTROLS.into(), "record to remove".into());
+        state
+            .later
+            .insert("future_state".into(), serde_json::json!({"kept": true}));
+        let mut explicit = state.clone();
+        assert!(merge(&lamp.records, &mut state).unwrap());
+        assert!(merge_for(&lamp.records, &mut explicit, Op::Back, 41).unwrap());
+        assert_eq!(explicit, state);
+        assert_eq!(state.settings[EXPRESSION], "restored record");
+        assert!(!state.settings.contains_key(CONTROLS));
+        assert_eq!(
+            state.later["future_state"],
+            serde_json::json!({"kept": true})
+        );
+
+        // With no receipt, the legacy helper and the explicit parent both do
+        // nothing, even if there is no longer a staged request.
+        finish(&lamp.records).unwrap();
+        let before = state.clone();
+        assert!(!merge(&lamp.records, &mut state).unwrap());
+        assert!(!merge_for(&lamp.records, &mut state, Op::Back, 41).unwrap());
+        assert_eq!(state, before);
+    }
+
+    #[test]
+    fn an_unknown_done_operation_is_refused_without_changing_any_setting_record() {
+        let lamp = Lamp::new();
+        stage(&lamp.records, Op::Apply, 41, None, false).unwrap();
+        write_json(
+            &folder(&lamp.records).join(DONE),
+            &serde_json::json!({
+                "version": VERSION + 1,
+                "op": "future_operation",
+                "sequence": 41,
+                "records": {EXPRESSION: "must not be merged"},
+                "later": true,
+            }),
+        )
+        .unwrap();
+        let mut state = State::default();
+        state
+            .settings
+            .insert(EXPRESSION.into(), "old record".into());
+        let before = state.clone();
+        assert!(merge(&lamp.records, &mut state).is_err());
+        assert_eq!(state, before);
+        assert!(merge_for(&lamp.records, &mut state, Op::Apply, 41).is_err());
+        assert_eq!(state, before);
     }
 
     #[test]
