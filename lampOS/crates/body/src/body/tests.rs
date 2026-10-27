@@ -13954,8 +13954,8 @@ fn roll_near_its_stop(cancel_at: Duration) -> (Lamp, Clock) {
 
 /// #3558: a joint that has arrived and rests near its goal is given where
 /// it is, so nothing pushes; a roll resting inside its own range but past
-/// the inset window is rested there, not refused. A motion goal from there
-/// (the eased way home at the end) is still refused on the window.
+/// the inset window is rested there, not refused, and the eased way home
+/// at the end brings it back inside (#3504).
 #[test]
 fn with_own_ranges_a_joint_arrived_near_a_stop_rests_there() {
     let (mut lamp, mut clock) = roll_near_its_stop(Duration::from_secs(4));
@@ -13978,19 +13978,70 @@ fn with_own_ranges_a_joint_arrived_near_a_stop_rests_there() {
     // It rested until the end, not stopped at once.
     assert!(lamp.goal_times[0] < Duration::from_secs(1));
     assert!(clock.time.get() >= Duration::from_secs(4));
-    assert!(
-        matches!(
-            report.stop,
-            Stop::Window {
-                goal: 2_059,
-                window: (1_085, 2_044),
-                from: 2_060,
-                ..
-            }
-        ),
-        "{:?}",
-        report.stop
-    );
+    // At the end the eased way home walks it back in from where it rested
+    // (#3504): each step nearer the window, none refused, the last inside.
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    let rolls: Vec<u16> = lamp
+        .goals
+        .iter()
+        .filter_map(|write| {
+            write
+                .iter()
+                .find(|(id, _)| *id == Joint::WristRoll.id())
+                .map(|(_, goal)| *goal)
+        })
+        .skip_while(|goal| *goal != 2_060)
+        .collect();
+    assert!(rolls.windows(2).all(|pair| pair[1] <= pair[0]), "{rolls:?}");
+    assert_eq!(rolls.last(), Some(&2_044), "{rolls:?}");
+}
+
+/// #3504: a head or base joint lying past its inset window may be sent back
+/// toward it, from where it lies to the window and inside its own stored
+/// range; never farther out, past the stored range, or out the other side.
+#[test]
+fn with_own_ranges_a_goal_back_toward_the_window_is_taken() {
+    let (mut lamp, mut clock) = folded(Duration::from_secs(8));
+    let mut bus = Bus::new(&mut lamp, &mut clock, None);
+    let mut ranges = LAMP_52E6_RANGES;
+    ranges[Joint::WristRoll.index()] = (1_065, 2_064);
+    bus.windows = ranges.map(own_window);
+    bus.ranges = ranges;
+    let roll = Joint::WristRoll;
+    bus.good[roll.index()] = Some(2_060);
+    for goal in [2_060, 2_059, 2_050, 2_044, 1_085] {
+        assert_eq!(bus.goal_refused(roll, goal), None, "{goal}");
+    }
+    for goal in [2_061, 2_065, 1_084] {
+        assert!(
+            matches!(
+                bus.goal_refused(roll, goal),
+                Some(Stop::Window {
+                    window: (1_085, 2_044),
+                    ..
+                })
+            ),
+            "{goal}"
+        );
+    }
+    // Read past its stored stop, it is still never sent past that stop.
+    bus.good[roll.index()] = Some(2_070);
+    assert_eq!(bus.goal_refused(roll, 2_064), None);
+    assert!(bus.goal_refused(roll, 2_065).is_some());
+    // The base on its low side: yaw stores 809..=3239, window 829..=3219.
+    let yaw = Joint::BaseYaw;
+    bus.good[yaw.index()] = Some(812);
+    for goal in [812, 813, 820, 829] {
+        assert_eq!(bus.goal_refused(yaw, goal), None, "{goal}");
+    }
+    for goal in [811, 808, 3_220] {
+        assert!(bus.goal_refused(yaw, goal).is_some(), "{goal}");
+    }
+    // With no read, the goal last written is where it lies.
+    bus.good[yaw.index()] = None;
+    bus.goals[yaw.index()] = Some(815);
+    assert_eq!(bus.goal_refused(yaw, 815), None);
+    assert!(bus.goal_refused(yaw, 814).is_some());
 }
 
 /// #3558: a run that ends stops pushing where each joint is; a roll there,

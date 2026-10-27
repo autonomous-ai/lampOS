@@ -217,7 +217,12 @@ which V1's calibration wrote on its lamps), says them in its report
 (`own_ranges`), and bounds the lamp by them as V1 bounds every goal:
 - a head or base goal must then be inside its joint's own range less 20
   counts either side (`OWN_RANGE_MARGIN`), or the run ends on `Stop::Window`
-  as for an arm goal;
+  as for an arm goal; except that a joint lying past that window (its last
+  good read, else the goal last written) may be sent back toward it: a goal
+  between where it lies and the window, and inside the servo's own range, is
+  taken, while one farther out, past the range or out the other side is
+  still refused (#3504,
+  `with_own_ranges_a_goal_back_toward_the_window_is_taken`);
 - a hold where a head or base joint already is (taking hold of it, the
   write-back after, a joint that has arrived or settled at rest given where
   it is, every stop-pushing hold when a wake, a lowering or the run ends)
@@ -225,8 +230,8 @@ which V1's calibration wrote on its lamps), says them in its report
   holding is not motion, so a roll resting at 2,410 under a stored 2,413
   still takes hold, and is not clamped, which would move it
   (`with_own_ranges_a_roll_resting_near_its_stop_is_taken_hold_of_at_start`,
-  `with_own_ranges_a_stop_pushing_hold_near_a_stop_is_written`); a motion
-  goal from there is still refused on the window
+  `with_own_ranges_a_stop_pushing_hold_near_a_stop_is_written`); motion
+  from there walks it back inside, as the eased way home at the end does
   (`with_own_ranges_a_joint_arrived_near_a_stop_rests_there`);
 - a `--home`, a pitch window or a `--stand` pitch, roll or yaw outside that
   same window, or a `--folded-arm` or `--stand` shoulder or elbow outside
