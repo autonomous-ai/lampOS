@@ -791,6 +791,9 @@ pub type LampDid = Arc<dyn Fn(Did) + Send + Sync>;
 /// Whether the lamp's name was heard since a time, by this process's clock
 /// ([`Engine::knowing_the_name_heard`]).
 pub type NameSounded = Arc<dyn Fn(u64) -> bool + Send + Sync>;
+/// Whether lamp-name heard the name in a request's line, by its request
+/// ([`Engine::knowing_the_name_fired`]).
+pub type NameFired = Arc<dyn Fn(u64) -> bool + Send + Sync>;
 /// The note a spoken request gets on whether it called the lamp by name
 /// ([`Engine::noting_whether_called`]): with its request and words.
 pub type CallNote = Arc<dyn Fn(u64, &str) -> Option<&'static str> + Send + Sync>;
@@ -978,6 +981,8 @@ struct Shared {
     call_note: Option<CallNote>,
     /// Whether the lamp's name was heard since a time.
     name_sounded: Option<NameSounded>,
+    /// Whether lamp-name heard the name in a request's line (#3504 N4).
+    name_fired: Option<NameFired>,
     /// With the tasks part: the note that a prepared task waits for a yes.
     task_waiting: Option<TaskNote>,
     /// With `LAMP_AIR_FACTS=on`: the air's note, when it is due, and what
@@ -1379,6 +1384,210 @@ fn named_near(request: u64, text: String, window: (u64, u64), near: &NameNear) -
         }
         None => text,
     }
+}
+
+/// Words a line often opens with, set off, that are said, not a wake heard
+/// as another word ([`wake_heard_as`]): "Yes, please.", "Well, …", "Dạ, …".
+const OPENS_SET_OFF: &[&str] = &[
+    "yes",
+    "yeah",
+    "yep",
+    "no",
+    "nope",
+    "so",
+    "well",
+    "please",
+    "thanks",
+    "thank",
+    "sorry",
+    "actually",
+    "wait",
+    "now",
+    "and",
+    "but",
+    "also",
+    "right",
+    "sure",
+    "alright",
+    "fine",
+    "good",
+    "great",
+    "cool",
+    "nice",
+    "hmm",
+    "hm",
+    "mm",
+    "um",
+    "umm",
+    "uh",
+    "oh",
+    "hello",
+    "listen",
+    "look",
+    "again",
+    "then",
+    "anyway",
+    "v\u{e2}ng",
+    "d\u{1ea1}",
+    "\u{1eeb}",
+    "kh\u{f4}ng",
+    "nh\u{e9}",
+    "\u{e0}",
+    "\u{1a1}i",
+];
+
+/// #3504 finding N4: on a line lamp-name heard the lamp's name in (the
+/// voice's own sign, [`Engine::knowing_the_name_fired`], or its name note
+/// given), the first word past a greeting, set off as a name is
+/// ([`first_word_set_off`]: "Ramon. …", "Edeland, …", "Hey, mom. …"), is
+/// the lamp's name as speech to text wrote it, not a person's: when it is
+/// not "Lamp" itself (the name, or `LAMP_NAME_NEAR`'s word put in its
+/// place), is none of [`OPENS_SET_OFF`], and more is said after it. Text
+/// alone can't tell the misheard name from a person's (Ramon, Ilan and Elan
+/// are names too), so this is read only on such a line. The word, and the
+/// line after it.
+pub(crate) fn wake_heard_as(text: &str) -> Option<(&str, &str)> {
+    let (start, end) = first_word_set_off(text)?;
+    let word = &text[start..end];
+    let lower = unicode_normalization::UnicodeNormalization::nfc(word)
+        .collect::<String>()
+        .to_lowercase();
+    let rest = text[end..].trim_start_matches(|c: char| !c.is_alphanumeric());
+    let named = lower == "lamp" || lower == "lamb";
+    let common = OPENS_SET_OFF.contains(&lower.as_str()) || NOT_A_NAME.contains(&lower.as_str());
+    (!rest.is_empty() && !named && !common).then_some((word, rest))
+}
+
+/// Words that open a line set off and are said, never a name heard for the
+/// lamp's (the reviewer-lead's HOLD on `0990f0a27`: "Tomorrow, I see the
+/// dentist at 3" must keep its day): time and day words, verbs a request
+/// opens with, and discourse words, English and Vietnamese, NFC lower case.
+const NOT_A_NAME: &[&str] = &[
+    // Time and day.
+    "today",
+    "tomorrow",
+    "tonight",
+    "yesterday",
+    "now",
+    "later",
+    "soon",
+    "morning",
+    "afternoon",
+    "evening",
+    "night",
+    "noon",
+    "weekend",
+    "monday",
+    "tuesday",
+    "wednesday",
+    "thursday",
+    "friday",
+    "saturday",
+    "sunday",
+    "mai",
+    "nay",
+    "s\u{e1}ng",
+    "tr\u{1b0}a",
+    "chi\u{1ec1}u",
+    "t\u{1ed1}i",
+    "\u{111}\u{00ea}m",
+    "h\u{f4}m",
+    // Verbs a request opens with.
+    "remember",
+    "remind",
+    "forget",
+    "delete",
+    "tell",
+    "set",
+    "turn",
+    "play",
+    "stop",
+    "show",
+    "call",
+    "add",
+    "look",
+    "find",
+    "check",
+    "make",
+    "put",
+    "start",
+    "open",
+    "close",
+    "read",
+    "nh\u{1edb}",
+    "qu\u{ea}n",
+    "nh\u{1eaf}c",
+    "b\u{1ead}t",
+    "t\u{1eaf}t",
+    "m\u{1edf}",
+    "x\u{f3}a",
+    "k\u{1ec3}",
+    "n\u{f3}i",
+    "cho",
+    // Discourse words.
+    "honestly",
+    "seriously",
+    "really",
+    "first",
+    "second",
+    "finally",
+    "besides",
+    "otherwise",
+    "plus",
+    "though",
+    "however",
+    "anyway",
+    "basically",
+    "luckily",
+    "sadly",
+    "guys",
+    "everyone",
+    "everybody",
+    "hello",
+    "hi",
+    "okay",
+    "ok",
+    "alright",
+    "listen",
+    "excuse",
+    "wow",
+    "nh\u{01b0}ng",
+    "v\u{e0}",
+    "r\u{1ed3}i",
+    "th\u{1ebf}",
+    "\u{1eeb}",
+];
+
+/// What the model is told of [`wake_heard_as`]'s word: not a name.
+pub(crate) fn wake_note(word: &str) -> String {
+    format!(
+        "(For you to know, not to answer: \"{word}\" at the start of what they said is how your name, Lamp, was heard. It is nobody's name: never call them by it, and never keep it as a name or in anything you remember.)"
+    )
+}
+
+/// With `LAMP_MEMORY_KEEP_HEARD` (`keep_heard`) and lamp-name's hearing of
+/// the name in the line (`named`), a line opening with [`wake_heard_as`]'s word: its request's
+/// own line is held without it, so a kept fact is never worded with it
+/// (lamp-06c1, 27 Oct: "Edeland's dog is called Moe"), and the model is
+/// told it is no name. `None` changes nothing: the switch off, no name
+/// heard, or no such word.
+pub(crate) fn wake_not_a_name(
+    request: u64,
+    text: &str,
+    named: bool,
+    keep_heard: bool,
+) -> Option<String> {
+    if !(named && keep_heard) {
+        return None;
+    }
+    let (word, rest) = wake_heard_as(text)?;
+    if let Ok(mut thread) = crate::thread::THREAD.lock() {
+        thread.line_of(request, rest);
+    }
+    eprintln!(
+        "lamp-voice second: request {request}: its first word, set off, is the lamp's name as heard, not a name: the model is told, and its line is kept without it (LAMP_MEMORY_KEEP_HEARD)"
+    );
+    Some(wake_note(word))
 }
 
 /// Told how the room was, and who spoke, as a line the rule has not judged
@@ -2045,6 +2254,7 @@ impl Engine {
                 policy_now: None,
                 call_note: None,
                 name_sounded: None,
+                name_fired: None,
                 task_waiting: None,
                 air: None,
                 seems: None,
@@ -2909,6 +3119,16 @@ impl Engine {
     /// piece's time, so the name counts for it, and not its sound, which
     /// held the words back about 2 s (#1712, the first builder at 19:21).
     /// Before any turn only.
+    /// `fired` says whether lamp-name heard the name in a request's line:
+    /// the signal for [`wake_not_a_name`] (#3504 finding N4). Before any
+    /// turn only.
+    pub fn knowing_the_name_fired(mut self, fired: NameFired) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.name_fired = Some(fired);
+        }
+        self
+    }
+
     pub fn knowing_the_name_heard(mut self, heard: NameSounded) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.name_sounded = Some(heard);
@@ -5654,6 +5874,18 @@ async fn spoken(
         .as_ref()
         .and_then(|note| note(request))
         .map(str::to_owned);
+    // The lamp's name heard as another word at the line's start is no name
+    // (#3504 finding N4).
+    let fired = shared
+        .name_fired
+        .as_ref()
+        .is_some_and(|fired| fired(request));
+    let wake = wake_not_a_name(
+        request,
+        &text,
+        fired || named.is_some(),
+        crate::remember::heard::on(),
+    );
     // A task prepared and waiting for a yes: this route's history keeps the
     // words of its last exchanges, not its calls, so the model is told, or a
     // yes is taken as a new hand-over (#1712).
@@ -5725,6 +5957,7 @@ async fn spoken(
         .chain(staff)
         .chain(remembered)
         .chain(named)
+        .chain(wake)
         .chain(call)
         .chain(alone)
         .chain(waiting)
