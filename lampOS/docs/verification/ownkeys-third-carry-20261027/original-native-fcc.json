@@ -1,0 +1,116 @@
+{
+  "status": "ORIGINAL_NATIVE_PASSED",
+  "holds": [],
+  "source": {
+    "actual_preview": "582b377ae197ad5b6fa6dd4c7d02382faa093290",
+    "event_head": "fcc236b3fd8a793ba0db6f92a2845f03388cbba1",
+    "local_comparison_head": "083536db6ce4379ead3b147b24db136a7f42aa16",
+    "local_tree": "1b614eb528a697f8082104f8ac1d5a483013f082",
+    "ordered_parents": [
+      "3d5ea2dd792d42fd52f26b978daf5ddbe9c68487",
+      "fcc236b3fd8a793ba0db6f92a2845f03388cbba1"
+    ],
+    "preview_tree": "1b614eb528a697f8082104f8ac1d5a483013f082",
+    "whole_tree_equal": true
+  },
+  "nextest": {
+    "ipc_camera_authority_pass": 18,
+    "per_package_pass": {
+      "lamp-actions": 123,
+      "lamp-addons": 50,
+      "lamp-air": 27,
+      "lamp-audio": 193,
+      "lamp-body": 624,
+      "lamp-bus": 107,
+      "lamp-camera": 90,
+      "lamp-cloud": 196,
+      "lamp-controls": 516,
+      "lamp-ears": 76,
+      "lamp-environment": 12,
+      "lamp-expression": 340,
+      "lamp-eyes": 340,
+      "lamp-gemini": 285,
+      "lamp-health": 91,
+      "lamp-ipc": 45,
+      "lamp-keeper": 42,
+      "lamp-lean": 61,
+      "lamp-local-time": 11,
+      "lamp-memory": 336,
+      "lamp-mood": 118,
+      "lamp-msgs": 172,
+      "lamp-name": 44,
+      "lamp-near-call": 8,
+      "lamp-observer": 46,
+      "lamp-peek": 26,
+      "lamp-policy": 284,
+      "lamp-records": 193,
+      "lamp-ring": 53,
+      "lamp-same-voice": 5,
+      "lamp-schedule": 215,
+      "lamp-selftest": 85,
+      "lamp-settings": 49,
+      "lamp-setup": 186,
+      "lamp-skills": 530,
+      "lamp-sound-fixtures": 15,
+      "lamp-station": 69,
+      "lamp-surround": 268,
+      "lamp-tasks": 220,
+      "lamp-turn-end": 32,
+      "lamp-turn-end-wire": 5,
+      "lamp-turn-owner": 37,
+      "lamp-update": 452,
+      "lamp-voice": 4167,
+      "lamp-voice-eval": 623,
+      "lamp-voice-processes": 2
+    },
+    "skip_names_available": false,
+    "status_counts": {
+      "PASS": 11469
+    },
+    "summary_skips": 106,
+    "unique_rows": 11469,
+    "verified_post_summary_reprints_excluded": 35,
+    "voice_library_pass": 3849
+  },
+  "controls": {
+    "linux_only_once_pass": 6,
+    "missing_or_nonpass": [],
+    "once_pass": 71,
+    "required": 71
+  },
+  "separate_docs": {
+    "failed": 0,
+    "ignored": 0,
+    "passed": 3,
+    "sections": 47
+  },
+  "separate_custom_harnesses": {
+    "relay_signals_ok": true,
+    "turn_end_process13_0": true
+  },
+  "limits": [
+    "Only this original event and executed preview; no newer Main or device acceptance.",
+    "Successful Reader observation does not establish cause or waive original642 Reader failure held by Tests under #3543.",
+    "No CI rerun, binary download/execution or device action.",
+    "Summary skips have no per-case names in log and are not waived."
+  ],
+  "runs": {
+    "arm": {
+      "actual_checkout": "582b377ae197ad5b6fa6dd4c7d02382faa093290",
+      "attempt": 1,
+      "conclusion": "success",
+      "head": "fcc236b3fd8a793ba0db6f92a2845f03388cbba1",
+      "job": 122013889568,
+      "run": 40451138977
+    },
+    "linux": {
+      "actual_checkout": "582b377ae197ad5b6fa6dd4c7d02382faa093290",
+      "attempt": 1,
+      "conclusion": "success",
+      "head": "fcc236b3fd8a793ba0db6f92a2845f03388cbba1",
+      "job": 122013889352,
+      "run": 40451138975
+    }
+  },
+  "full_private_receipt_sha256": "1019b4da0f115310818367c31635d2880a350b5a0c421442d5eeb9e4e9dbf714"
+}
