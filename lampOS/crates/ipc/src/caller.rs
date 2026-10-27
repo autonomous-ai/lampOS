@@ -74,6 +74,22 @@ pub fn unit_of(cgroup: &str) -> Option<String> {
     })
 }
 
+/// The uid of the user `name` in `passwd`'s text (`/etc/passwd`'s form),
+/// for a part that holds a unit to the user it runs as (`lampos`).
+pub fn uid_in_passwd(passwd: &str, name: &str) -> Option<u32> {
+    passwd.lines().find_map(|line| {
+        let mut fields = line.split(':');
+        (fields.next() == Some(name))
+            .then(|| fields.nth(1)?.parse().ok())
+            .flatten()
+    })
+}
+
+/// [`uid_in_passwd`] of `/etc/passwd`, read now; `None` if it can't be.
+pub fn uid_named(name: &str) -> Option<u32> {
+    uid_in_passwd(&std::fs::read_to_string("/etc/passwd").ok()?, name)
+}
+
 /// The caller `pid` and `uid` name, its unit read now.
 #[cfg(target_os = "linux")]
 fn named(pid: u32, uid: u32) -> Caller {
@@ -229,6 +245,16 @@ mod tests {
         );
         assert_eq!(unit_of("0::/lampos.slice/\n"), None);
         assert_eq!(unit_of("0::/system.slice/.service\n"), None);
+    }
+
+    #[test]
+    fn a_users_uid_is_read_from_passwd() {
+        let passwd = "root:x:0:0:root:/root:/bin/bash\nlampos:x:990:990::/nonexistent:/usr/sbin/nologin\nlamposx:x:7:7::/:/bin/false\nbad:x:nan:1::/:/bin/false\n";
+        assert_eq!(uid_in_passwd(passwd, "lampos"), Some(990));
+        assert_eq!(uid_in_passwd(passwd, "root"), Some(0));
+        assert_eq!(uid_in_passwd(passwd, "lamp"), None);
+        assert_eq!(uid_in_passwd(passwd, "bad"), None);
+        assert_eq!(uid_in_passwd("", "lampos"), None);
     }
 
     #[cfg(target_os = "linux")]

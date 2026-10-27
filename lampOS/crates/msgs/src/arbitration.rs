@@ -282,9 +282,76 @@ pub fn arbitration_topics() -> Vec<(&'static str, Declaration)> {
     ]
 }
 
+/// The user a part runs as, by its product unit's `User=`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RunsAs {
+    Root,
+    Lampos,
+}
+
+/// The most each part's caller may ask at, by its systemd unit (phase 0 of
+/// the lamp programming protocol, #3504): a claim above it is held to it.
+pub const MOST_BY_UNIT: [(&str, RunsAs, Priority); 7] = [
+    ("lamp-voice.service", RunsAs::Root, Priority::Person),
+    // The app's light preview asks at conversation (`cloud/src/lamp.rs`).
+    ("lamp-cloud.service", RunsAs::Lampos, Priority::Conversation),
+    // The voice's light and volume tools go through it.
+    (
+        "lamp-actions.service",
+        RunsAs::Lampos,
+        Priority::Conversation,
+    ),
+    ("lamp-skills.service", RunsAs::Lampos, Priority::Skill),
+    // The programming door (#3715), not `lamp-controls`, the touch pads.
+    ("lamp-control.service", RunsAs::Lampos, Priority::Skill),
+    ("lamp-addons.service", RunsAs::Lampos, Priority::Idle),
+    ("lamp-expression.service", RunsAs::Lampos, Priority::Idle),
+];
+
+/// The most a caller may ask at, as the kernel named it (`lamp_ipc::caller`):
+/// its unit's in [`MOST_BY_UNIT`], only while it runs as that unit's user
+/// (`lampos`: that user's uid, if known); `None`, no bound, for root's own
+/// helpers, which keep what they ask; and idle for anyone else, a known
+/// unit with another user's uid among them.
+pub fn most_for(unit: Option<&str>, uid: u32, lampos: Option<u32>) -> Option<Priority> {
+    let named = MOST_BY_UNIT.iter().find(|(name, _, _)| Some(*name) == unit);
+    match named {
+        Some((_, RunsAs::Root, most)) if uid == 0 => Some(*most),
+        Some((_, RunsAs::Lampos, most)) if Some(uid) == lampos => Some(*most),
+        Some(_) => Some(Priority::Idle),
+        None if uid == 0 => None,
+        None => Some(Priority::Idle),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn each_unit_asks_at_most_at_its_own_and_only_as_its_own_user() {
+        use Priority::*;
+        let lampos = Some(990);
+        let most = |unit, uid| most_for(unit, uid, lampos);
+        assert_eq!(most(Some("lamp-voice.service"), 0), Some(Person));
+        assert_eq!(most(Some("lamp-cloud.service"), 990), Some(Conversation));
+        assert_eq!(most(Some("lamp-actions.service"), 990), Some(Conversation));
+        assert_eq!(most(Some("lamp-skills.service"), 990), Some(Skill));
+        assert_eq!(most(Some("lamp-control.service"), 990), Some(Skill));
+        assert_eq!(most(Some("lamp-addons.service"), 990), Some(Idle));
+        assert_eq!(most(Some("lamp-expression.service"), 990), Some(Idle));
+        // Root's own helpers keep what they ask.
+        assert_eq!(most(Some("lamp-waking.service"), 0), None);
+        assert_eq!(most(None, 0), None);
+        // A known name with another unit's user is nobody's.
+        assert_eq!(most(Some("lamp-voice.service"), 990), Some(Idle));
+        assert_eq!(most(Some("lamp-skills.service"), 1000), Some(Idle));
+        assert_eq!(most(Some("lamp-skills.service"), 0), Some(Idle));
+        assert_eq!(most_for(Some("lamp-skills.service"), 990, None), Some(Idle));
+        // Anyone else asks at idle.
+        assert_eq!(most(None, 1000), Some(Idle));
+        assert_eq!(most(Some("lamp-eyes.service"), 990), Some(Idle));
+    }
 
     fn claim(priority: Priority, until_us: u64) -> Claim {
         Claim {
