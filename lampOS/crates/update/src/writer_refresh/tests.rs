@@ -591,3 +591,209 @@ fn restoring_an_apply_requires_its_original_grant_and_preimage_identity() {
         serde_json::to_value(grant.preimages).unwrap()
     );
 }
+
+#[test]
+fn reloaded_inputs_keep_the_exact_origin_and_distinguish_writer_from_apply_restoration() {
+    for (prefix, origin) in [
+        RecoveryOrigin::Prepared,
+        RecoveryOrigin::Armed,
+        RecoveryOrigin::Published,
+        RecoveryOrigin::Probed,
+        RecoveryOrigin::Granted,
+        RecoveryOrigin::Applying,
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let (_folder, store) = fixture();
+        let binding = binding();
+        let grant = first_apply(&binding);
+        let mut live = store.prepare(binding.clone()).unwrap();
+        if prefix >= 1 {
+            live.armed().unwrap();
+        }
+        if prefix >= 2 {
+            live.published().unwrap();
+        }
+        if prefix >= 3 {
+            live.probed().unwrap();
+        }
+        if prefix >= 4 {
+            live.grant(grant.clone()).unwrap();
+        }
+        if prefix >= 5 {
+            let _permit = live.claim(&grant).unwrap();
+        }
+        drop(live);
+        let mut recovery = store.recover(&binding).unwrap();
+        let before = bytes(&store);
+        let expected = if prefix >= 4 {
+            RecoveryInputs::RestoreApply {
+                binding: &binding,
+                first_apply: &grant,
+                origin,
+                restoration_started: false,
+            }
+        } else {
+            RecoveryInputs::RestoreWriter {
+                binding: &binding,
+                origin,
+                restoration_started: false,
+            }
+        };
+        assert_eq!(recovery.recovery_inputs().unwrap(), expected);
+        assert_eq!(bytes(&store), before, "accessor changed prefix {prefix}");
+        recovery.restoring().unwrap();
+        drop(recovery);
+
+        let mut recovery = store.recover(&binding).unwrap();
+        let before = bytes(&store);
+        let expected = if prefix >= 4 {
+            RecoveryInputs::RestoreApply {
+                binding: &binding,
+                first_apply: &grant,
+                origin,
+                restoration_started: true,
+            }
+        } else {
+            RecoveryInputs::RestoreWriter {
+                binding: &binding,
+                origin,
+                restoration_started: true,
+            }
+        };
+        assert_eq!(recovery.recovery_inputs().unwrap(), expected);
+        assert_eq!(bytes(&store), before);
+        recovery.restored().unwrap();
+        assert_eq!(
+            recovery.recovery_inputs().unwrap(),
+            RecoveryInputs::Ordinary {
+                binding: &binding,
+                writer: &binding.previous_writer,
+                first_apply: (prefix >= 4).then_some(&grant),
+                qualification: None,
+                product_closed: None,
+            }
+        );
+    }
+}
+
+#[test]
+fn qualified_and_closed_inputs_keep_the_compatible_writer_and_bound_product_receipts() {
+    let (_folder, store) = fixture();
+    let binding = binding();
+    let grant = first_apply(&binding);
+    let qualification = Artifact::of(b"qualified writer and first apply receipt");
+    let closure = Artifact::of(b"product recovery completed with the compatible writer");
+    let mut live = store.prepare(binding.clone()).unwrap();
+    probe(&mut live);
+    live.grant(grant.clone()).unwrap();
+    let permit = live.claim(&grant).unwrap();
+    live.qualify(&permit, qualification.clone()).unwrap();
+    drop(live);
+
+    let mut recovery = store.recover(&binding).unwrap();
+    let before = bytes(&store);
+    assert_eq!(
+        recovery.recovery_inputs().unwrap(),
+        RecoveryInputs::RecoverProduct {
+            binding: &binding,
+            first_apply: &grant,
+            qualification: &qualification,
+        }
+    );
+    assert!(recovery.restoring().is_err());
+    assert_eq!(bytes(&store), before);
+    recovery.product_closed(&grant, closure.clone()).unwrap();
+    drop(recovery);
+
+    let recovery = store.recover(&binding).unwrap();
+    let before = bytes(&store);
+    assert_eq!(
+        recovery.recovery_inputs().unwrap(),
+        RecoveryInputs::Ordinary {
+            binding: &binding,
+            writer: &binding.writer,
+            first_apply: Some(&grant),
+            qualification: Some(&qualification),
+            product_closed: Some(&closure),
+        }
+    );
+    assert_eq!(bytes(&store), before);
+}
+
+#[test]
+fn live_or_poisoned_sessions_cannot_expose_stale_recovery_inputs() {
+    let (_folder, store) = fixture();
+    let binding = binding();
+    let grant = first_apply(&binding);
+    let mut live = store.prepare(binding.clone()).unwrap();
+    assert!(live.recovery_inputs().is_err());
+    probe(&mut live);
+    live.grant(grant.clone()).unwrap();
+    let _permit = live.claim(&grant).unwrap();
+    assert!(live.recovery_inputs().is_err());
+    drop(live);
+
+    let mut recovery = store.recover(&binding).unwrap();
+    assert!(matches!(
+        recovery.recovery_inputs().unwrap(),
+        RecoveryInputs::RestoreApply { .. }
+    ));
+    store.fail_after_write.set(true);
+    assert!(recovery.restoring().is_err());
+    assert_eq!(document(&store)["phase"], json!("restoring"));
+    let before = bytes(&store);
+    assert!(recovery.recovery_inputs().is_err());
+    assert_eq!(bytes(&store), before);
+    drop(recovery);
+
+    let recovery = store.recover(&binding).unwrap();
+    assert_eq!(
+        recovery.recovery_inputs().unwrap(),
+        RecoveryInputs::RestoreApply {
+            binding: &binding,
+            first_apply: &grant,
+            origin: RecoveryOrigin::Applying,
+            restoration_started: true,
+        }
+    );
+}
+
+#[test]
+fn recovery_views_retain_later_metadata_in_the_bound_inputs_without_reparsing() {
+    let (_folder, store) = fixture();
+    let binding = binding();
+    let mut value = serde_json::to_value(first_apply(&binding)).unwrap();
+    value["future_receipt_context"] = json!({"v": 2});
+    value["preimages"]["future_format_note"] = json!("nonsemantic metadata");
+    let grant: FirstApply = serde_json::from_value(value).unwrap();
+    let mut live = store.prepare(binding.clone()).unwrap();
+    probe(&mut live);
+    live.grant(grant.clone()).unwrap();
+    drop(live);
+    let mut saved = document(&store);
+    saved["binding"]["future_build_note"] = json!("retained alongside the known identity");
+    replace(&store, &saved);
+
+    let recovery = store.recover(&binding).unwrap();
+    let before = bytes(&store);
+    let RecoveryInputs::RestoreApply {
+        binding: retained,
+        first_apply,
+        ..
+    } = recovery.recovery_inputs().unwrap()
+    else {
+        panic!("the retained grant was lost");
+    };
+    assert_eq!(
+        serde_json::to_value(retained).unwrap()["future_build_note"],
+        saved["binding"]["future_build_note"]
+    );
+    assert_eq!(first_apply, &grant);
+    assert_eq!(
+        serde_json::to_value(first_apply).unwrap()["preimages"]["future_format_note"],
+        json!("nonsemantic metadata")
+    );
+    assert_eq!(bytes(&store), before);
+}

@@ -356,6 +356,52 @@ pub enum Admission {
     ProductRecoveryNeeded,
 }
 
+/// The validated stage whose effects may need undoing. A Restoring journal
+/// retains this original stage; it is not treated as a new writer-only plan.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RecoveryOrigin {
+    Prepared,
+    Armed,
+    Published,
+    Probed,
+    Granted,
+    Applying,
+}
+
+/// A read-only view while the recovery session holds its guard lock. These
+/// references identify retained inputs; they authenticate no signature or
+/// bytes and are not permission to execute an external effect.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RecoveryInputs<'a> {
+    RestoreWriter {
+        binding: &'a Binding,
+        origin: RecoveryOrigin,
+        restoration_started: bool,
+    },
+    RestoreApply {
+        binding: &'a Binding,
+        first_apply: &'a FirstApply,
+        origin: RecoveryOrigin,
+        restoration_started: bool,
+    },
+    /// Keep this qualified writer for product recovery: the older writer
+    /// cannot necessarily interpret the first apply's new-path preimages.
+    RecoverProduct {
+        binding: &'a Binding,
+        first_apply: &'a FirstApply,
+        qualification: &'a Artifact,
+    },
+    /// Terminal state has no refresh restoration action. Receipts and inputs
+    /// remain available without reparsing the journal or authorizing pruning.
+    Ordinary {
+        binding: &'a Binding,
+        writer: &'a Artifact,
+        first_apply: Option<&'a FirstApply>,
+        qualification: Option<&'a Artifact>,
+        product_closed: Option<&'a Artifact>,
+    },
+}
+
 /// An already existing private folder. No default system path is provided.
 pub struct Store {
     folder: PathBuf,
@@ -526,6 +572,85 @@ pub struct Permit {
 }
 
 impl Session<'_> {
+    /// Expose only Store-validated retained inputs after a recovery reload.
+    /// Live or poisoned sessions must first drop their lock and reload; this
+    /// accessor neither reparses JSON nor advances or saves a journal phase.
+    pub fn recovery_inputs(&self) -> io::Result<RecoveryInputs<'_>> {
+        if !self.recovery || self.poisoned {
+            return Err(invalid(
+                "recovery inputs require a reloaded recovery session",
+            ));
+        }
+        let journal = &self.journal;
+        let grant = || {
+            journal
+                .grant
+                .as_ref()
+                .ok_or_else(|| invalid("recovery input is missing its first-apply identity"))
+        };
+        match journal.phase {
+            Phase::Qualified => {
+                return Ok(RecoveryInputs::RecoverProduct {
+                    binding: &journal.binding,
+                    first_apply: grant()?,
+                    qualification: journal.qualification.as_ref().ok_or_else(|| {
+                        invalid("product recovery input is missing its qualification identity")
+                    })?,
+                });
+            }
+            Phase::Closed | Phase::Restored => {
+                let writer = if journal.phase == Phase::Closed {
+                    &journal.binding.writer
+                } else {
+                    &journal.binding.previous_writer
+                };
+                return Ok(RecoveryInputs::Ordinary {
+                    binding: &journal.binding,
+                    writer,
+                    first_apply: journal.grant.as_ref(),
+                    qualification: journal.qualification.as_ref(),
+                    product_closed: journal.product_closed.as_ref(),
+                });
+            }
+            _ => {}
+        }
+        let restoration_started = journal.phase == Phase::Restoring;
+        let source = if restoration_started {
+            journal
+                .restore_from
+                .ok_or_else(|| invalid("recovery input is missing its restoration origin"))?
+        } else {
+            journal.phase
+        };
+        let origin = match source {
+            Phase::Prepared => RecoveryOrigin::Prepared,
+            Phase::Armed => RecoveryOrigin::Armed,
+            Phase::Published => RecoveryOrigin::Published,
+            Phase::Probed => RecoveryOrigin::Probed,
+            Phase::Granted => RecoveryOrigin::Granted,
+            Phase::Applying => RecoveryOrigin::Applying,
+            _ => {
+                return Err(invalid(
+                    "recovery input has an unsupported restoration origin",
+                ));
+            }
+        };
+        if matches!(source, Phase::Granted | Phase::Applying) {
+            Ok(RecoveryInputs::RestoreApply {
+                binding: &journal.binding,
+                first_apply: grant()?,
+                origin,
+                restoration_started,
+            })
+        } else {
+            Ok(RecoveryInputs::RestoreWriter {
+                binding: &journal.binding,
+                origin,
+                restoration_started,
+            })
+        }
+    }
+
     pub fn admission(&self) -> Admission {
         if self.poisoned {
             return Admission::RecoveryNeeded;
