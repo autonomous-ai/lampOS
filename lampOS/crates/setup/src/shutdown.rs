@@ -757,7 +757,20 @@ mod tests {
             Some("an update is being installed: try again once it is done")
         );
         drop(held);
-        let lock = update_lock(&records).unwrap();
+        // A child spawned meanwhile by another test in this process (scan's)
+        // holds a copy of every descriptor from fork to exec, the lock's
+        // too, for about a millisecond: retried for a short while, not
+        // read as held once.
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
+        let lock = loop {
+            match update_lock(&records) {
+                Ok(lock) => break lock,
+                Err(_) if std::time::Instant::now() < deadline => {
+                    std::thread::sleep(std::time::Duration::from_millis(1))
+                }
+                Err(why) => panic!("{why}"),
+            }
+        };
         // Held by the shutdown: an update that starts meanwhile can't have it.
         assert!(records.lock().is_err());
         drop(lock);
