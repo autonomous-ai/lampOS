@@ -21,6 +21,7 @@ use std::path::PathBuf;
 
 use lamp_control::{cert, pairing::Clients, parts, server, session};
 use lamp_msgs::LightRequest;
+use std::sync::{Arc, Mutex};
 
 const ENVIRONMENT: &str = "LAMP_CONTROL";
 const STATE_DIR: &str = "/var/lib/lampos-control";
@@ -118,9 +119,13 @@ fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
     );
     let body = option(arguments, "--mood-socket").map(PathBuf::from);
     let say = option(arguments, "--say-socket").map(PathBuf::from);
-    let light: Option<Box<dyn parts::LightOut>> = match option(arguments, "--bus-root") {
-        Some(root) => {
-            let bus = lamp_bus::Bus::new(root).map_err(|e| format!("bus: {e}"))?;
+    let bus = match option(arguments, "--bus-root") {
+        Some(root) => Some(lamp_bus::Bus::new(root).map_err(|e| format!("bus: {e}"))?),
+        None => None,
+    };
+    let watch = Arc::new(Mutex::new(lamp_control::watch::Watch::new()));
+    let light: Option<Box<dyn parts::LightOut>> = match &bus {
+        Some(bus) => {
             let out = bus
                 .publisher_declared(LightRequest::TOPIC, &LightRequest::declaration(), "control")
                 .map_err(|e| format!("light/request: {e}"))?;
@@ -135,8 +140,9 @@ fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
                 .map(|id| id.trim().to_owned())
         })
         .unwrap_or_default();
+    let watching = watch.clone();
     let shared = server::Shared::new_with(door, identity.pin.clone(), move |events| {
-        Box::new(parts::Lamp::new(body, light, say, clock_id, events))
+        Box::new(parts::Lamp::new(body, light, say, clock_id, events).watching(watching))
     });
     let tls = server::acceptor(&identity).map_err(|e| format!("tls: {e}"))?;
     let runtime = tokio::runtime::Builder::new_current_thread()
@@ -168,6 +174,10 @@ fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
         std::fs::set_permissions(&admin, std::fs::Permissions::from_mode(0o600))
             .map_err(|e| e.to_string())?;
         tokio::spawn(server::admin(owner, shared.clone()));
+        if let Some(bus) = &bus {
+            server::watch_bus(bus, watch, shared.clone())
+                .map_err(|e| format!("bus topics: {e}"))?;
+        }
         tokio::select! {
             () = server::serve(listener, tls, shared) => {}
             _ = tokio::signal::ctrl_c() => {}

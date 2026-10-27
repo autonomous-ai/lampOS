@@ -19,6 +19,21 @@ pub const SAY_MAX_CHARS: usize = 300;
 pub const PHRASES_MAX: usize = 16;
 /// The longest phrase, in characters.
 pub const PHRASE_MAX_CHARS: usize = 64;
+/// A phrase is at least two words, or one of at least this many letters, so
+/// a program can't register single common words ("a", "yes") and probe the
+/// room's speech word by word (Fourteen's P2 on #3868).
+pub const PHRASE_MIN_LETTERS: usize = 8;
+
+/// A phrase's or a heard line's words, as both the floor and the match see
+/// them: split on anything but letters, digits and the apostrophe (so
+/// "don't" is one word in both places, the Reviewer-lead's P3 on #3868),
+/// lowercased.
+pub fn phrase_words(text: &str) -> Vec<String> {
+    text.split(|c: char| !c.is_alphanumeric() && c != '\'')
+        .filter(|word| !word.is_empty())
+        .map(str::to_lowercase)
+        .collect()
+}
 /// The longest a light request or one lease renewal holds, in ms: as the
 /// ring's own light requests ([`lamp_msgs::LightRequest`]'s claims, ≤ 30 s).
 pub const HOLD_MAX_MS: u32 = 30_000;
@@ -374,6 +389,13 @@ impl Op {
                     {
                         return Err(format!(
                             "phrases: words of at most {PHRASE_MAX_CHARS} characters"
+                        ));
+                    }
+                    let words = phrase_words(phrase).len();
+                    let letters = phrase.chars().filter(|c| c.is_alphanumeric()).count();
+                    if words < 2 && letters < PHRASE_MIN_LETTERS {
+                        return Err(format!(
+                            "phrases: {phrase:?} is too short: two words or more, or one of {PHRASE_MIN_LETTERS} letters"
                         ));
                     }
                 }
@@ -841,12 +863,33 @@ mod tests {
         for frame in &refused {
             assert_eq!(why(frame).0, Some(1), "{frame}");
         }
-        let phrases: Vec<String> = (0..=PHRASES_MAX).map(|n| format!("\"p{n}\"")).collect();
+        let phrases: Vec<String> = (0..=PHRASES_MAX)
+            .map(|n| format!("\"phrase number {n}\""))
+            .collect();
         let frame = format!(
             r#"{{"id":1,"op":"subscribe","events":["phrase.heard"],"phrases":[{}]}}"#,
             phrases.join(",")
         );
-        assert_eq!(why(&frame).0, Some(1));
+        assert!(why(&frame).1.contains("at most 16"), "{:?}", why(&frame));
+        // Fourteen's P2 on #3868: two words or one of 8 letters, never a
+        // single common word.
+        let subscribe = |phrase: &str| {
+            format!(
+                r#"{{"id":1,"op":"subscribe","events":["phrase.heard"],"phrases":["{phrase}"]}}"#
+            )
+        };
+        for short in ["a", "yes", "the", "lights", "ok!", "don't", "it's"] {
+            assert!(why(&subscribe(short)).1.contains("too short"), "{short}");
+        }
+        for fine in [
+            "lights please",
+            "good night lamp",
+            "password",
+            "ok lamp",
+            "don't stop",
+        ] {
+            assert!(parse(&subscribe(fine)).is_ok(), "{fine}");
+        }
     }
 
     #[test]
@@ -869,7 +912,7 @@ mod tests {
         assert_eq!(needs(r#"{"id":1,"op":"say","text":"Hi."}"#), [Grant::Speak]);
         assert_eq!(
             needs(
-                r#"{"id":1,"op":"subscribe","events":["person.arrived","sound.heard","touch","phrase.heard"],"phrases":["hi"]}"#
+                r#"{"id":1,"op":"subscribe","events":["person.arrived","sound.heard","touch","phrase.heard"],"phrases":["lights please"]}"#
             ),
             [Grant::Look, Grant::Hear, Grant::Sound]
         );

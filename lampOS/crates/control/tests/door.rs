@@ -470,3 +470,53 @@ async fn the_last_connection_closing_or_a_revoke_stops_its_actions() {
     );
     assert_eq!(stops.lock().unwrap().last(), Some(&other));
 }
+
+#[tokio::test]
+async fn the_bus_reaches_a_subscriber_as_events_phrases_only_and_lease_signals() {
+    use lamp_control::protocol::{EventKind, LeaseWhy};
+    use lamp_control::watch::Out;
+    let lamp = lamp("events").await;
+    let mut socket = paired(&lamp, json!(["look", "hear", "light"]), 4).await;
+    let subscribed = send(
+        &mut socket,
+        json!({"id": 3, "op": "subscribe", "events": ["person.arrived", "phrase.heard"], "phrases": ["lights please"]}),
+    )
+    .await;
+    assert_eq!(subscribed["ok"], true, "{subscribed}");
+    // Not subscribed: never sent.
+    lamp.shared
+        .deliver(vec![Out::Event(EventKind::Touch, json!({"kind": "tap"}))]);
+    lamp.shared.deliver(vec![Out::Event(
+        EventKind::PersonArrived,
+        json!({"count": 1, "near": 0.3}),
+    )]);
+    let arrived = next(&mut socket).await;
+    assert_eq!(arrived["ev"], "person.arrived");
+    assert_eq!(arrived["count"], 1);
+    assert!(arrived["at"].as_str().unwrap().ends_with('Z'));
+    // The words heard never leave the lamp: only the phrase.
+    lamp.shared
+        .deliver(vec![Out::Heard("ok the lights please now".into())]);
+    let heard = next(&mut socket).await;
+    assert_eq!(heard["ev"], "phrase.heard");
+    assert_eq!(heard["phrase"], "lights please");
+    assert!(!heard.to_string().contains("now"), "{heard}");
+    // A conversation suspends its lease; resting holds it again.
+    let take = send(
+        &mut socket,
+        json!({"id": 4, "op": "lease.take", "parts": ["light"], "for_ms": 30000}),
+    )
+    .await;
+    assert_eq!(take["lease"], "l_1");
+    lamp.shared
+        .deliver(vec![Out::Suspend(None, LeaseWhy::Conversation)]);
+    assert_eq!(
+        next(&mut socket).await,
+        json!({"ev": "lease", "lease": "l_1", "state": "suspended", "why": "conversation"})
+    );
+    lamp.shared.deliver(vec![Out::Resume]);
+    assert_eq!(
+        next(&mut socket).await,
+        json!({"ev": "lease", "lease": "l_1", "state": "held"})
+    );
+}
