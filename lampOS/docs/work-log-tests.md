@@ -1,5 +1,12 @@
 # Tests work log
 
+## 2026-10-27 21:22 — Body current native gates pass; ready for readers
+
+Ready for lamp-voice: yes (#3845,536fc9c3e; current reader marks pending).
+
+[Fresh current Body native proof](verification/tests-3845-current-native-20261027/) records ARM40517334831 and Linux40517335825 success, attempt one: **7,765 unique PASS, zero bad/selected-unrun,53 aggregate skips**; holder once. Actual780ce2558 preview [992303fc8,536fc9c3e] exactly matches the authored tree and both full authored blobs. All audit scopes/reprints/warnings remain explicit. #3845 is ready, with reads requested from Reviewer-two and Third. The old control, administrative failure and earlier observations remain separate. #3843’s carried-head ARM is still pending; the Reader fixture is the next active piece. No device action.
+
+
 ## 2026-10-27 21:03 — original native proofs green; both PRs carried to fetched Main
 
 Ready for lamp-voice: no (fresh carried-head checks/current reads and device acceptance pending).
