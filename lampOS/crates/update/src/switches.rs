@@ -7,7 +7,7 @@
 //! a setting edited on the lamp (docs/install.md), so a drop-in from a
 //! lamp's builder days with `Environment=LAMP_CLOUD=off`, or an edited
 //! `EnvironmentFile=` saying so, leaves a part quietly off after an install
-//! to stable. Install and `check-units` name each one ([`turned_off`]);
+//! to stable. Install and `check-units` name each one ([`merged_off`]);
 //! neither changes it.
 
 /// What one file's `Environment=` lines (or an environment file's lines)
@@ -183,20 +183,36 @@ pub fn switches(unit: &str) -> Vec<String> {
         .collect()
 }
 
-/// How a file turns one of `switches` off, said after its name and before
-/// "; the product sets it on": `turns LAMP_CLOUD off ("off")`, or, for an
-/// empty `Environment=` that cleared the product's lines and set none back,
-/// `turns LAMP_CLOUD off (an empty Environment= clears it)`.
-pub fn turned_off(switches: &[String], found: &Assignments) -> Vec<String> {
+/// Which of `switches` end up off once every file that sets them is read in
+/// systemd's order (`sources`: the unit's kept drop-ins in name order, then
+/// its environment files, which win over `Environment=`), each with the file
+/// that left it off and how (`turns LAMP_CLOUD off ("off")`). A drop-in's `off` that
+/// a later drop-in or file sets back `on` is not said: the switch is on.
+pub fn merged_off(switches: &[String], sources: &[(String, Assignments)]) -> Vec<(String, String)> {
     switches
         .iter()
-        .filter_map(|name| match found.get(name) {
-            Some("on") => None,
-            Some(value) => Some(format!("turns {name} off ({value:?})")),
-            None if found.cleared => Some(format!(
-                "turns {name} off (an empty Environment= clears it)"
-            )),
-            None => None,
+        .filter_map(|name| {
+            // The product unit sets every switch `on`; `None` is cleared.
+            let mut value = Some("on");
+            let mut by: Option<&str> = None;
+            for (what, found) in sources {
+                if let Some(set) = found.get(name) {
+                    value = Some(set);
+                    by = Some(what);
+                } else if found.cleared {
+                    value = None;
+                    by = Some(what);
+                }
+            }
+            let by = by?.to_owned();
+            match value {
+                Some("on") => None,
+                Some(value) => Some((by, format!("turns {name} off ({value:?})"))),
+                None => Some((
+                    by,
+                    format!("turns {name} off (an empty Environment= clears it)"),
+                )),
+            }
         })
         .collect()
 }
@@ -209,6 +225,60 @@ pub fn said(what: &str, how: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// One file read alone: how it leaves each switch off.
+    fn turned_off(switches: &[String], found: &Assignments) -> Vec<String> {
+        merged_off(switches, &[("f".to_owned(), found.clone())])
+            .into_iter()
+            .map(|(_, how)| how)
+            .collect()
+    }
+
+    #[test]
+    fn a_later_drop_in_or_file_that_sets_it_back_on_leaves_it_on() {
+        let switches = ["LAMP_CLOUD".to_owned()];
+        let old = environment("[Service]\nEnvironment=LAMP_CLOUD=off\n");
+        let fix = environment("[Service]\nEnvironment=LAMP_CLOUD=on\n");
+        let file_on = environment_file("LAMP_CLOUD=on\n");
+        let file_off = environment_file("LAMP_CLOUD=off\n");
+        let cleared = environment("[Service]\nEnvironment=\n");
+        let source = |what: &str, found: &Assignments| (what.to_owned(), found.clone());
+        assert!(
+            merged_off(&switches, &[source("10-old", &old), source("20-fix", &fix)]).is_empty()
+        );
+        assert!(
+            merged_off(
+                &switches,
+                &[source("old", &old), source("store.env", &file_on)]
+            )
+            .is_empty()
+        );
+        assert_eq!(
+            merged_off(&switches, &[source("10-fix", &fix), source("20-old", &old)]),
+            [(
+                "20-old".to_owned(),
+                r#"turns LAMP_CLOUD off ("off")"#.to_owned()
+            )]
+        );
+        assert_eq!(
+            merged_off(
+                &switches,
+                &[source("fix", &fix), source("store.env", &file_off)]
+            ),
+            [(
+                "store.env".to_owned(),
+                r#"turns LAMP_CLOUD off ("off")"#.to_owned()
+            )]
+        );
+        assert_eq!(
+            merged_off(&switches, &[source("fix", &fix), source("clear", &cleared)]),
+            [(
+                "clear".to_owned(),
+                "turns LAMP_CLOUD off (an empty Environment= clears it)".to_owned()
+            )]
+        );
+        assert!(merged_off(&switches, &[]).is_empty(), "the unit's own on");
+    }
 
     #[test]
     fn the_product_switches_are_its_on_lines_and_lamp_cloud_is_one() {
