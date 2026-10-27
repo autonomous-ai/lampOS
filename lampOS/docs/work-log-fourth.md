@@ -1,3 +1,17 @@
+## 2026-10-27 09:50 UTC — Common expiry latch discriminated; fresh gates active
+
+Ready for lamp-voice: no
+
+[Expiry latch RED receipt](verification/common-expiry-latch-red-20261027/receipt.json):
+old-production source `67c500d29` gives actual test exit 101, 0/1 at the first Pending-expiry
+latch assertion; the later Ready row is unreached. Native 90428 / exit 1 also records
+later diagnostic admission 125 with zero bodies. Recovery 94823 / exit 0 retains the
+failed driver and verifies all 7,890 protected files, actual zero backings and
+source/process closure. The once-only diagnostic exit 0 keeps the original 50 ms
+assertion; it is not qualification or an explanation of the old full-run miss.
+Earlier compile 81851 / exit 1 (zero bodies) and fixture 48603 / exit 1 remain failed. Corrective
+`8cfcb464b` source has fresh 112-control gate 36537 active; no final result or ready claim.
+
 ## 2026-10-27 08:54 UTC — Common transport run narrows to five failures
 
 Ready for lamp-voice: no

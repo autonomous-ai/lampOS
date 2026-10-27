@@ -1,0 +1,115 @@
+{
+  "status": "EXPECTED_RED_OBSERVED_CORRECTIVE_SOURCE_NOT_QUALIFIED",
+  "source_tree": "67c500d29ce85ee3193b552624098a2251e31e3f",
+  "source_scope": "Corrected control 112 and timing-only instrumentation on unchanged old production latch behavior",
+  "intended_control": {
+    "test": "second_provider::worker::private_speaker_expiry_tests::expired_v3_speaker_latches_loss_without_renewing_the_request",
+    "actual_test_exit": 101,
+    "selected_top_level_cases": 1,
+    "passed": 0,
+    "failed": 1,
+    "ignored": 0,
+    "filtered_not_executed": 3996,
+    "failure_boundary": {
+      "source_file": "crates/voice/src/second_provider/worker.rs",
+      "line": 22293,
+      "row": "Pending at original speaker expiry",
+      "validator_returned_Lost_before_latch_assertion": true
+    },
+    "internal_row_reach_not_additional_test_counts": {
+      "planned_rows": 4,
+      "neutral_rows_completed_before_failure": 2,
+      "Pending_expiry_failed": 1,
+      "later_Ready_expiry_not_reached": 1
+    },
+    "original_speaker_deadline_seconds": 2,
+    "fresh_modeled_V3_observations_and_actual_SCM_RIGHTS_required": true,
+    "immutable_deadline_already_denied_disclosure": true,
+    "privacy_revival_not_established": true
+  },
+  "original_wrapper": {
+    "native_session": 90428,
+    "native_exit": 1,
+    "later_diagnostic_admission_exit": 125,
+    "later_diagnostic_bodies_executed": 0,
+    "expected_RED_test_failure_not_a_GREEN_result": true,
+    "wrapper_failure_not_relabelled": true
+  },
+  "only_unrun_diagnostic": {
+    "actual_exit": 0,
+    "top_level_cases": 1,
+    "passed": 1,
+    "failed": 0,
+    "ignored": 0,
+    "filtered_not_executed": 3996,
+    "original_50ms_assertion_unchanged": true,
+    "qualification": false,
+    "explains_old_full_run_miss": false,
+    "request_number": 2,
+    "fixture_us": 810,
+    "ahead_ready_us": 664,
+    "told_us": 685,
+    "total_us": 2160,
+    "session_opens_before": 3,
+    "session_opens_after": 3,
+    "phase_print_inside_outer_50ms_clock": true,
+    "total_us_captured_before_phase_print": true,
+    "test_control_not_replayed_in_recovery": true,
+    "reported_total_minus_phase_sums_us": 1
+  },
+  "retention_release": {
+    "actual_native_session": 94823,
+    "actual_native_exit": 0,
+    "actual_native_chunk": "d3f150",
+    "actual_native_tool_completion_observed": true,
+    "failed_drivers": 1,
+    "retained_driver_mode": "0600",
+    "prior_protected_files": 7889,
+    "protected_files": 7890,
+    "actual_dsymutil_exit": 0,
+    "independent_MachO_backing_entries": 0,
+    "source_stable": true,
+    "owned_sessions_closed": true,
+    "target_release_permitted": true
+  },
+  "earlier_distinct_failures": [
+    {
+      "native_session": 81851,
+      "native_exit": 1,
+      "compile_exit": 101,
+      "test_bodies_executed": 0,
+      "outcome": "Compile input failure; no runtime regression evidence",
+      "failure_not_relabelled": true
+    },
+    {
+      "native_session": 48603,
+      "native_exit": 1,
+      "actual_test_exit": 101,
+      "passed": 0,
+      "failed": 1,
+      "intended_latch_boundary_reached": false,
+      "outcome": "Unexpected camera fixture setup failure; not the intended negative control",
+      "failure_not_relabelled": true
+    }
+  ],
+  "corrective_source": {
+    "tree": "8cfcb464b38b74a83eac86438f4bf36a725e6ad5",
+    "fresh_gate_native_session": 36537,
+    "required_pairs": 112,
+    "gate_state_at_preparation": "ACTIVE_NO_FINAL_RESULT",
+    "fmt_exit": 0,
+    "metadata_exit": 0,
+    "diagnostic_instrumentation_excluded": true,
+    "runtime_result_credited": false,
+    "ready_for_lamp_voice": false
+  },
+  "native_ARM_Linux_or_device_acceptance": false,
+  "evidence_sha256": {
+    "retention_actual_native_release": "98cab30fbd230d071770f5414b25e3d7aa2fb5c2f0f45e0bdd6e411b8b0b08bc",
+    "intended_RED_operation": "8979c9cb8bb06f1293ede566da8ba991c5157073d6fecb6cea41dbebf3bd28b2",
+    "zero_body_diagnostic_admission": "56c8c11e861181c9011a024253173b71c99118cd2fdadedaa718b910af1552ae",
+    "actual_only_unrun_diagnostic_operation": "0af44428bf81c7369c7d13a550f179069587f5bc84dbcdb34e36096e48676dc6",
+    "retained_failed_driver": "c1bcc995a2feb9013e544c232f0329dfaef0968ccd84375e3dd54daf9173198c",
+    "source_freeze": "435f4eaf4d0bd414fd7c41858e39eeb5a91a22fa6006c361a66a540e65f3526e"
+  }
+}
