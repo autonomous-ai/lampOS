@@ -14,5 +14,7 @@
 //! the parts come in the pieces after it, off unless `LAMP_CONTROL=on`.
 
 pub mod lease;
+pub mod pairing;
 pub mod protocol;
 pub mod rate;
+pub mod session;

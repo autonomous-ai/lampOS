@@ -37,13 +37,17 @@ cập cho nhà phát triển trong ứng dụng.
 ## Đường truyền
 
 - `wss://<đèn>.local:7731/v1`, tìm bằng mDNS `_lampos._tcp`, chứng chỉ tự
-  ký được ghim khi ghép đôi.
+  ký của đèn, mà máy kiểm tra theo mã ghim (SHA-256) ứng dụng đưa kèm mã
+  ghép đôi, trước khi gửi bất cứ thứ gì.
 - Mỗi khung là một đối tượng JSON: yêu cầu `{"id":7,"op":"..."}`, trả lời
   `{"re":7,"ok":true}` hoặc `{"re":7,"ok":false,"error":{...}}`, sự kiện
   `{"ev":"...","at":"..."}`.
-- **Ghép đôi** một lần cho mỗi máy: mã dùng một lần từ ứng dụng (hoặc giữ
-  nút của đèn 3 giây), rồi `lamp pair` gửi khóa Ed25519 công khai cùng bằng
-  chứng. **Hello** trên mỗi kết nối, ký bằng khóa đó.
+- **Ghép đôi** một lần cho mỗi máy: mã dùng một lần từ ứng dụng, kèm mã
+  ghim chứng chỉ của đèn; không có ghép đôi nào thiếu mã ghim đó. `lamp pair`
+  kiểm tra chứng chỉ trước, rồi gửi khóa Ed25519 công khai cùng bằng chứng
+  (HMAC trên mã ghim, khóa và nonce). Bằng chứng sai thì kết nối bị đóng, và
+  mỗi giây chỉ một lần thử trên cả đèn. **Hello** trên mỗi kết nối, ký bằng
+  khóa đó, một lần cho mỗi kết nối.
 
 ## Ai thắng
 
