@@ -130,6 +130,7 @@ lamp says so.
 | `skills.install` (`{"url", "sha256", "name", "version"}`, all but `url` optional) | with `LAMP_SKILLS_PAGE=on`, `LAMP_SKILLS_STORE=on` and the separate Store public key ("Installing from the Skills Store" below): a Skills Store catalogue entry, passed to root's manage helper, which fetches the package over HTTPS and installs it only when it is signed with the Store's key (never a core skill or a core skill's name; `lamp-cloud` writes and fetches nothing); the reply is `skills.list`'s, read after it. Without the Store switch or a valid key, V1's "not on this lamp" |
 | `skills.remove` (`{"name"}`) | with `LAMP_SKILLS_PAGE=on` ("Removing a skill" below): an installed or made-here skill taken off on the person's tap, asked of root's manage helper over its local socket (`lamp-cloud` never writes the skills folder), on a lamp installed before #2429 only after `lamp-update install` once; the reply is `skills.list`'s, read after it. A core skill, a name that is not a skill's and one not on the lamp are refused. Without the switch, V1's "not on this lamp" |
 | `skills.off`, `skills.on` (`{"name"}`) | with `LAMP_SKILLS_PAGE=on` (#2815, "Turning a skill off and on" below): a skill turned off or on on the person's tap, asked of root's manage helper as a remove is, and kept in `lamp-skills`' `off` (a core skill shipped off turned on in its file and kept in `on`, #2585), so a round and a restart keep it; the reply is `skills.list`'s, read after it. A skill that is part of the lamp itself (a core grant), one that doesn't load, a name that is not a skill's and one not on the lamp are refused with why. Without the switch, V1's "not on this lamp" |
+| `skills.camera` (`{"name", "allow": bool}`) | with `LAMP_SKILLS_PAGE=on` (#3504's piece C, "The owner's yes to a skill's camera" below): the owner's yes to the skill seeing the camera's picture, given (`allow` true) or taken back, past the app's warning, asked of root's manage helper as off and on are and kept in `lamp-skills`' `camera`; the reply is `skills.list`'s, read after it. A name that is not a skill's is refused, and `allow` that isn't a JSON bool is `allow must be true or false`. Without the switch, V1's "not on this lamp" |
 | `guard.on`, `guard.off` | with `LAMP_GUARD_FROM_APP=on` (#2562, [guard-mode.md](guard-mode.md)): guard mode turned on or off from the owner's app, handed to `lamp-skills`' call socket (`/run/lampos-skills/call.sock`) as `{"op":"guard","turn":"on"\|"off","deadline_us":...}`, which takes it only with the same switch in its own unit and only from `lamp-cloud`'s unit (by `SO_PEERCRED` and cgroup); `lamp-cloud` turns nothing itself. `deadline_us` is the moment `lamp-cloud` sent the op plus the 2 s it waits (`watch::FROM_APP_WAIT`, shared), on the host's shared monotonic clock (`lamp_ipc::monotonic_us`): that socket answers one connection at a time, so an op read at or past it, behind a voice call, is let go ("guard.on let go: it waited N ms behind another call, past the app's 2 s") and nothing is turned, as the app was told; one with no `deadline_us`, from an older `lamp-cloud`, is let go too. `{"guard": "on"}` or `{"guard": "off"}`, or `lamp-skills`' reason (the privacy switch closed, its mark not showable, paused under the person's light, not installed), or "guard mode can't be reached on the lamp now". The faint mark still shows, and nothing is counted until the ring confirms it. Without the switch, V1's "not on this lamp" |
 | `skills.make`, `skills.made` | with `LAMP_APP_MAKE_SKILL=on` and the skills page (`LAMP_SKILLS_PAGE=on`), and the same switch in `lamp-voice`'s unit (#2813, "A skill typed in the app" below): `skills.make` (`{"words", "request_id"}`, the words at most 180 bytes) hands the words to `lamp-voice`'s app-make socket (`/run/lampos-app-make/make.sock`), which makes the skill as the voice's own; `{"making": true, "request_id"}`, or why not in plain words. `skills.made` (`{"request_id"}`, or `{}` for the newest) tells what became of the app's own ask: `state` (`making`, `kept`, `asked`, `on`, `left_off`, `not_kept` with `why`), and once kept its `name`, `description`, `version`, `sha256` and `may_use` (the skills page's rows). Nothing from the app puts a skill on: only a spoken yes at the lamp. Without the switches, V1's "not on this lamp" |
 | `faces.add_photo` (`{"name", "photo"}`, the photo a JPEG in base64, at most 8 MiB) | with `LAMP_PHOTO_FACES=on` (#1968, "A face from the app's photo" below): the photo is handed to the eyes, which keep its face **unconfirmed** until its person says yes at the lamp. `{"added": NAME, "unconfirmed": true}`, or `{"remembered": NAME}` for a face already theirs; else the eyes' reason in plain words. Without the switch, V1's "not on this lamp" |
@@ -502,13 +503,14 @@ command's plain words), the kinds' gates in `answer::tests`,
 then on or still off; another SHA-256, or on in the no arm, fails the check
 and the run; no `CLOUD` changes nothing; no Python on the lamp).
 
-## The skills page (#1722, `skills.list`, `skills.remove`, `skills.off`, `skills.on`, `skills.install`)
+## The skills page (#1722, `skills.list`, `skills.remove`, `skills.off`, `skills.on`, `skills.camera`, `skills.install`)
 
 The Autonomous app's Lamp 2 skills page (mobile's design on #1722, the
 first builder's yes at 17:21 on 19 Oct): the lamp's skills as a phone's
 home screen of apps. All its kinds but `catalog` are built: `skills.list`, read
 only, `skills.remove` ("Removing a skill" below), `skills.off` and
-`skills.on` ("Turning a skill off and on" below) and, behind a switch of
+`skills.on` ("Turning a skill off and on" below), `skills.camera` ("The
+owner's yes to a skill's camera" below) and, behind a switch of
 its own, `skills.install` ("Installing from the Skills Store" below);
 `catalog` comes with the Store's server, and is refused as a kind this lamp
 lacks until then.
@@ -543,7 +545,7 @@ build; not yet timed on a lamp). A folder that can't be read is answered
    "description": "When someone asks the lamp to dance (…)",
    "group": "core", "version": "1.0.0", "sha256": null,
    "can_remove": false, "can_turn_off": true, "off": false,
-   "loads": true, "why": null,
+   "camera_allowed": null, "loads": true, "why": null,
    "may_use": [
      {"name": "speak", "says": "speaks, or plays a short sound", "privacy": null},
      {"name": "light", "says": "changes the light", "privacy": null},
@@ -553,7 +555,7 @@ build; not yet timed on a lamp). A folder that can't be read is answered
    "group": "installed", "version": "1.0.0",
    "sha256": "…",
    "can_remove": true, "can_turn_off": true, "off": true,
-   "loads": true, "why": null,
+   "camera_allowed": false, "loads": true, "why": null,
    "may_use": [
      {"name": "speak", "says": "speaks, or plays a short sound", "privacy": null},
      {"name": "light", "says": "changes the light", "privacy": null},
@@ -598,6 +600,13 @@ build; not yet timed on a lamp). A folder that can't be read is answered
   snoozed until the morning then, which `lamp-skills` keeps only in
   memory). Null when it can't be turned off, or when the off file can't
   be read.
+- **`camera_allowed`** (#3504's piece C): when it asks the camera's
+  picture (its `may_use` has `camera`), true when it may see it: a core
+  skill, or one the owner said yes to (`skills.camera`, kept in
+  `/var/lib/lampos-skills-state/camera`, a name a line, beside the off
+  file); false when not, or when that file can't be read, as
+  `lamp-skills` then gives no picture. Null when it doesn't ask the
+  picture.
 - **`loads`** and **`why`**: whether the running `lamp-skills` loads it, and
   if not, why, in its words on one line (at most 300 bytes). A skill that
   doesn't load stays in its group, with its kind, version and permissions
@@ -769,6 +778,30 @@ kept as a `[stop]`'s off is, so an update round and a restart keep it.
 - Without `LAMP_SKILLS_PAGE=on`, `not on this lamp: skills.off` (and
   `skills.on`).
 
+### The owner's yes to a skill's camera (`skills.camera`)
+
+`{"name": "desk-tutor", "allow": true}` (#3504's piece C), sent once the
+owner has read the app's strong warning for a skill that asks the camera's
+picture ([skill-format.md](skill-format.md), "The camera"; the warning
+screen is the app's), or `"allow": false` to take it back. As off and on:
+`lamp-cloud` checks the name and that `allow` is a JSON bool, asks the
+manage helper `{"camera": NAME}` or `{"camera_off": NAME}`, writes nothing
+itself, and replies with `skills.list`'s page, the skill's
+`camera_allowed` now true or false.
+
+- **What is kept.** The name in `lamp-skills`' `camera`
+  (`/var/lib/lampos-skills-state/camera`, a name a line, beside `off`),
+  which a round never touches. The name need not be on the lamp yet: a
+  Store package that asks the camera is refused until its yes is kept
+  (`not installed: NAME: it asks the camera, and the owner hasn't said
+  yes`), so the app says yes before `skills.install`.
+- **What it does.** The running `lamp-skills` reads the file at every call
+  that would give the model the picture: a skill that is not core sees it
+  only while its name is there, and a yes taken back holds from the next
+  call, nothing restarted ([skills.md](skills.md), "The manage helper").
+  A core skill needs no yes.
+- Without `LAMP_SKILLS_PAGE=on`, `not on this lamp: skills.camera`.
+
 ### Installing from the Skills Store (`skills.install`)
 
 `{"name": "desk-tutor", "version": "1.0.0", "sha256": "…", "url":
@@ -817,11 +850,13 @@ key step and the single shared switch to change after it.
   entry's; then installs it under the folder's lock (waited for at most 4
   s, `ASKED_LOCK_WAIT`, as a remove's, then `the lamp's skills can't be
   changed now` with nothing written), loaded first and
-  renamed into place, never core, never over a core skill and never older
+  renamed into place, never core, never over a core skill, never older
   than the version installed (the same is a reinstall; `not installed:
   desk-tutor 1.10.0 is on this lamp, and this package is the older 1.2.3:
-  a skill is never put back to an older version`). Nothing is written
-  before that last step.
+  a skill is never put back to an older version`), and never one that asks
+  the camera's picture before the owner's yes to it is kept (`not
+  installed: NAME: it asks the camera, and the owner hasn't said yes`;
+  `skills.camera` above). Nothing is written before that last step.
 - **The key: separate from updates.**
   `/etc/lampOS/skills/store-key.pub`, named by
   `lamp_skills::package::STORE_KEY` and the helper unit's `--key-file`.

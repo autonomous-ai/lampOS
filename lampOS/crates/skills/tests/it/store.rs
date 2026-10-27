@@ -99,10 +99,19 @@ fn left(dir: &Path) -> Vec<String> {
     names
 }
 
-/// A skills folder with the lamp's core Dance in it.
+/// A skills folder with the lamp's core Dance in it, and beside it the
+/// state folder [`ask`] gives the helper, with the owner's yes to Desk
+/// tutor's camera kept: its package asks the camera (#3504's piece C).
 fn skills(dir: &Path) -> PathBuf {
     let skills = dir.join("skills");
     copy(&skills_root().join("dance"), &skills.join("dance"));
+    let state = skills.with_extension("state");
+    fs::create_dir_all(&state).unwrap();
+    lamp_skills::keep_names(
+        &state.join(lamp_skills::CAMERA_FILE),
+        &["desk-tutor".to_owned()].into(),
+    )
+    .unwrap();
     skills
 }
 
@@ -420,6 +429,41 @@ fn a_package_signed_with_the_store_key_installs_and_is_listed() {
         "{answer}"
     );
     assert_eq!(left(&skills), ["dance", "desk-tutor"]);
+}
+
+/// #3504's piece C: a package from the Store that asks the camera's
+/// picture is refused, nothing written, until the owner's yes to it is
+/// kept (`{"camera": NAME}`), then installs.
+#[test]
+fn a_package_that_asks_the_camera_installs_only_once_the_owner_said_yes() {
+    let dir = tempfile::tempdir().unwrap();
+    let skills = skills(dir.path());
+    let camera = skills
+        .with_extension("state")
+        .join(lamp_skills::CAMERA_FILE);
+    fs::remove_file(&camera).unwrap();
+    let channel = key(1);
+    let key_file = key_file(dir.path(), &channel);
+    let bytes = packed(dir.path(), Some(&channel));
+    let (port, store) = serve(vec![ok(&bytes), ok(&bytes)]);
+    let (answer, done) = ask(&skills, &key_file, port, install(URL));
+    assert!(!done);
+    assert_eq!(
+        refused(&answer),
+        "not installed: desk-tutor: it asks the camera, and the owner hasn't said yes"
+    );
+    assert_eq!(left(&skills), ["dance"]);
+    let (answer, done) = ask(
+        &skills,
+        &key_file,
+        port,
+        serde_json::json!({ "camera": "desk-tutor" }),
+    );
+    assert!(done, "{answer}");
+    let (answer, done) = ask(&skills, &key_file, port, install(URL));
+    assert!(done, "{answer}");
+    assert_eq!(left(&skills), ["dance", "desk-tutor"]);
+    assert_eq!(store.join().unwrap(), 2);
 }
 
 /// Unsigned, signed with another key, a signature that is not one, a

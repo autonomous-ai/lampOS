@@ -3430,6 +3430,8 @@ fn a_declared_tool_is_in_the_tools_file_and_a_call_runs_the_skills_steps() {
                 root.join("actions.sock").as_os_str(),
                 "--tools-dir".as_ref(),
                 tools.as_os_str(),
+                "--state-dir".as_ref(),
+                camera_yes(root, &["tutor"]).as_os_str(),
             ])
             .args(clock.args())
             .spawn()
@@ -3957,6 +3959,8 @@ fn a_repeat_tool_call_holds_the_runs_pose_again_and_only_that() {
                 root.join("actions.sock").as_os_str(),
                 "--tools-dir".as_ref(),
                 tools.as_os_str(),
+                "--state-dir".as_ref(),
+                camera_yes(root, &["tutor"]).as_os_str(),
             ])
             .args(clock.args())
             .spawn()
@@ -7285,6 +7289,17 @@ fn the_tools_socket_lost_is_made_again_and_the_folder_gone_ends_lamp_skills() {
     assert!(!tools.exists(), "not made again by lamp-skills");
 }
 
+/// A state folder in `root` with the owner's yes to `names`' camera kept,
+/// as the app's `skills.camera` keeps it (#3504's piece C): its path, for
+/// `--state-dir`, so a tool that hands the model the picture gets it.
+fn camera_yes(root: &Path, names: &[&str]) -> PathBuf {
+    let state = root.join("state");
+    fs::create_dir_all(&state).unwrap();
+    let names = names.iter().map(|name| (*name).to_owned()).collect();
+    lamp_skills::keep_names(&state.join(lamp_skills::CAMERA_FILE), &names).unwrap();
+    state
+}
+
 /// A program on a bus of its own whose skills a test calls by their tools,
 /// with the body's mood socket, the actions part (which says each colour on
 /// `light/state` at 3, as the real one shows it) and the voice's state
@@ -7396,6 +7411,8 @@ impl ToolProgram {
                     root.join("actions.sock").as_os_str(),
                     "--tools-dir".as_ref(),
                     tools.as_os_str(),
+                    "--state-dir".as_ref(),
+                    camera_yes(&root, &[name]).as_os_str(),
                 ])
                 .args(clock.args())
                 .spawn()
@@ -8024,6 +8041,29 @@ fn a_search_looks_at_the_desk_first_then_where_asked_and_no_more_than_its_looks(
     );
     // The light was made once, by the first look.
     assert_eq!(program.colours(0), Vec::<String>::new());
+}
+
+/// #3504's piece C, through the running program: a skill that is not core
+/// gets the picture only while the owner's yes is kept, read at each call.
+/// Taken back mid-search, the next look gives no picture, nothing
+/// restarted; given again, the one after does.
+#[test]
+fn a_skills_picture_waits_for_the_owners_yes_read_at_each_call() {
+    let program = ToolProgram::with("look", SEARCH, &[]);
+    let camera = program
+        ._dir
+        .path()
+        .join("state")
+        .join(lamp_skills::CAMERA_FILE);
+    let first = program.call("look_for", "{}");
+    assert_eq!(first["result"]["look"], true, "{first}");
+    lamp_skills::keep_names(&camera, &Default::default()).unwrap();
+    let taken_back = program.call("look_for", r#"{"place":"left"}"#);
+    assert_eq!(taken_back["ok"], true, "{taken_back}");
+    assert!(taken_back["result"].get("look").is_none(), "{taken_back}");
+    lamp_skills::keep_names(&camera, &["look".to_owned()].into()).unwrap();
+    let again = program.call("look_for", r#"{"place":"right"}"#);
+    assert_eq!(again["result"]["look"], true, "{again}");
 }
 
 /// #1685: someone speaking ends a search within a fifth of a second: its

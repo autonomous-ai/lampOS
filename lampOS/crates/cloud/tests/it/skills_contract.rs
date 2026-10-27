@@ -36,7 +36,7 @@ const REPLY: [(&str, &str); 3] = [
 ];
 
 /// Each skill's fields, and the types each may take.
-const SKILL: [(&str, &[&str]); 12] = [
+const SKILL: [(&str, &[&str]); 13] = [
     ("name", &["string"]),
     ("title", &["string"]),
     ("description", &["string"]),
@@ -46,6 +46,7 @@ const SKILL: [(&str, &[&str]); 12] = [
     ("can_remove", &["bool"]),
     ("can_turn_off", &["bool"]),
     ("off", &["bool", "null"]),
+    ("camera_allowed", &["bool", "null"]),
     ("loads", &["bool"]),
     ("why", &["string", "null"]),
     ("may_use", &["array"]),
@@ -286,6 +287,23 @@ fn removing_answers_the_page_as_it_now_is_and_refuses_in_the_envelope() {
     let trick = asked(&mut real, "skills.remove", &json!({"name": "../skills"}));
     assert_eq!(trick["error"], skills::NOT_A_NAME);
     assert!(folder.join("dance").exists());
+
+    // The owner's yes to its camera, through the same helper, answered
+    // with the page as it now is (#3504's piece C).
+    let camera_of = |reply: &Value| {
+        reply["data"]["skills"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|row| row["name"] == "desk-tutor")
+            .unwrap()["camera_allowed"]
+            .clone()
+    };
+    assert_eq!(camera_of(&sent(&mut real)), json!(false));
+    let yes = json!({"name": "desk-tutor", "allow": true});
+    let camera = asked(&mut real, "skills.camera", &yes);
+    assert_eq!(camera["status"], "success", "{camera}");
+    assert_eq!(camera_of(&camera), json!(true));
 
     let removed = asked(&mut real, "skills.remove", &json!({"name": "desk-tutor"}));
     assert_eq!(

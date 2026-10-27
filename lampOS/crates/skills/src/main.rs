@@ -2659,6 +2659,15 @@ fn tool_call(
     };
     // The look's picture goes to the model only for a skill that may see it.
     let sockets = runner.sockets_for(&run.skill);
+    // And, its grant given, only with the owner's yes, read at each call
+    // (#3504's piece C): a skill not core without it gets no picture.
+    if run.calls.contains(&Call::Look)
+        && sockets.may.refuses(&Call::Look).is_none()
+        && let Some(why) = engine.picture_refused(&run.skill)
+    {
+        let _ = sockets.may.refused("look", why);
+        run.calls.retain(|call| *call != Call::Look);
+    }
     if run
         .calls
         .iter()

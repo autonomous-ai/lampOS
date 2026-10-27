@@ -1282,7 +1282,7 @@ for it.
   with it, read-only), one capability, `CAP_DAC_OVERRIDE`
   (`CapabilityBoundingSet=`, for the app's off and on: the state folder is
   `lampos`'s, 0700, and root without it is held to that mode),
-  `NoNewPrivileges` and 60 s at most. `off` and `on` are written beside
+  `NoNewPrivileges` and 60 s at most. `off`, `on` and `camera` are written beside
   and moved over, the file beside only ever made new and never through a
   link (`O_CREAT | O_EXCL | O_NOFOLLOW`; a link there is refused, its
   target untouched), and read never through a link (the reviewer's P2 on
@@ -1323,7 +1323,7 @@ for it.
   a `BrokenPipe` still has to accompany the original refusal, failed status
   and preserved skill. It collects those observations and reaps the child;
   authorized requests still require their write and half-close to succeed.
-- **It checks each request itself,** whoever connected. Five are taken,
+- **It checks each request itself,** whoever connected. Seven are taken,
   each exactly one key:
   - `{"remove": NAME}`, a string: it runs `remove` above, which refuses a
     name that is not a skill's (1 to 64 lowercase letters, digits and
@@ -1359,10 +1359,33 @@ for it.
     (`tests/it/package.rs`) and, through two update rounds and a restart,
     `the_apps_off_and_on_hold_through_a_round_and_a_restart`
     (`crates/update/tests/round.rs`).
+  - `{"camera": NAME}` and `{"camera_off": NAME}`, a string: the owner's
+    yes to the skill seeing the camera's picture, given or taken back in
+    the app past its warning (#3504's piece C, `package::camera`), under
+    the folder's lock, kept in `--state-dir`'s `camera`, one name a line,
+    beside `off`. The name need not be on the lamp yet: a Store package
+    that asks the camera installs only once its yes is kept ("From the
+    Skills Store", below). It answers `NAME may see the camera's picture`
+    or `NAME may not see the camera's picture`. **Every call reads it:** a
+    skill that is not core (`kind = "core"`, which every product skill is)
+    and asks the picture (`camera`, or format 1's `look`) gets it only while
+    its name is in `camera`, read at the call that would give it
+    (`Engine::picture_refused`); without its yes the call runs without the
+    look, the journal says `skill:NAME: refused look: the owner hasn't said
+    yes to its camera`, and a yes taken back holds from the next call,
+    nothing restarted. A program with no `--state-dir` keeps no yes, so it
+    gives none. This holds for a skill put on by hand or made here too:
+    neither is refused at install, and neither sees the picture without the
+    yes (Desk tutor and Look for my keys, installable, among them). Tests:
+    `the_owners_camera_yes_is_kept_read_at_each_call_and_taken_back`
+    (`tests/it/package.rs`) and, through the running program,
+    `a_skills_picture_waits_for_the_owners_yes_read_at_each_call`
+    (`tests/it/skills.rs`).
 
   Anything else is refused, `a request is one line, {"remove": NAME},
   {"install": {"url": URL, "sha256": HASH, "name": NAME, "version":
-  VERSION}}, all but url optional, or {"install_made": SHA256}`.
+  VERSION}}, all but url optional, {"install_made": SHA256}, {"off": NAME},
+  {"on": NAME}, {"camera": NAME} or {"camera_off": NAME}`.
 
   Each waits at most 4 s for the folder's lock (`ASKED_LOCK_WAIT`, under
   `lamp-cloud`'s 5 s wait for a remove's answer; an install waits for it
@@ -1708,7 +1731,13 @@ nothing written before the last step:
    together in `.install-NAME-PID`, where the running program does not
    look, loaded with every check a load makes, refused if it says `kind =
    "core"`, if a core skill on the lamp has its name, or another skill its
-   function, or if it is **older than the installed one** (below); then
+   function, if it is **older than the installed one** (below), or if it
+   asks the camera's picture (`camera`, or format 1's `look`) and the
+   owner's yes to it is not kept in `--state-dir`'s `camera` (`{"camera":
+   NAME}` above): `not installed: NAME: it asks the camera, and the owner
+   hasn't said yes`, with nothing written
+   (`a_package_that_asks_the_camera_installs_only_once_the_owner_said_yes`,
+   `tests/it/store.rs`); then
    renamed into place (an installed one of the same name is replaced
    whole, the old renamed aside first). The running `lamp-skills` loads it
    within 2 s.
