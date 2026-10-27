@@ -1,0 +1,15 @@
+# 11:00, alone but for minutes 100 to 110, when a second face is in view: due at 105, held
+# (faces_at_most = 1) and asked once they have been gone a minute, at 111, still in lunchtime.
+clock = "11:00"
+
+[[expect]]
+at = "111m"
+within = "1m"
+call = "body.gaze"
+args = { look_at = "face" }
+
+[[expect]]
+at = "111m"
+within = "1m"
+call = "say"
+args = { note = "They have been at the desk through most of lunchtime. Ask them once, warmly and in a few words, the way a friend would, whether they've had lunch yet. One open question: suggest no food, no menu and no place, and say nothing about health." }

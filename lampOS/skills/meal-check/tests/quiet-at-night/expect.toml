@@ -1,0 +1,4 @@
+# 22:00, 150 minutes at the desk alone: nothing at night. No meal window is open then
+# either, so this shows the night is silent, not `[quiet]` (22:00 to 08:00) on its own.
+clock = "22:00"
+none = true

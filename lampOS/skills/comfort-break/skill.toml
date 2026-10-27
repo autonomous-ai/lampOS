@@ -80,7 +80,7 @@ after_ignored = 2
 # last, or with all, every one. First in folder order, so its about is the one told.
 [stop]
 tool = "wellbeing_nudges"
-about = "When someone asks you to stop a wellbeing nudge, the lamp's short hints after a long sitting (a slow blue glow for water, a tilt to rest the eyes, a turn to stand up, a word that it's a good moment for a short break, an evening droop): snooze it until tomorrow morning, turn it off until they ask again, or on again. Leave all out for the one that came last; all = true for every one of them."
+about = "When someone asks you to stop a wellbeing nudge, the lamp's short hints after a long sitting (a slow blue glow for water, a tilt to rest the eyes, a turn to stand up, a word that it's a good moment for a short break, a question at lunch or dinner time whether they've eaten, an evening droop): snooze it until tomorrow morning, turn it off until they ask again, or on again. Leave all out for the one that came last; all = true for every one of them."
 
 [ask]
 policy = "nudge"

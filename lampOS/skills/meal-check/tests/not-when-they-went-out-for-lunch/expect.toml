@@ -1,0 +1,4 @@
+# 11:00, an hour at the desk, out 45 minutes at lunch, back at 12:45 for an hour: nothing,
+# since 45 minutes of lunchtime are left, under its 75.
+clock = "11:00"
+none = true

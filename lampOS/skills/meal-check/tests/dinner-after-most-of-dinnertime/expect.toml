@@ -1,0 +1,15 @@
+# 18:00, 150 minutes at the desk alone: dinnertime opens at 18:30, so its 75 minutes come at
+# 19:45, minute 105.
+clock = "18:00"
+
+[[expect]]
+at = "105m"
+within = "1m"
+call = "body.gaze"
+args = { look_at = "face" }
+
+[[expect]]
+at = "105m"
+within = "1m"
+call = "say"
+args = { note = "They have been at the desk through most of dinnertime. Ask them once, warmly and in a few words, the way a friend would, whether they've had dinner yet. One open question: suggest no food, no menu and no place, and say nothing about health." }

@@ -1,0 +1,27 @@
+# 11:00, at the desk until 20:40 without leaving: asked at lunch (12:45, minute 105) and at
+# dinner (19:45, minute 525), and never between or again.
+clock = "11:00"
+
+[[expect]]
+at = "105m"
+within = "1m"
+call = "body.gaze"
+args = { look_at = "face" }
+
+[[expect]]
+at = "105m"
+within = "1m"
+call = "say"
+args = { note = "They have been at the desk through most of lunchtime. Ask them once, warmly and in a few words, the way a friend would, whether they've had lunch yet. One open question: suggest no food, no menu and no place, and say nothing about health." }
+
+[[expect]]
+at = "525m"
+within = "1m"
+call = "body.gaze"
+args = { look_at = "face" }
+
+[[expect]]
+at = "525m"
+within = "1m"
+call = "say"
+args = { note = "They have been at the desk through most of dinnertime. Ask them once, warmly and in a few words, the way a friend would, whether they've had dinner yet. One open question: suggest no food, no menu and no place, and say nothing about health." }

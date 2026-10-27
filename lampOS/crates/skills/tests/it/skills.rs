@@ -379,6 +379,7 @@ fn every_skill_folder_says_its_kind_and_version() {
             "desk-tutor-marks",
             "guard-mode",
             "look-for-things",
+            "meal-check",
             "who-was-here"
         ]
     );
@@ -2650,6 +2651,67 @@ fn a_comfort_break_never_names_the_bathroom() {
             );
         }
     }
+    assert_eq!(skill.kind, SkillKind::Installable);
+}
+
+/// A meal check (#3504) asks one open question: it names no food or dish
+/// in its question, its `SKILL.md` or its `[stop]`, tells the voice to
+/// suggest no food, menu or place, and
+/// it reads no picture (its topics are the faces, the voice's state and the
+/// eyes' activity; no `look`).
+#[test]
+fn a_meal_check_names_no_food_and_takes_no_picture() {
+    let folder = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../skills/meal-check");
+    let skill = load(&folder).unwrap();
+    let markdown = fs::read_to_string(folder.join("SKILL.md")).unwrap();
+    let toml: toml::Value =
+        toml::from_str(&fs::read_to_string(folder.join("skill.toml")).unwrap()).unwrap();
+    let mut told = vec![markdown];
+    let steps = toml["do"].as_array().unwrap();
+    assert_eq!(steps.len(), 2);
+    for step in steps {
+        let say = step["say"].as_str().unwrap();
+        // The voice words the question: it is told to suggest none.
+        assert!(
+            say.contains("suggest no food, no menu and no place"),
+            "{say}"
+        );
+        told.push(say.to_owned());
+        assert!(step.get("look").is_none(), "{step:?}");
+    }
+    told.push(toml["stop"]["about"].as_str().unwrap().to_owned());
+    for text in &told {
+        let lower = text.to_lowercase();
+        for word in [
+            "recipe",
+            "salad",
+            "sandwich",
+            "pizza",
+            "rice",
+            "noodles",
+            "soup",
+            "snack",
+            "order",
+            "delivery",
+            "restaurant",
+            "cook",
+            "calories",
+            "diet",
+            "hungry",
+        ] {
+            assert!(
+                !lower
+                    .split(|c: char| !c.is_alphanumeric())
+                    .any(|token| token == word),
+                "{word} in {text:?}"
+            );
+        }
+    }
+    assert_eq!(
+        toml["permissions"]["topics"].as_array().unwrap(),
+        &["humans/faces/tracked", "voice/state", "room/activity"]
+            .map(|topic| toml::Value::String(topic.to_owned()))
+    );
     assert_eq!(skill.kind, SkillKind::Installable);
 }
 
