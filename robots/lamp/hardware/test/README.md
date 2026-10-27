@@ -91,8 +91,19 @@ sudo python3 factory-voice.py -- ./steps.sh --unit-id <ID> --write --from 4   # 
   - **Each question:** what to do, then "Say ready when you are ready".
   - **Step 1:** each stand, "Arm measured", and a refused rest read ("My head
     is not on its stop…").
-  - **Step 2:** the head pads' timeline, started at the person's yes: hands
-    away for 11 s, then pad one, pad two, any other pad.
+  - **Step 2:** the head pads' timeline, started at the yes. It fits inside
+    discover-head's fixed 40 s:
+    - hands away for 11 s;
+    - then **10 s for pad one** ("Press and hold it for two seconds,
+      twice");
+    - 10 s for pad two;
+    - any other pad until 39 s.
+- **`--auto`, one go.** At each question (the stand, letting a held lamp go,
+  the head pads, the self-test) the lamp says what to do, then "Starting in
+  five seconds", and answers the question itself after those 5 s. The reset
+  is never answered for the person. Ctrl-C stops at any time.
+  `factory-lamp.sh` runs this way by default; `ASK=1` answers each question
+  at the laptop.
   - **Step 4:** the self-test's touch window as it opens, its result and the
     reset.
   - **Any failed step:** "A step failed. Please check the laptop."
@@ -110,33 +121,77 @@ sudo python3 factory-voice.py -- ./steps.sh --unit-id <ID> --write --from 4   # 
     my head, then press my button. Keep doing it for twenty seconds." Then
     lamp-voice is started again and given `--voice-settle` (6 s). During step
     4 a prompt the speaker refuses is skipped and said once on the console.
+  - **`--auto-reset`** (a batch's explicit choice) answers a passed
+    self-test's reset too, after `--before-reset CMD` has run.
 - **A factory tool, not the product:** the prompts belong to the hardware
   team's bench and are never part of the image.
 - `--no-voice` mutes it and `--dry-run` prints each prompt instead.
   `tools/factory-voice-test.py` tests it on a host with stand-ins (no lamp, no
   sound).
 
-## `tools/factory-lamp.sh`: one lamp's factory steps from the Mac
+## `tools/factory-lamp.sh` and `tools/factory-run.sh`: many lamps from one Mac
 
-The same run for every lamp on #3530, from the Mac at the bench: the QC
-person answers at the laptop, the lamp says what to do.
+Each lamp runs its own factory steps (`factory-run.sh`, started detached on
+the lamp) and says every step on its speaker. The Mac only starts runs and
+collects results, so one person keeps several lamps going at once:
 
 ```bash
-LAMP_PASS=<lamp password> STEPS=<steps.sh> STEPS_SHA=<its sha256> PROMPTS=prompts \
-  tools/factory-lamp.sh unset 3e83           # lamp not set up, over its hotspot lamp-3e83
-LAMP_PASS=... tools/factory-lamp.sh selftest 3e83 <ip>   # after the app setup: step 4
+export LAMP_PASS=<lamp password> STEPS=<steps.sh from lamp-voice> STEPS_SHA=<its sha256> PROMPTS=prompts
+tools/factory-lamp.sh start 3e83 29e7 75c9     # unset lamps: ~20 s each over its hotspot, then the next
+tools/factory-lamp.sh follow 3e83              # optional: watch one lamp's run
+# … set every lamp up from the app (iPhone Auto-Join off) …
+RESET=yes tools/factory-lamp.sh selftest 172.168.20.180 172.168.20.189   # all at once, bench network
+tools/factory-lamp.sh collect 3e83 29e7 75c9   # one table: factory-records.csv
 ```
 
-- **unset:**
-  1. Joins `lamp-ID` with the Mac's Wi-Fi. Ethernet keeps the internet and must be first in the service order.
-  2. Reads the hostname, copies `steps.sh`, `factory-voice.py`, `head-nudge.py` and the prompts.
-  3. Checks r2 (no `country_code`), 4b (camera `01da:5875@3-1.1.4`), 4e–4g, and that the lamp is unset.
-  4. Reads the body at rest. If the head is off its stop, it offers `head-nudge.py`.
-  5. Runs steps 1–3 spoken (from step 2 when `lamp.env` is already there).
-  6. Adds `--gaze` (4d).
-  7. Reads back `lamp.env`, the pins file, `key.pub` and the gaze before it says done.
-- **selftest:** refuses a lamp that is not set up, then runs step 4 spoken; the reset follows as `steps.sh` asks.
-- **Keys:** each unset lamp is at `192.168.100.1`, so each gets its own `known_hosts`, kept in `STATE` (default `~/.factory-lamp`). No key is left on a lamp.
+**The unset run, on the lamp:**
+1. **Checks:** r2 (no `country_code`), 4b (camera `01da:5875@3-1.1.4`), 4f, 4g, and that the lamp is unset.
+2. **The head onto its stop:** `head-nudge.py`, when the rest read refuses.
+3. **Step 1, the arm stand.**
+4. **Every input in one window** (`input-check.py`, below).
+5. **Step 3, the key.**
+6. **4d:** `--gaze`.
+
+The person answers nothing: each question is said, then "Starting in five seconds", then answered (`factory-voice.py --auto`).
+
+**The self-test (step 4)** runs on set-up lamps in parallel. With `RESET=yes`, a passed lamp's reset is answered too, after its record is written, since the lamp reboots at once.
+
+**On the lamp, in `/var/lib/lamp-test`** (outside the reset's wipe list, so it survives the 5 s reset):
+- `factory.env` — the record:
+  - `HEAD_PAD_LINES` (two of 37, 96, 97, 98, differing by unit);
+  - `BUTTON_PRIMARY`, `RESET_BUTTON`, `PRIVACY_SWITCH`;
+  - `HEAD_REST`, `BODY_POSES`;
+  - each step's result, `SELFTEST_FAILED`, the build and `steps.sh`'s sha256.
+- `factory-run.log` — everything the steps printed.
+- `factory-run.status` — `RUNNING <step>`, `PASS <mode>` or `FAIL <mode>: <why>`.
+
+**The Mac:** each unset lamp is at `192.168.100.1`, so each gets its own `known_hosts` (in `STATE`, default `~/.factory-lamp`), and its hostname is read before anything runs. A re-flashed card's new host key is accepted once, and that hostname check decides. `follow` and `collect` use the bench network first, and a lamp's hotspot only when it is unset.
+
+## `tools/input-check.py`: every input in one window
+
+```bash
+sudo python3 input-check.py            # 30 s touch and press, 30 s hands off, write the pins
+sudo python3 input-check.py --dry-run  # the same reading, nothing written
+```
+
+**The windows:**
+- **30 s touch.** The lamp says: "Input test. For thirty seconds, touch each head pad, press my button, and press the reset button briefly. Any order, as many times as you like."
+- **30 s hands off.**
+
+**What it reads:**
+- the four pad candidates, each probed with both pulls (a driven line is a pad's chip, and its level is its rest);
+- the button (line 99), the reset (line 100) and the privacy switch (chip 1, line 9), where the pins file names them.
+
+**When it passes:**
+- two or more pads, each touched twice or held 0.5 s, and still in the quiet window, as `steps.sh` judges;
+- the button and the reset each pressed;
+- nothing stuck.
+
+The privacy switch is recorded whether or not it moved.
+
+**What it writes:** the pads into the pins file exactly as `steps.sh` step 2 writes them (`head_pads` and `head_rest`, which lamp-controls reads, #711), with the profile kept beside. Every result goes out as `RECORD` lines for `factory.env`.
+
+**lamp-controls is stopped** while the lines are read, so a reset held here resets nothing.
 
 ## `tools/head-nudge.py`: a head off its stop
 
