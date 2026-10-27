@@ -703,9 +703,86 @@ pub struct Says {
     last_sound_us: Option<u64>,
     /// Kept so that the socket goes with the voice.
     _socket: Option<Bound>,
+    /// Bound at the voice's start ([`Says::start`]): a run that ends hands
+    /// the socket back to [`PARKED`] instead of removing it.
+    parks: bool,
+}
+
+/// The say service bound at the voice's start, while no run holds it: the
+/// socket stays through the privacy wait, and each ask is refused there at
+/// once ([`Says::refuse_parked`]), never left unanswered (#3697).
+static PARKED: std::sync::Mutex<Option<Says>> = std::sync::Mutex::new(None);
+
+fn parked() -> std::sync::MutexGuard<'static, Option<Says>> {
+    PARKED
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+}
+
+impl Drop for Says {
+    fn drop(&mut self) {
+        if !self.parks {
+            return;
+        }
+        // What waits is dropped with this run, as before; the socket and
+        // its queue go on to the next wait.
+        let (_, closed) = mpsc::channel();
+        let kept = Self {
+            own: self.own.clone(),
+            incoming: std::mem::replace(&mut self.incoming, closed),
+            waiting: Vec::new(),
+            order: self.order,
+            last_sound_us: self.last_sound_us,
+            _socket: self._socket.take(),
+            parks: true,
+        };
+        *parked() = Some(kept);
+    }
 }
 
 impl Says {
+    /// The service bound at the voice's start, when [`ENVIRONMENT`] is
+    /// `on`, so the socket is there before the microphones open and through
+    /// every privacy wait (lamp-52e6, 27 Oct: the socket appeared only five
+    /// minutes after the start, when the switch was read open, and
+    /// `lamp-setup shutdown` found no say service). Each run takes it
+    /// ([`Self::for_run`]) and hands it back as it ends.
+    pub fn start(recordings: Recordings) {
+        if let Some(mut says) = Self::from_environment(recordings) {
+            says.parks = true;
+            *parked() = Some(says);
+        }
+    }
+
+    /// The service bound at start for this run, or one bound now.
+    pub fn for_run(recordings: Recordings) -> Option<Self> {
+        let started = parked().take();
+        started.or_else(|| Self::from_environment(recordings))
+    }
+
+    /// While no run holds the service (the privacy wait): each ask is
+    /// refused at once with `why`. Nothing is said while the microphones
+    /// are closed, as before.
+    pub fn refuse_parked(why: &str) {
+        let mut parked = parked();
+        let Some(says) = parked.as_mut() else {
+            return;
+        };
+        while let Ok(asked) = says.incoming.try_recv() {
+            let _ = asked
+                .answer
+                .send(Answer::Done(Outcome::Refused(why.into())));
+        }
+    }
+
+    /// The voice ends: the socket bound at start is removed.
+    pub fn stop() {
+        let started = parked().take();
+        if let Some(mut says) = started {
+            says.parks = false;
+        }
+    }
+
     /// The service, when [`ENVIRONMENT`] is `on` and the socket can be
     /// made; one that cannot is said once, and the voice goes on without.
     pub fn from_environment(recordings: Recordings) -> Option<Self> {
@@ -775,6 +852,7 @@ impl Says {
             order: 0,
             last_sound_us: None,
             _socket: Some(bound),
+            parks: false,
         })
     }
 
@@ -916,6 +994,7 @@ impl Says {
                 order: 0,
                 last_sound_us: None,
                 _socket: None,
+                parks: false,
             },
             ask,
         )
@@ -2790,6 +2869,49 @@ mod tests {
     /// Through the socket: a request is handed to the voice and its answer
     /// comes back when the voice gives it; a bad one is refused at once; the
     /// socket is the voice user's alone without a group.
+    /// lamp-52e6, 27 Oct (#3697): the say socket appeared only when the
+    /// privacy switch was read open, five minutes after the voice started,
+    /// so `lamp-setup shutdown` found no say service. Bound at the start, it
+    /// is there through the privacy wait and answers there at once, nothing
+    /// said; each run takes it and hands it back; the voice's end removes it.
+    #[test]
+    fn bound_at_start_the_say_socket_answers_through_the_privacy_wait() {
+        let dir = socket_dir("parked");
+        let path = dir.join("say.sock");
+        let mut says = Says::serve(&path, None, &dir, Recordings::none()).unwrap();
+        says.parks = true;
+        *parked() = Some(says);
+        let during_wait = |path: &Path| {
+            let client = {
+                let path = path.to_path_buf();
+                thread::spawn(move || {
+                    exchange(
+                        &path,
+                        "{\"skill\":\"reminders\",\"text\":\"Bye.\",\"expires_in_ms\":60000}\n",
+                    )
+                })
+            };
+            // The wait's own ticks, as `muted_wait_pulsing` gives them.
+            while !client.is_finished() {
+                Says::refuse_parked("the lamp is muted");
+                thread::sleep(Duration::from_millis(2));
+            }
+            client.join().unwrap()
+        };
+        let refused = format!("{}\n", Outcome::Refused("the lamp is muted".into()).line());
+        assert_eq!(during_wait(&path), refused);
+        // A run takes it, and hands it back as it ends: the next wait
+        // answers on the same socket.
+        let run = Says::for_run(Recordings::none()).expect("the service bound at start");
+        assert!(parked().is_none());
+        drop(run);
+        assert!(path.exists());
+        assert_eq!(during_wait(&path), refused);
+        Says::stop();
+        assert!(!path.exists());
+        let _ = fs::remove_dir(&dir);
+    }
+
     #[test]
     fn through_the_socket_an_ask_is_answered_when_the_voice_says_what_became_of_it() {
         let dir = socket_dir("sock");

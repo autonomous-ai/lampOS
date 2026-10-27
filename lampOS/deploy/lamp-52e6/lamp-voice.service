@@ -4,8 +4,8 @@
 PartOf=lampos.target
 Description=lampOS voice (lamp-voice serve)
 ConditionHost=lamp-52e6
-After=network-online.target sound.target lamp-cmedia-speaker.service
-Wants=network-online.target lamp-cmedia-speaker.service
+After=network-online.target sound.target lamp-cmedia-speaker.service lamp-controls.service
+Wants=network-online.target lamp-cmedia-speaker.service lamp-controls.service
 StartLimitIntervalSec=0
 
 [Service]
