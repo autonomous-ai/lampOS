@@ -1,0 +1,88 @@
+{
+  "base": "1fb93206e4a6c26d35c801b3472a5af179231881",
+  "committed_receipt_head_before_test_additions": "1863f6d58c1d75f128469516c81c9e20d3c41284",
+  "runtime_source": "This head plus the captured tests/round.rs change. No production code changed; documentation received the actual counts only after all gates closed. No new commit/full-tree qualification is claimed.",
+  "results": [
+    {
+      "name": "fmt",
+      "exit_code": 0
+    },
+    {
+      "name": "clippy",
+      "exit_code": 0
+    },
+    {
+      "name": "compile",
+      "exit_code": 0
+    },
+    {
+      "name": "lib",
+      "exit_code": 0,
+      "summary": [
+        "test result: ok. 155 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 22.57s"
+      ]
+    },
+    {
+      "name": "round",
+      "exit_code": 0,
+      "summary": [
+        "test result: ok. 67 passed; 0 failed; 0 ignored; 0 measured; 134 filtered out; finished in 203.50s"
+      ]
+    }
+  ],
+  "exact_round_selection_count": 67,
+  "round_filtered": 134,
+  "new_control_names_pass_once": [
+    "a_rejected_apply_receipt_runs_real_back_and_restores_written_settings_modes_and_records",
+    "a_rejected_back_receipt_keeps_the_journal_until_real_back_is_acknowledged"
+  ],
+  "new_control_observations": [
+    "Existing applier actually writes before-images and changes two files, removes one and creates one nested setting. A wrong ApplyDone sequence is refused; actual Back restores bytes/modes/settings records and keeps the previous installed sequence.",
+    "A candidate binary reports unwell during watch. Existing Back actually restores files, but a wrong BackDone operation is refused. The journal remains, installed sequence stays old and setting-record restoration is not falsely acknowledged. A later actual Back completes idempotently, refuses build2, clears the journal and no new Apply runs."
+  ],
+  "driver_bindings": {
+    "lib": {
+      "sha256": "b542d89ba8b1c8785ad77e27e438c06f6a89b22b6a2cc17ced3c48331370da6e",
+      "size": 14788336,
+      "compiler_target": "lamp_update",
+      "compiler_kind": [
+        "lib"
+      ],
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "fresh": false,
+      "preserved_equal": true
+    },
+    "round": {
+      "sha256": "aeb152ced5c20460f906d668027df742330e0492eba6b4d321e4415088b60419",
+      "size": 20754632,
+      "compiler_target": "round",
+      "compiler_kind": [
+        "test"
+      ],
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "fresh": false,
+      "preserved_equal": true
+    }
+  },
+  "source_guard_before_after_equal": true,
+  "source_guard_scope": "Eight changed/manifest/toolchain files. Final Git diff is only tests/round.rs and the added documentation counts; all other captured bytes remain unchanged.",
+  "earlier_negative_and_fixed_drivers_still_match": true,
+  "limits": [
+    "No old negative experiment rerun.",
+    "The fault replaces a receipt header after actual Rust apply/back execution in filesystem/FakeSystemd fixtures; no systemd process/root one-shot or reboot/power test ran.",
+    "No helper authentication, nonce, path/postimage validation or guard engine added.",
+    "No full workspace/full round suite, Linux/ARM64, CI, lamp, public write, commit or push for these additions."
+  ]
+}

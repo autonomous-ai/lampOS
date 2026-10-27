@@ -1,3 +1,11 @@
+## 27 October 2026, 17:25 +07 — apply receipt binding published
+
+#3808 offers c688ec71a on c28789eeb. The waiting parent supplies its own expected operation/build sequence; a mismatched Done changes no setting record. Legacy later versions and additive fields remain tolerated, unknown operations refused. This is receipt identity only, not helper authentication, record/postimage validation or writer replacement.
+
+Current scoped gate: fmt/strict Update all-target Clippy, full library 155 passed / 0 failed / 2 ignored, plus the two actual-applier rollback cases 2/0, 199 filtered. Actual1fb qualification separately passed155/0/2 plus67/0 selected rounds; initiale362 separately passed152/0/2 plus65/0. Original old-production two library and one round expected failures remain retained. [Published packets](verification/apply-receipt-binding-20261027/README.md) bind source and actual/preserved drivers; all three manifests verify. Original PR Linux/ARM gates are active, no device run.
+
+Bug disposition: the wrong-operation/sequence merge found during #3689 audit is fixed in this PR and waits on original CI/readers. #3775 combined-head CI has reported green; independent counts/provenance audit is completing before its final native claim. The read-only preimage observer has reached source review, still unwired.
+
 Ready for lamp-voice: no (#3775 combined original checks/read pending); Cloud train disposition pending
 
 ## Current checkpoint: 2026-10-27 17:16 +07, complete combined foundation pushed

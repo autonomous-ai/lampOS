@@ -1,0 +1,10 @@
+{
+  "lampOS/crates/update/src/apply.rs": "c0f4fb9f6cdfb5b2d175e8c554c5b60cc6261a335cf295fdf639ef6b6b7d3fda",
+  "lampOS/crates/update/src/round.rs": "dce652eaf308ab2b657d081a996a79c7306d443329f3ae1c4cfc84f01e866fe8",
+  "lampOS/crates/update/tests/round.rs": "e07537adeea6efc45104511c1fbbd356762f4603a83b33e505bcc492c572192f",
+  "lampOS/docs/updates.md": "9a57c3b046463304e9ee410d33c4bb28cb7bba381e5c179ec8a5d2593a3e172c",
+  "lampOS/Cargo.toml": "2b1005b31d36511ed3c9d59429a4779f9579317ccead0c0a20d729a75d2ef940",
+  "lampOS/Cargo.lock": "bb7fd9560e040c0a5b161ae441a662cb21e41418f18e8f71dcd5389fcbb1e9bf",
+  "lampOS/crates/update/Cargo.toml": "37aadd247a80b20ccdb284439d7e9d779f7bc7fe97447d49c9773070535bd71f",
+  "lampOS/rust-toolchain.toml": "fb0a56ca2fc09db10159f6983e9d747f4afeb64e1d6d941dc36a3c20bf3a5749"
+}

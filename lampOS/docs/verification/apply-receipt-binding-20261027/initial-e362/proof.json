@@ -1,0 +1,176 @@
+{
+  "base": "e362659ce65f15c0e1e708a86e786bcea8bc87a6",
+  "branch": "second/apply-receipt-binding",
+  "source_scope": "Uncommitted worktree on this exact base with four changed paths; no authored full-tree/commit binding yet. Eight changed/manifest/toolchain inputs hash equally before/after the fixed gate; Git status/diff at closure confirms the exact four-path scope.",
+  "changed_paths": [
+    "lampOS/crates/update/src/apply.rs",
+    "lampOS/crates/update/src/round.rs",
+    "lampOS/crates/update/tests/round.rs",
+    "lampOS/docs/updates.md"
+  ],
+  "patch_sha256": "c92e913e6fe9f4492770164afebda655a5a1bac20dfd59ae4dda69ed9dd4fe2f",
+  "host": {
+    "os": "Darwin",
+    "architecture": "arm64"
+  },
+  "old_production_baseline": {
+    "production_prefixes_equal_to_base": {
+      "lampOS/crates/update/src/apply.rs": {
+        "production_prefix_equal_to_base": true,
+        "sha256": "fb67865ade7edfe7ac1a73c00ca4cc86d8d3ec4a18c4bff263863a3f2b5dba98"
+      },
+      "lampOS/crates/update/src/round.rs": {
+        "production_prefix_equal_to_base": true,
+        "sha256": "2dbd098010dd7af8435e0106601d2386d2f4b42f75429932e0d3127b2021b796"
+      },
+      "base": "e362659ce65f15c0e1e708a86e786bcea8bc87a6"
+    },
+    "results": [
+      {
+        "name": "lib",
+        "exit_code": 101,
+        "expected_failures": 2,
+        "summary_found": true
+      },
+      {
+        "name": "round",
+        "exit_code": 101,
+        "expected_failures": 1,
+        "summary_found": true
+      }
+    ],
+    "library_summary": [
+      "test result: FAILED. 0 passed; 2 failed; 0 ignored; 0 measured; 149 filtered out; finished in 0.10s"
+    ],
+    "round_summary": [
+      "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 196 filtered out; finished in 0.13s"
+    ],
+    "round_limit": "The original round fails at its first wrong-operation iteration with Switched(2); its later wrong-sequence iteration is not reached. The independent old library wrong-sequence test also fails."
+  },
+  "fixed_results": [
+    {
+      "name": "fmt",
+      "exit_code": 0
+    },
+    {
+      "name": "clippy",
+      "exit_code": 0
+    },
+    {
+      "name": "compile",
+      "exit_code": 0
+    },
+    {
+      "name": "lib",
+      "exit_code": 0,
+      "summary": [
+        "test result: ok. 152 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 20.79s"
+      ]
+    },
+    {
+      "name": "round",
+      "exit_code": 0,
+      "summary": [
+        "test result: ok. 65 passed; 0 failed; 0 ignored; 0 measured; 132 filtered out; finished in 205.33s"
+      ]
+    }
+  ],
+  "round_selection": {
+    "selected": 65,
+    "filtered": 132,
+    "groups": {
+      "top-level settings/image/reset-plan": 19,
+      "head_touch": 34,
+      "product_carrier": 12
+    }
+  },
+  "new_controls_pass_once": [
+    "apply::tests::a_done_for_another_operation_does_not_change_any_setting_record",
+    "apply::tests::a_done_for_another_sequence_does_not_change_any_setting_record",
+    "apply::tests::an_explicit_expected_identity_does_not_follow_a_rewritten_staged_request",
+    "apply::tests::a_matching_done_keeps_the_permanent_forward_read_contract",
+    "apply::tests::an_unknown_done_operation_is_refused_without_changing_any_setting_record",
+    "the_round_rejects_a_done_matching_a_rewritten_request_instead_of_its_own_request"
+  ],
+  "stage_executables": {
+    "old_negative": {
+      "round": {
+        "sha256": "2bde60e9b6149e4428023673e235e57c49bc0156c8e2ce637b0476da4b0e2d17",
+        "size": 20673800,
+        "actual_compiler_target": "round",
+        "actual_compiler_target_kind": [
+          "test"
+        ],
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 2,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "fresh": false,
+        "preserved_hash_equal": true
+      },
+      "lib": {
+        "sha256": "aa8542e6decc2ee5b7ad768298216efd217ea1edf0a34a1de5ba2931cac46697",
+        "size": 14663232,
+        "actual_compiler_target": "lamp_update",
+        "actual_compiler_target_kind": [
+          "lib"
+        ],
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 2,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "fresh": false,
+        "preserved_hash_equal": true
+      }
+    },
+    "fixed": {
+      "round": {
+        "sha256": "63ac4711ba9c116f758713616fd76511817a40ad066a7317bdb279accd21ed25",
+        "size": 20674136,
+        "actual_compiler_target": "round",
+        "actual_compiler_target_kind": [
+          "test"
+        ],
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 2,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "fresh": false,
+        "preserved_hash_equal": true
+      },
+      "lib": {
+        "sha256": "b992d5fd02ee1eb81fa75f7810f2b2ca2083819918a6d79f82535bcbf23554a9",
+        "size": 14709216,
+        "actual_compiler_target": "lamp_update",
+        "actual_compiler_target_kind": [
+          "lib"
+        ],
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 2,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "fresh": false,
+        "preserved_hash_equal": true
+      }
+    }
+  },
+  "limitations": [
+    "No local Linux/ARM, CI or device test by this gate.",
+    "No helper authentication, nonce, record-path or postimage validation added.",
+    "Legacy version/additive fields still read through; unknown operation refused.",
+    "No full workspace or full round test suite executed."
+  ],
+  "history": "One initial placement attempt used the wrong cwd and failed before production copying; corrected with errexit. Its failure is retained separately. Original expected-failure binaries were copied before execution and before target reuse; no old-source regression rerun."
+}

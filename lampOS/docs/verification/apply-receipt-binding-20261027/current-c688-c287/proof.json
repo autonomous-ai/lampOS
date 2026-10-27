@@ -1,0 +1,55 @@
+{
+  "head": "c688ec71a95bf128409265e3deadcb1873a9791b",
+  "base": "c28789eeb03bf5d441927a7e991b949a2689b557",
+  "tree": "4e2cf8ab0a0290b1a82f9ca1247306494eb65aef",
+  "source_before_equals_after": true,
+  "current_files_equal_gated_sources": true,
+  "drivers": {
+    "round": {
+      "sha256": "72bc42577f49546f04e8d2a0da78250a8b925571c62e0c61f8a75d8a44b90d92",
+      "bytes": 20754632,
+      "actual_and_preserved_match": true,
+      "compiler_target": "round"
+    },
+    "lib": {
+      "sha256": "2739ee55931b952dbd2aa2594ce3ec9ab0ff4329764afcaa6c45e49885772aef",
+      "bytes": 14788336,
+      "actual_and_preserved_match": true,
+      "compiler_target": "lamp_update"
+    }
+  },
+  "results": [
+    {
+      "name": "fmt",
+      "exit_code": 0
+    },
+    {
+      "name": "clippy",
+      "exit_code": 0
+    },
+    {
+      "name": "compile",
+      "exit_code": 0
+    },
+    {
+      "name": "lib",
+      "exit_code": 0,
+      "summary": [
+        "test result: ok. 155 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 22.46s"
+      ]
+    },
+    {
+      "name": "round",
+      "exit_code": 0,
+      "summary": [
+        "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 199 filtered out; finished in 0.51s"
+      ]
+    }
+  ],
+  "selected_round_tests": [
+    "a_rejected_apply_receipt_runs_real_back_and_restores_written_settings_modes_and_records",
+    "a_rejected_back_receipt_keeps_the_journal_until_real_back_is_acknowledged"
+  ],
+  "scope": "Current c287 carry: full LIB and two exact new round tests only. Earlier 67 round PASS remain bound to 1fb; earlier 152 LIB /65 round remain bound to e362. Original old-production 2 LIB and 1 round expected failures retained; never rerun.",
+  "limits": "Native Mac fake-systemd/private-filesystem tests; not Linux ARM64, a lamp, privileged writer activation, authentication or postimage validation."
+}

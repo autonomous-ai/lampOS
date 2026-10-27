@@ -1,0 +1,19 @@
+{
+  "compiler.stderr": "1eac7414c601b7fed6fac3e51887d52d8c7f3f904808fc49ae45d0cf0a072593",
+  "fmt-command.json": "b88a31bcc78365286fce25145ac62272ef5c787d847ce90f9b1976af52633798",
+  "fmt.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "source-before.json": "baec7b2a51c8d1748a5bb4cc068db23c0c8afbbc7839a472e6903fc2733d7962",
+  "round-selected.json": "d507e2b9d6fb35b99d03069191083a8dd7f08270c9d86f25bd3d225979978462",
+  "compile-command.json": "341197ac59c2fcbcb346f8f520ba5d934fc0390fdaa2cd57123d408f31e4de3e",
+  "source-after.json": "baec7b2a51c8d1748a5bb4cc068db23c0c8afbbc7839a472e6903fc2733d7962",
+  "round-command.json": "892acd04c6f9a466d1c3d5abd82bd196d00eac97cae39f9ea9d3eced9a1a739d",
+  "results.json": "6b234958cea5d324e8182109936755f41b4a9baa40a6cb2af70e400b54d9a670",
+  "clippy.log": "1659024f03d3af3b3c87696e7684226c7bf604637ed746650266c5df7d295f22",
+  "lib.log": "9603a6bb06416dbf6629a1fd5b87db7e119e13c204b6e4ecff72af6199f2b4d9",
+  "driver-bindings.json": "b50d88ac859a5d801cc2bf769b9e6fe4d4fe26f028c22b21b43c0e93852dc9a0",
+  "round.log": "fd5af63bf1452c9611b4490901f86ddfc7092598fb374d7f4d1eff606afc08b1",
+  "compiler.jsonl": "f8f4defc119c3ed3010ef0451fefb2befcbd59880bd1dab1e2658d9a7db37998",
+  "round-list.txt": "191813faa19d978be7c520dc76b13ef4dbe51d8b40b9498e560b5009324d703c",
+  "lib-command.json": "c018ade3b4c44b89838e692e088f9e65ed6fe059818fdbc861edfd0472389901",
+  "clippy-command.json": "97bf5488751311bfec6c5e834054757bdd10ee1950cb4fd60351e9783cce6954"
+}
