@@ -126,6 +126,58 @@ pub struct Door {
     /// The SHA-256 of the lamp's own TLS certificate, which every pairing
     /// proof is made over.
     pin: [u8; 32],
+    /// The quiet hours, once wired: the lamp's local time, if known.
+    quiet: Option<Quiet>,
+}
+
+/// The lamp's quiet hours on the door: `say` and `sound` refused from
+/// 22:00 to 07:00 local (`lamp_local_time::quiet_hours`, one definition
+/// with lamp-skills), and while the lamp's local time isn't known.
+pub struct Quiet {
+    /// The lamp's zone, or none when it couldn't be read.
+    pub local_time: Option<std::sync::Arc<lamp_local_time::LocalTime>>,
+    /// When each computer's refusal was last journaled (unix s), so the
+    /// journal says it once a night.
+    journaled: BTreeMap<String, u64>,
+}
+
+/// Before this, the clock isn't set (a lamp has no battery clock and boots
+/// in the past): 2026-01-01 UTC.
+pub const CLOCK_SET_AFTER_S: u64 = 1_767_225_600;
+
+impl Quiet {
+    pub fn new(local_time: Option<std::sync::Arc<lamp_local_time::LocalTime>>) -> Self {
+        Self {
+            local_time,
+            journaled: BTreeMap::new(),
+        }
+    }
+
+    /// Why `client`'s say or sound is refused at `wall_s`, if it is.
+    fn refuses(&mut self, client: &str, wall_s: u64) -> Option<String> {
+        let why = match &self.local_time {
+            Some(local) if wall_s >= CLOCK_SET_AFTER_S => {
+                let minute = local.minute_of_day(wall_s.saturating_mul(1_000));
+                if !lamp_local_time::quiet_hours(minute) {
+                    return None;
+                }
+                format!(
+                    "quiet hours: {:02}:{:02} to {:02}:{:02} local",
+                    lamp_local_time::QUIET_FROM_MINUTE / 60,
+                    lamp_local_time::QUIET_FROM_MINUTE % 60,
+                    lamp_local_time::QUIET_TO_MINUTE / 60,
+                    lamp_local_time::QUIET_TO_MINUTE % 60
+                )
+            }
+            _ => "quiet hours: the lamp's local time isn't known".to_owned(),
+        };
+        let last = self.journaled.get(client).copied();
+        if last.is_none_or(|last| wall_s.saturating_sub(last) >= 12 * 3_600) {
+            eprintln!("lamp-control: {client}'s say or sound refused: {why}");
+            self.journaled.insert(client.to_owned(), wall_s);
+        }
+        Some(why)
+    }
 }
 
 impl Door {
@@ -153,7 +205,15 @@ impl Door {
             random: SystemRandom::new(),
             unsaved_revokes: BTreeSet::new(),
             pin,
+            quiet: None,
         }
+    }
+
+    /// The quiet hours held on the door (lamp-control's `serve` always
+    /// wires them; a door without, as in tests, holds none).
+    pub fn with_quiet_hours(mut self, quiet: Quiet) -> Self {
+        self.quiet = Some(quiet);
+        self
     }
 
     /// A new connection, and the `welcome` to send it first.
@@ -420,6 +480,15 @@ impl Door {
                 ErrorCode::Busy,
                 "another computer holds the body".to_owned(),
             );
+        }
+        // The quiet hours, before the rate, so a refusal isn't counted.
+        if matches!(op, Op::Say { .. } | Op::Sound { .. })
+            && let Some(why) = self
+                .quiet
+                .as_mut()
+                .and_then(|quiet| quiet.refuses(&client, wall_s))
+        {
+            return refuse(ErrorCode::QuietHours, why);
         }
         let class = Class::of(&op);
         if let Some(class) = class
@@ -924,6 +993,65 @@ mod tests {
         }
         let later = door.handle(&mut session, light, &mut fake, 3 * S + 20, 1);
         assert!(!later.close);
+    }
+
+    /// The quiet hours on the door (#3917, one definition in #3924): a
+    /// computer's `say` and `sound` are refused `quiet_hours` from 22:00 to
+    /// 07:00 local, and while the lamp's local time isn't known; the refusal
+    /// reaches no part and isn't counted against the rate.
+    #[test]
+    fn say_and_sound_are_refused_in_the_quiet_hours_and_while_the_time_is_unknown() {
+        let computer = Computer::new(1);
+        let (door, mut session, mut fake) = paired(&computer, &[Grant::Speak, Grant::Light]);
+        // UTC+7, as the lamps' own; 2026-10-28 at 00:00 UTC is 07:00 there.
+        let utc7 = std::sync::Arc::new(lamp_local_time::LocalTime::Offset(7 * 60));
+        let mut door = door.with_quiet_hours(Quiet::new(Some(utc7)));
+        const MIDNIGHT_UTC: u64 = 1_793_145_600;
+        let at = |hour_local: u64| MIDNIGHT_UTC + ((hour_local + 24 - 7) % 24) * 3_600;
+        macro_rules! send {
+            ($door:expr, $frame:expr, $wall_s:expr) => {
+                $door.handle(&mut session, $frame, &mut fake, 2 * S, $wall_s)
+            };
+        }
+        let say = r#"{"id":3,"op":"say","text":"Hi."}"#;
+        let sound = r#"{"id":4,"op":"sound","name":"chime"}"#;
+        for hour in [22, 23, 0, 3, 6] {
+            for frame in [say, sound] {
+                let refused = send!(door, frame, at(hour));
+                assert_eq!(
+                    code_of(&refused),
+                    Some("quiet_hours"),
+                    "{hour}: {refused:?}"
+                );
+                assert_eq!(
+                    reply(&refused)["error"]["why"],
+                    "quiet hours: 22:00 to 07:00 local"
+                );
+            }
+        }
+        // Nothing reached a part, and a light at night is the ring's to clamp.
+        let light = r#"{"id":5,"op":"light","colour":"warm","level":2,"for_ms":1000}"#;
+        assert_eq!(reply(&send!(door, light, at(23)))["ok"], true);
+        assert_eq!(fake.did.len(), 1, "{:?}", fake.did);
+        assert!(fake.did[0].ends_with(" light"), "{:?}", fake.did);
+        // By day it goes through, and the night's refusals weren't counted:
+        // six says a minute is still the rate.
+        for id in 0..6 {
+            let frame = format!(r#"{{"id":{},"op":"say","text":"Hi."}}"#, 10 + id);
+            assert_eq!(reply(&send!(door, &frame, at(12)))["ok"], true, "{id}");
+        }
+        // A clock that isn't set yet, or a zone that couldn't be read: quiet.
+        let unset = send!(door, say, 1_000);
+        assert_eq!(code_of(&unset), Some("quiet_hours"));
+        assert_eq!(
+            reply(&unset)["error"]["why"],
+            "quiet hours: the lamp's local time isn't known"
+        );
+        let (door, mut session, mut fake) = paired(&Computer::new(2), &[Grant::Speak]);
+        let mut door = door.with_quiet_hours(Quiet::new(None));
+        let unknown = door.handle(&mut session, say, &mut fake, 2 * S, at(12));
+        assert_eq!(code_of(&unknown), Some("quiet_hours"));
+        assert!(fake.did.is_empty());
     }
 
     #[test]
