@@ -32,6 +32,7 @@ pub mod switches;
 pub mod unit;
 pub mod world;
 pub mod writer_files;
+pub(crate) mod writer_plan;
 pub mod writer_preimages;
 pub mod writer_refresh;
 pub mod writer_settings;

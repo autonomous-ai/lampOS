@@ -63,14 +63,14 @@ impl Artifact {
         }
     }
 
-    fn check(&self, most: u64) -> io::Result<()> {
+    pub(crate) fn check(&self, most: u64) -> io::Result<()> {
         if !digest(&self.sha256) || self.size == 0 || self.size > most {
             return Err(invalid("invalid or oversized artifact identity"));
         }
         metadata(&self.later, &["sha256", "size"])
     }
 
-    fn matches(&self, other: &Self) -> bool {
+    pub(crate) fn matches(&self, other: &Self) -> bool {
         self.sha256 == other.sha256 && self.size == other.size
     }
 }
@@ -112,7 +112,7 @@ impl Binding {
         }
     }
 
-    fn check(&self) -> io::Result<()> {
+    pub(crate) fn check(&self) -> io::Result<()> {
         if !digest(&self.transaction) || self.sequence == 0 {
             return Err(invalid("invalid refresh transaction or sequence"));
         }
