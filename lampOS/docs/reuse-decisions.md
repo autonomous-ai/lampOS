@@ -1,5 +1,17 @@
 # Reuse decisions: V1, ROS 2 and existing Rust systems
 
+## Bind signed source to saved ordinary decisions without another executor (2026-10-28)
+
+Reuse the full existing Ed25519 manifest verifier at its compiled capability,
+byte-identity validators, immutable preimage/Head formats, ordinary ownership
+table, bounded Head projector and verifier. Independently protected selected
+records must agree with the bundle; hashes alone do not establish provenance.
+Add only pure represented Raw-prefix consistency and complete row/order
+reconciliation. Retain signed PINS separately from derived text and preserve
+the projector's appended order. This changes no ordinary runtime policy and
+adds no loader, codec, grant, privileged helper or execution. See
+[preparation and its limits](ordinary-plan-preparation.md).
+
 ## Compare existing saved observations before finite-plan derivation (2026-10-28)
 
 Reuse the validated bounded preimage bundle and saved Head codec rather than
