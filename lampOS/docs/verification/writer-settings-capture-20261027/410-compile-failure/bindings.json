@@ -1,0 +1,31 @@
+{
+  "identity.json": {
+    "raw_sha256": "ab05ffb0f029ca121831ca105c0f31933395bd942fcdfb470fd3de34a5a28ed2",
+    "published_sha256": "a20ecf5b2adbd5f63b1f174f4a038c823dd26180365bc4f5a51a1a92b112a65a",
+    "normalization": "known checkout/gate/target/cargo path aliases; one terminal newline"
+  },
+  "results.json": {
+    "raw_sha256": "4967b28bd6cde7d7aa34fadd3a177faf9c2aebe69d946174fb4d546bd807c437",
+    "published_sha256": "1247f9fb2e4fd24e1764da93ac517fef531cb5ee53eea28a649268d6d2ebbbcb",
+    "normalization": "known checkout/gate/target/cargo path aliases; one terminal newline"
+  },
+  "closure.json": {
+    "raw_sha256": "344458c67f6a2016a09d40a0846d617ce55cd375db6e72a50eaad2431eeee80c",
+    "published_sha256": "344458c67f6a2016a09d40a0846d617ce55cd375db6e72a50eaad2431eeee80c",
+    "normalization": "known checkout/gate/target/cargo path aliases; one terminal newline"
+  },
+  "target-reuse.json": {
+    "raw_sha256": "1b89714ebc48312a3da9a4a7f99b8b9bd5c0fd30443bdffeeb407ff47ef1c2de",
+    "published_sha256": "1b89714ebc48312a3da9a4a7f99b8b9bd5c0fd30443bdffeeb407ff47ef1c2de",
+    "normalization": "known checkout/gate/target/cargo path aliases; one terminal newline"
+  },
+  "reader-census.json": {
+    "raw_sha256": "2d1710eaf5f61a607e26c6ad66df804b99dec4f4b5da721faa2072e1cfa0e9e7",
+    "published_sha256": "2d1710eaf5f61a607e26c6ad66df804b99dec4f4b5da721faa2072e1cfa0e9e7",
+    "normalization": "known checkout/gate/target/cargo path aliases; one terminal newline"
+  },
+  "diagnostic.txt": {
+    "raw_sha256": "ab33f3b37eb182d7eae26b1682fea3f69d6985c00729b82b75af122dff8e3f1b",
+    "published_sha256": "ab33f3b37eb182d7eae26b1682fea3f69d6985c00729b82b75af122dff8e3f1b"
+  }
+}

@@ -1,0 +1,51 @@
+{
+  "head": "c38883ce292135cc117721f0774f988c74778f7a",
+  "base": "3b9bfb628e1c416926b958fecf56f65c539dc533",
+  "tree": "91c1ba31f84e0d9ba7db25bee1f37c45784f1749",
+  "scope": "actual clean c388/3b9 observer+raw carry; delivered writer_refresh preserved; no receipt patch present",
+  "owned": {
+    "lampOS/crates/update/src/apply.rs": {
+      "sha256": "74fc0cc534568e144449fbfdc5292686f2c53f60d953acda6cd8c404a37cfa3d",
+      "mode": 420
+    },
+    "lampOS/crates/update/src/lib.rs": {
+      "sha256": "d429a76236d320f916997619f4a1384705a8ee35c39f5c6d1333cec89a46ab47",
+      "mode": 420
+    },
+    "lampOS/crates/update/src/writer_files.rs": {
+      "sha256": "13657a14e71d7dd07f0bffe176a09585ef270051ed90dfb756ff96d85267b55c",
+      "mode": 420
+    },
+    "lampOS/crates/update/src/writer_files/tests.rs": {
+      "sha256": "8165868d61749055d934b068abad50bc8b514f366b51b8e3973e9e8c937baf95",
+      "mode": 420
+    },
+    "lampOS/crates/update/src/writer_settings.rs": {
+      "sha256": "7d8a2c8813db1b32e59a5419cd4a89da8670d10524d70c0b67b7e01ffefdd201",
+      "mode": 420
+    },
+    "lampOS/crates/update/src/writer_settings/tests.rs": {
+      "sha256": "3c02e3090d6b4989b0a98a185e8caec1f88e5352b2f95cf02e1cf324f2650763",
+      "mode": 420
+    },
+    "lampOS/docs/reuse-decisions.md": {
+      "sha256": "926a69adf3a29f3e10aa0629af5ec8d390bb622b37275f74c0c0153df9b9b066",
+      "mode": 420
+    },
+    "lampOS/docs/updates.md": {
+      "sha256": "1e52a2341687cd7de5a03df3a98fbb210958e91983844d86ca4ae5a83823fe40",
+      "mode": 420
+    },
+    "lampOS/docs/writer-file-observation.md": {
+      "sha256": "3b31b6f8ed539bf5ea7429b7bd8047d90fef2af51048761b736a06ce36a6c684",
+      "mode": 420
+    },
+    "lampOS/docs/writer-settings-capture.md": {
+      "sha256": "9ea438eb4b9c9e386592e1d6388b941f832fa8925296c11734875f75925b2048",
+      "mode": 420
+    }
+  },
+  "status": "",
+  "controller_sha256": "8a9095c4be5f22645f2ba07706ccfc1ef4a431e6168d6f38df30d0e00a3cf4cc",
+  "target": "<target>"
+}

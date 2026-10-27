@@ -1,0 +1,4 @@
+crates/update/src/writer_settings/tests.rs:227:66: error[E0308]: mismatched types: expected `&BTreeMap<String, Vec<String>>`, found `&BTreeMap<String, String>`
+crates/update/src/writer_settings/tests.rs:232:69: error[E0308]: mismatched types: expected `&BTreeMap<String, Vec<String>>`, found `&BTreeMap<String, String>`
+crates/update/src/writer_settings/tests.rs:237:71: error[E0308]: mismatched types: expected `&BTreeMap<String, Vec<String>>`, found `&BTreeMap<String, String>`
+error: could not compile `lamp-update` (lib test) due to 3 previous errors

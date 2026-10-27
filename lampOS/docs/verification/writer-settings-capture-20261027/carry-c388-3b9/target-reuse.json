@@ -1,0 +1,8 @@
+{
+  "actual_and_preserved_verified": true,
+  "executable_count": 10,
+  "previous_closed_boundaries": [
+    "closed latest receipt3b9 full502/0/6 manifest supplied at invocation; verified before reuse"
+  ],
+  "no_active_handles": "Receipt410 owner must explicitly release the sole slot before Root starts"
+}

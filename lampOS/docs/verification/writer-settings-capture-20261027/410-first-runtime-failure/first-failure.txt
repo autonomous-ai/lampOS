@@ -1,0 +1,7 @@
+---- writer_settings::tests::captured_bytes_preserve_ordinary_ownership_and_keep_all_omitted_noops stdout ----
+
+thread 'writer_settings::tests::captured_bytes_preserve_ordinary_ownership_and_keep_all_omitted_noops' (11133396) panicked at crates/update/src/writer_settings/tests.rs:85:5:
+assertion `left == right` failed
+  left: Some(Keep("this lamp's own"))
+ right: Some(Write)
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace

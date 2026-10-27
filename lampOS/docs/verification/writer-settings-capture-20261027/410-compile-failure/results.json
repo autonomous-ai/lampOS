@@ -1,0 +1,33 @@
+[
+  {
+    "stage": "fmt",
+    "argv": [
+      "cargo",
+      "+1.96.0",
+      "fmt",
+      "--all",
+      "--check"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 5.897
+  },
+  {
+    "stage": "clippy",
+    "argv": [
+      "cargo",
+      "+1.96.0",
+      "clippy",
+      "--locked",
+      "-q",
+      "-p",
+      "lamp-update",
+      "--all-targets",
+      "--message-format=short",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 20.054
+  }
+]

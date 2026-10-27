@@ -1,0 +1,12 @@
+{
+  "command": [
+    "rg",
+    "-n",
+    "writer_(files|settings)::|mod writer_(files|settings)",
+    "lampOS/crates"
+  ],
+  "exit_code": 0,
+  "stdout": "lampOS/crates/update/src/writer_settings.rs:11:    writer_files::{self, Entry, Observation},\nlampOS/crates/update/src/writer_settings.rs:166:        let cap = writer_files::MOST_BYTES.min(MOST_OLD_BYTES - old_bytes);\nlampOS/crates/update/src/writer_settings.rs:167:        let before = writer_files::observe(root, relative, cap)?;\nlampOS/crates/update/src/writer_settings/tests.rs:137:    let bytes = vec![42; writer_files::MOST_BYTES];\nlampOS/crates/update/src/writer_settings/tests.rs:162:        &vec![42; writer_files::MOST_BYTES + 1],\nlampOS/crates/update/src/lib.rs:34:pub mod writer_files;\nlampOS/crates/update/src/lib.rs:35:pub mod writer_settings;\n",
+  "stderr": "",
+  "scope": "only Update module declaration; private unit tests use super imports; no CLI/round/service caller"
+}

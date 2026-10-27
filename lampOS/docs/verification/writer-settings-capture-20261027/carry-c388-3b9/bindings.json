@@ -1,0 +1,42 @@
+{
+  "identity.json": {
+    "raw_sha256": "5aed3c0d178c1220bafe11e3717aec2635e76e65f1bbdc913dc2dfe2d0418040",
+    "published_sha256": "8ff83d1894a955068ff9c8352039bcc7ddd92ca96a458000deafb55f11cd6bdf",
+    "normalization": "known checkout/gate/target/cargo path aliases; one terminal newline"
+  },
+  "results.json": {
+    "raw_sha256": "8f3a37992c79e97d510335423f9d487dd801149aac4b955b762c05f5e3326768",
+    "published_sha256": "9f9f0534d07995f6f048e7aac8efa2d4150efda8d49e27678cc83af7f259bfa5",
+    "normalization": "known checkout/gate/target/cargo path aliases; one terminal newline"
+  },
+  "census.json": {
+    "raw_sha256": "aac7b28124cc54e5fdf32e1ef91dc3386265d41c826f9463a908f2d1f1277dff",
+    "published_sha256": "459fa71ac64c7d29d5f74a4d69b685b43b012a322312aad785fe4227b7b4209d",
+    "normalization": "known checkout/gate/target/cargo path aliases; one terminal newline"
+  },
+  "closure.json": {
+    "raw_sha256": "120d9f002c867efc8c770b0f7faf4cc167466a03d575b4ef91afcb3616582eb7",
+    "published_sha256": "120d9f002c867efc8c770b0f7faf4cc167466a03d575b4ef91afcb3616582eb7",
+    "normalization": "known checkout/gate/target/cargo path aliases; one terminal newline"
+  },
+  "target-reuse.json": {
+    "raw_sha256": "5f96d73b240211eef93c5b179fc2ef37525599623a7094b78ad325b10292a303",
+    "published_sha256": "5f96d73b240211eef93c5b179fc2ef37525599623a7094b78ad325b10292a303",
+    "normalization": "known checkout/gate/target/cargo path aliases; one terminal newline"
+  },
+  "compile-artifacts.json": {
+    "raw_sha256": "8c88fc7f44ee631bba291c5a31ba7d91c45bac4758e9d223ecc817e4d1b228b1",
+    "published_sha256": "470e9eeb9c4420a7ea8dd828b666eddf5946ac0f0d447d55c77e47dac4e7dc70",
+    "normalization": "known checkout/gate/target/cargo path aliases; one terminal newline"
+  },
+  "executables.json": {
+    "raw_sha256": "631653e7dc197c50c300893ef63bf2616763b41f37b1d336b3c75cdcef43e156",
+    "published_sha256": "f77057a9d3a59c1a4438efdba1fc6b2b47e767a97335cca86d5a95ad47ca8a43",
+    "normalization": "known checkout/gate/target/cargo path aliases; one terminal newline"
+  },
+  "reader-census.json": {
+    "raw_sha256": "5da918caf4c83db64eccbb29d531088ef92775263b3057f082fe6827d7c56b43",
+    "published_sha256": "5da918caf4c83db64eccbb29d531088ef92775263b3057f082fe6827d7c56b43",
+    "normalization": "known checkout/gate/target/cargo path aliases; one terminal newline"
+  }
+}

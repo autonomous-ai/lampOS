@@ -1,3 +1,11 @@
+## 27 October 2026, 19:35 +07 — raw capture evidence and a routed lock failure
+
+[Raw capture historical packets](verification/writer-settings-capture-20261027/README.md) are now published with exact compile failure, first488/1/6 fixture failure, corrected491/0/6 and carry509/0/6 scopes. Empty-file ownership behavior was preserved; both owned and unowned cases are explicit after the fixture correction. No negative source was rerun to green.
+
+The later4f25/3f4 full gate is separately509/1/6: all15 own controls and18 foundation controls pass; unchanged round.rs second-round check returned another-updater-busy instead of UpToDate2. Source/driver guards close, failed bytes retained, cause unestablished. Queue6441965369 routes evidence to Tests/First for a baseline-cohort/errno investigation; it is not waived or qualification. Receipt continues its own fresh gate on latest Main; Root continues projection-input work without replaying the failed case.
+
+Foundation3775 and Cloud3644 are delivered through their trains; the two-doc3821 correction is delivered too. No physical helper/restore/7071 acceptance is claimed.
+
 ## 27 October 2026, 19:10 +07 — delivered Cloud and writer foundation, source-bound evidence
 
 #3775 is [delivered through train #3815](verification/settings-writer-refresh-foundation-20261027/delivery-train3815/README.md); all three qualified Rust blobs and eighteen controls remain intact. [Original e74/410 native evidence](verification/settings-writer-refresh-foundation-20261027/native-e74-410/README.md) and [Linux lint](verification/settings-writer-refresh-foundation-20261027/linux-e74-410/README.md) keep that source. The eighteen-test prose correction [#3821](https://github.com/autonomous-ai/lampOS/pull/3821) is ready; no foundation reapplication.

@@ -1,0 +1,8 @@
+{
+  "actual_and_preserved_verified": true,
+  "executable_count": 10,
+  "previous_closed_boundaries": [
+    "closed raw410 failed-runtime manifest supplied at invocation; actual/preserved witness verified before reuse"
+  ],
+  "no_active_handles": "Receipt410 owner must explicitly release the sole slot before Root starts"
+}

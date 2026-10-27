@@ -1,0 +1,39 @@
+{
+  "head": "75f0621752c716a8d6b5fcf3d63d07fdb41ce0c7",
+  "base": "410faf6180d4dfeacb9021d1e272020c6037d18d",
+  "tree": "9a87814ab228c5993e43903607545cd07013557d",
+  "scope": "actual410 plus committed observer and seven owned uncommitted raw-capture paths; no writer_refresh or receipt patch present",
+  "owned": {
+    "lampOS/crates/update/src/apply.rs": {
+      "sha256": "74fc0cc534568e144449fbfdc5292686f2c53f60d953acda6cd8c404a37cfa3d",
+      "mode": 420
+    },
+    "lampOS/crates/update/src/lib.rs": {
+      "sha256": "ceac944c7986d7638a8c2c6e293113b2a1e6241f3c3ef10e4ca8253a5d09c4d6",
+      "mode": 420
+    },
+    "lampOS/crates/update/src/writer_settings.rs": {
+      "sha256": "7d8a2c8813db1b32e59a5419cd4a89da8670d10524d70c0b67b7e01ffefdd201",
+      "mode": 420
+    },
+    "lampOS/crates/update/src/writer_settings/tests.rs": {
+      "sha256": "247b2b1a7897b55eda87c4434ad2b81ceb409c5fb901065315ee60dbe62e1e4c",
+      "mode": 420
+    },
+    "lampOS/docs/reuse-decisions.md": {
+      "sha256": "42c47de507b091d5cc194179cba559f8090df629e6908648db1a6aaeed7368fa",
+      "mode": 420
+    },
+    "lampOS/docs/updates.md": {
+      "sha256": "501ba0e0db9696c5ecd91bb82dd9c2fe82305c15f7217f0f1818d3bf793c90af",
+      "mode": 420
+    },
+    "lampOS/docs/writer-settings-capture.md": {
+      "sha256": "9ea438eb4b9c9e386592e1d6388b941f832fa8925296c11734875f75925b2048",
+      "mode": 420
+    }
+  },
+  "status": " M lampOS/crates/update/src/apply.rs\n M lampOS/crates/update/src/lib.rs\n M lampOS/docs/reuse-decisions.md\n M lampOS/docs/updates.md\n?? lampOS/crates/update/src/writer_settings.rs\n?? lampOS/crates/update/src/writer_settings/tests.rs\n?? lampOS/docs/writer-settings-capture.md\n",
+  "controller_sha256": "2c68b9c52d964f5a743168e4403f69b1471461bf65c01376aa887153f9401e2e",
+  "target": "<target>"
+}
