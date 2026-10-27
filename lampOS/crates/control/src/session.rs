@@ -50,6 +50,19 @@ impl Parts for Unrouted {
     fn stop(&mut self, _: &str, _: u64) {}
 }
 
+/// What a revoke did: whether the computer was paired (or its revoke still
+/// waited for the file), the lease changes to tell, and whether it reached
+/// the file. Refused in memory either way. The caller tells the owner a
+/// failed `saved`: a restart before a save succeeds brings the key back
+/// (the Reviewer-lead's P3 on #3780).
+#[must_use]
+#[derive(Debug)]
+pub struct Revoked {
+    pub was: bool,
+    pub changes: Vec<Change>,
+    pub saved: std::io::Result<()>,
+}
+
 /// One connection's own state.
 #[derive(Debug)]
 pub struct Session {
@@ -96,6 +109,9 @@ pub struct Door {
     rates: Rates,
     open: BTreeMap<String, usize>,
     random: SystemRandom,
+    /// Revokes taken in memory but not yet in the file: written out by the
+    /// next save that succeeds.
+    unsaved_revokes: BTreeSet<String>,
     /// The SHA-256 of the lamp's own TLS certificate, which every pairing
     /// proof is made over.
     pin: [u8; 32],
@@ -123,6 +139,7 @@ impl Door {
             rates: Rates::new(),
             open: BTreeMap::new(),
             random: SystemRandom::new(),
+            unsaved_revokes: BTreeSet::new(),
             pin,
         }
     }
@@ -154,16 +171,32 @@ impl Door {
     /// The owner revokes `client`: its leases end, told. Whether it was
     /// paired. The server closes its connections at once; a frame that
     /// beats it is refused.
-    pub fn revoke(&mut self, client: &str, now_us: u64) -> std::io::Result<(bool, Vec<Change>)> {
+    pub fn revoke(&mut self, client: &str, now_us: u64) -> Revoked {
+        let waiting = self.unsaved_revokes.contains(client);
+        // At once in memory, whatever the disk does: the computer is refused
+        // at its next frame and its leases and rates end (the Reviewer-lead's
+        // P2 on #3780: a revoke that waited for a failing disk did nothing).
         let was = self.clients.revoke(client);
+        let mut changes = Vec::new();
         if was {
-            self.save()?;
             self.rates.forget(client);
+            changes = self.leases.client_gone(client, LeaseWhy::Revoked, now_us);
+            self.unsaved_revokes.insert(client.to_owned());
         }
-        Ok((
-            was,
-            self.leases.client_gone(client, LeaseWhy::Revoked, now_us),
-        ))
+        // To the file: now, or with the next save that succeeds (a retry,
+        // a pairing), so a restart can't bring the key back once the disk
+        // takes it (Reviewer-two's P2 on #3736).
+        let saved = if was || waiting { self.save() } else { Ok(()) };
+        Revoked {
+            was: was || waiting,
+            changes,
+            saved,
+        }
+    }
+
+    /// Revokes taken but not yet written to the file.
+    pub fn unsaved_revokes(&self) -> &BTreeSet<String> {
+        &self.unsaved_revokes
     }
 
     /// A connection closed: when its client's last one goes, its leases end.
@@ -451,11 +484,13 @@ impl Door {
         )
     }
 
-    fn save(&self) -> std::io::Result<()> {
-        match &self.clients_path {
-            Some(path) => self.clients.save(path),
-            None => Ok(()),
+    /// Writes the clients out; on success, every revoke not yet written is.
+    fn save(&mut self) -> std::io::Result<()> {
+        if let Some(path) = &self.clients_path {
+            self.clients.save(path)?;
         }
+        self.unsaved_revokes.clear();
+        Ok(())
     }
 }
 
@@ -950,8 +985,8 @@ mod tests {
         let outcome = door.handle(&mut session, r#"{"id":6,"op":"stop"}"#, &mut fake, 2 * S, 1);
         assert_eq!(reply(&outcome)["ok"], true);
         assert_eq!(fake.stopped, std::slice::from_ref(&id));
-        let (was, _) = door.revoke(&id, 3 * S).unwrap();
-        assert!(was);
+        let revoked = door.revoke(&id, 3 * S);
+        assert!(revoked.was && revoked.saved.is_ok());
         let outcome = door.handle(
             &mut session,
             r#"{"id":7,"op":"get","state":["lamp"]}"#,
@@ -1032,6 +1067,108 @@ mod tests {
         );
         door.closed(&real, 7 * S);
         assert_eq!(door.leases().holder(Part::Body, 7 * S), None);
+    }
+
+    #[test]
+    fn a_revoke_takes_effect_at_once_and_waits_for_the_file_when_its_save_fails() {
+        let directory =
+            std::env::temp_dir().join(format!("lamp-control-revoke-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&directory);
+        std::fs::create_dir_all(&directory).unwrap();
+        let path = directory.join("clients.json");
+        let computer = Computer::new(1);
+        let mut door = Door::new(
+            "lamp-75c9",
+            "Lamp",
+            PIN,
+            Clients::default(),
+            Some(path.clone()),
+        );
+        let mut fake = Fake::default();
+        let code = door.issue_code([Grant::Body].into(), 0);
+        let (mut session, welcome) = door.open();
+        let outcome = door.handle(
+            &mut session,
+            &computer.pair_frame(&code, &welcome),
+            &mut fake,
+            S,
+            1,
+        );
+        let id = reply(&outcome)["client"].as_str().unwrap().to_owned();
+        door.handle(
+            &mut session,
+            &computer.hello_frame(&welcome),
+            &mut fake,
+            S,
+            1,
+        );
+        door.handle(
+            &mut session,
+            r#"{"id":3,"op":"lease.take","parts":["body"],"for_ms":30000}"#,
+            &mut fake,
+            S,
+            1,
+        );
+        // The save is blocked: the revoke still takes effect at once (the
+        // Reviewer-lead's P2 on #3780): its lease ends, told, and its next
+        // frame is refused. Only the file is behind, and the revoke waits.
+        std::fs::create_dir_all(directory.join("clients.json.new")).unwrap();
+        let revoked = door.revoke(&id, 2 * S);
+        assert!(revoked.was);
+        assert!(revoked.saved.is_err());
+        assert_eq!(revoked.changes.len(), 1);
+        assert!(door.clients().get(&id).is_none());
+        assert!(door.unsaved_revokes().contains(&id));
+        let outcome = door.handle(
+            &mut session,
+            r#"{"id":4,"op":"get","state":["lamp"]}"#,
+            &mut fake,
+            2 * S,
+            1,
+        );
+        assert_eq!(code_of(&outcome), Some("unpaired"));
+        assert!(outcome.close);
+        assert!(
+            Clients::load(&path).unwrap().get(&id).is_some(),
+            "the file is behind"
+        );
+        // Unblocked, a retry writes it out, and a restart keeps it gone.
+        std::fs::remove_dir_all(directory.join("clients.json.new")).unwrap();
+        let retried = door.revoke(&id, 3 * S);
+        assert!(retried.was && retried.saved.is_ok());
+        assert!(door.unsaved_revokes().is_empty());
+        assert!(Clients::load(&path).unwrap().get(&id).is_none());
+        // Any later save writes a waiting revoke out too: another
+        // computer's pairing.
+        let code = door.issue_code([Grant::Body].into(), 6 * S);
+        let (mut again, welcome) = door.open();
+        door.handle(
+            &mut again,
+            &computer.pair_frame(&code, &welcome),
+            &mut fake,
+            6 * S,
+            1,
+        );
+        let id = door.clients().clients[0].id.clone();
+        std::fs::create_dir_all(directory.join("clients.json.new")).unwrap();
+        assert!(door.revoke(&id, 7 * S).saved.is_err());
+        std::fs::remove_dir_all(directory.join("clients.json.new")).unwrap();
+        let other = Computer::new(2);
+        let code = door.issue_code([Grant::Body].into(), 8 * S);
+        let (mut theirs, welcome) = door.open();
+        let outcome = door.handle(
+            &mut theirs,
+            &other.pair_frame(&code, &welcome),
+            &mut fake,
+            8 * S,
+            1,
+        );
+        assert_eq!(reply(&outcome)["ok"], true, "{outcome:?}");
+        assert!(door.unsaved_revokes().is_empty());
+        let kept = Clients::load(&path).unwrap();
+        assert!(kept.get(&id).is_none());
+        assert!(kept.get(&pairing::client_id(&other.key())).is_some());
+        let _ = std::fs::remove_dir_all(&directory);
     }
 
     #[test]

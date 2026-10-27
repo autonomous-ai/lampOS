@@ -336,7 +336,8 @@ where
 
 /// The owner's side, one JSON object a line on a Unix socket:
 /// - `{"code": {"grants": ["body", "light"]}}` → `{"code": "12345678", "pin": "<sha256>"}`;
-/// - `{"revoke": "c_…"}` → `{"revoked": true}`;
+/// - `{"revoke": "c_…"}` → `{"revoked": true, "saved": true}`, or `"saved":
+///   false` with an `error` when the file couldn't take it yet;
 /// - `{"clients": true}` → `{"clients": [{id, name, grants, paired_at}]}`.
 pub async fn admin(listener: UnixListener, shared: Arc<Shared>) {
     loop {
@@ -379,12 +380,16 @@ fn admin_answer(shared: &Shared, line: &str) -> Value {
     }
     if let Some(Value::String(client)) = asked.get("revoke") {
         let revoked = shared.door.lock().expect("door").revoke(client, now);
-        let answer = match revoked {
-            Ok((was, changes)) => {
-                shared.tell(changes);
-                json!({"revoked": was})
-            }
-            Err(error) => json!({"error": format!("could not keep the revoke: {error}")}),
+        shared.tell(revoked.changes);
+        // In effect now either way; a failed save is said, since a restart
+        // before a save succeeds would bring the key back.
+        let answer = match revoked.saved {
+            Ok(()) => json!({"revoked": revoked.was, "saved": true}),
+            Err(error) => json!({
+                "revoked": revoked.was,
+                "saved": false,
+                "error": format!("not saved yet, so a restart now would bring it back: {error}"),
+            }),
         };
         // Refused in memory either way, so its connections go now.
         shared.close_client(client);
