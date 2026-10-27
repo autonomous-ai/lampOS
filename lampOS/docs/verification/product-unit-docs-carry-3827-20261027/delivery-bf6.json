@@ -1,0 +1,128 @@
+{
+  "actual_landed_Doc_commit": "45096e2b0c0203687bd6350ca363875a907bca60",
+  "all_doc_added_blocks_retained_in_final_composition": true,
+  "all_handles_closed": true,
+  "doc_raw_author_message_payload_and_mode_preserved": true,
+  "handles": {
+    "arm_text_collector": {
+      "exit_code": 0,
+      "session": 45593
+    },
+    "delivery_watcher": "not needed: merge observed during source audit",
+    "linux_text_collector": {
+      "exit_code": 0,
+      "session": 90963
+    },
+    "native_watchers": "not started: original workflows already terminal",
+    "source_binder_and_final_audit": "synchronous completed0"
+  },
+  "hashes": {
+    "actual-main-ref.json": "4b0ba03f725adcc44cdbeaf81a4c4683088b2e0ce8d673064e6fb9dabf0cd63d",
+    "finalize-delivery.py": "cddce8e21acf83bd3a875b2dc99b064b3a9c167e6672c10056ca9e60c744e90a",
+    "landed-source-delivery.json": "a49bf982ee2597ab16d78b283281a24a01246cc8aa8deb55189fd4592f50d2df",
+    "member-source-proof.json": "42305c920a40f4ebac8357b8715590e99da437f554e9921b4d2c182e19313bc5",
+    "native-train238/qualified-current-receipt.json": "4dd92e8974db6d6b7b9a05cff89d5bd4bb29c6a8f234059d52d48ff5ace76926",
+    "own-doc-final.json": "db5e51cc8a83646341bad52ff26299a8e692172662d72c9ef66adedc7477267c",
+    "own-doc-landed.patch": "dbdc25d54b0ffd788cded1f4a2b729e6f939b78b411f0c1e44401afa13ced960",
+    "own-doc-original.patch": "dbdc25d54b0ffd788cded1f4a2b729e6f939b78b411f0c1e44401afa13ced960",
+    "own-doc-range-diff.txt": "90e4d71a1c6ea98c572870b465c536374486b3e2b718def1b978bed0c72c7b91",
+    "own-doc-train-member.patch": "dbdc25d54b0ffd788cded1f4a2b729e6f939b78b411f0c1e44401afa13ced960",
+    "reported-landed-commit.json": "8a38e74164cc2ccc4ed626ddb68e525cf2221ea499bbe7bceaf0c59b4715aa7c",
+    "train-final.json": "3b79b58631bbbc7cf293d5a69442fd709b8031705f99d3c2af7ab39ed75d4065"
+  },
+  "landed_Main_commit": "bf6f7bbdf5e936c2ef82621e1bb7592d511c1453",
+  "landed_Main_parents": [
+    "3d4cdc228aa101ca4886edb49c0a1e01bc2d1dcb"
+  ],
+  "landed_Main_tree": "2b2cc3107b22699b092b10d1ed6b02cac1c878f6",
+  "native_original": {
+    "custom_harness": {
+      "process13_0": true,
+      "relay_signals_ok": true
+    },
+    "docs": {
+      "failed": 0,
+      "headings": 47,
+      "ignored": 0,
+      "incomplete_group": null,
+      "interleaved_groups": [],
+      "passed": 4,
+      "step": "success",
+      "summaries": 47
+    },
+    "nextest": {
+      "executed": 11719,
+      "failed": 0,
+      "line": 12563,
+      "passed": 11719,
+      "selected": 11719,
+      "skipped": 106
+    },
+    "receipt_controls_once_PASS": 26,
+    "runs": {
+      "arm": {
+        "all_job_metadata_preserved": true,
+        "attempt": 1,
+        "conclusion": "success",
+        "id": 40510299895,
+        "job": 122210126277,
+        "name": "lampOS \u2014 build and test on Linux ARM64 (1/1)"
+      },
+      "linux": {
+        "all_job_metadata_preserved": true,
+        "attempt": 1,
+        "conclusion": "success",
+        "id": 40510299782,
+        "job": 122210129156,
+        "name": "lampOS \u2014 clippy, every crate and target (x86 Linux)"
+      }
+    },
+    "unique_PASS": 11719
+  },
+  "no_public_posts_merge_close_forcepush_Cargo_binary_or_device_actions": true,
+  "original3753_untouched": true,
+  "original_train_native_tree_equals_landed_Main": true,
+  "other_workflow_scopes_API_status_only": [
+    {
+      "conclusion": "success",
+      "event": "pull_request",
+      "id": 40510299498,
+      "name": "lampOS SDKs",
+      "run_attempt": 1
+    },
+    {
+      "conclusion": "success",
+      "event": "pull_request",
+      "id": 40510299496,
+      "name": "CI",
+      "run_attempt": 1
+    },
+    {
+      "conclusion": "success",
+      "event": "push",
+      "id": 40510286983,
+      "name": "CI",
+      "run_attempt": 1
+    }
+  ],
+  "own_doc_PR": 3827,
+  "own_doc_PR_final_state": "CLOSED",
+  "receipt_landed_commits": [
+    {
+      "landed_commit": "1891c56ec4d4e95b7e19d21a1c8b049c67aa4e36",
+      "offered_commit": "d312090bc0644baf7970b2130a8e416894332a5c",
+      "raw_author_message_equal": true,
+      "whole_context_free_payload_equal": true
+    },
+    {
+      "landed_commit": "3d4cdc228aa101ca4886edb49c0a1e01bc2d1dcb",
+      "offered_commit": "bf3bc78b69f1aeac04ba47cba7202ad31d9c854a",
+      "raw_author_message_equal": true,
+      "whole_context_free_payload_equal": true
+    }
+  ],
+  "scope": "OwnDoc3827 and receipt3808 only; no whole-train semantic or Memory review. Original receipt failure cohorts retain their separate scopes.",
+  "status": "OWN_DOC3827_DELIVERED_AND_SCOPED_TRAIN_NATIVE_RECEIPT_AUDIT_COMPLETE",
+  "train_PR": 3841,
+  "train_mergedAt": "2026-10-27T13:32:47Z"
+}
