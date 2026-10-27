@@ -1,0 +1,28 @@
+{
+  "head": "4fcd2ebe6f92362203cb54fd81280385b37baee6",
+  "base": "5cf73706750f2e3f6925b2e8a268d2f33ff5d29e",
+  "tree": "2e8fcd34c4004a746daa7159c0f0981fde5e0b7f",
+  "status": "VERIFIED_SELECTED_REMINDER_SCOPE",
+  "holds": [],
+  "selected_direct_counts": {
+    "failed": 0,
+    "ignored": 12,
+    "passed": 1224
+  },
+  "tests_retried": 0,
+  "limits": [
+    "Selected Skills/Update plus three exact install policy cases, seven switch and one Welcome cases, full Body library, made_skill/app_make/task_news test modules and twelve-package docs; not current full Voice or twelve-package runtime. Eight comfort corpus inputs are source-bound, not eight independently observed passes. Current clean two-commit source tree is bound; prior staged execution keeps its original identity.",
+    "Historical b490 full-suite privacy failure remains failed and separate.",
+    "No native, device or latency qualification."
+  ],
+  "full_private_audit_sha256": "b4593f4c3e8fe81615db47fc548674728e7b9cadcfc739f6bf4d9709c4ba6311",
+  "required_witnesses": 105,
+  "required_pass_once": 105,
+  "expected_caught_hooks": 2,
+  "unknown_hooks": 0,
+  "artifact_pairs": 133,
+  "source_files": 7291,
+  "raw_entries": 8762,
+  "scope": "13 selected commands, including whole Body library and made/app/task-news modules; not full twelve-package runtime.",
+  "guard_result": "All guards stable, metadata unchanged, no timeout or forced cleanup."
+}
