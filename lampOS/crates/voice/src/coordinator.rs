@@ -3126,6 +3126,23 @@ impl SpeakerControlIo for Rig {
         self.publish(snapshot)
     }
 }
+/// Latches that the bound onboarding invitation reached the speaker. It is
+/// read right after the speaker's receipts are taken, before anything can
+/// drop the reply, so audio that played and was cut before the walk's next
+/// poll counts as said. Provider PCM that never reached the speaker does
+/// not: that turn stays unsaid and gives the try back (#3754).
+fn latch_invitation_sounded(
+    reply: &Option<Reply>,
+    invitation: Option<(BootId, u64)>,
+    audio: &mut bool,
+) {
+    if let Some(current) = reply.as_ref()
+        && invitation == Some((current.owner.boot(), current.owner.turn()))
+    {
+        *audio |= current.reached_speaker();
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 fn service_speaker_control(
     io: &mut impl SpeakerControlIo,
@@ -7072,6 +7089,11 @@ fn conversation_with_gate_inner(
             trace,
             &mut speaker_lapsed,
         )?;
+        latch_invitation_sounded(
+            reply,
+            onboarding_invitation_turn,
+            &mut onboarding_invitation_audio,
+        );
         if let Some(lapsed) = speaker_lapsed.take()
             && cut_after_speaker_lapse(
                 lapsed,
@@ -8393,8 +8415,18 @@ fn conversation_with_gate_inner(
                         trace,
                         &mut speaker_lapsed,
                     )? {
+                        latch_invitation_sounded(
+                            reply,
+                            onboarding_invitation_turn,
+                            &mut onboarding_invitation_audio,
+                        );
                         continue;
                     }
+                    latch_invitation_sounded(
+                        reply,
+                        onboarding_invitation_turn,
+                        &mut onboarding_invitation_audio,
+                    );
                     if let Some(lapsed) = speaker_lapsed.take()
                         && cut_after_speaker_lapse(
                             lapsed,
@@ -9935,7 +9967,7 @@ fn conversation_with_gate_inner(
                     // Nothing of it played is no ask at all (#3754).
                     let delivery = if current.heard_whole(&speaker_pending, snapshot) {
                         crate::onboarding::Delivery::Whole
-                    } else if !current.had_audio {
+                    } else if !current.reached_speaker() && !onboarding_invitation_audio {
                         crate::onboarding::Delivery::Unsaid
                     } else {
                         crate::onboarding::Delivery::Cut
@@ -10967,7 +10999,7 @@ fn conversation_with_gate_inner(
             if let Some(current) = reply.as_ref()
                 && onboarding_invitation_turn == Some((current.owner.boot(), current.owner.turn()))
             {
-                onboarding_invitation_audio |= current.had_audio;
+                onboarding_invitation_audio |= current.reached_speaker();
             }
             if let Some((boot, turn)) = walk.invitation_binding()
                 && reply
@@ -16121,6 +16153,63 @@ mod tests {
         delivered.extend(samples);
         assert_eq!(delivered, original);
         assert!(current.next_speaker_chunk().is_none());
+    }
+
+    /// #3754 (the 20:05 HOLD on #3831): provider PCM that arrived but never
+    /// reached the speaker is not "said": an invitation interrupted before
+    /// the speaker accepted any of it stays `Unsaid` and gives the try back.
+    #[test]
+    fn invitation_pcm_queued_then_interrupted_before_acceptance_stays_unsaid() {
+        let (_, mut current, _) = active_reply();
+        let bound = Some((current.owner.boot(), current.owner.turn()));
+        // Queued from the provider; the speaker accepted none of it.
+        current.playback = None;
+        current.sounded = false;
+        current.had_audio = true;
+        current.pcm = vec![7; 480].into();
+        assert!(!current.reached_speaker());
+        let mut audio = false;
+        latch_invitation_sounded(&Some(current), bound, &mut audio);
+        assert!(!audio, "provider PCM alone is not said");
+        assert!(matches!(
+            crate::onboarding::Delivery::unsettled(audio),
+            crate::onboarding::Delivery::Unsaid
+        ));
+    }
+
+    /// Audio the speaker accepted, then cut before the walk's next poll,
+    /// was heard: the latch keeps it past the reply, so it is `Cut`.
+    #[test]
+    fn invitation_audio_accepted_then_cut_is_cut() {
+        let (_, mut current, _) = active_reply();
+        let bound = Some((current.owner.boot(), current.owner.turn()));
+        // Accepted once, then paused: `sounded` alone carries it.
+        current.playback = None;
+        current.had_audio = true;
+        current.sounded = true;
+        let mut audio = false;
+        latch_invitation_sounded(&Some(current), bound, &mut audio);
+        assert!(audio);
+        // The reply is then dropped by the cut; the latch outlives it.
+        latch_invitation_sounded(&None, bound, &mut audio);
+        assert!(matches!(
+            crate::onboarding::Delivery::unsettled(audio),
+            crate::onboarding::Delivery::Cut
+        ));
+    }
+
+    /// Another turn's audio can't latch the bound invitation.
+    #[test]
+    fn another_owners_audio_does_not_latch_the_invitation() {
+        let (_, mut current, _) = active_reply();
+        current.had_audio = true;
+        current.sounded = true;
+        let other = Some((current.owner.boot(), current.owner.turn() + 1));
+        let mut audio = false;
+        latch_invitation_sounded(&Some(current), other, &mut audio);
+        assert!(!audio);
+        latch_invitation_sounded(&None, None, &mut audio);
+        assert!(!audio);
     }
 
     #[test]
