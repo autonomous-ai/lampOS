@@ -677,13 +677,17 @@ when the voice lacks the clip.
 password. The two lines said while online go as `text`, words for the voice's
 model: "I'm on the new Wi-Fi now."; "I couldn't join that one, so I've gone
 back to the old Wi-Fi.". With neither network back, "I can't reach any Wi-Fi.
-If your Wi-Fi has changed, hold the reset button for five seconds. That erases
+If you changed your Wi-Fi's name or password, push a paperclip into the hole
+marked reset on the back of my base and hold it for five seconds. That erases
 me and starts setup again." at most once a minute, for 10 minutes at most or
-until a network is back (#3743). It names the reset button, not the main one,
+until a network is back (#3743). It names the reset, not the main button,
 whose 5 s hold only mutes the microphones ([controls.md](controls.md)), and
-says the hold erases. The button's place on the lamp joins the words once the
-hardware lead gives it (#1711); they are kept in one constant,
-`wifi_change::SAY_LOST`. It is first said only after the old network has not
+where it is: the pinhole labelled RESET on the back of the base, beside the
+round POWER button, held 5 s with a paperclip or SIM pin (the hardware lead on
+#3743). It says the hold erases; the words are kept in one constant,
+`wifi_change::SAY_LOST`. A lamp moved over from V1 has no reset pinhole
+(`reset: none`, [cloud.md](cloud.md)), so the line's instruction doesn't apply
+to it. It is first said only after the old network has not
 come back in three 60 s waits, so 3 minutes at least after the lamp left it: a
 router's restart (2-3 minutes) never hears it.
 

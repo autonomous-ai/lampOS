@@ -237,7 +237,13 @@ the install change merges.
 | `provider_unavailable` | "Sorry, I can't reach the internet right now. I'll be back soon." | `provider-unavailable.en-US.wav` |
 | `back_online` | "I'm back online." | `back-online.en-US.wav` |
 | `voice_service_unreachable` | "Sorry, I'm having trouble thinking right now. Give me a moment." | `voice-service-unreachable.en-US.wav` |
-| `wifi_lost` | "I can't reach any Wi-Fi. If your Wi-Fi has changed, hold the reset button for five seconds. That erases me and starts setup again." | `wifi-lost.en-US.wav` |
+| `wifi_lost` | "I can't reach any Wi-Fi. If you changed your Wi-Fi's name or password, push a paperclip into the hole marked reset on the back of my base and hold it for five seconds. That erases me and starts setup again." | `wifi-lost.en-US.wav` |
+
+The `wifi_lost` words above are the new ones (#3743), naming the RESET
+pinhole on the back of the base. The clip `wifi-lost.en-US.wav` pinned in
+`deploy/product/models.json` still has the old words ("If your Wi-Fi has
+changed, hold the reset button for five seconds."). A lamp plays the clip, so
+the new words arrive from the next notices release.
 
 They and `manifest.json` are in the release `notices-2026-10-20`, pinned by
 size and SHA-256 in `deploy/product/models.json`. `lamp-update install`
