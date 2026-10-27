@@ -1,0 +1,96 @@
+{
+  "status": "CLOSED_MOOD_INTEGRITY_HANDOFF",
+  "released_for_head": "4deeae914b9ffec50fffd87f58a24d83a2e391c8",
+  "parent_folder": "mood-3aa-full-expression-gates-prep",
+  "parent_runtime_head": "d168fa939905531a3257f80a335a69dcfd528027",
+  "parent_terminal": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/mood-3aa-full-expression-gates-prep/terminal.json",
+    "sha256": "3a4c7b45b8f53e7e7fa34624b309273c1c40617ecfcbdbc4db2c33a1b9f077b2",
+    "bytes": 4662
+  },
+  "parent_native": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/mood-3aa-full-expression-gates-prep/native-controller-result.json",
+    "sha256": "3349f22db3d6f316ce78fcfc7d5472757fb4cdadcc0045c42cc7f743762f1c52",
+    "bytes": 472
+  },
+  "parent_source_before": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/mood-3aa-full-expression-gates-prep/prepared-canonical-source.json",
+    "sha256": "99cba24c289e68c829097cbe1a7995e9e8527ce4f3ce7abfce2605315ca63f76",
+    "bytes": 2457655
+  },
+  "parent_source_after": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/mood-3aa-full-expression-gates-prep/source-after.json",
+    "sha256": "39c52c62ba0cbf3dea726e53c481963340af75222002ad469e308bdceb936a27",
+    "bytes": 3253947
+  },
+  "parent_input_manifest": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/restart-a17-full-lib-gates-prep/parent-input-manifest.json",
+    "sha256": "c35e5e649ad6e1e905b97ddc98bcb0f521bddeb685c2d922745f3302deeb6d52",
+    "bytes": 4605
+  },
+  "parent_command_receipts": [
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/mood-3aa-full-expression-gates-prep/cmd-tests.json",
+      "sha256": "23d0e1a4c5d496584dc2231532ffe52bfa29b698391681cfb4a8c0929636cbf3",
+      "bytes": 1976
+    }
+  ],
+  "sealed_manifest": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/mood-3aa-full-expression-gates-prep/protected-after.json",
+    "sha256": "210e02c1f83e541c9f1fc709be738b8d9b2a72e59c047207410040c5a4961138",
+    "bytes": 217921
+  },
+  "retired_mutable_manifest": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/mood-3aa-full-expression-gates-prep/actual-executables-after.json",
+    "sha256": "bc977cdfc43e61370218b1d8c832f19b2c8c029ce8a0e1ddc94d077909f86d4f",
+    "bytes": 2404
+  },
+  "sealed_count": 531,
+  "retired_mutable_count": 8,
+  "target_dev_ino": [
+    16777222,
+    486188298
+  ],
+  "release_receipt": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/warm-target-mood-to-restart-20261028/release.json",
+    "sha256": "cb8f4f1c586909d01dc04126f42a8c742296252e0ea5702056ee59bf48d4386e",
+    "bytes": 786
+  },
+  "release_verified_bindings": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/warm-target-mood-to-restart-20261028/verified-bindings.json",
+    "sha256": "58b4aa9475ce33ef5147b73380ad6e7858b9ef2dff100453e8b0fc65d8b3015d",
+    "bytes": 228742
+  },
+  "release_lsof_stdout": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/warm-target-mood-to-restart-20261028/lsof.stdout",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  "release_lsof_stderr": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/warm-target-mood-to-restart-20261028/lsof.stderr",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  "retained_prior_receipts": {
+    "parent_historical_dispositions": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/mood-3aa-full-expression-gates-prep/historical-dispositions.json",
+      "sha256": "518accd6245399f81d3d5c9f5aa5acbb003f9de9fdf24cbce0f1fdbc136759b7",
+      "bytes": 7244
+    },
+    "old_candidate_full_Voice_failure": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/sentinel-3c983-full-lib-gates-prep/terminal.json",
+      "sha256": "e203a26a29fe09b2dfcdf0cad65d3d89f6d8488c206f9dda6f656477401d2656",
+      "bytes": 874
+    },
+    "old_Main_full_Voice_failure": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/sentinel-3c-main-full-context-control-prep/terminal.json",
+      "sha256": "5d307b18ad6ec652e0bc75fb99f12a8b3b451c6ec433c14e8855d0b338e307d1",
+      "bytes": 1233
+    },
+    "old_Main_isolated_PASS_inconclusive": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/sentinel-3c-main-second-route-control-prep/terminal.json",
+      "sha256": "710c8436fb713d9128225175904d77857838ebc5e05dd30a16f768c10997e766",
+      "bytes": 1748
+    }
+  }
+}

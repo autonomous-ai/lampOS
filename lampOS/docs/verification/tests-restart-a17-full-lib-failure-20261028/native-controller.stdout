@@ -1,0 +1,16 @@
+{"event": "start", "label": "cmd-fmt", "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/restart-a17-full-lib-gates-prep"}
+{"event": "finish", "label": "cmd-fmt", "exit_code": 0, "wall_seconds": 13.330743}
+{"event": "start", "label": "cmd-metadata", "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/restart-a17-full-lib-gates-prep"}
+{"event": "finish", "label": "cmd-metadata", "exit_code": 0, "wall_seconds": 0.917847}
+{"event": "start", "label": "cmd-strict", "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/restart-a17-full-lib-gates-prep"}
+{"event": "finish", "label": "cmd-strict", "exit_code": 0, "wall_seconds": 163.067465}
+{"event": "start", "label": "cmd-workspace", "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/restart-a17-full-lib-gates-prep"}
+{"event": "finish", "label": "cmd-workspace", "exit_code": 0, "wall_seconds": 98.075793}
+{"event": "start", "label": "cmd-Voice-lib-compile", "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/restart-a17-full-lib-gates-prep"}
+{"event": "finish", "label": "cmd-Voice-lib-compile", "exit_code": 0, "wall_seconds": 131.56542}
+{"event": "start", "label": "cmd-inventory-all", "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/restart-a17-full-lib-gates-prep"}
+{"event": "finish", "label": "cmd-inventory-all", "exit_code": 0, "wall_seconds": 2.088106}
+{"event": "start", "label": "cmd-inventory-ignored", "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/restart-a17-full-lib-gates-prep"}
+{"event": "finish", "label": "cmd-inventory-ignored", "exit_code": 0, "wall_seconds": 0.103705}
+{"event": "start", "label": "cmd-full-Voice-lib", "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/restart-a17-full-lib-gates-prep"}
+{"event": "finish", "label": "cmd-full-Voice-lib", "exit_code": 101, "wall_seconds": 969.924836}

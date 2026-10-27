@@ -1,0 +1,59 @@
+{
+  "command": [
+    "/Users/autonomous/.cargo/bin/cargo",
+    "+1.96.0",
+    "build",
+    "--offline",
+    "--locked",
+    "--jobs",
+    "1",
+    "--workspace",
+    "--message-format=json"
+  ],
+  "cwd": "/private/tmp/tests-ready-speaking-1c-20261026/lampOS",
+  "started_at": "2026-10-27T18:32:56.617218+00:00",
+  "timeout_seconds": 3600,
+  "stdout": "cmd-workspace.stdout.txt",
+  "stderr": "cmd-workspace.stderr.txt",
+  "timeout_cleanup": [
+    {
+      "action": "leader exited unreaped; no other owned group members",
+      "members": [
+        {
+          "pid": 76137,
+          "state": "Z"
+        }
+      ]
+    }
+  ],
+  "timed_out": false,
+  "disk_reserve_breached": false,
+  "stop_reason": null,
+  "process_group_scope": "Owned group only; no detached-descendant cleanup claim.",
+  "group_closure_method": "WNOWAIT leader reservation and ps group inventory before reap",
+  "launch_state": "Popen_recorded",
+  "disk_reserve_bytes": 2214592512,
+  "disk_sample_interval_seconds": 1,
+  "disk_paths": [
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/restart-a17-full-lib-gates-prep",
+    "/private/tmp/tests-restart-f9-cargo-20261027_root"
+  ],
+  "disk_samples": 97,
+  "disk_last_available_bytes": 6990970880,
+  "disk_minimum_available_bytes": 6844956672,
+  "available_bytes_before_Cargo": 7004143616,
+  "owned_pid": 76137,
+  "owned_process_group": 76137,
+  "direct_wait_status": 0,
+  "exit_code": 0,
+  "owned_group_absent_after_cleanup": true,
+  "unexpected_owned_descendants": false,
+  "unresolved_owned_pids": [],
+  "compiler_lease_held": false,
+  "wall_seconds": 98.075793,
+  "finished_at": "2026-10-27T18:34:34.691106+00:00",
+  "stdout_sha256": "2d07a71acf79cb7dfb83c2e316bcdadb03883ec422c6a5349ca2f72ef1a6da4c",
+  "stdout_bytes": 380708,
+  "stderr_sha256": "d1020c3e04dcaeff3c9c0c7297403004354c252418d8591742836655fcadb5cc",
+  "stderr_bytes": 673
+}

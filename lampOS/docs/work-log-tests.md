@@ -1,5 +1,11 @@
 # Tests work log
 
+## 2026-10-28 02:03 — Restart full current Voice gate fails the Reader assertion
+
+Ready for lamp-voice: no (#3572 full gate failed; matched baseline and Reader prerequisite remain).
+
+[Restart full Voice failure](verification/tests-restart-a17-full-lib-failure-20261028/) records **3,882/1/15**, Rust101/native1, on4deeae914 / Maina17. All21 Restart cases pass once; the sole failure is the unprinted Reader finish-report predicate at tests.rs131. All3,898 identities bind and all source,534 witness/three executable guards pass; groups closed and no timeout/reserve breach. Matching the older Main3c assertion signature is not a current a17 attribution. One full matched a17 baseline is next; no blind retry or waiver. Reader's latest carry is in source handoff for fresh gates in the separately released Skills cache. No device action.
+
 ## 2026-10-28 01:54 — current Skills full package passes and is pushed
 
 Ready for lamp-voice: no (fresh native checks and current readers remain).

@@ -1,0 +1,138 @@
+{
+  "path": "lampOS/crates/voice/src/same_voice.rs",
+  "sha256": "151acd1d793723ba2ed1ac78ed9ca9517e376f52cf9119839de990107394ec72",
+  "actual_source_cases": [
+    {
+      "identity": "same_voice::tests::a_print_is_coming_from_its_first_sample_until_it_comes",
+      "attributes": "#[test]",
+      "line": 1035
+    },
+    {
+      "identity": "same_voice::tests::a_line_judged_without_the_check_says_which_print_was_missing",
+      "attributes": "#[test]",
+      "line": 1067
+    },
+    {
+      "identity": "same_voice::tests::a_line_is_judged_from_its_first_1_8_s_when_it_is_long_enough_and_said_with_the_lamp_quiet",
+      "attributes": "#[test]",
+      "line": 1112
+    },
+    {
+      "identity": "same_voice::tests::a_child_that_never_gets_ready_is_started_three_times_and_then_the_check_is_off",
+      "attributes": "#[test]",
+      "line": 1230
+    },
+    {
+      "identity": "same_voice::tests::each_line_the_check_says_is_said_to_its_journal",
+      "attributes": "#[test]",
+      "line": 1302
+    },
+    {
+      "identity": "same_voice::tests::a_child_that_hangs_after_it_is_ready_is_killed_and_started_again",
+      "attributes": "#[test]",
+      "line": 1353
+    },
+    {
+      "identity": "same_voice::tests::another_voice_is_known_only_against_the_conversation_the_lamp_last_answered_in",
+      "attributes": "#[test]",
+      "line": 1376
+    },
+    {
+      "identity": "same_voice::tests::a_mixed_print_among_the_conversations_does_not_make_its_own_voice_another",
+      "attributes": "#[test]",
+      "line": 1419
+    },
+    {
+      "identity": "same_voice::tests::the_conversation_keeps_its_last_prints_and_a_new_one_begins_afresh",
+      "attributes": "#[test]",
+      "line": 1449
+    },
+    {
+      "identity": "same_voice::tests::a_new_conversation_ends_any_late_voice_of_the_one_before",
+      "attributes": "#[test]",
+      "line": 1480
+    },
+    {
+      "identity": "same_voice::tests::a_call_takes_no_late_voice_from_before_it_at_its_verdict",
+      "attributes": "#[test]",
+      "line": 1515
+    },
+    {
+      "identity": "same_voice::tests::a_late_print_is_compared_before_it_becomes_the_conversations_voice",
+      "attributes": "#[test]",
+      "line": 1547
+    },
+    {
+      "identity": "same_voice::tests::a_late_print_from_too_little_speech_is_unsure",
+      "attributes": "#[test]",
+      "line": 1586
+    },
+    {
+      "identity": "same_voice::tests::an_unsure_print_let_out_is_not_the_conversations_voice",
+      "attributes": "#[test]",
+      "line": 1614
+    },
+    {
+      "identity": "same_voice::tests::with_the_caller_only_a_going_on_line_never_becomes_the_conversations_voice",
+      "attributes": "#[test]",
+      "line": 1655
+    },
+    {
+      "identity": "same_voice::tests::a_short_call_takes_its_voice_from_the_callers_first_follow_up_seen_spoken",
+      "attributes": "#[test]",
+      "line": 1688
+    },
+    {
+      "identity": "same_voice::tests::a_voice_at_0_20_against_the_conversations_is_another",
+      "attributes": "#[test]",
+      "line": 1724
+    },
+    {
+      "identity": "same_voice::tests::a_voice_at_0_35_was_another_at_0_45_and_is_the_conversations_at_0_30",
+      "attributes": "#[test]",
+      "line": 1755
+    },
+    {
+      "identity": "same_voice::tests::a_print_that_comes_after_its_answer_still_becomes_the_conversations",
+      "attributes": "#[test]",
+      "line": 1772
+    },
+    {
+      "identity": "same_voice::tests::the_model_path_is_absolute_and_its_flag_follows_the_spoken_to_one",
+      "attributes": "#[test]",
+      "line": 1800
+    },
+    {
+      "identity": "same_voice::tests::the_childs_answers_are_read_as_its_serving_writes_them",
+      "attributes": "#[test]",
+      "line": 1817
+    }
+  ],
+  "darwin_all": [
+    "same_voice::tests::a_call_takes_no_late_voice_from_before_it_at_its_verdict",
+    "same_voice::tests::a_child_that_hangs_after_it_is_ready_is_killed_and_started_again",
+    "same_voice::tests::a_child_that_never_gets_ready_is_started_three_times_and_then_the_check_is_off",
+    "same_voice::tests::a_late_print_from_too_little_speech_is_unsure",
+    "same_voice::tests::a_late_print_is_compared_before_it_becomes_the_conversations_voice",
+    "same_voice::tests::a_line_is_judged_from_its_first_1_8_s_when_it_is_long_enough_and_said_with_the_lamp_quiet",
+    "same_voice::tests::a_line_judged_without_the_check_says_which_print_was_missing",
+    "same_voice::tests::a_mixed_print_among_the_conversations_does_not_make_its_own_voice_another",
+    "same_voice::tests::a_new_conversation_ends_any_late_voice_of_the_one_before",
+    "same_voice::tests::a_print_is_coming_from_its_first_sample_until_it_comes",
+    "same_voice::tests::a_print_that_comes_after_its_answer_still_becomes_the_conversations",
+    "same_voice::tests::a_short_call_takes_its_voice_from_the_callers_first_follow_up_seen_spoken",
+    "same_voice::tests::a_voice_at_0_20_against_the_conversations_is_another",
+    "same_voice::tests::a_voice_at_0_35_was_another_at_0_45_and_is_the_conversations_at_0_30",
+    "same_voice::tests::an_unsure_print_let_out_is_not_the_conversations_voice",
+    "same_voice::tests::another_voice_is_known_only_against_the_conversation_the_lamp_last_answered_in",
+    "same_voice::tests::each_line_the_check_says_is_said_to_its_journal",
+    "same_voice::tests::the_childs_answers_are_read_as_its_serving_writes_them",
+    "same_voice::tests::the_conversation_keeps_its_last_prints_and_a_new_one_begins_afresh",
+    "same_voice::tests::the_model_path_is_absolute_and_its_flag_follows_the_spoken_to_one",
+    "same_voice::tests::with_the_caller_only_a_going_on_line_never_becomes_the_conversations_voice"
+  ],
+  "darwin_ignored": [],
+  "source_derived_not_executed": true,
+  "required_fixture_worker_payload_equal_old_authored_blob": true,
+  "no_historical_runtime_reuse": true
+}

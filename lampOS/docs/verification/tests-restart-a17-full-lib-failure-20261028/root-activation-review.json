@@ -1,0 +1,23 @@
+{
+  "at": "2026-10-28T01:29:03.044418+07:00",
+  "reviewer": "Tests Root",
+  "kind": "Restart",
+  "controller_sha256": "8e3df8931708cb98d049c3df32ddef28d3e3bf623aac8a0913e3ce09cf617480",
+  "activated_plan_sha256": "6427d51751ca01116e6fb29f05daebf4b69efc076f6999fe8286376fc4ddb248",
+  "launch_sha256": "54182af4eba5944bfe72ad075ef9dc68c0462e04c0b8e27756689fe58c8d5878",
+  "exact_source_and_target_verified": true,
+  "initial_lsof_exit": 1,
+  "lease": "root-restart-a17-full-voice-lib",
+  "reviewed": [
+    "entire controller and minimal parent diff",
+    "actual source and parent integrity release schemas",
+    "one unfiltered serial package/library execution, actual compiled inventory primary",
+    "partial raw/parsed results durable before runtime postguards",
+    "no retries or failure waiver",
+    "source, frozen witness and actual executable hashes/metadata",
+    "bounded subprocess cleanup and retained native continuation handle",
+    "strict actual reverse closure, workspace and current compile bindings"
+  ],
+  "parent_failure_disposition": "Expression341 PASS only; no full Voice runtime credit",
+  "no_device_or_ARM_build_on_Mac": true
+}

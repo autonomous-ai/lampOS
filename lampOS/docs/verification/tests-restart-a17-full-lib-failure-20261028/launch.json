@@ -1,0 +1,21 @@
+{
+  "execution": "ROOT_APPROVED",
+  "root_review_approved": true,
+  "require_escalated": true,
+  "exclusive_target": true,
+  "parent_closed_and_target_released": true,
+  "controller_sha256": "8e3df8931708cb98d049c3df32ddef28d3e3bf623aac8a0913e3ce09cf617480",
+  "plan_sha256": "6427d51751ca01116e6fb29f05daebf4b69efc076f6999fe8286376fc4ddb248",
+  "concurrency_context": {
+    "idle_host_claim": false,
+    "declared_other_activity": "Separate Skills Body-target and Restart warm-target gates, each jobs1, distinct canonical and official sources; Mood native audit and Memory source-only preparation. No shared target/source writer."
+  },
+  "compiler_lease": "root-restart-a17-full-voice-lib",
+  "exclusive_source": true,
+  "parent_closed_and_released": true,
+  "independent_gate_after_failed_parent_authorized": true,
+  "target_dev_ino": [
+    16777222,
+    486188298
+  ]
+}

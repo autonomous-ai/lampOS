@@ -1,0 +1,25 @@
+{
+  "status": "FAIL",
+  "head": "4deeae914b9ffec50fffd87f58a24d83a2e391c8",
+  "base": "a17ec9216e53f6a77931dd9686f83be8244d05a2",
+  "runtime_attempts": 1,
+  "runtime_scope": "ONE complete actual VoiceLIB executable unfiltered serial; all ordinary cases and ignores reconciled from actual inventory; same_voice::tests:: required subset once within the same run.",
+  "source_state": "clean committed HEAD",
+  "committed_head_alone_qualification_claim": true,
+  "Linux_platform_runtime_claim": false,
+  "old_mutable_bindings_retired_count": 8,
+  "no_clean": true,
+  "error": "AssertionError()",
+  "source_unchanged": true,
+  "official_owner_unchanged": true,
+  "sealed_and_actual_guards": true,
+  "protected_count": 534,
+  "actual_count": 3,
+  "full_hash_checkpoints": [
+    "initial",
+    "final"
+  ],
+  "owned_groups_closed": true,
+  "unresolved_owned_pids": [],
+  "lease_released": true
+}
