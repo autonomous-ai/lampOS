@@ -1612,7 +1612,11 @@ is installed only with it.
   - a package with no signature;
   - one signed as the Store signs (no `public`);
   - one whose signature names another key than it carries;
-  - one whose manifest or any file changed after it was signed.
+  - one whose manifest or any file changed after it was signed;
+  - one whose key is one of the Store's (`store_keys`): anyone can add the
+    Store's public key to a Store package's signature, which then checks,
+    but the package is the Store's, not an author's (Fourteen's P3 on
+    #3931). The caller passes the Store's keys, as `store_keys` reads them.
 - **Planned, not yet built:**
   - a shared install is a `skill.push` of a signed package, with the
     `asks` the computer showed (required for a signed one), so its consent
@@ -1621,7 +1625,8 @@ is installed only with it.
     permissions and the author key shown before install (`lamp skill
     install`), and the picture's own yes;
   - the push path keeps a skill's name with the key that installed it
-    (`.pushed.json`'s `author`). An update must be signed by the same key;
+    (`.pushed.json`'s `author`): all 32 bytes, as `Package.author` gives
+    them, since the 64-bit fingerprint is only for showing. An update must be signed by the same key;
     another author's package of that name, or an unsigned one, is refused
     until the skill is removed. A signer never changes in place.
   - They land with the helper's, the door's and the SDK's halves.

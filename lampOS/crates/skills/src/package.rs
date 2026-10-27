@@ -133,10 +133,11 @@ pub struct Package {
     pub files: Files,
     pub signature: Option<Vec<u8>>,
     pub signed_by: Option<String>,
-    /// The author's key's fingerprint, for a shared package read with
-    /// [`read_shared_package_bytes`]: what the push path pins a skill's
-    /// name to (`control.md`, "Skills pushed from a computer").
-    pub author: Option<String>,
+    /// The author's key, for a shared package read with
+    /// [`read_shared_package_bytes`]: the push path pins a skill's name to
+    /// all 32 bytes of it, not the fingerprint, which is only for showing
+    /// (Eighth's P3 on #3931; `control.md`, "Skills pushed from a computer").
+    pub author: Option<Author>,
     pub sha256: String,
 }
 
@@ -618,10 +619,13 @@ pub fn read_package_bytes(bytes: &[u8], keys: Option<&[[u8; 32]]>) -> Result<Pac
 /// A shared package from its bytes (decision 4, "sharing from day one"):
 /// read and checked as [`read_package_bytes`] does, and signed by its
 /// author ([`check_author`]), checked before the manifest is parsed. Its
-/// `author` is that key's fingerprint, which the push path keeps with the
-/// skill, so an update must come from the same author.
-pub fn read_shared_package_bytes(bytes: &[u8]) -> Result<Package, String> {
-    read_checked(bytes, Check::Author)
+/// `author` is that key, which the push path keeps with the skill, so an
+/// update must come from the same author. A key that is one of the
+/// Store's (`store`, as [`store_keys`] reads them) is refused: anyone can
+/// add the Store's public key to a Store package's signature, and it is
+/// then no author's (Fourteen's P3 on #3931).
+pub fn read_shared_package_bytes(bytes: &[u8], store: &[[u8; 32]]) -> Result<Package, String> {
+    read_checked(bytes, Check::Author(store))
 }
 
 /// What a package's signature is held to as it is read.
@@ -630,8 +634,9 @@ enum Check<'a> {
     None,
     /// One of the Store's keys ([`check_signature`]).
     Store(&'a [[u8; 32]]),
-    /// Its author's, the key it carries ([`check_author`]).
-    Author,
+    /// Its author's, the key it carries ([`check_author`]), never one of
+    /// the Store's keys.
+    Author(&'a [[u8; 32]]),
 }
 
 fn read_checked(bytes: &[u8], check: Check) -> Result<Package, String> {
@@ -721,9 +726,16 @@ fn read_checked(bytes: &[u8], check: Check) -> Result<Package, String> {
             Some(check_signature(&manifest, signature.as_deref(), keys)?),
             None,
         ),
-        Check::Author => {
-            let author = check_author(&manifest, signature.as_deref())?.fingerprint;
-            (Some(author.clone()), Some(author))
+        Check::Author(store) => {
+            let author = check_author(&manifest, signature.as_deref())?;
+            if store.contains(&author.public) {
+                return Err(format!(
+                    "{SIGNATURE} carries the Store's key {}: a Store package is \
+                     installed from the Store, not shared",
+                    author.fingerprint
+                ));
+            }
+            (Some(author.fingerprint.clone()), Some(author))
         }
     };
     let manifest: Manifest =
