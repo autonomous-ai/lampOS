@@ -179,6 +179,12 @@ async fn a_computer_pairs_says_hello_and_is_answered_over_tls() {
         lapsed,
         json!({"ev": "lease", "lease": "l_1", "state": "lost", "why": "expired"})
     );
+    let held = send(
+        &mut socket,
+        json!({"id": 5, "op": "lease.take", "parts": ["light"], "for_ms": 30000}),
+    )
+    .await;
+    assert_eq!(held["lease"], "l_2");
     // The owner sees the computer, and a revoke closes it out.
     let listed = admin(&lamp, json!({"clients": true})).await;
     assert_eq!(listed["clients"][0]["name"], "test laptop");
@@ -186,12 +192,26 @@ async fn a_computer_pairs_says_hello_and_is_answered_over_tls() {
         admin(&lamp, json!({"revoke": client})).await,
         json!({"revoked": true})
     );
-    let after = send(
-        &mut socket,
-        json!({"id": 5, "op": "get", "state": ["lamp"]}),
-    )
-    .await;
-    assert_eq!(after["error"]["code"], "unpaired");
+    assert_eq!(
+        next(&mut socket).await,
+        json!({"ev": "lease", "lease": "l_2", "state": "lost", "why": "revoked"})
+    );
+    // Closed at once while it only listens, sending nothing
+    // (harness-reviewer's P2 on #3778).
+    let closed = tokio::time::timeout(Duration::from_secs(1), async {
+        loop {
+            match socket.next().await {
+                Some(Ok(Message::Ping(_) | Message::Pong(_))) => continue,
+                other => return other,
+            }
+        }
+    })
+    .await
+    .expect("closed at once, not at its next frame");
+    assert!(
+        matches!(closed, None | Some(Ok(Message::Close(_))) | Some(Err(_))),
+        "{closed:?}"
+    );
     // The pairing was kept on disk, 0600, and is gone after the revoke.
     let kept = pairing::Clients::load(&lamp.dir.join("clients.json")).unwrap();
     assert!(kept.clients.is_empty());

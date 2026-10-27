@@ -50,6 +50,17 @@ impl Class {
         }
     }
 
+    /// The class's bounds, as a refusal's why says them.
+    pub fn says(self) -> &'static str {
+        match self {
+            Self::Joints => "joints: 20 a second",
+            Self::Motion => "motion: 1 each 2 s",
+            Self::Light => "light: 5 a second",
+            Self::Say => "say: 6 a minute and 60 an hour",
+            Self::Express => "express: 1 a minute",
+        }
+    }
+
     fn longest(self) -> u64 {
         self.windows()
             .iter()
@@ -73,6 +84,15 @@ impl Rates {
     /// Counts `client`'s action of `class` at `now_us`, or refuses it with
     /// how many ms until it would be allowed.
     pub fn take(&mut self, client: &str, class: Class, now_us: u64) -> Result<(), u64> {
+        self.check(client, class, now_us)?;
+        self.count(client, class, now_us);
+        Ok(())
+    }
+
+    /// Whether `client`'s action of `class` fits at `now_us`, counting
+    /// nothing: the door counts it once the part takes it, so a refused
+    /// action isn't counted (harness-reviewer's P2 on #3778).
+    pub fn check(&mut self, client: &str, class: Class, now_us: u64) -> Result<(), u64> {
         let seen = self.seen.entry((client.to_owned(), class)).or_default();
         let longest = class.longest();
         while seen.front().is_some_and(|at| at + longest <= now_us) {
@@ -94,8 +114,15 @@ impl Rates {
         if wait_us > 0 {
             return Err(wait_us.div_ceil(1_000));
         }
-        seen.push_back(now_us);
         Ok(())
+    }
+
+    /// Counts `client`'s action of `class` at `now_us`.
+    pub fn count(&mut self, client: &str, class: Class, now_us: u64) {
+        self.seen
+            .entry((client.to_owned(), class))
+            .or_default()
+            .push_back(now_us);
     }
 
     /// Forgets a client's counts (revoked or unpaired).

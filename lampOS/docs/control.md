@@ -128,7 +128,7 @@ own consent screen.
 
 ```text
 lamp-control serve [--state-dir DIR] [--listen ADDR] [--admin-socket PATH] [--name NAME]
-lamp-control code --grants body,light,speak     # the owner's side: a pairing code and the pin
+lamp-control code --grants body,light,speak,look  # the owner's side: a pairing code and the pin; look for presence events
 lamp-control revoke c_…
 lamp-control clients
 ```
@@ -226,8 +226,8 @@ zero byte, then the welcome's 32 nonce bytes. Each proof names what it is for,
 so one made for pairing can never stand as a hello's, or the other way round
 (Nine, #3504). An unpaired client, a revoked one or a bad signature gets
 `unpaired` and the connection closes. One `hello` a connection: a second is
-`bad_request`. A revoked computer's open connections get `unpaired` at their
-next frame and close, and its leases end; they also end when its last
+`bad_request`. A revoked computer's open connections close at once, a
+listener's included, after its leases' `lost`, and its leases end; they also end when its last
 connection closes. `limits` says the rates below, so an
 SDK can keep under them: for each class (`joints`, `motion`, `light`, `say`,
 `express`) a list of `{"most": N, "within_ms": M}`, and `hold_max_ms`,
