@@ -4679,10 +4679,18 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
     // What each joint read on its last step neither held, a hand nor over
     // its bound: its own weight.
     let mut rest_load = [0u16; 3];
-    // Where a joint first gave way, kept while it is held: re-held where a
-    // hand has it each second, `gave_at` follows the hand, and a hand that
-    // keeps a joint off its rest, pressing under its bound, is still one.
+    // Where a joint first gave way, kept while it is held and across the
+    // holds of one push (`last_held`): re-held where a hand has it each
+    // second, `gave_at` follows the hand, and a hand that keeps a joint off
+    // its rest, pressing under its bound, is still one.
     let mut gave_first = [0u16; 3];
+    // The step each joint was last held on: one that gives way again within
+    // a hold's length (`EASE_STEPS`) of it is the same push, and keeps where
+    // it first gave. On lamp-52e6 on 2026-10-27 a hand turned the base about
+    // 30 counts a hold, each a stop-pushing of its own at loads of 104 to
+    // 160 under its 220, and from where each hold began it never moved
+    // `HAND_MOVED`.
+    let mut last_held: [Option<u64>; 3] = [None; 3];
     // Whether a joint went over its full load bound in this hold, kept while
     // it is held: a hand pressing at 300 on a head bound 240 did; lamp-06c1's
     // head, at 130 at its rest with one read of 192, did not. The hold bound
@@ -6335,6 +6343,9 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                 rest_load[index] = is.load;
             }
             over_full[index] = held[index] && (over_full[index] || is.load > strained);
+            if held[index] {
+                last_held[index] = Some(report.steps);
+            }
             let moved = is.position.abs_diff(gave_first[index]) > HAND_MOVED;
             // Pressure over its own rest load: over half the bound and a
             // quarter of it over its own weight. A press at 300 easing to
@@ -6544,7 +6555,9 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                     } else {
                         is.position
                     };
-                    gave_first[index] = gave_at[index];
+                    if last_held[index].is_none_or(|at| report.steps - at > u64::from(EASE_STEPS)) {
+                        gave_first[index] = gave_at[index];
+                    }
                     over_full[index] = is.load > strained;
                     in_hand[index] = 0;
                     over_load[index] = 0;
