@@ -1,0 +1,96 @@
+{
+  "all_handles_terminal0_reaped_group_absent": true,
+  "base": "3b9bfb628e1c416926b958fecf56f65c539dc533",
+  "clean_worktree": true,
+  "counts": {
+    "library-controls": [
+      "test result: ok. 23 passed; 0 failed; 0 ignored; 0 measured; 153 filtered out; finished in 6.92s"
+    ],
+    "round-controls": [
+      "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 198 filtered out; finished in 2.48s"
+    ]
+  },
+  "evidence": {
+    "foundation-source-binding.json": "c88f0763839a345c0d2605d630149b7a61f613a846b1a70f03ec0e4bd16891b2",
+    "library-controls.log": "3d3dc6fbfaf65453180132f0b168da7c3c05740a397bac125f86a433284b3ea0",
+    "required-controls.json": "f2ca6f3b40c186c2a91a7229884f04c4f025f82535264a30d4adae2e666b472e",
+    "round-controls.log": "aeed99ef32e0955ad8de8dab954bd34257a4433df6a9b8f3bdbe411ef4841ca0",
+    "scope.json": "1a5e8d5820d1d596c7806aea2c66bce452ca74d206210ed92fa1cc6bbc7702cc",
+    "source-review.json": "f4e78c0aa76436cb18d55c016e2f920871f837e677f04e6655eb9b64665b4ba4"
+  },
+  "handles": {
+    "fmt": 72795,
+    "library-controls": 83043,
+    "round-controls": 74467,
+    "update-clippy": 19731
+  },
+  "head": "09762d1a2a24cbb17c452512db09861715c7d6cc",
+  "limits": [
+    "No full 502-test Update run, native Linux/ARM run, real root helper, device, systemd, reboot or power-cut test.",
+    "Identity binding does not establish helper authentication, nonce/replay protection, record path/postimage validation or completion of the writer-refresh design.",
+    "No Memory implementation or PR reads, product edits, public actions or private dependency harness builds."
+  ],
+  "pr_final": {
+    "comments_read": 1,
+    "draft": true,
+    "head": "09762d1a2a24cbb17c452512db09861715c7d6cc",
+    "metadata_sha256": "ef0453737cbe026de6b89907c722a833efdf79ad65f3dde3fa7f1904aca072eb",
+    "state": "OPEN"
+  },
+  "result": "Scoped READ-OK. No new P1/P2 found in the receipt identity source and focused host controls.",
+  "selected_test_totals": {
+    "foundation_library": 18,
+    "ignored": 0,
+    "receipt_library": 5,
+    "receipt_round": 3,
+    "total": 26
+  },
+  "source_hashes_unchanged": 7371,
+  "stages": {
+    "fmt": {
+      "cleanup": [],
+      "controller_error": null,
+      "elapsed_seconds": 12.985324541999999,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "process_group": "absent",
+      "reaped": true,
+      "returncode": 0,
+      "source_unchanged": true,
+      "timed_out": false
+    },
+    "library-controls": {
+      "cleanup": [],
+      "controller_error": null,
+      "elapsed_seconds": 111.07336424799999,
+      "log_sha256": "3d3dc6fbfaf65453180132f0b168da7c3c05740a397bac125f86a433284b3ea0",
+      "process_group": "absent",
+      "reaped": true,
+      "returncode": 0,
+      "source_unchanged": true,
+      "timed_out": false
+    },
+    "round-controls": {
+      "cleanup": [],
+      "controller_error": null,
+      "elapsed_seconds": 9.746493023000001,
+      "log_sha256": "aeed99ef32e0955ad8de8dab954bd34257a4433df6a9b8f3bdbe411ef4841ca0",
+      "process_group": "absent",
+      "reaped": true,
+      "returncode": 0,
+      "source_unchanged": true,
+      "timed_out": false
+    },
+    "update-clippy": {
+      "cleanup": [],
+      "controller_error": null,
+      "elapsed_seconds": 59.829279546,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "process_group": "absent",
+      "reaped": true,
+      "returncode": 0,
+      "source_unchanged": true,
+      "timed_out": false
+    }
+  },
+  "target_free": "third-reminder-carry-target"
+}
