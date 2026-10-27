@@ -292,8 +292,8 @@ pub const EXIT_NOTE: &str = include_str!("../../../deploy/product/exit-note.conf
 /// The skills every lamp receives: each a folder of `lampOS/skills/`, put in
 /// `/var/lib/lampOS/skills/` whole but for its `tests/` ([`SETTINGS`]).
 /// Every core skill is one (the owner: core skills are always installed;
-/// `tests/install.rs` holds the two lists equal). Fourteen keep their folders'
-/// own default: thirteen enabled, and Bedtime and Morning disabled by its own
+/// `tests/install.rs` holds the two lists equal). Eighteen keep their folders'
+/// own default: seventeen enabled, and Bedtime and Morning disabled by its own
 /// `enabled = false` until its lamp comparison (#1672); those of
 /// [`PRODUCT_SKILLS_OFF`] are installed disabled until their lamp checks,
 /// so none of their functions reach a session.
@@ -342,6 +342,7 @@ pub const PRODUCT_SKILLS: &[&str] = &[
     "light-show",
     "smoky-air",
     "dusty-air",
+    "feelings",
 ];
 
 /// The product skills installed disabled, each with why: install and a
@@ -388,6 +389,13 @@ pub const PRODUCT_SKILLS_OFF: &[(&str, &str)] = &[
         "dusty-air",
         "not measured for false alarms yet (#1684): its hour at 125 ug/m3 waits for the same \
          traces and an office's own days, replayed",
+    ),
+    // #3691's core skill, built and not yet seen on a lamp.
+    (
+        "feelings",
+        "not yet seen on a lamp (#3691): it reads `mood/state`'s `felt`, which Mood says only with \
+         `LAMP_MOOD=on` (and a line's tone with `LAMP_MOOD_TONE=on`), both trial-only; each \
+         feeling's move and light wait for an observer's verdict with the video face",
     ),
 ];
 
@@ -555,6 +563,11 @@ pub const SETTINGS: &[(&str, &str)] = &[
     skill_file!("smoky-air", "SKILL.md"),
     skill_file_off!("dusty-air"),
     skill_file!("dusty-air", "SKILL.md"),
+    skill_file_off!("feelings"),
+    skill_file!("feelings", "SKILL.md"),
+    skill_file!("feelings", "moves/glad-lift.json"),
+    skill_file!("feelings", "moves/perk.json"),
+    skill_file!("feelings", "moves/low-droop.json"),
 ];
 
 /// Setup's own page (docs/setup.md, "On a lamp"), written only with

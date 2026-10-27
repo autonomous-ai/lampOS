@@ -1,0 +1,5 @@
+# Low at 42 s while the lamp speaks until 110 s: free only at 140 s, past the minute
+# it waits (to 102 s): nothing.
+clock = "10:00"
+
+none = true

@@ -1,0 +1,27 @@
+# Glad at 40 s, lively at 5 min and low at 10 min, each its first: two an hour
+# between the feelings, so the low gets nothing.
+clock = "10:00"
+
+[[expect]]
+at = "40s"
+within = "1s"
+call = "body.move"
+args = { move = "glad-lift" }
+
+[[expect]]
+at = "40s"
+within = "1s"
+call = "light"
+args = { relative = { warmer = 1, dimmer = 1 }, for = "12s", breathe_ms = 6000 }
+
+[[expect]]
+at = "300s"
+within = "1s"
+call = "body.move"
+args = { move = "perk" }
+
+[[expect]]
+at = "300s"
+within = "1s"
+call = "light"
+args = { relative = { warmer = 1, dimmer = 1 }, for = "8s", breathe_ms = 4000 }

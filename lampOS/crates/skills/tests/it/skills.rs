@@ -346,6 +346,7 @@ fn every_skill_folder_says_its_kind_and_version() {
             "bedtime-morning",
             "dance",
             "dusty-air",
+            "feelings",
             "laugh-glance",
             "light-out",
             "light-scenes",

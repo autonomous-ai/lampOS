@@ -125,6 +125,7 @@ is released or the reader has failed.
 | A bang, something dropped | One startled glance, then lets it go; the next ones get nothing | Now when awake; resting #710 |
 | Music | Once, a slight sway when music has played a while, only if it is not working with you | Installed on in the product since #2834: `skills/music-sway` on `ears/classes` (#1669), its bar kept from lamp-52e6 (#2475). It sways only once the product's ears run their sound classes, after YAMNet's distribution review (sound-events.md); its lamp row after a full update is still owed |
 | A long silence | Breathing eye, tiny shifts of weight; dozes after a while | Rest clip now; sleep to build |
+| You smile, sound glad or lively, or seem low | Glad: a small lift of the head and a warm breath at your light's level; lively: the same lift, quicker; low: a small, slow lowering and its light a shade warmer and dimmer, keeping you quiet company. Once, small, never while talking, over your work, asleep or at night | Built, installed off: `skills/feelings` (#3691) on Mood's `felt`, with Mood and Tone trial-only; its lamp check with the video face is still owed |
 
 ### Sight
 

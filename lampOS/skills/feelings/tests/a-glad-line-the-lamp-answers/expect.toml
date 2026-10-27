@@ -1,0 +1,16 @@
+# A glad line at 40 s (listening 38 s to 42 s) that the lamp answers (speaking 42 s
+# to 50 s): Mood holds glad 90 s, to 130 s (the case ends at 91 s), so the lift comes once the lamp has not
+# spoken for 30 s, at 80 s, within the minute it waits.
+clock = "10:00"
+
+[[expect]]
+at = "80s"
+within = "1s"
+call = "body.move"
+args = { move = "glad-lift" }
+
+[[expect]]
+at = "80s"
+within = "1s"
+call = "light"
+args = { relative = { warmer = 1, dimmer = 1 }, for = "12s", breathe_ms = 6000 }

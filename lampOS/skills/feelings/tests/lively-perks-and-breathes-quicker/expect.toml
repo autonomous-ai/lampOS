@@ -1,0 +1,14 @@
+# Mood lively from 40 s to 60 s: the quick perk and a quicker breath, once, at 40 s.
+clock = "10:00"
+
+[[expect]]
+at = "40s"
+within = "1s"
+call = "body.move"
+args = { move = "perk" }
+
+[[expect]]
+at = "40s"
+within = "1s"
+call = "light"
+args = { relative = { warmer = 1, dimmer = 1 }, for = "8s", breathe_ms = 4000 }

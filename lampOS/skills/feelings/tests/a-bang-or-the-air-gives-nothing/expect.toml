@@ -1,0 +1,5 @@
+# Energy up 0.25 at 40 s (a bang) and down 0.08 from 10 min (stuffy air), with no
+# felt: nothing.
+clock = "10:00"
+
+none = true

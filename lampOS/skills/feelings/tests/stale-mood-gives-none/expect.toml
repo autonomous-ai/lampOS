@@ -1,0 +1,5 @@
+# Glad from 20 s, held back (the lamp's voice not yet 30 s quiet), then Mood goes
+# silent after 27 s: its state runs out in 2.5 s and nothing is shown.
+clock = "10:00"
+
+none = true

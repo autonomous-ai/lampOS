@@ -1,0 +1,4 @@
+# From 22:00, glad from 40 s to 60 s: nothing at night (21:00 to 08:00).
+clock = "22:00"
+
+none = true
