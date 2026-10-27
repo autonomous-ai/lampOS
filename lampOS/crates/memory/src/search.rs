@@ -41,9 +41,15 @@ const COMMON: &[&str] = &[
     "gì", "nào",
 ];
 
-/// Whether this word, in [`text`]'s form, is one of [`COMMON`].
+/// Whether this word, in [`text`]'s form, is one of [`COMMON`]. Each is
+/// put in that form once, not again for every word asked about: a forget
+/// checks every word of what it reads (#3871).
 fn common(word: &str) -> bool {
-    COMMON.iter().any(|known| text(known) == word)
+    static FORMS: std::sync::OnceLock<std::collections::HashSet<String>> =
+        std::sync::OnceLock::new();
+    FORMS
+        .get_or_init(|| COMMON.iter().map(|known| text(known)).collect())
+        .contains(word)
 }
 
 /// A fact's distinctive words, in [`text`]'s form, each once: three
@@ -69,6 +75,36 @@ pub(crate) fn content_words(value: &str) -> Vec<String> {
         }
     }
     words
+}
+
+/// Whether `value`, in [`text`]'s form, may have a character the search
+/// index keeps inside a word where [`content_words`] ends one: a combining
+/// mark that is no letter ("İ" lower-cased is "i" and a dot above, so the
+/// index holds "istanbul" where the words say "stanbul": Fourteen on
+/// #3902), or a private-use character. The index may not find such a
+/// row's words, so a forget reads it whole. Asked of each character of
+/// `value` on its own, each kind once: what [`text`] makes of a whole
+/// line only joins marks, never adds one no character has. Plain ASCII
+/// never has one.
+pub(crate) fn splits_unlike_index(value: &str) -> bool {
+    thread_local! {
+        static SEEN: std::cell::RefCell<std::collections::HashMap<char, bool>> =
+            std::cell::RefCell::default();
+    }
+    let unlike = |character: char| {
+        !character.is_alphanumeric()
+            && (unicode_normalization::char::is_combining_mark(character)
+                || matches!(u32::from(character), 0xe000..=0xf8ff | 0xf0000..=0x10ffff))
+    };
+    !value.is_ascii()
+        && SEEN.with_borrow_mut(|seen| {
+            value.chars().filter(|c| !c.is_ascii()).any(|character| {
+                *seen.entry(character).or_insert_with(|| {
+                    unlike(character)
+                        || text(character.encode_utf8(&mut [0; 4])).chars().any(unlike)
+                })
+            })
+        })
 }
 
 /// [`query`], or with `skip_common` the same OR without [`COMMON`] words,
