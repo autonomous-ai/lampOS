@@ -1,0 +1,53 @@
+{
+  "primary_3315_failure": {
+    "full_voice": {
+      "passed": 4085,
+      "failed": 1,
+      "ignored": 21,
+      "disposition": "Failed and held; preserved, not replaced by current passes"
+    },
+    "isolated": {
+      "passed": 0,
+      "failed": 1,
+      "exit": 101,
+      "libtest_seconds": 7.87,
+      "driver_sha256": "8fcfdceae92f3ecd1752d6fa1b93042df0f514dd320b2f09dbb9fd18611b01d8",
+      "raw_sha256": "4514e5ed744d99f88580a95cc1100ab77307a6679bd2cc04aa5379ae0f4dd3de",
+      "attempts": 10,
+      "final_error_class": "privacy publisher unavailable",
+      "cause": "Unknown: aggregate error does not distinguish SourceGone from Late",
+      "evidence_kind": "Retained issue comment receipt; original private driver and log not independently rehashed in this audit"
+    },
+    "comment_urls": [
+      "https://github.com/autonomous-ai/lampOS/issues/3315#issuecomment-6411032710",
+      "https://github.com/autonomous-ai/lampOS/issues/3315#issuecomment-6414732740"
+    ]
+  },
+  "additional_old_four_failures": [
+    {
+      "test": "privacy_bus::tests::selected_endpoints_bind_and_read_a_real_bus",
+      "event": "failed",
+      "seconds": 10.693896555
+    },
+    {
+      "test": "privacy_bus::tests::after_a_datagram_a_gap_ends_the_lease_reader_inside_its_first_second",
+      "event": "failed",
+      "seconds": 13.892013846
+    },
+    {
+      "test": "privacy_bus::tests::the_lease_watch_answers_at_once_through_refused_input_and_lets_a_lease_expire",
+      "event": "failed",
+      "seconds": 6.214611095
+    },
+    {
+      "test": "privacy_bus::tests::the_lease_reader_resyncs_on_kept_leases_only_before_its_first_datagram_in_its_first_second",
+      "event": "failed",
+      "seconds": 18.719005956
+    }
+  ],
+  "additional_four_diagnostic_passes": {
+    "count": 4,
+    "evidence": "Preserved original-driver exact invocations, one per case, passed separately; no full-gate or causal credit",
+    "terminal_sha256": "eaa039a24d320773fc2cd54285109a117630aeeee45126084dba781bb3cf0780"
+  }
+}

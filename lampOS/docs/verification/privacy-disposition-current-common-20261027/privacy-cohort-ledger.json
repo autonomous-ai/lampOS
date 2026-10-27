@@ -1,0 +1,401 @@
+[
+  {
+    "binary": "lamp-bus::it",
+    "test": "bus::a_subscriber_is_told_once_that_the_source_has_gone_and_once_that_it_is_back",
+    "source_path": "lampOS/crates/bus/tests/it/bus.rs",
+    "body_start_line": 1684,
+    "body_end_line": 1748,
+    "body_sha256": "89edc0de92d0b338d3e8e40544e11f5de13c27751f5a9f150235ca395ccffa5e",
+    "body_equal_before_3637": true,
+    "actual_native_body_directly_bound": true,
+    "mac_selected": false,
+    "mac_terminal": [],
+    "arm_terminal": [
+      {
+        "test": "bus::a_subscriber_is_told_once_that_the_source_has_gone_and_once_that_it_is_back",
+        "binary": "lamp-bus::it",
+        "event": "PASS",
+        "raw_line": 2009,
+        "duration_display": "0.409s"
+      }
+    ]
+  },
+  {
+    "binary": "lamp-bus::it",
+    "test": "bus::a_topic_that_promised_a_period_is_late_after_twice_that_and_on_time_with_the_next",
+    "source_path": "lampOS/crates/bus/tests/it/bus.rs",
+    "body_start_line": 1792,
+    "body_end_line": 1859,
+    "body_sha256": "dd5de5e0af7e9be8443cf4d49b1185bade7f4b388f75d67e593aef0f1e1d0117",
+    "body_equal_before_3637": true,
+    "actual_native_body_directly_bound": true,
+    "mac_selected": false,
+    "mac_terminal": [],
+    "arm_terminal": [
+      {
+        "test": "bus::a_topic_that_promised_a_period_is_late_after_twice_that_and_on_time_with_the_next",
+        "binary": "lamp-bus::it",
+        "event": "PASS",
+        "raw_line": 2018,
+        "duration_display": "0.526s"
+      }
+    ]
+  },
+  {
+    "binary": "lamp-msgs::it",
+    "test": "privacy::a_lamp_with_no_slide_permits_only_with_its_marker_and_a_fresh_observation",
+    "source_path": "lampOS/crates/msgs/tests/it/privacy.rs",
+    "body_start_line": 174,
+    "body_end_line": 219,
+    "body_sha256": "ff17ba2d06b24fad65cd019224b385e0339c538d9a916d1f93c1ee6f3a073e94",
+    "body_equal_before_3637": true,
+    "actual_native_body_directly_bound": true,
+    "mac_selected": false,
+    "mac_terminal": [],
+    "arm_terminal": [
+      {
+        "test": "privacy::a_lamp_with_no_slide_permits_only_with_its_marker_and_a_fresh_observation",
+        "binary": "lamp-msgs::it",
+        "event": "PASS",
+        "raw_line": 4877,
+        "duration_display": "0.004s"
+      }
+    ]
+  },
+  {
+    "binary": "lamp-msgs::it",
+    "test": "privacy::envelope_must_name_voice_and_match_payload_clock_time_session_and_sequence",
+    "source_path": "lampOS/crates/msgs/tests/it/privacy.rs",
+    "body_start_line": 103,
+    "body_end_line": 127,
+    "body_sha256": "c59f67776d357dbcf82f128e958fab4694b62121778af59c2c7b9a26baac4417",
+    "body_equal_before_3637": true,
+    "actual_native_body_directly_bound": true,
+    "mac_selected": false,
+    "mac_terminal": [],
+    "arm_terminal": [
+      {
+        "test": "privacy::envelope_must_name_voice_and_match_payload_clock_time_session_and_sequence",
+        "binary": "lamp-msgs::it",
+        "event": "PASS",
+        "raw_line": 4878,
+        "duration_display": "0.004s"
+      }
+    ]
+  },
+  {
+    "binary": "lamp-msgs::it",
+    "test": "privacy::freshness_is_original_acquisition_bounded_and_boot_scoped",
+    "source_path": "lampOS/crates/msgs/tests/it/privacy.rs",
+    "body_start_line": 54,
+    "body_end_line": 69,
+    "body_sha256": "97d62cea7602ac76aca56567b67acddd4981fca86d831136c6037a7d936fa18a",
+    "body_equal_before_3637": true,
+    "actual_native_body_directly_bound": true,
+    "mac_selected": false,
+    "mac_terminal": [],
+    "arm_terminal": [
+      {
+        "test": "privacy::freshness_is_original_acquisition_bounded_and_boot_scoped",
+        "binary": "lamp-msgs::it",
+        "event": "PASS",
+        "raw_line": 4879,
+        "duration_display": "0.004s"
+      }
+    ]
+  },
+  {
+    "binary": "lamp-msgs::it",
+    "test": "privacy::permission_requires_known_open_switch_and_bounded_valid_lineage",
+    "source_path": "lampOS/crates/msgs/tests/it/privacy.rs",
+    "body_start_line": 72,
+    "body_end_line": 100,
+    "body_sha256": "bcbe66ad91a7d14b51837fc6b09eca5ce553e7038a027cd1a9b3e10bebbf6055",
+    "body_equal_before_3637": true,
+    "actual_native_body_directly_bound": true,
+    "mac_selected": false,
+    "mac_terminal": [],
+    "arm_terminal": [
+      {
+        "test": "privacy::permission_requires_known_open_switch_and_bounded_valid_lineage",
+        "binary": "lamp-msgs::it",
+        "event": "PASS",
+        "raw_line": 4880,
+        "duration_display": "0.004s"
+      }
+    ]
+  },
+  {
+    "binary": "lamp-msgs::it",
+    "test": "privacy::topic_is_additive_and_json_roundtrips",
+    "source_path": "lampOS/crates/msgs/tests/it/privacy.rs",
+    "body_start_line": 130,
+    "body_end_line": 171,
+    "body_sha256": "97883fcb31ed1c8040010b8d01336b8cb085652c90e35024be43860128df6eee",
+    "body_equal_before_3637": true,
+    "actual_native_body_directly_bound": true,
+    "mac_selected": false,
+    "mac_terminal": [],
+    "arm_terminal": [
+      {
+        "test": "privacy::topic_is_additive_and_json_roundtrips",
+        "binary": "lamp-msgs::it",
+        "event": "PASS",
+        "raw_line": 4881,
+        "duration_display": "0.004s"
+      }
+    ]
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "privacy_bus::tests::a_receipt_comes_only_with_a_slides_reading",
+    "source_path": "lampOS/crates/voice/src/privacy_bus.rs",
+    "body_start_line": 1132,
+    "body_end_line": 1152,
+    "body_sha256": "9ad4be77bacbdc11127a7ccf3337264e52dbfc86a2da0cd71d1f87efe2d8401f",
+    "body_equal_before_3637": true,
+    "actual_native_body_directly_bound": true,
+    "mac_selected": true,
+    "mac_terminal": [
+      {
+        "test": "privacy_bus::tests::a_receipt_comes_only_with_a_slides_reading",
+        "event": "ok",
+        "raw_line": 5903,
+        "seconds": 0.047078451
+      }
+    ],
+    "arm_terminal": [
+      {
+        "test": "privacy_bus::tests::a_receipt_comes_only_with_a_slides_reading",
+        "binary": "lamp-voice",
+        "event": "PASS",
+        "raw_line": 9446,
+        "duration_display": "0.007s"
+      }
+    ]
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "privacy_bus::tests::after_a_datagram_a_gap_ends_the_lease_reader_inside_its_first_second",
+    "source_path": "lampOS/crates/voice/src/privacy_bus.rs",
+    "body_start_line": 1326,
+    "body_end_line": 1427,
+    "body_sha256": "7c9399ca4a9d9b1115c36b709976d2900a870e1bc6707df28c261be2d05cd6e7",
+    "body_equal_before_3637": true,
+    "actual_native_body_directly_bound": true,
+    "mac_selected": true,
+    "mac_terminal": [
+      {
+        "test": "privacy_bus::tests::after_a_datagram_a_gap_ends_the_lease_reader_inside_its_first_second",
+        "event": "ok",
+        "raw_line": 5905,
+        "seconds": 0.051802978
+      }
+    ],
+    "arm_terminal": [
+      {
+        "test": "privacy_bus::tests::after_a_datagram_a_gap_ends_the_lease_reader_inside_its_first_second",
+        "binary": "lamp-voice",
+        "event": "PASS",
+        "raw_line": 9448,
+        "duration_display": "0.010s"
+      }
+    ]
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "privacy_bus::tests::only_recovery_finishes_the_source_episode_and_allows_a_new_one",
+    "source_path": "lampOS/crates/voice/src/privacy_bus.rs",
+    "body_start_line": 1059,
+    "body_end_line": 1074,
+    "body_sha256": "607589d9cbeafdaefda0edf42231be3837d70981d5669fa387e038b01a71dd6b",
+    "body_equal_before_3637": true,
+    "actual_native_body_directly_bound": true,
+    "mac_selected": true,
+    "mac_terminal": [
+      {
+        "test": "privacy_bus::tests::only_recovery_finishes_the_source_episode_and_allows_a_new_one",
+        "event": "ok",
+        "raw_line": 5907,
+        "seconds": 0.045565128
+      }
+    ],
+    "arm_terminal": [
+      {
+        "test": "privacy_bus::tests::only_recovery_finishes_the_source_episode_and_allows_a_new_one",
+        "binary": "lamp-voice",
+        "event": "PASS",
+        "raw_line": 9447,
+        "duration_display": "0.007s"
+      }
+    ]
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "privacy_bus::tests::recovery_queued_after_a_source_stall_reports_the_old_expiry_first",
+    "source_path": "lampOS/crates/voice/src/privacy_bus.rs",
+    "body_start_line": 1077,
+    "body_end_line": 1109,
+    "body_sha256": "fe17c83da97b309442c7109a4beabced378584fdcfa2bd440ece0c6f07d028ad",
+    "body_equal_before_3637": true,
+    "actual_native_body_directly_bound": true,
+    "mac_selected": true,
+    "mac_terminal": [
+      {
+        "test": "privacy_bus::tests::recovery_queued_after_a_source_stall_reports_the_old_expiry_first",
+        "event": "ok",
+        "raw_line": 5909,
+        "seconds": 0.040087859
+      }
+    ],
+    "arm_terminal": [
+      {
+        "test": "privacy_bus::tests::recovery_queued_after_a_source_stall_reports_the_old_expiry_first",
+        "binary": "lamp-voice",
+        "event": "PASS",
+        "raw_line": 9449,
+        "duration_display": "0.006s"
+      }
+    ]
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "privacy_bus::tests::selected_endpoints_bind_and_read_a_real_bus",
+    "source_path": "lampOS/crates/voice/src/privacy_bus.rs",
+    "body_start_line": 1155,
+    "body_end_line": 1206,
+    "body_sha256": "1a24bf9adc9393a83fa11c1270549fb4bf2afd2c9b5ac7ef6fae2abb421815e8",
+    "body_equal_before_3637": true,
+    "actual_native_body_directly_bound": true,
+    "mac_selected": true,
+    "mac_terminal": [
+      {
+        "test": "privacy_bus::tests::selected_endpoints_bind_and_read_a_real_bus",
+        "event": "ok",
+        "raw_line": 5911,
+        "seconds": 0.051346461
+      }
+    ],
+    "arm_terminal": [
+      {
+        "test": "privacy_bus::tests::selected_endpoints_bind_and_read_a_real_bus",
+        "binary": "lamp-voice",
+        "event": "PASS",
+        "raw_line": 9450,
+        "duration_display": "0.007s"
+      }
+    ]
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "privacy_bus::tests::source_expiry_is_ridden_only_when_enabled_after_permission",
+    "source_path": "lampOS/crates/voice/src/privacy_bus.rs",
+    "body_start_line": 1034,
+    "body_end_line": 1056,
+    "body_sha256": "a0a906100b5dc487098054d4ac0fea6899be72a5e6f6b2f9075a92b1e09cce7c",
+    "body_equal_before_3637": true,
+    "actual_native_body_directly_bound": true,
+    "mac_selected": true,
+    "mac_terminal": [
+      {
+        "test": "privacy_bus::tests::source_expiry_is_ridden_only_when_enabled_after_permission",
+        "event": "ok",
+        "raw_line": 5913,
+        "seconds": 0.046636541
+      }
+    ],
+    "arm_terminal": [
+      {
+        "test": "privacy_bus::tests::source_expiry_is_ridden_only_when_enabled_after_permission",
+        "binary": "lamp-voice",
+        "event": "PASS",
+        "raw_line": 9451,
+        "duration_display": "0.006s"
+      }
+    ]
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "privacy_bus::tests::the_lease_reader_resyncs_on_kept_leases_only_before_its_first_datagram_in_its_first_second",
+    "source_path": "lampOS/crates/voice/src/privacy_bus.rs",
+    "body_start_line": 1217,
+    "body_end_line": 1318,
+    "body_sha256": "f34687d997f096135af9cd394cc42e5eee32f7e578291b091f6d134e41fd2ca1",
+    "body_equal_before_3637": false,
+    "actual_native_body_directly_bound": true,
+    "mac_selected": true,
+    "mac_terminal": [
+      {
+        "test": "privacy_bus::tests::the_lease_reader_resyncs_on_kept_leases_only_before_its_first_datagram_in_its_first_second",
+        "event": "ok",
+        "raw_line": 5915,
+        "seconds": 0.061505674
+      }
+    ],
+    "arm_terminal": [
+      {
+        "test": "privacy_bus::tests::the_lease_reader_resyncs_on_kept_leases_only_before_its_first_datagram_in_its_first_second",
+        "binary": "lamp-voice",
+        "event": "PASS",
+        "raw_line": 9452,
+        "duration_display": "0.023s"
+      }
+    ]
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "privacy_bus::tests::the_lease_watch_answers_at_once_through_refused_input_and_lets_a_lease_expire",
+    "source_path": "lampOS/crates/voice/src/privacy_bus.rs",
+    "body_start_line": 1481,
+    "body_end_line": 1578,
+    "body_sha256": "4d1292faf0ea9a38213d757fe83383dfac8a4e1779a4ba3c111c96a032bcbbdf",
+    "body_equal_before_3637": true,
+    "actual_native_body_directly_bound": true,
+    "mac_selected": true,
+    "mac_terminal": [
+      {
+        "test": "privacy_bus::tests::the_lease_watch_answers_at_once_through_refused_input_and_lets_a_lease_expire",
+        "event": "ok",
+        "raw_line": 5933,
+        "seconds": 0.344737901
+      }
+    ],
+    "arm_terminal": [
+      {
+        "test": "privacy_bus::tests::the_lease_watch_answers_at_once_through_refused_input_and_lets_a_lease_expire",
+        "binary": "lamp-voice",
+        "event": "PASS",
+        "raw_line": 9474,
+        "duration_display": "0.243s"
+      }
+    ]
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "privacy_bus::tests::the_order_begins_again_only_before_the_first_datagram_in_the_first_second",
+    "source_path": "lampOS/crates/voice/src/privacy_bus.rs",
+    "body_start_line": 1122,
+    "body_end_line": 1129,
+    "body_sha256": "772e499262122852fa487a000c8a7f5292319c5f2236fabca5126163f51ba7de",
+    "body_equal_before_3637": true,
+    "actual_native_body_directly_bound": true,
+    "mac_selected": true,
+    "mac_terminal": [
+      {
+        "test": "privacy_bus::tests::the_order_begins_again_only_before_the_first_datagram_in_the_first_second",
+        "event": "ok",
+        "raw_line": 5917,
+        "seconds": 0.033217225
+      }
+    ],
+    "arm_terminal": [
+      {
+        "test": "privacy_bus::tests::the_order_begins_again_only_before_the_first_datagram_in_the_first_second",
+        "binary": "lamp-voice",
+        "event": "PASS",
+        "raw_line": 9453,
+        "duration_display": "0.006s"
+      }
+    ]
+  }
+]

@@ -1,0 +1,90 @@
+{
+  "actual_commit": "0bacfde9a344c1b7cd07d21cde6a23b1967daaa5",
+  "actual_tree": "66435569942c9118e5bf84ee1e3dad89448e8b7a",
+  "actual_parents": [
+    "bf6f7bbdf5e936c2ef82621e1bb7592d511c1453",
+    "28af4573a66c2844cdd0a91936d2eca8c566fd5b"
+  ],
+  "direct_api_source_binding": true,
+  "tree_bytes": 3482203,
+  "source_bytes": 297668,
+  "sources": [
+    {
+      "path": "lampOS/crates/voice/src/privacy_bus.rs",
+      "git_blob": "d94b9f8dc4b372a3a7518d69aa20f0945c18d292",
+      "sha256": "0f376c76bc9409f9d41c07187d4a58de553bfb5b49a6d600342bcd90714a67df",
+      "bytes": 63417,
+      "equal_merged_3637_and_local_364776": true
+    },
+    {
+      "path": "lampOS/crates/msgs/src/privacy.rs",
+      "git_blob": "8c491f4ed8f71f230a2baed38d8e8bbe2b53333e",
+      "sha256": "32ec32a89137fc6e39e5fb9b66314f0349069d1321e63d7e0cd5fc2ce0b8e8a1",
+      "bytes": 7079,
+      "equal_merged_3637_and_local_364776": true
+    },
+    {
+      "path": "lampOS/crates/msgs/tests/it/privacy.rs",
+      "git_blob": "928b84419c17db8678b3805982801b38bd62de00",
+      "sha256": "49877816630df846011d0c3a9fe3239e4bbdac0cdfffa31478a38c159ca03356",
+      "bytes": 7409,
+      "equal_merged_3637_and_local_364776": true
+    },
+    {
+      "path": "lampOS/crates/bus/tests/it/bus.rs",
+      "git_blob": "f7eda7431cf06877921b6b889a10b8957d2e6205",
+      "sha256": "7040765d6d856c9e228a1211da736b8a891680a5bf90d4b0a3a6ced064a1f76a",
+      "bytes": 88851,
+      "equal_merged_3637_and_local_364776": true
+    },
+    {
+      "path": "lampOS/crates/bus/src/subscribe.rs",
+      "git_blob": "cb70bd3b17dce6c6909c3e8e94fb9102d40f54df",
+      "sha256": "0404a4e881ee06ba41c4f5874d31dcf773a9aba818d2b4df410e6a05bf396e28",
+      "bytes": 38012,
+      "equal_merged_3637_and_local_364776": true
+    },
+    {
+      "path": "lampOS/crates/bus/src/wire.rs",
+      "git_blob": "163e6a31afd997dd305de616954799df83dd1d17",
+      "sha256": "2773cbc3f2dd0fe5accd28e1e940b57dc579dc48c922821e4b66e5b80abf6920",
+      "bytes": 13555,
+      "equal_merged_3637_and_local_364776": true
+    },
+    {
+      "path": "lampOS/crates/bus/src/publish.rs",
+      "git_blob": "e77ff9701bd60af6102913e8acde45ac33582931",
+      "sha256": "3b760ef2169d8561750c0bf28f8bea176f729c8ba18de45354067068814016c1",
+      "bytes": 32256,
+      "equal_merged_3637_and_local_364776": true
+    },
+    {
+      "path": "lampOS/crates/bus/src/live.rs",
+      "git_blob": "d0cdfbcccd2d232544310d51a42cba715b56c58f",
+      "sha256": "b0a04b4b0a58ab8ca01a38de39931bf3657fc985187caee6db43499b2b6b6291",
+      "bytes": 5990,
+      "equal_merged_3637_and_local_364776": true
+    },
+    {
+      "path": "lampOS/crates/bus/src/declare.rs",
+      "git_blob": "27597f2bddc465db1459d97880ef180e2ac55999",
+      "sha256": "60183bfa717674edc75d709417c7cb4f8366900bb598a8db627240a2a96c5995",
+      "bytes": 10492,
+      "equal_merged_3637_and_local_364776": true
+    },
+    {
+      "path": "lampOS/crates/ipc/src/lib.rs",
+      "git_blob": "ed70b4552127e008540f46baaf01be629a1fa473",
+      "sha256": "f64aa5070b79991a58ed0fe772c6697c3d52f4c58b48e793046c753358703c44",
+      "bytes": 11451,
+      "equal_merged_3637_and_local_364776": true
+    },
+    {
+      "path": "lampOS/crates/controls/src/privacy.rs",
+      "git_blob": "11271c06626b2f6c97d88429b8981b6da80dbf6e",
+      "sha256": "3a22d4b087a9f6cf68b3fbcc753bed367d53354d2660c6c1057b7bdb04a60a2d",
+      "bytes": 19156,
+      "equal_merged_3637_and_local_364776": true
+    }
+  ]
+}

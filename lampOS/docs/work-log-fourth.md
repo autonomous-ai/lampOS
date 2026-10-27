@@ -1,3 +1,16 @@
+## 2026-10-27 14:22 UTC — Current privacy evidence handed for independent disposition
+
+Ready for lamp-voice: no
+
+[Named source-bound cohort](verification/privacy-disposition-current-common-20261027/README.md):
+existing Common local execution has nine Voice privacy controls once; its original
+ARM has sixteen once, including the seven Bus/Msgs cases outside the Mac selection.
+Direct API checks bind eleven full source files to merged #3637, local 364776 and
+actual native 0bac/664355. Fifteen bodies are unchanged; only the synthetic resync
+fixture body changed. The old full 4,085/1/21 and isolated 0/1 remain failed with
+unknown historical cause. No rerun or clearance: Tests and Reviewer-two receive
+an explicit disposition request, while all independent holds stay open.
+
 ## 2026-10-27 14:02 UTC — Common 28af native gates and artifact integrity pass
 
 Ready for lamp-voice: no

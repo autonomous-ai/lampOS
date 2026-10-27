@@ -1,0 +1,49 @@
+{
+  "ready": false,
+  "hold_cleared": false,
+  "scope": "Offline retained-output audit plus explicitly authorized bounded read-only GitHub source API; no runtime execution or repository mutation",
+  "shipping_fix": "c7c197f986e870577ef2af34043d92a52b882160",
+  "common_published_head": "28af4573a66c2844cdd0a91936d2eca8c566fd5b",
+  "local_tree": "364776260748a4c355cf625768c2065a32f510d0",
+  "actual_native_commit": "0bacfde9a344c1b7cd07d21cde6a23b1967daaa5",
+  "actual_native_tree": "66435569942c9118e5bf84ee1e3dad89448e8b7a",
+  "source_files_directly_equal": 11,
+  "source_production_prefix_sha256": "377f840f7868d2b8c7c028681b33ee085f41de92ee4fcb2fb39edb4389bc67dc",
+  "unchanged_control_bodies": 15,
+  "changed_fixture_bodies": 1,
+  "mac": {
+    "native_session": 60954,
+    "actual_exit": 0,
+    "privacy_unique_pass": 9,
+    "privacy_duplicates": 0,
+    "msgs_and_bus_not_selected": 7,
+    "raw_sha256": "f5338d87efb652ccdc1adb0420b5ff76cc13ea5b904d797407ebc5d56543fa77",
+    "discovery_sha256": "0347e233aa1a2a35f80eee693ddfbbc2fc23d11e901a82603b3efab7828e8c54"
+  },
+  "arm": {
+    "run": 40513174138,
+    "whole_outer_terminal_count": 11922,
+    "privacy_unique_pass": 16,
+    "privacy_duplicates": 0,
+    "raw_sha256": "17da804b041d67fd8eed4519f44c4c8e008a5c36d5ca010410dfb7432d61842e",
+    "original_audit_receipt_sha256": "ac428a9fa1a4a8b02f83befee792c716655fa3e18fb2610787a5923e4d589dcd"
+  },
+  "source_api_native_completion": {
+    "session": 7539,
+    "exit": 0,
+    "chunk": "ef9cce"
+  },
+  "limits": [
+    "The cohort is selected by explicit names; no transfer from prior 314 CI.",
+    "Seven Mac omissions are package selection, not platform ignores.",
+    "Linux Clippy is not an additional execution of the privacy cohort.",
+    "Native summary skips lack per-case names and are not reclassified.",
+    "Fixture Late diagnostic demonstrates a prospective mechanism, not the unknown historical unavailable cause.",
+    "Only independent Tests / Reviewer-two can disposition #3315; no physical privacy acceptance or installed-pin claim."
+  ],
+  "third_evidence_hashes": {
+    "shipping-4bff-audit.json": "caa6e6fb530aec565f9371677df0c1a99dec2550541c75a35febfb8f9e92e0d3",
+    "diagnostic-audit.json": "9595d6f338bbdd739741f5a3e78138efc4f6382f38f005788b4c94ff620ebc07",
+    "diagnostic-terminal.json": "0a620bf0f0d0286acaf819c1c54ed27e1da080203665dddf16f3ad00ec56d4bc"
+  }
+}
