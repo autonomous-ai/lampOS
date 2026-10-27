@@ -110,13 +110,25 @@ fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
         clients.clients.len(),
         identity.pin
     );
+    // The quiet hours (#3917): the lamp's zone, `--zone`, `system` by
+    // default. One that can't be read keeps every computer's say and sound
+    // refused as quiet, never a silent UTC.
+    let zone = option(arguments, "--zone").unwrap_or_else(|| "system".to_owned());
+    let local_time = match lamp_local_time::LocalTime::zone(&zone) {
+        Ok(local_time) => Some(Arc::new(local_time)),
+        Err(error) => {
+            eprintln!("lamp-control: {error}; say and sound are refused as quiet hours");
+            None
+        }
+    };
     let door = session::Door::new(
         &host,
         &host,
         identity.pin_bytes(),
         clients,
         Some(clients_path),
-    );
+    )
+    .with_quiet_hours(session::Quiet::new(local_time));
     let body = option(arguments, "--mood-socket").map(PathBuf::from);
     let say = option(arguments, "--say-socket").map(PathBuf::from);
     let bus = match option(arguments, "--bus-root") {
