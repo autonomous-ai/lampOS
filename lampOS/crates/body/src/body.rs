@@ -1992,6 +1992,21 @@ impl<P: PortIo, R: Runtime> Bus<'_, P, R> {
         Ok(profiles)
     }
 
+    /// Torque enable of all five, by `Joint::index`.
+    fn torques(&mut self) -> Result<[u8; 5], String> {
+        let request = ReadOnlyRequest::sync_read(&Joint::ALL, ReadWindow::TORQUE_AND_PROFILE)
+            .map_err(|error| error.to_string())?;
+        let mut torques = [0; 5];
+        self.read(&request, |reply| {
+            let profile = reply
+                .torque_and_profile()
+                .map_err(|error| error.to_string())?;
+            torques[reply.joint().index()] = profile.torque_enable_raw();
+            Ok(())
+        })?;
+        Ok(torques)
+    }
+
     /// Torque, acceleration, goal speed and goal of the shoulder and elbow.
     fn arm_profiles(&mut self) -> Result<[(u8, u8, u16, u16); 2], String> {
         let request = ReadOnlyRequest::sync_read(&ARM, ReadWindow::TORQUE_AND_PROFILE)
@@ -3033,6 +3048,77 @@ fn torque_off<P: PortIo, R: Runtime>(
 /// off on all five, once each (a wire that has gone silent is not waited on).
 fn let_go_at_end<P: PortIo, R: Runtime>(bus: &mut Bus<'_, P, R>, report: &mut BodyReport) {
     let _ = torque_off(bus, report, &mut Joint::ALL.to_vec());
+}
+
+/// What a let-go after the body stopped found and did (#3697,
+/// `lamp-body-measure let-go`): whether the lamp was down, whether every
+/// joint then read back let go, and each joint as it was read.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize)]
+pub struct LetGo {
+    pub down: bool,
+    pub let_go: bool,
+    pub joints: Vec<LetGoJoint>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+}
+
+/// One joint of a [`LetGo`], servo 1 to 5: where it was found, and its
+/// torque enable read back afterwards (0 let go, 1 held; `None` unread).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct LetGoJoint {
+    pub joint: &'static str,
+    pub position: u16,
+    pub torque: Option<u8>,
+}
+
+/// The body's let-go before the power goes (#3697, HAL-4.12 and HAL-5.18):
+/// run once the body has stopped, folded and holding. Each joint is read;
+/// only a lamp that is down, as the stop's own let-go judges it (the head
+/// within `LET_GO_NEAR` of `home`, the arm of `folded` when the lamp has
+/// one), has torque off written to all five. Then each joint's torque is
+/// read back. A lamp found up keeps its torque: let go, it would fall.
+pub(crate) fn let_go_stopped<P: PortIo, R: Runtime>(
+    io: &mut P,
+    runtime: &mut R,
+    home: [u16; 3],
+    folded: Option<[u16; 2]>,
+) -> LetGo {
+    let mut bus = Bus::new(io, runtime, None);
+    let mut out = LetGo::default();
+    let found = match bus.samples() {
+        Ok(found) => found,
+        Err(error) => {
+            out.error = Some(format!("first read: {error}"));
+            return out;
+        }
+    };
+    out.down = (0..3).all(|index| {
+        found[COMMANDED[index].index()]
+            .position
+            .abs_diff(home[index])
+            <= LET_GO_NEAR
+    }) && folded.is_none_or(|folded| arm_folded(&found, folded));
+    if out.down {
+        for joint in Joint::ALL {
+            if let Err(error) = bus.write_acknowledged(joint, &torque_write(joint, 0), true) {
+                out.error.get_or_insert(format!("torque off: {error}"));
+            }
+        }
+    }
+    let torques = bus.torques();
+    if let Err(error) = &torques {
+        out.error.get_or_insert(format!("read back: {error}"));
+    }
+    out.joints = Joint::ALL
+        .iter()
+        .map(|joint| LetGoJoint {
+            joint: joint.name(),
+            position: found[joint.index()].position,
+            torque: torques.as_ref().ok().map(|torques| torques[joint.index()]),
+        })
+        .collect();
+    out.let_go = out.down && out.joints.iter().all(|joint| joint.torque == Some(0));
+    out
 }
 
 /// How often the joints are read while the lamp is let go for a pose a

@@ -14325,3 +14325,32 @@ fn a_base_given_way_and_held_still_under_its_bound_is_not_a_hand() {
         assert!(seen.iter().all(|g| !g.hand), "limp {limp}: {report:?}");
     }
 }
+
+/// The let-go before the power goes (#3697): a lamp found down, as the
+/// stop left it, has torque off written to all five and reads each back.
+#[test]
+fn a_down_lamp_is_let_go_and_each_joint_reads_back_let_go() {
+    let (mut lamp, mut clock) = folded(Duration::from_secs(1));
+    let out = let_go_stopped(&mut lamp, &mut clock, HOME, Some([2_050, 2_047]));
+    assert!(out.down && out.let_go, "{out:?}");
+    assert_eq!(out.error, None);
+    assert!(let_go_of_the_whole_lamp(&lamp));
+    let names: Vec<_> = out.joints.iter().map(|joint| joint.joint).collect();
+    assert_eq!(names, Joint::ALL.map(Joint::name));
+    assert!(out.joints.iter().all(|joint| joint.torque == Some(0)));
+    assert_eq!(out.joints[PITCH].position, 2_000);
+}
+
+/// A lamp found up, its arm off its folded counts or its head off home,
+/// keeps its torque: let go, it would fall. Nothing is written.
+#[test]
+fn a_lamp_found_up_keeps_its_torque() {
+    for (servo, at) in [(1usize, 2_650.0f32), (PITCH, 1_900.0)] {
+        let (mut lamp, mut clock) = folded(Duration::from_secs(1));
+        lamp.servos[servo].position = at;
+        let out = let_go_stopped(&mut lamp, &mut clock, HOME, Some([2_050, 2_047]));
+        assert!(!out.down && !out.let_go, "{out:?}");
+        assert!(lamp.registers.is_empty());
+        assert!(out.joints.iter().all(|joint| joint.torque == Some(1)));
+    }
+}

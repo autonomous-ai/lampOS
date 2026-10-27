@@ -2060,6 +2060,18 @@ V1 never calibrated), as #3558 asks
 `the_sweep_line_is_appended_once_to_an_existing_file`). Stop the body and
 every other bus owner first.
 
+**`lamp-body-measure let-go`** (#3697, shutdown.md) is the body's park before
+the power goes, run by `lamp-setup shutdown-now` 0.4 s after the body has
+stopped, as the body's user. It takes the port and its lock as the body does
+(`linux::let_go_once`), reads each joint, and only for a lamp that is down (the
+head within 20 counts of `lamp.env`'s `--home`, the arm within 20 of its
+`--folded-arm` when it has one: the bound the let-go at a stop uses) writes
+torque off to all five; then it reads each joint's torque back and prints one
+JSON line, each joint with where it was and its torque. A lamp found up keeps
+its torque and nothing is written (`a_down_lamp_is_let_go_and_each_joint_reads_back_let_go`,
+`a_lamp_found_up_keeps_its_torque`). It exits 0 only when every joint reads
+back let go.
+
 **The first stand of a moved lamp, confirmed at the lamp** (#2396; the
 first builder on #1711, 21 Oct). `lamp-body-measure first-stand`
 (`crates/body/src/first_stand.rs`, run by `deploy/units/lamp-first-stand.service`
