@@ -1,0 +1,36 @@
+{
+  "stage": "workspace",
+  "original_receipt": {
+    "private_evidence_role": "skills-after-mood29f-full-gates-prep-20261028/cmd-workspace.json",
+    "sha256": "0b5b79c931db24565b53293c4d257c7483903aafb5a829a8103ea88c87724c0a",
+    "bytes": 1947
+  },
+  "command": [
+    "cargo",
+    "+1.96.0",
+    "build",
+    "--offline",
+    "--locked",
+    "--workspace",
+    "--jobs",
+    "1",
+    "--message-format=json"
+  ],
+  "exit_code": 0,
+  "direct_wait_status": 0,
+  "timed_out": false,
+  "disk_reserve_breached": false,
+  "owned_group_absent_after_cleanup": true,
+  "unresolved_owned_pids": [],
+  "raw_stdout": {
+    "stdout_sha256": "139e343195e6f9c94165bab17bcc1ae7b0c198197a9864a0636716bdbe016b6d",
+    "stdout_bytes": 376887
+  },
+  "raw_stderr": {
+    "stderr_sha256": "f4deb9c7e46f1c201329f84eb61efe98bbfcf04e054c27ae11e96ee90645d120",
+    "stderr_bytes": 60
+  },
+  "actual_new_invocation_in_continuation": false,
+  "original_controller_native_exit": 1,
+  "original_failed_capacity_stop_preserved": true
+}

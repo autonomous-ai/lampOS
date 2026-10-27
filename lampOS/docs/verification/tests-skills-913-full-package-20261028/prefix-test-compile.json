@@ -1,0 +1,38 @@
+{
+  "stage": "test-compile",
+  "original_receipt": {
+    "private_evidence_role": "skills-after-mood29f-full-gates-prep-20261028/cmd-test-compile.json",
+    "sha256": "95b7887f9aee86fc74ccd1d42d44d196dc29f7a7a6a73d1ffac65578a82a040f",
+    "bytes": 1981
+  },
+  "command": [
+    "cargo",
+    "+1.96.0",
+    "test",
+    "--offline",
+    "--locked",
+    "--jobs",
+    "1",
+    "-p",
+    "lamp-skills",
+    "--no-run",
+    "--message-format=json"
+  ],
+  "exit_code": 0,
+  "direct_wait_status": 0,
+  "timed_out": false,
+  "disk_reserve_breached": false,
+  "owned_group_absent_after_cleanup": true,
+  "unresolved_owned_pids": [],
+  "raw_stdout": {
+    "stdout_sha256": "ef602c72285ae81641eeb4783739cf822950599b394cabe9ffdf04c67c575ced",
+    "stdout_bytes": 193684
+  },
+  "raw_stderr": {
+    "stderr_sha256": "5a84968f781e8e414f1f9bd7cdfea727236f61b1f8abd98f31f75e7bd5168a2b",
+    "stderr_bytes": 162
+  },
+  "actual_new_invocation_in_continuation": false,
+  "original_controller_native_exit": 1,
+  "original_failed_capacity_stop_preserved": true
+}

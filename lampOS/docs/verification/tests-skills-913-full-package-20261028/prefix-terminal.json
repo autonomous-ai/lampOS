@@ -1,0 +1,25 @@
+{
+  "status": "FAIL",
+  "head": "913b4222c563ba478ad3965680aec91d6fe78139",
+  "base": "89823095e69dcbafaa5b3b79733c17ecf9d8e8f7",
+  "runtime_attempts": 0,
+  "scope": "Fresh full unfiltered serial Skills Cargo package including docs/custom cases",
+  "runtime_reuse": false,
+  "old_521_1_9_failure_retained": true,
+  "no_clean": true,
+  "full_reverse_package_runtime_claim": false,
+  "native_claim": false,
+  "error": "AssertionError('Insufficient disk before Cargo')",
+  "source_unchanged": true,
+  "official_owner_unchanged": true,
+  "sealed_and_actual_guards": true,
+  "protected_count": 208,
+  "actual_count": 7,
+  "full_hash_checkpoints": [
+    "initial",
+    "final"
+  ],
+  "owned_groups_closed": true,
+  "unresolved_owned_pids": [],
+  "lease_released": true
+}

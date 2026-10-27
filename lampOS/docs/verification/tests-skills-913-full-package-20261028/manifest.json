@@ -1,0 +1,55 @@
+{
+  "self_excluded": "manifest.json",
+  "files": [
+    {
+      "path": "README.md",
+      "sha256": "bc8402d7f10b4d1dabbda6b5538684549afefa06246d1da74fafa2ad62458fcd",
+      "bytes": 2376
+    },
+    {
+      "path": "audit.json",
+      "sha256": "a445d906329b4b07158b3669ff7a8a2d6aa15cfcfe9b5f62f285b7cc9f4e3b27",
+      "bytes": 87602
+    },
+    {
+      "path": "full-package.stdout.txt",
+      "sha256": "eb873245cc8f4f4d43dd522877ba7ef4bebba54a3f93f26b13ce3aeaeaa45925",
+      "bytes": 47773
+    },
+    {
+      "path": "prefix-fmt.json",
+      "sha256": "205b92805ddd57e2ce5a3e2b29f856cda63340f62623a19ba440da2a60d485d4",
+      "bytes": 912
+    },
+    {
+      "path": "prefix-metadata.json",
+      "sha256": "6f4b19eea6cd3ea637ef23f57fc802eab141293b5b4b7c8a3f6cbccaada89d97",
+      "bytes": 972
+    },
+    {
+      "path": "prefix-strict.json",
+      "sha256": "ad4d371e21114a40e51534ad38a7af24cc8c4205fcc300af50e4e733255a43a0",
+      "bytes": 1389
+    },
+    {
+      "path": "prefix-terminal.json",
+      "sha256": "23dcaa1c1588006f20fa8bfb7ba29a2bea18073eeb4216f28dec1c3860c6279e",
+      "bytes": 765
+    },
+    {
+      "path": "prefix-test-compile.json",
+      "sha256": "102a9443ef6fdff09b036fe0875ac8f3274f3587996d49c0d8aadd80ad6ab7f0",
+      "bytes": 1040
+    },
+    {
+      "path": "prefix-workspace.json",
+      "sha256": "b385c525b9516ee8acb498c955a1f9cb66851a47f0f440d43cf4a78c17ef17c7",
+      "bytes": 1008
+    },
+    {
+      "path": "terminal.json",
+      "sha256": "7646dbca10e39994785a24908b7ac5fa144552335bb5f6444f1e1f9852daa536",
+      "bytes": 1873
+    }
+  ]
+}

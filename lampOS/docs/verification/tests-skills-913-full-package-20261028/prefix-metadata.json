@@ -1,0 +1,34 @@
+{
+  "stage": "metadata",
+  "original_receipt": {
+    "private_evidence_role": "skills-after-mood29f-full-gates-prep-20261028/cmd-metadata.json",
+    "sha256": "4c1be0e0c112f4e26526898529403656b57acd19bf21c133ab4ba1ac814d3a3b",
+    "bytes": 1910
+  },
+  "command": [
+    "cargo",
+    "+1.96.0",
+    "metadata",
+    "--offline",
+    "--locked",
+    "--format-version",
+    "1"
+  ],
+  "exit_code": 0,
+  "direct_wait_status": 0,
+  "timed_out": false,
+  "disk_reserve_breached": false,
+  "owned_group_absent_after_cleanup": true,
+  "unresolved_owned_pids": [],
+  "raw_stdout": {
+    "stdout_sha256": "42736187989422977e9649f4b9c0e115958c347ae4700fbb63835a0f09d26d3f",
+    "stdout_bytes": 2386296
+  },
+  "raw_stderr": {
+    "stderr_sha256": "4c9eb667b06d15fae0587960059a48122a7acc60b10acd07c1b3eee2e2167a76",
+    "stderr_bytes": 52
+  },
+  "actual_new_invocation_in_continuation": false,
+  "original_controller_native_exit": 1,
+  "original_failed_capacity_stop_preserved": true
+}

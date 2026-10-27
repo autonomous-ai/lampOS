@@ -1,0 +1,63 @@
+{
+  "stage": "strict",
+  "original_receipt": {
+    "private_evidence_role": "skills-after-mood29f-full-gates-prep-20261028/cmd-strict.json",
+    "sha256": "ac5a450390d61c9f5f84684bfabaee4f933eb95e21f3cab3b7f1260f97743df6",
+    "bytes": 2327
+  },
+  "command": [
+    "cargo",
+    "+1.96.0",
+    "clippy",
+    "--offline",
+    "--locked",
+    "--all-targets",
+    "--jobs",
+    "1",
+    "--message-format=json",
+    "-p",
+    "lamp-body",
+    "-p",
+    "lamp-cloud",
+    "-p",
+    "lamp-expression",
+    "-p",
+    "lamp-keeper",
+    "-p",
+    "lamp-lean",
+    "-p",
+    "lamp-memory",
+    "-p",
+    "lamp-peek",
+    "-p",
+    "lamp-setup",
+    "-p",
+    "lamp-skills",
+    "-p",
+    "lamp-update",
+    "-p",
+    "lamp-voice",
+    "-p",
+    "lamp-voice-eval",
+    "--",
+    "-D",
+    "warnings"
+  ],
+  "exit_code": 0,
+  "direct_wait_status": 0,
+  "timed_out": false,
+  "disk_reserve_breached": false,
+  "owned_group_absent_after_cleanup": true,
+  "unresolved_owned_pids": [],
+  "raw_stdout": {
+    "stdout_sha256": "8ba11ed02cce3afabdb0fcde63bf0e2e822f3db095cdececf47144d6927a20f0",
+    "stdout_bytes": 360002
+  },
+  "raw_stderr": {
+    "stderr_sha256": "ab46f0e8a749cf4626192f5625ce3316824d5b236877012c0e74f363ebcc8638",
+    "stderr_bytes": 268
+  },
+  "actual_new_invocation_in_continuation": false,
+  "original_controller_native_exit": 1,
+  "original_failed_capacity_stop_preserved": true
+}
