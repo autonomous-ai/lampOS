@@ -106,3 +106,30 @@ it pins them.
 
 Tests: `PYTHONPATH=src python3 -m pytest tests` (needs `pytest`; with
 `jsonschema`, the fake lamp checks every request against the schema).
+
+## Check a skill folder
+
+A skill is a folder the lamp runs without code: its rules in `skill.toml`
+([the skill format, version 1](../../docs/skill-format.md)). Check one
+before it goes to a lamp or the Store:
+
+```sh
+pip install './lampOS/sdk/python[check]'   # the format's schema check needs jsonschema
+lamp skill check path/to/my-skill
+```
+
+It checks SKILL.md's front matter as the lamp reads it (`---` exactly on
+the first line, `name:` and `description:` at a line's start, a value taken
+as written, quotes and all), with the folder's own `name`; `skill.toml`'s
+shape against the format's schema (a misspelt key is an error, as on the
+lamp); that the folder holds no script (by suffix, executable bit or `#!`)
+and no link where the lamp reads (it never follows one); its moves, held to
+lamp-body's own bounds (name, `step_ms` 40 to 1000, 1.5 to 10 s, from rest
+to rest, each joint's reach and speed); and its sounds (16-bit mono 24 kHz,
+3 s at most). A file it can't read is that folder's error, and the next
+folder is still checked. It warns
+on `[permissions] look = true` without `camera = true`, which format 1
+still reads as the full picture: ask `camera` for the picture and keep
+`look` for presence. The rules between keys, such as permissions
+covering every read, are the lamp's own load check: a folder that passes
+here can still be refused there, with its reason.

@@ -13,10 +13,11 @@ dependencies = ["websockets>=13", "cryptography>=42"]
 
 [project.optional-dependencies]
 find = ["zeroconf>=0.130"]
-test = ["pytest>=8", "jsonschema>=4.20"]
+check = ["jsonschema>=4.20", "tomli>=2; python_version < '3.11'"]
+test = ["pytest>=8", "jsonschema>=4.20", "tomli>=2; python_version < '3.11'"]
 
 [project.scripts]
 lamp = "lampos.cli:main"
 
 [tool.setuptools.package-data]
-lampos = ["control.schema.json"]
+lampos = ["control.schema.json", "skill-format.schema.json"]
