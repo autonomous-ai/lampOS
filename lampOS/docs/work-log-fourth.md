@@ -1,3 +1,21 @@
+## 2026-10-27 16:53 UTC — Onboarding native run fails at the upstream journal fixture
+
+Ready for lamp-voice: no
+
+[Original failed native receipt](verification/onboarding-c0cf-native-failure-20261027/README.md):
+#3472 `c0cf52f96` ARM40541161543 failed on merge `0f4ba582e`: 9,067 PASS,
+one FAIL and 2,692 selected unrun; zero leaks, 106 summary skips. Twenty
+required controls passed, but the socket P3 control is unrun. Linux40541161690
+passed. The upstream N13 fixture rejects the legal old-close/new-open order;
+Friday's existing #3891 repairs that assertion. No rerun or gate waiver.
+Docs, relay, process and artifact export did not execute; no failed executable
+or new install pins were available. Raw logs and source remain retained.
+
+#3564 landed in train249 as `e43fd36f6`, satisfying the Common composition
+prerequisite. Its actual post-landing carry is being prepared privately while
+the #3544 current full runtime continues; all four changed bounded cases pass.
+The new remainder has 4,159 eligible cases, with no premature pass claim.
+
 ## 2026-10-27 16:28 UTC — Onboarding folded into one qualified-source commit
 
 Ready for lamp-voice: no

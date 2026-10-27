@@ -1,0 +1,358 @@
+{
+  "created_at": "2026-10-27T16:51:49.818104+00:00",
+  "pr": 3472,
+  "published_head": "c0cf52f9690d178f81d105e31e22c7694cc5738f",
+  "published_tree": "5efa5a3e970a2ac5a863a053cc044f46f7794a38",
+  "authored_base": "c3eb20be307d06a6d6278254ec54654b68698b0e",
+  "result": "ARM FAILED; Linux Clippy PASS",
+  "native_tools": [
+    {
+      "operation": "ARM gh run watch",
+      "session": 5776,
+      "exit": 1,
+      "chunk": "032645"
+    },
+    {
+      "operation": "Linux gh run watch",
+      "session": 12314,
+      "exit": 0,
+      "chunk": "858d9b"
+    },
+    {
+      "operation": "Linux original log collection",
+      "session": 42330,
+      "exit": 0,
+      "chunk": "4747c5"
+    },
+    {
+      "operation": "ARM original log collection",
+      "session": 83385,
+      "exit": 0,
+      "chunk": "de0f9d"
+    },
+    {
+      "operation": "combined actual source binding",
+      "session": 39686,
+      "exit": 0,
+      "chunk": "0bae6e"
+    },
+    {
+      "operation": "failure source read",
+      "session": 81756,
+      "exit": 0,
+      "chunk": "282c81"
+    }
+  ],
+  "runs": [
+    {
+      "id": 40541161543,
+      "head_sha": "c0cf52f9690d178f81d105e31e22c7694cc5738f",
+      "run_attempt": 1,
+      "status": "completed",
+      "conclusion": "failure",
+      "created_at": "2026-10-27T16:27:53Z",
+      "updated_at": "2026-10-27T16:49:09Z"
+    },
+    {
+      "id": 40541161690,
+      "head_sha": "c0cf52f9690d178f81d105e31e22c7694cc5738f",
+      "run_attempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-10-27T16:27:53Z",
+      "updated_at": "2026-10-27T16:33:14Z"
+    }
+  ],
+  "source_binding": {
+    "offered_head": "c0cf52f9690d178f81d105e31e22c7694cc5738f",
+    "offered_tree": "5efa5a3e970a2ac5a863a053cc044f46f7794a38",
+    "records": [
+      {
+        "checkout": "0f4ba582efc0f17954536bf3a69e8fd90e605aad",
+        "tree": "0f1556bbf4d0488503c99df754758197b142d7cd",
+        "parents": [
+          "0d1d1f2b944581169c9f96adba9f40ab88adba92",
+          "c0cf52f9690d178f81d105e31e22c7694cc5738f"
+        ],
+        "runs": [
+          40541161690,
+          40541161543
+        ],
+        "sources": [
+          {
+            "path": "lampOS/crates/eyes/tests/remember_speaker.rs",
+            "offered_git_blob": "86201511f978f2ae0a6969e298893e28c4369a27",
+            "actual_git_blob": "86201511f978f2ae0a6969e298893e28c4369a27",
+            "exact": true,
+            "offered_sha256": "f9944d4e2f9b7aa916ae8754ba900cf5bece558b41e7e17642c5b01a6405dc01",
+            "owned_path": false,
+            "required_source": true,
+            "actual_sha256": "f9944d4e2f9b7aa916ae8754ba900cf5bece558b41e7e17642c5b01a6405dc01"
+          },
+          {
+            "path": "lampOS/crates/skills/tests/it/format.rs",
+            "offered_git_blob": "8e7c0f3ab84f1ed4e6adfb871b9a27bac184d277",
+            "actual_git_blob": "8e7c0f3ab84f1ed4e6adfb871b9a27bac184d277",
+            "exact": true,
+            "offered_sha256": "abc826f03b24058eb59040f5ea9825b22b6fa35e88874c5374c00d79a2712362",
+            "owned_path": false,
+            "required_source": true,
+            "actual_sha256": "abc826f03b24058eb59040f5ea9825b22b6fa35e88874c5374c00d79a2712362"
+          },
+          {
+            "path": "lampOS/crates/update/tests/install.rs",
+            "offered_git_blob": "518161713c84214d2c72869142dc237809f6a454",
+            "actual_git_blob": "518161713c84214d2c72869142dc237809f6a454",
+            "exact": true,
+            "offered_sha256": "a04d6d349ddbf5347f42630df58b002ebd2c52e263a085b729677680424224ed",
+            "owned_path": true,
+            "required_source": false,
+            "actual_sha256": "a04d6d349ddbf5347f42630df58b002ebd2c52e263a085b729677680424224ed"
+          },
+          {
+            "path": "lampOS/crates/update/tests/it/ci_paths.rs",
+            "offered_git_blob": "a80a8e67b0a3f29afb4e2be266a25c09100584a7",
+            "actual_git_blob": "a80a8e67b0a3f29afb4e2be266a25c09100584a7",
+            "exact": true,
+            "offered_sha256": "da2d09282d8c6ee4248f61bdfc904d21eb2b28f89e72d9639d88b8777c5e4725",
+            "owned_path": false,
+            "required_source": true,
+            "actual_sha256": "da2d09282d8c6ee4248f61bdfc904d21eb2b28f89e72d9639d88b8777c5e4725"
+          },
+          {
+            "path": "lampOS/crates/voice/src/onboarding/legacy_words.rs",
+            "offered_git_blob": "adc4474ddb5bdf24fba0e6267c8fb0a5dc1c3a23",
+            "actual_git_blob": "adc4474ddb5bdf24fba0e6267c8fb0a5dc1c3a23",
+            "exact": true,
+            "offered_sha256": "cdc72b9b1af6f3cdd58966cec1c9ac86174c791a9795a14f6c8d7c79abbe76f7",
+            "owned_path": true,
+            "required_source": false,
+            "actual_sha256": "cdc72b9b1af6f3cdd58966cec1c9ac86174c791a9795a14f6c8d7c79abbe76f7"
+          },
+          {
+            "path": "lampOS/crates/voice/src/onboarding/skill/tests.rs",
+            "offered_git_blob": "05a2f5073bbe87afe8920c02e701426d442b9f44",
+            "actual_git_blob": "05a2f5073bbe87afe8920c02e701426d442b9f44",
+            "exact": true,
+            "offered_sha256": "0e10833f5af87724bb12e6f73fcc2497a809d7a88a84351bab80b9dd7617f764",
+            "owned_path": false,
+            "required_source": true,
+            "actual_sha256": "0e10833f5af87724bb12e6f73fcc2497a809d7a88a84351bab80b9dd7617f764"
+          },
+          {
+            "path": "lampOS/crates/voice/src/process/switch_census_tests.rs",
+            "offered_git_blob": "dc71041a9cdc4de112ef523df8ccd1fda28166f0",
+            "actual_git_blob": "dc71041a9cdc4de112ef523df8ccd1fda28166f0",
+            "exact": true,
+            "offered_sha256": "e596c3e13ee57afb14000b1f75bae78b4476a28c06c1f7c35aeaa324884d263c",
+            "owned_path": false,
+            "required_source": true,
+            "actual_sha256": "e596c3e13ee57afb14000b1f75bae78b4476a28c06c1f7c35aeaa324884d263c"
+          },
+          {
+            "path": "lampOS/crates/voice/src/remember_speaker.rs",
+            "offered_git_blob": "2e7e45ad21f1f89eff98f71c3b9c6a96dc2ffa39",
+            "actual_git_blob": "2e7e45ad21f1f89eff98f71c3b9c6a96dc2ffa39",
+            "exact": true,
+            "offered_sha256": "f97706ed4e41fb0abb398079e124df1c4dbca9abcaec223f63a40d3adf9495f4",
+            "owned_path": true,
+            "required_source": true,
+            "actual_sha256": "f97706ed4e41fb0abb398079e124df1c4dbca9abcaec223f63a40d3adf9495f4"
+          },
+          {
+            "path": "lampOS/deploy/product/lamp-eyes.service",
+            "offered_git_blob": "f9f8384db58d1a10b50e5413ecdf3ec6ed580ca4",
+            "actual_git_blob": "f9f8384db58d1a10b50e5413ecdf3ec6ed580ca4",
+            "exact": true,
+            "offered_sha256": "1cbe896bcafcf473f9e70ae3bac1145d1d7ca4807d93e345210e83ef13b9274d",
+            "owned_path": true,
+            "required_source": false,
+            "actual_sha256": "1cbe896bcafcf473f9e70ae3bac1145d1d7ca4807d93e345210e83ef13b9274d"
+          },
+          {
+            "path": "lampOS/deploy/product/lamp-voice.service",
+            "offered_git_blob": "b9886e337535d697306438efc93c004d90b26938",
+            "actual_git_blob": "91f7f3fedd4ca4ebe0dbc7cfc9182da4e07299bf",
+            "exact": false,
+            "offered_sha256": "e3c054e74a7d79254bece637392ab314ebb8672690256f10c6ed73f472a6647e",
+            "owned_path": true,
+            "required_source": false,
+            "actual_sha256": "51f30f5490a3728390269c6c266df3f676f6c4aa6d2f504d70e0db2d9451a702"
+          },
+          {
+            "path": "lampOS/docs/onboarding.md",
+            "offered_git_blob": "d6b0368fc89459babe4fe22f0cfb7b96f68f0725",
+            "actual_git_blob": "d6b0368fc89459babe4fe22f0cfb7b96f68f0725",
+            "exact": true,
+            "offered_sha256": "387a80b63c84b78f036593d35f67507611ee6615f28b970d15c64fcc7b88fe5a",
+            "owned_path": true,
+            "required_source": false,
+            "actual_sha256": "387a80b63c84b78f036593d35f67507611ee6615f28b970d15c64fcc7b88fe5a"
+          },
+          {
+            "path": "lampOS/docs/switches.md",
+            "offered_git_blob": "9882932b0b0b17fdaddecf96657ba4e0e5b57cfa",
+            "actual_git_blob": "b19f7d3ad7c3d0c7a5f6d9ef4b693c6ed30010e1",
+            "exact": false,
+            "offered_sha256": "58d5e63eeda9a67ec48f61c76a97e935ff8422cdae4c79730d2ad7a8bf997227",
+            "owned_path": true,
+            "required_source": false,
+            "actual_sha256": "5de5f9ecca65bf2b23a1f476de415fb2d659f229e87442b00605ee7c666ec8be"
+          },
+          {
+            "path": "lampOS/docs/verification/onboarding-speaking-face-20261025/README.md",
+            "offered_git_blob": "5973b4dd54697e47e661fe59e5801fb467356457",
+            "actual_git_blob": "5973b4dd54697e47e661fe59e5801fb467356457",
+            "exact": true,
+            "offered_sha256": "e2da22578de45851e408cfa1ee6954677271a699fe660a4c740c3d5a14dea400",
+            "owned_path": true,
+            "required_source": false,
+            "actual_sha256": "e2da22578de45851e408cfa1ee6954677271a699fe660a4c740c3d5a14dea400"
+          },
+          {
+            "path": "lampOS/skills/onboarding/SKILL.md",
+            "offered_git_blob": "a588fce43a1d956b179b18cae0932e62d3495826",
+            "actual_git_blob": "a588fce43a1d956b179b18cae0932e62d3495826",
+            "exact": true,
+            "offered_sha256": "4a81cb05fd8db9408fad73a2f5eedbbf2d678ef4ea9901235f40d6d44d906f57",
+            "owned_path": true,
+            "required_source": false,
+            "actual_sha256": "4a81cb05fd8db9408fad73a2f5eedbbf2d678ef4ea9901235f40d6d44d906f57"
+          },
+          {
+            "path": "lampOS/skills/onboarding/skill.toml",
+            "offered_git_blob": "af4d0ca0b03b20f68c71ec0fb3f380e3cf24cb23",
+            "actual_git_blob": "af4d0ca0b03b20f68c71ec0fb3f380e3cf24cb23",
+            "exact": true,
+            "offered_sha256": "030ba75d5cbf7abd3b62834c82511022a1423c9f9d40465cfe41a9e907dc8d4d",
+            "owned_path": true,
+            "required_source": false,
+            "actual_sha256": "030ba75d5cbf7abd3b62834c82511022a1423c9f9d40465cfe41a9e907dc8d4d"
+          }
+        ]
+      }
+    ],
+    "no_working_tree_source_binding": true
+  },
+  "outer_terminal_counts": {
+    "PASS": 9067,
+    "FAIL": 1
+  },
+  "unique_outer_identities": 9068,
+  "duplicate_terminal_identities": 0,
+  "summary": [
+    {
+      "line": 9994,
+      "text": "     Summary [ 210.367s] 9068/11760 tests run: 9067 passed, 1 failed, 106 skipped"
+    }
+  ],
+  "selected": 11760,
+  "executed": 11760,
+  "unrun": 0,
+  "summary_skips": 106,
+  "skipped_identities_not_catalogued": true,
+  "required_total": 21,
+  "required_once_pass": 20,
+  "required_unrun": [
+    {
+      "binary": "lamp-voice",
+      "test": "remember_speaker::tests::remember_speaker_wire_uses_internal_evidence_and_old_eyes_never_get_a_retry"
+    }
+  ],
+  "required_failed": [],
+  "native_test_step_exit": 100,
+  "failure": {
+    "binary": "lamp-voice",
+    "test": "remember::tests::after_a_forget_the_next_conversation_is_journalled_and_ended",
+    "outer_duration_seconds": 0.011,
+    "source_path": "lampOS/crates/voice/src/remember.rs",
+    "source_blob": "7b409c183bc25ae14d7cc80bdc453a1bb0f9e578",
+    "source_sha256": "a248d2d47f8b18683d300b7de8ab678c472cce4879b3ed49c9721f4d39345360",
+    "inner_assertion_line": 17068,
+    "outer_child_status_assertion_line": 16867,
+    "actual_operations": [
+      "session_open",
+      "forget",
+      "session_close",
+      "session_open",
+      "append_linked",
+      "conversation_end"
+    ],
+    "expected_operations": [
+      "session_open",
+      "forget",
+      "session_open",
+      "session_close",
+      "append_linked",
+      "conversation_end"
+    ],
+    "inference": "The fixture requires a total order that the source does not guarantee between a queued old-session close and a synchronous new-session open. The log shows both operations completed. This does not establish a production journal-resume failure or qualify the unrun assertions.",
+    "runtime_replayed": false,
+    "fix_prepared": false,
+    "owner_scope": "Upstream journal-resume N13 fixture, outside the enrollment change owned by this PR.",
+    "suggested_control": "Retain all six methods and session identities, append before conversation_end, source_ids and journal_inhibited assertions; permit the two legal middle open/close orders rather than sorting or dropping any operation."
+  },
+  "local_source_bridge": {
+    "published_head": "c0cf52f9690d178f81d105e31e22c7694cc5738f",
+    "published_tree": "5efa5a3e970a2ac5a863a053cc044f46f7794a38",
+    "local_tested_tree": "0063ca3a3385aa8d8acb6d904cc2ae1f842f065e",
+    "whole_tree_equal": false,
+    "post_gate_changes": [
+      "lampOS/docs/verification/onboarding-speaking-face-20261025/README.md"
+    ],
+    "required_source_files_exact": [
+      {
+        "path": "lampOS/crates/eyes/tests/remember_speaker.rs",
+        "git_blob": "86201511f978f2ae0a6969e298893e28c4369a27"
+      },
+      {
+        "path": "lampOS/crates/skills/tests/it/format.rs",
+        "git_blob": "8e7c0f3ab84f1ed4e6adfb871b9a27bac184d277"
+      },
+      {
+        "path": "lampOS/crates/update/tests/it/ci_paths.rs",
+        "git_blob": "a80a8e67b0a3f29afb4e2be266a25c09100584a7"
+      },
+      {
+        "path": "lampOS/crates/voice/src/onboarding/skill/tests.rs",
+        "git_blob": "05a2f5073bbe87afe8920c02e701426d442b9f44"
+      },
+      {
+        "path": "lampOS/crates/voice/src/process/switch_census_tests.rs",
+        "git_blob": "dc71041a9cdc4de112ef523df8ccd1fda28166f0"
+      },
+      {
+        "path": "lampOS/crates/voice/src/remember_speaker.rs",
+        "git_blob": "2e7e45ad21f1f89eff98f71c3b9c6a96dc2ffa39"
+      }
+    ],
+    "local_required_terminal_ledger_sha256": "a6b6c931bf05b12a79630e0b51839c3d10405b7f90eddbdadc6b25acd389450c",
+    "local_required_unique_pass": 21,
+    "runtime_credit_transferred_to_native": false
+  },
+  "local_runtime_not_transferred_to_native": true,
+  "docs_relay_process_export": "Skipped after runtime failure; zero runtime credit for these stages.",
+  "artifact_api_total": 0,
+  "artifact_downloaded": false,
+  "failed_executable_available": false,
+  "failed_executable_retention_limit": "Original run exposed no artifacts; failed test executable bytes and independent binary digest are unavailable. Original job logs and exact failed-source Git blob were retained.",
+  "old_failures_preserved": "No prior packet was edited and no old failed or isolated run was relabelled.",
+  "holds": {
+    "draft": "unchanged",
+    "current_base": "unchanged",
+    "physical": "unchanged",
+    "ready": false
+  },
+  "no_source_index_ref_target_log_worktree_changes": true,
+  "no_tests_reruns_workflow_dispatch_or_binary_execution": true,
+  "evidence_sha256": {
+    "40541161543-original-logs.zip": "79afdbc6c4e7bc7139ab5ebb4f2e93888211ae112201b338aec48d7fd2904fd4",
+    "40541161690-original-logs.zip": "739c25d3f2925f73d01955b63ad05b3f471c273cdcee6aa7ac74eaaeb7c4147d",
+    "native-terminal-ledger.json": "ae029d68050be0c56d5ce8b21cf43eb027365b83ecccbad2d6f703c46b3f1faf",
+    "required21-native-ledger.json": "d0164098e0246856f0f3db444119983e8d5f7c06e5e0f4269cd6e49f48961b3d",
+    "failure-original-excerpt.log": "6d693221e917272959c45eab3a3320781e2f4f74c3d5aa684a03f7de7c0df1ca",
+    "failure-source-remember.rs": "a248d2d47f8b18683d300b7de8ab678c472cce4879b3ed49c9721f4d39345360",
+    "actual-native-source-binding.json": "b100d1d6e306a83d2cbb33c5a6a6d68424275567b6b8c3eaec5e296b6604e73a",
+    "local-source-bridge.json": "56ddab4051c4b34b4f12c857947c9aaeec7e8682541e7dfa1d00182d9a0b2fd6"
+  }
+}

@@ -1,0 +1,330 @@
+[
+  {
+    "binary": "lamp-voice",
+    "test": "process::switch_census_tests::session_read_access_is_owned_by_the_coordinator_and_never_given_to_a_worker",
+    "source_path": "lampOS/crates/voice/src/process/switch_census_tests.rs",
+    "local_body_sha256": "4cdbf1cb586f61e99470fb41e3a2dc89ed1857f3db01e63e694b9a3dfc289103",
+    "terminals": [
+      {
+        "event": "PASS",
+        "duration": "0.310s",
+        "binary": "lamp-voice",
+        "test": "process::switch_census_tests::session_read_access_is_owned_by_the_coordinator_and_never_given_to_a_worker",
+        "raw_line": 9444
+      }
+    ],
+    "one_clean_native_pass": true
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "process::switch_census_tests::remember_speaker_arguments_survive_both_workers_cleared_environments",
+    "source_path": "lampOS/crates/voice/src/process/switch_census_tests.rs",
+    "local_body_sha256": "cc5035ea57b1c7a519d2b4d5847a15f5e91aad41699f2dcea14c0eef11fabc76",
+    "terminals": [
+      {
+        "event": "PASS",
+        "duration": "0.007s",
+        "binary": "lamp-voice",
+        "test": "process::switch_census_tests::remember_speaker_arguments_survive_both_workers_cleared_environments",
+        "raw_line": 9442
+      }
+    ],
+    "one_clean_native_pass": true
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "process::switch_census_tests::every_switch_the_workers_read_reaches_a_worker_or_says_why_not",
+    "source_path": "lampOS/crates/voice/src/process/switch_census_tests.rs",
+    "local_body_sha256": "c0c81558ab1dd1e58c9014e7c7270004c472a5c52cb54b053ebe54b1c05b2a48",
+    "terminals": [
+      {
+        "event": "PASS",
+        "duration": "0.320s",
+        "binary": "lamp-voice",
+        "test": "process::switch_census_tests::every_switch_the_workers_read_reaches_a_worker_or_says_why_not",
+        "raw_line": 9443
+      }
+    ],
+    "one_clean_native_pass": true
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "process::switch_census_tests::the_census_follows_the_helpers_a_worker_calls_and_sees_their_switches",
+    "source_path": "lampOS/crates/voice/src/process/switch_census_tests.rs",
+    "local_body_sha256": "36d1f96d2c14e934762be972a77c53608cd42753dd63b9ebc4a665f0cfa49f1f",
+    "terminals": [
+      {
+        "event": "PASS",
+        "duration": "0.317s",
+        "binary": "lamp-voice",
+        "test": "process::switch_census_tests::the_census_follows_the_helpers_a_worker_calls_and_sees_their_switches",
+        "raw_line": 9450
+      }
+    ],
+    "one_clean_native_pass": true
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "process::switch_census_tests::a_helper_left_out_loses_its_switches",
+    "source_path": "lampOS/crates/voice/src/process/switch_census_tests.rs",
+    "local_body_sha256": "f20b4a054029c6b381533de7328bbad5f3047886bd543030ecb9f953ba85d730",
+    "terminals": [
+      {
+        "event": "PASS",
+        "duration": "0.603s",
+        "binary": "lamp-voice",
+        "test": "process::switch_census_tests::a_helper_left_out_loses_its_switches",
+        "raw_line": 9449
+      }
+    ],
+    "one_clean_native_pass": true
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "process::switch_census_tests::a_helper_is_named_by_its_functions_not_by_its_types",
+    "source_path": "lampOS/crates/voice/src/process/switch_census_tests.rs",
+    "local_body_sha256": "09e6fb22491a5973ccd9ccd9e55825c0a70b230364d221907771cba5e28f5fbb",
+    "terminals": [
+      {
+        "event": "PASS",
+        "duration": "0.005s",
+        "binary": "lamp-voice",
+        "test": "process::switch_census_tests::a_helper_is_named_by_its_functions_not_by_its_types",
+        "raw_line": 9439
+      }
+    ],
+    "one_clean_native_pass": true
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "process::switch_census_tests::the_coordinators_functions_are_still_in_their_files",
+    "source_path": "lampOS/crates/voice/src/process/switch_census_tests.rs",
+    "local_body_sha256": "2e6ae170b739823eead36420bd683b28c500356ab3103c0d1a4b195890a77a13",
+    "terminals": [
+      {
+        "event": "PASS",
+        "duration": "0.010s",
+        "binary": "lamp-voice",
+        "test": "process::switch_census_tests::the_coordinators_functions_are_still_in_their_files",
+        "raw_line": 9445
+      }
+    ],
+    "one_clean_native_pass": true
+  },
+  {
+    "binary": "lamp-eyes::remember_speaker",
+    "test": "a_speaker_bound_enrollment_request_is_understood",
+    "source_path": "lampOS/crates/eyes/tests/remember_speaker.rs",
+    "local_body_sha256": "d6b994561e220587caf249d52646ff671e00f60bcca5e12c01f8f22e7d2a828b",
+    "terminals": [
+      {
+        "event": "PASS",
+        "duration": "0.005s",
+        "binary": "lamp-eyes::remember_speaker",
+        "test": "a_speaker_bound_enrollment_request_is_understood",
+        "raw_line": 3687
+      }
+    ],
+    "one_clean_native_pass": true
+  },
+  {
+    "binary": "lamp-eyes::remember_speaker",
+    "test": "the_legacy_capture_contract_stays_available_when_not_guarded",
+    "source_path": "lampOS/crates/eyes/tests/remember_speaker.rs",
+    "local_body_sha256": "1ca76a4553526a9478e018dc63ab6ed054176bd11ce384aab2830a0c0a7da479",
+    "terminals": [
+      {
+        "event": "PASS",
+        "duration": "0.004s",
+        "binary": "lamp-eyes::remember_speaker",
+        "test": "the_legacy_capture_contract_stays_available_when_not_guarded",
+        "raw_line": 3692
+      }
+    ],
+    "one_clean_native_pass": true
+  },
+  {
+    "binary": "lamp-eyes::remember_speaker",
+    "test": "the_real_capture_collector_never_mixes_in_a_replacement_under_the_same_id",
+    "source_path": "lampOS/crates/eyes/tests/remember_speaker.rs",
+    "local_body_sha256": "4df4e678869979cea0f1733a9b011e5df6c366d07c188d46db6b8a22a2f6a7c9",
+    "terminals": [
+      {
+        "event": "PASS",
+        "duration": "0.005s",
+        "binary": "lamp-eyes::remember_speaker",
+        "test": "the_real_capture_collector_never_mixes_in_a_replacement_under_the_same_id",
+        "raw_line": 3693
+      }
+    ],
+    "one_clean_native_pass": true
+  },
+  {
+    "binary": "lamp-eyes::remember_speaker",
+    "test": "five_fresh_prints_of_the_requesting_speaker_reach_the_final_fence",
+    "source_path": "lampOS/crates/eyes/tests/remember_speaker.rs",
+    "local_body_sha256": "73e8a33b90efcdb20dca167b6f8faf4eae0c3dd1008ed913011db08604ac2564",
+    "terminals": [
+      {
+        "event": "PASS",
+        "duration": "0.004s",
+        "binary": "lamp-eyes::remember_speaker",
+        "test": "five_fresh_prints_of_the_requesting_speaker_reach_the_final_fence",
+        "raw_line": 3688
+      }
+    ],
+    "one_clean_native_pass": true
+  },
+  {
+    "binary": "lamp-eyes::remember_speaker",
+    "test": "missing_or_ambiguous_frames_end_a_capture_and_a_return_cannot_rescue_it",
+    "source_path": "lampOS/crates/eyes/tests/remember_speaker.rs",
+    "local_body_sha256": "46d4538890525180130f5a0387cfb3ca34ee6d9c278e43c41891b06bda7e9679",
+    "terminals": [
+      {
+        "event": "PASS",
+        "duration": "0.004s",
+        "binary": "lamp-eyes::remember_speaker",
+        "test": "missing_or_ambiguous_frames_end_a_capture_and_a_return_cannot_rescue_it",
+        "raw_line": 3690
+      }
+    ],
+    "one_clean_native_pass": true
+  },
+  {
+    "binary": "lamp-eyes::remember_speaker",
+    "test": "guarded_proof_cannot_be_mixed_with_a_legacy_operation_or_unknown_fields",
+    "source_path": "lampOS/crates/eyes/tests/remember_speaker.rs",
+    "local_body_sha256": "2c1e9c3720f0f65fe30d631749395840ee922f1812ca4ecad9d3c4e26a1d8b0f",
+    "terminals": [
+      {
+        "event": "PASS",
+        "duration": "0.004s",
+        "binary": "lamp-eyes::remember_speaker",
+        "test": "guarded_proof_cannot_be_mixed_with_a_legacy_operation_or_unknown_fields",
+        "raw_line": 3689
+      }
+    ],
+    "one_clean_native_pass": true
+  },
+  {
+    "binary": "lamp-eyes::remember_speaker",
+    "test": "a_short_line_between_recognition_ticks_has_no_anchor_and_never_falls_back",
+    "source_path": "lampOS/crates/eyes/tests/remember_speaker.rs",
+    "local_body_sha256": "5ffe19957fc9e1cd40b480a20fe1ff5e5589b5551ac8c5917ae3803a346067fc",
+    "terminals": [
+      {
+        "event": "PASS",
+        "duration": "0.005s",
+        "binary": "lamp-eyes::remember_speaker",
+        "test": "a_short_line_between_recognition_ticks_has_no_anchor_and_never_falls_back",
+        "raw_line": 3686
+      }
+    ],
+    "one_clean_native_pass": true
+  },
+  {
+    "binary": "lamp-update::it",
+    "test": "ci_paths::every_doc_a_crate_reads_is_named_back_in_the_workflows_pull_request_paths",
+    "source_path": "lampOS/crates/update/tests/it/ci_paths.rs",
+    "local_body_sha256": "041901e6bd66b0110c5f23a9235805042fbc24d22fc57b5152ebcd4395f72e9d",
+    "terminals": [
+      {
+        "event": "PASS",
+        "duration": "0.123s",
+        "binary": "lamp-update::it",
+        "test": "ci_paths::every_doc_a_crate_reads_is_named_back_in_the_workflows_pull_request_paths",
+        "raw_line": 7593
+      }
+    ],
+    "one_clean_native_pass": true
+  },
+  {
+    "binary": "lamp-update::it",
+    "test": "ci_paths::the_scan_sees_paths_in_strings_and_not_in_comments_or_prose",
+    "source_path": "lampOS/crates/update/tests/it/ci_paths.rs",
+    "local_body_sha256": "2bcc427875a200ef2c571520928f4189387b6b56267eb6dbd3b201b1c6872682",
+    "terminals": [
+      {
+        "event": "PASS",
+        "duration": "0.004s",
+        "binary": "lamp-update::it",
+        "test": "ci_paths::the_scan_sees_paths_in_strings_and_not_in_comments_or_prose",
+        "raw_line": 7594
+      }
+    ],
+    "one_clean_native_pass": true
+  },
+  {
+    "binary": "lamp-skills::it",
+    "test": "format::every_skill_folder_in_the_repo_validates_against_format_1",
+    "source_path": "lampOS/crates/skills/tests/it/format.rs",
+    "local_body_sha256": "f466f6f6b8cde39e94922fc1720e00791d46ce05cbc46dfe1cfe8f508ea7899b",
+    "terminals": [
+      {
+        "event": "PASS",
+        "duration": "0.030s",
+        "binary": "lamp-skills::it",
+        "test": "format::every_skill_folder_in_the_repo_validates_against_format_1",
+        "raw_line": 6309
+      }
+    ],
+    "one_clean_native_pass": true
+  },
+  {
+    "binary": "lamp-skills::it",
+    "test": "format::the_schema_refuses_what_lamp_skills_refuses_in_shape",
+    "source_path": "lampOS/crates/skills/tests/it/format.rs",
+    "local_body_sha256": "7b1850aa092f6e339be9c2976669fc5ea3328441b0518d4b164b14b4c7bf5075",
+    "terminals": [
+      {
+        "event": "PASS",
+        "duration": "0.015s",
+        "binary": "lamp-skills::it",
+        "test": "format::the_schema_refuses_what_lamp_skills_refuses_in_shape",
+        "raw_line": 6307
+      }
+    ],
+    "one_clean_native_pass": true
+  },
+  {
+    "binary": "lamp-skills::it",
+    "test": "format::the_schemas_lists_are_the_codes",
+    "source_path": "lampOS/crates/skills/tests/it/format.rs",
+    "local_body_sha256": "f5dc59818f87584b7f821fcd0c06643052edcc75c29ae38f254fdcef09ebdade",
+    "terminals": [
+      {
+        "event": "PASS",
+        "duration": "0.007s",
+        "binary": "lamp-skills::it",
+        "test": "format::the_schemas_lists_are_the_codes",
+        "raw_line": 6308
+      }
+    ],
+    "one_clean_native_pass": true
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "remember_speaker::tests::remember_speaker_wire_uses_internal_evidence_and_old_eyes_never_get_a_retry",
+    "source_path": "lampOS/crates/voice/src/remember_speaker.rs",
+    "local_body_sha256": "d3815391f1349e50dbbf344a838ff78c0477fa6f962403f20d000e9660c9ba2b",
+    "terminals": [],
+    "one_clean_native_pass": false
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "onboarding::skill::tests::shipped_definition_matches_the_original_order_words_and_reoffers_byte_for_byte",
+    "source_path": "lampOS/crates/voice/src/onboarding/skill/tests.rs",
+    "local_body_sha256": "7c7d016463cbae13d858eb3ee4cca9f686d29d9fab9570eb8de87686069997d1",
+    "terminals": [
+      {
+        "event": "PASS",
+        "duration": "0.006s",
+        "binary": "lamp-voice",
+        "test": "onboarding::skill::tests::shipped_definition_matches_the_original_order_words_and_reoffers_byte_for_byte",
+        "raw_line": 9259
+      }
+    ],
+    "one_clean_native_pass": true
+  }
+]
