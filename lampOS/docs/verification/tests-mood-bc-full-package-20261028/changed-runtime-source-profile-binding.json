@@ -1,0 +1,51 @@
+{
+  "artifact": {
+    "reason": "compiler-artifact",
+    "package_id": "path+file:///private/tmp/tests-skills-canonical-20261028/lampOS/crates/expression#lamp-expression@0.1.0",
+    "manifest_path": "/private/tmp/tests-skills-canonical-20261028/lampOS/crates/expression/Cargo.toml",
+    "target": {
+      "kind": [
+        "test"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "runtime",
+      "src_path": "/private/tmp/tests-skills-canonical-20261028/lampOS/crates/expression/tests/runtime.rs",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "features": [],
+    "filenames": [
+      "/private/tmp/tests-body-holder-cargo-20261027/debug/deps/runtime-f9b92bb4002b831f"
+    ],
+    "executable": "/private/tmp/tests-body-holder-cargo-20261027/debug/deps/runtime-f9b92bb4002b831f",
+    "fresh": false
+  },
+  "depinfo_sha256": "daaa8eddfc4fe2f92548e9ca00c560c96bf386daac7740406ef4b220b29cc005",
+  "actual_local_inputs": {
+    "lampOS/crates/expression/tests/runtime.rs": {
+      "sha256": "34c0f7b294e1fa4011cdb0da02daba8035432cdcc28bbd57864cf06951e94752",
+      "bytes": 53262,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/expression/alive-behaviours.json": {
+      "sha256": "fc8474cff5d5c85d379b3f9effe45bb8cfc12c30c8e102488beece21b1c83384",
+      "bytes": 10256,
+      "mode": 420,
+      "kind": "file"
+    }
+  },
+  "fresh_false_selected_only": true,
+  "no_blanket_transitive_freshness_claim": true
+}

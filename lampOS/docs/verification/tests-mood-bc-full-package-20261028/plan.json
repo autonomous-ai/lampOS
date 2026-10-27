@@ -1,0 +1,160 @@
+{
+  "reserved_closer_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/privacy-2a-host-control-prep/run.py",
+  "reserved_closer_sha256": "468ea6f8b4ce19e58c977014f7f015d12bc99e02ef158498e7c2fd2191a57efc",
+  "minimum_free_bytes": 3221225472,
+  "operational_reserve_bytes": 2214592512,
+  "expected_reverse_closure": [
+    "lamp-body",
+    "lamp-cloud",
+    "lamp-expression",
+    "lamp-keeper",
+    "lamp-lean",
+    "lamp-memory",
+    "lamp-peek",
+    "lamp-setup",
+    "lamp-skills",
+    "lamp-update",
+    "lamp-voice",
+    "lamp-voice-eval"
+  ],
+  "candidate_paths": [
+    "lampOS/crates/expression/tests/runtime.rs",
+    "lampOS/docs/expression.md"
+  ],
+  "required_cases": [
+    "sleep_name::the_service_breathes_the_head_with_moods_breath_from_the_bus",
+    "sleep_name::an_expired_sleeping_name_is_journaled_once_by_the_service"
+  ],
+  "forward_closure_kind_policy": "Include root Expression dev dependencies; traverse normal/build dependency edges only below the root, retaining all target predicates conservatively. Dependency dev-only edges do not propagate.",
+  "support_sha256": "8910e667094e5511a4311da37ae44c59e8c8ee635641863bf91cc2037676627d",
+  "execution_ready": true,
+  "root_review_required": true,
+  "compiler_lease": "root-mood-a17-body-fresh-expression",
+  "worktree": "/private/tmp/tests-skills-canonical-20261028",
+  "permanent_worktree": "/private/tmp/tests-sleep-mood-clock-20261027",
+  "canonical_branch": "tests/3623-qualify-bc-bodycache-20261028",
+  "branch": "tests/1806-sleep-mood-clock",
+  "head": "bc0c03ef598c60b9e740d339b20bf05700aa8926",
+  "base": "a17ec9216e53f6a77931dd9686f83be8244d05a2",
+  "target": "/private/tmp/tests-body-holder-cargo-20261027",
+  "target_dev_ino": [
+    16777222,
+    487951267
+  ],
+  "handoff_binding": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/mood-a17-body-after-reader-source-handoff-20261028/handoff-binding.json",
+    "sha256": "f79e0d7491bd7bbccf8e0402cbbf7b70bb99995d67702cd1b48ef52a45ce640c",
+    "bytes": 10541
+  },
+  "inherited_frozen_count": 142,
+  "initial_current_actual_count": 0,
+  "parent_current_actual": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/reader-a17-body-after-skills-gates-prep-20261028/actual-after.json",
+    "sha256": "da0ae9d057e69cbaa12169c7735163a7cee802ee82dee0d6f51b2a694d148b5a",
+    "bytes": 5953
+  },
+  "canonical_source_binding": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/mood-a17-body-after-reader-source-handoff-20261028/prepared-canonical-source.json",
+    "sha256": "b3d027c6b884722f894249aa4deb2a7e0e66cdb69e89dba0542200d0c9af6d9a",
+    "bytes": 2457874
+  },
+  "official_source_binding": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/mood-a17-body-after-reader-source-handoff-20261028/prepared-official-source.json",
+    "sha256": "b688235c834424254ff91bb9208ca57a63700d11984dbae9dbc4936b503249fb",
+    "bytes": 2457861
+  },
+  "parent_final_protected": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/reader-a17-body-after-skills-gates-prep-20261028/protected-after.json",
+    "sha256": "717cf9ad8e2346760681912bb03538a5cc724aca07a9f3f23755427f6ab1fabb",
+    "bytes": 60051
+  },
+  "canonical_alias_bound": true,
+  "scope": "ONE FRESH full unfiltered serial current Expression Cargo package incldocs; new Bodycanonicalpath forbids oldWarm runtime reuse; no filters/retry/timeoutbumps",
+  "runtime_reuse_authorized": false,
+  "expected_current_ordinary_counts": null,
+  "expected_doc_counts": null,
+  "historical_inputs": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/mood-a17-body-after-reader-full-expression-gates-prep-20261028/historical-dispositions.json",
+    "sha256": "f77af8e8f3226bfb185a5e60babd23c4290571d3e3cfa00e44a4dfc346f9cad3",
+    "bytes": 8917
+  },
+  "source_transition": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/mood-a17-body-after-reader-source-handoff-20261028/source-transition.json",
+    "sha256": "24e29d5f126a171c78b659f8546f840f9cf4b10ac0316f271f31e8fc0a62795e",
+    "bytes": 2806
+  },
+  "parent_source_transition": [
+    "lampOS/crates/expression/tests/runtime.rs",
+    "lampOS/crates/voice/src/session_reader/tests.rs",
+    "lampOS/docs/expression.md",
+    "lampOS/docs/realtime-tests.md"
+  ],
+  "require_changed_runtime_fresh_false": true,
+  "known_forbidden_diagnostic_markers": [
+    "SHARED_INPUT_PAUSE",
+    "CONTROLLED_CANDIDATE_PAUSE",
+    "BASE_ONLY_INPUT_DELAY"
+  ],
+  "source_count": 10912,
+  "inputs_sha256": {},
+  "no_clean": true,
+  "prospective_alias_inode_policy": {
+    "derivation": "Only current Cargo artifacts for this package with profile.test=false and kind bin/example, exact convenience path under current target/debug or target/debug/examples. No legacy retired target paths.",
+    "allowed_change": [
+      "inode"
+    ],
+    "strict_other_fields": [
+      "sha256",
+      "bytes",
+      "mode",
+      "mtime_ns",
+      "device"
+    ],
+    "allowed_boundary": "Only post completed sole full Cargo package0/101, owned group closed/no timeout/reserve/descendants and no Compiling/Checking; only inode may change on metadata-derived non-test convenience aliases, Rust101 stillFAIL",
+    "legacy_paths": []
+  },
+  "guard_policy": {
+    "full_SHA_points": [
+      "initial",
+      "final"
+    ],
+    "full_SHA_scope": "All tracked canonical/official source and inherited/new sealed witnesses; no filesystem-wide read-only claim.",
+    "other_boundaries": "Entire tracked file-set/stat6 plus both HEAD/branch/base/index/clean metadata; all sealed original metadata and every active actual executable SHA/stat.",
+    "consumption": "All post-no-run actual SHA/stat before every list and sole full Cargo runtime, corresponding independent witnesses guarded; raw and parsed Cargo census durable before postguards.",
+    "parent_handoff": "Actual Reader4+Trace6 only,142sealed/3Root-verified retired actuals; no fullVoice/Mood/runtime reuse transfer.",
+    "alias_policy": "Prospective metadata-derived normal bin/example convenience alias inode-only at closed no-recompile full Cargo0/101; all other attrs/test/frozen inodes strict. Rust failures remain FAIL.",
+    "new_frozen_modes": "copy2 retains each emitted executable mode; no chmod/read-only-filesystem claim. All inherited modes remain strict."
+  },
+  "expected_parent_head": "ecc34ddf5a7f274eff1bb5be273a89a15c0c591f",
+  "expected_parent_source_binding": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/reader-a17-body-after-skills-gates-prep-20261028/source-before.json",
+    "sha256": "6f2701dff587717e44718235b0c91b26cc4b2380be9858134883098d10d8dbcd",
+    "bytes": 2457875
+  },
+  "canonical_physical_binding": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/mood-a17-body-after-reader-source-handoff-20261028/prepared-canonical-physical.json",
+    "sha256": "ff74dc26e11402785be298a16c9ba31ee23cea7f63ade6539c5f22f25bb05b3e",
+    "bytes": 2359437
+  },
+  "official_physical_binding": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/mood-a17-body-after-reader-source-handoff-20261028/prepared-official-physical.json",
+    "sha256": "a595ba77352ff44598c4415bd7c901ea7bdaf7d3693dd1303a090c5a1f7d83d9",
+    "bytes": 2359437
+  },
+  "expected_parent_base": "a17ec9216e53f6a77931dd9686f83be8244d05a2",
+  "inventory_timeout_seconds": 300,
+  "package_runtime_timeout_seconds": 3600,
+  "expected_executable_count_reference": 8,
+  "expected_driver_count_reference": 4,
+  "controller_sha256": "5e160b74746287b5b104f77c7030f04557bccd29502dac9c92a66512045f6620",
+  "raw_handoff_cache_epoch_binding": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/mood-a17-body-after-reader-source-handoff-20261028/cache-epoch.json",
+    "sha256": "88c12410ce96341b51e03860b1f2d6575bc2544661d1f7a9b3da8fa387773a7f",
+    "bytes": 650
+  },
+  "cache_epoch_binding": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/mood-a17-body-after-reader-full-expression-gates-prep-20261028/cache-epoch-corrected-no-clean.json",
+    "sha256": "a254af313367de9a1154a36731619a958d780cd91dd81e00ee6aca8b00761bea",
+    "bytes": 1409
+  }
+}

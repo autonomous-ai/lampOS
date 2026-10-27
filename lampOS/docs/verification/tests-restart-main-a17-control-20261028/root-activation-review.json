@@ -1,0 +1,23 @@
+{
+  "at": "2026-10-28T02:09:18.968769+07:00",
+  "reviewer": "Tests Root",
+  "kind": "MainControl",
+  "controller_sha256": "e3861df83e60b1711a7bfa918c9c78b723e74f61ba138024ffe88e4bab7139d4",
+  "activated_plan_sha256": "36f723b81839f10303438603920d41a613390a1195ac4ee179ad8f15c40103f5",
+  "launch_sha256": "12d927c29beb9ead3bc2793ec667636926d601782fab0640c6496de72c85d9db",
+  "exact_source_and_target_verified": true,
+  "initial_lsof_exit": 1,
+  "lease": "root-main-a17-restart-full-control",
+  "reviewed": [
+    "entire controller and minimal parent diff",
+    "actual source and parent integrity release schemas",
+    "one unfiltered serial package/library execution, actual compiled inventory primary",
+    "partial raw/parsed results durable before runtime postguards",
+    "no retries or failure waiver",
+    "source, frozen witness and actual executable hashes/metadata",
+    "bounded subprocess cleanup and retained native continuation handle",
+    "strict actual reverse closure, workspace and current compile bindings"
+  ],
+  "parent_failure_disposition": "Expression341 PASS only; no full Voice runtime credit",
+  "no_device_or_ARM_build_on_Mac": true
+}

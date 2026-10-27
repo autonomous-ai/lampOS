@@ -1,0 +1,62 @@
+{
+  "command": [
+    "/Users/autonomous/.cargo/bin/cargo",
+    "+1.96.0",
+    "test",
+    "--offline",
+    "--locked",
+    "--jobs",
+    "1",
+    "-p",
+    "lamp-expression",
+    "--no-fail-fast",
+    "--",
+    "--test-threads=1"
+  ],
+  "cwd": "/private/tmp/tests-skills-canonical-20261028/lampOS",
+  "started_at": "2026-10-27T19:33:41.886751+00:00",
+  "timeout_seconds": 3600,
+  "stdout": "cmd-tests.stdout.txt",
+  "stderr": "cmd-tests.stderr.txt",
+  "timeout_cleanup": [
+    {
+      "action": "leader exited unreaped; no other owned group members",
+      "members": [
+        {
+          "pid": 94011,
+          "state": "Z"
+        }
+      ]
+    }
+  ],
+  "timed_out": false,
+  "disk_reserve_breached": false,
+  "stop_reason": null,
+  "process_group_scope": "Owned group only; no detached-descendant cleanup claim.",
+  "group_closure_method": "WNOWAIT leader reservation and ps group inventory before reap",
+  "launch_state": "Popen_recorded",
+  "disk_reserve_bytes": 2214592512,
+  "disk_sample_interval_seconds": 1,
+  "disk_paths": [
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/mood-a17-body-after-reader-full-expression-gates-prep-20261028",
+    "/private/tmp/tests-body-holder-cargo-20261027"
+  ],
+  "disk_samples": 22,
+  "disk_last_available_bytes": 4242964480,
+  "disk_minimum_available_bytes": 4235767808,
+  "available_bytes_before_Cargo": 4321722368,
+  "owned_pid": 94011,
+  "owned_process_group": 94011,
+  "direct_wait_status": 0,
+  "exit_code": 0,
+  "owned_group_absent_after_cleanup": true,
+  "unexpected_owned_descendants": false,
+  "unresolved_owned_pids": [],
+  "compiler_lease_held": false,
+  "wall_seconds": 21.724471,
+  "finished_at": "2026-10-27T19:34:03.610902+00:00",
+  "stdout_sha256": "507649d438390cf0437a59469a890dc6c7d3f5731f0725202bf8bdc0edc9de09",
+  "stdout_bytes": 30630,
+  "stderr_sha256": "36da92a8ddfd8246cdc00456e4d1a87604ce9c1a995d202a4d79972d8b40f4cb",
+  "stderr_bytes": 566
+}

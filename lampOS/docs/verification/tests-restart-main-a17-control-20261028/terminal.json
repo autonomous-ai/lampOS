@@ -1,0 +1,84 @@
+{
+  "status": "CONTROL_COMPLETE",
+  "head": "a17ec9216e53f6a77931dd9686f83be8244d05a2",
+  "base": "40923624247a893a19e1d980a328424eedffa308",
+  "runtime_attempts": 1,
+  "runtime_scope": "ONE full unfiltered serial Main a17 VoiceLIB without own Restart patch; SameVoice21 and failed Reader case reconciled within this command. Rust101 is completed control observation, not gate PASS.",
+  "source_state": "clean committed HEAD",
+  "committed_head_alone_qualification_claim": false,
+  "control_scope": "Matched Main a17 full context, not latest Main44; no cause inference",
+  "candidate_failure_retained": true,
+  "control_observation_complete": true,
+  "Linux_platform_runtime_claim": false,
+  "old_mutable_bindings_retired_count": 3,
+  "no_clean": true,
+  "runtime_command_exit": 101,
+  "full_Voice_LIB_counts": {
+    "passed": 3882,
+    "failed": 1,
+    "ignored": 15
+  },
+  "failed_identities": [
+    "session_reader::tests::group_lookup_failure_retains_private_logging_without_writer_failure"
+  ],
+  "actual_full_inventory_count": 3898,
+  "Restart_platform_cases": [
+    "same_voice::tests::a_call_takes_no_late_voice_from_before_it_at_its_verdict",
+    "same_voice::tests::a_child_that_hangs_after_it_is_ready_is_killed_and_started_again",
+    "same_voice::tests::a_child_that_never_gets_ready_is_started_three_times_and_then_the_check_is_off",
+    "same_voice::tests::a_late_print_from_too_little_speech_is_unsure",
+    "same_voice::tests::a_late_print_is_compared_before_it_becomes_the_conversations_voice",
+    "same_voice::tests::a_line_is_judged_from_its_first_1_8_s_when_it_is_long_enough_and_said_with_the_lamp_quiet",
+    "same_voice::tests::a_line_judged_without_the_check_says_which_print_was_missing",
+    "same_voice::tests::a_mixed_print_among_the_conversations_does_not_make_its_own_voice_another",
+    "same_voice::tests::a_new_conversation_ends_any_late_voice_of_the_one_before",
+    "same_voice::tests::a_print_is_coming_from_its_first_sample_until_it_comes",
+    "same_voice::tests::a_print_that_comes_after_its_answer_still_becomes_the_conversations",
+    "same_voice::tests::a_short_call_takes_its_voice_from_the_callers_first_follow_up_seen_spoken",
+    "same_voice::tests::a_voice_at_0_20_against_the_conversations_is_another",
+    "same_voice::tests::a_voice_at_0_35_was_another_at_0_45_and_is_the_conversations_at_0_30",
+    "same_voice::tests::an_unsure_print_let_out_is_not_the_conversations_voice",
+    "same_voice::tests::another_voice_is_known_only_against_the_conversation_the_lamp_last_answered_in",
+    "same_voice::tests::each_line_the_check_says_is_said_to_its_journal",
+    "same_voice::tests::the_childs_answers_are_read_as_its_serving_writes_them",
+    "same_voice::tests::the_conversation_keeps_its_last_prints_and_a_new_one_begins_afresh",
+    "same_voice::tests::the_model_path_is_absolute_and_its_flag_follows_the_spoken_to_one",
+    "same_voice::tests::with_the_caller_only_a_going_on_line_never_becomes_the_conversations_voice"
+  ],
+  "Restart_cases_executed_once": true,
+  "Main_failed_case_rows": [
+    [
+      "session_reader::tests::group_lookup_failure_retains_private_logging_without_writer_failure",
+      "FAILED"
+    ]
+  ],
+  "Voice_test_fresh": false,
+  "Voice_artifact_source_profile_bound": true,
+  "Voice_freshness_observed_only": true,
+  "strict_packages": [
+    "lamp-body",
+    "lamp-cloud",
+    "lamp-expression",
+    "lamp-keeper",
+    "lamp-lean",
+    "lamp-memory",
+    "lamp-peek",
+    "lamp-setup",
+    "lamp-skills",
+    "lamp-update",
+    "lamp-voice",
+    "lamp-voice-eval"
+  ],
+  "source_unchanged": true,
+  "official_owner_unchanged": true,
+  "sealed_and_actual_guards": true,
+  "protected_count": 537,
+  "actual_count": 3,
+  "full_hash_checkpoints": [
+    "initial",
+    "final"
+  ],
+  "owned_groups_closed": true,
+  "unresolved_owned_pids": [],
+  "lease_released": true
+}

@@ -1,0 +1,23 @@
+{
+  "at": "2026-10-28T02:30:35.949419+07:00",
+  "reviewer": "Tests Root",
+  "kind": "Mood",
+  "controller_sha256": "5e160b74746287b5b104f77c7030f04557bccd29502dac9c92a66512045f6620",
+  "activated_plan_sha256": "7cd2694133f4f5c4f3fa32d970c963d250831815d2d95ba61ab4f6282df82aae",
+  "launch_sha256": "0dcf0c1d936988f44c1dc396954081eda3b546068825761f3ebf1c4864225875",
+  "exact_source_and_target_verified": true,
+  "initial_lsof_exit": 1,
+  "lease": "root-mood-a17-body-fresh-expression",
+  "reviewed": [
+    "entire controller and minimal parent diff",
+    "actual source and parent integrity release schemas",
+    "one fresh full unfiltered serial Expression package including doctests; no runtime reuse or clean",
+    "partial raw/parsed results durable before runtime postguards",
+    "no retries or failure waiver",
+    "source, frozen witness and actual executable hashes/metadata",
+    "bounded subprocess cleanup and retained native continuation handle",
+    "strict actual reverse closure, workspace and current compile bindings"
+  ],
+  "parent_failure_disposition": "Reader4+Trace6 module PASS only;142sealed+3retired, no full Voice or Mood runtime transfer",
+  "no_device_or_ARM_build_on_Mac": true
+}

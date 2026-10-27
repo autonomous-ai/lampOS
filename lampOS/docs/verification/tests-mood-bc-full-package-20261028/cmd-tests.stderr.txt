@@ -1,0 +1,6 @@
+    Finished `test` profile [unoptimized] target(s) in 0.39s
+     Running unittests src/lib.rs (/private/tmp/tests-body-holder-cargo-20261027/debug/deps/lamp_expression-97b0d6d78b5cc498)
+     Running unittests src/main.rs (/private/tmp/tests-body-holder-cargo-20261027/debug/deps/lamp_expression-7d5e7ac9619c42c0)
+     Running tests/it/main.rs (/private/tmp/tests-body-holder-cargo-20261027/debug/deps/it-707453661fb429d2)
+     Running tests/runtime.rs (/private/tmp/tests-body-holder-cargo-20261027/debug/deps/runtime-f9b92bb4002b831f)
+   Doc-tests lamp_expression

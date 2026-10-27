@@ -1,0 +1,5 @@
+# Matched Main a17 full Voice control
+
+One fresh full serial Voice library on unchanged Main a17ec9216 / parent409236242, without the Restart patch, reproduced **3882 passed /1 failed /15 ignored**, Rust101. The same Reader group-lookup finish-report predicate failed as candidate4dee/a17; all21 Main SameVoice cases passed once. All3898 identities bind to the compiled inventory. Candidate and control source differ only in same_voice.rs and same-voice.md; preserved candidate owner is unchanged. This directly demonstrates the failure without the Restart change at the matched a17 pin. It does not establish the false report field, host cause or latest-Main result.
+
+CONTROL_COMPLETE/native0 means a fully recorded experiment, not a passing test gate: Rust101 remains failed. Formatting, actual twelve-package strict Clippy, workspace/fresh compilation and all source/owner,537 witness/three executable guards passed; groups closed, no unresolved processes or timeout/reserve breach. Raw/parsed results precede postguards. Candidate3882/1/15 and older failures remain failed. No retry, assertion change, broader waiver or device claim.

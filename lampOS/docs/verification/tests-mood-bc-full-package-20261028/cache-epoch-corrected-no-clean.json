@@ -1,0 +1,27 @@
+{
+  "path": "lampOS/crates/expression/tests/runtime.rs",
+  "head": "bc0c03ef598c60b9e740d339b20bf05700aa8926",
+  "canonical_root": "/private/tmp/tests-skills-canonical-20261028",
+  "source_index_sha256": "321738aecb44ad46d8003227d0adef5df3b1ca5f273edbe5c3c8338c0478782c",
+  "bytes_sha256": "34c0f7b294e1fa4011cdb0da02daba8035432cdcc28bbd57864cf06951e94752",
+  "mtime_ns": 1793128829939817599,
+  "canonical_source_checkout_complete": true,
+  "after_clean_checkout": true,
+  "normal_git_checkout_only": true,
+  "mtime_refresh_performed": false,
+  "Expression_scoped_clean_required_before_qualification": false,
+  "no_compilation_or_reuse_claim": true,
+  "policy_correction": {
+    "type": "NONOBSERVATIONAL_INHERITED_POLICY_FIELD_CORRECTION",
+    "original_descriptor": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/mood-a17-body-after-reader-source-handoff-20261028/cache-epoch.json",
+      "sha256": "88c12410ce96341b51e03860b1f2d6575bc2544661d1f7a9b3da8fa387773a7f",
+      "bytes": 650
+    },
+    "authority": "Root explicit no-clean instruction for this current Mood Body gate",
+    "actual_observed_fields_unchanged": true,
+    "mtime_or_source_changes": false,
+    "all_command_allowlists_exclude_clean": true,
+    "unexpected_runtime_fresh_true": "STOP before inventory/runtime with no clean or retry"
+  }
+}

@@ -1,5 +1,15 @@
 # Tests work log
 
+## 2026-10-28 02:46 — matched Main reproduces Reader failure; fresh Mood passes
+
+Ready for lamp-voice: no (current-base carries/qualification and current reads remain).
+
+[Matched Maina17 control](verification/tests-restart-main-a17-control-20261028/) reproduces the candidate's **3882/1/15** and same Reader predicate without the Restart patch; all21 Main SameVoice cases pass. CONTROL_COMPLETE/native0 is recording success, not gatePASS; Rust101 remains failed. All537 witnesses/three actual guards/source pass and groups close. Candidate4dee is pushedDRAFT with this known baseline failure, fresh native checks running.
+
+[Fresh Moodbc package](verification/tests-mood-bc-full-package-20261028/) passes **341/0/0** once, all four drivers+docs and both controls, strict/workspace/fresh compile/source and150/eight guards. No clean/reuse/retry. bc is pushed with fresh native checks running. [ECC original native audit](verification/tests-reader-ecc-native-20261028/) is green7800 unique passes, all15Reader+sevenTrace once,53 skips; actualf81fa[f0f65,ecc] preserves10inputs with22entrytree delta explicit. Separate Python is49/12/7, not stale35. No payload/device action.
+
+Reviewer-two explicitly holds Skills for a current-base carry. ExactlatestRootfetch2e66c1ade now anchors new Skills792937f43 and Reader2671aeabd, both own patches/fullblobs equal. Their refreshed gates are being bound in released caches; old555/full/native scopes remain separate. No readiness claim before those gates/read conditions clear.
+
 ## 2026-10-28 02:24 — current Reader module gates pass; carry pushed
 
 Ready for lamp-voice: no (fresh native checks and current reads pending).

@@ -1,0 +1,11 @@
+{
+  "status": "ZERO_WORK_PREACTIVATION_SCHEMA_STOP",
+  "error": "Generic activation helper treated parent_source_transition path-list as a binding object",
+  "plan_unchanged_and_disabled": true,
+  "controller_unchanged": true,
+  "wrapper_started": false,
+  "Cargo_attempts": 0,
+  "runtime_attempts": 0,
+  "target_untouched": true,
+  "correction": "Typed list distinguished from bound source-transition descriptor; actual descriptor still hash-verified"
+}

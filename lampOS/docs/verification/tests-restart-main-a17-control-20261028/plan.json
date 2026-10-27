@@ -1,0 +1,123 @@
+{
+  "execution_ready": true,
+  "root_review_required": true,
+  "compiler_lease": "root-main-a17-restart-full-control",
+  "worktree": "/private/tmp/tests-ready-speaking-1c-20261026",
+  "official_worktree": "/private/tmp/tests-same-voice-restart-20261026",
+  "head": "a17ec9216e53f6a77931dd9686f83be8244d05a2",
+  "base": "40923624247a893a19e1d980a328424eedffa308",
+  "branch": "tests/3572-control-main-a17",
+  "official_branch": "tests/1569-same-voice-restart-exit",
+  "expected_status": "",
+  "approved_dirty_paths": [],
+  "approved_payloads": {},
+  "source_binding": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/restart-main-a17-full-context-control-prep-20261028/prepared-canonical-source.json",
+    "sha256": "65ba89747b2265f979a1d332c69712ce9a9f2d3a1bd7de334e929bdc57531cf9",
+    "bytes": 2457861
+  },
+  "official_source_binding": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/restart-main-a17-full-context-control-prep-20261028/prepared-official-source.json",
+    "sha256": "66653a0c2026ce0710410e0bcce9674f87a24311f73660fbdf18c0da310e579c",
+    "bytes": 2457868
+  },
+  "source_snapshot_status": "Actual clean Main a17 own canonical qualifier and separately preserved clean candidate official source bound; 10912 files and exactly same_voice.rs/same-voice.md differences.",
+  "canonical_alias_bound": true,
+  "source_carry_verified": true,
+  "target": "/private/tmp/tests-restart-f9-cargo-20261027_root",
+  "target_dev_ino": [
+    16777222,
+    486188298
+  ],
+  "root_reported_target_inode": 486188298,
+  "handoff_binding": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/restart-main-a17-full-context-control-prep-20261028/handoff-binding.json",
+    "sha256": "49c431e7cb6650ff923b7a0559599d0e2ac1d17adbf5375e63dd2d5b976741fd",
+    "bytes": 8782
+  },
+  "handoff_release_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/warm-target-restart-failure-to-main-control-20261028/release.json",
+  "expected_inherited_sealed_count": 534,
+  "expected_retired_mutable_count": 3,
+  "handoff_status": "Actual failed-parent integrity release534+3; parent FAIL/native1/Rust101 not waived",
+  "minimum_free_bytes": 3221225472,
+  "operational_reserve_bytes": 2214592512,
+  "support_sha256": "8910e667094e5511a4311da37ae44c59e8c8ee635641863bf91cc2037676627d",
+  "reserved_closer_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/privacy-2a-host-control-prep/run.py",
+  "reserved_closer_sha256": "468ea6f8b4ce19e58c977014f7f015d12bc99e02ef158498e7c2fd2191a57efc",
+  "strict_expected": [
+    "lamp-body",
+    "lamp-cloud",
+    "lamp-expression",
+    "lamp-keeper",
+    "lamp-lean",
+    "lamp-memory",
+    "lamp-peek",
+    "lamp-setup",
+    "lamp-skills",
+    "lamp-update",
+    "lamp-voice",
+    "lamp-voice-eval"
+  ],
+  "strict_policy": "Derive actual all-edge reverse closure and require the currently expected 12 names; stop for Root review on drift.",
+  "scoped_clean_packages": [],
+  "cache_epoch_binding": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/restart-main-a17-full-context-control-prep-20261028/cache-epoch-input.json",
+    "sha256": "d9133901f1dd19cd7a9aac730e292ab23a2204c2c7875a7b35948a4452926d5c",
+    "bytes": 656
+  },
+  "required_cache_epoch_path": "lampOS/crates/voice/src/same_voice.rs",
+  "require_voice_test_fresh_false": true,
+  "known_forbidden_diagnostic_markers": [
+    "SHARED_INPUT_PAUSE",
+    "SENTINEL_PROBE",
+    "READER_LINUX_CONTROLLED",
+    "PROBE_TRACE"
+  ],
+  "runtime_scope": "ONE full unfiltered serial Main a17 VoiceLIB without own Restart patch; SameVoice21 and failed Reader case reconciled within this command. Rust101 is completed control observation, not gate PASS.",
+  "full_runtime_timeout_s": 3600,
+  "inventory_timeout_s": 300,
+  "compile_timeout_s": 3600,
+  "test_threads": 1,
+  "build_jobs": 1,
+  "debug_info": 0,
+  "incremental": false,
+  "retry": false,
+  "native_arm_or_linux_case_claim": false,
+  "input_names_reserved": [
+    "cache-epoch-input.json",
+    "handoff-binding.json",
+    "immutable-source-comparison.json",
+    "launch.json",
+    "parent-input-manifest.json",
+    "parent-to-child-source-transition.json",
+    "plan.json",
+    "prepared-canonical-source.json",
+    "prepared-official-source.json",
+    "restart-source-reference.json",
+    "source-review.json"
+  ],
+  "guard_policy": "Initial/final full source+sealed SHA, intermediate stat6/index/set/head/branch, actual SHA adjacent consumption. Separate preserved candidate official owner, actual3 retired only by release. No runtime reuse.",
+  "runtime_helper_target_names": [
+    "lamp-voice",
+    "lamp-same-voice"
+  ],
+  "runtime_helper_binding_scope": "Actual workspace normal executables for the Voice main and source-named same-voice child; tests use owned private programs/current_exe. Binding is provenance and immutability, not a claim that every helper executes.",
+  "actual_release_native_receipt_claim": false,
+  "prospective_normal_helper_phase_policy": "Workspace helpers are hash/stat phase observations, not active runtime guards. Across VoiceLIB no-run require SHA/bytes/mode/mtime/device unchanged; only metadata-derived normal bin aliases directly under target/debug may republish inode. Freeze/bind all actual helpers AFTER no-run. All new actuals then require all attrs including inode; no Cargo after activation.",
+  "target_allocation_status": "UNALLOCATED; no mutation before actual Root release",
+  "source_transition": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/restart-main-a17-full-context-control-prep-20261028/parent-to-child-source-transition.json",
+    "sha256": "a214774a794dbe4be998261186e192a86d1f568e00d86ae41c38ce9f444bc4e5",
+    "bytes": 1797
+  },
+  "prior_folded_source_result": "No prior runtime reuse: own patches/source-only carries retain exact authored blobs and assertions; old native/host failures and historicalPASS stay bound to their original epochs.",
+  "restart_source_reference": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/restart-main-a17-full-context-control-prep-20261028/restart-source-reference.json",
+    "sha256": "2adc37bbbd722e51eb29a4cca3fd9436ec80a2e7de22618aff955c5dea710d30",
+    "bytes": 2210
+  },
+  "official_head": "4deeae914b9ffec50fffd87f58a24d83a2e391c8",
+  "official_base": "a17ec9216e53f6a77931dd9686f83be8244d05a2",
+  "control_scope": "Matched Main a17 full context, not latest Main44; no cause inference",
+  "control_failed_identity": "session_reader::tests::group_lookup_failure_retains_private_logging_without_writer_failure"
+}

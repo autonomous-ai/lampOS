@@ -1,0 +1,11 @@
+{
+  "kind": "MainControl",
+  "original_review_sha256": "2e4afe8926575a8e4a0ba3116c7338e63799737acbea3bb5752c1e396b52a05e",
+  "administrative_scope_correction": true,
+  "original_review_retained": true,
+  "correct_parent_disposition": "Actual parent Restart full3882/1/15 FAIL, native1/Rust101;534sealed+3retired. No failure waiver or attribution.",
+  "correct_runtime_review_scope": "One full unfiltered Main a17 baseline, Rust0/101 fully accounted observation; no candidate PASS.",
+  "reason": "Generic administrative activation note used the previous Expression parent wording; controller and actual handoff/plan always bind the correct parent and runtime scope.",
+  "controller_plan_launch_source_artifacts_results_unchanged": true,
+  "no_execution_or_failure_reclassification": true
+}

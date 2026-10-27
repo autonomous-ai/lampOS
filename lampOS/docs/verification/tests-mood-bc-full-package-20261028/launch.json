@@ -1,0 +1,29 @@
+{
+  "controller_sha256": "5e160b74746287b5b104f77c7030f04557bccd29502dac9c92a66512045f6620",
+  "plan_sha256": "7cd2694133f4f5c4f3fa32d970c963d250831815d2d95ba61ab4f6282df82aae",
+  "compiler_lease": "root-mood-a17-body-fresh-expression",
+  "root_review_approved": true,
+  "parent_closed": true,
+  "exclusive_target": true,
+  "previous_owner_released": true,
+  "full_runtime_authorized": true,
+  "exclusive_source_copy": true,
+  "exclusive_owner": true,
+  "sealed_no_legitimate_writer": true,
+  "require_escalated": true,
+  "target_dev_ino": [
+    16777222,
+    487951267
+  ],
+  "concurrency_context": {
+    "idle_host_claim": false,
+    "declared_other_activity": "Fresh full Expression on Body cache while Root7630 matched Main full Voice control runs on separate warm cache; current Reader CI audit. Distinct canonical/official sources and targets, jobs1 per local compiler, no legitimate shared source/target/witness writer."
+  },
+  "execution": "ROOT_APPROVED",
+  "exclusive_source": true,
+  "exclusive_canonical_source": true,
+  "exclusive_official_source": true,
+  "parent_closed_and_released": true,
+  "parent_closed_and_target_released": true,
+  "independent_gate_after_failed_parent_authorized": true
+}
