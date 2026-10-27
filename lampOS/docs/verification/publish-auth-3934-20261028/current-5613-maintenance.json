@@ -1,0 +1,160 @@
+{
+  "head": "5613b3420fd7a189f7f140035d38bd8821379ad4",
+  "base": "fc9c781afaed38dc976f650484c30f65bf5db57a",
+  "qualification": "Current51publisher tests and7saved-x86 CLI compatibility cases pass once; no fresh Rust/native acceptance transfer. Originalnewhead CI pending.",
+  "source_carry": {
+    "branch": "third/publish-auth-fc9-prep",
+    "candidate": "5613b3420fd7a189f7f140035d38bd8821379ad4",
+    "clean": true,
+    "commits": [
+      {
+        "context_free_payload_equal": true,
+        "context_free_payload_sha256": "a7f934a82e0e4ccfb48fee97d80ae684e3696f7e3d403895ad544b1bbe2e3d2a",
+        "new": "5613b3420fd7a189f7f140035d38bd8821379ad4",
+        "new_patch_sha256": "e383dec301e9aed906271d971fe0725cdad499a91d3851fca803250e82951c81",
+        "old": "2675dec2a56a23002128f7dd68e7900f79c8a5bd",
+        "old_patch_sha256": "2a23048f41997cecd5d6100133ca3a230614b361449799db757cb8146e07e40c",
+        "raw_author_message_equal": true,
+        "raw_author_sha256": "7345a4f7a35f03944666c7d6bb753e534d6097202994dcd28d7128c6a875b3c0",
+        "raw_message_sha256": "b185ddd5e71875360997c8dff67ea3bd74bb2687d2172c5c55b4c6770a132cc5"
+      }
+    ],
+    "conflicts": false,
+    "frozen_base": "fc9c781afaed38dc976f650484c30f65bf5db57a",
+    "gate_status": "NOT_RUN",
+    "inherited_doc_difference": "Only owned updates.md whole blob/preimage differs, carrying incoming Main collector/codec paragraphs; context-free authored payload remains identical.",
+    "limits": [
+      "Prepared isolated rebase only; public branch/head unchanged.",
+      "Historical runtime remains bound to original source.",
+      "No Cargo, target-bank reads, tests, credential actions or public push."
+    ],
+    "no_substantive_edits": true,
+    "old_base": "c1fa2bc9f327f5d553bb3dcc355053d8e7e94bfa",
+    "owned": [
+      {
+        "equal": true,
+        "new": "100644 blob d58295237f5da65e12debfa3cad5a4c856042755\t.github/scripts/lampos-publish-cli-test.py",
+        "new_preimage": "100644 blob 97877b2eb242795908b8cf85cae1c97bfd1f511e\t.github/scripts/lampos-publish-cli-test.py",
+        "old": "100644 blob d58295237f5da65e12debfa3cad5a4c856042755\t.github/scripts/lampos-publish-cli-test.py",
+        "old_preimage": "100644 blob 97877b2eb242795908b8cf85cae1c97bfd1f511e\t.github/scripts/lampos-publish-cli-test.py",
+        "path": ".github/scripts/lampos-publish-cli-test.py",
+        "preimage_equal": true
+      },
+      {
+        "equal": true,
+        "new": "100644 blob a0c7d50d2270ce799c56d5c90a8ada7c9ca0f9e2\t.github/scripts/lampos-publish-test.py",
+        "new_preimage": "100644 blob 37e55bc682a7e9f53437ab904c1c76c4b8b09ef0\t.github/scripts/lampos-publish-test.py",
+        "old": "100644 blob a0c7d50d2270ce799c56d5c90a8ada7c9ca0f9e2\t.github/scripts/lampos-publish-test.py",
+        "old_preimage": "100644 blob 37e55bc682a7e9f53437ab904c1c76c4b8b09ef0\t.github/scripts/lampos-publish-test.py",
+        "path": ".github/scripts/lampos-publish-test.py",
+        "preimage_equal": true
+      },
+      {
+        "equal": true,
+        "new": "100644 blob 7ec7a7604d98545bba5018a803d1c948259851d7\t.github/scripts/lampos-publish.py",
+        "new_preimage": "100644 blob 0bf124c39c41fb3e8eb397d935964b426b663cb2\t.github/scripts/lampos-publish.py",
+        "old": "100644 blob 7ec7a7604d98545bba5018a803d1c948259851d7\t.github/scripts/lampos-publish.py",
+        "old_preimage": "100644 blob 0bf124c39c41fb3e8eb397d935964b426b663cb2\t.github/scripts/lampos-publish.py",
+        "path": ".github/scripts/lampos-publish.py",
+        "preimage_equal": true
+      },
+      {
+        "equal": true,
+        "new": "100644 blob 423815723541d87b139fa6a67b5698953153b116\t.github/workflows/lampos-arm64.yml",
+        "new_preimage": "100644 blob c1a4b4479b284e52f3ff37701cd55734783040b3\t.github/workflows/lampos-arm64.yml",
+        "old": "100644 blob 423815723541d87b139fa6a67b5698953153b116\t.github/workflows/lampos-arm64.yml",
+        "old_preimage": "100644 blob c1a4b4479b284e52f3ff37701cd55734783040b3\t.github/workflows/lampos-arm64.yml",
+        "path": ".github/workflows/lampos-arm64.yml",
+        "preimage_equal": true
+      },
+      {
+        "equal": false,
+        "new": "100644 blob 4f7411595b0922ca2dd30acef8d92c09482f5062\tlampOS/docs/updates.md",
+        "new_preimage": "100644 blob 07f7cfbeb5b452fb264e832ad5cb1883d4a47619\tlampOS/docs/updates.md",
+        "old": "100644 blob 61b4d4c046ecfe70b40a1fe2084535d05ff74f2d\tlampOS/docs/updates.md",
+        "old_preimage": "100644 blob 8e3b89613d7eb71116eec5a822faff2cad78c54c\tlampOS/docs/updates.md",
+        "path": "lampOS/docs/updates.md",
+        "preimage_equal": false
+      }
+    ],
+    "owned_count": 5,
+    "parents": [
+      "fc9c781afaed38dc976f650484c30f65bf5db57a"
+    ],
+    "pr": 3934,
+    "public_lease": "2675dec2a56a23002128f7dd68e7900f79c8a5bd",
+    "range_diff_sha256": "599dd3898362b2fabf8d5cdccad680718174d6467678eca600fc01fd31afe1bc",
+    "tree": "488913d2af0646bccaf7a1846ffe3e2ad9f5a02a",
+    "whole_owned_equal_count": 4,
+    "worktree": "third-publish-auth-fc9-prep"
+  },
+  "local_gate": {
+    "Cargo_or_bank": false,
+    "all_guards_equal": true,
+    "base": "fc9c781afaed38dc976f650484c30f65bf5db57a",
+    "guarded_tracked_files": 10919,
+    "head": "5613b3420fd7a189f7f140035d38bd8821379ad4",
+    "limits": [
+      "Original current-head ARM/Linux required after publication.",
+      "Protected credential and draft hold unchanged.",
+      "No live gh/git/network/publication; committed tests use synthetic fixture credentials."
+    ],
+    "rows": [
+      {
+        "argv": [
+          "python3",
+          "-B",
+          "-I",
+          ".github/scripts/lampos-publish-test.py"
+        ],
+        "elapsed_seconds": 1.1148,
+        "exit": 0,
+        "group_absent": true,
+        "name": "unit51",
+        "pgid": 41223,
+        "pid": 41223,
+        "stderr_sha256": "4370be5f5cb394ec880730609928b78dfbc4b0a5d7beaeeb01cb642eccf5c571",
+        "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "timeout": false
+      },
+      {
+        "argv": [
+          "python3",
+          "-B",
+          "-I",
+          ".github/scripts/lampos-publish-cli-test.py",
+          "--updater",
+          "REPO/.claude/worktrees/third-ownkeys-carry-evidence/carry-2e66/preimages/b697cdd748fc9f5976c360d1/lamp-update"
+        ],
+        "elapsed_seconds": 5.0042,
+        "exit": 0,
+        "group_absent": true,
+        "name": "cli7-saved-x86-compat",
+        "pgid": 41265,
+        "pid": 41265,
+        "stderr_sha256": "1ff90c8a2b7936167ca397702e1de0f36a03b30283890af963b9d2ea4b219ba8",
+        "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "timeout": false
+      }
+    ],
+    "runtime_profile": "saved old x86 updater compatibility only, not current Rust acceptance",
+    "updater_sha256": "fc7cb94c1a8441af3f56345b19cfe1ec1dd85d44f83d249f03eb428422b2bd8c"
+  },
+  "root_independent_checks": {
+    "unit_unique_pass_rows": 51,
+    "cli_unique_pass_rows": 7,
+    "raw_stderr_hashes_match": true,
+    "allfour_script_workflow_files_equal_prior_head": true,
+    "range_diff": "1:2675dec2a5 = 1:5613b3420f",
+    "prep_tree_clean": true
+  },
+  "private_receipt_sha256": {
+    "auth-gate/qualified.json": "a3c16ad5459dc3b1a36bd07ba4bfa8e962a30568dc5f1c030af3c5db4d12a04c",
+    "3934-source-carry.json": "2d7cbb06b4fe62a9f31aeec927393d56dfd01ad57a1eeb0e5c9ea28088b3b874"
+  },
+  "holds": [
+    "Protected release credential unprovided; draft retained.",
+    "No real credential, GitHub release, deployment, CI rerun or Mac ARM64 link.",
+    "New original LinuxARM andclippy required; old2675nativegreen stayshistorical."
+  ]
+}
