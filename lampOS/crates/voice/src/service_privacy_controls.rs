@@ -615,13 +615,80 @@ pub(crate) mod tests {
 
     /// A privacy worker's process that ended by itself with `command`'s
     /// status, as `check_running` finds it.
+    #[track_caller]
     pub(crate) fn a_privacy_worker_ended(command: &str) -> io::Error {
+        use std::os::unix::process::ExitStatusExt;
+
+        let caller = std::panic::Location::caller();
+        let fixture_started = Instant::now();
         let directory = SessionDirectory::create().unwrap();
-        let (mut worker, _peer) = Worker::command_fixture(&directory.path, "privacy", command);
-        let deadline = Instant::now() + Duration::from_secs(5);
-        while !matches!(worker.try_exit(), Ok(Some(_))) {
-            assert!(Instant::now() < deadline, "the stand-in did not end");
+        // Only this deliberate crash avoids an unnecessary regular core file.
+        // Linux can ignore this limit for a piped core collector; this is not
+        // evidence of what delayed any earlier fixture's exit observation.
+        let child_command = if command == "kill -SEGV $$" {
+            "ulimit -c 0 && kill -SEGV $$"
+        } else {
+            command
+        };
+        let (mut worker, _peer) =
+            Worker::command_fixture(&directory.path, "privacy", child_command);
+        let wait_started = Instant::now();
+        let deadline = wait_started + Duration::from_secs(5);
+        let pid = worker.process_id();
+        // The fixture's R marker proves its first shell started, not that the
+        // inner command ended. Only the observed child status proves the latter.
+        eprintln!(
+            "privacy exit fixture returned: command={command:?}, child_command={child_command:?}, caller={}:{}, pid={pid}, setup_us={}",
+            caller.file(),
+            caller.line(),
+            wait_started.duration_since(fixture_started).as_micros()
+        );
+        let mut polls = 0_u64;
+        let status = loop {
+            polls += 1;
+            match worker.try_exit() {
+                Ok(Some(status)) => break status,
+                Ok(None) => assert!(
+                    Instant::now() < deadline,
+                    "the stand-in did not end: command={command:?}, caller={}:{}, pid={pid}, polls={polls}, wait_us={}, total_us={}, last_try_exit=None",
+                    caller.file(),
+                    caller.line(),
+                    wait_started.elapsed().as_micros(),
+                    fixture_started.elapsed().as_micros()
+                ),
+                Err(error) => panic!(
+                    "stand-in exit observation failed: command={command:?}, caller={}:{}, pid={pid}, polls={polls}, wait_us={}, kind={:?}, raw_os_error={:?}: {error}",
+                    caller.file(),
+                    caller.line(),
+                    wait_started.elapsed().as_micros(),
+                    error.kind(),
+                    error.raw_os_error()
+                ),
+            }
             std::thread::sleep(Duration::from_millis(2));
+        };
+        eprintln!(
+            "privacy exit fixture observed: command={command:?}, caller={}:{}, pid={pid}, polls={polls}, wait_us={}, total_us={}, status={status}, code={:?}, signal={:?}, core_dumped={}",
+            caller.file(),
+            caller.line(),
+            wait_started.elapsed().as_micros(),
+            fixture_started.elapsed().as_micros(),
+            status.code(),
+            status.signal(),
+            status.core_dumped()
+        );
+        if command == "kill -SEGV $$" {
+            assert_eq!(
+                status.signal(),
+                Some(rustix::process::Signal::SEGV.as_raw()),
+                "the stand-in must really end by SIGSEGV: pid={pid}, status={status}"
+            );
+        } else if command == "exit 101" {
+            assert_eq!(
+                status.code(),
+                Some(101),
+                "the stand-in must really exit 101: pid={pid}, status={status}"
+            );
         }
         let ended = worker.check_running().unwrap_err();
         drop(worker);
