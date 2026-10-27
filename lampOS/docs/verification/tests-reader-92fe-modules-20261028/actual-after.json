@@ -1,0 +1,161 @@
+{
+  "/private/tmp/tests-restart-f9-cargo-20261027_root/debug/lamp-same-voice": {
+    "bound": {
+      "sha256": "c8767d2c2a22f7e746a912faa9b1016dfa6217778e06a66b719a47704807baff",
+      "bytes": 74262104,
+      "mode": 493,
+      "mtime_ns": 1793103137313800113,
+      "device": 16777222,
+      "inode": 489865362,
+      "kind": "file",
+      "artifact": {
+        "reason": "compiler-artifact",
+        "package_id": "path+file:///private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/same-voice#lamp-same-voice@0.1.0",
+        "manifest_path": "/private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/same-voice/Cargo.toml",
+        "target": {
+          "kind": [
+            "bin"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "lamp-same-voice",
+          "src_path": "/private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/same-voice/src/main.rs",
+          "edition": "2024",
+          "doc": true,
+          "doctest": false,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": false
+        },
+        "features": [],
+        "filenames": [
+          "/private/tmp/tests-restart-f9-cargo-20261027_root/debug/lamp-same-voice"
+        ],
+        "executable": "/private/tmp/tests-restart-f9-cargo-20261027_root/debug/lamp-same-voice",
+        "fresh": true
+      },
+      "sealed_copy": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/reader-82a6-atomic-current-gates-20261028/frozen/current-helper-0-c8767d2c2a22f7e7-lamp-same-voice"
+    },
+    "observed": {
+      "sha256": "c8767d2c2a22f7e746a912faa9b1016dfa6217778e06a66b719a47704807baff",
+      "bytes": 74262104,
+      "mode": 493,
+      "mtime_ns": 1793103137313800113,
+      "device": 16777222,
+      "inode": 489865362,
+      "kind": "file"
+    }
+  },
+  "/private/tmp/tests-restart-f9-cargo-20261027_root/debug/lamp-voice": {
+    "bound": {
+      "sha256": "84ac5ea232d42e3b9f8c1e97d31824017fa27291368c98d8fa21a0395023198a",
+      "bytes": 42705488,
+      "mode": 493,
+      "mtime_ns": 1793130918885984505,
+      "device": 16777222,
+      "inode": 489865482,
+      "kind": "file",
+      "artifact": {
+        "reason": "compiler-artifact",
+        "package_id": "path+file:///private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/voice#lamp-voice@0.1.0",
+        "manifest_path": "/private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/voice/Cargo.toml",
+        "target": {
+          "kind": [
+            "bin"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "lamp-voice",
+          "src_path": "/private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/voice/src/main.rs",
+          "edition": "2024",
+          "doc": true,
+          "doctest": false,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": false
+        },
+        "features": [],
+        "filenames": [
+          "/private/tmp/tests-restart-f9-cargo-20261027_root/debug/lamp-voice"
+        ],
+        "executable": "/private/tmp/tests-restart-f9-cargo-20261027_root/debug/lamp-voice",
+        "fresh": true
+      },
+      "sealed_copy": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/reader-82a6-atomic-current-gates-20261028/frozen/current-helper-1-84ac5ea232d42e3b-lamp-voice"
+    },
+    "observed": {
+      "sha256": "84ac5ea232d42e3b9f8c1e97d31824017fa27291368c98d8fa21a0395023198a",
+      "bytes": 42705488,
+      "mode": 493,
+      "mtime_ns": 1793130918885984505,
+      "device": 16777222,
+      "inode": 489865482,
+      "kind": "file"
+    }
+  },
+  "/private/tmp/tests-restart-f9-cargo-20261027_root/debug/deps/lamp_voice-6d619bbdd1df3a0d": {
+    "bound": {
+      "sha256": "e145dd810812b4b0f81f31cad3ffe6969aed4ae41a09ef4e8b6eba379195e070",
+      "bytes": 117369504,
+      "mode": 493,
+      "mtime_ns": 1793132231263510095,
+      "device": 16777222,
+      "inode": 489760963,
+      "kind": "file",
+      "artifact": {
+        "reason": "compiler-artifact",
+        "package_id": "path+file:///private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/voice#lamp-voice@0.1.0",
+        "manifest_path": "/private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/voice/Cargo.toml",
+        "target": {
+          "kind": [
+            "lib"
+          ],
+          "crate_types": [
+            "lib"
+          ],
+          "name": "lamp_voice",
+          "src_path": "/private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/voice/src/lib.rs",
+          "edition": "2024",
+          "doc": true,
+          "doctest": true,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": [],
+        "filenames": [
+          "/private/tmp/tests-restart-f9-cargo-20261027_root/debug/deps/lamp_voice-6d619bbdd1df3a0d"
+        ],
+        "executable": "/private/tmp/tests-restart-f9-cargo-20261027_root/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+        "fresh": true
+      },
+      "sealed_copy": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/reader-82a6-atomic-current-gates-20261028/frozen/Voice-lib-e145dd810812b4b0-lamp_voice-6d619bbdd1df3a0d"
+    },
+    "observed": {
+      "sha256": "e145dd810812b4b0f81f31cad3ffe6969aed4ae41a09ef4e8b6eba379195e070",
+      "bytes": 117369504,
+      "mode": 493,
+      "mtime_ns": 1793132231263510095,
+      "device": 16777222,
+      "inode": 489760963,
+      "kind": "file"
+    }
+  }
+}

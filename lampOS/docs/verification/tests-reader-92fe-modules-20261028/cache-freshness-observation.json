@@ -1,0 +1,17 @@
+{
+  "epoch": {
+    "path": "lampOS/crates/voice/src/session_reader/tests.rs",
+    "head": "92fe225289b2b662bfc8d8427e5614fb46b41c07",
+    "canonical_root": "/private/tmp/tests-ready-speaking-1c-20261026",
+    "source_index_sha256": "2c90c913bddc9dc9743ef38ea2807d4494c4cd811f2e43660389d7841c421059",
+    "bytes_sha256": "8300c327d3cd22649320721f6a5b7126693a395ebb19d31fa7c0df9c35b493f8",
+    "mtime_ns": 1793130364120440589,
+    "canonical_source_checkout_complete": true,
+    "mtime_refresh_performed": false,
+    "normal_git_checkout_only": true,
+    "unchanged_source_mtime_retained": true,
+    "Cargo_freshness_observed_without_forcing": true
+  },
+  "Voice_test_fresh": true,
+  "blanket_transitive_freshness_claim": false
+}

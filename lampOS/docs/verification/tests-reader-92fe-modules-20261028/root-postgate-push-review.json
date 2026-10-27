@@ -1,0 +1,37 @@
+{
+  "status": "ROOT_VERIFIED_PASS_FOR_OWN_BRANCH_PUSH",
+  "head": "92fe225289b2b662bfc8d8427e5614fb46b41c07",
+  "base": "82a62867cc1bcbbc4b0848519c6757f623d112ce",
+  "latest_remote_at_push_admission": "82a62867cc1bcbbc4b0848519c6757f623d112ce",
+  "same_base_at_observation": true,
+  "commands": [
+    "cmd-Voice-lib-compile.json",
+    "cmd-fmt.json",
+    "cmd-inventory-all.json",
+    "cmd-inventory-ignored.json",
+    "cmd-metadata.json",
+    "cmd-module-service_trace.json",
+    "cmd-module-session_reader.json",
+    "cmd-strict.json",
+    "cmd-workspace.json"
+  ],
+  "module_counts": {
+    "session_reader::tests::": {
+      "passed": 4,
+      "failed": 0,
+      "ignored": 0
+    },
+    "service_trace::tests::": {
+      "passed": 6,
+      "failed": 0,
+      "ignored": 0
+    }
+  },
+  "guards": {
+    "sealed": 546,
+    "actual": 3
+  },
+  "genuine_Cargo_freshness": true,
+  "no_full_Voice_runtime_credit": true,
+  "draft_until_current_native_and_reads": true
+}

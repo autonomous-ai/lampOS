@@ -1,0 +1,275 @@
+{
+  "changed_entries": {
+    "lampOS/Cargo.lock": {
+      "before": {
+        "sha256": "e4f567679e5b62bf5b1fe5c93b5ce923449b7912d72c2befd8651d0235b09b22",
+        "bytes": 122933,
+        "mode": 420,
+        "kind": "file"
+      },
+      "after": {
+        "sha256": "86dce55e0b4315886ba9bcde43291feff191bd3d44ced7a315bb05e88c9f556e",
+        "bytes": 122953,
+        "mode": 420,
+        "kind": "file"
+      }
+    },
+    "lampOS/crates/body/src/bin/lamp-body-measure.rs": {
+      "before": {
+        "sha256": "bc3a22395e77f5f296a2d6f9dfd84110ad86b5779c40f221b35078dc3dd97842",
+        "bytes": 31260,
+        "mode": 420,
+        "kind": "file"
+      },
+      "after": {
+        "sha256": "e01ae173cb674202080fed92fbfc9b14174e6477ea1ae19cf05be3bb347d018b",
+        "bytes": 33475,
+        "mode": 420,
+        "kind": "file"
+      }
+    },
+    "lampOS/crates/control/Cargo.toml": {
+      "before": {
+        "sha256": "e5c93b4556de5d81c13bf7bba0e28f4c6f74eb1ec93a6a3ad90f24c537f2cd5a",
+        "bytes": 1953,
+        "mode": 420,
+        "kind": "file"
+      },
+      "after": {
+        "sha256": "ad77b623cd691ba194ac373861d24bd60803225d1442b20875f5f28acfe10954",
+        "bytes": 2058,
+        "mode": 420,
+        "kind": "file"
+      }
+    },
+    "lampOS/crates/control/src/main.rs": {
+      "before": {
+        "sha256": "2d89c5ad83991796dff511af54943c0948bc9939c03cc48d689a3d790728050d",
+        "bytes": 8021,
+        "mode": 420,
+        "kind": "file"
+      },
+      "after": {
+        "sha256": "740a15dc71baa995e58ce1e99d9b2c99c2f81693858961523993045089ff3c98",
+        "bytes": 8622,
+        "mode": 420,
+        "kind": "file"
+      }
+    },
+    "lampOS/crates/control/src/session.rs": {
+      "before": {
+        "sha256": "962392e9e60995a2a1b47c524bf2aa415ceb4e885d3cd719c7668274ab544502",
+        "bytes": 49774,
+        "mode": 420,
+        "kind": "file"
+      },
+      "after": {
+        "sha256": "c7ce8317564de42f8836c58ebf3de8ef9bc22f07c2baa4b6e6e247496fc7a72b",
+        "bytes": 55604,
+        "mode": 420,
+        "kind": "file"
+      }
+    },
+    "lampOS/crates/skills/src/main.rs": {
+      "before": {
+        "sha256": "74d35938cf988f4c5e7dc4c1a620683bc84a58e1e1e8422dccc65d935fdadb97",
+        "bytes": 215965,
+        "mode": 420,
+        "kind": "file"
+      },
+      "after": {
+        "sha256": "489dd9545450890409a10f2473fc340a55368896fab9dffa5193da441b5cd6e0",
+        "bytes": 216548,
+        "mode": 420,
+        "kind": "file"
+      }
+    },
+    "lampOS/crates/skills/src/package.rs": {
+      "before": {
+        "sha256": "2ab4959691c7a6d5d1e3746b459f51bc7d0217457beb20d10b1db52db739405b",
+        "bytes": 84035,
+        "mode": 420,
+        "kind": "file"
+      },
+      "after": {
+        "sha256": "458969b0d032283e2dccc1a6455f4590d48aa6c048a84b38bb1538cd6f462aa4",
+        "bytes": 89836,
+        "mode": 420,
+        "kind": "file"
+      }
+    },
+    "lampOS/crates/skills/tests/it/main.rs": {
+      "before": {
+        "sha256": "fd47c1c3275639afcab9d3ffe1793c44544b24eef274d37929097665048828ac",
+        "bytes": 1492,
+        "mode": 420,
+        "kind": "file"
+      },
+      "after": {
+        "sha256": "e667da6f6199a72de54e9408f2eeaf86b6a829e67f6fb4b431ffb4f7df94b905",
+        "bytes": 1504,
+        "mode": 420,
+        "kind": "file"
+      }
+    },
+    "lampOS/crates/skills/tests/it/shared.rs": {
+      "before": null,
+      "after": {
+        "sha256": "de452b22905338bba8a591359f52094fdf965df15575a7601f8c08bab41fa574",
+        "bytes": 8034,
+        "mode": 420,
+        "kind": "file"
+      }
+    },
+    "lampOS/docs/control.md": {
+      "before": {
+        "sha256": "c9f332bb3b276fb9ce2f1effc8e4b9f1a2760618bedc50759480e88e8fda4b83",
+        "bytes": 36086,
+        "mode": 420,
+        "kind": "file"
+      },
+      "after": {
+        "sha256": "7e2100998ffd1be03aecbd4c8d447ba7b4023c83af97eacb4b85037aab2476e0",
+        "bytes": 36517,
+        "mode": 420,
+        "kind": "file"
+      }
+    },
+    "lampOS/docs/control.schema.json": {
+      "before": {
+        "sha256": "720de5713c1bf2ab01ca73226184795c49687c3c037ee179295072d84af6aac3",
+        "bytes": 34128,
+        "mode": 420,
+        "kind": "file"
+      },
+      "after": {
+        "sha256": "5276c81ca02cc60827c6de809e3f77da21776b4814bbb68196ec9dd9fe680bf9",
+        "bytes": 34257,
+        "mode": 420,
+        "kind": "file"
+      }
+    },
+    "lampOS/docs/install.md": {
+      "before": {
+        "sha256": "efdc2f0b7eba6a6f612e4f5bf78a6d84355858ba2a13895aaa774a6df44f1fd1",
+        "bytes": 106470,
+        "mode": 420,
+        "kind": "file"
+      },
+      "after": {
+        "sha256": "1219b3f3b27a16fbf9e0167ae203fb5cfd1470ea14c1cab95a49ee8993c3e873",
+        "bytes": 106770,
+        "mode": 420,
+        "kind": "file"
+      }
+    },
+    "lampOS/docs/skill-format.md": {
+      "before": {
+        "sha256": "cf14871192dedb35e4c88e1a49723e19cd2dead4988cba26e107920d093e0999",
+        "bytes": 18373,
+        "mode": 420,
+        "kind": "file"
+      },
+      "after": {
+        "sha256": "1280b930df89cfac68a95601c3abc00312607c86bc04b9e3c070c86afb2619ba",
+        "bytes": 18534,
+        "mode": 420,
+        "kind": "file"
+      }
+    },
+    "lampOS/docs/skills.md": {
+      "before": {
+        "sha256": "0037da9f90a123dcc9561d51e8b9f3ad6f2f6c6ba57ede785140628659896e16",
+        "bytes": 213472,
+        "mode": 420,
+        "kind": "file"
+      },
+      "after": {
+        "sha256": "f241296740bf9b006bb1a7c9a69f5abba9a01287cfb23026b1a0092f9975384e",
+        "bytes": 215950,
+        "mode": 420,
+        "kind": "file"
+      }
+    },
+    "lampOS/sdk/js/README.md": {
+      "before": {
+        "sha256": "7935c82badbfe4401483f99dd348b943b6da5001bdc0ebd46d7866623d6fbccb",
+        "bytes": 4881,
+        "mode": 420,
+        "kind": "file"
+      },
+      "after": {
+        "sha256": "57ceb86545924033d629b69179077dfaa1ac6cbbdd377bd5943eb999f02be3c1",
+        "bytes": 4913,
+        "mode": 420,
+        "kind": "file"
+      }
+    },
+    "lampOS/sdk/js/src/control.schema.json": {
+      "before": {
+        "sha256": "720de5713c1bf2ab01ca73226184795c49687c3c037ee179295072d84af6aac3",
+        "bytes": 34128,
+        "mode": 420,
+        "kind": "file"
+      },
+      "after": {
+        "sha256": "5276c81ca02cc60827c6de809e3f77da21776b4814bbb68196ec9dd9fe680bf9",
+        "bytes": 34257,
+        "mode": 420,
+        "kind": "file"
+      }
+    },
+    "lampOS/sdk/python/README.md": {
+      "before": {
+        "sha256": "4ed80040d1084daf71612c9e71ea004a15b0d24edbb4c54b559dc55f752a4e05",
+        "bytes": 6302,
+        "mode": 420,
+        "kind": "file"
+      },
+      "after": {
+        "sha256": "76a02f662701c3eb7137908b2c57282f2804a6d6f4836f83e624b200db90e2eb",
+        "bytes": 6334,
+        "mode": 420,
+        "kind": "file"
+      }
+    },
+    "lampOS/sdk/python/src/lampos/control.schema.json": {
+      "before": {
+        "sha256": "720de5713c1bf2ab01ca73226184795c49687c3c037ee179295072d84af6aac3",
+        "bytes": 34128,
+        "mode": 420,
+        "kind": "file"
+      },
+      "after": {
+        "sha256": "5276c81ca02cc60827c6de809e3f77da21776b4814bbb68196ec9dd9fe680bf9",
+        "bytes": 34257,
+        "mode": 420,
+        "kind": "file"
+      }
+    }
+  },
+  "changed_paths": [
+    "lampOS/Cargo.lock",
+    "lampOS/crates/body/src/bin/lamp-body-measure.rs",
+    "lampOS/crates/control/Cargo.toml",
+    "lampOS/crates/control/src/main.rs",
+    "lampOS/crates/control/src/session.rs",
+    "lampOS/crates/skills/src/main.rs",
+    "lampOS/crates/skills/src/package.rs",
+    "lampOS/crates/skills/tests/it/main.rs",
+    "lampOS/crates/skills/tests/it/shared.rs",
+    "lampOS/docs/control.md",
+    "lampOS/docs/control.schema.json",
+    "lampOS/docs/install.md",
+    "lampOS/docs/skill-format.md",
+    "lampOS/docs/skills.md",
+    "lampOS/sdk/js/README.md",
+    "lampOS/sdk/js/src/control.schema.json",
+    "lampOS/sdk/python/README.md",
+    "lampOS/sdk/python/src/lampos/control.schema.json"
+  ],
+  "old_head": "37076c5df20e47ac7de31df4c6b7b3d6ca0bf216",
+  "head": "92fe225289b2b662bfc8d8427e5614fb46b41c07",
+  "base": "82a62867cc1bcbbc4b0848519c6757f623d112ce",
+  "no_parent_runtime_transfer": true
+}

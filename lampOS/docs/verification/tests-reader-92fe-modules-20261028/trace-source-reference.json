@@ -1,0 +1,65 @@
+{
+  "path": "lampOS/crates/voice/src/service_trace.rs",
+  "sha256": "593290a4d1e64c2283bd6ae7b481b39449353bc70fd53e4c67318323ae4adafe",
+  "darwin_all": [
+    "service_trace::tests::closure_flushes_final_accepted_event_without_inventing_complete_evidence",
+    "service_trace::tests::disk_failure_latches_health_without_an_audio_result_error",
+    "service_trace::tests::oversized_event_is_dropped_not_truncated_into_a_misleading_record",
+    "service_trace::tests::private_and_failed_reader_traces_keep_the_original_records_and_finite_state",
+    "service_trace::tests::rotation_uses_only_pinned_files_and_bounded_disk_space",
+    "service_trace::tests::stalled_writer_has_fixed_capacity_and_bounded_finish_without_joining"
+  ],
+  "darwin_ignored": [],
+  "source_cases": [
+    {
+      "identity": "service_trace::tests::closure_flushes_final_accepted_event_without_inventing_complete_evidence",
+      "line": 607,
+      "attributes": "#[test]",
+      "darwin": true,
+      "ignored": false
+    },
+    {
+      "identity": "service_trace::tests::disk_failure_latches_health_without_an_audio_result_error",
+      "line": 621,
+      "attributes": "#[test]",
+      "darwin": true,
+      "ignored": false
+    },
+    {
+      "identity": "service_trace::tests::stalled_writer_has_fixed_capacity_and_bounded_finish_without_joining",
+      "line": 634,
+      "attributes": "#[test]",
+      "darwin": true,
+      "ignored": false
+    },
+    {
+      "identity": "service_trace::tests::oversized_event_is_dropped_not_truncated_into_a_misleading_record",
+      "line": 652,
+      "attributes": "#[test]",
+      "darwin": true,
+      "ignored": false
+    },
+    {
+      "identity": "service_trace::tests::shared_session_rotation_keeps_granted_descriptors_and_private_health",
+      "line": 665,
+      "attributes": "#[cfg(target_os = \"linux\")]\n    #[test]",
+      "darwin": false,
+      "ignored": false
+    },
+    {
+      "identity": "service_trace::tests::rotation_uses_only_pinned_files_and_bounded_disk_space",
+      "line": 715,
+      "attributes": "#[test]",
+      "darwin": true,
+      "ignored": false
+    },
+    {
+      "identity": "service_trace::tests::private_and_failed_reader_traces_keep_the_original_records_and_finite_state",
+      "line": 743,
+      "attributes": "#[test]",
+      "darwin": true,
+      "ignored": false
+    }
+  ],
+  "source_only_not_execution": true
+}

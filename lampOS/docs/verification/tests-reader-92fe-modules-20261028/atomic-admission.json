@@ -1,0 +1,41 @@
+{
+  "status": "ADMITTED_CURRENT_SOURCE_FOR_ONE_REVIEWED_GATE",
+  "head": "92fe225289b2b662bfc8d8427e5614fb46b41c07",
+  "base": "82a62867cc1bcbbc4b0848519c6757f623d112ce",
+  "observed_origin": "82a62867cc1bcbbc4b0848519c6757f623d112ce",
+  "source_count": 10913,
+  "changed_source_count": 18,
+  "whole_committed_blob_bytes_checked": true,
+  "authored_patch_identical": true,
+  "authored_whole_blobs_and_modes_identical": true,
+  "range_diff": "1:  e350328a9a = 1:  92fe225289 lampOS: wait for reader fixture completion within owned roots\n",
+  "source_physical_epochs_bound": true,
+  "no_clean_touch_cache_or_artifact_substitution": true,
+  "parent_release": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/warm-target-reader-af546-to-reader-dad-20261028/release.json",
+    "sha256": "55d302577bf814ec701c348a5f58dab149d91a9591a640a68311672f95a8ad89",
+    "bytes": 1213
+  },
+  "inherited_sealed": 543,
+  "retired_actual": 3,
+  "controller": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/reader-82a6-atomic-current-gates-20261028/run.py",
+    "sha256": "ec3a015d24efa9894917e9954aeb97df27d355ac3116198d6b255f08efd545ef",
+    "bytes": 26428
+  },
+  "activated_plan": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/reader-82a6-atomic-current-gates-20261028/plan.json",
+    "sha256": "772cb565bf2740b9c7b3605c5187e8797215b95c01382ea606ecb8c354381b29",
+    "bytes": 9851
+  },
+  "launch": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/reader-82a6-atomic-current-gates-20261028/launch.json",
+    "sha256": "86cd4c4504ad56bf0ee19a82a71eeb5ae7939fabf76d44b2259f3ce399a2266d",
+    "bytes": 1141
+  },
+  "prospective_approval": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/reader-82a6-atomic-current-gates-20261028/root-prospective-approval.json",
+    "sha256": "9bdf620b1e70000bd5bb936b9f810d8c6f9a1f3b6f6a5bbdb9eba6a475aba22a",
+    "bytes": 1787
+  }
+}

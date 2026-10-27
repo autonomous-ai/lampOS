@@ -1,0 +1,15 @@
+coordinator::tests::endpoint_session::real_worker_session_records_verdict_provenance: test
+coordinator::tests::hand_controls::head_tap_cue_decision_to_speaker_dispatch_latency: test
+coordinator::tests::hand_controls::local_hand_stop_dispatch_latency: test
+hand_controls::tests::head_touch_bus_to_poll_latency: test
+provider_worker::tests::sixty_second_answer_follows_output_capacity: test
+provider_worker::tests::three_minute_answer_follows_output_capacity: test
+reference::recovery::tests::recentred_the_fixed_margin_carries_an_hour_of_that_lamps_drift: test
+reference::tests::four_virtual_hours_capture_clocked: test
+remember::tests::hits_note_latency_on_a_200_entry_kept_list: test
+reminders::tests::parent_poll_cost: test
+reminders::transport::tests::poll_cost: test
+second_provider::tests::policy::measure_the_wait_from_the_call_to_its_run: test
+task_news::tests::work_whose_agent_never_answers_after_it_was_accepted_is_told: test
+thread::tests::write_a_thread_fixture: test
+tools::tests::use_skill_cost: test

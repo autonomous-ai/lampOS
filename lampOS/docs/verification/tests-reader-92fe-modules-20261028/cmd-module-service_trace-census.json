@@ -1,0 +1,71 @@
+{
+  "module_prefix": "service_trace::tests::",
+  "rows": [
+    [
+      "service_trace::tests::closure_flushes_final_accepted_event_without_inventing_complete_evidence",
+      "ok"
+    ],
+    [
+      "service_trace::tests::disk_failure_latches_health_without_an_audio_result_error",
+      "ok"
+    ],
+    [
+      "service_trace::tests::oversized_event_is_dropped_not_truncated_into_a_misleading_record",
+      "ok"
+    ],
+    [
+      "service_trace::tests::private_and_failed_reader_traces_keep_the_original_records_and_finite_state",
+      "ok"
+    ],
+    [
+      "service_trace::tests::rotation_uses_only_pinned_files_and_bounded_disk_space",
+      "ok"
+    ],
+    [
+      "service_trace::tests::stalled_writer_has_fixed_capacity_and_bounded_finish_without_joining",
+      "ok"
+    ]
+  ],
+  "raw_rows": [
+    [
+      "service_trace::tests::closure_flushes_final_accepted_event_without_inventing_complete_evidence",
+      "ok"
+    ],
+    [
+      "service_trace::tests::disk_failure_latches_health_without_an_audio_result_error",
+      "ok"
+    ],
+    [
+      "service_trace::tests::oversized_event_is_dropped_not_truncated_into_a_misleading_record",
+      "ok"
+    ],
+    [
+      "service_trace::tests::private_and_failed_reader_traces_keep_the_original_records_and_finite_state",
+      "ok"
+    ],
+    [
+      "service_trace::tests::rotation_uses_only_pinned_files_and_bounded_disk_space",
+      "ok"
+    ],
+    [
+      "service_trace::tests::stalled_writer_has_fixed_capacity_and_bounded_finish_without_joining",
+      "ok"
+    ]
+  ],
+  "libtest_annotation_mapping": [],
+  "counts": {
+    "ok": 6
+  },
+  "command_exit": 0,
+  "raw_summary": [
+    [
+      "6",
+      "0",
+      "0",
+      "0",
+      "3894"
+    ]
+  ],
+  "saved_before_post_runtime_guard": true,
+  "full_Voice_runtime_claim": false
+}

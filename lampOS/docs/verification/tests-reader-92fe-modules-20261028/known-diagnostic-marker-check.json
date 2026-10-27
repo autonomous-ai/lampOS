@@ -1,0 +1,15 @@
+{
+  "known_markers": [
+    "SHARED_INPUT_PAUSE",
+    "SENTINEL_PROBE",
+    "READER_LINUX_CONTROLLED",
+    "PROBE_TRACE"
+  ],
+  "all_current_actuals_checked": [
+    "/private/tmp/tests-restart-f9-cargo-20261027_root/debug/lamp-same-voice",
+    "/private/tmp/tests-restart-f9-cargo-20261027_root/debug/lamp-voice",
+    "/private/tmp/tests-restart-f9-cargo-20261027_root/debug/deps/lamp_voice-6d619bbdd1df3a0d"
+  ],
+  "none_found": true,
+  "unknown_marker_absence_claim": false
+}

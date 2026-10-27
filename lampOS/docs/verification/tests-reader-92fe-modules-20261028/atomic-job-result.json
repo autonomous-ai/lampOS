@@ -1,0 +1,32 @@
+{
+  "exit_code": 0,
+  "stage": "reviewed-controller",
+  "controller_launched": true,
+  "completed_at": "2026-10-27T20:41:41.128549+00:00",
+  "no_push": true,
+  "atomic-admission.json": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/reader-82a6-atomic-current-gates-20261028/atomic-admission.json",
+    "sha256": "c03d10ed09507d00fc820576ccb7173cb47fb753e29b9e7e12f44c0f589903e4",
+    "bytes": 2307
+  },
+  "terminal.json": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/reader-82a6-atomic-current-gates-20261028/terminal.json",
+    "sha256": "39536829e26540867d64bf384e78667b1ea0cef5d70fdb73da14b872f55e789c",
+    "bytes": 9850
+  },
+  "native-controller-result.json": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/reader-82a6-atomic-current-gates-20261028/native-controller-result.json",
+    "sha256": "a2c6028097820ad9d57d208924bd1fcfc5a56a63debd53a8289ac5df0ce9e85f",
+    "bytes": 472
+  },
+  "plan.json": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/reader-82a6-atomic-current-gates-20261028/plan.json",
+    "sha256": "772cb565bf2740b9c7b3605c5187e8797215b95c01382ea606ecb8c354381b29",
+    "bytes": 9851
+  },
+  "launch.json": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/reader-82a6-atomic-current-gates-20261028/launch.json",
+    "sha256": "86cd4c4504ad56bf0ee19a82a71eeb5ae7939fabf76d44b2259f3ce399a2266d",
+    "bytes": 1141
+  }
+}

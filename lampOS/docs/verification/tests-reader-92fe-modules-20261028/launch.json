@@ -1,0 +1,28 @@
+{
+  "require_escalated": true,
+  "root_review_approved": true,
+  "exclusive_target": true,
+  "parent_closed_and_target_released": true,
+  "exclusive_canonical_source": true,
+  "exclusive_official_source": true,
+  "compiler_lease": "root-reader-dad-warm-modules",
+  "independent_gate_after_failed_parent_authorized": false,
+  "controller_sha256": "ec3a015d24efa9894917e9954aeb97df27d355ac3116198d6b255f08efd545ef",
+  "plan_sha256": "772cb565bf2740b9c7b3605c5187e8797215b95c01382ea606ecb8c354381b29",
+  "concurrency_context": {
+    "idle_host_claim": false,
+    "other_target_workloads": [
+      "Root independent Body cache may run; contemporaneous host load not controlled"
+    ]
+  },
+  "allocation": {
+    "head": "92fe225289b2b662bfc8d8427e5614fb46b41c07",
+    "worktree": "/private/tmp/tests-ready-speaking-1c-20261026",
+    "target": "/private/tmp/tests-restart-f9-cargo-20261027_root",
+    "target_dev_ino": [
+      16777222,
+      486188298
+    ],
+    "gate": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/reader-82a6-atomic-current-gates-20261028"
+  }
+}

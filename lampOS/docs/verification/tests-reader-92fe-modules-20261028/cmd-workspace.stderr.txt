@@ -1,0 +1,5 @@
+   Compiling lamp-skills v0.1.0 (/private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/skills)
+   Compiling lamp-control v0.1.0 (/private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/control)
+   Compiling lamp-cloud v0.1.0 (/private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/cloud)
+   Compiling lamp-body v0.1.0 (/private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/body)
+    Finished `dev` profile [unoptimized] target(s) in 24.71s

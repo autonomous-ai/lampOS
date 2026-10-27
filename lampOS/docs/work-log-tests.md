@@ -1,5 +1,13 @@
 # Tests work log
 
+## 2026-10-28 03:50 — current Reader passes and is pushed
+
+Ready for lamp-voice: no (new native checks and current reads remain).
+
+[Reader92 qualification](verification/tests-reader-92fe-modules-20261028/) passes Reader4 plus Trace6 once each on frozen Main82, all strict/workspace/current compilation and source/owner/546 witness/three executable guards. Cargo genuinely reports fresh:true with current source/profile/lock/depinfo bound; no clean, touch or forced compilation. Nine command groups close; controller/native0. The platform schema now derives actual portable/Linux-exclusive/Mac-only rows correctly.
+
+The exact-lease own push succeeds while live Main is still82. Original ARM40580786734/Linux40580786883 are running, separately watched without rerun. A once-only full serial Voice library check on this same Reader source is being prepared in the verified released cache, not claimed as already run. Skills current full package continues; Mood is prepared for the next released Body slot. Prior full failures stay failed. No device access.
+
 ## 2026-10-28 03:41 — published Reader and Skills original native audits
 
 Ready for lamp-voice: no (fresh82 qualifications and current reads remain).

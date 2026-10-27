@@ -1,0 +1,62 @@
+{
+  "command": [
+    "/Users/autonomous/.cargo/bin/cargo",
+    "+1.96.0",
+    "test",
+    "--offline",
+    "--locked",
+    "--jobs",
+    "1",
+    "-p",
+    "lamp-voice",
+    "--lib",
+    "--no-run",
+    "--message-format=json"
+  ],
+  "cwd": "/private/tmp/tests-ready-speaking-1c-20261026/lampOS",
+  "started_at": "2026-10-27T20:40:45.117881+00:00",
+  "timeout_seconds": 3600,
+  "stdout": "cmd-Voice-lib-compile.stdout.txt",
+  "stderr": "cmd-Voice-lib-compile.stderr.txt",
+  "timeout_cleanup": [
+    {
+      "action": "leader exited unreaped; no other owned group members",
+      "members": [
+        {
+          "pid": 41006,
+          "state": "Z"
+        }
+      ]
+    }
+  ],
+  "timed_out": false,
+  "disk_reserve_breached": false,
+  "stop_reason": null,
+  "process_group_scope": "Owned group only; no detached-descendant cleanup claim.",
+  "group_closure_method": "WNOWAIT leader reservation and ps group inventory before reap",
+  "launch_state": "Popen_recorded",
+  "disk_reserve_bytes": 2214592512,
+  "disk_sample_interval_seconds": 1,
+  "disk_paths": [
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/reader-82a6-atomic-current-gates-20261028",
+    "/private/tmp/tests-restart-f9-cargo-20261027_root"
+  ],
+  "disk_samples": 1,
+  "disk_last_available_bytes": 6952931328,
+  "disk_minimum_available_bytes": 6952931328,
+  "available_bytes_before_Cargo": 6952931328,
+  "owned_pid": 41006,
+  "owned_process_group": 41006,
+  "direct_wait_status": 0,
+  "exit_code": 0,
+  "owned_group_absent_after_cleanup": true,
+  "unexpected_owned_descendants": false,
+  "unresolved_owned_pids": [],
+  "compiler_lease_held": false,
+  "wall_seconds": 0.601935,
+  "finished_at": "2026-10-27T20:40:45.720609+00:00",
+  "stdout_sha256": "bd5cb8449c54d28d9cd701a8e85cd963b26bcb01404f378f7ec174d3afa0255e",
+  "stdout_bytes": 256333,
+  "stderr_sha256": "d1bbea1d9f658cc75e5332f7541eeb0db9722590d8e40a0ebef0466f8cc2068f",
+  "stderr_bytes": 61
+}

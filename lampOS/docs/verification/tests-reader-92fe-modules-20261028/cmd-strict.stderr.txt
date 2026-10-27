@@ -1,0 +1,6 @@
+    Checking lamp-skills v0.1.0 (/private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/skills)
+    Checking lamp-cloud v0.1.0 (/private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/cloud)
+    Checking lamp-voice-eval v0.1.0 (/private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/voice-eval)
+    Checking lamp-update v0.1.0 (/private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/update)
+    Checking lamp-body v0.1.0 (/private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/body)
+    Finished `dev` profile [unoptimized] target(s) in 50.16s
