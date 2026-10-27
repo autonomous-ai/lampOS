@@ -1,0 +1,19 @@
+{
+  "old": "a616ce5ca88ba934f841776a974e9c13d83fa7d7",
+  "old_parent": "a808ef04b5885ccb35e8e7693eee16ae331e3a7f",
+  "head": "d4ce16238c705e615bddffce4400c907ae3fef17",
+  "base": "c1fa2bc9f327f5d553bb3dcc355053d8e7e94bfa",
+  "tree": "ebb7cb559946c2ee98ae3ca58c7af91dfa94f2d1",
+  "equals_original_green_a616_actual_CI_complete_tree": true,
+  "all35_authored_blobs_exact": true,
+  "root_HEAD_and_index_bytes_unchanged": true,
+  "own_patch_sha256": "492fdf21eb8e8bfdb34e9103c3c4cfac0b868747fd9b272addb17eb35f0763ed",
+  "range_diff": "1:  a616ce5ca8 = 1:  d4ce16238c lampOS: bind speaking-face enrollment to live consent",
+  "one_original_author_and_message_preserved": true,
+  "pushed": true,
+  "original_a616_receipt_sha256": "62aeb6a68cda59f3146bd101a1c2afbc1e87827c63dae21f71060244db112182",
+  "new_head_original_ARM": 40592229097,
+  "new_head_original_Linux": 40592229102,
+  "new_head_results": "PENDING",
+  "physical_activation_HOLD_unchanged": true
+}

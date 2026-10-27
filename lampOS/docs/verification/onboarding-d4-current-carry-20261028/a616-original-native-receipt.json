@@ -1,0 +1,150 @@
+{
+  "status": "ORIGINAL_ARM_AND_LINUX_CLIPPY_SUCCESS",
+  "published_head": "a616ce5ca88ba934f841776a974e9c13d83fa7d7",
+  "published_authored_base": "a808ef04b5885ccb35e8e7693eee16ae331e3a7f",
+  "published_tree": "83a683ca12f900d3796d59d699405dbec859eb92",
+  "actual_checkout": "1ed6ef7945e22fbc04e678f226cacb3f23fec7c9",
+  "actual_tree": "ebb7cb559946c2ee98ae3ca58c7af91dfa94f2d1",
+  "actual_parents": [
+    "c1fa2bc9f327f5d553bb3dcc355053d8e7e94bfa",
+    "a616ce5ca88ba934f841776a974e9c13d83fa7d7"
+  ],
+  "actual_tree_entries": 10920,
+  "whole_actual_tree_equals_published_tree": false,
+  "actual_tree_bound_to_current_worktree": false,
+  "ARM_run": 40586502035,
+  "ARM_job": 122479201000,
+  "ARM_attempt": 1,
+  "ARM_native_watch": {
+    "session": 30408,
+    "exit": 0,
+    "chunk": "2fa122"
+  },
+  "Linux_Clippy_run": 40586502037,
+  "Linux_Clippy_job": 122479200993,
+  "Linux_Clippy_attempt": 1,
+  "Linux_Clippy_native_watch": {
+    "session": 11499,
+    "exit": 0,
+    "chunk": "c8e4d4"
+  },
+  "unique_outer_PASS": 11829,
+  "FAIL": 0,
+  "LEAK": 0,
+  "TIMEOUT": 0,
+  "ABORT": 0,
+  "duplicates": 0,
+  "retries": 0,
+  "selected_unrun": 0,
+  "summary_skips": 107,
+  "skip_identities_not_invented": true,
+  "required_total_once_PASS": 56,
+  "required_once_PASS": {
+    "new": 29,
+    "retained": 16,
+    "Eyes": 11
+  },
+  "required_source_files_exact_to_local_tested_ab92": true,
+  "owned_published_path_blob_mode_matches": 35,
+  "supplemental_Body_cases_once_PASS": 8,
+  "supplemental_Linux_only_case_once_PASS": "tests::a_read_that_stops_short_says_why",
+  "separate_not_added_to_nextest": {
+    "doc_targets": 47,
+    "doc_pass": 4,
+    "doc_failed": 0,
+    "relay_aggregate_pass": 1,
+    "process_cases_pass": 13,
+    "process_failed": 0
+  },
+  "export_log": {
+    "binaries": 48,
+    "examples": 2,
+    "complete_SHA256SUMS_reported": true
+  },
+  "artifact_metadata_only": {
+    "id": 12771978254,
+    "compressed_bytes": 118886921,
+    "API_ZIP_digest": "sha256:d403b446a6de9ae94c46749758be95e5fc5a5e7e3725ac43f36bc64a41543cda",
+    "upload_log_digest_matches_API": true,
+    "archive_downloaded": false,
+    "payload_hashes_or_ELF_headers_verified": false,
+    "Voice_Eyes_pins_derived": false,
+    "test_executable_equivalence_claimed": false
+  },
+  "historical_failed_native_and_local_epochs_unchanged": true,
+  "no_old_run_counts_transferred": true,
+  "updated_install_doc_reader_once_PASS": true,
+  "ci_paths_cases_once_PASS": 2,
+  "complete_tree_comparison": {
+    "actual_Clippy_checkout": "1ed6ef7945e22fbc04e678f226cacb3f23fec7c9",
+    "actual_Clippy_tree": "ebb7cb559946c2ee98ae3ca58c7af91dfa94f2d1",
+    "published_head": "a616ce5ca88ba934f841776a974e9c13d83fa7d7",
+    "actual_vs_authored": [
+      {
+        "path": "lampOS/docs/install.md",
+        "before": [
+          "100644",
+          "blob",
+          "fae84ea436fe23dac3e58d29d19931949fff02a0"
+        ],
+        "after": [
+          "100644",
+          "blob",
+          "1ded79654d818eb44a919571dcbf793aaa7c9e82"
+        ]
+      }
+    ],
+    "actual_vs_previous_f8_CI": [
+      {
+        "path": "lampOS/docs/install.md",
+        "before": [
+          "100644",
+          "blob",
+          "157d7a44a37c1dd1a068a7d3c50592497e97f271"
+        ],
+        "after": [
+          "100644",
+          "blob",
+          "1ded79654d818eb44a919571dcbf793aaa7c9e82"
+        ]
+      }
+    ],
+    "ARM_binding": "ORIGINAL_ARM_CHECKOUT_INDEPENDENTLY_MATCHES_CLIPPY",
+    "runtime_credit_transferred": false
+  },
+  "independent_review_current_base_installed_pin_and_physical_holds_not_cleared": true,
+  "no_rerun_dispatch_cancel_source_ref_target_post_or_artifact_download_actions": true,
+  "actual_read_only_collection_completions": [
+    {
+      "operation": "ARM original logs",
+      "session": 33949,
+      "exit": 0,
+      "chunk": "cb6a28"
+    },
+    {
+      "operation": "Linux original logs",
+      "session": 3275,
+      "exit": 0,
+      "chunk": "23b7e6"
+    },
+    {
+      "operation": "actual source API",
+      "session": 25959,
+      "exit": 0,
+      "chunk": "8fb9bd"
+    }
+  ],
+  "evidence_sha256": {
+    "40586502035-original-logs.zip": "456a9646f58fda7d64706d774857c8aa25711bfe351d66411f3ee8d878f6dd6b",
+    "40586502037-original-logs.zip": "2cd6ce22556c3ff976e45168892871d912ed6754a1d88b86a7fd311c2d73d3c6",
+    "native-terminal-ledger.json": "c99da41b3587af4a4264293eb2224e0be2cbd3e25bcbfc99df95deff1b926538",
+    "native-runtime-accounting.json": "815a80187a1964d2395450df265057afa286439279af2f2a3e16b2af6c147f0b",
+    "required56-native-ledger.json": "2862ca15d4860fd343a12a166feb6a49b2b69a64807ffbd8df5d49fba4204e50",
+    "supplemental-body-native-ledger.json": "5f51f774ca383f9bf79c12ab4c1943dcbc0f4ac3760b40f5d97bffd8ee175d49",
+    "separate-harness-accounting.json": "5972154150e5c1e6b8173a65c4634f391e79567475be350571a22aabb046b1ca",
+    "artifact-metadata-accounting.json": "9e0798ad692dae51d2604d1c3aaf9527c113efd7cecc1db1f21407ece514b692",
+    "source-composition.json": "525d809a0384ce3b78b385279ea128e25cbbd25948e171d0ba8f422b7d9c28bb",
+    "doc-reader-native-ledger.json": "e65c274c0ea331de8b9bd89050c42917f80c554bd611aa94af2922add6871c2a",
+    "1ed6ef7945e22fbc04e678f226cacb3f23fec7c9-source-binding.json": "6d2c7faabc4d94606be04c3dde5211de9ac1f8580138e91dcf9d5476c2993a48"
+  }
+}
