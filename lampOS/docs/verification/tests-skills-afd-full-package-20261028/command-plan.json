@@ -1,0 +1,29 @@
+{
+  "status": "DISABLED_NO_TARGET_ACCESS_OR_COMPILER",
+  "expected_lease": "root-skills-current-body-full",
+  "whole_controller": [
+    "python3",
+    "-B",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-a17-body-target-gates-prep-20261028/native-wrapper.py"
+  ],
+  "permission": "require_escalated entire controller",
+  "pipeline": [
+    "cargo +1.96.0 fmt --all --check",
+    "cargo +1.96.0 metadata --offline --locked --format-version1",
+    "cargo +1.96.0 clippy --offline --locked --all-targets --jobs1 --message-format=json -p EACH_ACTUAL_REVERSE -- -D warnings",
+    "cargo +1.96.0 build --offline --locked --workspace --jobs1 --message-format=json",
+    "cargo +1.96.0 test --offline --locked --jobs1 -p lamp-skills --no-run --message-format=json",
+    "every actual driver --list --format terse AND --ignored --list --format terse, identities derived",
+    "cargo +1.96.0 test --offline --locked --jobs1 -p lamp-skills --no-fail-fast -- --test-threads=1 ONCE"
+  ],
+  "runtime_filters": 0,
+  "runtime_reuse": false,
+  "no_clean": true,
+  "source_head": "afd9585cf60435d96ff27593933b32b62c9684e1",
+  "pinned_base": "a17ec9216e53f6a77931dd9686f83be8244d05a2",
+  "target_identity_from_actual_release_only": [
+    16777222,
+    487951267
+  ],
+  "no_fixed_current_test_count": true
+}

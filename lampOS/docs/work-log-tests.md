@@ -1,5 +1,13 @@
 # Tests work log
 
+## 2026-10-28 01:54 — current Skills full package passes and is pushed
+
+Ready for lamp-voice: no (fresh native checks and current readers remain).
+
+[Current Skills qualification](verification/tests-skills-afd-full-package-20261028/) passed **555/0/9** once on afd9585cf / Maina17ec9216, all five drivers,564 inventory identities and zero-case doctests. The addon and two Routine controls pass once. Formatting, twelve-package strict Clippy, workspace/fresh integration compilation and all source,139 witness/seven executable guards pass; groups closed. The initial stale-plan admission is zero work, not a test attempt. Historical failures remain failed. Own branch is pushed, original ARM40563875974/Linux40563875822 are running.
+
+The verified Skills cache release now belongs to Reader's exact current-base carry ecc34ddf5; source import and renewed gates are next. Restart's full Voice gate continues separately. Mood's bc0c03ef5/a17 and Ready's5be3742ed/44d carries retain exact authored blobs/patches but have zero current execution credit. Friday owns the Memory repair, with our source findings handed over; no duplicate implementation. No device access.
+
 ## 2026-10-28 01:30 — Mood original native green; current carries continue
 
 Ready for lamp-voice: no (current-base qualification and current readers remain).

@@ -1,0 +1,28 @@
+{
+  "controller_sha256": "998d1c003edec248e9a63b6d9cb1a02f91450c3a2df21a383250b21aeafaed46",
+  "plan_sha256": "741978d49f1a5573bfd51e28bbc31001be47aa5b5ceb23f7653f0d98c1f8faca",
+  "compiler_lease": "root-skills-current-body-full",
+  "require_escalated": true,
+  "root_review_approved": true,
+  "exclusive_source": true,
+  "exclusive_target": true,
+  "parent_closed_and_released": true,
+  "independent_gate_after_failed_parent_authorized": true,
+  "target_dev_ino": [
+    16777222,
+    487951267
+  ],
+  "allocation": {
+    "kind": "Skills",
+    "head": "afd9585cf60435d96ff27593933b32b62c9684e1",
+    "gate": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-a17-body-target-gates-prep-20261028",
+    "worktree": "/private/tmp/tests-skills-canonical-20261028",
+    "target": "/private/tmp/tests-body-holder-cargo-20261027"
+  },
+  "concurrency_context": {
+    "idle_host_claim": false,
+    "declared_other_activity": "Separate Skills Body-target and Restart warm-target gates, each jobs1, distinct canonical and official sources; Mood native audit and Memory source-only preparation. No shared target/source writer."
+  },
+  "execution": "ROOT_APPROVED",
+  "parent_closed_and_target_released": true
+}

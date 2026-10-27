@@ -1,0 +1,187 @@
+{
+  "execution_ready": true,
+  "root_review_required": true,
+  "compiler_lease": "root-skills-current-body-full",
+  "worktree": "/private/tmp/tests-skills-canonical-20261028",
+  "official_worktree": "/private/tmp/tests-skills-addon-journal-current-20261026",
+  "official_git_store": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/update-product-carrier.git",
+  "head": "afd9585cf60435d96ff27593933b32b62c9684e1",
+  "base": "a17ec9216e53f6a77931dd9686f83be8244d05a2",
+  "official_branch": "tests/1806-addon-journal-e1",
+  "canonical_branch": "tests/3545-qualify-current",
+  "canonical_alias_bound": true,
+  "canonical_import_receipt": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-a17-body-target-gates-prep-20261028/canonical-source-alias-receipt.json",
+    "sha256": "4c4910af3bd744c28f3b3e4d081797a8064fe16c5a45556f0fc03d5688dc484d",
+    "bytes": 832
+  },
+  "canonical_source_binding": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-a17-body-target-gates-prep-20261028/prepared-canonical-source.json",
+    "sha256": "64cc0978139701be39bdbb481c0b9d39423c61030d4da76f228c59fe533b5da1",
+    "bytes": 2457860
+  },
+  "official_source_binding": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-a17-body-target-gates-prep-20261028/prepared-official-source.json",
+    "sha256": "fa906e5471a5f446437e6bf59bfabf14dccd8760f74a02dead12d9177824d844",
+    "bytes": 2457861
+  },
+  "official_source_stat_binding": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-a17-body-target-gates-prep-20261028/prepared-official-stat.json",
+    "sha256": "a70ca781720dbdd31a21be30b5592b22a22a8effe31db4b609029ca35b8d5b04",
+    "bytes": 2359437
+  },
+  "source_count": 10912,
+  "candidate_paths": [
+    "lampOS/crates/skills/tests/it/addon.rs",
+    "lampOS/docs/skills.md"
+  ],
+  "target": "/private/tmp/tests-body-holder-cargo-20261027",
+  "target_dev_ino": [
+    16777222,
+    487951267
+  ],
+  "handoff_binding": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-a17-body-target-gates-prep-20261028/handoff-binding.json",
+    "sha256": "2a439b2d07ab9d05b25332f7e45315eba72b2617182c4dc096f931015f8a3493",
+    "bytes": 4760
+  },
+  "parent_slot_status": "Actual closed Updater FAIL integrity release only; independent Skills compiler/runtime allocation remains disabled pending Root review",
+  "inherited_sealed_count": 132,
+  "retired_parent_mutable_count": 102,
+  "parent_source_transition": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-a17-body-target-gates-prep-20261028/prepared-source-transition.json",
+    "sha256": "31b2a2fcc739e169690f8c805bfdb86698d4a4e2c426014f413edc89d4f2da9e",
+    "bytes": 26700
+  },
+  "expected_source_or_compiler_freshness_not_guessed": true,
+  "minimum_free_bytes": 3221225472,
+  "operational_reserve_bytes": 2214592512,
+  "reserved_closer_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/privacy-2a-host-control-prep/run.py",
+  "reserved_closer_sha256": "468ea6f8b4ce19e58c977014f7f015d12bc99e02ef158498e7c2fd2191a57efc",
+  "support_sha256": "8910e667094e5511a4311da37ae44c59e8c8ee635641863bf91cc2037676627d",
+  "census_parser_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/qualification/3218/census.py",
+  "census_parser_sha256": "037e1092a95db8f800009d2d0efaa8d561284c0788cf615d8c003ef70c992716",
+  "retained_failure_census": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/shared-current-gates-prep/skills/completed-failure-census.json",
+    "sha256": "36318b8829282969a2cbaf65344a73dd7915e9c11ea36ac61636f009679da92a"
+  },
+  "retained_failure_terminal": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/shared-current-gates-prep/skills/terminal.json",
+    "sha256": "390f1cf6877bd57926e1c0edefd14ad435686618ff0f58192f38eae41ddff08a"
+  },
+  "historical_receipts": {
+    "terminal.json": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/shared-current-gates-prep/skills/terminal.json",
+      "sha256": "390f1cf6877bd57926e1c0edefd14ad435686618ff0f58192f38eae41ddff08a"
+    },
+    "completed-failure-census.json": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/shared-current-gates-prep/skills/completed-failure-census.json",
+      "sha256": "36318b8829282969a2cbaf65344a73dd7915e9c11ea36ac61636f009679da92a"
+    },
+    "tests.json": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/shared-current-gates-prep/skills/tests.json",
+      "sha256": "2ff076489dac43ecb78c6c747de96b64e57af2c2bfc2eeda5cba33def5322db8"
+    },
+    "tests.stdout.txt": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/shared-current-gates-prep/skills/tests.stdout.txt",
+      "sha256": "2817e59a0f2239ce1f6b6d181f3f6be64f78fba4c3dfea44d146c0cbc4e1e934"
+    },
+    "tests.stderr.txt": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/shared-current-gates-prep/skills/tests.stderr.txt",
+      "sha256": "73be2b54b4961034a9961de247df67753911b7b2f8465003fecf289e751f3a19"
+    }
+  },
+  "historical_failure_counts_only": {
+    "passed": 521,
+    "failed": 1,
+    "ignored": 9
+  },
+  "historical_cause_status": "UNESTABLISHED; no passing scope waives the retained failure",
+  "Routine_3598_scope": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-3c98-full-gates-prep/routine-3598-scope.json",
+    "sha256": "f970274510295b02d83bf6d7ce148895293ef4be5db35bb4d9b9ff47734cd14f"
+  },
+  "required_cases": [
+    "addon::says_the_judge_dropped_do_not_spend_the_hour",
+    "routine::tests::a_delayed_sample_inside_the_window_keeps_its_original_deadline",
+    "routine::tests::a_host_stall_expires_the_request_header_without_changing_the_manager_deadline"
+  ],
+  "single_addon_internal_variants": [
+    true,
+    false
+  ],
+  "changed_test_input": "lampOS/crates/skills/tests/it/addon.rs",
+  "require_changed_IT_fresh_false": true,
+  "known_forbidden_diagnostic_markers": [
+    "SHARED_INPUT_PAUSE",
+    "SENTINEL_PROBE",
+    "READER_LINUX_CONTROLLED",
+    "PROBE_TRACE"
+  ],
+  "no_clean": true,
+  "no_source_payload_edit": true,
+  "runtime_reuse_authorized": false,
+  "ordinary_runtime_filters": 0,
+  "full_runtime_attempts": 1,
+  "full_runtime_timeout_s": 3600,
+  "expected_current_ordinary_counts": null,
+  "expected_current_doc_counts": null,
+  "expected_current_driver_count": null,
+  "expected_current_helper_count": null,
+  "declared_driver_source_reference": [
+    "lampOS/crates/skills/src/lib.rs",
+    "lampOS/crates/skills/src/main.rs",
+    "lampOS/crates/skills/tests/release_pair.rs",
+    "lampOS/crates/skills/tests/requested_audio.rs",
+    "lampOS/crates/skills/tests/it/main.rs"
+  ],
+  "normal_helper_source_reference": [
+    "lamp-skills",
+    "render_relaxing_music"
+  ],
+  "target_count_policy": "Actual Cargo metadata/no-run emitted drivers and normal bin/examples must cover package targets; old5drivers/2helpers are reference only, not assumed or dropped",
+  "scope": "Fresh full cargo test -p lamp-skills --no-fail-fast -- --test-threads=1 ONCE, all ordinary/current custom cases plus doctests; no full reverse-dependent runtime or native/device claim",
+  "pipeline": "fmt; metadata actual reverse closure; strict all actual reverse targets; workspace build; full Skills no-run; freeze source/profile/helper bindings; actual all/ignored inventories; full serial Cargo once; raw/parsed statuses before postguards",
+  "build_jobs": 1,
+  "test_threads": 1,
+  "debug_info": 0,
+  "incremental": false,
+  "offline_locked": true,
+  "retry": false,
+  "freshness_policy": "Only changed Skills IT executable must be fresh:false; all other compiler-artifact flags, profiles, features and current tracked inputs observed, no transitive cold-cache claim",
+  "guard_policy": "Full canonical/official source and all132 inherited/new sealed SHA initial/final; complete source file-set/stat6+Git metadata and all frozen bound metadata at command boundaries; all active actual SHA/stat, consumed driver/helpers+independent copies SHA adjacent. Prepared source physical epochs bound.102 Root-verified parent actuals explicitly already retired, not current guards. No legitimate source/target/witness writer during allocation; no chmod/FSreadonly/idle-host claim.",
+  "prospective_alias_inode_policy": "After returned sole full Cargo0or101 only, if owned groups closed/no timeout/reserve/error and no Compiling/Checking: metadata-derived normal bin/example aliases may change inode only when SHA/size/mode/mtime/device/kind all match. Test/frozen inodes remain strict; Rust101 remains FAIL; interrupted command has no exception.",
+  "reserved_input_names": [
+    "README.md",
+    "adapt-controller.py",
+    "canonical-allocation-source-only.json",
+    "canonical-carry.stderr.txt",
+    "canonical-carry.stdout.txt",
+    "canonical-source-alias-receipt.json",
+    "controller-minimal.diff",
+    "disabled-preparation-manifest.json",
+    "fetch.stderr.txt",
+    "fetch.stdout.txt",
+    "fetched-base.json",
+    "handoff-binding.json",
+    "launch-template.json",
+    "native-wrapper.py",
+    "parent-source-files.json",
+    "plan-disabled.json",
+    "plan.json",
+    "preparation-review.json",
+    "prepared-canonical-source.json",
+    "prepared-canonical-stat.json",
+    "prepared-official-source.json",
+    "prepared-official-stat.json",
+    "prepared-source-transition.json",
+    "run.py",
+    "support.py"
+  ],
+  "controller_sha256": "998d1c003edec248e9a63b6d9cb1a02f91450c3a2df21a383250b21aeafaed46",
+  "canonical_source_stat_binding": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-a17-body-target-gates-prep-20261028/prepared-canonical-stat.json",
+    "sha256": "89a6ae20329753aaf1d8d5852c562b72f203b90243aa86c32701ed2ab5649d24",
+    "bytes": 2359437
+  }
+}

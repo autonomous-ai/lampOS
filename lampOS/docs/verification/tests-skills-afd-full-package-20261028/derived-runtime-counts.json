@@ -1,0 +1,29 @@
+{
+  "counts": {
+    "passed": 555,
+    "failed": 0,
+    "ignored": 9
+  },
+  "doc_targets": [
+    {
+      "kind": "doctests",
+      "package": "lamp-skills",
+      "name": "lamp-skills:doctests",
+      "result": "ok",
+      "counts": {
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 0
+      },
+      "raw_test_rows": [],
+      "test_rows": [],
+      "display_annotation_mapping": [],
+      "stdout_interleaving_mapping": []
+    }
+  ],
+  "Rust_exit": 0,
+  "runtime_reuse": false,
+  "ordinary_filters": 0
+}

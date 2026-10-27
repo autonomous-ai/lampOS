@@ -1,0 +1,86 @@
+{
+  "status": "ROOT_VERIFIED_INTEGRITY_RELEASE_AFTER_FAILED_UPDATER",
+  "previous_owner": "3843-1d97-full-affected-gates-prep",
+  "release_receipt": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/body-target-updater-to-skills-20261028/release.json",
+    "sha256": "def0c42a329c0fbafad8803d748de592544d5c487cdb28d1deb117afd65f0246",
+    "bytes": 920
+  },
+  "parent_terminal": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/terminal.json",
+    "sha256": "a3b763a7616eb4644e90516db31f98cd209ab5c4611b200ff8bde3d0a3fcdd0d",
+    "bytes": 763
+  },
+  "parent_native": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/native-controller-result.json",
+    "sha256": "e18e2ca01dbfce0ad4f3382119b8f62700ba130a4b8a64da01a13e22b394bc0e",
+    "bytes": 760
+  },
+  "parent_Rust_command": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/cmd-full-closure.json",
+    "sha256": "83ba8117e060207015cb091611d3e26f2abf9e5d10cd3726f52f60da23854128",
+    "bytes": 2316
+  },
+  "parent_source_before": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/source-before.json",
+    "sha256": "171022f3b7736059c5283e149e7875f931709ccc6f1be64645ee8e7388fa9e48",
+    "bytes": 2456248
+  },
+  "parent_source_after": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/source-after.json",
+    "sha256": "171022f3b7736059c5283e149e7875f931709ccc6f1be64645ee8e7388fa9e48",
+    "bytes": 2456248
+  },
+  "parent_source_files": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-a17-body-target-gates-prep-20261028/parent-source-files.json",
+    "sha256": "a8d01b8d9c2592dce8ad66f922ccfba8af88ca9273f98d652dda855593f2005f",
+    "bytes": 2325175
+  },
+  "retained_parent_outcome": {
+    "status": "FAIL",
+    "native_exit": 1,
+    "Rust_exit": 101,
+    "parser_KeyError_retained": true,
+    "offline_reconciliation_not_a_pass": true
+  },
+  "protected_manifest": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/protected-after.json",
+    "sha256": "d40dabbf379beef15f2ab8c24ca184580a55b5e35f0b193a9c3e3bd9940b7b97",
+    "bytes": 55566
+  },
+  "mutable_manifest": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/3843-1d97-full-affected-gates-prep/actual-artifacts-after.json",
+    "sha256": "128265834a8389feec82d52e839ceafa0338095ed0f24756c529d891551b1036",
+    "bytes": 30495
+  },
+  "verified_bindings": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/body-target-updater-to-skills-20261028/verified-bindings.json",
+    "sha256": "c11800a18ea7217eb9d64c8c46416e99dc419331e78eaf003032acc343e3217a",
+    "bytes": 89278
+  },
+  "sealed_count": 132,
+  "mutable_count": 102,
+  "target_dev_ino": [
+    16777222,
+    487951267
+  ],
+  "lsof_stdout": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/body-target-updater-to-skills-20261028/lsof.stdout",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  "lsof_stderr": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/body-target-updater-to-skills-20261028/lsof.stderr",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  "raw_release_true_fields": {
+    "all_protected_full_hash_metadata_verified": true,
+    "all_actual_full_hash_metadata_verified_before_retirement": true,
+    "actual_bindings_retired": true,
+    "lsof_no_open_target_file": true,
+    "all_owned_groups_previously_closed": true,
+    "no_historical_test_failure_waived": true
+  },
+  "allocation_status": "DEFERRED_ROOT_REVIEW_LAUNCH_MUST_AUTHORIZE_FAILED_PARENT_INDEPENDENT_GATE"
+}

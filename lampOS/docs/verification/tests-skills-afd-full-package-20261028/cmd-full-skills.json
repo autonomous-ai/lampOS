@@ -1,0 +1,62 @@
+{
+  "command": [
+    "/Users/autonomous/.cargo/bin/cargo",
+    "+1.96.0",
+    "test",
+    "--offline",
+    "--locked",
+    "--jobs",
+    "1",
+    "-p",
+    "lamp-skills",
+    "--no-fail-fast",
+    "--",
+    "--test-threads=1"
+  ],
+  "cwd": "/private/tmp/tests-skills-canonical-20261028/lampOS",
+  "started_at": "2026-10-27T18:42:59.009958+00:00",
+  "timeout_seconds": 3600,
+  "stdout": "cmd-full-skills.stdout.txt",
+  "stderr": "cmd-full-skills.stderr.txt",
+  "timeout_cleanup": [
+    {
+      "action": "leader exited unreaped; no other owned group members",
+      "members": [
+        {
+          "pid": 19386,
+          "state": "Z"
+        }
+      ]
+    }
+  ],
+  "timed_out": false,
+  "disk_reserve_breached": false,
+  "stop_reason": null,
+  "process_group_scope": "Owned group only; no detached-descendant cleanup claim.",
+  "group_closure_method": "WNOWAIT leader reservation and ps group inventory before reap",
+  "launch_state": "Popen_recorded",
+  "disk_reserve_bytes": 2214592512,
+  "disk_sample_interval_seconds": 1,
+  "disk_paths": [
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-a17-body-target-gates-prep-20261028",
+    "/private/tmp/tests-body-holder-cargo-20261027"
+  ],
+  "disk_samples": 351,
+  "disk_last_available_bytes": 5744156672,
+  "disk_minimum_available_bytes": 5696905216,
+  "available_bytes_before_Cargo": 6215712768,
+  "owned_pid": 19386,
+  "owned_process_group": 19386,
+  "direct_wait_status": 0,
+  "exit_code": 0,
+  "owned_group_absent_after_cleanup": true,
+  "unexpected_owned_descendants": false,
+  "unresolved_owned_pids": [],
+  "compiler_lease_held": false,
+  "wall_seconds": 354.899842,
+  "finished_at": "2026-10-27T18:48:53.924666+00:00",
+  "stdout_sha256": "ea4f612f20976ee5bf306cdce491f6105571d4f21107e01beaa00ae9dd46c671",
+  "stdout_bytes": 47620,
+  "stderr_sha256": "22f27e8b2b3a6fde56e0ff7be866e54b677442f60976ea1d2eaf84435569cad8",
+  "stderr_bytes": 53755
+}

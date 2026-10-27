@@ -1,0 +1,12 @@
+{
+  "source_path": "lampOS/crates/skills/src/routine.rs",
+  "source_sha256": "d75ba61b4d327600519c16111c3ca53ee9477406b800f1ba77f5c252780e01b4",
+  "stock_declaration_ms": 500,
+  "clock_policy_fixture_override_ms": 5000,
+  "injected_deadline_uses_fixture_now": true,
+  "paired_control": "routine::tests::a_host_stall_expires_the_request_header_without_changing_the_manager_deadline",
+  "historical_failed_case": "routine::tests::a_delayed_sample_inside_the_window_keeps_its_original_deadline",
+  "historical_cause_not_established": true,
+  "not_the_old_unrun_expires_after_None_proposal": true,
+  "no_fresh_runtime_claim": true
+}

@@ -1,0 +1,22 @@
+{
+  "status": "ROOT_REPORTED_PREACTIVATION_ASSERTION_FAILURE_ZERO_GATE_WORK",
+  "Root_handle": "60613",
+  "Root_reported_exit": 1,
+  "stage": "Before activation, plan.controller_sha256 assertion",
+  "old_plan_sha256": "cbbb94c8d8b12db9165d5117ea870627f0e86e84d9db1c2ad2d2295b30e5a5e1",
+  "old_plan_controller_sha256": "1852ae0d2326295d8165f6f1914df4a616dc78ccd588778320a5b2ef8ef5d26c",
+  "actual_controller_sha256": "998d1c003edec248e9a63b6d9cb1a02f91450c3a2df21a383250b21aeafaed46",
+  "gate_controller_launched": false,
+  "wrapper_launched": false,
+  "Cargo_commands": 0,
+  "runtime_attempts": 0,
+  "source_target_mutations": false,
+  "prior_disabled_plan_preserved": "plan-disabled-before-controller-binding.json",
+  "Root_copy_preserved": "plan-before-root-activation.json",
+  "local_state_verified": "plan disabled/unallocated; no launch.json/cmd-* or native wrapper result",
+  "not_a_Rust_or_test_failure": true,
+  "not_a_retry_of_executed_commands": true,
+  "correction_scope": "plan controller hash only, controller/support/source/target unchanged",
+  "corrected_plan_sha256": "8a9bec3e9b0d24facb9197d0968d750db7432b4aa13886a26fb3cb611bd7f545",
+  "at": "2026-10-27T18:30:09.011775+00:00"
+}

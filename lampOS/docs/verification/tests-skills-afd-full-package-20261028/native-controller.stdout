@@ -1,0 +1,32 @@
+{"event": "start", "label": "cmd-fmt", "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-a17-body-target-gates-prep-20261028"}
+{"event": "finish", "label": "cmd-fmt", "exit_code": 0, "wall_seconds": 13.471476}
+{"event": "start", "label": "cmd-metadata", "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-a17-body-target-gates-prep-20261028"}
+{"event": "finish", "label": "cmd-metadata", "exit_code": 0, "wall_seconds": 0.847233}
+{"event": "start", "label": "cmd-strict", "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-a17-body-target-gates-prep-20261028"}
+{"event": "finish", "label": "cmd-strict", "exit_code": 0, "wall_seconds": 220.55535}
+{"event": "start", "label": "cmd-workspace", "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-a17-body-target-gates-prep-20261028"}
+{"event": "finish", "label": "cmd-workspace", "exit_code": 0, "wall_seconds": 215.176769}
+{"event": "start", "label": "cmd-test-compile", "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-a17-body-target-gates-prep-20261028"}
+{"event": "finish", "label": "cmd-test-compile", "exit_code": 0, "wall_seconds": 231.720134}
+{"event": "start", "label": "cmd-inventory-0-all", "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-a17-body-target-gates-prep-20261028"}
+{"event": "finish", "label": "cmd-inventory-0-all", "exit_code": 0, "wall_seconds": 1.311359}
+{"event": "start", "label": "cmd-inventory-0-ignored", "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-a17-body-target-gates-prep-20261028"}
+{"event": "finish", "label": "cmd-inventory-0-ignored", "exit_code": 0, "wall_seconds": 0.169533}
+{"event": "start", "label": "cmd-inventory-1-all", "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-a17-body-target-gates-prep-20261028"}
+{"event": "finish", "label": "cmd-inventory-1-all", "exit_code": 0, "wall_seconds": 1.167655}
+{"event": "start", "label": "cmd-inventory-1-ignored", "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-a17-body-target-gates-prep-20261028"}
+{"event": "finish", "label": "cmd-inventory-1-ignored", "exit_code": 0, "wall_seconds": 0.231037}
+{"event": "start", "label": "cmd-inventory-2-all", "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-a17-body-target-gates-prep-20261028"}
+{"event": "finish", "label": "cmd-inventory-2-all", "exit_code": 0, "wall_seconds": 0.993014}
+{"event": "start", "label": "cmd-inventory-2-ignored", "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-a17-body-target-gates-prep-20261028"}
+{"event": "finish", "label": "cmd-inventory-2-ignored", "exit_code": 0, "wall_seconds": 0.288983}
+{"event": "start", "label": "cmd-inventory-3-all", "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-a17-body-target-gates-prep-20261028"}
+{"event": "finish", "label": "cmd-inventory-3-all", "exit_code": 0, "wall_seconds": 1.776362}
+{"event": "start", "label": "cmd-inventory-3-ignored", "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-a17-body-target-gates-prep-20261028"}
+{"event": "finish", "label": "cmd-inventory-3-ignored", "exit_code": 0, "wall_seconds": 0.48456}
+{"event": "start", "label": "cmd-inventory-4-all", "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-a17-body-target-gates-prep-20261028"}
+{"event": "finish", "label": "cmd-inventory-4-all", "exit_code": 0, "wall_seconds": 1.6404}
+{"event": "start", "label": "cmd-inventory-4-ignored", "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-a17-body-target-gates-prep-20261028"}
+{"event": "finish", "label": "cmd-inventory-4-ignored", "exit_code": 0, "wall_seconds": 0.249151}
+{"event": "start", "label": "cmd-full-skills", "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-a17-body-target-gates-prep-20261028"}
+{"event": "finish", "label": "cmd-full-skills", "exit_code": 0, "wall_seconds": 354.899842}

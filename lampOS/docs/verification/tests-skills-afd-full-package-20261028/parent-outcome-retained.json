@@ -1,0 +1,7 @@
+{
+  "status": "FAIL",
+  "native_exit": 1,
+  "Rust_exit": 101,
+  "parser_KeyError_retained": true,
+  "offline_reconciliation_not_a_pass": true
+}
