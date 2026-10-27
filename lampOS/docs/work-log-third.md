@@ -1,3 +1,13 @@
+## 2026-10-28 01:44 — empty-component token regression repaired on latest base
+
+Ready for lamp-voice: no (current native gate and independent reads pending, #3912).
+
+Pushed #3912 6472ec41c on live-checked Main44d1ec5ab with the exact b2 lease, same three files and one-line task commit. Additional source audit found short bare JWTs with an empty signature, and direct JWE shapes with an empty encrypted-key component, escaped the recognized-token matcher. [One new control](verification/publish-diagnostics-3906-20261028/empty-jose-regression.json) fails both synthetic subcases before repair; after allowing empty components, full offline publisher gate passes49/0 in0.874s. All35 inherited method ASTs remain exact,14 new controls total. Signing/publication checks and retry behavior stay unchanged; English updates wording records the pattern boundary. Original current ARM40561968598/job122393091074 is watched without workflow mutation.
+
+[Prior b2 original native proof](verification/publish-diagnostics-3906-20261028/original-b2-native.json) is separately sealed: ARM40559613613/job122384791198 succeeds on attempt1, logged6da604c60 [a17/b2], tree277f107e1 exactly authored, all three owned blobs/modes equal. Actual offline48/OK and required build/simulated CLI/Rust/docs steps succeed. That pass does not qualify corrected49 source. No real publication, promotion, signature claim or device action. Fourteen has taken the corrected source read; First's release-path read remains requested.
+
+Own-key old4d source and99 saved executable copies across three epochs remain preserved. Latest source-only carry is6a0e1a62f/44d, with no conflicts; no new own-key Cargo, runtime or push is yet approved. Broker draft and old failures remain held.
+
 ## 2026-10-28 01:31 — Mood fixture source and twelve focused service controls read
 
 READ-OK #3623 d168fa939 in [the fixture/source and focused current integration scope](verification/mood-read-3623-20261028/current-d168-local.json). Production Expression bytes are unchanged. The held-Mood test uses the service's250ms sample cadence; its state is stamped after ordinary input publication, with first clock read paired to the old wall sample and later reads including Mood publication work. Ordinary200ms stepping, source ages, freshness limits, amplitude/oscillation assertions, exact Journal assertion,25 later checks, child cleanup and15s watchdog remain unchanged. This does not repair or reinterpret any historical failed run.

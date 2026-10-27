@@ -1,0 +1,28 @@
+{
+  "head": "6472ec41cec29c20111ee52617fcd3afb375ac64",
+  "base": "44d1ec5abe70723bc7e232552f05eb14f029c0d8",
+  "change": "Redact empty JOSE components, including empty JWT signature and direct JWE encrypted-key component. Same three task files; no publication behavior/retry change.",
+  "negative": {
+    "command": "python3 -B -I .github/scripts/lampos-publish-test.py CommandsTests.test_short_tokens_with_empty_jose_components_are_redacted",
+    "scope": "One new method, two synthetic subcases before production matcher repair; expected failure exit1 and both subcases failed. Not a full-suite result.",
+    "production_source": "56f39b42c9f29d03d8798f22608ba434668d5d45 production file; same bytes as b2",
+    "test_source": "new test file retained unchanged in final6472; no separate pre-execution source guard claimed"
+  },
+  "positive": {
+    "command": "python3 -B -I .github/scripts/lampos-publish-test.py",
+    "exit": 0,
+    "tests": 49,
+    "elapsed_seconds": 0.874,
+    "retained_test_ASTs_exact": 35,
+    "new_methods": 14
+  },
+  "raw_sha256": {
+    "negative-one-case.log": "db411b41bc6129bf12f2e2355be84cc903151487d4ea13085aebf08557388217",
+    "positive-full49.log": "628c35153c8a5def3f5787156a8572bc8a5e37764111cbf97508274d317003db"
+  },
+  "limits": [
+    "Offline mocked git/gh/updater; no real network, key, signing, publication, workflow or device invocation by tests.",
+    "Existing local Python cache exists; new empty-component control fails under old matcher and passes under repaired matcher. No bytecode-absence claim.",
+    "Original b2 native48 remains source-bound; corrected49 original ARM pending."
+  ]
+}

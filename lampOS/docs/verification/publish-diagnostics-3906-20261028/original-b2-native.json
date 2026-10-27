@@ -1,0 +1,396 @@
+{
+  "PR": 3912,
+  "Python_offline_tests": {
+    "case_source_equal_actual": true,
+    "command": "python3 -I .github/scripts/lampos-publish-test.py",
+    "command_line": 229,
+    "execution_context_lines": [
+      232,
+      284
+    ],
+    "new_controls": 13,
+    "outcomes": [
+      {
+        "line": 284,
+        "raw": "OK",
+        "status": "OK"
+      }
+    ],
+    "passed": 48,
+    "reported_options": {},
+    "retained35_exact_AST": true,
+    "scope": "Offline faked gh/git/updater fixture coverage; no observed real GitHub failure diagnosis or signing acceptance.",
+    "static_test_methods": 48,
+    "summaries": [
+      {
+        "line": 282,
+        "ran": 48,
+        "raw": "Ran 48 tests in 0.260s"
+      }
+    ]
+  },
+  "Rust_observations": {
+    "failed_or_retry_status_observations": [],
+    "full_unique_nextest_census_performed": false,
+    "source_implementations_not_reviewed": true,
+    "summaries_only": [
+      {
+        "executed_reported": 11784,
+        "failed": 0,
+        "line": 12569,
+        "passed": 11784,
+        "raw_suffix": "11784 passed, 106 skipped",
+        "selected_if_explicit": null,
+        "selected_unrun_if_explicit": null,
+        "skipped": 106
+      }
+    ]
+  },
+  "all_step_statuses": [
+    {
+      "conclusion": "success",
+      "name": "Set up job",
+      "number": 1,
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "system packages",
+      "number": 2,
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "Run actions/checkout@v4",
+      "number": 3,
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "publication failure tests (offline, no signing secret)",
+      "number": 4,
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "Rust 1.96.0",
+      "number": 5,
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "artifact provenance regression (offline, disposable Cargo workspace)",
+      "number": 6,
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "stable promotion tests (offline, disposable test key)",
+      "number": 7,
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "restore the cache",
+      "number": 8,
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "unchanged source files get the cached build's times back",
+      "number": 9,
+      "status": "completed"
+    },
+    {
+      "conclusion": "skipped",
+      "name": "record fresh source times for a cold publication build",
+      "number": 10,
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "Run taiki-e/install-action@v2",
+      "number": 11,
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "build (release, the lamps' binaries)",
+      "number": 12,
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "every built lamp-* binary is classified for the lamp-os package",
+      "number": 13,
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "build the two selected artifact examples without filename collisions",
+      "number": 14,
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "publication CLI rehearsal (local test key and simulated GitHub only)",
+      "number": 15,
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "which crates a pull request tests",
+      "number": 16,
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "test (full run, every test one at a time; otherwise without the realtime group, in parallel)",
+      "number": 17,
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "doc tests and the own-harness tests (nextest runs neither)",
+      "number": 18,
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "export only current Cargo targets and their SHA-256",
+      "number": 19,
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "Run actions/upload-artifact@v4",
+      "number": 20,
+      "status": "completed"
+    },
+    {
+      "conclusion": "skipped",
+      "name": "discard the isolated example target before saving the cache",
+      "number": 21,
+      "status": "completed"
+    },
+    {
+      "conclusion": "skipped",
+      "name": "save the cache",
+      "number": 22,
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "Post Run actions/checkout@v4",
+      "number": 44,
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "Complete job",
+      "number": 45,
+      "status": "completed"
+    }
+  ],
+  "hashes": {
+    "arm-checkout.json": "86a36617f8ab9d5033eceb8456daba7332577911a49d82b857aa5f04f8adc207",
+    "arm-job.log": "d1755a1ca5f65d4a45802b709e412957bfb27430c48fde7e23decaca77fa9145",
+    "arm-jobs.json": "7dbd890e67ddc550e769e238bd165f177d9028a7e2f52dcf78be9efa3670d106",
+    "arm-original-attempt.json": "0fc568c32f4b3a09109127ea592348fa55212cc49ee884d6667e82df74af3275",
+    "arm-run.json": "fdf9ff4944a472d4ffeb9bad0fbe96f338bcc0f75d04623f319f821a979be4cd",
+    "arm-watch.started.json": "69a409ae896e6e38220bd57e0d9484fe17c145d44337be219b4bc5d1f0058e93",
+    "arm-watch.terminal.json": "9b20f7558f2b4aeab418b60fc54fee5a5362aefd417a0818d96770f976868b31",
+    "audit-original.py": "91a49100d9057ef38d5b62e09e73c2bcd202c3930dfdd790e7172c43fe3500cc",
+    "authored-source.json": "355a26266ad6daf254d0d37e28afd9376253149d5d28be6f4f645c5dfb204755",
+    "collect-original.py": "a8fc6e0a5ce4b2a6b3294280dc8b531bcb18d4e9a56bd23c5f98874702d8d1ef",
+    "prepare-source.py": "f864fbe0e2bd2784b1309b2322eee5c8e484ce82caf0e7e0d56fe0fc9e6a19a0",
+    "preview-fetch.json": "63dbb5c689b3e5eb21c8a62cef50fbba042ed12cdbb47c942207590f692f6b81",
+    "watch-controller.terminal.json": "ee5c2ae35e8fdb42e9d2b26478f5758779a531cd60be83957c47cc5e129776ce",
+    "watch-original.py": "c4bac9dd1f32ac56b496f8936d9b029c4c92c4dea89598e266424fe610868839"
+  },
+  "historical_boundary": "Current b2eb51d/a17 original result only; older00cc/409 receipt remains a separate completed epoch. No moving-Main or later-head runtime credit.",
+  "holds": [],
+  "limits": [
+    "All real gh operations by helper were read-only run/log/source metadata. No diagnostics invocation, local tests/Cargo, rerun/cancel/dispatch, release/publish, signing keys, artifact binaries or devices.",
+    "CLI rehearsal and offline publication/provenance/promotion step successes use their stated simulated/test-key boundaries, not real GitHub failure or signature validation.",
+    "Own3646 remains unrelated DRAFT/broker held; no activation/readiness change."
+  ],
+  "release_blocker": 3906,
+  "required_actual_step_statuses": {
+    "CLI rehearsal": [
+      {
+        "conclusion": "success",
+        "name": "publication CLI rehearsal (local test key and simulated GitHub only)",
+        "number": 15,
+        "status": "completed"
+      }
+    ],
+    "Python offline failure tests": [
+      {
+        "conclusion": "success",
+        "name": "publication failure tests (offline, no signing secret)",
+        "number": 4,
+        "status": "completed"
+      }
+    ],
+    "Rust docs/custom harness": [
+      {
+        "conclusion": "success",
+        "name": "doc tests and the own-harness tests (nextest runs neither)",
+        "number": 18,
+        "status": "completed"
+      }
+    ],
+    "Rust release build": [
+      {
+        "conclusion": "success",
+        "name": "build (release, the lamps' binaries)",
+        "number": 12,
+        "status": "completed"
+      }
+    ],
+    "Rust setup": [
+      {
+        "conclusion": "success",
+        "name": "Rust 1.96.0",
+        "number": 5,
+        "status": "completed"
+      }
+    ],
+    "Rust tests": [
+      {
+        "conclusion": "success",
+        "name": "test (full run, every test one at a time; otherwise without the realtime group, in parallel)",
+        "number": 17,
+        "status": "completed"
+      }
+    ]
+  },
+  "run": {
+    "aggregate_conclusion": "success",
+    "aggregate_status": "completed",
+    "all_jobs": [
+      {
+        "conclusion": "success",
+        "id": 122384791198,
+        "name": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+        "status": "completed"
+      },
+      {
+        "conclusion": "skipped",
+        "id": 122384793690,
+        "name": "lampOS \u2014 promote a tested release to the stable feed",
+        "status": "completed"
+      },
+      {
+        "conclusion": "skipped",
+        "id": 122392483366,
+        "name": "report-full-run-failure",
+        "status": "completed"
+      },
+      {
+        "conclusion": "skipped",
+        "id": 122392483377,
+        "name": "lampOS \u2014 sign and publish the tested lamp-voice artifact",
+        "status": "completed"
+      }
+    ],
+    "attempt": 1,
+    "event_head": "b2eb51db87083e072d6a62653e3b1442b9e20998",
+    "id": 40559613613,
+    "job_conclusion": "success",
+    "job_id": 122384791198,
+    "job_name": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+    "job_status": "completed"
+  },
+  "separate_Linux_Clippy_gate": "Not triggered for these Python-only paths, per Root assignment; none dispatched or claimed. Other skipped jobs remain skipped.",
+  "source_binding": {
+    "actual_tree_API_and_Git": "277f107e1eec6a85f56104e756eb9bc2cf87132a",
+    "authored_base": "a17ec9216e53f6a77931dd9686f83be8244d05a2",
+    "authored_head": "b2eb51db87083e072d6a62653e3b1442b9e20998",
+    "authored_tree": "277f107e1eec6a85f56104e756eb9bc2cf87132a",
+    "checkout_attribution": "Checkout SHA logged; ordered parents/tree source-API and fetched-Git bound, not invented as logged. No source WT reads/changes.",
+    "logged_actual_checkout": "6da604c60b05d28e310b811f2db85f450af7a054",
+    "ordered_parents_API_and_Git": [
+      "a17ec9216e53f6a77931dd9686f83be8244d05a2",
+      "b2eb51db87083e072d6a62653e3b1442b9e20998"
+    ],
+    "owned3": [
+      {
+        "actual_preview": {
+          "mode": "100644",
+          "sha": "4fb16b18f1a007a729ffb89b4f01a89f34b5056f",
+          "type": "blob"
+        },
+        "authored": {
+          "mode": "100644",
+          "sha": "4fb16b18f1a007a729ffb89b4f01a89f34b5056f",
+          "type": "blob"
+        },
+        "authored_sha256": "04b9c2afd002604b0e79ddc0d1bd72e6cb2d75ff7ab340fbe464b0a96ba5791f",
+        "base": {
+          "mode": "100644",
+          "sha": "9c984c5d33b734d725a7b60f40959ca51bf6dc6b",
+          "type": "blob"
+        },
+        "exact_blob_and_mode_equal": true,
+        "path": ".github/scripts/lampos-publish-test.py"
+      },
+      {
+        "actual_preview": {
+          "mode": "100644",
+          "sha": "705c083dfbae3b5141cb4f5268372aafbd4cb97c",
+          "type": "blob"
+        },
+        "authored": {
+          "mode": "100644",
+          "sha": "705c083dfbae3b5141cb4f5268372aafbd4cb97c",
+          "type": "blob"
+        },
+        "authored_sha256": "2c16ebe67e43a14326b458f3b0ca83236abd562c96bb610ef7fbfc643024b02f",
+        "base": {
+          "mode": "100644",
+          "sha": "91d2051a193a7a503dd09f927a5c708e9e7507a5",
+          "type": "blob"
+        },
+        "exact_blob_and_mode_equal": true,
+        "path": ".github/scripts/lampos-publish.py"
+      },
+      {
+        "actual_preview": {
+          "mode": "100644",
+          "sha": "699dbdc493a7ae953b0a1c5165a2f6ff26f6b106",
+          "type": "blob"
+        },
+        "authored": {
+          "mode": "100644",
+          "sha": "699dbdc493a7ae953b0a1c5165a2f6ff26f6b106",
+          "type": "blob"
+        },
+        "authored_sha256": "79d5b9a614d5624f78d23c38df39f103e72d96218a16c316458575474dfa257e",
+        "base": {
+          "mode": "100644",
+          "sha": "60151dfe4163e236a653af26712396eae353f797",
+          "type": "blob"
+        },
+        "exact_blob_and_mode_equal": true,
+        "path": "lampOS/docs/updates.md"
+      }
+    ],
+    "whole_tree_equal": true
+  },
+  "status": "ORIGINAL_ARM_PASSED_BOUND_B2_OWNED3_OFFLINE48",
+  "watcher": {
+    "at": "2026-10-27T18:38:25.558122+00:00",
+    "driver_reaped": true,
+    "elapsed_seconds": 679.9574070190138,
+    "error": null,
+    "job": 122384791198,
+    "process_group": "absent",
+    "returncode": 0,
+    "run": 40559613613,
+    "timed_out": false,
+    "watcher_only_cleanup": [],
+    "workflow_modified": false
+  }
+}
