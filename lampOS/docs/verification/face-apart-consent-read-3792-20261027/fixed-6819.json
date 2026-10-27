@@ -1,0 +1,104 @@
+{
+  "all_handles_terminal0_reaped_group_absent": true,
+  "clean_worktree": true,
+  "counts": {
+    "eyes-who": [
+      "test result: ok. 61 passed; 0 failed; 1 ignored; 0 measured; 267 filtered out; finished in 7.81s"
+    ],
+    "voice-known-faces": [
+      "test result: ok. 25 passed; 0 failed; 0 ignored; 0 measured; 3823 filtered out; finished in 0.15s"
+    ]
+  },
+  "evidence": {
+    "eyes-who.log": "79d08830982a089afc790fcbb450d996b4407ce77ed989216fbd7d4586cd01c4",
+    "pr-current.json": "06ad18f1b059736f59686fd8a165a04f6922d9a5f4716ce49b660d94c0f4301d",
+    "scope.json": "d1a7c1d67f7faeddf751c869230c25dd7043ae11523153f6255728469c6bdb9b",
+    "source-before.json": "07317f20e3112dd8d57658f53030761ec44c1152757f1cb852a2f68407b15273",
+    "source-review.json": "ff6f61d85eb268e3a288d48bd1f9d321464a9bf4bcc7718034d48afbed9f7a57",
+    "voice-known-faces.log": "214f672c8a49da040f9bc81c5d3f82f11df772df377380f7638ccfb18b5a3b2b"
+  },
+  "handles": {
+    "clippy": 24067,
+    "eyes-who": 42079,
+    "fmt": 99151,
+    "voice-known-faces": 56742
+  },
+  "head": "6819ced6b53ad970badb14ee3af9a88b8099707b",
+  "limits": [
+    "No fullEyes/fullVoice, composed-main, mixed-binary, Memoryimplementation, model/TTS/device execution.",
+    "Fresh requested WHO controls executed separately; no inference from old head counts.",
+    "New actual Voice tests use local fake Eyes socket; no Eyes-store end-to-end execution."
+  ],
+  "result": "HOLD closed for scoped source and requested native gates; no new P1/P2 demonstrated",
+  "source": {
+    "base": "661fe1012610d2b1e28a5bfc7b4a3af09ab1eefd",
+    "eyes_guard_source": "who.rs1175 near refusal before replace;1190+ recognized rename only keeps SAME_PERSON prints. Same source as165; fresh WHO required and now passed.",
+    "eyes_who_equal_165": true,
+    "head": "6819ced6b53ad970badb14ee3af9a88b8099707b",
+    "hold_status_source": "Original disclosure/takeover and all later told_apart-consent findings have no remaining new path in current source.",
+    "new_negative_regression": "known_faces::tests::a_new_name_for_a_near_face_says_no_name_and_a_no_sends_nothing",
+    "new_regression_both_wrong_calls": [
+      "replace:true",
+      "apart:true"
+    ],
+    "new_regression_inputs": [
+      "No.",
+      "No, I'm someone else."
+    ],
+    "removed_helper_definitions_absent": true,
+    "scope": "Fresh fmt, strictEyes+VoicealltargetsClippy, known_faces filter plus fresh who module. No helper needed since shortcut removed. No Memory/device/model/TTS/fullsuite.",
+    "spelling_positive": "K E M A L. sends one_face apart:true",
+    "voice_production_end_line": 1951,
+    "voice_production_prefix_bytes": 80301,
+    "voice_production_prefix_equal_base": true,
+    "voice_production_prefix_sha256": "d2403afec78c1d99649009a75d07afd4e27d10752a0b6c4a7a9e468faae9d16d"
+  },
+  "source_hashes_unchanged": 7282,
+  "stages": {
+    "eyes-voice-clippy": {
+      "cleanup": [],
+      "controller_error": null,
+      "elapsed_seconds": 91.178688184,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "process_group": "absent",
+      "reaped": true,
+      "returncode": 0,
+      "source_unchanged": true,
+      "timed_out": false
+    },
+    "eyes-who": {
+      "cleanup": [],
+      "controller_error": null,
+      "elapsed_seconds": 9.434047474,
+      "log_sha256": "79d08830982a089afc790fcbb450d996b4407ce77ed989216fbd7d4586cd01c4",
+      "process_group": "absent",
+      "reaped": true,
+      "returncode": 0,
+      "source_unchanged": true,
+      "timed_out": false
+    },
+    "fmt": {
+      "cleanup": [],
+      "controller_error": null,
+      "elapsed_seconds": 12.913536447,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "process_group": "absent",
+      "reaped": true,
+      "returncode": 0,
+      "source_unchanged": true,
+      "timed_out": false
+    },
+    "voice-known-faces": {
+      "cleanup": [],
+      "controller_error": null,
+      "elapsed_seconds": 128.86302671,
+      "log_sha256": "214f672c8a49da040f9bc81c5d3f82f11df772df377380f7638ccfb18b5a3b2b",
+      "process_group": "absent",
+      "reaped": true,
+      "returncode": 0,
+      "source_unchanged": true,
+      "timed_out": false
+    }
+  },
+  "target_free": true
+}

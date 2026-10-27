@@ -1,0 +1,84 @@
+{
+  "head": "a8dbca7a27cc8bc8d70a0e70160f1bb2c5872a6e",
+  "stages": [
+    {
+      "stage": "fmt",
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "returncode": 0,
+      "timed_out": false,
+      "reaped": true,
+      "process_group": "absent",
+      "cleanup": [],
+      "seconds": 12.27,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "stage": "clippy",
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "clippy",
+        "--locked",
+        "-q",
+        "-p",
+        "lamp-body",
+        "--all-targets",
+        "--message-format=short",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "returncode": 0,
+      "timed_out": false,
+      "reaped": true,
+      "process_group": "absent",
+      "cleanup": [],
+      "seconds": 24.39,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "stage": "lease-tests",
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--locked",
+        "-q",
+        "-p",
+        "lamp-body",
+        "--lib",
+        "lease::tests::",
+        "--",
+        "--test-threads=2"
+      ],
+      "returncode": 0,
+      "timed_out": false,
+      "reaped": true,
+      "process_group": "absent",
+      "cleanup": [],
+      "seconds": 33.02,
+      "log_sha256": "3e21d42f51996f480962b493c2906b9abaaba958d460fe3a0b632156574b416c",
+      "summaries": [
+        [
+          "ok",
+          "5",
+          "0",
+          "0"
+        ]
+      ]
+    }
+  ],
+  "source_hashes_unchanged": 7359,
+  "limits": [
+    "Host focused lease tests only; Linux socket boundary and device excluded",
+    "No acoustic or actuator measurement",
+    "Control wire reason integration remains with consumer owner"
+  ]
+}

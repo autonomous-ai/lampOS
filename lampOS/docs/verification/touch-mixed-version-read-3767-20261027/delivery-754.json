@@ -1,0 +1,67 @@
+{
+  "reviewed": "3d56da1852b17b97f857a6e55d493d7cf8fa6960",
+  "landed": "7547545e0998397178d2746ddd40fc5c38b1d215",
+  "train_tip": "184532c6cbf929ba12a7d3fb3b61c94091d5bed4",
+  "range_diff": "1:  3d56da185 = 1:  7547545e0 lampOS: no head-touch sleep while onboarding is under way, and a tap or a hand kept a second wakes a sleeping lamp (#3747)\n",
+  "files": {
+    "lampOS/crates/controls/src/touch.rs": {
+      "old": "323a5921ea2f9639dbf34d793f1b764b47592907",
+      "landed": "323a5921ea2f9639dbf34d793f1b764b47592907"
+    },
+    "lampOS/crates/controls/tests/it/touch.rs": {
+      "old": "54ec6ae19c21d5b319c62ed83eeeb30688e6d754",
+      "landed": "54ec6ae19c21d5b319c62ed83eeeb30688e6d754"
+    },
+    "lampOS/crates/expression/src/alive.rs": {
+      "old": "348a9bda82239825f2baa937d08fb8a05d6c9f3a",
+      "landed": "348a9bda82239825f2baa937d08fb8a05d6c9f3a"
+    },
+    "lampOS/crates/expression/tests/it/alive_engine.rs": {
+      "old": "e77ba1f0e57206b7c2a6c6b965730dc0140c4eea",
+      "landed": "e77ba1f0e57206b7c2a6c6b965730dc0140c4eea"
+    },
+    "lampOS/crates/msgs/src/controls.rs": {
+      "old": "f24ce56057a8e664a37490e15e222157b06b7461",
+      "landed": "f24ce56057a8e664a37490e15e222157b06b7461"
+    },
+    "lampOS/crates/msgs/tests/it/touch.rs": {
+      "old": "a50e2949c9f7e1297e7cf34cab4de2ac1ea8c31b",
+      "landed": "a50e2949c9f7e1297e7cf34cab4de2ac1ea8c31b"
+    },
+    "lampOS/crates/voice/src/coordinator.rs": {
+      "old": "3efac99d4f5b3bd9a5bbfec7b6eeaf2a57647ab6",
+      "landed": "953468cdb854851a3848fe1161c2ac5787cd5d28"
+    },
+    "lampOS/crates/voice/src/coordinator/tests/hand_controls.rs": {
+      "old": "940ad7c69c7124b111a4a9682cff66b450b29992",
+      "landed": "940ad7c69c7124b111a4a9682cff66b450b29992"
+    },
+    "lampOS/crates/voice/src/hand_controls.rs": {
+      "old": "e9a78edcadf9448d46d1cfa66b4f3aa5e99d1e53",
+      "landed": "e9a78edcadf9448d46d1cfa66b4f3aa5e99d1e53"
+    },
+    "lampOS/crates/voice/src/hand_controls/tests.rs": {
+      "old": "8f2716a1a40fd2e84b9519ebfdb0a176f86a5b78",
+      "landed": "8f2716a1a40fd2e84b9519ebfdb0a176f86a5b78"
+    },
+    "lampOS/crates/voice/src/onboarding.rs": {
+      "old": "d266889821486dc64685d5955d8b6e638eccb82c",
+      "landed": "e42130beed1008a653d1d4cf0850da07321b4b1a"
+    },
+    "lampOS/docs/alive.md": {
+      "old": "ee6e3c47a03090e38adbd2d52210b41419ae98a8",
+      "landed": "ee6e3c47a03090e38adbd2d52210b41419ae98a8"
+    },
+    "lampOS/docs/controls.md": {
+      "old": "caf636d597ad117f82c41266ad7d778e459c84e1",
+      "landed": "caf636d597ad117f82c41266ad7d778e459c84e1"
+    },
+    "lampOS/docs/creature.md": {
+      "old": "d6974b9cf8eecdcc02b367bb4497aa4550a793b0",
+      "landed": "d6974b9cf8eecdcc02b367bb4497aa4550a793b0"
+    }
+  },
+  "exact_blobs": 12,
+  "total_files": 14,
+  "limit": "Source delivery only, no new tests or whole train/native/physical claim"
+}

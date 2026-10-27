@@ -1,3 +1,11 @@
+## 2026-10-27 18:34 — consent hold closed; body lease read
+
+READ-OK #3792 6819ced6b closes Third's consent HOLD after [fresh scoped gates](verification/face-apart-consent-read-3792-20261027/fixed-6819.json). The unsafe shortcut is removed; the entire Voice production prefix is byte-identical to base, and apart again requires spelling in this turn. The new regression checks erroneous replace/apart calls for No and someone-else-only turns. Eyes retains nameless near refusal and SAME_PERSON-only recognized rename. Pinned fmt/strict Eyes+Voice Clippy pass, WHO61/0/1 inherited ignore and known_faces25/0/0 pass. All handles/groups closed, 7,282 hashes stable. No full suite, real model/TTS, Eyes-store end-to-end, native/device or latest-Main composition claim.
+
+READ-OK #3820 a8dbca7a2 after [host fmt, strict Body all-target Clippy and five focused lease cases](verification/body-slumped-lease-read-3820-20261027/receipt.json), zero failures or ignores. The existing torque-off glimpse reaches lease revocation; a new hold while slumped is lost and clearing the condition never restores it. Source guard covers 7,359 files, handles/groups closed. No new blocking work in the changed path. Linux socket, full Body and actuator/device behavior are not executed by Third. Lead's refused-let-go false glimpse, second-overload socket-only loss and consumer Slumped/Lapsed mapping remain explicit P3s; the feature stays off in product units.
+
+#3767 is closed after train #3811. [Delivery source proof](verification/touch-mixed-version-read-3767-20261027/delivery-754.json) binds reviewed3d56 to landed7547545e0 with equal range diff: twelve of fourteen file blobs exact, two include earlier Main context. No fresh test, whole-train or physical acceptance is inferred.
+
 ## 2026-10-27 18:30 — consent replacement and current draft gates
 
 #3792 e691 remains a historical [consent HOLD](verification/face-apart-consent-read-3792-20261027/held-e691.json): exact helpers accepted quoted/hypothetical identity assertions after clause splitting or with substantive suffixes. Five observational passes establish the unwanted behavior, not product acceptance; no socket/store persistence was executed. The author removed the shortcut on 6819; the fresh read and scoped gates are in progress, with no approval transferred from e691.
