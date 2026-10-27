@@ -130,7 +130,7 @@ fn offer(walk: &mut Onboarding, now: u64) -> u64 {
 fn play(walk: &mut Onboarding, now: u64, unix_ms: u64, turn: u64) -> Prompt {
     let token = offer(walk, now);
     let words = walk.take_invitation(token, now).unwrap();
-    assert!(words.contains("call your name"), "{words}");
+    assert!(words.to_lowercase().contains("call my name"), "{words}");
     let boot = BootId::new([3; 16]).unwrap();
     assert!(walk.bind_invitation(token, boot, turn));
     // The lamp spoke the prompt.
@@ -803,7 +803,9 @@ fn report_skip(walk: &Onboarding) {
         name: STEP.into(),
         args: json!({"step":"how_you_sound","outcome":"skipped"}),
     };
-    assert_eq!(run(&walk.file, &call), (json!({"ok": true}), true));
+    // The walk says the skip itself (#3769).
+    let (answer, ok) = run(&walk.file, &call);
+    assert!(ok && answer["ok"] == json!(true), "{answer}");
 }
 
 struct Release(Option<mpsc::SyncSender<()>>);
