@@ -2269,7 +2269,7 @@ landmarks YuNet already gives: a few additions a face a look, no new model,
 and no picture is kept or leaves the lamp. `from` says what judged it, and
 the score is on that one's scale: the corners' in eye distances a look
 (`yes` from 0.02), the mesh's in inner-lip gap over face height (`yes` from
-0.012, below). The second route reads it with
+0.015, below). The second route reads it with
 `LAMP_SECOND_SPEAKING_FACE=on` ([memory.md](memory.md#how-the-voice-uses-it)),
 with the known face's id the eyes keep beside the known file
 ([Who is there](#who-is-there)).
@@ -2392,9 +2392,14 @@ was cut from (the same without the switch), and the time. No picture is kept.
 With `LAMP_EYES_SPEAKING=on` as well, that face's `speaking` reads the
 mesh instead of the corners whenever every look in its 2 s window had the
 mesh read: the score is how much `mouth_open` changes from look to look
-(root mean square), and `yes` from 0.012 (`MESH_SPEAKING_AT`). Every other
-face, and a window with one look the mesh missed, is judged by the corners
-as above, with the same `unknown` gates. On a recorded talking face cut as
+(root mean square), and `yes` from 0.015 (`MESH_SPEAKING_AT`; 0.012 until
+#3699, where on lamp-52e6 a still screen face cut from the 1280 by 960 look
+scored at most 0.0123 and a talking one over 0.015 in 237 of 257 looks).
+Every other face, and a window with one look the mesh missed, is judged by
+the corners as above, with the same `unknown` gates, except that a window
+the mesh read on some looks never says `yes` by the corners: their score at
+or over 0.02 there is `unknown` (on 52e6 a still face's corners scored 0.08
+across such a gap). On a recorded talking face cut as
 the lamp sees it (NASA's public-domain interview SVS14704, 320 by 240, 4
 looks a second, run through the real `Detector`, `Mesh` and `Mouths`), the
 mesh said `yes` in 98% of the talking looks at 26 px between the eyes and

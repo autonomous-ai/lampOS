@@ -65,7 +65,11 @@ pub const SPEAKING_AT: f32 = 0.02;
 /// 4 looks a second), 95% of 2 s windows of talk scored 0.015 or more, at
 /// 26 and at 51 px between the eyes alike. A still silent face on the
 /// lamp's camera is not measured yet: this bar is to be checked against it.
-pub const MESH_SPEAKING_AT: f32 = 0.012;
+/// On lamp-52e6 (#3699) with the mouth cut from the 1280 by 960 look, a
+/// screen face 110 px between the eyes (in the mesh's pixels) scored at most
+/// 0.0123 still (233 looks) and over 0.015 in 237 of 257 looks talking, so the
+/// bar is 0.015.
+pub const MESH_SPEAKING_AT: f32 = 0.015;
 /// The marks' own jitter moves the mouth's width, look to look, this share
 /// of how much it bends the eye line (squared, from the geometry of the
 /// four points: (4 + 4 x 0.8^2) / 12, with the mouth 0.8 eye distances wide).
@@ -369,8 +373,15 @@ impl Mouths {
         let change = pairs.iter().map(|(a, b)| (b.1 - a.1).powi(2)).sum::<f32>() / steps;
         // What the jitter explains of the width's change is taken off.
         let score = (change - JITTER_TO_SHAPE * rest).max(0.0).sqrt();
-        let state = if score >= SPEAKING_AT {
+        // A window the mesh read on some looks but not all is the mesh
+        // missing a look, not a face it cannot read: the corners may say
+        // `no` there but never `yes` (#3699: on lamp-52e6 a still face's
+        // corners scored 0.08 across such a gap).
+        let gapped = looks.iter().any(|look| look.4.is_some());
+        let state = if score >= SPEAKING_AT && !gapped {
             SpeakingState::Yes
+        } else if score >= SPEAKING_AT {
+            return UNKNOWN;
         } else {
             SpeakingState::No
         };
@@ -687,9 +698,9 @@ mod tests {
                 );
             }
         }
-        // One look in the window without the mesh: the corners judge. The
-        // mesh would hold this mouth still (0.01 each look) and say no; the
-        // talking corners say yes.
+        // One look in the window without the mesh: the corners judge, but
+        // a window the mesh read on its other looks never says yes by them
+        // (#3699): the talking corners give unknown, not yes.
         let mut mixed = Mouths::default();
         let mut last = None;
         for look in 0..8u64 {
@@ -703,6 +714,22 @@ mod tests {
             );
             let open = (look != 5).then_some(0.01);
             last = Some(mixed.judge(3, &seen, Some(0.0), open, look * LOOK_US));
+        }
+        let last = last.unwrap();
+        assert_eq!(last.state, SpeakingState::Unknown, "{last:?}");
+        // Without the mesh on any look, the same talking corners say yes.
+        let mut corners = Mouths::default();
+        let mut last = None;
+        for look in 0..8u64 {
+            let seen = marks(
+                &Scene {
+                    talk: true,
+                    ..STILL
+                },
+                look as f32 * 0.3,
+                &mut noise,
+            );
+            last = Some(corners.judge(4, &seen, Some(0.0), None, look * LOOK_US));
         }
         let last = last.unwrap();
         assert_eq!(last.state, SpeakingState::Yes, "{last:?}");
