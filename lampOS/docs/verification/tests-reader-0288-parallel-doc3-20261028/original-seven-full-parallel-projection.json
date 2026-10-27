@@ -1,0 +1,33 @@
+{
+  "cases": [
+    [
+      "provider_worker::tests::requested_audio_crosses_the_live_worker_only_after_its_tool_reply",
+      "ok"
+    ],
+    [
+      "provider_worker::tests::policy_holds::a_timer_in_a_turn_that_follows_the_lamp_is_set_though_the_policy_said_stay_quiet",
+      "ok"
+    ],
+    [
+      "provider_worker::tests::reminders::a_reminder_rung_into_a_busy_room_is_no_answer_to_end_it_by",
+      "ok"
+    ],
+    [
+      "remember::tests::the_oldest_of_a_long_kept_list_is_found_and_the_rooms_are_marked",
+      "ok"
+    ],
+    [
+      "second_provider::worker::tests::stop_during_music_rpc_revokes_scope_and_finishes_without_waiting_for_the_reply",
+      "ok"
+    ],
+    [
+      "second_provider::worker::tests::the_lamps_own_answers_to_talk_keep_no_conversation_going",
+      "ok"
+    ],
+    [
+      "coordinator::tests::requested_audio::cancelled_gapped_or_expired_music_never_acknowledges_its_confirmation_news",
+      "ok"
+    ]
+  ],
+  "scope": "native Mac default-thread full VoiceLIB once"
+}

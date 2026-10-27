@@ -1,0 +1,15 @@
+# Reader 0288 original native CI audit
+
+Original attempt-1 ARM64 [40592297864](https://github.com/autonomous-ai/lampOS/actions/runs/40592297864) and Linux Clippy [40592297885](https://github.com/autonomous-ai/lampOS/actions/runs/40592297885) concluded SUCCESS for authored `0288c0db50097f4560bf0d09157a137d6b66d7fc`, parent `c1fa2bc9f327f5d553bb3dcc355053d8e7e94bfa`.
+
+The ARM execution window records **7,804 unique PASS, zero FAIL/LEAK/TIMEOUT, zero selected unrun; 54 aggregate skips**, across 70 binaries (120 skipped binaries). All identities and ordinals are bound to raw log lines. This is the actual twelve-package nextest selection, not every workspace/custom-harness test. The 34 later records are configured final-output reprints, proven against immutable source rules and their original identity/status/duration/ordinal/total. Execution duplicates and retries: zero.
+
+All **15 ordinary Reader**, **7 Trace**, and **seven originally reported Voice tests** PASS exactly once inside that total. The privileged dropped-identity DAC case remains ignored and absent from execution; aggregate skips do not provide a complete skipped-name inventory. No device or privileged claim is made.
+
+Both checkout logs identify preview `09f776faa7be17fb7c4b5fcd994127a15665a51e`, ordered parents `[ef90c8561b3f9b22472f1962ea1ffb10bf6a423b, 0288c0db50097f4560bf0d09157a137d6b66d7fc]`, tree `1023948d6dbfa27fb5c044c79ac7101723258837`. The preview differs from the authored tree in exactly `lampOS/crates/name/src/main.rs` and `lampOS/docs/name.md`; their immutable blobs and fetched source hashes are recorded. Both complete Reader-owned files, ten fetched source/config/workflow inputs, and all 94 CI/build-input records per context equal authored inputs. Name is outside the twelve selected runtime packages; no Name runtime claim is inferred from packaging or compilation.
+
+Separate outcomes: promoter 25/0/0; workspace doctests 4/0/0 across 47 groups; process 13/0; relay OK; offline Python counts [49, 12, 7]. These are not added to nextest. Original upload metadata matches API artifact ID, bytes and digest; 48 workspace binaries, 2 examples and 51 uploaded files are reported. No artifact archive, checksum payload or ARM binary was downloaded or independently hashed.
+
+The separate private public-text bundle binds native x86 Mac default-parallel full Voice **3,885/0/15**, plus **three** documentation checks, at authored 0288/c1fa. The seven Voice cases and Reader/Trace subsets are not extra counts. Mac and ARM profiles/executables/trees are not equated. Original capacity/import admission stops, older serial scopes and all real failed scopes remain unchanged. No historical cause, failure waiver, latest-base readiness or independent READ-OK is inferred.
+
+One bounded original ARM watch closed 0; Linux was terminal at discovery. Collection used bounded plain job logs and immutable source/metadata only, with no CI rerun, source/ref/target mutation, local build/test, GitHub post or hardware action. The recursive SHA-256/byte manifest is verified after collection; only its own file and verification receipt are excluded from self-reference.

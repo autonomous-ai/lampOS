@@ -1,0 +1,21 @@
+{
+  "scope": "Exact text summaries/projections; original private receipts and raw logs retained separately; no executable/collector payload.",
+  "files": {
+    "README.md": {
+      "sha256": "8708536271c8a271ca91366428eb1603ccd792db5923c449e2516acdfd23c0c9",
+      "bytes": 3269
+    },
+    "audit.json": {
+      "sha256": "49b8403983d9939bd5b212b5ae163b3950b8f0de727f1fc4ffaee1d6bacccbd4",
+      "bytes": 540036
+    },
+    "original-seven-full-parallel-projection.json": {
+      "sha256": "154431f3cf48e80a82e14a6600153749f1691f8c4ba75461e5c6c8569dbb9d17",
+      "bytes": 1007
+    },
+    "x86-mac-architecture-proof.json": {
+      "sha256": "691b33ddd574eaa6e7dc9087257bd6253e88383869d3025e209d737a925b2750",
+      "bytes": 1076
+    }
+  }
+}

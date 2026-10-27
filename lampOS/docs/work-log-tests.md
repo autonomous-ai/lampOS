@@ -1,5 +1,15 @@
 # Tests work log
 
+## 2026-10-28 05:35 — full x86 parallel Voice and current Mood/ARM packets
+
+Ready for lamp-voice: no (latest authored-base maintenance and current reads remain).
+
+[Reader0288 x86_64 Mac parallel](verification/tests-reader-0288-parallel-doc3-20261028/) passed **3,885/0/15**, all 3,900 identities once and all seven originally reported cases once. Reader 4 / Trace 6 are subsets, not extra passes. Separate real install 1/whole ci_paths 2 passed, all 555 witnesses/three latest actual guards closed; original capacity/import zero-work stops remain. [Original ARM/Linux](verification/tests-reader-0288-native-20261028/) passed **7,804 unique cases**, zero bad/unrun, 54 skips; Reader 15 / Trace 7 / original seven once. Actual 09f776faa [ef90,0288] differs only in Name main/doc; both own blobs/all 10 inputs/94 CI records match. Reprints/auxiliary stay separate; metadata only/no payload.
+
+[Mood cd4 current full package plus Doc3](verification/tests-mood-cd4-full-doc3-20261028/) passed **341/0/0 + docs 0**, required two once, then separate install 1/ci_paths 2 and 183/three guards. [Original ARM/Linux](verification/tests-mood-cd4-native-20261028/) passed **7,803 unique cases**, zero bad/unrun, 54 skips, all 341 Expression/required two/Doc3 once. Actual 300ec7711 [ef90,cd4] has the two Name deltas; own two/all 47 inputs/94 CI records equal, not whole-tree equality.
+
+[Scoped capacity recovery](verification/tests-retired-compiler-cache-space-20261028/) preserved all evidence/executables/current caches. Fresh Skills 527/ef90 full 557/0/9 and 190/seven guards passed and is pushed; its new original checks remain separate. Main then advanced to fc9 Update codec. Each branch now owns its latest full gate and exact-lease push end-to-end, retaining every original scope/failure. No device access.
+
 ## 2026-10-28 04:21 — full Reader serial context and exact-source Skills native pass
 
 Ready for lamp-voice: no (current reads/latest-base maintenance remain).

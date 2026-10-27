@@ -1,0 +1,15 @@
+{
+  "status": "X86_MAC_FULL_PARALLEL_ARCHITECTURE_BOUND",
+  "head": "0288c0db50097f4560bf0d09157a137d6b66d7fc",
+  "base": "c1fa2bc9f327f5d553bb3dcc355053d8e7e94bfa",
+  "host": "x86_64-apple-darwin",
+  "frozen_executable": "Voice-lib-e145dd810812b4b0-lamp_voice-6d619bbdd1df3a0d",
+  "image": "Mach-O 64-bit executable x86_64",
+  "recorded_sha256": "e145dd810812b4b0f81f31cad3ffe6969aed4ae41a09ef4e8b6eba379195e070",
+  "observed_sha256": "e145dd810812b4b0f81f31cad3ffe6969aed4ae41a09ef4e8b6eba379195e070",
+  "rustc_verbose": "rustc 1.96.0 (ac68faa20 2026-05-25)\nbinary: rustc\ncommit-hash: ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96\ncommit-date: 2026-05-25\nhost: x86_64-apple-darwin\nrelease: 1.96.0\nLLVM version: 22.1.2\n",
+  "Linux_x86_runtime_claim": false,
+  "Linux_ARM_build_on_Mac": false,
+  "original_private_receipt_sha256": "41e65c2080adc69c6d4cc75d8ec4d6f563d29ad5f4c2a93d24b4854cc05d8412",
+  "sanitization": "Only the private absolute artifact directory was replaced with the artifact basename; source identity, toolchain, architecture and hashes are unchanged."
+}

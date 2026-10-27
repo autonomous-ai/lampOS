@@ -1,0 +1,373 @@
+{
+  "exclusions": [
+    "collection-manifest.json",
+    "collection-manifest-verification.json"
+  ],
+  "files": [
+    {
+      "path": "ARM-watch-native.json",
+      "sha256": "9973d02c3364a41f74936f9587b9697f3c71800f2e1b36c27317f79b9207076b",
+      "bytes": 346
+    },
+    {
+      "path": "ARM-watch.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "ARM-watch.stdout",
+      "sha256": "e1101fff9925fe2d668581cae1fa105ebca663b4fd7be1a670101d39087858fe",
+      "bytes": 4572
+    },
+    {
+      "path": "ARM64-actual-commit.json",
+      "sha256": "efd9dfaf6e4cd0082a2e1eaae64ece879a00e521e98bb1fbda00a1e414be1c03",
+      "bytes": 2603
+    },
+    {
+      "path": "ARM64-actual-tree.json",
+      "sha256": "451393fdeaeaf7705e9cef75c11026fac9f0c24e58692e9eb48993fac7584a81",
+      "bytes": 3509863
+    },
+    {
+      "path": "ARM64-artifacts.json",
+      "sha256": "4a98324aee95996882ad9632ea707398ab643bf4925ce346179c3ac9b6a0eccf",
+      "bytes": 783
+    },
+    {
+      "path": "ARM64-artifacts.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "ARM64-full-tree-delta.json",
+      "sha256": "99e64e3dfc376353bb30782f62428144004587fc8812e695a98a7c24a238bc41",
+      "bytes": 1562
+    },
+    {
+      "path": "ARM64-job-122499342375-download.json",
+      "sha256": "8ce1ea117d7f095bd6bf7ec4ec33f4abcb62749454adc105ea13ea0bfd1fbf64",
+      "bytes": 218
+    },
+    {
+      "path": "ARM64-job-122499342375.log",
+      "sha256": "2b5d91a2f2e7f2f633e4634c618d04b6f1f35ebaec317fa99139af5b94b39675",
+      "bytes": 1376025
+    },
+    {
+      "path": "ARM64-job-122499342375.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "ARM64-jobs-final.json",
+      "sha256": "a917b0b5f4a2c42158ff853f1dd924d38bb623eeb18fda81bffa858eb14cb62f",
+      "bytes": 8154
+    },
+    {
+      "path": "ARM64-jobs-final.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "ARM64-metadata-final.json",
+      "sha256": "1d6907155d3c89b1f5b5c6550364a0e50021defd66c9f0783fc77b1c8f5dbad3",
+      "bytes": 12753
+    },
+    {
+      "path": "ARM64-metadata-final.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "Linux-clippy-actual-commit.json",
+      "sha256": "efd9dfaf6e4cd0082a2e1eaae64ece879a00e521e98bb1fbda00a1e414be1c03",
+      "bytes": 2603
+    },
+    {
+      "path": "Linux-clippy-actual-tree.json",
+      "sha256": "451393fdeaeaf7705e9cef75c11026fac9f0c24e58692e9eb48993fac7584a81",
+      "bytes": 3509863
+    },
+    {
+      "path": "Linux-clippy-artifacts.json",
+      "sha256": "244563f989470892c537c9a4622920af0d228ee4528f7d00c64a06d6cd95856c",
+      "bytes": 32
+    },
+    {
+      "path": "Linux-clippy-artifacts.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "Linux-clippy-full-tree-delta.json",
+      "sha256": "99e64e3dfc376353bb30782f62428144004587fc8812e695a98a7c24a238bc41",
+      "bytes": 1562
+    },
+    {
+      "path": "Linux-clippy-job-122499342473-download.json",
+      "sha256": "13eb29a0d13003d101b348c340020082c6bbf6928b40ae9ca1b992ea68b19013",
+      "bytes": 216
+    },
+    {
+      "path": "Linux-clippy-job-122499342473.log",
+      "sha256": "8f07a4fa5bfdb50fb2c9e1194a333c96c225842b8b040b4b5d305ec4745b3886",
+      "bytes": 48312
+    },
+    {
+      "path": "Linux-clippy-job-122499342473.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "Linux-clippy-jobs-final.json",
+      "sha256": "68bfcf2f4c8086dc79f6b78b4f7360f4713bb144b9da3bd12289ab58d902885b",
+      "bytes": 3006
+    },
+    {
+      "path": "Linux-clippy-jobs-final.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "Linux-clippy-metadata-final.json",
+      "sha256": "5450cca152c549f72b4c130a0dfb1174b25589e03091ed9e5b20ee39f9dd3804",
+      "bytes": 12752
+    },
+    {
+      "path": "Linux-clippy-metadata-final.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "Linux-clippy-metadata-first.json",
+      "sha256": "5450cca152c549f72b4c130a0dfb1174b25589e03091ed9e5b20ee39f9dd3804",
+      "bytes": 12752
+    },
+    {
+      "path": "Linux-clippy-metadata-first.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "Name2-preview-delta-audit.json",
+      "sha256": "56b1a8e6b915edbe502c8449d684275b580c42b1838dbb49ba06520c9fe435af",
+      "bytes": 3641
+    },
+    {
+      "path": "PR-initial.json",
+      "sha256": "9fc7fda6860615b4af5c0cd25f7b53464bacf9ac81912f7d631b911be840f687",
+      "bytes": 20511
+    },
+    {
+      "path": "PR-initial.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "README.md",
+      "sha256": "8062758c4e1455605323fb520fb978dcd22a603183dbd98a5f1b68aa3dea83e4",
+      "bytes": 3151
+    },
+    {
+      "path": "Reader-platform-audit.json",
+      "sha256": "e573f7f40f245215bc72c531d4f4b68aa2c5fa3e45ae00e5c50d3ba07a581c49",
+      "bytes": 10681
+    },
+    {
+      "path": "Trace-platform-audit.json",
+      "sha256": "0da5eea64f6aef9d4ebb7f9f7888f1b3e259828ae34e38ca62184faf01d16d78",
+      "bytes": 5037
+    },
+    {
+      "path": "actual-changed-consumed-source-paths.json",
+      "sha256": "bf57a692b6456730dc020ee9f8f89ae624fd818196f5bd168a50bd9e19001239",
+      "bytes": 64
+    },
+    {
+      "path": "actual-selection-and-profile.json",
+      "sha256": "e15dbf3dc65f3a65403e308395886bef27c7c1496c1a7a479b16abfb03d6114b",
+      "bytes": 4761
+    },
+    {
+      "path": "actual-source/lampOS/crates/name/src/main.rs",
+      "sha256": "382f8925452fd90117ce22f0c95d536065ed6079f7b8f58f4919b42808db4c31",
+      "bytes": 68659
+    },
+    {
+      "path": "actual-source/lampOS/docs/name.md",
+      "sha256": "22e6ec6d3a3b7c25b19678c64103c4274843fffcd108d2dabe4823908be43d70",
+      "bytes": 30037
+    },
+    {
+      "path": "actual-source-bindings.json",
+      "sha256": "d209fa00b67071ea709389e606d0e0bf49b5e7fd66c4b0c3ecc09e66f9243486",
+      "bytes": 13877
+    },
+    {
+      "path": "all-tracked-CI-input-bindings.json",
+      "sha256": "7dcb9da8f7b2fc27ed6dd23e8fad9e66b4cfa61a1d55cd7fd39d85b522c49bdc",
+      "bytes": 158124
+    },
+    {
+      "path": "audit-core.py",
+      "sha256": "54597e6a8663b5981f81f3964446ea29be389dd6d1643f095dc5df846f81f1d4",
+      "bytes": 10902
+    },
+    {
+      "path": "audit.json",
+      "sha256": "91bfa4e56e46ab4c60a0e56d9b3ddc8f3befe5f0d0b91b95c2bab3984c9351af",
+      "bytes": 22448
+    },
+    {
+      "path": "authored-commit.json",
+      "sha256": "bffc7add3947d6ebd34e613330e11815e3aabaea3c4335677329ed5dfd0366f5",
+      "bytes": 1136
+    },
+    {
+      "path": "authored-commit.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "authored-source/.github/scripts/lampos-pr-crates.py",
+      "sha256": "943ca7f9d87f6a89b16ac80871003bc8bf9dd7c526fcf9ce4c23873467a9d658",
+      "bytes": 5523
+    },
+    {
+      "path": "authored-source/.github/workflows/lampos-arm64.yml",
+      "sha256": "5ddf0f7ae45bceaba81e899719ca199a4246a045b6f32f505edcccc61b3d170f",
+      "bytes": 20708
+    },
+    {
+      "path": "authored-source/.github/workflows/lampos-clippy.yml",
+      "sha256": "d2b21162ac7c05964816c147a0cfc10c0082e39f1c7775e247e43ddf02ee0909",
+      "bytes": 4721
+    },
+    {
+      "path": "authored-source/lampOS/.config/nextest.toml",
+      "sha256": "c4992da8d157df279011a424b5feb4833f001fd1d46ce3edd0a56992c848bb33",
+      "bytes": 5157
+    },
+    {
+      "path": "authored-source/lampOS/Cargo.lock",
+      "sha256": "86dce55e0b4315886ba9bcde43291feff191bd3d44ced7a315bb05e88c9f556e",
+      "bytes": 122953
+    },
+    {
+      "path": "authored-source/lampOS/Cargo.toml",
+      "sha256": "2b1005b31d36511ed3c9d59429a4779f9579317ccead0c0a20d729a75d2ef940",
+      "bytes": 1442
+    },
+    {
+      "path": "authored-source/lampOS/crates/voice/src/service_trace.rs",
+      "sha256": "593290a4d1e64c2283bd6ae7b481b39449353bc70fd53e4c67318323ae4adafe",
+      "bytes": 30629
+    },
+    {
+      "path": "authored-source/lampOS/crates/voice/src/session_reader/tests.rs",
+      "sha256": "8300c327d3cd22649320721f6a5b7126693a395ebb19d31fa7c0df9c35b493f8",
+      "bytes": 40267
+    },
+    {
+      "path": "authored-source/lampOS/docs/realtime-tests.md",
+      "sha256": "648709b374aad46db298f7485e708288209316950c781dc46fd0732cf1475708",
+      "bytes": 117703
+    },
+    {
+      "path": "authored-source/lampOS/rust-toolchain.toml",
+      "sha256": "fb0a56ca2fc09db10159f6983e9d747f4afeb64e1d6d941dc36a3c20bf3a5749",
+      "bytes": 86
+    },
+    {
+      "path": "authored-source-bindings.json",
+      "sha256": "ea56004b444540e773b3c1ee82aff8348b18f223ef4a9f170c3e05fba0627038",
+      "bytes": 3243
+    },
+    {
+      "path": "authored-tree.json",
+      "sha256": "9f93a2764b16ce894dc81b50bb919665e9e1887dee1a09ee48d4414beba89b3e",
+      "bytes": 3509863
+    },
+    {
+      "path": "auxiliary-stage-audit.json",
+      "sha256": "65ca7e1a7cc124023ef8890373296b532b8b336f5c72d2adff315e13b8425a5b",
+      "bytes": 8199
+    },
+    {
+      "path": "checks-current.json",
+      "sha256": "a12d9f625b996bb8944c2c3acfbd5208aa5025c8659c1c597d925ffaa78406f9",
+      "bytes": 17886
+    },
+    {
+      "path": "checks-current.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "collect-source.py",
+      "sha256": "ba71e92fd6c66d9ffdf244d0b5638c96a84102a4020baeab3e3d4fd10adb3af3",
+      "bytes": 4064
+    },
+    {
+      "path": "collect-terminal-originals.py",
+      "sha256": "659a2d49ec4f27ae48e40dfd4b034bcb1a811d30121e864a07ecf4a4aea10a9d",
+      "bytes": 2708
+    },
+    {
+      "path": "current-platform-source-reference.json",
+      "sha256": "5265f11fe1bd95fa0b534880939f1f13eb0fedce31f966200ad15aca2c74ed3a",
+      "bytes": 8669
+    },
+    {
+      "path": "discovery-summary.json",
+      "sha256": "1d914b9a4f6484e227bc967b6b734134eeca33a0251496954601d85539ed8e5e",
+      "bytes": 1583
+    },
+    {
+      "path": "execution-identities.json",
+      "sha256": "c28a04b4872512f53f49474d81ac1dc39b6febe36c1cdb92734e6247e3185d35",
+      "bytes": 2225527
+    },
+    {
+      "path": "execution-window.json",
+      "sha256": "84dca34a9f70df02de66c458706b8bc2d86c5a0b0b5be8dedbb4fbf82b93da5b",
+      "bytes": 1307
+    },
+    {
+      "path": "final-reprints.json",
+      "sha256": "865e1778f4e6ea69df7eaa00eca78d741f449004cb2143c29e9c0558c30bced2",
+      "bytes": 24549
+    },
+    {
+      "path": "finalize-offline.py",
+      "sha256": "2d979fe2b560394ae768a4c558eaff854fd2d39fa978f968b77426ab45ca0ee1",
+      "bytes": 14137
+    },
+    {
+      "path": "head-runs-initial.json",
+      "sha256": "f73d8fd319006b3cecdccc82987e946039f69d2c07c930e45863cb4d71050b73",
+      "bytes": 25495
+    },
+    {
+      "path": "original-seven-native-projection.json",
+      "sha256": "08d9ffb91ae01edb215adf2ecaceb5da7bedff0f8e6cc25e89faf8301ef51ff5",
+      "bytes": 3984
+    },
+    {
+      "path": "per-binary-census.json",
+      "sha256": "a93744887bff7d24a5f55c6d251cf744c9cef1837b730050e25332674f5d4c73",
+      "bytes": 7405
+    },
+    {
+      "path": "status-current.json",
+      "sha256": "150cda8bbbadb90ea1e6be050d2a586d0780bbc762f0c077c7d01409a5e5d0cc",
+      "bytes": 4613
+    },
+    {
+      "path": "status-current.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    }
+  ]
+}

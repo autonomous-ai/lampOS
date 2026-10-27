@@ -1,0 +1,31 @@
+{
+  "entries_checked": 99,
+  "all_bytes_SHA256_match": true,
+  "manifest_sha256": "36a88461f38af182b6e569e809139f2e3690edaab617a12d9eac8d35b3692d9f",
+  "mismatches": [],
+  "unlisted_nonexcluded": [],
+  "watch_results": {
+    "ARM64": {
+      "watch_started": false,
+      "reason": "Original attempt-one terminal state already observed at initial collection; no duplicate watch",
+      "watch_exit": 0,
+      "watch_timeout": false,
+      "subject": "Mood",
+      "label": "ARM64",
+      "run": 40592309189,
+      "started_at": "2026-10-27T22:16:07.764272+00:00",
+      "finished_at": "2026-10-27T22:16:07.764522+00:00"
+    },
+    "Linux-clippy": {
+      "watch_started": false,
+      "reason": "Original attempt-one terminal state already observed at initial collection; no duplicate watch",
+      "watch_exit": 0,
+      "watch_timeout": false,
+      "subject": "Mood",
+      "label": "Linux-clippy",
+      "run": 40592309083,
+      "started_at": "2026-10-27T22:16:07.764711+00:00",
+      "finished_at": "2026-10-27T22:16:07.764720+00:00"
+    }
+  }
+}

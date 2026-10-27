@@ -1,0 +1,573 @@
+{
+  "status": "PASS_ORIGINAL_SELECTED_NATIVE_SCOPE",
+  "subject": "Reader",
+  "authored_head": "0288c0db50097f4560bf0d09157a137d6b66d7fc",
+  "authored_parent": [
+    "c1fa2bc9f327f5d553bb3dcc355053d8e7e94bfa"
+  ],
+  "authored_tree": "f9f03ee88e0846e2da1c409e8743323d1dd1210f",
+  "original_runs": [
+    {
+      "label": "ARM64",
+      "subject": "Reader",
+      "folder": "reader-0288-original-native-20261028",
+      "id": 40592297864,
+      "name": "lampOS on ARM64",
+      "path": ".github/workflows/lampos-arm64.yml",
+      "head_sha": "0288c0db50097f4560bf0d09157a137d6b66d7fc",
+      "event": "pull_request",
+      "run_attempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-10-27T22:07:13Z",
+      "html_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40592297864",
+      "log_bytes": 1376025
+    },
+    {
+      "label": "Linux-clippy",
+      "subject": "Reader",
+      "folder": "reader-0288-original-native-20261028",
+      "id": 40592297885,
+      "name": "lampOS clippy",
+      "path": ".github/workflows/lampos-clippy.yml",
+      "head_sha": "0288c0db50097f4560bf0d09157a137d6b66d7fc",
+      "event": "pull_request",
+      "run_attempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-10-27T22:07:13Z",
+      "html_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40592297885",
+      "log_bytes": 48312
+    }
+  ],
+  "actual_source": {
+    "ARM64": {
+      "raw_log": "ARM64-job-122499342375.log",
+      "raw_log_SHA256": "2b5d91a2f2e7f2f633e4634c618d04b6f1f35ebaec317fa99139af5b94b39675",
+      "raw_checkout": {
+        "sha": "09f776faa7be17fb7c4b5fcd994127a15665a51e",
+        "command_line": 290,
+        "sha_line": 291
+      },
+      "actual_preview": "09f776faa7be17fb7c4b5fcd994127a15665a51e",
+      "ordered_parents": [
+        "ef90c8561b3f9b22472f1962ea1ffb10bf6a423b",
+        "0288c0db50097f4560bf0d09157a137d6b66d7fc"
+      ],
+      "actual_tree": "1023948d6dbfa27fb5c044c79ac7101723258837",
+      "authored_tree": "f9f03ee88e0846e2da1c409e8743323d1dd1210f",
+      "whole_tree_equal_authored": false,
+      "input_bindings": [
+        {
+          "path": "lampOS/crates/voice/src/session_reader/tests.rs",
+          "git_blob": "967b8b5f10df1e4c8d876b79fff24b0ed1fb09e7",
+          "mode": "100644",
+          "sha256": "8300c327d3cd22649320721f6a5b7126693a395ebb19d31fa7c0df9c35b493f8",
+          "bytes": 40267,
+          "equal_current_closed_Mac_source": true,
+          "actual_blob": "967b8b5f10df1e4c8d876b79fff24b0ed1fb09e7",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/docs/realtime-tests.md",
+          "git_blob": "a896bba9eafb5691c3dc594e865b45a3bc098151",
+          "mode": "100644",
+          "sha256": "648709b374aad46db298f7485e708288209316950c781dc46fd0732cf1475708",
+          "bytes": 117703,
+          "equal_current_closed_Mac_source": true,
+          "actual_blob": "a896bba9eafb5691c3dc594e865b45a3bc098151",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/voice/src/service_trace.rs",
+          "git_blob": "a752cd988686fc724bca573f76f03edf90f24a82",
+          "mode": "100644",
+          "sha256": "593290a4d1e64c2283bd6ae7b481b39449353bc70fd53e4c67318323ae4adafe",
+          "bytes": 30629,
+          "equal_current_closed_Mac_source": true,
+          "actual_blob": "a752cd988686fc724bca573f76f03edf90f24a82",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": ".github/workflows/lampos-arm64.yml",
+          "git_blob": "c1a4b4479b284e52f3ff37701cd55734783040b3",
+          "mode": "100644",
+          "sha256": "5ddf0f7ae45bceaba81e899719ca199a4246a045b6f32f505edcccc61b3d170f",
+          "bytes": 20708,
+          "equal_current_closed_Mac_source": true,
+          "actual_blob": "c1a4b4479b284e52f3ff37701cd55734783040b3",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": ".github/workflows/lampos-clippy.yml",
+          "git_blob": "04d2b49b5065c00f567e91ce271e2ba04669bb16",
+          "mode": "100644",
+          "sha256": "d2b21162ac7c05964816c147a0cfc10c0082e39f1c7775e247e43ddf02ee0909",
+          "bytes": 4721,
+          "equal_current_closed_Mac_source": true,
+          "actual_blob": "04d2b49b5065c00f567e91ce271e2ba04669bb16",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": ".github/scripts/lampos-pr-crates.py",
+          "git_blob": "05ebfb6628f0caec9b5a4d462f183aa5d617b982",
+          "mode": "100644",
+          "sha256": "943ca7f9d87f6a89b16ac80871003bc8bf9dd7c526fcf9ce4c23873467a9d658",
+          "bytes": 5523,
+          "equal_current_closed_Mac_source": true,
+          "actual_blob": "05ebfb6628f0caec9b5a4d462f183aa5d617b982",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/.config/nextest.toml",
+          "git_blob": "3463c6682e8126b0c02cedda3d67cfc5bc081169",
+          "mode": "100644",
+          "sha256": "c4992da8d157df279011a424b5feb4833f001fd1d46ce3edd0a56992c848bb33",
+          "bytes": 5157,
+          "equal_current_closed_Mac_source": true,
+          "actual_blob": "3463c6682e8126b0c02cedda3d67cfc5bc081169",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/rust-toolchain.toml",
+          "git_blob": "e3b40113e65befef4d5d198284b99c78c27136f0",
+          "mode": "100644",
+          "sha256": "fb0a56ca2fc09db10159f6983e9d747f4afeb64e1d6d941dc36a3c20bf3a5749",
+          "bytes": 86,
+          "equal_current_closed_Mac_source": true,
+          "actual_blob": "e3b40113e65befef4d5d198284b99c78c27136f0",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/Cargo.toml",
+          "git_blob": "be7fabdad667551d2636c36e732b0a45bfb5e359",
+          "mode": "100644",
+          "sha256": "2b1005b31d36511ed3c9d59429a4779f9579317ccead0c0a20d729a75d2ef940",
+          "bytes": 1442,
+          "equal_current_closed_Mac_source": true,
+          "actual_blob": "be7fabdad667551d2636c36e732b0a45bfb5e359",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/Cargo.lock",
+          "git_blob": "83b4f18cc1b5711f65c56fba11ebf9dfabf1a9d9",
+          "mode": "100644",
+          "sha256": "86dce55e0b4315886ba9bcde43291feff191bd3d44ced7a315bb05e88c9f556e",
+          "bytes": 122953,
+          "equal_current_closed_Mac_source": true,
+          "actual_blob": "83b4f18cc1b5711f65c56fba11ebf9dfabf1a9d9",
+          "actual_mode": "100644",
+          "equal_authored": true
+        }
+      ],
+      "all_fetched_source_equal_authored": true,
+      "full_tree_delta_entries": 2,
+      "owned_two_complete_blobs_modes": [
+        {
+          "path": "lampOS/crates/voice/src/session_reader/tests.rs",
+          "authored": {
+            "path": "lampOS/crates/voice/src/session_reader/tests.rs",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "967b8b5f10df1e4c8d876b79fff24b0ed1fb09e7",
+            "size": 40267,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/967b8b5f10df1e4c8d876b79fff24b0ed1fb09e7"
+          },
+          "actual": {
+            "path": "lampOS/crates/voice/src/session_reader/tests.rs",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "967b8b5f10df1e4c8d876b79fff24b0ed1fb09e7",
+            "size": 40267,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/967b8b5f10df1e4c8d876b79fff24b0ed1fb09e7"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/docs/realtime-tests.md",
+          "authored": {
+            "path": "lampOS/docs/realtime-tests.md",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "a896bba9eafb5691c3dc594e865b45a3bc098151",
+            "size": 117703,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/a896bba9eafb5691c3dc594e865b45a3bc098151"
+          },
+          "actual": {
+            "path": "lampOS/docs/realtime-tests.md",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "a896bba9eafb5691c3dc594e865b45a3bc098151",
+            "size": 117703,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/a896bba9eafb5691c3dc594e865b45a3bc098151"
+          },
+          "equal": true
+        }
+      ],
+      "both_complete_owned_blobs_equal": true
+    },
+    "Linux-clippy": {
+      "raw_log": "Linux-clippy-job-122499342473.log",
+      "raw_log_SHA256": "8f07a4fa5bfdb50fb2c9e1194a333c96c225842b8b040b4b5d305ec4745b3886",
+      "raw_checkout": {
+        "sha": "09f776faa7be17fb7c4b5fcd994127a15665a51e",
+        "command_line": 345,
+        "sha_line": 346
+      },
+      "actual_preview": "09f776faa7be17fb7c4b5fcd994127a15665a51e",
+      "ordered_parents": [
+        "ef90c8561b3f9b22472f1962ea1ffb10bf6a423b",
+        "0288c0db50097f4560bf0d09157a137d6b66d7fc"
+      ],
+      "actual_tree": "1023948d6dbfa27fb5c044c79ac7101723258837",
+      "authored_tree": "f9f03ee88e0846e2da1c409e8743323d1dd1210f",
+      "whole_tree_equal_authored": false,
+      "input_bindings": [
+        {
+          "path": "lampOS/crates/voice/src/session_reader/tests.rs",
+          "git_blob": "967b8b5f10df1e4c8d876b79fff24b0ed1fb09e7",
+          "mode": "100644",
+          "sha256": "8300c327d3cd22649320721f6a5b7126693a395ebb19d31fa7c0df9c35b493f8",
+          "bytes": 40267,
+          "equal_current_closed_Mac_source": true,
+          "actual_blob": "967b8b5f10df1e4c8d876b79fff24b0ed1fb09e7",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/docs/realtime-tests.md",
+          "git_blob": "a896bba9eafb5691c3dc594e865b45a3bc098151",
+          "mode": "100644",
+          "sha256": "648709b374aad46db298f7485e708288209316950c781dc46fd0732cf1475708",
+          "bytes": 117703,
+          "equal_current_closed_Mac_source": true,
+          "actual_blob": "a896bba9eafb5691c3dc594e865b45a3bc098151",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/voice/src/service_trace.rs",
+          "git_blob": "a752cd988686fc724bca573f76f03edf90f24a82",
+          "mode": "100644",
+          "sha256": "593290a4d1e64c2283bd6ae7b481b39449353bc70fd53e4c67318323ae4adafe",
+          "bytes": 30629,
+          "equal_current_closed_Mac_source": true,
+          "actual_blob": "a752cd988686fc724bca573f76f03edf90f24a82",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": ".github/workflows/lampos-arm64.yml",
+          "git_blob": "c1a4b4479b284e52f3ff37701cd55734783040b3",
+          "mode": "100644",
+          "sha256": "5ddf0f7ae45bceaba81e899719ca199a4246a045b6f32f505edcccc61b3d170f",
+          "bytes": 20708,
+          "equal_current_closed_Mac_source": true,
+          "actual_blob": "c1a4b4479b284e52f3ff37701cd55734783040b3",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": ".github/workflows/lampos-clippy.yml",
+          "git_blob": "04d2b49b5065c00f567e91ce271e2ba04669bb16",
+          "mode": "100644",
+          "sha256": "d2b21162ac7c05964816c147a0cfc10c0082e39f1c7775e247e43ddf02ee0909",
+          "bytes": 4721,
+          "equal_current_closed_Mac_source": true,
+          "actual_blob": "04d2b49b5065c00f567e91ce271e2ba04669bb16",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": ".github/scripts/lampos-pr-crates.py",
+          "git_blob": "05ebfb6628f0caec9b5a4d462f183aa5d617b982",
+          "mode": "100644",
+          "sha256": "943ca7f9d87f6a89b16ac80871003bc8bf9dd7c526fcf9ce4c23873467a9d658",
+          "bytes": 5523,
+          "equal_current_closed_Mac_source": true,
+          "actual_blob": "05ebfb6628f0caec9b5a4d462f183aa5d617b982",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/.config/nextest.toml",
+          "git_blob": "3463c6682e8126b0c02cedda3d67cfc5bc081169",
+          "mode": "100644",
+          "sha256": "c4992da8d157df279011a424b5feb4833f001fd1d46ce3edd0a56992c848bb33",
+          "bytes": 5157,
+          "equal_current_closed_Mac_source": true,
+          "actual_blob": "3463c6682e8126b0c02cedda3d67cfc5bc081169",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/rust-toolchain.toml",
+          "git_blob": "e3b40113e65befef4d5d198284b99c78c27136f0",
+          "mode": "100644",
+          "sha256": "fb0a56ca2fc09db10159f6983e9d747f4afeb64e1d6d941dc36a3c20bf3a5749",
+          "bytes": 86,
+          "equal_current_closed_Mac_source": true,
+          "actual_blob": "e3b40113e65befef4d5d198284b99c78c27136f0",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/Cargo.toml",
+          "git_blob": "be7fabdad667551d2636c36e732b0a45bfb5e359",
+          "mode": "100644",
+          "sha256": "2b1005b31d36511ed3c9d59429a4779f9579317ccead0c0a20d729a75d2ef940",
+          "bytes": 1442,
+          "equal_current_closed_Mac_source": true,
+          "actual_blob": "be7fabdad667551d2636c36e732b0a45bfb5e359",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/Cargo.lock",
+          "git_blob": "83b4f18cc1b5711f65c56fba11ebf9dfabf1a9d9",
+          "mode": "100644",
+          "sha256": "86dce55e0b4315886ba9bcde43291feff191bd3d44ced7a315bb05e88c9f556e",
+          "bytes": 122953,
+          "equal_current_closed_Mac_source": true,
+          "actual_blob": "83b4f18cc1b5711f65c56fba11ebf9dfabf1a9d9",
+          "actual_mode": "100644",
+          "equal_authored": true
+        }
+      ],
+      "all_fetched_source_equal_authored": true,
+      "full_tree_delta_entries": 2,
+      "owned_two_complete_blobs_modes": [
+        {
+          "path": "lampOS/crates/voice/src/session_reader/tests.rs",
+          "authored": {
+            "path": "lampOS/crates/voice/src/session_reader/tests.rs",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "967b8b5f10df1e4c8d876b79fff24b0ed1fb09e7",
+            "size": 40267,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/967b8b5f10df1e4c8d876b79fff24b0ed1fb09e7"
+          },
+          "actual": {
+            "path": "lampOS/crates/voice/src/session_reader/tests.rs",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "967b8b5f10df1e4c8d876b79fff24b0ed1fb09e7",
+            "size": 40267,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/967b8b5f10df1e4c8d876b79fff24b0ed1fb09e7"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/docs/realtime-tests.md",
+          "authored": {
+            "path": "lampOS/docs/realtime-tests.md",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "a896bba9eafb5691c3dc594e865b45a3bc098151",
+            "size": 117703,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/a896bba9eafb5691c3dc594e865b45a3bc098151"
+          },
+          "actual": {
+            "path": "lampOS/docs/realtime-tests.md",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "a896bba9eafb5691c3dc594e865b45a3bc098151",
+            "size": 117703,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/a896bba9eafb5691c3dc594e865b45a3bc098151"
+          },
+          "equal": true
+        }
+      ],
+      "both_complete_owned_blobs_equal": true
+    }
+  },
+  "Name2_preview_delta": "Name2-preview-delta-audit.json",
+  "all_tracked_CI_build_inputs": "all-tracked-CI-input-bindings.json",
+  "execution_window": {
+    "starting_line": 839,
+    "summary_line": 8645,
+    "following_group_line": 9062,
+    "start_raw": "2026-10-27T22:13:18.1457155Z     Starting 7804 tests across 70 binaries (54 tests and 120 binaries skipped)",
+    "summary_raw": "2026-10-27T22:16:06.7881869Z      Summary [ 168.642s] 7804 tests run: 7804 passed, 54 skipped",
+    "selected": 7804,
+    "binaries": 70,
+    "aggregate_skips": 54,
+    "skipped_binaries": 120,
+    "execution_records": 7804,
+    "unique_identities": 7804,
+    "unique_ordinals": 7804,
+    "outcomes": {
+      "PASS": 7804
+    },
+    "unobserved_selected": 0,
+    "duplicate_execution_identities": [],
+    "post_summary_reprints": 34,
+    "outside_records": [],
+    "retry_flaky_records": [],
+    "selected_packages": [
+      "lamp-body",
+      "lamp-cloud",
+      "lamp-expression",
+      "lamp-keeper",
+      "lamp-lean",
+      "lamp-memory",
+      "lamp-peek",
+      "lamp-setup",
+      "lamp-skills",
+      "lamp-update",
+      "lamp-voice",
+      "lamp-voice-eval"
+    ],
+    "picked_raw": [
+      811,
+      "2026-10-27T22:09:50.9597539Z   PICKED: package(=lamp-body) | package(=lamp-cloud) | package(=lamp-expression) | package(=lamp-keeper) | package(=lamp-lean) | package(=lamp-memory) | package(=lamp-peek) | package(=lamp-setup) | package(=lamp-skills) | package(=lamp-update) | package(=lamp-voice) | package(=lamp-voice-eval)"
+    ]
+  },
+  "per_binary_census": "per-binary-census.json",
+  "all_case_outcomes": "execution-identities.json",
+  "final_reprints": "final-reprints.json",
+  "Reader_ordinary_PASS_once": 15,
+  "Trace_ordinary_PASS_once": 7,
+  "privileged_DAC_ignored_unrun": [
+    "session_reader::tests::linux::dedicated_reader_can_only_read_new_events_under_dropped_identity"
+  ],
+  "original_seven_all_PASS_once": true,
+  "original_seven_already_in_global_counts": true,
+  "separate_auxiliary": {
+    "promoter": {
+      "passed": 25,
+      "failed": 0,
+      "ignored": 0
+    },
+    "workspace_docs": {
+      "passed": 4,
+      "failed": 0,
+      "ignored": 0,
+      "summary_groups": 47
+    },
+    "process": {
+      "line": 9378,
+      "passed": 13,
+      "failed": 0
+    },
+    "relay_ok_line": 9360,
+    "offline_Python": [
+      {
+        "line": 347,
+        "count": 49
+      },
+      {
+        "line": 417,
+        "count": 12
+      },
+      {
+        "line": 791,
+        "count": 7
+      }
+    ],
+    "added_to_nextest": false
+  },
+  "artifact_metadata_only": [
+    {
+      "id": 12775715495,
+      "name": "lampos-arm64-0288c0db50097f4560bf0d09157a137d6b66d7fc",
+      "size_in_bytes": 118781833,
+      "digest": "sha256:d0bf15af9ae901e882a41d71782f48663c10524f082fd864f659d1bc4407c15b",
+      "expired": false,
+      "workflow_run": {
+        "id": 40592297864,
+        "repository_id": 1259624583,
+        "head_repository_id": 1259624583,
+        "head_branch": "tests/1806-reader-sentinel-root",
+        "head_sha": "0288c0db50097f4560bf0d09157a137d6b66d7fc"
+      }
+    }
+  ],
+  "artifact_metadata_matches_upload_logs": true,
+  "archive_payload_checksum_downloaded": false,
+  "individual_binary_hash_verified": false,
+  "export_counts": {
+    "current_workspace_binaries": 48,
+    "selected_examples": 2,
+    "uploaded_files": 51
+  },
+  "exact_API_head_checks": [
+    {
+      "id": 122503556189,
+      "name": "report-full-run-failure",
+      "head_sha": "0288c0db50097f4560bf0d09157a137d6b66d7fc",
+      "status": "completed",
+      "conclusion": "skipped",
+      "details_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40592297864/job/122503556189"
+    },
+    {
+      "id": 122503555690,
+      "name": "lampOS \u2014 sign and publish the tested lamp-voice artifact",
+      "head_sha": "0288c0db50097f4560bf0d09157a137d6b66d7fc",
+      "status": "completed",
+      "conclusion": "skipped",
+      "details_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40592297864/job/122503555690"
+    },
+    {
+      "id": 122499344637,
+      "name": "lampOS \u2014 promote a tested release to the stable feed",
+      "head_sha": "0288c0db50097f4560bf0d09157a137d6b66d7fc",
+      "status": "completed",
+      "conclusion": "skipped",
+      "details_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40592297864/job/122499344637"
+    },
+    {
+      "id": 122499342473,
+      "name": "lampOS \u2014 clippy, every crate and target (x86 Linux)",
+      "head_sha": "0288c0db50097f4560bf0d09157a137d6b66d7fc",
+      "status": "completed",
+      "conclusion": "success",
+      "details_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40592297885/job/122499342473"
+    },
+    {
+      "id": 122499342375,
+      "name": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "head_sha": "0288c0db50097f4560bf0d09157a137d6b66d7fc",
+      "status": "completed",
+      "conclusion": "success",
+      "details_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40592297864/job/122499342375"
+    }
+  ],
+  "branch_protection_requirements_audited": false,
+  "host_public_text_bundle": [
+    {
+      "name": "README.md",
+      "sha256": "8708536271c8a271ca91366428eb1603ccd792db5923c449e2516acdfd23c0c9",
+      "bytes": 3269
+    },
+    {
+      "name": "audit.json",
+      "sha256": "49b8403983d9939bd5b212b5ae163b3950b8f0de727f1fc4ffaee1d6bacccbd4",
+      "bytes": 540036
+    },
+    {
+      "name": "original-seven-full-parallel-projection.json",
+      "sha256": "154431f3cf48e80a82e14a6600153749f1691f8c4ba75461e5c6c8569dbb9d17",
+      "bytes": 1007
+    },
+    {
+      "name": "x86-mac-architecture-proof.json",
+      "sha256": "691b33ddd574eaa6e7dc9087257bd6253e88383869d3025e209d737a925b2750",
+      "bytes": 1076
+    }
+  ],
+  "host_scope_separate": "Native x86 Mac default-parallel full Voice 3885/0/15 plus three distinct documentation checks at authored0288/c1fa; no same-binary or identical-tree assertion against Name2 preview",
+  "watch_scope": "One original ARM bounded watch exited0; Linux already terminal at discovery; no rerun",
+  "retained_history": "Original capacity and import native1 admissions remain zero Cargo/runtime; old serial92/82 result and all older real failures remain separate, no cause inference or failure waiver",
+  "source_ref_target_compiler_GH_device_mutation": false,
+  "collected_utc": "2026-10-27T22:26:12.406548+00:00"
+}

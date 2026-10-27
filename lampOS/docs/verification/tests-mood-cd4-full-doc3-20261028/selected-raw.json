@@ -1,0 +1,145 @@
+{
+  "scope": "Target starts/summaries and required case statuses only; complete bound identity sets are in audit.json",
+  "records": [
+    {
+      "phase": "full",
+      "file": "cmd-tests.stdout.txt",
+      "full_raw": {
+        "name": "cmd-tests.stdout.txt",
+        "bytes": 30630,
+        "sha256": "20f86f81e934e0f0e18ef9e060c184612ac12323e3f156f4f687f26bad166d27"
+      },
+      "selected_lines": [
+        {
+          "line": 2,
+          "raw": "running 28 tests"
+        },
+        {
+          "line": 32,
+          "raw": "test result: ok. 28 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.39s"
+        },
+        {
+          "line": 35,
+          "raw": "running 4 tests"
+        },
+        {
+          "line": 41,
+          "raw": "test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s"
+        },
+        {
+          "line": 44,
+          "raw": "running 281 tests"
+        },
+        {
+          "line": 327,
+          "raw": "test result: ok. 281 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 12.71s"
+        },
+        {
+          "line": 330,
+          "raw": "running 28 tests"
+        },
+        {
+          "line": 348,
+          "raw": "test sleep_name::an_expired_sleeping_name_is_journaled_once_by_the_service ... ok"
+        },
+        {
+          "line": 351,
+          "raw": "test sleep_name::the_service_breathes_the_head_with_moods_breath_from_the_bus ... ok"
+        },
+        {
+          "line": 360,
+          "raw": "test result: ok. 28 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.49s"
+        },
+        {
+          "line": 363,
+          "raw": "running 0 tests"
+        },
+        {
+          "line": 365,
+          "raw": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        }
+      ]
+    },
+    {
+      "phase": "full",
+      "file": "cmd-tests.stderr.txt",
+      "full_raw": {
+        "name": "cmd-tests.stderr.txt",
+        "bytes": 566,
+        "sha256": "d66338013d24246f269721fb53b29fef59997b616edab5e45ab5a4191c402570"
+      },
+      "selected_lines": [
+        {
+          "line": 2,
+          "raw": "     Running unittests src/lib.rs (/private/tmp/tests-body-holder-cargo-20261027/debug/deps/lamp_expression-97b0d6d78b5cc498)"
+        },
+        {
+          "line": 3,
+          "raw": "     Running unittests src/main.rs (/private/tmp/tests-body-holder-cargo-20261027/debug/deps/lamp_expression-7d5e7ac9619c42c0)"
+        },
+        {
+          "line": 4,
+          "raw": "     Running tests/it/main.rs (/private/tmp/tests-body-holder-cargo-20261027/debug/deps/it-707453661fb429d2)"
+        },
+        {
+          "line": 5,
+          "raw": "     Running tests/runtime.rs (/private/tmp/tests-body-holder-cargo-20261027/debug/deps/runtime-f9b92bb4002b831f)"
+        },
+        {
+          "line": 6,
+          "raw": "   Doc-tests lamp_expression"
+        }
+      ]
+    },
+    {
+      "phase": "Doc3",
+      "file": "cmd-install-selected-runtime.stdout.txt",
+      "full_raw": {
+        "name": "cmd-install-selected-runtime.stdout.txt",
+        "bytes": 180,
+        "sha256": "d505da6dbd471a889fc5c29626b3739d724d94ca6d25e744a7d80fb0a3eb82ed"
+      },
+      "selected_lines": [
+        {
+          "line": 2,
+          "raw": "running 1 test"
+        },
+        {
+          "line": 3,
+          "raw": "test every_part_of_the_lamp_waits_for_setups_marker_itself ... ok"
+        },
+        {
+          "line": 5,
+          "raw": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 107 filtered out; finished in 0.00s"
+        }
+      ]
+    },
+    {
+      "phase": "Doc3",
+      "file": "cmd-it-selected-runtime.stdout.txt",
+      "full_raw": {
+        "name": "cmd-it-selected-runtime.stdout.txt",
+        "bytes": 292,
+        "sha256": "7fae9c9daa9c61ed45e65081f57c57fe4bd55a1063099f4db1a288008077f873"
+      },
+      "selected_lines": [
+        {
+          "line": 2,
+          "raw": "running 2 tests"
+        },
+        {
+          "line": 3,
+          "raw": "test ci_paths::the_scan_sees_paths_in_strings_and_not_in_comments_or_prose ... ok"
+        },
+        {
+          "line": 4,
+          "raw": "test ci_paths::every_doc_a_crate_reads_is_named_back_in_the_workflows_pull_request_paths ... ok"
+        },
+        {
+          "line": 6,
+          "raw": "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 11 filtered out; finished in 0.45s"
+        }
+      ]
+    }
+  ]
+}

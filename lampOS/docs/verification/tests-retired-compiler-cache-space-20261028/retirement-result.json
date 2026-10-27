@@ -1,0 +1,13 @@
+{
+  "status": "CLOSED_RECONSTRUCTIBLE_OLD_CACHE_RETIREMENT",
+  "removed_files": 1902,
+  "candidate_files": 1902,
+  "retained_old_cache_files_verified": 10008,
+  "allocated_bytes_retired": 3895992320,
+  "free_before": 2620268544,
+  "free_after": 6232231936,
+  "sources_raw_Git_executables_dynamiclibs_witnesses_and_current_targets_preserved": true,
+  "historical_debug2_untouched": true,
+  "Cargo_or_tests_run": false,
+  "completed_at": "2026-10-27T21:45:09.065536+00:00"
+}
