@@ -15,7 +15,12 @@
 //! be before (the body's test of "a hand moved it") with its goal within
 //! `HAND_MOVED` of where it is (the body holds it where the hand has it, the
 //! negation of its "in a hand" test), and then `body/hand` says released.
+//! "Before" is the oldest goal of the last second with no hand said
+//! ([`BEFORE_MS`]): the body gives way where the hand already has it, its
+//! goal there, a step before it says the hand (lamp-52e6, 27 Oct, #3504),
+//! so the last goal before the push is already the hand's.
 //! The model may only skip it. Nothing here asks the body for anything.
+//! What it saw and decided is said on the journal (`lamp-voice: giving_way:`).
 #[cfg(test)]
 pub use super::legacy_words::{GIVE_ASK, GIVE_DONE, GIVE_FAILED};
 
@@ -25,13 +30,19 @@ use super::{
 };
 use lamp_turn_owner::BootId;
 use serde_json::json;
+use std::collections::VecDeque;
 use std::time::Duration;
 
-/// The joints that carry the head, as `body/hand` covers them.
+/// The joints that carry the head, as `body/hand` covers them. The base is
+/// one: "take its head, move it a little" turned only the base on lamp-52e6.
 const HEAD: [&str; 3] = ["base_yaw", "head_pitch", "head_roll"];
 /// The body's "a hand moved it" (`lamp_body::HAND_MOVED`, 15 counts), in
 /// radians: `body/joint_states` says 4,096 counts a turn.
 const MOVED_RADIANS: f64 = lamp_body::HAND_MOVED as f64 * std::f64::consts::TAU / 4_096.0;
+/// How far back the head's goals before a push are kept: the body's second
+/// in a hand (`HAND_STEPS`), well past its few steps of pushing back before
+/// it gives way.
+const BEFORE_MS: u64 = 1_000;
 /// The body's publisher name (`lamp_body::bus_out::SOURCE`, a Linux-only
 /// module): anything else on its topics is not the body.
 const BODY: &str = "body";
@@ -197,18 +208,54 @@ pub(super) struct GivingWayFlow {
     offer: Option<Offer>,
     window: Option<Window>,
     retry_after_us: u64,
-    /// The head's goals at the last reading with no hand on it.
-    before: Option<[f64; 3]>,
+    /// The head's goals, with their Unix milliseconds, at the readings with
+    /// no hand on it in the last [`BEFORE_MS`], oldest first.
+    before: VecDeque<(u64, [f64; 3])>,
     pushed: bool,
-    /// In this push, a head joint moved by the hand and held there.
-    moved: bool,
+    /// In this push, the head joint farthest from where it was asked to be,
+    /// one held where the hand has it first.
+    moved: Option<Moved>,
+    /// Pushes the body said in this try, for the journal.
+    pushes: u32,
+}
+
+/// A head joint read during a push, in radians.
+#[derive(Clone, Copy)]
+struct Moved {
+    joint: usize,
+    from: f64,
+    position: f64,
+    goal: f64,
+}
+
+impl Moved {
+    fn distance(&self) -> f64 {
+        (self.position - self.from).abs()
+    }
+
+    /// A hand moved it, and the body holds it there.
+    fn by_hand(&self) -> bool {
+        self.distance() > MOVED_RADIANS && (self.goal - self.position).abs() <= MOVED_RADIANS
+    }
+
+    fn told(&self) -> String {
+        let counts = |radians: f64| 2_048.0 + radians * 4_096.0 / std::f64::consts::TAU;
+        format!(
+            "{} at {:.0} counts, {:.0} from its goal before at {:.0}, its goal {:.0}",
+            HEAD[self.joint],
+            counts(self.position),
+            self.distance() * 4_096.0 / std::f64::consts::TAU,
+            counts(self.from),
+            counts(self.goal)
+        )
+    }
 }
 
 impl GivingWayFlow {
     fn forget_push(&mut self) {
-        self.before = None;
+        self.before.clear();
         self.pushed = false;
-        self.moved = false;
+        self.moved = None;
     }
 }
 
@@ -353,6 +400,8 @@ impl Onboarding {
             return;
         }
         self.giving.forget_push();
+        self.giving.pushes = 0;
+        eprintln!("lamp-voice: giving_way: the invitation was played whole; the try is open");
         self.giving.window = Some(Window {
             ended_ms: (self.unix_clock)(),
             ended_us: now_us,
@@ -374,24 +423,61 @@ impl Onboarding {
         let flow = &mut self.giving;
         match felt {
             Felt::Restart | Felt::Invalid => flow.forget_push(),
-            Felt::Joints { head, .. } if !flow.pushed => {
-                flow.before = Some(head.map(|(_, goal)| goal));
-            }
-            Felt::Joints { head, .. } => {
-                if let Some(before) = flow.before
-                    && head.iter().zip(before).any(|(&(position, goal), was)| {
-                        (position - was).abs() > MOVED_RADIANS
-                            && (goal - position).abs() <= MOVED_RADIANS
-                    })
+            Felt::Joints { at_ms, head } if !flow.pushed => {
+                flow.before.push_back((at_ms, head.map(|(_, goal)| goal)));
+                while flow
+                    .before
+                    .front()
+                    .is_some_and(|&(was, _)| was.saturating_add(BEFORE_MS) < at_ms)
                 {
-                    flow.moved = true;
+                    flow.before.pop_front();
                 }
             }
-            Felt::Hand { pushed: true, .. } => flow.pushed = true,
+            Felt::Joints { head, .. } => {
+                let Some(&(_, before)) = flow.before.front() else {
+                    return;
+                };
+                for (joint, (&(position, goal), from)) in head.iter().zip(before).enumerate() {
+                    let read = Moved {
+                        joint,
+                        from,
+                        position,
+                        goal,
+                    };
+                    if flow.moved.is_none_or(|was| {
+                        (read.by_hand(), read.distance()) > (was.by_hand(), was.distance())
+                    }) {
+                        flow.moved = Some(read);
+                    }
+                }
+            }
+            Felt::Hand { pushed: true, .. } => {
+                if !flow.pushed {
+                    flow.pushes += 1;
+                    eprintln!(
+                        "lamp-voice: giving_way: the body says a hand is on it, push {} of this try",
+                        flow.pushes
+                    );
+                }
+                flow.pushed = true;
+            }
             Felt::Hand { pushed: false, .. } => {
-                let given_way = flow.pushed && flow.moved;
+                if !flow.pushed {
+                    return;
+                }
+                let moved = flow.moved.take();
                 flow.pushed = false;
-                flow.moved = false;
+                let given_way = moved.is_some_and(|moved| moved.by_hand());
+                eprintln!(
+                    "lamp-voice: giving_way: the body says the hand let go; {}: {}",
+                    moved.map_or("no head reading during the push".into(), |moved| moved
+                        .told()),
+                    if given_way {
+                        "given way"
+                    } else {
+                        "not given way (wanted more than HAND_MOVED counts from its goal before, its goal within HAND_MOVED of it)"
+                    }
+                );
                 if !given_way {
                     return;
                 }
@@ -420,6 +506,10 @@ impl Onboarding {
             .as_ref()
             .is_some_and(|window| now_us.saturating_sub(window.ended_us) >= WINDOW_US)
         {
+            eprintln!(
+                "lamp-voice: giving_way: the try's minute ended, not given way; the body said a hand {} times",
+                self.giving.pushes
+            );
             self.records.push(json!({"kind":"onboarding_giving_way_try",
                 "felt":false,"why":"no hand moved the head","at_us":now_us}));
             flow_end(self, now_us);
