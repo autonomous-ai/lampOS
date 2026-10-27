@@ -420,4 +420,37 @@ mod tests {
         next.publish_json(release.stamp.at_us, &release).unwrap();
         wait(&mut reader, 120);
     }
+
+    /// The feelings skill's Glad (#3691): warmth and a 6 s breath at the
+    /// person's level, here the brightest (5), asked of the ring under a
+    /// night cap of 24. The cap's ceiling holds every channel of every frame
+    /// through two breaths, and the breath still shows.
+    #[test]
+    fn a_glad_breath_at_the_persons_brightest_draws_nothing_over_a_cap() {
+        use crate::ring_face::{Face, Lit, Mood};
+        use lamp_msgs::{LightPattern, PatternKind};
+        let mut caps = Caps::new(HOST);
+        assert!(caps.accept(&message(&snapshot(1, 1, 100, Some(24))), 100, WALL));
+        let ceiling = u8::try_from(caps.ceiling(120, WALL)).unwrap();
+        assert_eq!(ceiling, 24);
+        let mut face = Face::new();
+        face.light(Lit::of(true, "warm", 5).unwrap());
+        face.pattern(Some((
+            LightPattern {
+                kind: PatternKind::Breathe,
+                period_ms: 6_000,
+                low: 4,
+            },
+            0,
+        )));
+        let mut brightest = 0;
+        for frame in 0..600u64 {
+            for pixel in face.render(Mood::Resting, 0, frame * 20_000, ceiling) {
+                let most = pixel.red.max(pixel.green).max(pixel.blue);
+                assert!(most <= ceiling, "frame {frame}: {pixel:?} over {ceiling}");
+                brightest = brightest.max(most);
+            }
+        }
+        assert!(brightest > 0, "the breath must still show");
+    }
 }

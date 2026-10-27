@@ -58,8 +58,10 @@ pub const TONE_LIVELY: f32 = 0.6;
 pub const TONE_SURE: f32 = 0.6;
 const LIVELY_ENERGY: f64 = SMILE_ENERGY / 2.0;
 /// How long glad or lively is said on `mood/state` after what made it
-/// (#3691); low is said for its two-minute spell ([`QUIET_US`]).
-pub const FELT_HOLD_US: u64 = 20 * SECOND_US;
+/// (#3691): long enough for the feelings skill, which waits for 30 s with
+/// no lamp speech and a minute after a talk, to still see a glad line the
+/// lamp answered. Low is said for its two-minute spell ([`QUIET_US`]).
+pub const FELT_HOLD_US: u64 = 90 * SECOND_US;
 
 /// What a line's tone counts as, if anything.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]

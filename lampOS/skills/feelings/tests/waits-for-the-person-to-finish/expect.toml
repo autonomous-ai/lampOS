@@ -1,0 +1,15 @@
+# Glad at 42 s while the person talks (listening 40 s to 50 s): nothing then; the lift
+# once the voice has rested 5 s, at 55 s, while Mood still feels it.
+clock = "10:00"
+
+[[expect]]
+at = "55s"
+within = "1s"
+call = "body.move"
+args = { move = "glad-lift" }
+
+[[expect]]
+at = "55s"
+within = "1s"
+call = "light"
+args = { relative = { warmer = 1, dimmer = 1 }, for = "12s", breathe_ms = 6000 }

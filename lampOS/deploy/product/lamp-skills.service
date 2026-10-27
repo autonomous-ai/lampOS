@@ -1,7 +1,7 @@
 # lampOS skills: physical skills, each a folder in /var/lib/lampOS/skills (lampOS/docs/skills.md).
 # The product unit (lampOS/docs/install.md); install puts every product skill in that folder
-# (lamp-update's install::PRODUCT_SKILLS: every core skill). Eleven are enabled; Bedtime and Morning
-# stays off until its lamp comparison, and install::PRODUCT_SKILLS_OFF's eight are installed off
+# (lamp-update's install::PRODUCT_SKILLS: every core skill). Seventeen are enabled; Bedtime and Morning
+# stays off until its lamp comparison, and install::PRODUCT_SKILLS_OFF's seven are installed off
 # until their lamp checks. A skill speaks only through the voice's say service
 # (LAMP_SAY=on in lamp-voice.service, its socket in the group lampos); the voice has no hello of its own (#2825), so only
 # Welcome back greets, and its reminders and task news wait for their skills' asks (=skill).

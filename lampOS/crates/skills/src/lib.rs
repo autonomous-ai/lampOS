@@ -2485,10 +2485,23 @@ impl Call {
             Self::Sound { name, .. } => ("sound", json!({ "sound": name })),
             Self::Cue => ("sound", json!({ "cue": "hum" })),
             Self::Rest(rest) => ("rest", json!({ "op": rest.op })),
-            Self::Relative { warmer, dimmer, .. } => (
-                "light",
-                json!({ "relative": { "warmer": warmer, "dimmer": dimmer } }),
-            ),
+            Self::Relative {
+                warmer,
+                dimmer,
+                lasting,
+                breathe_ms,
+            } => {
+                let mut args = json!({ "relative": { "warmer": warmer, "dimmer": dimmer } });
+                if let Some(lasting) = lasting {
+                    args["for"] = json!(lasting);
+                }
+                // A case names the breath its light keeps (#3691: Glad's
+                // and Lively's breaths, Low's steady light).
+                if let Some(period_ms) = breathe_ms {
+                    args["breathe_ms"] = json!(period_ms);
+                }
+                ("light", args)
+            }
             Self::RequestedAudio(_) => ("requested_audio", json!({})),
             Self::AfterSay => ("after_say", json!({})),
             Self::Text(text) => ("text", json!({ "text": text })),

@@ -1,0 +1,15 @@
+# Mood low from 40 s for its two-minute spell: the small droop and a steady light
+# a level dimmer and warmer, once for the spell, at 40 s.
+clock = "10:00"
+
+[[expect]]
+at = "40s"
+within = "1s"
+call = "body.move"
+args = { move = "low-droop" }
+
+[[expect]]
+at = "40s"
+within = "1s"
+call = "light"
+args = { relative = { warmer = 1, dimmer = 1 }, for = "20s" }
