@@ -1841,10 +1841,14 @@ Said unasked when it changes:
 - `{"lease":"suspended","why":"conversation"}` while the mood is listening,
   thinking or speaking, and `{"lease":"held"}` again after.
 - `{"lease":"lost","why":"hand|slumped|private|paused|asleep|lapsed"}`: a
-  hand on a joint, the body let go under load or by a hand (its torque off), the person's privacy mute, a pause, a hand's sleep, or a hold not
-  renewed within its `for_ms`. It is not taken back when that ends; the
-  holder asks again. A hold asked while one of these lasts is answered
-  `lost` with why.
+  hand on a joint, the body let go under load or by a hand (its torque
+  off) or let go waiting for a hand to set its pose right
+  (`--refused-let-go`), the person's privacy mute, a pause, a hand's sleep,
+  or a hold not renewed within its `for_ms`. It is not taken back when that
+  ends; the holder asks again. A hold asked while one of these lasts is
+  answered `lost` with why. A run that ends with a holder connected tells
+  it `lost`/`slumped` first when the body gave out (an overload a second
+  time within ten minutes), then closes.
 
 Its holder gone, the lease ends at once, so the lamp's own life is back
 within a step if `lamp-control` stops, and within 30 s if it hangs. A
