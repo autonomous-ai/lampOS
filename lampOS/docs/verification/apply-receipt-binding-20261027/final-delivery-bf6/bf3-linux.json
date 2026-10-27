@@ -1,0 +1,62 @@
+{
+  "actual_checkout": "ff1c9a639c7b0cce3d65da265dc5e0b53e45269c",
+  "base": "36a42f30a756b6fd6f31c9b6102cb66e5008416c",
+  "cache_note": [
+    "7339 of 7361 source files are as the cached build had them and get its times back; 22 changed or new keep the checkout's time."
+  ],
+  "commands": [
+    "cargo fmt --manifest-path .github/tools/lampos-promote/Cargo.toml --check",
+    "cargo clippy --locked --manifest-path .github/tools/lampos-promote/Cargo.toml --all-targets -- -D warnings",
+    "cargo +1.96.0 fmt --all --check",
+    "cargo clippy --locked --workspace --all-targets -- -D warnings"
+  ],
+  "completion_note": "Actual bash -e commands, Finished output and successful required-stage conclusions corroborate success; numeric per-command exit codes are not separately printed. Cache/source-time reuse is not a cache-free rebuild claim.",
+  "full_tree": "aa8b87ae4309ada8e2fc67d126eb56efa054ade2",
+  "head": "bf3bc78b69f1aeac04ba47cba7202ad31d9c854a",
+  "job": {
+    "completed_at": "2026-10-27T13:00:12Z",
+    "conclusion": "success",
+    "id": 122196231916,
+    "name": "lampOS \u2014 clippy, every crate and target (x86 Linux)",
+    "started_at": "2026-10-27T12:45:22Z",
+    "status": "completed"
+  },
+  "limits": "Actualbf3/36a Linux lint composition only; subsequent Main movement is not qualified. No runtime, lamp or helper result from this audit.",
+  "log": {
+    "bytes": 43209,
+    "lines": 564,
+    "sha256": "806e0d0a7d1cfd5104ffbd7055687fb944146fa568808cb3d2623b311c25badd"
+  },
+  "ordered_parents": [
+    "36a42f30a756b6fd6f31c9b6102cb66e5008416c",
+    "bf3bc78b69f1aeac04ba47cba7202ad31d9c854a"
+  ],
+  "pr": 3808,
+  "preview_authored_complete_tree_equal": true,
+  "required_stages": [
+    {
+      "conclusion": "success",
+      "name": "stable promotion formatting and strict Clippy",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "formatting (whole workspace, pinned Rust)",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "clippy (every crate and target, warnings as errors)",
+      "status": "completed"
+    }
+  ],
+  "run": {
+    "conclusion": "success",
+    "event": "pull_request",
+    "head_sha": "bf3bc78b69f1aeac04ba47cba7202ad31d9c854a",
+    "id": 40506267279,
+    "run_attempt": 1,
+    "status": "completed"
+  },
+  "toolchain": "1.96.0-x86_64-unknown-linux-gnu"
+}

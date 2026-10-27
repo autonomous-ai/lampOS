@@ -1,0 +1,262 @@
+{
+  "actual_checkout": "ff1c9a639c7b0cce3d65da265dc5e0b53e45269c",
+  "authored_preview_complete_tree_equal": true,
+  "base": "36a42f30a756b6fd6f31c9b6102cb66e5008416c",
+  "counts": {
+    "CANCEL": 0,
+    "EXECFAIL": 0,
+    "FAIL": 0,
+    "LEAK": 0,
+    "PASS": 7758,
+    "TIMEOUT": 0,
+    "XFAIL": 0,
+    "XPASS": 0
+  },
+  "foundation_controls": [
+    {
+      "binary": "lamp-update",
+      "name": "writer_refresh::tests::a_restart_at_every_unqualified_prefix_requires_recovery_and_never_reissues_the_grant",
+      "ordinal": 2588,
+      "status": "PASS",
+      "total": 7758
+    },
+    {
+      "binary": "lamp-update",
+      "name": "writer_refresh::tests::a_stale_or_modified_first_apply_cannot_consume_the_single_grant",
+      "ordinal": 2589,
+      "status": "PASS",
+      "total": 7758
+    },
+    {
+      "binary": "lamp-update",
+      "name": "writer_refresh::tests::diagnostics_hide_unknown_values_and_known_duplicate_or_shadowed_fields_are_refused",
+      "ordinal": 2590,
+      "status": "PASS",
+      "total": 7758
+    },
+    {
+      "binary": "lamp-update",
+      "name": "writer_refresh::tests::failed_persist_after_publication_poisons_the_live_session_until_actual_disk_state_is_recovered",
+      "ordinal": 2591,
+      "status": "PASS",
+      "total": 7758
+    },
+    {
+      "binary": "lamp-update",
+      "name": "writer_refresh::tests::first_apply_binds_its_own_later_envelope_and_sequence_without_replacing_the_refresh_identity",
+      "ordinal": 2592,
+      "status": "PASS",
+      "total": 7758
+    },
+    {
+      "binary": "lamp-update",
+      "name": "writer_refresh::tests::future_nonsemantic_metadata_is_preserved_without_becoming_admission_authority",
+      "ordinal": 2593,
+      "status": "PASS",
+      "total": 7758
+    },
+    {
+      "binary": "lamp-update",
+      "name": "writer_refresh::tests::guard_lock_is_exclusive_and_independent_of_the_product_lock",
+      "ordinal": 2594,
+      "status": "PASS",
+      "total": 7758
+    },
+    {
+      "binary": "lamp-update",
+      "name": "writer_refresh::tests::identity_substitution_never_changes_or_admits_the_saved_transaction",
+      "ordinal": 2595,
+      "status": "PASS",
+      "total": 7758
+    },
+    {
+      "binary": "lamp-update",
+      "name": "writer_refresh::tests::live_or_poisoned_sessions_cannot_expose_stale_recovery_inputs",
+      "ordinal": 2596,
+      "status": "PASS",
+      "total": 7758
+    },
+    {
+      "binary": "lamp-update",
+      "name": "writer_refresh::tests::missing_and_nonregular_records_do_not_turn_into_a_fresh_transaction",
+      "ordinal": 2597,
+      "status": "PASS",
+      "total": 7758
+    },
+    {
+      "binary": "lamp-update",
+      "name": "writer_refresh::tests::no_apply_does_not_qualify_but_one_exact_apply_can_enter_without_an_ordinary_round",
+      "ordinal": 2598,
+      "status": "PASS",
+      "total": 7758
+    },
+    {
+      "binary": "lamp-update",
+      "name": "writer_refresh::tests::qualified_and_closed_inputs_keep_the_compatible_writer_and_bound_product_receipts",
+      "ordinal": 2599,
+      "status": "PASS",
+      "total": 7758
+    },
+    {
+      "binary": "lamp-update",
+      "name": "writer_refresh::tests::qualified_writer_and_preimages_survive_a_restart_until_the_product_journal_closes",
+      "ordinal": 2600,
+      "status": "PASS",
+      "total": 7758
+    },
+    {
+      "binary": "lamp-update",
+      "name": "writer_refresh::tests::recovery_views_retain_later_metadata_in_the_bound_inputs_without_reparsing",
+      "ordinal": 2601,
+      "status": "PASS",
+      "total": 7758
+    },
+    {
+      "binary": "lamp-update",
+      "name": "writer_refresh::tests::reloaded_inputs_keep_the_exact_origin_and_distinguish_writer_from_apply_restoration",
+      "ordinal": 2602,
+      "status": "PASS",
+      "total": 7758
+    },
+    {
+      "binary": "lamp-update",
+      "name": "writer_refresh::tests::restoring_an_apply_requires_its_original_grant_and_preimage_identity",
+      "ordinal": 2603,
+      "status": "PASS",
+      "total": 7758
+    },
+    {
+      "binary": "lamp-update",
+      "name": "writer_refresh::tests::unsupported_or_malformed_journals_are_retained_and_block_every_admission",
+      "ordinal": 2604,
+      "status": "PASS",
+      "total": 7758
+    },
+    {
+      "binary": "lamp-update",
+      "name": "writer_refresh::tests::write_bound_and_invalid_identities_leave_no_journal_or_partial_acceptance",
+      "ordinal": 2605,
+      "status": "PASS",
+      "total": 7758
+    }
+  ],
+  "full_tree": "aa8b87ae4309ada8e2fc67d126eb56efa054ade2",
+  "head": "bf3bc78b69f1aeac04ba47cba7202ad31d9c854a",
+  "identical_echoes_excluded": 34,
+  "job_id": 122196234881,
+  "limits": "Dependency-selected runtime, not full-workspace runtime. Separate scopes are not added to nextest. No per-nextest executable bytes, device, signing/promotion or helper activation credit.",
+  "ordered_parents": [
+    "36a42f30a756b6fd6f31c9b6102cb66e5008416c",
+    "bf3bc78b69f1aeac04ba47cba7202ad31d9c854a"
+  ],
+  "original_run": {
+    "conclusion": "success",
+    "event": "pull_request",
+    "head_sha": "bf3bc78b69f1aeac04ba47cba7202ad31d9c854a",
+    "html_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40506267516",
+    "id": 40506267516,
+    "run_attempt": 1,
+    "status": "completed"
+  },
+  "pr": 3808,
+  "raw_complete_job_log_sha256": "5cb6cb92bbd58e4e756aa3b78dfce40bb40e19f4292c253c186d05f47be4280c",
+  "raw_metadata_sha256": {
+    "arm-jobs-final.json": "41c21d5fa0b6ad0f56c534f63e393ab1ad530183c2a5cd317198ec42c3609a47",
+    "arm-run-final.json": "dba7dab8daa2b52386ad5100a8e02ec8d2b149970cbd09dbb1fbcbdf8411386d",
+    "authored-commit.json": "49fc38f61707dae2eb7bd26eed651429c2b9c18830c7be3a10398c192ecf1267",
+    "preview-commit-initial.json": "f624c2d5530632fce35ee126797ae9c0de2bf74c44a51e836eec5dce4d5a3529"
+  },
+  "receipt_controls": [
+    {
+      "binary": "lamp-update",
+      "name": "apply::tests::a_done_for_another_operation_does_not_change_any_setting_record",
+      "ordinal": 2431,
+      "status": "PASS",
+      "total": 7758
+    },
+    {
+      "binary": "lamp-update",
+      "name": "apply::tests::a_done_for_another_sequence_does_not_change_any_setting_record",
+      "ordinal": 2432,
+      "status": "PASS",
+      "total": 7758
+    },
+    {
+      "binary": "lamp-update",
+      "name": "apply::tests::a_matching_done_keeps_the_permanent_forward_read_contract",
+      "ordinal": 2433,
+      "status": "PASS",
+      "total": 7758
+    },
+    {
+      "binary": "lamp-update",
+      "name": "apply::tests::an_explicit_expected_identity_does_not_follow_a_rewritten_staged_request",
+      "ordinal": 2445,
+      "status": "PASS",
+      "total": 7758
+    },
+    {
+      "binary": "lamp-update",
+      "name": "apply::tests::an_unknown_done_operation_is_refused_without_changing_any_setting_record",
+      "ordinal": 2446,
+      "status": "PASS",
+      "total": 7758
+    },
+    {
+      "binary": "lamp-update::round",
+      "name": "a_rejected_apply_receipt_runs_real_back_and_restores_written_settings_modes_and_records",
+      "ordinal": 2770,
+      "status": "PASS",
+      "total": 7758
+    },
+    {
+      "binary": "lamp-update::round",
+      "name": "a_rejected_back_receipt_keeps_the_journal_until_real_back_is_acknowledged",
+      "ordinal": 2771,
+      "status": "PASS",
+      "total": 7758
+    },
+    {
+      "binary": "lamp-update::round",
+      "name": "the_round_rejects_a_done_matching_a_rewritten_request_instead_of_its_own_request",
+      "ordinal": 2922,
+      "status": "PASS",
+      "total": 7758
+    }
+  ],
+  "runner_version_from_actual_log": "cargo-nextest0.9.149",
+  "selected_packages": [
+    "lamp-body",
+    "lamp-cloud",
+    "lamp-expression",
+    "lamp-keeper",
+    "lamp-lean",
+    "lamp-memory",
+    "lamp-peek",
+    "lamp-setup",
+    "lamp-skills",
+    "lamp-update",
+    "lamp-voice",
+    "lamp-voice-eval"
+  ],
+  "selected_unrun": 0,
+  "selection": {
+    "binaries": 70,
+    "selected": 7758,
+    "skipped_binaries": 118,
+    "skipped_tests": 53
+  },
+  "separate_scopes": {
+    "doctest_summaries": 47,
+    "doctests_passed": 4,
+    "process_passed": 13,
+    "promotion_helper_passed": 25,
+    "python_regressions": [
+      35,
+      12,
+      7
+    ],
+    "relay_success": 1
+  },
+  "unique_terminal_cases": 7758
+}

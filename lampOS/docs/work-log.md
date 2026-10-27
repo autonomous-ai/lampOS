@@ -1,3 +1,11 @@
+## 27 October 2026, 20:53 +07 — receipt delivery and final source-bound gates
+
+[Receipt delivery and qualification](verification/apply-receipt-binding-20261027/final-delivery-bf6/README.md) binds train #3841's delivered patches to the actual qualified source. Original `bf3/36a` ARM passes **7,758 unique tests / zero bad or selected unrun / 53 skips**, with all eight receipt and eighteen foundation controls once; original Linux formatting and strict Clippy pass. Its production archive and all fifty AArch64 members verify without inventing per-test executable hashes.
+
+The later `054/026` preferred local execution separately passes **503 unique tests / zero bad or selected unrun / six skips**, with all 26 controls once. Source, tool, configuration, controller and actual/preserved executable guards close. Doctests and overlapping Mac contracts add no passes. Main advanced before push; the publication guard stopped, exact delivery was verified, and no implementation was reapplied. The host clarification alone is [#3851](https://github.com/autonomous-ai/lampOS/pull/3851).
+
+Old negative controls, the unrelated raw libtest failure and its inconclusive baseline retain their own scopes. This does not establish post-train runtime, writer activation or physical acceptance. Current raw capture and the next head-pair carry retain separate gates; the read-only observation recheck is source-reviewed and awaits its own execution.
+
 ## 27 October 2026, 20:52 +07 — head-pair input seam qualified; receipt delivered
 
 [Head-pair qualification](verification/head-touch-inputs-20261027/initial-and-026/README.md) records two separate Update-only Mac executions: first Main `36a` plus five frozen files, later committed unchanged as `8c5`; then clean `8e2/026`. Each passes fmt, strict all-target Clippy and **499 unique PASS / zero bad or selected unrun / six ignored**, with four new controls plus eighteen foundation controls and the existing mask case once. Doctests report zero cases; overlapping Mac skip contracts add no passes. Source, tool, controller and ten actual/preserved executable guards close.
