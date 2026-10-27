@@ -41,7 +41,7 @@ pub const PITCH_WINDOW: (u16, u16) = (1740, 2030);
 /// a head resting on its stop (#2396: lamp-0c89 rests at 1755, five under
 /// 1760): it is brought to the nearest edge. Farther out, the head is off
 /// its stop and the read is refused, unless it is over the range (the side
-/// the head falls with its weight) within [`WAKE_REACH`]: a head moved off
+/// the head tips up, measured on lamp-52e6) within [`WAKE_REACH`]: a head moved off
 /// home by a hand, which the body wakes home (#3504).
 pub const HOME_PITCH_TOLERANCE: u16 = 20;
 /// How far the shoulder and the elbow may each stand from folded
@@ -210,7 +210,7 @@ fn head_checked(read: &RestRead) -> Result<(Span, Span, u16, Option<String>), St
 /// start, which lies inside `--pitch-window` and over the head's floor). A
 /// rest pitch within [`HOME_PITCH_TOLERANCE`] outside it is the head on its
 /// stop: brought to the nearest edge, with the line saying so. Over it (the
-/// side the head falls with its weight) by more, but within [`WAKE_REACH`],
+/// side the head tips up: lamp-52e6 looks down as its pitch falls) by more, but within [`WAKE_REACH`],
 /// is a head moved off home by a hand (#3504: lamp-52e6 at 2213, lamp-3e83
 /// at 2102 after handling, each staying where a hand left it): the high
 /// edge is kept, and the body, waking, brings the head home from there.
@@ -698,8 +698,8 @@ mod tests {
         );
     }
 
-    /// #3504: a head a hand moved off home, over the range (the side it falls
-    /// with its weight) within the body's wake reach, keeps the high edge,
+    /// #3504: a head a hand moved off home, over the range (the head
+    /// tipped up) within the body's wake reach, keeps the high edge,
     /// which the body wakes it to; lamp-52e6 read 2213 after an SD card swap.
     #[test]
     fn a_home_pitch_moved_by_hand_within_the_wake_reach_keeps_the_edge() {
