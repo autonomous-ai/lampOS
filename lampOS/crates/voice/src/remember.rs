@@ -1638,6 +1638,55 @@ fn about_words(about: &str) -> Vec<String> {
 /// [`FORGET_ABOUT_ENVIRONMENT`] is.
 pub const HEARD_NAMED: &str = "heard_named";
 
+/// The argument the lamp adds, never the model, to a `forget` by
+/// `source_id` whose heard line asks to forget and names nothing ("forget
+/// that", "forget it", "quên cái đó đi"; [`named_forget`], #3504, Friday's
+/// N1): the id is the model's guess at "that", so the memory asks which one
+/// when more than one thing could be meant ([`FORGET_WHICH`]).
+pub const HEARD_BARE: &str = "heard_bare";
+
+/// What the model is told of a bare forget's guessed `source_id`
+/// ([`HEARD_BARE`]) while more than one thing this session was shown could
+/// be "that": nothing is forgotten, and it asks once which one. On
+/// lamp-06c1 (27 Oct) "Forget that." with no follow-up asked removed an old
+/// observation the model chose, and only then asked what was meant. Of
+/// their own it may name two; of the room's, which may be anyone's, none
+/// (the reviewer-lead's P3 on #3601).
+pub fn forget_which(theirs: bool) -> Value {
+    let ask = if theirs {
+        "Ask them once which one, in a few words, naming at most two of theirs, such as \"The graduation date, or your coffee?\""
+    } else {
+        "Ask them once what they want forgotten, without naming or listing anything you keep"
+    };
+    json!({
+        "forgotten": false,
+        "note": format!("Nothing was forgotten yet: their words name nothing, and more than one thing could be meant. {ask}, and forget only the one they then name.")
+    })
+}
+
+/// A forget's arguments as the journal says them (#3504, Friday's N1):
+/// ids and counts only, never `about`'s words.
+pub fn forget_args_logged(call: &ToolCall) -> String {
+    let id = call.args.get("source_id").map_or_else(
+        || "none".to_owned(),
+        |id| {
+            id.as_u64()
+                .map_or_else(|| "not a number".to_owned(), |id| id.to_string())
+        },
+    );
+    let about = call
+        .args
+        .get("about")
+        .and_then(Value::as_str)
+        .map_or(0, |about| about.split_whitespace().count());
+    format!(
+        "{} called: source_id {id}, about {about} words, heard named {}, heard bare {}",
+        call.name,
+        call.args.get(HEARD_NAMED) == Some(&json!(true)),
+        call.args.get(HEARD_BARE) == Some(&json!(true)),
+    )
+}
+
 /// Words that name nothing to forget, beyond [`ABOUT_STOP_WORDS`] and
 /// [`SMALL_WORDS`] (#3113): "forget that", "forget what I just said",
 /// "never mind", "scratch that", and the Vietnamese "quên cái đó đi" and
@@ -1992,6 +2041,21 @@ pub fn named_forget_with(
             .map(|(_, about, _)| about.clone()),
         asked: None,
     };
+    // A recalled id for words that name nothing, with no named forget just
+    // before: the model's guess at "that", marked for the memory to check.
+    if call.name == FORGET
+        && recent.named.is_none()
+        && call.args.get("source_id").is_some_and(|id| !id.is_null())
+        && said.is_some_and(|said| asks_to_forget(said) && named_subject(said).is_none())
+    {
+        let mut args = call.args.clone();
+        args[HEARD_BARE] = json!(true);
+        return Some(ToolCall {
+            id: call.id.clone(),
+            name: call.name.clone(),
+            args,
+        });
+    }
     let ForgetPick::Named(subject) = pick_forget(call, said, &recent) else {
         return None;
     };
@@ -3345,6 +3409,11 @@ fn replace_session(
     if bare_forget_target(context, person).is_none() {
         context.just_asked = None;
     }
+    // What the last session's remember or recall gave is not this one's
+    // "that" (#3504, Friday's N1).
+    if context.session.as_deref() != Some(name) {
+        context.last_given = None;
+    }
     if context.session.as_deref() == Some(name) {
         (
             None,
@@ -3990,6 +4059,14 @@ struct DaysContext {
     /// remember of theirs, and by a confirmed forget of theirs; a refused
     /// or lost one leaves it for their retry.
     just_asked: Option<(String, u64, u32, Instant)>,
+    /// What the session's last `remember` or `recall` gave, each with its
+    /// person, and when: a bare forget's id that is the one thing it gave,
+    /// within [`HELD_FORGET_FOR`], is "that" ([`HEARD_BARE`], #3504,
+    /// Friday's N1). Emptied as each `remember` or `recall` is sent (one
+    /// that fails gives nothing), as a session opens under another name and
+    /// as one closes (the reviewer-lead's P2 on #3737: a morning's recall is
+    /// not the evening's "that").
+    last_given: Option<(Vec<Source>, Instant)>,
 }
 
 /// How many of their lines after the lamp asked about a follow-up a bare
@@ -5298,6 +5375,7 @@ impl DaysClient {
         }
         let unoffered = context.let_event_go();
         context.just_asked = None;
+        context.last_given = None;
         drop(context);
         self.take_back(unoffered);
         for (name, person) in open {
@@ -5801,6 +5879,7 @@ impl DaysClient {
         // toward closing a job unsent.
         if matches!(call.name.as_str(), FORGET | FORGET_EVERYTHING) {
             OBSERVE_FORGETS.fetch_add(1, Ordering::AcqRel);
+            eprintln!("lamp-voice provider: {}", forget_args_logged(call));
         }
         if !scope_current(lease) {
             return (gone(), false);
@@ -5828,6 +5907,25 @@ impl DaysClient {
                 // nobody forgets another's, nor the room's for everyone.
                 if !context.of(person).contains(&id) {
                     return (not_shown(), true);
+                }
+                // Words that name nothing ("forget that"): the id is the
+                // model's guess. It runs when it is plainly "that": the
+                // follow-up just asked about, or the one thing the last
+                // remember or recall gave. Otherwise, with more than one
+                // thing shown, nothing runs and the model asks which.
+                if call.args.get(HEARD_BARE) == Some(&json!(true)) {
+                    let shown = context.shown(person).len();
+                    let plain = bare_forget_target(&context, person) == Some(id)
+                        || context.last_given.as_ref().is_some_and(|(given, at)| {
+                            at.elapsed() <= HELD_FORGET_FOR
+                                && *given == [(person.map(str::to_owned), id)]
+                        });
+                    if !plain && shown > 1 {
+                        eprintln!(
+                            "lamp-voice provider: a bare forget's source_id {id} is not run: {shown} shown could be meant, asked which"
+                        );
+                        return (forget_which(person.is_some()), true);
+                    }
                 }
                 Some(json!({"op":"forget","id":id}))
             }
@@ -6029,6 +6127,13 @@ impl DaysClient {
             request["speaker"] = json!(speaker);
         }
         let request_text = request["text"].as_str().map(str::to_owned);
+        // A remember or recall sent gives "that" only when it is answered
+        // (#3504, Friday's N1): one that fails or is lost leaves none.
+        if matches!(call.name.as_str(), REMEMBER | RECALL)
+            && let Ok(mut context) = self.context.lock()
+        {
+            context.last_given = None;
+        }
         let writes = matches!(call.name.as_str(), REMEMBER | FORGET | FORGET_EVERYTHING);
         if writes {
             let Ok(mut context) = self.context.try_lock() else {
@@ -6269,6 +6374,9 @@ impl DaysClient {
                     context.shown_as(whose, id, text);
                 }
             }
+        }
+        if matches!(call.name.as_str(), REMEMBER | RECALL) {
+            context.last_given = Some((ids.clone(), Instant::now()));
         }
         for (at, (whose, id)) in ids.into_iter().enumerate() {
             said = said.or(context.include(whose.as_deref(), &[id]));
@@ -9022,6 +9130,269 @@ mod tests {
         assert_eq!(local_day(kept, None), 20_520);
     }
     const DAY: u64 = 86_400_000;
+
+    /// lamp-06c1, 27 Oct (#3504, Friday's N1): "Alone. Forget that." with no
+    /// follow-up asked removed an old observation whose id the model chose,
+    /// and only then asked. A bare forget's id is marked by the lamp's
+    /// guard; with more than one thing shown it is not run and the model is
+    /// told to ask which, unless the id is plainly "that": the only thing
+    /// shown, the one thing the last recall or remember gave, or the
+    /// follow-up just asked about.
+    #[test]
+    fn a_bare_forget_asks_which_before_running_a_guessed_id() {
+        const MINH: &str = "p-be9688998f085098";
+        let carry = Carry::default();
+        let guarded = |id: u64, said: Option<&str>, person| {
+            named_forget_with(
+                &call(FORGET, json!({"source_id": id})),
+                said,
+                person,
+                &carry,
+            )
+        };
+        // The guard marks words that name nothing, in English and Vietnamese.
+        for said in ["Alone. Forget that.", "forget it", "quên cái đó đi"] {
+            let marked = guarded(4, Some(said), Some(MINH)).expect(said);
+            assert_eq!(
+                marked.args,
+                json!({"source_id":4,HEARD_BARE:true}),
+                "{said}"
+            );
+        }
+        // Nothing heard (a lamp-written turn): not marked.
+        assert!(guarded(4, None, Some(MINH)).is_none());
+        // A line that names a thing is no guess: never marked bare.
+        let named = guarded(4, Some("forget the graduation date"), Some(MINH));
+        assert!(named.is_none_or(|named| named.args.get(HEARD_BARE).is_none()));
+        // Just after a named forget, "forget it" is that thing again
+        // (#3113's carry): named, never marked bare.
+        let again = guarded(4, Some("forget it"), Some(MINH));
+        assert!(again.is_none_or(|again| again.args.get(HEARD_BARE).is_none()));
+
+        let (socket, served) = memory("bare-forget-asks", 2, |request| {
+            match request["op"].as_str() {
+                Some("forget") => json!({"ok":true,"removed":1}),
+                _ => json!({"ok":false}),
+            }
+        });
+        let client = DaysClient::new(socket.clone()).unwrap();
+        client.forget_all.store(true, Ordering::Release);
+        let bare = |id: u64| json!({"source_id": id, HEARD_BARE: true});
+        let run = |args| {
+            client.run_at(
+                &call(FORGET, args),
+                FIRST_READ,
+                NOW,
+                Some(&EAST),
+                Some(MINH),
+            )
+        };
+        // One thing shown: it is "that".
+        assert_eq!(
+            client.context.lock().unwrap().include(Some(MINH), &[4]),
+            None
+        );
+        assert_eq!(run(bare(4)).0, json!({"forgotten": true}));
+        // Three shown, none given last: nothing runs, the model asks.
+        assert_eq!(
+            client.context.lock().unwrap().include(Some(MINH), &[5, 6]),
+            None
+        );
+        let (told, answered) = run(bare(5));
+        assert!(answered);
+        assert_eq!(told, forget_which(true), "{told}");
+        assert_eq!(told["forgotten"], false);
+        assert!(
+            told["note"]
+                .as_str()
+                .unwrap()
+                .contains("Ask them once which one")
+        );
+        // The one thing the last recall or remember gave is "that".
+        client.context.lock().unwrap().last_given =
+            Some((vec![(Some(MINH.to_owned()), 6)], Instant::now()));
+        assert_eq!(run(bare(6)).0, json!({"forgotten": true}));
+        // The follow-up just asked of them is "that".
+        assert_eq!(
+            client.context.lock().unwrap().include(Some(MINH), &[7]),
+            None
+        );
+        assert_eq!(run(bare(5)).0, forget_which(true));
+        let read = served.join().unwrap();
+        assert_eq!(
+            read,
+            [
+                json!({"op":"forget","id":4,"person":MINH,"selective":true}),
+                json!({"op":"forget","id":6,"person":MINH,"selective":true})
+            ]
+        );
+        drop(client);
+        std::fs::remove_file(&socket).unwrap();
+
+        let (socket, served) = memory("bare-forget-asked", 4, |request| {
+            match request["op"].as_str() {
+                Some("forget") => json!({"ok":true,"removed":1}),
+                Some("search") => json!({"ok":true,"entries":[
+                    {"kind":"kept","id":3,"at_unix_ms":NOW-DAY,"text":"the spare key is in the red box"}
+                ]}),
+                _ => json!({"ok":false}),
+            }
+        });
+        let client = DaysClient::new(socket.clone()).unwrap();
+        client.forget_all.store(true, Ordering::Release);
+        let run =
+            |args, person| client.run_at(&call(FORGET, args), FIRST_READ, NOW, Some(&EAST), person);
+        assert_eq!(
+            client.context.lock().unwrap().include(Some(MINH), &[5, 6]),
+            None
+        );
+        client.context.lock().unwrap().just_asked = Some((MINH.to_owned(), 5, 0, Instant::now()));
+        assert_eq!(run(bare(5), Some(MINH)).0, json!({"forgotten": true}));
+        // The room's: asked without naming anything kept, which may be anyone's.
+        assert_eq!(client.context.lock().unwrap().include(None, &[2, 3]), None);
+        let (told, _) = run(bare(2), None);
+        assert_eq!(told, forget_which(false));
+        assert!(
+            told["note"]
+                .as_str()
+                .unwrap()
+                .contains("without naming or listing")
+        );
+        // The one thing a recall just gave is "that".
+        let recalled = client.run_at(
+            &call(RECALL, json!({"about":"key"})),
+            FIRST_READ,
+            NOW,
+            Some(&EAST),
+            None,
+        );
+        assert!(recalled.1, "{recalled:?}");
+        assert_eq!(
+            client
+                .context
+                .lock()
+                .unwrap()
+                .last_given
+                .as_ref()
+                .map(|(given, _)| given.clone()),
+            Some(vec![(None, 3)])
+        );
+        assert_eq!(run(bare(3), None).0, json!({"forgotten": true}));
+        // The same id not marked bare runs as called.
+        assert_eq!(
+            run(json!({"source_id":2}), None).0,
+            json!({"forgotten": true})
+        );
+        let read = served.join().unwrap();
+        assert_eq!(
+            read[0],
+            json!({"op":"forget","id":5,"person":MINH,"selective":true})
+        );
+        assert_eq!(read[1]["op"], "search");
+        assert_eq!(
+            (read[2]["id"].clone(), read[3]["id"].clone()),
+            (json!(3), json!(2))
+        );
+        assert!(read[2..].iter().all(|line| line.get("person").is_none()));
+        drop(client);
+        std::fs::remove_file(&socket).unwrap();
+    }
+
+    /// The reviewer-lead's P2 on #3737: what the last remember or recall
+    /// gave is "that" only for [`HELD_FORGET_FOR`], in the same session,
+    /// and not after a recall that failed. Past any of them a bare forget's
+    /// id with more than one shown asks which.
+    #[test]
+    fn what_the_last_recall_gave_is_that_only_soon_in_its_session() {
+        const MINH: &str = "p-be9688998f085098";
+        let (socket, served) = memory("bare-forget-bounds", 3, |request| {
+            match request["op"].as_str() {
+                Some("search") if request["query"] == "key" => json!({"ok":true,"entries":[
+                    {"kind":"kept","id":3,"at_unix_ms":NOW-DAY,"text":"the spare key is in the red box"}
+                ]}),
+                _ => json!({"ok":false,"error":"busy","message":"m"}),
+            }
+        });
+        let client = DaysClient::new(socket.clone()).unwrap();
+        client.forget_all.store(true, Ordering::Release);
+        let bare = json!({"source_id": 3, HEARD_BARE: true});
+        let forget = || {
+            client.run_at(
+                &call(FORGET, bare.clone()),
+                FIRST_READ,
+                NOW,
+                Some(&EAST),
+                None,
+            )
+        };
+        let recall = |about| {
+            client.run_at(
+                &call(RECALL, json!({"about": about})),
+                FIRST_READ,
+                NOW,
+                Some(&EAST),
+                None,
+            )
+        };
+        assert_eq!(client.context.lock().unwrap().include(None, &[2, 9]), None);
+        // Past the bound: a morning's recall is not the evening's "that".
+        assert!(recall("key").1);
+        client
+            .context
+            .lock()
+            .unwrap()
+            .last_given
+            .as_mut()
+            .unwrap()
+            .1 = Instant::now()
+            .checked_sub(HELD_FORGET_FOR + Duration::from_secs(1))
+            .unwrap();
+        assert_eq!(forget().0, forget_which(false));
+        // A new session under another name lets it go.
+        assert!(recall("key").1);
+        let (jobs, _) = sync_channel(16);
+        {
+            let mut context = client.context.lock().unwrap();
+            let _ = replace_session(&mut context, &jobs, ("later", Some(MINH)), true);
+            assert!(context.last_given.is_none());
+        }
+        // A recall that fails gives no "that", though the last one did.
+        client.context.lock().unwrap().last_given = Some((vec![(None, 3)], Instant::now()));
+        let _ = recall("plant");
+        assert_eq!(forget().0, forget_which(false));
+        // And a session closing lets it go.
+        client.context.lock().unwrap().last_given = Some((vec![(None, 3)], Instant::now()));
+        client.close_open_session(Duration::from_millis(20));
+        assert!(client.context.lock().unwrap().last_given.is_none());
+        let read = served.join().unwrap();
+        assert!(read.iter().all(|line| line["op"] == "search"), "{read:?}");
+        drop(client);
+        std::fs::remove_file(&socket).unwrap();
+    }
+
+    /// A forget's arguments are journalled with ids and counts only, never
+    /// its `about` words (#3504, Friday's N1).
+    #[test]
+    fn a_forgets_arguments_are_logged_with_ids_and_counts_only() {
+        let logged = forget_args_logged(&call(FORGET, json!({"source_id":594,HEARD_BARE:true})));
+        assert_eq!(
+            logged,
+            "forget called: source_id 594, about 0 words, heard named false, heard bare true"
+        );
+        let logged = forget_args_logged(&call(
+            FORGET,
+            json!({"about":"graduation date secret","heard_named":true}),
+        ));
+        assert_eq!(
+            logged,
+            "forget called: source_id none, about 3 words, heard named true, heard bare false"
+        );
+        assert!(!logged.contains("graduation"));
+        assert_eq!(
+            forget_args_logged(&call(FORGET_EVERYTHING, json!({}))),
+            "forget_everything called: source_id none, about 0 words, heard named false, heard bare false"
+        );
+    }
 
     /// #1693, `LAMP_MEMORY_FORGET_ALL`: something recall gave is forgotten
     /// by its id, only if this session was shown it in that scope, and
