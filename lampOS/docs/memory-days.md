@@ -734,6 +734,34 @@ sources, duplicate replacements and newer facts overwritten by old evidence
 are refused. Apply rechecks generation, current sources and corrections
 inside its transaction. Ordinary appends do not invalidate useful work.
 
+A question is never kept as a fact (finding N10 on #3504: lamp-06c1, 27
+Oct, a misheard "What is my favorite dream?" kept as "Asked what their
+favorite dream is."). The voice's prompt says to keep what the person
+stated, never their questions (`OBSERVE_STATED`), and `tidy_apply` leaves
+out a proposal whose text starts "Asked" with a question word in its next
+four words and before any "to" ("Asked what …", "Asked the lamp whether
+…", "Asked about …"; "Asked the lamp to remind them …" is a promise and
+kept), or whose cited exchanges' heard lines only
+ask and which cites no kept thing (`tidy::only_asked`). A heard
+line only asks when its last sentence asks and any sentence before it is
+three words or fewer ("Hey, mom."). A sentence asks when it ends in "?",
+unless that is only a short tag after a comma behind a statement ("I love
+tea, you know?" states; "Mom, where is it?" asks); one opening "do you
+know", "did you know" or "you know" states when what follows is no
+question word ("Do you know I like tea?" states, "Do you know where my
+keys are?" asks);
+one ending in "." or "!" states; one with no mark asks when it opens with a question word (what,
+when, where, who, how, why, is, do, can and a few more) or, in Vietnamese,
+opens with "sao", "ai", "tại sao", "vì sao", "khi nào", "ở đâu", "bao giờ"
+or ends with "gì", "đâu", "ai", "sao", "nào", "chưa" or "có … không". The
+rest of the batch is kept as before, a batch left with nothing is done with
+nothing kept, and the log counts what was left out, never its words. Its
+limit: a question with no "?" that opens with no listed word ("tell me my
+favorite drink"), or in another language, passes, and only the prompt
+guards it (the reviewer-lead's P3s on #3852). Tests:
+`tidy::tests::a_question_is_only_asked_and_a_statement_is_not`,
+`it::days::a_question_is_never_kept_as_a_fact`.
+
 With a remote adapter, at most 32 KiB of serialized input per submitted
 job would leave the lamp: selected exchange text, timestamps, IDs,
 caller-supplied person scope and prior observations. Repeated attempts would

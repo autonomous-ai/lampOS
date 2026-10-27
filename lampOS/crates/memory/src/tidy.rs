@@ -267,6 +267,156 @@ pub fn validate_output(input: &Input, output: &Output) -> Result<(), ModelError>
     Ok(())
 }
 
+/// Words that make what follows "asked" a question asked ("Asked the lamp
+/// what time it is"), or what follows "do you know" one ("Do you know
+/// where my keys are?"), for [`only_asked`].
+const ASKED_ABOUT: &[&str] = &[
+    "what", "what's", "whats", "when", "where", "who", "whom", "whose", "which", "how", "why",
+    "whether", "if", "about",
+];
+
+/// English words a question opens with, for [`only_asked`].
+const ASKS_EN: &[&str] = &[
+    "what", "what's", "whats", "when", "where", "who", "whose", "which", "how", "why", "is", "are",
+    "do", "does", "did", "can", "could",
+];
+
+/// Vietnamese words that make a line a question, for [`only_asked`]: one
+/// it opens with ("sao", "ai", "khi nào", "tại sao", "vì sao", "ở đâu"), or
+/// one it ends with ("gì", "đâu", "ai", "sao", "nào", "không" after "có").
+const ASKS_VI_FIRST: &[&str] = &["sao", "ai", "tại", "vì", "khi", "ở", "bao"];
+const ASKS_VI_LAST: &[&str] = &["gì", "đâu", "ai", "sao", "nào", "chưa"];
+
+/// Whether one sentence, its end mark given, asks rather than states.
+/// Ending in "?" it asks, unless only a short tag after a comma does and
+/// what comes before it opens with no question word ("I love tea, you
+/// know?"), and is more than a name ("Mom, where is it?" asks). Ending in "." or "!" it states. With no mark it asks when it
+/// opens with a question word, or in Vietnamese ends with one.
+fn asks(sentence: &str, mark: Option<char>) -> bool {
+    let words = |text: &str| -> Vec<String> {
+        text.split_whitespace()
+            .map(|word| {
+                word.replace('\u{2019}', "'")
+                    .trim_matches(|c: char| !(c.is_alphanumeric() || c == '\''))
+                    .to_lowercase()
+            })
+            .filter(|word| !word.is_empty())
+            .collect()
+    };
+    let opens_asking = |words: &[String]| {
+        words.first().is_some_and(|first| {
+            ASKS_EN.contains(&first.as_str())
+                || (ASKS_VI_FIRST.contains(&first.as_str())
+                    && match first.as_str() {
+                        "tại" | "vì" => words.get(1).is_some_and(|w| w == "sao"),
+                        "khi" | "bao" => words.get(1).is_some_and(|w| w == "nào" || w == "giờ"),
+                        "ở" => words.get(1).is_some_and(|w| w == "đâu"),
+                        _ => true,
+                    })
+        })
+    };
+    let ends_asking_vi = |words: &[String]| {
+        words.last().is_some_and(|last| {
+            ASKS_VI_LAST.contains(&last.as_str())
+                || (last == "không" && words[..words.len() - 1].iter().any(|w| w == "có"))
+        })
+    };
+    // "Do you know I like tea?": a statement told as a question (the
+    // reviewer-lead's P3 on #3852), what follows the opener is theirs.
+    // "Do you know where my keys are?" still asks (the reviewer-lead's P3
+    // at 263793ad9): only a known thing that is no question word states.
+    let all = words(sentence);
+    let told = match all.iter().map(String::as_str).collect::<Vec<_>>()[..] {
+        ["do" | "did", "you", "know", "that", next, ..]
+        | ["do" | "did", "you", "know", next, ..]
+        | ["you", "know", "that", next, ..]
+        | ["you", "know", next, ..] => !ASKED_ABOUT.contains(&next),
+        _ => false,
+    };
+    if told {
+        return false;
+    }
+    match mark {
+        Some('?') => match sentence.rsplit_once(',') {
+            Some((head, tag)) if words(tag).len() <= 3 && !words(head).is_empty() => {
+                let head = words(head);
+                // "Mom, where is it?": a name or greeting before the question.
+                opens_asking(&head) || (head.len() <= 2 && opens_asking(&words(tag)))
+            }
+            _ => true,
+        },
+        Some(_) => false,
+        None => opens_asking(&all) || ends_asking_vi(&all),
+    }
+}
+
+/// Whether what was heard only asks something: its last sentence asks
+/// ([`asks`]) and any before it is a greeting or a name of three words or
+/// fewer ("Hey, mom. What is my favorite dream?"). A line that also says
+/// something of its own ("I work at a library now. Where is it?") states.
+fn heard_only_asks(heard: &str) -> bool {
+    let mut sentences = vec![];
+    let mut start = 0;
+    for (at, character) in heard.char_indices() {
+        if matches!(character, '.' | '!' | '?') {
+            sentences.push((&heard[start..at], Some(character)));
+            start = at + character.len_utf8();
+        }
+    }
+    if !heard[start..].trim().is_empty() {
+        sentences.push((&heard[start..], None));
+    }
+    sentences.retain(|(text, _)| text.chars().any(char::is_alphanumeric));
+    let Some(((last, mark), before)) = sentences.split_last() else {
+        return false;
+    };
+    asks(last, *mark)
+        && before
+            .iter()
+            .all(|(text, _)| text.split_whitespace().count() <= 3)
+}
+
+/// Whether `proposal` keeps a question as a fact, which is left out
+/// (finding N10 on #3504: lamp-06c1, 27 Oct, a misheard "What is my
+/// favorite dream?" kept as "Asked what their favorite dream is."): its
+/// text starts "Asked" and a question word ("Asked what …", "Asked
+/// whether …", "Asked about …"; "Asked the lamp to remind them …" is a
+/// promise, kept: the reviewer-lead's P3 on #3852), or every cited exchange's heard line only asks
+/// ([`heard_only_asks`]) and it cites no kept thing. A statement with a
+/// question tag ("I love tea, you know?") states, and is kept.
+pub fn only_asked(input: &Input, proposal: &Proposal) -> bool {
+    // "Asked" and, within its next four words and before any "to", a
+    // question word: "Asked what …", "Asked the lamp whether …" (the
+    // reviewer-lead's P3 at 263793ad9); "Asked the lamp to remind them …"
+    // is a promise.
+    let opening: Vec<String> = proposal
+        .text
+        .split_whitespace()
+        .take(5)
+        .map(|word| {
+            word.trim_matches(|c: char| !c.is_alphanumeric() && c != '\'')
+                .to_lowercase()
+        })
+        .collect();
+    if opening.first().is_some_and(|first| first == "asked")
+        && opening[1..]
+            .iter()
+            .take_while(|word| *word != "to")
+            .any(|word| ASKED_ABOUT.contains(&word.as_str()))
+    {
+        return true;
+    }
+    let cited: Vec<&Evidence> = input
+        .records
+        .iter()
+        .filter(|record| proposal.source_ids.contains(&record.id))
+        .collect();
+    !cited.is_empty()
+        && cited
+            .iter()
+            .all(|record| record.kind == "exchange" && heard_only_asks(&record.heard))
+}
+
 /// Words that say nothing of what a proposal is about, for
 /// [`said_by_the_person`].
 const PLAIN: &[&str] = &[
@@ -1111,5 +1261,65 @@ mod tests {
         let error = validate_output(&input(), &bad).unwrap_err();
         assert!(!error.to_string().contains(secret));
         assert!(!format!("{error:?}").contains(secret));
+    }
+
+    /// Finding N10 on #3504: a question is never kept as a fact; a
+    /// statement, with a question tag or not, is.
+    #[test]
+    fn a_question_is_only_asked_and_a_statement_is_not() {
+        for heard in [
+            "What is my favorite dream?",
+            "Hey, mom. What is my favorite drink?",
+            "Mom, where is it?",
+            "where do I work",
+            "Can you tell me the time?",
+            "Is the shop open on Sunday?",
+            "Do you like tea, Tom?",
+            "Bạn tên gì",
+            "Khi nào cửa hàng mở cửa",
+            "Chìa khoá ở đâu",
+            "Bạn có thích trà không",
+            // The reviewer-lead's P3 at 263793ad9.
+            "Do you know where my keys are?",
+            "Do you know what my favorite drink is?",
+        ] {
+            assert!(heard_only_asks(heard), "{heard}");
+        }
+        for heard in [
+            "I love tea, you know?",
+            "I work at a library now, right?",
+            "I work at a library now. Where is it?",
+            "When I was young, I lived in Hue.",
+            "My sister's wedding is in June.",
+            "I can't stand coffee",
+            "Tôi thích cà phê sữa",
+            "",
+            // The reviewer-lead's P3 on #3852.
+            "Do you know I like tea?",
+            "Did you know my sister lives in Hanoi?",
+            "Do you know that I moved?",
+        ] {
+            assert!(!heard_only_asks(heard), "{heard}");
+        }
+        let mut input = input();
+        input.records[0].heard = "What is my favorite dream?".into();
+        let mut proposal = output().observations.remove(0);
+        proposal.supersedes = None;
+        assert!(only_asked(&input, &proposal));
+        input.records[0].heard = "I love tea, you know?".into();
+        assert!(!only_asked(&input, &proposal));
+        proposal.text = "Asked what their favorite dream is.".into();
+        assert!(only_asked(&input, &proposal));
+        for asked in [
+            "Asked whether the shop opens on Sunday",
+            "Asked the lamp what time it is.",
+            "Asked the lamp whether it would rain.",
+        ] {
+            proposal.text = asked.into();
+            assert!(only_asked(&input, &proposal), "{asked}");
+        }
+        // A promise they asked for is kept (the reviewer-lead's P3 on #3852).
+        proposal.text = "Asked the lamp to remind them to call mom on Saturday.".into();
+        assert!(!only_asked(&input, &proposal));
     }
 }
