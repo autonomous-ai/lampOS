@@ -1,3 +1,11 @@
+## 2026-10-28 00:04 — played-row cleanup read finds two data-preservation faults
+
+HOLD #3889 663cec5fd after [source checks and two exact-section mock controls](verification/played-cleanup-read-3889-20261028/hold.json). P2: saved Voice state is under REMOTE/saved, but a failed restore only prints a warning before stand-in out deletes REMOTE, and the disconnect guard deletes it without restoration. The exact cleanup function/EXIT trap with a failed restore stub returns zero and still requests out. Recovery data must survive cleanup until restoration is verified, with a truthful failure and guard recovery path.
+
+P2: the pre-existing stand-up-nudge guard pipelines skills list into grep without validating the list command. A nonzero empty result is treated as absence, although later cleanup removes that name unconditionally. The exact preflight with a list stub exiting17 continues and returns zero. Require a successful complete list before mutation/removal can be armed; a temporary communication failure must not authorize removing an existing skill.
+
+Both committed scripts pass bash syntax. The once-only full committed mock suite reaches the180-second bound without a terminal; the initial full-arm fault control reaches45 seconds, both retained/reaped and unqualified. Their fake answers keep actual wait loops, so no PR-failure cause is inferred from those bounds. Two separate focused controls test exact sections without repeating the played arm. No actual SSH, sound, remote command, erase, source change, CI action or lamp proof. Own #3646 approved strict18/normal13/308-case gate is active separately; broker and old failure holds remain.
+
 ## 2026-10-27 23:53 — yawn fix original native slice verified
 
 #3887 7e92d6272 [original native receipt](verification/yawn-read-3887-20261027/native.json): ARM40541552504/job122320975884 and Linux40541552486/job122320975637 both succeed on attempt one. Both complete logs name843075e3c; API/Git ordered parents0d1d/7e92 and tree976bdd70e exactly equal authored. The one owned yawn blob/mode and all three selected source files are bound to that preview. Pinned workspace formatting and strict all-target Linux Clippy steps complete successfully.

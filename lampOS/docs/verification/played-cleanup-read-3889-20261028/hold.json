@@ -1,0 +1,181 @@
+{
+  "cleanup_fault": {
+    "argv": [
+      "/bin/bash",
+      "<WORKSPACE>/.claude/worktrees/third-played-cleanup-read-3889-evidence/exact-cleanup-restore-fault.sh"
+    ],
+    "driver_reaped": true,
+    "elapsed_seconds": 0.621835503,
+    "exit": 0,
+    "group_absent": true,
+    "output": "mock restore failed\nmake-skill.sh: the voice's made skills and told news were not put back\nmock stand-in out invoked\n",
+    "requested_cleanup_command": "sudo -n env PLAYED_REMOTE=/mock/played-stand-in sh -s -- out\n",
+    "source_guards_match": true,
+    "unsafe_observation": "Subject EXIT remains0 and invokes destructive real cleanup after mocked restore failure. Actual real cleanup deletion is source-bound, not executed here."
+  },
+  "completed_local_stages": {
+    "scope": "Exact local committed mock suite and one explicit mock restore-failure diagnostic; no real SSH/audio/device call or erase executed.",
+    "source": {
+      "diagnostic_sha256": "ef45202f3b3f978c61e02eebdd5b51ee9ea8888bc904799cb5bd2b083918585d",
+      "expected_observation": "On restore failure current subject exits0, emits not-put-back warning and still invokes stand-in out; source stand-in out recursively removes REMOTE containing SAVED. Guard also removes it without restoration. No actual data loss/device simulation claimed.",
+      "fault_scope": "Only fake lamp restore response is changed to failure. Subject script, settings and stand-in source remain exact committed bytes. The diagnostic uses the committed mock harness prefix, and saves its captured stdout/calls. No SSH, speech or remote command executes.",
+      "head": "663cec5fde52da6f2cf7b83a818d2787c4b4c483",
+      "parent": "e43fd36f6aee55e4fe9a2ee73acc2e261765fa5f",
+      "subject_files_sha256": {
+        "make-skill-test.sh": "dd1ee36f5665d94e22c7917e794b62a22d15b610f0eedbe1bde82f8fe5dc02cf",
+        "make-skill.sh": "2a0f21df37b6bb4821d6bb186319a3352e03033063c026dd6f0e6c8c9d41bdd9",
+        "settings.sh": "256dc6b0176b131d2e7ba426594e3b0a851058580f992f6b802dcee6e1b4ca4b",
+        "stand-in.sh": "f827bece4653b502560a6c4376fc12586ce26fc23a857b9ae68693e400672092"
+      }
+    },
+    "source_guards_match": true,
+    "stages": {
+      "committed-suite": {
+        "argv": [
+          "/bin/bash",
+          "<WORKSPACE>/.claude/worktrees/third-played-cleanup-read-3889-evidence/subject/make-skill-test.sh"
+        ],
+        "cwd": "<WORKSPACE>/.claude/worktrees/third-played-cleanup-read-3889-evidence/subject",
+        "driver_reaped": true,
+        "elapsed_seconds": 180.024469158,
+        "environment_overrides": {},
+        "group_absent": true,
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "returncode": -15,
+        "timed_out": true
+      },
+      "restore-fault-control": {
+        "argv": [
+          "/bin/bash",
+          "<WORKSPACE>/.claude/worktrees/third-played-cleanup-read-3889-evidence/subject/restore-failure-control.sh"
+        ],
+        "cwd": "<WORKSPACE>/.claude/worktrees/third-played-cleanup-read-3889-evidence/subject",
+        "driver_reaped": true,
+        "elapsed_seconds": 45.027272638999996,
+        "environment_overrides": {
+          "FAKE_CALLS_CAPTURE": "<WORKSPACE>/.claude/worktrees/third-played-cleanup-read-3889-evidence/fault-mock-calls.log",
+          "FAKE_CAPTURE": "<WORKSPACE>/.claude/worktrees/third-played-cleanup-read-3889-evidence/fault-subject-output.log"
+        },
+        "group_absent": true,
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "returncode": -15,
+        "timed_out": true
+      },
+      "syntax-make-skill-test.sh": {
+        "argv": [
+          "/bin/bash",
+          "-n",
+          "<WORKSPACE>/.claude/worktrees/third-played-cleanup-read-3889-evidence/subject/make-skill-test.sh"
+        ],
+        "cwd": "<WORKSPACE>/.claude/worktrees/third-played-cleanup-read-3889-evidence/subject",
+        "driver_reaped": true,
+        "elapsed_seconds": 0.006255783000000001,
+        "environment_overrides": {},
+        "group_absent": true,
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "returncode": 0,
+        "timed_out": false
+      },
+      "syntax-make-skill.sh": {
+        "argv": [
+          "/bin/bash",
+          "-n",
+          "<WORKSPACE>/.claude/worktrees/third-played-cleanup-read-3889-evidence/subject/make-skill.sh"
+        ],
+        "cwd": "<WORKSPACE>/.claude/worktrees/third-played-cleanup-read-3889-evidence/subject",
+        "driver_reaped": true,
+        "elapsed_seconds": 0.005770779999999996,
+        "environment_overrides": {},
+        "group_absent": true,
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "returncode": 0,
+        "timed_out": false
+      }
+    }
+  },
+  "findings": [
+    {
+      "priority": "P2",
+      "problem": "Saved Voice state is under cleanup-owned REMOTE/saved. Failed restore only prints a warning, then stand-in out removes that backup; the remote guard removes it without restoration after disconnect.",
+      "repair": "Keep recovery data outside automatic cleanup until verified restoration, propagate failure, and make guard/disconnect recovery explicit; test failed restoration and guard expiry with saved data."
+    },
+    {
+      "priority": "P2",
+      "problem": "Pre-existing stand-up-nudge guard treats a failed skills list as absence, then cleanup unconditionally removes that name. A transient list failure can therefore remove a pre-existing owner skill.",
+      "repair": "Require a successful complete list before interpreting absence or arming unconditional removal; test nonzero list with no output before any mutation/playback."
+    }
+  ],
+  "head": "663cec5fde52da6f2cf7b83a818d2787c4b4c483",
+  "limits": [
+    "Both committed script syntax checks pass. Full committed mock suite hit180s local bound with no terminal result; all groups reaped; this is not a suite pass or an attributed product failure.",
+    "Initial full-arm restore fault control hit45s without reaching a terminal; preserved separately, not retried. Two later focused controls exercise exact cleanup/preflight sections without re-running the played arm.",
+    "Focused failure stubs establish control flow only; actual backup deletion is source evidence, not an executed data-loss/device test.",
+    "No SSH, sound, actual remote command, source branch edit, CI action or device acceptance."
+  ],
+  "parent": "e43fd36f6aee55e4fe9a2ee73acc2e261765fa5f",
+  "preflight_fault": {
+    "argv": [
+      "/bin/bash",
+      "<WORKSPACE>/.claude/worktrees/third-played-cleanup-read-3889-evidence/exact-preflight-list-fault.sh"
+    ],
+    "driver_reaped": true,
+    "exact_preflight_line": "lamp \"sudo -n $SKILLS list\" | grep -qE '^stand-up-nudge +' && { echo \"make-skill.sh: a skill called stand-up-nudge is already on the lamp; nothing changed\" >&2; exit 3; }",
+    "group_absent": true,
+    "head": "663cec5fde52da6f2cf7b83a818d2787c4b4c483",
+    "injected_list_exit": 17,
+    "output": "continued after failed list\n",
+    "scope": "Exact current preflight line only, local lamp stub exits17 and emits no list; subsequent marker proves the guard treats failure as absence. No SSH or played subject run.",
+    "subject_exit": 0
+  },
+  "receipt_sha256": {
+    "focused-cleanup-plan.json": "6bc8c667e3e4cea4281b72ef6cb8778c099d4411eeb0997e3c9f803451ec03fd",
+    "focused-cleanup-terminal.json": "c4509563221aa424c81d010a291448f7bbd1fb3407510f21c78194564c397859",
+    "focused-preflight-terminal.json": "60342b8846343038b4edebf434ed9ac0d7a8d631090a733e7bb3b91783be32bd",
+    "local-receipt.json": "6ad50cc9fa892fc405f5d9a28d0b85e8be64920a1b1b1c0d04d1748415903dac",
+    "source-plan.json": "e7ea8d3ed20c03e02c3e1ea40cbfc9bb45fafa5c27d9bff8ecc008c766865629"
+  },
+  "source_line_bindings": {
+    "make-skill.sh": [
+      {
+        "line": 82,
+        "text": "lamp \"sudo -n $SKILLS list\" | grep -qE '^stand-up-nudge +' && { echo \"make-skill.sh: a skill called stand-up-nudge is already on the lamp; nothing changed\" >&2; exit 3; }"
+      },
+      {
+        "line": 133,
+        "text": "trap 'lamp \"sudo -n rm -rf $REMOTE\"' EXIT"
+      },
+      {
+        "line": 157,
+        "text": "  voice_state restore || echo \"make-skill.sh: the voice's made skills and told news were not put back\""
+      },
+      {
+        "line": 158,
+        "text": "  \"$LAMP_SSH\" \"sudo -n env PLAYED_REMOTE=$REMOTE sh -s -- out\" < stand-in.sh"
+      }
+    ],
+    "stand-in.sh": [
+      {
+        "line": 129,
+        "text": "    \"rm -f $TASKS_DROP $VOICE_DROP; systemctl daemon-reload; systemctl restart lamp-tasks lamp-voice; rm -rf $REMOTE\" \\"
+      },
+      {
+        "line": 150,
+        "text": "  rm -rf \"$REMOTE\""
+      }
+    ]
+  },
+  "source_plan": {
+    "diagnostic_sha256": "ef45202f3b3f978c61e02eebdd5b51ee9ea8888bc904799cb5bd2b083918585d",
+    "expected_observation": "On restore failure current subject exits0, emits not-put-back warning and still invokes stand-in out; source stand-in out recursively removes REMOTE containing SAVED. Guard also removes it without restoration. No actual data loss/device simulation claimed.",
+    "fault_scope": "Only fake lamp restore response is changed to failure. Subject script, settings and stand-in source remain exact committed bytes. The diagnostic uses the committed mock harness prefix, and saves its captured stdout/calls. No SSH, speech or remote command executes.",
+    "head": "663cec5fde52da6f2cf7b83a818d2787c4b4c483",
+    "parent": "e43fd36f6aee55e4fe9a2ee73acc2e261765fa5f",
+    "subject_files_sha256": {
+      "make-skill-test.sh": "dd1ee36f5665d94e22c7917e794b62a22d15b610f0eedbe1bde82f8fe5dc02cf",
+      "make-skill.sh": "2a0f21df37b6bb4821d6bb186319a3352e03033063c026dd6f0e6c8c9d41bdd9",
+      "settings.sh": "256dc6b0176b131d2e7ba426594e3b0a851058580f992f6b802dcee6e1b4ca4b",
+      "stand-in.sh": "f827bece4653b502560a6c4376fc12586ce26fc23a857b9ae68693e400672092"
+    }
+  },
+  "status": "HOLD_TWO_DATA_PRESERVATION_P2_FINDINGS"
+}
