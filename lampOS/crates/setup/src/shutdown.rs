@@ -416,20 +416,10 @@ fn still(first: &[f64], now: &[f64]) -> bool {
 }
 
 /// The update's lock, taken without waiting, held by the caller through
-/// the shutdown so no update installs under it (as a restart asked from
-/// the app holds it, `lamp-keeper restart-asked`). Refused while another
-/// holder has it, and when it cannot be checked.
-pub fn update_lock(
-    records: &lamp_update::records::Records,
-) -> Result<lamp_update::records::Lock, String> {
-    records.lock().map_err(|why| {
-        if why.kind() == io::ErrorKind::WouldBlock {
-            "an update is being installed: try again once it is done".to_owned()
-        } else {
-            format!("the update's state could not be checked: {why}")
-        }
-    })
-}
+/// the shutdown so no update installs under it: the one rule every helper
+/// that restarts or turns off the lamp reads (`lamp_keeper::restart`).
+/// Refused while another holder has it, and when it cannot be checked.
+pub use lamp_keeper::restart::update_lock;
 
 #[cfg(test)]
 mod tests {

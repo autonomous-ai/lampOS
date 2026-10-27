@@ -57,13 +57,28 @@ go and lit, and then starts again every `lamp*` unit that was active before its 
 ## The switch
 
 `LAMP_SHUTDOWN` (`on` exactly; off unless set; `switches.md`) is for the ways
-a person asks, which the later changes add. The runner itself is not behind it:
-it is only ever started by one of those, or by hand.
+a person asks: `lamp-cloud` reads it for the app (below); the others come with
+later changes. The runner itself is not behind it: it is only ever started by
+one of those, or by hand.
 
-## What later changes add
+## The ways a person asks
 
-1. The app's `system.shutdown` through `lamp-cloud`, on a root socket as the
-   app's restart is asked (`lamp-keeper restart-asked`, keeper.md).
+1. **The app** (Mobile's off button, #3698): `system.shutdown` to
+   `lamp-cloud`, which sends `{"shutdown":"lamp"}` to setup's change helper
+   (`lamp-setup change` on `/run/lampos-setup-change/change.sock`, root's,
+   on every lamp; setup.md, "Changed after setup"). The helper takes
+   lamp-update's lock without waiting: held by an update (or not checkable),
+   it refuses with why ("an update is being installed: try again once it is
+   done"). Otherwise it lets the lock go, answers
+   `{"done":{"shutting_down":true}}`, so the app hears `success` before the
+   lamp goes down, and starts `lamp-setup shutdown` (the runner above, which
+   takes the lock again itself and refuses, logged, if an update took it in
+   between). `lamp-cloud` keeps the yes: an app that asks again is answered
+   the same and the helper is asked once (cloud.md, "The lamp turned off from
+   the app"). No keeper is needed: a product lamp has none.
+
+Still to come:
+
 2. The button held, acting on release by hold time (HAL-5.7), with warning
    lights while it is held.
 3. Voice: "Lamp, turn off", only with a spoken yes, never on a guess. The
@@ -73,8 +88,12 @@ Each starts `lamp-setup shutdown` and is behind `LAMP_SHUTDOWN`.
 
 ## Not yet seen on a lamp
 
-Host tests only (`lamp-setup`'s `shutdown`, `lamp-body`'s let-go against
-simulated servos). On a lamp still to see: the rest proof on a standing lamp;
+Host tests only (`lamp-setup`'s `shutdown` and its change helper's answer
+under a held update lock, `lamp-body`'s let-go against simulated servos,
+`lamp-cloud`'s `system.shutdown` against a stand-in helper answering with the
+helper's own code). On a lamp still to see: the app's `success` before the
+lamp goes down, and the helper's `systemd-run` from its sandboxed unit; the
+rest proof on a standing lamp;
 the let-go's per-joint read-back; whether the ring keeps its frame after the
 poweroff (it does only while the LEDs keep power); whether the servos keep
 power after the board's poweroff; and a clean boot with no filesystem repair.
