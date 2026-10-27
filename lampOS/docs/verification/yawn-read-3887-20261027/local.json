@@ -1,0 +1,180 @@
+{
+  "raw_private_sha256": "8be2370ca4393ea3cf0f22995e1ba246ce29ff1e0ad5e3ebf1c63400c8038ade",
+  "receipt": {
+    "binary_sha256": {
+      "current.test": "4b00a11de17235bcd0fce4bedaa32a5632c094df6c299b07ea78fcb9c9c1ae50",
+      "old-production-current-tests.test": "fafe234c0f24b4221b7c0fb1097c9cfdbadf8bfe2ed6cc475bddd0c4004f9555"
+    },
+    "commands": {
+      "current-compile": {
+        "argv": [
+          "<HOME>/.cargo/bin/rustup",
+          "run",
+          "1.96.0",
+          "rustc",
+          "--edition=2024",
+          "--test",
+          "-D",
+          "warnings",
+          "<WORKSPACE>/.claude/worktrees/third-yawn-read-3887-evidence/current.rs",
+          "-o",
+          "<WORKSPACE>/.claude/worktrees/third-yawn-read-3887-evidence/current.test"
+        ],
+        "driver_reaped": true,
+        "elapsed_seconds": 0.532301283,
+        "exit": 0,
+        "expected_exit": 0,
+        "expected_matched": true,
+        "group_absent": true,
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "timed_out": false
+      },
+      "current-runtime": {
+        "argv": [
+          "<WORKSPACE>/.claude/worktrees/third-yawn-read-3887-evidence/current.test",
+          "--test-threads=1",
+          "--nocapture"
+        ],
+        "driver_reaped": true,
+        "elapsed_seconds": 0.814112597,
+        "exit": 0,
+        "expected_exit": 0,
+        "expected_matched": true,
+        "group_absent": true,
+        "log_sha256": "e1db92fbc1d3a432ac4b9b63b4f53f03e36c9fb622809965d3829fa6d4c6725b",
+        "timed_out": false
+      },
+      "fmt": {
+        "argv": [
+          "<HOME>/.cargo/bin/rustup",
+          "run",
+          "1.96.0",
+          "rustfmt",
+          "--check",
+          "--edition",
+          "2024",
+          "<WORKSPACE>/.claude/worktrees/third-yawn-read-3887-evidence/current.rs"
+        ],
+        "driver_reaped": true,
+        "elapsed_seconds": 0.13895760699999998,
+        "exit": 0,
+        "expected_exit": 0,
+        "expected_matched": true,
+        "group_absent": true,
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "timed_out": false
+      },
+      "old-negative-runtime": {
+        "argv": [
+          "<WORKSPACE>/.claude/worktrees/third-yawn-read-3887-evidence/old-production-current-tests.test",
+          "--exact",
+          "tests::a_face_gone_with_its_mouth_open_does_not_block_the_next_yawn",
+          "--test-threads=1",
+          "--nocapture"
+        ],
+        "driver_reaped": true,
+        "elapsed_seconds": 0.5383667889999999,
+        "exit": 101,
+        "expected_exit": 101,
+        "expected_matched": true,
+        "group_absent": true,
+        "log_sha256": "ec452c070f39916793857eccfa3efa266d101770b0e5652cfc66739fe2d1b44f",
+        "timed_out": false
+      },
+      "old-production-current-tests-compile": {
+        "argv": [
+          "<HOME>/.cargo/bin/rustup",
+          "run",
+          "1.96.0",
+          "rustc",
+          "--edition=2024",
+          "--test",
+          "-D",
+          "warnings",
+          "<WORKSPACE>/.claude/worktrees/third-yawn-read-3887-evidence/old-production-current-tests.rs",
+          "-o",
+          "<WORKSPACE>/.claude/worktrees/third-yawn-read-3887-evidence/old-production-current-tests.test"
+        ],
+        "driver_reaped": true,
+        "elapsed_seconds": 0.258809881,
+        "exit": 0,
+        "expected_exit": 0,
+        "expected_matched": true,
+        "group_absent": true,
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "timed_out": false
+      },
+      "rustc-version": {
+        "argv": [
+          "<HOME>/.cargo/bin/rustup",
+          "run",
+          "1.96.0",
+          "rustc",
+          "-Vv"
+        ],
+        "driver_reaped": true,
+        "elapsed_seconds": 0.250908525,
+        "exit": 0,
+        "expected_exit": 0,
+        "expected_matched": true,
+        "group_absent": true,
+        "log_sha256": "4d8ef7a4d2fe91e2e73066fdff851a6b49773a97b60cf751f81045606a502281",
+        "timed_out": false
+      }
+    },
+    "diff_check_exit": 0,
+    "host": {
+      "machine": "x86_64",
+      "release": "25.6.0",
+      "system": "Darwin"
+    },
+    "identity": {
+      "base": "0d1d1f2b944581169c9f96adba9f40ab88adba92",
+      "case": "tests::a_face_gone_with_its_mouth_open_does_not_block_the_next_yawn",
+      "head": "7e92d6272b710ef5d4b4fdeb213db689c51a2c6a",
+      "new_tests_added_to_product": false,
+      "old_source_sha256": "0dbb0d19930d67622ea83eef651ce6cd47d559f533ecb0121acbfccf86c05833",
+      "path": "lampOS/crates/eyes/src/yawn.rs",
+      "private_sources": {
+        "current.rs": "2aaac24f9ccde37aaa3fae6c3face30c8f328f8a164363ab70b6f12bed76c249",
+        "old-production-current-tests.rs": "ca262516a1aa5c2096efe39a1a71f575aa37a8b0181fbacd1e919cb367040ccb",
+        "source-diff.patch": "6cd6b751769f18759eda63a545b4c05ea4a8e677b20784eb00d66e780c02d131"
+      },
+      "runtime_bound_seconds": 30,
+      "scope": "Exact committed std-only yawn module compiled and all its ten unit tests executed; separate old production plus unchanged current test module runs only repaired regression expecting failure. No Cargo/whole eyes/consent/device/native claim.",
+      "source_blob": "e2c1051cb77b0ca0a2dd5a0b0e06d9c046f7cb15",
+      "source_sha256": "2aaac24f9ccde37aaa3fae6c3face30c8f328f8a164363ab70b6f12bed76c249"
+    },
+    "independent_terminal_parse": {
+      "current_failed": 0,
+      "current_ignored": 0,
+      "current_names": [
+        "tests::a_face_gone_with_its_mouth_open_does_not_block_the_next_yawn",
+        "tests::a_held_smile_or_surprise_is_no_yawn",
+        "tests::a_mouth_held_wide_for_the_hold_is_one_yawn",
+        "tests::a_mouth_that_only_half_closes_is_still_the_same_yawn",
+        "tests::a_short_gape_is_no_yawn",
+        "tests::looks_far_apart_are_not_one_hold",
+        "tests::one_misread_look_is_forgiven_and_two_end_the_hold",
+        "tests::scores_are_wanted_only_for_an_open_mouth",
+        "tests::talk_is_no_yawn",
+        "tests::two_yawns_with_the_mouth_closed_between_are_two"
+      ],
+      "old_negative_expected_exit": 101,
+      "old_negative_failure": "one missed mesh: counted2 instead of1",
+      "unique_current_passes": 10
+    },
+    "limits": [
+      "Exact std-only committed module only, not Cargo package/all-target Clippy or full Eyes/consent replay.",
+      "No latency, camera/mesh model accuracy, activation, device or acoustic proof.",
+      "No source edit, repeat runtime or CI rerun.",
+      "Source pre/post guards cover generated current and old-control source plus frozen diff; runner helper has post-execution SHA only, no invented pre-execution helper guard."
+    ],
+    "only_changed_path": [
+      "lampOS/crates/eyes/src/yawn.rs"
+    ],
+    "runner_post_sha256": "a6b9cec7f5b127b9e3175f8f0f838a4b93905f33aa2de222c0d9e191167bcc02",
+    "source_guards_match": true,
+    "status": "CLOSED_EXPECTED_RESULTS"
+  }
+}

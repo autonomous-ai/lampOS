@@ -1,0 +1,606 @@
+{
+  "raw_private_sha256": "cd51336d1bfc8707134b4918cea3511ed797aacbcf1b89692c07e62e9320a6e3",
+  "receipt": {
+    "all_owned_child_groups_reaped": true,
+    "authored_base": "197f21533736cc99a1e1a819721a5a96ff8f3033",
+    "closed_local_handles": [
+      30051,
+      94753,
+      37945,
+      77703,
+      44392
+    ],
+    "commands_path_normalized": {
+      "environment-probe": {
+        "argv": [
+          "<PYTHON3_12_2>",
+          "-c",
+          "import importlib.metadata as m,json,platform,sys,lampos,jsonschema,websockets,pytest,cryptography\nfrom pathlib import Path\nnames=['pytest','pluggy','iniconfig','packaging','Pygments','cryptography','cffi','pycparser'];out={'version':sys.version,'executable':sys.executable,'platform':platform.platform(),'machine':platform.machine(),'sdk_module':lampos.__file__,'distributions':{},'files':[]}\nfor n in names:\n try:d=m.distribution(n)\n except m.PackageNotFoundError:continue\n out['distributions'][n]=d.version\n out['files'] += [str(d.locate_file(p).resolve()) for p in d.files or [] if not str(p).endswith('.pyc') and d.locate_file(p).is_file()]\nfor n in ['jsonschema','websockets']:\n d=m.distribution(n);out['distributions'][n]=d.version\nprint(json.dumps(out,sort_keys=True))"
+        ],
+        "cwd": "<CHECKOUT>",
+        "environment_overrides": {
+          "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
+          "PYTHONDONTWRITEBYTECODE": "1",
+          "PYTHONPATH": "<CHECKOUT>/lampOS/sdk/python/src:<EVIDENCE>/private-deps"
+        },
+        "expected_exit": 0,
+        "umask": "022"
+      },
+      "python-sdk-suite": {
+        "argv": [
+          "<PYTHON3_12_2>",
+          "-m",
+          "pytest",
+          "-q",
+          "-p",
+          "no:cacheprovider",
+          "--junitxml=<EVIDENCE>/python-sdk-suite.xml",
+          "tests"
+        ],
+        "cwd": "<CHECKOUT>/lampOS/sdk/python",
+        "environment_overrides": {
+          "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
+          "PYTHONDONTWRITEBYTECODE": "1",
+          "PYTHONPATH": "<CHECKOUT>/lampOS/sdk/python/src:<EVIDENCE>/private-deps"
+        },
+        "expected_exit": 0,
+        "umask": "022"
+      },
+      "schema-mismatch-1": {
+        "argv": [
+          "/bin/bash",
+          "<EVIDENCE>/schema-copy-step.sh"
+        ],
+        "cwd": "<EVIDENCE>/schema-fixtures/schema-mismatch-1",
+        "environment_overrides": {
+          "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
+          "PYTHONDONTWRITEBYTECODE": "1",
+          "PYTHONPATH": "<CHECKOUT>/lampOS/sdk/python/src:<EVIDENCE>/private-deps"
+        },
+        "expected_exit": 1,
+        "umask": "022"
+      },
+      "schema-mismatch-2": {
+        "argv": [
+          "/bin/bash",
+          "<EVIDENCE>/schema-copy-step.sh"
+        ],
+        "cwd": "<EVIDENCE>/schema-fixtures/schema-mismatch-2",
+        "environment_overrides": {
+          "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
+          "PYTHONDONTWRITEBYTECODE": "1",
+          "PYTHONPATH": "<CHECKOUT>/lampOS/sdk/python/src:<EVIDENCE>/private-deps"
+        },
+        "expected_exit": 1,
+        "umask": "022"
+      },
+      "schema-mismatch-3": {
+        "argv": [
+          "/bin/bash",
+          "<EVIDENCE>/schema-copy-step.sh"
+        ],
+        "cwd": "<EVIDENCE>/schema-fixtures/schema-mismatch-3",
+        "environment_overrides": {
+          "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
+          "PYTHONDONTWRITEBYTECODE": "1",
+          "PYTHONPATH": "<CHECKOUT>/lampOS/sdk/python/src:<EVIDENCE>/private-deps"
+        },
+        "expected_exit": 1,
+        "umask": "022"
+      },
+      "schema-missing-1": {
+        "argv": [
+          "/bin/bash",
+          "<EVIDENCE>/schema-copy-step.sh"
+        ],
+        "cwd": "<EVIDENCE>/schema-fixtures/schema-missing-1",
+        "environment_overrides": {
+          "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
+          "PYTHONDONTWRITEBYTECODE": "1",
+          "PYTHONPATH": "<CHECKOUT>/lampOS/sdk/python/src:<EVIDENCE>/private-deps"
+        },
+        "expected_exit": 1,
+        "umask": "022"
+      },
+      "schema-missing-2": {
+        "argv": [
+          "/bin/bash",
+          "<EVIDENCE>/schema-copy-step.sh"
+        ],
+        "cwd": "<EVIDENCE>/schema-fixtures/schema-missing-2",
+        "environment_overrides": {
+          "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
+          "PYTHONDONTWRITEBYTECODE": "1",
+          "PYTHONPATH": "<CHECKOUT>/lampOS/sdk/python/src:<EVIDENCE>/private-deps"
+        },
+        "expected_exit": 1,
+        "umask": "022"
+      },
+      "schema-missing-3": {
+        "argv": [
+          "/bin/bash",
+          "<EVIDENCE>/schema-copy-step.sh"
+        ],
+        "cwd": "<EVIDENCE>/schema-fixtures/schema-missing-3",
+        "environment_overrides": {
+          "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
+          "PYTHONDONTWRITEBYTECODE": "1",
+          "PYTHONPATH": "<CHECKOUT>/lampOS/sdk/python/src:<EVIDENCE>/private-deps"
+        },
+        "expected_exit": 1,
+        "umask": "022"
+      },
+      "schema-positive-checkout": {
+        "argv": [
+          "/bin/bash",
+          "<EVIDENCE>/schema-copy-step.sh"
+        ],
+        "cwd": "<CHECKOUT>",
+        "environment_overrides": {
+          "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
+          "PYTHONDONTWRITEBYTECODE": "1",
+          "PYTHONPATH": "<CHECKOUT>/lampOS/sdk/python/src:<EVIDENCE>/private-deps"
+        },
+        "expected_exit": 0,
+        "umask": "022"
+      }
+    },
+    "evidence_sha256": {
+      "audit-receipt.py": "f60ffde87c0e416add35b720cb4f196142e31acddedca8c4a4f8af00c3920344",
+      "b76-to-ad095-P3.patch": "52ba988ffbbb85c9035ce009f43185f9eae1b92f5214ab0b5df2c9296b3c23e3",
+      "dependencies-after.json": "e6245cbd63ef67ceb8c381406240e90b6e6a5321e65b4ceb5a2c2387352c9f2c",
+      "dependencies-before.json": "e6245cbd63ef67ceb8c381406240e90b6e6a5321e65b4ceb5a2c2387352c9f2c",
+      "four-path-diff.patch": "bd803b62148c1224b0e070b8c75be117d5cfb49ff50ade201fa00523fc9be729",
+      "local-plan.json": "80cab533bf791ae107e7b5098e22b4a01ce4a96071744fef73ff0c4311aa90fc",
+      "local.terminal.json": "7ae7b2b08b2ced912af3f8b4c7652aa7abb9677460900e3b921631b0db853de0",
+      "original-arm-metadata-only-metadata.json": "e7fe05e5252bb83fad990e6bc89fe792516ba6b1e19c19d5c837a20b41e98bf1",
+      "original-linux-metadata-only-metadata.json": "85db2861e589254e47bee465c8a78bbddb736c2e0f89a8edaa23b928267310df",
+      "original-sdk-jobs.json": "f2e6e400c95b54c6645c65f78b42726003a97869647a4d77757300a3a3e03ec0",
+      "original-sdk-metadata.json": "82b50d575cd48e563093b90bf0fe26d00db768d0cff720ae7dced3001b97c36a",
+      "original-sdk-source-binding.json": "bdcfc8afcfe48213fcedc2040cdef45063c6dfb695dda88bd0e1e983a920018a",
+      "original-sdk.log": "b33c71ee6200fb4d28391014b87b25ef1a7d28935c8776306d0691d21db11b4e",
+      "pr-final.json": "1768aa15770eb3a284649884336459370db4e6174a229bc3e9a47148fcb43a2d",
+      "pr-initial.json": "f5e0cd7026d7ec92ad0a73eb43c2c7dd5ebf48276a7a72181d5be77d1cf57206",
+      "python-environment-current.json": "811d9efd8fd5f41d83b3ffd80b4dd3af219202d89a6547e3b0bd04d98ff3cad6",
+      "python-environment-inventory.json": "16497a6d80fb9d240f9aa6ede9edb6d38d5150e6cc60a7af50ffaaa7d961be15",
+      "python-sdk-suite-counts.json": "f52247a39630a77c9972aee6036f5ce2329b2b9d18337dabb4e80fac9ea499aa",
+      "python-sdk-suite.log": "fd05d29b665590d4cdd29cd0fbcc18d2444c8c3e32450502560acb125c6d18d7",
+      "python-sdk-suite.xml": "4b9c033c7f3bf8c022af1262ee3c705498a429bec9a4d1ffd03696d467d5bd0b",
+      "run-local.py": "09c7a8b3a915a326b9c18c2329108d52238f382dd64467066293aeee3a69dec4",
+      "schema-copy-controls.json": "a5ecdc1d2821112761ef27e992e0993b1e0238fcd1dec30d1203ef8f220ec9e5",
+      "schema-copy-step.sh": "026d1cde963b5a2da8a66950204fc2eb3473a6f25f00b4988e5f22d36a729c26",
+      "setup-private-deps.py": "2afa0bbf2bf1b83c64f0ffbd67c8b265f8a768f2e249c3a96a7de4244128b252",
+      "setup-timeline.json": "0f6a8ed905a06b631beb1011e9ae16dac227698ac43ff784b29b2575d53d5756",
+      "setup/downloaded-artifacts.json": "a1945352a5d39f8372f665a956529c0bf342e44a374d79b84e5792e20b821ef0",
+      "setup/requirements-hashed.txt": "44e9a1204fba238b3b81df4533879b68da897c261259b7159f22671164aae3c4",
+      "setup/terminal.json": "e06eec287ebe0abbe044b3c400d2c9c4f9d43bd7a275405878505ce07ddc97ce",
+      "source-after.json": "bf425ca30266bc7f6b7d16b5d360f7085461d11d96326ab94db43d500bb2b10c",
+      "source-before.json": "bf425ca30266bc7f6b7d16b5d360f7085461d11d96326ab94db43d500bb2b10c",
+      "source-review.json": "147549ae7a24a99eedd1cd4395ca3344c180a88a0381d4c93c596668deed669f"
+    },
+    "head": "ad095ae6159dce197eb510f9b691901aea4eab2c",
+    "holds": [],
+    "limits": [
+      "No local Python3.10 execution, Cargo/Rust/ARM compile, runtime/device test, workflow rerun/cancel or CI artifact execution.",
+      "ARM/Linux are metadata-only success; no native test census, coverage or artifact qualification claimed.",
+      "Exact authored base/preview only; no latest-Main carry or format2 qualification.",
+      "Default interpreter/dependency setup limitations and offline setup failure remain retained separately from the once-only SDK test execution."
+    ],
+    "local_python": {
+      "Python3_10_run_locally": false,
+      "counts": {
+        "failed": 0,
+        "skipped": 0,
+        "tests": 60,
+        "unique": 60
+      },
+      "dependency_and_tool_file_count": 872,
+      "dependency_versions": {
+        "Pygments": "2.20.0",
+        "cffi": "1.17.1",
+        "cryptography": "43.0.0",
+        "iniconfig": "2.3.0",
+        "jsonschema": "4.26.0",
+        "packaging": "24.1",
+        "pluggy": "1.6.0",
+        "pycparser": "2.21",
+        "pytest": "9.1.1",
+        "websockets": "17.3"
+      },
+      "machine": "x86_64",
+      "platform": "macOS-26.6.2-x86_64-i386-64bit",
+      "source_file_count": 774,
+      "source_test_dependency_helper_tool_hashes_unchanged": true,
+      "suite_execution_count": 1,
+      "suite_retry_count": 0,
+      "umask": "022",
+      "version": "3.12.2"
+    },
+    "original_SDK": {
+      "copies_job": {
+        "conclusion": "success",
+        "id": 122309342303,
+        "status": "completed"
+      },
+      "python_logs": {
+        "3.10.22": {
+          "conclusion": "success",
+          "failed_summary_observed": false,
+          "job_id": 122309342674,
+          "passed": 60,
+          "passed_summary_count": 1,
+          "result_line": 750,
+          "scope": "Original SDK text log; distinct from local Python3.12.2 execution.",
+          "status": "completed"
+        },
+        "3.12.15": {
+          "conclusion": "success",
+          "failed_summary_observed": false,
+          "job_id": 122309342646,
+          "passed": 60,
+          "passed_summary_count": 1,
+          "result_line": 444,
+          "scope": "Original SDK text log; distinct from local Python3.12.2 execution.",
+          "status": "completed"
+        }
+      },
+      "scope": "SDK original attempt1 text/source read; local Python3.12.2 is separate. JS jobs success metadata only; no separate JS source/read/runtime claim.",
+      "source_binding": {
+        "actual_preview": "4e54b21106f04dc787498d83fe8bfe87152169ac",
+        "actual_preview_tree": "22ec0edbb437e2919ae99e62f4f09352b5259ba1",
+        "attempt": 1,
+        "authored_base": "197f21533736cc99a1e1a819721a5a96ff8f3033",
+        "authored_head": "ad095ae6159dce197eb510f9b691901aea4eab2c",
+        "authored_tree": "22ec0edbb437e2919ae99e62f4f09352b5259ba1",
+        "four_owned_blobs_and_modes_equal": true,
+        "ordered_parents": [
+          "197f21533736cc99a1e1a819721a5a96ff8f3033",
+          "ad095ae6159dce197eb510f9b691901aea4eab2c"
+        ],
+        "original_sdk_run": 40538270273,
+        "owned_paths_modes_blobs": [
+          "100644 blob 1e3055cdb3d8d34452fa1462cd35152b3d61133e\t.github/workflows/lampos-sdk.yml",
+          "100644 blob fb7b1dcbece8456f7b4d661e84359db335bbc3b7\tlampOS/sdk/python/README.md",
+          "100644 blob 388cd9f8ecd62179bfcdfce3f9f730b2c1703475\tlampOS/sdk/python/src/lampos/skillcheck.py",
+          "100644 blob c1b7a14d37937a0cc5a7ade532caf2eb689c0456\tlampOS/sdk/python/tests/test_skillcheck.py"
+        ],
+        "source_binding_only_not_artifact_execution": true,
+        "tree_equal": true
+      }
+    },
+    "original_run_metadata": {
+      "original-arm-metadata-only": {
+        "conclusion": "success",
+        "head_sha": "ad095ae6159dce197eb510f9b691901aea4eab2c",
+        "id": 40538270692,
+        "run_attempt": 1,
+        "status": "completed"
+      },
+      "original-linux-metadata-only": {
+        "conclusion": "success",
+        "head_sha": "ad095ae6159dce197eb510f9b691901aea4eab2c",
+        "id": 40538270213,
+        "run_attempt": 1,
+        "status": "completed"
+      },
+      "original-sdk": {
+        "conclusion": "success",
+        "head_sha": "ad095ae6159dce197eb510f9b691901aea4eab2c",
+        "id": 40538270273,
+        "run_attempt": 1,
+        "status": "completed"
+      }
+    },
+    "path_normalization": "Raw exact argv/cwd/environment records remain private in each stage command/terminal JSON; only checkout/evidence/interpreter prefixes are replaced here. No human names or home paths appear in this publishable receipt.",
+    "private_setup": {
+      "declared_wheels": [
+        {
+          "filename": "attrs-26.1.0-py3-none-any.whl",
+          "name": "attrs",
+          "sha256": "c647aa4a12dfbad9333ca4e71fe62ddc36f4e63b2d260a37a8b83d2f043ac309",
+          "version": "26.1.0"
+        },
+        {
+          "filename": "jsonschema-4.26.0-py3-none-any.whl",
+          "name": "jsonschema",
+          "sha256": "d489f15263b8d200f8387e64b4c3a75f06629559fb73deb8fdfb525f2dab50ce",
+          "version": "4.26.0"
+        },
+        {
+          "filename": "jsonschema_specifications-2025.9.1-py3-none-any.whl",
+          "name": "jsonschema-specifications",
+          "sha256": "98802fee3a11ee76ecaca44429fda8a41bff98b00a0f2838151b113f210cc6fe",
+          "version": "2025.9.1"
+        },
+        {
+          "filename": "referencing-0.37.0-py3-none-any.whl",
+          "name": "referencing",
+          "sha256": "381329a9f99628c9069361716891d34ad94af76e461dcb0335825aecc7692231",
+          "version": "0.37.0"
+        },
+        {
+          "filename": "rpds_py-2026.9.1-cp312-cp312-macosx_10_12_x86_64.whl",
+          "name": "rpds-py",
+          "sha256": "50906f5aea24b5a865cbd0a589698288631d9f3a54c3a937c83aefa95a0d14af",
+          "version": "2026.9.1"
+        },
+        {
+          "filename": "typing_extensions-4.16.0-py3-none-any.whl",
+          "name": "typing_extensions",
+          "sha256": "481caa481374e813c1b176ada14e97f1f67a4539ce9cfeb3f350d78d6370c2e8",
+          "version": "4.16.0"
+        },
+        {
+          "filename": "websockets-17.3-cp312-cp312-macosx_10_13_x86_64.whl",
+          "name": "websockets",
+          "sha256": "8f7469408740cf06a79b01605f2ae0b2acc8839c03fcbbf05da49baee12d3302",
+          "version": "17.3"
+        }
+      ],
+      "existing_compatible_interpreter": "Python3.12.2 with pytest9.1.1 and cryptography43.0.0; jsonschema/websockets missing initially.",
+      "initial_default_interpreter": "Python3.9.1 below >=3.10 and no pytest; no suite attempted there.",
+      "installation_scope": "Only missing declared roots jsonschema>=4.20 and websockets>=13 plus required dependencies, private evidence target. Existing global/environment unchanged.",
+      "network_download_exit": 0,
+      "offline_exit": 1,
+      "private_hashed_install_exit": 0,
+      "timestamps": "setup-timeline.json retains filesystem creation/modification times; exact initial default-probe timestamp was not instrumented, not fabricated."
+    },
+    "public_posts_by_helper": false,
+    "schema_copy_step": {
+      "all_seven_controls_expected": true,
+      "checkout_inputs_changed": false,
+      "negative_controls": [
+        {
+          "checkout_inputs_mutated": false,
+          "copy": "lampOS/sdk/python/src/lampos/control.schema.json",
+          "diagnostic_verified": true,
+          "expected_exit": 1,
+          "stage": "schema-missing-1"
+        },
+        {
+          "checkout_inputs_mutated": false,
+          "copy": "lampOS/sdk/js/src/control.schema.json",
+          "diagnostic_verified": true,
+          "expected_exit": 1,
+          "stage": "schema-missing-2"
+        },
+        {
+          "checkout_inputs_mutated": false,
+          "copy": "lampOS/sdk/python/src/lampos/skill-format.schema.json",
+          "diagnostic_verified": true,
+          "expected_exit": 1,
+          "stage": "schema-missing-3"
+        },
+        {
+          "checkout_inputs_mutated": false,
+          "copy": "lampOS/sdk/python/src/lampos/control.schema.json",
+          "diagnostic_verified": true,
+          "expected_exit": 1,
+          "stage": "schema-mismatch-1"
+        },
+        {
+          "checkout_inputs_mutated": false,
+          "copy": "lampOS/sdk/js/src/control.schema.json",
+          "diagnostic_verified": true,
+          "expected_exit": 1,
+          "stage": "schema-mismatch-2"
+        },
+        {
+          "checkout_inputs_mutated": false,
+          "copy": "lampOS/sdk/python/src/lampos/skill-format.schema.json",
+          "diagnostic_verified": true,
+          "expected_exit": 1,
+          "stage": "schema-mismatch-3"
+        }
+      ],
+      "positive_checkout_exit": 0,
+      "script_sha256": "026d1cde963b5a2da8a66950204fc2eb3473a6f25f00b4988e5f22d36a729c26"
+    },
+    "scope": [
+      ".github/workflows/lampos-sdk.yml",
+      "lampOS/sdk/python/README.md",
+      "lampOS/sdk/python/src/lampos/skillcheck.py",
+      "lampOS/sdk/python/tests/test_skillcheck.py"
+    ],
+    "setup_commands_path_normalized": {
+      "install-private-deps": [
+        "<PYTHON3_12_2>",
+        "-m",
+        "pip",
+        "--disable-pip-version-check",
+        "--no-cache-dir",
+        "install",
+        "--no-index",
+        "--find-links",
+        "<EVIDENCE>/setup/wheels",
+        "--no-deps",
+        "--no-compile",
+        "--ignore-installed",
+        "--target",
+        "<EVIDENCE>/private-deps",
+        "--require-hashes",
+        "-r",
+        "<EVIDENCE>/setup/requirements-hashed.txt"
+      ],
+      "network-declared-deps": [
+        "<PYTHON3_12_2>",
+        "-m",
+        "pip",
+        "--disable-pip-version-check",
+        "--no-cache-dir",
+        "download",
+        "--only-binary=:all:",
+        "--dest",
+        "<EVIDENCE>/setup/wheels",
+        "jsonschema>=4.20",
+        "websockets>=13"
+      ],
+      "offline-declared-deps": [
+        "<PYTHON3_12_2>",
+        "-m",
+        "pip",
+        "--disable-pip-version-check",
+        "--no-cache-dir",
+        "download",
+        "--only-binary=:all:",
+        "--dest",
+        "<EVIDENCE>/setup/wheels",
+        "--no-index",
+        "jsonschema>=4.20",
+        "websockets>=13"
+      ]
+    },
+    "source_branch_mutations_by_helper": false,
+    "source_findings": [],
+    "source_line_bindings": [
+      {
+        "file_sha256": "7b874b4a294dfb7ff14dcca7fe25c5c91e73a43699e33cad790981edaa8b761f",
+        "line_bindings": [
+          {
+            "line": 109,
+            "sha256_no_newline": "d9baf40c3c892fef6a18afb8491147d00eaca1972417ad789576742aa1908a81"
+          },
+          {
+            "line": 114,
+            "sha256_no_newline": "3a8b5dce554a22e16b2a93904c877221958bc5f029db1df50c46ba9a1097dad0"
+          },
+          {
+            "line": 117,
+            "sha256_no_newline": "b4884b3918a4c9f0a6a67598c58ac3028bdfd668da21f4bd14cefa486d4a57e5"
+          },
+          {
+            "line": 212,
+            "sha256_no_newline": "47826eb4bb39c31ad19e8fdcfda90f57680baa82fc6260d1152aec26b4e2ada1"
+          },
+          {
+            "line": 214,
+            "sha256_no_newline": "a0e6904594a5bb98e276daa24ac3d16cd4b48368dbce8ca44c1103e3ec60e4ba"
+          },
+          {
+            "line": 275,
+            "sha256_no_newline": "0784853d810c02a49f825d60e23f553391c696d26b4d300254bb21fdd9428d71"
+          },
+          {
+            "line": 277,
+            "sha256_no_newline": "270dc3ca5b010b57b2016cadd6c59808c8665203589d7bd46add3ae513a2900a"
+          },
+          {
+            "line": 302,
+            "sha256_no_newline": "91e79c458a47ef305bb2fbc38d3a1dd148b40195e2379e32c76156598ce1e202"
+          },
+          {
+            "line": 306,
+            "sha256_no_newline": "23c8d26f80a10d4c6f10b4bcbac3822b11a33bff3e292cc1306f1ec786a0c89a"
+          }
+        ],
+        "path": "lampOS/sdk/python/src/lampos/skillcheck.py"
+      },
+      {
+        "file_sha256": "20d80d2f55d812c3eb6f4e73a634228cbfabbb8fe99c19b8d17549c66e6b0566",
+        "line_bindings": [
+          {
+            "line": 2550,
+            "sha256_no_newline": "35a0d6cbbb102ef487975d35c44659200c35d95f70b29fcacb4ea2f7d790d443"
+          },
+          {
+            "line": 2559,
+            "sha256_no_newline": "56eec95de0d5a8544a10a76264b2b5327cc2dc9f7eb7d84ebe6b3a8a1fa7320d"
+          },
+          {
+            "line": 2561,
+            "sha256_no_newline": "7ffe9b735e12c90a4b2c2af5e4f83c50983805ef532f286b6190db5d91117b28"
+          },
+          {
+            "line": 1267,
+            "sha256_no_newline": "06233038503c01352caca4a4545fa2e648573af953ecff23ce63c7e15971e8af"
+          },
+          {
+            "line": 1268,
+            "sha256_no_newline": "ae0f76a22e6f1573060a6298cc1a72336e6007bc5e28c2e402c5aa1adb0e0773"
+          }
+        ],
+        "path": "lampOS/crates/skills/src/lib.rs"
+      },
+      {
+        "file_sha256": "c9c6f1c247daa7b4282e631e1c67fb252c8ce5ce0511310296ac3d15f0bc9612",
+        "line_bindings": [
+          {
+            "line": 281,
+            "sha256_no_newline": "0a3d63318d5d4922cdcb45481169df5bbc0b7912a46947f5cce6cb1a7955f2f9"
+          },
+          {
+            "line": 306,
+            "sha256_no_newline": "68554b850d322e1a2e3a32a81f978504c26c85b93beb7d4355cc64f3e052328c"
+          },
+          {
+            "line": 342,
+            "sha256_no_newline": "79a9db30d27aefc1e1a21645fdfcc96e17f5f1547fa57a7dfa84d9703cb450a4"
+          },
+          {
+            "line": 344,
+            "sha256_no_newline": "acc03a0042006818887c1d1cb22d6d8e21b85bae4f996d69fb510fbf28801cae"
+          },
+          {
+            "line": 345,
+            "sha256_no_newline": "f1f1ab223afc99d2099970a3cbd25fcd916d3bf06a271953d617a2d23e9f8a39"
+          }
+        ],
+        "path": "lampOS/crates/body/src/moves.rs"
+      },
+      {
+        "file_sha256": "cf14871192dedb35e4c88e1a49723e19cd2dead4988cba26e107920d093e0999",
+        "line_bindings": [
+          {
+            "line": 241,
+            "sha256_no_newline": "56bdfe9770c7b3fe370ce35c0c5b0065930cb0fdfe894ce9d4902dfe0653bef1"
+          },
+          {
+            "line": 249,
+            "sha256_no_newline": "a88e0ecb7376d5fea82a59bdc886f30f0f2915f76fde9ef5ce0ca54b25042cbc"
+          },
+          {
+            "line": 274,
+            "sha256_no_newline": "7ce13b7776f292709363ec1025db6aea8b4ff03aeda438cf6154ea103e806b39"
+          }
+        ],
+        "path": "lampOS/docs/skill-format.md"
+      },
+      {
+        "file_sha256": "bb34c35d6a8cefdc8089f5ce6b4c8ef92fc27b82b99adcb6019b4ec2e6638ef6",
+        "line_bindings": [
+          {
+            "line": 39,
+            "sha256_no_newline": "32a2c26cdffadcfdf63835c7c9de3ae72aa1f6c4f31664ca7d8d334bfa78d8c9"
+          },
+          {
+            "line": 41,
+            "sha256_no_newline": "4ba59d9753f12932d732a3238165471ff2b1fad506604a32c267e80cf092f92d"
+          },
+          {
+            "line": 55,
+            "sha256_no_newline": "233fcf5703d65161b3fcd35972582199d3aba5276716083fbc9b7366e3bf5487"
+          }
+        ],
+        "path": ".github/workflows/lampos-sdk.yml"
+      }
+    ],
+    "source_review": {
+      "P3_b76_repair": "Actual b76-to-ad095 diff adds dot-name skip, fixes warning comment and adds the AppleDouble control.",
+      "first_empty_name": "Python stops at the first matching name/description line, including empty, matching Rust find_map followed by empty filter.",
+      "format1_picture": "Warning/comment/README accurately say camera/picture and presence topics; no format2 claim.",
+      "moves": "Python skips dot-named .json moves and refuses directory/nonregular candidates; matches specified Rust load/read points. Existing broader Store/script/link checks remain separate.",
+      "tests": {
+        "inherited_exact_module_prefix": true,
+        "inherited_function_ASTs_retained": 17,
+        "new_regression_tests": [
+          "test_a_directory_named_as_a_move_is_not_a_file",
+          "test_a_dot_named_move_is_passed_over_as_the_body_does",
+          "test_the_first_name_line_is_the_name_even_empty"
+        ]
+      }
+    },
+    "status": "SCOPED_SOURCE_READ_OK_LOCAL60_AND_ORIGINAL_SDK_BOUND",
+    "tree": "22ec0edbb437e2919ae99e62f4f09352b5259ba1",
+    "utc": "2026-10-27T16:38:02.058448+00:00"
+  }
+}
