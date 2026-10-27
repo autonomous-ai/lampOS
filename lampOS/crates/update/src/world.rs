@@ -13,6 +13,8 @@ use std::{
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
+mod query;
+
 pub trait Systemd {
     /// Each unit's state, as `systemctl show` gives it.
     fn states(&mut self, units: &[String]) -> Result<Vec<UnitState>, String>;
@@ -271,36 +273,13 @@ fn self_recovery_show(text: &str) -> Result<(), String> {
 /// for it, and must never wait without end.
 pub const JOURNAL_WITHIN: Duration = Duration::from_secs(5);
 
-/// What `command` printed, if it ended well within `within`; else none, and
-/// it is killed. Its output is read while it runs, so one that prints more
-/// than a pipe holds is not stopped by its own writing.
+/// The complete UTF-8 response, at most 1 MiB, if `command` ends successfully
+/// within `within`; otherwise none, never a truncated or partial response.
+/// Reads stay bounded when descendants retain stdout. Error cleanup stops
+/// the owned process group before reaping its leader.
 pub fn output_within(command: &mut Command, within: Duration) -> Option<String> {
-    let mut child = command
-        .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::null())
-        .spawn()
-        .ok()?;
-    let mut stdout = child.stdout.take()?;
-    let reading = thread::spawn(move || {
-        let mut text = String::new();
-        let _ = io::Read::read_to_string(&mut stdout, &mut text);
-        text
-    });
-    let until = Instant::now() + within;
-    let status = loop {
-        match child.try_wait() {
-            Ok(Some(status)) => break Some(status),
-            Ok(None) if Instant::now() < until => thread::sleep(Duration::from_millis(20)),
-            _ => {
-                let _ = child.kill();
-                let _ = child.wait();
-                break None;
-            }
-        }
-    };
-    let text = reading.join().ok()?;
-    status.filter(|status| status.success()).map(|_| text)
+    let bytes = query::output_within(command, Instant::now() + within).ok()?;
+    String::from_utf8(bytes).ok()
 }
 
 /// The longest line a round's outcome carries of a part's journal.
