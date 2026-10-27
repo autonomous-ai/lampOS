@@ -144,7 +144,9 @@ alone is not proof that the privacy exercise was completed.
 
 ## The reset (built, off unless set)
 
-`crates/setup` builds `lamp-setup`. Its first slice is the reset:
+`crates/setup` builds `lamp-setup`. Its first slice is the reset. The safe
+shutdown (`lamp-setup shutdown`, #3697) reuses its stop and its own unit, and is
+shutdown.md.
 
 ```sh
 lamp-setup check --plan PLAN.json

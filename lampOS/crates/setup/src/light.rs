@@ -68,7 +68,7 @@ pub fn look(phase: Phase) -> Option<SetupLook> {
 /// breathes; faster while joining, busy but not hurried.
 pub fn breath(look: SetupLook) -> Duration {
     match look {
-        SetupLook::Waiting | SetupLook::Failed => Duration::from_secs(6),
+        SetupLook::Waiting | SetupLook::Failed | SetupLook::Unplug => Duration::from_secs(6),
         SetupLook::Joining => Duration::from_secs(3),
     }
 }

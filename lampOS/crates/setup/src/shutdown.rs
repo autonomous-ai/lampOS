@@ -1,0 +1,432 @@
+//! The safe shutdown (#3697, `docs/shutdown.md`): the lamp is turned off
+//! the way V1 parked it before the power went (HAL-4.12, HAL-5.18), so that
+//! nobody has to pull the plug on a running lamp. In order: the lamp is
+//! paused and the body rests, still for [`STILL_FOR`]; every part is
+//! stopped ([`crate::reset::stop_and_wait`]); [`LET_GO_AFTER`] later the
+//! body lets go, torque off on all five and each read back
+//! (`lamp-body-measure let-go`); the ring shows that it is safe to unplug
+//! and is left so; the disks are synced; the machine powers off.
+//!
+//! The order is here, the effects behind [`Host`], so a test never stops,
+//! lets go or powers anything off. Every step says one line.
+
+use serde::Serialize;
+use std::{io, time::Duration};
+
+/// The product switch for the ways a person asks (the app, a long press,
+/// a spoken yes), which later changes add. Off unless `on`. The runner
+/// itself, `lamp-setup shutdown-now`, is not behind it: it is only ever
+/// started by one of those, or by hand.
+pub const SWITCH: &str = "LAMP_SHUTDOWN";
+
+/// Whether [`SWITCH`] is on.
+pub fn switched_on(value: Option<&str>) -> bool {
+    value == Some("on")
+}
+
+/// How the lamp's parts are stopped: as the reset's plan stops them, each
+/// part named and each read back stopped ([`crate::reset::stop_and_wait`]).
+pub const STOP: [&str; 3] = ["/usr/bin/systemctl", "stop", "lampos.target"];
+
+/// How the machine is powered off.
+pub const POWER_OFF: [&str; 2] = ["/usr/bin/systemctl", "poweroff"];
+
+/// The rest the body must show before the parts stop (HAL-4.12, "move to
+/// rest over 2 s"): every joint still this long.
+pub const STILL_FOR: Duration = Duration::from_secs(2);
+
+/// The longest the body is waited for to rest: a standing lamp folds over
+/// its stand time (6 s on the product) and then must be still for
+/// [`STILL_FOR`]. After it the shutdown goes on and says so: the body's own
+/// stop folds it too, and the let-go writes nothing to a lamp found up.
+pub const REST_WITHIN: Duration = Duration::from_secs(15);
+
+/// Still: no joint moved more than this between the first read of the rest
+/// and the last, in radians (about 6 counts of 4,096 a turn).
+pub const STILL_RADIANS: f64 = 0.01;
+
+/// How often the joints are looked at while the body rests.
+pub const LOOK_EVERY: Duration = Duration::from_millis(100);
+
+/// From the body's stop to its let-go (HAL-4.12, "wait 0.4 s").
+pub const LET_GO_AFTER: Duration = Duration::from_millis(400);
+
+/// What the shutdown does outside its own order. The lamp's is in
+/// `lamp-setup`'s `main`; a test's records each call.
+pub trait Host {
+    /// Time since some fixed start.
+    fn now(&self) -> Duration;
+    fn sleep(&mut self, pause: Duration);
+    /// Say on `lamp/pause` that the lamp is paused, or no longer.
+    fn pause(&mut self, paused: bool) -> io::Result<()>;
+    /// Where each joint is now, in radians, from a fresh `body/joint_states`;
+    /// `None` while the body says nothing.
+    fn joints(&mut self) -> Option<Vec<f64>>;
+    /// Stop every part, and return once each reads stopped.
+    fn stop(&mut self) -> io::Result<()>;
+    /// The body's let-go: its one report line, or why it did not let go.
+    fn let_go(&mut self) -> Result<String, String>;
+    /// The ring's safe-to-unplug light, left on.
+    fn light(&mut self) -> io::Result<()>;
+    fn sync(&mut self);
+    fn power_off(&mut self) -> io::Result<()>;
+}
+
+/// Each step as it went, in order.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case", tag = "step", content = "why")]
+pub enum Step {
+    Paused,
+    NotPaused(String),
+    Rested,
+    NotRested,
+    Stopped,
+    NotStopped(String),
+    LetGo,
+    NotLetGo(String),
+    Lit,
+    NotLit(String),
+    Synced,
+    PoweringOff,
+    WouldPowerOff,
+    PowerOffFailed(String),
+}
+
+/// The shutdown, once the update's lock is held. Nothing that fails stops
+/// it short of the power: a lamp that asked to be turned off and is left
+/// half stopped helps nobody, and the system's own poweroff stops what is
+/// left in its order (the reset reboots after a failed stop the same way).
+/// Only `dry_run` stops short: everything but the power, said instead.
+pub fn run(host: &mut impl Host, dry_run: bool, say: &mut impl FnMut(&str)) -> Vec<Step> {
+    let mut steps = Vec::new();
+    let mut step = |step: Step, line: String, say: &mut dyn FnMut(&str)| {
+        say(&line);
+        steps.push(step);
+    };
+    match host.pause(true) {
+        Ok(()) => step(Step::Paused, "paused: the body goes to rest".into(), say),
+        Err(why) => step(
+            Step::NotPaused(why.to_string()),
+            format!("not paused ({why}): the body rests as it stops"),
+            say,
+        ),
+    }
+    if rested(host) {
+        step(
+            Step::Rested,
+            format!("the body is at rest, still {} s", STILL_FOR.as_secs()),
+            say,
+        );
+    } else {
+        step(
+            Step::NotRested,
+            format!(
+                "the body did not show rest within {} s; stopping all the same, its stop folds it",
+                REST_WITHIN.as_secs()
+            ),
+            say,
+        );
+    }
+    let stopped = host.stop();
+    match &stopped {
+        Ok(()) => step(Step::Stopped, "every part is stopped".into(), say),
+        Err(why) => step(
+            Step::NotStopped(why.to_string()),
+            format!("not every part stopped ({why}); going on, the poweroff stops the rest"),
+            say,
+        ),
+    }
+    // Stopped, the parts no longer read it; a kept pause would hold the
+    // lamp paused when it is next started without a power-up (a dry run).
+    if stopped.is_ok()
+        && let Err(why) = host.pause(false)
+    {
+        say(&format!("the pause is left kept ({why})"));
+    }
+    host.sleep(LET_GO_AFTER);
+    match host.let_go() {
+        Ok(report) => step(Step::LetGo, format!("let go: {report}"), say),
+        Err(why) => step(
+            Step::NotLetGo(why.clone()),
+            format!("not let go: {why}"),
+            say,
+        ),
+    }
+    match host.light() {
+        Ok(()) => step(Step::Lit, "the ring says it is safe to unplug".into(), say),
+        Err(why) => step(
+            Step::NotLit(why.to_string()),
+            format!("the ring is not lit ({why})"),
+            say,
+        ),
+    }
+    host.sync();
+    step(Step::Synced, "synced".into(), say);
+    if dry_run {
+        step(
+            Step::WouldPowerOff,
+            format!("dry run: would run {}", POWER_OFF.join(" ")),
+            say,
+        );
+        return steps;
+    }
+    step(Step::PoweringOff, "powering off".into(), say);
+    if let Err(why) = host.power_off() {
+        step(
+            Step::PowerOffFailed(why.to_string()),
+            format!("the poweroff failed ({why})"),
+            say,
+        );
+    }
+    steps
+}
+
+/// Whether the body shows rest within [`REST_WITHIN`]: every joint still,
+/// within [`STILL_RADIANS`], for [`STILL_FOR`] of fresh reads.
+fn rested(host: &mut impl Host) -> bool {
+    let until = host.now() + REST_WITHIN;
+    let mut since: Option<(Duration, Vec<f64>)> = None;
+    loop {
+        let now = host.now();
+        match (host.joints(), &since) {
+            (Some(at), Some((from, first))) if still(first, &at) => {
+                if now.saturating_sub(*from) >= STILL_FOR {
+                    return true;
+                }
+            }
+            (Some(at), _) => since = Some((now, at)),
+            (None, _) => since = None,
+        }
+        if now >= until {
+            return false;
+        }
+        host.sleep(LOOK_EVERY);
+    }
+}
+
+fn still(first: &[f64], now: &[f64]) -> bool {
+    !first.is_empty()
+        && first.len() == now.len()
+        && first
+            .iter()
+            .zip(now)
+            .all(|(a, b)| (a - b).abs() <= STILL_RADIANS)
+}
+
+/// The update's lock, taken without waiting, held by the caller through
+/// the shutdown so no update installs under it (as a restart asked from
+/// the app holds it, `lamp-keeper restart-asked`). Refused while another
+/// holder has it, and when it cannot be checked.
+pub fn update_lock(
+    records: &lamp_update::records::Records,
+) -> Result<lamp_update::records::Lock, String> {
+    records.lock().map_err(|why| {
+        if why.kind() == io::ErrorKind::WouldBlock {
+            "an update is being installed: try again once it is done".to_owned()
+        } else {
+            format!("the update's state could not be checked: {why}")
+        }
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A lamp in a test: its clock, its joints read by read, and every
+    /// call in order with when it came.
+    #[derive(Default)]
+    struct Fake {
+        now: Duration,
+        /// Each read of the joints in turn; the last one again after.
+        joints: Vec<Option<Vec<f64>>>,
+        reads: usize,
+        stop_fails: bool,
+        calls: Vec<(Duration, &'static str)>,
+    }
+
+    impl Host for Fake {
+        fn now(&self) -> Duration {
+            self.now
+        }
+        fn sleep(&mut self, pause: Duration) {
+            self.now += pause;
+        }
+        fn pause(&mut self, paused: bool) -> io::Result<()> {
+            self.calls
+                .push((self.now, if paused { "pause" } else { "resume" }));
+            Ok(())
+        }
+        fn joints(&mut self) -> Option<Vec<f64>> {
+            let read = self.joints.get(self.reads).or(self.joints.last()).cloned();
+            self.reads += 1;
+            read.flatten()
+        }
+        fn stop(&mut self) -> io::Result<()> {
+            self.calls.push((self.now, "stop"));
+            self.now += Duration::from_secs(3);
+            if self.stop_fails {
+                Err(io::Error::other("lamp-body.service active"))
+            } else {
+                Ok(())
+            }
+        }
+        fn let_go(&mut self) -> Result<String, String> {
+            self.calls.push((self.now, "let go"));
+            Ok("{}".into())
+        }
+        fn light(&mut self) -> io::Result<()> {
+            self.calls.push((self.now, "light"));
+            Ok(())
+        }
+        fn sync(&mut self) {
+            self.calls.push((self.now, "sync"));
+        }
+        fn power_off(&mut self) -> io::Result<()> {
+            self.calls.push((self.now, "power off"));
+            Ok(())
+        }
+    }
+
+    fn names(fake: &Fake) -> Vec<&'static str> {
+        fake.calls.iter().map(|(_, name)| *name).collect()
+    }
+
+    fn at(fake: &Fake, name: &str) -> Duration {
+        fake.calls
+            .iter()
+            .find(|(_, called)| *called == name)
+            .unwrap()
+            .0
+    }
+
+    #[test]
+    fn it_rests_stops_waits_lets_go_lights_syncs_and_powers_off_in_that_order() {
+        // Folding for a second, then still.
+        let mut joints = vec![Some(vec![0.0, 1.0]); 1];
+        for step in 0..10 {
+            joints.push(Some(vec![0.1 * f64::from(step), 1.0]));
+        }
+        joints.push(Some(vec![1.0, 1.0]));
+        let mut fake = Fake {
+            joints,
+            ..Fake::default()
+        };
+        let mut lines = Vec::new();
+        let steps = run(&mut fake, false, &mut |line| lines.push(line.to_owned()));
+        assert_eq!(
+            names(&fake),
+            [
+                "pause",
+                "stop",
+                "resume",
+                "let go",
+                "light",
+                "sync",
+                "power off"
+            ]
+        );
+        assert_eq!(
+            steps,
+            [
+                Step::Paused,
+                Step::Rested,
+                Step::Stopped,
+                Step::LetGo,
+                Step::Lit,
+                Step::Synced,
+                Step::PoweringOff
+            ]
+        );
+        assert_eq!(lines.len(), steps.len(), "one line a step: {lines:?}");
+        // Still for 2 s after the fold ended at 1 s, then stopped.
+        let stop = at(&fake, "stop");
+        assert!(
+            stop >= Duration::from_secs(3) && stop < REST_WITHIN,
+            "{stop:?}"
+        );
+        // The let-go waits 0.4 s from the end of the stop.
+        assert!(at(&fake, "let go") - (stop + Duration::from_secs(3)) >= LET_GO_AFTER);
+    }
+
+    #[test]
+    fn a_body_that_never_rests_is_waited_for_a_bounded_time_then_stopped_and_let_go() {
+        for joints in [
+            vec![None],
+            (0..400).map(|n| Some(vec![f64::from(n)])).collect(),
+        ] {
+            let mut fake = Fake {
+                joints,
+                ..Fake::default()
+            };
+            let steps = run(&mut fake, false, &mut |_| {});
+            assert_eq!(steps[1], Step::NotRested);
+            let stop = at(&fake, "stop");
+            assert!(stop >= REST_WITHIN && stop < REST_WITHIN + Duration::from_secs(1));
+            assert_eq!(
+                names(&fake),
+                [
+                    "pause",
+                    "stop",
+                    "resume",
+                    "let go",
+                    "light",
+                    "sync",
+                    "power off"
+                ]
+            );
+        }
+    }
+
+    #[test]
+    fn a_part_that_will_not_stop_keeps_the_pause_and_still_powers_off() {
+        let mut fake = Fake {
+            joints: vec![Some(vec![0.0])],
+            stop_fails: true,
+            ..Fake::default()
+        };
+        let steps = run(&mut fake, false, &mut |_| {});
+        assert!(matches!(steps[2], Step::NotStopped(_)));
+        assert_eq!(
+            names(&fake),
+            ["pause", "stop", "let go", "light", "sync", "power off"]
+        );
+    }
+
+    #[test]
+    fn a_dry_run_does_everything_but_power_off() {
+        let mut fake = Fake {
+            joints: vec![Some(vec![0.0])],
+            ..Fake::default()
+        };
+        let steps = run(&mut fake, true, &mut |_| {});
+        assert!(!names(&fake).contains(&"power off"));
+        assert_eq!(names(&fake).last(), Some(&"sync"));
+        assert_eq!(steps.last(), Some(&Step::WouldPowerOff));
+    }
+
+    #[test]
+    fn a_shutdown_is_refused_while_an_update_holds_its_lock() {
+        let folder = std::env::temp_dir().join(format!("lss-{}", std::process::id()));
+        let records = lamp_update::records::Records::new(folder.clone());
+        let held = records.lock().unwrap();
+        assert_eq!(
+            update_lock(&records).err().as_deref(),
+            Some("an update is being installed: try again once it is done")
+        );
+        drop(held);
+        let lock = update_lock(&records).unwrap();
+        // Held by the shutdown: an update that starts meanwhile can't have it.
+        assert!(records.lock().is_err());
+        drop(lock);
+        let _ = std::fs::remove_dir_all(folder);
+    }
+
+    #[test]
+    fn the_switch_is_on_only_when_said_on() {
+        assert!(switched_on(Some("on")));
+        for value in [None, Some(""), Some("off"), Some("1"), Some("ON")] {
+            assert!(!switched_on(value));
+        }
+    }
+}
