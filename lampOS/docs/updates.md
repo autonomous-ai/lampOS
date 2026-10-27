@@ -1714,7 +1714,9 @@ On the development Mac (Intel, macOS 26.6, Rust 1.96.0), not on a lamp:
   stays; a link left beside a temp file is replaced, never written
   through. Each fails with its fix taken out.
 - Apply receipt identity (#3689, `apply::merge_for` and the parent-round
-  control), Mac qualification on 27 October on base `e362659ce`: fmt and
+  control), qualified on 27 October on Apple Silicon
+  (`aarch64-apple-darwin`, macOS 26.6.2, Rust 1.96.0), distinct from the
+  historical Intel host named above. On base `e362659ce`, fmt and
   strict Update all-target Clippy passed; the full library passed
   **152 / 0 / 2 ignored**, and 65 selected settings, image, reset-plan,
   head-touch and product-carrier round tests passed **65 / 0**, with 132
@@ -1726,7 +1728,8 @@ On the development Mac (Intel, macOS 26.6, Rust 1.96.0), not on a lamp:
   later-version/additive-field acceptance. These local results do not cover
   the whole round suite, Linux/ARM64, a device, helper authentication or the
   frozen writer guard.
-  A later Mac gate on base `1fb93206e` adds two controls that wrap the actual
+  A later gate on the same Apple Silicon host, on base `1fb93206e`, adds
+  two controls that wrap the actual
   applier: a wrong Apply receipt still restores overwritten, removed and new
   settings, modes and records through real Back; a wrong Back receipt keeps
   the incomplete journal until a later idempotent Back is acknowledged,
