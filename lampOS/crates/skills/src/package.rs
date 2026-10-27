@@ -1024,8 +1024,10 @@ fn functions_said(skills: &[Skill]) -> String {
 /// and one that does not load is never live. A core skill is refused, and
 /// so is one whose name a core skill on the lamp has, or whose tool's name
 /// another skill there has. What a killed install or remove left is
-/// deleted first ([`swept`]).
-pub fn install(skills: &Path, from: &Path) -> Result<String, String> {
+/// deleted first ([`swept`]). With `state`, the running program's state
+/// folder, the owner's yes to the camera kept for its name is taken away
+/// before it goes in ([`moved_in`]).
+pub fn install(skills: &Path, state: Option<&Path>, from: &Path) -> Result<String, String> {
     if !fs::metadata(skills).is_ok_and(|meta| meta.is_dir()) {
         return Err(format!("no skills folder at {}", skills.display()));
     }
@@ -1047,7 +1049,15 @@ pub fn install(skills: &Path, from: &Path) -> Result<String, String> {
         let files = std::mem::take(&mut package.files);
         (package.manifest.name.clone(), files, Some(package))
     };
-    put_in(skills, &swept, &name, &files, package.as_ref(), None)
+    put_in(
+        skills,
+        &swept,
+        &name,
+        &files,
+        package.as_ref(),
+        state,
+        false,
+    )
 }
 
 /// A skill made on this lamp by voice (`lamp_voice::made_skill`, #1685),
@@ -1062,6 +1072,7 @@ pub fn install(skills: &Path, from: &Path) -> Result<String, String> {
 /// is, the folder waited for at most `wait`.
 pub fn install_made(
     skills: &Path,
+    state: Option<&Path>,
     made: &Path,
     sha256: &str,
     wait: Duration,
@@ -1069,7 +1080,7 @@ pub fn install_made(
     let now_unix_ms = std::time::SystemTime::now()
         .duration_since(std::time::SystemTime::UNIX_EPOCH)
         .map_or(0, |since| since.as_millis() as u64);
-    install_made_at(skills, made, sha256, wait, now_unix_ms)
+    install_made_at(skills, state, made, sha256, wait, now_unix_ms)
 }
 
 /// [`install_made`] at `now_unix_ms`: only the made skill the lamp asked
@@ -1080,6 +1091,7 @@ pub fn install_made(
 /// asker's.
 pub fn install_made_at(
     skills: &Path,
+    state: Option<&Path>,
     made: &Path,
     sha256: &str,
     wait: Duration,
@@ -1172,7 +1184,7 @@ pub fn install_made_at(
     let files = std::mem::take(&mut package.files);
     // What binds these bytes is the person's yes, by their SHA-256, not a
     // signature (the reviewer's P3 on #2414).
-    put_in(skills, &swept, &name, &files, Some(&package), None).map(|said| {
+    put_in(skills, &swept, &name, &files, Some(&package), state, false).map(|said| {
         said.replace(
             NO_SIGNATURE,
             &format!(
@@ -1194,15 +1206,18 @@ fn made_here(card: &str) -> bool {
 
 /// The skill `name` of these `files` put together beside the live skills,
 /// loaded and moved in ([`moved_in`]), with the skills folder [`locked`] by
-/// the caller and what a killed run left `swept`. `store_state`, for a
-/// Store install only, is where the owner's yes to the camera is kept.
+/// the caller and what a killed run left `swept`. `state` is where the
+/// owner's yes to the camera is kept: `from_store`, a Store package keeps
+/// its name's yes (and needs it to ask the camera); any other install
+/// takes it away ([`moved_in`]).
 fn put_in(
     skills: &Path,
     swept: &[String],
     name: &str,
     files: &Files,
     package: Option<&Package>,
-    store_state: Option<&Path>,
+    state: Option<&Path>,
+    from_store: bool,
 ) -> Result<String, String> {
     let name = name.to_owned();
     if !skill_name_ok(&name) {
@@ -1236,7 +1251,15 @@ fn put_in(
             fs::write(folder.join(INSTALLED_FROM), json).map_err(failed)?;
         }
         open_to_parts(&folder).map_err(failed)?;
-        moved_in(skills, &name, &folder, files.len(), package, store_state)
+        moved_in(
+            skills,
+            &name,
+            &folder,
+            files.len(),
+            package,
+            state,
+            from_store,
+        )
     })();
     let _ = fs::remove_dir_all(&staged);
     if swept.is_empty() {
@@ -1259,7 +1282,8 @@ fn moved_in(
     folder: &Path,
     count: usize,
     package: Option<&Package>,
-    store_state: Option<&Path>,
+    state: Option<&Path>,
+    from_store: bool,
 ) -> Result<String, String> {
     let skill =
         load(folder).map_err(|why| format!("not installed: {name} does not load: {why}"))?;
@@ -1317,20 +1341,26 @@ fn moved_in(
             kind.name()
         ));
     }
-    // From the Store, a package that asks the camera's picture goes on
-    // only once the owner's yes to it is kept (#3504's piece C). One put
-    // on by hand or made here is not held here: its picture still waits
-    // for the yes at each call (`Engine::picture_refused`).
-    if let Some(state) = store_state
-        && skill.permissions.sees_picture()
-    {
+    // The owner's yes to the camera is kept by name (#3504's piece C).
+    // From the Store, a package that asks the camera's picture goes on only
+    // once that yes is kept, and an update of the same catalogue entry
+    // keeps it. Any other install that puts a skill in place under that
+    // name (by hand, or made here) takes the yes away first, under the
+    // same lock and before the rename, so its picture waits for a new yes
+    // at each call (`Engine::picture_refused`); a record that can't be
+    // read or written installs nothing.
+    if let Some(state) = state {
         let file = state.join(super::CAMERA_FILE);
-        let yes = super::read_names(&file)
-            .map_err(|error| format!("not installed: {}: {error}", file.display()))?;
-        if !yes.contains(name) {
-            return Err(format!(
-                "not installed: {name}: it asks the camera, and the owner hasn't said yes"
-            ));
+        let failed = |error: io::Error| format!("not installed: {}: {error}", file.display());
+        let mut yes = super::read_names(&file).map_err(failed)?;
+        if from_store {
+            if skill.permissions.sees_picture() && !yes.contains(name) {
+                return Err(format!(
+                    "not installed: {name}: it asks the camera, and the owner hasn't said yes"
+                ));
+            }
+        } else if yes.remove(name) {
+            super::keep_names(&file, &yes).map_err(failed)?;
         }
     }
     let failed = |error: io::Error| format!("not installed: {}: {error}", target.display());
@@ -1836,7 +1866,15 @@ pub fn install_from_url(
     let swept = swept(skills);
     let files = std::mem::take(&mut package.files);
     let name = package.manifest.name.clone();
-    put_in(skills, &swept, &name, &files, Some(&package), Some(state))
+    put_in(
+        skills,
+        &swept,
+        &name,
+        &files,
+        Some(&package),
+        Some(state),
+        true,
+    )
 }
 
 /// The Skills Store's side of the manage helper: where its key is, and how
@@ -1981,7 +2019,7 @@ pub fn asked(
     let done = match (only("remove"), install) {
         _ if only("install_made").is_some() => match only("install_made") {
             Some(serde_json::Value::String(sha256)) => {
-                install_made(skills, made, sha256, lock_wait)
+                install_made(skills, Some(state), made, sha256, lock_wait)
             }
             _ => Err("a made skill is asked for as {\"install_made\": SHA256}".to_owned()),
         },
