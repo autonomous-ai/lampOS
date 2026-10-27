@@ -1,3 +1,20 @@
+## 2026-10-27 10:56 UTC — Common local gates complete with original artifact failure preserved
+
+Ready for lamp-voice: no
+
+[8cf composite local receipt](verification/common-8cf-qualified-local-20261027/receipt.json):
+5,538 unique clean passes, all 112 / all 525 named controls, 25 overlaps not
+added; zero failures/leaks/timeouts/retries and 43 ignores (27 JSON, 16 start-only).
+Normal compiler gates pass with test DEBUG0 only. Original native36537/125
+post-artifact guard failure remains failed beside actual runtime0. Restoration
+24093/0 restores all46 captured hashes with zero bodies; only-unrun14924/0 gives
+separate docs4/0, relay1/0 aggregate and process13/0, with no nextest replay.
+Full source/mtimes, all7,890 protected bytes and owned closure hold. The unchanged
+50ms case passes here; its earlier miss is not explained or waived. Metadata-only
+82135/0 bridges tested ed9 to reconstructed `3e9b721257` with identical full8cf
+tree/mtimes; both fixture range-diff rows are `=`. Push/native CI results are
+not claimed. ARM64/Linux, readers, privacy and lamp/device/physical holds remain.
+
 ## 2026-10-27 10:43 UTC — Common full runtime passes; artifact guard remains failed
 
 Ready for lamp-voice: no
