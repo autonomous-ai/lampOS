@@ -43,6 +43,7 @@ exchange|Final check. Say: Hey Lamp, what time is it?
 done_pass|Test complete. All checks passed.
 done_fail|Test complete. Some checks did not pass.
 factory_say_ready|Say ready when you are ready.
+factory_auto_start|Starting in five seconds.
 factory_stand_ready|Next, the arm stand. Rest one hand lightly on my arm.
 factory_held|I am holding my arm. I will let it go now. Keep a hand by my arm and my head.
 factory_stand_go|I am standing up now. Say stop at any time.
@@ -50,11 +51,11 @@ factory_stand_30|Standing to thirty percent.
 factory_stand_100|Standing all the way up.
 factory_stand_done|Arm measured. Folding down.
 factory_head_off|My head is not on its stop. Press my head down, then run this step again.
-factory_pads_ready|Next, the head pads. Take your hands off me.
-factory_pads_away|Hands away. Do not touch me for eleven seconds.
-factory_pads_1|Now hold head pad one for two seconds.
-factory_pads_2|Let go. Now hold head pad two for two seconds.
-factory_pads_more|Let go. Any other head pad, the same way.
+factory_pads_ready|Next, the head pads. Hands off me, and do not touch until I say head pad one.
+factory_pads_away|Listening now. Hands off for eleven seconds.
+factory_pads_1|Now head pad one. You have ten seconds. Press and hold it for two seconds, twice.
+factory_pads_2|Now head pad two. You have ten seconds. Press and hold it for two seconds, twice.
+factory_pads_more|Any other head pad, the same way.
 factory_pads_wait|Hands away now. Please wait.
 factory_pads_done|Head pads done.
 factory_key_done|Update key checked.
@@ -71,4 +72,9 @@ factory_reset_ready|Say yes to reset me for packing.
 factory_resetting|Resetting now. Remove me from the factory account, then pack me.
 factory_failed|A step failed. Please check the laptop.
 factory_all_done|All steps done. Thank you.
+factory_inputs_touch|Input test. For thirty seconds, touch each head pad, press my button, and press the reset button briefly. Any order, as many times as you like.
+factory_padcheck_10|Ten seconds left.
+factory_padcheck_rest|Now hands off me for thirty seconds. Do not touch.
+factory_inputs_done|Inputs recorded.
+factory_inputs_fail|Input test failed. Please check the laptop.
 EOF

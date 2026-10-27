@@ -12,13 +12,25 @@
 #   factory-voice.py --strip -- ./steps.sh ...   the base strip is read (LAMP_CONTROLS_STRIP=on)
 #   factory-voice.py --no-voice -- ./steps.sh ... no spoken prompts
 #   factory-voice.py --dry-run -- ./steps.sh ...  print the prompts, play nothing
+#   factory-voice.py --auto -- ./steps.sh ...    one go: the lamp answers its own
+#                                                questions (not the reset)
 #
 # steps.sh runs unchanged under a pseudo-terminal, so its "Ready? [y/N]" still
 # has the console it needs, and what it prints and what the person types pass
 # through as they are. Its exit status is this one's. The prompts follow what
 # steps.sh prints (a stand, a refusal, a step done) and the person's yes to
 # each question: the head pads' timing (11 s hands away, then pad one, pad
-# two) starts at that yes, as discover-head does.
+# two) starts at that yes, as discover-head does: 11 s hands away, then 10 s
+# for each pad, inside discover-head's fixed 40 s.
+#
+# With --auto the run goes in one go: at each question (the stand, letting a
+# held lamp go, the head pads, the self-test) the lamp says what to do, then
+# "Starting in five seconds", and after those 5 s answers the question itself.
+# The reset after a passed self-test is answered only with --auto-reset (a
+# batch's explicit choice, factory-run.sh's RESET=yes), and after
+# --before-reset CMD has run, so a record can be written before the lamp
+# reboots. Ctrl-C stops at any time (steps.sh's own trap eases a standing
+# arm back).
 #
 # Prompts: the factory_* WAVs made once on a Mac by make-prompts.sh, in
 # --prompts (default /var/lib/lamp-test/prompts). A missing prompt is silence.
@@ -56,6 +68,10 @@ import tty
 APLAY = os.environ.get("APLAY", "aplay")
 SYSTEMCTL = os.environ.get("SYSTEMCTL", "systemctl")
 TIME_SCALE = float(os.environ.get("FACTORY_VOICE_TIME_SCALE", "1"))
+# The questions --auto answers itself, and how long it gives the person after
+# saying "Starting in five seconds". Never the reset.
+AUTO = {"stand", "held", "pads", "selftest"}
+AUTO_WAIT = 5.0
 
 # What steps.sh prints → the prompts to play, in order. A question also names
 # what the person's yes to it starts (YES below).
@@ -82,10 +98,11 @@ LINES = [
 # The person's yes to a question → (seconds after the yes, prompt).
 YES = {
     "stand": [(0.0, "factory_stand_go")],
-    # discover-head: 10 s of rest after a settle, so 11 s hands away (as the
-    # question says), then each pad held about 2 s.
-    "pads": [(0.0, "factory_pads_away"), (11.5, "factory_pads_1"), (15.5, "factory_pads_2"),
-             (19.5, "factory_pads_more"), (30.0, "factory_pads_wait")],
+    # discover-head listens 40 s: 10 s of rest after a settle, so 11 s hands
+    # away (as the question says), then 10 s for each pad, the rest to 39 s
+    # for any other.
+    "pads": [(0.0, "factory_pads_away"), (11.5, "factory_pads_1"), (21.5, "factory_pads_2"),
+             (31.5, "factory_pads_more"), (39.0, "factory_pads_wait")],
     "selftest": [(0.0, "factory_selftest_wait")],
 }
 
@@ -103,6 +120,8 @@ class Voice:
     def say(self, key):
         if key == "TOUCH":
             key = "factory_touch_now_strip" if self.args.strip else "factory_touch_now"
+        if key == "factory_say_ready" and self.args.auto:
+            key = "factory_auto_start"
         self.q.put(key)
 
     def later(self, plan):
@@ -147,8 +166,12 @@ class Voice:
 class Watch:
     """Matches what steps.sh prints, across reads, each match once."""
 
-    def __init__(self, voice):
+    def __init__(self, voice, answer=None, auto=AUTO, before_reset=None):
         self.voice = voice
+        self.answer = answer
+        self.auto = auto
+        self.before_reset = before_reset
+        self.lock = threading.Lock()
         self.text = ""
         self.lines = [(re.compile(p), keys, q) for p, keys, q in LINES]
         self.done = [0] * len(LINES)
@@ -164,14 +187,33 @@ class Watch:
                 for key in keys:
                     self.voice.say(key)
                 if question:
-                    self.question = question
+                    with self.lock:
+                        self.question = question
+                    if self.answer and question in self.auto:
+                        threading.Thread(target=self._auto, args=(question,), daemon=True).start()
+
+    def _auto(self, question):
+        """Answer the question for the person, once what to do and "Starting in
+        five seconds" have been said and those seconds have passed."""
+        self.voice.drain(60)
+        time.sleep(AUTO_WAIT * TIME_SCALE)
+        # Claimed before the yes is written: steps.sh may ask its next
+        # question at once, and that one must stay open for its own answer.
+        with self.lock:
+            if self.question != question:
+                return
+            self.question = None
+        if question == "reset" and self.before_reset:
+            subprocess.run(self.before_reset, shell=True, check=False)
+        if question in YES:
+            self.voice.later(YES[question])
+        self.answer(b"y\r")
 
     def answered(self, line):
-        if self.question is None:
-            return
-        if line in ("y", "Y") and self.question in YES:
-            self.voice.later(YES[self.question])
-        self.question = None
+        with self.lock:
+            question, self.question = self.question, None
+        if question is not None and line in ("y", "Y") and question in YES:
+            self.voice.later(YES[question])
 
 
 def runs_step_4(command):
@@ -213,6 +255,11 @@ def main():
     ap.add_argument("--no-voice", action="store_true", help="no spoken prompts")
     ap.add_argument("--voice-settle", type=float, default=6.0,
                     help="seconds after starting lamp-voice again, before step 4")
+    ap.add_argument("--auto", action="store_true",
+                    help="one go: the lamp answers its own questions after a spoken 5 s (never the reset)")
+    ap.add_argument("--auto-reset", action="store_true",
+                    help="with --auto: answer a passed self-test's reset too (a batch's explicit choice)")
+    ap.add_argument("--before-reset", help="with --auto-reset: a command run before the reset is answered")
     ap.add_argument("--dry-run", action="store_true", help="print each prompt, play nothing")
     ap.add_argument("command", nargs=argparse.REMAINDER, help="-- steps.sh and its options")
     args = ap.parse_args()
@@ -221,7 +268,6 @@ def main():
         ap.error("give the command after --, e.g. -- ./steps.sh --unit-id ID --write --to 3")
 
     voice = Voice(args)
-    watch = Watch(voice)
     if not args.no_voice and runs_step_4(command) and voice_active():
         brief_step_4(args, voice)
     pid, fd = pty.fork()
@@ -232,6 +278,8 @@ def main():
             os.write(2, f"factory-voice: cannot run {command[0]}: {e}\n".encode())
             os._exit(127)
 
+    watch = Watch(voice, (lambda data: os.write(fd, data)) if args.auto else None,
+                  AUTO | ({"reset"} if args.auto_reset else set()), args.before_reset)
     console = os.isatty(0)
     saved = termios.tcgetattr(0) if console else None
     if console:
