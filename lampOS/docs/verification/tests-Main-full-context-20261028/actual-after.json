@@ -1,0 +1,161 @@
+{
+  "/private/tmp/tests-restart-f9-cargo-20261027_root/debug/lamp-same-voice": {
+    "bound": {
+      "sha256": "c8767d2c2a22f7e746a912faa9b1016dfa6217778e06a66b719a47704807baff",
+      "bytes": 74262104,
+      "mode": 493,
+      "mtime_ns": 1793103137313800113,
+      "device": 16777222,
+      "inode": 488832771,
+      "kind": "file",
+      "artifact": {
+        "reason": "compiler-artifact",
+        "package_id": "path+file:///private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/same-voice#lamp-same-voice@0.1.0",
+        "manifest_path": "/private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/same-voice/Cargo.toml",
+        "target": {
+          "kind": [
+            "bin"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "lamp-same-voice",
+          "src_path": "/private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/same-voice/src/main.rs",
+          "edition": "2024",
+          "doc": true,
+          "doctest": false,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": false
+        },
+        "features": [],
+        "filenames": [
+          "/private/tmp/tests-restart-f9-cargo-20261027_root/debug/lamp-same-voice"
+        ],
+        "executable": "/private/tmp/tests-restart-f9-cargo-20261027_root/debug/lamp-same-voice",
+        "fresh": true
+      },
+      "sealed_copy": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/sentinel-3c-main-second-route-control-prep/frozen/helper-0-c8767d2c2a22f7e7-lamp-same-voice"
+    },
+    "observed": {
+      "sha256": "c8767d2c2a22f7e746a912faa9b1016dfa6217778e06a66b719a47704807baff",
+      "bytes": 74262104,
+      "mode": 493,
+      "mtime_ns": 1793103137313800113,
+      "device": 16777222,
+      "inode": 488832771,
+      "kind": "file"
+    }
+  },
+  "/private/tmp/tests-restart-f9-cargo-20261027_root/debug/lamp-voice": {
+    "bound": {
+      "sha256": "2df9a9163b04a301a2bf59125b7bdbcc5c9adc455240eeea75c8e46c3327d2ab",
+      "bytes": 42668856,
+      "mode": 493,
+      "mtime_ns": 1793115330808774656,
+      "device": 16777222,
+      "inode": 488832809,
+      "kind": "file",
+      "artifact": {
+        "reason": "compiler-artifact",
+        "package_id": "path+file:///private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/voice#lamp-voice@0.1.0",
+        "manifest_path": "/private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/voice/Cargo.toml",
+        "target": {
+          "kind": [
+            "bin"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "lamp-voice",
+          "src_path": "/private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/voice/src/main.rs",
+          "edition": "2024",
+          "doc": true,
+          "doctest": false,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": false
+        },
+        "features": [],
+        "filenames": [
+          "/private/tmp/tests-restart-f9-cargo-20261027_root/debug/lamp-voice"
+        ],
+        "executable": "/private/tmp/tests-restart-f9-cargo-20261027_root/debug/lamp-voice",
+        "fresh": true
+      },
+      "sealed_copy": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/sentinel-3c-main-second-route-control-prep/frozen/helper-1-2df9a9163b04a301-lamp-voice"
+    },
+    "observed": {
+      "sha256": "2df9a9163b04a301a2bf59125b7bdbcc5c9adc455240eeea75c8e46c3327d2ab",
+      "bytes": 42668856,
+      "mode": 493,
+      "mtime_ns": 1793115330808774656,
+      "device": 16777222,
+      "inode": 488832809,
+      "kind": "file"
+    }
+  },
+  "/private/tmp/tests-restart-f9-cargo-20261027_root/debug/deps/lamp_voice-6d619bbdd1df3a0d": {
+    "bound": {
+      "sha256": "e730ab4ee620a6daf40cc21cf7197e77bacfea12beeda05f87527b5b5ad0b834",
+      "bytes": 117135192,
+      "mode": 493,
+      "mtime_ns": 1793117978934818509,
+      "device": 16777222,
+      "inode": 488841106,
+      "kind": "file",
+      "artifact": {
+        "reason": "compiler-artifact",
+        "package_id": "path+file:///private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/voice#lamp-voice@0.1.0",
+        "manifest_path": "/private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/voice/Cargo.toml",
+        "target": {
+          "kind": [
+            "lib"
+          ],
+          "crate_types": [
+            "lib"
+          ],
+          "name": "lamp_voice",
+          "src_path": "/private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/voice/src/lib.rs",
+          "edition": "2024",
+          "doc": true,
+          "doctest": true,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": [],
+        "filenames": [
+          "/private/tmp/tests-restart-f9-cargo-20261027_root/debug/deps/lamp_voice-6d619bbdd1df3a0d"
+        ],
+        "executable": "/private/tmp/tests-restart-f9-cargo-20261027_root/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+        "fresh": false
+      },
+      "sealed_copy": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/sentinel-3c-main-second-route-control-prep/frozen/Main-Voice-lib-e730ab4ee620a6da-lamp_voice-6d619bbdd1df3a0d"
+    },
+    "observed": {
+      "sha256": "e730ab4ee620a6daf40cc21cf7197e77bacfea12beeda05f87527b5b5ad0b834",
+      "bytes": 117135192,
+      "mode": 493,
+      "mtime_ns": 1793117978934818509,
+      "device": 16777222,
+      "inode": 488841106,
+      "kind": "file"
+    }
+  }
+}

@@ -1,5 +1,13 @@
 # Tests work log
 
+## 2026-10-28 00:22 — existing Main provenance extended; completion gates active
+
+Ready for lamp-voice: no (#3543 fresh local fixture modules active; native Reader remains unqualified).
+
+Extended the [existing full-Main packet](verification/tests-Main-full-context-20261028/) with both full source snapshots, all520 witness bookends and three executable bookends, as requested by Reviewer-two. All six attributes match; the original command proves group closure. No rerun. Its3867/1/15 failure remains failed.
+
+The formatted Reader completion payload is now in fresh metadata/strict/workspace/VoiceLIB compile gates, followed by the Reader and service-trace modules once each, including the immutable bounded-finish stalled-writer control. This is module qualification, not a claim of a passing full Voice suite. Both old failed full runs and b7's incomplete ARM run stay recorded. The separate updater full gate continues. No device action.
+
 ## 2026-10-28 00:14 — native Reader fail-fast; Main Reader fallback finding
 
 Ready for lamp-voice: no (#3543 native Reader cases unreached; completion follow-up being qualified).

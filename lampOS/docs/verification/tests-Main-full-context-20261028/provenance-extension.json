@@ -1,0 +1,38 @@
+{
+  "scope": "Existing immutable full-Main context receipts; no rerun",
+  "source_bookends_equal": true,
+  "source_files": 10904,
+  "witnesses": 520,
+  "witness_bookends_equal": true,
+  "actual_executables": 3,
+  "all_actual_six_field_bookends_equal": true,
+  "owned_group_absent": true,
+  "unresolved_pids": [],
+  "native_status": "FAIL/native1/Rust101 retained",
+  "added_raw_copies": {
+    "source-before.json": {
+      "sha256": "73a5dc405e09e1f4a753869a6a2a61380c1d45ef5508d7169702d1e12d0ef90d",
+      "bytes": 2456238
+    },
+    "source-after.json": {
+      "sha256": "73a5dc405e09e1f4a753869a6a2a61380c1d45ef5508d7169702d1e12d0ef90d",
+      "bytes": 2456238
+    },
+    "protected-before.json": {
+      "sha256": "c53784ab12b21887eade2e9803b4d534a3566c94e270f69460354bff8d8f44c8",
+      "bytes": 213262
+    },
+    "protected-after.json": {
+      "sha256": "c53784ab12b21887eade2e9803b4d534a3566c94e270f69460354bff8d8f44c8",
+      "bytes": 213262
+    },
+    "actual-before.json": {
+      "sha256": "cf585c5d31b83008bbc07fee70c4eab260af4c23b104f7b47fb8aa5934f9606a",
+      "bytes": 4870
+    },
+    "actual-after.json": {
+      "sha256": "a911bbd4fd9f74606f754028997185b870e5815c32971c842a97cba86fc7f003",
+      "bytes": 5969
+    }
+  }
+}
