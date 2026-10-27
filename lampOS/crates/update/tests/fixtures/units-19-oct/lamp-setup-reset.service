@@ -1,0 +1,20 @@
+# The reset (#806, lampOS/docs/setup.md), as the product installs it (lampOS/docs/install.md): the
+# reset button held 5 s and released, as Controls publishes it on controls/touch. It stops the lamp,
+# wipes the person's data, removes the setup marker and reboots into setup.
+[Unit]
+Description=lampOS reset: the reset button held 5 s wipes the person's data
+PartOf=lampos.target
+ConditionPathExists=/var/lib/lampos-setup/done
+ConditionPathExists=/etc/lampOS/setup/reset-plan.json
+After=lamp-controls.service
+
+[Service]
+Type=simple
+# Root: the person's stores belong to several parts; stopping the lamp; reboot.
+User=root
+ExecStart=/opt/lampOS/setup/current/lamp-setup watch-reset --plan /etc/lampOS/setup/reset-plan.json --bus-root /run/lampos-bus --enable
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=lampos.target

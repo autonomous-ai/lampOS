@@ -1,0 +1,45 @@
+# lampOS body: all motion; it alone owns the servo port (lampOS/docs/body.md).
+# The product unit (lampOS/docs/install.md). Its poses are this lamp's own, measured on it, in
+# /etc/lampOS/body/lamp.env as BODY_POSES="--gaze .. --stand .. --folded-arm .. --home .." and any
+# other option only this lamp needs. Without that file the body does not start: a body never
+# moves on poses measured on another lamp.
+# A body that stopped itself three times in ten minutes stays stopped until someone has looked.
+[Unit]
+Description=lampOS body (lamp-body)
+PartOf=lampos.target
+# Not before setup has finished (#806). The target's own condition holds back none of its parts.
+ConditionPathExists=/var/lib/lampos-setup/done
+After=lamp-voice.service
+StartLimitIntervalSec=600
+StartLimitBurst=3
+
+[Service]
+Type=notify
+NotifyAccess=main
+WatchdogSec=5
+# Never root: the servo port's owner refuses a process that could bypass its lock.
+User=lampos
+Group=lampos
+SupplementaryGroups=dialout
+Slice=lampos-parts.slice
+WorkingDirectory=/
+RuntimeDirectory=lampos-body
+RuntimeDirectoryMode=0755
+Environment=LAMP_BUS=on
+Environment=LAMP_EXPRESSION_BODY=on
+EnvironmentFile=/etc/lampOS/body/lamp.env
+ExecStart=/opt/lampOS/body/current/lamp-body --device /dev/ttyACM0 --unit-id %H --lock-directory /run/lampos-locks/motor --mood-socket /run/lampos-body/mood.sock --gaze-socket /run/lampos-body/gaze.sock --reach 150,15,1,250 --speed 120 --servo-speed 1000 --servo-acceleration 60 --gaze-reach 480,120 --stand-share 100 --stand-seconds 6 --awake-seconds 90 --idle on --force-limit 600 --wake on --rest-glance on --look-at-name on $BODY_POSES
+Restart=on-failure
+RestartSec=15s
+KillMode=mixed
+KillSignal=SIGTERM
+# A standing lamp folds down before it leaves.
+TimeoutStopSec=25s
+StandardInput=null
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=lamp-body
+NoNewPrivileges=yes
+
+[Install]
+WantedBy=lampos.target
