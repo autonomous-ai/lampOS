@@ -1,3 +1,11 @@
+## 27 October 2026, 17:30 +07 — current combined foundation native gates close
+
+#3775 current3c3ef1a2a/c28789eeb original attempt1 ARM40485795636 passes7,684 unique tests, zero FAIL/LEAK/TIMEOUT/selected-unrun,53 skipped; all18 admission/accessor controls pass once. Actual selected scope is12packages/70binaries, not whole-workspace runtime. Separate process13/0,relay1,docs4 across47,Rusthelper25 and Python35/12/7 remain separate. Linux40485795797 actual workspace fmt/strict all-target Clippy passes.
+
+Both actual previews are4dd9eff7c, ordered[c287,3c3], fulltreed2e2cd8a equal authored. ARM artifact12725677945 ZIP digest verifies against API/upload witnesses; all50 manifested AArch64 production members verify. Individual nextest executable bytes were not uploaded; no per-test executable-hash claim. [Current ARM packet](verification/settings-writer-refresh-foundation-20261027/native-3c3-c287/README.md) and [Linux packet](verification/settings-writer-refresh-foundation-20261027/linux-3c3-c287/README.md) retain that limit and source bindings. Prior failures and older scopes remain separately bound.
+
+The PR is ready for a source read, with onboarding priority respected; no NEXT TRAIN or independent restore/writer/device acceptance is claimed. Receipt #3808 original CI continues while its localproof is published641c22a650. The bounded regular-file observer is entering its single full Update gate.
+
 ## 27 October 2026, 17:25 +07 — apply receipt binding published
 
 #3808 offers c688ec71a on c28789eeb. The waiting parent supplies its own expected operation/build sequence; a mismatched Done changes no setting record. Legacy later versions and additive fields remain tolerated, unknown operations refused. This is receipt identity only, not helper authentication, record/postimage validation or writer replacement.

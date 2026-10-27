@@ -1,0 +1,643 @@
+{
+  "counts": {
+    "CANCEL": 0,
+    "EXECFAIL": 0,
+    "FAIL": 0,
+    "LEAK": 0,
+    "PASS": 7684,
+    "TIMEOUT": 0,
+    "XFAIL": 0,
+    "XPASS": 0
+  },
+  "echo_keys": [
+    "lamp-skills::it skills::a_reading_pose_is_held_on_the_mood_socket_for_its_for_and_then_let_go",
+    "lamp-skills::it skills::asking_the_policy_a_hello_made_and_not_noticed_rests",
+    "lamp-skills::it skills::asking_the_policy_on_the_hosts_clock_gives_up_after_its_wait",
+    "lamp-skills::it skills::the_program_forgets_a_snooze_at_a_restart",
+    "lamp-skills::it skills::the_program_keeps_a_skill_off_across_a_restart",
+    "lamp-voice coordinator::tests::endpoint_session::endpoint_fixture_reaps_on_panic_before_and_after_handoff",
+    "lamp-voice hand_controls::tests::with_the_wait_an_idle_pump_wakes_five_times_a_second_and_stops_at_once",
+    "lamp-voice hand_controls::tests::with_the_wait_an_owner_polling_every_2_ms_does_not_wake_the_pump",
+    "lamp-voice::it capture_hold_worker::a_microphone_busy_for_a_moment_at_start_is_opened_once_it_is_free",
+    "lamp-voice::it capture_hold_worker::a_microphone_gone_for_a_moment_at_start_is_opened_once_it_is_back",
+    "lamp-voice::it capture_hold_worker::a_mute_while_a_busy_microphone_is_waited_for_opens_nothing",
+    "lamp-voice::it capture_hold_worker::a_mute_while_the_microphone_is_waited_for_opens_nothing",
+    "lamp-voice::it capture_hold_worker::a_speaker_held_up_ends_the_capture_worker_unless_recovery_is_bounded",
+    "lamp-voice::it capture_hold_worker::a_stop_is_read_though_the_worker_has_gone_when_authority_falls_due",
+    "lamp-voice::it capture_hold_worker::another_microphone_is_handed_on_at_once_and_its_early_sound_is_not_accounted_for",
+    "lamp-voice::it capture_hold_worker::mic1_frames_wait_four_blocks_with_their_own_times_and_a_stop_drops_what_is_held",
+    "lamp-voice::it capture_hold_worker::mic1_muted_while_frames_are_held_hands_none_of_them_on",
+    "lamp-voice::it capture_hold_worker::mic1_with_a_recording_keeps_the_held_steps_before_the_first_block",
+    "lamp-voice::it capture_hold_worker::stalls_in_a_row_each_reopen_the_microphone_while_the_reference_goes_on",
+    "lamp-voice::it capture_hold_worker::stop_words_blocks_carry_what_was_asked_only_when_asked",
+    "lamp-voice::it capture_hold_worker::the_loop_waits_on_the_microphone_only_with_the_switch",
+    "lamp-voice::it capture_hold_worker::with_the_render_5_ms_after_each_block_all_but_a_few_blocks_are_read_within_a_ms",
+    "lamp-voice::it privacy_worker::a_producer_kept_up_only_if_its_samples_span_the_scenario",
+    "lamp-voice::it privacy_worker::after_its_first_datagram_a_gap_ends_the_worker_as_discontinuous",
+    "lamp-voice::it privacy_worker::allowed_authority_without_a_first_observation_cannot_start_a_gap_ride",
+    "lamp-voice::it privacy_worker::a_gap_ride_survives_controls_late_and_restabilizes_before_reopening",
+    "lamp-voice::it privacy_worker::before_any_datagram_the_worker_reads_the_kept_value_past_gaps_until_controls_is_late",
+    "lamp-voice::it privacy_worker::expiry_without_the_opt_in_or_allowed_authority_still_ends_the_worker",
+    "lamp-voice::it privacy_worker::a_gap_ride_recovers_short_repeated_publication_gaps_in_the_same_worker",
+    "lamp-voice::it privacy_worker::fresh_low_during_a_gap_ride_never_grants_the_same_worker_again",
+    "lamp-voice::it privacy_worker::losing_controls_ends_the_real_worker_cleanly_and_expires_its_lease",
+    "lamp-voice::it privacy_worker::the_real_worker_with_no_slide_grants_from_its_controller_alone",
+    "lamp-voice::it privacy_worker::selected_worker_requires_authority_latches_low_and_recovers_only_after_verified_stop",
+    "lamp-voice::it privacy_worker::an_isolated_fresh_high_does_not_extend_the_real_workers_gap_ride"
+  ],
+  "full_terminal_census_sha256": "59cc721c9cd7507fcc7f6facbb33fd0e1b00da09bc7be5ec05c8396a8388dba9",
+  "identical_echo_rows_excluded": 34,
+  "linux_custom_drivers": {
+    "note": "Subset of nextest; not extra tests.",
+    "rows": [
+      {
+        "binary": "lamp-update::self-cli-exec",
+        "name": "actual_cli_exec_confirms_before_the_next_round",
+        "ordinal": 2883,
+        "status": "PASS",
+        "total": 7684
+      },
+      {
+        "binary": "lamp-update::self-process-cuts",
+        "name": "persisted_self_switches_survive_sigkill",
+        "ordinal": 3296,
+        "status": "PASS",
+        "total": 7684
+      }
+    ]
+  },
+  "missing_controls": [],
+  "picked_filter": "package(=lamp-body) | package(=lamp-cloud) | package(=lamp-expression) | package(=lamp-keeper) | package(=lamp-lean) | package(=lamp-memory) | package(=lamp-peek) | package(=lamp-setup) | package(=lamp-skills) | package(=lamp-update) | package(=lamp-voice) | package(=lamp-voice-eval)",
+  "required_controls": [
+    {
+      "binary": "lamp-update",
+      "name": "writer_refresh::tests::a_restart_at_every_unqualified_prefix_requires_recovery_and_never_reissues_the_grant",
+      "ordinal": 2538,
+      "status": "PASS",
+      "total": 7684
+    },
+    {
+      "binary": "lamp-update",
+      "name": "writer_refresh::tests::a_stale_or_modified_first_apply_cannot_consume_the_single_grant",
+      "ordinal": 2539,
+      "status": "PASS",
+      "total": 7684
+    },
+    {
+      "binary": "lamp-update",
+      "name": "writer_refresh::tests::diagnostics_hide_unknown_values_and_known_duplicate_or_shadowed_fields_are_refused",
+      "ordinal": 2540,
+      "status": "PASS",
+      "total": 7684
+    },
+    {
+      "binary": "lamp-update",
+      "name": "writer_refresh::tests::failed_persist_after_publication_poisons_the_live_session_until_actual_disk_state_is_recovered",
+      "ordinal": 2541,
+      "status": "PASS",
+      "total": 7684
+    },
+    {
+      "binary": "lamp-update",
+      "name": "writer_refresh::tests::first_apply_binds_its_own_later_envelope_and_sequence_without_replacing_the_refresh_identity",
+      "ordinal": 2542,
+      "status": "PASS",
+      "total": 7684
+    },
+    {
+      "binary": "lamp-update",
+      "name": "writer_refresh::tests::future_nonsemantic_metadata_is_preserved_without_becoming_admission_authority",
+      "ordinal": 2543,
+      "status": "PASS",
+      "total": 7684
+    },
+    {
+      "binary": "lamp-update",
+      "name": "writer_refresh::tests::guard_lock_is_exclusive_and_independent_of_the_product_lock",
+      "ordinal": 2544,
+      "status": "PASS",
+      "total": 7684
+    },
+    {
+      "binary": "lamp-update",
+      "name": "writer_refresh::tests::identity_substitution_never_changes_or_admits_the_saved_transaction",
+      "ordinal": 2545,
+      "status": "PASS",
+      "total": 7684
+    },
+    {
+      "binary": "lamp-update",
+      "name": "writer_refresh::tests::live_or_poisoned_sessions_cannot_expose_stale_recovery_inputs",
+      "ordinal": 2546,
+      "status": "PASS",
+      "total": 7684
+    },
+    {
+      "binary": "lamp-update",
+      "name": "writer_refresh::tests::missing_and_nonregular_records_do_not_turn_into_a_fresh_transaction",
+      "ordinal": 2547,
+      "status": "PASS",
+      "total": 7684
+    },
+    {
+      "binary": "lamp-update",
+      "name": "writer_refresh::tests::no_apply_does_not_qualify_but_one_exact_apply_can_enter_without_an_ordinary_round",
+      "ordinal": 2548,
+      "status": "PASS",
+      "total": 7684
+    },
+    {
+      "binary": "lamp-update",
+      "name": "writer_refresh::tests::qualified_and_closed_inputs_keep_the_compatible_writer_and_bound_product_receipts",
+      "ordinal": 2549,
+      "status": "PASS",
+      "total": 7684
+    },
+    {
+      "binary": "lamp-update",
+      "name": "writer_refresh::tests::qualified_writer_and_preimages_survive_a_restart_until_the_product_journal_closes",
+      "ordinal": 2550,
+      "status": "PASS",
+      "total": 7684
+    },
+    {
+      "binary": "lamp-update",
+      "name": "writer_refresh::tests::recovery_views_retain_later_metadata_in_the_bound_inputs_without_reparsing",
+      "ordinal": 2551,
+      "status": "PASS",
+      "total": 7684
+    },
+    {
+      "binary": "lamp-update",
+      "name": "writer_refresh::tests::reloaded_inputs_keep_the_exact_origin_and_distinguish_writer_from_apply_restoration",
+      "ordinal": 2552,
+      "status": "PASS",
+      "total": 7684
+    },
+    {
+      "binary": "lamp-update",
+      "name": "writer_refresh::tests::restoring_an_apply_requires_its_original_grant_and_preimage_identity",
+      "ordinal": 2553,
+      "status": "PASS",
+      "total": 7684
+    },
+    {
+      "binary": "lamp-update",
+      "name": "writer_refresh::tests::unsupported_or_malformed_journals_are_retained_and_block_every_admission",
+      "ordinal": 2554,
+      "status": "PASS",
+      "total": 7684
+    },
+    {
+      "binary": "lamp-update",
+      "name": "writer_refresh::tests::write_bound_and_invalid_identities_leave_no_journal_or_partial_acceptance",
+      "ordinal": 2555,
+      "status": "PASS",
+      "total": 7684
+    }
+  ],
+  "selected_packages": [
+    "lamp-body",
+    "lamp-cloud",
+    "lamp-expression",
+    "lamp-keeper",
+    "lamp-lean",
+    "lamp-memory",
+    "lamp-peek",
+    "lamp-setup",
+    "lamp-skills",
+    "lamp-update",
+    "lamp-voice",
+    "lamp-voice-eval"
+  ],
+  "selected_unrun": 0,
+  "selection": {
+    "binaries": 70,
+    "selected": 7684,
+    "skipped_binaries": 118,
+    "skipped_tests": 53
+  },
+  "selection_scope": "Actual PR dependency-selected suite; all-workspace build is a separate stage.",
+  "separate_process": {
+    "pass_rows": [
+      "test an_idle_worker_stays_ready_across_a_long_quiet ... ok (2010 ms)",
+      "test a_worker_reporting_another_model_is_refused_before_any_request ... ok (2 ms)",
+      "test no_outcome_is_delivered_after_close_even_for_an_answer_on_its_way ... ok (4 ms)",
+      "test verdict_carries_identity_and_one_request_at_a_time ... ok (56 ms)",
+      "test missing_model_is_final_and_never_restarted ... ok (164 ms)",
+      "test missing_executable_fails_at_once ... ok (2 ms)",
+      "test spawn_returns_while_worker_startup_is_held ... ok (6 ms)",
+      "test startup_failures_are_final ... ok (411 ms)",
+      "test serving_failures_are_replaced_within_budget ... ok (514 ms)",
+      "test protocol_violations_are_replaced ... ok (177 ms)",
+      "test cancelled_answers_are_never_delivered ... ok (155 ms)",
+      "test close_during_inference_never_waits ... ok (233 ms)",
+      "test sustained_requests_stay_bounded ... ok (692 ms)"
+    ],
+    "passed": 13
+  },
+  "separate_promotion_helper": {
+    "failed": 0,
+    "ordered_summaries": [
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 2,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 22,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 1,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      }
+    ],
+    "passed": 25
+  },
+  "separate_python_regressions": [
+    {
+      "command": "python3 -I .github/scripts/lampos-publish-test.py",
+      "literal": "Ran 35 tests in 0.235s",
+      "passed": 35,
+      "terminal": "OK"
+    },
+    {
+      "command": "python3 -B -I .github/scripts/lampos-publish-artifact-test.py",
+      "literal": "Ran 12 tests in 0.719s",
+      "passed": 12,
+      "terminal": "OK"
+    },
+    {
+      "command": "python3 -I .github/scripts/lampos-publish-cli-test.py --updater lampOS/target/release/lamp-update",
+      "literal": "Ran 7 tests in 0.430s",
+      "passed": 7,
+      "terminal": "OK"
+    }
+  ],
+  "separate_relay": {
+    "passed": 1,
+    "success_rows": [
+      "relay_signals: ok"
+    ]
+  },
+  "separate_workspace_doctests": {
+    "failed": 0,
+    "headers": [
+      "lamp_actions",
+      "lamp_addons",
+      "lamp_air",
+      "lamp_audio",
+      "lamp_body",
+      "lamp_bus",
+      "lamp_camera",
+      "lamp_cloud",
+      "lamp_control",
+      "lamp_controls",
+      "lamp_ears",
+      "lamp_environment",
+      "lamp_expression",
+      "lamp_eyes",
+      "lamp_gemini",
+      "lamp_health",
+      "lamp_ipc",
+      "lamp_keeper",
+      "lamp_lean",
+      "lamp_local_time",
+      "lamp_memory",
+      "lamp_mood",
+      "lamp_msgs",
+      "lamp_name",
+      "lamp_near_call",
+      "lamp_observer",
+      "lamp_peek",
+      "lamp_policy",
+      "lamp_records",
+      "lamp_ring",
+      "lamp_same_voice",
+      "lamp_schedule",
+      "lamp_selftest",
+      "lamp_settings",
+      "lamp_setup",
+      "lamp_skills",
+      "lamp_sound_fixtures",
+      "lamp_station",
+      "lamp_surround",
+      "lamp_tasks",
+      "lamp_turn_end",
+      "lamp_turn_end_wire",
+      "lamp_turn_owner",
+      "lamp_update",
+      "lamp_voice",
+      "lamp_voice_eval",
+      "lamp_voice_processes"
+    ],
+    "note": "Interleaved streams: no fabricated crate-to-summary mapping.",
+    "ordered_summaries": [
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 2,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 1,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 1,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      }
+    ],
+    "passed": 4
+  },
+  "summary": [
+    "Summary [ 164.943s] 7684 tests run: 7684 passed, 53 skipped"
+  ],
+  "unique_terminal_rows": 7684
+}

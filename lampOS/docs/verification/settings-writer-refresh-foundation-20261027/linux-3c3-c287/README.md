@@ -1,0 +1,5 @@
+# Current combined #3775 Linux qualification
+
+Original attempt-1 run 40485795797 / job 122127131464 completed successfully on exact preview `4dd9eff7c8af64669aa694d7a1bb9e1c8fe4b54c`, ordered parents [`c28789eeb03bf5d441927a7e991b949a2689b557`,`3c3ef1a2a97ca821b031b99245147254d7aaa47a`], complete tree `d2e2cd8afbddad700ed155c3ea3776ec25398ac3` identical to authored. Actual executed pinned Rust 1.96 workspace formatting, strict all-crate/all-target Clippy, and separate promotion-tool formatting/strict Clippy are checked from the full log and successful step metadata. Cache reuse is recorded, not called a clean rebuild. No rerun or local compiler was requested for this audit.
+
+This packet proves current Linux lint only. ARM runtime and artifact verification are separate. Original 16f and Mac cb97/1fb 492/0/6 and current 3c3/c287 173/0/2 remain their own executions; no counts transfer. This remains an unwired foundation/accessor with no helper copying, actual key, signing, installation, promotion, device or power-cut acceptance.

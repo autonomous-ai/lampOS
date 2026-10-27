@@ -1,0 +1,49 @@
+{
+  "base": "c28789eeb03bf5d441927a7e991b949a2689b557",
+  "files": [
+    {
+      "blob": "77d5807ac882409e634840bbfda142623797a31d",
+      "kind": "blob",
+      "mode": "100644",
+      "path": "lampOS/crates/update/src/lib.rs",
+      "sha256": "573bd7b2cd44230661a5284cd8c9c68fb8500642dc53c73eae2d3eecae2f0e1d"
+    },
+    {
+      "blob": "77ad2e38e7a3135fe56723cde18a822df5da8680",
+      "kind": "blob",
+      "mode": "100644",
+      "path": "lampOS/crates/update/src/writer_refresh.rs",
+      "sha256": "f90f1851020a0a8fa443e30f5dd496f8a2d142b255a46f3490bb54414aa935ca"
+    },
+    {
+      "blob": "a9bb99c4ace0198232f37c658984f7d2a8ec79ae",
+      "kind": "blob",
+      "mode": "100644",
+      "path": "lampOS/crates/update/src/writer_refresh/tests.rs",
+      "sha256": "45aac2379e34fbf4585f2270e76ef445dbc09a7ca8e38bf849e3f47272616b9c"
+    },
+    {
+      "blob": "a1f6ed3dae788bdc4206d1e4027428aa1c20c06e",
+      "kind": "blob",
+      "mode": "100644",
+      "path": "lampOS/docs/reuse-decisions.md",
+      "sha256": "3e1d52fda1b6c2ac2eb2d4168efb76d32f69f9abd88f13f973667ca8d80557ba"
+    },
+    {
+      "blob": "4d595ce730e3569b98f1ca8c3bad22833a91181e",
+      "kind": "blob",
+      "mode": "100644",
+      "path": "lampOS/docs/settings-writer-refresh.md",
+      "sha256": "acb1a1d15ba09af36eaaf5200cf06ee271bcadfeac2766d9642a90e50b7ff767"
+    },
+    {
+      "blob": "bc096ebcafb0c9d0e22f3e1606f3930b50f7ee08",
+      "kind": "blob",
+      "mode": "100644",
+      "path": "lampOS/docs/updates.md",
+      "sha256": "4e84757d34b0d96a44ce8ec5b2d77238f4933d8d797d975b8892150d8b6e9a2d"
+    }
+  ],
+  "head": "3c3ef1a2a97ca821b031b99245147254d7aaa47a",
+  "tree": "d2e2cd8afbddad700ed155c3ea3776ec25398ac3"
+}

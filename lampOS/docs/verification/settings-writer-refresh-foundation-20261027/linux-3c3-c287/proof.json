@@ -1,0 +1,97 @@
+{
+  "actual_commands": [
+    "cargo +1.96.0 fmt --all --check",
+    "cargo clippy --locked --workspace --all-targets -- -D warnings",
+    "cargo fmt --manifest-path .github/tools/lampos-promote/Cargo.toml --check",
+    "cargo clippy --locked --manifest-path .github/tools/lampos-promote/Cargo.toml --all-targets -- -D warnings"
+  ],
+  "attempt": 1,
+  "authored_preview_complete_tree_equal": true,
+  "base": "c28789eeb03bf5d441927a7e991b949a2689b557",
+  "conclusion": "success",
+  "head": "3c3ef1a2a97ca821b031b99245147254d7aaa47a",
+  "job_id": 122127131464,
+  "ordered_parents": [
+    "c28789eeb03bf5d441927a7e991b949a2689b557",
+    "3c3ef1a2a97ca821b031b99245147254d7aaa47a"
+  ],
+  "pr": 3775,
+  "preview": "4dd9eff7c8af64669aa694d7a1bb9e1c8fe4b54c",
+  "raw_sha256": {
+    "linux-122127131464-job.log": "6b7c348ba853ae35c0f3956ae2586f3425c3a33aedaff801d9130b75ba818c99",
+    "linux-jobs-final.json": "3b3dee8016587222dbc67623b27f40f01149a8635f4f4fce428841296276f6f9",
+    "linux-run-final.json": "7e4b75fabec299fc519a419bea34a98af5a751ed0dc0e90d1d3c67aa31afc0fc",
+    "linux-run-first.json": "9b3f2f93dfcbdb17b6244e6eb06ff3ceb139c10eef2dedc7dbc811f205aa04ba"
+  },
+  "required_successful_stages": [
+    "Rust 1.96.0",
+    "stable promotion formatting and strict Clippy",
+    "formatting (whole workspace, pinned Rust)",
+    "clippy (every crate and target, warnings as errors)"
+  ],
+  "run_id": 40485795797,
+  "status": "completed",
+  "steps": [
+    {
+      "conclusion": "success",
+      "name": "Set up job",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "system packages",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "Run actions/checkout@v4",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "Rust 1.96.0",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "stable promotion formatting and strict Clippy",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "formatting (whole workspace, pinned Rust)",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "restore the cache",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "unchanged source files get the cached build's times back",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "clippy (every crate and target, warnings as errors)",
+      "status": "completed"
+    },
+    {
+      "conclusion": "skipped",
+      "name": "save the cache",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "Post Run actions/checkout@v4",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "Complete job",
+      "status": "completed"
+    }
+  ],
+  "tree": "d2e2cd8afbddad700ed155c3ea3776ec25398ac3"
+}
