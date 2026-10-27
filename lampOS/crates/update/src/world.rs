@@ -6,9 +6,10 @@ use lamp_bus::{Bus, Subscriber};
 use lamp_msgs::{Health, Speech, VoiceState};
 use std::{
     collections::BTreeMap,
-    io,
+    io::{self, Read},
     path::Path,
     process::{Command, Stdio},
+    sync::mpsc,
     thread,
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
@@ -76,20 +77,17 @@ impl Default for Systemctl {
 
 impl Systemd for Systemctl {
     fn states(&mut self, units: &[String]) -> Result<Vec<UnitState>, String> {
-        let output = Command::new("systemctl")
-            .args([
-                "show",
-                "--property=Id,ActiveState,SubState,MainPID,NRestarts",
-                "--",
-            ])
-            .args(units)
-            .stdin(Stdio::null())
-            .output()
-            .map_err(|error| format!("systemctl: {error}"))?;
-        if !output.status.success() {
-            return Err(String::from_utf8_lossy(&output.stderr).trim().to_owned());
-        }
-        Ok(parse_show(&String::from_utf8_lossy(&output.stdout)))
+        let stdout = query_within(
+            Command::new("systemctl")
+                .args([
+                    "show",
+                    "--property=Id,ActiveState,SubState,MainPID,NRestarts",
+                    "--",
+                ])
+                .args(units),
+            JOURNAL_WITHIN,
+        )?;
+        Ok(parse_show(&stdout))
     }
 
     fn setup_unit_properties(&mut self) -> Option<String> {
@@ -280,6 +278,73 @@ pub const JOURNAL_WITHIN: Duration = Duration::from_secs(5);
 pub fn output_within(command: &mut Command, within: Duration) -> Option<String> {
     let bytes = query::output_within(command, Instant::now() + within).ok()?;
     String::from_utf8(bytes).ok()
+}
+
+/// What `command` printed, if it ended well within `within`, both of its
+/// pipes read to their end by then. Otherwise an error says why: it could
+/// not start, it did not finish (it is killed), a pipe stayed open (a child
+/// it left holds it), or it failed, in its own trimmed words on stderr. A
+/// stalled query never holds its caller past `within`.
+fn query_within(command: &mut Command, within: Duration) -> Result<String, String> {
+    let mut child = command
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|error| format!("systemctl: {error}"))?;
+    let (sent, read) = mpsc::channel();
+    let pipes: [Option<Box<dyn io::Read + Send>>; 2] = [
+        child.stdout.take().map(|pipe| Box::new(pipe) as _),
+        child.stderr.take().map(|pipe| Box::new(pipe) as _),
+    ];
+    for (which, pipe) in pipes.into_iter().enumerate() {
+        let sent = sent.clone();
+        let Some(mut pipe) = pipe else {
+            let _ = sent.send((which, Vec::new()));
+            continue;
+        };
+        // Left running if a pipe never closes: it ends with the pipe.
+        thread::spawn(move || {
+            let mut bytes = Vec::new();
+            let _ = pipe.read_to_end(&mut bytes);
+            let _ = sent.send((which, bytes));
+        });
+    }
+    let until = Instant::now() + within;
+    let status = loop {
+        match child.try_wait() {
+            Ok(Some(status)) => break status,
+            Ok(None) if Instant::now() < until => thread::sleep(Duration::from_millis(20)),
+            Ok(None) => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return Err(format!(
+                    "systemctl did not finish within {} s",
+                    within.as_secs()
+                ));
+            }
+            Err(error) => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return Err(format!("systemctl: {error}"));
+            }
+        }
+    };
+    let mut output = [Vec::new(), Vec::new()];
+    for _ in 0..2 {
+        let left = until.saturating_duration_since(Instant::now());
+        let (which, bytes) = read.recv_timeout(left).map_err(|_| {
+            format!(
+                "systemctl's output did not close within {} s",
+                within.as_secs()
+            )
+        })?;
+        output[which] = bytes;
+    }
+    if !status.success() {
+        return Err(String::from_utf8_lossy(&output[1]).trim().to_owned());
+    }
+    Ok(String::from_utf8_lossy(&output[0]).into_owned())
 }
 
 /// The longest line a round's outcome carries of a part's journal.
@@ -526,6 +591,58 @@ impl Clock for Monotonic {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn sh(script: &str) -> Command {
+        let mut command = Command::new("sh");
+        command.args(["-c", script]);
+        command
+    }
+
+    #[test]
+    fn a_stalled_systemctl_show_is_an_error_within_its_bound() {
+        let at = Instant::now();
+        let why = query_within(&mut sh("sleep 30"), Duration::from_secs(1)).unwrap_err();
+        assert!(why.contains("did not finish within 1 s"), "{why}");
+        assert!(at.elapsed() < Duration::from_secs(3), "{:?}", at.elapsed());
+    }
+
+    #[test]
+    fn a_child_holding_the_pipe_is_an_error_within_the_bound() {
+        // The stand-in ends at once, well; the child it leaves keeps both
+        // pipes open.
+        let at = Instant::now();
+        let why = query_within(
+            &mut sh("sleep 30 & echo Id=lamp-voice.service"),
+            Duration::from_secs(1),
+        )
+        .unwrap_err();
+        assert!(why.contains("output did not close within 1 s"), "{why}");
+        assert!(at.elapsed() < Duration::from_secs(3), "{:?}", at.elapsed());
+    }
+
+    #[test]
+    fn a_failed_query_says_its_trimmed_stderr_and_a_good_one_its_stdout() {
+        assert_eq!(
+            query_within(
+                &mut sh("echo '  no such unit  ' >&2; exit 1"),
+                JOURNAL_WITHIN
+            ),
+            Err("no such unit".to_owned())
+        );
+        let text = query_within(
+            &mut sh("printf 'Id=a.service\\nActiveState=active\\n'; echo noise >&2"),
+            JOURNAL_WITHIN,
+        )
+        .unwrap();
+        assert_eq!(parse_show(&text)[0].active, "active");
+        // More than a pipe holds, on both pipes, is read while it runs.
+        let big = query_within(
+            &mut sh("head -c 200000 /dev/zero; head -c 200000 /dev/zero >&2"),
+            JOURNAL_WITHIN,
+        )
+        .unwrap();
+        assert_eq!(big.len(), 200000);
+    }
 
     const BACK_SHOW: &str = "Id=lamp-update-back.service\nLoadState=loaded\nUnitFileState=static\nActiveState=inactive\nSubState=dead\n";
     const TIMER_SHOW: &str = "Id=lamp-update-back.timer\nLoadState=loaded\nUnitFileState=enabled\nActiveState=active\nSubState=waiting\nUnit=lamp-update-back.service\n";
