@@ -1,0 +1,329 @@
+{
+  "boundary": "before and after trace then all four hand direct watchdogs and the disjoint nextest remainder; after-docs input identity not claimed",
+  "live_target_access_for_this_audit": false,
+  "rows": [
+    {
+      "name": "lamp-voice",
+      "role": "normal companion",
+      "path": "target/debug/lamp-voice",
+      "sha256": "b6b635b2460f9cc90ace850775b2f090126638b35eda2ae10e4b045f0ea87cab",
+      "size": 40823544,
+      "mode": "0o755",
+      "single_link": true,
+      "no_symlink": true,
+      "compiler_profiles": [
+        {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": false
+        }
+      ]
+    },
+    {
+      "name": "lamp-update",
+      "role": "normal companion",
+      "path": "target/debug/lamp-update",
+      "sha256": "322b75c3948b5c9752678b4c68e377c149e845deb72659eff1ad09c3120b7249",
+      "size": 11093892,
+      "mode": "0o755",
+      "single_link": true,
+      "no_symlink": true,
+      "compiler_profiles": [
+        {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": false
+        }
+      ]
+    },
+    {
+      "name": "lamp-update",
+      "role": "test driver",
+      "path": "target/debug/deps/lamp_update-24de88e79548cc68",
+      "sha256": "063dcd7ba573d16b3292bbf1c34304a0e7ddc8feaac22520d81bcb23a7539711",
+      "size": 13931012,
+      "mode": "0o755",
+      "single_link": true,
+      "no_symlink": true,
+      "compiler_profiles": [
+        {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        }
+      ]
+    },
+    {
+      "name": "lamp-update::functions",
+      "role": "test driver",
+      "path": "target/debug/deps/functions-1d5b9815a72ee26c",
+      "sha256": "20893f02ca741f453ea996d2480f0c47296e83c031b1a6760e1f5dde11aa6bda",
+      "size": 18708440,
+      "mode": "0o755",
+      "single_link": true,
+      "no_symlink": true,
+      "compiler_profiles": [
+        {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        }
+      ]
+    },
+    {
+      "name": "lamp-update::install",
+      "role": "test driver",
+      "path": "target/debug/deps/install-4ec61a384a7bebd6",
+      "sha256": "8691d3c3362ebecf8fc3eb516ddd3f012b3642386772e96dca0a7b3e598c2933",
+      "size": 14342348,
+      "mode": "0o755",
+      "single_link": true,
+      "no_symlink": true,
+      "compiler_profiles": [
+        {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        }
+      ]
+    },
+    {
+      "name": "lamp-update::it",
+      "role": "test driver",
+      "path": "target/debug/deps/it-8a12cad2e19346cc",
+      "sha256": "772ff15f6355f18b4de328efa4562b3860733adbe4c40352c6b0f28614a2a241",
+      "size": 1648824,
+      "mode": "0o755",
+      "single_link": true,
+      "no_symlink": true,
+      "compiler_profiles": [
+        {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        }
+      ]
+    },
+    {
+      "name": "lamp-update::release_pair",
+      "role": "test driver",
+      "path": "target/debug/deps/release_pair-fbb78cd8463e3e15",
+      "sha256": "1217921c5d4e53e47d98c73da178e467305e2eb95779cedc48940bc3ccb4d874",
+      "size": 2807788,
+      "mode": "0o755",
+      "single_link": true,
+      "no_symlink": true,
+      "compiler_profiles": [
+        {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        }
+      ]
+    },
+    {
+      "name": "lamp-update::round",
+      "role": "test driver",
+      "path": "target/debug/deps/round-b723bd10f0d74f6d",
+      "sha256": "63434bd1d9658662dd58c325f6dbf878e0be7e7c36f7eb4d10f0333749e8a107",
+      "size": 17084236,
+      "mode": "0o755",
+      "single_link": true,
+      "no_symlink": true,
+      "compiler_profiles": [
+        {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        }
+      ]
+    },
+    {
+      "name": "lamp-update::self-cli-exec",
+      "role": "test driver",
+      "path": "target/debug/deps/self_cli_exec-ef6e8d0794df29a2",
+      "sha256": "f092e07be610c2215c90b06bd1315fc860b38596a89afa085999958634d53710",
+      "size": 473952,
+      "mode": "0o755",
+      "single_link": true,
+      "no_symlink": true,
+      "compiler_profiles": [
+        {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        }
+      ]
+    },
+    {
+      "name": "lamp-update::self-process-cuts",
+      "role": "test driver",
+      "path": "target/debug/deps/self_process_cuts-bd9ef5b2a6d38c28",
+      "sha256": "b98ee2b631906e5412b29a4b137c190ed76e7e2f48b31c9ce66c9f0142e0ac87",
+      "size": 473944,
+      "mode": "0o755",
+      "single_link": true,
+      "no_symlink": true,
+      "compiler_profiles": [
+        {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        }
+      ]
+    },
+    {
+      "name": "lamp-update::bin/lamp-update",
+      "role": "test driver",
+      "path": "target/debug/deps/lamp_update-f84669b4788eaa93",
+      "sha256": "f7d2542191b55e77659682bfaf39a0db9f5e36be256f88e36e287a1c4188df15",
+      "size": 1185808,
+      "mode": "0o755",
+      "single_link": true,
+      "no_symlink": true,
+      "compiler_profiles": [
+        {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        }
+      ]
+    },
+    {
+      "name": "lamp-voice",
+      "role": "test driver",
+      "path": "target/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+      "sha256": "fdf9ff702b08102589ff986a2ba6490c4ac99b04ae412375225a4af382cdfd9f",
+      "size": 117384928,
+      "mode": "0o755",
+      "single_link": true,
+      "no_symlink": true,
+      "compiler_profiles": [
+        {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        }
+      ]
+    },
+    {
+      "name": "lamp-voice::it",
+      "role": "test driver",
+      "path": "target/debug/deps/it-ac9b9993d410d428",
+      "sha256": "1a85f9c3d2c277463c4ce774d1b8b9e803200b75f50adfac16ec276d59aa351d",
+      "size": 94649924,
+      "mode": "0o755",
+      "single_link": true,
+      "no_symlink": true,
+      "compiler_profiles": [
+        {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        }
+      ]
+    },
+    {
+      "name": "lamp-voice::release_pair",
+      "role": "test driver",
+      "path": "target/debug/deps/release_pair-92e5f959ae720155",
+      "sha256": "5d42a1db2079690335e44d7ac6da7490cfdd47ac8641cb16ad554dcde8721f60",
+      "size": 4822788,
+      "mode": "0o755",
+      "single_link": true,
+      "no_symlink": true,
+      "compiler_profiles": [
+        {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        }
+      ]
+    },
+    {
+      "name": "lamp-voice::bin/lamp-voice",
+      "role": "test driver",
+      "path": "target/debug/deps/lamp_voice-507b8ab98a2c94b0",
+      "sha256": "38e712846fa22e90ae6f9ea8a98d40f7c9d2abbab6b27065efa7adbe427a301e",
+      "size": 1119920,
+      "mode": "0o755",
+      "single_link": true,
+      "no_symlink": true,
+      "compiler_profiles": [
+        {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        }
+      ]
+    },
+    {
+      "name": "lamp-voice::example/render_line_second",
+      "role": "test driver",
+      "path": "target/debug/examples/render_line_second-d52e8b12a523439f",
+      "sha256": "262ca84845806936da6b40b0d672f6084f26ab631273840bac087e273038d1c9",
+      "size": 1435616,
+      "mode": "0o755",
+      "single_link": true,
+      "no_symlink": true,
+      "compiler_profiles": [
+        {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        }
+      ]
+    },
+    {
+      "name": "lamp-voice::example/stop_words_stt_replay",
+      "role": "test driver",
+      "path": "target/debug/examples/stop_words_stt_replay-5a8c99799d0dadff",
+      "sha256": "4973c6b3c3da87679d70039553ae0148f780e85a144ee4c6c57204a0dd343abf",
+      "size": 2729424,
+      "mode": "0o755",
+      "single_link": true,
+      "no_symlink": true,
+      "compiler_profiles": [
+        {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        }
+      ]
+    }
+  ]
+}

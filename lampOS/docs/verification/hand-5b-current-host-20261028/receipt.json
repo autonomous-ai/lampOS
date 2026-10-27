@@ -1,0 +1,555 @@
+{
+  "status": "HOST_GATE_PASSED; original new-head ARM and Linux Clippy pending",
+  "head": "5b018ca5d0278f5c3655548c00c41a45ab58e9db",
+  "authored_base": "fc9c781afaed38dc976f650484c30f65bf5db57a",
+  "tree": "0ed8528f4684ab660029cd1805685a19f6714634",
+  "host": "x86_64-apple-darwin",
+  "compiler": {
+    "native_session": 10977,
+    "actual_exit": 0,
+    "chunk": "781a49",
+    "release_sha256": "e4b620a924520488e8056657e359a00dabb80545740aa375a66702717abcca82",
+    "stages": [
+      {
+        "stage": "fmt",
+        "command": [
+          "cargo",
+          "+1.96.0",
+          "fmt",
+          "--all",
+          "--",
+          "--check"
+        ],
+        "exit": 0,
+        "elapsed_seconds": 13.139902502996847,
+        "owned_session_empty": true
+      },
+      {
+        "stage": "metadata",
+        "command": [
+          "cargo",
+          "+1.96.0",
+          "metadata",
+          "--offline",
+          "--locked",
+          "--format-version=1"
+        ],
+        "exit": 0,
+        "elapsed_seconds": 0.6725993200088851,
+        "owned_session_empty": true
+      },
+      {
+        "stage": "clippy",
+        "command": [
+          "cargo",
+          "+1.96.0",
+          "clippy",
+          "--offline",
+          "--locked",
+          "--jobs",
+          "1",
+          "--workspace",
+          "--all-targets",
+          "--message-format=json",
+          "--",
+          "-D",
+          "warnings"
+        ],
+        "exit": 0,
+        "elapsed_seconds": 201.8103187950328,
+        "owned_session_empty": true
+      },
+      {
+        "stage": "workspace-build",
+        "command": [
+          "cargo",
+          "+1.96.0",
+          "build",
+          "--offline",
+          "--locked",
+          "--jobs",
+          "1",
+          "--workspace",
+          "--message-format=json"
+        ],
+        "exit": 0,
+        "elapsed_seconds": 180.77675818599528,
+        "owned_session_empty": true
+      }
+    ]
+  },
+  "runtime": {
+    "native_session": 21324,
+    "actual_exit": 0,
+    "chunk": "7740b8",
+    "release_sha256": "428f40afdab855ff3f661cf2eaabef6150262f9146edcfd1aadf17ff81765bb0",
+    "counts": {
+      "selected_unique": 4224,
+      "passed_unique": 4224,
+      "failed": 0,
+      "unrun_selected": 0,
+      "all_selected_terminal": true,
+      "required_host_passed": 22,
+      "Linux_only_no_Mac_credit": 1,
+      "direct_watchdogs_passed": 5,
+      "trace_watchdog_passed": 1,
+      "hand_watchdogs_passed": 4,
+      "direct_watchdog_seconds": 30,
+      "direct_term_grace_seconds": 2,
+      "disjoint_remainder": {
+        "accounting_valid": true,
+        "all_selected_terminal": true,
+        "selected_cases": 4219,
+        "passed_including_LEAK": 4219,
+        "clean_passed": 4219,
+        "passed_but_LEAK": 0,
+        "failed": 0,
+        "ignored_discovery_and_human_SKIP": 33,
+        "ignored_JSON_terminals": 17,
+        "raw_nextest_exit": 0,
+        "failed_keys": [],
+        "leaky_keys": [],
+        "timeout_case_count": 0,
+        "suite_terminal_rows_retained": 12,
+        "suite_rows_not_independent_test_counts": true
+      },
+      "repeated_selected_cases": 0,
+      "old4163_credit_transferred": false,
+      "dependent3577_executed": false
+    },
+    "groups_disjoint": {
+      "Voice_lib": 3887,
+      "Update_lib": 227,
+      "Update_install": 108,
+      "Update_ci_paths": 2
+    },
+    "subset_counts_not_additive": {
+      "hand_controls": 64,
+      "stock_privacy": 9,
+      "transport": 28
+    },
+    "documentation_separate": {
+      "actual_exit": 0,
+      "rows": [
+        [
+          "ok",
+          "0",
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        [
+          "ok",
+          "0",
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        [
+          "ok",
+          "0",
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        [
+          "ok",
+          "0",
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        [
+          "ok",
+          "0",
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        [
+          "ok",
+          "2",
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        [
+          "ok",
+          "0",
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        [
+          "ok",
+          "0",
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        [
+          "ok",
+          "0",
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        [
+          "ok",
+          "0",
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        [
+          "ok",
+          "0",
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        [
+          "ok",
+          "0",
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        [
+          "ok",
+          "0",
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        [
+          "ok",
+          "0",
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        [
+          "ok",
+          "0",
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        [
+          "ok",
+          "0",
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        [
+          "ok",
+          "1",
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        [
+          "ok",
+          "0",
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        [
+          "ok",
+          "0",
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        [
+          "ok",
+          "0",
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        [
+          "ok",
+          "0",
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        [
+          "ok",
+          "0",
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        [
+          "ok",
+          "1",
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        [
+          "ok",
+          "0",
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        [
+          "ok",
+          "0",
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        [
+          "ok",
+          "0",
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        [
+          "ok",
+          "0",
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        [
+          "ok",
+          "0",
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        [
+          "ok",
+          "0",
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        [
+          "ok",
+          "0",
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        [
+          "ok",
+          "0",
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        [
+          "ok",
+          "0",
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        [
+          "ok",
+          "0",
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        [
+          "ok",
+          "0",
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        [
+          "ok",
+          "0",
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        [
+          "ok",
+          "0",
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        [
+          "ok",
+          "0",
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        [
+          "ok",
+          "0",
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        [
+          "ok",
+          "0",
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        [
+          "ok",
+          "0",
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        [
+          "ok",
+          "0",
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        [
+          "ok",
+          "0",
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        [
+          "ok",
+          "0",
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        [
+          "ok",
+          "0",
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        [
+          "ok",
+          "0",
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        [
+          "ok",
+          "0",
+          "0",
+          "0",
+          "0",
+          "0"
+        ],
+        [
+          "ok",
+          "0",
+          "0",
+          "0",
+          "0",
+          "0"
+        ]
+      ],
+      "passed": 4,
+      "failed": 0,
+      "ignored": 0,
+      "separate_from_runtime": true
+    }
+  },
+  "source_stable": true,
+  "retained_prior_metadata_unchanged": true,
+  "all_owned_sessions_groups_closed": true,
+  "failed_driver_witnesses_created": 0,
+  "actual_completion_confirmed_by_root": true,
+  "current_target_access_for_audit": false,
+  "retained_original_failures": {
+    "parent_1b_ARM_run": 40588908587,
+    "passed": 6466,
+    "failed": 3,
+    "selected_unrun": 1336,
+    "selected": 7805,
+    "summary_skips": 54,
+    "reclassified": false,
+    "prior_failure_public_log": "a0a4067249",
+    "old_child_a47_ARM_run": 40551384357,
+    "old_child_passed": 5097,
+    "old_child_failed": 1,
+    "old_child_selected_unrun": 2698,
+    "all_other_historical_failures_retained": true
+  },
+  "limits": [
+    "This saved-evidence audit does not identify the cause of the original native failures.",
+    "Direct control operation times are not physical input-to-feedback or acoustic latency.",
+    "The Linux-only required control has no Mac execution credit.",
+    "Dependent child #3577 was excluded from this host runtime.",
+    "No current target was accessed, no artifact downloaded, and no device was operated."
+  ],
+  "saved_input_evidence_sha256": {
+    "source-freeze.json": "9454b82898661a04286d0b6fdd9f78f28ddf8cb0b4ee2f50e4a80982a855e72b",
+    "source-mtimes.json": "f7b3c1a1a01956f18d091bf84a6837740cffbff75aeab0d6b42c43c74a79b97a",
+    "runtime-build-inputs.json": "c8fcfa3bf61b68823dd27baf9ee51200e895f6582e61a213d8112337ce0a7303",
+    "compiler-artifact-provenance.json": "b8bdc21e6a71e7e66e096926cbef3bf6b1697e406a3bb391dca39e51ce38eabb",
+    "normal-companion-bindings.json": "0dc670e27787c50fa1fcd6364fa3d9ab27ba2f33e74a47bf32a9496239fd5d98",
+    "required-source-identities.json": "1f685e9ec14ce4241a311a119a69e8219dd72e7d59f0ccc6b2460ae7494f18f3",
+    "union-terminal-ledger.json": "6ffe0cfd8146d6d78c88dabd69ffb90a23b5a1e02cd6224c7df8e6a400b86cfa",
+    "operations.json": "fde3d2891e53f447d956a7432b295beea054828a22ec148cf5075c54a00b57fc"
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "files": [
+    {
+      "path": "README.md",
+      "sha256": "349d0ad48d5127be596cd8a07a276308055542783a6de1f937274c64d2467417",
+      "bytes": 2135
+    },
+    {
+      "path": "direct-controls.json",
+      "sha256": "75b2492b6a52391359e33e2b981d5e30087610197221c0395b7854050c387d54",
+      "bytes": 3675
+    },
+    {
+      "path": "receipt.json",
+      "sha256": "7a3645e8f4a63876bdf90cfa992e340f678f0a4879d7cfc65b8156b890334d7a",
+      "bytes": 10845
+    },
+    {
+      "path": "required-controls.json",
+      "sha256": "626262c0fe41ff639d931ac03a2128b308dce7b9f8c5535b6860ce7f08749e0c",
+      "bytes": 13900
+    },
+    {
+      "path": "saved-binary-bindings.json",
+      "sha256": "0746da4ef5e478c4bb29f3020872773f826d02847291c7574f0815d7ee546f08",
+      "bytes": 9265
+    },
+    {
+      "path": "source-ledger.json",
+      "sha256": "2462d753a881c5223327a5161b25ea5440f9cee33f8a3449f47d1267dc1cd76b",
+      "bytes": 1408
+    }
+  ]
+}

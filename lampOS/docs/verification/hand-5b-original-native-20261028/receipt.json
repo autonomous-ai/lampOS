@@ -1,0 +1,111 @@
+{
+  "head": "5b018ca5d0278f5c3655548c00c41a45ab58e9db",
+  "authored_base": "fc9c781afaed38dc976f650484c30f65bf5db57a",
+  "authored_tree": "0ed8528f4684ab660029cd1805685a19f6714634",
+  "native_runtime": {
+    "selected": 7858,
+    "PASS_unique": 7858,
+    "FAIL": 0,
+    "LEAK": 0,
+    "TIMEOUT": 0,
+    "selected_unrun": 0,
+    "duplicate_identities": 0,
+    "retries": 0,
+    "summary_skips": 54,
+    "summary_skip_identities_not_invented": true,
+    "required23_PASS_once": 23,
+    "privacy16_cohort": {
+      "observed_PASS_once": 9,
+      "no_terminal_observed": 7,
+      "absent_Bus_Msgs_identities_not_claimed_passed_or_selected_unrun": true
+    }
+  },
+  "separate_harnesses": {
+    "doc_targets": 47,
+    "doc_PASS": 4,
+    "doc_FAIL": 0,
+    "relay_aggregate_PASS": 1,
+    "process_distinct_PASS": 13,
+    "process_FAIL": 0,
+    "not_added_to_nextest": true
+  },
+  "artifact_metadata_only": {
+    "id": 12778678413,
+    "compressed_bytes": 118788689,
+    "API_and_upload_digest": "sha256:9417616a00eea94a11c89e2e0807fdf63d9f1fdddc98d8b78526ad85d0fe4ba4",
+    "exported_binaries_reported": 48,
+    "exported_examples_reported": 2,
+    "archive_downloaded": false,
+    "headers_independently_verified": false,
+    "pins_or_installed_bytes_claimed": false
+  },
+  "earlier_failure": {
+    "run": 40588908587,
+    "passed": 6466,
+    "failed": 3,
+    "selected_unrun": 1336,
+    "still_FAILED": true,
+    "three_current_case_PASS_do_not_establish_original_cause": true
+  },
+  "limits": [
+    "Whole authored-tree equality is not claimed; actual merge checkout is separately bound.",
+    "This audit does not authorize readiness, merging, deployment, or physical acceptance.",
+    "No current target, source, index, or ref was accessed or mutated for this CI audit.",
+    "Original logs were bounded to 32 MiB compressed and 64 MiB expanded per run; production artifact downloads were not authorized."
+  ],
+  "status": "Original ARM64 and Linux Clippy passed; readiness and merge disposition remain separate.",
+  "actual_checkout": "6b6a27fe2faaf76209231746a1aa5505bfca369c",
+  "actual_tree": "cc19e3f51fc08e96b8bc408b51fbd7ef8a7a5faa",
+  "actual_parents": [
+    "89823095e69dcbafaa5b3b79733c17ecf9d8e8f7",
+    "5b018ca5d0278f5c3655548c00c41a45ab58e9db"
+  ],
+  "ARM": {
+    "run": 40600417604,
+    "native_watcher_session": 74009,
+    "actual_exit": 0,
+    "actual_chunk": "a67c59",
+    "log_collection_native_session": 68726,
+    "collection_actual_exit": 0,
+    "collection_chunk": "c217fc"
+  },
+  "Linux_Clippy": {
+    "run": 40600417514,
+    "actual_native_watcher": 59608,
+    "actual_exit": 0,
+    "actual_chunk": "b494d1"
+  },
+  "historically_failed_cases_now_observed": [
+    {
+      "event": "PASS",
+      "duration": "7.922s",
+      "binary": "lamp-voice",
+      "test": "second_provider::worker::tests::with_two_faces_held_looks_between_lines_make_the_first_line_busy",
+      "raw_line": 7753
+    },
+    {
+      "event": "PASS",
+      "duration": "0.008s",
+      "binary": "lamp-voice",
+      "test": "service_trace::tests::private_and_failed_reader_traces_keep_the_original_records_and_finite_state",
+      "raw_line": 7369
+    },
+    {
+      "event": "PASS",
+      "duration": "0.128s",
+      "binary": "lamp-voice",
+      "test": "service_privacy_controls::tests::only_a_privacy_worker_that_ended_cleanly_at_its_start_is_an_unreadable_switch",
+      "raw_line": 7362
+    }
+  ],
+  "old_failures_reclassified": false,
+  "all_earlier_failed_epochs_remain_preserved": true,
+  "private_receipt_sha256": "7704937bbc34468ae6be2a823a7f7051fca7942c3f56203a83067aaa0989ecc2",
+  "original_log_zip_sha256": {
+    "40600417604": "6c269f3a2316af76a9efa63d987de52102606ba8cdf0609dc57221ba1eb1ed47",
+    "40600417514": "a9b68b1adb08f7782ee6ca4e28ff67222d8eb79c6779883009d43132c3b4943e"
+  },
+  "source_API_commit_sha256": "f0f146992ae8bd8394d1d8af0ed81bbb8ca6be861a56a9fc736892638bd4436c",
+  "source_API_tree_sha256": "7c27f98db809ecc9003529f4c7d8ca3094bb4232cdd259a37e5a52ee38f61506",
+  "required_ledger_sha256": "f00e2113cbe94a3bca10ab9e08433be2da3c406b5af96b1895a71aa1988d0d3c"
+}

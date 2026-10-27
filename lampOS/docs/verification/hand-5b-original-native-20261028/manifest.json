@@ -1,0 +1,24 @@
+{
+  "files": [
+    {
+      "name": "README.md",
+      "bytes": 2209,
+      "sha256": "7f49e52278db930491d0f4cff8535d7d04b6ed059089aa025938be2b3cc9339c"
+    },
+    {
+      "name": "receipt.json",
+      "bytes": 4082,
+      "sha256": "e54a84d84652bac4c87c750137d06fe727f7c692226bf96744f592de003a3edc"
+    },
+    {
+      "name": "required23-ledger.json",
+      "bytes": 13989,
+      "sha256": "f00e2113cbe94a3bca10ab9e08433be2da3c406b5af96b1895a71aa1988d0d3c"
+    },
+    {
+      "name": "source-ledger.json",
+      "bytes": 4710,
+      "sha256": "a6dbd661d6a146dfcbf7bb866f5de47d30734f3de5aaf6152346a847c47da18b"
+    }
+  ]
+}

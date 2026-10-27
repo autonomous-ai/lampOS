@@ -1,0 +1,105 @@
+{
+  "actual_checkout": "6b6a27fe2faaf76209231746a1aa5505bfca369c",
+  "actual_tree": "cc19e3f51fc08e96b8bc408b51fbd7ef8a7a5faa",
+  "parents": [
+    "89823095e69dcbafaa5b3b79733c17ecf9d8e8f7",
+    "5b018ca5d0278f5c3655548c00c41a45ab58e9db"
+  ],
+  "whole_authored_tree_equivalence_claimed": false,
+  "rows": [
+    {
+      "path": "lampOS/crates/bus/tests/it/bus.rs",
+      "actual_blob": "f7eda7431cf06877921b6b889a10b8957d2e6205",
+      "actual_mode": "100644",
+      "published_blob": "f7eda7431cf06877921b6b889a10b8957d2e6205",
+      "published_mode": "100644",
+      "exact_published_blob_mode": true,
+      "same_published_and_local_tested": true,
+      "published_sha256": "7040765d6d856c9e228a1211da736b8a891680a5bf90d4b0a3a6ced064a1f76a"
+    },
+    {
+      "path": "lampOS/crates/msgs/tests/it/privacy.rs",
+      "actual_blob": "928b84419c17db8678b3805982801b38bd62de00",
+      "actual_mode": "100644",
+      "published_blob": "928b84419c17db8678b3805982801b38bd62de00",
+      "published_mode": "100644",
+      "exact_published_blob_mode": true,
+      "same_published_and_local_tested": true,
+      "published_sha256": "49877816630df846011d0c3a9fe3239e4bbdac0cdfffa31478a38c159ca03356"
+    },
+    {
+      "path": "lampOS/crates/voice/src/hand_controls.rs",
+      "actual_blob": "233a2c6f0d5a01241020031c5ebb688ef2ceea72",
+      "actual_mode": "100644",
+      "published_blob": "233a2c6f0d5a01241020031c5ebb688ef2ceea72",
+      "published_mode": "100644",
+      "exact_published_blob_mode": true,
+      "same_published_and_local_tested": true,
+      "published_sha256": "6f7ccdebf95bc841bdc57de1d8d042e32d92fffb5b96577a9282ba5cfa510df6"
+    },
+    {
+      "path": "lampOS/crates/voice/src/hand_controls/tests.rs",
+      "actual_blob": "ed5029cc4dfd47eba12d017d7f6ea1687a83bd88",
+      "actual_mode": "100644",
+      "published_blob": "ed5029cc4dfd47eba12d017d7f6ea1687a83bd88",
+      "published_mode": "100644",
+      "exact_published_blob_mode": true,
+      "same_published_and_local_tested": true,
+      "published_sha256": "c19bd7259a707d26651fa722b1266878a18c5aa952ab6830c42a334c1aa25d29"
+    },
+    {
+      "path": "lampOS/crates/voice/src/privacy_bus.rs",
+      "actual_blob": "d94b9f8dc4b372a3a7518d69aa20f0945c18d292",
+      "actual_mode": "100644",
+      "published_blob": "d94b9f8dc4b372a3a7518d69aa20f0945c18d292",
+      "published_mode": "100644",
+      "exact_published_blob_mode": true,
+      "same_published_and_local_tested": true,
+      "published_sha256": "0f376c76bc9409f9d41c07187d4a58de553bfb5b49a6d600342bcd90714a67df"
+    },
+    {
+      "path": "lampOS/crates/voice/src/transport.rs",
+      "actual_blob": "615e120d3e2780b35c9cb0c1427501e3ae20b528",
+      "actual_mode": "100644",
+      "published_blob": "615e120d3e2780b35c9cb0c1427501e3ae20b528",
+      "published_mode": "100644",
+      "exact_published_blob_mode": true,
+      "same_published_and_local_tested": true,
+      "published_sha256": "1841fe337f3140999634a31506bc026d2cc9e23f170edf1941bd770dcd1c759a"
+    },
+    {
+      "path": "lampOS/docs/realtime-tests.md",
+      "actual_blob": "1d529515bacbf8ac6cc7df4e41ae0a9ce0f0f013",
+      "actual_mode": "100644",
+      "published_blob": "1d529515bacbf8ac6cc7df4e41ae0a9ce0f0f013",
+      "published_mode": "100644",
+      "exact_published_blob_mode": true,
+      "same_published_and_local_tested": true,
+      "published_sha256": "fd1ae380f4465ae866e30928d335e01eb66637b828faeaeeb70110a66b1da9b6"
+    },
+    {
+      "path": "lampOS/crates/voice/src/service_trace.rs",
+      "actual_blob": "a752cd988686fc724bca573f76f03edf90f24a82",
+      "saved_host_blob": "a752cd988686fc724bca573f76f03edf90f24a82",
+      "saved_host_sha256": "593290a4d1e64c2283bd6ae7b481b39449353bc70fd53e4c67318323ae4adafe",
+      "exact_blob_mode": true,
+      "binding": "Both original runs independently logged the same actual checkout."
+    },
+    {
+      "path": "lampOS/crates/voice/src/service_privacy_controls.rs",
+      "actual_blob": "06278b55bb0cdf160e32a29ec1fe3fa16fc169e1",
+      "saved_host_blob": "06278b55bb0cdf160e32a29ec1fe3fa16fc169e1",
+      "saved_host_sha256": "20e1cfa06201d5263f55a5e8989a88dcba695dfbaee9959d2405106049d7487d",
+      "exact_blob_mode": true,
+      "binding": "Both original runs independently logged the same actual checkout."
+    },
+    {
+      "path": "lampOS/crates/voice/src/second_provider/worker.rs",
+      "actual_blob": "70dffd5ceffd3ff63953e4d9bd68b3db0f054250",
+      "saved_host_blob": "70dffd5ceffd3ff63953e4d9bd68b3db0f054250",
+      "saved_host_sha256": "3fd295e2842c895f0a69d18c231146769e398a89be8fff3843e69f29ef146101",
+      "exact_blob_mode": true,
+      "binding": "Both original runs independently logged the same actual checkout."
+    }
+  ]
+}
