@@ -391,7 +391,7 @@ As built on 2026-10-16 (#938, `crates/skills`, not yet run on a lamp):
     lamp-skills [--dir DIR] [--bus-root DIR] [--gaze-socket PATH] [--mood-socket PATH] [--actions-socket PATH] [--say-socket PATH] [--tools-dir DIR] [--state-dir DIR] [--clock-control PATH] [--known-file PATH] [--zone system|NAME | --utc-offset-minutes N]
     lamp-skills test SKILL_DIR...
     lamp-skills install [--dir DIR] SKILL_DIR|PACKAGE.tar
-    lamp-skills remove [--dir DIR] NAME
+    lamp-skills remove [--dir DIR] [--state-dir DIR] NAME
     lamp-skills list [--dir DIR]
     lamp-skills pack [--out DIR] [--key-file PRIVATE] SKILL_DIR
     lamp-skills asked [--dir DIR] [--key-file PATH]
@@ -1210,7 +1210,7 @@ product's skills folder is root's; the part itself only reads it, under
 `ProtectSystem=strict`):
 
     lamp-skills install [--dir DIR] SKILL_DIR|PACKAGE.tar
-    lamp-skills remove [--dir DIR] NAME
+    lamp-skills remove [--dir DIR] [--state-dir DIR] NAME
     lamp-skills list [--dir DIR]
     lamp-skills pack [--out DIR] [--key-file PRIVATE] SKILL_DIR
     lamp-skills asked [--dir DIR] [--key-file PATH]
@@ -1252,7 +1252,8 @@ it does not know).
   every folder of exactly that shape directly in `DIR` (a skill's name and a
   number; a link or a file of such a name is left as it is) and says so.
 - **`remove`** renames an installable skill's folder aside, so it is gone
-  at once for the program, then deletes it.
+  at once for the program, then deletes it. First it takes the owner's
+  yes to the skill's camera out of `--state-dir`'s `camera` (below).
   The app's skills page removes a skill the same way, through the manage
   helper below.
 - **`asked`** is the manage helper ("The manage helper", below): one
@@ -1366,13 +1367,22 @@ for it.
     Skills Store", below). It answers `NAME may see the camera's picture`
     or `NAME may not see the camera's picture`. **Every call reads it:** a
     skill that is not core (`kind = "core"`, which every product skill is)
-    and asks the picture (`camera`, or format 1's `look`) gets it only while
-    its name is in `camera`, read at the call that would give it
-    (`Engine::picture_refused`); without its yes the call runs without the
-    look, the journal says `skill:NAME: refused look: the owner hasn't said
-    yes to its camera`, and a yes taken back holds from the next call,
-    nothing restarted. A program with no `--state-dir` keeps no yes, so it
-    gives none. This holds for a skill put on by hand or made here too:
+    whose function hands the model the picture (a `look = true` step,
+    `Skill::looks`) runs it only while its name is in `camera`, read at
+    each call
+    (`Engine::picture_refused`). Without its yes the whole call is refused
+    before it is a run: no pose, no light, no look counted (a search's
+    `found` after it is still before a look), and no note of a picture.
+    The model is told `The owner hasn't allowed this skill's camera; they
+    can allow it in the app.` (`CAMERA_NOT_ALLOWED`), and the journal says
+    `skill:NAME: refused FUNCTION: the owner hasn't said yes to its camera`.
+    A yes taken back holds from the next call, nothing restarted. A program
+    with no `--state-dir` keeps no yes, so it gives none. **A remove takes
+    the yes back** (`{"remove": NAME}`, the app's `skills.remove`, and
+    `lamp-skills remove`, whose `--state-dir` is
+    `/var/lib/lampos-skills-state` by default), under the same lock and
+    before the folder goes, so a skill put on again by that name asks
+    again; a yes that can't be taken back removes nothing. This holds for a skill put on by hand or made here too:
     neither is refused at install, and neither sees the picture without the
     yes (Desk tutor and Look for my keys, installable, among them). Tests:
     `the_owners_camera_yes_is_kept_read_at_each_call_and_taken_back`

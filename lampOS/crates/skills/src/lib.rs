@@ -527,6 +527,12 @@ pub const FOUND: &str = "found";
 pub const FOUND_BEFORE_A_LOOK: &str =
     "Nothing is being looked at now: look first, with a place, and say found only once you see it.";
 
+/// What the model is told of a call to a skill that asks the camera's
+/// picture while the owner's yes to it is not kept (#3504's piece C,
+/// [`Engine::picture_refused`]): the whole call is refused, nothing moved.
+pub const CAMERA_NOT_ALLOWED: &str =
+    "The owner hasn't allowed this skill's camera; they can allow it in the app.";
+
 /// The most looks a search may say it takes: a living thing looks at a few
 /// places and lets it go (CLAUDE.md's rule 8).
 pub const SEARCH_LOOKS_AT_MOST: u32 = 8;
@@ -1854,6 +1860,15 @@ impl Skill {
         let found = self.search.as_ref()?.found.as_deref()?;
         let choice = self.choice.as_ref()?;
         (args.get(&choice.name).and_then(Value::as_str) == Some(FOUND)).then_some(found)
+    }
+
+    /// Whether a step of it hands the model the camera's picture (a `look =
+    /// true` step), whatever its choice: what the owner's yes to its camera
+    /// is asked of (#3504's piece C, [`Engine::picture_refused`]).
+    pub fn looks(&self) -> bool {
+        self.steps
+            .iter()
+            .any(|(_, step)| *step == Step::Call(Call::Look))
     }
 
     /// The arguments a search's next look is made with, after `looked` of
