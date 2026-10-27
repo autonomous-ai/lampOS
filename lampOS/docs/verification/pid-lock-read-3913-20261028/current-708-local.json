@@ -1,0 +1,188 @@
+{
+  "schema": "third-independent-source-and-native-two-test-read-v1",
+  "pr": 3913,
+  "head": "70815838048d0340daccd52699589d81560d283e",
+  "reviewed_base": "40923624247a893a19e1d980a328424eedffa308",
+  "disposition": "No blocking defect found in narrow acquiring-PID/Drop source change; requested native two-control read passed.",
+  "exact_source": {
+    "worktree": ".claude/worktrees/third-pr3913-708",
+    "clean_before_and_after": true,
+    "tracked_source_configuration_guards": 7500,
+    "guard_manifest": ".claude/worktrees/third-pr3913-audit/source-before.json",
+    "guard_manifest_sha256": "1d90e775d6f8cc26e75a4fcfc59aad4493d2eca25a04d9fb88cc0ab34bf4eee4",
+    "files": [
+      {
+        "path": "lampOS/crates/update/src/writer_refresh.rs",
+        "sha256": "791c3d84c26ecda383e5a1515f8dc1b2469e9d690c9fd5293bd8fd30f6215301"
+      },
+      {
+        "path": "lampOS/crates/update/src/writer_refresh/tests.rs",
+        "sha256": "c0f4301d420258b17df454dee6ef7197ab72bc00828ce0481a4778abc804c58e"
+      },
+      {
+        "path": "lampOS/docs/settings-writer-refresh.md",
+        "sha256": "6e75944cf45e138261de65be2e56f3642997e24760dae6947d4125dc5f120b84"
+      }
+    ]
+  },
+  "compilation": {
+    "command": "cargo +1.96.0 test --locked --offline -p lamp-update --lib --no-run --jobs 1 --message-format=json",
+    "once": true,
+    "deadline_seconds": 1200,
+    "target": ".claude/worktrees/third-store-target",
+    "controls": {
+      "CARGO_BUILD_JOBS": "1",
+      "CARGO_INCREMENTAL": "0",
+      "CARGO_PROFILE_DEV_DEBUG": "0",
+      "CARGO_PROFILE_TEST_DEBUG": "0",
+      "CARGO_TERM_COLOR": "never",
+      "RUST_TEST_THREADS": "1",
+      "CARGO_NET_OFFLINE": "true"
+    },
+    "artifact": {
+      "kind": [
+        "lib"
+      ],
+      "profile_test": true,
+      "features": [],
+      "fresh": false,
+      "source": ".claude/worktrees/third-pr3913-708/lampOS/crates/update/src/lib.rs",
+      "actual_executable": ".claude/worktrees/third-store-target/debug/deps/lamp_update-cebdb705cde8ec81",
+      "saved_before_discovery_and_runtime": ".claude/worktrees/third-pr3913-audit/exact-head-lib-test",
+      "actual_and_saved_sha256_before_after": "2b4884821be4993c873a0a9c12dd1bcbb0ab7c71620e19e0d7147fa033387c87"
+    }
+  },
+  "discovery": {
+    "test_count": 184,
+    "benchmark_count": 0,
+    "required_exact_names_each_once": [
+      "writer_refresh::tests::dropping_the_session_releases_its_lease_despite_a_retained_duplicate",
+      "writer_refresh::tests::a_nonowner_guard_drop_cannot_unlock_the_acquiring_process_lease"
+    ]
+  },
+  "native_test_witnesses": [
+    {
+      "test": "writer_refresh::tests::dropping_the_session_releases_its_lease_despite_a_retained_duplicate",
+      "run_count": 1,
+      "passed": 1,
+      "failed": 0,
+      "ignored": 0,
+      "filtered_out": 183,
+      "threads": 1,
+      "deadline_seconds": 30,
+      "retries": 0,
+      "stdout": ".claude/worktrees/third-pr3913-audit/test-1.stdout",
+      "stdout_sha256": "50155e6c5c2cf49aa75971dd51721e614c4233260da9c1fd6e217bc84bc19db3"
+    },
+    {
+      "test": "writer_refresh::tests::a_nonowner_guard_drop_cannot_unlock_the_acquiring_process_lease",
+      "run_count": 1,
+      "passed": 1,
+      "failed": 0,
+      "ignored": 0,
+      "filtered_out": 183,
+      "threads": 1,
+      "deadline_seconds": 30,
+      "retries": 0,
+      "stdout": ".claude/worktrees/third-pr3913-audit/test-2.stdout",
+      "stdout_sha256": "0e333609daaae2614262afe2d586095376492efefaf6f198c497a67320263d95"
+    }
+  ],
+  "stage_results": [
+    {
+      "label": "compile",
+      "returncode": 0,
+      "timed_out": false,
+      "elapsed_seconds": 67.497,
+      "stdout_sha256": "c11e2d6577563e008e8bc74dfb0f5c8b649798c27c8839078daa695d8e025c7b",
+      "stderr_sha256": "f8e590e7d2a30b9e8719f83eed96391c6757fcf534c71859259d9c4d7712e5ee"
+    },
+    {
+      "label": "discovery",
+      "returncode": 0,
+      "timed_out": false,
+      "elapsed_seconds": 0.69,
+      "stdout_sha256": "19d54103723c56ec6a2591f94534e3af47ec93c64f833ce65217880c7c2e56fb",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "test-1",
+      "returncode": 0,
+      "timed_out": false,
+      "elapsed_seconds": 0.086,
+      "stdout_sha256": "50155e6c5c2cf49aa75971dd51721e614c4233260da9c1fd6e217bc84bc19db3",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "test-2",
+      "returncode": 0,
+      "timed_out": false,
+      "elapsed_seconds": 0.079,
+      "stdout_sha256": "0e333609daaae2614262afe2d586095376492efefaf6f198c497a67320263d95",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "process_control": {
+    "native_exec_handle": 91934,
+    "native_exec_terminal_exit": 0,
+    "bounded_compile_discovery_and_test_children_waited_to_exit_zero": true,
+    "each_child_started_new_session": true,
+    "timeouts_or_kills": 0,
+    "child_pid_and_process_group_ids_retained": false,
+    "independent_post_exit_process_group_absence_retained": false,
+    "limit": "Only completed bounded child waits are claimed; no recorded group IDs or independent group-absence proof."
+  },
+  "exclusive_bank_handoff": {
+    "prior_task": "3892 current9e",
+    "prior_explicit_release_retained": ".claude/worktrees/third-pr3913-audit/bank-release-3892.json",
+    "prior_actual_and_saved_hash_verified_before_compile": "6e423f749b553b140d3e860f7e1f80213c34ce3a7c42981b044fed078801f77b",
+    "prior_saved_copy_hash_unchanged_after_runtime": "6e423f749b553b140d3e860f7e1f80213c34ce3a7c42981b044fed078801f77b",
+    "owner_lock": ".claude/worktrees/third-store-target.owner.lock",
+    "ownership": "exclusive nonblocking flock during controls; released after guards",
+    "release_state": "RELEASED_ALL_GUARDS_CLOSED",
+    "lock_reacquisition_checked": true
+  },
+  "source_findings": [
+    {
+      "path": "lampOS/crates/update/src/writer_refresh.rs",
+      "line": 465,
+      "finding": "Guard constructed only after successful actual exclusive flock; failed acquisition closes plain File and does not invoke owner Unlock."
+    },
+    {
+      "path": "lampOS/crates/update/src/writer_refresh.rs",
+      "line": 417,
+      "finding": "Owner Drop explicitly unlocks before implicit File destruction; nonowner PID branch skips Unlock."
+    },
+    {
+      "path": "lampOS/crates/update/src/writer_refresh.rs",
+      "line": 527,
+      "finding": "prepare/inspect/recover local guard covers subsequent error returns, then Session retains guard."
+    },
+    {
+      "path": "lampOS/crates/update/src/writer_refresh/tests.rs",
+      "line": 65,
+      "finding": "Actual descriptor-retention control requires immediate recovery and verifies stale duplicate close cannot release independently opened recovery lease or change journal bytes."
+    },
+    {
+      "path": "lampOS/crates/update/src/writer_refresh/tests.rs",
+      "line": 97,
+      "finding": "Actual flock plus private mismatched-PID model catches unconditional Unlock destructor; not a real fork."
+    }
+  ],
+  "old_production_negative": {
+    "scope": "Source reasoning only; not transplanted or rerun by reader.",
+    "expected_witness": "Original File-only lock plus retained duplicate leaves immediate post-drop inspect at candidate tests.rs:78 blocked with WouldBlock. Numeric OS code is platform-dependent.",
+    "separate": true,
+    "prior_reported_flake_cause_established": false
+  },
+  "limits": [
+    "PID check protects automatic nonowner guard drop only; Session methods do not enforce acquiring PID. Inherited child journal/grant operations remain forbidden caller contract.",
+    "Unlock errors cannot be returned from Drop; File close fallback cannot guarantee immediate unlock while another reference remains. No unlock-failure injection performed.",
+    "No real fork or spawn model executed; descriptor retention and private PID mismatch only.",
+    "No full suite, old-production negative replay, current Linux/ARM64, device, release, signing or activation validation performed by reader.",
+    "Authors historical full-suite totals and earlier flake cause not independently established by this two-control read.",
+    "Process-group IDs and independent post-exit group absence were not retained; waited-child exit0 and released bank only."
+  ],
+  "evidence_root": ".claude/worktrees/third-pr3913-audit",
+  "controller_sha256": "ce2fc2ef7a354b40323320d18b4580710a5d678344d369cb1231c9c9628755f3"
+}
