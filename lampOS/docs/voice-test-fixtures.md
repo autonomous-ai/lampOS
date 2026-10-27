@@ -6,6 +6,22 @@ fixture helpers are compiled only under `cfg(test)`. There is no runtime
 flag, environment setting or wider production deadline. Ordinary builds
 continue to use the existing monotonic clock.
 
+## Kept privacy lease resynchronization
+
+The kept-value resync fixture deliberately receives no datagrams. Its local
+declaration uses a one-second publication period so the stock 20 ms
+datagram-silence notice cannot end the reader during its two bounded 500 ms
+reads. Kept-file renewals do not reset that silence timer.
+
+Only this fixture's publication period changes. Its envelope lifespan and
+typed capture lease remain 50 ms, its zero-datagram and sequence-gap checks
+stay intact, and resync still ends at the first datagram or the one-second
+boundary. The separate post-datagram negative uses the stock declaration;
+the Bus period/late and typed privacy freshness controls remain unchanged.
+This isolates the resync assertion from publisher liveness, not from real
+lease expiry: a host stall beyond 50 ms can still exhaust its existing ten
+attempts and fails the test. No product declaration or timing policy changes.
+
 ## Histories on a freshly booted host
 
 The #1569 Voice fixtures that place events before the present choose a

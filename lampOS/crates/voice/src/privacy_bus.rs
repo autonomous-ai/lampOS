@@ -1230,11 +1230,11 @@ pub(crate) mod tests {
             }
             Ok(())
         };
-        // A lease lives 50 ms, and the topic beats every 10 ms. An attempt in
-        // which the host stalled past either before the reader took a lease
-        // (the bus counts it expired, the lease reads stale, or the bus says
-        // its publisher is late, as with no datagram it soon does) says
-        // nothing, so it is made again on a new bus, up to ten times (#1569).
+        // A lease still lives 50 ms. An attempt in which the host stalled
+        // past envelope or payload freshness says nothing about resync,
+        // so it is made again on a new bus, up to ten times (#1569). The
+        // fixture's separate publication period does not extend those
+        // bounds or turn an expired lease into permission.
         let stalled = |error: &io::Error| {
             let text = error.to_string();
             text.contains("discarded") || text.contains("stale") || text.contains("unavailable")
@@ -1250,12 +1250,12 @@ pub(crate) mod tests {
             let never_looks = Bus::new(&root.0)
                 .unwrap()
                 .rescan_every(Duration::from_secs(3_600));
+            // Kept values do not renew the subscriber's datagram heartbeat.
+            // Isolate resync from its unrelated 20 ms Late notice: both reads
+            // remain bounded at 500 ms, and the actual lease still lasts 50 ms.
+            let declaration = MicrophonePrivacy::declaration().every(Duration::from_secs(1));
             let mut publisher = never_looks
-                .publisher_declared(
-                    MicrophonePrivacy::TOPIC,
-                    &MicrophonePrivacy::declaration(),
-                    "voice",
-                )
+                .publisher_declared(MicrophonePrivacy::TOPIC, &declaration, "voice")
                 .unwrap();
             let session = publisher.boot().to_owned();
             let mut lease = |sequence: u64| {
