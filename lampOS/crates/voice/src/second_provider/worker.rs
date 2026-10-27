@@ -1237,7 +1237,7 @@ pub(crate) fn time_elsewhere(
 /// "what is the weather like in Hanoi" heard as "Hannover" or answered with
 /// "You asking what the weather's like here?"; "Night!" at 1 pm, the
 /// character's example; a poem of two lines).
-pub(crate) const SPOKEN_NOTE: &str = "\n\nYou read what people say as words, and your ears turn some words into others, names and places most of all. When a question is plainly about the weather, a price, a time or a place, answer it for the likeliest meaning, here first, and search if you need to; ask back only when you cannot guess at all. Greet and say goodbye for the time of day it is now. A poem you are asked for has at least four lines.";
+pub(crate) const SPOKEN_NOTE: &str = "\n\nYou read what people say as words, and your ears turn some words into others, names and places most of all. When a question is plainly about the weather, a price, a time or a place, answer it for the likeliest meaning, here first, and search if you need to; ask back only when you cannot guess at all. Greet and say goodbye for the time of day it is now. A poem you are asked for has at least four lines. Call someone by a name only when you were given it: as the person you know by face, the name given at setup, or a name they tell you as their own (\"I'm Tom\"); never by a word heard at the start of what they said, which is often your own name misheard.";
 
 /// Why a line of a word or two is held ([`lone_words`]).
 pub(crate) const LONE_WORDS: &str = "a word or two in a conversation, no question and no short word said to the lamp, and nothing shows it was said to the lamp: no name, nobody turned to it";
@@ -2981,6 +2981,15 @@ pub fn serve(
                 heeding.lock().ok()?.name_note_for(request)
             }));
         }
+        // Whether lamp-name heard the name in a line (#3504 finding N4).
+        {
+            let heeding = heeding.clone();
+            engine = engine.knowing_the_name_fired(Arc::new(move |request| {
+                heeding
+                    .lock()
+                    .is_ok_and(|heeding| heeding.name_fired_for(request))
+            }));
+        }
         // The name heard in a wordless piece counts for the line going on from
         // it without its sound sent again (#1712).
         {
@@ -4525,6 +4534,10 @@ pub(crate) struct Heeding {
     name_note: Option<(bool, bool)>,
     /// The request judged last, and the note it earned, if any.
     noted: Option<(u64, Option<&'static str>)>,
+    /// The request judged last whose line lamp-name heard the name in, as
+    /// the name note counts a hearing, whether or not a note was given
+    /// (#3504 finding N4, [`Self::name_fired_for`]).
+    fired: Option<u64>,
     /// The request last let out only as the conversation going on.
     alone: Option<u64>,
     /// The request last judged in a busy room ([`Self::judged_busy`]).
@@ -5370,6 +5383,7 @@ impl Heeding {
             keeps_room: false,
             name_note: None,
             noted: None,
+            fired: None,
             alone: None,
             busy: None,
             policy: None,
@@ -6739,6 +6753,14 @@ impl Heeding {
         ended_ago(self.said_until_us, now_us)
     }
 
+    /// Whether lamp-name heard the name in `request`'s line, as the name
+    /// note counts a hearing ([`crate::called::LEAST_SCORE`] or more, from
+    /// [`crate::called::BEFORE_US`] before its start to its end), with or
+    /// without the note: the last request judged only.
+    pub(crate) fn name_fired_for(&self, request: u64) -> bool {
+        self.fired == Some(request)
+    }
+
     /// The note `request` earned when it was judged, if any.
     pub(crate) fn name_note_for(&self, request: u64) -> Option<&'static str> {
         self.noted
@@ -6752,14 +6774,15 @@ impl Heeding {
     /// than [`crate::called::BEFORE_US`] before the line. The note, or why
     /// none, said in the journal as the Live route says it.
     fn note_the_name(&mut self, request: u64, (began_us, ended_us): (u64, u64), signs: &Signs) {
-        let Some((needs_face, heard_as)) = self.name_note else {
-            return;
-        };
         let heard = signs.names.iter().any(|(at, score)| {
             *score >= crate::called::LEAST_SCORE
                 && at.saturating_add(crate::called::BEFORE_US) >= began_us
                 && *at <= ended_us
         });
+        self.fired = heard.then_some(request);
+        let Some((needs_face, heard_as)) = self.name_note else {
+            return;
+        };
         let note = heard.then(|| {
             let busy = needs_face && signs.room == crate::room_told::Room::Busy;
             let sure = signs
@@ -19519,6 +19542,40 @@ mod tests {
         ] {
             assert!(!crate::attention::begins_with_the_name(heard), "{heard}");
         }
+    }
+
+    /// #3504 finding N4: lamp-name's hearing of the name in a line is kept
+    /// for that request, with the name note switched off too, and a line
+    /// it was not heard in is not "named"; the spoken note says to call
+    /// someone only by a name given, never by a word heard at the start.
+    #[test]
+    fn lamp_name_s_hearing_in_a_line_is_known_with_or_without_the_note() {
+        use crate::room_told::Room;
+        let signs = |names: Vec<(u64, f32)>| super::Signs {
+            room: Room::Quiet,
+            going_on: false,
+            lamp_asked: false,
+            turned: None,
+            names,
+            near: false,
+            continues_from: None,
+        };
+        let line = (10_000_000, 12_000_000);
+        let heard = crate::called::LEAST_SCORE;
+        let mut heeding = super::Heeding::new(false, false, None, None);
+        heeding.note_the_name(1, line, &signs(vec![(10_200_000, heard)]));
+        assert!(heeding.name_fired_for(1), "heard in its line, no note");
+        assert_eq!(heeding.name_note_for(1), None, "the note is not on");
+        heeding.note_the_name(2, line, &signs(vec![(1_000_000, heard)]));
+        assert!(!heeding.name_fired_for(2), "heard long before the line");
+        assert!(!heeding.name_fired_for(1), "the last request judged only");
+        heeding.note_the_name(3, line, &signs(Vec::new()));
+        assert!(!heeding.name_fired_for(3), "not heard");
+        let spoken = super::spoken_character("CHARACTER", false, true);
+        assert!(
+            spoken.contains("never by a word heard at the start of what they said"),
+            "{spoken}"
+        );
     }
 
     /// #1712: the name note, as the Live route gives it: the model is told
