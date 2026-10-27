@@ -682,13 +682,28 @@ milliseconds by the headers, as near-call's; the body's own `since_us` is its
 monotonic clock and is never read as a time):
 
 1. `body/joint_states` with no hand on it: each head joint's goal (`base_yaw`,
-   `head_pitch`, `head_roll`), where it was asked to be.
+   `head_pitch`, `head_roll`), where it was asked to be. The base is a head
+   joint here: asked to "take its head, move it a little", the person on
+   lamp-52e6 (27 Oct, #3504) turned only the base, 30 holds all on
+   `base_yaw`. The goal judged against is the oldest of the last second with
+   no hand said (`BEFORE_MS`, the body's second in a hand), not the last one:
+   the body gives way where the hand already has it, its goal there, a step
+   before it says the hand, so the last goal before the push is already the
+   hand's and a turn held there read as no move.
 2. `body/hand` says `pushed`.
 3. While it does, a head joint is more than `HAND_MOVED` from that goal and its
    own goal is within `HAND_MOVED` of where it is: the hand moved it and the
    body holds it there (it gave way, under `return` and `stay` alike; a body
    that pushes back keeps its goal and is not counted).
 4. `body/hand` says not pushed: done, and the lamp says so.
+
+The journal says what the step saw, as `lamp-voice: giving_way: ...`: the
+try opening, each push the body says, and on its release the decision with
+the head joint farthest from its goal before (one held where the hand has it
+first), in counts: where it is, how far, its goal before and its goal now; and
+a minute ending with how many pushes the body said. A try that fails says
+whether the body never said a hand, or a hand that did not move the head that
+far or was not held there.
 
 A push that does not move the head that far (a bump), a hand still on it when
 the minute ends, a reading from before the invitation ended, from another
@@ -720,7 +735,10 @@ still on, two unfelt tries failing; a bump, a body pushing back, a restart, a
 forged publisher and early evidence not done; a clock jump; no body and the
 pause `not_available`; a skip and a redo ignoring later evidence; a held
 progress write; a rebuilt walk not asking a third time; a corrupt kept count
-refused). The record is in
+refused; the base turned about 32 counts a hold from 1,903, as on lamp-52e6
+on 27 Oct, with the hand said from the second hold as the body says it since
+#3676: done after two holds and after the day's five to 1,744, and not done
+while the body never says the hand). The record is in
 [verification/onboarding-giving-way-host-20261019](verification/onboarding-giving-way-host-20261019/README.md).
 No coordinator test drives an onboarding invitation through the say service on
 either route (privacy and near-call have none either). Not shown: a lamp run
