@@ -376,11 +376,8 @@ async fn a_held_forget_runs_only_on_a_plain_yes_from_them_within_a_minute() {
 
 #[tokio::test]
 async fn a_forget_asked_for_in_words_runs_at_once() {
-    for (said, name) in [
-        ("Forget everything about me.", EVERYTHING),
-        ("xóa khuôn mặt tôi", FACE),
-        ("delete my face", FACE),
-    ] {
+    // Not `forget_everything`, which always asks first (#3504, N3).
+    for (said, name) in [("xóa khuôn mặt tôi", FACE), ("delete my face", FACE)] {
         let ran = run(&[("A", said, Lamp::Calls(name, "Done."), 0)]).await;
         assert_eq!(
             ran.forgets,
@@ -426,14 +423,92 @@ async fn a_bare_forget_never_runs_or_holds_forget_everything() {
             );
         }
     }
+    // The explicit ask is held and asked about (#3504, N3); their yes runs it.
+    let asks = Lamp::Calls(EVERYTHING, "Shall I forget everything about you?");
     for said in ["Forget everything about me.", "Xóa tất cả về tôi."] {
-        let ran = run(&[follow_up, ("A", said, Lamp::Calls(EVERYTHING, "Done."), 5)]).await;
+        let ran = run(&[follow_up, ("A", said, asks, 5)]).await;
+        assert!(ran.forgets.is_empty(), "{said}");
+        let ran = run(&[
+            follow_up,
+            ("A", said, asks, 5),
+            ("A", "Yes.", Lamp::Says("Done."), 5),
+        ])
+        .await;
         assert_eq!(
             ran.forgets,
             [(EVERYTHING.to_owned(), json!({"name": "A"}))],
             "{said}"
         );
     }
+}
+
+/// #3504, N3 (the person's decision, 27 Oct): on lamp-06c1 speech to text
+/// heard "except my name" as "accept my name", and one person's whole
+/// memory went. A spoken `forget_everything` never runs on the turn that
+/// asks for it: the lamp asks once, and only the same person's plain yes on
+/// the next turn runs it. A no, another person's yes, another line or
+/// nothing at all forgets nothing.
+#[tokio::test]
+async fn a_spoken_forget_everything_always_asks_first() {
+    let asks = Lamp::Calls(
+        EVERYTHING,
+        "Shall I forget everything I know about you, including your name?",
+    );
+    let ask = ("A", "Forget everything about me.", asks, 0);
+    let misheard = ("A", "Forget everything about me. Accept my name.", asks, 0);
+    let cases: &[(&[Turn], usize)] = &[
+        // Asked: nothing deleted on the turn itself.
+        (&[ask], 0),
+        (&[misheard], 0),
+        // Their plain yes next runs it, once.
+        (
+            &[ask, ("A", "Yes.", Lamp::Says("Done, it's all gone."), 5)],
+            1,
+        ),
+        (&[misheard, ("A", "Vâng.", Lamp::Says("Xong."), 5)], 1),
+        // A no, anything else, another person's yes, or nobody's.
+        (
+            &[ask, ("A", "No.", Lamp::Says("Okay, I'll keep it."), 5)],
+            0,
+        ),
+        (&[ask, ("A", "What time is it?", Lamp::Says("Noon."), 5)], 0),
+        (&[ask, ("B", "Yes.", Lamp::Says("Okay."), 5)], 0),
+        (&[ask, ("", "Yes.", Lamp::Says("Okay."), 5)], 0),
+        // Asking again in words asks again; it does not run.
+        (&[ask, ("A", "Forget everything about me.", asks, 5)], 0),
+        // A yes too late.
+        (&[ask, ("A", "Yes.", Lamp::Says("Okay."), 61)], 0),
+        // Called again on the yes: run once, never twice.
+        (
+            &[ask, ("A", "Yes.", Lamp::Calls(EVERYTHING, "Done."), 5)],
+            1,
+        ),
+    ];
+    for (turns, runs) in cases {
+        let ran = run(turns).await;
+        assert_eq!(
+            ran.forgets.len(),
+            *runs,
+            "{:?}",
+            turns
+                .iter()
+                .map(|turn| (turn.0, turn.1))
+                .collect::<Vec<_>>()
+        );
+    }
+    // The model is told to ask, naming the name as well.
+    let ran = run(&[ask]).await;
+    assert_eq!(
+        ran.asked[1].last().cloned().unwrap(),
+        Message::tool(
+            "c1",
+            json!({"held": crate::remember::FORGET_EVERYTHING_ASKS}).to_string()
+        )
+    );
+    assert!(crate::remember::asks_about_forgetting(
+        "Shall I forget everything I know about you, including your name?",
+        EVERYTHING
+    ));
 }
 
 /// What asks for everything, by its words alone, clause by clause, the

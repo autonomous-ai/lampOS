@@ -7372,6 +7372,9 @@ async fn answer(
     // One the same person asked for in words on their turn just before
     // runs at once ([`asked_just_before`]).
     let asks_now = crate::remember::asks_to_forget(&said);
+    // Whether these words are a plain yes and nothing else: the only turn
+    // a spoken `forget_everything` runs on (#3504, N3).
+    let plain_yes_now = heard && crate::known_faces::plain_agreement(&said);
     // What these words, the request's own, say of forgetting everything
     // ([`crate::remember::everything_asked`]): `Some(false)`, a refusal or
     // a smaller ask such as "forget that", outweighs an ask just before and
@@ -8071,7 +8074,21 @@ async fn answer(
                     ));
                     continue;
                 }
-                if crate::remember::is_forget(&call.name) && !forget_may_run && !asked_just_before {
+                // A spoken `forget_everything` from someone known never runs
+                // on the turn that asks for it, however plainly (#3504, N3,
+                // the person's decision, 27 Oct: "except my name" heard as
+                // "accept my name" wiped one person). It is held and asked
+                // about once; their plain yes next runs it, as does a plain
+                // yes after their own ask just before. Nobody known: as
+                // before, the memory refuses it.
+                let everything_waits = call.name == crate::remember::FORGET_EVERYTHING
+                    && heard
+                    && !crate::remember::forget_unguarded()
+                    && (!(asked_just_before && plain_yes_now) || held_forget_ran)
+                    && forget_asker(scope.as_ref()).is_some();
+                if crate::remember::is_forget(&call.name)
+                    && ((!forget_may_run && !asked_just_before) || everything_waits)
+                {
                     let holding = match forget_asker(scope.as_ref()) {
                         _ if held_forget_ran => None,
                         Some(asker) if heard => {

@@ -284,7 +284,9 @@ async fn an_off_camera_line_is_not_observed_or_kept_as_the_silent_owners() {
 async fn the_owners_own_face_seen_speaking_keeps_their_scope() {
     let a = crate::remember::person_id("A");
     let got = one_line("owner", FORGET_ME, forget_everything(), true, BOOT, true).await;
-    assert_eq!(got.calls, [Some(a.clone())]);
+    // A's own: held for their yes, never run on the ask (#3504, N3).
+    assert!(got.calls.is_empty(), "held for A's yes");
+    assert_eq!(got.lease, Some(a.clone()));
     assert_eq!(got.lease, Some(a.clone()));
     assert_eq!(
         got.told,
@@ -320,7 +322,9 @@ async fn a_reused_id_after_the_eyes_restart_is_not_the_known_persons_face() {
         false,
     )
     .await;
-    assert_eq!(got.calls, [Some(a)]);
+    // A's own: held for their yes, never run on the ask (#3504, N3).
+    assert!(got.calls.is_empty(), "held for A's yes");
+    assert_eq!(got.lease, Some(a));
 }
 
 /// Reviewer-two's P2 on #3437: the eyes' reader never started (the bus
@@ -353,7 +357,9 @@ async fn with_no_eyes_to_read_a_line_is_the_rooms() {
         None,
     )
     .await;
-    assert_eq!(got.calls, [Some(a)]);
+    // A's own: held for their yes, never run on the ask (#3504, N3).
+    assert!(got.calls.is_empty(), "held for A's yes");
+    assert_eq!(got.lease, Some(a));
 }
 
 const TOKYO: &str = "I'm flying to Tokyo next week.";
@@ -461,7 +467,9 @@ async fn without_the_switch_the_early_words_still_prepare() {
 async fn without_the_switch_an_off_camera_line_stays_the_silent_owners() {
     let a = crate::remember::person_id("A");
     let got = one_line("off", FORGET_ME, forget_everything(), false, BOOT, false).await;
-    assert_eq!(got.calls, [Some(a.clone())]);
+    // A's own: held for their yes, never run on the ask (#3504, N3).
+    assert!(got.calls.is_empty(), "held for A's yes");
+    assert_eq!(got.lease, Some(a.clone()));
     assert_eq!(got.lease, Some(a.clone()));
     let got = one_line(
         "owner-off",
@@ -472,7 +480,9 @@ async fn without_the_switch_an_off_camera_line_stays_the_silent_owners() {
         false,
     )
     .await;
-    assert_eq!(got.calls, [Some(a)]);
+    // A's own: held for their yes, never run on the ask (#3504, N3).
+    assert!(got.calls.is_empty(), "held for A's yes");
+    assert_eq!(got.lease, Some(a));
 }
 
 /// Second's case at 09:24 on #3435: after a restart the cache is cold, so
