@@ -5,6 +5,7 @@ refusals. No lamp needed, and nothing here stands in for a lamp check."""
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -24,14 +25,14 @@ def run(coroutine):
 
 
 @asynccontextmanager
-async def connected(folder: Path, grants=("body", "light", "speak"), auto_done=True):
+async def connected(folder: Path, grants=("body", "light", "speak"), auto_done=True, clock=None):
     """A fake lamp, this computer paired with it, and an MCP session on the
     server built for it."""
     async with FakeLamp(grants=tuple(grants), auto_done=auto_done) as fake:
         ring = Keyring(folder)
         await Lamp.pair(fake.code, fake.host, pin=fake.pin, port=fake.port, name="test laptop", keyring=ring)
         async with await Lamp.connect(keyring=ring) as lamp:
-            server = build(lamp, client="test laptop")
+            server = build(lamp, client="test laptop", **({"clock": clock} if clock else {}))
             async with create_connected_server_and_client_session(server._mcp_server) as session:
                 yield fake, lamp, session
 
@@ -125,6 +126,166 @@ def test_a_lease_the_lamp_takes_back_is_the_tools_error(tmp_path):
             assert result.isError and "lease_lost: hand" in text(result)
             # Lost is gone already: nothing to let go of, and no retry.
             assert not fake.asked("lease.release") and len(fake.asked("move")) == 1
+
+    run(go())
+
+
+def test_a_lease_whose_action_is_refused_or_never_ends_is_not_listed_held(tmp_path):
+    """The Reviewer-lead's P3 on #3802: `lamp://lease` lists only leases
+    still held."""
+    now = [1000.0]
+
+    async def leases(session) -> list:
+        return json.loads((await session.read_resource("lamp://lease")).contents[0].text)
+
+    async def go():
+        async with connected(tmp_path, auto_done=False, clock=lambda: now[0]) as (fake, _, session):
+            fake.refuse_next("look", "quiet_hours", "it's night")
+            result = await session.call_tool("lamp_look", {"at": "ahead"})
+            assert result.isError and "quiet_hours" in text(result)
+            # Refused: its lease is let go of at once.
+            assert len(fake.asked("lease.release")) == 1 and await leases(session) == []
+            now[0] += 20  # past the tool's own 10 s wait without a done
+            frames = [[0, 0, 0, 0, 0], [20, 0, 30, 0, 0], [0, 0, 0, 0, 0]]
+            call = asyncio.create_task(session.call_tool("lamp_move", {"step_ms": 40, "frames": frames}))
+            await until(lambda: fake.asked("move"))
+            assert len(await leases(session)) == 1
+            now[0] += 11  # it lapses by itself on the lamp
+            assert await leases(session) == []
+            call.cancel()
+
+    run(go())
+
+
+def test_an_action_handed_to_a_part_ends_at_once(tmp_path):
+    """blue's P3 on #3813: lamp-control answers `move` with `{"to": "body"}`
+    and sends no `done`, so the tool doesn't wait out its lease."""
+
+    async def go():
+        async with connected(tmp_path, auto_done=False) as (fake, _, session):
+            plain = fake._ok
+
+            async def handed(ws, id_, **fields):
+                if any(r["id"] == id_ and r["op"] == "move" for r in fake.requests):
+                    fields["to"] = "body"
+                await plain(ws, id_, **fields)
+
+            fake._ok = handed
+            frames = [[0, 0, 0, 0, 0], [20, 0, 30, 0, 0], [0, 0, 0, 0, 0]]
+            started = asyncio.get_running_loop().time()
+            result = await session.call_tool("lamp_move", {"step_ms": 40, "frames": frames})
+            assert not result.isError and text(result).startswith("move taken by the body")
+            assert asyncio.get_running_loop().time() - started < 5
+
+    run(go())
+
+
+def test_a_lamp_without_look_is_not_promised_who_is_there(tmp_path):
+    """blue's P3 on #3802."""
+
+    async def go():
+        async with connected(tmp_path) as (_, _, session):
+            tool = next(t for t in (await session.list_tools()).tools if t.name == "lamp_state")
+            assert "who is there" not in tool.description and "presence" not in tool.description
+        async with connected(tmp_path / "look", grants=("body", "look")) as (_, _, session):
+            tool = next(t for t in (await session.list_tools()).tools if t.name == "lamp_state")
+            assert "who is there" in tool.description
+
+    run(go())
+
+
+def test_a_wait_for_a_phrase_ends_only_on_its_own_phrases(tmp_path):
+    """The Reviewer-lead's P2 on #3813: an earlier wait's phrase, still heard,
+    never ends a later wait, and no phrase is kept for later subscribes."""
+
+    async def go():
+        async with connected(tmp_path, grants=("hear",)) as (fake, lamp, session):
+            first = await session.call_tool(
+                "lamp_wait_for", {"events": ["phrase.heard"], "phrases": ["stop"], "timeout_s": 0.2}
+            )
+            assert json.loads(text(first)) == {"timed_out": True}
+            call = asyncio.create_task(
+                session.call_tool("lamp_wait_for", {"events": ["phrase.heard"], "phrases": ["good night"], "timeout_s": 5})
+            )
+            await until(lambda: any("good night" in ask.get("phrases", []) for ask in fake.asked("subscribe")))
+            await fake.emit("phrase.heard", phrase="stop")
+            await asyncio.sleep(0.2)
+            assert not call.done()
+            await fake.emit("phrase.heard", phrase="good night")
+            assert json.loads(text(await call))["phrase"] == "good night"
+            # One subscribe a wait, carrying its phrases: none without them.
+            assert all(ask.get("phrases") for ask in fake.asked("subscribe"))
+
+    run(go())
+
+
+def test_a_wait_cancelled_before_its_subscribe_reply_leaves_nothing(tmp_path):
+    """Reviewer-two's P2 on #3813: cancelled while `on()` awaits the reply,
+    a wait leaves no handler, no subscription and no recorded event."""
+
+    async def go():
+        async with FakeLamp(grants=("hear",)) as fake:
+            ring = Keyring(tmp_path)
+            await Lamp.pair(fake.code, fake.host, pin=fake.pin, port=fake.port, name="test laptop", keyring=ring)
+            async with await Lamp.connect(keyring=ring) as lamp:
+                server = build(lamp, client="test laptop")
+                plain = fake._ok
+
+                async def slow(ws, id_, **fields):
+                    if any(r["id"] == id_ and r["op"] == "subscribe" for r in fake.requests):
+                        await asyncio.sleep(0.3)
+                    await plain(ws, id_, **fields)
+
+                fake._ok = slow
+                for tries in range(1, 4):
+                    call = asyncio.create_task(
+                        server.call_tool(
+                            "lamp_wait_for", {"events": ["phrase.heard"], "phrases": ["stop"], "timeout_s": 5}
+                        )
+                    )
+                    await until(lambda: len(fake.asked("subscribe")) >= tries)
+                    call.cancel()
+                    with contextlib.suppress(asyncio.CancelledError):
+                        await call
+                    assert not lamp._handlers.get("phrase.heard"), f"after {tries} cancelled"
+                await asyncio.sleep(0.5)
+                assert len(fake.asked("unsubscribe")) == 3
+                await fake.emit("phrase.heard", phrase="stop")
+                await asyncio.sleep(0.1)
+                recent = await server.read_resource("lamp://events/recent")
+                assert json.loads(list(recent)[0].content) == []
+
+    run(go())
+
+
+def test_a_phrase_wait_without_phrases_is_refused(tmp_path):
+    """The Reviewer-lead's P3 on #3813, as the lamp refuses it."""
+
+    async def go():
+        async with connected(tmp_path, grants=("hear",)) as (fake, _, session):
+            result = await session.call_tool("lamp_wait_for", {"events": ["phrase.heard"], "timeout_s": 1})
+            assert result.isError and "bad_request: phrase.heard needs the phrases" in text(result)
+            assert not fake.asked("subscribe")
+
+    run(go())
+
+
+def test_a_second_phrase_wait_while_one_runs_is_busy(tmp_path):
+    """The Reviewer-lead's P3 on #3813: the lamp keeps one list of phrases a
+    session, so a second wait would silence the first."""
+
+    async def go():
+        async with connected(tmp_path, grants=("hear",)) as (fake, _, session):
+            call = asyncio.create_task(
+                session.call_tool("lamp_wait_for", {"events": ["phrase.heard"], "phrases": ["stop"], "timeout_s": 5})
+            )
+            await until(lambda: fake.asked("subscribe"))
+            second = await session.call_tool(
+                "lamp_wait_for", {"events": ["phrase.heard"], "phrases": ["go"], "timeout_s": 1}
+            )
+            assert second.isError and "busy: " in text(second)
+            await fake.emit("phrase.heard", phrase="stop")
+            assert json.loads(text(await call))["phrase"] == "stop"
 
     run(go())
 

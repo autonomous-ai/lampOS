@@ -121,7 +121,17 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
     limits = Limits(lamp.limits, clock)
     why = f"MCP: {client or socket.gethostname()}"[:64]
     recent: collections.deque = collections.deque(maxlen=RECENT_EVENTS)
-    leases: set[str] = set()
+    phrase_waits: set[asyncio.Future] = set()
+    # Each lease this server took, and when it lapses by itself: one whose
+    # action never ended is listed only until then (the Reviewer-lead's P3
+    # on #3802).
+    leases: dict[str, float] = {}
+
+    def held() -> list[str]:
+        now = clock()
+        for lease in [lease for lease, lapses in leases.items() if lapses <= now]:
+            del leases[lease]
+        return sorted(leases)
     server = FastMCP(
         "lamp",
         instructions=(
@@ -159,7 +169,7 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
         except LampError as error:
             raise refused(error) from error
         lease = taken["lease"]
-        leases.add(lease)
+        leases[lease] = clock() + ACTION_LEASE_MS / 1000
         ended: asyncio.Future = asyncio.get_running_loop().create_future()
 
         def follow(event: dict) -> None:
@@ -176,7 +186,15 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
             try:
                 sent.update(await lamp.request(op, **fields))
             except LampError as error:
+                # The action was refused: its lease is let go of at once.
+                if not ended.done():
+                    ended.set_result(("done", "refused", None))
                 raise refused(error) from error
+            if sent.get("to"):
+                # Handed to a part (`{"to": "body"}`): no `done` follows, so
+                # the tool ends now and the lease lapses by itself (blue's
+                # P3 on #3813, lamp-control part 4, #3805).
+                return f"{op} taken by the {sent['to']}; its lease lapses within {ACTION_LEASE_MS // 1000} s"
             try:
                 what, how, why_ended = await asyncio.wait_for(asyncio.shield(ended), ACTION_LEASE_MS / 1000)
             except asyncio.TimeoutError:
@@ -195,18 +213,28 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
             if ended.done():
                 what, how, _ = ended.result()
                 if what == "done" or how == "suspended":
-                    leases.discard(lease)
+                    leases.pop(lease, None)
                     try:
                         await lamp.request("lease.release", lease=lease)
                     except LampError:
                         pass
                 elif how == "lost":
-                    leases.discard(lease)
+                    leases.pop(lease, None)
 
-    @server.tool()
+    # Only what this computer may read is promised (blue's P3 on #3802).
+    state_words = {
+        "presence": "who is there (a count and how near, never who)",
+        "light": "its light",
+        "mood": "its mood",
+        "lamp": "whether it is talking, paused, private or asleep",
+    }
+
+    @server.tool(
+        description="The lamp's state now: "
+        + ", ".join(state_words[state] for state in states)
+        + f". `which` is some of {', '.join(states)}; by default all of them."
+    )
     async def lamp_state(which: list[Literal["presence", "light", "mood", "lamp"]] | None = None) -> dict:
-        """The lamp's state now: who is there (a count and how near, never who), its light, its mood,
-        and whether it is talking, paused, private or asleep."""
         ungranted = [state for state in which or [] if state not in states]
         if ungranted:
             raise ToolError(f"no_grant: this computer may read {', '.join(states)}")
@@ -229,27 +257,50 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
         ungranted = [event for event in events if event not in events_heard]
         if ungranted:
             raise ToolError(f"no_grant: this computer may wait for {', '.join(events_heard)}")
+        if "phrase.heard" in events and not phrases:
+            # As the lamp refuses it: with none, the client would fill in an
+            # earlier wait's phrases, and this wait could only time out (the
+            # Reviewer-lead's P3 on #3813).
+            raise ToolError("bad_request: phrase.heard needs the phrases to listen for")
         first: asyncio.Future = asyncio.get_running_loop().create_future()
 
         def heard(event: dict) -> None:
+            # Only this wait's own phrases end it: another's, still heard
+            # by the lamp, never does (the Reviewer-lead's P2 on #3813).
+            if event.get("ev") == "phrase.heard" and event.get("phrase") not in (phrases or []):
+                return
             recent.append(event)
             if not first.done():
                 first.set_result(event)
 
-        # Subscribed here, not by `on()`'s own background subscribe, so a
-        # refusal (`no_grant`) is the tool's error; `off()` unsubscribes.
+        # One phrase wait at a time: the lamp keeps one list of phrases a
+        # session, so a second would replace the first's (the Reviewer-lead's
+        # P3 on #3813).
+        listening = "phrase.heard" in events
+        if listening and phrase_waits:
+            raise ToolError("busy: another wait for a phrase is running")
+        # Subscribed by `on()` alone, awaited, so its one subscribe carries
+        # this wait's phrases and a refusal (`no_grant`) is the tool's
+        # error, never one left unread (the SDK takes a refused handler back
+        # off). `off()` unsubscribes.
+        added: list[str] = []
+        if listening:
+            phrase_waits.add(first)
         try:
-            await lamp.subscribe(events, phrases)
+            for event in events:
+                # Tracked before the subscribe is awaited: `on()` adds the
+                # handler at once, so a wait cancelled before the reply still
+                # takes it back off (Reviewer-two's P2 on #3813).
+                added.append(event)
+                await lamp.on(event, heard, phrases=phrases if event == "phrase.heard" else None)
+            return await asyncio.wait_for(first, min(max(timeout_s, 0), MOST_WAIT_S))
         except LampError as error:
             raise refused(error) from error
-        for event in events:
-            lamp.on(event, heard)
-        try:
-            return await asyncio.wait_for(first, min(max(timeout_s, 0), MOST_WAIT_S))
         except asyncio.TimeoutError:
             return {"timed_out": True}
         finally:
-            for event in events:
+            phrase_waits.discard(first)
+            for event in added:
                 lamp.off(event, heard)
 
     if allowed("body", "light"):
@@ -318,8 +369,8 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
     async def lamp_stop() -> str:
         """Stop everything this computer asked of the lamp, now, and let go of the body."""
         await act("stop")
-        for lease in list(leases):
-            leases.discard(lease)
+        for lease in held():
+            leases.pop(lease, None)
             try:
                 await lamp.request("lease.release", lease=lease)
             except LampError:
@@ -348,7 +399,7 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
     @server.resource("lamp://lease", mime_type="application/json")
     def held_leases() -> list[str]:
         """The leases this server holds now."""
-        return sorted(leases)
+        return held()
 
     return server
 
