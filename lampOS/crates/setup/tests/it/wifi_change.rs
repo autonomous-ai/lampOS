@@ -676,7 +676,7 @@ fn the_lamp_says_what_happened_in_a_few_words_and_never_the_name() {
     );
     assert_eq!(
         SAY_LOST,
-        "I can't reach any Wi-Fi. If your Wi-Fi has changed, hold the reset button for five seconds. That erases me and starts setup again."
+        "I can't reach any Wi-Fi. If you changed your Wi-Fi's name or password, push a paperclip into the hole marked reset on the back of my base and hold it for five seconds. That erases me and starts setup again."
     );
     // After a real change and a real fall-back: one line each, no name.
     for (networks, want) in [
