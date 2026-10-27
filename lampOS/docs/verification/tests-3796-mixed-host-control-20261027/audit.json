@@ -1,0 +1,117 @@
+{
+  "kind": "Unchanged-product negative control, not a passing Rust suite",
+  "base": "3b9bfb628e1c416926b958fecf56f65c539dc533",
+  "test_only_path": "lampOS/crates/update/tests/round/product_carrier.rs",
+  "test_payload_sha256": "cd9f2c23c632473a820f5d94606760e580891fef14e17f4890278a54c608414f",
+  "unchanged_product_source_sha256": {
+    "lampOS/crates/update/src/round.rs": "f7f02ae54d2c7b700f165645a0382cd6195c3d6fa02b8b7fbe8938f842520610",
+    "lampOS/crates/update/src/unit.rs": "02521360f0d1495ba9839a029287043f0798deb5cc82324fd441e8f2bbc11aa3"
+  },
+  "tracked_source_count": 10800,
+  "selected_census": {
+    "exit": 101,
+    "rows": [
+      [
+        "product_carrier::a_climbed_updater_confirms_product_after_its_pinned_lamp_template",
+        "FAILED"
+      ],
+      [
+        "product_carrier::a_climbed_updater_confirms_product_before_its_pinned_lamp_template",
+        "FAILED"
+      ],
+      [
+        "product_carrier::a_compatible_linked_lamp_template_still_wins_in_either_manifest_order",
+        "ok"
+      ],
+      [
+        "product_carrier::a_linked_part_uses_product_after_its_pinned_lamp_template",
+        "FAILED"
+      ],
+      [
+        "product_carrier::a_linked_part_uses_product_before_its_pinned_lamp_template",
+        "FAILED"
+      ],
+      [
+        "product_carrier::a_pinned_part_keeps_its_pinned_lamp_template_beside_product_in_either_order",
+        "ok"
+      ]
+    ],
+    "counts": {
+      "passed": 2,
+      "failed": 4,
+      "ignored": 0
+    },
+    "raw_stdout_sha256": "b96dd913e9dcc49bc973356f5295132ce9b910f04e17e9b4651e73487ca6c5fb",
+    "runtime_attempts": 1
+  },
+  "exact_failure_signatures": {
+    "product_carrier::a_linked_part_uses_product_before_its_pinned_lamp_template": true,
+    "product_carrier::a_linked_part_uses_product_after_its_pinned_lamp_template": true,
+    "product_carrier::a_climbed_updater_confirms_product_before_its_pinned_lamp_template": true,
+    "product_carrier::a_climbed_updater_confirms_product_after_its_pinned_lamp_template": true
+  },
+  "terminal": {
+    "status": "EXPECTED_RED_CONTROL_OBSERVED",
+    "base": "3b9bfb628e1c416926b958fecf56f65c539dc533",
+    "phase": "TEST_ONLY_RED",
+    "runtime_attempts": 1,
+    "all_original_Rust_failures_retained": true,
+    "no_product_fix_present": true,
+    "counts": {
+      "passed": 2,
+      "failed": 4,
+      "ignored": 0
+    },
+    "Rust_exit": 101,
+    "signatures_verified": true,
+    "product_cause_claim": "Exact six-case discriminator only; device/shipping acceptance remains separate",
+    "source_unchanged": true,
+    "sealed_guard_pass": true,
+    "sealed_count": 407,
+    "actual_guard_pass": true,
+    "unresolved_owned_pids": [],
+    "lease_released": true
+  },
+  "native_controller_exit": 0,
+  "runtime_seconds": 1.79591,
+  "runtime_boundary": "Actual selected libtest child only; excludes compilation, inventory and source/evidence guards",
+  "runtime_threads": 1,
+  "compiled_artifacts": [
+    {
+      "target": "round",
+      "kind": [
+        "test"
+      ],
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "fresh": false,
+      "sha256": "a0e788b6b08e12993a5a66bed8f84eb0eea2170c78793ede314a442b0f56d7b2"
+    },
+    {
+      "target": "lamp-update",
+      "kind": [
+        "bin"
+      ],
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "fresh": false,
+      "sha256": "25fb2bb8f5bbb90a4eac3b3bfad0c0c62787bb01484ba136659672377f220ac8"
+    }
+  ],
+  "raw_stdout_sha256": "b96dd913e9dcc49bc973356f5295132ce9b910f04e17e9b4651e73487ca6c5fb",
+  "current_fixed_qualification_base": "db3d44d7303a1c026c4c0f1dcf995adf40b0605d",
+  "current_fixed_result": "pending; not included in this control",
+  "device_result": "none; earlier 52e6 refusal and recovery are separate evidence, slot released"
+}

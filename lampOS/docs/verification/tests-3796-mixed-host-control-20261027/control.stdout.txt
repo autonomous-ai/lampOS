@@ -1,0 +1,49 @@
+
+running 6 tests
+test product_carrier::a_climbed_updater_confirms_product_after_its_pinned_lamp_template ... FAILED
+test product_carrier::a_climbed_updater_confirms_product_before_its_pinned_lamp_template ... FAILED
+test product_carrier::a_compatible_linked_lamp_template_still_wins_in_either_manifest_order ... ok
+test product_carrier::a_linked_part_uses_product_after_its_pinned_lamp_template ... FAILED
+test product_carrier::a_linked_part_uses_product_before_its_pinned_lamp_template ... FAILED
+test product_carrier::a_pinned_part_keeps_its_pinned_lamp_template_beside_product_in_either_order ... ok
+
+failures:
+
+---- product_carrier::a_climbed_updater_confirms_product_after_its_pinned_lamp_template stdout ----
+
+thread 'product_carrier::a_climbed_updater_confirms_product_after_its_pinned_lamp_template' (38512086) panicked at crates/update/tests/round/product_carrier.rs:706:5:
+assertion `left == right` failed: reverse=false: ["installed /opt/lampOS/update/0c23cc2b5985555eeb46bda05d886e2281c00731bcfc5aca22e00a4d4baa6100/ beside /opt/lampOS/update/770d04978e2d35436f10e12c7b9bf1ecb11616764fbf7ae24af47ffdefd245fe/", "lamp-update switches to its build 0c23cc2b5985; it must confirm itself within 10 min"]
+  left: NotProven("refused, nothing switched: the build's lamp-eyes.service does not start /opt/lampOS/eyes/ through its current link")
+ right: Confirmed
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- product_carrier::a_climbed_updater_confirms_product_before_its_pinned_lamp_template stdout ----
+
+thread 'product_carrier::a_climbed_updater_confirms_product_before_its_pinned_lamp_template' (38512099) panicked at crates/update/tests/round/product_carrier.rs:706:5:
+assertion `left == right` failed: reverse=true: ["installed /opt/lampOS/update/0c23cc2b5985555eeb46bda05d886e2281c00731bcfc5aca22e00a4d4baa6100/ beside /opt/lampOS/update/770d04978e2d35436f10e12c7b9bf1ecb11616764fbf7ae24af47ffdefd245fe/", "lamp-update switches to its build 0c23cc2b5985; it must confirm itself within 10 min"]
+  left: NotProven("refused, nothing switched: the build's lamp-eyes.service does not start /opt/lampOS/eyes/ through its current link")
+ right: Confirmed
+
+---- product_carrier::a_linked_part_uses_product_after_its_pinned_lamp_template stdout ----
+
+thread 'product_carrier::a_linked_part_uses_product_after_its_pinned_lamp_template' (38512494) panicked at crates/update/tests/round/product_carrier.rs:569:5:
+assertion `left == right` failed: reverse=false: []
+  left: Refused("the build's lamp-eyes.service does not start /opt/lampOS/eyes/ through its current link")
+ right: Switched(2)
+
+---- product_carrier::a_linked_part_uses_product_before_its_pinned_lamp_template stdout ----
+
+thread 'product_carrier::a_linked_part_uses_product_before_its_pinned_lamp_template' (38512498) panicked at crates/update/tests/round/product_carrier.rs:569:5:
+assertion `left == right` failed: reverse=true: []
+  left: Refused("the build's lamp-eyes.service does not start /opt/lampOS/eyes/ through its current link")
+ right: Switched(2)
+
+
+failures:
+    product_carrier::a_climbed_updater_confirms_product_after_its_pinned_lamp_template
+    product_carrier::a_climbed_updater_confirms_product_before_its_pinned_lamp_template
+    product_carrier::a_linked_part_uses_product_after_its_pinned_lamp_template
+    product_carrier::a_linked_part_uses_product_before_its_pinned_lamp_template
+
+test result: FAILED. 2 passed; 4 failed; 0 ignored; 0 measured; 198 filtered out; finished in 1.70s
+

@@ -1,5 +1,12 @@
 # Tests work log
 
+## 2026-10-27 19:06 — #3796 mixed-layout control reproduces the exact refusal
+
+Ready for lamp-voice: no (full fixed-source gates active).
+
+The [unchanged-source control](verification/tests-3796-mixed-host-control-20261027/) on `3b9bfb628` produced exactly 2 PASS / 4 FAIL / 0 ignored in one selected serial invocation. All four failures name the linked-template refusal, including signed updater confirmation in both manifest orders. Native controller zero means expected RED, never Rust success. All 407 witnesses, actual executable/source bindings and owned-group closure passed. The fix and fourteen total new cases are now on `db3d44d73`; formatting passed, strict twelve-package Clippy is active, with workspace/full affected tests next. No new device access.
+
+
 ## 2026-10-27 18:48 — #3796 lasting host-template fix claimed
 
 Ready for lamp-voice: no (unchanged-source regression and product gates pending).
