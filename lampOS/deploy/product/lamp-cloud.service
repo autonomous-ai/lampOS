@@ -50,6 +50,10 @@ Environment=LAMP_SKILLS_PAGE=on
 Environment=LAMP_SKILLS_STORE=off
 EnvironmentFile=-/etc/lampOS/skills/store.env
 Environment=LAMP_APP_UPDATE=on
+# The app's keys.set, keys.remove and keys.get (#2094, #2846; lampOS/docs/own-keys.md) go to root's keys helper on
+# lamp-setup-keys.socket; lamp-cloud writes nothing. The product also sets LAMP_SETTINGS_CHANGE=on above, so
+# enabling LAMP_OWN_KEYS opens these app calls as well as setup's key fields.
+Environment=LAMP_OWN_KEYS=on
 # `+`: as root, past the sandbox below; `-`: a lamp with no os-server (every product lamp) goes on.
 ExecStartPre=-+/usr/bin/systemctl stop os-server.service
 User=lampos

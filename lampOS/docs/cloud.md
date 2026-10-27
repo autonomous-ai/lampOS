@@ -1354,7 +1354,12 @@ hotspot's `/wifi` page), so this one is new. Off unless
 ### A person's own keys (`keys.*`, #2094)
 
 Off unless `LAMP_OWN_KEYS=on` beside `LAMP_SETTINGS_CHANGE=on` and
-`LAMP_CLOUD=on`. `lamp-cloud` hands one line (`{"set", "key", "base_url"?}`,
+`LAMP_CLOUD=on`. The product already sets `LAMP_SETTINGS_CHANGE` and
+`LAMP_CLOUD`; the proposed `LAMP_OWN_KEYS=on` (#2846) therefore opens all
+three app calls. Product activation remains HOLD for #2094's
+broker/account/TLS work and fresh activation acceptance on this base
+([own-keys.md](own-keys.md)); no settings-off gate remains.
+`lamp-cloud` hands one line (`{"set", "key", "base_url"?}`,
 `{"remove"}` or `{"which": true}`) to root's keys helper on
 `/run/lampos-setup-keys/keys.sock`, on a thread of its own, waiting 15 s at
 most (the helper's one check is 5 s). The helper answers only a peer in

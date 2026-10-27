@@ -850,6 +850,176 @@ fn an_edited_setting_or_environment_file_that_turns_a_switch_off_is_named() {
     );
 }
 
+const OLD_OWN_KEYS: &str = "/etc/systemd/system/lamp-voice.service.d/own-keys.conf";
+
+fn retired_own_keys_template() -> &'static [u8] {
+    // Pin the historical file, not a shortened approximation or a future
+    // replacement: only these original bytes belong to the retired default.
+    let bytes: &[u8] = include_bytes!("../src/retired-own-keys-voice.conf");
+    assert_eq!(bytes.len(), 919);
+    assert_eq!(
+        sha256_hex(bytes),
+        "0d301205f8b182039ec5bea38691d3f3aff43cf69ca433341cd428a6e08ea619"
+    );
+    assert!(install::RETIRED_DROP_INS.contains(&("lamp-voice.service.d/own-keys.conf", bytes)));
+    bytes
+}
+
+fn assert_own_keys_install_is_idle(lamp: &mut Lamp) {
+    let calls = lamp.host.calls.clone();
+    let before = lamp.state();
+    assert!(!before.systemd_owed);
+    let done = lamp.install().unwrap();
+    assert!(done.changed.is_empty(), "{:?}", done.changed);
+    assert_eq!(lamp.host.calls, calls, "no needless systemd reload");
+    assert_eq!(lamp.state(), before);
+}
+
+/// #2846: only the exact historical own-keys drop-in is retired, with
+/// systemd told; the lamp's other drop-ins and their folder stay.
+#[test]
+fn install_removes_the_voices_old_own_keys_drop_in_and_keeps_the_rest() {
+    let mut lamp = Lamp::new(188, &[]);
+    lamp.install().unwrap();
+    let other = "/etc/systemd/system/lamp-voice.service.d/30-local.conf";
+    let exit_note = "/etc/systemd/system/lamp-voice.service.d/exit-note.conf";
+    let local = b"# this lamp's own drop-in\n[Service]\nNice=5\n";
+    fs::write(lamp.on(OLD_OWN_KEYS), retired_own_keys_template()).unwrap();
+    fs::write(lamp.on(other), local).unwrap();
+    let exit_before = fs::read(lamp.on(exit_note)).unwrap();
+    let calls = lamp.host.calls.len();
+    let done = lamp.install().unwrap();
+    assert_eq!(
+        fs::symlink_metadata(lamp.on(OLD_OWN_KEYS))
+            .unwrap_err()
+            .kind(),
+        std::io::ErrorKind::NotFound
+    );
+    assert_eq!(fs::read(lamp.on(other)).unwrap(), local);
+    assert_eq!(fs::read(lamp.on(exit_note)).unwrap(), exit_before);
+    assert_eq!(done.changed.len(), 2, "{:?}", done.changed);
+    assert_eq!(done.changed[0], format!("removed {OLD_OWN_KEYS}"));
+    assert!(done.changed[1].starts_with("enabled "));
+    assert_eq!(
+        lamp.host.calls[calls..]
+            .iter()
+            .map(|call| call.split(' ').next().unwrap())
+            .collect::<Vec<_>>(),
+        ["tmpfiles", "enable"]
+    );
+    assert!(!lamp.state().systemd_owed);
+    let before = tree(&lamp.root);
+    assert_own_keys_install_is_idle(&mut lamp);
+    assert_eq!(tree(&lamp.root), before);
+}
+
+#[test]
+fn install_keeps_a_same_length_edited_own_keys_drop_in_without_reloading() {
+    let mut lamp = Lamp::new(188, &[]);
+    lamp.install().unwrap();
+    let original = retired_own_keys_template();
+    let mut edited = original.to_vec();
+    assert!(edited.starts_with(b"# lampOS"));
+    edited[2] = b'L';
+    assert_eq!(edited.len(), original.len());
+    assert_ne!(edited, original);
+    fs::write(lamp.on(OLD_OWN_KEYS), &edited).unwrap();
+    let before = tree(&lamp.root);
+    assert_own_keys_install_is_idle(&mut lamp);
+    assert_eq!(fs::read(lamp.on(OLD_OWN_KEYS)).unwrap(), edited);
+    assert_eq!(tree(&lamp.root), before);
+}
+
+#[test]
+fn install_keeps_an_own_keys_off_drop_in_without_reloading() {
+    let mut lamp = Lamp::new(188, &[]);
+    lamp.install().unwrap();
+    let custom = b"[Service]\nEnvironment=LAMP_OWN_KEYS=off\n";
+    fs::write(lamp.on(OLD_OWN_KEYS), custom).unwrap();
+    let before = tree(&lamp.root);
+    assert_own_keys_install_is_idle(&mut lamp);
+    assert_eq!(fs::read(lamp.on(OLD_OWN_KEYS)).unwrap(), custom);
+    assert_eq!(tree(&lamp.root), before);
+}
+
+#[test]
+fn install_keeps_an_own_keys_symlink_to_the_exact_template() {
+    let mut lamp = Lamp::new(188, &[]);
+    lamp.install().unwrap();
+    let target = lamp.root.join("kept-own-keys-template.conf");
+    fs::write(&target, retired_own_keys_template()).unwrap();
+    std::os::unix::fs::symlink(&target, lamp.on(OLD_OWN_KEYS)).unwrap();
+    let before = tree(&lamp.root);
+    let mode = mode_of(&target);
+    assert_own_keys_install_is_idle(&mut lamp);
+    assert!(
+        fs::symlink_metadata(lamp.on(OLD_OWN_KEYS))
+            .unwrap()
+            .is_symlink()
+    );
+    assert_eq!(fs::read_link(lamp.on(OLD_OWN_KEYS)).unwrap(), target);
+    assert_eq!(fs::read(&target).unwrap(), retired_own_keys_template());
+    assert_eq!(mode_of(&target), mode);
+    assert_eq!(tree(&lamp.root), before);
+}
+
+/// Head-touch preflight refuses an unreadable drop-in before retirement
+/// runs; the directory and every installed file remain unchanged.
+#[test]
+fn install_preflight_refuses_a_directory_at_the_retired_own_keys_path() {
+    let mut lamp = Lamp::new(188, &[]);
+    lamp.install().unwrap();
+    let directory = lamp.on(OLD_OWN_KEYS);
+    fs::create_dir(&directory).unwrap();
+    fs::write(directory.join("kept.conf"), b"# local contents\n").unwrap();
+    let before = tree(&lamp.root);
+    let state = lamp.state();
+    let calls = lamp.host.calls.clone();
+    let why = lamp.install().unwrap_err();
+    assert!(why.contains("own-keys.conf"), "{why}");
+    assert!(fs::symlink_metadata(&directory).unwrap().is_dir());
+    assert_eq!(
+        fs::read(directory.join("kept.conf")).unwrap(),
+        b"# local contents\n"
+    );
+    assert_eq!(tree(&lamp.root), before);
+    assert_eq!(lamp.state(), state);
+    assert_eq!(lamp.host.calls, calls);
+}
+
+#[test]
+fn a_failed_reload_after_retiring_own_keys_is_retried_without_removing_again() {
+    let mut lamp = Lamp::new(188, &[]);
+    lamp.install().unwrap();
+    fs::write(lamp.on(OLD_OWN_KEYS), retired_own_keys_template()).unwrap();
+    lamp.host.failing_enables = 1;
+    let why = lamp.install().unwrap_err();
+    assert!(why.contains("Failed to connect to bus"), "{why}");
+    assert_eq!(
+        fs::symlink_metadata(lamp.on(OLD_OWN_KEYS))
+            .unwrap_err()
+            .kind(),
+        std::io::ErrorKind::NotFound
+    );
+    assert!(lamp.state().systemd_owed);
+    let calls = lamp.host.calls.len();
+    let done = lamp.install().unwrap();
+    assert_eq!(done.changed.len(), 1, "{:?}", done.changed);
+    assert!(done.changed[0].starts_with("enabled "));
+    assert_eq!(
+        lamp.host.calls[calls..]
+            .iter()
+            .map(|call| call.split(' ').next().unwrap())
+            .collect::<Vec<_>>(),
+        ["tmpfiles", "enable"]
+    );
+    assert!(!lamp.state().systemd_owed);
+    assert!(!lamp.on(OLD_OWN_KEYS).exists());
+    let before = tree(&lamp.root);
+    assert_own_keys_install_is_idle(&mut lamp);
+    assert_eq!(tree(&lamp.root), before);
+}
+
 #[test]
 fn a_failed_exit_note_write_keeps_reload_debt_for_the_next_install() {
     let mut lamp = Lamp::new(188, &[]);
@@ -1061,7 +1231,7 @@ fn every_part_of_the_lamp_waits_for_setups_marker_itself() {
             );
         }
     }
-    assert_eq!(gated.len(), 24, "{gated:?}");
+    assert_eq!(gated.len(), 25, "{gated:?}");
     for outside in ["lamp-update.service", "lamp-records.timer"] {
         assert!(!gated.contains(&outside), "{outside}");
     }
@@ -1148,6 +1318,53 @@ fn the_product_sees_who_speaks() {
             "{name} lacks {line}"
         );
     }
+}
+
+/// #2846: a person's own keys are on in the product, on the three units
+/// that read the switch: setup (its request's fields), the cloud (the app's
+/// `keys.*`) and the voice, which loads the keys' folder whole. Its
+/// `ConfigurationDirectory=` makes the folder, so a lamp with no key starts
+/// on the relay; the reset wipes it; and root's keys helper is installed
+/// with its socket enabled, so a full update brings all of it.
+#[test]
+fn the_product_takes_a_persons_own_keys() {
+    let unit = |name: &str| {
+        install::PRODUCT
+            .iter()
+            .find(|(unit, _)| *unit == name)
+            .unwrap_or_else(|| panic!("no {name}"))
+            .1
+    };
+    for name in [
+        "lamp-setup.service",
+        "lamp-cloud.service",
+        "lamp-voice.service",
+    ] {
+        assert!(
+            section(unit(name), "Service").contains(&"Environment=LAMP_OWN_KEYS=on"),
+            "{name} lacks LAMP_OWN_KEYS=on"
+        );
+    }
+    let voice = section(unit("lamp-voice.service"), "Service");
+    for line in [
+        "LoadCredential=own:/etc/lampOS/voice/own",
+        "ConfigurationDirectory=lampOS/voice/own",
+        "ConfigurationDirectoryMode=0700",
+    ] {
+        assert!(voice.contains(&line), "lamp-voice.service lacks {line}");
+    }
+    let helper = section(unit("lamp-setup-keys@.service"), "Service");
+    assert!(
+        helper
+            .iter()
+            .any(|line| line.contains(" keys --folder /etc/lampOS/voice/own ")),
+        "{helper:?}"
+    );
+    unit("lamp-setup-keys.socket");
+    assert!(
+        install::RESET_PLAN.contains("\"/etc/lampOS/voice/own\""),
+        "the reset leaves the keys"
+    );
 }
 
 /// #1176 (Nine and the reviewer): Expression's `--head-touch` only beside

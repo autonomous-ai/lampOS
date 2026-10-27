@@ -514,7 +514,7 @@ adjacent fade tests. It still waits for white, stops the painter, then
 checks that its last frame is black and the ring is closed. The product's
 fade durations and the real two-second stop deadline are unchanged.
 
-## A person's own keys (#2094, built, off unless set)
+## A person's own keys (#2094, proposed product activation, #2846)
 
 With `LAMP_OWN_KEYS=on`, the setup request may carry a person's own
 DeepSeek endpoint and key and Deepgram key (`deepseek_api_key`,
@@ -523,7 +523,12 @@ service after the join and before the marker, and kept only if it works, in
 `/etc/lampOS/voice/own/` (root's, 0700, each key 0600), which the reset
 wipes. None fails setup: the status's `own_keys` gives each answer. After
 setup the app changes them through root's keys helper,
-`lamp-setup keys` on `lamp-setup-keys.socket`. All of it is in
+`lamp-setup keys` on `lamp-setup-keys.socket`, which install enables; the
+app's half also needs `LAMP_SETTINGS_CHANGE=on` in `lamp-cloud`, which the
+product already sets. The proposed own-keys switch therefore opens setup
+and app calls together. Activation remains HOLD for #2094's
+broker/account/TLS work and a fresh activation decision and lamp check;
+the installer tests do not establish that acceptance. All of it is in
 [own-keys.md](own-keys.md).
 
 ## Changed after setup (#1959, built, off unless set)

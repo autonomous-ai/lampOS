@@ -1000,8 +1000,9 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
    daemon-reload`, and `systemctl enable` of every part, `lampos.target`,
    `lamp-update.service`, `lamp-records.timer`, `lamp-selftest.timer`,
    `lamp-update-back.timer`, `lampos-setup-done.path`, and the helpers'
-   sockets `lamp-skills-manage.socket`, `lamp-setup-change.socket` and
-   `lamp-setup-wifi.socket` (#2853; each template is started by its socket,
+   sockets `lamp-skills-manage.socket`, `lamp-setup-change.socket`,
+   `lamp-setup-wifi.socket` and `lamp-setup-keys.socket` (#2853, #2846; each
+   template is started by its socket,
    never enabled; each timer's service is started by the timer
    alone; lamp-update-back's also by lamp-update's `OnFailure=`, #1680;
    `lamp-update-apply.service` is never enabled: only a round starts it,
@@ -1011,6 +1012,19 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
    enable fails, or that is stopped anywhere after its first unit is
    written, leaves the debt, and the next run pays it though it writes
    nothing (the reviewer on #815, 19:17 and 19:32).
+   The retired `/etc/systemd/system/lamp-voice.service.d/own-keys.conf`
+   is removed only when it is a regular file matching the exact historical
+   template embedded in `RETIRED_DROP_INS`. Its bytes and kind are checked
+   again after unit writes; edited files, explicit off overrides, symlinks
+   and other kinds stay. Reload debt is saved before removal, and the
+   parent directory is synced after it, so a failed enable is retried on
+   the next install even after the file is gone. Unrelated drop-ins and
+   nonempty directories stay. Preservation does not promise a successful
+   install with an invalid drop-in: existing head-touch preflight refuses a
+   directory before cleanup. The FIFO regression checks this matcher only;
+   it does not qualify the whole installer's separate file-admission rules.
+   This cleanup does not qualify the proposed
+   own-keys activation: [own-keys.md](own-keys.md) records its HOLD.
 9. **Harness at boot** (#811, the first builder's recipe, 01:56), once
    Harness is on the lamp at `/usr/local/bin/harness` (its own installer,
    run as `lampos`, puts it in `~/.local/bin`, then a link is made there; see

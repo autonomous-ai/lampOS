@@ -1,0 +1,1049 @@
+{
+  "base": "2747c72a709882a62d625d5bbb3bfbe3fd797581",
+  "build_jobs": 1,
+  "gates": {
+    "clippy": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "clippy",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-update",
+        "-p",
+        "lamp-voice",
+        "-p",
+        "lamp-selftest",
+        "-p",
+        "lamp-setup",
+        "-p",
+        "lamp-cloud",
+        "-p",
+        "lamp-health",
+        "-p",
+        "lamp-controls",
+        "-p",
+        "lamp-skills",
+        "-p",
+        "lamp-voice-eval",
+        "--all-targets",
+        "--message-format=short",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "elapsed_seconds": 71.508,
+      "error": null,
+      "exit_code": 0,
+      "log_bytes": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "purpose": "Strict all-target Clippy for the nine selected crates.",
+      "source_entries": 7172,
+      "source_unchanged": true
+    },
+    "controls-product": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-controls",
+        "--test",
+        "it",
+        "touch_runtime::controls_runs_at_real_time_priority_above_the_voice",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "elapsed_seconds": 6.068,
+      "error": null,
+      "exit_code": 0,
+      "log_bytes": 115,
+      "log_sha256": "d108915ace502cc7be3aec9ee11a871280c43ef972d00c47c268f03128b69b5d",
+      "purpose": "Controls/product voice scheduling-priority comparison.",
+      "source_entries": 7172,
+      "source_unchanged": true,
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered": 470,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1,
+          "status": "ok"
+        }
+      ],
+      "totals": {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 1
+      }
+    },
+    "fmt": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "elapsed_seconds": 6.302,
+      "error": null,
+      "exit_code": 0,
+      "log_bytes": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "purpose": "Formatting only.",
+      "source_entries": 7172,
+      "source_unchanged": true
+    },
+    "force-order": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "second_provider::worker::memory_observer::the_first_force_that_names_a_function_is_the_one_kept",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "elapsed_seconds": 0.543,
+      "error": null,
+      "exit_code": 0,
+      "log_bytes": 116,
+      "log_sha256": "cba5102012942da58d69fcfd16bdec83a218a67933add2e219f856db297445bb",
+      "purpose": "Generic first_force priority/None behavior; not a full serve-chain integration test.",
+      "source_entries": 7172,
+      "source_unchanged": true,
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered": 3799,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1,
+          "status": "ok"
+        }
+      ],
+      "totals": {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 1
+      }
+    },
+    "generic-product-units": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-update",
+        "--lib",
+        "unit::tests::the_generic_voice_",
+        "--",
+        "--test-threads=1"
+      ],
+      "elapsed_seconds": 5.731,
+      "error": null,
+      "exit_code": 0,
+      "log_bytes": 119,
+      "log_sha256": "2512ba227bcbdfb0676da533d2691187ab5cb83b1ce737264eb1f27e09ae4828",
+      "purpose": "Generic/product unit compatibility readers for ring, errors, clock/session and answers.",
+      "source_entries": 7172,
+      "source_unchanged": true,
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered": 119,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 4,
+          "status": "ok"
+        }
+      ],
+      "totals": {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 4
+      }
+    },
+    "install": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-update",
+        "--test",
+        "install",
+        "--",
+        "--test-threads=1"
+      ],
+      "elapsed_seconds": 205.9,
+      "error": null,
+      "exit_code": 0,
+      "log_bytes": 223,
+      "log_sha256": "2cb11aa54d6c091ea75c8dff99857c7d5ddd40d316c18d0d3b560d18d5e413b2",
+      "purpose": "Complete install integration target, whose fixtures write the changed PRODUCT voice unit; includes all own-keys retirement controls.",
+      "source_entries": 7172,
+      "source_unchanged": true,
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 99,
+          "status": "ok"
+        }
+      ],
+      "totals": {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 99
+      }
+    },
+    "matcher": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-update",
+        "--lib",
+        "retired_drop_in_matcher_",
+        "--",
+        "--test-threads=1"
+      ],
+      "elapsed_seconds": 0.57,
+      "error": null,
+      "exit_code": 0,
+      "log_bytes": 115,
+      "log_sha256": "823877d087b4a6ef1dd99eedb8b24adebf52879c84b0bc198ed48635add593f1",
+      "purpose": "Private retirement matcher; Mac directory case only, Linux FIFO remains native-only.",
+      "source_entries": 7172,
+      "source_unchanged": true,
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered": 122,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1,
+          "status": "ok"
+        }
+      ],
+      "totals": {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 1
+      }
+    },
+    "product-functions": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-update",
+        "--test",
+        "functions",
+        "--",
+        "--test-threads=1"
+      ],
+      "elapsed_seconds": 1.956,
+      "error": null,
+      "exit_code": 0,
+      "log_bytes": 118,
+      "log_sha256": "9d2f05ffd56b48f1950dc2616da75739562ed09a99c8c782582dae883ffadcd9",
+      "purpose": "Product function catalog and chat-bound controls using a child with the actual product Environment lines; helper guard cases remain included in target count.",
+      "source_entries": 7172,
+      "source_unchanged": true,
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 5,
+          "status": "ok"
+        }
+      ],
+      "totals": {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 5
+      }
+    },
+    "product-ownkeys": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "second_config::tests::the_product_unit_loads_the_own_keys_folder_the_names_here_read",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "elapsed_seconds": 0.54,
+      "error": null,
+      "exit_code": 0,
+      "log_bytes": 116,
+      "log_sha256": "cba5102012942da58d69fcfd16bdec83a218a67933add2e219f856db297445bb",
+      "purpose": "Compiled product own-keys folder/credential reader.",
+      "source_entries": 7172,
+      "source_unchanged": true,
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered": 3799,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1,
+          "status": "ok"
+        }
+      ],
+      "totals": {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 1
+      }
+    },
+    "product-relay": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "second_config::tests::the_company_relay_reaches_deepseek_through_itself",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "elapsed_seconds": 0.542,
+      "error": null,
+      "exit_code": 0,
+      "log_bytes": 116,
+      "log_sha256": "cba5102012942da58d69fcfd16bdec83a218a67933add2e219f856db297445bb",
+      "purpose": "Product relay credential/configuration reader.",
+      "source_entries": 7172,
+      "source_unchanged": true,
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered": 3799,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1,
+          "status": "ok"
+        }
+      ],
+      "totals": {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 1
+      }
+    },
+    "relay-round": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-update",
+        "--test",
+        "round",
+        "a_round_keeping_second_json_still_reaches_deepseek_through_the_relay",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "elapsed_seconds": 6.925,
+      "error": null,
+      "exit_code": 0,
+      "log_bytes": 115,
+      "log_sha256": "4bac2dc6059844240a59a0fd874d692e33c9257f8fd8bc2395c170ce1b2c23cd",
+      "purpose": "OTA round consuming current product voice relay configuration.",
+      "source_entries": 7172,
+      "source_unchanged": true,
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered": 166,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1,
+          "status": "ok"
+        }
+      ],
+      "totals": {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 1
+      }
+    },
+    "schedule-actions": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "tools::schedule_integration_tests::",
+        "--",
+        "--test-threads=1"
+      ],
+      "elapsed_seconds": 0.994,
+      "error": null,
+      "exit_code": 0,
+      "log_bytes": 121,
+      "log_sha256": "c35bd97eca83b5622322df28632dd8594452d511efdd9c849d45c4353abb2193",
+      "purpose": "Existing real Actions/Schedule adapter and voice function boundary controls.",
+      "source_entries": 7172,
+      "source_unchanged": true,
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered": 3795,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 5,
+          "status": "ok"
+        }
+      ],
+      "totals": {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 5
+      }
+    },
+    "schedule-asked": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "tools::schedule_asked::tests::",
+        "--",
+        "--test-threads=1"
+      ],
+      "elapsed_seconds": 81.587,
+      "error": null,
+      "exit_code": 0,
+      "log_bytes": 119,
+      "log_sha256": "ef371878e61a3a48edb15139709664708e50b8ca33eb84c169678885450745dc",
+      "purpose": "The new parser, force selector and generated chat-wire controls; no provider call.",
+      "source_entries": 7172,
+      "source_unchanged": true,
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered": 3797,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 3,
+          "status": "ok"
+        }
+      ],
+      "totals": {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 3
+      }
+    },
+    "selftest-product": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-selftest",
+        "--lib",
+        "voice_route::tests::the_product_unit_has_the_own_keys_lines",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "elapsed_seconds": 3.331,
+      "error": null,
+      "exit_code": 0,
+      "log_bytes": 114,
+      "log_sha256": "d3a92181ee34dfc0b38e2cfdd926b92b3aec09ce723826556d4b5bcc3200deb9",
+      "purpose": "Selftest compiled product own-keys lines.",
+      "source_entries": 7172,
+      "source_unchanged": true,
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered": 76,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1,
+          "status": "ok"
+        }
+      ],
+      "totals": {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 1
+      }
+    },
+    "setup-product": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-setup",
+        "--test",
+        "it",
+        "wifi_change::the_product_voice_loads_its_recorded_lines_from_the_fixed_folder",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "elapsed_seconds": 26.538,
+      "error": null,
+      "exit_code": 0,
+      "log_bytes": 115,
+      "log_sha256": "030ac6bfdaa31b766edba04dc8e02ab98b5a9ba39dc4dfaf1048e0d85d5c504e",
+      "purpose": "Setup compiled product recorded-lines folder and credential configuration.",
+      "source_entries": 7172,
+      "source_unchanged": true,
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered": 156,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1,
+          "status": "ok"
+        }
+      ],
+      "totals": {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 1
+      }
+    },
+    "skills-product": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-skills",
+        "--lib",
+        "package::tests::the_askers_cgroups_are_their_product_units_slices",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "elapsed_seconds": 6.93,
+      "error": null,
+      "exit_code": 0,
+      "log_bytes": 115,
+      "log_sha256": "030ac6bfdaa31b766edba04dc8e02ab98b5a9ba39dc4dfaf1048e0d85d5c504e",
+      "purpose": "Skills caller cgroups read from product unit slices.",
+      "source_entries": 7172,
+      "source_unchanged": true,
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered": 156,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1,
+          "status": "ok"
+        }
+      ],
+      "totals": {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 1
+      }
+    },
+    "switches": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-voice-eval",
+        "--test",
+        "it",
+        "switches::",
+        "--",
+        "--test-threads=1"
+      ],
+      "elapsed_seconds": 53.705,
+      "error": null,
+      "exit_code": 0,
+      "log_bytes": 117,
+      "log_sha256": "1c8ce6b96caada736a13b613365297381769fd85679e71caa8339d3b35fbd927",
+      "purpose": "Both compiled docs/switches.md census readers.",
+      "source_entries": 7172,
+      "source_unchanged": true,
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered": 236,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 2,
+          "status": "ok"
+        }
+      ],
+      "totals": {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 2
+      }
+    },
+    "withdrawal": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "remember::asked::tests::",
+        "--",
+        "--test-threads=1"
+      ],
+      "elapsed_seconds": 0.545,
+      "error": null,
+      "exit_code": 0,
+      "log_bytes": 119,
+      "log_sha256": "753d4f6ed4c69238ad650aea690db32cd94aec21e564fefcec83d36eaf764388",
+      "purpose": "Existing withdrawal and remember-wire controls for the now-shared withdrawal helper.",
+      "source_entries": 7172,
+      "source_unchanged": true,
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered": 3797,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 3,
+          "status": "ok"
+        }
+      ],
+      "totals": {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 3
+      }
+    },
+    "worker-environment": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "-q",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "process::tests::",
+        "--",
+        "--test-threads=1"
+      ],
+      "elapsed_seconds": 4.498,
+      "error": null,
+      "exit_code": 0,
+      "log_bytes": 134,
+      "log_sha256": "5314a6bfab836a09c2ee5813225918a69f880ddcd81e492bc3500eae3d6dd9a3",
+      "purpose": "Role environment routing including exact schedule opt-in and real child-worker environment census.",
+      "source_entries": 7172,
+      "source_unchanged": true,
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered": 3784,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 16,
+          "status": "ok"
+        }
+      ],
+      "totals": {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 16
+      }
+    }
+  },
+  "head": "4a0f0cc4291f4d1d9917c8d7efbe5412200f96fb",
+  "host": "aarch64-apple-darwin",
+  "limits": [
+    "No full current Voice or nine-crate suite is claimed. Counts belong to the exact listed command selections.",
+    "Existing parser/wire and generic first_force controls do not exercise the complete production serve force chain or actual provider transport.",
+    "Product unit readers compile/install into disposable test roots; no actual systemd or lamp installation is claimed.",
+    "No executable or compiler artifact manifest is produced by this controller; source/command/log binding only.",
+    "Earlier failed selected gate and native 98f60 results keep their original scope; fresh native checks must bind the eventual head.",
+    "No provider, real key, device latency or physical/product activation acceptance."
+  ],
+  "old_base": "d21a854b6a46209c8a76a70d8a8b3f3e286f0ff3",
+  "old_head": "0b496997a901541595f0321d821c3734c7abfe52",
+  "prior_d21": {
+    "base": "d21a854b6a46209c8a76a70d8a8b3f3e286f0ff3",
+    "full_voice_totals": {
+      "failed": 0,
+      "ignored": 21,
+      "passed": 4068
+    },
+    "packet_checksums": {
+      "README.md": "4fa449bea8b99d568980b7a90b098704925e6f119c5c5c93b5a1d816779d5cb4",
+      "inputs.sha256": "b74031e4b01e613ea3c8e69e95a3ee64dd4606bf17be1008150e5b3f75d6f96a",
+      "range-diff.txt": "24d8c67f9ae03c0f5ed47f42ed9f542ae1a8e02fadc8bf142b5784e3f9d2a76a",
+      "results.json": "771864e4da116711a9206534f3a2def7b09e5b475e525c146fb4919fa9d1e85f"
+    },
+    "proof_commit": "0b496997a901541595f0321d821c3734c7abfe52",
+    "scope": "Historical full Voice execution at d21 only; not relabelled as a full 274 run.",
+    "tested_head": "4fb4c1c041f920bbccbaa8dc2d1119fd9ad9edc9"
+  },
+  "rebase": {
+    "five_equal_patches": [
+      {
+        "new": "6ffdcc5a7e078bc246d34bc4f9bef9e0e822c050",
+        "old": "4bb741248595a940424698fa119d9b2d96442091",
+        "stable_patch_id": "abb7428942b09a160a4ecade1e8de7630111d49b"
+      },
+      {
+        "new": "b3297f015bd469e6ebb806fd72e9cfc40971ce0d",
+        "old": "220208cc3f2a9f7ff405ed87687acaf1d073b030",
+        "stable_patch_id": "94ebf96e7330e2df0514bd4a3ecb9288d555af68"
+      },
+      {
+        "new": "a092c3a06aaa6ebb14435778632fc27864a6dbee",
+        "old": "1ad392b4f0ad3dc3ed15ea3ce32fbb238f2f839c",
+        "stable_patch_id": "54320f9f9f54cd951fc4132a820558309592cd86"
+      },
+      {
+        "new": "d2a760f4886ab2e366b4dbca00c97eba2d5012bb",
+        "old": "4fb4c1c041f920bbccbaa8dc2d1119fd9ad9edc9",
+        "stable_patch_id": "1009d172d14604ba4a8fa2751c980b5606f0c0d7"
+      },
+      {
+        "new": "4a0f0cc4291f4d1d9917c8d7efbe5412200f96fb",
+        "old": "0b496997a901541595f0321d821c3734c7abfe52",
+        "stable_patch_id": "e41108a67cdd262974f783a8746f13c8eefe330b"
+      }
+    ],
+    "owned": [
+      {
+        "after_blob": "d7dbb6121d0b001e46e01681c47ac17391fe45db",
+        "before_blob": "d7dbb6121d0b001e46e01681c47ac17391fe45db",
+        "mode": 420,
+        "path": "lampOS/crates/selftest/src/voice_route.rs",
+        "sha256": "ecc6c17f39fc3a91014446aac85c6bec20622332e84a239e311c492908893e61",
+        "unchanged": true
+      },
+      {
+        "after_blob": "79c0d6145d6d9263828170be18d986573814e13a",
+        "before_blob": "79c0d6145d6d9263828170be18d986573814e13a",
+        "mode": 420,
+        "path": "lampOS/crates/update/src/install.rs",
+        "sha256": "1794da24137f416e62d68d2a9943d3f2909553db812fbc5401e1649ad757db3c",
+        "unchanged": true
+      },
+      {
+        "after_blob": "ce1cee3234fe14c3cd5d80f66af94b0349a15ee7",
+        "before_blob": "ce1cee3234fe14c3cd5d80f66af94b0349a15ee7",
+        "mode": 420,
+        "path": "lampOS/crates/update/src/retired-own-keys-voice.conf",
+        "sha256": "0d301205f8b182039ec5bea38691d3f3aff43cf69ca433341cd428a6e08ea619",
+        "unchanged": true
+      },
+      {
+        "after_blob": "e00dfbfabbbbf4bb7c1cbc30da8d00f7874f116c",
+        "before_blob": "e00dfbfabbbbf4bb7c1cbc30da8d00f7874f116c",
+        "mode": 420,
+        "path": "lampOS/crates/update/tests/install.rs",
+        "sha256": "9fbe2121e480ab66a5525e17c3786b2980a5e9b4ebd666742f68040488ac9291",
+        "unchanged": true
+      },
+      {
+        "after_blob": "40c2c89bc247ed46a03f2c22b999ed8e95a4fc52",
+        "before_blob": "40c2c89bc247ed46a03f2c22b999ed8e95a4fc52",
+        "mode": 420,
+        "path": "lampOS/crates/voice/src/second_config.rs",
+        "sha256": "74132d5bde138174f9eb51408789f56966e9dd57eeab34b24087efcab0feb29f",
+        "unchanged": true
+      },
+      {
+        "after_blob": "17efe0bfa3cf91e128eb5ef441ffb111d34107e5",
+        "before_blob": "17efe0bfa3cf91e128eb5ef441ffb111d34107e5",
+        "mode": 420,
+        "path": "lampOS/deploy/product/README.md",
+        "sha256": "f43cc0303435ed800435e6ee13b6faf2580bf4003125a5824aec364394bfad65",
+        "unchanged": true
+      },
+      {
+        "after_blob": "3a754428d4275a095d706286cc5ba22165731dea",
+        "before_blob": "3a754428d4275a095d706286cc5ba22165731dea",
+        "mode": 420,
+        "path": "lampOS/deploy/product/lamp-cloud.service",
+        "sha256": "7a3b4df7c7d4b5545d95cb8be2dae72459a9a946b5a0086b1af661636ac5f46f",
+        "unchanged": true
+      },
+      {
+        "after_blob": "6706f518997442593a66e86cd09a5b423a3b893a",
+        "before_blob": "6706f518997442593a66e86cd09a5b423a3b893a",
+        "mode": 420,
+        "path": "lampOS/deploy/product/lamp-setup-keys.socket",
+        "sha256": "27f4d2127223156eae29a6500f86ef1b0895c5c3eca9380e54085262dd40777a",
+        "unchanged": true
+      },
+      {
+        "after_blob": "d5ebabfb680eaac39917f5dd86372243b02e70d6",
+        "before_blob": "d5ebabfb680eaac39917f5dd86372243b02e70d6",
+        "mode": 420,
+        "path": "lampOS/deploy/product/lamp-setup.service",
+        "sha256": "5a190537d2f663378a1011c78b08cd5b967db473c9ff407e562582a34c5bbacd",
+        "unchanged": true
+      },
+      {
+        "after_blob": "958360bf4e5c4e617fc31cbe608bccf1857271c6",
+        "before_blob": "aba6bc0132a98cefb3751120a49b3e8b308ebd6b",
+        "mode": 420,
+        "path": "lampOS/deploy/product/lamp-voice.service",
+        "sha256": "34fa04899347e10efa161b419702a5694378005af2e4797548b1abced98a18af",
+        "unchanged": false
+      },
+      {
+        "after_blob": "cf45e3fe0b99bc728bbbaa43fafadbb931c7c701",
+        "before_blob": "cf45e3fe0b99bc728bbbaa43fafadbb931c7c701",
+        "mode": 420,
+        "path": "lampOS/docs/cloud.md",
+        "sha256": "e89bf968c9da512a648a2f5ba847629afc8acbeac5bb0c936819678d2f8fcefc",
+        "unchanged": true
+      },
+      {
+        "after_blob": "8a3d7513eab5c8b51b7f3a5569a247f49e5a0684",
+        "before_blob": "8a3d7513eab5c8b51b7f3a5569a247f49e5a0684",
+        "mode": 420,
+        "path": "lampOS/docs/install.md",
+        "sha256": "ff2e3a0171ce8cf2e60222de76fdb6d2f7d36d9565ba48f8726a69dcca2cd25b",
+        "unchanged": true
+      },
+      {
+        "after_blob": "b87bacb3d344a61f8a9d7783313d1ed89122daba",
+        "before_blob": "b87bacb3d344a61f8a9d7783313d1ed89122daba",
+        "mode": 420,
+        "path": "lampOS/docs/own-keys.md",
+        "sha256": "b8e6543f481a5e68884ac3124bed8cbb4178db4579403d21fb9bc864198cb73c",
+        "unchanged": true
+      },
+      {
+        "after_blob": "16bcde45592599461dc7cba485de14048ef2c6e9",
+        "before_blob": "16bcde45592599461dc7cba485de14048ef2c6e9",
+        "mode": 420,
+        "path": "lampOS/docs/selftest.md",
+        "sha256": "3aca305d0acda08079e55960518e81a905e5338218a613dd35b7e627e345f175",
+        "unchanged": true
+      },
+      {
+        "after_blob": "68d5e20e058ed3c8d559fd3ad45cbfe0761efd16",
+        "before_blob": "68d5e20e058ed3c8d559fd3ad45cbfe0761efd16",
+        "mode": 420,
+        "path": "lampOS/docs/setup.md",
+        "sha256": "5094a18d870cf95e22e5fd336a21aaf084014e37af1b60127d701967945d8211",
+        "unchanged": true
+      },
+      {
+        "after_blob": "8206c3a3f39a3f8b7116009558f7a596ad2a13d1",
+        "before_blob": "6a907c64412d5b6c455ea14a19eeef1993422644",
+        "mode": 420,
+        "path": "lampOS/docs/switches.md",
+        "sha256": "fa526ec702bf7b35e018033868e330830e826e8cc0fe15a04d797ddedcb4781f",
+        "unchanged": false
+      },
+      {
+        "after_blob": "4aef32d676f1c4d56c1ce7004c1ef0530112a60b",
+        "before_blob": "4aef32d676f1c4d56c1ce7004c1ef0530112a60b",
+        "mode": 420,
+        "path": "lampOS/docs/verification/own-keys-product-carry-20261026/README.md",
+        "sha256": "2ab693773076817230acb170f5354f0f91bbf16839f5c167fab812efe0d0b83e",
+        "unchanged": true
+      },
+      {
+        "after_blob": "bc3f4d823d9f86e34944e37786d9dcd6a46539bd",
+        "before_blob": "bc3f4d823d9f86e34944e37786d9dcd6a46539bd",
+        "mode": 420,
+        "path": "lampOS/docs/verification/own-keys-product-carry-20261026/SHA256SUMS",
+        "sha256": "af918e4f1ece8c372523a5efec86af6c5bda73b1a9928d25a7ea26b9e71682d4",
+        "unchanged": true
+      },
+      {
+        "after_blob": "d475f1e0d78194684d2e19632b9166656b323bbd",
+        "before_blob": "d475f1e0d78194684d2e19632b9166656b323bbd",
+        "mode": 420,
+        "path": "lampOS/docs/verification/own-keys-product-carry-20261026/current-d21/README.md",
+        "sha256": "4fa449bea8b99d568980b7a90b098704925e6f119c5c5c93b5a1d816779d5cb4",
+        "unchanged": true
+      },
+      {
+        "after_blob": "5fbda765b06200e590401f74fe593562b296944b",
+        "before_blob": "5fbda765b06200e590401f74fe593562b296944b",
+        "mode": 420,
+        "path": "lampOS/docs/verification/own-keys-product-carry-20261026/current-d21/SHA256SUMS",
+        "sha256": "7d35e8b9981e986f80e41e209dbe512a1ce38ccc8d6bed0442e10e8a7dd0bf74",
+        "unchanged": true
+      },
+      {
+        "after_blob": "1b420823f8cc4c2447a01ea69c6652ad25296140",
+        "before_blob": "1b420823f8cc4c2447a01ea69c6652ad25296140",
+        "mode": 420,
+        "path": "lampOS/docs/verification/own-keys-product-carry-20261026/current-d21/inputs.sha256",
+        "sha256": "b74031e4b01e613ea3c8e69e95a3ee64dd4606bf17be1008150e5b3f75d6f96a",
+        "unchanged": true
+      },
+      {
+        "after_blob": "5055526b3c731b763ae0a6c02ee745108386eab9",
+        "before_blob": "5055526b3c731b763ae0a6c02ee745108386eab9",
+        "mode": 420,
+        "path": "lampOS/docs/verification/own-keys-product-carry-20261026/current-d21/range-diff.txt",
+        "sha256": "24d8c67f9ae03c0f5ed47f42ed9f542ae1a8e02fadc8bf142b5784e3f9d2a76a",
+        "unchanged": true
+      },
+      {
+        "after_blob": "c5b2a38c710ce74195f1c54693864b4adbacf114",
+        "before_blob": "c5b2a38c710ce74195f1c54693864b4adbacf114",
+        "mode": 420,
+        "path": "lampOS/docs/verification/own-keys-product-carry-20261026/current-d21/results.json",
+        "sha256": "771864e4da116711a9206534f3a2def7b09e5b475e525c146fb4919fa9d1e85f",
+        "unchanged": true
+      },
+      {
+        "after_blob": "c058e0b698621c2df923c3866a4a30d7c65dfca6",
+        "before_blob": "c058e0b698621c2df923c3866a4a30d7c65dfca6",
+        "mode": 420,
+        "path": "lampOS/docs/verification/own-keys-product-carry-20261026/inputs.sha256",
+        "sha256": "0e8b2a3040d3e5ffc873ed33281a66b78d44a164290fb301fdeccfc042f86e4c",
+        "unchanged": true
+      },
+      {
+        "after_blob": "055ba371c93a3d2dc614fe6212428d7eb315c207",
+        "before_blob": "055ba371c93a3d2dc614fe6212428d7eb315c207",
+        "mode": 420,
+        "path": "lampOS/docs/verification/own-keys-product-carry-20261026/results.json",
+        "sha256": "1076977e2351312b9bf6ceaa805d23f1dc7dcc4dde0541c9f22004bc7d32226f",
+        "unchanged": true
+      },
+      {
+        "after_blob": "ae7a87cdaeb17232418c886794c918e43eb64916",
+        "before_blob": "ae7a87cdaeb17232418c886794c918e43eb64916",
+        "mode": 420,
+        "path": "lampOS/docs/verification/own-keys-product-carry-20261026/review-docs/README.md",
+        "sha256": "7ef33440356f498105adc296745d636ca1e14e7ce1a7205125f3558e4b035cab",
+        "unchanged": true
+      },
+      {
+        "after_blob": "c8737a31184da7637dfd35eb3d229255ee680108",
+        "before_blob": "c8737a31184da7637dfd35eb3d229255ee680108",
+        "mode": 420,
+        "path": "lampOS/docs/verification/own-keys-product-carry-20261026/review-docs/SHA256SUMS",
+        "sha256": "0271ddc58ef08ab37a89bda786002adb4eaf0a769793e6a8c16fb07dfd39fe48",
+        "unchanged": true
+      },
+      {
+        "after_blob": "ade447267c3def3134d8f69335ae2a61b7c45402",
+        "before_blob": "ade447267c3def3134d8f69335ae2a61b7c45402",
+        "mode": 420,
+        "path": "lampOS/docs/verification/own-keys-product-carry-20261026/review-docs/results.json",
+        "sha256": "cc06a5a33b5687c78ba6aeac7a6b3c60003e682eadc5429281d3bb8b887dbb1a",
+        "unchanged": true
+      }
+    ],
+    "owned_changed": [
+      "lampOS/deploy/product/lamp-voice.service",
+      "lampOS/docs/switches.md"
+    ],
+    "prior_proof_blobs_modes_preserved": true,
+    "prior_proof_entries": 4460,
+    "range_diff_sha256": "6c486c186e65430d212c4516a5ce48bbf9b5f8e0f10ddc6d5c6bdd277500681b",
+    "upstream_and_carry_stable_patch_id": "2d0da65989c4046bf9b5d193d94b3f14d1482856",
+    "upstream_delta": [
+      "lampOS/crates/voice/src/process.rs",
+      "lampOS/crates/voice/src/remember/asked.rs",
+      "lampOS/crates/voice/src/second_provider/worker.rs",
+      "lampOS/crates/voice/src/tools.rs",
+      "lampOS/crates/voice/src/tools/schedule_asked.rs",
+      "lampOS/deploy/product/lamp-voice.service",
+      "lampOS/docs/schedule.md",
+      "lampOS/docs/switches.md"
+    ]
+  },
+  "schema": 1,
+  "source_inventory": {
+    "current_files_match": true,
+    "entries": 7172,
+    "sha256": "8de140048aaab82a084fdd373993ca169719187e91776c350b47d0c34fded6bd"
+  },
+  "test_threads": 1,
+  "toolchain": "1.96.0"
+}

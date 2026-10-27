@@ -18,6 +18,9 @@ Type=simple
 User=root
 StateDirectory=lampos-setup
 StateDirectoryMode=0700
+# A person's own DeepSeek and Deepgram keys in the setup request, each checked once and kept in the voice's
+# keys folder before the marker (#2094, #2846; lampOS/docs/own-keys.md). A key refused or unchecked never fails setup.
+Environment=LAMP_OWN_KEYS=on
 ExecStart=/opt/lampOS/setup/current/lamp-setup serve --config /etc/lampOS/setup/serve.json --plan /etc/lampOS/setup/reset-plan.json --enable
 # However it ends, V1's nginx does not stay on.
 ExecStopPost=/usr/bin/systemctl stop nginx
