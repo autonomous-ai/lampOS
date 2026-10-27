@@ -956,6 +956,10 @@ promise cleanup of detached descendants or descendants that closed stdout.
 Kernel spawn/reap and filesystem operations have no new hard deadline, and
 this per-query limit is not an overall health-report deadline.
 
+The query tests include a writer that never closes stdout and one with a
+pipe-holding child. Both must be refused at the size cap before the query
+deadline, and their owned processes must be gone within the bounded probe.
+
 `failed_units` is a current observation, not a count or a crash history. A
 failed oneshot appears even with `NRestarts=0`; after it recovers, it leaves
 the list on the next fresh successful systemd sample. The usual health
