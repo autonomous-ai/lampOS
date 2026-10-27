@@ -1,0 +1,55 @@
+{
+  "command": [
+    "/private/tmp/tests-restart-f9-cargo-20261027_root/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+    "--list",
+    "--format",
+    "terse",
+    "--ignored"
+  ],
+  "cwd": "/private/tmp/tests-ready-speaking-1c-20261026/lampOS",
+  "started_at": "2026-10-27T21:00:59.155084+00:00",
+  "timeout_seconds": 300,
+  "stdout": "cmd-inventory-ignored.stdout.txt",
+  "stderr": "cmd-inventory-ignored.stderr.txt",
+  "timeout_cleanup": [
+    {
+      "action": "leader exited unreaped; no other owned group members",
+      "members": [
+        {
+          "pid": 93316,
+          "state": "Z"
+        }
+      ]
+    }
+  ],
+  "timed_out": false,
+  "disk_reserve_breached": false,
+  "stop_reason": null,
+  "process_group_scope": "Owned group only; no detached-descendant cleanup claim.",
+  "group_closure_method": "WNOWAIT leader reservation and ps group inventory before reap",
+  "launch_state": "Popen_recorded",
+  "disk_reserve_bytes": 2214592512,
+  "disk_sample_interval_seconds": 1,
+  "disk_paths": [
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/reader82-full-voice-context-v2-20261028",
+    "/private/tmp/tests-restart-f9-cargo-20261027_root"
+  ],
+  "disk_samples": 1,
+  "disk_last_available_bytes": 5854576640,
+  "disk_minimum_available_bytes": 5854576640,
+  "available_bytes_before_Cargo": 5854576640,
+  "owned_pid": 93316,
+  "owned_process_group": 93316,
+  "direct_wait_status": 0,
+  "exit_code": 0,
+  "owned_group_absent_after_cleanup": true,
+  "unexpected_owned_descendants": false,
+  "unresolved_owned_pids": [],
+  "compiler_lease_held": false,
+  "wall_seconds": 0.101463,
+  "finished_at": "2026-10-27T21:00:59.256667+00:00",
+  "stdout_sha256": "5460a54eff06379661a554db4840fe29e11c241e26db2b69cb181abaff998dcf",
+  "stdout_bytes": 1015,
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stderr_bytes": 0
+}

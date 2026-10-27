@@ -1,0 +1,212 @@
+{
+  "status": "ROOT_REVIEWED_CLOSED_RELEASE_FOR_READER",
+  "released_for_head": "92fe225289b2b662bfc8d8427e5614fb46b41c07",
+  "parent_terminal": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/reader-82a6-atomic-current-gates-20261028/terminal.json",
+    "sha256": "39536829e26540867d64bf384e78667b1ea0cef5d70fdb73da14b872f55e789c",
+    "bytes": 9850
+  },
+  "parent_native": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/reader-82a6-atomic-current-gates-20261028/native-controller-result.json",
+    "sha256": "a2c6028097820ad9d57d208924bd1fcfc5a56a63debd53a8289ac5df0ce9e85f",
+    "bytes": 472
+  },
+  "native_exit_field": "exit_code",
+  "retained_parent_outcome": {
+    "status": "PASS",
+    "native_exit": 0,
+    "scope": "Completed Reader4+Trace6 only; this additional full run remains separate"
+  },
+  "parent_source_before": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/reader-82a6-atomic-current-gates-20261028/source-before.json",
+    "sha256": "67a68739efc846f94e924719966a7d3483eab977fcdb1ded9225633ca2e754f3",
+    "bytes": 2458073
+  },
+  "parent_source_after": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/reader-82a6-atomic-current-gates-20261028/source-after.json",
+    "sha256": "67a68739efc846f94e924719966a7d3483eab977fcdb1ded9225633ca2e754f3",
+    "bytes": 2458073
+  },
+  "parent_files_key": "files",
+  "parent_command_receipts": [
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/reader-82a6-atomic-current-gates-20261028/cmd-Voice-lib-compile.json",
+      "sha256": "29d514b743bb748bcb026c561d8533aa21d2b860caa5b2f5c4ee05b11eaea45f",
+      "bytes": 2001
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/reader-82a6-atomic-current-gates-20261028/cmd-fmt.json",
+      "sha256": "4171a838776bfa0f33880f010c8d643b045f138dbdcb70381a7d3d4ae270ca17",
+      "bytes": 1853
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/reader-82a6-atomic-current-gates-20261028/cmd-inventory-all.json",
+      "sha256": "f8f8f0a97bae9ae777d492f291d59631bd4e77668608263dca285fcff14d605d",
+      "bytes": 1919
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/reader-82a6-atomic-current-gates-20261028/cmd-inventory-ignored.json",
+      "sha256": "93513b770a9e7274ed928a638109e573ea4dd9c67ae742cc2d0a47417a2db68a",
+      "bytes": 1942
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/reader-82a6-atomic-current-gates-20261028/cmd-metadata.json",
+      "sha256": "9907ee765ebb8bff3a5f53d292ca5be4567c85fa987c02d451b874fe7be32793",
+      "bytes": 1910
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/reader-82a6-atomic-current-gates-20261028/cmd-module-service_trace.json",
+      "sha256": "9b86efeff38b7bf81ffc862d0af4d1121d881fe51f1e13d4dc8402cd36f10846",
+      "bytes": 1941
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/reader-82a6-atomic-current-gates-20261028/cmd-module-session_reader.json",
+      "sha256": "9b468212a0c4ebf4a0623502ec4f757713e8195c0fc868ea374a14c44562e440",
+      "bytes": 1942
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/reader-82a6-atomic-current-gates-20261028/cmd-strict.json",
+      "sha256": "237ee0654af1d1ae6c570f53e7d29f4ceecdf17b639070dfec99ee009cbf468e",
+      "bytes": 2331
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/reader-82a6-atomic-current-gates-20261028/cmd-workspace.json",
+      "sha256": "3c13d1bc5da20e08a3b822fa453f784a6cc497527fd02787d1f1853ce45e29fc",
+      "bytes": 1951
+    }
+  ],
+  "parent_command_expected_exits": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+  ],
+  "source_guard_fields": [
+    "source_unchanged",
+    "official_owner_unchanged",
+    "sealed_and_actual_guards"
+  ],
+  "parent_protected_count_field": "protected_count",
+  "sealed_manifest": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/reader-82a6-atomic-current-gates-20261028/protected-after.json",
+    "sha256": "397152b25d12e5ed3284d3b15803b9ab401ff9c5cf3c6c64f4110a69b974119a",
+    "bytes": 224877
+  },
+  "retired_mutable_manifest": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/reader-82a6-atomic-current-gates-20261028/actual-after.json",
+    "sha256": "e67187b6986940f72e29b8432a5852744229042be702f60de1b3ddd5671b21ae",
+    "bytes": 5976
+  },
+  "mutable_schema": "bound_observed",
+  "release_verified_bindings": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/warm-target-reader82-to-full-context-release-20261028/verified-bindings.json",
+    "sha256": "0250a84c717e2af888a3c2d92916706efac18afd8b0eb5a4b52cb91d61f505c1",
+    "bytes": 234040
+  },
+  "sealed_count": 546,
+  "retired_mutable_count": 3,
+  "release_receipt": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/warm-target-reader82-to-full-context-release-20261028/release.json",
+    "sha256": "a5b81c1e2ddc3eaa5b5fad6c48b9e70ce5d1d492c1dc24a17429b6fab0c2c897",
+    "bytes": 4048
+  },
+  "raw_release_status": "CLOSED_VERIFIED_READER82_RELEASE_FOR_FULL_VOICE",
+  "raw_release_count_fields": {
+    "sealed": "protected_count",
+    "actual": "actual_count"
+  },
+  "raw_release_true_fields": {
+    "sealed_verified": "full_hash_metadata_verified",
+    "actual_verified": "full_hash_metadata_verified",
+    "actual_retired": "actual_bindings_retired",
+    "lsof_closed": "lsof_no_open_target_file",
+    "groups_closed": "owned_groups_previously_closed",
+    "no_failure_waiver": "no_historical_failure_waived"
+  },
+  "release_lsof_stdout": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/warm-target-reader82-to-full-context-release-20261028/lsof.stdout",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  "release_lsof_stderr": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/warm-target-reader82-to-full-context-release-20261028/lsof.stderr",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  "target_dev_ino": [
+    16777222,
+    486188298
+  ],
+  "retained_prior_receipts": {
+    "parent_historical_dispositions": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/mood-3aa-full-expression-gates-prep/historical-dispositions.json",
+      "sha256": "518accd6245399f81d3d5c9f5aa5acbb003f9de9fdf24cbce0f1fdbc136759b7",
+      "bytes": 7244
+    },
+    "old_candidate_full_Voice_failure": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/sentinel-3c983-full-lib-gates-prep/terminal.json",
+      "sha256": "e203a26a29fe09b2dfcdf0cad65d3d89f6d8488c206f9dda6f656477401d2656",
+      "bytes": 874
+    },
+    "old_Main_full_Voice_failure": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/sentinel-3c-main-full-context-control-prep/terminal.json",
+      "sha256": "5d307b18ad6ec652e0bc75fb99f12a8b3b451c6ec433c14e8855d0b338e307d1",
+      "bytes": 1233
+    },
+    "old_Main_isolated_PASS_inconclusive": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/sentinel-3c-main-second-route-control-prep/terminal.json",
+      "sha256": "710c8436fb713d9128225175904d77857838ebc5e05dd30a16f768c10997e766",
+      "bytes": 1748
+    },
+    "Main_control_raw_census": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/restart-main-a17-full-context-control-prep-20261028/observed-census.json",
+      "sha256": "6b6c3475b9839507dfe3cf118a46f7b1c3114bd8e02ba899ed3cbe5e76f59b85",
+      "bytes": 942709
+    },
+    "failed_Restart_candidate": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/restart-a17-full-lib-gates-prep/terminal.json",
+      "sha256": "d9bda252b45995817f7206d8eb5bc3f009219004099c535abc757b137368ff6a",
+      "bytes": 889
+    },
+    "old_Reader_modules_scope": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/reader-a17-body-after-skills-gates-prep-20261028/terminal.json",
+      "sha256": "d9a7c250433bc6bcde8c9715ea7b025019fb6bec277c0ae67832eb51858bb02a",
+      "bytes": 1915
+    },
+    "previous_Reader_modules_scope": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/reader-2e66-warm-modules-gates-prep-20261028/terminal.json",
+      "sha256": "798b30a434672858b11ce3286ab10667ca64cc87f9a47d917c1857db06ed1d6f",
+      "bytes": 1915
+    },
+    "previous_Reader_module_censuses": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/reader-2e66-warm-modules-gates-prep-20261028/observed-module-censuses.json",
+      "sha256": "8847ce8a6f2c1947ca707a18ca6cb449f01b1f140968ed14e9b55bffad7da218",
+      "bytes": 5305
+    },
+    "previous_AF_module_scope": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/reader-af546-warm-modules-gates-prep-20261028/terminal.json",
+      "sha256": "bcd12d3ae250dd15fb4ed3fb5d367fd3996db08effb2fc266e5bf56ded8a44aa",
+      "bytes": 1915
+    },
+    "AF_platform_clarification": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/reader-af546-platform-label-addendum-20261028/audit.json",
+      "sha256": "5df60d5bc663ad9ab9b3a0ebbc16be8f96e5969ffe2ef6a82234092c0ffff861",
+      "bytes": 9092
+    },
+    "completed_Reader82_modules": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/reader-82a6-atomic-current-gates-20261028/terminal.json",
+      "sha256": "39536829e26540867d64bf384e78667b1ea0cef5d70fdb73da14b872f55e789c",
+      "bytes": 9850
+    },
+    "module_platform_census": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/reader-82a6-atomic-current-gates-20261028/observed-module-censuses.json",
+      "sha256": "222e5ba5b2c87e76c3cf1a17031efedb85c5df064c14b46c9ae84b18cfa0a522",
+      "bytes": 19710
+    }
+  }
+}

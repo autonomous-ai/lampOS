@@ -1,0 +1,32 @@
+{
+  "exit_code": 0,
+  "stage": "full-controller",
+  "controller_launched": true,
+  "completed_at": "2026-10-27T21:12:47.521149+00:00",
+  "no_push": true,
+  "admission.json": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/reader82-full-voice-context-v2-20261028/admission.json",
+    "sha256": "c134b897ee2d3d872dd5c75dce654c9a877281675eaf58ed4f5ac9a8b9c85ff0",
+    "bytes": 1774
+  },
+  "terminal.json": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/reader82-full-voice-context-v2-20261028/terminal.json",
+    "sha256": "7c9383784d43a0a760922020c05b0857bae4587bf7d9714fc1566b42622cbfe4",
+    "bytes": 10478
+  },
+  "native-controller-result.json": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/reader82-full-voice-context-v2-20261028/native-controller-result.json",
+    "sha256": "f3ab6f5f9e04194bcb05d25ebf7463315aa055e21127465fe82921024e947caa",
+    "bytes": 473
+  },
+  "plan.json": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/reader82-full-voice-context-v2-20261028/plan.json",
+    "sha256": "3d3ac1043b427c66cf12ca73d3f572424f5d16b4321f5349f5360305325901d9",
+    "bytes": 10295
+  },
+  "launch.json": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/reader82-full-voice-context-v2-20261028/launch.json",
+    "sha256": "180b6e23d8d1e88252b266c2b072583e2263268d8ec20c730a437d4e09dfa727",
+    "bytes": 1129
+  }
+}

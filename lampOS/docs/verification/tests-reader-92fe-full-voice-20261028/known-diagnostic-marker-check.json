@@ -1,0 +1,11 @@
+{
+  "known_markers": [
+    "SHARED_INPUT_PAUSE",
+    "SENTINEL_PROBE",
+    "READER_LINUX_CONTROLLED",
+    "PROBE_TRACE"
+  ],
+  "actual_Voice_SHA": "e145dd810812b4b0f81f31cad3ffe6969aed4ae41a09ef4e8b6eba379195e070",
+  "none_found": true,
+  "unknown_marker_absence_claim": false
+}

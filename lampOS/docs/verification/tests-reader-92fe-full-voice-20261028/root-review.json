@@ -1,0 +1,25 @@
+{
+  "status": "ROOT_VERIFIED_FULL_VOICE_SERIAL_PASS",
+  "head": "92fe225289b2b662bfc8d8427e5614fb46b41c07",
+  "base": "82a62867cc1bcbbc4b0848519c6757f623d112ce",
+  "counts": {
+    "passed": 3885,
+    "failed": 0,
+    "ignored": 15
+  },
+  "all3900_unique_inventory_bound": true,
+  "commands": [
+    "cmd-workspace.json",
+    "cmd-inventory-ignored.json",
+    "cmd-metadata.json",
+    "cmd-inventory-all.json",
+    "cmd-fmt.json",
+    "cmd-Voice-lib-compile.json",
+    "cmd-full-Voice-lib.json",
+    "cmd-strict.json"
+  ],
+  "sealed": 549,
+  "actual": 3,
+  "historical_failures_unchanged": true,
+  "latest_a808_and_parallel_claim": false
+}

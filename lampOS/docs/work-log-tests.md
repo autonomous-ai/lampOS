@@ -1,5 +1,15 @@
 # Tests work log
 
+## 2026-10-28 04:21 — full Reader serial context and exact-source Skills native pass
+
+Ready for lamp-voice: no (current reads/latest-base maintenance remain).
+
+[Reader92 full serial Voice](verification/tests-reader-92fe-full-voice-20261028/) passes **3,885/0/15**, all 3,900 identities once, all eight command/source/549 witness/three executable guards and closed groups. Reader4/Trace6 are subsets, not additional executions. The one old admission-format stop remains zero-runtime; current runtime is once only. This is Mac serial on82, not Linux x86 or default parallel.
+
+[Skills6c93 original native](verification/tests-skills-6c93-native-20261028/) passes **7,803 unique cases**, zero bad or selected unrun,54 skips; all560 Skills pass, comprising Mac557 plus three Linux-only cases. Shared2 already belongs to557 and is not added twice. All three required controls pass once; Reader14/Trace7 are separate from Reader92's15. Actual d7b23a41b [82,6c93] tree equals authored c3f58be284; all44 fetched inputs/two owned blobs/modes match. Ninety-one private manifest entries are independently verified; raw logs and projections are public. No archive/payload.
+
+Maina808 changes only install.md after these qualifications. Current Reader source P1/P2 is clear and its census P3 closed; the latest doc carry and fresh parallel/default-thread Voice plus actual doc consumers are being prepared. Moodbc8/82 qualified341/0/0 is pushed with new original native checks, and its source/actual preview stays separately audited. Old failed observations stay failed. No device access.
+
 ## 2026-10-28 04:09 — current Reader original native passes on exact authored tree
 
 Ready for lamp-voice: no (current independent reads and additional full context remain).

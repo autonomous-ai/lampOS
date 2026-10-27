@@ -1,0 +1,298 @@
+{
+  "source_basis": "actual ARM checkout source",
+  "source_cases": [
+    {
+      "identity": "session_reader::tests::local_session_reader_group_is_exact_unique_and_bounded",
+      "attributes": "#[test]"
+    },
+    {
+      "identity": "session_reader::tests::finite_and_unset_service_never_resolve_a_reader_group",
+      "attributes": "#[test]"
+    },
+    {
+      "identity": "session_reader::tests::group_lookup_failure_retains_private_logging_without_writer_failure",
+      "attributes": "#[test]"
+    },
+    {
+      "identity": "session_reader::tests::linux::only_the_new_session_is_shared_after_one_pinned_lookup",
+      "attributes": "#[test]"
+    },
+    {
+      "identity": "session_reader::tests::linux::dedicated_reader_can_only_read_new_events_under_dropped_identity",
+      "attributes": "#[test]\n    #[ignore = \"requires isolated Linux root and setpriv; run explicitly with --ignored\"]"
+    },
+    {
+      "identity": "session_reader::tests::linux::unprepared_or_wrong_group_parent_never_grants_or_changes_ancestors",
+      "attributes": "#[test]"
+    },
+    {
+      "identity": "session_reader::tests::linux::readable_or_linked_voice_siblings_deny_preparation_and_late_grant",
+      "attributes": "#[test]"
+    },
+    {
+      "identity": "session_reader::tests::linux::every_grant_failure_restores_private_modes_and_original_groups",
+      "attributes": "#[test]"
+    },
+    {
+      "identity": "session_reader::tests::linux::failed_private_rollback_disables_only_metadata",
+      "attributes": "#[test]"
+    },
+    {
+      "identity": "session_reader::tests::linux::an_earlier_reader_refusal_keeps_a_verified_private_writer",
+      "attributes": "#[test]"
+    },
+    {
+      "identity": "session_reader::tests::linux::a_fixture_root_retains_ancestor_mode_acl_and_path_checks",
+      "attributes": "#[test]"
+    },
+    {
+      "identity": "session_reader::tests::linux::access_and_default_acl_are_refused_without_stripping_or_widening_them",
+      "attributes": "#[test]"
+    },
+    {
+      "identity": "session_reader::tests::linux::replaced_record_never_changes_an_outside_sentinel",
+      "attributes": "#[test]"
+    },
+    {
+      "identity": "session_reader::tests::linux::shared_session_writer_projects_every_segment_without_private_values",
+      "attributes": "#[test]"
+    },
+    {
+      "identity": "session_reader::tests::linux::a_verified_failed_grant_keeps_private_original_records",
+      "attributes": "#[test]"
+    }
+  ],
+  "ordinary_required": 14,
+  "ordinary_rows": [
+    {
+      "test": "session_reader::tests::local_session_reader_group_is_exact_unique_and_bounded",
+      "records": [
+        {
+          "line": 7333,
+          "timestamp": "2026-10-27T20:59:38.1668348Z",
+          "status": "PASS",
+          "seconds": 0.006,
+          "ordinal": 6489,
+          "total": 7803,
+          "binary": "lamp-voice",
+          "test": "session_reader::tests::local_session_reader_group_is_exact_unique_and_bounded"
+        }
+      ],
+      "PASS_once": true
+    },
+    {
+      "test": "session_reader::tests::finite_and_unset_service_never_resolve_a_reader_group",
+      "records": [
+        {
+          "line": 7320,
+          "timestamp": "2026-10-27T20:59:38.1182827Z",
+          "status": "PASS",
+          "seconds": 0.005,
+          "ordinal": 6476,
+          "total": 7803,
+          "binary": "lamp-voice",
+          "test": "session_reader::tests::finite_and_unset_service_never_resolve_a_reader_group"
+        }
+      ],
+      "PASS_once": true
+    },
+    {
+      "test": "session_reader::tests::group_lookup_failure_retains_private_logging_without_writer_failure",
+      "records": [
+        {
+          "line": 7322,
+          "timestamp": "2026-10-27T20:59:38.1256870Z",
+          "status": "PASS",
+          "seconds": 0.007,
+          "ordinal": 6478,
+          "total": 7803,
+          "binary": "lamp-voice",
+          "test": "session_reader::tests::group_lookup_failure_retains_private_logging_without_writer_failure"
+        }
+      ],
+      "PASS_once": true
+    },
+    {
+      "test": "session_reader::tests::linux::only_the_new_session_is_shared_after_one_pinned_lookup",
+      "records": [
+        {
+          "line": 7328,
+          "timestamp": "2026-10-27T20:59:38.1512243Z",
+          "status": "PASS",
+          "seconds": 0.009,
+          "ordinal": 6484,
+          "total": 7803,
+          "binary": "lamp-voice",
+          "test": "session_reader::tests::linux::only_the_new_session_is_shared_after_one_pinned_lookup"
+        }
+      ],
+      "PASS_once": true
+    },
+    {
+      "test": "session_reader::tests::linux::unprepared_or_wrong_group_parent_never_grants_or_changes_ancestors",
+      "records": [
+        {
+          "line": 7332,
+          "timestamp": "2026-10-27T20:59:38.1632936Z",
+          "status": "PASS",
+          "seconds": 0.006,
+          "ordinal": 6488,
+          "total": 7803,
+          "binary": "lamp-voice",
+          "test": "session_reader::tests::linux::unprepared_or_wrong_group_parent_never_grants_or_changes_ancestors"
+        }
+      ],
+      "PASS_once": true
+    },
+    {
+      "test": "session_reader::tests::linux::readable_or_linked_voice_siblings_deny_preparation_and_late_grant",
+      "records": [
+        {
+          "line": 7329,
+          "timestamp": "2026-10-27T20:59:38.1518241Z",
+          "status": "PASS",
+          "seconds": 0.006,
+          "ordinal": 6485,
+          "total": 7803,
+          "binary": "lamp-voice",
+          "test": "session_reader::tests::linux::readable_or_linked_voice_siblings_deny_preparation_and_late_grant"
+        }
+      ],
+      "PASS_once": true
+    },
+    {
+      "test": "session_reader::tests::linux::every_grant_failure_restores_private_modes_and_original_groups",
+      "records": [
+        {
+          "line": 7326,
+          "timestamp": "2026-10-27T20:59:38.1425698Z",
+          "status": "PASS",
+          "seconds": 0.011,
+          "ordinal": 6482,
+          "total": 7803,
+          "binary": "lamp-voice",
+          "test": "session_reader::tests::linux::every_grant_failure_restores_private_modes_and_original_groups"
+        }
+      ],
+      "PASS_once": true
+    },
+    {
+      "test": "session_reader::tests::linux::failed_private_rollback_disables_only_metadata",
+      "records": [
+        {
+          "line": 7327,
+          "timestamp": "2026-10-27T20:59:38.1457658Z",
+          "status": "PASS",
+          "seconds": 0.006,
+          "ordinal": 6483,
+          "total": 7803,
+          "binary": "lamp-voice",
+          "test": "session_reader::tests::linux::failed_private_rollback_disables_only_metadata"
+        }
+      ],
+      "PASS_once": true
+    },
+    {
+      "test": "session_reader::tests::linux::an_earlier_reader_refusal_keeps_a_verified_private_writer",
+      "records": [
+        {
+          "line": 7325,
+          "timestamp": "2026-10-27T20:59:38.1394393Z",
+          "status": "PASS",
+          "seconds": 0.008,
+          "ordinal": 6481,
+          "total": 7803,
+          "binary": "lamp-voice",
+          "test": "session_reader::tests::linux::an_earlier_reader_refusal_keeps_a_verified_private_writer"
+        }
+      ],
+      "PASS_once": true
+    },
+    {
+      "test": "session_reader::tests::linux::a_fixture_root_retains_ancestor_mode_acl_and_path_checks",
+      "records": [
+        {
+          "line": 7321,
+          "timestamp": "2026-10-27T20:59:38.1243076Z",
+          "status": "PASS",
+          "seconds": 0.006,
+          "ordinal": 6477,
+          "total": 7803,
+          "binary": "lamp-voice",
+          "test": "session_reader::tests::linux::a_fixture_root_retains_ancestor_mode_acl_and_path_checks"
+        }
+      ],
+      "PASS_once": true
+    },
+    {
+      "test": "session_reader::tests::linux::access_and_default_acl_are_refused_without_stripping_or_widening_them",
+      "records": [
+        {
+          "line": 7323,
+          "timestamp": "2026-10-27T20:59:38.1314151Z",
+          "status": "PASS",
+          "seconds": 0.006,
+          "ordinal": 6479,
+          "total": 7803,
+          "binary": "lamp-voice",
+          "test": "session_reader::tests::linux::access_and_default_acl_are_refused_without_stripping_or_widening_them"
+        }
+      ],
+      "PASS_once": true
+    },
+    {
+      "test": "session_reader::tests::linux::replaced_record_never_changes_an_outside_sentinel",
+      "records": [
+        {
+          "line": 7330,
+          "timestamp": "2026-10-27T20:59:38.1569000Z",
+          "status": "PASS",
+          "seconds": 0.006,
+          "ordinal": 6486,
+          "total": 7803,
+          "binary": "lamp-voice",
+          "test": "session_reader::tests::linux::replaced_record_never_changes_an_outside_sentinel"
+        }
+      ],
+      "PASS_once": true
+    },
+    {
+      "test": "session_reader::tests::linux::shared_session_writer_projects_every_segment_without_private_values",
+      "records": [
+        {
+          "line": 7331,
+          "timestamp": "2026-10-27T20:59:38.1607000Z",
+          "status": "PASS",
+          "seconds": 0.009,
+          "ordinal": 6487,
+          "total": 7803,
+          "binary": "lamp-voice",
+          "test": "session_reader::tests::linux::shared_session_writer_projects_every_segment_without_private_values"
+        }
+      ],
+      "PASS_once": true
+    },
+    {
+      "test": "session_reader::tests::linux::a_verified_failed_grant_keeps_private_original_records",
+      "records": [
+        {
+          "line": 7324,
+          "timestamp": "2026-10-27T20:59:38.1316583Z",
+          "status": "PASS",
+          "seconds": 0.008,
+          "ordinal": 6480,
+          "total": 7803,
+          "binary": "lamp-voice",
+          "test": "session_reader::tests::linux::a_verified_failed_grant_keeps_private_original_records"
+        }
+      ],
+      "PASS_once": true
+    }
+  ],
+  "all_ordinary_PASS_once": true,
+  "privileged_ignored": [
+    "session_reader::tests::linux::dedicated_reader_can_only_read_new_events_under_dropped_identity"
+  ],
+  "privileged_execution_rows": [],
+  "no_DAC_credit": true
+}

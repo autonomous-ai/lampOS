@@ -1,0 +1,134 @@
+{
+  "native-atomic-full-context-result.json": {
+    "sha256": "f79a26f25a34780d0e1b1dbb823aed1a18e8f3e5ca51091053580d4fbbccc286",
+    "bytes": 750
+  },
+  "handoff-binding.json": {
+    "sha256": "681d5c0f03ffb788a45f49c86464573fcd421f632d5fed5e6729a3a87d8faf78",
+    "bytes": 12216
+  },
+  "cmd-full-Voice-lib.stderr.txt": {
+    "sha256": "71b3166af6b5a0d606d5af71da6f895f640c43d6acf7a8dc4b1c39a93be62c8a",
+    "bytes": 186
+  },
+  "protected-after.json": {
+    "sha256": "4e0e9eb3ae4a2646c3f7a221ffbd5dd4dfc4b252a0f17869feaa2c7d48348543",
+    "bytes": 226258
+  },
+  "cmd-workspace.json": {
+    "sha256": "3bcb2a81108e532a236dd4b4192067fc3342cb9568bb78d286938272994f283d",
+    "bytes": 1946
+  },
+  "plan.json": {
+    "sha256": "3d3ac1043b427c66cf12ca73d3f572424f5d16b4321f5349f5360305325901d9",
+    "bytes": 10295
+  },
+  "cmd-inventory-ignored.json": {
+    "sha256": "01ab56391290b6313418e32938094003f09f5b1cbd9503d45d134d25a841379d",
+    "bytes": 1940
+  },
+  "reader-source-reference.json": {
+    "sha256": "e4b1672810046dc8edd3ecbd6ef9d17260aabd73a5c13d2cdab963f1d3dc8694",
+    "bytes": 6491
+  },
+  "source-before.json": {
+    "sha256": "67a68739efc846f94e924719966a7d3483eab977fcdb1ded9225633ca2e754f3",
+    "bytes": 2458073
+  },
+  "runtime-Cargo-freshness-observation.json": {
+    "sha256": "5179f1c73ef0e743c3590f79391f16f4c19250a14f48d163007bb1bc060116f4",
+    "bytes": 143
+  },
+  "cmd-metadata.json": {
+    "sha256": "ad095f1a64102d3bc9ba1e3e307bbc73bdccef2e3f98d0ab1b8313887b4fe280",
+    "bytes": 1908
+  },
+  "source-after.json": {
+    "sha256": "67a68739efc846f94e924719966a7d3483eab977fcdb1ded9225633ca2e754f3",
+    "bytes": 2458073
+  },
+  "cmd-inventory-all.json": {
+    "sha256": "ab33738896b8eb0eaaaaed7a49007752bd01382d6d7e44acbc994d1db3790fb7",
+    "bytes": 1917
+  },
+  "cmd-fmt.json": {
+    "sha256": "17b67ec30971abbf75aee2ac64d1231a499703c42e039116780ca7e64acf98e2",
+    "bytes": 1851
+  },
+  "cmd-Voice-lib-compile.json": {
+    "sha256": "2433a2a8960e895b7d20cb83a7ab0e4309504848d77c7eac618cbc27a838fd55",
+    "bytes": 1999
+  },
+  "trace-source-reference.json": {
+    "sha256": "dba37582dd51e45a28380022ab67485cbfd0b3b9264ddb16e149e3e22f647a30",
+    "bytes": 2374
+  },
+  "observed-census.json": {
+    "sha256": "e0ad59728f9d0175d5fed6a9dd4b0ac846f03be2d86ae4443ba50c8c781af63e",
+    "bytes": 949847
+  },
+  "runtime-Cargo-compiler-artifacts.json": {
+    "sha256": "e4f01b847f6a282b8a30efbd527b789bdeff438800fde69c893919c67f5108c4",
+    "bytes": 316265
+  },
+  "README.md": {
+    "sha256": "2dded8880584e4cb7054164e8aa78de0dcfa04b7ea6058d1cbc45b0658ea4483",
+    "bytes": 1779
+  },
+  "actual-after.json": {
+    "sha256": "68408a0537e01ae4a8710a0d8e7bbec789a85cab7e7e1e3cec18cf89e99ec213",
+    "bytes": 5970
+  },
+  "runtime-Cargo-source-profile-bindings.json": {
+    "sha256": "4c5555a5bb9cb7a902ab6826d6084d2b07a582751cffb2a129b47c0d72799890",
+    "bytes": 249677
+  },
+  "cmd-full-Voice-lib.stdout.txt": {
+    "sha256": "d8f4567916af0a729725f632457a3a6d18a180639e896b5cf05296e7751aa90c",
+    "bytes": 643603
+  },
+  "known-diagnostic-marker-check.json": {
+    "sha256": "bb568286694ff1e8c1cb5ebdab2135f025c1d939417799c6314b8f315fe80b8a",
+    "bytes": 279
+  },
+  "Voice-actual-depinfo.json": {
+    "sha256": "cfa623d6f2d2ef8c8977b9a3e48bc79bc740c637ff926f0812c63ed96b091758",
+    "bytes": 62195
+  },
+  "cmd-full-Voice-lib.json": {
+    "sha256": "8dbd37f4b4672b77ae93bacc7c6ecd803cfdc67160520ae806297577f9ab871c",
+    "bytes": 2016
+  },
+  "inventory.json": {
+    "sha256": "8085d2a436e2c11712f41fa20ddc955968923a15c22b1a8df7cee4ad862d214c",
+    "bytes": 374780
+  },
+  "terminal.json": {
+    "sha256": "7c9383784d43a0a760922020c05b0857bae4587bf7d9714fc1566b42622cbfe4",
+    "bytes": 10478
+  },
+  "cmd-strict.json": {
+    "sha256": "7712bf4079ba72e75db59b826822362405018e14bd2d92014ecfb2b3d180ae89",
+    "bytes": 2326
+  },
+  "launch.json": {
+    "sha256": "180b6e23d8d1e88252b266c2b072583e2263268d8ec20c730a437d4e09dfa727",
+    "bytes": 1129
+  },
+  "native-controller-result.json": {
+    "sha256": "f3ab6f5f9e04194bcb05d25ebf7463315aa055e21127465fe82921024e947caa",
+    "bytes": 473
+  },
+  "atomic-full-context-result.json": {
+    "sha256": "1bb43d53770840c6caa6c115cc3b30b21e5b5d60880d71de4a988ae4b863f319",
+    "bytes": 1778
+  },
+  "admission.json": {
+    "sha256": "c134b897ee2d3d872dd5c75dce654c9a877281675eaf58ed4f5ac9a8b9c85ff0",
+    "bytes": 1774
+  },
+  "root-review.json": {
+    "sha256": "410f610f7dfa51f0889f4fcf9acf27c58b495a8ebac53c65da030dbc882b3660",
+    "bytes": 638
+  }
+}

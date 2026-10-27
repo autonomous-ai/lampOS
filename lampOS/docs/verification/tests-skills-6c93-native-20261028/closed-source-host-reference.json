@@ -1,0 +1,55 @@
+{
+  "head": "6c931b8cd73019301f031b6596bb17a24d5cb6b2",
+  "base": "82a62867cc1bcbbc4b0848519c6757f623d112ce",
+  "terminal_status": "PASS",
+  "protected_count": 164,
+  "actual_count": 7,
+  "source_unchanged": true,
+  "scope": "Fresh full unfiltered serial Skills Cargo package including docs/custom cases",
+  "receipt_bindings": [
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-82-body-after-7929-full-gates-20261028/terminal.json",
+      "bytes": 1613,
+      "sha256": "77284032fd48abc1e0d34ca29a5c498cdc162581f7b705fa4afc622963a072f9"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-82-body-after-7929-full-gates-20261028/native-controller-result.json",
+      "bytes": 472,
+      "sha256": "7823a0a8b585488a144384693525a6d2ff90511bc800944455a95114eb380394"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-82-body-after-7929-full-gates-20261028/source-before.json",
+      "bytes": 2458076,
+      "sha256": "f66aab6d63df876eb92dcaafd43c888fd637374ba1b89303bb4163666dd90142"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-82-body-after-7929-full-gates-20261028/source-after.json",
+      "bytes": 2458076,
+      "sha256": "f66aab6d63df876eb92dcaafd43c888fd637374ba1b89303bb4163666dd90142"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-82-body-after-7929-full-gates-20261028/protected-after.json",
+      "bytes": 69778,
+      "sha256": "d823665d15ba204337d5fe81010e578a76ddc0753a64605084d48dcc6a0bcae0"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-82-body-after-7929-full-gates-20261028/actual-after.json",
+      "bytes": 11391,
+      "sha256": "84ffa3bbbe564e1bb146009280de060368ad9f315966374e4fc83c5ccd35ed90"
+    }
+  ],
+  "no_binary_or_target_rehash_in_this_audit": true,
+  "counts": {
+    "passed": 557,
+    "failed": 0,
+    "ignored": 9
+  },
+  "runtime_reuse": false,
+  "drivers": 5,
+  "helpers": 2,
+  "compiled_census": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-82-body-after-7929-full-gates-20261028/compiled-census.json",
+    "bytes": 48658,
+    "sha256": "f4af8f7f7fc2588f7f793e282054f89e9382214ae864375280ba55c8024a4af6"
+  }
+}

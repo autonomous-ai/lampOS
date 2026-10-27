@@ -1,0 +1,1440 @@
+{
+  "subject": "Skills",
+  "API_head": "6c931b8cd73019301f031b6596bb17a24d5cb6b2",
+  "authored_parent": [
+    "82a62867cc1bcbbc4b0848519c6757f623d112ce"
+  ],
+  "authored_tree": "c3f58be2840a544805ed75750b4f6bdaac59951f",
+  "qualification_scope": "PASS exact6c93 original native selected scope at recorded actual checkout; current557 host and source-specific native scopes remain distinct from old7929",
+  "original_runs": {
+    "ARM64": {
+      "id": 40581843149,
+      "html_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40581843149",
+      "head_sha": "6c931b8cd73019301f031b6596bb17a24d5cb6b2",
+      "run_attempt": 1,
+      "event": "pull_request",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-10-27T20:52:11Z",
+      "updated_at": "2026-10-27T21:00:20Z"
+    },
+    "Linux-clippy": {
+      "id": 40581843061,
+      "html_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40581843061",
+      "head_sha": "6c931b8cd73019301f031b6596bb17a24d5cb6b2",
+      "run_attempt": 1,
+      "event": "pull_request",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-10-27T20:52:11Z",
+      "updated_at": "2026-10-27T20:56:09Z"
+    }
+  },
+  "actual_source": {
+    "ARM64": {
+      "raw_log": "ARM64-job-122462997953.log",
+      "raw_log_SHA256": "b0812cc0a3719b14546831dd926dbca6df4736728c05fed4a6122639d147bf46",
+      "raw_checkout": {
+        "sha": "d7b23a41b567bf0ca57e4dabd87b569ebeec6a63",
+        "command_line": 290,
+        "sha_line": 291
+      },
+      "actual_preview": "d7b23a41b567bf0ca57e4dabd87b569ebeec6a63",
+      "ordered_parents": [
+        "82a62867cc1bcbbc4b0848519c6757f623d112ce",
+        "6c931b8cd73019301f031b6596bb17a24d5cb6b2"
+      ],
+      "actual_tree": "c3f58be2840a544805ed75750b4f6bdaac59951f",
+      "authored_tree": "c3f58be2840a544805ed75750b4f6bdaac59951f",
+      "whole_tree_equal_authored": true,
+      "input_bindings": [
+        {
+          "path": ".github/scripts/lampos-pr-crates.py",
+          "git_blob": "05ebfb6628f0caec9b5a4d462f183aa5d617b982",
+          "mode": "100644",
+          "sha256": "943ca7f9d87f6a89b16ac80871003bc8bf9dd7c526fcf9ce4c23873467a9d658",
+          "bytes": 5523,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "05ebfb6628f0caec9b5a4d462f183aa5d617b982",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": ".github/workflows/lampos-arm64.yml",
+          "git_blob": "c1a4b4479b284e52f3ff37701cd55734783040b3",
+          "mode": "100644",
+          "sha256": "5ddf0f7ae45bceaba81e899719ca199a4246a045b6f32f505edcccc61b3d170f",
+          "bytes": 20708,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "c1a4b4479b284e52f3ff37701cd55734783040b3",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": ".github/workflows/lampos-clippy.yml",
+          "git_blob": "04d2b49b5065c00f567e91ce271e2ba04669bb16",
+          "mode": "100644",
+          "sha256": "d2b21162ac7c05964816c147a0cfc10c0082e39f1c7775e247e43ddf02ee0909",
+          "bytes": 4721,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "04d2b49b5065c00f567e91ce271e2ba04669bb16",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/.cargo/config.toml",
+          "git_blob": "b3515e952d3665dd4c6a26887a6812bc9c597dca",
+          "mode": "100644",
+          "sha256": "48a3e9ff36c92393a61c94924a7268fd9e732dc55afe239842fe7fdd2fa7db71",
+          "bytes": 210,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "b3515e952d3665dd4c6a26887a6812bc9c597dca",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/.config/nextest.toml",
+          "git_blob": "3463c6682e8126b0c02cedda3d67cfc5bc081169",
+          "mode": "100644",
+          "sha256": "c4992da8d157df279011a424b5feb4833f001fd1d46ce3edd0a56992c848bb33",
+          "bytes": 5157,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "3463c6682e8126b0c02cedda3d67cfc5bc081169",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/Cargo.lock",
+          "git_blob": "83b4f18cc1b5711f65c56fba11ebf9dfabf1a9d9",
+          "mode": "100644",
+          "sha256": "86dce55e0b4315886ba9bcde43291feff191bd3d44ced7a315bb05e88c9f556e",
+          "bytes": 122953,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "83b4f18cc1b5711f65c56fba11ebf9dfabf1a9d9",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/Cargo.toml",
+          "git_blob": "be7fabdad667551d2636c36e732b0a45bfb5e359",
+          "mode": "100644",
+          "sha256": "2b1005b31d36511ed3c9d59429a4779f9579317ccead0c0a20d729a75d2ef940",
+          "bytes": 1442,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "be7fabdad667551d2636c36e732b0a45bfb5e359",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/Cargo.toml",
+          "git_blob": "2605527e6dc85157f8bea06a5838e29832f9df01",
+          "mode": "100644",
+          "sha256": "2164868d15498af30ed9824833f0db630861f5ccd229ef853c9b6c2897e6be5c",
+          "bytes": 2926,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "2605527e6dc85157f8bea06a5838e29832f9df01",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/examples/render_relaxing_music.rs",
+          "git_blob": "02b0bd3e256da9882bb676e594817c3c58b7cfe9",
+          "mode": "100644",
+          "sha256": "c9decd0ee3d0644abfda79322fa1962bd2bbbebfd41ba3e2acc4a100cc62588b",
+          "bytes": 11692,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "02b0bd3e256da9882bb676e594817c3c58b7cfe9",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/src/addon.rs",
+          "git_blob": "44fffd2e66cb5fc0e0c96c37da5164593d5a3028",
+          "mode": "100644",
+          "sha256": "1d497446058d710d0c7663433403536068fc16778e6b73aef331574051cd11af",
+          "bytes": 8608,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "44fffd2e66cb5fc0e0c96c37da5164593d5a3028",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/src/clock.rs",
+          "git_blob": "aa929268e22e3b42fad0b894d664c921675707a4",
+          "mode": "100644",
+          "sha256": "ec85f68f7644491423814c9194ea458005bda36712eb9fa4428712248ea9c33a",
+          "bytes": 5386,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "aa929268e22e3b42fad0b894d664c921675707a4",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/src/daily.rs",
+          "git_blob": "8686ee16b8a3c451a27524fe916a439189c14f70",
+          "mode": "100644",
+          "sha256": "0d235ad368e10935fd365d4e05d8d7427a26440e4d27fcec4144cb49852a5916",
+          "bytes": 48107,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "8686ee16b8a3c451a27524fe916a439189c14f70",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/src/glow.rs",
+          "git_blob": "cee423f0c95ab06aaf55675f3b4e3a3609a66886",
+          "mode": "100644",
+          "sha256": "2a7699566f1dfc17ea398748b09bfa1e7f4e0059a8359e47e771a47140f18fbe",
+          "bytes": 35303,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "cee423f0c95ab06aaf55675f3b4e3a3609a66886",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/src/known.rs",
+          "git_blob": "633a1e758877f39145bd32a865291c4eb703412d",
+          "mode": "100644",
+          "sha256": "3975d9517f74c2da071f6b9f501ff8cfe6da369308fb6f3b70fa873bb4d5308b",
+          "bytes": 4782,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "633a1e758877f39145bd32a865291c4eb703412d",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/src/lib.rs",
+          "git_blob": "849297d43a3b4fc5382657c07c80ffcf8649bcd3",
+          "mode": "100644",
+          "sha256": "20d80d2f55d812c3eb6f4e73a634228cbfabbb8fe99c19b8d17549c66e6b0566",
+          "bytes": 337151,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "849297d43a3b4fc5382657c07c80ffcf8649bcd3",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/src/limits.rs",
+          "git_blob": "24e2c73660ea1adbb2d793927b1f8977e0ec154a",
+          "mode": "100644",
+          "sha256": "3b11bbc541571d24c3744bb9b6530abeb14e824e436e91c774bb3d1699f3bf1c",
+          "bytes": 24655,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "24e2c73660ea1adbb2d793927b1f8977e0ec154a",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/src/main.rs",
+          "git_blob": "c70f04beaca0cb593a9f917a802708143af1b8b2",
+          "mode": "100644",
+          "sha256": "489dd9545450890409a10f2473fc340a55368896fab9dffa5193da441b5cd6e0",
+          "bytes": 216548,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "c70f04beaca0cb593a9f917a802708143af1b8b2",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/src/package.rs",
+          "git_blob": "5615cf34d756454295af464e331d747e2be4a677",
+          "mode": "100644",
+          "sha256": "458969b0d032283e2dccc1a6455f4590d48aa6c048a84b38bb1538cd6f462aa4",
+          "bytes": 89836,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "5615cf34d756454295af464e331d747e2be4a677",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/src/requested_audio.rs",
+          "git_blob": "d88da9e59241a12ae2be202784e4cbd4b64fe962",
+          "mode": "100644",
+          "sha256": "f4459837b0b129cf3f4645b07ba3bcb5d5310e7e9860adca11a42e22257bda56",
+          "bytes": 40941,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "d88da9e59241a12ae2be202784e4cbd4b64fe962",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/src/routine.rs",
+          "git_blob": "44d0df95104ea06afb87bfdd98375692ce3693fc",
+          "mode": "100644",
+          "sha256": "d75ba61b4d327600519c16111c3ca53ee9477406b800f1ba77f5c252780e01b4",
+          "bytes": 123713,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "44d0df95104ea06afb87bfdd98375692ce3693fc",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/src/unplug.rs",
+          "git_blob": "1c5027f271e438c92a849791d8c06d4bebe08f2b",
+          "mode": "100644",
+          "sha256": "4cac520cc9bdf09df466f6ad01b79f0f7b79bad3de923c209c91cf9ff0ffeec8",
+          "bytes": 14918,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "1c5027f271e438c92a849791d8c06d4bebe08f2b",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/src/visits.rs",
+          "git_blob": "2d907376b172f95dd20614d4f205260ea089e902",
+          "mode": "100644",
+          "sha256": "7aad8e5a6cbedcd790d46bc3563093fc434590bf2256285427f5a52a2012d44b",
+          "bytes": 43434,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "2d907376b172f95dd20614d4f205260ea089e902",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/src/watch.rs",
+          "git_blob": "2517a9cbed8be4e2b39da477cfb28acdf9213d7d",
+          "mode": "100644",
+          "sha256": "cb83df51c09174748928db5d709d868d81ae9a7c4bdbedfbe159ed966e674e4f",
+          "bytes": 126817,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "2517a9cbed8be4e2b39da477cfb28acdf9213d7d",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/tests/it/addon.rs",
+          "git_blob": "248b00aa3349525c13491aee2f1f3f57e70f222d",
+          "mode": "100644",
+          "sha256": "886d83f75fffd352ffc3f721af202bd152d8f2f500ef13f825b0e035fbc83c2b",
+          "bytes": 31421,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "248b00aa3349525c13491aee2f1f3f57e70f222d",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/tests/it/call_wait.rs",
+          "git_blob": "da62b664ebf5d2425ac4c90c21b8b5b8e746fbc0",
+          "mode": "100644",
+          "sha256": "53ece4468ce33a9348a7531e4e75c9f769711adbaaeb0194dec10376ae17196f",
+          "bytes": 6766,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "da62b664ebf5d2425ac4c90c21b8b5b8e746fbc0",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/tests/it/daily_engine.rs",
+          "git_blob": "33bcf10b80d828e5d6a4ade166c46f6151c473a1",
+          "mode": "100644",
+          "sha256": "181d2f1d4fd5d853a3b1056c91a947e9a5577c821f4d74ca07e27c84eb52d359",
+          "bytes": 58923,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "33bcf10b80d828e5d6a4ade166c46f6151c473a1",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/tests/it/format.rs",
+          "git_blob": "8e7c0f3ab84f1ed4e6adfb871b9a27bac184d277",
+          "mode": "100644",
+          "sha256": "abc826f03b24058eb59040f5ea9825b22b6fa35e88874c5374c00d79a2712362",
+          "bytes": 13834,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "8e7c0f3ab84f1ed4e6adfb871b9a27bac184d277",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/tests/it/journal_output.rs",
+          "git_blob": "b4c1ce93ea1010d22216a04388af5474ddae53fb",
+          "mode": "100644",
+          "sha256": "0ffc955cc126ab95b1cb614575bcb634d25358df2c2ba7e5a90e3f36142cba9e",
+          "bytes": 10751,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "b4c1ce93ea1010d22216a04388af5474ddae53fb",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/tests/it/made.rs",
+          "git_blob": "4394c6a34751a3a9d03d0b81492719dc32ec3a43",
+          "mode": "100644",
+          "sha256": "1cc3c3ee270332e00c1af2269907ffad52f77ab04fd0710842bd0812ae070a75",
+          "bytes": 20703,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "4394c6a34751a3a9d03d0b81492719dc32ec3a43",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/tests/it/main.rs",
+          "git_blob": "6210d32e08705394a3368add8ca912588dc98b71",
+          "mode": "100644",
+          "sha256": "e667da6f6199a72de54e9408f2eeaf86b6a829e67f6fb4b431ffb4f7df94b905",
+          "bytes": 1504,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "6210d32e08705394a3368add8ca912588dc98b71",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/tests/it/night_sleep.rs",
+          "git_blob": "5ff6dd04aa059f1ad622518a678ee52701083a4e",
+          "mode": "100644",
+          "sha256": "899356a2a4b9a0e7252f87ac7a66b930116dcf1fbfc3b19b24722b576bb3f6b1",
+          "bytes": 38664,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "5ff6dd04aa059f1ad622518a678ee52701083a4e",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/tests/it/package.rs",
+          "git_blob": "fbf435677e7513e65cd80f7480b16042f8e60c2b",
+          "mode": "100644",
+          "sha256": "0946eb63a6240d31c3c469b0c5fbad6e347e3d79b2498266ac92f7623abbaa93",
+          "bytes": 55704,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "fbf435677e7513e65cd80f7480b16042f8e60c2b",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/tests/it/routine_service.rs",
+          "git_blob": "2036da1b9dc1a904cdda2d7b12b6cb702b2ce494",
+          "mode": "100644",
+          "sha256": "92505d167f1ef467e8ecd67900cd2fd340c5b4252e6c4c3d54d1a9830c8c540d",
+          "bytes": 20877,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "2036da1b9dc1a904cdda2d7b12b6cb702b2ce494",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/tests/it/shared.rs",
+          "git_blob": "2e680c2b5616aac146ece8532e2bb1b52cd0c2d9",
+          "mode": "100644",
+          "sha256": "de452b22905338bba8a591359f52094fdf965df15575a7601f8c08bab41fa574",
+          "bytes": 8034,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "2e680c2b5616aac146ece8532e2bb1b52cd0c2d9",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/tests/it/skills.rs",
+          "git_blob": "122c7826095eed08a39216e67ee395b254527d81",
+          "mode": "100644",
+          "sha256": "712b9e2709f46580020cd8f3e896bb7957cada1e5de8f099be534225a2a9561d",
+          "bytes": 505714,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "122c7826095eed08a39216e67ee395b254527d81",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/tests/it/store.rs",
+          "git_blob": "3de3a850f0ed1439555131c88b735d5c71a7cfdc",
+          "mode": "100644",
+          "sha256": "6b5c4ab32d319166a2ec75e261f849885db8e7cb1dd5552d4c1517ee46446a1e",
+          "bytes": 45508,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "3de3a850f0ed1439555131c88b735d5c71a7cfdc",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/tests/it/welcome_stuck.rs",
+          "git_blob": "47c9be24f15789c93f4eeef66926a799c341bfd7",
+          "mode": "100644",
+          "sha256": "fd52973bec91a76833b66a0bb704fdacb6f75998f5b50684c399082dae721192",
+          "bytes": 9418,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "47c9be24f15789c93f4eeef66926a799c341bfd7",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/tests/release_pair.rs",
+          "git_blob": "cf9ce3a236d1fd8441f94d162844af4da2c7c12a",
+          "mode": "100644",
+          "sha256": "a3203635e3f3275384da2340280cdf66020269ddddb039165f894eba64cfeed2",
+          "bytes": 2136,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "cf9ce3a236d1fd8441f94d162844af4da2c7c12a",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/tests/release_pair/fixture.rs",
+          "git_blob": "b30840961fa6aa02b2e1a5dc4bf94efb0c394861",
+          "mode": "100644",
+          "sha256": "33c4ffcf5642c9a6b260805f9eb4abc73caabf8127fd72f45acb2bed4535f744",
+          "bytes": 34856,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "b30840961fa6aa02b2e1a5dc4bf94efb0c394861",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/tests/release_pair/package.rs",
+          "git_blob": "7d4ce785dd9d0433b00073c2649e3c1a28d9be4b",
+          "mode": "100644",
+          "sha256": "93033533c5bbc26809a85463949a5e7fab72afbf0194c8a62831b395d1459920",
+          "bytes": 24585,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "7d4ce785dd9d0433b00073c2649e3c1a28d9be4b",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/tests/release_pair/rested.rs",
+          "git_blob": "f368263b8b92eea4760b9d951d52f216fa3a1c70",
+          "mode": "100644",
+          "sha256": "8f86b89847f78a59880c3e1b65b17d55f8830c468b74469f2547e9ef46a916d4",
+          "bytes": 33709,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "f368263b8b92eea4760b9d951d52f216fa3a1c70",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/tests/requested_audio.rs",
+          "git_blob": "b4c6d6a852b5eb00988e671fd8265c1edfceffc4",
+          "mode": "100644",
+          "sha256": "2d85663a8ecab38ed3df1e8beb4bcd05209ac3aa1bacd6d3d9bcd9ce3057ef36",
+          "bytes": 62489,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "b4c6d6a852b5eb00988e671fd8265c1edfceffc4",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/docs/skills.md",
+          "git_blob": "023d830e789f50c6fb65b209432f088fae68ebf7",
+          "mode": "100644",
+          "sha256": "7b5a1200b155c64f11f567c04087f2bb6b453f94db6c072fbde84b6d31d9022d",
+          "bytes": 216663,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "023d830e789f50c6fb65b209432f088fae68ebf7",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/rust-toolchain.toml",
+          "git_blob": "e3b40113e65befef4d5d198284b99c78c27136f0",
+          "mode": "100644",
+          "sha256": "fb0a56ca2fc09db10159f6983e9d747f4afeb64e1d6d941dc36a3c20bf3a5749",
+          "bytes": 86,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "e3b40113e65befef4d5d198284b99c78c27136f0",
+          "actual_mode": "100644",
+          "equal_authored": true
+        }
+      ],
+      "all_fetched_source_equal_authored": true,
+      "full_tree_delta_entries": 0,
+      "owned_two_complete_blobs_modes": [
+        {
+          "path": "lampOS/crates/skills/tests/it/addon.rs",
+          "authored": {
+            "path": "lampOS/crates/skills/tests/it/addon.rs",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "248b00aa3349525c13491aee2f1f3f57e70f222d",
+            "size": 31421,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/248b00aa3349525c13491aee2f1f3f57e70f222d"
+          },
+          "actual": {
+            "path": "lampOS/crates/skills/tests/it/addon.rs",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "248b00aa3349525c13491aee2f1f3f57e70f222d",
+            "size": 31421,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/248b00aa3349525c13491aee2f1f3f57e70f222d"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/docs/skills.md",
+          "authored": {
+            "path": "lampOS/docs/skills.md",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "023d830e789f50c6fb65b209432f088fae68ebf7",
+            "size": 216663,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/023d830e789f50c6fb65b209432f088fae68ebf7"
+          },
+          "actual": {
+            "path": "lampOS/docs/skills.md",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "023d830e789f50c6fb65b209432f088fae68ebf7",
+            "size": 216663,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/023d830e789f50c6fb65b209432f088fae68ebf7"
+          },
+          "equal": true
+        }
+      ],
+      "both_complete_owned_blobs_equal": true
+    },
+    "Linux-clippy": {
+      "raw_log": "Linux-clippy-job-122462997160.log",
+      "raw_log_SHA256": "614718aa888aa1bd3a997118bf1c189f7eeba514bceae8818259dff684c7f421",
+      "raw_checkout": {
+        "sha": "d7b23a41b567bf0ca57e4dabd87b569ebeec6a63",
+        "command_line": 336,
+        "sha_line": 337
+      },
+      "actual_preview": "d7b23a41b567bf0ca57e4dabd87b569ebeec6a63",
+      "ordered_parents": [
+        "82a62867cc1bcbbc4b0848519c6757f623d112ce",
+        "6c931b8cd73019301f031b6596bb17a24d5cb6b2"
+      ],
+      "actual_tree": "c3f58be2840a544805ed75750b4f6bdaac59951f",
+      "authored_tree": "c3f58be2840a544805ed75750b4f6bdaac59951f",
+      "whole_tree_equal_authored": true,
+      "input_bindings": [
+        {
+          "path": ".github/scripts/lampos-pr-crates.py",
+          "git_blob": "05ebfb6628f0caec9b5a4d462f183aa5d617b982",
+          "mode": "100644",
+          "sha256": "943ca7f9d87f6a89b16ac80871003bc8bf9dd7c526fcf9ce4c23873467a9d658",
+          "bytes": 5523,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "05ebfb6628f0caec9b5a4d462f183aa5d617b982",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": ".github/workflows/lampos-arm64.yml",
+          "git_blob": "c1a4b4479b284e52f3ff37701cd55734783040b3",
+          "mode": "100644",
+          "sha256": "5ddf0f7ae45bceaba81e899719ca199a4246a045b6f32f505edcccc61b3d170f",
+          "bytes": 20708,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "c1a4b4479b284e52f3ff37701cd55734783040b3",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": ".github/workflows/lampos-clippy.yml",
+          "git_blob": "04d2b49b5065c00f567e91ce271e2ba04669bb16",
+          "mode": "100644",
+          "sha256": "d2b21162ac7c05964816c147a0cfc10c0082e39f1c7775e247e43ddf02ee0909",
+          "bytes": 4721,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "04d2b49b5065c00f567e91ce271e2ba04669bb16",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/.cargo/config.toml",
+          "git_blob": "b3515e952d3665dd4c6a26887a6812bc9c597dca",
+          "mode": "100644",
+          "sha256": "48a3e9ff36c92393a61c94924a7268fd9e732dc55afe239842fe7fdd2fa7db71",
+          "bytes": 210,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "b3515e952d3665dd4c6a26887a6812bc9c597dca",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/.config/nextest.toml",
+          "git_blob": "3463c6682e8126b0c02cedda3d67cfc5bc081169",
+          "mode": "100644",
+          "sha256": "c4992da8d157df279011a424b5feb4833f001fd1d46ce3edd0a56992c848bb33",
+          "bytes": 5157,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "3463c6682e8126b0c02cedda3d67cfc5bc081169",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/Cargo.lock",
+          "git_blob": "83b4f18cc1b5711f65c56fba11ebf9dfabf1a9d9",
+          "mode": "100644",
+          "sha256": "86dce55e0b4315886ba9bcde43291feff191bd3d44ced7a315bb05e88c9f556e",
+          "bytes": 122953,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "83b4f18cc1b5711f65c56fba11ebf9dfabf1a9d9",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/Cargo.toml",
+          "git_blob": "be7fabdad667551d2636c36e732b0a45bfb5e359",
+          "mode": "100644",
+          "sha256": "2b1005b31d36511ed3c9d59429a4779f9579317ccead0c0a20d729a75d2ef940",
+          "bytes": 1442,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "be7fabdad667551d2636c36e732b0a45bfb5e359",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/Cargo.toml",
+          "git_blob": "2605527e6dc85157f8bea06a5838e29832f9df01",
+          "mode": "100644",
+          "sha256": "2164868d15498af30ed9824833f0db630861f5ccd229ef853c9b6c2897e6be5c",
+          "bytes": 2926,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "2605527e6dc85157f8bea06a5838e29832f9df01",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/examples/render_relaxing_music.rs",
+          "git_blob": "02b0bd3e256da9882bb676e594817c3c58b7cfe9",
+          "mode": "100644",
+          "sha256": "c9decd0ee3d0644abfda79322fa1962bd2bbbebfd41ba3e2acc4a100cc62588b",
+          "bytes": 11692,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "02b0bd3e256da9882bb676e594817c3c58b7cfe9",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/src/addon.rs",
+          "git_blob": "44fffd2e66cb5fc0e0c96c37da5164593d5a3028",
+          "mode": "100644",
+          "sha256": "1d497446058d710d0c7663433403536068fc16778e6b73aef331574051cd11af",
+          "bytes": 8608,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "44fffd2e66cb5fc0e0c96c37da5164593d5a3028",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/src/clock.rs",
+          "git_blob": "aa929268e22e3b42fad0b894d664c921675707a4",
+          "mode": "100644",
+          "sha256": "ec85f68f7644491423814c9194ea458005bda36712eb9fa4428712248ea9c33a",
+          "bytes": 5386,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "aa929268e22e3b42fad0b894d664c921675707a4",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/src/daily.rs",
+          "git_blob": "8686ee16b8a3c451a27524fe916a439189c14f70",
+          "mode": "100644",
+          "sha256": "0d235ad368e10935fd365d4e05d8d7427a26440e4d27fcec4144cb49852a5916",
+          "bytes": 48107,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "8686ee16b8a3c451a27524fe916a439189c14f70",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/src/glow.rs",
+          "git_blob": "cee423f0c95ab06aaf55675f3b4e3a3609a66886",
+          "mode": "100644",
+          "sha256": "2a7699566f1dfc17ea398748b09bfa1e7f4e0059a8359e47e771a47140f18fbe",
+          "bytes": 35303,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "cee423f0c95ab06aaf55675f3b4e3a3609a66886",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/src/known.rs",
+          "git_blob": "633a1e758877f39145bd32a865291c4eb703412d",
+          "mode": "100644",
+          "sha256": "3975d9517f74c2da071f6b9f501ff8cfe6da369308fb6f3b70fa873bb4d5308b",
+          "bytes": 4782,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "633a1e758877f39145bd32a865291c4eb703412d",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/src/lib.rs",
+          "git_blob": "849297d43a3b4fc5382657c07c80ffcf8649bcd3",
+          "mode": "100644",
+          "sha256": "20d80d2f55d812c3eb6f4e73a634228cbfabbb8fe99c19b8d17549c66e6b0566",
+          "bytes": 337151,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "849297d43a3b4fc5382657c07c80ffcf8649bcd3",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/src/limits.rs",
+          "git_blob": "24e2c73660ea1adbb2d793927b1f8977e0ec154a",
+          "mode": "100644",
+          "sha256": "3b11bbc541571d24c3744bb9b6530abeb14e824e436e91c774bb3d1699f3bf1c",
+          "bytes": 24655,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "24e2c73660ea1adbb2d793927b1f8977e0ec154a",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/src/main.rs",
+          "git_blob": "c70f04beaca0cb593a9f917a802708143af1b8b2",
+          "mode": "100644",
+          "sha256": "489dd9545450890409a10f2473fc340a55368896fab9dffa5193da441b5cd6e0",
+          "bytes": 216548,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "c70f04beaca0cb593a9f917a802708143af1b8b2",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/src/package.rs",
+          "git_blob": "5615cf34d756454295af464e331d747e2be4a677",
+          "mode": "100644",
+          "sha256": "458969b0d032283e2dccc1a6455f4590d48aa6c048a84b38bb1538cd6f462aa4",
+          "bytes": 89836,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "5615cf34d756454295af464e331d747e2be4a677",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/src/requested_audio.rs",
+          "git_blob": "d88da9e59241a12ae2be202784e4cbd4b64fe962",
+          "mode": "100644",
+          "sha256": "f4459837b0b129cf3f4645b07ba3bcb5d5310e7e9860adca11a42e22257bda56",
+          "bytes": 40941,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "d88da9e59241a12ae2be202784e4cbd4b64fe962",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/src/routine.rs",
+          "git_blob": "44d0df95104ea06afb87bfdd98375692ce3693fc",
+          "mode": "100644",
+          "sha256": "d75ba61b4d327600519c16111c3ca53ee9477406b800f1ba77f5c252780e01b4",
+          "bytes": 123713,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "44d0df95104ea06afb87bfdd98375692ce3693fc",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/src/unplug.rs",
+          "git_blob": "1c5027f271e438c92a849791d8c06d4bebe08f2b",
+          "mode": "100644",
+          "sha256": "4cac520cc9bdf09df466f6ad01b79f0f7b79bad3de923c209c91cf9ff0ffeec8",
+          "bytes": 14918,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "1c5027f271e438c92a849791d8c06d4bebe08f2b",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/src/visits.rs",
+          "git_blob": "2d907376b172f95dd20614d4f205260ea089e902",
+          "mode": "100644",
+          "sha256": "7aad8e5a6cbedcd790d46bc3563093fc434590bf2256285427f5a52a2012d44b",
+          "bytes": 43434,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "2d907376b172f95dd20614d4f205260ea089e902",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/src/watch.rs",
+          "git_blob": "2517a9cbed8be4e2b39da477cfb28acdf9213d7d",
+          "mode": "100644",
+          "sha256": "cb83df51c09174748928db5d709d868d81ae9a7c4bdbedfbe159ed966e674e4f",
+          "bytes": 126817,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "2517a9cbed8be4e2b39da477cfb28acdf9213d7d",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/tests/it/addon.rs",
+          "git_blob": "248b00aa3349525c13491aee2f1f3f57e70f222d",
+          "mode": "100644",
+          "sha256": "886d83f75fffd352ffc3f721af202bd152d8f2f500ef13f825b0e035fbc83c2b",
+          "bytes": 31421,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "248b00aa3349525c13491aee2f1f3f57e70f222d",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/tests/it/call_wait.rs",
+          "git_blob": "da62b664ebf5d2425ac4c90c21b8b5b8e746fbc0",
+          "mode": "100644",
+          "sha256": "53ece4468ce33a9348a7531e4e75c9f769711adbaaeb0194dec10376ae17196f",
+          "bytes": 6766,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "da62b664ebf5d2425ac4c90c21b8b5b8e746fbc0",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/tests/it/daily_engine.rs",
+          "git_blob": "33bcf10b80d828e5d6a4ade166c46f6151c473a1",
+          "mode": "100644",
+          "sha256": "181d2f1d4fd5d853a3b1056c91a947e9a5577c821f4d74ca07e27c84eb52d359",
+          "bytes": 58923,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "33bcf10b80d828e5d6a4ade166c46f6151c473a1",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/tests/it/format.rs",
+          "git_blob": "8e7c0f3ab84f1ed4e6adfb871b9a27bac184d277",
+          "mode": "100644",
+          "sha256": "abc826f03b24058eb59040f5ea9825b22b6fa35e88874c5374c00d79a2712362",
+          "bytes": 13834,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "8e7c0f3ab84f1ed4e6adfb871b9a27bac184d277",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/tests/it/journal_output.rs",
+          "git_blob": "b4c1ce93ea1010d22216a04388af5474ddae53fb",
+          "mode": "100644",
+          "sha256": "0ffc955cc126ab95b1cb614575bcb634d25358df2c2ba7e5a90e3f36142cba9e",
+          "bytes": 10751,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "b4c1ce93ea1010d22216a04388af5474ddae53fb",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/tests/it/made.rs",
+          "git_blob": "4394c6a34751a3a9d03d0b81492719dc32ec3a43",
+          "mode": "100644",
+          "sha256": "1cc3c3ee270332e00c1af2269907ffad52f77ab04fd0710842bd0812ae070a75",
+          "bytes": 20703,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "4394c6a34751a3a9d03d0b81492719dc32ec3a43",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/tests/it/main.rs",
+          "git_blob": "6210d32e08705394a3368add8ca912588dc98b71",
+          "mode": "100644",
+          "sha256": "e667da6f6199a72de54e9408f2eeaf86b6a829e67f6fb4b431ffb4f7df94b905",
+          "bytes": 1504,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "6210d32e08705394a3368add8ca912588dc98b71",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/tests/it/night_sleep.rs",
+          "git_blob": "5ff6dd04aa059f1ad622518a678ee52701083a4e",
+          "mode": "100644",
+          "sha256": "899356a2a4b9a0e7252f87ac7a66b930116dcf1fbfc3b19b24722b576bb3f6b1",
+          "bytes": 38664,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "5ff6dd04aa059f1ad622518a678ee52701083a4e",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/tests/it/package.rs",
+          "git_blob": "fbf435677e7513e65cd80f7480b16042f8e60c2b",
+          "mode": "100644",
+          "sha256": "0946eb63a6240d31c3c469b0c5fbad6e347e3d79b2498266ac92f7623abbaa93",
+          "bytes": 55704,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "fbf435677e7513e65cd80f7480b16042f8e60c2b",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/tests/it/routine_service.rs",
+          "git_blob": "2036da1b9dc1a904cdda2d7b12b6cb702b2ce494",
+          "mode": "100644",
+          "sha256": "92505d167f1ef467e8ecd67900cd2fd340c5b4252e6c4c3d54d1a9830c8c540d",
+          "bytes": 20877,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "2036da1b9dc1a904cdda2d7b12b6cb702b2ce494",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/tests/it/shared.rs",
+          "git_blob": "2e680c2b5616aac146ece8532e2bb1b52cd0c2d9",
+          "mode": "100644",
+          "sha256": "de452b22905338bba8a591359f52094fdf965df15575a7601f8c08bab41fa574",
+          "bytes": 8034,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "2e680c2b5616aac146ece8532e2bb1b52cd0c2d9",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/tests/it/skills.rs",
+          "git_blob": "122c7826095eed08a39216e67ee395b254527d81",
+          "mode": "100644",
+          "sha256": "712b9e2709f46580020cd8f3e896bb7957cada1e5de8f099be534225a2a9561d",
+          "bytes": 505714,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "122c7826095eed08a39216e67ee395b254527d81",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/tests/it/store.rs",
+          "git_blob": "3de3a850f0ed1439555131c88b735d5c71a7cfdc",
+          "mode": "100644",
+          "sha256": "6b5c4ab32d319166a2ec75e261f849885db8e7cb1dd5552d4c1517ee46446a1e",
+          "bytes": 45508,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "3de3a850f0ed1439555131c88b735d5c71a7cfdc",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/tests/it/welcome_stuck.rs",
+          "git_blob": "47c9be24f15789c93f4eeef66926a799c341bfd7",
+          "mode": "100644",
+          "sha256": "fd52973bec91a76833b66a0bb704fdacb6f75998f5b50684c399082dae721192",
+          "bytes": 9418,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "47c9be24f15789c93f4eeef66926a799c341bfd7",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/tests/release_pair.rs",
+          "git_blob": "cf9ce3a236d1fd8441f94d162844af4da2c7c12a",
+          "mode": "100644",
+          "sha256": "a3203635e3f3275384da2340280cdf66020269ddddb039165f894eba64cfeed2",
+          "bytes": 2136,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "cf9ce3a236d1fd8441f94d162844af4da2c7c12a",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/tests/release_pair/fixture.rs",
+          "git_blob": "b30840961fa6aa02b2e1a5dc4bf94efb0c394861",
+          "mode": "100644",
+          "sha256": "33c4ffcf5642c9a6b260805f9eb4abc73caabf8127fd72f45acb2bed4535f744",
+          "bytes": 34856,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "b30840961fa6aa02b2e1a5dc4bf94efb0c394861",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/tests/release_pair/package.rs",
+          "git_blob": "7d4ce785dd9d0433b00073c2649e3c1a28d9be4b",
+          "mode": "100644",
+          "sha256": "93033533c5bbc26809a85463949a5e7fab72afbf0194c8a62831b395d1459920",
+          "bytes": 24585,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "7d4ce785dd9d0433b00073c2649e3c1a28d9be4b",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/tests/release_pair/rested.rs",
+          "git_blob": "f368263b8b92eea4760b9d951d52f216fa3a1c70",
+          "mode": "100644",
+          "sha256": "8f86b89847f78a59880c3e1b65b17d55f8830c468b74469f2547e9ef46a916d4",
+          "bytes": 33709,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "f368263b8b92eea4760b9d951d52f216fa3a1c70",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/crates/skills/tests/requested_audio.rs",
+          "git_blob": "b4c6d6a852b5eb00988e671fd8265c1edfceffc4",
+          "mode": "100644",
+          "sha256": "2d85663a8ecab38ed3df1e8beb4bcd05209ac3aa1bacd6d3d9bcd9ce3057ef36",
+          "bytes": 62489,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "b4c6d6a852b5eb00988e671fd8265c1edfceffc4",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/docs/skills.md",
+          "git_blob": "023d830e789f50c6fb65b209432f088fae68ebf7",
+          "mode": "100644",
+          "sha256": "7b5a1200b155c64f11f567c04087f2bb6b453f94db6c072fbde84b6d31d9022d",
+          "bytes": 216663,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "023d830e789f50c6fb65b209432f088fae68ebf7",
+          "actual_mode": "100644",
+          "equal_authored": true
+        },
+        {
+          "path": "lampOS/rust-toolchain.toml",
+          "git_blob": "e3b40113e65befef4d5d198284b99c78c27136f0",
+          "mode": "100644",
+          "sha256": "fb0a56ca2fc09db10159f6983e9d747f4afeb64e1d6d941dc36a3c20bf3a5749",
+          "bytes": 86,
+          "full_bytes_equal_closed_Mac_source": true,
+          "actual_blob": "e3b40113e65befef4d5d198284b99c78c27136f0",
+          "actual_mode": "100644",
+          "equal_authored": true
+        }
+      ],
+      "all_fetched_source_equal_authored": true,
+      "full_tree_delta_entries": 0,
+      "owned_two_complete_blobs_modes": [
+        {
+          "path": "lampOS/crates/skills/tests/it/addon.rs",
+          "authored": {
+            "path": "lampOS/crates/skills/tests/it/addon.rs",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "248b00aa3349525c13491aee2f1f3f57e70f222d",
+            "size": 31421,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/248b00aa3349525c13491aee2f1f3f57e70f222d"
+          },
+          "actual": {
+            "path": "lampOS/crates/skills/tests/it/addon.rs",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "248b00aa3349525c13491aee2f1f3f57e70f222d",
+            "size": 31421,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/248b00aa3349525c13491aee2f1f3f57e70f222d"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/docs/skills.md",
+          "authored": {
+            "path": "lampOS/docs/skills.md",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "023d830e789f50c6fb65b209432f088fae68ebf7",
+            "size": 216663,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/023d830e789f50c6fb65b209432f088fae68ebf7"
+          },
+          "actual": {
+            "path": "lampOS/docs/skills.md",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "023d830e789f50c6fb65b209432f088fae68ebf7",
+            "size": 216663,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/023d830e789f50c6fb65b209432f088fae68ebf7"
+          },
+          "equal": true
+        }
+      ],
+      "both_complete_owned_blobs_equal": true
+    }
+  },
+  "whole_tree_deltas": {
+    "ARM64": 0,
+    "Linux-clippy": 0
+  },
+  "all_CI_input_bindings": "all-tracked-CI-input-bindings.json",
+  "current_subject_census": "subject-case-audit.json",
+  "Reader_actual_source_ordinary": 14,
+  "Reader_all_PASS_once": true,
+  "Trace_actual_source_ordinary": 7,
+  "Trace_all_PASS_once": true,
+  "ignored_DAC_no_runtime_credit": true,
+  "execution_window": {
+    "starting_line": 844,
+    "summary_line": 8649,
+    "following_group_line": 9066,
+    "start_raw": "2026-10-27T20:57:05.6873979Z     Starting 7803 tests across 70 binaries (54 tests and 120 binaries skipped)",
+    "summary_raw": "2026-10-27T20:59:55.7319172Z      Summary [ 170.044s] 7803 tests run: 7803 passed, 54 skipped",
+    "selected": 7803,
+    "binaries": 70,
+    "aggregate_skips": 54,
+    "skipped_binaries": 120,
+    "execution_records": 7803,
+    "unique_identities": 7803,
+    "unique_ordinals": 7803,
+    "outcomes": {
+      "PASS": 7803
+    },
+    "unobserved_selected": 0,
+    "duplicate_execution_identities": [],
+    "post_summary_reprints": 34,
+    "outside_records": [],
+    "retry_flaky_records": [],
+    "selected_packages": [
+      "lamp-body",
+      "lamp-cloud",
+      "lamp-expression",
+      "lamp-keeper",
+      "lamp-lean",
+      "lamp-memory",
+      "lamp-peek",
+      "lamp-setup",
+      "lamp-skills",
+      "lamp-update",
+      "lamp-voice",
+      "lamp-voice-eval"
+    ],
+    "picked_raw": [
+      814,
+      "2026-10-27T20:55:27.7917081Z   PICKED: package(=lamp-body) | package(=lamp-cloud) | package(=lamp-expression) | package(=lamp-keeper) | package(=lamp-lean) | package(=lamp-memory) | package(=lamp-peek) | package(=lamp-setup) | package(=lamp-skills) | package(=lamp-update) | package(=lamp-voice) | package(=lamp-voice-eval)"
+    ]
+  },
+  "final_output_reprints": "final-reprints.json",
+  "auxiliary_separate_totals": {
+    "promoter": {
+      "passed": 25,
+      "failed": 0,
+      "ignored": 0
+    },
+    "workspace_docs": {
+      "passed": 4,
+      "failed": 0,
+      "ignored": 0,
+      "summary_groups": 47
+    },
+    "process": {
+      "line": 9382,
+      "passed": 13,
+      "failed": 0
+    },
+    "relay_ok_line": 9364,
+    "offline_Python": [
+      {
+        "line": 347,
+        "count": 49
+      },
+      {
+        "line": 417,
+        "count": 12
+      },
+      {
+        "line": 794,
+        "count": 7
+      }
+    ],
+    "added_to_nextest": false
+  },
+  "artifact_metadata_only": [
+    {
+      "id": 12770357955,
+      "name": "lampos-arm64-6c931b8cd73019301f031b6596bb17a24d5cb6b2",
+      "size_in_bytes": 118780800,
+      "digest": "sha256:c3297aaf39f280e3f3224e6d6e505e4bf3b0932f6050f3b5fb8764366bb95aaa",
+      "expired": false,
+      "workflow_run": {
+        "id": 40581843149,
+        "repository_id": 1259624583,
+        "head_repository_id": 1259624583,
+        "head_branch": "tests/1806-addon-journal-e1",
+        "head_sha": "6c931b8cd73019301f031b6596bb17a24d5cb6b2"
+      },
+      "API_digest_in_upload_log": true,
+      "API_size_and_id_in_upload_log": true,
+      "archive_downloaded": false,
+      "individual_payload_or_checksum_downloaded": false,
+      "API_digest_independently_rehashed": false
+    }
+  ],
+  "export_metadata": {
+    "binaries": 48,
+    "examples": 2,
+    "files_uploaded": 51
+  },
+  "local_host_source_specific_reference": {
+    "head": "6c931b8cd73019301f031b6596bb17a24d5cb6b2",
+    "base": "82a62867cc1bcbbc4b0848519c6757f623d112ce",
+    "terminal_status": "PASS",
+    "protected_count": 164,
+    "actual_count": 7,
+    "source_unchanged": true,
+    "scope": "Fresh full unfiltered serial Skills Cargo package including docs/custom cases",
+    "receipt_bindings": [
+      {
+        "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-82-body-after-7929-full-gates-20261028/terminal.json",
+        "bytes": 1613,
+        "sha256": "77284032fd48abc1e0d34ca29a5c498cdc162581f7b705fa4afc622963a072f9"
+      },
+      {
+        "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-82-body-after-7929-full-gates-20261028/native-controller-result.json",
+        "bytes": 472,
+        "sha256": "7823a0a8b585488a144384693525a6d2ff90511bc800944455a95114eb380394"
+      },
+      {
+        "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-82-body-after-7929-full-gates-20261028/source-before.json",
+        "bytes": 2458076,
+        "sha256": "f66aab6d63df876eb92dcaafd43c888fd637374ba1b89303bb4163666dd90142"
+      },
+      {
+        "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-82-body-after-7929-full-gates-20261028/source-after.json",
+        "bytes": 2458076,
+        "sha256": "f66aab6d63df876eb92dcaafd43c888fd637374ba1b89303bb4163666dd90142"
+      },
+      {
+        "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-82-body-after-7929-full-gates-20261028/protected-after.json",
+        "bytes": 69778,
+        "sha256": "d823665d15ba204337d5fe81010e578a76ddc0753a64605084d48dcc6a0bcae0"
+      },
+      {
+        "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-82-body-after-7929-full-gates-20261028/actual-after.json",
+        "bytes": 11391,
+        "sha256": "84ffa3bbbe564e1bb146009280de060368ad9f315966374e4fc83c5ccd35ed90"
+      }
+    ],
+    "no_binary_or_target_rehash_in_this_audit": true,
+    "counts": {
+      "passed": 557,
+      "failed": 0,
+      "ignored": 9
+    },
+    "runtime_reuse": false,
+    "drivers": 5,
+    "helpers": 2,
+    "compiled_census": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-82-body-after-7929-full-gates-20261028/compiled-census.json",
+      "bytes": 48658,
+      "sha256": "f4af8f7f7fc2588f7f793e282054f89e9382214ae864375280ba55c8024a4af6"
+    }
+  },
+  "native_release_and_Mac_debug_profiles_distinct": true,
+  "effective_owned_patch_comparison": {
+    "ARM64": [
+      {
+        "path": "lampOS/crates/skills/tests/it/addon.rs",
+        "authored": {
+          "path": "lampOS/crates/skills/tests/it/addon.rs",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "248b00aa3349525c13491aee2f1f3f57e70f222d",
+          "size": 31421,
+          "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/248b00aa3349525c13491aee2f1f3f57e70f222d"
+        },
+        "actual": {
+          "path": "lampOS/crates/skills/tests/it/addon.rs",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "248b00aa3349525c13491aee2f1f3f57e70f222d",
+          "size": 31421,
+          "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/248b00aa3349525c13491aee2f1f3f57e70f222d"
+        },
+        "equal": true
+      },
+      {
+        "path": "lampOS/docs/skills.md",
+        "authored": {
+          "path": "lampOS/docs/skills.md",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "023d830e789f50c6fb65b209432f088fae68ebf7",
+          "size": 216663,
+          "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/023d830e789f50c6fb65b209432f088fae68ebf7"
+        },
+        "actual": {
+          "path": "lampOS/docs/skills.md",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "023d830e789f50c6fb65b209432f088fae68ebf7",
+          "size": 216663,
+          "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/023d830e789f50c6fb65b209432f088fae68ebf7"
+        },
+        "equal": true
+      }
+    ],
+    "Linux-clippy": [
+      {
+        "path": "lampOS/crates/skills/tests/it/addon.rs",
+        "authored": {
+          "path": "lampOS/crates/skills/tests/it/addon.rs",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "248b00aa3349525c13491aee2f1f3f57e70f222d",
+          "size": 31421,
+          "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/248b00aa3349525c13491aee2f1f3f57e70f222d"
+        },
+        "actual": {
+          "path": "lampOS/crates/skills/tests/it/addon.rs",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "248b00aa3349525c13491aee2f1f3f57e70f222d",
+          "size": 31421,
+          "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/248b00aa3349525c13491aee2f1f3f57e70f222d"
+        },
+        "equal": true
+      },
+      {
+        "path": "lampOS/docs/skills.md",
+        "authored": {
+          "path": "lampOS/docs/skills.md",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "023d830e789f50c6fb65b209432f088fae68ebf7",
+          "size": 216663,
+          "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/023d830e789f50c6fb65b209432f088fae68ebf7"
+        },
+        "actual": {
+          "path": "lampOS/docs/skills.md",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "023d830e789f50c6fb65b209432f088fae68ebf7",
+          "size": 216663,
+          "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/023d830e789f50c6fb65b209432f088fae68ebf7"
+        },
+        "equal": true
+      }
+    ]
+  },
+  "exact_API_head_checks": [
+    {
+      "id": 122467139424,
+      "name": "report-full-run-failure",
+      "head_sha": "6c931b8cd73019301f031b6596bb17a24d5cb6b2",
+      "status": "completed",
+      "conclusion": "skipped",
+      "details_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40581843149/job/122467139424"
+    },
+    {
+      "id": 122467139376,
+      "name": "lampOS \u2014 sign and publish the tested lamp-voice artifact",
+      "head_sha": "6c931b8cd73019301f031b6596bb17a24d5cb6b2",
+      "status": "completed",
+      "conclusion": "skipped",
+      "details_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40581843149/job/122467139376"
+    },
+    {
+      "id": 122463000231,
+      "name": "lampOS \u2014 promote a tested release to the stable feed",
+      "head_sha": "6c931b8cd73019301f031b6596bb17a24d5cb6b2",
+      "status": "completed",
+      "conclusion": "skipped",
+      "details_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40581843149/job/122463000231"
+    },
+    {
+      "id": 122462997953,
+      "name": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "head_sha": "6c931b8cd73019301f031b6596bb17a24d5cb6b2",
+      "status": "completed",
+      "conclusion": "success",
+      "details_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40581843149/job/122462997953"
+    },
+    {
+      "id": 122462997160,
+      "name": "lampOS \u2014 clippy, every crate and target (x86 Linux)",
+      "head_sha": "6c931b8cd73019301f031b6596bb17a24d5cb6b2",
+      "status": "completed",
+      "conclusion": "success",
+      "details_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40581843061/job/122462997160"
+    }
+  ],
+  "branch_protection_requirements_audited": false,
+  "retained_failure_scope": "retained-failure-and-control-scope.json",
+  "latest_base_policy_question": "Exact92 original scope only; latest readiness and reads are assessed separately, with no policy waiver.",
+  "no_local_compiler_runtime_target_source_ref_GHwrite_or_ARM_payload_access": true,
+  "collected_utc": "2026-10-27T21:13:26.630668+00:00",
+  "collection_manifest": "collection-manifest.json",
+  "post_close_verification": "collection-manifest-verification.json",
+  "build_warning_audit": "build-warning-audit.json",
+  "build_warning_records": {
+    "ARM64": 10,
+    "Linux-clippy": 2
+  },
+  "watcher_started": false
+}

@@ -1,0 +1,374 @@
+{
+  "created_utc": "2026-10-27T21:13:26.761113+00:00",
+  "entry_count": 91,
+  "explicit_self_reference_exclusions": [
+    "collection-manifest-verification.json",
+    "collection-manifest.json"
+  ],
+  "files": {
+    "ARM64-actual-commit.json": {
+      "bytes": 2603,
+      "sha256": "2e9afd39c416509ae9d478c2db2ff0143b8d147da9587b92a73557e3728dedc9"
+    },
+    "ARM64-actual-tree.json": {
+      "bytes": 3509863,
+      "sha256": "a14390491d1b5ce9583e512acaea2b59253564c0e830daae6b4c7612acb721f9"
+    },
+    "ARM64-artifacts.json": {
+      "bytes": 779,
+      "sha256": "c41c764304c39d861cc1147a3d9174eeb372a25c6066b83cc76305c2a0c7cc9b"
+    },
+    "ARM64-full-tree-delta.json": {
+      "bytes": 161,
+      "sha256": "932196827c00e73f128f7a4de8042e3aa253a5f381fe9e50f78065ce66566fae"
+    },
+    "ARM64-job-122462997953.log": {
+      "bytes": 1376423,
+      "sha256": "b0812cc0a3719b14546831dd926dbca6df4736728c05fed4a6122639d147bf46"
+    },
+    "ARM64-jobs-final.json": {
+      "bytes": 8138,
+      "sha256": "ccb5cac441763c81b4ec437de35486a7ade67c153f19631b5ab15c0eb081454e"
+    },
+    "ARM64-metadata-final.json": {
+      "bytes": 12755,
+      "sha256": "5eeb76aaed7d7225f2b6397043268ee7eb237f740afb4565bd1f6eb581d7a693"
+    },
+    "ARM64-metadata-first.json": {
+      "bytes": 12755,
+      "sha256": "5eeb76aaed7d7225f2b6397043268ee7eb237f740afb4565bd1f6eb581d7a693"
+    },
+    "Linux-clippy-actual-commit.json": {
+      "bytes": 2603,
+      "sha256": "2e9afd39c416509ae9d478c2db2ff0143b8d147da9587b92a73557e3728dedc9"
+    },
+    "Linux-clippy-actual-tree.json": {
+      "bytes": 3509863,
+      "sha256": "a14390491d1b5ce9583e512acaea2b59253564c0e830daae6b4c7612acb721f9"
+    },
+    "Linux-clippy-artifacts.json": {
+      "bytes": 32,
+      "sha256": "244563f989470892c537c9a4622920af0d228ee4528f7d00c64a06d6cd95856c"
+    },
+    "Linux-clippy-full-tree-delta.json": {
+      "bytes": 161,
+      "sha256": "932196827c00e73f128f7a4de8042e3aa253a5f381fe9e50f78065ce66566fae"
+    },
+    "Linux-clippy-job-122462997160.log": {
+      "bytes": 48983,
+      "sha256": "614718aa888aa1bd3a997118bf1c189f7eeba514bceae8818259dff684c7f421"
+    },
+    "Linux-clippy-jobs-final.json": {
+      "bytes": 3002,
+      "sha256": "6f7e526b522029b10f508c4220bc9d0756ad1389ab03c65f660f0ff7cb41e859"
+    },
+    "Linux-clippy-metadata-final.json": {
+      "bytes": 12754,
+      "sha256": "c88639e02d36fd9139736cf8f8f59f76b539a67d141ae61dcd2ff32822821a2b"
+    },
+    "Linux-clippy-metadata-first.json": {
+      "bytes": 12754,
+      "sha256": "c88639e02d36fd9139736cf8f8f59f76b539a67d141ae61dcd2ff32822821a2b"
+    },
+    "PR.json": {
+      "bytes": 19757,
+      "sha256": "a0c2e3e48b2227b6d5cd88b65cc98d24ce6e7f91aa8b7c5b800eb134a0b80822"
+    },
+    "README.md": {
+      "bytes": 3514,
+      "sha256": "0a4f99ee750a6280af1782b2087bbde5db8a0849c3f9d2698188644e1fd9e9d1"
+    },
+    "Reader-platform-audit.json": {
+      "bytes": 9999,
+      "sha256": "11ba77eb9d7f8278d404ed37158cc234949dd84c72ae955201f6169147096a84"
+    },
+    "Trace-platform-audit.json": {
+      "bytes": 5037,
+      "sha256": "bfaa038bf044414e727777cf1cc59b610c8557bf083999e83838ee9731ee80a0"
+    },
+    "actual-changed-consumed-source-paths.json": {
+      "bytes": 3,
+      "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570"
+    },
+    "actual-selection-and-profile.json": {
+      "bytes": 4699,
+      "sha256": "a27ffa4c66f003cedfdbf81d013efc6e62f4ef90a383ad32f01a4a4687c7cf67"
+    },
+    "actual-source/lampOS/crates/voice/src/service_trace.rs": {
+      "bytes": 30629,
+      "sha256": "593290a4d1e64c2283bd6ae7b481b39449353bc70fd53e4c67318323ae4adafe"
+    },
+    "actual-source/lampOS/crates/voice/src/session_reader/tests.rs": {
+      "bytes": 36539,
+      "sha256": "794a44b35d1025ee9f66035099d3fe1facc8233eb39f7d17878e08a7ea7f3e49"
+    },
+    "actual-source-bindings.json": {
+      "bytes": 44991,
+      "sha256": "b62bbe1c2ef628fd7d818efbef1535df84b1ee6d618ff917a44030c99499959f"
+    },
+    "all-tracked-CI-input-bindings.json": {
+      "bytes": 158124,
+      "sha256": "7dcb9da8f7b2fc27ed6dd23e8fad9e66b4cfa61a1d55cd7fd39d85b522c49bdc"
+    },
+    "audit-core.py": {
+      "bytes": 10850,
+      "sha256": "13e1ad1685d288ccb11b3197b35b5d268ffee2af115e451f68dc96226bd74543"
+    },
+    "audit.json": {
+      "bytes": 60303,
+      "sha256": "82e9e4be22fe5ecf5959fcfefe403155346cc1737af411f3f1b329f7e5bdb2b4"
+    },
+    "authored-commit.json": {
+      "bytes": 1138,
+      "sha256": "4657e21dba386883313eb348403fb9f229cbeae04d78608be14b6e4cafe70579"
+    },
+    "authored-source/.github/scripts/lampos-pr-crates.py": {
+      "bytes": 5523,
+      "sha256": "943ca7f9d87f6a89b16ac80871003bc8bf9dd7c526fcf9ce4c23873467a9d658"
+    },
+    "authored-source/.github/workflows/lampos-arm64.yml": {
+      "bytes": 20708,
+      "sha256": "5ddf0f7ae45bceaba81e899719ca199a4246a045b6f32f505edcccc61b3d170f"
+    },
+    "authored-source/.github/workflows/lampos-clippy.yml": {
+      "bytes": 4721,
+      "sha256": "d2b21162ac7c05964816c147a0cfc10c0082e39f1c7775e247e43ddf02ee0909"
+    },
+    "authored-source/lampOS/.cargo/config.toml": {
+      "bytes": 210,
+      "sha256": "48a3e9ff36c92393a61c94924a7268fd9e732dc55afe239842fe7fdd2fa7db71"
+    },
+    "authored-source/lampOS/.config/nextest.toml": {
+      "bytes": 5157,
+      "sha256": "c4992da8d157df279011a424b5feb4833f001fd1d46ce3edd0a56992c848bb33"
+    },
+    "authored-source/lampOS/Cargo.lock": {
+      "bytes": 122953,
+      "sha256": "86dce55e0b4315886ba9bcde43291feff191bd3d44ced7a315bb05e88c9f556e"
+    },
+    "authored-source/lampOS/Cargo.toml": {
+      "bytes": 1442,
+      "sha256": "2b1005b31d36511ed3c9d59429a4779f9579317ccead0c0a20d729a75d2ef940"
+    },
+    "authored-source/lampOS/crates/skills/Cargo.toml": {
+      "bytes": 2926,
+      "sha256": "2164868d15498af30ed9824833f0db630861f5ccd229ef853c9b6c2897e6be5c"
+    },
+    "authored-source/lampOS/crates/skills/examples/render_relaxing_music.rs": {
+      "bytes": 11692,
+      "sha256": "c9decd0ee3d0644abfda79322fa1962bd2bbbebfd41ba3e2acc4a100cc62588b"
+    },
+    "authored-source/lampOS/crates/skills/src/addon.rs": {
+      "bytes": 8608,
+      "sha256": "1d497446058d710d0c7663433403536068fc16778e6b73aef331574051cd11af"
+    },
+    "authored-source/lampOS/crates/skills/src/clock.rs": {
+      "bytes": 5386,
+      "sha256": "ec85f68f7644491423814c9194ea458005bda36712eb9fa4428712248ea9c33a"
+    },
+    "authored-source/lampOS/crates/skills/src/daily.rs": {
+      "bytes": 48107,
+      "sha256": "0d235ad368e10935fd365d4e05d8d7427a26440e4d27fcec4144cb49852a5916"
+    },
+    "authored-source/lampOS/crates/skills/src/glow.rs": {
+      "bytes": 35303,
+      "sha256": "2a7699566f1dfc17ea398748b09bfa1e7f4e0059a8359e47e771a47140f18fbe"
+    },
+    "authored-source/lampOS/crates/skills/src/known.rs": {
+      "bytes": 4782,
+      "sha256": "3975d9517f74c2da071f6b9f501ff8cfe6da369308fb6f3b70fa873bb4d5308b"
+    },
+    "authored-source/lampOS/crates/skills/src/lib.rs": {
+      "bytes": 337151,
+      "sha256": "20d80d2f55d812c3eb6f4e73a634228cbfabbb8fe99c19b8d17549c66e6b0566"
+    },
+    "authored-source/lampOS/crates/skills/src/limits.rs": {
+      "bytes": 24655,
+      "sha256": "3b11bbc541571d24c3744bb9b6530abeb14e824e436e91c774bb3d1699f3bf1c"
+    },
+    "authored-source/lampOS/crates/skills/src/main.rs": {
+      "bytes": 216548,
+      "sha256": "489dd9545450890409a10f2473fc340a55368896fab9dffa5193da441b5cd6e0"
+    },
+    "authored-source/lampOS/crates/skills/src/package.rs": {
+      "bytes": 89836,
+      "sha256": "458969b0d032283e2dccc1a6455f4590d48aa6c048a84b38bb1538cd6f462aa4"
+    },
+    "authored-source/lampOS/crates/skills/src/requested_audio.rs": {
+      "bytes": 40941,
+      "sha256": "f4459837b0b129cf3f4645b07ba3bcb5d5310e7e9860adca11a42e22257bda56"
+    },
+    "authored-source/lampOS/crates/skills/src/routine.rs": {
+      "bytes": 123713,
+      "sha256": "d75ba61b4d327600519c16111c3ca53ee9477406b800f1ba77f5c252780e01b4"
+    },
+    "authored-source/lampOS/crates/skills/src/unplug.rs": {
+      "bytes": 14918,
+      "sha256": "4cac520cc9bdf09df466f6ad01b79f0f7b79bad3de923c209c91cf9ff0ffeec8"
+    },
+    "authored-source/lampOS/crates/skills/src/visits.rs": {
+      "bytes": 43434,
+      "sha256": "7aad8e5a6cbedcd790d46bc3563093fc434590bf2256285427f5a52a2012d44b"
+    },
+    "authored-source/lampOS/crates/skills/src/watch.rs": {
+      "bytes": 126817,
+      "sha256": "cb83df51c09174748928db5d709d868d81ae9a7c4bdbedfbe159ed966e674e4f"
+    },
+    "authored-source/lampOS/crates/skills/tests/it/addon.rs": {
+      "bytes": 31421,
+      "sha256": "886d83f75fffd352ffc3f721af202bd152d8f2f500ef13f825b0e035fbc83c2b"
+    },
+    "authored-source/lampOS/crates/skills/tests/it/call_wait.rs": {
+      "bytes": 6766,
+      "sha256": "53ece4468ce33a9348a7531e4e75c9f769711adbaaeb0194dec10376ae17196f"
+    },
+    "authored-source/lampOS/crates/skills/tests/it/daily_engine.rs": {
+      "bytes": 58923,
+      "sha256": "181d2f1d4fd5d853a3b1056c91a947e9a5577c821f4d74ca07e27c84eb52d359"
+    },
+    "authored-source/lampOS/crates/skills/tests/it/format.rs": {
+      "bytes": 13834,
+      "sha256": "abc826f03b24058eb59040f5ea9825b22b6fa35e88874c5374c00d79a2712362"
+    },
+    "authored-source/lampOS/crates/skills/tests/it/journal_output.rs": {
+      "bytes": 10751,
+      "sha256": "0ffc955cc126ab95b1cb614575bcb634d25358df2c2ba7e5a90e3f36142cba9e"
+    },
+    "authored-source/lampOS/crates/skills/tests/it/made.rs": {
+      "bytes": 20703,
+      "sha256": "1cc3c3ee270332e00c1af2269907ffad52f77ab04fd0710842bd0812ae070a75"
+    },
+    "authored-source/lampOS/crates/skills/tests/it/main.rs": {
+      "bytes": 1504,
+      "sha256": "e667da6f6199a72de54e9408f2eeaf86b6a829e67f6fb4b431ffb4f7df94b905"
+    },
+    "authored-source/lampOS/crates/skills/tests/it/night_sleep.rs": {
+      "bytes": 38664,
+      "sha256": "899356a2a4b9a0e7252f87ac7a66b930116dcf1fbfc3b19b24722b576bb3f6b1"
+    },
+    "authored-source/lampOS/crates/skills/tests/it/package.rs": {
+      "bytes": 55704,
+      "sha256": "0946eb63a6240d31c3c469b0c5fbad6e347e3d79b2498266ac92f7623abbaa93"
+    },
+    "authored-source/lampOS/crates/skills/tests/it/routine_service.rs": {
+      "bytes": 20877,
+      "sha256": "92505d167f1ef467e8ecd67900cd2fd340c5b4252e6c4c3d54d1a9830c8c540d"
+    },
+    "authored-source/lampOS/crates/skills/tests/it/shared.rs": {
+      "bytes": 8034,
+      "sha256": "de452b22905338bba8a591359f52094fdf965df15575a7601f8c08bab41fa574"
+    },
+    "authored-source/lampOS/crates/skills/tests/it/skills.rs": {
+      "bytes": 505714,
+      "sha256": "712b9e2709f46580020cd8f3e896bb7957cada1e5de8f099be534225a2a9561d"
+    },
+    "authored-source/lampOS/crates/skills/tests/it/store.rs": {
+      "bytes": 45508,
+      "sha256": "6b5c4ab32d319166a2ec75e261f849885db8e7cb1dd5552d4c1517ee46446a1e"
+    },
+    "authored-source/lampOS/crates/skills/tests/it/welcome_stuck.rs": {
+      "bytes": 9418,
+      "sha256": "fd52973bec91a76833b66a0bb704fdacb6f75998f5b50684c399082dae721192"
+    },
+    "authored-source/lampOS/crates/skills/tests/release_pair/fixture.rs": {
+      "bytes": 34856,
+      "sha256": "33c4ffcf5642c9a6b260805f9eb4abc73caabf8127fd72f45acb2bed4535f744"
+    },
+    "authored-source/lampOS/crates/skills/tests/release_pair/package.rs": {
+      "bytes": 24585,
+      "sha256": "93033533c5bbc26809a85463949a5e7fab72afbf0194c8a62831b395d1459920"
+    },
+    "authored-source/lampOS/crates/skills/tests/release_pair/rested.rs": {
+      "bytes": 33709,
+      "sha256": "8f86b89847f78a59880c3e1b65b17d55f8830c468b74469f2547e9ef46a916d4"
+    },
+    "authored-source/lampOS/crates/skills/tests/release_pair.rs": {
+      "bytes": 2136,
+      "sha256": "a3203635e3f3275384da2340280cdf66020269ddddb039165f894eba64cfeed2"
+    },
+    "authored-source/lampOS/crates/skills/tests/requested_audio.rs": {
+      "bytes": 62489,
+      "sha256": "2d85663a8ecab38ed3df1e8beb4bcd05209ac3aa1bacd6d3d9bcd9ce3057ef36"
+    },
+    "authored-source/lampOS/docs/skills.md": {
+      "bytes": 216663,
+      "sha256": "7b5a1200b155c64f11f567c04087f2bb6b453f94db6c072fbde84b6d31d9022d"
+    },
+    "authored-source/lampOS/rust-toolchain.toml": {
+      "bytes": 86,
+      "sha256": "fb0a56ca2fc09db10159f6983e9d747f4afeb64e1d6d941dc36a3c20bf3a5749"
+    },
+    "authored-source-bindings.json": {
+      "bytes": 13880,
+      "sha256": "932d1c66473a3b341ef7c001d6c6ede73ecc3d6474b23b6273cfc0445d151ff6"
+    },
+    "authored-tree.json": {
+      "bytes": 3509863,
+      "sha256": "a14390491d1b5ce9583e512acaea2b59253564c0e830daae6b4c7612acb721f9"
+    },
+    "auxiliary-stage-audit.json": {
+      "bytes": 8199,
+      "sha256": "33aa24778e31b86b300da3dd95346305c17e8a8e6cd41bb7d6697e64eb9c0939"
+    },
+    "build-warning-audit.json": {
+      "bytes": 3555,
+      "sha256": "5fcb2f853883a4e7899fe76ac6848c1ef9c558fe7e21b146409f3c4530c79a77"
+    },
+    "checks-current.json": {
+      "bytes": 17866,
+      "sha256": "2aadb7ffdcfcae3d1c07bdba4bd69bcd76b4ca66fe164cce798eb8c1925d20a8"
+    },
+    "closed-source-host-reference.json": {
+      "bytes": 2810,
+      "sha256": "6850b51cf9b9d447bf8a59c200170173601f7700938c8f26db11e4ee78e28192"
+    },
+    "collect-source.py": {
+      "bytes": 3004,
+      "sha256": "8496fb47bbe1155eee4c3971ccc512ec536e4cd4f3cc1e54eed158845f6f04bb"
+    },
+    "collect-terminal-originals.py": {
+      "bytes": 2118,
+      "sha256": "0ce10afd6252a49696b09456da7c835a06a8f0e4a6759f1f31d9d735586bb2c3"
+    },
+    "discovery-summary.json": {
+      "bytes": 1491,
+      "sha256": "2282872028bdbdf31f52fe665bde7fd0711f96efb7aeb04ef9329906e8ad7d00"
+    },
+    "execution-identities.json": {
+      "bytes": 2225196,
+      "sha256": "bbc029939f8c1b3d8f0de0e35832758cbe2b9eded664e5f4dd9b0440a71c12be"
+    },
+    "execution-window.json": {
+      "bytes": 1307,
+      "sha256": "1967b324228a1a2595c63de042fd8da551e945166fd5703d95b7d581d8204714"
+    },
+    "final-reprints.json": {
+      "bytes": 24555,
+      "sha256": "443f8971e366f075979f038f5fe4ca349a6f5be99f6db4cc1e2025306d7864e5"
+    },
+    "finalize.py": {
+      "bytes": 28480,
+      "sha256": "de8c989233dbca97a418e02171a649b55ac7a5a1168e624813d5c9e1540c27c5"
+    },
+    "required-addon-internal-variants.json": {
+      "bytes": 344,
+      "sha256": "3414190829f955cf1c35b10d672f97e014721ce227b6da8632817fb32143c0f3"
+    },
+    "retained-failure-and-control-scope.json": {
+      "bytes": 1590,
+      "sha256": "5e021d0e51cc627b2f3c99a3798c3803a33312dfa19bd48df15d2badf3b6011d"
+    },
+    "source-platform-ignore-declarations.json": {
+      "bytes": 3336,
+      "sha256": "902230c3d1bf18cd08b7d20e155221fff4ac17d0d57b5e398b65da642c8a3726"
+    },
+    "status-current.json": {
+      "bytes": 4613,
+      "sha256": "3555d0be74c1f39fbe2a0ff61055e48b25c4b429b92e84e5c54f0331edcd45f7"
+    },
+    "subject-case-audit.json": {
+      "bytes": 243059,
+      "sha256": "0c91441fd6d98525371f39b4945d89010640f1e376a8416811dd9638c727ae7b"
+    }
+  }
+}

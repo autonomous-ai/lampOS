@@ -1,0 +1,28 @@
+{
+  "require_escalated": true,
+  "root_review_approved": true,
+  "exclusive_target": true,
+  "parent_closed_and_target_released": true,
+  "exclusive_canonical_source": true,
+  "exclusive_official_source": true,
+  "compiler_lease": "root-reader82-full-context",
+  "independent_gate_after_failed_parent_authorized": false,
+  "controller_sha256": "db6d64a08ac46d00c4d6bb762422fb224958a2ef982abbdee3546f4a03e80ee9",
+  "plan_sha256": "3d3ac1043b427c66cf12ca73d3f572424f5d16b4321f5349f5360305325901d9",
+  "concurrency_context": {
+    "idle_host_claim": false,
+    "other_target_workloads": [
+      "Root Mood may run in independent Body cache; host load not controlled"
+    ]
+  },
+  "allocation": {
+    "head": "92fe225289b2b662bfc8d8427e5614fb46b41c07",
+    "worktree": "/private/tmp/tests-ready-speaking-1c-20261026",
+    "target": "/private/tmp/tests-restart-f9-cargo-20261027_root",
+    "target_dev_ino": [
+      16777222,
+      486188298
+    ],
+    "gate": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/reader82-full-voice-context-v2-20261028"
+  }
+}

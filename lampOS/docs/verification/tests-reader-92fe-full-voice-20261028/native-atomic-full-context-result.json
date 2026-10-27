@@ -1,0 +1,24 @@
+{
+  "exit_code": 0,
+  "completed_at": "2026-10-27T21:12:47.540273+00:00",
+  "atomic-native.stdout": {
+    "sha256": "412948d83703341c614dcdfbcda1084ef8f6175a9ed68ec84be1fd287923dcd3",
+    "bytes": 1676
+  },
+  "atomic-native.stderr": {
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  "atomic-full-context-result.json": {
+    "sha256": "1bb43d53770840c6caa6c115cc3b30b21e5b5d60880d71de4a988ae4b863f319",
+    "bytes": 1778
+  },
+  "terminal.json": {
+    "sha256": "7c9383784d43a0a760922020c05b0857bae4587bf7d9714fc1566b42622cbfe4",
+    "bytes": 10478
+  },
+  "native-controller-result.json": {
+    "sha256": "f3ab6f5f9e04194bcb05d25ebf7463315aa055e21127465fe82921024e947caa",
+    "bytes": 473
+  }
+}

@@ -1,0 +1,2 @@
+    Finished `test` profile [unoptimized] target(s) in 0.33s
+     Running unittests src/lib.rs (/private/tmp/tests-restart-f9-cargo-20261027_root/debug/deps/lamp_voice-6d619bbdd1df3a0d)

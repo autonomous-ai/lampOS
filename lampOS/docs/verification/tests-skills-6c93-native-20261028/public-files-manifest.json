@@ -1,0 +1,77 @@
+{
+  "scope": "Exact text audit and original raw logs; complete private manifest separately retained; no collector code or payload.",
+  "files": {
+    "audit.json": {
+      "sha256": "82e9e4be22fe5ecf5959fcfefe403155346cc1737af411f3f1b329f7e5bdb2b4",
+      "bytes": 60303
+    },
+    "retained-failure-and-control-scope.json": {
+      "sha256": "5e021d0e51cc627b2f3c99a3798c3803a33312dfa19bd48df15d2badf3b6011d",
+      "bytes": 1590
+    },
+    "subject-case-audit.json": {
+      "sha256": "0c91441fd6d98525371f39b4945d89010640f1e376a8416811dd9638c727ae7b",
+      "bytes": 243059
+    },
+    "execution-window.json": {
+      "sha256": "1967b324228a1a2595c63de042fd8da551e945166fd5703d95b7d581d8204714",
+      "bytes": 1307
+    },
+    "all-tracked-CI-input-bindings.json": {
+      "sha256": "7dcb9da8f7b2fc27ed6dd23e8fad9e66b4cfa61a1d55cd7fd39d85b522c49bdc",
+      "bytes": 158124
+    },
+    "final-reprints.json": {
+      "sha256": "443f8971e366f075979f038f5fe4ca349a6f5be99f6db4cc1e2025306d7864e5",
+      "bytes": 24555
+    },
+    "actual-selection-and-profile.json": {
+      "sha256": "a27ffa4c66f003cedfdbf81d013efc6e62f4ef90a383ad32f01a4a4687c7cf67",
+      "bytes": 4699
+    },
+    "Trace-platform-audit.json": {
+      "sha256": "bfaa038bf044414e727777cf1cc59b610c8557bf083999e83838ee9731ee80a0",
+      "bytes": 5037
+    },
+    "README.md": {
+      "sha256": "0a4f99ee750a6280af1782b2087bbde5db8a0849c3f9d2698188644e1fd9e9d1",
+      "bytes": 3514
+    },
+    "closed-source-host-reference.json": {
+      "sha256": "6850b51cf9b9d447bf8a59c200170173601f7700938c8f26db11e4ee78e28192",
+      "bytes": 2810
+    },
+    "auxiliary-stage-audit.json": {
+      "sha256": "33aa24778e31b86b300da3dd95346305c17e8a8e6cd41bb7d6697e64eb9c0939",
+      "bytes": 8199
+    },
+    "collection-manifest-verification.json": {
+      "sha256": "f65f54612a50e412385ad9151a115a1fd4a98f2d88dcb9a7809ea5db531024af",
+      "bytes": 323
+    },
+    "Linux-clippy-job-122462997160.log": {
+      "sha256": "614718aa888aa1bd3a997118bf1c189f7eeba514bceae8818259dff684c7f421",
+      "bytes": 48983
+    },
+    "Reader-platform-audit.json": {
+      "sha256": "11ba77eb9d7f8278d404ed37158cc234949dd84c72ae955201f6169147096a84",
+      "bytes": 9999
+    },
+    "Linux-clippy-full-tree-delta.json": {
+      "sha256": "932196827c00e73f128f7a4de8042e3aa253a5f381fe9e50f78065ce66566fae",
+      "bytes": 161
+    },
+    "ARM64-full-tree-delta.json": {
+      "sha256": "932196827c00e73f128f7a4de8042e3aa253a5f381fe9e50f78065ce66566fae",
+      "bytes": 161
+    },
+    "ARM64-job-122462997953.log": {
+      "sha256": "b0812cc0a3719b14546831dd926dbca6df4736728c05fed4a6122639d147bf46",
+      "bytes": 1376423
+    },
+    "collection-manifest.json": {
+      "sha256": "1b6f6f8d0d5850ea883da1836796616a3b9055128720f7dc3b04a8b6531843a6",
+      "bytes": 14847
+    }
+  }
+}

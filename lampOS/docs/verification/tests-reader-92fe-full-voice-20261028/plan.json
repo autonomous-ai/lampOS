@@ -1,0 +1,160 @@
+{
+  "execution_ready": true,
+  "root_review_required": true,
+  "compiler_lease": "root-reader82-full-context",
+  "worktree": "/private/tmp/tests-ready-speaking-1c-20261026",
+  "official_worktree": "/private/tmp/tests-reader-sentinel-root-20261026",
+  "head": "92fe225289b2b662bfc8d8427e5614fb46b41c07",
+  "base": "82a62867cc1bcbbc4b0848519c6757f623d112ce",
+  "branch": "tests/3543-qualify-82a6-warm-20261028",
+  "official_branch": "tests/1806-reader-sentinel-root",
+  "expected_status": "",
+  "approved_dirty_paths": [],
+  "approved_payloads": {},
+  "source_binding": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/reader-82a6-atomic-current-gates-20261028/prepared-canonical-source.json",
+    "sha256": "67a68739efc846f94e924719966a7d3483eab977fcdb1ded9225633ca2e754f3",
+    "bytes": 2458073
+  },
+  "official_source_binding": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/reader-82a6-atomic-current-gates-20261028/prepared-official-source.json",
+    "sha256": "16dbc6f5c812854627766cce96406b0a8979b5899b09eaa19fa3436b30009f9f",
+    "bytes": 2458067
+  },
+  "source_snapshot_status": "Single authorized atomic fetch/carry/committed-source+same-path admission, no sampling/chasing or runtime reuse",
+  "canonical_alias_bound": true,
+  "source_carry_verified": true,
+  "target": "/private/tmp/tests-restart-f9-cargo-20261027_root",
+  "target_dev_ino": [
+    16777222,
+    486188298
+  ],
+  "root_reported_target_inode": 486188298,
+  "handoff_binding": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/reader82-full-voice-context-v2-20261028/handoff-binding.json",
+    "sha256": "681d5c0f03ffb788a45f49c86464573fcd421f632d5fed5e6729a3a87d8faf78",
+    "bytes": 12216
+  },
+  "handoff_release_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/warm-target-reader82-to-full-context-release-20261028/release.json",
+  "expected_inherited_sealed_count": 546,
+  "expected_retired_mutable_count": 3,
+  "handoff_status": "Actual Reader82 modulePASS and closed546+3 release; additional full context not yet executed",
+  "minimum_free_bytes": 3221225472,
+  "operational_reserve_bytes": 2214592512,
+  "support_sha256": "8910e667094e5511a4311da37ae44c59e8c8ee635641863bf91cc2037676627d",
+  "reserved_closer_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/privacy-2a-host-control-prep/run.py",
+  "reserved_closer_sha256": "468ea6f8b4ce19e58c977014f7f015d12bc99e02ef158498e7c2fd2191a57efc",
+  "strict_expected": [
+    "lamp-body",
+    "lamp-cloud",
+    "lamp-expression",
+    "lamp-keeper",
+    "lamp-lean",
+    "lamp-memory",
+    "lamp-peek",
+    "lamp-setup",
+    "lamp-skills",
+    "lamp-update",
+    "lamp-voice",
+    "lamp-voice-eval"
+  ],
+  "strict_policy": "Derive actual all-edge reverse closure and require the currently expected 12 names; stop for Root review on drift.",
+  "scoped_clean_packages": [],
+  "cache_epoch_binding": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/reader-82a6-atomic-current-gates-20261028/cache-epoch.json",
+    "sha256": "7e85412355ac9c683caa951798f38935418aca64ae9b6f6ce3c89e412530ffad",
+    "bytes": 614
+  },
+  "required_cache_epoch_path": "lampOS/crates/voice/src/session_reader/tests.rs",
+  "require_voice_test_fresh_false": false,
+  "reader_source_reference": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/reader82-full-voice-context-v2-20261028/reader-source-reference.json",
+    "sha256": "e4b1672810046dc8edd3ecbd6ef9d17260aabd73a5c13d2cdab963f1d3dc8694",
+    "bytes": 6491
+  },
+  "known_forbidden_diagnostic_markers": [
+    "SHARED_INPUT_PAUSE",
+    "SENTINEL_PROBE",
+    "READER_LINUX_CONTROLLED",
+    "PROBE_TRACE"
+  ],
+  "runtime_scope": "ONE full unfiltered cargo test -p lamp-voice --lib -- --test-threads=1; all current compiled identities/ignores reconciled, Reader/Trace subsets observed within same full run.",
+  "inventory_timeout_s": 300,
+  "compile_timeout_s": 3600,
+  "test_threads": 1,
+  "build_jobs": 1,
+  "debug_info": 0,
+  "incremental": false,
+  "retry": false,
+  "native_arm_or_linux_case_claim": false,
+  "input_names_reserved": [
+    "README.md",
+    "controller-minimal.diff",
+    "disabled-preparation-manifest.json",
+    "handoff-binding.json",
+    "handoff-template.json",
+    "launch-template.json",
+    "launch.json",
+    "native-wrapper.py",
+    "plan-disabled.json",
+    "plan.json",
+    "preparation-review.json",
+    "prepared-official-physical.json",
+    "prepared-official-source.json",
+    "reader-source-reference.json",
+    "run.py",
+    "support.py",
+    "trace-source-reference.json"
+  ],
+  "guard_policy": "Full canonical/official/all inherited and new frozen SHA initial/final; whole source file-set/stat6/Git metadata and all frozen bound metadata at other boundaries; actual executable SHA/stat always, consumed executable+sealed copy SHA adjacent. Preserve every inherited/new mode/inode. Root binds actual future release counts/current alias/source/epoch; no active source/target access at preparation. Raw/parsed each disjoint module output retained before artifact/source postguard even partial; no full Voice qualification.",
+  "runtime_helper_target_names": [
+    "lamp-voice",
+    "lamp-same-voice"
+  ],
+  "runtime_helper_binding_scope": "Actual workspace normal executables for the Voice main and source-named same-voice child; tests use owned private programs/current_exe. Binding is provenance and immutability, not a claim that every helper executes.",
+  "actual_release_native_receipt_claim": false,
+  "prospective_normal_helper_phase_policy": "Workspace helpers are hash/stat phase observations, not active runtime guards. Across VoiceLIB no-run require SHA/bytes/mode/mtime/device unchanged; only metadata-derived normal bin aliases directly under target/debug may republish inode. Freeze/bind all actual helpers AFTER no-run. All new actuals then require all attrs including inode; no Cargo after activation.",
+  "target_allocation_status": "ROOT_APPROVED_ADMITTED_ONE_ADDITIONAL_FULL_VOICE_CONTEXT",
+  "source_transition": null,
+  "prior_folded_source_result": "DAD unlaunched prep preserved; original AF modulePASS and old fullVoice failures retain exact scopes; no current runtime transfer.",
+  "runtime_module_prefixes": [
+    "session_reader::tests::",
+    "service_trace::tests::"
+  ],
+  "module_runtime_timeout_s": 600,
+  "earlier_candidate_failed_case": "session_reader::tests::group_lookup_failure_retains_private_logging_without_writer_failure",
+  "required_stalled_control": "service_trace::tests::stalled_writer_has_fixed_capacity_and_bounded_finish_without_joining",
+  "immutable_stalled_control_source_path": "lampOS/crates/voice/src/service_trace.rs",
+  "immutable_stalled_control_source_sha256": "593290a4d1e64c2283bd6ae7b481b39449353bc70fd53e4c67318323ae4adafe",
+  "official_physical_binding": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/reader-82a6-atomic-current-gates-20261028/prepared-official-physical.json",
+    "sha256": "c2cc3887f6f5853ba8a0bb50cbc0dea6279ae020a93ed2dbad93db4f14b2ecc3",
+    "bytes": 2359630
+  },
+  "canonical_physical_binding": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/reader-82a6-atomic-current-gates-20261028/prepared-canonical-physical.json",
+    "sha256": "fafda2139838c2e1ac6a7c33e4b41051d656d14ee86d7f081962cfc9736c3c40",
+    "bytes": 2359630
+  },
+  "trace_source_reference": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/reader82-full-voice-context-v2-20261028/trace-source-reference.json",
+    "sha256": "dba37582dd51e45a28380022ab67485cbfd0b3b9264ddb16e149e3e22f647a30",
+    "bytes": 2374
+  },
+  "controller_sha256": "db6d64a08ac46d00c4d6bb762422fb224958a2ef982abbdee3546f4a03e80ee9",
+  "required_control_cases": [
+    "service_trace::tests::closure_flushes_final_accepted_event_without_inventing_complete_evidence",
+    "service_trace::tests::stalled_writer_has_fixed_capacity_and_bounded_finish_without_joining",
+    "service_trace::tests::disk_failure_latches_health_without_an_audio_result_error"
+  ],
+  "future_handoff_policy": "Actual closed AF543+3 integrity handoff only. No clean, timestamp forcing, retries, bound changes or runtime reuse. Actual selected Voice fresh:false required; no transitive freshness claim.",
+  "pinned_cargo_lock_sha256": "86dce55e0b4315886ba9bcde43291feff191bd3d44ced7a315bb05e88c9f556e",
+  "observed_local_origin_lamp_voice": "82a62867cc1bcbbc4b0848519c6757f623d112ce",
+  "platform_census_policy": "Linux_source_catalog is source only. Portable, Linux-exclusive ordinary/ignored, and Mac-only sets derived from current source catalogs. Actual outcomes joined independently; no hardcoded case counts or Linux runtime credit.",
+  "freshness_policy": "Observe genuine Cargo bool. No clean, touch or cache edits to force false; current source/lock/profile/features/depinfo and all actual executables bound before fresh module observations.",
+  "full_runtime_timeout_s": 3600,
+  "required_failure_context_case": "session_reader::tests::group_lookup_failure_retains_private_logging_without_writer_failure",
+  "runtime_command_policy": "Cargo locked/offline/jobs1 and existing debug0/incremental0 profiles; message-format=json preserves actual runtime compiler metadata. Raw full census saved before postguard; any Rust failure or artifact mismatch prevents PASS.",
+  "actual_runtime_guard_policy": "All current actuals remain strict SHA/stat/kind including inode after freeze; all inherited/new sealed copies strict. No after-the-fact alias waiver.",
+  "parent_module_scope_retroactive_full_claim": false
+}

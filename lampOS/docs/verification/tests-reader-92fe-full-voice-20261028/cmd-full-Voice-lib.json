@@ -1,0 +1,63 @@
+{
+  "command": [
+    "/Users/autonomous/.cargo/bin/cargo",
+    "+1.96.0",
+    "test",
+    "--offline",
+    "--locked",
+    "--jobs",
+    "1",
+    "-p",
+    "lamp-voice",
+    "--lib",
+    "--message-format=json",
+    "--",
+    "--test-threads=1"
+  ],
+  "cwd": "/private/tmp/tests-ready-speaking-1c-20261026/lampOS",
+  "started_at": "2026-10-27T21:01:03.036267+00:00",
+  "timeout_seconds": 3600,
+  "stdout": "cmd-full-Voice-lib.stdout.txt",
+  "stderr": "cmd-full-Voice-lib.stderr.txt",
+  "timeout_cleanup": [
+    {
+      "action": "leader exited unreaped; no other owned group members",
+      "members": [
+        {
+          "pid": 93399,
+          "state": "Z"
+        }
+      ]
+    }
+  ],
+  "timed_out": false,
+  "disk_reserve_breached": false,
+  "stop_reason": null,
+  "process_group_scope": "Owned group only; no detached-descendant cleanup claim.",
+  "group_closure_method": "WNOWAIT leader reservation and ps group inventory before reap",
+  "launch_state": "Popen_recorded",
+  "disk_reserve_bytes": 2214592512,
+  "disk_sample_interval_seconds": 1,
+  "disk_paths": [
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/reader82-full-voice-context-v2-20261028",
+    "/private/tmp/tests-restart-f9-cargo-20261027_root"
+  ],
+  "disk_samples": 656,
+  "disk_last_available_bytes": 5279367168,
+  "disk_minimum_available_bytes": 5008257024,
+  "available_bytes_before_Cargo": 5854388224,
+  "owned_pid": 93399,
+  "owned_process_group": 93399,
+  "direct_wait_status": 0,
+  "exit_code": 0,
+  "owned_group_absent_after_cleanup": true,
+  "unexpected_owned_descendants": false,
+  "unresolved_owned_pids": [],
+  "compiler_lease_held": false,
+  "wall_seconds": 664.112221,
+  "finished_at": "2026-10-27T21:12:07.206902+00:00",
+  "stdout_sha256": "d8f4567916af0a729725f632457a3a6d18a180639e896b5cf05296e7751aa90c",
+  "stdout_bytes": 643603,
+  "stderr_sha256": "71b3166af6b5a0d606d5af71da6f895f640c43d6acf7a8dc4b1c39a93be62c8a",
+  "stderr_bytes": 186
+}
