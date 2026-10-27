@@ -25,8 +25,10 @@ use crate::rate::{Class, Rates};
 /// What the lamp's parts do for the door: each action, each piece of state,
 /// and a client's `stop`.
 pub trait Parts {
-    /// Does `op` for `client`: what the reply adds, or why the part refused.
-    fn act(&mut self, client: &str, op: &Op, now_us: u64) -> Result<Value, Error>;
+    /// Does `op` for `client`, request `re`: what the reply adds, or why
+    /// the part refused. An action that ends later says so with a `done`
+    /// event naming `re`.
+    fn act(&mut self, client: &str, re: u64, op: &Op, now_us: u64) -> Result<Value, Error>;
     /// One piece of state, as `get` answers it.
     fn state(&self, kind: StateKind) -> Value;
     /// Ends everything `client` asked for that is still going.
@@ -38,7 +40,7 @@ pub trait Parts {
 pub struct Unrouted;
 
 impl Parts for Unrouted {
-    fn act(&mut self, _: &str, _: &Op, _: u64) -> Result<Value, Error> {
+    fn act(&mut self, _: &str, _: u64, _: &Op, _: u64) -> Result<Value, Error> {
         Err(Error::new(
             ErrorCode::Refused,
             "not routed to the lamp's parts yet",
@@ -372,7 +374,7 @@ impl Door {
             error.retry_ms = Some(retry_ms);
             return reply_refused(Some(re), error);
         }
-        match parts.act(&client, &op, now_us) {
+        match parts.act(&client, re, &op, now_us) {
             Ok(with) => {
                 // Counted only once the part took it.
                 if let Some(class) = class {
@@ -380,7 +382,12 @@ impl Door {
                 }
                 ok(re, with)
             }
-            Err(error) => reply_refused(Some(re), error),
+            Err(error) => {
+                let mut outcome = reply_refused(Some(re), error);
+                // Past the refusals' bound the connection closes.
+                outcome.close = self.rates.take(&client, Class::Refused, now_us).is_err();
+                outcome
+            }
         }
     }
 
@@ -509,6 +516,7 @@ pub fn limits() -> Value {
         "light": class(Class::Light),
         "say": class(Class::Say),
         "express": class(Class::Express),
+        "refused": class(Class::Refused),
         "hold_max_ms": protocol::HOLD_MAX_MS,
         "take_max_ms": crate::lease::TAKE_MAX_US / 1_000,
         "say_max_chars": protocol::SAY_MAX_CHARS,
@@ -577,7 +585,7 @@ mod tests {
     }
 
     impl Parts for Fake {
-        fn act(&mut self, client: &str, op: &Op, _: u64) -> Result<Value, Error> {
+        fn act(&mut self, client: &str, _: u64, op: &Op, _: u64) -> Result<Value, Error> {
             if let Some(error) = self.refuse_with.clone() {
                 return Err(error);
             }
@@ -780,6 +788,31 @@ mod tests {
         let again = door.handle(&mut session, express, &mut fake, 4 * S, 1);
         assert_eq!(code_of(&again), Some("rate"));
         assert_eq!(reply(&again)["error"]["why"], "express: 1 a minute");
+    }
+
+    /// Fourteen's P3 on #3798: refused actions are bounded, 20 a second;
+    /// past that the connection closes.
+    #[test]
+    fn spinning_refused_actions_closes_the_connection() {
+        let computer = Computer::new(1);
+        let (mut door, mut session, mut fake) = paired(&computer, &[Grant::Light]);
+        fake.refuse_with = Some(Error::new(ErrorCode::Refused, "no"));
+        let light = r#"{"id":3,"op":"light","colour":"warm","level":3,"for_ms":1000}"#;
+        for n in 0..20 {
+            let outcome = door.handle(&mut session, light, &mut fake, 2 * S + n, 1);
+            assert_eq!(code_of(&outcome), Some("refused"));
+            assert!(!outcome.close, "closed at {n}");
+        }
+        let outcome = door.handle(&mut session, light, &mut fake, 2 * S + 20, 1);
+        assert!(outcome.close);
+        // A second later the window has room again.
+        let (mut door, mut session, mut fake) = paired(&computer, &[Grant::Light]);
+        fake.refuse_with = Some(Error::new(ErrorCode::Refused, "no"));
+        for n in 0..20 {
+            door.handle(&mut session, light, &mut fake, 2 * S + n, 1);
+        }
+        let later = door.handle(&mut session, light, &mut fake, 3 * S + 20, 1);
+        assert!(!later.close);
     }
 
     #[test]

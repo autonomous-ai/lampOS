@@ -2,6 +2,7 @@
 //!
 //! ```text
 //! lamp-control serve [--state-dir DIR] [--listen ADDR] [--admin-socket PATH] [--name NAME]
+//!                    [--mood-socket PATH] [--say-socket PATH] [--bus-root DIR] [--boot-id ID]
 //! lamp-control code --grants body,light,speak [--admin-socket PATH]
 //! lamp-control revoke CLIENT [--admin-socket PATH]
 //! lamp-control clients [--admin-socket PATH]
@@ -11,12 +12,15 @@
 //! says so and exits 0. It keeps its certificate and paired computers in
 //! `--state-dir` (`/var/lib/lampos-control`), listens on `--listen`
 //! (`0.0.0.0:7731`) and answers the owner's side on `--admin-socket`
-//! (`/run/lampos-control/admin.sock`, 0600). Until actions are routed to the
-//! lamp's parts, every action is refused with a why.
+//! (`/run/lampos-control/admin.sock`, 0600). Actions go to the body's
+//! `--mood-socket`, the voice's `--say-socket` and the ring's light requests
+//! on the bus at `--bus-root` (docs/control.md, "Routing"); a part not given
+//! is refused with a why.
 
 use std::path::PathBuf;
 
-use lamp_control::{cert, pairing::Clients, server, session};
+use lamp_control::{cert, pairing::Clients, parts, server, session};
+use lamp_msgs::LightRequest;
 
 const ENVIRONMENT: &str = "LAMP_CONTROL";
 const STATE_DIR: &str = "/var/lib/lampos-control";
@@ -112,7 +116,28 @@ fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
         clients,
         Some(clients_path),
     );
-    let shared = server::Shared::new(door, Box::new(session::Unrouted), identity.pin.clone());
+    let body = option(arguments, "--mood-socket").map(PathBuf::from);
+    let say = option(arguments, "--say-socket").map(PathBuf::from);
+    let light: Option<Box<dyn parts::LightOut>> = match option(arguments, "--bus-root") {
+        Some(root) => {
+            let bus = lamp_bus::Bus::new(root).map_err(|e| format!("bus: {e}"))?;
+            let out = bus
+                .publisher_declared(LightRequest::TOPIC, &LightRequest::declaration(), "control")
+                .map_err(|e| format!("light/request: {e}"))?;
+            Some(Box::new(out))
+        }
+        None => None,
+    };
+    let clock_id = option(arguments, "--boot-id")
+        .or_else(|| {
+            std::fs::read_to_string("/proc/sys/kernel/random/boot_id")
+                .ok()
+                .map(|id| id.trim().to_owned())
+        })
+        .unwrap_or_default();
+    let shared = server::Shared::new_with(door, identity.pin.clone(), move |events| {
+        Box::new(parts::Lamp::new(body, light, say, clock_id, events))
+    });
     let tls = server::acceptor(&identity).map_err(|e| format!("tls: {e}"))?;
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()

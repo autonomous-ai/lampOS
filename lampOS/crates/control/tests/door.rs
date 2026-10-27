@@ -23,6 +23,10 @@ struct Lamp {
 }
 
 async fn lamp(name: &str) -> Lamp {
+    lamp_with(name, Box::new(session::Unrouted)).await
+}
+
+async fn lamp_with(name: &str, parts: Box<dyn session::Parts + Send>) -> Lamp {
     let dir = std::env::temp_dir().join(format!("lamp-control-door-{name}-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
@@ -34,7 +38,7 @@ async fn lamp(name: &str) -> Lamp {
         pairing::Clients::default(),
         Some(dir.join("clients.json")),
     );
-    let shared = server::Shared::new(door, Box::new(session::Unrouted), identity.pin.clone());
+    let shared = server::Shared::new(door, parts, identity.pin.clone());
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let address = listener.local_addr().unwrap();
     let admin = dir.join("admin.sock");
@@ -268,6 +272,7 @@ async fn silent_peers_are_dropped_at_the_handshake_time_and_never_hold_the_door(
         total: 32,
         per_peer: 2,
         quiet: server::QUIET_MAX,
+        hello: server::HELLO_WITHIN,
     });
     let _one = tokio::net::TcpStream::connect(lamp.address).await.unwrap();
     let _two = tokio::net::TcpStream::connect(lamp.address).await.unwrap();
@@ -313,6 +318,7 @@ async fn a_listener_kept_alive_by_pings_stays_and_a_silent_one_goes() {
         total: 32,
         per_peer: 4,
         quiet: Duration::from_millis(400),
+        hello: server::HELLO_WITHIN,
     });
     let mut pinging = paired(&lamp, json!(["light"]), 5).await;
     for _ in 0..5 {
@@ -360,4 +366,107 @@ async fn a_revoke_the_file_cannot_take_yet_says_so() {
         "{answer}"
     );
     std::fs::remove_dir(lamp.dir.join("clients.json.new")).unwrap();
+}
+
+/// Fourteen's P3 on #3778: frames before `hello` don't move its deadline;
+/// a client that never says it is closed at the hello time from its welcome.
+#[tokio::test]
+async fn frames_before_hello_buy_no_time() {
+    let lamp = lamp("hello-time").await;
+    lamp.shared.set_limits(server::Limits {
+        handshake: server::HANDSHAKE_WITHIN,
+        total: 32,
+        per_peer: 4,
+        quiet: server::QUIET_MAX,
+        hello: Duration::from_millis(500),
+    });
+    let mut socket = connect(&lamp, "/v1").await.unwrap();
+    assert_eq!(next(&mut socket).await["ev"], "welcome");
+    let started = std::time::Instant::now();
+    let closed = tokio::time::timeout(Duration::from_secs(3), async {
+        loop {
+            if socket
+                .send(Message::text(
+                    json!({"id": 1, "op": "get", "state": ["lamp"]}).to_string(),
+                ))
+                .await
+                .is_err()
+            {
+                return;
+            }
+            tokio::time::sleep(Duration::from_millis(100)).await;
+            while let Ok(Some(frame)) =
+                tokio::time::timeout(Duration::from_millis(1), socket.next()).await
+            {
+                if !matches!(frame, Ok(Message::Text(_))) {
+                    return;
+                }
+            }
+        }
+    })
+    .await;
+    assert!(
+        closed.is_ok(),
+        "still open after 3 s of frames before hello"
+    );
+    assert!(
+        started.elapsed() < Duration::from_millis(1_500),
+        "{:?}",
+        started.elapsed()
+    );
+}
+
+/// Parts that keep each client's `stop`.
+struct Stops(Arc<std::sync::Mutex<Vec<String>>>);
+
+impl session::Parts for Stops {
+    fn act(
+        &mut self,
+        _: &str,
+        _: u64,
+        _: &lamp_control::protocol::Op,
+        _: u64,
+    ) -> Result<Value, lamp_control::protocol::Error> {
+        Ok(Value::Null)
+    }
+    fn state(&self, _: lamp_control::protocol::StateKind) -> Value {
+        Value::Null
+    }
+    fn stop(&mut self, client: &str, _: u64) {
+        self.0.lock().unwrap().push(client.to_owned());
+    }
+}
+
+/// The Reviewer-lead's P3 on #3736 and #3778: a computer's last connection
+/// closing stops what it asked for, as its `stop` would; so does a revoke.
+#[tokio::test]
+async fn the_last_connection_closing_or_a_revoke_stops_its_actions() {
+    let stops = Arc::new(std::sync::Mutex::new(Vec::new()));
+    let lamp = lamp_with("stops", Box::new(Stops(stops.clone()))).await;
+    let mut first = paired(&lamp, json!(["light"]), 7).await;
+    let listed = admin(&lamp, json!({"clients": true})).await;
+    let client = listed["clients"][0]["id"].as_str().unwrap().to_owned();
+    first.close(None).await.unwrap();
+    for _ in 0..100 {
+        if !stops.lock().unwrap().is_empty() {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+    assert_eq!(*stops.lock().unwrap(), std::slice::from_ref(&client));
+    // One pairing try a second, door-wide.
+    tokio::time::sleep(Duration::from_millis(1_100)).await;
+    let _second = paired(&lamp, json!(["light"]), 8).await;
+    let other = admin(&lamp, json!({"clients": true})).await["clients"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|c| c["id"].as_str().unwrap().to_owned())
+        .find(|id| *id != client)
+        .unwrap();
+    assert_eq!(
+        admin(&lamp, json!({"revoke": other})).await,
+        json!({"revoked": true, "saved": true})
+    );
+    assert_eq!(stops.lock().unwrap().last(), Some(&other));
 }

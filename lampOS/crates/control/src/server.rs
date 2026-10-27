@@ -61,6 +61,8 @@ pub struct Limits {
     pub per_peer: usize,
     /// [`QUIET_MAX`].
     pub quiet: Duration,
+    /// [`HELLO_WITHIN`].
+    pub hello: Duration,
 }
 
 impl Default for Limits {
@@ -70,6 +72,7 @@ impl Default for Limits {
             total: CONNECTIONS_MAX,
             per_peer: PER_PEER_MAX,
             quiet: QUIET_MAX,
+            hello: HELLO_WITHIN,
         }
     }
 }
@@ -146,6 +149,42 @@ impl Shared {
             shared: self.clone(),
             peer,
         })
+    }
+
+    /// As [`Shared::new`], with parts made knowing where their later events
+    /// go (a `say`'s `done`): to every connection of the client named.
+    pub fn new_with(
+        door: Door,
+        pin: String,
+        parts: impl FnOnce(crate::parts::Events) -> Box<dyn Parts + Send>,
+    ) -> Arc<Self> {
+        Arc::new_cyclic(|shared: &std::sync::Weak<Self>| {
+            let shared = shared.clone();
+            let events: crate::parts::Events = Arc::new(move |client: &str, event: Value| {
+                if let Some(shared) = shared.upgrade() {
+                    shared.send_to(client, event);
+                }
+            });
+            Self {
+                door: Mutex::new(door),
+                parts: Mutex::new(parts(events)),
+                open: Mutex::new(HashMap::new()),
+                next: AtomicU64::new(1),
+                started: Instant::now(),
+                pin,
+                limits: Mutex::new(Limits::default()),
+                peers: Mutex::new(HashMap::new()),
+            }
+        })
+    }
+
+    /// Sends `event` to every connection of `client`.
+    fn send_to(&self, client: &str, event: Value) {
+        for (of, outbox) in self.open.lock().expect("open").values() {
+            if of.as_deref() == Some(client) {
+                let _ = outbox.send(event.clone());
+            }
+        }
     }
 
     fn now_us(&self) -> u64 {
@@ -266,8 +305,13 @@ where
     let (outbox, mut inbox) = mpsc::unbounded_channel::<Value>();
     let (mut session, welcome) = shared.door.lock().expect("door").open();
     shared.open.lock().expect("open").insert(id, (None, outbox));
-    let quiet = shared.limits.lock().expect("limits").quiet;
-    let mut quiet_until = tokio::time::Instant::now() + HELLO_WITHIN;
+    let (quiet, hello) = {
+        let limits = shared.limits.lock().expect("limits");
+        (limits.quiet, limits.hello)
+    };
+    // Set once from the welcome: frames before `hello` buy no more time
+    // (Fourteen's P3 on #3778).
+    let mut quiet_until = tokio::time::Instant::now() + hello;
     if socket
         .send(Message::text(welcome.to_string()))
         .await
@@ -315,7 +359,9 @@ where
                     if gone || outcome.close {
                         break;
                     }
-                    quiet_until = tokio::time::Instant::now() + if session.client().is_some() { quiet } else { HELLO_WITHIN };
+                    if session.client().is_some() {
+                        quiet_until = tokio::time::Instant::now() + quiet;
+                    }
                 }
                 event = inbox.recv() => {
                     let Some(event) = event else { break };
@@ -331,6 +377,20 @@ where
     shared.open.lock().expect("open").remove(&id);
     let now = shared.now_us();
     let changes = shared.door.lock().expect("door").closed(&session, now);
+    // Its last connection gone, what it asked for that still goes stops (a
+    // light held, a say waiting), as its `stop` would (the Reviewer-lead's
+    // P3 on #3736 and #3778).
+    if let Some(client) = session.client() {
+        let still_open = shared
+            .open
+            .lock()
+            .expect("open")
+            .values()
+            .any(|open| open.0.as_deref() == Some(client));
+        if !still_open {
+            shared.parts.lock().expect("parts").stop(client, now);
+        }
+    }
     shared.tell(changes);
 }
 
@@ -381,6 +441,10 @@ fn admin_answer(shared: &Shared, line: &str) -> Value {
     if let Some(Value::String(client)) = asked.get("revoke") {
         let revoked = shared.door.lock().expect("door").revoke(client, now);
         shared.tell(revoked.changes);
+        // What it asked for that still goes stops, as its `stop` would.
+        if revoked.was {
+            shared.parts.lock().expect("parts").stop(client, now);
+        }
         // In effect now either way; a failed save is said, since a restart
         // before a save succeeds would bring the key back.
         let answer = match revoked.saved {

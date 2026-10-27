@@ -1,0 +1,544 @@
+//! Each action routed to the part of the lamp that already does it
+//! (docs/control.md, "Routing"), held to that part's own limits:
+//!
+//! - `gesture` and `move` → the body's mood socket, as lamp-skills sends
+//!   them (`lamp_skills::body_ask`), at `skill` priority with the source
+//!   `control:<client>`. The body plays them with its own move check, reach,
+//!   speed and anti-tip limits, or drops them with why in its journal.
+//! - `light` → a `light/request` on the bus at `skill` priority, lapsing at
+//!   its `for_ms` unless asked again, the ring's own night caps on top.
+//!   `stop` gives the light back at once.
+//! - `say` → the voice's say socket as written words (`text`), through its
+//!   quiet, privacy, pause and busy gates. Its outcome comes later as a
+//!   `done` event: spoken, dropped, expired or refused, with why.
+//!
+//! The priority is this part's, never the caller's: a client cannot claim
+//! more than `skill`. With the parts' own caller check (#3720, Ten's caps)
+//! the body and the ring hold `lamp-control` to `skill` as well.
+//!
+//! Not routed yet, each refused with what it waits for: `look` and `joints`
+//! (the body's lease socket, Ten's piece 4), `express` (Jarvis's `feelings`
+//! skill), `play` and `sound` (a client's package, with the Store's
+//! packaging). State and events from the bus come in their own piece.
+
+use std::collections::HashMap;
+use std::io::{BufReader, Write as _};
+use std::os::unix::net::{UnixDatagram, UnixStream};
+use std::path::PathBuf;
+use std::sync::Arc;
+use std::time::Duration;
+
+use lamp_msgs::{Claim, Light, LightPattern, LightRequest, PatternKind, Priority};
+use serde_json::{Value, json};
+
+use crate::protocol::{Error, ErrorCode, Op, Pattern, StateKind};
+use crate::session::Parts;
+
+/// How long a `say` may wait to begin before the voice lets it go.
+pub const SAY_EXPIRES_MS: u64 = 30_000;
+/// How long the say socket's answer may take, its turn included.
+pub const SAY_ANSWER_WITHIN: Duration = Duration::from_secs(90);
+
+/// Where the events of actions that end later go: the client, and the
+/// event (`done`).
+pub type Events = Arc<dyn Fn(&str, Value) + Send + Sync>;
+
+/// Something a light request can be published on: the bus, or a test's
+/// list.
+pub trait LightOut: Send {
+    /// Publishes it: how many subscribers took it.
+    fn publish(&mut self, request: &LightRequest) -> std::io::Result<usize>;
+}
+
+impl LightOut for lamp_bus::Publisher {
+    fn publish(&mut self, request: &LightRequest) -> std::io::Result<usize> {
+        Ok(self
+            .publish_json(lamp_ipc::monotonic_us(), request)?
+            .delivered)
+    }
+}
+
+/// The lamp's parts, as `lamp-control` reaches them.
+pub struct Lamp {
+    pub body: Option<PathBuf>,
+    pub light: Option<Box<dyn LightOut>>,
+    pub say: Option<PathBuf>,
+    /// The boot's id, which a light request's clock names.
+    pub clock_id: String,
+    pub events: Events,
+    /// Each client's light still asked for, to give back at its `stop`.
+    lights: HashMap<String, (Light, u64)>,
+    datagram: Option<UnixDatagram>,
+    /// The boot's monotonic clock (`CLOCK_MONOTONIC`), the one a claim's
+    /// `until_us` is read against: not the door's own, which starts with
+    /// lamp-control (the Reviewer-lead's P2 on #3805).
+    clock: fn() -> u64,
+}
+
+impl Lamp {
+    pub fn new(
+        body: Option<PathBuf>,
+        light: Option<Box<dyn LightOut>>,
+        say: Option<PathBuf>,
+        clock_id: String,
+        events: Events,
+    ) -> Self {
+        Self {
+            body,
+            light,
+            say,
+            clock_id,
+            events,
+            lights: HashMap::new(),
+            // Never blocking under the door's lock: a full mood queue is
+            // the body busy, said (the Reviewer-lead's P3 on #3805).
+            datagram: UnixDatagram::unbound()
+                .and_then(|socket| socket.set_nonblocking(true).map(|()| socket))
+                .ok(),
+            clock: lamp_ipc::monotonic_us,
+        }
+    }
+
+    /// Another clock for claims, for tests.
+    pub fn with_clock(mut self, clock: fn() -> u64) -> Self {
+        self.clock = clock;
+        self
+    }
+
+    fn to_body(&self, mut ask: Value, client: &str) -> Result<Value, Error> {
+        let (Some(path), Some(socket)) = (&self.body, &self.datagram) else {
+            return Err(not_here("the body"));
+        };
+        ask["source"] = json!(source(client));
+        ask["priority"] = json!(Priority::Skill);
+        socket
+            .send_to(ask.to_string().as_bytes(), path)
+            .map_err(|error| {
+                let why = if error.kind() == std::io::ErrorKind::WouldBlock {
+                    "the body is busy: its queue is full".to_owned()
+                } else {
+                    format!("the body did not take it: {error}")
+                };
+                Error::new(ErrorCode::Refused, why)
+            })?;
+        Ok(json!({"to": "body"}))
+    }
+
+    fn light(
+        &mut self,
+        client: &str,
+        colour: &str,
+        level: u8,
+        pattern: Option<Pattern>,
+        for_ms: u32,
+    ) -> Result<Value, Error> {
+        let pattern = pattern.map(|pattern| {
+            let kind = match pattern {
+                Pattern::Breathe => PatternKind::Breathe,
+                Pattern::Candle => PatternKind::Candle,
+                Pattern::Pulse => PatternKind::Pulse,
+            };
+            LightPattern {
+                kind,
+                period_ms: LightPattern::default_ms(kind),
+                low: 1,
+            }
+        });
+        if let Some(pattern) = &pattern {
+            pattern
+                .check(level)
+                .map_err(|invalid| Error::new(ErrorCode::Refused, invalid.0))?;
+        }
+        let light = Light {
+            on: true,
+            colour: colour.to_owned(),
+            level,
+        };
+        let until_us = (self.clock)() + u64::from(for_ms) * 1_000;
+        self.ask_ring(client, light.clone(), pattern, until_us)?;
+        self.lights.insert(client.to_owned(), (light, until_us));
+        Ok(json!({"to": "ring"}))
+    }
+
+    fn ask_ring(
+        &mut self,
+        client: &str,
+        light: Light,
+        pattern: Option<LightPattern>,
+        until_us: u64,
+    ) -> Result<(), Error> {
+        let Some(out) = self.light.as_mut() else {
+            return Err(not_here("the ring"));
+        };
+        let request = LightRequest {
+            claim: Claim {
+                source: source(client),
+                priority: Priority::Skill,
+                clock_id: self.clock_id.clone(),
+                until_us,
+            },
+            light,
+            pattern,
+            fade_ms: None,
+        };
+        match out.publish(&request) {
+            Ok(0) => Err(Error::new(
+                ErrorCode::Refused,
+                "the ring took no light request (LAMP_LIGHT_REQUESTS off?)",
+            )),
+            Ok(_) => Ok(()),
+            Err(error) => Err(Error::new(
+                ErrorCode::Refused,
+                format!("the ring did not take it: {error}"),
+            )),
+        }
+    }
+
+    fn say(&self, client: &str, re: u64, text: &str) -> Result<Value, Error> {
+        let Some(path) = self.say.clone() else {
+            return Err(not_here("the voice"));
+        };
+        let line = json!({"skill": "control", "text": text, "expires_in_ms": SAY_EXPIRES_MS});
+        let events = self.events.clone();
+        let client = client.to_owned();
+        // Off the door's lock, connecting included (the Reviewer-lead's P3
+        // on #3805: a voice whose backlog is full must not hold every
+        // connection). The outcome comes when the turn ends, as `done`; a
+        // voice that can't be reached is a `done` dropped, with why.
+        std::thread::spawn(move || {
+            let (how, why) = match UnixStream::connect(&path)
+                .and_then(|mut stream| writeln!(stream, "{line}").map(|()| stream))
+            {
+                Ok(stream) => {
+                    let _ = stream.set_read_timeout(Some(SAY_ANSWER_WITHIN));
+                    outcome(BufReader::new(stream))
+                }
+                Err(error) => (
+                    "dropped",
+                    Some(format!("the voice did not take it: {error}")),
+                ),
+            };
+            let mut done = json!({"ev": "done", "re": re, "how": how});
+            if let Some(why) = why {
+                done["why"] = json!(why);
+            }
+            events(&client, done);
+        });
+        Ok(json!({"to": "voice"}))
+    }
+}
+
+/// The say socket's outcome, past the `begun` event, in the protocol's
+/// words (`done.how`: `finished`, `cut_short`, `dropped`; the Reviewer-lead's
+/// and harness-reviewer's P2 on #3805): `spoken` is `finished`; `dropped`,
+/// `expired`, `refused` and no outcome at all are `dropped`, the voice's
+/// own word and why in `why`.
+fn outcome(reader: impl std::io::BufRead) -> (&'static str, Option<String>) {
+    for line in reader.lines() {
+        let Ok(line) = line else { break };
+        let Ok(said) = serde_json::from_str::<Value>(&line) else {
+            continue;
+        };
+        if said.get("event").is_some() {
+            continue;
+        }
+        let word = said["outcome"].as_str().unwrap_or("failed");
+        if word == "spoken" {
+            return ("finished", None);
+        }
+        let why = match said["why"].as_str() {
+            Some(why) => format!("{word}: {why}"),
+            None => word.to_owned(),
+        };
+        return ("dropped", Some(why));
+    }
+    ("dropped", Some("the voice gave no outcome".to_owned()))
+}
+
+fn source(client: &str) -> String {
+    format!("control:{client}")
+}
+
+fn not_here(part: &str) -> Error {
+    Error::new(
+        ErrorCode::Refused,
+        format!("{part} is not reachable from lamp-control here"),
+    )
+}
+
+fn waits_for(what: &str) -> Error {
+    Error::new(
+        ErrorCode::Refused,
+        format!("not routed yet: waits for {what}"),
+    )
+}
+
+impl Parts for Lamp {
+    fn act(&mut self, client: &str, re: u64, op: &Op, _: u64) -> Result<Value, Error> {
+        match op {
+            Op::Gesture { name } => self.to_body(json!({"gesture": name}), client),
+            Op::Move { step_ms, frames } => self.to_body(
+                json!({"move": {"name": "control", "step_ms": step_ms, "frames": frames}}),
+                client,
+            ),
+            Op::Light {
+                colour,
+                level,
+                pattern,
+                for_ms,
+            } => self.light(client, colour, *level, *pattern, *for_ms),
+            Op::Say { text } => self.say(client, re, text),
+            Op::Look { .. } | Op::Joints { .. } => Err(waits_for("the body's lease socket")),
+            Op::Express { .. } => Err(waits_for("the feelings skill")),
+            Op::Play { .. } | Op::Sound { .. } => Err(waits_for("client packages")),
+            _ => Err(Error::new(ErrorCode::BadRequest, "not an action")),
+        }
+    }
+
+    fn state(&self, _: StateKind) -> Value {
+        Value::Null
+    }
+
+    fn stop(&mut self, client: &str, _: u64) {
+        // The light given back now: the same light, lapsing at once.
+        let now_us = (self.clock)();
+        if let Some((light, until_us)) = self.lights.remove(client)
+            && until_us > now_us
+        {
+            let _ = self.ask_ring(client, light, None, now_us);
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::BufRead as _;
+    use std::sync::Mutex;
+
+    #[derive(Clone, Default)]
+    struct Ring(Arc<Mutex<Vec<LightRequest>>>);
+
+    impl LightOut for Ring {
+        fn publish(&mut self, request: &LightRequest) -> std::io::Result<usize> {
+            self.0.lock().unwrap().push(request.clone());
+            Ok(1)
+        }
+    }
+
+    fn dir(name: &str) -> PathBuf {
+        let dir =
+            std::env::temp_dir().join(format!("lamp-control-parts-{name}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    fn op(frame: &str) -> Op {
+        crate::protocol::parse(frame).unwrap().op
+    }
+
+    fn quiet() -> Events {
+        Arc::new(|_, _| {})
+    }
+
+    #[test]
+    fn a_gesture_and_a_move_go_to_the_body_at_skill_priority_as_this_part() {
+        let dir = dir("body");
+        let path = dir.join("mood.sock");
+        let body = UnixDatagram::bind(&path).unwrap();
+        let mut lamp = Lamp::new(Some(path), None, None, "boot".into(), quiet());
+        lamp.act("c_1", 1, &op(r#"{"id":1,"op":"gesture","name":"nod"}"#), 0)
+            .unwrap();
+        let mut buffer = [0u8; 4096];
+        let length = body.recv(&mut buffer).unwrap();
+        assert_eq!(
+            serde_json::from_slice::<Value>(&buffer[..length]).unwrap(),
+            json!({"gesture": "nod", "source": "control:c_1", "priority": "skill"})
+        );
+        lamp.act("c_1", 2, &op(r#"{"id":2,"op":"move","step_ms":40,"frames":[[0,0,0,0,0],[20,0,30,0,0],[0,0,0,0,0]]}"#), 0).unwrap();
+        let length = body.recv(&mut buffer).unwrap();
+        let sent: Value = serde_json::from_slice(&buffer[..length]).unwrap();
+        assert_eq!(sent["move"]["frames"][1], json!([20, 0, 30, 0, 0]));
+        assert_eq!(sent["priority"], "skill");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// 61 s since boot.
+    fn booted_61s_ago() -> u64 {
+        61_000_000
+    }
+
+    /// The Reviewer-lead's P2 on #3805: the door started a minute after
+    /// boot, so its own clock reads 1 s; the claim is on the boot's clock,
+    /// the one the ring reads.
+    #[test]
+    fn a_light_is_a_request_that_lapses_and_stop_gives_it_back() {
+        let ring = Ring::default();
+        let mut lamp = Lamp::new(
+            None,
+            Some(Box::new(ring.clone())),
+            None,
+            "boot-1".into(),
+            quiet(),
+        )
+        .with_clock(booted_61s_ago);
+        lamp.act("c_1", 1, &op(r#"{"id":1,"op":"light","colour":"warm","level":3,"pattern":"breathe","for_ms":10000}"#), 1_000_000).unwrap();
+        {
+            let asked = ring.0.lock().unwrap();
+            assert_eq!(
+                asked[0].claim,
+                Claim {
+                    source: "control:c_1".into(),
+                    priority: Priority::Skill,
+                    clock_id: "boot-1".into(),
+                    until_us: 71_000_000
+                }
+            );
+            assert_eq!(
+                asked[0].light,
+                Light {
+                    on: true,
+                    colour: "warm".into(),
+                    level: 3
+                }
+            );
+            assert_eq!(
+                asked[0].pattern.map(|p| (p.kind, p.period_ms)),
+                Some((PatternKind::Breathe, 6_000))
+            );
+        }
+        // A candle at level 2 is the ring's own refusal, said.
+        let error = lamp.act("c_1", 2, &op(r#"{"id":2,"op":"light","colour":"warm","level":2,"pattern":"candle","for_ms":1000}"#), 0).unwrap_err();
+        assert_eq!(error.code, ErrorCode::Refused);
+        assert!(error.why.contains("level 3"), "{}", error.why);
+        lamp.stop("c_1", 2_000_000);
+        let asked = ring.0.lock().unwrap();
+        assert_eq!(asked.len(), 2);
+        assert_eq!(asked[1].claim.until_us, 61_000_000);
+    }
+
+    #[test]
+    fn a_say_is_written_words_and_its_outcome_comes_as_done() {
+        let dir = dir("say");
+        let path = dir.join("say.sock");
+        let listener = std::os::unix::net::UnixListener::bind(&path).unwrap();
+        let told: Arc<Mutex<Vec<(String, Value)>>> = Arc::default();
+        let sink = told.clone();
+        let events: Events =
+            Arc::new(move |client, event| sink.lock().unwrap().push((client.to_owned(), event)));
+        let voice = std::thread::spawn(move || {
+            let (stream, _) = listener.accept().unwrap();
+            let mut line = String::new();
+            BufReader::new(&stream).read_line(&mut line).unwrap();
+            let mut out = &stream;
+            writeln!(out, r#"{{"event":"begun","at_us":5}}"#).unwrap();
+            writeln!(out, r#"{{"outcome":"spoken"}}"#).unwrap();
+            serde_json::from_str::<Value>(&line).unwrap()
+        });
+        let mut lamp = Lamp::new(None, None, Some(path), "boot".into(), events);
+        assert_eq!(
+            lamp.act(
+                "c_1",
+                14,
+                &op(r#"{"id":14,"op":"say","text":"Build passed."}"#),
+                0
+            )
+            .unwrap(),
+            json!({"to": "voice"})
+        );
+        let asked = voice.join().unwrap();
+        assert_eq!(
+            asked,
+            json!({"skill": "control", "text": "Build passed.", "expires_in_ms": 30000})
+        );
+        for _ in 0..200 {
+            if !told.lock().unwrap().is_empty() {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        assert_eq!(
+            told.lock().unwrap()[0],
+            (
+                "c_1".to_owned(),
+                json!({"ev": "done", "re": 14, "how": "finished"})
+            )
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn what_is_not_routed_yet_says_what_it_waits_for() {
+        let mut lamp = Lamp::new(None, None, None, "boot".into(), quiet());
+        for (frame, waits) in [
+            (r#"{"id":1,"op":"look","at":"ahead"}"#, "lease socket"),
+            (r#"{"id":1,"op":"express","feeling":"glad"}"#, "feelings"),
+            (r#"{"id":1,"op":"play","name":"wave"}"#, "packages"),
+        ] {
+            let error = lamp.act("c_1", 1, &op(frame), 0).unwrap_err();
+            assert!(error.why.contains(waits), "{frame}: {}", error.why);
+        }
+        let error = lamp
+            .act("c_1", 1, &op(r#"{"id":1,"op":"gesture","name":"nod"}"#), 0)
+            .unwrap_err();
+        assert!(error.why.contains("not reachable"), "{}", error.why);
+        assert_eq!(
+            outcome(BufReader::new(
+                &b"{\"event\":\"begun\"}\n{\"outcome\":\"dropped\",\"why\":\"someone spoke\"}\n"[..]
+            )),
+            ("dropped", Some("dropped: someone spoke".to_owned()))
+        );
+        // The voice's words in the protocol's (the P2s on #3805).
+        for (line, how, why) in [
+            (r#"{"outcome":"spoken"}"#, "finished", None),
+            (r#"{"outcome":"expired"}"#, "dropped", Some("expired")),
+            (
+                r#"{"outcome":"refused","why":"private"}"#,
+                "dropped",
+                Some("refused: private"),
+            ),
+            ("", "dropped", Some("the voice gave no outcome")),
+        ] {
+            assert_eq!(
+                outcome(BufReader::new(line.as_bytes())),
+                (how, why.map(str::to_owned)),
+                "{line}"
+            );
+        }
+    }
+
+    /// A voice that can't be reached is a `done` dropped, off the door's
+    /// lock: the reply comes at once.
+    #[test]
+    fn a_say_the_voice_cannot_take_is_done_dropped() {
+        let dir = dir("say-gone");
+        let told: Arc<Mutex<Vec<(String, Value)>>> = Arc::default();
+        let sink = told.clone();
+        let events: Events =
+            Arc::new(move |client, event| sink.lock().unwrap().push((client.to_owned(), event)));
+        let mut lamp = Lamp::new(
+            None,
+            None,
+            Some(dir.join("none.sock")),
+            "boot".into(),
+            events,
+        );
+        let said = lamp.act("c_1", 3, &op(r#"{"id":3,"op":"say","text":"Hi."}"#), 0);
+        assert_eq!(said.unwrap(), json!({"to": "voice"}));
+        for _ in 0..200 {
+            if !told.lock().unwrap().is_empty() {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        let (client, done) = told.lock().unwrap()[0].clone();
+        assert_eq!(client, "c_1");
+        assert_eq!(done["how"], "dropped");
+        assert!(
+            done["why"].as_str().unwrap().contains("did not take"),
+            "{done}"
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+}
