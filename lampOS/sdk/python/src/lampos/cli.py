@@ -5,7 +5,9 @@ it all with no lamp.
     lamp pair 12345678 --pin <64 hex> [--host lamp-75c9.local] [--name "Dev's laptop"]
     lamp hello [LAMP_ID]
     lamp fake [--every 10] [--cycles N]
-    lamp skill check FOLDER...
+    lamp skill check FOLDER|PACKAGE...
+    lamp skill keygen
+    lamp skill pack FOLDER [--sign] [--out DIR]
     lamp skill push FOLDER [LAMP_ID]
     lamp skill list [LAMP_ID]
     lamp skill remove NAME [LAMP_ID]
@@ -17,11 +19,15 @@ import argparse
 import asyncio
 import json
 import sys
+from pathlib import Path
+
+from cryptography.hazmat.primitives import serialization
 
 from . import schema
 from .client import Lamp
 from .discovery import find
 from .errors import LampError
+from .keys import Keyring
 
 
 async def _pair(args) -> int:
@@ -45,7 +51,6 @@ async def _fake(args) -> int:
     that says a person arrived, a phrase heard and the person left, every
     `--every` seconds, and prints what it is asked. Try an example against
     it in another terminal, with the same LAMPOS_HOME."""
-    from .keys import Keyring
     from .testing import LAMP_CONTROL_REFUSES, FakeLamp
 
     refuses = {} if getattr(args, "everything", False) else LAMP_CONTROL_REFUSES
@@ -78,20 +83,73 @@ async def _find(_args) -> int:
 
 
 async def _skill_check(args) -> int:
+    import tempfile
+
+    from .push import open_package
     from .skillcheck import check
 
     failed = 0
-    for folder in args.folders:
-        report = check(folder)
+    for given in args.folders:
+        signed = ""
+        with tempfile.TemporaryDirectory() as scratch:
+            folder = Path(given)
+            if folder.is_file():
+                # A package: its signature and files first, then the skill
+                # inside, read as a folder is.
+                try:
+                    opened = open_package(folder.read_bytes())
+                except LampError as error:
+                    print(f"{folder.name}: error: {error.why}")
+                    failed += 1
+                    continue
+                # Integrity, not trust: anyone can make a key (Fourteen, #3504).
+                signed = f", signed by key {opened.author}, not the Store" if opened.author else ", not signed"
+                folder = Path(scratch) / opened.name
+                for path, body in opened.files.items():
+                    (folder / path).parent.mkdir(parents=True, exist_ok=True)
+                    (folder / path).write_bytes(body)
+            report = check(folder)
         for line in report.errors:
             print(f"{report.folder.name}: error: {line}")
         for line in report.warnings:
             print(f"{report.folder.name}: warning: {line}")
         if report.ok:
-            print(f"{report.folder.name}: ok, format {report.format}")
+            print(f"{report.folder.name}: ok, format {report.format}{signed}")
         else:
             failed += 1
     return 1 if failed else 0
+
+
+async def _skill_keygen(args) -> int:
+    from .push import fingerprint
+
+    ring = Keyring()
+    made = ring.author_key() is None
+    key = ring.author_key(make=True)
+    public = key.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
+    print(f"author key {fingerprint(public)} {'made' if made else 'already there'}: {ring.folder / 'author.pem'}")
+    return 0
+
+
+async def _skill_pack(args) -> int:
+    from .push import pack
+    from .skillcheck import check
+
+    report = check(args.folder)
+    if not report.ok:
+        raise LampError(f"{report.folder.name}: {report.errors[0]}", code="bad_request")
+    author = None
+    if args.sign:
+        author = Keyring().author_key()
+        if author is None:
+            raise LampError("no author key: make one with `lamp skill keygen`", code="bad_request")
+    package = pack(args.folder, author=author)
+    out = Path(args.out)
+    out.mkdir(parents=True, exist_ok=True)
+    path = out / f"{package.name}-{package.version}.tar"
+    path.write_bytes(package.data)
+    print(f"{path} {package.sha256}{' signed' if author else ''}")
+    return 0
 
 
 async def _skill_push(args) -> int:
@@ -151,9 +209,16 @@ def main(argv: list[str] | None = None) -> int:
     hello.set_defaults(run=_hello)
     skill = commands.add_parser("skill", help="skill folders: check, push, list, remove")
     skill_commands = skill.add_subparsers(dest="skill_command", required=True)
-    skill_check = skill_commands.add_parser("check", help="check skill folders against the skill format, version 1")
-    skill_check.add_argument("folders", nargs="+", help="each a folder with SKILL.md and skill.toml")
+    skill_check = skill_commands.add_parser("check", help="check skill folders or packages against the skill format, version 1")
+    skill_check.add_argument("folders", nargs="+", help="each a folder with SKILL.md and skill.toml, or a package (.tar)")
     skill_check.set_defaults(run=_skill_check)
+    skill_keygen = skill_commands.add_parser("keygen", help="make the key you sign your skills with, apart from the pairing key")
+    skill_keygen.set_defaults(run=_skill_keygen)
+    skill_pack = skill_commands.add_parser("pack", help="check a skill folder and pack it as NAME-VERSION.tar, to share it")
+    skill_pack.add_argument("folder")
+    skill_pack.add_argument("--sign", action="store_true", help="sign it with your author key (lamp skill keygen)")
+    skill_pack.add_argument("--out", default=".", help="the folder to write it in (.)")
+    skill_pack.set_defaults(run=_skill_pack)
     skill_push = skill_commands.add_parser("push", help="check a skill folder and put it on your paired lamp (the skills grant)")
     skill_push.add_argument("folder")
     skill_push.add_argument("lamp", nargs="?")

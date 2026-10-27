@@ -177,3 +177,24 @@ the owner says yes in the app, and the answer says so. In code:
 `await lamp.remove_skill(name)`. A pushed skill keeps running after this
 computer goes; revoking the computer, or taking back `skills`, turns its
 skills off.
+
+## Share a skill, signed
+
+To share a skill with other people's lamps, sign it with a key of your own.
+That key is kept apart from the pairing key, so revoking a pairing never
+changes who wrote a skill:
+
+```sh
+lamp skill keygen                              # once: author.pem in LAMPOS_HOME
+lamp skill pack path/to/my-skill --sign        # my-skill-1.0.0.tar, signed
+lamp skill check my-skill-1.0.0.tar            # the signature, every file, then the skill
+```
+
+The package is the shape `lamp-skills pack --key-file` makes. Its
+`lamp-skill.sig` names your key's fingerprint (the first 16 hex of its
+SHA-256), carries the public key, and signs `lamp-skill.json`'s exact bytes.
+A changed file or a changed manifest fails the check. A signature says the
+bytes are that key's, not who is behind the key: `check` says "signed by key
+FPR16, not the Store", never "verified". Installing someone
+else's package on your lamp is planned (#3504): the lamp will keep a
+skill's author and refuse an update by another key.

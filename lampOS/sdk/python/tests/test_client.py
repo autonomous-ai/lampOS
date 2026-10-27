@@ -793,6 +793,34 @@ def test_a_signed_package_names_its_author_and_any_change_is_refused(tmp_path):
         assert says in raised.value.why
 
 
+def test_lamp_skill_keygen_pack_and_check_a_package(tmp_path):
+    import os
+    import subprocess
+    import sys
+
+    env = {**os.environ, "LAMPOS_HOME": str(tmp_path / "home")}
+
+    def lamp(*args: str) -> tuple[int, str]:
+        done = subprocess.run([sys.executable, "-m", "lampos.cli", *args], env=env, capture_output=True, text=True)
+        return done.returncode, (done.stdout + done.stderr).strip()
+
+    folder = _skill(tmp_path, "desk-wave")
+    out = tmp_path / "out"
+    assert lamp("skill", "pack", str(folder), "--sign", "--out", str(out)) == (
+        1, "lamp: bad_request: no author key: make one with `lamp skill keygen`")
+    code, said = lamp("skill", "keygen")
+    fpr = said.split()[2]
+    assert code == 0 and said.endswith("author.pem") and len(fpr) == 16
+    assert lamp("skill", "keygen")[1].startswith(f"author key {fpr} already there")
+    code, said = lamp("skill", "pack", str(folder), "--sign", "--out", str(out))
+    assert code == 0 and said.endswith(" signed")
+    package = out / "desk-wave-0.1.0.tar"
+    assert lamp("skill", "check", str(package)) == (0, f"desk-wave: ok, format 1, signed by key {fpr}, not the Store")
+    package.write_bytes(package.read_bytes().replace(b"light = true", b"light = TRUE"))
+    code, said = lamp("skill", "check", str(package))
+    assert code == 1 and "does not match lamp-skill.json" in said
+
+
 def test_a_skill_is_packed_as_lamp_skills_packs_it(tmp_path):
     import io
     import tarfile
