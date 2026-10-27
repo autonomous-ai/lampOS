@@ -642,3 +642,4 @@ Ready for lamp-voice: yes (#2553), once its ARM64 run is green
 - 21:34: #3848 merged in train 241 (f9926922d). #3859 has READ-OKs (Fourteen) and no P1/P2 from the reviewer-lead; it'll likely land near #3840. Still waiting: #3829, #3836, #3840 for a train; #3847 after #3805. #3840's follow-up will flip until-3840 to required.
 - 21:39: quiet tick; nothing on my PRs or #3859.
 - 21:44: quiet tick; nothing on my PRs or #3859.
+- 21:49: #3859 has a NEXT TRAIN; asked the train not to combine #3840 and #3859 (the SDK skill-format copy would mismatch); #3859 first, then I carry #3840.
