@@ -1,5 +1,13 @@
 # Tests work log
 
+## 2026-10-28 01:09 — updater current native green; holder acceptance pending
+
+Ready for lamp-voice: no (#3843 software current reads/device acceptance pending; #3543 ready for current reads).
+
+[Current updater original native proof](verification/tests-3843-c958-native-20261028/) records ARM40553683146 and Linux40553682904 success, attempt one: **7808 unique PASS, zero bad/unrun**,53 aggregate skips. All215 Round cases and all14 required product-carrier controls pass once; the prior Skills failure case passes in this separate native scope. Actual46d8f6e2f [f903659bb,c9582a43f] preserves all three owned blobs but adds12 upstream paths; no full authored-tree equality or earlier-host failure waiver.
+
+The checksum manifest names updater7e24e609b8e3d273af96aa37d362357840bd189777a7829f625eac93b0ab491f. The bounded range retrieval fetched67700bytes, including a ZIP tail that can contain compressed payload bytes; no ARM binary extraction/decompression/hash/execution or whole-archive digest verification occurred. The original zero-payload-byte wording is explicitly corrected in the packet. This is not installed-device evidence. Current reads and the holder's installed head/digest, normal hostname after stopgap removal and health-watch acceptance remain. Mood's current full Expression gate continues locally. No device access.
+
 ## 2026-10-28 01:02 — Reader current native green; ready for current readers
 
 Ready for lamp-voice: yes (#3543, 495a47618; current reader marks pending).
