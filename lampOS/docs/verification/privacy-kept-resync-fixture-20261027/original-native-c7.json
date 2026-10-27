@@ -1,0 +1,285 @@
+{
+  "status": "ORIGINAL_NATIVE_PASSED_PREVIEW_ONLY",
+  "holds": [],
+  "runs": {
+    "arm": {
+      "actual_checkout": "70f1460c70dc4fca4da605da9632e2375e0953c9",
+      "attempt": 1,
+      "conclusion": "success",
+      "head": "c7c197f986e870577ef2af34043d92a52b882160",
+      "job": 122072728913,
+      "labels": [
+        "ubuntu-22.04-arm"
+      ],
+      "run": 40469447096,
+      "runner_name": "GitHub Actions 1000085386",
+      "steps": [
+        {
+          "conclusion": "success",
+          "name": "Set up job"
+        },
+        {
+          "conclusion": "success",
+          "name": "system packages"
+        },
+        {
+          "conclusion": "success",
+          "name": "Run actions/checkout@v4"
+        },
+        {
+          "conclusion": "success",
+          "name": "publication failure tests (offline, no signing secret)"
+        },
+        {
+          "conclusion": "success",
+          "name": "Rust 1.96.0"
+        },
+        {
+          "conclusion": "success",
+          "name": "artifact provenance regression (offline, disposable Cargo workspace)"
+        },
+        {
+          "conclusion": "success",
+          "name": "stable promotion tests (offline, disposable test key)"
+        },
+        {
+          "conclusion": "success",
+          "name": "restore the cache"
+        },
+        {
+          "conclusion": "success",
+          "name": "unchanged source files get the cached build's times back"
+        },
+        {
+          "conclusion": "skipped",
+          "name": "record fresh source times for a cold publication build"
+        },
+        {
+          "conclusion": "success",
+          "name": "Run taiki-e/install-action@v2"
+        },
+        {
+          "conclusion": "success",
+          "name": "build (release, the lamps' binaries)"
+        },
+        {
+          "conclusion": "success",
+          "name": "every built lamp-* binary is classified for the lamp-os package"
+        },
+        {
+          "conclusion": "success",
+          "name": "build the two selected artifact examples without filename collisions"
+        },
+        {
+          "conclusion": "success",
+          "name": "publication CLI rehearsal (local test key and simulated GitHub only)"
+        },
+        {
+          "conclusion": "success",
+          "name": "which crates a pull request tests"
+        },
+        {
+          "conclusion": "success",
+          "name": "test (full run, every test one at a time; otherwise without the realtime group, in parallel)"
+        },
+        {
+          "conclusion": "success",
+          "name": "doc tests and the own-harness tests (nextest runs neither)"
+        },
+        {
+          "conclusion": "success",
+          "name": "export only current Cargo targets and their SHA-256"
+        },
+        {
+          "conclusion": "success",
+          "name": "Run actions/upload-artifact@v4"
+        },
+        {
+          "conclusion": "skipped",
+          "name": "discard the isolated example target before saving the cache"
+        },
+        {
+          "conclusion": "skipped",
+          "name": "save the cache"
+        },
+        {
+          "conclusion": "success",
+          "name": "Post Run actions/checkout@v4"
+        },
+        {
+          "conclusion": "success",
+          "name": "Complete job"
+        }
+      ]
+    },
+    "linux": {
+      "actual_checkout": "70f1460c70dc4fca4da605da9632e2375e0953c9",
+      "attempt": 1,
+      "conclusion": "success",
+      "head": "c7c197f986e870577ef2af34043d92a52b882160",
+      "job": 122072728886,
+      "labels": [
+        "ubuntu-22.04"
+      ],
+      "run": 40469447100,
+      "runner_name": "GitHub Actions 1000085385",
+      "steps": [
+        {
+          "conclusion": "success",
+          "name": "Set up job"
+        },
+        {
+          "conclusion": "success",
+          "name": "system packages"
+        },
+        {
+          "conclusion": "success",
+          "name": "Run actions/checkout@v4"
+        },
+        {
+          "conclusion": "success",
+          "name": "Rust 1.96.0"
+        },
+        {
+          "conclusion": "success",
+          "name": "stable promotion formatting and strict Clippy"
+        },
+        {
+          "conclusion": "success",
+          "name": "formatting (whole workspace, pinned Rust)"
+        },
+        {
+          "conclusion": "success",
+          "name": "restore the cache"
+        },
+        {
+          "conclusion": "success",
+          "name": "unchanged source files get the cached build's times back"
+        },
+        {
+          "conclusion": "success",
+          "name": "clippy (every crate and target, warnings as errors)"
+        },
+        {
+          "conclusion": "skipped",
+          "name": "save the cache"
+        },
+        {
+          "conclusion": "success",
+          "name": "Post Run actions/checkout@v4"
+        },
+        {
+          "conclusion": "success",
+          "name": "Complete job"
+        }
+      ]
+    }
+  },
+  "source": [
+    {
+      "actual_preview": "70f1460c70dc4fca4da605da9632e2375e0953c9",
+      "committed_head": "c7c197f986e870577ef2af34043d92a52b882160",
+      "committed_tree": "63794bcb3da8bee41c1b6cbb7720669a051b1700",
+      "ordered_parents": [
+        "f7252d81dc2e72494afc6ea842bd8b0445f1991c",
+        "c7c197f986e870577ef2af34043d92a52b882160"
+      ],
+      "preview_tree": "37f76ccdbb6319aee8436a0734c31bebec17ead2",
+      "whole_tree_equal": false
+    }
+  ],
+  "privacy_controls": {
+    "once_pass": 9,
+    "required": 9
+  },
+  "source_delta_review": {
+    "actual_base": "f7252d81dc2e72494afc6ea842bd8b0445f1991c",
+    "actual_preview": "70f1460c70dc4fca4da605da9632e2375e0953c9",
+    "all_changed_paths": [
+      "lampOS/crates/body/src/clips.rs",
+      "lampOS/crates/msgs/src/arbitration.rs",
+      "lampOS/docs/control.md",
+      "lampOS/docs/control.schema.json",
+      "lampOS/docs/vi/control_vi.md",
+      "robots/lamp/hardware/cad/README.md",
+      "robots/lamp/hardware/cad/f3d/Lamp_09102026.f3d"
+    ],
+    "allowed_changed_msgs_paths": [
+      "lampOS/crates/msgs/src/arbitration.rs"
+    ],
+    "authored_base": "f9a9404de4d6cad65e6f3945ab2e60c50eb5eacc",
+    "msgs_runtime_delta": false,
+    "no_runtime_expansion_or_retry": true,
+    "reviewed_rust_changes": [
+      {
+        "actual_blob": "47ac0ab4fff65b6f9675893e9609119857cfc22c",
+        "authored_blob": "ab34a5268b9a8d06f332dbdf39324291c8050150",
+        "diff": "diff --git a/lampOS/crates/msgs/src/arbitration.rs b/lampOS/crates/msgs/src/arbitration.rs\nindex ab34a5268..47ac0ab4f 100644\n--- a/lampOS/crates/msgs/src/arbitration.rs\n+++ b/lampOS/crates/msgs/src/arbitration.rs\n@@ -508,4 +508,39 @@ mod tests {\n             (LightOutranked::TYPE, Kind::Event)\n         );\n     }\n+\n+    /// docs/control.schema.json's colours and patterns are the lamp's own.\n+    #[test]\n+    fn the_control_schemas_colours_and_patterns_are_the_lamps() {\n+        let schema: serde_json::Value =\n+            serde_json::from_str(include_str!(\"../../../docs/control.schema.json\")).unwrap();\n+        let names = |def: &str| -> Vec<String> {\n+            schema[\"$defs\"][def][\"enum\"]\n+                .as_array()\n+                .unwrap()\n+                .iter()\n+                .map(|name| name.as_str().unwrap().to_owned())\n+                .collect()\n+        };\n+        assert_eq!(names(\"colour\"), crate::Light::COLOURS);\n+        // A new kind does not build here until it is listed below and in the schema.\n+        let _listed = |kind: PatternKind| match kind {\n+            PatternKind::Breathe | PatternKind::Candle | PatternKind::Pulse => (),\n+        };\n+        let patterns: Vec<String> = [\n+            PatternKind::Breathe,\n+            PatternKind::Candle,\n+            PatternKind::Pulse,\n+        ]\n+        .iter()\n+        .map(|kind| {\n+            serde_json::to_value(kind)\n+                .unwrap()\n+                .as_str()\n+                .unwrap()\n+                .to_owned()\n+        })\n+        .collect();\n+        assert_eq!(names(\"pattern\"), patterns);\n+    }\n }\n",
+        "path": "lampOS/crates/msgs/src/arbitration.rs",
+        "production_prefix_identical": true,
+        "production_prefix_sha256": "77fd6c9695cad123860cbeed6cd36ca62ff9c1c1e7d92f226d9502f931f78b13",
+        "scope": "One additional control.schema.json census test inside existing cfg(test) module; runtime prefix unchanged."
+      },
+      {
+        "actual_blob": "d4f5f8fec3e0dbfbe02e79f332c0ce0c86305161",
+        "authored_blob": "06b830f68f89fa4571b2c148814e5f378e4dabfb",
+        "diff": "diff --git a/lampOS/crates/body/src/clips.rs b/lampOS/crates/body/src/clips.rs\nindex 06b830f68..d4f5f8fec 100644\n--- a/lampOS/crates/body/src/clips.rs\n+++ b/lampOS/crates/body/src/clips.rs\n@@ -202,4 +202,25 @@ mod tests {\n         assert_eq!(TWO.at(200_000), None);\n         assert_eq!(TWO.at(u64::MAX), None);\n     }\n+\n+    /// docs/control.md's gestures are the body's clips but `idle`, the\n+    /// lamp's own life, and `scanning`, a sweep rule 8 keeps for a person's\n+    /// ask: a clip added here is either named there or left out on purpose.\n+    #[test]\n+    fn the_control_schemas_gestures_are_the_clips_but_idle_and_scanning() {\n+        let schema: serde_json::Value =\n+            serde_json::from_str(include_str!(\"../../../docs/control.schema.json\")).unwrap();\n+        let named: Vec<&str> = schema[\"$defs\"][\"gesture\"][\"enum\"]\n+            .as_array()\n+            .unwrap()\n+            .iter()\n+            .map(|name| name.as_str().unwrap())\n+            .collect();\n+        let offered: Vec<&str> = ALL\n+            .iter()\n+            .map(|clip| clip.name)\n+            .filter(|name| ![\"idle\", \"scanning\"].contains(name))\n+            .collect();\n+        assert_eq!(named, offered);\n+    }\n }\n",
+        "path": "lampOS/crates/body/src/clips.rs",
+        "production_prefix_identical": true,
+        "production_prefix_sha256": "7e6f54019302c8d264955a87142e1cf5f3f035cdc82d158213d2d9914eeefd5b",
+        "scope": "One additional control.schema.json census test inside existing cfg(test) module; runtime prefix unchanged."
+      }
+    ],
+    "scope": "Metadata already collected; local source text only, no CAD binary blob read/download.",
+    "status": "SOURCE_REVIEWED_TEST_ONLY_DELTA",
+    "voice_privacy_bus_runtime_delta": false
+  },
+  "limits": [
+    "Only these original event/run_attempt1 checkouts; no reruns or binary artifacts downloaded/executed.",
+    "Actual preview and actual base are bound to full recursive source manifests; authored c7 tree equality is reported, never assumed. No device acceptance.",
+    "Realtime/profile skips retain original workflow scope; names absent from summary are not waived.",
+    "Reader PASS observation does not infer cause/repair or waive original642 fault; Tests #3543 owns investigation."
+  ],
+  "nextest": {
+    "per_package_pass": {
+      "lamp-body": 638,
+      "lamp-cloud": 196,
+      "lamp-expression": 340,
+      "lamp-keeper": 42,
+      "lamp-lean": 61,
+      "lamp-memory": 336,
+      "lamp-peek": 26,
+      "lamp-setup": 186,
+      "lamp-skills": 531,
+      "lamp-update": 469,
+      "lamp-voice": 4179,
+      "lamp-voice-eval": 623
+    },
+    "status_counts": {
+      "PASS": 7627
+    },
+    "summary": {
+      "line": 8516,
+      "passed": 7627,
+      "skipped": 53,
+      "total": 7627
+    },
+    "summary_skip_names_available": false,
+    "unique_rows": 7627,
+    "verified_post_summary_reprints_excluded": 34
+  },
+  "docs": {
+    "failed": 0,
+    "ignored": 0,
+    "passed": 4,
+    "sections": 48,
+    "interleaving": "Two adjacent headings have two successful zero-case summaries; their individual attribution is intentionally not inferred."
+  },
+  "own_harness": {
+    "process13_0": true,
+    "process_started": true,
+    "relay_started": true
+  },
+  "full_private_receipt_sha256": "aad8f207c373300796fa84e5243e5122088dd2ec26146d3ba0ddc0cff44ebd4f",
+  "initial_auditor_hold": "Retained df1c150bc864b4d6acd21e15f4371d2983d1b64399e5ac51825de34a6104261a: conservative parser/source-delta holds, resolved by raw grouped-doc evidence and test-only source review; no test/workflow rerun."
+}
