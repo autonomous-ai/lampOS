@@ -1,3 +1,7 @@
+## 2026-10-27 14:48 — reminder 5cf qualification pushed
+
+#3525 is pushed as 4fcd2ebe6 on 5cf, both patches and author metadata preserved. [Fresh host qualification](verification/reminder-pending-present-20261026/current-4fcd-selected-audit.json): four compiler gates and thirteen selected runtime commands pass, 1,224/0/12, all 105 active witnesses once. Whole Body library contributes 453 passes; made/app/task-news contributes 61/0/1, with the inherited ignored case unchanged. Twelve docs sections contain no cases. Exactly two expected caught hooks, all source/raw/133 artifact pairs stable, metadata unchanged, all child groups absent, no retries or forced cleanup. Original f1d native is green on exactly this whole tree, separately recorded. Latest-base carry and renewed reads follow; no device or acoustic acceptance.
+
 ## 2026-10-27 14:43 — Controls PID-path repair pushed; current native bridges verified
 
 #3757 at 64987f2a4 fixes only the compatibility diagnostic test in Controls. [Qualification](verification/controls-diagnostic-path-20261027/receipt.json): the fixed high-900 path fails the original substring assertion and passes exact diagnostic equality. Formatting, strict Controls all-target Clippy and full Mac host tests pass 516/0/3. Only the exact test file was staged and committed. Linux gates and a reader are requested; no product or device change. A preliminary preparation path mistake ran no Cargo and changed no source before correction.
