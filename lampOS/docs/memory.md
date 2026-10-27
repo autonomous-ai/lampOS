@@ -2361,11 +2361,19 @@ then use that person's scope:
     A text from the app is always the room's, so its personal `remember`
     gets the same note: to have it kept, the person says it again at the
     lamp, known.
-  - **The observation pass never keeps the lamp's own words** (finding M
-    on #3504): `OBSERVE_PROMPT` says `heard` is the person's and `said`
-    the lamp's, and never to propose what only the lamp said; the store
-    keeps a proposal only if its words are in what was heard of a cited
-    exchange (`tidy::said_by_the_person`, [memory-days.md](memory-days.md)).
+  - **The observation pass keeps only what rests on the person's words**
+    (finding M on #3504): `OBSERVE_PROMPT` says `heard` is the person's and
+    `said` the lamp's, never to propose what only the lamp said, and to keep
+    the person's own words and language. The store leaves out a proposal
+    with a distinctive word only the lamp said (a recall's echo, "Hibiscus
+    tea", among them) or one that restates what the scope keeps; it keeps
+    one sharing a word with what was heard, or one in other words or
+    another language when what was heard says something itself and the
+    lamp's lines say nothing of their own; any other is left out ("ừ" to
+    the lamp's "Mình thì thích trà xanh hơn"). A lexical check: a lamp's
+    paraphrase in a line that also carries the person's own words can
+    still pass (`tidy::said_by_the_person`, `tidy::restates`,
+    [memory-days.md](memory-days.md)).
     Test: `it::days::an_observation_never_rests_only_on_the_lamps_own_words`.
   - **The observation pass** (`LAMP_MEMORY_OBSERVE`) drops the proposals
     the detector marks before `tidy_apply`; the rest go as before.
