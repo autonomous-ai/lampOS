@@ -190,7 +190,7 @@ async fn a_computer_pairs_says_hello_and_is_answered_over_tls() {
     assert_eq!(listed["clients"][0]["name"], "test laptop");
     assert_eq!(
         admin(&lamp, json!({"revoke": client})).await,
-        json!({"revoked": true})
+        json!({"revoked": true, "saved": true})
     );
     assert_eq!(
         next(&mut socket).await,
@@ -341,4 +341,23 @@ async fn a_listener_kept_alive_by_pings_stays_and_a_silent_one_goes() {
     .await
     .expect("closed in time");
     assert!(!matches!(closed, Some(Ok(Message::Text(_)))), "{closed:?}");
+}
+
+/// The Reviewer-lead's P3 on #3780: a revoke the file can't take yet is in
+/// effect, and the owner is told it isn't saved.
+#[tokio::test]
+async fn a_revoke_the_file_cannot_take_yet_says_so() {
+    let lamp = lamp("unsaved").await;
+    let _socket = paired(&lamp, json!(["light"]), 9).await;
+    let listed = admin(&lamp, json!({"clients": true})).await;
+    let client = listed["clients"][0]["id"].as_str().unwrap().to_owned();
+    std::fs::create_dir(lamp.dir.join("clients.json.new")).unwrap();
+    let answer = admin(&lamp, json!({"revoke": client})).await;
+    assert_eq!(answer["revoked"], true, "{answer}");
+    assert_eq!(answer["saved"], false, "{answer}");
+    assert!(
+        answer["error"].as_str().unwrap().contains("restart"),
+        "{answer}"
+    );
+    std::fs::remove_dir(lamp.dir.join("clients.json.new")).unwrap();
 }
