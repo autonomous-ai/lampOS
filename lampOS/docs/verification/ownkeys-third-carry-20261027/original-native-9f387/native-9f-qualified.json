@@ -1,0 +1,807 @@
+{
+  "ARM": {
+    "all_job_steps": [
+      {
+        "conclusion": "success",
+        "name": "Set up job",
+        "number": 1,
+        "status": "completed"
+      },
+      {
+        "conclusion": "success",
+        "name": "system packages",
+        "number": 2,
+        "status": "completed"
+      },
+      {
+        "conclusion": "success",
+        "name": "Run actions/checkout@v4",
+        "number": 3,
+        "status": "completed"
+      },
+      {
+        "conclusion": "success",
+        "name": "publication failure tests (offline, no signing secret)",
+        "number": 4,
+        "status": "completed"
+      },
+      {
+        "conclusion": "success",
+        "name": "Rust 1.96.0",
+        "number": 5,
+        "status": "completed"
+      },
+      {
+        "conclusion": "success",
+        "name": "artifact provenance regression (offline, disposable Cargo workspace)",
+        "number": 6,
+        "status": "completed"
+      },
+      {
+        "conclusion": "success",
+        "name": "stable promotion tests (offline, disposable test key)",
+        "number": 7,
+        "status": "completed"
+      },
+      {
+        "conclusion": "success",
+        "name": "restore the cache",
+        "number": 8,
+        "status": "completed"
+      },
+      {
+        "conclusion": "success",
+        "name": "unchanged source files get the cached build's times back",
+        "number": 9,
+        "status": "completed"
+      },
+      {
+        "conclusion": "skipped",
+        "name": "record fresh source times for a cold publication build",
+        "number": 10,
+        "status": "completed"
+      },
+      {
+        "conclusion": "success",
+        "name": "Run taiki-e/install-action@v2",
+        "number": 11,
+        "status": "completed"
+      },
+      {
+        "conclusion": "success",
+        "name": "build (release, the lamps' binaries)",
+        "number": 12,
+        "status": "completed"
+      },
+      {
+        "conclusion": "success",
+        "name": "every built lamp-* binary is classified for the lamp-os package",
+        "number": 13,
+        "status": "completed"
+      },
+      {
+        "conclusion": "success",
+        "name": "build the two selected artifact examples without filename collisions",
+        "number": 14,
+        "status": "completed"
+      },
+      {
+        "conclusion": "success",
+        "name": "publication CLI rehearsal (local test key and simulated GitHub only)",
+        "number": 15,
+        "status": "completed"
+      },
+      {
+        "conclusion": "success",
+        "name": "which crates a pull request tests",
+        "number": 16,
+        "status": "completed"
+      },
+      {
+        "conclusion": "success",
+        "name": "test (full run, every test one at a time; otherwise without the realtime group, in parallel)",
+        "number": 17,
+        "status": "completed"
+      },
+      {
+        "conclusion": "success",
+        "name": "doc tests and the own-harness tests (nextest runs neither)",
+        "number": 18,
+        "status": "completed"
+      },
+      {
+        "conclusion": "success",
+        "name": "export only current Cargo targets and their SHA-256",
+        "number": 19,
+        "status": "completed"
+      },
+      {
+        "conclusion": "success",
+        "name": "Run actions/upload-artifact@v4",
+        "number": 20,
+        "status": "completed"
+      },
+      {
+        "conclusion": "skipped",
+        "name": "discard the isolated example target before saving the cache",
+        "number": 21,
+        "status": "completed"
+      },
+      {
+        "conclusion": "skipped",
+        "name": "save the cache",
+        "number": 22,
+        "status": "completed"
+      },
+      {
+        "conclusion": "success",
+        "name": "Post Run actions/checkout@v4",
+        "number": 44,
+        "status": "completed"
+      },
+      {
+        "conclusion": "success",
+        "name": "Complete job",
+        "number": 45,
+        "status": "completed"
+      }
+    ],
+    "attempt": 1,
+    "job": 122514944048,
+    "job_conclusion": "success",
+    "job_status": "completed",
+    "run": 40596887224,
+    "run_conclusion": "success",
+    "run_status": "completed",
+    "watcher": {
+      "at": "2026-10-27T22:59:19.521875+00:00",
+      "driver_reaped": true,
+      "elapsed_seconds": 931.0841459979999,
+      "error": null,
+      "job": 122514944048,
+      "process_group": "absent",
+      "returncode": 0,
+      "run": 40596887224,
+      "timed_out": false,
+      "watcher_only_cleanup": [],
+      "workflow_modified": false
+    }
+  },
+  "IPC": {
+    "cases": [
+      {
+        "name": "one_revocation_closes_two_independently_transferred_observers",
+        "once_PASS": true
+      },
+      {
+        "name": "dropping_one_client_does_not_shutdown_the_shared_endpoint",
+        "once_PASS": true
+      },
+      {
+        "name": "old_ticket_never_revives_with_a_new_hold",
+        "once_PASS": true
+      },
+      {
+        "name": "revoke_before_grant_refuses_and_pinned_arc_does_not_delay_explicit_revoke",
+        "once_PASS": true
+      },
+      {
+        "name": "revoke_during_prepared_grant_transfers_only_a_terminal_observer",
+        "once_PASS": true
+      },
+      {
+        "name": "witness_drop_revokes_even_when_a_prepared_grant_keeps_an_observer",
+        "once_PASS": true
+      },
+      {
+        "name": "incremental_frame_retains_fd_until_exact_frame_and_control_eof",
+        "once_PASS": true
+      },
+      {
+        "name": "wrong_binding_magic_reserved_size_and_trailing_bytes_refuse_and_close_rights",
+        "once_PASS": true
+      },
+      {
+        "name": "missing_extra_and_truncated_rights_refuse_without_leaking_descriptors",
+        "once_PASS": true
+      },
+      {
+        "name": "wrong_fd_kinds_and_unconnected_stream_refuse",
+        "once_PASS": true
+      },
+      {
+        "name": "cancellation_drops_a_retained_partial_frame_fd",
+        "once_PASS": true
+      },
+      {
+        "name": "deadline_does_not_renew_while_waiting_for_reply",
+        "once_PASS": true
+      },
+      {
+        "name": "unexpected_data_never_disappears_between_observers",
+        "once_PASS": true
+      },
+      {
+        "name": "token_refuses_empty_incarnation_zero_hold_and_wraparound",
+        "once_PASS": true
+      },
+      {
+        "name": "completed_frame_with_closed_or_nonsilent_observer_never_exposes_ready",
+        "once_PASS": true
+      },
+      {
+        "name": "full_control_socket_keeps_grant_pending_until_its_original_deadline",
+        "once_PASS": true
+      },
+      {
+        "name": "partial_receive_deadline_immediately_closes_retained_rights",
+        "once_PASS": true
+      },
+      {
+        "name": "full_control_recovers_one_grant_after_exact_drain_without_renewing_deadline",
+        "once_PASS": true
+      }
+    ],
+    "once_PASS": 18,
+    "required": 18,
+    "selected": true
+  },
+  "Linux": {
+    "attempt": 1,
+    "conclusion": "success",
+    "event_head": "9f3876368ee2ee5d451349e95236397338fb8712",
+    "job": 122514943718,
+    "native_runtime_case_results_claimed": false,
+    "run": 40596887218,
+    "strict_workspace_clippy": [
+      {
+        "command": "##[group]Run cargo clippy --locked --workspace --all-targets -- -D warnings",
+        "line": 615
+      },
+      {
+        "command": "cargo clippy --locked --workspace --all-targets -- -D warnings",
+        "line": 616
+      }
+    ],
+    "watcher_closure": {
+      "at": "2026-10-27T22:48:07.080053+00:00",
+      "driver_reaped": true,
+      "elapsed_seconds": 258.610842813,
+      "error": null,
+      "job": 122514943718,
+      "process_group": "absent",
+      "returncode": 0,
+      "run": 40596887218,
+      "timed_out": false,
+      "watcher_only_cleanup": [],
+      "workflow_modified": false
+    }
+  },
+  "all_source_evidence_tools_helpers_guards_equal": true,
+  "attempts": {
+    "all_observed_markers": [],
+    "failure_attempt_events": [],
+    "source_inventory_sha256": "6badaf1534753a0eff1bacf243f9fddca22111dd9ad157da361e5d6f843b280e",
+    "stderr_channel_zero_claimed": false,
+    "stderr_heading_zone_counts": {
+      "post_nextest_summary": 21
+    },
+    "wholejob_rawlog_preserved": true,
+    "workflow_retry_policy_inferred": false
+  },
+  "custom_harness": {
+    "process13_0": true,
+    "relay_signals_ok": true
+  },
+  "debug_only_source_exclusion": [
+    {
+      "PASS_or_SKIP_credit": false,
+      "actual_native_profile_applicable": false,
+      "binary": "lamp-body",
+      "expected_status": "PASS",
+      "kind": [
+        "lib"
+      ],
+      "linux_only": false,
+      "name": "lease::tests::a_seventh_why_is_refused_where_it_is_said",
+      "package": "lamp-body",
+      "profile_boundary_sha256": "ab34eb58b9e3797f4158ca196cc01703ee42ceecd063e6998a8e24b352c6552b",
+      "role": "additional-current-guard",
+      "source_bindings": [
+        {
+          "Memory_scope": null,
+          "authored_blob": "851aedfbe66c8977555e35572e4d58fcb6061613",
+          "authored_body_sha256": "dff470843b7c8baa27081b6d729702772ce2c07bbfbf43bc3256b20ae4b7aefe",
+          "authored_declaration_lines": [
+            295
+          ],
+          "authored_function_sha256": "2ca3e7cf575680a4b644ff28930be56ca1808d6f936dabd0339bc49b6ac121d3",
+          "authored_sha256": "4286a96cc4ff1359447985c3e6f88a73195b49cbe9323266fc0917a99f48a5d7",
+          "cfg_Linux_proof": [],
+          "cfg_debug_assertions": true,
+          "direct_declaration_attributes": [
+            {
+              "line": 287,
+              "text": ""
+            },
+            {
+              "line": 288,
+              "text": "    /// The whys are a closed set (Fourteen on #3900): every one the body"
+            },
+            {
+              "line": 289,
+              "text": "    /// can say is in `LOST_WHYS`, and there are six, so a seventh can't"
+            },
+            {
+              "line": 290,
+              "text": "    /// land without that list, and lamp-control's `LeaseWhy`, changing."
+            },
+            {
+              "line": 291,
+              "text": "    /// A why outside the six is refused where every `lost` is made."
+            },
+            {
+              "line": 292,
+              "text": "    #[test]"
+            },
+            {
+              "line": 293,
+              "text": "    #[cfg(debug_assertions)]"
+            },
+            {
+              "line": 294,
+              "text": "    #[should_panic(expected = \"cold is not in LOST_WHYS\")]"
+            }
+          ],
+          "path": "lampOS/crates/body/src/lease.rs"
+        }
+      ],
+      "source_origins_only_no_runtime_credit": [
+        "current20source",
+        "Dad26source",
+        "fb27source"
+      ],
+      "status": "SOURCE_CFG_EXCLUDED_DEBUG_ASSERTIONS_RELEASE",
+      "target": "lamp_body"
+    }
+  ],
+  "docs": {
+    "failed": 0,
+    "headings": 47,
+    "ignored": 0,
+    "incomplete_group": null,
+    "interleaved_groups": [],
+    "passed": 4,
+    "step_status": "success",
+    "summaries": 47
+  },
+  "hashes": {
+    "arm-job.log": "493fd2a6be85a3afe206c01707025da986cfc91f48a1b45b0acdec82ac30da3f",
+    "arm-receipt.json": "cf9db85883fe875fb43b325ef855a9613d3efbf923bf19e47279cac510c833a3",
+    "authored-census.json": "8c03595bccf35737d2ea0d2b63aad7d0abc459fb725c913d516282d1d83f9df5",
+    "docs-groups.json": "b2ea91c244b1c008ca95425df9bedb32ec37c35a0220619d242e2a9c5a3b61a9",
+    "linux-job.log": "4a7ad38f117a5460791a4749e423dbecc2c495b917c45656a270d9c992c2665f",
+    "linux-receipt.json": "b518bd38f2fd14bf6f7ea9ba21af7c0c0b898ad25ccbbe093732cc8789347543",
+    "native-attempt-inventory.json": "6badaf1534753a0eff1bacf243f9fddca22111dd9ad157da361e5d6f843b280e",
+    "native-guards-after.json": "3c2008117599927280a4fcec5de034b7fb652ae0b55d8d1abc65557c982fc6a0",
+    "native-guards-before.json": "3d8965efe3f1e3fe94b3137b1c02b6b6dd3f1963a34f6cde8d4820f20758febd",
+    "native-release-cfg-boundary.json": "ab34eb58b9e3797f4158ca196cc01703ee42ceecd063e6998a8e24b352c6552b",
+    "nextest-unique-cases.json": "1dd48e60e014c50255ad31775ec6e1736ce97c5c5f31618ddbd45717514b7974",
+    "projection-overlay-source-binding.json": "86f349a578f7421b1b70f9346f837f4379ee282919587cb75847db6a2b1ac7d9",
+    "push-confirmation.json": "28a874d52b52a16cb006de6acc5a6aa736f206a2fc828fff03a936b267514caf",
+    "required-current-cases.json": "5f09633cef8327f85ba5a070ccf5c6cfc4f74c8d78908168cfa09bd5c147de82",
+    "seal-native9f.py": "268b7f33b610fb97aa0e5fd325e93a989633480e029b88e81526ce68b63e9bf4",
+    "watch-controller.terminal.json": "94d24a2bef388619c994b61878e46d9c59e3201449d3364705887e243f98fb12"
+  },
+  "head": "9f3876368ee2ee5d451349e95236397338fb8712",
+  "historical_counts_or_artifact_admission_transferred": false,
+  "limits": [
+    "Native runtime credit belongs to logged integration preview, which has six projection overlay paths and is not the authored whole tree. Full checkout SHA is logged; ordered parents/tree derive independently from API plus fetched Git.",
+    "338 source-bound required candidates; one debug-only case excluded under actual release profile receives no PASS/SKIP/unrun credit. All337 applicable,71own and9Linux are observed once PASS.",
+    "Actual primary totals, exact post-summary reprints, summary skips, selected unrun and any attempt/retry markers come from new original logs; no historical11806 or producer count transfer.",
+    "Two platform-specific helper test bodies in the prior authored local21 had optional Mac earlyreturns; current native observations remain separate.",
+    "Doctests and interleaved groups, IPC and relay/process harnesses remain separate from nextest.",
+    "No Memory implementation/Friday semantics, binary artifacts, device/provider/credential/signature/release acceptance or CI rerun/cancel/dispatch.",
+    "DRAFT broker2094, original539 Reader failure and3890 parallel report remain unwaived. Current observation implies no historical failure cause or repair."
+  ],
+  "nextest": {
+    "bad_primary_events": [],
+    "named_skips": [],
+    "ordinal_selected_unrun": 0,
+    "per_binary_PASS": {
+      "lamp-actions": 65,
+      "lamp-actions::bin/lamp-actions": 3,
+      "lamp-actions::it": 30,
+      "lamp-actions::release_pair": 2,
+      "lamp-actions::speaker_state": 23,
+      "lamp-addons": 38,
+      "lamp-addons::judge": 12,
+      "lamp-air": 26,
+      "lamp-air::bin/lamp-air": 1,
+      "lamp-audio": 81,
+      "lamp-audio::it": 112,
+      "lamp-body": 475,
+      "lamp-body::bin/lamp-body": 44,
+      "lamp-body::bin/lamp-body-inspect": 2,
+      "lamp-body::bin/lamp-body-measure": 8,
+      "lamp-body::bin/lamp-body-mood": 3,
+      "lamp-body::bin/lamp-body-worker": 1,
+      "lamp-body::it": 125,
+      "lamp-bus": 55,
+      "lamp-bus::bin/lamp-bus": 2,
+      "lamp-bus::it": 50,
+      "lamp-camera": 32,
+      "lamp-camera::it": 58,
+      "lamp-cloud": 177,
+      "lamp-cloud::it": 30,
+      "lamp-control": 46,
+      "lamp-control::doc_examples": 2,
+      "lamp-control::door": 11,
+      "lamp-control::event_schema": 2,
+      "lamp-controls": 34,
+      "lamp-controls::bin/lamp-controls": 2,
+      "lamp-controls::it": 471,
+      "lamp-controls::release_pair": 1,
+      "lamp-controls::strip_worker": 9,
+      "lamp-ears": 67,
+      "lamp-ears::bin/lamp-ears": 6,
+      "lamp-ears::pcm_bus": 3,
+      "lamp-environment::snapshots": 12,
+      "lamp-expression": 28,
+      "lamp-expression::bin/lamp-expression": 4,
+      "lamp-expression::it": 281,
+      "lamp-expression::runtime": 28,
+      "lamp-eyes": 337,
+      "lamp-eyes::bin/lamp-eyes": 9,
+      "lamp-eyes::example/glance_replay": 1,
+      "lamp-eyes::full_look_replay": 1,
+      "lamp-eyes::remember_speaker": 7,
+      "lamp-gemini": 254,
+      "lamp-gemini::example/early_end_probe": 6,
+      "lamp-gemini::it": 25,
+      "lamp-health": 42,
+      "lamp-health::bin/lamp-health": 3,
+      "lamp-health::it": 46,
+      "lamp-ipc": 16,
+      "lamp-ipc::camera_authority": 18,
+      "lamp-ipc::probe": 3,
+      "lamp-ipc::relay_exit": 1,
+      "lamp-ipc::relay_shared": 1,
+      "lamp-ipc::sockets": 13,
+      "lamp-keeper": 40,
+      "lamp-keeper::bin/lamp-keeper": 2,
+      "lamp-lean": 10,
+      "lamp-lean::it": 51,
+      "lamp-local-time::local_time": 12,
+      "lamp-memory": 105,
+      "lamp-memory::bin/lamp-memory": 8,
+      "lamp-memory::bin/lamp-memory-eval": 8,
+      "lamp-memory::forget_person": 3,
+      "lamp-memory::forget_shared_exchange": 4,
+      "lamp-memory::forgot": 1,
+      "lamp-memory::health_control": 23,
+      "lamp-memory::it": 169,
+      "lamp-memory::paraphrase_fixture": 1,
+      "lamp-memory::voice_early_words": 1,
+      "lamp-memory::voice_follows_face": 1,
+      "lamp-memory::voice_forget": 5,
+      "lamp-memory::voice_forget_about": 2,
+      "lamp-memory::voice_forget_named": 2,
+      "lamp-memory::voice_link_used": 2,
+      "lamp-memory::voice_observe": 1,
+      "lamp-memory::voice_observe_forget": 1,
+      "lamp-memory::voice_observe_named_forget": 1,
+      "lamp-memory::voice_observe_room": 1,
+      "lamp-memory::voice_since_until": 2,
+      "lamp-mood": 1,
+      "lamp-mood::it": 123,
+      "lamp-msgs": 98,
+      "lamp-msgs::it": 82,
+      "lamp-name": 25,
+      "lamp-name::bin/lamp-name": 13,
+      "lamp-name::example/stop_words_replay": 6,
+      "lamp-name::it": 2,
+      "lamp-near-call": 9,
+      "lamp-observer": 45,
+      "lamp-observer::bin/lamp-observer": 1,
+      "lamp-peek": 15,
+      "lamp-peek::peek": 11,
+      "lamp-policy": 180,
+      "lamp-policy::bin/lamp-policy": 5,
+      "lamp-policy::bin/lamp-policy-judges": 3,
+      "lamp-policy::bin/lamp-policy-replay": 2,
+      "lamp-policy::it": 96,
+      "lamp-records": 143,
+      "lamp-records::bin/lamp-records": 23,
+      "lamp-records::records": 7,
+      "lamp-records::records_control": 14,
+      "lamp-records::release_pair_systemd": 6,
+      "lamp-ring": 53,
+      "lamp-same-voice": 4,
+      "lamp-same-voice::priority": 1,
+      "lamp-schedule": 5,
+      "lamp-schedule::example/schedule_check": 10,
+      "lamp-schedule::forward": 15,
+      "lamp-schedule::it": 183,
+      "lamp-schedule::storage_children": 2,
+      "lamp-selftest": 84,
+      "lamp-selftest::bin/lamp-selftest": 1,
+      "lamp-settings": 32,
+      "lamp-settings::it": 14,
+      "lamp-settings::release_pair": 3,
+      "lamp-setup": 26,
+      "lamp-setup::it": 165,
+      "lamp-setup::wake": 6,
+      "lamp-skills": 160,
+      "lamp-skills::bin/lamp-skills": 23,
+      "lamp-skills::it": 344,
+      "lamp-skills::release_pair": 2,
+      "lamp-skills::requested_audio": 31,
+      "lamp-sound-fixtures::cache_and_mix": 15,
+      "lamp-station": 62,
+      "lamp-station::bin/lamp-station": 7,
+      "lamp-surround": 2,
+      "lamp-surround::it": 263,
+      "lamp-surround::release_pair": 3,
+      "lamp-tasks": 110,
+      "lamp-tasks::harness": 55,
+      "lamp-tasks::runtime": 30,
+      "lamp-tasks::runtime_failures": 4,
+      "lamp-tasks::store": 27,
+      "lamp-turn-end": 16,
+      "lamp-turn-end-wire": 5,
+      "lamp-turn-end::bin/lamp-turn-end": 9,
+      "lamp-turn-end::it": 7,
+      "lamp-turn-owner": 1,
+      "lamp-turn-owner::it": 36,
+      "lamp-update": 235,
+      "lamp-update::bin/lamp-update": 3,
+      "lamp-update::functions": 5,
+      "lamp-update::install": 115,
+      "lamp-update::it": 13,
+      "lamp-update::round": 201,
+      "lamp-update::self-cli-exec": 1,
+      "lamp-update::self-process-cuts": 1,
+      "lamp-voice": 3917,
+      "lamp-voice-eval": 378,
+      "lamp-voice-eval::bin/lamp-voice-eval": 7,
+      "lamp-voice-eval::it": 238,
+      "lamp-voice-processes": 2,
+      "lamp-voice::bin/lamp-voice": 1,
+      "lamp-voice::example/render_line_second": 4,
+      "lamp-voice::example/stop_words_stt_replay": 6,
+      "lamp-voice::it": 307
+    },
+    "primary_status_counts": {
+      "PASS": 11861
+    },
+    "summaries": [
+      {
+        "executed": 11861,
+        "failed": 0,
+        "line": 12688,
+        "passed": 11861,
+        "selected": 11861,
+        "skipped": 107,
+        "suffix": "11861 passed, 107 skipped"
+      }
+    ],
+    "summary_skips_not_mapped_or_called_unrun": 107,
+    "unique_primary_cases": 11861,
+    "unmatched_reprints": [],
+    "verified_exact_reprints": 35
+  },
+  "observer_terminal": {
+    "all_local_watchers_reaped": true,
+    "closed": {
+      "arm": {
+        "at": "2026-10-27T22:59:19.521875+00:00",
+        "driver_reaped": true,
+        "elapsed_seconds": 931.0841459979999,
+        "error": null,
+        "job": 122514944048,
+        "process_group": "absent",
+        "returncode": 0,
+        "run": 40596887224,
+        "timed_out": false,
+        "watcher_only_cleanup": [],
+        "workflow_modified": false
+      },
+      "linux": {
+        "at": "2026-10-27T22:48:07.080053+00:00",
+        "driver_reaped": true,
+        "elapsed_seconds": 258.610842813,
+        "error": null,
+        "job": 122514943718,
+        "process_group": "absent",
+        "returncode": 0,
+        "run": 40596887218,
+        "timed_out": false,
+        "watcher_only_cleanup": [],
+        "workflow_modified": false
+      }
+    },
+    "elapsed_seconds": 931.084664055,
+    "error": null,
+    "overall_deadline_seconds": 1200,
+    "workflow_mutations": 0
+  },
+  "original539Reader_current_observation": {
+    "oldfailure_cause_repair_waiver_inferred": false,
+    "rows": [
+      {
+        "attempt_if_logged": null,
+        "binary": "lamp-voice",
+        "duration": "0.009s",
+        "line": 11368,
+        "name": "session_reader::tests::linux::shared_session_writer_projects_every_segment_without_private_values",
+        "ordinal": 10543,
+        "phase": 1,
+        "prefix": "PASS",
+        "status": "PASS",
+        "total": 11861
+      }
+    ]
+  },
+  "projection_overlay_source": {
+    "actual_parent": "2b73dd03073947c62b3d10593f293aa9ab954410",
+    "actual_preview": "f9d98d16dd062f31426709eb25ef5e0b4a943382",
+    "code_three_blob_modes_equal": [
+      {
+        "path": "lampOS/crates/update/src/head_touch.rs",
+        "preview": "100644 blob f85bd04a47173e02e491c40847941332eb780015\tlampOS/crates/update/src/head_touch.rs",
+        "previous_review_source": "100644 blob f85bd04a47173e02e491c40847941332eb780015\tlampOS/crates/update/src/head_touch.rs",
+        "whole_blob_mode_equal": true
+      },
+      {
+        "path": "lampOS/crates/update/src/head_touch/plan_output.rs",
+        "preview": "100644 blob 73ff1d98449036be0e7cb518e742e066b12e609b\tlampOS/crates/update/src/head_touch/plan_output.rs",
+        "previous_review_source": "100644 blob 73ff1d98449036be0e7cb518e742e066b12e609b\tlampOS/crates/update/src/head_touch/plan_output.rs",
+        "whole_blob_mode_equal": true
+      },
+      {
+        "path": "lampOS/crates/update/src/head_touch/plan_output/tests.rs",
+        "preview": "100644 blob 00a0acca0c909e32b24891474d3b46a6cc20d06b\tlampOS/crates/update/src/head_touch/plan_output/tests.rs",
+        "previous_review_source": "100644 blob 00a0acca0c909e32b24891474d3b46a6cc20d06b\tlampOS/crates/update/src/head_touch/plan_output/tests.rs",
+        "whole_blob_mode_equal": true
+      }
+    ],
+    "delta_paths": [
+      "lampOS/crates/update/src/head_touch.rs",
+      "lampOS/crates/update/src/head_touch/plan_output.rs",
+      "lampOS/crates/update/src/head_touch/plan_output/tests.rs",
+      "lampOS/docs/head-touch-plan-output.md",
+      "lampOS/docs/reuse-decisions.md",
+      "lampOS/docs/updates.md"
+    ],
+    "limits": [
+      "Only source composition identity; previous local six-test runtime remains bound to d682.",
+      "Current native observations, if selected, belong to actual preview.",
+      "Read-only private projection still unwired; no authority, whole-plan allocation, provider rollback or cancellation claim."
+    ],
+    "reviewed_projection_head": "d682ee30e52eefd1e760d899f5c178724f40a1ec"
+  },
+  "required_partition": {
+    "Linux_once_PASS": 9,
+    "Linux_required": 9,
+    "cfg_excluded_debug_only": 1,
+    "host_once_PASS": 328,
+    "host_required": 328,
+    "newLinuxmeasure_PASS": 1,
+    "once_PASS": 337,
+    "own_Linux6_PASS": 6,
+    "own_host65_PASS": 65,
+    "own_required71_PASS": 71,
+    "required": 337,
+    "required_candidates": 338,
+    "selected_required_missing_or_nonpass": 0
+  },
+  "source": {
+    "actual_base": "2b73dd03073947c62b3d10593f293aa9ab954410",
+    "actual_preview": "f9d98d16dd062f31426709eb25ef5e0b4a943382",
+    "actual_preview_tree": "755ab06e43e66f2529c69c4cfbf23f4c90286a5a",
+    "authored_base": "fc9c781afaed38dc976f650484c30f65bf5db57a",
+    "authored_head": "9f3876368ee2ee5d451349e95236397338fb8712",
+    "authored_tree": "bd9403825979b5ac6c3ac921b884ed407ccd7459",
+    "complete_authored_to_preview_delta": [
+      {
+        "actual": {
+          "mode": "100644",
+          "sha": "f85bd04a47173e02e491c40847941332eb780015",
+          "type": "blob"
+        },
+        "authored": {
+          "mode": "100644",
+          "sha": "f0f048d74a3010d0dd917b08b8eca0d31b239ad9",
+          "type": "blob"
+        },
+        "path": "lampOS/crates/update/src/head_touch.rs"
+      },
+      {
+        "actual": {
+          "mode": "100644",
+          "sha": "73ff1d98449036be0e7cb518e742e066b12e609b",
+          "type": "blob"
+        },
+        "authored": null,
+        "path": "lampOS/crates/update/src/head_touch/plan_output.rs"
+      },
+      {
+        "actual": {
+          "mode": "100644",
+          "sha": "00a0acca0c909e32b24891474d3b46a6cc20d06b",
+          "type": "blob"
+        },
+        "authored": null,
+        "path": "lampOS/crates/update/src/head_touch/plan_output/tests.rs"
+      },
+      {
+        "actual": {
+          "mode": "100644",
+          "sha": "eb6d9e9abed58e19a146d54dfa7d817ce20f9521",
+          "type": "blob"
+        },
+        "authored": null,
+        "path": "lampOS/docs/head-touch-plan-output.md"
+      },
+      {
+        "actual": {
+          "mode": "100644",
+          "sha": "0e8ac9a4d30560523022ac050d64184bf1804634",
+          "type": "blob"
+        },
+        "authored": {
+          "mode": "100644",
+          "sha": "9c29653056a211f84aed8f67b5a37d8723772c87",
+          "type": "blob"
+        },
+        "path": "lampOS/docs/reuse-decisions.md"
+      },
+      {
+        "actual": {
+          "mode": "100644",
+          "sha": "bc10513689c3c029589d029b226c00b6294bd108",
+          "type": "blob"
+        },
+        "authored": {
+          "mode": "100644",
+          "sha": "07f7cfbeb5b452fb264e832ad5cb1883d4a47619",
+          "type": "blob"
+        },
+        "path": "lampOS/docs/updates.md"
+      }
+    ],
+    "declaration_files": {
+      "total": 69,
+      "whole_file_equal": 69
+    },
+    "guarded_source_changed": [
+      "lampOS/crates/update/src/head_touch.rs",
+      "lampOS/docs/reuse-decisions.md",
+      "lampOS/docs/updates.md"
+    ],
+    "guarded_source_partition": {
+      "committed": 10941,
+      "missing": 0,
+      "nonGit_private_or_unmatched": [],
+      "same_blob_mode": 10938,
+      "total": 10941
+    },
+    "ordered_parents_API_and_Git": [
+      "2b73dd03073947c62b3d10593f293aa9ab954410",
+      "9f3876368ee2ee5d451349e95236397338fb8712"
+    ],
+    "owned38": {
+      "equal": 38,
+      "total": 38
+    },
+    "required_function_bindings": {
+      "Linux_cfg_bound": 9,
+      "equal_exact_function_bytes": 338,
+      "present": 338,
+      "required": 338
+    },
+    "whole_tree_equal_authored": false
+  },
+  "status": "QUALIFIED_ORIGINAL_9F_NATIVE_ACTUAL_PREVIEW"
+}
