@@ -1999,7 +1999,7 @@ must find the head to start (`Limits::FOLDED.pitch_home`, 1760..2020 as the
 code reads it): a rest pitch within `poses::HOME_PITCH_TOLERANCE` (20) counts
 outside it is the head resting on its stop and takes the nearest edge, said
 in a comment line of the file (lamp-0c89, #2396, rests at 1755 and gets the
-low edge). Over the range (the side the head falls with its weight) by more,
+low edge). Over the range (the head tipped up: on lamp-52e6 a falling pitch tips the head down) by more,
 but within `WAKE_REACH` (400), is a head moved off home by a hand (#3504:
 lamp-52e6 read 2213 after an SD card swap, lamp-3e83 2102 after handling,
 each head staying where a hand left it): `--home` keeps the high edge, 2020,
