@@ -243,8 +243,9 @@ pub fn agent_names() -> Vec<&'static str> {
 /// Devin's own name, since it is a person's name too. Devin Cloud
 /// (`devin-cloud`, openharness#1444) is Devin to the person, heard the same
 /// way: a lamp has one or the other. Hermes (#3504, 27 Oct: asked for in a
-/// demo, the work went to Claude Code unsaid) may come as "Hermès" or
-/// "her mes"; "air mess" is said to the model, never taken.
+/// demo, the work went to Claude Code unsaid) may come as "Hermès", which is
+/// `herms` once plain, or "her mes"; "air mess" is said to the model, never
+/// taken.
 const KINDS: [Kind; 6] = [
     Kind {
         engine: "claude",
@@ -293,7 +294,7 @@ const KINDS: [Kind; 6] = [
         engine: "hermes",
         name: "Hermes",
         sounds: "\"Hermes\", which can sound like \"Hermès\", \"her mes\" or \"air mess\"",
-        close: &["hermes", "hermez", "hermess", "hermies"],
+        close: &["hermes", "herms", "hermez", "hermess", "hermies"],
         heard: &["hermes"],
     },
 ];
@@ -6079,9 +6080,14 @@ pub(crate) mod tests {
             named_in_words(&on, "Ask Hermes to summarise my inbox."),
             ["Hermes"]
         );
+        // "Hermès" is `herms` once plain, a close form of Hermes (the
+        // Reviewer-lead's P3 on #3763).
+        assert_eq!(
+            named_in_words(&on, "Ask Hermès to summarise my inbox."),
+            ["Hermes"]
+        );
         // A brand said in passing names nobody: one word counts only right
-        // after an asking word, and "Hermès" is `herms` once plain (Fourteen's
-        // P3 on #3723).
+        // after an asking word (Fourteen's P3 on #3723).
         assert!(named_in_words(&on, "Ask Lumi about my Hermès bag.").is_empty());
         assert!(named_in_words(&on, "I left my hermes scarf at home.").is_empty());
         STAFF.lock().unwrap().clear();
