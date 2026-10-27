@@ -2275,6 +2275,7 @@ dependencies = [
  "lamp-update",
  "lamp-voice",
  "libc",
+ "regex",
  "ring",
  "rustix",
  "serde",
