@@ -1,0 +1,282 @@
+{
+  "status": "ORIGINAL_ARM_AND_LINUX_CLIPPY_SUCCESS",
+  "PR": 3472,
+  "published_head": "d4ce16238c705e615bddffce4400c907ae3fef17",
+  "published_tree": "ebb7cb559946c2ee98ae3ca58c7af91dfa94f2d1",
+  "authored_base": "c1fa2bc9f327f5d553bb3dcc355053d8e7e94bfa",
+  "actual_checkout": "d387b467983040a6674027eedfa04dfe65fbf59a",
+  "actual_tree": "e05fea4390899a7868a33336200bf5127b4e665b",
+  "actual_parents": [
+    "ef90c8561b3f9b22472f1962ea1ffb10bf6a423b",
+    "d4ce16238c705e615bddffce4400c907ae3fef17"
+  ],
+  "actual_tree_entries": 10920,
+  "all35_authored_blobs_modes_exact": true,
+  "full_actual_tree_equals_authored": false,
+  "actual_changed_paths_from_authored": [
+    "lampOS/crates/name/src/main.rs",
+    "lampOS/docs/name.md"
+  ],
+  "prior_published_tree_equality": {
+    "new_published_head": "d4ce16238c705e615bddffce4400c907ae3fef17",
+    "new_published_tree": "ebb7cb559946c2ee98ae3ca58c7af91dfa94f2d1",
+    "prior_original_runs": [
+      40586502035,
+      40586502037
+    ],
+    "prior_actual_checkout": "1ed6ef7945e22fbc04e678f226cacb3f23fec7c9",
+    "prior_actual_tree": "ebb7cb559946c2ee98ae3ca58c7af91dfa94f2d1",
+    "full_entry_map_equal": true,
+    "entries": 10920,
+    "new_original_runtime": "NOW_OBSERVED_IN_THIS_RECEIPT_WITH_NEW_ACTUAL_SOURCE_BINDING",
+    "no_new_counts_transferred": true
+  },
+  "current_original_outcome_is_independent": true,
+  "ARM_run": 40592229097,
+  "ARM_job": 122499117312,
+  "ARM_native_watch": {
+    "session": 57677,
+    "exit": 0,
+    "chunk": "5498ce"
+  },
+  "Linux_Clippy_run": 40592229102,
+  "Linux_Clippy_job": 122499117698,
+  "Linux_Clippy_native_watch": {
+    "session": 6641,
+    "exit": 0,
+    "chunk": "72c292"
+  },
+  "attempt": 1,
+  "unique_outer_PASS": 11831,
+  "bad": 0,
+  "duplicates": 0,
+  "retries": 0,
+  "selected_unrun": 0,
+  "aggregate_skips": 107,
+  "skip_identities_not_invented": true,
+  "final_echo_count_excluded": 35,
+  "required56_once_PASS": {
+    "new": 29,
+    "retained": 16,
+    "Eyes": 11
+  },
+  "required_total_once_PASS": 56,
+  "supplemental_Body_once_PASS": 8,
+  "Linux_short_read_Body_control_once_PASS": true,
+  "install_doc_reader_once_PASS": true,
+  "ci_paths_once_PASS": 2,
+  "observed_extra_identities_vs_a616": {
+    "prior_original_run": 40586502035,
+    "current_original_run": 40592229097,
+    "only_current": [
+      {
+        "event": "PASS",
+        "duration": "0.004s",
+        "binary": "lamp-name::bin/lamp-name",
+        "test": "tests::a_run_under_both_bars_is_one_line_and_one_at_the_near_bar_is_none",
+        "raw_line": 4924
+      },
+      {
+        "event": "PASS",
+        "duration": "0.004s",
+        "binary": "lamp-name::bin/lamp-name",
+        "test": "tests::under_its_bars_is_ten_lines_a_minute_at_most",
+        "raw_line": 4932
+      }
+    ],
+    "only_prior": [],
+    "counts_are_independently_observed_not_transferred": true
+  },
+  "separate_not_added_to_nextest": {
+    "doc_targets": 47,
+    "doc_PASS": 4,
+    "doc_failed": 0,
+    "relay_aggregate_PASS": 1,
+    "process_PASS": 13,
+    "process_failed": 0
+  },
+  "export_log": {
+    "binaries": 48,
+    "examples": 2,
+    "complete_SHA256SUMS_reported": true
+  },
+  "artifact_metadata_only": {
+    "id": 12775761525,
+    "compressed_bytes": 118886940,
+    "API_ZIP_digest": "sha256:233d8372be3e4682170a8d7ad92f743d62e65c3e473ecd36f4b41752f97d4e13",
+    "upload_log_matches_API": true,
+    "downloaded": false,
+    "payload_or_ELF_verified": false,
+    "pins_derived": false
+  },
+  "historical_failed_native_and_local_epochs_unchanged": true,
+  "parent_failed_run_not_reclassified": true,
+  "no_prior_runtime_counts_transferred": true,
+  "review_latest_parent_draft_and_physical_activation_conditions_separate": true,
+  "no_Cargo_rerun_dispatch_cancel_source_ref_target_post_or_artifact_payload_action": true,
+  "actual_read_only_collection_completions": [
+    {
+      "operation": "ARM logs",
+      "session": 49568,
+      "exit": 0,
+      "chunk": "41f1c7"
+    },
+    {
+      "operation": "Clippy logs",
+      "session": 1180,
+      "exit": 0,
+      "chunk": "fded46"
+    },
+    {
+      "operation": "actual source API",
+      "session": 62594,
+      "exit": 0,
+      "chunk": "2ced42"
+    }
+  ],
+  "evidence_sha256": {
+    "40592229097-original-logs.zip": "156181c3d9a2d7003f66c0388b28d79a0b36c45cd4d91e4550b451c9e38a6c4b",
+    "40592229102-original-logs.zip": "9cb8360f04a9d3eee8422a28325c52c05906609fda227de42113b6fe01ee356c",
+    "native-terminal-ledger.json": "bd98bff68ac5dd7d7ea9bd65780705afa358b112dc755f586bd67ee3ace7f8b9",
+    "native-runtime-accounting.json": "96b46d8e8b040ae054ada6f9b53134579ca98236bb6b694914ec55aac62d9909",
+    "required56-native-ledger.json": "8ea686f81367e0101ec612a86d768d518e5bcf24d3ee127696a03e5484458a18",
+    "supplemental-body-native-ledger.json": "3dbee27fd3cc55a123369acdf1dbcc06c865abe2362201949ee4b07e393ab27d",
+    "doc-reader-native-ledger.json": "cb0770d441833b28dbb69d775672dc89fa9b3dc13209fae2812ac6dc3d799a0f",
+    "final-echo-ledger.json": "8df3d1e927e18970b8d41964edb581bd88f438725c152824e927421891d261ad",
+    "native-identity-delta.json": "d1ec8450454c91b8cf8eedb14ae38162ab79625798fb8640e370b7cefdefbf23",
+    "source-composition.json": "f2ad8bd5a86301d981e4c3a8388af53fa5f8cd55ca3418b62d25e49f4ba798d4",
+    "d387b467983040a6674027eedfa04dfe65fbf59a-source-binding.json": "5d7eff933d9eb5e23900a52e1f478dbacb74d994c164ed564a2523a6dd734f97"
+  },
+  "ready": false,
+  "remaining_conditions": {
+    "newer_Main_fc9c781af_not_qualified_by_this_ef90_based_packet": true,
+    "literal_latest_parent_disposition": "OPEN",
+    "draft": "RETAINED",
+    "mixed_build_and_physical_activation_acceptance": "HOLD"
+  },
+  "supplemental_Body_rows": [
+    {
+      "test": "tests::a_read_that_stops_short_says_why",
+      "platform": "Linux only",
+      "terminal": {
+        "binary": "lamp-body::bin/lamp-body-measure",
+        "test": "tests::a_read_that_stops_short_says_why",
+        "event": "PASS",
+        "duration": "0.004s"
+      },
+      "once": true
+    },
+    {
+      "test": "tests::it_needs_its_device_unit_and_lock_and_takes_nothing_that_moves",
+      "platform": "portable",
+      "terminal": {
+        "binary": "lamp-body::bin/lamp-body-measure",
+        "test": "tests::it_needs_its_device_unit_and_lock_and_takes_nothing_that_moves",
+        "event": "PASS",
+        "duration": "0.004s"
+      },
+      "once": true
+    },
+    {
+      "test": "tests::seated_is_a_flag_given_once",
+      "platform": "portable",
+      "terminal": {
+        "binary": "lamp-body::bin/lamp-body-measure",
+        "test": "tests::seated_is_a_flag_given_once",
+        "event": "PASS",
+        "duration": "0.004s"
+      },
+      "once": true
+    },
+    {
+      "test": "tests::the_generic_units_read_seated_once_and_the_confirmed_poses_win",
+      "platform": "portable",
+      "terminal": {
+        "binary": "lamp-body::bin/lamp-body-measure",
+        "test": "tests::the_generic_units_read_seated_once_and_the_confirmed_poses_win",
+        "event": "PASS",
+        "duration": "0.004s"
+      },
+      "once": true
+    },
+    {
+      "test": "tests::the_file_is_written_once_and_never_over_another",
+      "platform": "portable",
+      "terminal": {
+        "binary": "lamp-body::bin/lamp-body-measure",
+        "test": "tests::the_file_is_written_once_and_never_over_another",
+        "event": "PASS",
+        "duration": "0.006s"
+      },
+      "once": true
+    },
+    {
+      "test": "tests::sweep_needs_its_device_unit_lock_and_seconds",
+      "platform": "portable",
+      "terminal": {
+        "binary": "lamp-body::bin/lamp-body-measure",
+        "test": "tests::sweep_needs_its_device_unit_lock_and_seconds",
+        "event": "PASS",
+        "duration": "0.005s"
+      },
+      "once": true
+    },
+    {
+      "test": "tests::the_sweep_line_is_appended_once_to_an_existing_file",
+      "platform": "portable",
+      "terminal": {
+        "binary": "lamp-body::bin/lamp-body-measure",
+        "test": "tests::the_sweep_line_is_appended_once_to_an_existing_file",
+        "event": "PASS",
+        "duration": "0.006s"
+      },
+      "once": true
+    },
+    {
+      "test": "tests::measured_at_is_a_utc_minute",
+      "platform": "portable",
+      "terminal": {
+        "binary": "lamp-body::bin/lamp-body-measure",
+        "test": "tests::measured_at_is_a_utc_minute",
+        "event": "PASS",
+        "duration": "0.005s"
+      },
+      "once": true
+    }
+  ],
+  "doc_reader_rows": [
+    {
+      "binary": "lamp-update::install",
+      "test": "every_part_of_the_lamp_waits_for_setups_marker_itself",
+      "terminal": {
+        "binary": "lamp-update::install",
+        "test": "every_part_of_the_lamp_waits_for_setups_marker_itself",
+        "event": "PASS",
+        "duration": "0.004s"
+      },
+      "once": true
+    },
+    {
+      "binary": "lamp-update::it",
+      "test": "ci_paths::every_doc_a_crate_reads_is_named_back_in_the_workflows_pull_request_paths",
+      "terminal": {
+        "binary": "lamp-update::it",
+        "test": "ci_paths::every_doc_a_crate_reads_is_named_back_in_the_workflows_pull_request_paths",
+        "event": "PASS",
+        "duration": "0.145s"
+      },
+      "once": true
+    },
+    {
+      "binary": "lamp-update::it",
+      "test": "ci_paths::the_scan_sees_paths_in_strings_and_not_in_comments_or_prose",
+      "terminal": {
+        "binary": "lamp-update::it",
+        "test": "ci_paths::the_scan_sees_paths_in_strings_and_not_in_comments_or_prose",
+        "event": "PASS",
+        "duration": "0.004s"
+      },
+      "once": true
+    }
+  ]
+}

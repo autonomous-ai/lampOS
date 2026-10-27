@@ -1,0 +1,382 @@
+{
+  "published_head": "d4ce16238c705e615bddffce4400c907ae3fef17",
+  "published_tree": "ebb7cb559946c2ee98ae3ca58c7af91dfa94f2d1",
+  "authored_base": "c1fa2bc9f327f5d553bb3dcc355053d8e7e94bfa",
+  "actual_checkout": "d387b467983040a6674027eedfa04dfe65fbf59a",
+  "actual_tree": "e05fea4390899a7868a33336200bf5127b4e665b",
+  "actual_parents": [
+    "ef90c8561b3f9b22472f1962ea1ffb10bf6a423b",
+    "d4ce16238c705e615bddffce4400c907ae3fef17"
+  ],
+  "actual_entries": 10920,
+  "both_original_checkout_logs_independently_match": true,
+  "all35_authored_blobs_modes_match": true,
+  "bound_authored_files": [
+    {
+      "path": "lampOS/crates/eyes/src/main.rs",
+      "actual_blob": "77f462692f2661e4bb718524e97fb9a2c91df652",
+      "actual_mode": "100644",
+      "published_blob": "77f462692f2661e4bb718524e97fb9a2c91df652",
+      "published_mode": "100644",
+      "exact_published_blob_mode": true,
+      "same_published_and_local_tested": true
+    },
+    {
+      "path": "lampOS/crates/eyes/src/remember_speaker.rs",
+      "actual_blob": "428c594e92e6a0ee3155253dffa57f115e85abb6",
+      "actual_mode": "100644",
+      "published_blob": "428c594e92e6a0ee3155253dffa57f115e85abb6",
+      "published_mode": "100644",
+      "exact_published_blob_mode": true,
+      "same_published_and_local_tested": true
+    },
+    {
+      "path": "lampOS/crates/eyes/src/who.rs",
+      "actual_blob": "da3132ee61f5cfae2af9373b2108c1662516b369",
+      "actual_mode": "100644",
+      "published_blob": "da3132ee61f5cfae2af9373b2108c1662516b369",
+      "published_mode": "100644",
+      "exact_published_blob_mode": true,
+      "same_published_and_local_tested": true
+    },
+    {
+      "path": "lampOS/crates/eyes/tests/remember_speaker.rs",
+      "actual_blob": "4ca92fdf4173d0b36d3b980eb9b678a543db48df",
+      "actual_mode": "100644",
+      "published_blob": "4ca92fdf4173d0b36d3b980eb9b678a543db48df",
+      "published_mode": "100644",
+      "exact_published_blob_mode": true,
+      "same_published_and_local_tested": true
+    },
+    {
+      "path": "lampOS/crates/update/tests/install.rs",
+      "actual_blob": "518161713c84214d2c72869142dc237809f6a454",
+      "actual_mode": "100644",
+      "published_blob": "518161713c84214d2c72869142dc237809f6a454",
+      "published_mode": "100644",
+      "exact_published_blob_mode": true,
+      "same_published_and_local_tested": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/coordinator.rs",
+      "actual_blob": "19b0e1f33c6ea5ee07446070bf5f88182dfc1fd1",
+      "actual_mode": "100644",
+      "published_blob": "19b0e1f33c6ea5ee07446070bf5f88182dfc1fd1",
+      "published_mode": "100644",
+      "exact_published_blob_mode": true,
+      "same_published_and_local_tested": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/coordinator/cloud.rs",
+      "actual_blob": "6a1b2689ffab03215f9c017b79365acc7aa36689",
+      "actual_mode": "100644",
+      "published_blob": "6a1b2689ffab03215f9c017b79365acc7aa36689",
+      "published_mode": "100644",
+      "exact_published_blob_mode": true,
+      "same_published_and_local_tested": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/coordinator/face_consent.rs",
+      "actual_blob": "2cdc504368deecdab4e30b4a097aeb7adfa15009",
+      "actual_mode": "100644",
+      "published_blob": "2cdc504368deecdab4e30b4a097aeb7adfa15009",
+      "published_mode": "100644",
+      "exact_published_blob_mode": true,
+      "same_published_and_local_tested": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/coordinator/hand.rs",
+      "actual_blob": "ef03a6f675ed49ccb06c4614b330b98be47c8044",
+      "actual_mode": "100644",
+      "published_blob": "ef03a6f675ed49ccb06c4614b330b98be47c8044",
+      "published_mode": "100644",
+      "exact_published_blob_mode": true,
+      "same_published_and_local_tested": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/coordinator/second.rs",
+      "actual_blob": "15ed3cbcdb259c3281c4d5e6bb80f14343a3f002",
+      "actual_mode": "100644",
+      "published_blob": "15ed3cbcdb259c3281c4d5e6bb80f14343a3f002",
+      "published_mode": "100644",
+      "exact_published_blob_mode": true,
+      "same_published_and_local_tested": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/coordinator/second/face_consent_tests.rs",
+      "actual_blob": "cc3b211c67f30292ada28195a53b940d63cecfb0",
+      "actual_mode": "100644",
+      "published_blob": "cc3b211c67f30292ada28195a53b940d63cecfb0",
+      "published_mode": "100644",
+      "exact_published_blob_mode": true,
+      "same_published_and_local_tested": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/coordinator/tests/endpoint_session.rs",
+      "actual_blob": "ca7e919a35fbf04bf8eb8aecd9f90c5a217594e1",
+      "actual_mode": "100644",
+      "published_blob": "ca7e919a35fbf04bf8eb8aecd9f90c5a217594e1",
+      "published_mode": "100644",
+      "exact_published_blob_mode": true,
+      "same_published_and_local_tested": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/coordinator/tests/pilot_faults.rs",
+      "actual_blob": "6d58971a03dd6b2d16fe974f9a8526e2c397b63f",
+      "actual_mode": "100644",
+      "published_blob": "6d58971a03dd6b2d16fe974f9a8526e2c397b63f",
+      "published_mode": "100644",
+      "exact_published_blob_mode": true,
+      "same_published_and_local_tested": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/coordinator/tests/provider_terminal.rs",
+      "actual_blob": "577322145e4e22172117152a4a2aeee4e4f1fde9",
+      "actual_mode": "100644",
+      "published_blob": "577322145e4e22172117152a4a2aeee4e4f1fde9",
+      "published_mode": "100644",
+      "exact_published_blob_mode": true,
+      "same_published_and_local_tested": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/coordinator/tests/second_route.rs",
+      "actual_blob": "2819d83eff896f364fbe90a67c3ada1d791cb35c",
+      "actual_mode": "100644",
+      "published_blob": "2819d83eff896f364fbe90a67c3ada1d791cb35c",
+      "published_mode": "100644",
+      "exact_published_blob_mode": true,
+      "same_published_and_local_tested": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/fixture_provider.rs",
+      "actual_blob": "0e1f59d14ae4206b54fd8cb155606f43ec37f39e",
+      "actual_mode": "100644",
+      "published_blob": "0e1f59d14ae4206b54fd8cb155606f43ec37f39e",
+      "published_mode": "100644",
+      "exact_published_blob_mode": true,
+      "same_published_and_local_tested": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/known_faces.rs",
+      "actual_blob": "091ac56630e8e9dcd1dda84491a5635c358915a7",
+      "actual_mode": "100644",
+      "published_blob": "091ac56630e8e9dcd1dda84491a5635c358915a7",
+      "published_mode": "100644",
+      "exact_published_blob_mode": true,
+      "same_published_and_local_tested": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/onboarding.rs",
+      "actual_blob": "475cc12f6a96c4cdc1e9b6e8808eea194c4f8905",
+      "actual_mode": "100644",
+      "published_blob": "475cc12f6a96c4cdc1e9b6e8808eea194c4f8905",
+      "published_mode": "100644",
+      "exact_published_blob_mode": true,
+      "same_published_and_local_tested": false
+    },
+    {
+      "path": "lampOS/crates/voice/src/onboarding/legacy_words.rs",
+      "actual_blob": "adc4474ddb5bdf24fba0e6267c8fb0a5dc1c3a23",
+      "actual_mode": "100644",
+      "published_blob": "adc4474ddb5bdf24fba0e6267c8fb0a5dc1c3a23",
+      "published_mode": "100644",
+      "exact_published_blob_mode": true,
+      "same_published_and_local_tested": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/provider_worker.rs",
+      "actual_blob": "4f9b0918c6ad36a0285a03f6dcb5a98d316998d4",
+      "actual_mode": "100644",
+      "published_blob": "4f9b0918c6ad36a0285a03f6dcb5a98d316998d4",
+      "published_mode": "100644",
+      "exact_published_blob_mode": true,
+      "same_published_and_local_tested": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/remember_speaker.rs",
+      "actual_blob": "9b1a325f615165e157fbc6ce286443321f9a719e",
+      "actual_mode": "100644",
+      "published_blob": "9b1a325f615165e157fbc6ce286443321f9a719e",
+      "published_mode": "100644",
+      "exact_published_blob_mode": true,
+      "same_published_and_local_tested": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/remember_speaker/consent.rs",
+      "actual_blob": "ee49d00c420a19088d7c34307c16024fe99c9893",
+      "actual_mode": "100644",
+      "published_blob": "ee49d00c420a19088d7c34307c16024fe99c9893",
+      "published_mode": "100644",
+      "exact_published_blob_mode": true,
+      "same_published_and_local_tested": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/remember_speaker/consent_flow_tests.rs",
+      "actual_blob": "901e5b2a8d1f27281702f0330797d46393793b41",
+      "actual_mode": "100644",
+      "published_blob": "901e5b2a8d1f27281702f0330797d46393793b41",
+      "published_mode": "100644",
+      "exact_published_blob_mode": true,
+      "same_published_and_local_tested": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/second_provider.rs",
+      "actual_blob": "679fbe4cd19db024859f9dc4306963af944717d7",
+      "actual_mode": "100644",
+      "published_blob": "679fbe4cd19db024859f9dc4306963af944717d7",
+      "published_mode": "100644",
+      "exact_published_blob_mode": true,
+      "same_published_and_local_tested": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/second_provider/worker.rs",
+      "actual_blob": "1c8e2d416dd3548ed42e7f471845a1fee693dac4",
+      "actual_mode": "100644",
+      "published_blob": "1c8e2d416dd3548ed42e7f471845a1fee693dac4",
+      "published_mode": "100644",
+      "exact_published_blob_mode": true,
+      "same_published_and_local_tested": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/second_provider/worker/face_consent_gate_tests.rs",
+      "actual_blob": "a75786a60074ebee53681bada3afb789a98bc616",
+      "actual_mode": "100644",
+      "published_blob": "a75786a60074ebee53681bada3afb789a98bc616",
+      "published_mode": "100644",
+      "exact_published_blob_mode": true,
+      "same_published_and_local_tested": true
+    },
+    {
+      "path": "lampOS/deploy/product/lamp-eyes.service",
+      "actual_blob": "f9f8384db58d1a10b50e5413ecdf3ec6ed580ca4",
+      "actual_mode": "100644",
+      "published_blob": "f9f8384db58d1a10b50e5413ecdf3ec6ed580ca4",
+      "published_mode": "100644",
+      "exact_published_blob_mode": true,
+      "same_published_and_local_tested": true
+    },
+    {
+      "path": "lampOS/deploy/product/lamp-voice.service",
+      "actual_blob": "91f7f3fedd4ca4ebe0dbc7cfc9182da4e07299bf",
+      "actual_mode": "100644",
+      "published_blob": "91f7f3fedd4ca4ebe0dbc7cfc9182da4e07299bf",
+      "published_mode": "100644",
+      "exact_published_blob_mode": true,
+      "same_published_and_local_tested": true
+    },
+    {
+      "path": "lampOS/docs/eyes.md",
+      "actual_blob": "c63f6723c644435cdb4fa349da8bd54d5d37ec8e",
+      "actual_mode": "100644",
+      "published_blob": "c63f6723c644435cdb4fa349da8bd54d5d37ec8e",
+      "published_mode": "100644",
+      "exact_published_blob_mode": true,
+      "same_published_and_local_tested": true
+    },
+    {
+      "path": "lampOS/docs/onboarding.md",
+      "actual_blob": "a3fbc60ce1421b33909087b57f1318d0e424b47e",
+      "actual_mode": "100644",
+      "published_blob": "a3fbc60ce1421b33909087b57f1318d0e424b47e",
+      "published_mode": "100644",
+      "exact_published_blob_mode": true,
+      "same_published_and_local_tested": false
+    },
+    {
+      "path": "lampOS/docs/switches.md",
+      "actual_blob": "1eebb53da849c4d6332ea637daf505c572684827",
+      "actual_mode": "100644",
+      "published_blob": "1eebb53da849c4d6332ea637daf505c572684827",
+      "published_mode": "100644",
+      "exact_published_blob_mode": true,
+      "same_published_and_local_tested": true
+    },
+    {
+      "path": "lampOS/docs/verification/onboarding-speaking-face-20261025/README.md",
+      "actual_blob": "3f659809a9c4d4651af46f5036bf00510305bb37",
+      "actual_mode": "100644",
+      "published_blob": "3f659809a9c4d4651af46f5036bf00510305bb37",
+      "published_mode": "100644",
+      "exact_published_blob_mode": true,
+      "same_published_and_local_tested": false
+    },
+    {
+      "path": "lampOS/docs/verification/onboarding-speaking-face-20261025/host-consent-20261028.json",
+      "actual_blob": "1b1ed41001025ae836f291d781ece018b6db62c7",
+      "actual_mode": "100644",
+      "published_blob": "1b1ed41001025ae836f291d781ece018b6db62c7",
+      "published_mode": "100644",
+      "exact_published_blob_mode": true,
+      "same_published_and_local_tested": false
+    },
+    {
+      "path": "lampOS/skills/onboarding/SKILL.md",
+      "actual_blob": "a588fce43a1d956b179b18cae0932e62d3495826",
+      "actual_mode": "100644",
+      "published_blob": "a588fce43a1d956b179b18cae0932e62d3495826",
+      "published_mode": "100644",
+      "exact_published_blob_mode": true,
+      "same_published_and_local_tested": true
+    },
+    {
+      "path": "lampOS/skills/onboarding/skill.toml",
+      "actual_blob": "af4d0ca0b03b20f68c71ec0fb3f380e3cf24cb23",
+      "actual_mode": "100644",
+      "published_blob": "af4d0ca0b03b20f68c71ec0fb3f380e3cf24cb23",
+      "published_mode": "100644",
+      "exact_published_blob_mode": true,
+      "same_published_and_local_tested": true
+    }
+  ],
+  "actual_differences_from_authored": [
+    {
+      "path": "lampOS/crates/name/src/main.rs",
+      "authored": [
+        "100644",
+        "blob",
+        "acca9fbe8d4fe955c25e5f1e4884520242a119b0"
+      ],
+      "actual": [
+        "100644",
+        "blob",
+        "42ed958893026e3c1070ca70b08e2cc1d6e03c2d"
+      ]
+    },
+    {
+      "path": "lampOS/docs/name.md",
+      "authored": [
+        "100644",
+        "blob",
+        "e7bd721d8bf22518dd03214754357880e2cdde66"
+      ],
+      "actual": [
+        "100644",
+        "blob",
+        "253a4f1872f7d2eb7b958ab58ec5b034938d22d9"
+      ]
+    }
+  ],
+  "supplemental_Body_source": {
+    "source": "lampOS/crates/body/src/bin/lamp-body-measure.rs",
+    "actual_blob": "d81a07d359cc2fde486db9514ea4aafd2a6ed3c9",
+    "source_sha256": "e01ae173cb674202080fed92fbfc9b14174e6477ea1ae19cf05be3bb347d018b"
+  },
+  "doc_reader_source_blobs": [
+    {
+      "path": "lampOS/crates/update/tests/install.rs",
+      "blob": "518161713c84214d2c72869142dc237809f6a454",
+      "mode": "100644"
+    },
+    {
+      "path": "lampOS/crates/update/tests/it/ci_paths.rs",
+      "blob": "a80a8e67b0a3f29afb4e2be266a25c09100584a7",
+      "mode": "100644"
+    },
+    {
+      "path": "lampOS/docs/install.md",
+      "blob": "1ded79654d818eb44a919571dcbf793aaa7c9e82",
+      "mode": "100644"
+    }
+  ],
+  "newer_Main_fc9_not_qualified": true
+}
