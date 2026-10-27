@@ -1,3 +1,7 @@
+## 2026-10-27 12:16 — bounded light-off documentation read
+
+READ-OK #3675 at e87181d81: [documentation consistency receipt](verification/light-off-doc-read-3675-20261027/receipt.json). The single lamp-runs row matches the holder's #2530 report for date, lamp-75c9, build 5900, seven reported drops and returning the person's orange light. Diff whitespace, one-line scope, table columns and strikethrough pass; no code tests apply. This is not an independent journal recount, binary-provenance check, device run or current-product acceptance. Other say/move rows remain open. The own PR host/native gates continue separately.
+
 ## 2026-10-27 12:11 — latest fixture pushed; own-keys current native audited
 
 Fixture #3637 is pushed as 0b4a77107 on 70b after [fresh selected qualification](verification/privacy-kept-resync-fixture-20261027/carry-70b-audit.json): four compiler stages pass, 238/0/1 plus three passing doctests, all sixteen witnesses, two expected hooks and stable source/raw/65 executable guards. The sole patch/message remains equal; rules unchanged. Current reads and original CI are pending. Historical outcomes remain recorded, and Tests owns the original Reader investigation without an inferred cause or repair.

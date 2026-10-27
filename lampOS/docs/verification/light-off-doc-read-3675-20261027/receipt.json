@@ -1,0 +1,22 @@
+{
+  "head": "e87181d81c3a5616088d16f0a67ea7e566e0401b",
+  "base": "205575ad84f66848b73870237f2a15d8d90be383",
+  "file": "lampOS/docs/lamp-runs.md",
+  "git_blob": "5f34b97ec591e6d5be920391d72509db564590cf",
+  "only_one_row_changed": true,
+  "table_delimiters": 6,
+  "balanced_strikethrough": true,
+  "declared_drop_count": 7,
+  "declared_build": 5900,
+  "declared_lamp": "lamp-75c9",
+  "scope": "Documentation consistency with published holder record only; no independent device result or binary provenance verification.",
+  "holder_record": "https://github.com/autonomous-ai/lampOS/issues/2530#issuecomment-6434033557",
+  "holder_body_sha256": "9116743b68422ab157afca3a37b3004c569a2e4d0f803ca2c065f04aa37ca2cc",
+  "checks": [
+    "git diff --check 205575ad8 origin/pr-3675: exit0",
+    "git diff --numstat: exactly1added/1removed line in lamp-runs.md",
+    "five-column row and balanced strikethrough",
+    "date/lamp/build/seven reported drops/light_on wording agree with holder record"
+  ],
+  "finding": "No P1/P2 in bounded documentation consistency scope. Seven drops are the holder reported count, not independently recounted journal entries."
+}
