@@ -676,6 +676,38 @@ passed. Tests: the notes' exact texts in `remember::tests`.
     (likes/like, 5/five, an English sentence for Vietnamese speech, a
     spelling such as "favorite") also keeps what was heard: never less than
     was said.
+  - **The lamp's name heard as another word is no name** (#3504 finding
+    N4). On lamp-06c1 the name was written "Ramon", "Edeland", "Elan" and
+    "Hey, mom"; the lamp called the person by it, and "Edeland, my dog is
+    called Moe" was kept as "Edeland's dog is called Moe." Two parts:
+    - **Every spoken turn on the second route** (no switch): the spoken
+      note (`worker::SPOKEN_NOTE`) says to call someone by a name only when
+      it was given, as the person known by face, the name given at setup or
+      a name they tell as their own ("I'm Tom"), never by a word heard at
+      the start of what they said.
+    - **With this switch, on a line lamp-name heard the name in** (the
+      voice's own sign, `Heeding::name_fired_for`: a hearing of
+      `called::LEAST_SCORE` or more from `called::BEFORE_US` before the
+      line to its end, the name note's rule, with or without
+      `LAMP_NAME_NOTE`; the name note given counts too), the first word
+      past a greeting set off as a name is ("Ramon. …", "Edeland, …"), not
+      "Lamp", not a common opener ("Yes,", "Well,", "Please,", "Vâng," …;
+      `OPENS_SET_OFF`), not a time, day, request verb or discourse word
+      ("Tomorrow,", "Today,", "Remember,", "Honestly,", "Mai,", "Nhớ," …;
+      `NOT_A_NAME`), so "Tomorrow, I see the dentist at 3" keeps its day,
+      with more
+      said after it (`second_provider::wake_heard_as`), is left out of the
+      line held for the request. So the check above keeps "They said: my
+      dog is Moe", and the model is told the word is how its name was
+      heard and nobody's name. Text alone never decides it: Ramon, Ilan
+      and Elan are people's names too (an offline check of 30 misheard
+      openings from 27 Oct against 40 real first names found no text rule
+      that takes the first without the second). A line lamp-name did not
+      hear the name in keeps a name that opens it, word for word. Known
+      cost: someone addressed at the line's start ("Tom, …") just as
+      lamp-name hears the lamp's name has that word left out of what is
+      kept. Tests: `second_provider::tests::wake_not_name`,
+      `worker::tests::lamp_name_s_hearing_in_a_line_is_known_with_or_without_the_note`.
   - **With `LAMP_MEMORY_REMEMBER_ONCE`:** an answer that already carries a
     `note` or `"existing": true` (nothing new written) is left as it is;
     the "kept what they said" note is added only when the store wrote a
