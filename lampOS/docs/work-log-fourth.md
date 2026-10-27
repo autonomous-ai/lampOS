@@ -1,3 +1,19 @@
+## 2026-10-27 08:54 UTC — Common transport run narrows to five failures
+
+Ready for lamp-voice: no
+
+[Completed e927 receipt](verification/common-e927-host-failure-20261027/receipt.json):
+normal compiler stages pass; all 5,537 selected local cases terminate with
+5,532 passes / five failures. Required controls are 110/1 of 111; the separate
+525 contract ledger is 521/4, with 25 overlaps not added. The named CONTROL
+regression passes. Native125 / nextest100 remain failed; zero leaks/timeouts,
+43 natural ignores (27 JSON, 16 start-only). Docs/custom are unrun. The exact
+failed Voice driver and actual zero-backing inspections are retained; helper0
+checks 7,888 protected files and source/process closure before release. The
+one-line expiry latch and ordinary camera fixture repairs need fresh gates;
+the original 50 ms voided-read assertion remains under audit and unchanged.
+No native, device or later-source acceptance.
+
 ## 2026-10-27 07:48 UTC — Named CONTROL EOF regression fails on old production
 
 Ready for lamp-voice: no

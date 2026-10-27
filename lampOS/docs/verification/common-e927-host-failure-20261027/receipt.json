@@ -1,0 +1,73 @@
+{
+  "status": "FAILED_COMPLETE_LOCAL_SCOPE",
+  "head": "ed9aff39b609676535343f8979631c909e2a430a",
+  "tree": "e927f8518fba011625cb17be57113e5900feb46c",
+  "base": "a9d3a827439de1605e62b90cde9d9dcb8f571280",
+  "actual_native": {
+    "session": 88544,
+    "exit": 125,
+    "chunk": "b6a946",
+    "nextest_exit": 100
+  },
+  "normal_compiler_stages": {
+    "fmt": 0,
+    "metadata": 0,
+    "workspace_all_targets_strict_clippy": 0,
+    "workspace_build": 0
+  },
+  "local_runtime": {
+    "selected_cases": 5537,
+    "clean_passed": 5532,
+    "failed": 5,
+    "passed_but_LEAK": 0,
+    "timeout_case_count": 0,
+    "all_selected_terminal": true,
+    "ignored_discovery_and_human_SKIP": 43,
+    "ignored_JSON_terminals": 27,
+    "required111_passed": 110,
+    "required111_failed": 1,
+    "preserved525_passed": 521,
+    "preserved525_failed": 4,
+    "overlap_not_added": 25
+  },
+  "natural_ignore_start_only_not_execution": 16,
+  "scope": "Full Eyes, Voice, Memory and Skills plus IPC camera authority; docs/custom unrun after failure",
+  "named_control_regression": {
+    "event": "ok",
+    "terminal_position": {
+      "binary": "lamp-ipc::camera_authority",
+      "test": "named_control_eof_after_both_write_halves_close_delivers_live_observers",
+      "event": "ok",
+      "line_one_based": 831,
+      "terminal_ordinal_one_based": 408
+    }
+  },
+  "failed_test_names": [
+    "second_provider::worker::camera_ticket_exec_tests::ordinary_engine_scope_factory_carries_ticket_without_arming_scoped_context",
+    "second_provider::worker::lookaway_authority_tests::checking_wait_ends_at_the_original_audio_deadline",
+    "second_provider::worker::lookaway_authority_tests::repeated_explicit_absence_does_not_extend_the_original_audio_deadline",
+    "second_provider::worker::lookaway_authority_tests::returning_track_completed_recognition_never_extends_original_audio_deadline",
+    "second_provider::worker::memory_note_retries::a_voided_read_is_never_told_and_holds_the_next_until_it_ends"
+  ],
+  "retention": {
+    "actual_native_session": 68382,
+    "actual_native_exit": 0,
+    "actual_native_chunk": "e90405",
+    "failed_drivers": 1,
+    "actual_backing_files": 0,
+    "protected_files": 7888,
+    "source_stable": true,
+    "owned_sessions_closed": true,
+    "original_failure_remains_failed": true
+  },
+  "later_latch_and_fixture_repairs_qualified": false,
+  "native_or_device_acceptance": false,
+  "evidence_sha256": {
+    "actual-native-terminal": "f848714d98e783d2eb63d31abc1603518ca606fcb076fa67411970b60ca861c9",
+    "runtime-counts": "d8123fb76f243e97c42835a05c46adc88405b6753619e9a4471b41e532355def",
+    "required111-terminals": "fe29f12d396454f6fca52c770378dd91b87c0b15d4543ea0e6790b4b555e3a99",
+    "preserved525-terminals": "f40435d28cb93bea7f046a8c000d3eb1c20c8344ec984b0d227841d38f1907ce",
+    "retention-actual-native-release": "d8eff021d82b11d63037639754c7a7aa25381fe3fa9804695c9d192314c1e74c",
+    "retention-independent-MachO": "754dc1137f70116e25ce7fbdb20fc9f5e87f33f9280c20459b15de25058e3d88"
+  }
+}
