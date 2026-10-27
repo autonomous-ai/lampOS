@@ -6,6 +6,15 @@ fixture helpers are compiled only under `cfg(test)`. There is no runtime
 flag, environment setting or wider production deadline. Ordinary builds
 continue to use the existing monotonic clock.
 
+The diagnostic DSP-reset sequence fixture uses the recorder's existing
+`MAX_FINISH_WAIT` (1 s) for its real file syncs. It checks queued submissions,
+an acknowledged `Complete` for sequence 2, and acknowledged `Invalid` results
+for sequences 1 and 3, with matching summaries, markers and frame/end counts.
+A timeout can no longer satisfy either negative case. Production's 500 ms
+default and 1 s maximum are unchanged. The original 500 ms timeout remains a
+failed observation; this fixture budget neither proves its cause nor guarantees
+completion under arbitrary OS or filesystem delays.
+
 ## Kept privacy lease resynchronization
 
 The kept-value resync fixture deliberately receives no datagrams. Its local

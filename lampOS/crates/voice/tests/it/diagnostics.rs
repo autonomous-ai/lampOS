@@ -516,26 +516,69 @@ fn dsp_reset_preserves_capture_sequence_and_cannot_cover_a_gap() {
         let temp = Private::new();
         let mut recorder = Recorder::start(temp.config(StreamKind::Capture)).unwrap();
         let at = recorder.started_at_us();
-        recorder.try_privacy(PrivacyMeta {
-            at_us: at,
-            generation: 2,
-            open: true,
-        });
-        recorder.try_capture(capture(at + 1, 1), &[1; 160], &[2; 160]);
-        recorder.try_reset(ResetMeta {
-            at_us: at + 2,
-            reason: ResetReason::DspReset,
-            capture_epoch: 1,
-            dsp_epoch: 2,
-            playback_epoch: 0,
-            privacy_generation: 2,
-            discarded: None,
-        });
+        assert_eq!(
+            recorder.try_privacy(PrivacyMeta {
+                at_us: at,
+                generation: 2,
+                open: true,
+            }),
+            SubmitResult::Queued
+        );
+        assert_eq!(
+            recorder.try_capture(capture(at + 1, 1), &[1; 160], &[2; 160]),
+            SubmitResult::Queued
+        );
+        assert_eq!(
+            recorder.try_reset(ResetMeta {
+                at_us: at + 2,
+                reason: ResetReason::DspReset,
+                capture_epoch: 1,
+                dsp_epoch: 2,
+                playback_epoch: 0,
+                privacy_generation: 2,
+                discarded: None,
+            }),
+            SubmitResult::Queued
+        );
         let mut next = capture(at + 3, next_sequence);
         next.dsp_epoch = 2;
-        recorder.try_capture(next, &[1; 160], &[2; 160]);
-        let report = recorder.finish(end(at + 4), DEFAULT_FINISH_WAIT);
-        assert_eq!(report.valid, next_sequence == 2, "{report:?}");
+        assert_eq!(
+            recorder.try_capture(next, &[1; 160], &[2; 160]),
+            SubmitResult::Queued
+        );
+        // This checks sequence/file validity, not the worker's 500 ms finish
+        // policy. Use the existing public maximum for real filesystem syncs.
+        let ended = end(at + 4);
+        let report = recorder.finish(ended, MAX_FINISH_WAIT);
+        let valid = next_sequence == 2;
+        assert_eq!(
+            report.outcome,
+            if valid {
+                FinishOutcome::Complete
+            } else {
+                FinishOutcome::Invalid
+            },
+            "sequence {next_sequence}: {report:?}"
+        );
+        assert_eq!(report.valid, valid, "{report:?}");
+        assert_eq!(report.completion_marker_published, valid, "{report:?}");
+        assert_eq!(temp.0.join("audio/complete.json").exists(), valid);
+        let summary = report.summary.as_ref().expect("writer acknowledgement");
+        assert_eq!(summary.valid, valid);
+        assert_eq!(summary.faults, report.faults);
+        assert_eq!(summary.faults == 0, valid);
+        assert!(summary.writer_error.is_none(), "{summary:?}");
+        assert_eq!(summary.capture_frames, if valid { 320 } else { 160 });
+        assert_eq!(summary.records_written, if valid { 5 } else { 3 });
+        if valid {
+            let observed_end = summary.end.expect("acknowledged end record");
+            assert_eq!(observed_end.reason, EndReason::Completed);
+            assert_eq!(observed_end.at_us, ended.at_us);
+            assert_eq!(summary.records_queued, 5);
+            assert_eq!(summary.records_rejected, 0);
+        } else {
+            assert!(summary.end.is_none(), "sequence gap must stop before End");
+        }
     }
 }
 
