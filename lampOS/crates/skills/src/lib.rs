@@ -1679,6 +1679,9 @@ pub struct Skill {
     pub enabled: bool,
     pub limits: Option<routine::Limits>,
     pub needs: Vec<String>,
+    /// The computer that pushed it over lamp-control, for a skill in the
+    /// developer folder ([`PUSHED_DIR`]); `None` for every other skill.
+    pub pushed_by: Option<String>,
     /// Core or installable.
     pub kind: SkillKind,
     /// Its version, if `skill.toml` says one.
@@ -4227,6 +4230,7 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
     let skill = Skill {
         name,
         description,
+        pushed_by: None,
         enabled: file.enabled,
         limits: file.limits.map(routine::LimitsFile::checked).transpose()?,
         needs: file.needs,
@@ -4634,6 +4638,119 @@ fn pattern_of(file: PatternFile, level: Option<u8>) -> Result<LightPattern, Stri
     Ok(pattern)
 }
 
+/// The developer folder: skills a paired computer pushed over lamp-control
+/// (`docs/control.md`, "Skills pushed from a computer"), apart from the
+/// Store's and the core skills, written only by the manage helper.
+pub const PUSHED_DIR: &str = "/var/lib/lampOS/skills-dev";
+
+/// Who pushed a skill, `{"computer": NAME, ...}`, which the manage helper
+/// writes into the skill's folder (a dot file: never part of the skill).
+pub const PUSHED_FROM: &str = ".pushed.json";
+
+/// The computer a pushed skill's [`PUSHED_FROM`] names, read without
+/// following a link and at most 1 KiB; "a computer" when it says none.
+fn pushed_by(folder: &Path) -> String {
+    use std::{io::Read, os::unix::fs::OpenOptionsExt};
+    #[derive(Deserialize)]
+    struct From {
+        computer: String,
+    }
+    let mut text = Vec::new();
+    fs::OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_NOFOLLOW)
+        .open(folder.join(PUSHED_FROM))
+        .and_then(|file| file.take(1024).read_to_end(&mut text))
+        .ok()
+        .and_then(|_| serde_json::from_slice::<From>(&text).ok())
+        .map(|from| {
+            from.computer
+                .chars()
+                .filter(|c| !c.is_control())
+                .take(64)
+                .collect::<String>()
+        })
+        .filter(|name| !name.trim().is_empty())
+        .unwrap_or_else(|| "a computer".to_owned())
+}
+
+/// The topics a pushed skill may read: presence, the protocol's `look`
+/// grant, and those the protocol's events take with no grant (`time`,
+/// `lamp.changed`, `touch`). Not `voice/heard`, `name/heard` or
+/// `ears/classes`: the protocol's `hear` and `sound` wait for the skill
+/// format's phrase and class lists, since a format 1 topic gives every one
+/// (Fourteen on #3869).
+pub const PUSHED_TOPICS: [&str; 6] = [
+    "humans/faces/tracked",
+    "room/stood_up",
+    LOCAL_CLOCK_TOPIC,
+    "voice/state",
+    "lamp/pause",
+    "controls/touch",
+];
+
+/// Why a pushed skill may not run, held to the protocol's grants
+/// (`docs/control.md`, "Skills pushed from a computer"); `None` if it may.
+/// The manage helper checks the same at install, and this check holds a
+/// folder put there by any other path to it too.
+pub fn pushed_refuses(skill: &Skill) -> Option<String> {
+    let permissions = &skill.permissions;
+    if skill.kind != SkillKind::Installable {
+        return Some(format!(
+            "a pushed skill is installable, never kind = \"{}\"",
+            skill.kind.name()
+        ));
+    }
+    let beyond = [
+        ("actions", !permissions.actions.is_empty()),
+        ("messages", permissions.messages),
+        ("known_faces", permissions.known_faces),
+        ("who", permissions.who),
+        ("output_limits", permissions.output_limits),
+        ("propose", !permissions.propose.is_empty()),
+        ("say", permissions.say.is_some()),
+        ("core", !permissions.core.is_empty()),
+    ];
+    if let Some((what, _)) = beyond.iter().find(|(_, asked)| *asked) {
+        return Some(format!(
+            "a pushed skill may not ask {what}: only the protocol's grants"
+        ));
+    }
+    if let Some(topic) = permissions
+        .topics
+        .iter()
+        .find(|topic| !PUSHED_TOPICS.contains(&topic.as_str()))
+    {
+        return Some(format!(
+            "a pushed skill may not read {topic}: only presence and the topics no grant needs"
+        ));
+    }
+    None
+}
+
+/// Every enabled skill under `root` and, with `pushed`, the developer
+/// folder's, and why each other folder did not load ([`load_each_with`]).
+pub fn load_all_with(root: &Path, pushed: Option<Pushed>) -> (Vec<Skill>, Vec<String>) {
+    let (mut skills, mut errors) = (Vec::new(), Vec::new());
+    for (folder, loaded) in load_each_with(root, pushed) {
+        match loaded {
+            Ok(skill) if skill.enabled => skills.push(skill),
+            Ok(_) => {}
+            Err(why) => errors.push(format!("{}: {why}", folder.display())),
+        }
+    }
+    (skills, errors)
+}
+
+/// The developer folder, and the pushed skills the owner said yes to
+/// seeing the picture (`--state-dir`'s [`ON_FILE`]): one that sees it is
+/// held off without that yes.
+#[derive(Clone, Copy)]
+pub struct Pushed<'a> {
+    pub dir: &'a Path,
+    pub picture_yes: &'a BTreeSet<String>,
+}
+
 /// Every enabled skill under `root`, and why each other folder did not
 /// load. Disabled skills are still validated and reserve their tool names
 /// in the complete inventory ([`load_each`]).
@@ -4658,6 +4775,12 @@ pub fn load_all(root: &Path) -> (Vec<Skill>, Vec<String>) {
 /// the model, and no second skill of a name is passed over without a word
 /// ([`tools_file`] and [`Engine::tool`] would give the name to the first).
 pub fn load_each(root: &Path) -> Vec<(PathBuf, Result<Skill, String>)> {
+    load_each_with(root, None)
+}
+
+/// The skill folders under `root`, sorted, but those whose name begins
+/// with a dot.
+fn folders_in(root: &Path) -> Vec<PathBuf> {
     let mut folders: Vec<PathBuf> = fs::read_dir(root)
         .into_iter()
         .flatten()
@@ -4667,22 +4790,92 @@ pub fn load_each(root: &Path) -> Vec<(PathBuf, Result<Skill, String>)> {
         .filter(|path| path.is_dir())
         .collect();
     folders.sort();
-    let mut loaded: Vec<(PathBuf, Result<Skill, String>)> = folders
+    folders
+}
+
+/// [`load_each`], and with `pushed` the developer folder's skills after
+/// `root`'s: each held to [`pushed_refuses`], said as pushed by its
+/// computer, never with the name of a skill under `root`, and claiming its
+/// tool's name only after every skill under `root` has, so a pushed skill
+/// never takes a core or Store skill's function.
+pub fn load_each_with(
+    root: &Path,
+    pushed: Option<Pushed>,
+) -> Vec<(PathBuf, Result<Skill, String>)> {
+    let mut loaded: Vec<(PathBuf, Result<Skill, String>)> = folders_in(root)
         .into_iter()
         .map(|folder| {
             let skill = load(&folder);
             (folder, skill)
         })
         .collect();
+    let here = loaded.len();
+    // The `[budget]` groups the skills under `root` use: a pushed skill
+    // never joins one, so it can't spend a group's hour (the Reviewer-lead's
+    // P2 on #3879: a pushed `wellbeing` member quieting sip-of-water).
+    let groups: BTreeSet<String> = loaded
+        .iter()
+        .filter_map(|(_, skill)| skill.as_ref().ok())
+        .filter_map(|skill| skill.budget.as_ref().map(|(group, _)| group.clone()))
+        .collect();
+    if let Some(pushed) = pushed {
+        for folder in folders_in(pushed.dir) {
+            let name = folder
+                .file_name()
+                .map(|name| name.to_string_lossy().into_owned());
+            let taken = loaded[..here].iter().any(|(other, _)| {
+                other
+                    .file_name()
+                    .map(|other| other.to_string_lossy().into_owned())
+                    == name
+            });
+            let skill = if taken {
+                Err("a skill of that name is already on the lamp: a pushed skill never takes its place".to_owned())
+            } else {
+                load(&folder).and_then(|mut skill| {
+                    if let Some(why) = pushed_refuses(&skill) {
+                        return Err(why);
+                    }
+                    if let Some((group, _)) = skill.budget.as_ref().filter(|(group, _)| groups.contains(group)) {
+                        return Err(format!(
+                            "its [budget] group {group:?} is a skill's on the lamp: a pushed skill never joins one"
+                        ));
+                    }
+                    skill.pushed_by = Some(pushed_by(&folder));
+                    // Held off for the owner's yes: a push never grants the
+                    // picture (#3859's split, #3869).
+                    if skill.permissions.sees_picture() && !pushed.picture_yes.contains(&skill.name)
+                    {
+                        skill.enabled = false;
+                    }
+                    Ok(skill)
+                })
+            };
+            loaded.push((folder, skill));
+        }
+    }
     // Each tool's name, and the skill that has it.
     // With, for a `[stop]` function, the `[budget]` group of its skill: a
     // `[stop]` may be shared by the skills of one group (#1685), one
     // function for them all.
     let mut taken: BTreeMap<String, (String, SkillKind, Option<String>)> = BTreeMap::new();
-    for kind in [SkillKind::Core, SkillKind::Installable, SkillKind::Addon] {
+    let pushed_names: BTreeSet<String> = loaded
+        .iter()
+        .filter_map(|(_, skill)| skill.as_ref().ok())
+        .filter(|skill| skill.pushed_by.is_some())
+        .map(|skill| skill.name.clone())
+        .collect();
+    // Every skill under `root` by kind, core first; then the pushed ones.
+    let passes = [
+        (SkillKind::Core, false),
+        (SkillKind::Installable, false),
+        (SkillKind::Addon, false),
+        (SkillKind::Installable, true),
+    ];
+    for (kind, pushed_pass) in passes {
         for (_, result) in &mut loaded {
             let Ok(skill) = result else { continue };
-            if skill.kind != kind {
+            if skill.kind != kind || skill.pushed_by.is_some() != pushed_pass {
                 continue;
             }
             let group = skill.budget.as_ref().map(|(group, _)| group.clone());
@@ -4701,7 +4894,13 @@ pub fn load_each(root: &Path) -> Vec<(PathBuf, Result<Skill, String>)> {
                 functions.iter().find_map(|(tool, shared)| {
                     taken
                         .get(tool)
-                        .filter(|(_, _, theirs)| shared.is_none() || theirs != shared)
+                        // A pushed skill shares no function with a skill under
+                        // `root`, whatever its group says.
+                        .filter(|(owner, _, theirs)| {
+                            shared.is_none()
+                                || theirs != shared
+                                || (pushed_pass && !pushed_names.contains(owner))
+                        })
                         .map(|owner| (tool, shared, owner))
                 })
             {

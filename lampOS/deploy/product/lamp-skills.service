@@ -40,6 +40,12 @@ Environment=LAMP_SKILLS_DAILY_FILE=/var/lib/lampos-skills-state/daily.json
 # LAMP_WHO_WAS_HERE_KNOWN=on. An Environment= line too, as --known-file is as new as guard mode
 # (19 Oct) and would end an older lamp-skills at its start (#2157).
 Environment=LAMP_SKILLS_KNOWN_FILE=/run/lampos-eyes/known
+# The developer folder: skills a paired computer pushed over lamp-control
+# (#3869, docs/skills.md "Skills pushed from a computer"), loaded after the
+# skills folder and held to the protocol's grants. Read only here; the
+# manage helper alone writes it. An Environment= line, as an older
+# lamp-skills ignores it where it would end at an unknown flag (#2157).
+Environment=LAMP_SKILLS_DEV_DIR=/var/lib/lampOS/skills-dev
 ExecStart=/opt/lampOS/skills/current/lamp-skills --dir /var/lib/lampOS/skills --bus-root /run/lampos-bus --gaze-socket /run/lampos-body/gaze.sock --mood-socket /run/lampos-body/mood.sock --actions-socket /run/lampos-actions/call.sock --say-socket /run/lampos-say/say.sock --tools-dir /run/lampos-skills --state-dir /var/lib/lampos-skills-state --zone system
 Restart=on-failure
 RestartSec=5s

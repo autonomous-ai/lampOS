@@ -14,7 +14,7 @@ use lamp_skills::routine::Permit;
 use lamp_skills::watch::{self, Out, Outs, Watches};
 use lamp_skills::{
     Admission, BODY_REQUESTS_ENVIRONMENT, CLIP_GAP_US, Call, Engine, Permissions, Run, body_ask,
-    clip_us, clock, duration_us, load_all, package, run_tests, told, tools_file,
+    clip_us, clock, duration_us, load_all_with, package, run_tests, told, tools_file,
 };
 use serde_json::json;
 use std::{
@@ -35,6 +35,7 @@ const USAGE: &str = "usage: lamp-skills [--dir DIR] [--bus-root DIR] [--gaze-soc
                      [--mood-socket PATH] [--actions-socket PATH] [--say-socket PATH] \
                      [--tools-dir DIR] [--state-dir DIR] [--boot-id ID] [--clock-control PATH] \
                      [--known-file PATH] (or LAMP_SKILLS_KNOWN_FILE) [--daily-state PATH] (or LAMP_SKILLS_DAILY_FILE)\n       \
+                     [--dev-dir DIR] (or LAMP_SKILLS_DEV_DIR)\n       \
                      [--zone system|NAME | --utc-offset-minutes N] [--trust-clock]\n       \
                      lamp-skills test SKILL_DIR...\n       \
                      lamp-skills install [--dir DIR] [--state-dir DIR] SKILL_DIR|PACKAGE.tar\n       \
@@ -48,6 +49,9 @@ const DAILY_ENVIRONMENT: &str = "LAMP_SKILLS_DAILY_FILE";
 /// The eyes' known file, as the product unit passes it; `--known-file` wins
 /// when both are given.
 const KNOWN_ENVIRONMENT: &str = "LAMP_SKILLS_KNOWN_FILE";
+/// The developer folder, as the product unit passes it; `--dev-dir` wins
+/// when both are given.
+const DEV_DIR_ENVIRONMENT: &str = "LAMP_SKILLS_DEV_DIR";
 /// Where the product keeps its skills (`deploy/product/lamp-skills.service`):
 /// the core ones `lamp-update install` writes and the installable ones.
 const SKILLS_DIR: &str = "/var/lib/lampOS/skills";
@@ -173,6 +177,7 @@ fn main() -> ExitCode {
     let mut boot_id = None;
     let mut clock_control = None;
     let mut known_file = None;
+    let mut dev_dir = None;
     let mut daily_state = None;
     let mut trust_clock = false;
     let mut offset = None;
@@ -237,6 +242,7 @@ fn main() -> ExitCode {
             "--boot-id" => boot_id = value.to_str().map(str::to_owned),
             "--clock-control" => clock_control = Some(value),
             "--known-file" => known_file = Some(value),
+            "--dev-dir" => dev_dir = Some(value),
             "--daily-state" if daily_state.is_none() => daily_state = Some(value),
             _ => {
                 eprintln!("{USAGE}");
@@ -268,6 +274,10 @@ fn main() -> ExitCode {
     // The eyes' known file comes so too, for a watch to tell the face of the
     // person who asked (#1685): `--known-file` is as new as guard mode.
     let known_file = flag_or_environment(known_file, KNOWN_ENVIRONMENT);
+    // The developer folder, the skills a paired computer pushed (#3869), as
+    // the daily journal comes: an `Environment=` line an older binary
+    // ignores, never a flag that would end it.
+    let dev_dir = flag_or_environment(dev_dir, DEV_DIR_ENVIRONMENT);
     let ask = std::env::var("LAMP_SKILLS_ASK").unwrap_or_default();
     let options = Options {
         tools,
@@ -283,6 +293,7 @@ fn main() -> ExitCode {
         routines: std::env::var(lamp_skills::routine::ENVIRONMENT).is_ok_and(|value| value == "on"),
         local_time,
         known_file,
+        dev_dir,
     };
     match serve(&dir, root, &sockets, &options) {
         Ok(()) => ExitCode::SUCCESS,
@@ -554,6 +565,9 @@ fn said_lately<T: serde::de::DeserializeOwned>(bus: &Bus, topic: &str) -> Option
 
 /// How the program serves, beyond its sockets.
 struct Options {
+    /// `--dev-dir` or `LAMP_SKILLS_DEV_DIR`: the skills a paired computer
+    /// pushed over lamp-control, loaded after `--dir`'s ([`lamp_skills::Pushed`]).
+    dev_dir: Option<PathBuf>,
     tools: Option<PathBuf>,
     /// `--state-dir`: the part's own folder, where the skills a person
     /// turned off are kept across a restart (#1685); without it, until the
@@ -1118,10 +1132,31 @@ fn serve(
                     .lock()
                     .unwrap()
                     .scanned(&scan, unchanged, lamp_ipc::monotonic_us());
-            let print = fingerprint(dir);
+            let mut print = fingerprint(dir);
+            if let Some(dev) = &options.dev_dir {
+                print.extend(fingerprint(dev));
+            }
+            // The owner's yes to a pushed skill seeing the picture: the app's
+            // on (#2815), kept in the state folder's `on`.
+            let picture_yes = options
+                .state
+                .as_ref()
+                .and_then(|state| lamp_skills::read_names(&state.join(lamp_skills::ON_FILE)).ok())
+                .unwrap_or_default();
+            print.extend(picture_yes.iter().map(|name| {
+                (
+                    PathBuf::from(format!("{}:{name}", lamp_skills::ON_FILE)),
+                    0,
+                    None,
+                )
+            }));
             if !accepted || seen.as_ref() != Some(&print) {
                 seen = Some(print);
-                let (mut skills, errors) = load_all(dir);
+                let pushed = options.dev_dir.as_deref().map(|dir| lamp_skills::Pushed {
+                    dir,
+                    picture_yes: &picture_yes,
+                });
+                let (mut skills, errors) = load_all_with(dir, pushed);
                 skills.retain(|skill| options.routines || !skill.is_routine());
                 skills.retain(|skill| !skill.prepares_unplug() || lamp_body::unplug::enabled());
                 skills.retain(|skill| {
