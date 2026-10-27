@@ -392,6 +392,13 @@ result, or `"ok":false`, an `"error"` (`bad_json`, `bad_request`, `unknown_op`,
 
 ### Additional requests with `--memory-days`
 
+Voice's `recall` description asks the model to call it before saying it
+does not remember a person's own preference, such as their favourite
+drink, unless the answer is already in the conversation
+(`remember::RECALL_OWN_PREFERENCE`; lamp-06c1, 26 Oct: P09 answered "I don't
+know" with no call, P40 called it and said black coffee). Words for the
+model, not a guarantee; memory still searches only the asker's scope.
+
 The old request and response shapes remain accepted. `recall` now selects
 by FTS5 rank and still returns the selected raw entries in chronological
 order; it does not return observations. New operations are:
