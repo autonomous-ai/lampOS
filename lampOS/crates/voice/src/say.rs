@@ -53,6 +53,15 @@
 //!   root's alone; its say or sound goes first and skips every gate above
 //!   but the keeper's pause and the privacy switch, cutting the lamp's own
 //!   speech ([`is_last_words`], [`may_play_last_words`]).
+//! - **A cached line** (#3697): `text` with `"cache": true`, asked by
+//!   root's helpers only (the shutdown, [`Caller`]), is not given to the
+//!   model: it is played from the speech cache ([`tts_cache`], V1's
+//!   `_TTS_CACHE_DIR`), a WAV per line under `/var/lib/lampOS/voice/tts-cache`
+//!   named by the SHA-256 of the voice, model, language and words, rendered
+//!   once through the speech service the voice speaks with and kept, so a
+//!   lamp offline still says it. [`tts_cache::WARM`] (the shutdown's line) is
+//!   rendered at start. It is played as a recording is (the shutdown's skill
+//!   past the gates, as its last words); not kept and not renderable, it is refused at once with why.
 //! - **A built-in cue**: `cue: "hum"` makes the existing short hum at its
 //!   fixed -20 dBFS default on the client's thread, without a file or model
 //!   request. It is a sound through the same queue, quiet, rarity, privacy
@@ -69,6 +78,7 @@
 //!
 //! Nothing of what is said is logged: the skill's name, the priority and
 //! the outcome only.
+pub mod tts_cache;
 mod unplug_guard;
 
 use serde::Deserialize;
@@ -212,6 +222,9 @@ pub enum Words {
     /// One of [`RECORDINGS`], by name, until the client's thread takes its
     /// samples from [`Recordings`].
     Recording(String),
+    /// A `text` asked with `cache` by root's helpers, until the client's
+    /// thread takes its samples from the speech cache ([`tts_cache`]).
+    Cached(String),
     Sound(Vec<i16>),
 }
 
@@ -223,7 +236,11 @@ impl Words {
             Self::Note(note) => Some(note.clone()),
             Self::Text(text) => Some(format!("{AS_WRITTEN} {text}")),
             Self::Quoted(line) => Some(quoted_turn(line)),
-            Self::From(_) | Self::SoundAt(_) | Self::Recording(_) | Self::Sound(_) => None,
+            Self::From(_)
+            | Self::SoundAt(_)
+            | Self::Recording(_)
+            | Self::Cached(_)
+            | Self::Sound(_) => None,
         }
     }
 }
@@ -323,6 +340,9 @@ struct Wire {
     recording: Option<String>,
     #[serde(default)]
     cue: Option<Cue>,
+    /// A `text` played from the speech cache (#3697): root's helpers only.
+    #[serde(default)]
+    cache: bool,
     #[serde(default)]
     unplug_request: Option<String>,
     #[serde(default)]
@@ -345,8 +365,9 @@ fn invitation_id<'de, D: serde::Deserializer<'de>>(
 /// Who is at the other end of the socket, as its peer credentials say.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Caller {
-    /// Root's Wi-Fi helper (`lamp-setup wifi`, #1959): the one caller that
-    /// may ask for a [`RECORDINGS`] line.
+    /// Root: the Wi-Fi helper (`lamp-setup wifi`, #1959), the one caller
+    /// that may ask for a [`RECORDINGS`] line, and the shutdown
+    /// (`lamp-setup shutdown-now`, #3697), for a cached `text`.
     WifiHelper,
     /// Any other: a skill, a part, or a peer whose credentials are unknown.
     Other,
@@ -509,6 +530,12 @@ pub fn parse_from(line: &str, caller: Caller) -> Result<Request, String> {
     } else if skill == "prepare-unplug" && matches!(words, Words::Text(_)) {
         return Err("prepare-unplug text requires unplug_request".into());
     }
+    let words = match (wire.cache, words) {
+        (false, words) => words,
+        (true, Words::Text(text)) if caller == Caller::WifiHelper => Words::Cached(text),
+        (true, Words::Text(_)) => return Err("cache is asked by root's helpers only".into()),
+        (true, _) => return Err("cache goes only with text".into()),
+    };
     let priority = wire.priority.unwrap_or(NORMAL_PRIORITY);
     if priority > 9 {
         return Err("priority is 0 to 9".into());
@@ -824,6 +851,7 @@ impl Says {
         };
         let sounds = std::env::var_os(SOUNDS_ENVIRONMENT)
             .map_or_else(|| PathBuf::from(DEFAULT_SOUNDS), PathBuf::from);
+        let recordings = recordings.with_cache(tts_cache::from_environment());
         match Self::serve(&path, group, &sounds, recordings) {
             Ok(says) => {
                 eprintln!("lamp-voice: the say service listens at {}", path.display());
@@ -1072,7 +1100,11 @@ impl Says {
         self.next_of(|request| {
             !matches!(
                 request.words,
-                Words::From(_) | Words::SoundAt(_) | Words::Recording(_) | Words::Sound(_)
+                Words::From(_)
+                    | Words::SoundAt(_)
+                    | Words::Recording(_)
+                    | Words::Cached(_)
+                    | Words::Sound(_)
             )
         })
     }
@@ -1341,6 +1373,9 @@ fn serve_client(
                     Words::Recording(name) => {
                         request.words = Words::Sound(recordings.samples(name)?);
                     }
+                    Words::Cached(text) => {
+                        request.words = Words::Sound(recordings.cached(text)?);
+                    }
                     Words::Quoted(_) if !ADDON_SAY.load(std::sync::atomic::Ordering::Relaxed) => {
                         return Err(format!("add-on says are off ({ADDON_SAY_ENVIRONMENT})"));
                     }
@@ -1458,6 +1493,8 @@ pub const RECORDINGS: &[&str] = &["wifi_lost"];
 pub struct Recordings {
     held: Vec<(&'static str, Loaded)>,
     helper_uid: u32,
+    /// The speech cache a cached `text` is played from (#3697); none, refused.
+    cache: Option<Arc<tts_cache::TtsCache>>,
 }
 
 /// One recording's samples, or why it is not there.
@@ -1480,6 +1517,20 @@ impl Recordings {
     pub fn helper_uid(mut self, uid: u32) -> Self {
         self.helper_uid = uid;
         self
+    }
+
+    /// Cached `text`s are played from `cache` (#3697).
+    pub fn with_cache(mut self, cache: Option<Arc<tts_cache::TtsCache>>) -> Self {
+        self.cache = cache;
+        self
+    }
+
+    /// The samples of a cached `text`, kept or rendered now, or why not.
+    pub fn cached(&self, text: &str) -> Result<Vec<i16>, String> {
+        self.cache
+            .as_ref()
+            .ok_or_else(|| "the speech cache is off".to_owned())?
+            .samples(text)
     }
 
     /// The samples of `name`, or why there are none, in words the asker
@@ -2089,6 +2140,92 @@ mod tests {
         let (samples, ticket) = taken.expect("the recording reached the voice");
         assert_eq!(samples, &line_samples[..]);
         assert_eq!(ticket.skill(), "wifi");
+        ticket.answer(Outcome::Spoken);
+        assert_eq!(
+            client.join().unwrap(),
+            format!("{}\n", Outcome::Spoken.line())
+        );
+        drop(says);
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// #3697: a cached `text` is root's helpers' only, never a turn for the
+    /// model, and goes with nothing but `text`.
+    #[test]
+    fn a_cached_text_is_asked_by_roots_helpers_only() {
+        let line = r#"{"skill":"shutdown","text":"Bye.","cache":true,"expires_in_ms":1000}"#;
+        let asked = parse_from(line, Caller::WifiHelper).unwrap();
+        assert_eq!(asked.words, Words::Cached("Bye.".into()));
+        assert_eq!(asked.words.turn(), None, "never a turn for the model");
+        assert_eq!(
+            parse(&line.replace("shutdown", "chime")).unwrap_err(),
+            "cache is asked by root's helpers only"
+        );
+        assert_eq!(
+            parse_from(
+                r#"{"skill":"shutdown","note":"Bye.","cache":true,"expires_in_ms":1}"#,
+                Caller::WifiHelper
+            )
+            .unwrap_err(),
+            "cache goes only with text"
+        );
+        // Without the speech cache it is refused with why, nothing rendered.
+        assert_eq!(
+            Recordings::none().cached("Bye.").unwrap_err(),
+            "the speech cache is off"
+        );
+    }
+
+    /// #3697: the shutdown's line, warmed at start, reaches the voice as a
+    /// sound from the cache with no further render (no network), as the
+    /// shutdown asks for it. The helper is this test's own user here.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn a_warm_cached_line_is_played_with_no_render() {
+        let us = rustix::process::getuid().as_raw();
+        let dir = socket_dir("cached");
+        fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("say.sock");
+        let renders = Arc::new(AtomicUsize::new(0));
+        let counted = Arc::clone(&renders);
+        let cache = tts_cache::TtsCache::new(
+            dir.join("tts-cache"),
+            "Rachel",
+            "eleven_v4_turbo",
+            "en",
+            Box::new(move |_: &str| {
+                counted.fetch_add(1, Ordering::SeqCst);
+                Ok(vec![1_500_i16; 24_000])
+            }),
+        );
+        cache.warm(tts_cache::WARM).unwrap();
+        assert_eq!(renders.load(Ordering::SeqCst), 1);
+        let held = Recordings::none()
+            .helper_uid(us)
+            .with_cache(Some(Arc::new(cache)));
+        let mut says = Says::serve(&path, None, &dir, held).unwrap();
+        let line = format!(
+            "{}\n",
+            json!({"skill": "shutdown", "text": lamp_msgs::GOING_TO_SLEEP, "cache": true,
+                "priority": 9, "expires_in_ms": 10_000})
+        );
+        let client = {
+            let path = path.clone();
+            thread::spawn(move || exchange(&path, &line))
+        };
+        let mut taken = None;
+        for _ in 0..200 {
+            says.poll(0);
+            assert!(says.take(0).is_none(), "a cached line is no say");
+            if let Some(one) = says.take_sound(0) {
+                taken = Some(one);
+                break;
+            }
+            thread::sleep(Duration::from_millis(5));
+        }
+        let (samples, ticket) = taken.expect("the cached line reached the voice");
+        assert_eq!(samples, vec![1_500_i16; 24_000]);
+        assert_eq!(renders.load(Ordering::SeqCst), 1, "played from the cache");
         ticket.answer(Outcome::Spoken);
         assert_eq!(
             client.join().unwrap(),

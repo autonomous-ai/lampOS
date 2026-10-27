@@ -111,6 +111,12 @@ pub use speaker_state::*;
 /// The memory's id for a person the eyes know, and the `known` file (#2176).
 pub mod known;
 
+/// The safe shutdown's line (#3697, `docs/shutdown.md`): said by
+/// `lamp-setup shutdown-now` and rendered ahead into the voice's speech
+/// cache, which is keyed by these exact words, so both take them from here.
+/// The ring's unplug light is soft green.
+pub const GOING_TO_SLEEP: &str = "Going to sleep now. Unplug me when my light turns green.";
+
 /// Why a message is not one its type allows, in words.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Invalid(pub String);
