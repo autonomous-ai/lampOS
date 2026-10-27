@@ -1,0 +1,17 @@
+{
+  "compiler_list_copy_runtime_or_audit_replays": 0,
+  "failure": "Post-final statuslabel assertion expected stale VERIFIED_DAD8_2E66 but independent auditor wrote correct VERIFIED_DAD_RUNTIME8.",
+  "identity": {
+    "base": "dadacc1bc2fe2e285ed5125a32dd6fe483c01991",
+    "head": "be86f79eba4f58399fc6c9743c8dd7b8663f292c",
+    "tree": "dfdfa4e4d242241de43f3256b70b539690bfccef"
+  },
+  "independent_final_auditor_exit": 0,
+  "independent_final_log_sha256": "b94fd16a797a443d0718bea454b9916040f61293773af1c037c6d5f413e1e65e",
+  "original_dispatcher_and_terminal_preserved": true,
+  "original_dispatcher_sha256": "d4e19fd596596d5af66906214c941f08a9c98319aca39ad24296f31c51acabf7",
+  "original_gate_terminal_sha256": "bd767334ddd98cc08d1e096cba9ae1bff4ae5963e5fe22da3deb76c0daf55da3",
+  "parent_handle26099_exit": 125,
+  "post_assembly_current_guard_passed": true,
+  "qualified_receipt_sha256": "d4aa98605ec8ef5f1e34d228c0ea5dd84e40f9e1d1201cadcf623b514d694b96"
+}

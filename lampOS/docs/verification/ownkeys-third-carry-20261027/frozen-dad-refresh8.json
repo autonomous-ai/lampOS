@@ -1,0 +1,194 @@
+{
+  "Linux_previous8_and_newmeasure1_not_executed": true,
+  "all_source_raw_helper_lock_depinfo_actual_saved_guards_match": true,
+  "caught_Round_hooks_current_scope": 0,
+  "compiler_features_opaqueIDs_actual": true,
+  "counts": {
+    "failed": 0,
+    "ignored": 0,
+    "passed": 8
+  },
+  "current_executable_paths": 15,
+  "discovery_drivers": 6,
+  "discovery_required": 26,
+  "drivers": 3,
+  "expected_should_panic": 0,
+  "hashes": {
+    "audit-dad.py": "8d8c68d6d690bc427739b85eaf106c28de7c70c40a8241ee4f6c496635915466",
+    "compiler-artifact-records.json": "84d741791745368e4e001a74807192eeb846642eff84d815b5e1f1cc412fa3d1",
+    "compiler-plan.json": "ea5be29aff6a38b93f765424f968467268e8ab66f2affb962e3dc8909f104563",
+    "compiler.terminal.json": "ebac6b51f22db7ce98a1bb5427c2fea9792a0ea05c546b0333174093b4be177b",
+    "current-artifacts.json": "8691cdcf59be824f61c9695731a71eec262dd5fb19a9717f7bbb7f669fd3ee03",
+    "emitted-features.json": "095d7177b4d73397331b611fcaf9dd728fe9f814a32bedf69568a0ecd2bab31b",
+    "expected-should-panic.json": "d8bff422f481b034e4ca65c39ed1357f3f570c5da44ffb0a07aaaddb238589df",
+    "immutable-saved153.json": "51c938296dd1847d5ca5e85cb3987c7180503d4ea8aef1bd2b7ff35b48e682e1",
+    "metadata.json": "1fa9740222eca7c074222ba9e6bc1754864bd60c5665874c7e2e46846880c71c",
+    "normal-child-current-admission.json": "7e73d5ef00bb3a52889d00880eb4dd58d550f12e84159261eada0f0817869f84",
+    "required-cases.json": "b4bcdf0f30132f6d001a95ad385119ccea8097000f27c75eb9f64cb24e5cd3ec",
+    "root-approval.json": "9a5a442d1ace81310cb84098464e8c2fab4c2a8db6d0812802b5473c11bfe236",
+    "runtime-plan.json": "a5ea18b3c70fd722142f2f130b9612db5b9c1442004c250f01ddc32e1587d300",
+    "scope-plan.json": "fd8c305d6c53cc3563c110085994b3c6b7fc8e4574a2dfe5eee94baf5c3f5697",
+    "source-audit-receipt.json": "f4782a515b513d976a608c1be78cf21acd047ed1026a308af4c0da317094c8f7",
+    "unit-switch-current-bindings.json": "b6eea3bbd5b70c1a20337706d7679c1f605f19401f661b09d6e694ef925dcc22"
+  },
+  "historical318_current_credit_transferred": false,
+  "historical44_caught4_not_imported": true,
+  "historical_holds": [
+    "Own3646 DRAFT broker2094; no activation/device/provider",
+    "539Reader failure remains unexplained/unwaived",
+    "#3890 parallelreport not rerun/repaired/waived"
+  ],
+  "holds": [],
+  "host_required": 8,
+  "identity": {
+    "base": "dadacc1bc2fe2e285ed5125a32dd6fe483c01991",
+    "head": "be86f79eba4f58399fc6c9743c8dd7b8663f292c",
+    "tree": "dfdfa4e4d242241de43f3256b70b539690bfccef"
+  },
+  "independent_saved_paths": 15,
+  "metadata_local_packages": 49,
+  "metadata_workspace_members": 47,
+  "no_Memory_semantic_or_feature_expansion": true,
+  "normal_build_roots": 5,
+  "normal_runtime_children": [
+    "lamp-skills"
+  ],
+  "observed_should_panic": [],
+  "own_selected": 0,
+  "phase": "final",
+  "prior153_saved_match": true,
+  "results": [
+    {
+      "cases": {
+        "a_late_line_from_a_dropped_body_connection_never_ends_a_newer_lease": [
+          {
+            "line": 3,
+            "status": "ok"
+          }
+        ]
+      },
+      "label": "runtime-02-lamp-control-door",
+      "log_sha256": "776858a68ca650c10ba3681b40cb2dfba9cd2d25e8d70262e3d77a60c4fd80a7",
+      "summaries": [
+        {
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 1,
+          "status": "ok"
+        }
+      ]
+    },
+    {
+      "cases": {
+        "session::tests::grants_leases_the_body_holder_and_rates_are_checked_before_the_part": [
+          {
+            "line": 3,
+            "status": "ok"
+          }
+        ],
+        "session::tests::say_and_sound_are_refused_in_the_quiet_hours_and_while_the_time_is_unknown": [
+          {
+            "line": 4,
+            "status": "ok"
+          }
+        ]
+      },
+      "label": "runtime-03-lamp-control-lamp_control",
+      "log_sha256": "062328c57d6c5ca16dc608abe54393e74a75b396e8ef40398b5d93b6201642ee",
+      "summaries": [
+        {
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 2,
+          "status": "ok"
+        }
+      ]
+    },
+    {
+      "cases": {
+        "format::the_schemas_lists_are_the_codes": [
+          {
+            "line": 3,
+            "status": "ok"
+          }
+        ],
+        "made::a_made_skill_that_does_more_than_it_declares_or_may_is_not_kept": [
+          {
+            "line": 4,
+            "status": "ok"
+          }
+        ],
+        "package::a_packages_signature_is_carried_and_not_checked": [
+          {
+            "line": 6,
+            "status": "ok"
+          }
+        ],
+        "shared::an_authors_package_carries_their_key_and_names_them": [
+          {
+            "line": 7,
+            "status": "ok"
+          }
+        ],
+        "shared::unsigned_store_signed_changed_or_misnamed_packages_are_refused": [
+          {
+            "line": 8,
+            "status": "ok"
+          }
+        ]
+      },
+      "label": "runtime-05-lamp-skills-it",
+      "log_sha256": "0549602b4932aa9be74ffc65da2437550517a55fe784445bb945a5c70604a8b8",
+      "summaries": [
+        {
+          "failed": 0,
+          "ignored": 0,
+          "measured": 0,
+          "passed": 5,
+          "status": "ok"
+        }
+      ]
+    }
+  ],
+  "selected_case_unrun": 0,
+  "status": "VERIFIED_DAD_RUNTIME8",
+  "strict_roots": 5,
+  "unique_actual_discovery": 26,
+  "unknown_panics": [],
+  "witnesses": {
+    "lamp-control::door::a_late_line_from_a_dropped_body_connection_never_ends_a_newer_lease": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-control::lamp_control::session::tests::grants_leases_the_body_holder_and_rates_are_checked_before_the_part": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-control::lamp_control::session::tests::say_and_sound_are_refused_in_the_quiet_hours_and_while_the_time_is_unknown": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-skills::it::format::the_schemas_lists_are_the_codes": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-skills::it::made::a_made_skill_that_does_more_than_it_declares_or_may_is_not_kept": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-skills::it::package::a_packages_signature_is_carried_and_not_checked": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-skills::it::shared::an_authors_package_carries_their_key_and_names_them": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-skills::it::shared::unsigned_store_signed_changed_or_misnamed_packages_are_refused": {
+      "own": false,
+      "pass_once": true
+    }
+  }
+}

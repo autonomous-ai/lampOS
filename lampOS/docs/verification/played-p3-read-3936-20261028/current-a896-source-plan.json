@@ -1,0 +1,75 @@
+{
+  "baseline_facc_to_af": [
+    {
+      "facc_and_af_bytes_equal": true,
+      "path": "lampOS/tools/played/README.md",
+      "sha256": "fe66cfad4fa4368f0790459c997178b0011a1024ad79dd9538621469f385dc07"
+    },
+    {
+      "facc_and_af_bytes_equal": true,
+      "path": "lampOS/tools/played/make-skill.sh",
+      "sha256": "e26bea28f68253e7aca85c998fe61d788ff34e628ce1c34cb0d68948cb21ba3e"
+    },
+    {
+      "facc_and_af_bytes_equal": true,
+      "path": "lampOS/tools/played/make-skill-test.sh",
+      "sha256": "982bdf8c611183510b018186b909c5e54f0676b402926802fff66636cccee6f3"
+    },
+    {
+      "facc_and_af_bytes_equal": true,
+      "path": "lampOS/tools/played/stand-in.sh",
+      "sha256": "4be23b62b781d2a64e98392593c8af1394e0e6f3b87b518e39a3e68747fd0c02"
+    },
+    {
+      "facc_and_af_bytes_equal": true,
+      "path": "lampOS/tools/played/stand-in-test.sh",
+      "sha256": "c18ec34dff356029cfbf74529f66c22df365e495cd3ca3c42f4e8dc61d30ad5d"
+    }
+  ],
+  "head": "a8962558b93c0efd6f89ba01b6d5a350270ea296",
+  "limits": [
+    "Source review and two controlled probes only. No peer source edits, commits, pushes, public posts, Cargo/shared bank, real SSH/sudo/service/audio/device/network operations.",
+    "Original controller1 retained; subject0 transcripts transcribed from native output with explicit provenance, not a newly persisted raw terminal log. No subject rerun."
+  ],
+  "owned_paths": {
+    "lampOS/tools/played/README.md": {
+      "mode_blob": "100644 blob 1eb1baddf79b5b3242d11ea889261666d21be744\tlampOS/tools/played/README.md",
+      "sha256": "99015aab9e30c0e56d3942423205a6714db2ffe75720c01eb44f4b6a12f9d23a"
+    },
+    "lampOS/tools/played/make-skill-test.sh": {
+      "mode_blob": "100755 blob 095d18a791cba1819f2bec087e3f81c31b3358a1\tlampOS/tools/played/make-skill-test.sh",
+      "sha256": "a25447a77c37534b9cf29a1562860f42f2dab3e00e55976d39300db6492ddd16"
+    },
+    "lampOS/tools/played/make-skill.sh": {
+      "mode_blob": "100755 blob 5cde28e71d4611728bd64ea83385c898123284bf\tlampOS/tools/played/make-skill.sh",
+      "sha256": "ffa1ecb7cb2bfcc46d839d86c726b606e43e005b9147321272e9dc8d274da45c"
+    },
+    "lampOS/tools/played/stand-in.sh": {
+      "mode_blob": "100755 blob 6d050281b4e8344e434f0d221bf48cf34f26966f\tlampOS/tools/played/stand-in.sh",
+      "sha256": "320d8ad18cf594a406f355665833642370f0347cb539f6f03f6b7085ca5b1ac5"
+    }
+  },
+  "parent": "af546143a9d30f3b3062bb7a6efbc215e3bfcef3",
+  "proposed_repair_gate": [
+    "First rerun only two tiny stop-exit17 controls against the repaired actual functions/guard: no restore mutation or backup deletion, nonzero result, cleanup/restart still reached.",
+    "Then run an actual committed focused entry point covering empty-subtree copy refusal, save-cut, part-left, both/guard ordering, successful restore, prior digest/link refusals and both new stop-failure paths. Exact command must be supplied/committed, not an invented flag or ad-hoc sleep reduction.",
+    "Run applicable four source syntax checks, generated-restore sh-n and committed stand-in suite once.",
+    "Full original make-skill suite <=1200s is deferred until repair; consider it only if focused committed coverage cannot cover global save/trap/arm cleanup composition. No current full811 rerun."
+  ],
+  "remaining_source_review": [
+    "Folder manifests now enumerate directories and regular files, record d/f entries plus entry count, and require both successful manifests to match. This addresses the earlier injected empty-subtree omission in source; current runtime repair closure not claimed while P2 remains.",
+    "Save writes into fresh0700 SAVED.part; final SAVED must be absent, both path kinds are recorded, manifests compared, done written, then part renamed. The stored script embeds final SAVED path. Main only proceeds to stand-in setup after successful save.",
+    "An interrupted save before rename leaves only part and does not authorize guard restore. The next preflight checks both existing final and part including symlinks, refuses before uploads/save, and prints explicit recovery. A late failure after rename retains final saved state because the failure cleanup removes only part. No simultaneous external-writer snapshot claim.",
+    "Per-arm reset remains unchanged with Voice running, as explicitly scoped. End-of-run and guard stop success are intended to be prerequisites, but the ignored-error P2 defeats that requirement. Main and guard must skip destructive restore on failed stop while continuing cleanup/restart and retaining nonzero failure status.",
+    "Existing focused controls only make stop succeed: local mock echoes stop, generated-guard mock records stop. Neither injects stop failure. No committed focused selector or executable entry point was found in the full test script.",
+    "No new broad writer race, real storage fault, physical restart/dependency or device-acceptance proof is supplied. System-unit claims and author811s/56 results remain separate source/producer evidence."
+  ],
+  "source_findings": [
+    {
+      "proof": "publication-stop-failure-HOLD.json",
+      "proof_sha256": "0a074b3463d453c92f8d4db13ca08ebfeee56972023e30a8faaf1869233c9a9c",
+      "severity": "P2",
+      "title": "Both stop-before-restore paths ignore stop failure"
+    }
+  ]
+}
