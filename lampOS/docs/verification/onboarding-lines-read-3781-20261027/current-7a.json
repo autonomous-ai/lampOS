@@ -1,0 +1,136 @@
+{
+  "head": "7a7587c23ff1268adb71ee20b713c4937ac1865f",
+  "stages": [
+    {
+      "stage": "fmt",
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "returncode": 0,
+      "timed_out": false,
+      "reaped": true,
+      "process_group": "absent",
+      "cleanup": [],
+      "seconds": 12.19,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "stage": "clippy",
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "clippy",
+        "--locked",
+        "-q",
+        "-p",
+        "lamp-voice",
+        "-p",
+        "lamp-skills",
+        "--all-targets",
+        "--message-format=short",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "returncode": 0,
+      "timed_out": false,
+      "reaped": true,
+      "process_group": "absent",
+      "cleanup": [],
+      "seconds": 131.11,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "stage": "voice-onboarding",
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--locked",
+        "-q",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "onboarding",
+        "--",
+        "--test-threads=2"
+      ],
+      "returncode": 0,
+      "timed_out": false,
+      "reaped": true,
+      "process_group": "absent",
+      "cleanup": [],
+      "seconds": 196.45,
+      "log_sha256": "db1872136250167180001363e685b4f4edd819294e259cb31307f895ed9184b0",
+      "summaries": [
+        [
+          "ok",
+          "152",
+          "0",
+          "0"
+        ]
+      ]
+    },
+    {
+      "stage": "skills-onboarding",
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--locked",
+        "-q",
+        "-p",
+        "lamp-skills",
+        "--test",
+        "it",
+        "onboarding",
+        "--",
+        "--test-threads=1"
+      ],
+      "returncode": 0,
+      "timed_out": false,
+      "reaped": true,
+      "process_group": "absent",
+      "cleanup": [],
+      "seconds": 96.48,
+      "log_sha256": "4853321dcfc0af830e24308bc88609ae788a07df5a37f0f156cc93627680c2fc",
+      "summaries": [
+        [
+          "ok",
+          "5",
+          "0",
+          "0"
+        ]
+      ]
+    }
+  ],
+  "source_hashes_unchanged": 7360,
+  "limits": [
+    "Exact current7a host onboarding and focused Skills only; no full Skills claim by Third",
+    "Author full Skills553pass result separately attributed, not re-executed",
+    "No Linux/native, physical new-person or old-file full startup/timeout/retry acceptance",
+    "Not a claim of full old-definition service startup/timeout/second retry flow",
+    "Paused/reoffered wording and physical/new-person checks stay with follow-up/holder"
+  ],
+  "base": "3b9bfb628e1c416926b958fecf56f65c539dc533",
+  "previous_head": "141c557ba838b0dc47f7a8e74c888b089879b9f7",
+  "added_deleted_payload_exact": true,
+  "payload_sha256": "c55ac2d8cf3fbadc572570b9cfa09dfa10c364f85c1f40329f5216794bb74d40",
+  "range_diff": "1:  141c557ba ! 1:  7a7587c23 lampOS: onboarding's touch and giving way say exact lines from the skill: what to do, what if it didn't work, and that it worked, before the next step (#3769)\n    @@ lampOS/crates/voice/src/onboarding/giving_way.rs\n     +pub use super::legacy_words::{GIVE_AGAIN, GIVE_ASK, GIVE_DONE, GIVE_FAILED};\n      \n      use super::{\n    -     FRESH_MS, GONE_US, Onboarding, Outcome, SIT_GIVE_UP_US, START_QUIET_US, STEP_GIVE_UP_US, Step,\n    +     Delivery, FRESH_MS, GONE_US, MOST_UNSAID, NOT_SAID, Onboarding, Outcome, SIT_GIVE_UP_US,\n     @@ lampOS/crates/voice/src/onboarding/giving_way.rs: impl Onboarding {\n              }\n              offer.claimed = true;\n    @@ lampOS/crates/voice/src/onboarding/skill/tests.rs: fn invalid_sequence_bounds_wo\n      ## lampOS/docs/onboarding.md ##\n     @@ lampOS/docs/onboarding.md: ready, not paused) and a face is in front of it.\n      | 1 | `where_you_sit` | asks them to sit where they usually sit and look at it | the eyes' largest fresh face (`humans/faces/tracked`) is at least 0.14 of the picture's height with its centre within 0.35 of the middle (the lead's chair at about 1 m, row 10 on lamp-52e6 on 21 October, gave size 0.15, x 0.05, y -0.26: a seated person is a little high in a lamp's picture), held 3 s while the head is still and no hand is on the lamp (every head joint, `base_yaw`, `head_pitch`, `head_roll` on `body/joint_states`, within 6 counts of its goal, slower than 25 counts a second, and the same goals as the last reading; `body/hand` not pushed; each reading fresh, within 0.7 s; any motion, or a reading stale or missing once there is any sign of a body, starts the 3 s again, and a hand not freshly released counts as still there. Any sign stays: either topic present at all (fresh, stale, unparseable, or a read that failed) or any `body/` topic or declaration on the bus. Only a lamp with no body at all goes without that gate): done, and the lamp says so. While the step is led the voice tells the body it listens between turns (`Onboarding::looking`), so the body's gaze turns the head to the face in small corrections, as a creature looks at someone, before anything is asked of the person. Short of that, after 8 s of quiet, one note (only one, ever) says what is missing: no face, or \"a bit closer\" / \"turn me a little toward you\" with \"where you are is fine too\". \"Turn me\" waits until a face big enough has been in view, looked at, for 5 s: the lamp asks to be moved only when its own look still has the person off the middle. After that note any face held 3 s the same way is done where it is, its framing kept: a person sitting beside the lamp (row 10 on lamp-52e6, the face at x 0.12, y -0.63) would just say \"there's fine\". After 60 s: failed, and the lamp says they can turn it toward their seat later or redo the setup | the framing (size, centre) |\n    - | 2 | `who_you_are` | asks what to call them; after a clear yes, `remember_my_face` ([eyes.md](eyes.md)) when the voice has it (`LAMP_EYES_WHO_SOCKET`, and eyes that recognise); without it, the name only, never `remember` | a name heard (\"call me \u2026\", \"my name is \u2026\", \"I'm \u2026\", \"I am \u2026\", \"it's \u2026\", or a name alone, one or two words and no question) and then a yes (\"yes\", \"that's fine\", \u2026) heard after it: the walk ends the step itself (`onboarding_heard`; row 10 on lamp-52e6, 21 October: named and agreed, never reported). The word after \"I'm\" and the others is no name when it is fine, good, okay, ok, not, sure, here, ready, sorry, just, back, busy, tired, the lamp's name (\"lamp\") or a yes or no word; a name alone also never is what, huh, hmm, um, uh, hey, hi or hello. A no after a name takes it back. The model's `setup_step` call is a second way in, as soon as the name (and the face, if asked) is settled. A face `remember_my_face` saves while this step is led is a third: the eyes' `ok` ends it as done through the same mailbox, so a chat that saves the face never leaves the step without an outcome (#3740, a tester's 7071 lamp on 27 October); a refused save, or one at any other time, changes nothing. A name heard with no yes is done, not failed, at the 90 s give-up. The name's words are not kept: the walk's record says `\"name_kept\": false`, as the model's own call keeps none. This reading is for the nudge off: with the nudge on (`LAMP_ONBOARDING_NUDGE`), the step ends only through the nudge's own path, where the name is asked back and kept on a yes (`onboarding_nudge`, `\"name_confirmed\": true`). The two never both end it (the first builder on #2526) | the face in the eyes' people file, when asked and agreed; otherwise nothing |\n    + | 2 | `who_you_are` | asks what to call them; after a clear yes, `remember_my_face` ([eyes.md](eyes.md)) when the voice has it (`LAMP_EYES_WHO_SOCKET`, and eyes that recognise); without it, the name only, never `remember` | a name heard (\"call me \u2026\", \"my name is \u2026\", \"I'm \u2026\", \"I am \u2026\", \"it's \u2026\", or a name alone, one or two words and no question) and then a yes (\"yes\", \"that's fine\", \u2026) heard after it: the walk ends the step itself (`onboarding_heard`; row 10 on lamp-52e6, 21 October: named and agreed, never reported). The word after \"I'm\" and the others is no name when it is fine, good, okay, ok, not, sure, here, ready, sorry, just, back, busy, tired, the lamp's name (\"lamp\") or a yes or no word; a name alone also never is what, huh, hmm, um, uh, hey, hi or hello. A no after a name takes it back. The model's `setup_step` call is a second way in, as soon as the name (and the face, if asked) is settled. A face `remember_my_face` saves while this step is led is a third: the eyes' `ok` ends it as done through the same mailbox, so a chat that saves the face never leaves the step without an outcome (#3740, a tester's 7071 lamp on 27 October); a refused save, or one at any other time, changes nothing. Nobody is known yet in this step, so every save there is the room's: a visitor's \"remember my face\" during it ends the step too, which the scope can't tell apart (the Reviewer-lead on #3746). The walk's record names it (`onboarding_face_saved`), and with the nudge on its `onboarding_nudge` line says `\"reported\": false`, since the model made no `setup_step` call. A name heard with no yes is done, not failed, at the 90 s give-up. The name's words are not kept: the walk's record says `\"name_kept\": false`, as the model's own call keeps none. This reading is for the nudge off: with the nudge on (`LAMP_ONBOARDING_NUDGE`), the step ends only through the nudge's own path, where the name is asked back and kept on a yes (`onboarding_nudge`, `\"name_confirmed\": true`). The two never both end it (the first builder on #2526) | the face in the eyes' people file, when asked and agreed; otherwise nothing |\n      | 3 | `how_you_sound` | the core onboarding skill requests a short prompt: stay in their usual seat and call the lamp's name once (#1803, below); then one to say a sentence from there in their own words | the name part: three accepted calls make a bar and its file is written; five prompts can't reach three, or the calls spread over 10 dB: no bar. Then the sentence part, whose outcome is the step's: a line heard with words, said close, its words covering it: done; short of that, coached once (\"a little louder\" or \"a little closer\"), then done or failed | the prompts and accepted tries (`rise_db`, `score`); the bar in `/var/lib/lampOS/voice/near-call.json`; the sentence's prompt count only |\n     -| 4 | `touch` | asks them, in a few words, to touch the top of its head gently, then stays quiet | a head-pad touch from Controls (`controls/touch`, `lamp_msgs/TouchEvent` from `controls`, `source: head`, enabled; `lamp-controls --touch`) after the ask: done. Short of that, after 8 s of quiet, one reminder; 60 s after the ask: failed. The model may only skip it. Not available without the voice's bus (`LAMP_BUS=on`) or the subscription to `controls/touch`; the base strip stays off (#1891) | the outcome only |\n     +| 4 | `touch` | says exactly \"Tap the top of my head once, then let go.\" (see \"Exact lines\" below), then stays quiet | a head-pad touch from Controls (`controls/touch`, `lamp_msgs/TouchEvent` from `controls`, `source: head`, enabled; `lamp-controls --touch`) after the ask: done. Short of that, after 8 s of quiet, one reminder, \"I didn't feel that. Tap a little firmer, right on top of my head.\"; 60 s after the ask: failed. Either end is said (`touch_done`, `touch_failed`) before the next step is asked. The model may only skip it. Not available without the voice's bus (`LAMP_BUS=on`) or the subscription to `controls/touch`; the base strip stays off (#1891) | the outcome only |\n",
+  "total_focused_runtime": {
+    "passed": 157,
+    "failed": 0,
+    "ignored": 0
+  },
+  "review_decision": "Third source and current composition HOLDs closed; READ-OK7a",
+  "preserved_base_composition": [
+    "7547545e0 no-sleep onboarding active guard",
+    "b966143b7 Unsaid and attempt refund logic",
+    "932f47298 face-save provenance"
+  ]
+}
