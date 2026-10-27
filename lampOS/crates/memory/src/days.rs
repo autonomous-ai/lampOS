@@ -1888,6 +1888,32 @@ impl Days {
             return Ok(vec![]);
         }
         let output = &theirs;
+        // What they stated is kept, never a question they asked
+        // (`tidy::only_asked`, finding N10 on #3504).
+        let stated = tidy::Output {
+            observations: output
+                .observations
+                .iter()
+                .filter(|proposal| !tidy::only_asked(&input, proposal))
+                .cloned()
+                .collect(),
+        };
+        let asked = output.observations.len() - stated.observations.len();
+        if asked > 0 {
+            eprintln!(
+                "lamp-memory: tidy_apply left out {asked} of {} observations keeping only a question",
+                output.observations.len()
+            );
+        }
+        if stated.observations.is_empty() {
+            tx.execute(
+                "UPDATE jobs SET state='done',input='',result='[]' WHERE job=?",
+                [job],
+            )?;
+            tx.commit()?;
+            return Ok(vec![]);
+        }
+        let output = &stated;
         validate_sources(&tx, person, &input.source_ids, true)?;
         let count: u64 = tx.query_row(
             "SELECT count(*) FROM entries WHERE person=? AND kind='observation'",
