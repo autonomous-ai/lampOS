@@ -20,8 +20,9 @@
 # never touched.
 #   PLAYED_REMOTE     the stand-in's folder (default /usr/local/lib/played-stand-in; /run may be noexec)
 #   PLAYED_GUARD_S    how long the lamp's guard waits, whole seconds (default 3600)
-#   PLAYED_RESTORE    a script the guard runs first, as /bin/sh, when it is still there (make-skill.sh's saved copy
-#                     of the voice's state, kept outside PLAYED_REMOTE, which removes itself once put back and checked)
+#   PLAYED_RESTORE    a script the guard runs first, as /bin/sh, when it is still there, with lamp-voice stopped
+#                     (make-skill.sh's saved copy of the voice's state, kept outside PLAYED_REMOTE, which removes
+#                     itself once put back and checked)
 # and, for stand-in-test.sh, PLAYED_UNITS (where the drop-ins go, default /run/systemd/system), SYSTEMCTL and
 # SYSTEMD_RUN.
 # The lamp's guard: before the drop-ins are written, `in` arms a systemd-run timer (zz-played-stand-in-guard) that
@@ -29,7 +30,8 @@
 # and the next run's `in` replaces it. So a Mac that sleeps or drops off mid-run, and never runs `out`, leaves the
 # lamp changed for at most that long, not overnight (lamp-0c89, 22 Oct, with full-look-row.sh, #3195). A skill a
 # make-skill.sh run put on is not the guard's: that run removes it itself; the voice's state it saved is, through
-# PLAYED_RESTORE, put back before anything else (Third's P2 on #3889).
+# PLAYED_RESTORE, put back before anything else (Third's P2 on #3889), with lamp-voice stopped first so it writes
+# none of it meanwhile; the guard's restart starts it again (El's P3 on #3889).
 REMOTE=${PLAYED_REMOTE:-/usr/local/lib/played-stand-in}
 UNITS=${PLAYED_UNITS:-/run/systemd/system}
 SYSTEMCTL=${SYSTEMCTL:-systemctl}
@@ -135,7 +137,7 @@ in)
   # would expand in the unit's command line.
   unguard
   restore=""
-  [ -z "${PLAYED_RESTORE:-}" ] || restore="[ ! -e $PLAYED_RESTORE ] || /bin/sh $PLAYED_RESTORE; "
+  [ -z "${PLAYED_RESTORE:-}" ] || restore="[ ! -e $PLAYED_RESTORE ] || { systemctl stop lamp-voice; /bin/sh $PLAYED_RESTORE; }; "
   $SYSTEMD_RUN --unit=$GUARD --on-active="${GUARD_S}s" /bin/sh -c \
     "${restore}rm -f $TASKS_DROP $VOICE_DROP; systemctl daemon-reload; systemctl restart lamp-tasks lamp-voice; rm -rf $REMOTE" \
     >/dev/null || fail "arming the lamp's guard (systemd-run) failed"
