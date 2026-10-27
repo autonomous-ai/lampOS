@@ -1,0 +1,57 @@
+# lampOS cloud: the lamp on the company broker, so the Autonomous app sees it online and its
+# page can ask it things (lampOS/docs/cloud.md, #1396). Off unless set: a drop-in turns it on,
+#   [Unit]
+#   Conflicts=os-server.service
+#   [Service]
+#   Environment=LAMP_CLOUD=on
+# V1's os-server connects with the same client id (os-server-{device_id}), so only one of them
+# may run. The conflict is in that drop-in, not here: an off lamp-cloud must never stop
+# os-server, on a lamp put back to V1 with lampOS's units still enabled (the reviewer on #1418).
+[Unit]
+Description=lampOS cloud (lamp-cloud)
+PartOf=lampos.target
+# Not before setup has finished (#806), and only with setup's account, the voice's key and
+# lamp-update's state to hand in: without them it has nothing to say who the lamp is.
+ConditionPathExists=/var/lib/lampos-setup/done
+ConditionPathExists=/etc/lampOS/setup/backend.json
+ConditionPathExists=/etc/lampOS/voice/credential
+ConditionPathExists=/var/lib/lampos-update/state.json
+After=network-online.target lamp-actions.service
+Wants=network-online.target
+StartLimitIntervalSec=600
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=lampos
+Group=lampos
+Slice=lampos-parts.slice
+# A login a ping rotated, kept 0600; the reset empties it.
+StateDirectory=lampos-cloud
+StateDirectoryMode=0700
+Nice=5
+# Root's files, handed in by systemd: setup's account (the broker's login and the two channels),
+# the voice's key (the ping's bearer) and lamp-update's state (the build, for `version`).
+LoadCredential=account:/etc/lampOS/setup/backend.json
+LoadCredential=key:/etc/lampOS/voice/credential
+LoadCredential=build:/var/lib/lampos-update/state.json
+ExecStart=/opt/lampOS/cloud/current/lamp-cloud --bus-root /run/lampos-bus
+Restart=on-failure
+RestartSec=5s
+StandardInput=null
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=lamp-cloud
+NoNewPrivileges=yes
+ProtectSystem=strict
+# The bus (the microphones, health and the light) and lamp-actions' socket (the volume).
+ReadWritePaths=/run/lampos-bus /run/lampos-actions
+ProtectHome=yes
+PrivateTmp=yes
+# No capability is needed (Fourth on #1404): the broker, the ping and the bus. Netlink is for `iw`,
+# which says the Wi-Fi's name.
+CapabilityBoundingSet=
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX AF_NETLINK
+
+[Install]
+WantedBy=lampos.target

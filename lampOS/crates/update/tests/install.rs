@@ -857,6 +857,7 @@ fn a_failed_exit_note_write_keeps_reload_debt_for_the_next_install() {
     fs::create_dir_all(lamp.on(blocked)).unwrap();
     let why = lamp.install().unwrap_err();
     assert!(why.contains(blocked), "{why}");
+    assert!(why.starts_with("units not all written: "), "{why}");
     assert!(lamp.state().systemd_owed);
     assert!(
         lamp.on("/etc/systemd/system/lamp-actions.service.d/exit-note.conf")
@@ -4910,6 +4911,182 @@ fn install_head_body_refuses_calibration_environment_overrides_before_mutation()
         assert_eq!(tree(&lamp.root), before);
         assert!(lamp.host.calls.is_empty(), "{:?}", lamp.host.calls);
     }
+}
+
+/// lamp-c0a4's base units after an install to stable (#3733): its
+/// `lamp-*.service` units as `deploy/product/` was on 19 Oct
+/// (4de8ebe1c), from before lamp-cloud was on in the product.
+fn units_of_19_oct() -> Vec<(String, String)> {
+    let folder = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/units-19-oct");
+    let mut units: Vec<(String, String)> = fs::read_dir(folder)
+        .unwrap()
+        .map(|entry| {
+            let path = entry.unwrap().path();
+            let name = path.file_name().unwrap().to_string_lossy().into_owned();
+            (name, fs::read_to_string(&path).unwrap())
+        })
+        .collect();
+    units.sort();
+    assert!(
+        units.iter().any(|(name, text)| name == "lamp-cloud.service"
+            && text.contains("Off unless set: a drop-in turns it on")),
+        "the fixture is 19 Oct's"
+    );
+    units
+}
+
+/// A lamp whose `/etc/systemd/system/` holds 19 Oct's units, and no drop-in.
+fn a_lamp_of_19_oct(leave_out: &[&str]) -> Lamp {
+    let lamp = Lamp::new(188, leave_out);
+    let units = lamp.on(install::UNITS);
+    fs::create_dir_all(&units).unwrap();
+    for (name, text) in units_of_19_oct() {
+        fs::write(units.join(name), text).unwrap();
+    }
+    lamp
+}
+
+/// What `systemctl cat` would print for every product unit on the lamp.
+fn printed(lamp: &Lamp) -> String {
+    PRODUCT
+        .iter()
+        .filter(|(name, _)| !name.starts_with('/'))
+        .filter_map(|(name, _)| {
+            let path = format!("{}{name}", install::UNITS);
+            let text = fs::read_to_string(lamp.on(&path)).ok()?;
+            Some(format!("# {path}\n{text}\n"))
+        })
+        .collect()
+}
+
+/// #3733: today's install over 19 Oct's units writes every product unit as
+/// the build has it, lamp-cloud's with `LAMP_CLOUD=on`; check-units names
+/// the old lamp-cloud before, and passes the units after.
+#[test]
+fn an_install_over_19_octs_units_writes_each_as_the_build_has_it() {
+    use lamp_update::check_units;
+    let mut lamp = a_lamp_of_19_oct(&[]);
+    let before = check_units::check(
+        &check_units::embedded(),
+        &check_units::parse(&printed(&lamp)),
+    );
+    assert!(!before.passes());
+    assert!(matches!(
+        before.units["lamp-cloud.service"],
+        check_units::Verdict::Differs(_)
+    ));
+    let said = before.said();
+    assert!(
+        said.contains("unit /etc/systemd/system/lamp-cloud.service leaves LAMP_CLOUD off; the product sets it on\n"),
+        "{said}"
+    );
+
+    lamp.install().unwrap();
+    let mut services = 0;
+    for (name, text) in PRODUCT {
+        if !(name.starts_with("lamp-") && name.ends_with(".service")) {
+            continue;
+        }
+        services += 1;
+        let path = format!("{}{name}", install::UNITS);
+        assert_eq!(fs::read_to_string(lamp.on(&path)).unwrap(), *text, "{name}");
+    }
+    assert!(services >= units_of_19_oct().len());
+    let cloud = fs::read_to_string(lamp.on("/etc/systemd/system/lamp-cloud.service")).unwrap();
+    assert!(
+        cloud
+            .lines()
+            .any(|line| line == "Environment=LAMP_CLOUD=on")
+    );
+    let after = check_units::check(
+        &check_units::embedded(),
+        &check_units::parse(&printed(&lamp)),
+    );
+    assert!(
+        after
+            .units
+            .values()
+            .all(|verdict| *verdict == check_units::Verdict::Same),
+        "{}",
+        after.said()
+    );
+    assert!(after.switches_off.is_empty(), "{:?}", after.switches_off);
+}
+
+/// #3733: an install that ends before its units, for each way it can,
+/// ends with an error that begins `units not written: ` and the reason,
+/// and leaves 19 Oct's units as they were, not one of them half-written.
+/// Once the cause is gone, the next install writes them all.
+#[test]
+fn an_install_that_ends_before_its_units_says_so_and_keeps_the_old_ones() {
+    let units = install::UNITS;
+    let old_cloud = units_of_19_oct()
+        .into_iter()
+        .find(|(name, _)| name == "lamp-cloud.service")
+        .unwrap()
+        .1;
+    let check = |lamp: &mut Lamp, before: &BTreeMap<PathBuf, String>, why: &str| {
+        let error = lamp.install().unwrap_err();
+        let prefix = format!("{}: ", install::UNITS_NOT_WRITTEN);
+        assert!(error.starts_with(&prefix) && error.contains(why), "{error}");
+        assert_eq!(&tree(&lamp.on(units)), before, "{why}");
+        assert_eq!(
+            fs::read_to_string(lamp.on("/etc/systemd/system/lamp-cloud.service")).unwrap(),
+            old_cloud
+        );
+    };
+
+    // The records locked by another lamp-update.
+    let mut lamp = a_lamp_of_19_oct(&[]);
+    let before = tree(&lamp.on(units));
+    let held = Records::new(lamp.on(&lamp.config.records)).lock().unwrap();
+    check(
+        &mut lamp,
+        &before,
+        "units not written: another lamp-update is running",
+    );
+    drop(held);
+    lamp.install().unwrap();
+    assert_ne!(tree(&lamp.on(units)), before);
+
+    // The head reader's preflight refuses a drop-in that turns it off.
+    let mut lamp = a_lamp_of_19_oct(&[]);
+    let drop_in = "/etc/systemd/system/lamp-body.service.d/30-local.conf";
+    fs::create_dir_all(lamp.on(drop_in).parent().unwrap()).unwrap();
+    fs::write(
+        lamp.on(drop_in),
+        "[Service]\nEnvironment=LAMP_HEAD_TOUCH=off\n",
+    )
+    .unwrap();
+    let before = tree(&lamp.on(units));
+    let error = lamp.install().unwrap_err();
+    assert!(
+        error.starts_with("units not written: ") && error.contains("local override"),
+        "{error}"
+    );
+    assert_eq!(tree(&lamp.on(units)), before);
+
+    // A build without one of the parts.
+    let mut lamp = a_lamp_of_19_oct(&["lamp-eyes"]);
+    let before = tree(&lamp.on(units));
+    check(&mut lamp, &before, "build 188 carries no lamp-eyes");
+
+    // A channel with no build.
+    let mut lamp = a_lamp_of_19_oct(&[]);
+    lamp.channel
+        .files
+        .remove(&format!("{CHANNEL}{}", manifest::ENVELOPE));
+    let before = tree(&lamp.on(units));
+    check(&mut lamp, &before, "the channel has published no build");
+
+    // A part's file that is not what was signed.
+    let mut lamp = a_lamp_of_19_oct(&[]);
+    lamp.channel.files.insert(
+        format!("{CHANNEL}lamp-body"),
+        b"not what was signed\n".to_vec(),
+    );
+    let before = tree(&lamp.on(units));
+    check(&mut lamp, &before, "lamp-body does not match its SHA-256");
 }
 
 #[cfg(unix)]

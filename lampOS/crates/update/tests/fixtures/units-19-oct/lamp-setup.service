@@ -1,0 +1,29 @@
+# The lamp's first boot (#806, lampOS/docs/setup.md), as the product installs it (lampOS/docs/install.md).
+# Runs only while setup's marker is missing: it finishes an interrupted reset, raises the lamp's
+# hotspot, starts nginx for V1's page and answers V1's setup API until the home's Wi-Fi is joined and
+# the person's settings are saved; then it writes the marker, and lampos-setup-done.path starts the
+# lamp. A lamp brought up by the keeper's package starts it with --setup-marker instead (#816).
+[Unit]
+Description=lampOS setup: the lamp's hotspot and setup page, while it is not set up
+ConditionPathExists=!/var/lib/lampos-setup/done
+# Its settings are the image's or the install's (lampOS/docs/install.md); without them it would only
+# fail and start again every 20 s.
+ConditionPathExists=/etc/lampOS/setup/serve.json
+ConditionPathExists=/etc/lampOS/setup/reset-plan.json
+After=local-fs.target
+
+[Service]
+Type=simple
+# Root: the radio scripts, wpa_supplicant's file, /etc/localtime, nginx.
+User=root
+StateDirectory=lampos-setup
+StateDirectoryMode=0700
+ExecStart=/opt/lampOS/setup/current/lamp-setup serve --config /etc/lampOS/setup/serve.json --plan /etc/lampOS/setup/reset-plan.json --enable
+# However it ends, V1's nginx does not stay on.
+ExecStopPost=/usr/bin/systemctl stop nginx
+Restart=on-failure
+# Each start raises the hotspot again, which drops a phone on it: not often.
+RestartSec=20
+
+[Install]
+WantedBy=multi-user.target

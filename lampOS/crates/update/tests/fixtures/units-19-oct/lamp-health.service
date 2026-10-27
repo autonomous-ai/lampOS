@@ -1,0 +1,38 @@
+# lampOS health: every part's own report gathered into one answer to "how is the lamp" (lampOS/docs/health.md).
+# The product unit (lampOS/docs/install.md).
+[Unit]
+Description=lampOS health (lamp-health)
+PartOf=lampos.target
+# Not before setup has finished (#806). The target's own condition holds back none of its parts.
+ConditionPathExists=/var/lib/lampos-setup/done
+After=local-fs.target
+StartLimitIntervalSec=600
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=lampos
+Group=lampos
+Slice=lampos-parts.slice
+Nice=5
+# The processors are judged by their own rule (warn from 95 °C, error once held back for a
+# minute; the hardware side, 2026-10-16), not their zones' trip points at 70 and 90 °C, which a
+# lamp at work passes all day. The skin zone keeps its own.
+# `--online on`: lamp/online from the voice's link, so the voice says "no internet" once and keeps
+# going (LAMP_OFFLINE_VOICE; lampOS/docs/offline.md; #830). No `--reach-probe`: it belongs only beside
+# the voice's second route, which the product has not, or a relay outage drops speech without a word.
+ExecStart=/opt/lampOS/health/current/lamp-health serve --bus-root /run/lampos-bus --expect board --expect voice --expect eyes --expect body --expect policy --expect name --expect controls --expect expression --expect actions --expect ears --expect memory --expect schedule --expect air --expect tasks --needs tasks=/usr/local/bin/harness --judge-zone skin --online on
+Restart=on-failure
+RestartSec=5s
+StandardInput=null
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=lamp-health
+NoNewPrivileges=yes
+ProtectSystem=strict
+ReadWritePaths=/run/lampos-bus
+ProtectHome=yes
+PrivateTmp=yes
+
+[Install]
+WantedBy=lampos.target
