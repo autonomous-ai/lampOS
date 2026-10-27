@@ -76,7 +76,7 @@ owner ticked. An unpaired caller gets `unpaired` and the connection closes.
 | `touch` | `kind` (`tap`, `pet`, `hold`), `where` | `controls/touch`, `controls/gesture`, `body/hand` | none |
 | `button` | `press` (`press`, `long_press`) | `controls/gesture` | none |
 | `time` | the client's own schedule | the lamp's clock and zone | none |
-| `lamp.changed` | `lamp_state`: `talking`, `paused`, `private`, `asleep`, `quiet_hours`, `lease` | `voice/state`, `lamp/pause`, privacy, `voice/mute`, the leases | none |
+| `lamp.changed` | `lamp_state`: `talking`, `paused`, `private`, `asleep`, `quiet_hours` (planned, not produced yet), `lease` | `voice/state`, `lamp/pause`, privacy, `voice/mute`, the leases | none |
 
 **Actions:**
 
@@ -89,7 +89,7 @@ owner ticked. An unpaired caller gets `unpaired` and the connection closes.
 | `play` | `name` of a move in the client's installed package | the same, from its `moves/NAME.json` | `body` | body |
 | `joints` | `lease`, `targets` (`pitch`, `roll`, `yaw`, `shoulder`, `elbow`, degrees; one at least), `within_ms` ≤ 5,000 | **new**: a goal stream under a lease, every step through the body's caps | `body` | body, named |
 | `light` | `colour` (one of 10), `level` 1–5, `pattern`, `for_ms` ≤ 30 s | `light/request` at the priority `lamp-control` stamps | `light` | no |
-| `say` | `text`, at most 300 characters | `say.sock`, with its quiet, privacy and busy gates | `speak` | no |
+| `say` | `text`, at most 300 characters | `say.sock`, with its quiet after a turn, privacy and busy gates | `speak` | no |
 | `sound` | `name` of a clip of 3 s or less in the client's package | `say.sock` `{sound}` | `speak` | no |
 | `stop` | | ends the client's own actions now | none | no |
 
@@ -320,7 +320,7 @@ which back. An SDK's wait for them returns at the answer.
 | `no_lease`, `lease_lost` | the action needs a lease the client doesn't hold |
 | `busy` | another client holds the part, or this one by another lease |
 | `refused` | the body's own check, with its why: "centre of gravity 27 mm > 22 mm", "pitch past its window" |
-| `quiet_hours`, `private`, `paused`, `asleep` | the lamp's state refuses it |
+| `quiet_hours` (planned, see "Limits, rates and quiet hours"), `private`, `paused`, `asleep` | the lamp's state refuses it |
 | `rate` | over a rate below; `retry_ms` says when |
 | `bad_request` | not this schema, or an op it doesn't know |
 | `off` | developer access is off in the app |
@@ -398,9 +398,15 @@ Rates a client is held to:
 says `retry_ms`, the time until the oldest counted action leaves its window.
 A refused action isn't counted.
 
-In the lamp's quiet hours the ring's night caps still clamp every light,
-`say` and `sound` are refused unless the owner allowed that client at night,
-and nothing moves while the lamp sleeps. Every command and its answer is
+At night the ring's night caps still clamp every light, and nothing moves
+while the lamp sleeps. **Quiet hours are planned, not yet enforced:** from
+22:00 to 07:00 local (one definition, `lamp_local_time::quiet_hours`, added
+with the piece that enforces it, which lamp-skills will use for pushed skills
+too), `say` and `sound` will be refused
+with `quiet_hours`, the hours in its why, and journaled once a computer a
+night; only the owner's per-client allowance, with the app's setting, will
+lift it (Fourteen, Eighth and Nine on #3504). Until then the door does not
+refuse them at night. Every command and its answer is
 journaled as one line (client id and name, op, result); the app can show the
 last 100 and revoke a client, which closes its connections at once.
 
@@ -460,7 +466,8 @@ on the lamp that run on their own".
 - **A ceiling the skill can't raise:** `skill.toml`'s `[budget]` and
   `[quiet]` are written by the computer, so the lamp holds a pushed skill
   to the live door's rates at most (`say` 6 a minute and 60 an hour) and to
-  the person's quiet hours, whatever the skill declares. lamp-skills holds
+  the quiet hours (planned, 22:00 to 07:00 local, as below), whatever the
+  skill declares. lamp-skills holds
   it, for every skill it loaded as pushed (Eighth and Nine, #3504).
 - **The package** is the shape `lamp-skills pack` makes: ustar,
   `lamp-skill.json` first (format, name, version, and each file's path,
