@@ -249,3 +249,34 @@ def test_a_dot_named_move_is_passed_over_as_the_body_does(tmp_path):
     (folder / "moves").mkdir()
     (folder / "moves" / "._wave.json").write_bytes(b"\0\0mac")
     assert check(folder).ok, check(folder).errors
+
+
+# Format 2 (#3878), as lamp-skills reads it: `look` is presence alone, the
+# picture is `camera` only, and a format other than 1 or 2 is refused.
+def test_format_2s_look_is_presence_and_warns_nothing(tmp_path):
+    report = check(skill(tmp_path / "f2", rules='format = 2\nversion = "1.0.0"\n[permissions]\nlook = true\n'))
+    assert report.ok and report.warnings == [] and report.format == 2, (report.errors, report.warnings)
+
+
+def test_a_look_step_needs_the_picture_as_the_lamp_reads_it(tmp_path):
+    step = '[[do]]\nlook = true\nsay = "What do you see?"\n'
+    f2 = check(skill(tmp_path / "f2", rules=f'format = 2\nversion = "1.0.0"\n[permissions]\nlook = true\nspeak = true\n{step}'))
+    assert any("look = true step" in line for line in f2.errors), f2.errors
+    with_camera = check(skill(tmp_path / "cam", rules=f'format = 2\nversion = "1.0.0"\n[permissions]\ncamera = true\nspeak = true\n{step}'))
+    assert not any("look = true step" in line for line in with_camera.errors), with_camera.errors
+    f1 = check(skill(tmp_path / "f1", rules=f'version = "1.0.0"\n[permissions]\nlook = true\nspeak = true\n{step}'))
+    assert not any("look = true step" in line for line in f1.errors), f1.errors
+
+
+def test_a_format_the_lamp_doesnt_read_is_refused_by_name(tmp_path):
+    report = check(skill(tmp_path / "f3", rules='format = 3\nversion = "1.0.0"\n'))
+    assert any("format 3" in line for line in report.errors), report.errors
+    # The lamp reads format as a u32: 2.0 is "invalid type: floating point" there (Fourteen's P3).
+    float_two = check(skill(tmp_path / "f20", rules='format = 2.0\nversion = "1.0.0"\n'))
+    assert any("format 2.0" in line for line in float_two.errors), float_two.errors
+
+
+def test_the_command_names_the_format(tmp_path, capsys):
+    folder = skill(tmp_path / "two", rules='format = 2\nversion = "1.0.0"\n')
+    assert main(["skill", "check", str(folder)]) == 0
+    assert "two: ok, format 2" in capsys.readouterr().out

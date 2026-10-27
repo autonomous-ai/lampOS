@@ -85,7 +85,7 @@ async def _skill_check(args) -> int:
         for line in report.warnings:
             print(f"{report.folder.name}: warning: {line}")
         if report.ok:
-            print(f"{report.folder.name}: ok, format 1")
+            print(f"{report.folder.name}: ok, format {report.format}")
         else:
             failed += 1
     return 1 if failed else 0
