@@ -1,0 +1,21 @@
+{
+  "head": "e6cc81ade62f7e15a066b44a20e0c717a060fc1e",
+  "base": "f7252d81dc2e72494afc6ea842bd8b0445f1991c",
+  "tree": "0583c6a9933ec793bd797610508c6ed67d9319b1",
+  "range_diff": "one equal patch",
+  "authored_file_blob_equal_to_649": true,
+  "authored_file_sha256": "16b27e2a59a6f7f051c338c5dcb5873b8fff9977eb08ff03ec2b844e0ff7a77a",
+  "fmt_exit": 0,
+  "strict_clippy_exit": 0,
+  "host_tests": {
+    "passed": 516,
+    "failed": 0,
+    "ignored": 3
+  },
+  "logs": {
+    "carry-f725-fmt.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "carry-f725-clippy.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "carry-f725-tests.log": "281c3887b430a93a17a45686019239de9bd3134ea5ed41654cf76ec394dea315"
+  },
+  "limits": "Mac host qualification on current base. Original 649 native result is separate; no device or ARM64 link on Mac."
+}
