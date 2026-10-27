@@ -18,19 +18,29 @@
 #   12. a lamp with no Harness CLI (lamp-06c1): the unit's ConditionPathExists=/usr/local/bin/harness would have
 #      systemd skip lamp-tasks, so the drop-in resets the conditions before its ExecStart swap, keeps the unit's
 #      others, needs the stand-in's own wrapper instead, and `out` removes it with the rest.
+#   13. a second `in` with the first's drop-in still in: `systemctl cat` prints that drop-in after the unit file, and
+#      the setup reads ExecStart and the conditions from the unit file's own section only, so the drop-in still
+#      clears the real Harness's condition and runs the unit's own ExecStart, not the stand-in's.
+#   14. a unit file whose body begins with its own `# /etc/systemd/system/lamp-tasks.service` line, copied from a
+#      `systemctl cat` as lamp-4ace's is: only a drop-in's `.d/*.conf` header ends the unit's section, so it reads
+#      whole and the drop-in has the unit's ExecStart and clears the harness condition (Fourteen's P2 on #3665).
 here=$(cd "$(dirname "$0")" && pwd)
 root=$(mktemp -d)
 trap 'rm -rf "$root"' EXIT
 failed=0
 check() { if eval "$2"; then echo "ok   $1"; else echo "FAIL $1"; failed=1; fi; }
 
-# The stand-in systemctl: `show` and `cat` from files, every call kept.
+# The stand-in systemctl: `show` and `cat` from files, every call kept. `cat` prints the unit file under its header
+# and then each lamp-tasks drop-in in the run's units under its own, as systemd's does.
 cat > "$root/systemctl" <<'EOF'
 #!/bin/sh
 echo "$*" >> "$STAND_IN/calls"
 case "$1" in
 show) case "$*" in *lamp-voice*) cat "$STAND_IN/voice_env" ;; *) cat "$STAND_IN/show" ;; esac ;;
-cat) cat "$STAND_IN/unit" ;;
+cat) printf '# /etc/systemd/system/lamp-tasks.service\n'; cat "$STAND_IN/unit"
+  for drop in "$STAND_IN"/units/lamp-tasks.service.d/*.conf; do
+    [ ! -f "$drop" ] || { printf '\n# %s\n' "$drop"; cat "$drop"; }
+  done ;;
 is-active) echo active ;;
 restart) [ -z "${FAIL_RESTART:-}" ] || exit 1 ;;
 esac
@@ -53,7 +63,8 @@ run() {  # USER EXECSTART MODE [TASKS]: the setup against the stand-in; its outp
   printf '#!/bin/sh\n' > "$root/remote/harness-fixture"
   chmod 0755 "$root/remote/harness-fixture"
   printf 'Group=%s\nUser=%s\n' "$(id -gn)" "$1" > "$root/show"
-  { [ -z "${unit_head:-}" ] || printf '[Unit]\n%s\n' "$unit_head"
+  { [ -z "${unit_top:-}" ] || printf '%s\n' "$unit_top"
+    [ -z "${unit_head:-}" ] || printf '[Unit]\n%s\n' "$unit_head"
     printf '[Service]\nUser=%s\nExecStart=%s\n' "$1" "$2"; } > "$root/unit"
   STAND_IN=$root PLAYED_REMOTE=$root/remote PLAYED_UNITS=$root/units SYSTEMCTL=$root/systemctl \
     SYSTEMD_RUN=$root/systemd-run PLAYED_TASKS=${4:-} PLAYED_GUARD_S=${guard_s:-} \
@@ -185,5 +196,34 @@ STAND_IN=$root PLAYED_REMOTE=$root/remote PLAYED_UNITS=$root/units SYSTEMCTL=$ro
   sh "$here/stand-in.sh" out > "$root/out" 2>&1
 check "12. out removes the drop-in, reloads and restarts, so a lamp with no Harness skips lamp-tasks again" \
   '[ ! -e "$tasks_drop" ] && grep -n "" "$root/calls" | grep -A9 ":daemon-reload$" | grep -q ":restart lamp-tasks lamp-voice$"'
+
+unit_head="ConditionPathExists=/var/lib/lampos-setup/done
+ConditionPathExists=/usr/local/bin/harness"
+run "$(id -un)" "$line" in; code=$?
+unset unit_head
+cp "$tasks_drop" "$root/first-drop"
+STAND_IN=$root PLAYED_REMOTE=$root/remote PLAYED_UNITS=$root/units SYSTEMCTL=$root/systemctl SYSTEMD_RUN=$root/systemd-run \
+  sh "$here/stand-in.sh" in > "$root/out" 2>&1; code2=$?
+check "13. a second in, with the first's drop-in in place, succeeds" '[ $code -eq 0 ] && [ $code2 -eq 0 ]'
+check "13. its drop-in still clears the real Harness's condition and keeps the unit's other one" \
+  'grep -qx "ConditionPathExists=/var/lib/lampos-setup/done" "$tasks_drop" &&
+   [ "$(grep -cx "ConditionPathExists=$root/remote/harness" "$tasks_drop")" -eq 1 ] && ! grep -q "=/usr/local/bin/harness$" "$tasks_drop"'
+check "13. it runs the unit's own ExecStart, as the first in did, not the stand-in's" 'cmp -s "$root/first-drop" "$tasks_drop"'
+STAND_IN=$root PLAYED_REMOTE=$root/remote PLAYED_UNITS=$root/units SYSTEMCTL=$root/systemctl \
+  sh "$here/stand-in.sh" out > "$root/out" 2>&1
+
+unit_top="# /etc/systemd/system/lamp-tasks.service"
+unit_head="ConditionPathExists=/var/lib/lampos-setup/done
+ConditionPathExists=/usr/local/bin/harness"
+run "$(id -un)" "$line" in; code=$?
+unset unit_top unit_head
+check "14. a unit with its own copied header line, as lamp-4ace's, succeeds" '[ $code -eq 0 ]'
+check "14. the drop-in has the unit's ExecStart, the stand-in in place of the real Harness" \
+  'grep -qx "ExecStart=$root/new-tasks serve --enable --harness-as-person --dir $root/remote/store --harness $root/remote/harness --watch --sign-in-by-code" "$tasks_drop"'
+check "14. it clears the real Harness's condition and keeps the unit's other one" \
+  'grep -qx "ConditionPathExists=/var/lib/lampos-setup/done" "$tasks_drop" &&
+   grep -qx "ConditionPathExists=$root/remote/harness" "$tasks_drop" && ! grep -q "=/usr/local/bin/harness$" "$tasks_drop"'
+STAND_IN=$root PLAYED_REMOTE=$root/remote PLAYED_UNITS=$root/units SYSTEMCTL=$root/systemctl \
+  sh "$here/stand-in.sh" out > "$root/out" 2>&1
 
 exit $failed
