@@ -4,7 +4,7 @@
   "description": "Program a lampOS lamp from your own computer: the v1 control protocol (docs/control.md)",
   "type": "module",
   "license": "Apache-2.0",
-  "engines": { "node": ">=18" },
+  "engines": { "node": ">=20.11" },
   "exports": {
     ".": "./src/index.js",
     "./testing": "./src/testing.js"
