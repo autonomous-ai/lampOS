@@ -1313,7 +1313,8 @@ Those exclusions are not claims of a complete systemd effective graph.
 by default when its deploy tree contains `product/`, as the release
 publisher's tree does. `--settings off` explicitly omits them; a deploy
 tree without a product folder keeps the old default. No key, credential,
-zone or lamp calibration is added to the settings allowlist.
+zone or lamp calibration is added to the settings allowlist (the Skills
+Store's public key goes in the skills folder it already takes; below).
 
 Fresh product installs explicitly set `LAMP_UPDATE_APPLY=on`. An existing
 product updater without that variable may apply a signed level-6 product
@@ -1339,7 +1340,21 @@ A build can carry the product's settings and tmpfiles (`apply.rs`,
 (`install::SETTINGS` and `lampos.conf`, `install::product_settings`), but
 for the product skills' files under `/var/lib/lampOS/skills/`: those are
 `lamp-product-skills`', placed by the round and judged by the skills
-guard, so one file never has two writers at the switch. Settings alone need
+guard, so one file never has two writers at the switch. The one setting
+there is the Skills Store's public key (#3692):
+`deploy/product/settings/var/lib/lampOS/skills/store-key.pub`
+(`install::STORE_KEY_SOURCE`), when the repository has it, is carried as
+`/var/lib/lampOS/skills/store-key.pub` (`install::STORE_KEY_SETTING`),
+0644, beside the skills and never in a skill's folder. With settings, `lamp-update manifest`
+refuses a file that isn't one or two keys, one a line, as a lamp reads it
+(`manifest::read_public_keys`). The repository has none until the Store's
+keeper gives its key, and a build without it leaves a lamp's key as it is.
+The path is one build 7071's fixed settings writer already takes, so a
+lamp still on that `lamp-update-back` gets it in a round
+(`publish::tests::the_stores_key_is_carried_only_when_the_repository_has_it`
+pins the five places as 7071 has them). lamp-skills reads it before the
+factory's `/etc/lampOS/skills/store-key.pub` ([skills.md](skills.md), "From
+the Skills Store"). Settings alone need
 `min_updater` 3 (`manifest::SETTINGS_UPDATER`); `--settings on` also carries
 the reset plan described below and therefore raises the floor to 5
 (`manifest::RESET_PLAN_UPDATER`). The current `UPDATER` is 6; a product service carrier raises the floor to 6.
@@ -1347,9 +1362,11 @@ A manifest without settings doesn't write the field. A path must be
 `/etc/lampOS/records.json`, `/etc/tmpfiles.d/lampos.conf`, or a file in
 plain parts under `/etc/lampOS/expression/`, `/etc/lampOS/controls/` or
 `/var/lib/lampOS/skills/`; any other refuses the build. So a build never
-writes a key, the voice's service, the zone, setup's answers,
-`body/lamp.env`, `person/name` or the update key: those are setup's, the
-person's or the lamp's. At most 128 settings and 160 KB of text.
+writes a secret key, the voice's service, the zone, setup's answers,
+`body/lamp.env`, `person/name`, the update key or the factory's Store key:
+those are setup's, the person's or the lamp's. The only key a build may
+write is the Skills Store's public key in the skills folder (above), which
+is no secret. At most 128 settings and 160 KB of text.
 
 With `LAMP_UPDATE_APPLY=on` in `lamp-update.service`'s environment:
 

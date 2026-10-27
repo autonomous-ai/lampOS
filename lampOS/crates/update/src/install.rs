@@ -667,6 +667,33 @@ pub fn product_settings() -> Vec<manifest::Setting> {
         .collect()
 }
 
+/// Where the repository keeps the Skills Store's public key a build ships
+/// (#3692), under `lamp-update manifest`'s `--deploy` (`lampOS/deploy`).
+/// Not in the repository until the Store's keeper gives its key; a build
+/// made without it carries none and leaves a lamp's key as it is.
+pub const STORE_KEY_SOURCE: &str = "product/settings/var/lib/lampOS/skills/store-key.pub";
+/// Where a build writes it: lamp-skills' `package::BUILD_STORE_KEY` in the
+/// product's skills folder, a place a settings writer from build 7071 on
+/// takes (`manifest::SETTING_FOLDERS`), so no newer `lamp-update-back` is
+/// needed for it.
+pub const STORE_KEY_SETTING: &str = "/var/lib/lampOS/skills/store-key.pub";
+
+/// The Store's key as a build carries it, from [`STORE_KEY_SOURCE`] under
+/// `deploy`, 0644: none when the repository has no such file, and refused
+/// unless it is one or two keys, one a line, as a lamp reads it
+/// (`manifest::read_public_keys`), so a build never ships a key file every
+/// lamp would refuse.
+pub fn store_key_setting(deploy: &Path) -> Result<Option<manifest::Setting>, String> {
+    let source = deploy.join(STORE_KEY_SOURCE);
+    let text = match fs::read_to_string(&source) {
+        Ok(text) => text,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(None),
+        Err(error) => return Err(format!("{}: {error}", source.display())),
+    };
+    manifest::read_public_keys(&text).map_err(|why| format!("{}: {why}", source.display()))?;
+    Ok(Some(manifest::Setting::new(STORE_KEY_SETTING, &text)))
+}
+
 /// `/etc/tmpfiles.d/lampos.conf`: the bus root and the locks.
 pub const TMPFILES: &str = include_str!("../../../deploy/product/lampos.conf");
 pub const TMPFILES_PATH: &str = "/etc/tmpfiles.d/lampos.conf";

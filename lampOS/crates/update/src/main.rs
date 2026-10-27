@@ -281,18 +281,17 @@ fn make_manifest(options: &BTreeMap<String, String>) -> Result<(), String> {
                 .map_err(|error| format!("{lamp}: {error}"))?
         }
     };
-    // With the settings, setup's reset plan, in its own field (#806).
-    let (settings, reset_plan) = if manifest_settings_on(
-        Path::new(wanted(options, "deploy")?),
-        options.get("settings").map(String::as_str),
-    )? {
-        (
-            install::product_settings(),
-            Some(install::reset_plan_setting()),
-        )
-    } else {
-        (Vec::new(), None)
-    };
+    // With the settings, setup's reset plan, in its own field (#806), and
+    // the Skills Store's key when the repository has one (#3692).
+    let deploy = Path::new(wanted(options, "deploy")?);
+    let (settings, reset_plan) =
+        if manifest_settings_on(deploy, options.get("settings").map(String::as_str))? {
+            let mut settings = install::product_settings();
+            settings.extend(install::store_key_setting(deploy)?);
+            (settings, Some(install::reset_plan_setting()))
+        } else {
+            (Vec::new(), None)
+        };
     let models = match options.get("models") {
         None => Vec::new(),
         Some(path) => {
