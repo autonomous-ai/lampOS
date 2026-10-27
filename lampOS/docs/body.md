@@ -1840,8 +1840,8 @@ answered `refused` with why and closed. Lines of JSON each way
 Said unasked when it changes:
 - `{"lease":"suspended","why":"conversation"}` while the mood is listening,
   thinking or speaking, and `{"lease":"held"}` again after.
-- `{"lease":"lost","why":"hand|private|paused|asleep|lapsed"}`: a hand on a
-  joint, the person's privacy mute, a pause, a hand's sleep, or a hold not
+- `{"lease":"lost","why":"hand|slumped|private|paused|asleep|lapsed"}`: a
+  hand on a joint, the body let go under load or by a hand (its torque off), the person's privacy mute, a pause, a hand's sleep, or a hold not
   renewed within its `for_ms`. It is not taken back when that ends; the
   holder asks again. A hold asked while one of these lasts is answered
   `lost` with why.
