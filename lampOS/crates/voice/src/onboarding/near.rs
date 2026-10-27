@@ -245,6 +245,20 @@ pub(crate) struct NearFlow {
 }
 
 impl NearFlow {
+    /// Whether the name part waits for a call (#3504): from its prompt
+    /// handed to the model, through its playing, to its try's judgement. A
+    /// line begun in it that is only the lamp's name is the step's, not a
+    /// turn (`ProviderInput::StepCall`).
+    pub(crate) fn waits_for_call(&self) -> bool {
+        self.offer
+            .as_ref()
+            .is_some_and(|offer| !offer.sentence && offer.claimed)
+            || self
+                .listening
+                .as_ref()
+                .is_some_and(|listening| !listening.sentence)
+    }
+
     /// [`Onboarding::near_holds_reply`]'s rule, on this step's own evidence.
     pub(crate) fn holds_reply(&self, began_us: u64, at_us: u64) -> bool {
         let Some(listening) = self.listening.as_ref() else {
@@ -654,6 +668,13 @@ impl Onboarding {
             return;
         }
         let offer = self.near.offer.take().expect("a bound offer");
+        // The cue a test driven from outside times its answer by (#3504).
+        eprintln!(
+            "lamp-voice onboarding: how_you_sound prompt {} played {} ({})",
+            offer.prompt,
+            if delivered_whole { "whole" } else { "cut" },
+            if offer.sentence { "sentence" } else { "call" }
+        );
         if !delivered_whole {
             self.near.retry_after_us = now_us.saturating_add(1_000_000);
             let kind = if offer.sentence {
@@ -690,6 +711,11 @@ impl Onboarding {
     /// than a call through too.
     pub(crate) fn near_holds_reply(&self, began_us: u64, at_us: u64) -> bool {
         self.near.holds_reply(began_us, at_us)
+    }
+
+    /// [`NearFlow::waits_for_call`], while this step is led.
+    pub(crate) fn near_waits_for_call(&self) -> bool {
+        self.collecting() && self.near.waits_for_call()
     }
 
     /// Whether the sentence part's window is open at `at_us`, from the
