@@ -2338,3 +2338,18 @@ finalized afterward without changing Rust/test bytes; it adds no runtime credit.
 Neither failed result is waived or diagnosed by the pass. Mac physical raw-name
 capture remains unverified, native ARM64 must run the Linux subsection, and no
 device/bootstrap/restore acceptance is claimed here.
+
+### Bounded saved head inputs for restart replay (#3689)
+
+The private [head-input codec](head-touch-codec.md) encodes captured facts and
+decodes externally hash/size-bound bytes into a separate closed `HeadInputs`
+provider. Decode and replay read no live files; explicit fresh revalidation
+remains separate. Typed negative facts, null metadata, raw names/link targets,
+witnesses and enumeration order are retained, as are exact accepted future
+metadata bytes. Semantic versions, operations, kinds and duplicate known fields
+refuse under streaming and whole-document bounds.
+
+This remains unwired data preparation. It adds no storage or durability receipt,
+authentication, path authority, executable plan, writer grant, helper refresh or
+restore. Ordinary reader policy and native capture equality are unchanged;
+current source/native evidence and physical acceptance remain separate.

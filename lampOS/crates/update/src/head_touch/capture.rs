@@ -3,6 +3,8 @@
 //! The caller owns a trusted stable root, including its ancestry/ownership, and
 //! excludes writers throughout collection and use. Checks detect observations,
 //! not an atomic filesystem snapshot or a kernel/storage latency deadline.
+pub(crate) mod codec;
+
 use super::{ConfEntries, HeadInputs};
 use rustix::fs::{AtFlags, Dir, FileType, Mode, OFlags, Stat};
 use std::{
