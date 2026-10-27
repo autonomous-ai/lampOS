@@ -103,14 +103,30 @@ pub fn run(host: &mut impl Host, dry_run: bool, say: &mut impl FnMut(&str)) -> V
         say(&line);
         steps.push(step);
     };
-    match host.pause(true) {
-        Ok(()) => step(Step::Paused, "paused: the body goes to rest".into(), say),
-        Err(why) => step(
-            Step::NotPaused(why.to_string()),
-            format!("not paused ({why}): the body rests as it stops"),
-            say,
-        ),
-    }
+    // A product lamp has no keeper (lamp-52e6 on 7071): its body rests
+    // as it stops, so no keeper is the plain path, not a fault.
+    let paused = match host.pause(true) {
+        Ok(()) => {
+            step(Step::Paused, "paused: the body goes to rest".into(), say);
+            true
+        }
+        Err(why) if why.kind() == io::ErrorKind::NotFound => {
+            step(
+                Step::NotPaused("no keeper".into()),
+                "no keeper on this lamp: the body rests as it stops".into(),
+                say,
+            );
+            false
+        }
+        Err(why) => {
+            step(
+                Step::NotPaused(why.to_string()),
+                format!("not paused ({why}): the body rests as it stops"),
+                say,
+            );
+            false
+        }
+    };
     if rested(host) {
         step(
             Step::Rested,
@@ -138,7 +154,8 @@ pub fn run(host: &mut impl Host, dry_run: bool, say: &mut impl FnMut(&str)) -> V
     }
     // Stopped, the parts no longer read it; a kept pause would hold the
     // lamp paused when it is next started without a power-up (a dry run).
-    if stopped.is_ok()
+    if paused
+        && stopped.is_ok()
         && let Err(why) = host.pause(false)
     {
         say(&format!("the pause is left kept ({why})"));
@@ -242,6 +259,8 @@ mod tests {
         joints: Vec<Option<Vec<f64>>>,
         reads: usize,
         stop_fails: bool,
+        /// No keeper on this lamp, as on a product image.
+        no_keeper: bool,
         calls: Vec<(Duration, &'static str)>,
     }
 
@@ -253,6 +272,9 @@ mod tests {
             self.now += pause;
         }
         fn pause(&mut self, paused: bool) -> io::Result<()> {
+            if self.no_keeper {
+                return Err(io::ErrorKind::NotFound.into());
+            }
             self.calls
                 .push((self.now, if paused { "pause" } else { "resume" }));
             Ok(())
@@ -390,6 +412,29 @@ mod tests {
         assert_eq!(
             names(&fake),
             ["pause", "stop", "let go", "light", "sync", "power off"]
+        );
+    }
+
+    /// lamp-52e6 on 7071 has no keeper: that is the plain path, said as
+    /// such, with no resume asked of a keeper that is not there.
+    #[test]
+    fn a_lamp_without_a_keeper_rests_as_it_stops_and_powers_off() {
+        let mut fake = Fake {
+            joints: vec![Some(vec![0.0])],
+            no_keeper: true,
+            ..Fake::default()
+        };
+        let mut said = Vec::new();
+        let steps = run(&mut fake, false, &mut |line| said.push(line.to_owned()));
+        assert_eq!(steps[0], Step::NotPaused("no keeper".into()));
+        assert_eq!(
+            said[0],
+            "no keeper on this lamp: the body rests as it stops"
+        );
+        assert!(!said.iter().any(|line| line.contains("pause is left kept")));
+        assert_eq!(
+            names(&fake),
+            ["stop", "let go", "light", "sync", "power off"]
         );
     }
 

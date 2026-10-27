@@ -35,7 +35,7 @@ shutdown: ...`) and one JSON line of the steps at the end:
 | Step | What | Bound |
 |---|---|---|
 | Refused | While `lamp-update` holds its lock (an update installs), or the lock cannot be checked, nothing is done: `{"refused": ...}`, exit 1. Otherwise the lock is held to the end, so no update starts under the shutdown. | taken without waiting |
-| Pause | `lamp-keeper pause`: each part that honours `lamp/pause` takes no new work, and the body goes to rest, folding if it stands. A pause that fails is said; the body's own stop folds it all the same. | one command |
+| Pause | `lamp-keeper pause`: each part that honours `lamp/pause` takes no new work, and the body goes to rest, folding if it stands. A product lamp has no keeper (lamp-52e6 on 7071): that is said as "no keeper on this lamp: the body rests as it stops", and no resume is asked; any other failed pause is said too. Either way the body's own stop folds it. | one command |
 | Rest | The body's `body/joint_states`, fresh, every 100 ms: every joint still within 0.01 rad (about 6 counts) for 2 s (`STILL_FOR`, HAL-4.12's two seconds). | 15 s (`REST_WITHIN`): a standing lamp folds over its 6 s stand time and is then still for 2 s. After it the shutdown goes on and says so. |
 | Stop | `systemctl stop lampos.target` with every part named and each read back `inactive` or `failed`, and the reset's starters and writers stopped with it (`reset::stop_and_wait`). The body folds on its stop and keeps its torque. Stopped, the pause is cleared, so a lamp started again without a power-up is not left paused. | each part's own `TimeoutStopSec` (the body's 25 s) |
 | Let go | 0.4 s after the stop (`LET_GO_AFTER`, HAL-4.12), `lamp-body-measure let-go` as the body's user (`setpriv --reuid=lampos --regid=lampos --groups=dialout`; the servo port's owner refuses root): it takes the port and its lock as the body does, reads each joint, and only for a lamp that is down, the head within 20 counts of `lamp.env`'s `--home` and the arm within 20 of its `--folded-arm` (a seated lamp has none, and its arm is not judged), writes torque off to all five and reads each joint's torque back. One JSON line, each joint with where it was and its torque. A lamp found up keeps its torque: let go, it would fall. | the port's own read deadlines, well under a second |
@@ -51,7 +51,7 @@ body that never shows rest is stopped after 15 s; its stop folds it, and the
 let-go writes nothing to a lamp it finds up.
 
 `--dry-run` does everything but the poweroff: the lamp is paused, stopped, let
-go and lit, and stays so. `lamp-keeper start lamp` brings it back.
+go and lit, and stays so. `lamp-keeper start lamp` brings it back, or `systemctl restart lampos.target` on a lamp without the keeper. `systemctl stop lampos.target` warns that `lampos-setup-done.path` can start the target again: before a power-off that does not matter, and after a dry run the target may read active with its parts stopped until it is restarted.
 
 ## The switch
 
