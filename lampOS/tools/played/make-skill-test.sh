@@ -1,8 +1,13 @@
 #!/usr/bin/env bash
 # Tests for make-skill.sh with no lamp and no speaker: a stand-in lamp_ssh answers from what the stand-in speaker
 # has played (the stand-in Harness's calls, the lamp's answers and words, the journal's lines, `lamp-skills list`),
-# and stand-ins for say, afplay and the quiet gate. Run: lampOS/tools/played/make-skill-test.sh
+# and stand-ins for say, afplay and the quiet gate. Run: lampOS/tools/played/make-skill-test.sh [all|focused]
+# `all` (the default) runs every group, about 13 minutes. `focused` (Third on #3936) skips the groups that play an
+# arm and runs only the save, put-back and guard controls, none of which plays one: the failed list, the put-back
+# that differs, digest failures, links, the empty folder, the failed stop, the save cut short, the copy left over
+# and the lost Mac with the guard. They take a few seconds.
 set -uo pipefail
+case ${1:-all} in all | focused) GROUPS_RUN=${1:-all} ;; *) echo "usage: make-skill-test.sh [all|focused]" >&2; exit 2 ;; esac
 
 SCRIPT=$(cd "$(dirname "$0")" && pwd)/make-skill.sh
 T=$(mktemp -d)
@@ -125,11 +130,16 @@ case "$*" in
   *"$FAKE_DIR/saved"*)  # the voice's saved state, run here as on the lamp, on this test's folders; after the setup's
     # case, whose PLAYED_RESTORE names it. FAKE_RESTORE_BREAKS: the put-back's copy is not as saved;
     # FAKE_DIGEST_FAILS: sha256sum and shasum exit 17 with no digest.
-    case "$*" in *"restore save"*) w=save ;; *"restore reset") w=reset ;; *"/restore") w=restore ;; *) w="" ;; esac
-    [[ -z $w ]] || echo "$w" >>"$FAKE_DIR/voice-state"
+    # The put-back runs in one root shell with lamp-voice's stop and start (El's P3s on #3889 and #3936): its step is
+    # logged where it runs, between them, and this test's systemctl logs each of those.
+    case "$*" in *"restore save"*) w=save ;; *"restore reset") w=reset ;; *"/restore; rc="*) w=restore ;; *) w="" ;; esac
+    [[ -z $w || $w == restore ]] || echo "$w" >>"$FAKE_DIR/voice-state"
     [[ $w == save && -n ${FAKE_SAVE_FAILS:-} ]] && { cat >/dev/null; exit 1; }
     c=$*; c=${c//sudo -n /}
-    p=$PATH; [[ $w == restore && -n ${FAKE_RESTORE_BREAKS:-} ]] && p=$FAKE_BADCP:$p
+    r="sh $FAKE_DIR/saved/restore;"; c=${c//"$r"/"echo restore >>$FAKE_DIR/voice-state; $r"}
+    # FAKE_SAVE_CUT: the save is killed after its first copy, and the Mac with it (no trap runs), as a Mac that drops.
+    [[ $w == save && -n ${FAKE_SAVE_CUT:-} ]] && { PATH=$FAKE_CUTCP:$PATH sh -c "$c"; kill -9 $PPID; exit 255; }
+    p=$FAKE_SYSBIN:$PATH; [[ $w == restore && -n ${FAKE_RESTORE_BREAKS:-} ]] && p=$FAKE_BADCP:$p
     [[ $w == restore && -n ${FAKE_DIGEST_FAILS:-} ]] && p=$FAKE_BADDIGEST:$p
     PATH=$p sh -c "$c" ;;
   *"date +%s"*) date +%s ;;
@@ -146,25 +156,55 @@ case "$*" in
   *) echo "fake lamp: not known: $*" >&2; exit 1 ;;
 esac
 EOF
-# A cp whose copy is not the saved one: one file more in the made skills, or (CP_CORRUPT=leaf, as Third's probe on
-# 1c4d27e02) the same files with one's bytes changed.
+# A cp whose copy is not the saved one: one file more in the made skills, (CP_CORRUPT=leaf, as Third's probe on
+# 1c4d27e02) the same files with one's bytes changed, or (CP_CORRUPT=emptydir, Third's P3 on #3889) the same files
+# with an empty folder dropped.
 mkdir -p "$T/badcp"
 cat >"$T/badcp/cp" <<'EOF'
 #!/bin/sh
 /bin/cp "$@" || exit
 for d; do :; done
 [ -d "$d/made-skills" ] || exit 0
-if [ "${CP_CORRUPT:-}" = leaf ]; then echo corrupted >"$d/made-skills/own/skill.toml"; else echo extra >"$d/made-skills/extra"; fi
+case ${CP_CORRUPT:-} in
+  leaf) echo corrupted >"$d/made-skills/own/skill.toml" ;;
+  emptydir) rm -rf "$d/made-skills/kept" ;;
+  *) echo extra >"$d/made-skills/extra" ;;
+esac
 EOF
+# A cp that copies, then kills the save that ran it.
+mkdir -p "$T/cutcp"
+cat >"$T/cutcp/cp" <<'EOF'
+#!/bin/sh
+/bin/cp "$@" || exit
+kill -9 $PPID
+EOF
+# The lamp's systemctl, inside the put-back's root shell: each call to lamp-voice logged, in order.
+mkdir -p "$T/sysbin"
+# FAKE_STOP_FAILS: its stop exits 17; FAKE_STILL_ACTIVE: its stop exits 0 and the voice is still active;
+# FAKE_QUERY=unknown: is-active prints unknown and exits 4; FAKE_QUERY=none: it prints nothing and exits 1.
+cat >"$T/sysbin/systemctl" <<'EOF'
+#!/bin/sh
+case "$1 $2 ${3:-}" in
+  "stop lamp-voice "*) echo stop >>"$FAKE_DIR/voice-state"; [ -z "${FAKE_STOP_FAILS:-}" ] || exit 17
+    [ -n "${FAKE_STILL_ACTIVE:-}" ] || touch "$FAKE_DIR/voice-stopped" ;;
+  "start lamp-voice "*) echo start >>"$FAKE_DIR/voice-state"; rm -f "$FAKE_DIR/voice-stopped" ;;
+  "is-active lamp-voice "* | "is-active -q lamp-voice")  # -q: the same status, nothing printed
+    case ${FAKE_QUERY:-} in unknown) st=unknown; rc=4 ;; none) st=""; rc=1 ;; *)
+      if [ -e "$FAKE_DIR/voice-stopped" ]; then st=inactive; rc=3; else st=active; rc=0; fi ;; esac
+    [ "$2" = -q ] || [ -z "$st" ] || echo "$st"; exit $rc ;;
+esac
+EOF
+chmod +x "$T/sysbin/systemctl"
 # Digest tools that fail: exit 17, no digest (Third's HOLD on 1c4d27e02).
 mkdir -p "$T/baddigest"
 printf '#!/bin/sh\necho "digest failed" >&2\nexit 17\n' >"$T/baddigest/sha256sum"
 cp "$T/baddigest/sha256sum" "$T/baddigest/shasum"
-chmod +x "$T"/say "$T"/afplay "$T"/quiet "$T"/state "$T"/lamp_ssh "$T/badcp/cp" "$T/baddigest/sha256sum" "$T/baddigest/shasum"
+chmod +x "$T"/say "$T"/afplay "$T"/quiet "$T"/state "$T"/lamp_ssh "$T/badcp/cp" "$T/cutcp/cp" "$T/baddigest/sha256sum" "$T/baddigest/shasum"
 # The voice's state as the lamp has it before a run, and its print: names and bytes.
 seed() {
   mkdir -p "$T/d/voice/made-skills/own"
   printf 'own skill\n' >"$T/d/voice/made-skills/own/skill.toml"
+  mkdir -p "$T/d/voice/made-skills/kept/empty"   # an empty subtree: no file in it
   printf 'told 381\n' >"$T/d/voice/tasks-told"
 }
 print_of() { (cd "$1" && find . | sort && find . -type f | sort | xargs cat) | cksum; }
@@ -176,13 +216,17 @@ run() { # NAME ARMS EXPECTED_EXIT GREP...: the script with this test's FAKE_ set
   local name=$1 arms=$2 want=$3 got out
   shift 3
   rm -rf "$T/d"; mkdir -p "$T/d"; seed
-  [[ -z ${FAKE_LEFTOVER:-} ]] || { mkdir -p "$T/d/saved"; touch "$T/d/saved/done"; }
+  case ${FAKE_LEFTOVER:-} in
+    '') ;;
+    part) mkdir -p "$T/d/saved.part"; printf 'made-skills dir\n' >"$T/d/saved.part/kinds" ;;  # a save cut short
+    *) mkdir -p "$T/d/saved"; touch "$T/d/saved/done" ;;
+  esac
   # FAKE_TOLD_LINK: tasks-told a link, dangling (to nothing) or to a file (Third's P2 on 93f0584c2).
   case ${FAKE_TOLD_LINK:-} in
     dangling) rm -f "$T/d/voice/tasks-told"; ln -s "$T/d/nowhere" "$T/d/voice/tasks-told" ;;
     file) printf 'told 381\n' >"$T/d/real-told"; rm -f "$T/d/voice/tasks-told"; ln -s "$T/d/real-told" "$T/d/voice/tasks-told" ;;
   esac
-  out=$(FAKE_DIR=$T/d FAKE_STATE=$T/state FAKE_SHA=$SHA FAKE_BADCP=$T/badcp FAKE_BADDIGEST=$T/baddigest MAKE_SAVED=$T/d/saved MAKE_VOICE_DIR=$T/d/voice \
+  out=$(FAKE_DIR=$T/d FAKE_STATE=$T/state FAKE_SHA=$SHA FAKE_BADCP=$T/badcp FAKE_BADDIGEST=$T/baddigest FAKE_CUTCP=$T/cutcp FAKE_SYSBIN=$T/sysbin MAKE_SAVED=$T/d/saved MAKE_VOICE_DIR=$T/d/voice \
     LAMP_HOST=fake LAMP_SSH=$T/lamp_ssh QUIET_GATE=$T/quiet \
     SAY=$T/say AFPLAY=$T/afplay PLAYED_OUT=$T/out MAKE_SETTLE=0 NOT_NOW_WAIT=0 LAMP_PLAY_AT_LUNCH=yes \
     "$SCRIPT" "$name" "$T/fixture" "$arms" 2>&1)
@@ -193,13 +237,14 @@ run() { # NAME ARMS EXPECTED_EXIT GREP...: the script with this test's FAKE_ set
   [[ ! -e $T/d/installed ]] || { echo "FAIL $name: a skill was left installed"; fail=1; }
   # The voice's state as before the run, and no saved copy left, unless the test keeps it (KEEP_SAVED).
   if [[ -z ${KEEP_SAVED:-} ]]; then
-    [[ ! -e $T/d/saved ]] || { echo "FAIL $name: the saved copy was left"; fail=1; }
+    [[ ! -e $T/d/saved && ! -e $T/d/saved.part ]] || { echo "FAIL $name: the saved copy was left"; fail=1; }
     [[ $(print_of "$T/d/voice") == "$SEED" ]] || { echo "FAIL $name: the voice's state is not as before"; fail=1; }
   fi
 }
 
 export FAKE_ENV="LAMP_VOICE_ROUTE=second LAMP_TASKS_DIR=/run/lampos-tasks"
 
+if [[ $GROUPS_RUN == all ]]; then
 # Both arms as they should go, offered at once: handed over to the stand-in, made, asked, put on only at the yes,
 # enabled, loaded, removed; and nothing on a no.
 run both both 0 "PASS asked to confirm: not needed" "PASS offered" "PASS handed over" "PASS the answer read" \
@@ -212,7 +257,7 @@ grep -q 'PLAYED_TARGET=auto' "$T/d/setup" || { echo "FAIL both: no targets file 
 # The put-on's yes is a plain one (the voice's plain_agreement), never "Yes, put it on.", which it refuses.
 grep -qx 'Yes, go ahead.' "$T/d/played" || { echo "FAIL both: the put-on's yes was not a plain one"; fail=1; }
 # The voice's made skills saved, back as saved before each arm, and both put back at the end.
-[[ $(tr '\n' ' ' <"$T/d/voice-state") == "save reset reset restore " ]] || { echo "FAIL both: voice state: $(tr '\n' ' ' <"$T/d/voice-state")"; fail=1; }
+[[ $(tr '\n' ' ' <"$T/d/voice-state") == "save reset reset stop restore start " ]] || { echo "FAIL both: voice state: $(tr '\n' ' ' <"$T/d/voice-state")"; fail=1; }
 grep -q "PLAYED_RESTORE=$T/d/saved/restore" "$T/d/setup" || { echo "FAIL both: the guard was not given the put-back"; fail=1; }
 # The stand-in's answer is the two files a made skill's answer has, in its `show`.
 python3 - "$T/d/plan.json" <<'PY' || { echo "FAIL both: the plan's answer is not a made skill's"; fail=1; }
@@ -296,6 +341,8 @@ FAKE_ENV="LAMP_TASKS_DIR=/run/lampos-tasks LAMP_MAKE_SKILL=on" run already yes 3
 [[ ! -e $T/d/fixture ]] || { echo "FAIL already: the stand-in was sent"; fail=1; }
 FAKE_ENV="LAMP_VOICE_ROUTE=second" run no-tasks yes 3 "no tasks part"
 
+fi
+
 # Third's controls on #3889, none of which plays an arm.
 # The skill list fails (exit 17, nothing printed) or is not whole: the run stops before any change.
 unchanged() { [[ ! -e $T/d/fixture && ! -e $T/d/voice-state ]] && ! grep -q " remove " "$T/d/calls" || { echo "FAIL $1: something was changed or removed"; fail=1; }; }
@@ -307,12 +354,29 @@ FAKE_SETUP_FAILS=1 FAKE_RESTORE_BREAKS=1 KEEP_SAVED=1 run restore-fails yes 8 \
 [[ -e $T/d/saved/done && -e $T/d/saved/restore && $(print_of "$T/d/saved/made-skills") == "$SEED_MADE" ]] \
   || { echo "FAIL restore-fails: the saved copy is not kept whole"; fail=1; }
 grep -q "rm -rf $T/d/saved" "$T/d/calls" && { echo "FAIL restore-fails: the saved copy was removed"; fail=1; }
+# A put-back whose check fails still starts lamp-voice again, after its stop and the put-back (El's P3 on #3936).
+[[ $(tr '\n' ' ' <"$T/d/voice-state") == "save stop restore start " ]] || { echo "FAIL restore-fails: lamp-voice not started again after a failed put-back: $(tr '\n' ' ' <"$T/d/voice-state")"; fail=1; }
+# lamp-voice can't be stopped (its stop exits 17), is still active after it (Third's HOLD on a8962558b), or its state
+# is not known (unknown, exit 4; nothing, exit 1: Third's HOLD on b2d2dfb0b): nothing is put back, the copy is kept
+# whole, the voice started again, and the run exits 8 with the stand-in taken out.
+for c in FAKE_STOP_FAILS=1 FAKE_STILL_ACTIVE=1 FAKE_QUERY=unknown FAKE_QUERY=none; do
+  eval "$c FAKE_SETUP_FAILS=1 KEEP_SAVED=1 run stop-fails-${c#*=} yes 8 'lamp-voice could not be stopped, so nothing was put back' 'the saved copy is kept at $T/d/saved' 'put back'"
+  [[ $(tr '\n' ' ' <"$T/d/voice-state") == "save stop start " && -e $T/d/saved/done && -e $T/d/saved/restore \
+     && $(print_of "$T/d/saved/made-skills") == "$SEED_MADE" && ! -e $T/d/voice-stopped ]] \
+    || { echo "FAIL stop-fails-${c#*=}: something was put back, the copy not kept whole, or the voice left stopped: $(tr '\n' ' ' <"$T/d/voice-state")"; fail=1; }
+done
 # The digest tool fails (exit 17) and the copy differs, or the copy is right and only the digest fails: nothing is
 # proved, so exit 8 and the copy kept whole.
 for c in "FAKE_RESTORE_BREAKS=1 CP_CORRUPT=leaf digest-fails-copy-differs" "FAKE_RESTORE_BREAKS= digest-fails"; do
   eval "${c% *} FAKE_SETUP_FAILS=1 FAKE_DIGEST_FAILS=1 KEEP_SAVED=1 run ${c##* } yes 8 'could not be read whole' 'the saved copy is kept at $T/d/saved'"
   [[ -e $T/d/saved/done && $(print_of "$T/d/saved/made-skills") == "$SEED_MADE" ]] || { echo "FAIL ${c##* }: the saved copy is not kept whole"; fail=1; }
 done
+# The put-back's copy drops an empty folder, every file's bytes the same (Third's P3 on #3889): folders are in the
+# manifest, so it differs, exits 8, and the copy is kept whole, the empty folder in it.
+FAKE_SETUP_FAILS=1 FAKE_RESTORE_BREAKS=1 CP_CORRUPT=emptydir KEEP_SAVED=1 run restore-drops-empty-dir yes 8 \
+  "restore: $T/d/voice is not as saved in $T/d/saved" "the saved copy is kept at $T/d/saved"
+[[ -d $T/d/saved/made-skills/kept/empty && ! -e $T/d/voice/made-skills/kept && $(print_of "$T/d/saved/made-skills") == "$SEED_MADE" ]] \
+  || { echo "FAIL restore-drops-empty-dir: the copy is not kept whole, or the folder was not dropped"; fail=1; }
 # tasks-told a link, dangling or to a file: the run stops before any change, the link and what it names as they were.
 for k in dangling file; do
   FAKE_TOLD_LINK=$k KEEP_SAVED=1 run told-link-$k yes 3 "tasks-told is a symbolic link" "not a plain file or folder (above); nothing changed"
@@ -328,6 +392,16 @@ FAKE_LINK_AT_SETUP=1 FAKE_SETUP_FAILS=1 KEEP_SAVED=1 run link-at-restore yes 8 "
 # A copy an earlier run left: the next run stops before any change, and names how to put it back.
 FAKE_LEFTOVER=1 KEEP_SAVED=1 run leftover-copy yes 3 "an earlier run's saved copy of the voice's state is at $T/d/saved" "sudo sh $T/d/saved/restore"
 [[ -e $T/d/saved/done && ! -e $T/d/fixture ]] || { echo "FAIL leftover-copy: the copy was touched or the stand-in sent"; fail=1; }
+# A save cut short, the Mac gone with it (El's P3 on #3889): only saved.part is left, never a copy named as whole, and
+# the voice's state is as it was.
+FAKE_SAVE_CUT=1 KEEP_SAVED=1 run save-cut yes 137
+[[ ! -e $T/d/saved && -d $T/d/saved.part && ! -e $T/d/saved.part/done && $(print_of "$T/d/voice") == "$SEED" ]] \
+  || { echo "FAIL save-cut: a save cut short was left as the copy, or the voice was changed"; fail=1; }
+# The next run after it: stopped before any change, told the voice is as it was and how to clear the cut-short save.
+FAKE_LEFTOVER=part KEEP_SAVED=1 run part-left yes 3 "save was cut short at $T/d/saved.part, before anything was changed" \
+  "remove it with: sudo rm -rf $T/d/saved.part"
+[[ -e $T/d/saved.part/kinds && ! -e $T/d/saved && ! -e $T/d/fixture && ! -e $T/d/voice-state ]] \
+  || { echo "FAIL part-left: the cut-short save was touched or the stand-in sent"; fail=1; }
 # The Mac loses the lamp at the setup: its put-back can't reach the lamp (exit 8), the copy is kept, and the lamp's
 # guard, armed by the setup with PLAYED_RESTORE, puts the voice's state back first; a guard whose put-back is not as
 # saved keeps the copy and still takes the stand-in out.
@@ -340,6 +414,9 @@ cat >"$T/g/bin/systemctl" <<EOF
 case "\$1" in
 cat) printf '[Service]\nUser=%s\nExecStart=$T/g/tasks serve --dir $T/g/store --harness /usr/local/bin/harness\n' "\$(id -un)" ;;
 show) printf 'User=%s\nGroup=%s\n' "\$(id -un)" "\$(id -gn)" ;;
+stop|start) echo "\$1 \$2" >>"$T/g/stops"; [ "\$1 \$2" != "stop lamp-voice" ] || [ -z "\${G_STOP_FAILS:-}" ] || exit 17 ;;
+is-active) case \${G_QUERY:-} in unknown) st=unknown; rc=4 ;; none) st=""; rc=1 ;; *) st=inactive; rc=3 ;; esac
+  [ "\$2" = -q ] || [ -z "\$st" ] || echo "\$st"; exit \$rc ;;
 esac
 EOF
 printf '#!/bin/sh\nprintf "%%s\\n" "$@" >"%s"\n' "$T/g/guard" >"$T/g/bin/systemd-run"
@@ -348,13 +425,26 @@ chmod +x "$T/g/bin/systemctl" "$T/g/bin/systemd-run" "$T/g/tasks" "$T/g/remote/h
 PATH=$T/g/bin:$PATH PLAYED_REMOTE=$T/g/remote PLAYED_UNITS=$T/g/units PLAYED_TASKS=$T/g/tasks PLAYED_RESTORE=$restore \
   sh "$(dirname "$SCRIPT")/stand-in.sh" in >"$T/g/out" 2>&1 || { echo "FAIL gone: the stand-in's setup failed:"; cat "$T/g/out"; fail=1; }
 guard=$(tail -n 1 "$T/g/guard" 2>/dev/null)
-[[ $restore == "$T/d/saved/restore" && $guard == "[ ! -e $restore ] || /bin/sh $restore; rm -f "* ]] \
+[[ $restore == "$T/d/saved/restore" && $guard == "[ ! -e $restore ] || { systemctl stop lamp-voice && systemctl is-active lamp-voice | grep -qx -e inactive -e failed && /bin/sh $restore; systemctl start lamp-voice; }; rm -f "*"; rm -rf $T/g/remote; [ ! -e $restore ]" ]] \
   || { echo "FAIL gone: the guard does not put back first: $guard"; fail=1; }
-PATH=$T/badcp:$T/g/bin:$PATH /bin/sh -c "$guard" 2>"$T/g/err"
-[[ -e $T/d/saved/done && ! -e $T/g/remote && ! -e $T/g/units/lamp-voice.service.d/zz-played-stand-in.conf ]] \
-  || { echo "FAIL gone: a guard whose put-back failed lost the copy or left the stand-in in"; fail=1; }
-PATH=$T/g/bin:$PATH /bin/sh -c "$guard"
-[[ ! -e $T/d/saved && $(print_of "$T/d/voice") == "$SEED" ]] || { echo "FAIL gone: the guard did not put the voice's state back"; fail=1; }
+# A guard whose stop of lamp-voice fails (Third's HOLD on a8962558b), or whose is-active says unknown (exit 4) or
+# nothing (exit 1; Third's HOLD on b2d2dfb0b), puts nothing back, keeps the copy, starts the voice, still takes the
+# stand-in out, and exits nonzero; so does one whose put-back is not as saved.
+before=$(print_of "$T/d/voice")
+for g in G_STOP_FAILS=1 G_QUERY=unknown G_QUERY=none; do
+  mkdir -p "$T/g/remote" "$T/g/units/lamp-voice.service.d"; touch "$T/g/units/lamp-voice.service.d/zz-played-stand-in.conf"
+  env "$g" PATH="$T/g/bin:$PATH" /bin/sh -c "$guard" 2>"$T/g/err"; got=$?
+  [[ $got != 0 && -e $T/d/saved/done && $(print_of "$T/d/voice") == "$before" && ! -e $T/g/remote && ! -e $T/g/units/lamp-voice.service.d/zz-played-stand-in.conf ]] \
+    || { echo "FAIL gone ($g): the guard exited $got, put back, lost the copy or left the stand-in in"; fail=1; }
+done
+PATH=$T/badcp:$T/g/bin:$PATH /bin/sh -c "$guard" 2>"$T/g/err"; got=$?
+[[ $got != 0 && -e $T/d/saved/done && ! -e $T/g/remote && ! -e $T/g/units/lamp-voice.service.d/zz-played-stand-in.conf ]] \
+  || { echo "FAIL gone: a guard whose put-back failed exited $got, lost the copy or left the stand-in in"; fail=1; }
+PATH=$T/g/bin:$PATH /bin/sh -c "$guard"; got=$?
+[[ $got == 0 && ! -e $T/d/saved && $(print_of "$T/d/voice") == "$SEED" ]] || { echo "FAIL gone: the guard exited $got or did not put the voice's state back"; fail=1; }
+# Each guard run stops lamp-voice before its put-back and starts it after, its stop or put-back failed or not.
+[[ $(grep ' lamp-voice$' "$T/g/stops" | tr '\n' ' ') == "$(printf 'stop lamp-voice start lamp-voice %.0s' 1 2 3 4 5)" ]] \
+  || { echo "FAIL gone: the guard did not stop and then start lamp-voice around each put-back: $(tr '\n' ' ' <"$T/g/stops")"; fail=1; }
 
 [[ $fail == 0 ]] && echo "make-skill-test: all passed"
 exit $fail
