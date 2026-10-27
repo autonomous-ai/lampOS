@@ -2271,7 +2271,15 @@ reading of how tired anyone is.
 `humans/seems` is kept, checked at most every 2 s. When the yes is
 withdrawn, the sitting's count goes to 0 at once, and no yawn counts until
 the yes is back. A closed camera forgets the count too, as it forgets the
-sitter's prints. Without either model the journal says so, and no yawn is
+sitter's prints. Each look offered to the yawn thread carries
+what its frame was captured under: the permission's own hold
+(`Permit::held`, another at every close and every permission after one ran
+out, counted on the permit's thread), the yes's epoch (moved on at every
+look without it) and the frame's time (`yawn::Grant`). A hold begun under
+another starts afresh. A count is taken only under the hold and the epoch
+the look has now, from a frame at most 2 s old (`yawn::current_counts`), so
+one finished after a close and a regrant is dropped (Fourth and Fourteen
+on #3898). Without either model the journal says so, and no yawn is
 counted.
 
 **What counts as a yawn** (`yawn.rs`): the mouth held at `mouth_open`

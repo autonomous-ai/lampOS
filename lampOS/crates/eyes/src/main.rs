@@ -973,18 +973,19 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
     // of its points on a thread of its own, so the look never waits (the
     // reviewer-lead on #3842, as the seems read's #2872); and only while the
     // face-expressions yes is kept (asked at most every 2 s).
-    /// One look's largest face for the yawn thread: when, and its
+    /// One look's largest face for the yawn thread: the grant its frame was
+    /// captured under (`yawn::Grant`), the frame's time, and its
     /// `mouth_open` with, while open wide, its Blendshape V2 points.
-    type YawnOffer = (u64, Option<(f32, Option<Vec<f32>>)>);
+    type YawnOffer = (lamp_eyes::yawn::Grant, u64, Option<(f32, Option<Vec<f32>>)>);
     let mut yawning = match (&arguments.seems_blendshapes, mesh.is_some()) {
         (Some(model), true)
             if std::env::var(lamp_eyes::yawn::ENVIRONMENT).as_deref() == Ok("on") =>
         {
             let reader = lamp_eyes::blendshapes::Reader::load(model)?;
-            let mut yawns = lamp_eyes::yawn::Yawns::default();
+            let mut yawns = lamp_eyes::yawn::Generations::default();
             let (offer, yawned) = lamp_eyes::latest::worker(
                 "eyes-yawn",
-                move |(at_us, face): YawnOffer| -> Option<u64> {
+                move |(grant, frame_us, face): YawnOffer| -> Option<(lamp_eyes::yawn::Grant, u64)> {
                     let mouth = face.map(|(open, points)| {
                         let scores = points
                             .and_then(|points| reader.scores(&points).ok())
@@ -995,10 +996,10 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                             brow_up: scores.map(|(_, up)| up),
                         }
                     });
-                    yawns.look(mouth, at_us).then_some(at_us)
+                    yawns.look(grant, mouth, frame_us)
                 },
             )?;
-            Some((offer, yawned, None::<(Instant, bool)>))
+            Some((offer, yawned, None::<(Instant, bool)>, 0u64))
         }
         _ => {
             if std::env::var(lamp_eyes::yawn::ENVIRONMENT).as_deref() == Ok("on") {
@@ -2397,8 +2398,8 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                         // its points while open wide, only while the yes is
                         // kept; without it the sitting's count is forgotten.
                         let mut yawns_yes = None;
-                        let mut yawned = Vec::new();
-                        if let Some((offer, done, asked)) = yawning.as_mut() {
+                        let mut yawned = 0;
+                        if let Some((offer, done, asked, yes_epoch)) = yawning.as_mut() {
                             let yes = match *asked {
                                 Some((at, yes)) if at.elapsed() < Duration::from_secs(2) => yes,
                                 _ => {
@@ -2410,7 +2411,11 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                                 }
                             };
                             yawns_yes = Some(yes);
-                            if yes {
+                            // Without the yes, nothing begun before it counts after.
+                            if !yes {
+                                *yes_epoch += 1;
+                            }
+                            if yes && let Some(hold) = frame_hold {
                                 let largest = heights
                                     .iter()
                                     .enumerate()
@@ -2432,9 +2437,16 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                                             .flatten();
                                         Some((open, points))
                                     });
-                                offer.offer((lamp_ipc::monotonic_us(), face));
+                                let grant = lamp_eyes::yawn::Grant { hold, yes: *yes_epoch };
+                                // A camera whose timestamps aren't the host's clock
+                                // gives 0: the look's own time stands in for it.
+                                let captured_us = if frame_us > 0 { frame_us } else { lamp_ipc::monotonic_us() };
+                                offer.offer((grant, captured_us, face));
                             }
-                            yawned.extend(done.try_iter().flatten());
+                            // Only under the hold and the yes the look has now, from a
+                            // frame not too old: one finished across a close is dropped.
+                            let now = permit.held().map(|hold| lamp_eyes::yawn::Grant { hold, yes: *yes_epoch });
+                            yawned = lamp_eyes::yawn::current_counts(done.try_iter(), now, lamp_ipc::monotonic_us());
                         }
                         if let Some(bus) = bus_out.as_mut() {
                             let now = lamp_ipc::monotonic_us();
@@ -2443,7 +2455,7 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                             if let Some(yes) = yawns_yes {
                                 bus.activity_yawns_allowed(yes);
                             }
-                            for _ in &yawned {
+                            for _ in 0..yawned {
                                 bus.activity_yawned(now);
                             }
                             if let Some(answered) = answered.as_mut() {
