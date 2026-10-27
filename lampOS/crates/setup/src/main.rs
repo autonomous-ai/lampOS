@@ -75,6 +75,17 @@ usage: lamp-setup COMMAND [OPTIONS]
   wake
       From power-on until the voice asks for the ring: the waking face
       (#1681). Only with LAMP_WAKING_FACE=on; otherwise it exits at once.
+  shutdown [--dry-run]
+      Hand shutdown-now to a unit of its own (lamp-setup-shutdown), outside
+      lampos.target, so stopping the lamp cannot stop it (#3697).
+  shutdown-now [--dry-run]
+      Turn the lamp off safely (docs/shutdown.md): refused while an update
+      installs; else the lamp is paused and the body rests (still 2 s, at
+      most 15 s waited), every part is stopped and read back stopped, 0.4 s
+      later the body lets go (torque off on all five, each read back, only
+      for a lamp found down), the ring shows it is safe to unplug, the disks
+      are synced and the machine powers off. --dry-run does all of it but
+      the poweroff, and says it instead. One journal line a step.
 
 The plan names the setup marker, the reset journal, the paths to wipe and
 the stop and reboot commands (docs/setup.md, \"The reset\").
@@ -158,6 +169,18 @@ fn run() -> Result<bool, Box<dyn std::error::Error>> {
     }
     if command == "keys" {
         return own_keys(given);
+    }
+    if command == "shutdown" || command == "shutdown-now" {
+        let dry_run = match given.next().as_deref() {
+            None => false,
+            Some("--dry-run") if given.next().is_none() => true,
+            Some(_) => return Err(format!("{command} takes only --dry-run").into()),
+        };
+        return if command == "shutdown" {
+            start_shutdown(dry_run)
+        } else {
+            shutdown_now(dry_run)
+        };
     }
     if command == "wifi-restore" {
         let boot = match given.next().as_deref() {
@@ -753,6 +776,157 @@ fn start_reset(plan: &Plan, plan_path: &Path) -> io::Result<()> {
         "--enable".to_owned(),
     ]);
     System.run(&argv)
+}
+
+/// Hand the shutdown to a unit of its own, outside `lampos.target`, as the
+/// reset is handed to one (`start_reset`): stopping the lamp must not stop it.
+fn start_shutdown(dry_run: bool) -> Result<bool, Box<dyn std::error::Error>> {
+    let mut argv: Vec<String> = [
+        "/usr/bin/systemd-run",
+        "--no-block",
+        "--collect",
+        "--unit=lamp-setup-shutdown",
+        "--property=Type=oneshot",
+    ]
+    .map(str::to_owned)
+    .into();
+    argv.push(std::env::current_exe()?.to_string_lossy().into_owned());
+    argv.push("shutdown-now".to_owned());
+    if dry_run {
+        argv.push("--dry-run".to_owned());
+    }
+    System.run(&argv)?;
+    Ok(true)
+}
+
+/// `shutdown-now`: the update's lock held to the end, then
+/// `lamp_setup::shutdown::run` on this lamp.
+fn shutdown_now(dry_run: bool) -> Result<bool, Box<dyn std::error::Error>> {
+    use lamp_setup::shutdown;
+    let records = lamp_update::records::Records::new(PathBuf::from(lamp_update::install::RECORDS));
+    let _lock = match shutdown::update_lock(&records) {
+        Ok(lock) => lock,
+        Err(why) => {
+            eprintln!("lamp-setup: shutdown: refused: {why}");
+            println!("{}", serde_json::json!({ "refused": why }));
+            return Ok(false);
+        }
+    };
+    let mut host = Shutdown {
+        started: Instant::now(),
+        bus: None,
+    };
+    let steps = shutdown::run(&mut host, dry_run, &mut |line| {
+        eprintln!("lamp-setup: shutdown: {line}")
+    });
+    println!(
+        "{}",
+        serde_json::json!({"dry_run": dry_run, "steps": steps})
+    );
+    Ok(true)
+}
+
+/// The shutdown's effects on this lamp.
+struct Shutdown {
+    started: Instant,
+    bus: Option<Bus>,
+}
+
+impl lamp_setup::shutdown::Host for Shutdown {
+    fn now(&self) -> Duration {
+        self.started.elapsed()
+    }
+    fn sleep(&mut self, pause: Duration) {
+        std::thread::sleep(pause);
+    }
+    /// The keeper's own pause (`lamp-keeper pause`), which owns `lamp/pause`.
+    fn pause(&mut self, paused: bool) -> io::Result<()> {
+        let verb = if paused { "pause" } else { "resume" };
+        System.run(&["/usr/local/bin/lamp-keeper".to_owned(), verb.to_owned()])
+    }
+    fn joints(&mut self) -> Option<Vec<f64>> {
+        if self.bus.is_none() {
+            self.bus = Bus::from_environment().ok();
+        }
+        let message = self
+            .bus
+            .as_ref()?
+            .latest(lamp_msgs::JointState::TOPIC)
+            .ok()??;
+        (!message.expired)
+            .then(|| message.parse::<lamp_msgs::JointState>().ok())
+            .flatten()
+            .map(|state| state.position)
+    }
+    fn stop(&mut self) -> io::Result<()> {
+        reset::stop_and_wait(&lamp_setup::shutdown::STOP.map(str::to_owned), &mut System)
+    }
+    /// `lamp-body-measure let-go` as the body's user, as the body runs
+    /// (the servo port's owner refuses root), on the body's own device,
+    /// lock and poses.
+    fn let_go(&mut self) -> Result<String, String> {
+        let output = std::process::Command::new("/usr/bin/setpriv")
+            .args([
+                "--reuid=lampos",
+                "--regid=lampos",
+                "--groups=dialout",
+                "--",
+                "/opt/lampOS/body/current/lamp-body-measure",
+                "let-go",
+                "--device",
+                "/dev/ttyACM0",
+                "--unit-id",
+                &host_name(),
+                "--lock-directory",
+                "/run/lampos-locks/motor",
+                "--lamp-env",
+                "/etc/lampOS/body/lamp.env",
+            ])
+            .output()
+            .map_err(|why| why.to_string())?;
+        let said = String::from_utf8_lossy(&output.stdout).trim().to_owned();
+        if output.status.success() {
+            Ok(said)
+        } else {
+            Err(format!(
+                "{}: {said} {}",
+                output.status,
+                String::from_utf8_lossy(&output.stderr).trim()
+            ))
+        }
+    }
+    fn light(&mut self) -> io::Result<()> {
+        unplug_light()
+    }
+    fn sync(&mut self) {
+        rustix::fs::sync();
+    }
+    /// As the reset's reboot: a poweroff that fails is forced, once synced.
+    fn power_off(&mut self) -> io::Result<()> {
+        let failed = System.run(&lamp_setup::shutdown::POWER_OFF.map(str::to_owned));
+        if failed.is_err() {
+            rustix::fs::sync();
+            #[cfg(target_os = "linux")]
+            let _ = rustix::system::reboot(rustix::system::RebootCommand::PowerOff);
+        }
+        failed
+    }
+}
+
+/// The ring's safe-to-unplug light, left on: the voice has let the ring go
+/// with its stop.
+#[cfg(target_os = "linux")]
+fn unplug_light() -> io::Result<()> {
+    use lamp_ring::setup::SetupLook;
+    let mut ring = lamp_ring::linux::open_setup()?;
+    ring.show(SetupLook::Unplug, SetupLook::Unplug, 1.0, 1.0)?;
+    ring.leave();
+    Ok(())
+}
+
+#[cfg(not(target_os = "linux"))]
+fn unplug_light() -> io::Result<()> {
+    Err(io::Error::other("there is no lamp's ring here"))
 }
 
 fn serve_config(path: &Path) -> Result<lamp_setup::serve::Config, Box<dyn std::error::Error>> {

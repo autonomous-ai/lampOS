@@ -7,6 +7,7 @@ pub mod recover;
 pub mod reset;
 pub mod scan;
 pub mod serve;
+pub mod shutdown;
 pub mod wake;
 pub mod wifi;
 pub mod wifi_change;
