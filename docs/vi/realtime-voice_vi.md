@@ -240,6 +240,17 @@ emotion, cử động, look hoặc delegate. Mô tả tool cho phép từ chối
 lỏm kể cả khi thiết bị có thể thực hiện. Trường hợp chưa chắc chắn, kết thúc im
 lặng và lỗi vẫn giữ hành vi fallback hiện có.
 
+Ngay sau `DEVICE IDENTITY`, `build_instructions()` thêm section
+`# HOW PEOPLE CALL YOU` (`wake_names=` trong floor breakdown, ~120 token) liệt kê
+tên gọi chủ máy đặt (`wake_phrases` trong config.json), hoặc wake word mặc định
+khi chủ máy giữ danh sách gốc. Section báo cho model rằng tên đó ở đầu hoặc cuối
+câu, kể cả khi bị nghe sai ("Sam" thành "Exam"), chỉ là lời gọi thiết bị: không
+thuộc yêu cầu, không phải ngôn ngữ khác và không phải lý do để reject hay
+delegate. Trước đây Gemini reject "Sam, mấy giờ rồi?" vì tưởng tiếng Tây Ban Nha,
+hoặc delegate "Exam mấy giờ rồi?" sang main agent thay vì tự trả lời. Danh sách
+được đọc lúc dựng instructions của phiên, nên thay đổi áp dụng từ phiên realtime
+kế tiếp.
+
 Thiết bị có thể tắt quy tắc này bằng `answer_overheard_speech: true` trong front
 matter ROBOT.md (Intern v2 bật; Lamp không). Khi đó `build_instructions()` nối
 `resources/answer_overheard_override.md` làm section cuối của prompt (`overheard=`
