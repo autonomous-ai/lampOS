@@ -1,0 +1,101 @@
+{
+  "schema_version": 1,
+  "status": "FAILED_CANCELLED_PARTIAL",
+  "ready_for_lamp_voice": false,
+  "source": {
+    "head": "ed9aff39b609676535343f8979631c909e2a430a",
+    "staged_tree": "9bfda85e9a5152cb41df1825e0ddd1e0aee12aac",
+    "state_at_attempt": "two staged repair paths; now superseded"
+  },
+  "host_test_profile": {
+    "platform": "macOS",
+    "debug_information": "disabled",
+    "optimization_assertions_overflow_checks": "unchanged",
+    "test_slots": 2,
+    "retries": 0
+  },
+  "actual_controller_exit": 125,
+  "actual_nextest_exit": 100,
+  "cancellation": {
+    "intentional": true,
+    "reason": "Superseded source already had fixture and disk failures; latest Main and repaired fixtures require fresh qualification.",
+    "in_flight_Update_SIGINT_failures": 2,
+    "interrupted_failures_remain_failed": true
+  },
+  "selected_cases": {
+    "total": 11495,
+    "observed_PASS": 6558,
+    "observed_FAILED": 12,
+    "observed_terminal_total": 6570,
+    "started_without_terminal": 0,
+    "UNSTARTED": 4925,
+    "LEAK": 0,
+    "ABORT": 0,
+    "TIMEOUT": 0
+  },
+  "observed_failures": {
+    "Eyes": 9,
+    "Health": 1,
+    "Update_deliberate_SIGINT": 2
+  },
+  "required_controls": {
+    "total": 110,
+    "observed_PASS": 40,
+    "observed_FAILED": 9,
+    "UNSTARTED": 61,
+    "all_terminal_claimed": false
+  },
+  "natural_ignored": {
+    "total": 100,
+    "JSON_ignored_terminals": 44,
+    "started_only_with_human_SKIP": 56,
+    "started_only_is_not_execution": true
+  },
+  "historical_rollover_control": {
+    "test": "camera_authority::tests::stale_expected_close_cannot_roll_capture_before_real_shutdown_completes",
+    "observed_status": "PASS",
+    "observed_count": 1,
+    "raw_stdout_line_one_based": 4881,
+    "global_test_terminal_ordinal_one_based": 2392,
+    "scope": "This superseded partial attempt only; no result transfer to later source."
+  },
+  "prior_RED_control": {
+    "actual_exit": 101,
+    "status": "FAILED_EXPECTED_NEGATIVE_CONTROL",
+    "failure_preserved": true
+  },
+  "failure_retention": {
+    "actual_native_exit": 0,
+    "failed_driver_copies": 3,
+    "drivers_inspected": 3,
+    "actual_dsymutil_object_entries": [
+      0,
+      0,
+      0
+    ],
+    "independent_MachO_N_OSO_entries": [
+      0,
+      0,
+      0
+    ],
+    "actual_backing_inputs": 0,
+    "zero_was_measured_independently_for_each_driver": true,
+    "source_and_owned_process_closure_verified": true
+  },
+  "evidence_sha256": {
+    "actual_native_terminal": "39e5d431db0cb95cc05c7d4f45042bcd612684590b2b4325a6550b97902dfdc3",
+    "offline_partial_audit": "135f20ba158b639f677338c69d9225aedf3d61de9eaed7dbbcfc7ac56015e2ea",
+    "case_ledger": "b2a97878ed938aa8de6abc54d0380d75cc6552453af09260fa51d7fad2e5de55",
+    "required110_status_ledger": "a44b02f8a03b2158896176b84cf5f605f0c3af7c1cb1559629f9f02f214f16be",
+    "retention_actual_native_release": "9f58fbe552d03d5920c8e477fd2f1d64759ee3d4c1f004ba16b21b788308de22",
+    "empty_clone_manifest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "limits": {
+    "full_workspace_qualification": false,
+    "all110_completed": false,
+    "latest_Main_carry_and_fixture_repairs": "staged and unqualified; fresh gates pending",
+    "source_result_transfer": false,
+    "physical_acceptance": false,
+    "test_replay_for_accounting": false
+  }
+}

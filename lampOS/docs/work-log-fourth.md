@@ -1,3 +1,25 @@
+## 2026-10-27 04:42 UTC — Superseded Common runtime failed and cancelled
+
+Ready for lamp-voice: no
+
+[Selected 9bf partial receipt](verification/common-superseded-9bf-partial-20261027/receipt.json):
+actual controller exit 125 and nextest exit 100 remain failed. Of 11,495 selected cases, 6,558
+passed, 12 failed (nine Eyes, one Health, two deliberate in-flight Update
+SIGINT) and 4,925 were unstarted; none lacked a terminal after starting.
+The 110 required controls give 40 passes, nine failures and 61 unstarted. All 100 natural
+ignores are identified: 44 JSON terminals and 56 start-only with human SKIP,
+which are not executions. The run was stopped because latest Main and fixture
+repairs require fresh qualification; no full-workspace or all 110 completion
+is claimed.
+
+The rollover control passed once only on this historical source; RED exit101
+remains a failed expected negative control. Retention exited 0 after inspecting
+all three retained drivers with actual dsymutil and independent Mach-O N_OSO:
+both found zero backing inputs for each, with source/process closure verified.
+Terminal, partial-audit, ledger and release hashes are bound in the receipt.
+Latest-Main carry and fixture repairs are staged and unqualified; fresh gates
+remain pending. No source-result transfer or physical acceptance.
+
 ## 2026-10-27 04:19 — Original Common native green and retained IPC failures
 
 Ready for lamp-voice: no
