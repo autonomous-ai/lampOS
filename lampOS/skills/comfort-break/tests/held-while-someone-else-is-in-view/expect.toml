@@ -1,0 +1,15 @@
+# 10:00, alone but for minutes 115 to 125, when a second face is in view: due at 120, held
+# (faces_at_most = 1) and said once they have been gone a minute, at 126, within the wait.
+clock = "10:00"
+
+[[expect]]
+at = "126m"
+within = "1m"
+call = "body.gaze"
+args = { look_at = "face" }
+
+[[expect]]
+at = "126m"
+within = "1m"
+call = "say"
+args = { note = "They have sat at the desk for about two hours. In one short, light line, the way a friend would, say it's a good moment for a short break. Say only a short break: name no place and no reason, and nothing about health." }

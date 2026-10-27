@@ -1,0 +1,14 @@
+# 10:00, 130 minutes at the desk alone: at 120 minutes it turns to them and says one line, once.
+clock = "10:00"
+
+[[expect]]
+at = "120m"
+within = "1m"
+call = "body.gaze"
+args = { look_at = "face" }
+
+[[expect]]
+at = "120m"
+within = "1m"
+call = "say"
+args = { note = "They have sat at the desk for about two hours. In one short, light line, the way a friend would, say it's a good moment for a short break. Say only a short break: name no place and no reason, and nothing about health." }

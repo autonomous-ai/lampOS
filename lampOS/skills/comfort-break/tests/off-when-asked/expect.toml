@@ -1,0 +1,8 @@
+# 10:00: asked to stop the wellbeing nudges a minute in, 130 minutes at the desk: nothing.
+clock = "10:00"
+none = true
+
+[[call_tool]]
+name = "wellbeing_nudges"
+at = "1m"
+args = { how = "off" }
