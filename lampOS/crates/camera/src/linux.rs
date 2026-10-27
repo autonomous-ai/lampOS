@@ -183,17 +183,20 @@ pub fn reset_usb(expected: &UsbIdentity) -> Result<PathBuf, PortError> {
         expected,
     )
 }
-/// The one camera with `vendor` and `product` on any USB port (#2190): its
-/// capture node and its device's topology, or why there is no one.
+/// The one camera with `vendor` and `product` at USB `port`, or on any
+/// port when it is empty (#2190, #3504): its capture node and its device's
+/// topology, or why there is no one.
 pub fn find_camera(
     vendor: u16,
     product: u16,
+    port: &str,
 ) -> Result<Result<(PathBuf, String), NotFound>, PortError> {
     find::find_under(
         std::path::Path::new("/sys"),
         std::path::Path::new("/dev"),
         vendor,
         product,
+        port,
     )
 }
 pub(super) fn errno(errno: i32) -> PortError {

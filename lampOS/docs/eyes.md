@@ -583,7 +583,9 @@ as before.
   VENDOR:PRODUCT@TOPOLOGY`, root's, started by `lamp-eyes-camera.socket`
   (`deploy/product/`, root and the group `lampos` may connect) for each ask
   as `lamp-eyes-camera@.service`, with the same camera and port as
-  lamp-eyes' own unit. It checks that the device at that port under
+  lamp-eyes' own unit (`01da:5875@3-1.1.4` in the product, held by the
+  install test, #3504); it acts at that port only, never at a camera with
+  the same ids elsewhere. It checks that the device at that port under
   `/sys/bus/usb/devices` has that `idVendor` and `idProduct`, writes its
   `authorized` 0, then 1 half a second later, as an unplug and a plug would,
   and answers one line: `{"reauthorized":true}`, or `false` with why
@@ -2535,21 +2537,32 @@ within about half a metre. Tested on the host only.
 ## Running it
 
 ```text
-lamp-eyes --device /dev/video0 --lock-directory /home/WORKER/private-camera-locks --usb 01da:5875@3-1.1.4 --model /opt/lampOS/eyes/face_detection_yunet_2023mar.onnx --permit-socket /run/lampos-eyes/permit.sock --body-socket /run/lampos-body/gaze.sock
+lamp-eyes --lock-directory /home/WORKER/private-camera-locks --usb 01da:5875@3-1.1.4 --model /opt/lampOS/eyes/face_detection_yunet_2023mar.onnx --permit-socket /run/lampos-eyes/permit.sock --body-socket /run/lampos-body/gaze.sock
 ```
 
 Every option shown is required; `--sight-file ABSOLUTE_PATH`, `--leave-still-faces on`, `--steady-rate on`, `--look-on-change on` (with `--glance-log ABSOLUTE_PATH`) and `--full-look 1280x960 --full-look-file /run/lampos-eyes/full-look.jpg` (up to `3264x2448`) may be added, the last with `--full-look-movement on`, and `--mouth-model ABSOLUTE_PATH` (with `--mouth-on-heard on` and `--mouth-runtime ABSOLUTE_PATH`). `--mouth-diagnostics on` observes the already enabled speaking judge as described above.
 `--usb` is `VENDOR:PRODUCT@TOPOLOGY`, the two numbers as four hex digits; or
-`VENDOR:PRODUCT` alone, without `--device` (#2190): then at each open the eyes
-take the one camera with those ids on whatever port it is on, its capture
-node found by following each `/sys/class/video4linux` node up to its USB
-device (`lamp_camera::linux::find_camera`), and open it as before, port
+`VENDOR:PRODUCT` alone (#2190). `--device` is given only with a port, and
+may be left out. Without it, at each open the eyes take the one camera with
+those ids, at the port named (#3504) or else on whatever port it is on, its
+capture node found by following each `/sys/class/video4linux` node up to its
+USB device (`lamp_camera::linux::find_camera`), and open it as before, port
 checked. None, or two or more (their ports named, so one can be given), is
-refused and said once in the journal ("camera 01da:5875 not opened: …"), and
-tried again every five seconds; "camera found at /dev/videoN on port P" is
-said when it is found, or found on another port. On lamp-dbda the camera is
-on `3-1.3.4`, where the product unit names `3-1.1.4`. The product unit still
-names the port; the ids alone are for a lamp that differs. The
+refused and said once in the journal ("camera 01da:5875 not opened: no
+camera with those ids at port 3-1.1.4", say), and tried again every five
+seconds; with a port named, a camera at another port is never taken instead.
+"camera found at /dev/videoN on port P" is said when it is found, or found
+on another port. **The product unit** gives `--usb 01da:5875@3-1.1.4`, and
+its helper below names the same `ids@port` (the install test holds both to
+it, #3504). It still passes `--device /dev/video0` until every channel
+carries a lamp-eyes that takes `--usb` with a port alone: an older one
+exits 2 without `--device`, and the updater installs units from its own
+build beside the channel's binaries ([install.md](install.md)). Then a
+second step drops `--device`, so a second camera on another port that
+enumerated first as `/dev/video0` is never used, and adds lamp-eyes to
+`product_units_pass_only_options_an_older_binary_takes`. On lamp-dbda the camera is on `3-1.3.4`; the ids alone are for a
+lamp that differs. The per-lamp units (`deploy/units/`, lamp-4ace,
+lamp-52e6) still give `--device` with the port, checked at open as before. The
 lock directory must be private to the user it runs as. A camera that does not open, or fails, is tried again every five
 seconds while permission lasts. A start is given a 2 s budget (`OPEN_BUDGET_US`)
 and a close 250 ms, so a camera slow to answer after a close is opened rather

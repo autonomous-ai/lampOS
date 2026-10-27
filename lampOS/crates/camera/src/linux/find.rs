@@ -4,6 +4,11 @@
 //! the USB device holding it, as `identity::observe_usb` does at open; only
 //! nodes whose device has the ids are taken. The open then checks the node's
 //! identity as before, port included.
+//!
+//! With a port named (#3504), only a node whose device is at that port is
+//! taken: a second camera, with the same ids or others, on another port is
+//! never it, whichever `/dev/video<N>` each enumerated as. None, or two, at
+//! that port is a refusal, never a fall back to another port.
 
 use crate::PortError;
 use std::path::{Path, PathBuf};
@@ -17,14 +22,15 @@ pub enum NotFound {
     Several(Vec<String>),
 }
 
-/// The one capture node whose USB device has `vendor` and `product`, under
-/// `sys` (`/sys`) with its node under `dev` (`/dev`): the node and its
-/// device's topology.
+/// The one capture node whose USB device has `vendor` and `product`, at
+/// `port` or on any port when it is empty, under `sys` (`/sys`) with its
+/// node under `dev` (`/dev`): the node and its device's topology.
 pub(super) fn find_under(
     sys: &Path,
     dev: &Path,
     vendor: u16,
     product: u16,
+    port: &str,
 ) -> Result<Result<(PathBuf, String), NotFound>, PortError> {
     let class = sys.join("class/video4linux");
     let devices = std::fs::canonicalize(sys.join("devices")).map_err(io)?;
@@ -50,6 +56,7 @@ pub(super) fn find_under(
                 );
                 if ids == (Some(vendor), Some(product))
                     && let Some(topology) = at.file_name().and_then(|n| n.to_str())
+                    && (port.is_empty() || topology == port)
                 {
                     found.push((dev.join(name), topology.to_owned()));
                 }
@@ -116,7 +123,7 @@ mod tests {
         std::fs::create_dir_all(sys.join("devices")).unwrap();
         let zvcai = (0x01da, 0x5875);
         assert_eq!(
-            find_under(&sys, dev, zvcai.0, zvcai.1),
+            find_under(&sys, dev, zvcai.0, zvcai.1, ""),
             Ok(Err(NotFound::None))
         );
         // lamp-dbda's port; its metadata node beside it; another camera.
@@ -124,18 +131,45 @@ mod tests {
         node(&sys, 1, "3-1.3.4", ("01da", "5875"), "1");
         node(&sys, 2, "3-1.2", ("1bcf", "28cc"), "0");
         assert_eq!(
-            find_under(&sys, dev, zvcai.0, zvcai.1),
+            find_under(&sys, dev, zvcai.0, zvcai.1, ""),
             Ok(Ok((PathBuf::from("/dev/video0"), "3-1.3.4".into())))
         );
         // A second one with the same ids: neither is taken, both ports said.
         node(&sys, 4, "3-1.1.4", ("01da", "5875"), "0");
         assert_eq!(
-            find_under(&sys, dev, zvcai.0, zvcai.1),
+            find_under(&sys, dev, zvcai.0, zvcai.1, ""),
             Ok(Err(NotFound::Several(vec![
                 "3-1.3.4".into(),
                 "3-1.1.4".into()
             ])))
         );
+        std::fs::remove_dir_all(&root).unwrap();
+    }
+
+    /// #3504: with the port named, only the camera at it is taken, though
+    /// another with the same ids, or another camera, came first as
+    /// `video0`; nothing at the port is a refusal, not another port.
+    #[test]
+    fn with_the_port_named_only_the_camera_there_is_taken() {
+        let root = std::env::temp_dir().join(format!("camera-port-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        let (sys, dev) = (root.join("sys"), Path::new("/dev"));
+        std::fs::create_dir_all(sys.join("class/video4linux")).unwrap();
+        std::fs::create_dir_all(sys.join("devices")).unwrap();
+        let at = |port| find_under(&sys, dev, 0x01da, 0x5875, port);
+        // Another camera, with the same ids and with others, before it.
+        node(&sys, 0, "3-1.3.4", ("01da", "5875"), "0");
+        node(&sys, 1, "3-1.3.4", ("01da", "5875"), "1");
+        node(&sys, 2, "3-1.2", ("1bcf", "28cc"), "0");
+        assert_eq!(at("3-1.1.4"), Ok(Err(NotFound::None)));
+        node(&sys, 4, "3-1.1.4", ("01da", "5875"), "0");
+        node(&sys, 5, "3-1.1.4", ("01da", "5875"), "1");
+        assert_eq!(
+            at("3-1.1.4"),
+            Ok(Ok((PathBuf::from("/dev/video4"), "3-1.1.4".into())))
+        );
+        // Other ids at the port are not it.
+        assert_eq!(at("3-1.2"), Ok(Err(NotFound::None)));
         std::fs::remove_dir_all(&root).unwrap();
     }
 }

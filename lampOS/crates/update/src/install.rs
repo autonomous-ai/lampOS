@@ -2867,7 +2867,7 @@ mod tests {
 
     /// #2892: the eyes' camera helper is installed, its socket enabled and
     /// its template never, and it names the same camera and port as the
-    /// eyes, which ask it.
+    /// eyes, which ask it; #3504: that port is `3-1.1.4`.
     #[test]
     fn the_eyes_camera_helper_socket_is_enabled_and_names_the_eyes_camera() {
         let unit = |name: &str| {
@@ -2900,6 +2900,14 @@ mod tests {
                 .contains("ListenStream=/run/lampos-eyes-camera/camera.sock")
         );
         assert!(unit("lamp-eyes-camera@.service").contains("lamp-eyes reauthorize-camera --usb"));
+        // #3504: both pinned to the product's camera at its port, each once.
+        // The eyes' unit keeps `--device` until every channel carries a
+        // lamp-eyes that takes `--usb` with a port alone (an older one exits
+        // 2 without it, and the units come from the updater's own build).
+        for name in ["lamp-eyes.service", "lamp-eyes-camera@.service"] {
+            assert_eq!(usb(unit(name)), "01da:5875@3-1.1.4", "{name}");
+            assert_eq!(unit(name).matches("--usb ").count(), 1, "{name}");
+        }
     }
 
     /// #1815: the cloud is enabled with the lamp, so a Lamp 2 set up from
