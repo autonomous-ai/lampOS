@@ -1,5 +1,30 @@
 # Reuse decisions: V1, ROS 2 and existing Rust systems
 
+## Refresh the fixed settings writer with independent recovery (2026-10-27)
+
+V1's `scripts/provision/software-update` snapshots absent rootfs entries as
+well as existing bytes, persists `pending-update.json` before moving live
+files, and clears it only after restoration and health. Its bootstrap
+recovery runs before version detection (`system/bootstrap/recovery.go`).
+Keep explicit absence, durable intent and recovery before normal work;
+do not reuse V1's broad rootfs permissions or claim runtime parity.
+
+Reuse Update's signed envelope, updater-first confirmation, atomic synced
+file replacement and bounded owned-child execution. Actual 7071's updater
+already runs as root and may write systemd units, so a narrowly scoped root
+one-shot is a viable bootstrap without changing its own unit. The old
+`apply` allowlist cannot install the helper, and the old `back` path cannot
+undo a new setting path after a partial apply. A saved `.prev` alone does
+not solve either recovery problem.
+
+The [settings-writer plan](settings-writer-refresh.md) specifies a frozen
+root-owned guard established before replacing the candidate writer, with
+its own versioned preimages and failure/boot admission. Recovery restores
+partial settings before the old writer and never depends on the broken
+candidate. Unknown recovery semantics block admission. This is a design
+and source audit, not implemented or tested behavior; first-use failure,
+process cuts, real Bookworm systemd and a 7071 lamp rehearsal remain owed.
+
 ## Reuse one kernel socket witness for a camera hold (2026-10-27)
 
 V1's `hal/privacy.py` publishes camera/speaker gates before slow teardown and

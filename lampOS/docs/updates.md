@@ -1482,6 +1482,12 @@ lamp-update-back as old as the lamp's install, as `self.json` is: their
 fields keep their meaning, a newer one may add fields, and each side
 ignores what it doesn't know. So does a setting in the manifest.
 
+Refreshing that fixed writer over the air is planned separately in
+[the #3689 settings-writer design](settings-writer-refresh.md). It requires
+independent failure and boot recovery before replacing the writer, and
+restoration of partial new-path settings before returning to an older
+writer. That extension is not implemented by the level-6 carrier.
+
 Explicit off, an invalid value, or absence outside the managed product
 carrier default leaves a build's settings unwritten. The round says which
 (`build N's settings are not written (...): LAMP_UPDATE_APPLY=on is not
