@@ -1,5 +1,14 @@
 # Tests work log
 
+## 2026-10-27 20:36 — updater draft offered; Body repair current gates pass
+
+Ready for lamp-voice: no (native checks, current reader marks and device acceptance remain).
+
+Pushed `ee6f88d2a` and opened draft #3843. The [full fixed updater Round target](verification/tests-3796-round-212-20261027/) passes **212/0/0 once**, all fourteen regressions included, with 511 witness/source/executable/group guards intact. Compilation predates the commit; all candidate bytes/modes match it. The [interrupted broad gate](verification/tests-3796-interrupted-host-gate-20261027/) remains FAIL; native ARM40512378554/Linux40512378505 are pending.
+
+The [separate Body fixture repair](verification/tests-body-holder-buffer-20261027/) at `2adcc4e209` on `02677931d` passes **646/0/0**, docs0, formatting, strict twelve-package Clippy and workspace build. Its unchanged Main control timed out at five seconds; the fixed exact case passed. Both writes are nonblocking and all original assertions remain, with byte conservation added. The equal carry preserves both authored blobs; the branch is pushed for its draft native checks. No new device access; Fifth retains the stopgap.
+
+
 ## 2026-10-27 20:10 — interrupted broad gate retained; independent Main Body repair
 
 Ready for lamp-voice: no (#3796 fixed Round and remaining gates pending).
