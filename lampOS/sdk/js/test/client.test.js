@@ -1,0 +1,334 @@
+// The SDK against the fake lamp: pairing, hello, events, actions, leases and
+// refusals, as docs/control.md says them. No lamp needed.
+import assert from 'node:assert/strict';
+import { chmodSync, existsSync, mkdtempSync, readFileSync, statSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { test } from 'node:test';
+import { Keyring, Lamp, LampError, NotPaired, WrongLamp, byCode, fromReply, schema } from '../src/index.js';
+import { FakeLamp } from '../src/testing.js';
+
+const folder = () => mkdtempSync(join(tmpdir(), 'lampos-test-'));
+const started = (t, options) => FakeLamp.start(options).then((fake) => { t.after(() => fake.stop()); return fake; });
+const until = async (ready) => { while (!ready()) await new Promise((r) => setTimeout(r, 10)); };
+
+async function withLamp(options, body) {
+  const fake = await FakeLamp.start(options);
+  const keyring = new Keyring(folder());
+  try {
+    await Lamp.pair(fake.code, fake.host, { pin: fake.pin, port: fake.port, name: 'test laptop', keyring });
+    const lamp = await Lamp.connect(undefined, { keyring });
+    try { await body(lamp, fake, keyring); } finally { await lamp.close(); }
+  } finally { await fake.stop(); }
+}
+
+test('the packaged schema is the repository\'s', (t) => {
+  // Outside the repository (an installed copy) there is nothing to compare;
+  // the lampOS SDK job in CI runs it in the repository.
+  const repoSchema = new URL('../../../docs/control.schema.json', import.meta.url);
+  if (!existsSync(repoSchema)) return t.skip('docs/control.schema.json is not beside this copy');
+  assert.deepEqual(JSON.parse(readFileSync(repoSchema, 'utf8')), schema.schema);
+});
+
+test('proofs name what they are for', async () => {
+  const { HELLO, PAIR, proof } = await import('../src/keys.js');
+  const { createHmac } = await import('node:crypto');
+  assert.equal(PAIR.toString(), 'lampos/v1/pair\0');
+  assert.equal(HELLO.toString(), 'lampos/v1/hello\0');
+  const key = Buffer.alloc(32);
+  const nonce = Buffer.from([...Array(32).keys()]);
+  const bare = createHmac('sha256', '12345678').update(Buffer.concat([key, nonce])).digest();
+  assert.ok(!proof('12345678', Buffer.alloc(32), key, nonce).equals(bare));
+  // The pin is inside, so a proof relayed through a host in the middle fails.
+  const pin = Buffer.alloc(32, 1);
+  const full = createHmac('sha256', '12345678').update(Buffer.concat([PAIR, pin, key, nonce])).digest();
+  assert.ok(proof('12345678', pin, key, nonce).equals(full));
+  assert.ok(!proof('12345678', Buffer.alloc(32, 2), key, nonce).equals(full));
+});
+
+test('every op has a call and every error code a class', () => {
+  const plumbing = new Set(['pair', 'hello', 'subscribe', 'unsubscribe', 'get', 'lease.take', 'lease.renew', 'lease.release']);
+  for (const op of schema.ops) assert.ok(plumbing.has(op) || typeof Lamp.prototype[op] === 'function', op);
+  for (const code of schema.errorCodes) assert.equal(new byCode[code]('x').code, code);
+  assert.equal(fromReply({ code: 'rate', why: 'x', retry_ms: 900 }).retryMs, 900);
+  assert.ok(fromReply({ code: 'no_grant', why: 'x' }) instanceof byCode.no_grant);
+});
+
+test('pairing keeps the key private and the lamp pinned', async (t) => {
+  const fake = await started(t, { grants: ['body', 'light'] });
+  const keyring = new Keyring(folder());
+  const pairing = await Lamp.pair(fake.code, fake.host, { pin: fake.pin, port: fake.port, name: 'test laptop', keyring });
+  assert.deepEqual([pairing.lamp, pairing.fp, pairing.grants], ['lamp-fake', fake.pin, ['body', 'light']]);
+  assert.equal(fake.clients.get(pairing.client).name, 'test laptop');
+  assert.equal(statSync(join(keyring.folder, 'key')).mode & 0o777, 0o600);
+  assert.ok(!readFileSync(join(keyring.folder, 'lamps.json'), 'utf8').includes(fake.code));
+});
+
+test('a wrong code is refused and nothing is kept', async (t) => {
+  const fake = await started(t);
+  const keyring = new Keyring(folder());
+  await assert.rejects(Lamp.pair('87654321', fake.host, { pin: fake.pin, port: fake.port, keyring }), byCode.unpaired);
+  await assert.rejects(Lamp.pair('1234', fake.host, { pin: fake.pin, port: fake.port, keyring }), LampError);
+  assert.deepEqual(keyring.pairings(), {});
+});
+
+test('another certificate than the pinned one is refused', async (t) => {
+  const fake = await started(t);
+  const keyring = new Keyring(folder());
+  // Another certificate than the pin: refused before any frame is sent.
+  await assert.rejects(Lamp.pair(fake.code, fake.host, { pin: '0'.repeat(64), port: fake.port, keyring }), WrongLamp);
+  // No pin, or mDNS's short hint: no pairing, and no connection.
+  for (const pin of [undefined, '', fake.fp]) {
+    await assert.rejects(Lamp.pair(fake.code, fake.host, { pin, port: fake.port, keyring }), WrongLamp);
+  }
+  assert.deepEqual(fake.received, []);
+  await Lamp.pair(fake.code, fake.host, { pin: fake.pin, port: fake.port, keyring });
+  const other = await started(t);
+  keyring.remember({ ...keyring.pairing(), port: other.port });
+  await assert.rejects(Lamp.connect(undefined, { keyring }), WrongLamp);
+});
+
+test('connect without a pairing says so', async () => {
+  await assert.rejects(Lamp.connect(undefined, { keyring: new Keyring(folder()) }), NotPaired);
+});
+
+test('hello with another computer\'s key is unpaired', async (t) => {
+  const fake = await started(t);
+  const mine = new Keyring(folder());
+  await Lamp.pair(fake.code, fake.host, { pin: fake.pin, port: fake.port, keyring: mine });
+  const stranger = new Keyring(folder());
+  stranger.remember(mine.pairing());
+  await assert.rejects(Lamp.connect(undefined, { keyring: stranger }), byCode.unpaired);
+});
+
+test('greet a person who arrives', async () => {
+  await withLamp({ grants: ['body', 'look'] }, async (lamp, fake) => {
+    let greeted;
+    const done = new Promise((resolve) => { greeted = resolve; });
+    await lamp.on('person.arrived', async () => { await lamp.gesture('greeting'); greeted(); });
+    fake.emit('person.arrived', { count: 1, near: 0.3 });
+    await done;
+    assert.deepEqual(fake.asked('gesture'), [{ name: 'greeting' }]);
+  });
+});
+
+test('phrases go with their subscription, and events carry only the phrase', async () => {
+  await withLamp({ grants: ['body', 'light', 'speak', 'hear'] }, async (lamp, fake) => {
+    const heard = [];
+    await lamp.on('phrase.heard', (event) => heard.push(event.phrase), { phrases: ['good night lamp'] });
+    assert.deepEqual(fake.asked('subscribe'), [{ events: ['phrase.heard'], phrases: ['good night lamp'] }]);
+    fake.emit('phrase.heard', { phrase: 'good night lamp' });
+    await until(() => heard.length);
+    assert.deepEqual(heard, ['good night lamp']);
+  });
+});
+
+test('actions send the schema\'s fields and wait for done', async () => {
+  await withLamp({}, async (lamp, fake) => {
+    await lamp.light('warm', 3, 10_000, 'breathe');
+    await lamp.say('Build passed.');
+    await lamp.express('glad');
+    assert.equal((await lamp.gesture('nod', { wait: true })).how, 'finished');
+    await lamp.stop();
+    assert.deepEqual(fake.asked('light'), [{ colour: 'warm', level: 3, pattern: 'breathe', for_ms: 10000 }]);
+    assert.deepEqual(fake.asked('say'), [{ text: 'Build passed.' }]);
+    assert.deepEqual(fake.asked('express'), [{ feeling: 'glad' }]);
+    assert.deepEqual(fake.asked('stop'), [{}]);
+  });
+});
+
+test('names outside the schema never leave this computer', async () => {
+  await withLamp({}, async (lamp, fake) => {
+    for (const call of [lamp.gesture('scanning'), lamp.gesture('idle'), lamp.light('magenta', 3, 1000)]) {
+      await assert.rejects(call, (error) => error.code === 'bad_request');
+    }
+    assert.throws(() => lamp.on('camera.frame', () => {}), LampError);
+    await lamp.stop();
+    assert.deepEqual(fake.received.filter((f) => ['gesture', 'light'].includes(f.op)), []);
+  });
+});
+
+test('a move needs a body lease, which renews itself and is released', async () => {
+  await withLamp({}, async (lamp, fake) => {
+    await assert.rejects(lamp.look({ yaw: -10, pitch: 5 }), byCode.no_lease);
+    await lamp.withLease(['body'], async (lease) => {
+      assert.ok(lease.held);
+      await lamp.look({ yaw: -10, pitch: 5 });
+      await lamp.joints(lease, 300, { pitch: 4, yaw: -12 });
+      await new Promise((r) => setTimeout(r, 1200));
+      assert.ok(fake.asked('lease.renew').length >= 2);
+    }, { forMs: 1000, why: 'test' });
+    assert.equal(fake.leases.size, 0);
+    assert.deepEqual(fake.asked('look'), [{ at: { yaw: -10, pitch: 5 } }]);
+    assert.deepEqual(fake.asked('joints'), [{ lease: 'l_1', targets: { pitch: 4, yaw: -12 }, within_ms: 300 }]);
+    assert.deepEqual(fake.asked('lease.release'), [{ lease: 'l_1' }]);
+  });
+});
+
+test('a lease the lamp takes back is lost with its why', async () => {
+  await withLamp({}, async (lamp, fake) => {
+    await lamp.withLease(['body'], async (lease) => {
+      fake.loseLease(lease.id, 'hand');
+      await until(() => lease.state === 'lost');
+      assert.equal(lease.lostWhy, 'hand');
+      await assert.rejects(lamp.move([[0, 0, 0, 0, 0], [20, 0, 0, 0, 0], [0, 0, 0, 0, 0]], 40), byCode.no_lease);
+    }, { forMs: 1000 });
+    assert.deepEqual(fake.asked('lease.release'), []);
+  });
+});
+
+test('refusals are typed and say when to try again', async () => {
+  await withLamp({ grants: ['body'] }, async (lamp, fake) => {
+    await assert.rejects(lamp.say('hello'), byCode.no_grant);
+    fake.refuseNext('gesture', 'rate', '1 every 2 s', 1500);
+    await assert.rejects(lamp.gesture('nod'), (error) => error instanceof byCode.rate && error.retryMs === 1500);
+    fake.refuseNext('gesture', 'private', 'the privacy switch is closed');
+    await assert.rejects(lamp.gesture('nod'), byCode.private);
+  });
+});
+
+test('get answers the states asked', async () => {
+  await withLamp({ grants: ['look'] }, async (lamp, fake) => {
+    fake.state.presence = { count: 2, near: 0.4, facing: true };
+    const state = await lamp.get('presence', 'lamp');
+    assert.equal(state.presence.count, 2);
+    assert.equal(state.lamp_state.private, false);
+  });
+});
+
+test('the examples call only what the client has', async () => {
+  const { readdirSync } = await import('node:fs');
+  const examples = readdirSync(new URL('../examples/', import.meta.url)).filter((f) => f.endsWith('.js'));
+  assert.ok(examples.length >= 5);
+  for (const example of examples) {
+    const text = readFileSync(new URL(`../examples/${example}`, import.meta.url), 'utf8');
+    for (const [, name] of text.matchAll(/\blamp\.([a-zA-Z]+)\(/g)) {
+      assert.equal(typeof Lamp.prototype[name], 'function', `${example}: lamp.${name}`);
+    }
+  }
+});
+
+test('a refused subscription rejects with its typed error', async () => {
+  await withLamp({ grants: ['body'] }, async (lamp) => {
+    await assert.rejects(lamp.on('person.arrived', () => {}), byCode.no_grant);
+    assert.equal(lamp.handlers.has('person.arrived'), false, 'a refused on() keeps no handler');
+  });
+});
+
+test('off takes a handler off and unsubscribes the last', async () => {
+  await withLamp({}, async (lamp, fake) => {
+    const seen = [];
+    const first = () => seen.push(1);
+    const second = () => seen.push(2);
+    await lamp.on('touch', first);
+    await lamp.on('touch', second);
+    await lamp.off('touch', first);
+    fake.emit('touch', { kind: 'pet' });
+    await until(() => seen.length);
+    assert.deepEqual(seen, [2]);
+    assert.deepEqual(fake.asked('unsubscribe'), []);
+    await lamp.off('touch', second);
+    assert.deepEqual(fake.asked('unsubscribe'), [{ events: ['touch'] }]);
+  });
+});
+
+test('the fake says done and lease changes to whoever they are for', async () => {
+  await withLamp({ autoDone: false }, async (lamp, fake) => {
+    await lamp.withLease(['body'], async (lease) => {
+      const waiting = lamp.move([[0, 0, 0, 0, 0], [20, 0, 0, 0, 0], [0, 0, 0, 0, 0]], 40, { wait: true });
+      await until(() => fake.asked('move').length);
+      fake.leaseEvent(lease.id, 'suspended', 'conversation');
+      await until(() => lease.state === 'suspended');
+      fake.done(fake.requests.at(-1).id, 'cut_short', 'conversation');
+      assert.equal((await waiting).how, 'cut_short');
+      fake.leaseEvent(lease.id, 'held');
+      await until(() => lease.held);
+    }, { forMs: 5000 });
+  });
+});
+
+test('base64 is strict and a nonce must be 32 bytes', async () => {
+  const { unb64 } = await import('../src/keys.js');
+  assert.throws(() => unb64('AAAA', 32));
+  assert.throws(() => unb64(`${'A'.repeat(43)}!`, 32));
+  assert.deepEqual(unb64(`${'A'.repeat(43)}=`, 32), Buffer.alloc(32));
+});
+
+test('the pairing store is this user\'s alone whatever the umask', () => {
+  const old = process.umask(0o002);
+  const keyring = new Keyring(join(folder(), 'lampos'));
+  try {
+    keyring.public();
+    keyring.remember({ lamp: 'l', client: 'c_1', grants: [], fp: '0'.repeat(64), host: 'h', port: 1 });
+    // A folder made group-writable before is closed again.
+    chmodSync(keyring.folder, 0o775);
+    keyring.remember({ lamp: 'l', client: 'c_1', grants: [], fp: '1'.repeat(64), host: 'h', port: 1 });
+  } finally {
+    process.umask(old);
+  }
+  assert.equal(statSync(keyring.folder).mode & 0o777, 0o700);
+  assert.equal(statSync(join(keyring.folder, 'key')).mode & 0o777, 0o600);
+  assert.equal(statSync(join(keyring.folder, 'lamps.json')).mode & 0o777, 0o600);
+});
+
+test('lamp fake pairs here and says an arrival', async () => {
+  const home = folder();
+  const before = process.env.LAMPOS_HOME;
+  process.env.LAMPOS_HOME = home;
+  try {
+    const { fake } = await import('../src/fake.js');
+    const faking = fake({ every: 1.5, cycles: 2 });
+    await until(() => existsSync(join(home, 'lamps.json')));
+    const lamp = await Lamp.connect(undefined, { keyring: new Keyring(home) });
+    assert.deepEqual([...lamp.grants].sort(), [...schema.grants].sort());
+    let arrived;
+    const arrival = new Promise((resolve) => { arrived = resolve; });
+    await lamp.on('person.arrived', () => arrived());
+    await arrival;
+    await lamp.close();
+    assert.equal(await faking, 0);
+  } finally {
+    if (before === undefined) delete process.env.LAMPOS_HOME; else process.env.LAMPOS_HOME = before;
+  }
+});
+
+test('a connection that only listens pings, so the lamp keeps it open', async () => {
+  const every = Lamp.KEEPALIVE_MS;
+  Lamp.KEEPALIVE_MS = 50;
+  try {
+    await withLamp({}, async (lamp, fake) => {
+      await lamp.on('touch', () => {});
+      await until(() => fake.pings >= 2);
+    });
+  } finally {
+    Lamp.KEEPALIVE_MS = every;
+  }
+});
+
+test('a lamp that stops answering pings is let go, not waited on forever', async () => {
+  const every = Lamp.KEEPALIVE_MS;
+  Lamp.KEEPALIVE_MS = 50;
+  try {
+    await withLamp({}, async (lamp, fake) => {
+      // The lamp goes quiet without a close, as off its Wi-Fi: no pongs.
+      for (const ws of fake.wss.clients) ws._socket.pause();
+      await Promise.race([lamp.closed(), new Promise((_, no) => setTimeout(() => no(new Error('never let go')), 2000))]);
+    });
+  } finally {
+    Lamp.KEEPALIVE_MS = every;
+  }
+});
+
+test('a refused waiting action leaves nothing behind to reject on close', async () => {
+  const unhandled = [];
+  const onUnhandled = (error) => unhandled.push(error);
+  process.on('unhandledRejection', onUnhandled);
+  try {
+    await withLamp({ grants: ['light'] }, async (lamp) => {
+      await assert.rejects(lamp.gesture('nod', { wait: true }), byCode.no_grant);
+      assert.equal(lamp.done.size, 0);
+    });
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    assert.deepEqual(unhandled, []);
+  } finally { process.off('unhandledRejection', onUnhandled); }
+});
