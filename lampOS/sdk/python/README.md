@@ -141,6 +141,9 @@ to rest, each joint's reach and speed); and its sounds (16-bit mono 24 kHz,
 folder is still checked. It warns
 on `[permissions] look = true` without `camera = true`, which format 1
 still reads as the full picture: ask `camera` for the picture; in format 1,
-presence is the presence topics (`humans/faces/tracked`, `room/stood_up`). The rules between keys, such as permissions
+presence is the presence topics (`humans/faces/tracked`, `room/stood_up`). A
+skill that says `format = 2` reads `look` as presence alone and `camera` as
+the only picture, so a `look = true` step there needs `camera = true`; a
+format other than 1 or 2 is refused. The rules between keys, such as permissions
 covering every read, are the lamp's own load check: a folder that passes
 here can still be refused there, with its reason.
