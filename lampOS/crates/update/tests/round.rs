@@ -4014,13 +4014,22 @@ const TMPFILES_CONF: &str = "/etc/tmpfiles.d/lampos.conf";
 
 /// Build `sequence`: build 1's binaries, and these settings.
 fn publish_settings(lamp: &mut Lamp, sequence: u64, settings: Vec<Setting>) {
+    publish_settings_with_controls(lamp, sequence, settings, "controls 1");
+}
+
+fn publish_settings_with_controls(
+    lamp: &mut Lamp,
+    sequence: u64,
+    settings: Vec<Setting>,
+    controls: &str,
+) {
     let mut manifest = lamp.manifest(
         sequence,
         &[
             ("lamp-voice", "voice 1"),
             ("lamp-turn-end", "turn-end 1"),
             ("lamp-body", "body 1"),
-            ("lamp-controls", "controls 1"),
+            ("lamp-controls", controls),
         ],
         &[],
     );
@@ -4031,6 +4040,218 @@ fn publish_settings(lamp: &mut Lamp, sequence: u64, settings: Vec<Setting>) {
     lamp.channel
         .files
         .insert(format!("{CHANNEL}{}", manifest::ENVELOPE), envelope);
+}
+
+const RECEIPT_REMOVED: &str = "/etc/lampOS/controls/receipt-removed.json";
+const RECEIPT_NEW: &str = "/etc/lampOS/controls/receipt-new/new.json";
+
+fn receipt_restore_settings(lamp: &mut Lamp) -> Vec<Setting> {
+    use std::os::unix::fs::PermissionsExt;
+
+    for (path, mode) in [(CONTROLS_JSON, 0o600), (RECORDS_JSON, 0o640)] {
+        fs::set_permissions(
+            lamp.root.join(path.trim_start_matches('/')),
+            fs::Permissions::from_mode(mode),
+        )
+        .unwrap();
+    }
+    let removed = lamp.root.join(RECEIPT_REMOVED.trim_start_matches('/'));
+    fs::write(&removed, "removed setting before").unwrap();
+    fs::set_permissions(&removed, fs::Permissions::from_mode(0o600)).unwrap();
+    let mut state = lamp.state();
+    state["settings"][RECEIPT_REMOVED] = sha("removed setting before").into();
+    fs::write(
+        lamp.root.join("var/lib/lampos-update/state.json"),
+        state.to_string(),
+    )
+    .unwrap();
+    vec![
+        Setting::new(CONTROLS_JSON, "controls 2"),
+        Setting::new(RECORDS_JSON, "records 2"),
+        Setting::new(RECEIPT_NEW, "new setting"),
+        Setting {
+            path: RECEIPT_REMOVED.into(),
+            text: None,
+            sha256: None,
+            mode: None,
+            removed: true,
+        },
+    ]
+}
+
+fn assert_receipt_settings_written(root: &Path) {
+    for (path, text) in [
+        (CONTROLS_JSON, "controls 2"),
+        (RECORDS_JSON, "records 2"),
+        (RECEIPT_NEW, "new setting"),
+    ] {
+        assert_eq!(
+            fs::read_to_string(root.join(path.trim_start_matches('/'))).unwrap(),
+            text
+        );
+    }
+    assert!(!root.join(RECEIPT_REMOVED.trim_start_matches('/')).exists());
+    let back: apply::Back = serde_json::from_slice(
+        &fs::read(root.join("var/lib/lampos-update/apply/back.json")).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(back.sequence, 2);
+    assert_eq!(back.files.len(), 4);
+}
+
+fn assert_receipt_settings_restored(root: &Path) {
+    use std::os::unix::fs::PermissionsExt;
+
+    for (path, text, mode) in [
+        (CONTROLS_JSON, "controls 1", 0o600),
+        (RECORDS_JSON, "records 1", 0o640),
+        (RECEIPT_REMOVED, "removed setting before", 0o600),
+    ] {
+        let path = root.join(path.trim_start_matches('/'));
+        assert_eq!(fs::read_to_string(&path).unwrap(), text);
+        assert_eq!(
+            fs::metadata(path).unwrap().permissions().mode() & 0o7777,
+            mode
+        );
+    }
+    assert!(!root.join(RECEIPT_NEW.trim_start_matches('/')).exists());
+    assert!(!root.join("etc/lampOS/controls/receipt-new").exists());
+}
+
+#[test]
+fn a_rejected_apply_receipt_runs_real_back_and_restores_written_settings_modes_and_records() {
+    let (mut lamp, _) = lamp_with_settings();
+    let settings = receipt_restore_settings(&mut lamp);
+    let before = lamp.state();
+    let mut applier = lamp.systemd.applier.take().unwrap();
+    let root = lamp.root.clone();
+    let calls = Rc::new(RefCell::new(Vec::new()));
+    let observed = Rc::clone(&calls);
+    let mut first_apply = true;
+    lamp.systemd.applier = Some(Box::new(move || {
+        let request: apply::Request = serde_json::from_slice(
+            &fs::read(root.join("var/lib/lampos-update/apply/request.json")).unwrap(),
+        )
+        .unwrap();
+        applier()?;
+        observed.borrow_mut().push((request.op, request.sequence));
+        if request.op == apply::Op::Apply && std::mem::take(&mut first_apply) {
+            // These are real apply effects and its real before-images, not
+            // a fake receipt for a helper that never changed the files.
+            assert_receipt_settings_written(&root);
+            let path = root.join("var/lib/lampos-update/apply/done.json");
+            let mut done: apply::Done = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+            done.sequence += 1;
+            fs::write(path, serde_json::to_vec(&done).unwrap()).unwrap();
+        }
+        Ok(())
+    }));
+    publish_settings(&mut lamp, 2, settings);
+
+    let outcome = lamp.round();
+
+    assert!(
+        matches!(&outcome, Outcome::RolledBack { sequence: 2, why, after: Ok(()), .. }
+        if why.contains("done.json is not for the requested settings operation and build")),
+        "{outcome:?}"
+    );
+    assert_receipt_settings_restored(&lamp.root);
+    assert_eq!(lamp.state()["settings"], before["settings"]);
+    assert_eq!(lamp.state()["installed"], before["installed"]);
+    assert_eq!(lamp.state()["refused"][0]["sequence"], 2);
+    assert!(!lamp.exists("/var/lib/lampos-update/journal.json"));
+    assert_eq!(
+        *calls.borrow(),
+        [(apply::Op::Apply, 2), (apply::Op::Back, 2)]
+    );
+}
+
+#[test]
+fn a_rejected_back_receipt_keeps_the_journal_until_real_back_is_acknowledged() {
+    let (mut lamp, _) = lamp_with_settings();
+    let settings = receipt_restore_settings(&mut lamp);
+    let before = lamp.state();
+    let mut applier = lamp.systemd.applier.take().unwrap();
+    let root = lamp.root.clone();
+    let calls = Rc::new(RefCell::new(Vec::new()));
+    let observed = Rc::clone(&calls);
+    let mut first_back = true;
+    lamp.systemd.applier = Some(Box::new(move || {
+        let request: apply::Request = serde_json::from_slice(
+            &fs::read(root.join("var/lib/lampos-update/apply/request.json")).unwrap(),
+        )
+        .unwrap();
+        applier()?;
+        observed.borrow_mut().push((request.op, request.sequence));
+        if request.op == apply::Op::Apply {
+            assert_receipt_settings_written(&root);
+        } else if std::mem::take(&mut first_back) {
+            assert_receipt_settings_restored(&root);
+            let path = root.join("var/lib/lampos-update/apply/done.json");
+            let mut done: apply::Done = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+            done.op = apply::Op::Apply;
+            fs::write(path, serde_json::to_vec(&done).unwrap()).unwrap();
+        }
+        Ok(())
+    }));
+    // The running candidate's health really fails; the restored old binary
+    // is healthy without changing the fixture's fault policy between rounds.
+    publish_settings_with_controls(&mut lamp, 2, settings, "controls 2 unwell");
+
+    let outcome = lamp.round();
+
+    assert!(
+        matches!(&outcome, Outcome::RolledBack { sequence: 2, after: Err(why), .. }
+        if why.contains("done.json is not for the requested settings operation and build")),
+        "{outcome:?}"
+    );
+    assert_receipt_settings_restored(&lamp.root);
+    let unresolved = lamp.state();
+    assert_eq!(unresolved["installed"], before["installed"]);
+    assert_eq!(unresolved["settings"][CONTROLS_JSON], sha("controls 2"));
+    assert_eq!(unresolved["settings"][RECORDS_JSON], sha("records 2"));
+    assert!(unresolved["refused"].as_array().unwrap().is_empty());
+    let journal: serde_json::Value =
+        serde_json::from_str(&lamp.read("/var/lib/lampos-update/journal.json")).unwrap();
+    assert_eq!(journal["build"]["sequence"], 2);
+    assert_eq!(journal["settings"], true);
+    // Files are already restored, but an unaccepted receipt has not settled
+    // their records. The journal remains the explicit incomplete transaction.
+    let recovered = lamp.round();
+    assert!(
+        matches!(
+            &recovered,
+            Outcome::RolledBack {
+                sequence: 2,
+                after: Ok(()),
+                ..
+            }
+        ),
+        "{recovered:?}"
+    );
+    assert_receipt_settings_restored(&lamp.root);
+    assert_eq!(lamp.state()["settings"], before["settings"]);
+    assert_eq!(lamp.state()["installed"], before["installed"]);
+    assert_eq!(lamp.state()["refused"][0]["sequence"], 2);
+    assert!(!lamp.exists("/var/lib/lampos-update/journal.json"));
+    assert_eq!(
+        *calls.borrow(),
+        [
+            (apply::Op::Apply, 2),
+            (apply::Op::Back, 2),
+            (apply::Op::Back, 2)
+        ]
+    );
+    let settled_calls = calls.borrow().clone();
+    let again = lamp.round();
+    assert!(!matches!(again, Outcome::Switched(_)), "{again:?}");
+    assert_eq!(
+        *calls.borrow(),
+        settled_calls,
+        "the refused build was applied again"
+    );
+    assert_eq!(lamp.state()["installed"], before["installed"]);
+    assert!(!lamp.exists("/var/lib/lampos-update/journal.json"));
 }
 
 #[test]
