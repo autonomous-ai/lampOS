@@ -380,6 +380,7 @@ fn every_skill_folder_says_its_kind_and_version() {
             "guard-mode",
             "look-for-things",
             "meal-check",
+            "sit-back",
             "who-was-here"
         ]
     );
@@ -2710,6 +2711,116 @@ fn a_meal_check_names_no_food_and_takes_no_picture() {
     assert_eq!(
         toml["permissions"]["topics"].as_array().unwrap(),
         &["humans/faces/tracked", "voice/state", "room/activity"]
+            .map(|topic| toml::Value::String(topic.to_owned()))
+    );
+    assert_eq!(skill.kind, SkillKind::Installable);
+}
+
+/// #3694: a trigger `follows` another of its skill's triggers by name, for 10
+/// s to 1 h after that one ran, once each time it holds, on the whole topic.
+/// Naming none of the others, itself, no rearm, a `within` past those bounds,
+/// or an `each`, `once_per_day` or `yields_to` beside it, is refused.
+#[test]
+fn follows_names_another_trigger_of_the_skill_and_is_refused_otherwise() {
+    let dir = tempfile::tempdir().unwrap();
+    let toml = |second: &str| {
+        format!(
+            "[[trigger]]\nname = \"slouch\"\ntopic = \"room/activity\"\nfield = \"state\"\n\
+             equals = \"leaning_in\"\nfor = \"10m\"\nrearm = \"leaves\"\n\
+             [[trigger]]\nname = \"sat_well\"\ntopic = \"room/activity\"\nfield = \"state\"\n\
+             equals = \"at_desk\"\nfor = \"1m\"\n{second}\
+             [ask]\npolicy = \"nudge\"\n[[do]]\nlight = {{ dim = 1 }}\n\
+             [permissions]\ntopics = [\"room/activity\"]\nlight = true\n"
+        )
+    };
+    load(&skill_with(
+        dir.path(),
+        "fine",
+        &toml("rearm = \"leaves\"\nfollows = { trigger = \"slouch\", within = \"15m\" }\n"),
+    ))
+    .unwrap();
+    for (second, why) in [
+        (
+            "rearm = \"leaves\"\nfollows = { trigger = \"slump\", within = \"15m\" }\n",
+            "names none of the skill's other triggers",
+        ),
+        (
+            "rearm = \"leaves\"\nfollows = { trigger = \"sat_well\", within = \"15m\" }\n",
+            "names none of the skill's other triggers",
+        ),
+        (
+            "follows = { trigger = \"slouch\", within = \"15m\" }\n",
+            "follows goes with rearm",
+        ),
+        (
+            "rearm = \"leaves\"\nfollows = { trigger = \"slouch\", within = \"5s\" }\n",
+            "follows.within is 10s to 1h",
+        ),
+        (
+            "rearm = \"leaves\"\nfollows = { trigger = \"slouch\", within = \"2h\" }\n",
+            "follows.within is 10s to 1h",
+        ),
+    ] {
+        let error = load(&skill_with(dir.path(), "bad", &toml(second))).unwrap_err();
+        assert!(error.contains(why), "{second}: {error}");
+    }
+}
+
+/// #3694: what Sit back says, what the model is told of it and its stop
+/// words never speak of a body or looks: only a good moment to sit back.
+/// It reads only the eyes' word on the person at the desk, the faces and the
+/// voice's state: no picture (no `look`).
+#[test]
+fn sit_back_says_nothing_of_a_body_and_takes_no_picture() {
+    let folder = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../skills/sit-back");
+    let skill = load(&folder).unwrap();
+    let markdown = fs::read_to_string(folder.join("SKILL.md")).unwrap();
+    let toml: toml::Value =
+        toml::from_str(&fs::read_to_string(folder.join("skill.toml")).unwrap()).unwrap();
+    let steps = toml["do"].as_array().unwrap();
+    assert_eq!(steps.len(), 2);
+    let mut told = vec![markdown];
+    for step in steps {
+        let say = step["say"].as_str().unwrap();
+        // The voice words it: it is told to say nothing of a body or looks.
+        assert!(
+            say.contains("Nothing about their body or looks")
+                || say.contains("nothing about their body"),
+            "{say}"
+        );
+        assert!(step.get("look").is_none(), "{step:?}");
+        told.push(say.to_owned());
+    }
+    told.push(toml["stop"]["about"].as_str().unwrap().to_owned());
+    for text in &told {
+        let lower = text.to_lowercase();
+        for word in [
+            "posture",
+            "slouch",
+            "slouching",
+            "slumped",
+            "hunched",
+            "hunch",
+            "spine",
+            "weight",
+            "fat",
+            "belly",
+            "shape",
+            "ugly",
+            "lazy",
+            "straighten",
+        ] {
+            assert!(
+                !lower
+                    .split(|c: char| !c.is_alphanumeric())
+                    .any(|token| token == word),
+                "{word} in {text:?}"
+            );
+        }
+    }
+    assert_eq!(
+        toml["permissions"]["topics"].as_array().unwrap(),
+        &["room/activity", "humans/faces/tracked", "voice/state"]
             .map(|topic| toml::Value::String(topic.to_owned()))
     );
     assert_eq!(skill.kind, SkillKind::Installable);
