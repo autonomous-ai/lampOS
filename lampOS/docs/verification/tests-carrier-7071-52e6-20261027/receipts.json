@@ -1,0 +1,178 @@
+{
+  "lamp": "lamp-52e6",
+  "baseline": {
+    "sequence": 7071,
+    "commit": "aa9ec9e27a788ee19d7b52a9c91296382208e490",
+    "voice_sha256": "fde6fd0eb5696efe001949ab39a52ef3aa081438a9c75c1641beaeb03b60ef38",
+    "updater_sha256": "e42c8d69422f4d222ce10c0259d7265a6ced5e84b60523fbcc5b2ec6d53697f6",
+    "voice_unit_sha256": "3f9356d49697ee9932f4d4f8b3d6a343ef15239e638d7630cf5754ebc1e9a705",
+    "archive_sha256": "81c4c6e22b9aef4cf9f4be78c2c899ade925267f9afd7ae2186780b8152e75d1",
+    "sequence_floors": {
+      "installed": 7071,
+      "previous": {
+        "present": false
+      },
+      "refused_sequences": [],
+      "all_state_sequence_fields": {
+        "state/installed/sequence": 7071
+      },
+      "max_recorded_sequence": 7071
+    }
+  },
+  "good_start_utc": "2026-10-27T05:07:54.478806+00:00",
+  "bad_start_utc": "2026-10-27T05:11:35.122006+00:00",
+  "good": {
+    "status": "GOOD_ACCEPTED",
+    "phase": "GOOD",
+    "climb_5_to_6": true,
+    "signed_dry_confirmation": true,
+    "normal_quiet_s": 45,
+    "normal_health_watch_s": 60,
+    "successful_round_outcome": true,
+    "meaningful_unit_and_process_memory_switches": true,
+    "automatic_voice_restart": true,
+    "unchanged_voice_binary_and_sidecars": true,
+    "voice_sidecar_files_checked": 10,
+    "good_sequence": 7071001,
+    "observed_elapsed_s": 137.198,
+    "voice_unit_sha256": "77dacb5121c8bfa426cca32efced3f7aa8f82a9630db2a533079c3c8934870ce",
+    "dropin_sha256": "1c43b1c98497ca1a3503602cc7cd5752da25f78e7def84e8b467df78cbaed27b",
+    "updater_sha256": "189688da14bbd02f81fd7d67540c18134b7001fe62e85c726f3ef609d5bba8a8",
+    "setup_recover_preexisting_loop": true,
+    "real_key_restoration_pending": true,
+    "utc": "2026-10-27T05:10:37.663664+00:00"
+  },
+  "bad": {
+    "status": "BAD_AUTOMATIC_EXACT_GOOD_FALLBACK_ACCEPTED",
+    "phase": "BAD",
+    "bad_sequence": 7071002,
+    "installed_stays_good": 7071001,
+    "refusal_recorded": true,
+    "automatic_fallback_previous_build_well": true,
+    "exact_good_unit_and_voice_link_restored": true,
+    "both_memory_switches_still_on": true,
+    "unchanged_voice_binary_and_sidecars": true,
+    "voice_sidecar_files_checked": 10,
+    "bad_unit_seen_in_sampled_observations": true,
+    "voice_failure_seen_in_sampled_observations": false,
+    "observed_elapsed_s": 142.763,
+    "no_manual_voice_restart": true,
+    "real_key_restoration_pending": true,
+    "utc": "2026-10-27T05:14:10.659135+00:00"
+  },
+  "bad_failure_witness": {
+    "voice_unknown_option_error": true,
+    "voice_exit_code_failure": true,
+    "bad_unit_start_seen": true,
+    "previous_build_well": true
+  },
+  "restoration": {
+    "status": "RESTORED_7071_ORIGINAL_SERVICES",
+    "sequence": 7071,
+    "commit": "aa9ec9e27a788ee19d7b52a9c91296382208e490",
+    "archive_sha256": "81c4c6e22b9aef4cf9f4be78c2c899ade925267f9afd7ae2186780b8152e75d1",
+    "real_key_sha256": "203c3cb5563d6c85f6019211a987369e0063200fa9796f4c43b0888768c65813",
+    "voice_unit_sha256": "3f9356d49697ee9932f4d4f8b3d6a343ef15239e638d7630cf5754ebc1e9a705",
+    "lock_inode_preserved": true,
+    "approved_ssh_key_preserved": true,
+    "archive_retained": true,
+    "trial_record_archive_sha256": "e7f9d67c9791bd7ea3e6a45e43b08c5f54823c24bad2cb0d3ccd0df06e691742",
+    "trial_record_archive_bytes": 30720,
+    "trial_record_bytes_privately_retained": true,
+    "source_inode_restoration_claim": false,
+    "trial_created_paths_removed": 5,
+    "parts": {
+      "lamp-update.service": {
+        "ActiveState": "active",
+        "SubState": "running",
+        "Result": "success",
+        "ExecMainStatus": "0"
+      },
+      "lamp-update-apply.service": {
+        "ActiveState": "inactive",
+        "SubState": "dead",
+        "Result": "success",
+        "ExecMainStatus": "0"
+      },
+      "lamp-update-back.service": {
+        "ActiveState": "inactive",
+        "SubState": "dead",
+        "Result": "success",
+        "ExecMainStatus": "0"
+      },
+      "lamp-update-back.timer": {
+        "ActiveState": "active",
+        "SubState": "waiting",
+        "Result": "success",
+        "ExecMainStatus": null
+      },
+      "lamp-voice.service": {
+        "ActiveState": "active",
+        "SubState": "running",
+        "Result": "success",
+        "ExecMainStatus": "0"
+      },
+      "lamp-body.service": {
+        "ActiveState": "active",
+        "SubState": "running",
+        "Result": "success",
+        "ExecMainStatus": "0"
+      },
+      "lamp-eyes.service": {
+        "ActiveState": "active",
+        "SubState": "running",
+        "Result": "success",
+        "ExecMainStatus": "0"
+      },
+      "lamp-setup-recover.service": {
+        "ActiveState": "activating",
+        "SubState": "auto-restart",
+        "Result": "exit-code",
+        "ExecMainStatus": "2"
+      }
+    },
+    "utc": "2026-10-27T05:22:16.534224+00:00"
+  },
+  "final": {
+    "status": "FINAL_RESTORED_7071_VERIFIED",
+    "sequence": 7071,
+    "commit": "aa9ec9e27a788ee19d7b52a9c91296382208e490",
+    "original_updater_sha256": "e42c8d69422f4d222ce10c0259d7265a6ced5e84b60523fbcc5b2ec6d53697f6",
+    "original_voice_sha256": "fde6fd0eb5696efe001949ab39a52ef3aa081438a9c75c1641beaeb03b60ef38",
+    "original_unit_sha256": "3f9356d49697ee9932f4d4f8b3d6a343ef15239e638d7630cf5754ebc1e9a705",
+    "real_key_restored": true,
+    "stable_feed_and_lamp_voice_signed_channel_restored": true,
+    "original_state_and_refusal_list_exact": true,
+    "trial_runtime_override_and_trust_removed": true,
+    "original_exit_note_preserved": true,
+    "approved_ssh_key_preserved": true,
+    "record_lock_inode_preserved": true,
+    "original_voice_active": true,
+    "body_and_eyes_original_pids_unchanged": true,
+    "recovery_timer_active": true,
+    "setup_recover_preexisting_exit2_loop": true,
+    "immutable_verified_trial_build_retained": true,
+    "private_original_and_trial_archives_retained_on_lamp": true,
+    "end_to_end_audio_not_retested": true,
+    "utc": "2026-10-27T05:22:43.501867+00:00"
+  },
+  "cleanup": {
+    "temporary_releases_and_tags_deleted": [
+      {
+        "tag": "tests-ota-3466-7071-20261027t050337z-good",
+        "exit_code": 0,
+        "stderr": ""
+      },
+      {
+        "tag": "tests-ota-3466-7071-20261027t050337z-bad",
+        "exit_code": 0,
+        "stderr": ""
+      }
+    ],
+    "disposable_local_private_key_deleted": true,
+    "production_release_modified": false,
+    "utc": "2026-10-27T05:23:23.305422+00:00"
+  },
+  "lease_released": true,
+  "voice_file_count_note": "Ten captured regular file paths under /opt/lampOS/voice, including executable aliases and sidecars; not ten distinct non-executable sidecars."
+}

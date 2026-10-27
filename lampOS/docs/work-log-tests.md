@@ -1,5 +1,15 @@
 # Tests work log
 
+## 2026-10-27 12:25 — Carrier 7071 round complete and lamp restored
+
+Ready for lamp-voice: yes (#3466, dd5a88c61; First owns merge/promotion)
+
+[Installed 7071 proof](verification/tests-carrier-7071-52e6-20261027/) records GOOD at 12:07:54 +07, **137.198 s**, real installed level5→6 climb and signed confirmation, actual Voice unit/process environment change and normal60-second health watch. BAD at12:11:35 completed **142.763 s**, actual unknown audio-option error/exit1, automatic exact-GOOD fallback, GOOD installed and BAD refused. All ten captured regular Voice file paths matched; this count includes executable aliases and sidecars. Both trials ran once. No functional claim for later memory behavior in the unchanged7071 Voice.
+
+Full restoration passed after two strict holds exposed archive-hardlink and current-link ordering issues; original bytes were recovered from the verified private archive before the original link was restored. Final12:22:43 checks verify original7071 state, updater/Voice bytes and unit, exact original records/refusals/absence, real key, stable feed, signed lamp-voice channel, preserved lock inode, approved SSH key and exit-note. Voice/updater/timer active; Body/Eyes original PIDs unchanged; the old setup-recover exit2 loop remains. Temporary runtime trust/override, releases/tags and local signing key removed; lamp released12:23. Private original/trial archives and immutable candidate build remain. No end-to-end audio retest.
+
+[Current dd5 native proof](verification/tests-carrier-dd5-native-20261027/) records original ARM40451556491/Linux40451556419/general40451556459 green: **11,476 unique PASS / zero bad/unrun /106 skips**,35 classified reprints. Actual205575ad/dd5 preview ef48ad7f1 and forty upstream differences stay distinct from authored dd5/e70 and its tree428ba4b3c. All242 manifest entries verify. Focused host233/0/6 plus promoter25/docs0 remain separate, with225 explicit host omissions and338 witnesses. Installed artifact remains qualified offered4fd/actualc43; no dd5 device equivalence claim. Reviewer-three and lead carried READ-OK to exact dd5. Next: current PR findings/base carries while First takes the shipping merge.
+
 ## 2026-10-27 11:43 — Restart native proof and corrected cache disposition
 
 Ready for lamp-voice: #3466 offered 4fd is ready by the lead's release order; current dd5/e70 gate continues.
