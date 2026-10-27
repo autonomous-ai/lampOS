@@ -1,0 +1,15 @@
+{
+  "all_stages_passed": true,
+  "all_ten_actual_and_preserved_executables_unchanged": true,
+  "carry_proof_unchanged": true,
+  "configuration_unchanged": true,
+  "controller_error": null,
+  "controller_unchanged": true,
+  "executable_source_scope": "All ten retained from donor; none newly compiled or executed by this prep-only gate",
+  "head_unchanged": true,
+  "input_scope_unchanged": true,
+  "runtime_execution": "UNRUN by approved input-equivalent scope",
+  "source_count": 7516,
+  "source_unchanged": true,
+  "status_unchanged": true
+}

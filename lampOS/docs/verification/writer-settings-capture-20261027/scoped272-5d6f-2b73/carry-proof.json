@@ -1,0 +1,42 @@
+{
+  "all_nonshared_owned_full_blobs_modes_equal": true,
+  "all_owned_modes_equal": true,
+  "all_owned_source_payloads_preserved": true,
+  "backup_ref": "refs/heads/second/raw-prepared-fc9c-20261028",
+  "changed_shared_upstream_docs": [
+    "lampOS/docs/reuse-decisions.md",
+    "lampOS/docs/updates.md"
+  ],
+  "complete_Rust_diff_equal": true,
+  "files": {
+    "lampOS/crates/update/src/apply.rs": "100644 blob 2e5e541d8eb974694cf451f27eac1a57897c1b69\tlampOS/crates/update/src/apply.rs",
+    "lampOS/crates/update/src/lib.rs": "100644 blob d10a9823678d0a044f126c120b394a11147cf25d\tlampOS/crates/update/src/lib.rs",
+    "lampOS/crates/update/src/writer_files.rs": "100644 blob 79b0f419624e2ed1f8416673844afd7e988531e7\tlampOS/crates/update/src/writer_files.rs",
+    "lampOS/crates/update/src/writer_files/tests.rs": "100644 blob 9dadf2e73c5db037d5126b95e78a7fcac768df1f\tlampOS/crates/update/src/writer_files/tests.rs",
+    "lampOS/crates/update/src/writer_settings.rs": "100644 blob 7afb9d0ddf4c2372dc95ece82f9bfa1ba42fc8c6\tlampOS/crates/update/src/writer_settings.rs",
+    "lampOS/crates/update/src/writer_settings/tests.rs": "100644 blob 00aaca5cffce778e7787b98bb3a4c3f66d85baa3\tlampOS/crates/update/src/writer_settings/tests.rs",
+    "lampOS/docs/reuse-decisions.md": "100644 blob 2b89a1a0e0bd2be1b9bc2a900ac7a6773aacf949\tlampOS/docs/reuse-decisions.md",
+    "lampOS/docs/updates.md": "100644 blob 6159d94e66c45e2c015c8be32b32e0c5b1dc9e12\tlampOS/docs/updates.md",
+    "lampOS/docs/writer-file-observation.md": "100644 blob 62a923dabe6c1dd267742ddd5275c6e25f3dcbdc\tlampOS/docs/writer-file-observation.md",
+    "lampOS/docs/writer-settings-capture.md": "100644 blob b9c8d7ba9bc37b7c26acc19d9723139a211b3f90\tlampOS/docs/writer-settings-capture.md"
+  },
+  "full_blobs_modes_equal": [
+    "lampOS/crates/update/src/apply.rs",
+    "lampOS/crates/update/src/lib.rs",
+    "lampOS/crates/update/src/writer_files.rs",
+    "lampOS/crates/update/src/writer_files/tests.rs",
+    "lampOS/crates/update/src/writer_settings.rs",
+    "lampOS/crates/update/src/writer_settings/tests.rs",
+    "lampOS/docs/writer-file-observation.md",
+    "lampOS/docs/writer-settings-capture.md"
+  ],
+  "gate": "UNRUN2b73; stoppedfc9c14898 BEFORE Cargo",
+  "new_base": "2b73dd03073947c62b3d10593f293aa9ab954410",
+  "new_head": "5d6f3db34ac69061908f3cbc57bc235087b9c72c",
+  "new_tree": "279925efded010712eac325d0170c17d7570e0c8",
+  "old_base": "fc9c781afaed38dc976f650484c30f65bf5db57a",
+  "old_head": "c0f7fc1109f127e235bd0991abb3d6678aa7c9b1",
+  "range_diff": "1:  c0f7fc1109 ! 1:  5d6f3db34a lampOS: capture and revalidate raw setting ownership\n    @@ lampOS/docs/updates.md: files remain separate. The lamp trials below do not enab\n      ### V1's OTA, in the form of the V1 verdicts\n      \n      Read for this task: `docs/bootstrap-ota.md` (sections 1, 2, 4 and 5) and\n    -@@ lampOS/docs/updates.md: This remains unwired data preparation. It adds no storage or durability receipt,\n    - authentication, path authority, executable plan, writer grant, helper refresh or\n    - restore. Ordinary reader policy and native capture equality are unchanged;\n    - current source/native evidence and physical acceptance remain separate.\n    +@@ lampOS/docs/updates.md: output, not on parsing, preexisting text or a complete authenticated plan.\n    + Ordinary callers retain their formatter, read order, diagnostics and bytes.\n    + The new path is unwired and introduces no storage, path authority, writer grant,\n    + helper refresh or restoration. Native/device acceptance remains separate.\n     +\n     +### Raw ownership capture for a future writer guard\n     +",
+  "shared_doc_preservation_sha256": "5a330f2583a00f406ecfa04500846fdc4ab2e3016315d723b7cf5d7dabba9b2f",
+  "shared_docs_upstream_exact_after_removing_owned_insertions": true
+}

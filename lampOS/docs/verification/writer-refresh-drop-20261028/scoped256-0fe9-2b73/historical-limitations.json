@@ -1,0 +1,29 @@
+{
+  "baseline20_instrumented38": "INCONCLUSIVE; original reported cause unknown",
+  "first_2b73_proof_initialization_error": {
+    "additive_v2_proof_order_only": true,
+    "before_metadata_Cargo_runtime": true,
+    "exit_code": 1,
+    "handle": 69045
+  },
+  "first_fc9c_guard": {
+    "before_Cargo": true,
+    "exit_code": 1,
+    "handle": 14898,
+    "no_runtime": true
+  },
+  "old_normal_libtest": {
+    "failures": 1,
+    "ignored": 6,
+    "passes": 509,
+    "unwaived": true
+  },
+  "old_production_model": {
+    "Os_errno": 35,
+    "expected_failures": 1,
+    "nextest_exit": 100,
+    "offline_parser_analysis_separate_no_runtime_replay": true,
+    "original_orchestration_exit": 1,
+    "passes": 0
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "runtime_origin_manifest": "<private-path>",
+  "runtime_origin_manifest_sha256": "5ccb3d01f074b78717a1b02f48dc4095a066f29c58d973a3014770d968a72608",
+  "runtime_origin_closure_sha256": "c84790ffd26c35692cf3974020521069db61d1d1188ea1ba1ce6b945b435a2c0",
+  "runtime_origin_census_sha256": "62810cae9d3b99e5b12a858125fd2a25644c4c3f7397a6a85721c1c9fd1935e6",
+  "custody_only_manifest": "<private-path>",
+  "custody_only_manifest_sha256": "6d3a9d683dbd2b303deca66a8f6bb96a757e87a24d06fdd12240a190379301e0",
+  "custody_only_closure": {
+    "head_unchanged": true,
+    "status_unchanged": true,
+    "source_unchanged": true,
+    "source_count": 7510,
+    "configuration_unchanged": true,
+    "controller_unchanged": true,
+    "carry_proof_unchanged": true,
+    "input_scope_unchanged": true,
+    "all_ten_actual_and_preserved_executables_unchanged": true,
+    "all_stages_passed": true,
+    "controller_error": null,
+    "runtime_execution": "UNRUN by approved input-equivalent scope",
+    "executable_source_scope": "All ten retained from donor; none newly compiled or executed by this prep-only gate"
+  },
+  "origin_selected_actual": 256,
+  "no_runtime_credit_or_executable_source_equivalence_to_candidate": true,
+  "typed_exact_ten_rows_equal_except_named_custody_fields": true
+}

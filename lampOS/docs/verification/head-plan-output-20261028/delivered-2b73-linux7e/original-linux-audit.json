@@ -1,0 +1,68 @@
+{
+  "actual_preview": "61d5329e81fdd0c61f2888f8c2bac0c38d8a96eb",
+  "actual_strict_Update_compiler_and_Finished_markers": true,
+  "actual_tree": "d748d5ce1d2dd3bc4da732cc494008271fef202a",
+  "authored_base": "fc9c781afaed38dc976f650484c30f65bf5db57a",
+  "authored_tree": "d748d5ce1d2dd3bc4da732cc494008271fef202a",
+  "commands": [
+    "cargo fmt --manifest-path .github/tools/lampos-promote/Cargo.toml --check",
+    "cargo clippy --locked --manifest-path .github/tools/lampos-promote/Cargo.toml --all-targets -- -D warnings",
+    "cargo +1.96.0 fmt --all --check",
+    "cargo clippy --locked --workspace --all-targets -- -D warnings"
+  ],
+  "complete_tree_equal": true,
+  "head": "7e4af32d940e854f37b2c82157143199546b4175",
+  "job": {
+    "completed_at": "2026-10-27T22:37:16Z",
+    "conclusion": "success",
+    "id": 122510612237,
+    "name": "lampOS \u2014 clippy, every crate and target (x86 Linux)",
+    "started_at": "2026-10-27T22:32:36Z",
+    "status": "completed"
+  },
+  "no_rerun_or_cancellation": true,
+  "no_runtime_or_artifact_claim": true,
+  "ordered_actual_parents": [
+    "fc9c781afaed38dc976f650484c30f65bf5db57a",
+    "7e4af32d940e854f37b2c82157143199546b4175"
+  ],
+  "pinned_x86_linux_Rust1_96_observed": true,
+  "pr": 3946,
+  "raw_log_sha256": "c8afe228d9f15cff190b263197463e08a5f00e2ea1c15f1b738d82aded178e9d",
+  "raw_metadata_sha256": {
+    "authored-commit.json": "cafd0cc8fab305528e13e73cabb299ef90f9b496d1fd788d6da80b135c084978",
+    "linux-job-final.json": "75b5adf74cfcc5755d3111afcfdddea51eb2c77ffdd8a9fa3af13a62839ad5f1",
+    "linux-preview-commit.json": "3a0b46fb39db7490eb0980313b2034ffbd9d4aa982d1e2f1d906eaf7a33a744b",
+    "linux-run-final.json": "718cfaf21c81c177462457a317dd5368a6c0011e53c83d4aabd67e09684a2d5a"
+  },
+  "run": {
+    "conclusion": "success",
+    "head_sha": "7e4af32d940e854f37b2c82157143199546b4175",
+    "html_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40595604723",
+    "id": 40595604723,
+    "run_attempt": 1,
+    "status": "completed"
+  },
+  "successful_stages": [
+    {
+      "conclusion": "success",
+      "name": "Rust 1.96.0",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "stable promotion formatting and strict Clippy",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "formatting (whole workspace, pinned Rust)",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "clippy (every crate and target, warnings as errors)",
+      "status": "completed"
+    }
+  ]
+}

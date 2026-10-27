@@ -1,0 +1,70 @@
+{
+  "cargo-configuration.json": {
+    "bytes": 709,
+    "sha256": "f0eaf64f5953e699ac6d652a8d8e3258e8412e0c3d60685154173abfc96cea79"
+  },
+  "carry-proof.json": {
+    "bytes": 951,
+    "sha256": "3bbe84e21687429abaac0c19060b471968cc992ba1483a9c15f74058d6241e9f"
+  },
+  "clippy.stderr": {
+    "bytes": 487,
+    "sha256": "e4121485935b48d467c97c006bff07b052d3ec018ebf1826cdace2ab45f8d108"
+  },
+  "clippy.stdout": {
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "closure.json": {
+    "bytes": 544,
+    "sha256": "a579b66f2b7aa447bf25ebc6c7bf852f954fb17662425459347a063625327a8d"
+  },
+  "executables-final.json": {
+    "bytes": 14109,
+    "sha256": "6d3a9d683dbd2b303deca66a8f6bb96a757e87a24d06fdd12240a190379301e0"
+  },
+  "fmt.stderr": {
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "fmt.stdout": {
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "input-equivalence.json": {
+    "bytes": 725,
+    "sha256": "4963398e93437a5d510fbb401e7e25008fbe64370b5f654dd913d94b740c87c6"
+  },
+  "metadata.stderr": {
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "metadata.stdout": {
+    "bytes": 1968654,
+    "sha256": "b4c1b619e2d9e4937fb77088788bc1ccf60f07c116ee2cd512894d92fb923233"
+  },
+  "public-Main-before.json": {
+    "bytes": 134,
+    "sha256": "3c78db5736e186246382023afa448d016a9928f88391f4953a96527f67f7a00d"
+  },
+  "results.json": {
+    "bytes": 772,
+    "sha256": "567fc58716c8bf2ef1d821b6df6e7fc1c78a176c90af081bab88c485cb908405"
+  },
+  "scope-proof.json": {
+    "bytes": 1268,
+    "sha256": "75b2d10267c58e90d9e24ba559b9e55a187852708e4891ad609f7c88a0bf1293"
+  },
+  "source-after.json": {
+    "bytes": 2204065,
+    "sha256": "5c7d6fdee0a7b445fbdd6e1bd996020956922ce4ec2051f1ca74ce4c4a8a96bf"
+  },
+  "source-before.json": {
+    "bytes": 2204065,
+    "sha256": "5c7d6fdee0a7b445fbdd6e1bd996020956922ce4ec2051f1ca74ce4c4a8a96bf"
+  },
+  "target-reuse.json": {
+    "bytes": 448,
+    "sha256": "8e6843528342394222204394bbeaf1ea2b6ab45b60ba3f25f4fa0624e6444e37"
+  }
+}

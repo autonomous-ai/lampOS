@@ -1,0 +1,24 @@
+{
+  "donor_manifest": "<private-path>",
+  "manifest_sha256": "6d3a9d683dbd2b303deca66a8f6bb96a757e87a24d06fdd12240a190379301e0",
+  "closure_sha256": "a579b66f2b7aa447bf25ebc6c7bf852f954fb17662425459347a063625327a8d",
+  "donor_closure": {
+    "head_unchanged": true,
+    "status_unchanged": true,
+    "source_unchanged": true,
+    "source_count": 7510,
+    "configuration_unchanged": true,
+    "controller_unchanged": true,
+    "carry_proof_unchanged": true,
+    "input_scope_unchanged": true,
+    "all_ten_actual_and_preserved_executables_unchanged": true,
+    "all_stages_passed": true,
+    "controller_error": null,
+    "runtime_execution": "UNRUN by approved input-equivalent scope",
+    "executable_source_scope": "All ten retained from donor; none newly compiled or executed by this prep-only gate"
+  },
+  "cache_boundary_only_no_runtime_equivalence": true,
+  "actual_and_preserved_count": 10,
+  "artifact_boundary_only_no_runtime_equivalence": true,
+  "explicit_slot_release_required": true
+}

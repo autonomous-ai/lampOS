@@ -1,0 +1,51 @@
+{
+  "approved": true,
+  "authorization": "Root explicit sole LOCAL slot, newest custody bridge + genuine runtime origin; full source-bound preimage111 gate; no runtime equivalence from custody-only checks",
+  "head": "e5c86db4d95e23b356fe40f4381abe0e4ff2b0ae",
+  "base": "89823095e69dcbafaa5b3b79733c17ecf9d8e8f7",
+  "donor": "<private-path>",
+  "donor_sha256": "6d3a9d683dbd2b303deca66a8f6bb96a757e87a24d06fdd12240a190379301e0",
+  "donor_closure_sha256": "a579b66f2b7aa447bf25ebc6c7bf852f954fb17662425459347a063625327a8d",
+  "donor_explicitly_released_by_Root": true,
+  "donor_record_keys": [
+    "custody_post_prep_sha256",
+    "fresh",
+    "package_id",
+    "path",
+    "post_list_sha256",
+    "post_runtime_sha256",
+    "preserved",
+    "preserved_post_prep_sha256",
+    "preserved_sha256",
+    "profile",
+    "sha256",
+    "size",
+    "target"
+  ],
+  "runtime_origin_required_true_keys": [
+    "affected_scope_unchanged",
+    "all_stages_passed",
+    "authored_carry_proof_unchanged",
+    "configuration_unchanged",
+    "controller_unchanged",
+    "head_unchanged",
+    "nextest_config_unchanged",
+    "nextest_tool_unchanged",
+    "receipt_selectors_unchanged",
+    "retained_failed_driver_unchanged",
+    "retained_negative_model_driver_unchanged",
+    "source_unchanged",
+    "status_unchanged",
+    "working_patch_unchanged"
+  ],
+  "controller": "<gate-evidence>.py",
+  "controller_sha256": "263846e0a4e3e3a4d0cb0ec327432b68d942915c77843f93c47480f166abb414",
+  "scope": "current preimages fullLIB functions it plus3receipt;111controls;no install",
+  "runtime_policy": {
+    "processes": 4,
+    "retries": 0,
+    "no_fail_fast": true,
+    "counts": "fresh discovery only"
+  },
+  "no_live_paths_keys_devices_or_full_workspace": true
+}

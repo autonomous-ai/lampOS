@@ -1,0 +1,7 @@
+# Bounded-output delivery and original 7e Linux audit
+
+Train270/#3951 delivered #3946 on Main2b73dd03073947c62b3d10593f293aa9ab954410. Offered7e4af32d940e854f37b2c82157143199546b4175 is one output commit on fc9c781af. Complete Main/offered trees equal d748d5ce1d2dd3bc4da732cc494008271fef202a; all six full blobs/modes match. The PR was already closed, merged=false: source delivery is distinguished from a GitHub merge event. No state mutation or code reapply was needed.
+
+Original attempt1 Linux40595604723/job122510612237 succeeds on actual61d5329e81fdd0c61f2888f8c2bac0c38d8a96eb with ordered[fc9c,7e] parents and the same complete source tree. Actual pinned1.96 x86 Linux, promotion-helper fmt/strict Clippy, workspace fmt and strict workspace/all-target Clippy commands, successful API stages and Update compiler/Finished markers are checked from the entire original log. This source/stage audit makes no runtime, per-test executable hash or artifact claim.
+
+Original7e ARM40595604459 remains owned by the original observer; no duplicate watcher/status loop, cancellation/rerun, archive, local compiler/runner or target access was introduced. Its actual terminal source/runtime proof remains a separate result. Oldd682 native and first563/c1fa or d2-executed13 evidence are not transferred by this delivery proof. No authority, helper, storage, effects, restoration, device or power-cut acceptance is implied.

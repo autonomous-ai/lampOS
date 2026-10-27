@@ -1,0 +1,21 @@
+[
+  {
+    "receipt": "request",
+    "raw_sha256": "8bbe3d77fcdd2c3f50d59228601c50c0ddbada4511fc03ab3d4484d844c361fd",
+    "sandbox_permissions": "require_escalated"
+  },
+  {
+    "receipt": "initial",
+    "raw_sha256": "7db4f80514aa6113bb637876a9b9b6eb5c3108ecafe2ec478da9c430cfbccc35",
+    "session_id": 36142,
+    "wall_time_seconds": 1.002507375,
+    "chunk_id": "c6528a"
+  },
+  {
+    "receipt": "final-native",
+    "raw_sha256": "951b5e3fb1dca3118b5884a398954a5432d619aa6561f8a2b89335c9e7b24831",
+    "exit_code": 0,
+    "wall_time_seconds": 0.592073625,
+    "chunk_id": "2a0795"
+  }
+]

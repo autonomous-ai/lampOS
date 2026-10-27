@@ -1,0 +1,18 @@
+{
+  "actual_runtime_base": "2b73dd03073947c62b3d10593f293aa9ab954410",
+  "actual_runtime_head": "0fe9d338cbacb4946ba27822c20d66c4ef87ce15",
+  "all_other_tracked_source_modes_and_bytes_equal": true,
+  "audited_changed_paths_outside_selected_compiler_and_runtime_read_sets": true,
+  "current_base": "89823095e69dcbafaa5b3b79733c17ecf9d8e8f7",
+  "current_head": "aaf7d32c0cf9c73016536c7a606f1a0f4ac63274",
+  "earlier_pass_count": 256,
+  "earlier_required_controls": 86,
+  "exact_changed_paths": [
+    "lampOS/tools/played/README.md",
+    "lampOS/tools/played/make-skill-test.sh",
+    "lampOS/tools/played/make-skill.sh",
+    "lampOS/tools/played/stand-in.sh"
+  ],
+  "new_runtime_execution": false,
+  "whole_tree_equal": false
+}

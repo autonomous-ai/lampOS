@@ -1,0 +1,24 @@
+{
+  "lampOS/docs/reuse-decisions.md": {
+    "authored_added_block": "## Persist ordinary before-images without adding execution authority (2026-10-27)\n\nV1's existing-before/explicit-absence snapshots and durable pending intent are\nuseful safeguards; its broad rootfs writer is not reused here. Reuse the new\nraw observer/capture, existing selected-record marker, serde_json/base64,\nmanifest SHA-256 and writer_refresh Artifact identities. The bounded\n[private bundle](writer-preimages.md) retains original bytes for forward\nnonsemantic fields without widening the observer's serde/API surface.\n\nFor this private artifact, reuse Rustix's descriptor-relative open/stat and\nLinux/Apple no-replace rename, complete file sync and parent sync. Existing\nrecords::write_whole atomically replaces a path and cleans its own sibling;\nthose semantics do not fit refusing an unknown artifact/stage without cleanup.\nIt is not reused as a live-path confinement or recovery writer. Authentication,\nindependent restore and root bootstrap remain separate work; no new dependency\nor unsafe code is introduced.\n\n",
+    "block_SHA256": "3fe16ef55797a94678c87acc803e154f022d4e7af5ff3995c420823054c6ed50",
+    "parent_SHA256": "fae802f2be40ec762aaefc43d3f8e15e4aff0230d49316ec849526df9587320b",
+    "old_complete_SHA256": "c3925c5c6465db836cd8c3d287f1b3b3fb9a196329f16fa7ba5d5c3e1c568539",
+    "new_complete_SHA256": "717b948b78921f9518b3572352a4c42781f4a254d18743f70c6ed53d1b582381",
+    "old_blob": "c14dbf2a1505992f4df128a963983547463ae348",
+    "new_blob": "52b5e88c12fc50b7fbbe08ca62e645a25a44a20f",
+    "mode": "100644",
+    "exact_own_block_and_complete_parent_preserved": true
+  },
+  "lampOS/docs/updates.md": {
+    "authored_added_block": "The unwired [private before-image bundle](writer-preimages.md) preserves bounded\nordinary captures as immutable, versioned bytes, with fixed-name durable\npublication in an existing private directory. This adds no live write, apply\nadmission, restoration or helper bootstrap. Unknown semantics retain bytes\nand refuse; content identity does not authenticate the caller.\n\n",
+    "block_SHA256": "6b021f18bb6e8de153fbe3706ba5a3b2fa6cd0cbd0366814a55c42f63cad5110",
+    "parent_SHA256": "9c403610581b64ffb6d82f046174c365036f5db348647eb860a290d7418a087f",
+    "old_complete_SHA256": "da0722349ce9284a2aae39f0fecdfce267a174ae9a49af7ba77bac93fe840b17",
+    "new_complete_SHA256": "782a70b9ec16fab1cd9fe000ddaafeada05f7361fcae445375763b8021935373",
+    "old_blob": "15a51746f982d4b4d0d96f28a7fc640a85035c49",
+    "new_blob": "42d65b877c7385c169ee44685ffe56419a962968",
+    "mode": "100644",
+    "exact_own_block_and_complete_parent_preserved": true
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "all_nonshared_owned_full_blobs_modes_equal": true,
+  "all_owned_full_blobs_modes_equal": true,
+  "all_owned_modes_equal": true,
+  "all_owned_source_payloads_preserved": true,
+  "backup_ref": "refs/heads/second/pid-prepared-fc9c-20261028",
+  "changed_shared_upstream_docs": [],
+  "complete_Rust_diff_equal": true,
+  "files": {
+    "lampOS/crates/update/src/writer_refresh.rs": "100644 blob 2dc0a4d026be3190755fc8b66793960648a381f1\tlampOS/crates/update/src/writer_refresh.rs",
+    "lampOS/crates/update/src/writer_refresh/tests.rs": "100644 blob c25d33e511f161f638595bccc36886f0f4a81698\tlampOS/crates/update/src/writer_refresh/tests.rs",
+    "lampOS/docs/settings-writer-refresh.md": "100644 blob 3932a4fa5195a15d94d4ee23d93122b566f2000c\tlampOS/docs/settings-writer-refresh.md"
+  },
+  "full_blobs_modes_equal": [
+    "lampOS/crates/update/src/writer_refresh.rs",
+    "lampOS/crates/update/src/writer_refresh/tests.rs",
+    "lampOS/docs/settings-writer-refresh.md"
+  ],
+  "gate": "UNRUN2b73; stoppedfc9c14898 BEFORE Cargo",
+  "new_base": "2b73dd03073947c62b3d10593f293aa9ab954410",
+  "new_head": "0fe9d338cbacb4946ba27822c20d66c4ef87ce15",
+  "new_tree": "e1f361424e9db130a9d46db479e66623f281a0ba",
+  "old_base": "fc9c781afaed38dc976f650484c30f65bf5db57a",
+  "old_head": "069e13c37dfd9d710c887e143f14108d7aa1a239",
+  "range_diff": "1:  069e13c37d = 1:  0fe9d338cb lampOS: release writer leases when their acquiring owner drops"
+}

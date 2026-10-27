@@ -1,0 +1,12 @@
+{
+  "argv": [
+    "git",
+    "push",
+    "https://github.com/autonomous-ai/lampOS.git",
+    "HEAD:refs/heads/second/writer-preimages-latest",
+    "--force-with-lease=refs/heads/second/writer-preimages-latest:5c8a646878a2bd30c5ea62fb324e7a90f9110867"
+  ],
+  "exit_code": 0,
+  "stdout": "",
+  "stderr": "To https://github.com/autonomous-ai/lampOS.git\n + 5c8a646878...e5c86db4d9 HEAD -> second/writer-preimages-latest (forced update)\n"
+}

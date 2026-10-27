@@ -1,0 +1,26 @@
+{
+  "actual_discovery_snapshot_only": [
+    {
+      "id": 40600791750,
+      "name": "lampOS on ARM64",
+      "event": "pull_request",
+      "head_sha": "e5c86db4d95e23b356fe40f4381abe0e4ff2b0ae",
+      "run_attempt": 1,
+      "status": "in_progress",
+      "conclusion": null,
+      "html_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40600791750"
+    },
+    {
+      "id": 40600791522,
+      "name": "lampOS clippy",
+      "event": "pull_request",
+      "head_sha": "e5c86db4d95e23b356fe40f4381abe0e4ff2b0ae",
+      "run_attempt": 1,
+      "status": "in_progress",
+      "conclusion": null,
+      "html_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40600791522"
+    }
+  ],
+  "required_job_success_not_inferred": true,
+  "no_rerun_or_cancellation": true
+}

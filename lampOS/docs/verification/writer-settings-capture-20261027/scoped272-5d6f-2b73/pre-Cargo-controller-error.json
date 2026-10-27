@@ -1,0 +1,10 @@
+{
+  "Cargo_metadata_compile_runtime_invocations": 0,
+  "error": "UnboundLocalError: carryproof used before assignment by the new authored-doc check",
+  "exit_code": 1,
+  "native_session": 69045,
+  "old_controller_sha256": "e35c955c4dddf913c2ab0321087e9c83a31fbca0b9e2a04cfc92c0e9fdcb0cec",
+  "original_request_saved_before_exec": true,
+  "project_source_or_test_changed": false,
+  "rerun_of_any_test": false
+}

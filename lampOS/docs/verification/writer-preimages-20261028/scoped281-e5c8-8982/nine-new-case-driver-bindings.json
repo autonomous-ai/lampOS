@@ -1,0 +1,92 @@
+[
+  {
+    "binary_id": "lamp-update",
+    "case": "writer_preimages::tests::actual_capture_keeps_binary_empty_missing_noops_records_and_every_identity_after_publication",
+    "status": "PASS",
+    "actual_path": "<controlled-target>/debug/deps/lamp_update-e14d54c83f68ff7f",
+    "actual_sha256": "925223cd13f26d3ba2530df75ddd84e56dd7a0a04447dae9b7d8b0a9ae6d8b0e",
+    "preserved_path": "<gate-evidence>/executables/2",
+    "preserved_sha256": "925223cd13f26d3ba2530df75ddd84e56dd7a0a04447dae9b7d8b0a9ae6d8b0e",
+    "binding": "runtime binary ID joins exact discovery/compiled/preserved driver; skipped cases excluded"
+  },
+  {
+    "binary_id": "lamp-update",
+    "case": "writer_preimages::tests::diagnostic_surfaces_hide_values_and_empty_selection_observes_no_live_root",
+    "status": "PASS",
+    "actual_path": "<controlled-target>/debug/deps/lamp_update-e14d54c83f68ff7f",
+    "actual_sha256": "925223cd13f26d3ba2530df75ddd84e56dd7a0a04447dae9b7d8b0a9ae6d8b0e",
+    "preserved_path": "<gate-evidence>/executables/2",
+    "preserved_sha256": "925223cd13f26d3ba2530df75ddd84e56dd7a0a04447dae9b7d8b0a9ae6d8b0e",
+    "binding": "runtime binary ID joins exact discovery/compiled/preserved driver; skipped cases excluded"
+  },
+  {
+    "binary_id": "lamp-update",
+    "case": "writer_preimages::tests::durable_prefix_and_lost_ack_failures_keep_bytes_without_admitting_retry_or_cleanup",
+    "status": "PASS",
+    "actual_path": "<controlled-target>/debug/deps/lamp_update-e14d54c83f68ff7f",
+    "actual_sha256": "925223cd13f26d3ba2530df75ddd84e56dd7a0a04447dae9b7d8b0a9ae6d8b0e",
+    "preserved_path": "<gate-evidence>/executables/2",
+    "preserved_sha256": "925223cd13f26d3ba2530df75ddd84e56dd7a0a04447dae9b7d8b0a9ae6d8b0e",
+    "binding": "runtime binary ID joins exact discovery/compiled/preserved driver; skipped cases excluded"
+  },
+  {
+    "binary_id": "lamp-update",
+    "case": "writer_preimages::tests::exact_four_mib_of_binary_old_bytes_and_empty_files_survive_without_truncation",
+    "status": "PASS",
+    "actual_path": "<controlled-target>/debug/deps/lamp_update-e14d54c83f68ff7f",
+    "actual_sha256": "925223cd13f26d3ba2530df75ddd84e56dd7a0a04447dae9b7d8b0a9ae6d8b0e",
+    "preserved_path": "<gate-evidence>/executables/2",
+    "preserved_sha256": "925223cd13f26d3ba2530df75ddd84e56dd7a0a04447dae9b7d8b0a9ae6d8b0e",
+    "binding": "runtime binary ID joins exact discovery/compiled/preserved driver; skipped cases excluded"
+  },
+  {
+    "binary_id": "lamp-update",
+    "case": "writer_preimages::tests::expected_identity_and_size_are_checked_before_parse_and_every_failed_load_retains_the_file",
+    "status": "PASS",
+    "actual_path": "<controlled-target>/debug/deps/lamp_update-e14d54c83f68ff7f",
+    "actual_sha256": "925223cd13f26d3ba2530df75ddd84e56dd7a0a04447dae9b7d8b0a9ae6d8b0e",
+    "preserved_path": "<gate-evidence>/executables/2",
+    "preserved_sha256": "925223cd13f26d3ba2530df75ddd84e56dd7a0a04447dae9b7d8b0a9ae6d8b0e",
+    "binding": "runtime binary ID joins exact discovery/compiled/preserved driver; skipped cases excluded"
+  },
+  {
+    "binary_id": "lamp-update",
+    "case": "writer_preimages::tests::publication_never_replaces_existing_final_or_unknown_stage_and_load_never_follows_links",
+    "status": "PASS",
+    "actual_path": "<controlled-target>/debug/deps/lamp_update-e14d54c83f68ff7f",
+    "actual_sha256": "925223cd13f26d3ba2530df75ddd84e56dd7a0a04447dae9b7d8b0a9ae6d8b0e",
+    "preserved_path": "<gate-evidence>/executables/2",
+    "preserved_sha256": "925223cd13f26d3ba2530df75ddd84e56dd7a0a04447dae9b7d8b0a9ae6d8b0e",
+    "binding": "runtime binary ID joins exact discovery/compiled/preserved driver; skipped cases excluded"
+  },
+  {
+    "binary_id": "lamp-update",
+    "case": "writer_preimages::tests::unknown_nonsemantic_fields_retain_the_complete_original_encoding_without_reserialization",
+    "status": "PASS",
+    "actual_path": "<controlled-target>/debug/deps/lamp_update-e14d54c83f68ff7f",
+    "actual_sha256": "925223cd13f26d3ba2530df75ddd84e56dd7a0a04447dae9b7d8b0a9ae6d8b0e",
+    "preserved_path": "<gate-evidence>/executables/2",
+    "preserved_sha256": "925223cd13f26d3ba2530df75ddd84e56dd7a0a04447dae9b7d8b0a9ae6d8b0e",
+    "binding": "runtime binary ID joins exact discovery/compiled/preserved driver; skipped cases excluded"
+  },
+  {
+    "binary_id": "lamp-update",
+    "case": "writer_preimages::tests::shape_stamp_base64_and_collection_bounds_are_checked_before_old_byte_allocations",
+    "status": "PASS",
+    "actual_path": "<controlled-target>/debug/deps/lamp_update-e14d54c83f68ff7f",
+    "actual_sha256": "925223cd13f26d3ba2530df75ddd84e56dd7a0a04447dae9b7d8b0a9ae6d8b0e",
+    "preserved_path": "<gate-evidence>/executables/2",
+    "preserved_sha256": "925223cd13f26d3ba2530df75ddd84e56dd7a0a04447dae9b7d8b0a9ae6d8b0e",
+    "binding": "runtime binary ID joins exact discovery/compiled/preserved driver; skipped cases excluded"
+  },
+  {
+    "binary_id": "lamp-update",
+    "case": "writer_preimages::tests::unknown_semantics_known_duplicates_duplicate_paths_and_invalid_records_block_without_deletion",
+    "status": "PASS",
+    "actual_path": "<controlled-target>/debug/deps/lamp_update-e14d54c83f68ff7f",
+    "actual_sha256": "925223cd13f26d3ba2530df75ddd84e56dd7a0a04447dae9b7d8b0a9ae6d8b0e",
+    "preserved_path": "<gate-evidence>/executables/2",
+    "preserved_sha256": "925223cd13f26d3ba2530df75ddd84e56dd7a0a04447dae9b7d8b0a9ae6d8b0e",
+    "binding": "runtime binary ID joins exact discovery/compiled/preserved driver; skipped cases excluded"
+  }
+]

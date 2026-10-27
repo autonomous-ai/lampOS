@@ -1,0 +1,32 @@
+[
+  {
+    "entire_new_upstream_reconstructed_after_removing_exact_owned_insertions": true,
+    "exact_owned_insertion_blocks": [
+      {
+        "bytes": 1055,
+        "sha256": "c008d6810ef67c29bee455a36b63367195804a2a120f9751c0b12c5a9a4d5b7f"
+      },
+      {
+        "bytes": 1115,
+        "sha256": "0eb3b91e62759f03152996383e765ac302740f0ce440edbd2cd316ca0354f2b6"
+      }
+    ],
+    "new_merged_sha256": "fae802f2be40ec762aaefc43d3f8e15e4aff0230d49316ec849526df9587320b",
+    "new_upstream_sha256": "a6a1ae1ab2d7054d49e7992878cac3b081016e8c0fe890ea2818e047afb45dcf"
+  },
+  {
+    "entire_new_upstream_reconstructed_after_removing_exact_owned_insertions": true,
+    "exact_owned_insertion_blocks": [
+      {
+        "bytes": 269,
+        "sha256": "09fae78f3652e14a61468d611a4fba2f3555fed6ad9ccadbc787118b3dbe67a2"
+      },
+      {
+        "bytes": 664,
+        "sha256": "6e418279b0db0559f1cf075010fdbe5adbebdfb8b552e50d6dda055f6b6cdc38"
+      }
+    ],
+    "new_merged_sha256": "9c403610581b64ffb6d82f046174c365036f5db348647eb860a290d7418a087f",
+    "new_upstream_sha256": "6e4ad4ed08fb88162ad1003313397cf364c6fba3f32a2a68243cb7bd28ba7df3"
+  }
+]

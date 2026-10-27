@@ -1,0 +1,7 @@
+# RAW input-equivalent 8982 carry
+
+Current head `3f03ec76858c14e348fdbccf407b9d2a57dc3b3c`, base `89823095e69dcbafaa5b3b79733c17ecf9d8e8f7`. All complete owned blobs and modes equal `5d6f3db34ac69061908f3cbc57bc235087b9c72c` on `2b73dd03073947c62b3d10593f293aa9ab954410`; ordered range-diff is equal. The full tracked source comparison differs only in four played-tool shell/README files, outside actual selected Update compiler/runtime/scanner read sets. This is selected-input equality, not whole-tree equality.
+
+Fresh locked metadata, formatting and strict Update all-target Clippy pass. Source/mode/config/controller/carry/input guards close. **No Cargo test compilation or test runtime was requested by this prep-only controller; no new runtime count is claimed.** Clippy checks code separately; the ten retained executable custody hashes remain unchanged. Their actual provenance remains the prior donor, not a new current-source test compilation. Earlier actual 2b73 qualification stays 272 passes/all102 for Raw and 256/all86 for PID. New original offered-head ARM/Linux evidence is separate and pending at packet creation.
+
+Original elevated request and native result hashes are included; no source, binary or private environment data is published. Historical failed libtest/descriptor-model evidence and all earlier orchestration errors retain their original outcomes; no cause or waiver. No activation, authority, device or release action.

@@ -1,0 +1,7 @@
+# Collector and codec delivered on Main fc9c
+
+Train269/#3950 delivered the collector and codec through #3937 on Main fc9c781afaed38dc976f650484c30f65bf5db57a. Main's COMPLETE tree equals offered codecd565d53d98d7e4f19edf402febeed5a878ad311f; all nine combined full blobs and modes match. Standalone collectore6e06d074b771797ca052221620af6831428d0e6 has the same complete tree and six full owned blobs/modes as codec prerequisite299deb7318ef1ed55ea289464cf3a1c942062653. Final Main capture.rs/shared docs include exactly the intended dependent codec module declaration and doc additions; the producer otherwise remains byte-identical.
+
+#3937 was closed by train; standalone#3892 was closed as already delivered after source/head/Main-ancestry guards. Both APIs report merged=false: this record proves source delivery, not a fabricated GitHub merge event. No code reapply or branch deletion occurred. Third's final e6/d565 source-carry dispositions preserve their old focused/runtime scopes separately.
+
+Main's original Linux40594476493 reported API success and ARM40594476475 was in progress at a single read. These are status observations, not an independent Main source/runtime/artifact audit. Own offered ef90 original ARM runs remain observed to their actual terminal results; no rerun/cancellation, new archive, compiler/runtime/target use or count transfer. Both ef90 local13 gates retain their own exact sources and counts. No authority, execution, restoration, device or power-cut acceptance is implied by delivery.

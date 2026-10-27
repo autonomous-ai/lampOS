@@ -1,0 +1,28 @@
+{
+  "read_once_status_only": true,
+  "source_runtime_or_artifact_audit_claimed": false,
+  "runs": [
+    {
+      "id": 40594476475,
+      "name": "lampOS on ARM64",
+      "head_sha": "fc9c781afaed38dc976f650484c30f65bf5db57a",
+      "event": "push",
+      "status": "in_progress",
+      "conclusion": null,
+      "run_attempt": 1,
+      "created_at": "2026-10-27T22:23:43Z",
+      "updated_at": "2026-10-27T22:23:49Z"
+    },
+    {
+      "id": 40594476493,
+      "name": "lampOS clippy",
+      "head_sha": "fc9c781afaed38dc976f650484c30f65bf5db57a",
+      "event": "push",
+      "status": "completed",
+      "conclusion": "success",
+      "run_attempt": 1,
+      "created_at": "2026-10-27T22:23:43Z",
+      "updated_at": "2026-10-27T22:28:41Z"
+    }
+  ]
+}

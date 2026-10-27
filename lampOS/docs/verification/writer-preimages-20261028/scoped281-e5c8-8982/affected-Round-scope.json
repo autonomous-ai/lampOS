@@ -1,0 +1,29 @@
+{
+  "source": "<private-path>",
+  "sha256": "75b2d10267c58e90d9e24ba559b9e55a187852708e4891ad609f7c88a0bf1293",
+  "plan": {
+    "old_base": "2b73dd03073947c62b3d10593f293aa9ab954410",
+    "new_base": "89823095e69dcbafaa5b3b79733c17ecf9d8e8f7",
+    "changed_paths": [
+      "lampOS/tools/played/README.md",
+      "lampOS/tools/played/make-skill-test.sh",
+      "lampOS/tools/played/make-skill.sh",
+      "lampOS/tools/played/stand-in.sh"
+    ],
+    "comparison_sha256": "3d9c2a3027bf0efe65b4e90abf7996e4548a14f29c5abddbae421a682857a23c",
+    "Cargo_Rust_manifest_lock_config_workflow_crate_data_unit_skill_model_install_changes": false,
+    "own_overlap": false,
+    "IT_source_scanners": "scratch_paths walks crates/*/src and tests only; ci_paths walks crates recursively and reads unchanged .github workflows; changed tool shell/README are outside both read sets",
+    "actual_last_current_results": {
+      "Raw_head": "5d6f3db34ac69061908f3cbc57bc235087b9c72c",
+      "Raw_pass": 272,
+      "Raw_required": 102,
+      "PID_unpushed_head": "0fe9d338cbacb4946ba27822c20d66c4ef87ce15",
+      "PID_pass": 256,
+      "PID_required": 86
+    },
+    "recommended_scope": "clean code-equivalent carry; fresh metadata/fmt/strict Clippy+source/byte-input guards only; no selected Update runtime input changed, no new runtime pass count claimed; new original offered-head CI still required",
+    "further_scope_requires_Root_approval": true
+  },
+  "projection281_only_until_discovery": true
+}

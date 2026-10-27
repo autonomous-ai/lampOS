@@ -1,0 +1,313 @@
+{
+  "plan": {
+    "actual_discovery_authoritative": true,
+    "changed_paths": [
+      "lampOS/crates/update/src/head_touch.rs",
+      "lampOS/crates/update/src/head_touch/capture.rs",
+      "lampOS/crates/update/src/head_touch/capture/codec.rs",
+      "lampOS/crates/update/src/head_touch/capture/codec/tests.rs",
+      "lampOS/crates/update/src/head_touch/capture/tests.rs",
+      "lampOS/crates/update/src/head_touch/plan_output.rs",
+      "lampOS/crates/update/src/head_touch/plan_output/tests.rs",
+      "lampOS/docs/head-touch-capture.md",
+      "lampOS/docs/head-touch-codec.md",
+      "lampOS/docs/head-touch-plan-output.md",
+      "lampOS/docs/reuse-decisions.md",
+      "lampOS/docs/updates.md"
+    ],
+    "comparison_sha256": "c59dbac818bf5c1b2dfffe2d7c0e121320d9e4819c22a6cafb1d27f76bf988c7",
+    "delivered_prerequisites": [
+      3892,
+      3937,
+      3946
+    ],
+    "do_not_reapply_delivered_commits": true,
+    "intermediate_guard_stopped_base": "fc9c781afaed38dc976f650484c30f65bf5db57a",
+    "new_Update_source_is_compiled": true,
+    "new_base": "2b73dd03073947c62b3d10593f293aa9ab954410",
+    "new_inherited_controls": [
+      {
+        "binary": "lamp-update",
+        "name": "head_touch::capture::tests::actual_projection_and_verification_replay_after_the_filesystem_is_gone",
+        "source": "lampOS/crates/update/src/head_touch/capture/tests.rs"
+      },
+      {
+        "binary": "lamp-update",
+        "name": "head_touch::capture::tests::custom_pins_and_settings_off_do_not_invent_product_or_body_dependencies",
+        "source": "lampOS/crates/update/src/head_touch/capture/tests.rs"
+      },
+      {
+        "binary": "lamp-update",
+        "name": "head_touch::capture::tests::absence_empty_regular_and_null_are_distinct_and_unknown_keys_are_errors",
+        "source": "lampOS/crates/update/src/head_touch/capture/tests.rs"
+      },
+      {
+        "binary": "lamp-update",
+        "name": "head_touch::capture::tests::a_fixture_null_spelling_is_regular_text_and_a_real_null_mask_is_metadata_only",
+        "source": "lampOS/crates/update/src/head_touch/capture/tests.rs"
+      },
+      {
+        "binary": "lamp-update",
+        "name": "head_touch::capture::tests::relative_directory_and_regular_links_and_contained_absolute_links_recheck",
+        "source": "lampOS/crates/update/src/head_touch/capture/tests.rs"
+      },
+      {
+        "binary": "lamp-update",
+        "name": "head_touch::capture::tests::cache_keys_and_link_targets_keep_directory_requiring_spellings_distinct",
+        "source": "lampOS/crates/update/src/head_touch/capture/tests.rs"
+      },
+      {
+        "binary": "lamp-update",
+        "name": "head_touch::capture::tests::escapes_and_link_loops_refuse_without_an_ordinary_reader_fallback",
+        "source": "lampOS/crates/update/src/head_touch/capture/tests.rs"
+      },
+      {
+        "binary": "lamp-update",
+        "name": "head_touch::capture::tests::dangling_link_appearance_and_missing_ancestor_creation_invalidate",
+        "source": "lampOS/crates/update/src/head_touch/capture/tests.rs"
+      },
+      {
+        "binary": "lamp-update",
+        "name": "head_touch::capture::tests::directory_membership_including_ignored_names_and_absence_is_rechecked",
+        "source": "lampOS/crates/update/src/head_touch/capture/tests.rs"
+      },
+      {
+        "binary": "lamp-update",
+        "name": "head_touch::capture::tests::removal_from_a_captured_directory_invalidates_without_a_text_dependency",
+        "source": "lampOS/crates/update/src/head_touch/capture/tests.rs"
+      },
+      {
+        "binary": "lamp-update",
+        "name": "head_touch::capture::tests::file_mutation_and_ancestor_replacement_refuse_before_freeze",
+        "source": "lampOS/crates/update/src/head_touch/capture/tests.rs"
+      },
+      {
+        "binary": "lamp-update",
+        "name": "head_touch::capture::tests::same_descriptor_checks_reject_preopen_swap_and_postread_mutation",
+        "source": "lampOS/crates/update/src/head_touch/capture/tests.rs"
+      },
+      {
+        "binary": "lamp-update",
+        "name": "head_touch::capture::tests::metadata_only_null_classification_refuses_zero_fifo_and_socket",
+        "source": "lampOS/crates/update/src/head_touch/capture/tests.rs"
+      },
+      {
+        "binary": "lamp-update",
+        "name": "head_touch::capture::tests::raw_non_utf8_names_are_preserved_but_non_utf8_text_is_refused",
+        "source": "lampOS/crates/update/src/head_touch/capture/tests.rs"
+      },
+      {
+        "binary": "lamp-update",
+        "name": "head_touch::capture::tests::regular_hard_links_retain_link_count_and_content_dependencies",
+        "source": "lampOS/crates/update/src/head_touch/capture/tests.rs"
+      },
+      {
+        "binary": "lamp-update",
+        "name": "head_touch::capture::tests::root_substitution_and_an_unrelated_root_refuse_revalidation",
+        "source": "lampOS/crates/update/src/head_touch/capture/tests.rs"
+      },
+      {
+        "binary": "lamp-update",
+        "name": "head_touch::capture::tests::any_caught_provider_error_poisoned_collection_and_policy_errors_are_redacted",
+        "source": "lampOS/crates/update/src/head_touch/capture/tests.rs"
+      },
+      {
+        "binary": "lamp-update",
+        "name": "head_touch::capture::tests::file_aggregate_directory_name_key_and_work_limits_return_no_partial_success",
+        "source": "lampOS/crates/update/src/head_touch/capture/tests.rs"
+      },
+      {
+        "binary": "lamp-update",
+        "name": "head_touch::capture::tests::actual_default_file_and_ignored_name_bounds_are_enforced_and_poisoned",
+        "source": "lampOS/crates/update/src/head_touch/capture/tests.rs"
+      },
+      {
+        "binary": "lamp-update",
+        "name": "head_touch::capture::tests::path_component_link_and_repeated_resolution_work_are_bounded",
+        "source": "lampOS/crates/update/src/head_touch/capture/tests.rs"
+      },
+      {
+        "binary": "lamp-update",
+        "name": "head_touch::capture::tests::a_body_calibration_change_after_capture_refuses_even_with_carried_base_units",
+        "source": "lampOS/crates/update/src/head_touch/capture/tests.rs"
+      },
+      {
+        "binary": "lamp-update",
+        "name": "head_touch::capture::codec::tests::closed_restart_keeps_regular_empty_null_and_both_absences_distinct",
+        "source": "lampOS/crates/update/src/head_touch/capture/codec/tests.rs"
+      },
+      {
+        "binary": "lamp-update",
+        "name": "head_touch::capture::codec::tests::relative_aliases_absolute_contained_links_and_raw_unresolved_suffix_replay",
+        "source": "lampOS/crates/update/src/head_touch/capture/codec/tests.rs"
+      },
+      {
+        "binary": "lamp-update",
+        "name": "head_touch::capture::codec::tests::portable_raw_names_and_link_bytes_are_exact_without_a_physical_mac_claim",
+        "source": "lampOS/crates/update/src/head_touch/capture/codec/tests.rs"
+      },
+      {
+        "binary": "lamp-update",
+        "name": "head_touch::capture::codec::tests::every_native_equality_field_is_selected_and_atime_is_excluded",
+        "source": "lampOS/crates/update/src/head_touch/capture/codec/tests.rs"
+      },
+      {
+        "binary": "lamp-update",
+        "name": "head_touch::capture::codec::tests::signed_timestamps_and_portable_widths_refuse_unsupported_values",
+        "source": "lampOS/crates/update/src/head_touch/capture/codec/tests.rs"
+      },
+      {
+        "binary": "lamp-update",
+        "name": "head_touch::capture::codec::tests::exact_external_hash_and_size_are_checked_and_do_not_authenticate_origin",
+        "source": "lampOS/crates/update/src/head_touch/capture/codec/tests.rs"
+      },
+      {
+        "binary": "lamp-update",
+        "name": "head_touch::capture::codec::tests::future_nonsemantic_bytes_and_escape_spellings_are_retained_exactly",
+        "source": "lampOS/crates/update/src/head_touch/capture/codec/tests.rs"
+      },
+      {
+        "binary": "lamp-update",
+        "name": "head_touch::capture::codec::tests::semantic_versions_ops_kinds_duplicates_and_nullable_shadowing_refuse",
+        "source": "lampOS/crates/update/src/head_touch/capture/codec/tests.rs"
+      },
+      {
+        "binary": "lamp-update",
+        "name": "head_touch::capture::codec::tests::malformed_strings_truncations_and_non_utf8_regular_bytes_never_yield_partial_saved",
+        "source": "lampOS/crates/update/src/head_touch/capture/codec/tests.rs"
+      },
+      {
+        "binary": "lamp-update",
+        "name": "head_touch::capture::codec::tests::joined_name_matches_the_native_exact_limit_and_refuses_one_over",
+        "source": "lampOS/crates/update/src/head_touch/capture/codec/tests.rs"
+      },
+      {
+        "binary": "lamp-update",
+        "name": "head_touch::capture::codec::tests::same_absent_key_is_coherent_across_both_apis_and_conflicts_refuse",
+        "source": "lampOS/crates/update/src/head_touch/capture/codec/tests.rs"
+      },
+      {
+        "binary": "lamp-update",
+        "name": "head_touch::capture::codec::tests::sorted_unique_rooted_keys_and_root_witness_agreement_are_required",
+        "source": "lampOS/crates/update/src/head_touch/capture/codec/tests.rs"
+      },
+      {
+        "binary": "lamp-update",
+        "name": "head_touch::capture::codec::tests::quota_refusal_happens_before_a_base64_allocation_is_invoked",
+        "source": "lampOS/crates/update/src/head_touch/capture/codec/tests.rs"
+      },
+      {
+        "binary": "lamp-update",
+        "name": "head_touch::capture::codec::tests::fact_and_witness_quotas_refuse_before_deserializing_the_next_collection",
+        "source": "lampOS/crates/update/src/head_touch/capture/codec/tests.rs"
+      },
+      {
+        "binary": "lamp-update",
+        "name": "head_touch::capture::codec::tests::root_slash_retains_the_producers_conservative_extra_separator_cap",
+        "source": "lampOS/crates/update/src/head_touch/capture/codec/tests.rs"
+      },
+      {
+        "binary": "lamp-update",
+        "name": "head_touch::capture::codec::tests::root_is_not_a_text_or_missing_directory_and_has_one_exact_witness",
+        "source": "lampOS/crates/update/src/head_touch/capture/codec/tests.rs"
+      },
+      {
+        "binary": "lamp-update",
+        "name": "head_touch::capture::codec::tests::known_variant_payloads_directory_shapes_and_component_bytes_are_strict",
+        "source": "lampOS/crates/update/src/head_touch/capture/codec/tests.rs"
+      },
+      {
+        "binary": "lamp-update",
+        "name": "head_touch::capture::codec::tests::lexical_and_encoded_bounds_refuse_before_the_json_parser_can_allocate",
+        "source": "lampOS/crates/update/src/head_touch/capture/codec/tests.rs"
+      },
+      {
+        "binary": "lamp-update",
+        "name": "head_touch::capture::codec::tests::actual_evaluator_replays_closed_after_restart_for_conditional_carried_and_omitted_inputs",
+        "source": "lampOS/crates/update/src/head_touch/capture/codec/tests.rs"
+      },
+      {
+        "binary": "lamp-update",
+        "name": "head_touch::capture::codec::tests::hard_link_aliases_keep_two_lexical_keys_and_revalidate_full_content",
+        "source": "lampOS/crates/update/src/head_touch/capture/codec/tests.rs"
+      },
+      {
+        "binary": "lamp-update",
+        "name": "head_touch::capture::codec::tests::revalidation_checks_negative_membership_link_and_root_facts_without_mutating_saved_bytes",
+        "source": "lampOS/crates/update/src/head_touch/capture/codec/tests.rs"
+      },
+      {
+        "binary": "lamp-update",
+        "name": "head_touch::capture::codec::tests::revalidation_compares_membership_as_a_set_and_replay_keeps_encoded_order",
+        "source": "lampOS/crates/update/src/head_touch/capture/codec/tests.rs"
+      },
+      {
+        "binary": "lamp-update",
+        "name": "head_touch::capture::codec::tests::combined_fact_and_witness_aggregate_limits_are_enforced_across_rows",
+        "source": "lampOS/crates/update/src/head_touch/capture/codec/tests.rs"
+      },
+      {
+        "binary": "lamp-update",
+        "name": "head_touch::capture::codec::tests::aggregate_names_raw_link_bytes_and_regular_text_refuse_below_the_encoded_cap",
+        "source": "lampOS/crates/update/src/head_touch/capture/codec/tests.rs"
+      },
+      {
+        "binary": "lamp-update",
+        "name": "head_touch::capture::codec::tests::encoder_preflight_refuses_combined_fact_and_text_budgets_without_changing_inputs",
+        "source": "lampOS/crates/update/src/head_touch/capture/codec/tests.rs"
+      },
+      {
+        "binary": "lamp-update",
+        "name": "head_touch::capture::codec::tests::lookup_parse_and_debug_diagnostics_redact_paths_contents_and_unknown_semantics",
+        "source": "lampOS/crates/update/src/head_touch/capture/codec/tests.rs"
+      },
+      {
+        "binary": "lamp-update",
+        "name": "head_touch::plan_output::tests::streaming_pretty_bytes_and_newline_obey_the_exact_utf8_byte_limit",
+        "source": "lampOS/crates/update/src/head_touch/plan_output/tests.rs"
+      },
+      {
+        "binary": "lamp-update",
+        "name": "head_touch::plan_output::tests::refusing_an_append_happens_before_buffer_growth_or_partial_write",
+        "source": "lampOS/crates/update/src/head_touch/plan_output/tests.rs"
+      },
+      {
+        "binary": "lamp-update",
+        "name": "head_touch::plan_output::tests::ordinary_policy_bytes_hashes_and_request_order_match_all_eight_closed_replays",
+        "source": "lampOS/crates/update/src/head_touch/plan_output/tests.rs"
+      },
+      {
+        "binary": "lamp-update",
+        "name": "head_touch::plan_output::tests::compact_input_that_expands_past_the_cap_refuses_only_the_new_plan_path",
+        "source": "lampOS/crates/update/src/head_touch/plan_output/tests.rs"
+      },
+      {
+        "binary": "lamp-update",
+        "name": "head_touch::plan_output::tests::keep_step_has_no_derived_output_and_moves_oversized_existing_text_without_copying",
+        "source": "lampOS/crates/update/src/head_touch/plan_output/tests.rs"
+      },
+      {
+        "binary": "lamp-update",
+        "name": "head_touch::plan_output::tests::late_provider_failure_returns_no_owned_partial_plan_or_private_diagnostic",
+        "source": "lampOS/crates/update/src/head_touch/plan_output/tests.rs"
+      }
+    ],
+    "new_inherited_test_count": 53,
+    "old_base": "ef90c8561b3f9b22472f1962ea1ffb10bf6a423b",
+    "ordinary_policy_reused_with_same_default_formatter": true,
+    "ordinary_wrapper_refactor_added": true,
+    "previous_fc9c14898_Cargo_runtime": 0,
+    "projected_passes": {
+      "PID": 256,
+      "Raw": 272
+    },
+    "projected_required_controls": {
+      "PID": 86,
+      "Raw": 102
+    },
+    "recommended_scope": "fresh normal LIB/functions/IT+3receipt Round; all53 inherited source controls required; no whole install/Round"
+  },
+  "projection256_only_until_discovery": true,
+  "sha256": "c9c2c862e8777eb36f8ac6bc396600737b04e19c569359a34ef951db55e90535",
+  "source": "[private evidence locator omitted]"
+}
