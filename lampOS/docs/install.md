@@ -1351,8 +1351,7 @@ lamp-update check-units --cat units.txt --image robots/lamp --variant pro
   (`1d238ca7…`, the model lamp-4ace and lamp-52e6 run), is in one release of
   ours, `models-2026-10-16`, with each model's licence beside it (the first
   builder on #811, 2026-10-16 13:58; the fifth made it). The voice's four
-  recorded lines are in `notices-2026-10-20`, and the shutdown's line with the
-  manifest naming all five in `notices-2026-10-27` (#3697), placed in
+  recorded lines and their manifest are in `notices-2026-10-20`, placed in
   `/opt/lampOS/voice/notices` (#1844, [failure-notices.md](failure-notices.md)). It is a draft until
   #811 ships, so until it is published every fetch says the model could not
   be had. One that cannot be had is said and the install goes on. What

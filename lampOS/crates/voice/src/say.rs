@@ -43,14 +43,12 @@
 //!   `recording` names one line recorded at build time in the lamp's own
 //!   voice and loaded with the failure notices at start
 //!   (`docs/failure-notices.md`), [`RECORDINGS`] only: `wifi_lost`, for the
-//!   Wi-Fi helper with no network, when the model cannot be reached, and
-//!   `going_to_sleep`, for the safe shutdown (#3697, `docs/shutdown.md`). Its
+//!   Wi-Fi helper with no network, when the model cannot be reached. Its
 //!   samples are played as a skill's sound is, with the same gates; one not
 //!   provisioned is refused at once with the loader's reason
-//!   ([`Recordings`]), and nothing is said. Only root's helpers (the Wi-Fi
-//!   helper, the shutdown) may ask for one: the socket's peer is root
-//!   ([`Caller`], by `SO_PEERCRED`), so a skill cannot say there is no Wi-Fi
-//!   while the lamp is online.
+//!   ([`Recordings`]), and nothing is said. Only the Wi-Fi helper may ask
+//!   for one: the socket's peer is root ([`Caller`], by `SO_PEERCRED`), so
+//!   a skill cannot say there is no Wi-Fi while the lamp is online.
 //! - **The shutdown's last words** (#3697): the skill [`SHUTDOWN_SKILL`] is
 //!   root's alone; its say or sound goes first and skips every gate above
 //!   but the keeper's pause and the privacy switch, cutting the lamp's own
@@ -347,9 +345,8 @@ fn invitation_id<'de, D: serde::Deserializer<'de>>(
 /// Who is at the other end of the socket, as its peer credentials say.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Caller {
-    /// Root: the Wi-Fi helper (`lamp-setup wifi`, #1959) or the shutdown
-    /// (`lamp-setup shutdown-now`, #3697), the only callers that may ask for
-    /// a [`RECORDINGS`] line.
+    /// Root's Wi-Fi helper (`lamp-setup wifi`, #1959): the one caller that
+    /// may ask for a [`RECORDINGS`] line.
     WifiHelper,
     /// Any other: a skill, a part, or a peer whose credentials are unknown.
     Other,
@@ -1451,7 +1448,7 @@ fn read_line_within(stream: &UnixStream, within: Duration) -> Result<String, &'s
 /// The recordings an ask may name (#1959): each is one line recorded at
 /// build time in the lamp's own voice, a failure notice of the same name
 /// (`lamp_audio::notice::NoticeKind`, `docs/failure-notices.md`).
-pub const RECORDINGS: &[&str] = &["wifi_lost", "going_to_sleep"];
+pub const RECORDINGS: &[&str] = &["wifi_lost"];
 
 /// The recordings the voice loaded at start, by name: their samples, or
 /// the loader's reason they are not there (`not_provisioned`,

@@ -1,5 +1,5 @@
 {
-  "about": "Models no build carries, fetched by lamp-update install where missing and checked by size and SHA-256 before they are placed (lampOS/docs/install.md, #811). The models from one release of ours, models-2026-10-16, each with its licence beside it (the first builder on #811, 2026-10-16 13:58); the voice's spoken notices (the offline line, back online, the voice service's line and the Wi-Fi helper's no-Wi-Fi line) from notices-2026-10-20, rendered in the second route's voice (#1844), and the shutdown's line with the manifest that names all five from notices-2026-10-27 (#3697). A file under a part's current/ goes beside its binary in the build's folder; a round carries it to the next.",
+  "about": "Models no build carries, fetched by lamp-update install where missing and checked by size and SHA-256 before they are placed (lampOS/docs/install.md, #811). The models from one release of ours, models-2026-10-16, each with its licence beside it (the first builder on #811, 2026-10-16 13:58); the voice's spoken notices (the offline line, back online, the voice service's line and the Wi-Fi helper's no-Wi-Fi line, with their manifest) from notices-2026-10-20, rendered in the second route's voice (#1844). A file under a part's current/ goes beside its binary in the build's folder; a round carries it to the next.",
   "models": [
     {
       "path": "/opt/lampOS/voice/current/smart-turn-v3.2-gpu.onnx",
@@ -62,9 +62,9 @@
     },
     {
       "path": "/opt/lampOS/voice/notices/manifest.json",
-      "url": "https://github.com/autonomous-ai/lampOS/releases/download/notices-2026-10-27/manifest.json",
-      "bytes": 2078,
-      "sha256": "fe0567fbdfb7fa342aafdef3399865f5ac01e0f4e9f0e3c65270f36f9198951b"
+      "url": "https://github.com/autonomous-ai/lampOS/releases/download/notices-2026-10-20/manifest.json",
+      "bytes": 1674,
+      "sha256": "0fae11431b5ac1a5d9c22d0a27826b0e479f9159455bc2c693a9b8012af63745"
     },
     {
       "path": "/opt/lampOS/voice/notices/provider-unavailable.en-US.wav",
@@ -89,12 +89,6 @@
       "url": "https://github.com/autonomous-ai/lampOS/releases/download/notices-2026-10-20/wifi-lost.en-US.wav",
       "bytes": 234804,
       "sha256": "fec06f71147735c1a4130902767108ef0ba4b2d975f23196d897d5dc169f3b93"
-    },
-    {
-      "path": "/opt/lampOS/voice/notices/going-to-sleep.en-US.wav",
-      "url": "https://github.com/autonomous-ai/lampOS/releases/download/notices-2026-10-27/going-to-sleep.en-US.wav",
-      "bytes": 166520,
-      "sha256": "f408519b79a5ec420efb19ddb9817159f2e82299543fba615781afc0a1863711"
     }
   ]
 }
