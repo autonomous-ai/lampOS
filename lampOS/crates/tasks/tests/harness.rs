@@ -1175,6 +1175,40 @@ fn every_dispatch_says_one_journal_line_without_the_ask() {
     assert!(rig.calls().is_empty());
 }
 
+/// The P3 Fourteen and the Reviewer-lead left on #3234: a lowercase
+/// computer name passes as a plain word, and hostnames often carry the
+/// owner's name. Every name and hostname the preflight's `machines` listed,
+/// each machine's id, and any long id of letters and digits are put as "…".
+#[test]
+fn a_dispatch_line_keeps_no_machine_name_or_id_from_stderr() {
+    let mut rig = Rig::new();
+    rig.plan(json!({
+        "machines": {"stdout": format!(
+            "{}\n{}\n",
+            json!({"machineId": MACHINE, "current": false, "name": "lan-macbook", "hostname": "lans-mbp.local"}),
+            json!({"machineId": "fedcba9876543210fedcba9876543210", "current": true, "name": "office imac"})
+        )},
+        "new": {
+            "exit": 1,
+            "stdout": "{\"ok\":false,\"error\":\"SPAWN_FAILED\"}\n",
+            "stderr": format!(
+                "error: spawn refused on lan-macbook (lans-mbp.local) for office machine {MACHINE}, \
+                 computer b96b89281e33431eb7e3f49012e7bed7\n"
+            ),
+        }
+    }));
+    let (_, lines) = journal_of(&mut rig, &launch());
+    assert_eq!(lines.len(), 1, "{lines:?}");
+    let line = &lines[0];
+    assert!(
+        line.ends_with(", stderr: error: spawn refused on … for … machine … computer …)"),
+        "{line}"
+    );
+    for private in ["lan", "lans", "imac", "office", MACHINE, "b96b8928"] {
+        assert!(!line.contains(private), "{private}: {line}");
+    }
+}
+
 /// Fourteen's privacy probe on #3234: the ask's short words (the people in
 /// it), a quoted echo, and the name-taken refusal's computer label, home
 /// folder and project never reach the journal; only plain words and codes
