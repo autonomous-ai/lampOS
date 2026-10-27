@@ -14,7 +14,7 @@
 set -eu
 
 # The words are wifi_change::SAY_LOST's (crates/setup/src/wifi_change.rs, #3743): change both together.
-LINE="I can't reach any Wi-Fi. If your Wi-Fi has changed, hold the reset button for five seconds. That erases me and starts setup again."
+LINE="I can't reach any Wi-Fi. If you changed your Wi-Fi's name or password, push a paperclip into the hole marked reset on the back of my base and hold it for five seconds. That erases me and starts setup again."
 
 [ $# -ge 2 ] && [ $# -le 3 ] || { echo "usage: $0 PROVIDER.json NEW_FOLDER [production|test]" >&2; exit 2; }
 provider=$1

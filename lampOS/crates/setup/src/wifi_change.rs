@@ -540,15 +540,16 @@ pub const SAY_BACK: &str = "I couldn't join that one, so I've gone back to the o
 /// never asked of it: it is [`RECORDING_LOST`], recorded at build time in
 /// the lamp's own voice and played by the voice (`docs/setup.md`). This is
 /// its transcript, and the one place its words are kept in code (#3743): it
-/// names the reset button, not the main one (whose 5 s hold only mutes),
-/// says the hold erases, and asks for it only when the Wi-Fi has really
-/// changed. The button's place on the lamp is added here once the hardware
-/// lead gives it (#1711).
+/// names the reset, not the main button (whose 5 s hold only mutes), and
+/// where it is: the pinhole labelled RESET on the back of the base, beside
+/// the round POWER button, pushed with a paperclip or SIM pin and held 5 s
+/// (the hardware lead on #3743). It says the hold erases, and asks for it
+/// only when the Wi-Fi's name or password has really changed.
 ///
 /// It is first said only when the old network has not come back in
 /// [`BACK_TRIES`] waits of [`BACK_WAIT`], 3 minutes at least after the
 /// lamp left it, so a router's restart (2-3 minutes) never hears it.
-pub const SAY_LOST: &str = "I can't reach any Wi-Fi. If your Wi-Fi has changed, hold the reset button for five seconds. That erases me and starts setup again.";
+pub const SAY_LOST: &str = "I can't reach any Wi-Fi. If you changed your Wi-Fi's name or password, push a paperclip into the hole marked reset on the back of my base and hold it for five seconds. That erases me and starts setup again.";
 /// The voice's recording of [`SAY_LOST`], by the name the say service takes
 /// (`recording`), the failure notice `wifi_lost` in
 /// `/opt/lampOS/voice/notices`, placed by install (`docs/failure-notices.md`,
