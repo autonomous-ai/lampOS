@@ -1,0 +1,182 @@
+{
+  "base": "3f4b87969113a89795c814051501c4ba581418e9",
+  "cases": {
+    "coordinator::tests::another_owners_audio_does_not_latch_the_invitation": [
+      {
+        "line": 358,
+        "outcome": "ok"
+      }
+    ],
+    "coordinator::tests::invitation_audio_accepted_then_cut_is_cut": [
+      {
+        "line": 359,
+        "outcome": "ok"
+      }
+    ],
+    "coordinator::tests::invitation_pcm_queued_then_interrupted_before_acceptance_stays_unsaid": [
+      {
+        "line": 360,
+        "outcome": "ok"
+      }
+    ],
+    "onboarding::giving_way_flow_tests::a_rebuilt_walk_keeps_its_invitations_and_does_not_ask_a_third_time": [
+      {
+        "line": 361,
+        "outcome": "ok"
+      }
+    ],
+    "onboarding::giving_way_flow_tests::an_invitation_the_voice_never_said_is_no_try_and_is_asked_again": [
+      {
+        "line": 364,
+        "outcome": "ok"
+      }
+    ],
+    "onboarding::privacy_flow_tests::a_close_before_the_invitation_began_is_not_its_answer": [
+      {
+        "line": 369,
+        "outcome": "ok"
+      }
+    ],
+    "onboarding::privacy_flow_tests::a_close_while_the_invitation_is_said_counts_without_another_offer": [
+      {
+        "line": 370,
+        "outcome": "ok"
+      }
+    ],
+    "onboarding::privacy_flow_tests::an_arm_that_fails_while_the_invitation_is_said_spends_no_try": [
+      {
+        "line": 371,
+        "outcome": "ok"
+      }
+    ],
+    "onboarding::privacy_flow_tests::no_person_means_no_privacy_invitation_and_missing_profile_is_unavailable": [
+      {
+        "line": 372,
+        "outcome": "ok"
+      }
+    ],
+    "onboarding::privacy_flow_tests::the_invitation_is_one_short_sentence_with_the_location": [
+      {
+        "line": 373,
+        "outcome": "ok"
+      }
+    ],
+    "onboarding::privacy_flow_tests::unplayed_invitation_never_arms_and_restarts_use_only_one_retry": [
+      {
+        "line": 374,
+        "outcome": "ok"
+      }
+    ],
+    "say::tests::onboarding_requires_its_skill_and_an_exclusive_nonzero_invitation": [
+      {
+        "line": 375,
+        "outcome": "ok"
+      }
+    ],
+    "say::tests::onboarding_takes_only_the_exact_invitation_before_expiry": [
+      {
+        "line": 376,
+        "outcome": "ok"
+      }
+    ]
+  },
+  "counts": [
+    {
+      "failed": 0,
+      "ignored": 0,
+      "passed": 13,
+      "status": "ok"
+    }
+  ],
+  "current_test_artifact": {
+    "compiler_fresh": false,
+    "features": [],
+    "path": "<WORKSPACE>/.claude/worktrees/third-store-target/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+    "post_execution_sha256": "3dd8b2d8d53b45f60b3877c1b1189e024ff525f355ca5d5f5d81c4b3a96c4c99",
+    "scope": "Standard current Cargo compile+execution; hash measured afterward, no pre-execution binary preimage claim."
+  },
+  "hashes": {
+    "audit-gates.py": "d614d287aea5e3d1f65fce9bf64f3f88a366269b0d50fe86f77f90b6ac7439a1",
+    "clippy.log": "5aea28f71c7c667209afafa1156b7fed519e1916f19901b9604b5329f945caa3",
+    "fmt.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "gate-plan.json": "fb3a3d9ee138b3d2a038d31ebb32247383db2ea2721704ce37f0314346b30a43",
+    "gate.terminal.json": "c767c3f574b3889af4b06ac1daac13e162c41eda5740a4bc93e5b40e4def06f5",
+    "invitation13.log": "fb4a3c0f7c42fb8bc7b734b20032c761dbc05dda55c6b2c35d1f8c129f245bf8",
+    "run-gates.py": "a3b846dad73ab73f8dc217b5de0caac9cb66511d3e2a6e32f1c39ef0e1900ca5",
+    "source-after.json": "f0444e4a67d406c1ef8501c3594b4017bc161a525e7e637bff84963d91cf9030",
+    "source-before.json": "f0444e4a67d406c1ef8501c3594b4017bc161a525e7e637bff84963d91cf9030",
+    "source-plan.json": "8da708088deee1512f73ea7520d91830a54d81c533f57cd96c0f52d4cc4d6022"
+  },
+  "head": "3fa5b9a218405f5253a148a3f2e10887f51bbce1",
+  "holds": [],
+  "limits": [
+    "Three new bound-owner latch/decision controls are not a full bound-invitation coordinator replay.",
+    "Queued test explicitly sets unaccepted PCM/false sounded and asserts Unsaid; selected giving-way flow independently asserts the refund counter.",
+    "No broad149/759/4k rerun or author storage-cohort waiver. Root owns final HOLD closure and native audit.",
+    "Fresh source-bound local gate only; Root owns final P2 closure and separate original native/source audit.",
+    "All13 includes10 existing invitation/refund/owner controls and3 new latch/decision controls; no full coordinator replay,149/759/4k run or acoustic/device result.",
+    "Original helda4, author149/1 storage failure and isolated retries remain separately retained and unwaived."
+  ],
+  "new_bound_latch_controls": [
+    {
+      "line": 16161,
+      "name": "coordinator::tests::invitation_pcm_queued_then_interrupted_before_acceptance_stays_unsaid",
+      "new_bound_latch_control": true,
+      "source": "crates/voice/src/coordinator.rs"
+    },
+    {
+      "line": 16182,
+      "name": "coordinator::tests::invitation_audio_accepted_then_cut_is_cut",
+      "new_bound_latch_control": true,
+      "source": "crates/voice/src/coordinator.rs"
+    },
+    {
+      "line": 16202,
+      "name": "coordinator::tests::another_owners_audio_does_not_latch_the_invitation",
+      "new_bound_latch_control": true,
+      "source": "crates/voice/src/coordinator.rs"
+    }
+  ],
+  "no_product_edits_public_posts_Memory_semantic_or_CI_actions": true,
+  "old_a4_HOLD_receipt_sha256": "31ca382b6da93d7d7a057889ec1bc89ebd07bd2e2d7882a067f368840016576a",
+  "scoped_source_hash_count": 7405,
+  "source_lock_helpers_unchanged": true,
+  "source_review": "Latch and decision fix follows accepted playback for matching boot+turn; all three latch call sites precede drop. Poll/completion aligned; provider had_audio cannot grant heard state.",
+  "stages": [
+    {
+      "cleanup": [],
+      "error": null,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "ok": true,
+      "process_group": "absent",
+      "reaped": true,
+      "returncode": 0,
+      "stage": "fmt",
+      "timed_out": false
+    },
+    {
+      "cleanup": [],
+      "error": null,
+      "log_sha256": "5aea28f71c7c667209afafa1156b7fed519e1916f19901b9604b5329f945caa3",
+      "ok": true,
+      "process_group": "absent",
+      "reaped": true,
+      "returncode": 0,
+      "stage": "clippy",
+      "timed_out": false
+    },
+    {
+      "cleanup": [],
+      "error": null,
+      "log_sha256": "fb4a3c0f7c42fb8bc7b734b20032c761dbc05dda55c6b2c35d1f8c129f245bf8",
+      "ok": true,
+      "process_group": "absent",
+      "reaped": true,
+      "returncode": 0,
+      "stage": "invitation13",
+      "timed_out": false
+    }
+  ],
+  "status": "REPAIRED_3831_LOCAL_INVITATION13_VERIFIED",
+  "tree": "65f675eaaafe421d5165e503710664e63a0649d8"
+}

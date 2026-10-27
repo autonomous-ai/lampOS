@@ -1,3 +1,13 @@
+## 2026-10-27 21:22 — invitation-audio P2 closed on the repaired head
+
+READ-OK #3831 3fa5b9a21. The [current source read](verification/invitation-audio-read-3831-20261027/current-3fa-source.json) closes Third's a4 P2: only accepted playback from the bound boot/turn latches the invitation, immediately after both speaker-receipt paths and before later cuts. Completion and the walk poll use the same reached-speaker rule; provider PCM alone stays Unsaid and refunds its try. A new binding resets the latch; another owner's audio cannot latch it.
+
+[Fresh authored-host gate](verification/invitation-audio-read-3831-20261027/current-3fa-local.json) passes pinned formatting, strict Voice all-target Clippy and thirteen invitation cases, zero failures/ignores; all three new bound controls once. All 7,405 input/source hashes and helpers remain unchanged; every stage/group closes without timeout. This is standard current Cargo compile/execution with a post-execution artifact digest, not a preserved pre-execution binary preimage claim.
+
+[Original native gates](verification/invitation-audio-read-3831-20261027/current-3fa-native.json) ARM 40517247658 and Linux 40517247499 pass attempt 1 on 12712e144 [992303fc8/3fa], tree 6425cca2d; thirteen selected invitation cases each pass once. The complete owned coordinator blob equals authored. Native preview also inherits #3781's onboarding/giving-way wording and helper changes, so it remains separate from authored-host execution. Neither whole-tree equality nor a full native census is claimed. Local watcher and collectors close without rerun/cancel.
+
+The three new controls model latch/decision states; there is still no full bound-invitation coordinator replay or physical/acoustic playback result. Old a4 HOLD evidence, original old-head native and the author's failed 149/1 storage cohort remain historical and unwaived; no broad 149/759/4k rerun was used to erase them. #3646's separate clean seven-commit carry onto frozen 992 is under source/feature/closure audit, retaining draft/broker holds.
+
 ## 2026-10-27 21:13 — two narrow documentation reads, invitation repair gates underway
 
 READ-OK #3851 5fdc61e2a in the [host-prose scope](verification/receipt-host-doc-read-3851-20261027/receipt.json): exactly updates.md, five additions/two deletions, clean whitespace. Historical Intel heading, counts, source labels, limitations and all three receipt Rust blobs/modes are preserved. Published original proof corroborates Darwin/arm64 and Rust 1.96 commands. Exact OS point release and private 48-header audit remain the author's firsthand evidence; those raw headers were not independently reopened. No build/native/device rerun or runtime-count transfer.

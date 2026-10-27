@@ -1,0 +1,36 @@
+{
+  "head": "3fa5b9a218405f5253a148a3f2e10887f51bbce1",
+  "old_held_head": "a4e13942453e01eba673952afff41a49a0589bd4",
+  "head_parent": "3f4b87969113a89795c814051501c4ba581418e9",
+  "head_tree": "65f675eaaafe421d5165e503710664e63a0649d8",
+  "owned_file": "lampOS/crates/voice/src/coordinator.rs",
+  "owned_blob": "c1dd6e3529f5319702274fa2c13d13ed14408583",
+  "latch_occurrence_lines": [
+    3134,
+    7092,
+    8418,
+    8425,
+    16172,
+    16191,
+    16194,
+    16209,
+    16211
+  ],
+  "new_bound_controls": [
+    "invitation_pcm_queued_then_interrupted_before_acceptance_stays_unsaid",
+    "invitation_audio_accepted_then_cut_is_cut",
+    "another_owners_audio_does_not_latch_the_invitation"
+  ],
+  "source_conclusions": [
+    "The provider-arrival had_audio latch is removed. Owner boot and turn must match before OR-ing reached_speaker.",
+    "reached_speaker is sounded or playback; service_speaker_control sets both only for positive accepted frames after sequence/origin validation.",
+    "Top-of-loop and both candidate-drain arms latch after speaker receipts, before subsequent lapse/interruption handling can drop Reply.",
+    "Completion uses heard_whole first, otherwise never reached plus never latched gives Unsaid; normal walk poll uses same accepted-playback rule.",
+    "New invitation binding resets the audio latch; other owner does not latch. Unsaid refunds the bound invitation try within its existing bounded retry policy."
+  ],
+  "limits": [
+    "New cases manually construct latch/decision states; no full coordinator replay of a bound invitation or physical/acoustic measurement.",
+    "Original a4 HOLD remains in its historical proof. Author 13/0 and759/0 are not independent current host credit."
+  ],
+  "receipt_assembly_note": "Initial scratch assertion incorrectly counted helper occurrences including extra test calls and exited1 before writing a receipt; corrected by recording occurrence lines instead. No code/gate failure or execution rerun."
+}

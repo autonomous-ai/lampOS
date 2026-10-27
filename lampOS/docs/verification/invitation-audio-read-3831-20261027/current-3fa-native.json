@@ -1,0 +1,155 @@
+{
+  "pr": 3831,
+  "head": "3fa5b9a218405f5253a148a3f2e10887f51bbce1",
+  "actual_preview": "12712e144522f4883e6f907257e06d584ef53a5d",
+  "parents": [
+    "992303fc8d72322bab46cdb18801c853ea43bb81",
+    "3fa5b9a218405f5253a148a3f2e10887f51bbce1"
+  ],
+  "preview_tree": "6425cca2dcb15fbabff525de44b796e585b6e6c9",
+  "only_change_against_preview_base": "lampOS/crates/voice/src/coordinator.rs",
+  "source_mapping": [
+    {
+      "path": "lampOS/crates/voice/src/coordinator.rs",
+      "authored_blob": "c1dd6e3529f5319702274fa2c13d13ed14408583",
+      "preview_blob": "c1dd6e3529f5319702274fa2c13d13ed14408583",
+      "equal": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/onboarding.rs",
+      "authored_blob": "720fccf3c0e6a9ef30ccc3e01e53b1e430a4d981",
+      "preview_blob": "b3e1d6e159f97d004cec612412747964fe01d907",
+      "equal": false
+    },
+    {
+      "path": "lampOS/crates/voice/src/onboarding/giving_way.rs",
+      "authored_blob": "bfbb38ff39631f901853f4b1021548085e03009e",
+      "preview_blob": "7ab6a0911242602563c7c077fffffcaf4b5efdd4",
+      "equal": false
+    },
+    {
+      "path": "lampOS/crates/voice/src/onboarding/giving_way_flow_tests.rs",
+      "authored_blob": "c95ff1739f6e3e21b84eff39cd3441dafae72d25",
+      "preview_blob": "7948021edc48a6cb586ebbd8a1396b4b136a9399",
+      "equal": false
+    },
+    {
+      "path": "lampOS/crates/voice/src/onboarding/privacy_flow_tests.rs",
+      "authored_blob": "5566a5e100106006b0c241cf8c9d97af5f6db09b",
+      "preview_blob": "5566a5e100106006b0c241cf8c9d97af5f6db09b",
+      "equal": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/say.rs",
+      "authored_blob": "0c38dffd3561fd91bd22f810917edab804b2a105",
+      "preview_blob": "0c38dffd3561fd91bd22f810917edab804b2a105",
+      "equal": true
+    }
+  ],
+  "original_ci": {
+    "arm": {
+      "run": {
+        "conclusion": "success",
+        "head_sha": "3fa5b9a218405f5253a148a3f2e10887f51bbce1",
+        "id": 40517247658,
+        "run_attempt": 1,
+        "status": "completed"
+      },
+      "log_sha256": "5e852b385c7bb5acdc75b1ac590bf0dbe773faff8dd818acfe53360486666d86"
+    },
+    "linux": {
+      "run": {
+        "conclusion": "success",
+        "head_sha": "3fa5b9a218405f5253a148a3f2e10887f51bbce1",
+        "id": 40517247499,
+        "run_attempt": 1,
+        "status": "completed"
+      },
+      "log_sha256": "f71cbfa081b105ad98b955ae35551296fca9cc34df266e20617add48765cbd58"
+    }
+  },
+  "selected_invitation_cases": [
+    {
+      "case": "coordinator::tests::another_owners_audio_does_not_latch_the_invitation",
+      "seconds": 0.006,
+      "ordinal": 3437
+    },
+    {
+      "case": "coordinator::tests::invitation_audio_accepted_then_cut_is_cut",
+      "seconds": 0.005,
+      "ordinal": 3660
+    },
+    {
+      "case": "coordinator::tests::invitation_pcm_queued_then_interrupted_before_acceptance_stays_unsaid",
+      "seconds": 0.005,
+      "ordinal": 3661
+    },
+    {
+      "case": "onboarding::giving_way_flow_tests::a_rebuilt_walk_keeps_its_invitations_and_does_not_ask_a_third_time",
+      "seconds": 0.016,
+      "ordinal": 4318
+    },
+    {
+      "case": "onboarding::giving_way_flow_tests::an_invitation_the_voice_never_said_is_no_try_and_is_asked_again",
+      "seconds": 0.017,
+      "ordinal": 4320
+    },
+    {
+      "case": "onboarding::privacy_flow_tests::a_close_before_the_invitation_began_is_not_its_answer",
+      "seconds": 0.014,
+      "ordinal": 4361
+    },
+    {
+      "case": "onboarding::privacy_flow_tests::a_close_while_the_invitation_is_said_counts_without_another_offer",
+      "seconds": 0.014,
+      "ordinal": 4362
+    },
+    {
+      "case": "onboarding::privacy_flow_tests::an_arm_that_fails_while_the_invitation_is_said_spends_no_try",
+      "seconds": 0.014,
+      "ordinal": 4367
+    },
+    {
+      "case": "onboarding::privacy_flow_tests::no_person_means_no_privacy_invitation_and_missing_profile_is_unavailable",
+      "seconds": 0.01,
+      "ordinal": 4372
+    },
+    {
+      "case": "onboarding::privacy_flow_tests::the_invitation_is_one_short_sentence_with_the_location",
+      "seconds": 0.01,
+      "ordinal": 4377
+    },
+    {
+      "case": "onboarding::privacy_flow_tests::unplayed_invitation_never_arms_and_restarts_use_only_one_retry",
+      "seconds": 0.015,
+      "ordinal": 4380
+    },
+    {
+      "case": "say::tests::onboarding_requires_its_skill_and_an_exclusive_nonzero_invitation",
+      "seconds": 0.006,
+      "ordinal": 5520
+    },
+    {
+      "case": "say::tests::onboarding_takes_only_the_exact_invitation_before_expiry",
+      "seconds": 0.005,
+      "ordinal": 5522
+    }
+  ],
+  "selected_unique_passes": 13,
+  "watch_terminal": {
+    "run": 40517247658,
+    "returncode": 0,
+    "timed_out": false,
+    "reaped": true,
+    "process_group": "absent",
+    "actions": [],
+    "elapsed_s": 278.57,
+    "scope": "Only local watcher; no Actions rerun/cancel"
+  },
+  "limits": [
+    "Original attempt1 run green and thirteen selected cases each observed once; no full runtime census or separate aggregate counting claim.",
+    "Whole authored/preview trees differ. Upstream #3781 changes onboarding/giving-way wording and shared test helper; current native13 scope stays on actual992/3fa preview.",
+    "New three bound controls prove latch/decision states, not a full coordinator-bound invitation replay or ALSA/acoustic playback.",
+    "Fresh authored-host gate tracked separately; no native rerun/cancel, binary execution or device."
+  ]
+}
