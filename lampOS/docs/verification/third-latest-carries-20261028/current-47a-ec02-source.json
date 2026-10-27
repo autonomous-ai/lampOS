@@ -1,0 +1,113 @@
+{
+  "candidate_base": "89823095e69dcbafaa5b3b79733c17ecf9d8e8f7",
+  "ownkeys": {
+    "head": "47a7e8f85e3cf15b15abfa401391d4e7eb4b750f",
+    "prior": "9f3876368ee2ee5d451349e95236397338fb8712",
+    "range_equal_commits": 7,
+    "whole_owned_equal": 38,
+    "delta_from_green_f9_preview": "Only four played-tool files, with no crate code consumer (one documentation comment).",
+    "new_local_runtime": false
+  },
+  "authorization": {
+    "head": "ec02fec6b8ccc73e01826d32c347a629a8108292",
+    "prior": "5613b3420fd7a189f7f140035d38bd8821379ad4",
+    "range_equal_commits": 1,
+    "whole_code_workflow_files_equal": 4,
+    "inherited_doc": "updates.md adds upstream projection documentation; authored patch unchanged",
+    "entire_github_tree_equal_green_8a": true,
+    "fresh_publisher_unit": {
+      "all_source_tool_guards_equal": true,
+      "counts": {
+        "FAIL": 0,
+        "PASS": 51,
+        "ignored": 0,
+        "retries": 0,
+        "unrun": 0
+      },
+      "limits": [
+        "Publisher synthetic offline unit tests only; real current-emitter7 CLI remains required in original ARM.",
+        "No credential provisioning, real GitHub/release or local compiler/bank operations."
+      ],
+      "row": {
+        "CLI_or_Cargo_or_bank": false,
+        "argv": [
+          "python3",
+          "-B",
+          "-I",
+          ".github/scripts/lampos-publish-test.py"
+        ],
+        "base": "89823095e69dcbafaa5b3b79733c17ecf9d8e8f7",
+        "cleanup_signals": [],
+        "elapsed_seconds": 1.0141,
+        "exit": 0,
+        "group_absent": true,
+        "head": "ec02fec6b8ccc73e01826d32c347a629a8108292",
+        "pgid": 98547,
+        "pid": 98547,
+        "retries": 0,
+        "stderr_sha256": "a45ce681e8f093c78e031e3d36bec074a873596d66621fe928437a9c94c1e6a4",
+        "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "timeout": false
+      },
+      "source_tools_after_sha256": "e965285d6609c699c2e1428d61b9068f974418f26be499359a0b32e884685a2f",
+      "source_tools_before_sha256": "e965285d6609c699c2e1428d61b9068f974418f26be499359a0b32e884685a2f"
+    },
+    "saved_CLI_not_repeated": true,
+    "current_updater_native_CLI_required": true
+  },
+  "push": {
+    "Main_observed_before_push": "c0ae5afa8376b6282eef1b6bacbe516d924c654b",
+    "atomic": true,
+    "attempt": 1,
+    "both_open_draft_confirmed": true,
+    "candidate_base": "89823095e69dcbafaa5b3b79733c17ecf9d8e8f7",
+    "exact_leases": {
+      "refs/heads/third/ownkeys-current": {
+        "expected": "9f3876368ee2ee5d451349e95236397338fb8712",
+        "pushed": "47a7e8f85e3cf15b15abfa401391d4e7eb4b750f"
+      },
+      "refs/heads/third/publish-auth": {
+        "expected": "5613b3420fd7a189f7f140035d38bd8821379ad4",
+        "pushed": "ec02fec6b8ccc73e01826d32c347a629a8108292"
+      }
+    },
+    "historical_native_credit_transferred": false,
+    "intervening_Main_delta": [
+      ".github/workflows/lampos-sdk.yml",
+      "lampOS/sdk/python/README.md",
+      "lampOS/sdk/python/src/lampos/skillcheck.py",
+      "lampOS/sdk/python/tests/test_skillcheck.py"
+    ],
+    "latest_claim": false,
+    "local_unit51": {
+      "all_source_tool_guards_equal": true,
+      "exit": 0,
+      "native_handle": 19352,
+      "once": true,
+      "qualified_sha256": "8b97279626a7bbbfba17035a4daa9b93db767e7c03b9716b39e69af58d9c6ba5"
+    },
+    "native_exit": 0,
+    "native_push_handle": 71222,
+    "no_local_CLI_Cargo_bank": true,
+    "original_runs": {
+      "auth_ARM": 40602024586,
+      "ownkeys_ARM": 40602022358,
+      "ownkeys_Linux": 40602022202
+    },
+    "prepush_local_sha256": "333919765dd82364b6424c7ee1246dd59e29f548dd89f14208935ccc118d0708",
+    "utc": "2026-10-27T23:30:23.451178+00:00",
+    "watch_handle": 79457
+  },
+  "root_checks": {
+    "both_range_diffs_equal": true,
+    "fresh_51_raw_unique_PASS": true,
+    "own_delta_verified_Git_and_no_code_consumer": true,
+    "auth_github_tree_diff_empty": true
+  },
+  "source_preparation_sha256": "a4f31d823c23e3d910868a7fa59f31eb546b4a4bc22c704c941bb49d83b61f0f",
+  "limits": [
+    "Source carry does not relabel historical local/native executions.",
+    "Draft broker and protected authorization holds remain.",
+    "New original native gates required, no local Cargo/bank/old CLI replay."
+  ]
+}
