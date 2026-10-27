@@ -23,7 +23,7 @@ classifiers = [
     "Topic :: Software Development :: Libraries",
     "Framework :: AsyncIO",
 ]
-dependencies = ["websockets>=13", "cryptography>=42"]
+dependencies = ["websockets>=13", "cryptography>=42", "tomli>=2; python_version < '3.11'"]
 
 [project.optional-dependencies]
 find = ["zeroconf>=0.130"]

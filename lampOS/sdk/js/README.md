@@ -44,7 +44,7 @@ LAMPOS_HOME=/tmp/lampos-try node examples/greet.js
 
 Terminal 1 then shows `asked {"op":"gesture","name":"greeting"}`. Every
 example runs this way: `tour.js` (every kind of call, one step at a time; with `lamp fake --everything` nothing is refused), `greet.js`, `follow.js`, `follow-hand.js` (with `lamp fake --hands`), `phrase.js`, `pomodoro.js`,
-`ci-light.js`.
+`ci-light.js`, and `push-skill.js ../../examples/relaxing-music` (a pairing with `skills`).
 
 It answers as a lamp does today: `gesture` and `move` with `{"to": "body"}`,
 `express` as the feelings skill's move and light, `say` and `sound`
@@ -175,6 +175,18 @@ with no lock file, as a library's are: the application that uses it locks
 them.
 
 Tests: `npm test`.
+
+## Push a skill to your own lamp
+
+With the `skills` grant, which the owner ticks at pairing, a computer can put
+a skill of its own on its own lamp, with no Store
+([control.md](../../docs/control.md), "Skills pushed from a computer"):
+`await lamp.pushSkill(folder)` packs the folder and sends it in parts, and
+resolves with the lamp's answer (on, or held for the owner's yes);
+`await lamp.skills()` and `await lamp.removeSkill(name)`; on the command line,
+`lamp skill push FOLDER`, `lamp skill list` and `lamp skill remove NAME`. It refuses a
+folder without a `version`, or a `core` or add-on skill. The fuller check is
+the Python SDK's `lamp skill check`, and the lamp checks everything again.
 
 ## Everything you can read
 
@@ -319,6 +331,14 @@ for its code (`WHAT_TO_DO`):
 | `bad_request` | The request doesn't fit the protocol; `why` names the field. Check it against the schema (control.schema.json). |
 | `off` | Developer access is off on this lamp: the owner turns it on in the app. |
 
+### Skills
+
+| call | parameters | grant |
+|---|---|---|
+| `lamp.pushSkill(folder)` | a skill folder (`SKILL.md`, `skill.toml` with a `version`): packed and sent in parts. The fuller check is the Python SDK's `lamp skill check` | `skills` |
+| `lamp.skills()` | | `skills` |
+| `lamp.removeSkill(name)` | one of this computer's own pushed skills | `skills` |
+
 ### The `lamp` command
 
 | command | options |
@@ -326,6 +346,9 @@ for its code (`WHAT_TO_DO`):
 | `lamp find` | none: lamps on this network by mDNS |
 | `lamp pair CODE --pin PIN [--host HOST] [--port 7731] [--name NAME]` | `CODE`: the 8-digit code. `--pin`: the 64-hex pin the app shows (required). `--host`: the address, found by mDNS without it, by the pin's first 16 hex. `--port`: 7731. `--name`: this computer's name in the app |
 | `lamp hello [LAMP_ID]` | a paired lamp's id, or the only one: connects and shows its grants |
+| `lamp skill push FOLDER [LAMP_ID]` | a skill folder, put on the paired lamp (`skills` grant) |
+| `lamp skill list [LAMP_ID]` | this computer's own pushed skills |
+| `lamp skill remove NAME [LAMP_ID]` | takes one of them off the lamp |
 | `lamp fake [--every 10] [--cycles N] [--everything] [--hands]` | `--every`: seconds between arrivals (10). `--cycles`: stop after N (default: until Ctrl-C). `--everything`: answer every op, without refusing what lamp-control doesn't route yet. `--hands`: a hand waves for 3 s after each arrival, and looks are answered, as on a lamp with the body's lease socket |
 
 `lamp skill check` is the Python SDK's. `LAMPOS_HOME` sets where the key and

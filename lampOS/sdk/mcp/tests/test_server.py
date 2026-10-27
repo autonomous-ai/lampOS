@@ -999,3 +999,38 @@ def test_a_clip_is_uploaded_from_a_file_played_listed_and_removed(tmp_path):
             assert missing.isError and "can't be read" in text(missing)
 
     run(go())
+
+
+def test_the_skill_tools_push_list_and_remove_with_the_skills_grant_only(tmp_path):
+    def skill(name: str, rules: str) -> Path:
+        path = tmp_path / "skills" / name
+        path.mkdir(parents=True)
+        (path / "SKILL.md").write_text(f"---\nname: {name}\ndescription: A test skill.\n---\n")
+        (path / "skill.toml").write_text(rules)
+        return path
+
+    async def go():
+        async with connected(tmp_path / "keys", grants=("light", "skills")) as (fake, _, session):
+            names = {tool.name for tool in (await session.list_tools()).tools}
+            assert {"lamp_skill_push", "lamp_skills", "lamp_skill_remove"} <= names
+            pushed = await session.call_tool(
+                "lamp_skill_push", {"folder": str(skill("desk-wave", 'version = "0.1.0"\n[permissions]\nlight = true\n'))}
+            )
+            assert not pushed.isError and '"desk-wave"' in text(pushed)
+            listed = await session.call_tool("lamp_skills", {})
+            assert not listed.isError and "desk-wave" in text(listed)
+            removed = await session.call_tool("lamp_skill_remove", {"name": "desk-wave"})
+            assert text(removed) == "desk-wave removed"
+            assert fake.asked("skill.remove") == [{"name": "desk-wave"}]
+            # A folder the check refuses is the tool's error, and nothing is sent.
+            sent = len(fake.asked("skill.push"))
+            broken = await session.call_tool(
+                "lamp_skill_push", {"folder": str(skill("broken", 'version = "0.1.0"\nverison = 1\n'))}
+            )
+            assert broken.isError and "bad_request: broken: skill.toml" in text(broken)
+            assert len(fake.asked("skill.push")) == sent
+        async with connected(tmp_path / "plain", grants=("light",)) as (_, _, session):
+            names = {tool.name for tool in (await session.list_tools()).tools}
+            assert not {"lamp_skill_push", "lamp_skills", "lamp_skill_remove"} & names
+
+    run(go())

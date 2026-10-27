@@ -355,6 +355,9 @@ class FakeLamp:
         self.pulses_dropped: list[tuple[str, dict]] = []
         self._pulsed: dict[str, float] = {}
         self.clock = time.monotonic
+        # Pushed skills by name, and the one push in flight on the lamp.
+        self.pushed: dict[str, dict] = {}
+        self._pushing: dict | None = None
         self.subscribed: dict[str, set[str]] = defaultdict(set)
         self.state: dict[str, Any] = {
             "presence": {"count": 0, "near": 0.0, "facing": False},
@@ -610,7 +613,7 @@ class FakeLamp:
         if op == "get":
             return sorted({self.STATE_GRANT[s] for s in request.get("state", []) if s in self.STATE_GRANT})
         if op == "lease.take":
-            # A lease's parts; `sound.upload`'s `parts` is a count.
+            # A lease's parts; a `sound.upload`'s or `skill.push`'s `parts` is a count.
             return [{"body": "body", "light": "light", "voice": "speak"}[p] for p in request.get("parts", [])]
         body = {"gesture", "move", "play", "joints", "look"}
         if op in body:
@@ -625,6 +628,9 @@ class FakeLamp:
             "sound.upload": ["speak"],
             "sound.list": ["speak"],
             "sound.remove": ["speak"],
+            "skill.push": ["skills"],
+            "skill.list": ["skills"],
+            "skill.remove": ["skills"],
         }.get(op, [])
 
     async def _upload(self, ws, client: str, request: dict) -> None:
@@ -661,6 +667,64 @@ class FakeLamp:
             return
         self.clips[client][request["name"]] = data
         await self._ok(ws, id_, sound=_clip(request["name"], data))
+
+    async def _push(self, ws, client: str, id_: int, request: dict) -> None:
+        """A part of a push, as lamp-control and the helper take it: in order
+        from 0, one push at a time, the whole checked against its SHA-256 and
+        its manifest, then kept as this computer's."""
+        import base64
+        import hashlib
+        import io
+        import tarfile
+
+        going = self._pushing
+        if request["part"] == 0:
+            if going and going["client"] != client:
+                await self._refuse(ws, id_, "busy", "another computer's push is in flight")
+                return
+            going = self._pushing = {"client": client, "request": request, "data": b""}
+        elif not going or going["client"] != client or request["part"] != going["part"] + 1:
+            await self._refuse(ws, id_, "bad_request", "parts out of order")
+            return
+        going["part"] = request["part"]
+        going["data"] += base64.b64decode(request["data"])
+        if request["part"] < request["parts"] - 1:
+            await self._ok(ws, id_, got=request["part"] + 1)
+            return
+        self._pushing = None
+        data = going["data"]
+        if len(data) != request["size"] or hashlib.sha256(data).hexdigest() != request["sha256"].lower():
+            await self._refuse(ws, id_, "bad_request", "the package's SHA-256 doesn't match")
+            return
+        with tarfile.open(fileobj=io.BytesIO(data)) as tar:
+            names = tar.getnames()
+            manifest = json.loads(tar.extractfile("lamp-skill.json").read())
+        if names[0] != "lamp-skill.json" or manifest["name"] != request["name"]:
+            await self._refuse(ws, id_, "refused", "not a package of that skill")
+            return
+        kept = self.pushed.get(request["name"])
+        if kept and kept["client"] != client:
+            await self._refuse(ws, id_, "refused", "another computer's skill has that name")
+            return
+        skill = {
+            "name": manifest["name"],
+            "version": manifest["version"],
+            "sha256": request["sha256"].lower(),
+            "on": True,
+            "held": None,
+        }
+        # Listed as the helper lists it (lamp-skills `list_pushed_by`): no
+        # `client`, which only this fake keeps; `author` is a signed skill's,
+        # never a pushed test folder's.
+        at = datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0)
+        self.pushed[request["name"]] = {
+            **skill,
+            "pushed_at": at.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "pushed_at_unix_ms": int(at.timestamp() * 1000),
+            "author": None,
+            "client": client,
+        }
+        await self._ok(ws, id_, skill={**skill, "asks": [], "shown": []})
 
     async def _op(self, ws, client: str, request: dict) -> None:
         op, id_ = request["op"], request["id"]
@@ -771,6 +835,17 @@ class FakeLamp:
             if self.auto_done:
                 at = request["at"] if isinstance(request["at"], dict) else {"yaw": 0.0, "pitch": 0.0}
                 await self._send_done(id_, {"how": "finished", "yaw": at["yaw"], "pitch": at["pitch"], "clamped": False})
+        elif op == "skill.push":
+            await self._push(ws, client, id_, request)
+        elif op == "skill.list":
+            await self._ok(ws, id_, skills=[{k: v for k, v in s.items() if k != "client"} for s in self.pushed.values() if s["client"] == client])
+        elif op == "skill.remove":
+            kept = self.pushed.get(request["name"])
+            if not kept or kept["client"] != client:
+                await self._refuse(ws, id_, "refused", "not one of this computer's pushed skills")
+                return
+            del self.pushed[request["name"]]
+            await self._ok(ws, id_)
         elif op == "sound.upload":
             await self._upload(ws, client, request)
         elif op == "sound.list":
