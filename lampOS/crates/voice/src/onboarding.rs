@@ -508,6 +508,13 @@ pub struct Onboarding {
     /// Whether the body has said where its joints are, or whether a hand
     /// is on it, since this voice started.
     body_heard: bool,
+    /// A name told while an earlier step of this walk was asked
+    /// ([`names_someone`]), heard for "who you are" when it begins. On
+    /// lamp-52e6 on 27 Oct (build 7071) a person told their name while
+    /// "where you sit" was asked, the model kept their face and name, and
+    /// "who you are", asked after it, heard none and was recorded failed at
+    /// its give-up. The words are not kept, only that a name was told.
+    named_in_walk: bool,
     /// Which steps this voice has (`Step::available`; tests set their own).
     available: fn(Step) -> bool,
     /// The move asked of the body for a step just done, until taken.
@@ -671,6 +678,7 @@ impl Onboarding {
             felt: None,
             goals: None,
             body_heard: false,
+            named_in_walk: false,
             nudge: false,
             released: true,
             near_since: None,
@@ -1579,6 +1587,9 @@ impl Onboarding {
             return;
         };
         let words = words_of(text);
+        if led.step != Step::WhoYouAre && names_someone(text, &words) {
+            self.named_in_walk = true;
+        }
         let done = match led.step {
             Step::WhoYouAre if nudge => false,
             Step::WhoYouAre => {
@@ -1825,8 +1836,15 @@ impl Onboarding {
             return None;
         }
         if self.led.as_ref().is_none_or(|led| led.step != step) {
+            // A name told earlier in the walk is heard for "who you are": a
+            // yes ends it, a no takes it back, and its give-up ends it done.
+            let heard = Answers {
+                name: step == Step::WhoYouAre && self.named_in_walk,
+                ..Answers::default()
+            };
             self.led = Some(Led {
                 step,
+                heard,
                 ..Led::default()
             });
         }
@@ -3518,6 +3536,50 @@ mod tests {
         // A name taken back by a no is not known either.
         room.walk.heard("Call me Marie.", room.at);
         room.walk.heard("No.", room.at);
+        assert_eq!(room.wait(95 * S, Some(NEAR_MIDDLE)), [PREFERENCES_NOTE]);
+        assert_eq!(room.outcome(Step::WhoYouAre), Some(Outcome::Failed));
+    }
+
+    /// lamp-52e6, build 7071, 27 Oct: a name told while "where you sit"
+    /// was asked (the model kept the face and name then), and nothing more
+    /// said after "who you are" was asked, recorded it failed at its
+    /// give-up. A name told earlier in the walk is heard for it: the give-up
+    /// ends it done and a yes ends it at once, while a no takes it back.
+    /// Without one, it is as before.
+    #[test]
+    fn a_name_told_before_who_you_are_is_heard_for_it() {
+        let named_while_sitting = |name: &str| {
+            let mut room = Room::new(name);
+            let mut said: Vec<String> = Vec::new();
+            while !said.iter().any(|line| line == SIT_NOTE) {
+                said.extend(room.wait(S, Some(NEAR_MIDDLE)));
+            }
+            room.walk.heard("My name is Marie.", room.at);
+            assert_eq!(room.outcome(Step::WhereYouSit), None);
+            while !said.iter().any(|line| line == WHO_NOTE) {
+                said.extend(room.wait(S, Some(NEAR_MIDDLE)));
+            }
+            room
+        };
+        // Nothing said after the ask: its give-up ends it done.
+        let mut room = named_while_sitting("named-before");
+        assert_eq!(room.wait(95 * S, Some(NEAR_MIDDLE)), [PREFERENCES_NOTE]);
+        assert_eq!(room.outcome(Step::WhoYouAre), Some(Outcome::Done));
+        // A yes to the name ends it at once.
+        let mut room = named_while_sitting("named-before-yes");
+        room.walk.heard("Yes, that's right.", room.at);
+        room.wait(S, Some(NEAR_MIDDLE));
+        assert_eq!(room.outcome(Step::WhoYouAre), Some(Outcome::Done));
+        // A no takes it back: not known, as before.
+        let mut room = named_while_sitting("named-before-no");
+        room.walk.heard("No.", room.at);
+        assert_eq!(room.wait(95 * S, Some(NEAR_MIDDLE)), [PREFERENCES_NOTE]);
+        assert_eq!(room.outcome(Step::WhoYouAre), Some(Outcome::Failed));
+        // No name told while sitting: its give-up still fails it.
+        let mut room = Room::new("not-named-before");
+        assert_eq!(room.wait(7 * S, Some(NEAR_MIDDLE)), [SIT_NOTE, SIT_DONE]);
+        room.walk.heard("I'm fine.", room.at);
+        assert_eq!(room.wait(20 * S, Some(NEAR_MIDDLE)), [WHO_NOTE]);
         assert_eq!(room.wait(95 * S, Some(NEAR_MIDDLE)), [PREFERENCES_NOTE]);
         assert_eq!(room.outcome(Step::WhoYouAre), Some(Outcome::Failed));
     }
