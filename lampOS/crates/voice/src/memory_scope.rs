@@ -1,7 +1,7 @@
 //! Caller-owned face observations and immutable per-request memory scope.
 //! No global registry, polling, speaker inference, or session authorization;
 //! a lease is only ever narrowed to the room, never widened. The one late
-//! look is a keep's ([`ScopeLease::keeper_within`]): a line admitted as the
+//! look is for a keep or single-item forget ([`ScopeLease::keeper_within`]): a line admitted as the
 //! room's whose face cache was cold at its start, or went cold before its
 //! end plus [`KEEPER_WAIT`] ([`FaceCache::is_cold`]: within [`COLD_FOR`] of
 //! a voice start, a privacy change, a face remembered or a change in the
@@ -761,8 +761,8 @@ impl ScopeLease {
     /// eyes' view, one armed only during it or whose face was first named
     /// past [`REFRESH_EVERY`] from its start ([`Self::face_at_end_seen`]), a revoked one, a privacy change since admission, a face held only by
     /// its gap, another face seen speaking the line, nobody known by its end
-    /// plus [`KEEPER_WAIT`], or no record by then. Only a keep reads this;
-    /// every read stays the room's.
+    /// plus [`KEEPER_WAIT`], or no record by then. A keep or single-item
+    /// forget reads this; recall and other calls retain the admitted scope.
     pub fn keeper_within(&self, wait: Duration) -> Option<String> {
         self.context.late.as_ref()?;
         let until = Instant::now() + wait;

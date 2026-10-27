@@ -2041,10 +2041,124 @@ fn subject_of<'a>(words: impl IntoIterator<Item = &'a str>) -> Option<String> {
 /// many costs a repeat (nothing matches, nothing is removed); a guess at
 /// the last kept thing costs what the person kept.
 pub fn named_subject(said: &str) -> Option<String> {
-    let lower: String = said.nfc().flat_map(char::to_lowercase).collect();
-    let sentence = lower
-        .split(['.', '!', '?', ';', '\n', '\u{3002}', '\u{ff1f}'])
-        .rfind(|sentence| asks_to_forget(sentence))?;
+    let lower = lower_line(said);
+    // Never a sentence that only says not to forget ("Forget my address.
+    // Don't forget my phone." names the address: [`ask_sentence`]).
+    let sentence = ask_sentence(&lower)?;
+    // The clause that asks names the thing when it names anything ("Forget
+    // my address, the old one" is the address alone: the Reviewer-lead's
+    // HOLD on `f639bf6d1`). When it names nothing, the first later clause
+    // that is not only fillers ([`FILLERS`]: "Forget, um, you know, my
+    // peanut allergy") names it, unless that clause opens with a pronoun
+    // as its subject ([`OPENS_A_CLAUSE`]: "Forget that, I got it wrong" is
+    // a bare forget still). A comma before the request ("Lamp, ...") is
+    // passed over.
+    let clauses: Vec<&str> = sentence.split(',').collect();
+    let Some(at) = clauses.iter().position(|clause| asks_to_forget(clause)) else {
+        return subjects_after_the_ask(sentence);
+    };
+    subjects_after_the_ask(clauses[at]).or_else(|| {
+        let next = clauses[at + 1..].iter().find_map(|clause| {
+            let words: Vec<&str> = clause
+                .split(|c: char| !(c.is_alphanumeric() || c == '\''))
+                .filter(|word| !word.is_empty())
+                .collect();
+            (!words.iter().all(|word| FILLERS.contains(word))).then_some((*clause, words))
+        });
+        let (clause, words) = next?;
+        (!OPENS_A_CLAUSE.contains(&words[0]))
+            .then(|| subjects_after_the_ask(&format!("{} {clause}", clauses[at])))
+            .flatten()
+    })
+}
+
+/// [`named_subject`] with every clause of the sentence read, an
+/// explanation's included: whether a line [`named_subject`] reads as bare
+/// has words that may name something ("Forget it, I mean my address"), so
+/// it is never the last kept thing on a guess ([`ForgetPick::Unclear`]).
+fn named_anywhere(said: &str) -> bool {
+    let lower = lower_line(said);
+    ask_sentence(&lower)
+        .and_then(|sentence| {
+            let words: Vec<&str> = sentence
+                .split(|c: char| !(c.is_alphanumeric() || c == '\''))
+                .filter(|word| !word.is_empty() && !FILLERS.contains(word))
+                .collect();
+            subjects_after_the_ask(&words.join(" "))
+        })
+        .is_some()
+}
+
+/// Words a clause between a forget and its thing may be only of, which name
+/// nothing: "Forget, um, you know, my address." Lower case.
+const FILLERS: &[&str] = &[
+    "um",
+    "umm",
+    "uh",
+    "uhm",
+    "er",
+    "erm",
+    "ah",
+    "oh",
+    "hmm",
+    "mm",
+    "like",
+    "you",
+    "know",
+    "well",
+    "so",
+    "please",
+    "actually",
+    "basically",
+    "lamp",
+    "lamb",
+    "hey",
+    "okay",
+    "ok",
+    "\u{1edd}",
+    "\u{e0}",
+    "\u{1eeb}",
+    "\u{1eeb}m",
+    "nh\u{e9}",
+    "\u{111}i",
+    "\u{1a1}i",
+];
+
+/// Words that open a clause of its own, not a thing named: a pronoun as its
+/// subject ("I got it wrong", "it was wrong", "that's old"), lower case.
+const OPENS_A_CLAUSE: &[&str] = &[
+    "i",
+    "i'm",
+    "i've",
+    "i'd",
+    "i'll",
+    "you",
+    "you're",
+    "we",
+    "we're",
+    "he",
+    "she",
+    "they",
+    "they're",
+    "it",
+    "it's",
+    "that",
+    "that's",
+    "this",
+    "there",
+    "there's",
+    "t\u{f4}i",
+    "m\u{ec}nh",
+    "em",
+    "anh",
+    "ch\u{1ecb}",
+    "n\u{f3}",
+    "c\u{e1}i",
+];
+
+/// [`named_subject`]'s subjects in one clause: the words after its forget
+/// word, split at "and".
+fn subjects_after_the_ask(sentence: &str) -> Option<String> {
     let words: Vec<&str> = sentence
         .split(|character: char| !character.is_alphanumeric())
         .filter(|word| !word.is_empty())
@@ -2201,6 +2315,15 @@ pub enum ForgetPick {
     /// The follow-up the lamp just asked the same person about, by its id
     /// ([`Recent::asked`]): a bare "forget that" right after the ask (#2808).
     Asked(u64),
+    /// The model's own `about` heard only in a clause that keeps or
+    /// denies ("…, but not my phone"): nothing is removed, and the model
+    /// is told they asked to keep it.
+    Kept,
+    /// A heard line read as bare whose other words may name something
+    /// ([`named_anywhere`]): nothing is removed, and the lamp asks which
+    /// thing (#3504 finding N8, reviewer-three's HOLD on `092767dfa`),
+    /// never the last kept thing on a guess.
+    Unclear,
 }
 
 /// What the session did just before a bare forget, for [`pick_forget`].
@@ -2224,10 +2347,7 @@ pub struct Recent {
 /// it."); a bare one just after a follow-up was asked is that follow-up
 /// ([`ForgetPick::Asked`], #2808); any other bare one is [`ForgetPick::Last`].
 pub fn pick_forget(call: &ToolCall, said: Option<&str>, recent: &Recent) -> ForgetPick {
-    if call.name != FORGET
-        || (forget_all_on() && call.args.get("source_id").is_some_and(|id| !id.is_null()))
-        || (forget_about_on() && call.args.get("about").is_some_and(|about| !about.is_null()))
-    {
+    if call.name != FORGET {
         return ForgetPick::AsCalled;
     }
     let model = || {
@@ -2236,6 +2356,44 @@ pub fn pick_forget(call: &ToolCall, said: Option<&str>, recent: &Recent) -> Forg
             .and_then(Value::as_str)
             .and_then(|about| subject_of(words_of(&search_text(about)).iter().map(String::as_str)))
     };
+    // Only from the part of the line that asks to forget, never from a
+    // clause that keeps or denies ("Forget my address, but not my phone":
+    // reviewer-three's P2 on `fe37acd20`). An `about` heard only there is
+    // refused ([`ForgetPick::Kept`]), on every switch.
+    let in_part = |part: &[String], subject: &str| {
+        subject
+            .split(' ')
+            .all(|word| part.iter().any(|said| about_same(said, word)))
+    };
+    let parts = said.map(forget_and_keep_parts);
+    // A line that only says not to forget ("Don't forget my phone.")
+    // forgets nothing, whatever the call.
+    if said.is_some_and(line_only_keeps) {
+        return ForgetPick::Kept;
+    }
+    if let (Some((forgets, keeps)), Some(subject)) = (&parts, model())
+        && !keeps.is_empty()
+        && !in_part(forgets, &subject)
+        && in_part(keeps, &subject)
+    {
+        return ForgetPick::Kept;
+    }
+    if (forget_all_on() && call.args.get("source_id").is_some_and(|id| !id.is_null()))
+        || (forget_about_on() && call.args.get("about").is_some_and(|about| !about.is_null()))
+    {
+        return ForgetPick::AsCalled;
+    }
+    let unclear = || said.is_some_and(named_anywhere);
+    // The model's own `about`, when each of its words was heard in the
+    // line: the one thing of a list it calls `forget` for ("Forget my
+    // address, phone and email" is three calls: address, phone, email),
+    // which the heard line's first thing alone would not name (#3504
+    // finding N8). Never a word that was not said.
+    if let (Some((forgets, _)), Some(subject)) = (&parts, model())
+        && in_part(forgets, &subject)
+    {
+        return ForgetPick::Named(subject);
+    }
     match said {
         Some(said) => named_subject(said),
         None => model(),
@@ -2243,8 +2401,295 @@ pub fn pick_forget(call: &ToolCall, said: Option<&str>, recent: &Recent) -> Forg
     .or_else(|| recent.named.clone())
     .map(ForgetPick::Named)
     .or_else(|| recent.asked.map(ForgetPick::Asked))
-    .unwrap_or(ForgetPick::Last)
+    .unwrap_or_else(|| {
+        if unclear() {
+            ForgetPick::Unclear
+        } else {
+            ForgetPick::Last
+        }
+    })
 }
+
+/// Words that open a new clause of a forget's line, the word staying at
+/// the new clause's start ([`forget_and_keep_parts`]): "but", "and", "or",
+/// "except", "besides", "apart", "nhưng", "trừ", "và", "hoặc".
+const CLAUSE_JOINS: &[&str] = &[
+    "but",
+    "and",
+    "or",
+    "except",
+    "besides",
+    "apart",
+    "nh\u{1b0}ng",
+    "tr\u{1eeb}",
+    "v\u{e0}",
+    "ho\u{1eb7}c",
+];
+
+/// Words skipped at a clause's start before its opener is read: "but
+/// keep …", "and please don't forget …", "nhưng hãy giữ …".
+const CLAUSE_LEADS: &[&str] = &[
+    "but",
+    "and",
+    "or",
+    "so",
+    "then",
+    "please",
+    "just",
+    "also",
+    "nh\u{1b0}ng",
+    "v\u{e0}",
+    "ho\u{1eb7}c",
+    "c\u{f2}n",
+    "h\u{e3}y",
+];
+
+/// A clause's first word (after [`CLAUSE_LEADS`]) that makes it keep:
+/// "keep my phone", "not my phone", "except my phone", "leave my phone",
+/// "giữ …", "trừ …", "ngoài …".
+const KEEP_OPENS: &[&str] = &[
+    "keep",
+    "leave",
+    "not",
+    "except",
+    "besides",
+    "apart",
+    "save",
+    "without",
+    "gi\u{1eef}",
+    "tr\u{1eeb}",
+    "ngo\u{e0}i",
+];
+
+/// Words that, before a clause's forget word, say not to forget it:
+/// "don't forget my phone", "never erase …", "đừng quên …", "đừng xóa …".
+/// Not "no": "No, forget my address" still asks.
+const KEEP_NEGATES: &[&str] = &[
+    "don't",
+    "dont",
+    "not",
+    "never",
+    "won't",
+    "wont",
+    "shouldn't",
+    "shouldnt",
+    "\u{111}\u{1eeb}ng",
+    "kh\u{f4}ng",
+    "ch\u{1edb}",
+    "ch\u{1eb3}ng",
+];
+
+/// `sentence`'s clauses and what each does, for [`forget_and_keep_parts`]:
+/// `Some(true)` keeps, `Some(false)` forgets, `None` goes with the one
+/// before. A clause starts after a separator (`,`, `:`, a dash, `…`) or at
+/// a [`CLAUSE_JOINS`] word. It keeps when it opens (after [`CLAUSE_LEADS`])
+/// with a [`KEEP_OPENS`] word ("…, keep my phone", "…, but not my phone",
+/// "…, except my phone") or when a [`KEEP_NEGATES`] word comes before its
+/// forget word ("Don't forget my phone, …", "…, nhưng đừng quên số điện
+/// thoại"), wherever the clause sits. It forgets when it has a forget word
+/// not negated so.
+fn clauses_of(sentence: &str) -> (Vec<Vec<&str>>, Vec<Option<bool>>) {
+    let mut clauses: Vec<Vec<&str>> = vec![];
+    for piece in sentence.split([
+        ',', ':', '\u{2014}', '\u{2013}', '\u{2026}', '(', ')', '\u{ff0c}', '\u{3001}',
+    ]) {
+        let mut clause: Vec<&str> = vec![];
+        for word in piece
+            .split(|c: char| !(c.is_alphanumeric() || c == '\''))
+            .filter(|word| !word.is_empty())
+        {
+            if CLAUSE_JOINS.contains(&word) && !clause.is_empty() {
+                clauses.push(std::mem::take(&mut clause));
+            }
+            clause.push(word);
+        }
+        if !clause.is_empty() {
+            clauses.push(clause);
+        }
+    }
+    let kinds = clauses
+        .iter()
+        .map(|clause| {
+            let opener = clause.iter().find(|word| !CLAUSE_LEADS.contains(word));
+            if opener.is_some_and(|word| KEEP_OPENS.contains(word)) {
+                return Some(true);
+            }
+            let verb = clause.iter().position(|word| forget_word(word))?;
+            Some(keeps_before(&clause[..verb]))
+        })
+        .collect();
+    (clauses, kinds)
+}
+
+/// Whether the words of a clause before its forget word say not to forget
+/// ([`clauses_of`]): a [`KEEP_NEGATES`] word ("don't forget", "đừng quên")
+/// that is not in a polite request ([`asks_politely`]: "Why don't you
+/// forget …"), or "I" as the forget's subject ("Why would I forget my
+/// phone?"), which asks the lamp nothing.
+fn keeps_before(words: &[&str]) -> bool {
+    words.last() == Some(&"i")
+        || words
+            .iter()
+            .enumerate()
+            .any(|(at, word)| KEEP_NEGATES.contains(word) && !asks_politely(words, at))
+}
+
+/// Pronouns that may stand between "sao" and "không" ("sao bạn không quên
+/// … đi").
+const POLITE_YOU_KEPT: &[&str] = &[
+    "b\u{1ea1}n",
+    "em",
+    "anh",
+    "ch\u{1ecb}",
+    "c\u{1ead}u",
+    "m\u{ec}nh",
+];
+
+/// Whether the negation at `at` in `words` is part of a polite request to
+/// forget, not a keep (reviewer-three's P2 on `63f85d9da`): "why don't
+/// you …", "why not …", "won't you …", "can't you …", "couldn't you …",
+/// "sao không … đi", "sao bạn không …". Never "can / could / would / will
+/// you not forget …", which asks to keep (reviewer-three's P2 on
+/// `ab4ad19c3`).
+fn asks_politely(words: &[&str], at: usize) -> bool {
+    let word = words[at];
+    let before = |back: usize| at.checked_sub(back).map(|index| words[index]);
+    let next = words.get(at + 1).copied();
+    (before(1) == Some("why") && ["don't", "dont", "not"].contains(&word))
+        || ([
+            "won't", "wont", "can't", "cant", "couldn't", "couldnt", "wouldn't", "wouldnt",
+        ]
+        .contains(&word)
+            && next == Some("you"))
+        || (word == "kh\u{f4}ng"
+            && (before(1) == Some("sao")
+                || (before(1).is_some_and(|you| POLITE_YOU_KEPT.contains(&you))
+                    && before(2) == Some("sao"))))
+}
+
+/// `said` NFC lower case, its typographic apostrophe a plain one, to be
+/// split at [`SENTENCE_ENDS`].
+fn lower_line(said: &str) -> String {
+    said.nfc()
+        .flat_map(char::to_lowercase)
+        .map(|c| if c == '\u{2019}' { '\'' } else { c })
+        .collect()
+}
+
+/// Whether `sentence` only says not to forget: it has a forget word, and
+/// each one is negated ("Don't forget my phone.", "Đừng quên số điện
+/// thoại."), so nothing of it is ever the thing forgotten (reviewer-three's
+/// P2 on `c4a596bd3`).
+fn only_keeps(sentence: &str) -> bool {
+    let (clauses, kinds) = clauses_of(sentence);
+    let negated: Vec<bool> = clauses
+        .iter()
+        .zip(&kinds)
+        .filter(|(clause, _)| clause.iter().any(|word| forget_word(word)))
+        .map(|(_, kind)| *kind == Some(true))
+        .collect();
+    !negated.is_empty() && negated.iter().all(|kept| *kept)
+}
+
+/// Whether `word` (NFC lower case) is a forget word ([`ASKS`],
+/// [`ASKS_KEPT`]).
+fn forget_word(word: &str) -> bool {
+    ASKS.contains(&about_fold(word).as_str()) || ASKS_KEPT.contains(&word)
+}
+
+/// The last sentence of `lower` that asks to forget and is not
+/// [`only_keeps`]: "Forget my address. Don't forget my phone." asks in its
+/// first sentence.
+fn ask_sentence(lower: &str) -> Option<&str> {
+    lower
+        .split(SENTENCE_ENDS)
+        .rfind(|sentence| asks_to_forget(sentence) && !only_keeps(sentence))
+}
+
+/// Where a heard line's sentences end.
+const SENTENCE_ENDS: [char; 7] = ['.', '!', '?', ';', '\n', '\u{3002}', '\u{ff1f}'];
+
+/// Whether every sentence of `said` that asks to forget only says not to
+/// ([`only_keeps`]): nothing in it is forgotten.
+fn line_only_keeps(said: &str) -> bool {
+    let lower = lower_line(said);
+    ask_sentence(&lower).is_none() && lower.split(SENTENCE_ENDS).any(only_keeps)
+}
+
+/// The words of `said` read clause by clause ([`clauses_of`]): what its
+/// sentences that ask without a negation (as [`ask_sentence`] reads them)
+/// ask to forget, every one of them ("Forget my address. Forget my
+/// phone."), and what the line keeps (none when it keeps nothing): their
+/// keeping clauses and the keeping clauses of every other sentence
+/// ("Forget my address. Don't forget my phone."). In an asking sentence a
+/// clause that neither keeps
+/// nor forgets goes with the one before it (a list: "address, phone and
+/// email"), the clauses before the first forget or keep going with the
+/// forget. A negation inside the forgotten thing ("Forget that I don't eat
+/// pork", "Quên rằng tôi không ăn thịt heo") is part of that thing, never a
+/// keeping clause (reviewer-three's HOLD on `9ba4fcddc`). A line that only
+/// keeps ([`line_only_keeps`]) forgets nothing and keeps all of it. Folded
+/// as [`about_words`] compares them.
+fn forget_and_keep_parts(said: &str) -> (Vec<String>, Vec<String>) {
+    let lower = lower_line(said);
+    let fold = |words: &[&str]| words_of(&search_text(&words.join(" ")));
+    let split = |sentence: &str| -> (Vec<String>, Vec<String>) {
+        let (clauses, kinds) = clauses_of(sentence);
+        let all: Vec<&str> = clauses.iter().flatten().copied().collect();
+        // A phrase that asks with no forget word ("don't keep my phone",
+        // "stop remembering …") keeps nothing.
+        if !kinds.contains(&Some(false)) && !kinds.contains(&Some(true)) {
+            return (fold(&all), Vec::new());
+        }
+        let (mut forgets, mut keeps): (Vec<&str>, Vec<&str>) = (vec![], vec![]);
+        let mut keeping = false;
+        for (clause, kind) in clauses.iter().zip(&kinds) {
+            if let Some(kind) = kind {
+                keeping = *kind;
+            }
+            if keeping { &mut keeps } else { &mut forgets }.extend(clause);
+        }
+        (fold(&forgets), fold(&keeps))
+    };
+    if ask_sentence(&lower).is_none() {
+        if line_only_keeps(said) {
+            let kept: Vec<&str> = lower
+                .split(SENTENCE_ENDS)
+                .filter(|sentence| only_keeps(sentence))
+                .collect();
+            return (Vec::new(), fold(&kept));
+        }
+        return (Vec::new(), Vec::new());
+    }
+    // Every sentence that asks without a negation adds what it forgets
+    // ("Forget my address. Forget my phone." forgets both, a call for
+    // each); every other sentence adds what it keeps.
+    let (mut forgets, mut keeps) = (Vec::new(), Vec::new());
+    for sentence in lower.split(SENTENCE_ENDS) {
+        if asks_to_forget(sentence) && !only_keeps(sentence) {
+            let (forget, keep) = split(sentence);
+            forgets.extend(forget);
+            keeps.extend(keep);
+        } else if clauses_of(sentence).1.contains(&Some(true)) {
+            keeps.extend(split(sentence).1);
+        }
+    }
+    (forgets, keeps)
+}
+
+/// The lamp's mark on a forget whose `about` was heard only in a keeping
+/// clause ([`ForgetPick::Kept`]): never sent to the memory.
+pub const HEARD_KEPT: &str = "heard_kept";
+
+/// What the model is told of it.
+pub const FORGET_KEPT: &str = "Not forgotten: they asked you to keep this, not to forget it. Forget only what they asked to forget, and do not call forget for this again.";
+
+/// The lamp's mark on a forget whose heard line was [`ForgetPick::Unclear`]:
+/// never sent to the memory.
+pub const HEARD_UNCLEAR: &str = "heard_unclear";
+
+/// What the model is told of an unclear forget: nothing removed, ask once.
+pub const FORGET_UNCLEAR: &str = "Nothing was forgotten: I couldn't tell which thing they meant to forget. Ask them once, in a few words, which thing, and forget it only when they name it.";
 
 /// The lamp's guard on a `forget` ([`pick_forget`]) in `person`'s scope,
 /// with `carry` what was named just before: a named pick is the call as it
@@ -2275,7 +2720,9 @@ pub fn named_forget_with(
     if call.name == FORGET
         && recent.named.is_none()
         && call.args.get("source_id").is_some_and(|id| !id.is_null())
-        && said.is_some_and(|said| asks_to_forget(said) && named_subject(said).is_none())
+        && said.is_some_and(|said| {
+            asks_to_forget(said) && !line_only_keeps(said) && named_subject(said).is_none()
+        })
     {
         let mut args = call.args.clone();
         args[HEARD_BARE] = json!(true);
@@ -2302,6 +2749,20 @@ pub fn named_forget_with(
                 id: call.id.clone(),
                 name: call.name.clone(),
                 args,
+            });
+        }
+        ForgetPick::Unclear => {
+            return Some(ToolCall {
+                id: call.id.clone(),
+                name: call.name.clone(),
+                args: json!({ HEARD_UNCLEAR: true }),
+            });
+        }
+        ForgetPick::Kept => {
+            return Some(ToolCall {
+                id: call.id.clone(),
+                name: call.name.clone(),
+                args: json!({ HEARD_KEPT: true }),
             });
         }
         _ => return None,
@@ -2480,6 +2941,18 @@ fn run_for_guarded(
 ) -> (Value, bool) {
     if !scope_current(lease) {
         return (gone(), false);
+    }
+    // A forget whose heard line may name something the lamp could not read
+    // removes nothing: the lamp asks which (#3504 finding N8).
+    if call.name == FORGET && call.args.get(HEARD_KEPT) == Some(&json!(true)) {
+        eprintln!("lamp-voice provider: a forget of what the line asked to keep is not run");
+        return (json!({"forgotten": false, "note": FORGET_KEPT}), true);
+    }
+    if call.name == FORGET && call.args.get(HEARD_UNCLEAR) == Some(&json!(true)) {
+        eprintln!(
+            "lamp-voice provider: a forget whose line names something unread is not run: asked which"
+        );
+        return (json!({"forgotten": false, "note": FORGET_UNCLEAR}), true);
     }
     // With `LAMP_MEMORY_PERSONAL_NEEDS_FACE`, nothing about a person is kept
     // while nobody is known, on either memory client.
@@ -2706,6 +3179,30 @@ pub(crate) fn told_kept(mut told: Value, id: u64, replaces: bool) -> Value {
     told
 }
 
+/// A single-item forget from an unknown speaker uses the room's memory.
+/// Tell the model that scope without repeating what was kept or assuming
+/// which guest originally said it.
+fn room_forget_told(mut told: Value, person: Option<&str>, on: bool) -> Value {
+    if on && person.is_none() {
+        match told.get("forgotten").and_then(Value::as_bool) {
+            Some(true) => {
+                told["scope"] = json!("room");
+                told["scope_note"] = json!(
+                    "Say that it was removed from what this room remembers. Do not say that someone's personal memory was cleared."
+                );
+            }
+            Some(false) => {
+                told["scope"] = json!("room");
+                told["scope_note"] = json!(
+                    "Say that nothing matching was removed from what this room remembers. A known face can also ask to forget their own memory."
+                );
+            }
+            None => {}
+        }
+    }
+    told
+}
+
 /// What to tell the model for the memory's answer, in `person`'s scope
 /// (`None`: the room's). `None` for one that is not the answer to that
 /// request.
@@ -2717,7 +3214,7 @@ pub(crate) fn answer_for(
     person: Option<&str>,
 ) -> Option<Value> {
     if answer.get("ok").and_then(Value::as_bool)? {
-        return Some(match name {
+        let told = match name {
             REMEMBER => {
                 answer.get("id")?;
                 // #2176: `existing` comes only with `LAMP_MEMORY_REMEMBER_ONCE`'s
@@ -2783,6 +3280,11 @@ pub(crate) fn answer_for(
                     json!({"found": found})
                 }
             }
+        };
+        return Some(if name == FORGET {
+            room_forget_told(told, person, needs_face::on())
+        } else {
+            told
         });
     }
     match answer.get("error").and_then(Value::as_str)? {
@@ -6450,7 +6952,7 @@ impl DaysClient {
             }
             FORGET_EVERYTHING if self.forget_all.load(Ordering::Acquire) => {
                 return (
-                    json!({"forgotten": false, "note": "I can forget everything only for someone I know by face, and I don't know who this is. I can forget one thing at a time instead."}),
+                    json!({"forgotten": false, "note": "I can forget everything only for someone I know by face. I don't know who this is. I can forget one thing kept in this room at a time instead."}),
                     true,
                 );
             }
@@ -6463,13 +6965,9 @@ impl DaysClient {
                     && call.args.get("about").is_some_and(|about| !about.is_null()) =>
             {
                 let until = started + deadline;
-                return self.forget_about(
-                    &call.args["about"],
-                    person,
-                    until,
-                    lease,
-                    heard_named(call),
-                );
+                let (told, answered) =
+                    self.forget_about(&call.args["about"], person, until, lease, heard_named(call));
+                return (room_forget_told(told, person, needs_face::on()), answered);
             }
             // "Forget that" right after a follow-up: the entry it was about
             // (the first builder, 03:29), as [`pick_forget`] picks it, and
@@ -10632,6 +11130,334 @@ mod tests {
             None,
         );
         assert_eq!(told, json!({"forgotten": true}));
+    }
+
+    /// Reviewer-three's P2 on `fe37acd20`: a call's `about` heard only in a
+    /// clause that keeps ("but not", "keep", "except") is refused, never
+    /// run; what the line asks to forget runs.
+    #[test]
+    fn a_call_for_what_the_line_keeps_is_refused() {
+        for said in [
+            "Forget my address, but not my phone.",
+            "Forget my address, keep my phone.",
+            "Forget my address, except my phone.",
+            "Quên địa chỉ của tôi, nhưng đừng quên số điện thoại.",
+        ] {
+            let address = if said.starts_with("Quên") {
+                "địa chỉ"
+            } else {
+                "address"
+            };
+            let phone = if said.starts_with("Quên") {
+                "điện thoại"
+            } else {
+                "phone"
+            };
+            let forget = |about: &str| call(FORGET, json!({ "about": about }));
+            // Named as the store compares it: folded, đ as d.
+            let named = subject_of(words_of(&search_text(address)).iter().map(String::as_str));
+            assert_eq!(
+                pick_forget(&forget(address), Some(said), &Recent::default()),
+                ForgetPick::Named(named.unwrap()),
+                "{said}"
+            );
+            assert_eq!(
+                pick_forget(&forget(phone), Some(said), &Recent::default()),
+                ForgetPick::Kept,
+                "{said}"
+            );
+            let kept = named_forget_with(&forget(phone), Some(said), Some(MAI), &Carry::default())
+                .unwrap();
+            assert_eq!(kept.args, json!({ HEARD_KEPT: true }));
+            // Never sent: nobody listens on this socket.
+            let socket = std::env::temp_dir().join("lamp-remember-nobody-kept.sock");
+            let (told, answered) = run_for(&socket, &kept, Duration::from_secs(1), Some(MAI));
+            assert!(answered);
+            assert_eq!(
+                told,
+                json!({"forgotten": false, "note": FORGET_KEPT}),
+                "{said}"
+            );
+        }
+        // A line that asks with no forget word keeps nothing.
+        assert_eq!(
+            pick_forget(
+                &call(FORGET, json!({"about": "phone"})),
+                Some("Don't keep my phone number."),
+                &Recent::default()
+            ),
+            ForgetPick::Named("phone".into())
+        );
+    }
+
+    /// Reviewer-three's HOLD on `9ba4fcddc`: a keeping word opens a keeping
+    /// clause only at a clause's start ("…, keep my phone", "…, but not my
+    /// phone") or before its forget word ("Don't forget my phone, …"),
+    /// wherever that clause sits. A negation inside the forgotten thing is
+    /// part of that thing.
+    #[test]
+    fn a_negation_inside_the_forgotten_thing_is_that_thing() {
+        let forget = |about: &str| call(FORGET, json!({ "about": about }));
+        let named = |about: &str| {
+            ForgetPick::Named(
+                subject_of(words_of(&search_text(about)).iter().map(String::as_str)).unwrap(),
+            )
+        };
+        for (said, about) in [
+            ("Forget that I don't eat pork.", "pork"),
+            ("Forget that I never drink coffee.", "coffee"),
+            ("Forget that I never liked coffee.", "coffee"),
+            ("Forget that I'm not a vegetarian anymore.", "vegetarian"),
+            ("Forget what I said about not drinking.", "drinking"),
+            ("Quên rằng tôi không ăn thịt heo.", "thịt heo"),
+            ("Quên là tôi không ăn thịt.", "ăn thịt"),
+            ("Don't forget my phone, but forget my address.", "address"),
+            ("Keep my phone number, but forget my address.", "address"),
+            ("Forget my address and keep my phone.", "address"),
+        ] {
+            assert_eq!(
+                pick_forget(&forget(about), Some(said), &Recent::default()),
+                named(about),
+                "{said}"
+            );
+            let sent = named_forget_with(&forget(about), Some(said), Some(MAI), &Carry::default())
+                .unwrap();
+            assert_eq!(
+                Some(sent.args["about"].clone()),
+                match named(about) {
+                    ForgetPick::Named(subject) => Some(json!(subject)),
+                    _ => None,
+                },
+                "{said}"
+            );
+        }
+        for (said, about) in [
+            ("Don't forget my phone, but forget my address.", "phone"),
+            (
+                "Keep my phone number, but forget my address.",
+                "phone number",
+            ),
+            ("Forget my address and keep my phone.", "phone"),
+            ("Forget my address but not my phone.", "phone"),
+            (
+                "Forget my address, and please don't forget my phone.",
+                "phone",
+            ),
+        ] {
+            assert_eq!(
+                pick_forget(&forget(about), Some(said), &Recent::default()),
+                ForgetPick::Kept,
+                "{said}"
+            );
+        }
+    }
+
+    /// Reviewer-three's P2 on `c4a596bd3`: a sentence that only says not to
+    /// forget ("Don't forget my phone.", "Đừng quên số điện thoại.") keeps
+    /// its things wherever it sits; the thing forgotten comes only from a
+    /// sentence that asks without a negation.
+    #[test]
+    fn a_sentence_that_says_not_to_forget_keeps_its_things() {
+        let forget = |about: &str| call(FORGET, json!({ "about": about }));
+        let folded =
+            |text: &str| subject_of(words_of(&search_text(text)).iter().map(String::as_str));
+        for (said, address, phone) in [
+            (
+                "Forget my address. Don't forget my phone.",
+                "address",
+                "phone",
+            ),
+            (
+                "Forget my address. But don't forget my phone.",
+                "address",
+                "phone",
+            ),
+            (
+                "Don't forget my phone. Forget my address.",
+                "address",
+                "phone",
+            ),
+            (
+                "Quên địa chỉ của tôi. Đừng quên số điện thoại.",
+                "địa chỉ",
+                "số điện thoại",
+            ),
+            (
+                "Đừng quên số điện thoại. Quên địa chỉ của tôi.",
+                "địa chỉ",
+                "số điện thoại",
+            ),
+        ] {
+            // The line's own thing as heard; a call's `about` as the store
+            // compares it (folded, đ as d).
+            assert_eq!(named_subject(said).as_deref(), Some(address), "{said}");
+            for (call, named) in [
+                (forget(address), folded(address).unwrap()),
+                (call(FORGET, json!({})), address.to_owned()),
+            ] {
+                assert_eq!(
+                    pick_forget(&call, Some(said), &Recent::default()),
+                    ForgetPick::Named(named),
+                    "{said}"
+                );
+            }
+            assert_eq!(
+                pick_forget(&forget(phone), Some(said), &Recent::default()),
+                ForgetPick::Kept,
+                "{said}"
+            );
+        }
+        // Two sentences that both ask: a call for each runs, and the
+        // line's own thing is the last one's.
+        for said in [
+            "Forget my address. Forget my phone.",
+            "Forget my address. Don't forget my email. Forget my phone.",
+        ] {
+            for about in ["address", "phone"] {
+                assert_eq!(
+                    pick_forget(&forget(about), Some(said), &Recent::default()),
+                    ForgetPick::Named(about.into()),
+                    "{said}"
+                );
+                let sent =
+                    named_forget_with(&forget(about), Some(said), Some(MAI), &Carry::default())
+                        .unwrap();
+                assert_eq!(sent.args["about"], about, "{said}");
+            }
+            assert_eq!(
+                pick_forget(&call(FORGET, json!({})), Some(said), &Recent::default()),
+                ForgetPick::Named("phone".into()),
+                "{said}"
+            );
+        }
+        assert_eq!(
+            pick_forget(
+                &forget("email"),
+                Some("Forget my address. Don't forget my email. Forget my phone."),
+                &Recent::default()
+            ),
+            ForgetPick::Kept
+        );
+        // A line that only says not to forget forgets nothing.
+        for said in ["Don't forget my phone.", "Đừng quên số điện thoại."] {
+            assert_eq!(named_subject(said), None, "{said}");
+            for call in [
+                forget("phone"),
+                call(FORGET, json!({})),
+                call(FORGET, json!({"source_id": 3})),
+            ] {
+                assert_eq!(
+                    pick_forget(&call, Some(said), &Recent::default()),
+                    ForgetPick::Kept,
+                    "{said}"
+                );
+                let sent =
+                    named_forget_with(&call, Some(said), Some(MAI), &Carry::default()).unwrap();
+                assert_eq!(sent.args, json!({ HEARD_KEPT: true }), "{said}");
+            }
+        }
+        // A negation inside the thing is still that thing.
+        assert_eq!(
+            pick_forget(
+                &forget("pork"),
+                Some("Forget that I don't eat pork."),
+                &Recent::default()
+            ),
+            ForgetPick::Named("pork".into())
+        );
+    }
+
+    /// Reviewer-three's P2 on `63f85d9da`: a negation in a polite request
+    /// ("Why don't you forget my address?") asks to forget; "I" as the
+    /// forget's subject ("Why would I forget my phone?") asks nothing.
+    #[test]
+    fn a_polite_request_to_forget_forgets() {
+        let forget = |about: &str| call(FORGET, json!({ "about": about }));
+        let folded =
+            |text: &str| subject_of(words_of(&search_text(text)).iter().map(String::as_str));
+        for (said, address) in [
+            ("Why don't you forget my address?", "address"),
+            ("Why not forget my address?", "address"),
+            ("Won't you forget my address?", "address"),
+            ("Can't you forget my address?", "address"),
+            ("Couldn't you forget my address?", "address"),
+            ("Sao không quên địa chỉ của tôi đi?", "địa chỉ"),
+            ("Sao bạn không quên địa chỉ của tôi?", "địa chỉ"),
+        ] {
+            assert_eq!(named_subject(said).as_deref(), Some(address), "{said}");
+            for (call, named) in [
+                (forget(address), folded(address).unwrap()),
+                (call(FORGET, json!({})), address.to_owned()),
+            ] {
+                assert_eq!(
+                    pick_forget(&call, Some(said), &Recent::default()),
+                    ForgetPick::Named(named),
+                    "{said}"
+                );
+            }
+        }
+        // A plain "don't forget", and "can / could / would / will you not
+        // forget", still keep.
+        for (said, about) in [
+            ("Don't forget my phone.", "phone"),
+            (
+                "Can you not forget my phone number this time?",
+                "phone number",
+            ),
+            ("Could you not forget my birthday this year?", "birthday"),
+            (
+                "Would you not forget my phone number, please?",
+                "phone number",
+            ),
+            ("Will you not forget my anniversary?", "anniversary"),
+        ] {
+            for call in [forget(about), call(FORGET, json!({}))] {
+                assert_eq!(
+                    pick_forget(&call, Some(said), &Recent::default()),
+                    ForgetPick::Kept,
+                    "{said}"
+                );
+            }
+        }
+        // Their own forgetting asks the lamp nothing: nothing is removed.
+        let said = "Why would I forget my phone?";
+        assert_eq!(named_subject(said), None);
+        for call in [forget("phone"), call(FORGET, json!({}))] {
+            assert_eq!(
+                pick_forget(&call, Some(said), &Recent::default()),
+                ForgetPick::Kept,
+                "{call:?}"
+            );
+        }
+    }
+
+    /// "Forget my address, phone and email": the heard line names the
+    /// address, and the model calls `forget` once for each item. Each call
+    /// is its own thing, as each `about` was heard; an `about` with a word
+    /// not said is the heard line's thing instead (#3504 finding N8).
+    #[test]
+    fn a_list_forgotten_by_one_call_per_item_forgets_each_item() {
+        let said = "Forget my address, phone and email.";
+        for (about, subject) in [
+            ("address", "address"),
+            ("phone", "phone"),
+            ("email", "email"),
+            ("passport", "address"),
+        ] {
+            let call = call(FORGET, json!({ "about": about }));
+            assert_eq!(
+                pick_forget(&call, Some(said), &Recent::default()),
+                ForgetPick::Named(subject.into()),
+                "{about}"
+            );
+            let named = named_forget_with(&call, Some(said), Some(MAI), &Carry::default()).unwrap();
+            assert_eq!(named.args["about"], subject, "{about}");
+        }
+        // With no `about`, the heard line's own thing.
+        assert_eq!(
+            pick_forget(&call(FORGET, json!({})), Some(said), &Recent::default()),
+            ForgetPick::Named("address".into())
+        );
     }
 
     /// A forget's arguments are journalled with ids and counts only, never
@@ -20101,12 +20927,26 @@ mod tests {
                 "màu yêu thích",
             ),
             ("My colour is violet. Forget my bicycle.", "bicycle"),
+            ("Forget it, the plant schedule.", "plant schedule"),
+            ("Forget, like, my address.", "address"),
+            ("Forget, you know, my address.", "address"),
+            ("Forget, um, my peanut allergy.", "peanut allergy"),
+            ("Forget, er, the plant schedule.", "plant schedule"),
+            ("Forget, um, you know, my peanut allergy.", "peanut allergy"),
+            ("Forget my address, phone and email.", "address"),
+            ("Forget my address, the old one.", "address"),
+            ("Forget, my peanut allergy.", "peanut allergy"),
+            ("Can you forget, my sister's birthday?", "sister birthday"),
+            ("Delete, the dentist appointment.", "dentist appointment"),
+            ("Lamp, forget my colour, I got it wrong.", "colour"),
         ] {
             assert_eq!(named_subject(said).as_deref(), Some(subject), "{said}");
         }
         for said in [
             "forget that",
             "Forget that.",
+            "Forget that, I got it wrong.",
+            "Forget it, it was wrong.",
             "forget it",
             "Forget what I just said.",
             "Please forget what I just told you, lamp.",
@@ -20415,6 +21255,87 @@ mod tests {
             ("colour", "color"),
         ] {
             assert!(!about_same(one, other), "{one} {other}");
+        }
+    }
+
+    #[test]
+    fn an_unknown_speakers_forget_result_names_the_room_scope() {
+        let removed = room_forget_told(json!({"forgotten": true}), None, true);
+        assert_eq!(removed["scope"], "room");
+        assert!(
+            removed["scope_note"]
+                .as_str()
+                .unwrap()
+                .contains("removed from what this room")
+        );
+        let missing = room_forget_told(json!({"forgotten": false}), None, true);
+        assert!(
+            missing["scope_note"]
+                .as_str()
+                .unwrap()
+                .contains("nothing matching")
+        );
+        assert!(
+            room_forget_told(json!({"forgotten": true}), Some(MAI), true)
+                .get("scope")
+                .is_none()
+        );
+        assert!(
+            room_forget_told(json!({"forgotten": true}), None, false)
+                .get("scope")
+                .is_none()
+        );
+    }
+
+    /// A room guest's plain "Forget that." runs on the room's last kept
+    /// item, read from the request's own line as the spoken route reads it.
+    /// "Forget that, I got it wrong." and "Forget it, I mean my address."
+    /// have words that may name something, so nothing is removed on a guess:
+    /// the lamp asks which (reviewer-three's HOLD on `092767dfa`).
+    #[test]
+    fn an_unknown_speakers_bare_forget_runs_and_an_unclear_one_asks() {
+        let now = Instant::now();
+        let mut thread = crate::thread::Thread::new();
+        thread.person("Forget that.", true, now);
+        thread.hold_line(91, now);
+        let said = thread.heard_for(91, now);
+        assert_eq!(said.as_deref(), Some("Forget that."));
+        let model = call(FORGET, json!({}));
+        // Nothing named and nothing to ask: the forget stays the model's,
+        // at most marked bare for the memory to check (#3860).
+        let routed = named_forget_with(&model, said.as_deref(), None, &Carry::default())
+            .unwrap_or_else(|| model.clone());
+        for named in ["about", HEARD_NAMED, HEARD_UNCLEAR, HEARD_KEPT] {
+            assert!(routed.args.get(named).is_none(), "{named}: {}", routed.args);
+        }
+        let (socket, served) = memory("forget-room-afterthought", 1, |request| {
+            assert_eq!(request["op"], "forget_last");
+            assert!(request.get("person").is_none());
+            json!({"ok":true,"removed":{"kind":"kept","id":4,"at_unix_ms":NOW}})
+        });
+        let client = DaysClient::new(socket.clone()).unwrap();
+        let (told, answered) = client.run_at(&routed, FIRST_READ, NOW, Some(&EAST), None);
+        assert!(answered && told["forgotten"] == true, "{told}");
+        served.join().unwrap();
+        drop(client);
+        std::fs::remove_file(&socket).unwrap();
+        for said in [
+            "Forget that, I got it wrong.",
+            "Forget it, I mean my address.",
+        ] {
+            assert_eq!(
+                pick_forget(&model, Some(said), &Recent::default()),
+                ForgetPick::Unclear,
+                "{said}"
+            );
+            let unclear = named_forget_with(&model, Some(said), None, &Carry::default())
+                .expect("marked unclear");
+            assert_eq!(unclear.args[HEARD_UNCLEAR], true);
+            // Never sent to the memory: nobody listens on this socket.
+            let (told, answered) = run_for(&socket, &unclear, Duration::from_secs(1), None);
+            assert!(answered, "{said}");
+            assert_eq!(told["forgotten"], false, "{said}");
+            assert_eq!(told["note"], FORGET_UNCLEAR, "{said}");
         }
     }
 

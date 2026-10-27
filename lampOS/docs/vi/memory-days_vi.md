@@ -56,6 +56,48 @@ như «tránh món đó» có thể còn lại. `forget_all` và `forget_person`
 toàn bộ phạm vi được yêu cầu; mọi lệnh quên vẫn vô hiệu hóa ghi chú phiên và
 lượt ghi đang chờ.
 
+Khi chưa nhận diện được mặt người nói, lệnh quên một thông tin cụ thể tìm
+trong ký ức chung của phòng. Quan sát cũ có thể đã lưu lời của khách tại đó;
+nếu tìm thấy, lamp xóa mục ấy và nói rõ rằng chỉ ký ức của phòng được thay đổi.
+Nếu không tìm thấy, lamp báo không có mục phù hợp, không nhận là đã xóa ký ức
+riêng của ai. Tuyến hội thoại thứ hai chờ tối đa 300 ms để camera nhận diện
+mặt đến muộn trước khi chọn phạm vi của người đó hay của phòng. Lệnh quên
+toàn bộ ký ức riêng của một người vẫn cần nhận diện được mặt.
+Khi mệnh đề có lệnh quên đã nêu một thứ, chỉ thứ đó được quên: «Quên địa
+chỉ của tôi, cái cũ» chỉ quên địa chỉ, không bao giờ quên những thứ «cũ».
+Khi nó không nêu gì, mệnh đề đầu tiên sau dấu phẩy không chỉ có từ đệm
+(«ờ», «à», «um», «you know») nêu thứ cần quên, trừ khi nó mở đầu bằng một
+đại từ làm chủ ngữ: «Quên điều đó, tôi nói sai rồi» vẫn là lệnh quên không
+nêu tên.
+Một danh sách («Quên địa chỉ, số điện thoại và email của tôi») được để cho
+mô hình: nó gọi `forget` một lần cho mỗi thứ, và `about` của mỗi lần gọi có
+mọi từ đã được nghe trong phần yêu cầu quên của câu thì là thứ của lần gọi
+đó. Câu được đọc theo từng mệnh đề, một mệnh đề bắt đầu sau dấu phẩy, dấu
+hai chấm, gạch ngang hoặc ở một từ nối («nhưng», «trừ», «và», «but», «and»,
+«except» …). Một mệnh đề là phần giữ lại khi nó mở đầu bằng một từ giữ lại
+(«giữ», «trừ», «keep», «not», «except» …, sau «nhưng», «hãy», «but»,
+«please» …) hoặc khi có một từ phủ định trước từ quên của nó («đừng quên»,
+«don't forget»), ở bất kỳ vị trí nào; mệnh đề không có cả hai đi theo mệnh
+đề trước nó. Với «Quên địa chỉ của tôi, nhưng đừng quên số điện thoại», lần
+gọi quên số điện thoại bị từ chối, không xóa gì. Một từ phủ định nằm trong
+chính thứ cần quên là một phần của thứ đó: «Quên rằng tôi không ăn thịt heo»
+vẫn quên điều đó. Các câu cũng tách mệnh đề: một câu mà mọi từ quên đều bị
+phủ định («Đừng quên số điện thoại.», «Don't forget my phone.») chỉ giữ lại,
+ở bất kỳ vị trí nào, và thứ cần quên chỉ đến từ câu cuối cùng yêu cầu quên
+mà không có từ phủ định: «Quên địa chỉ của tôi. Đừng quên số điện thoại.»
+quên địa chỉ và giữ số điện thoại; mỗi câu yêu cầu quên không có từ phủ
+định đều thêm thứ nó quên, nên với «Quên địa chỉ của tôi. Quên số điện
+thoại.» mỗi lần gọi đều chạy; một câu chỉ giữ lại thì không xóa gì. Một từ
+phủ định trong lời nhờ lịch sự vẫn là yêu cầu quên («Sao không quên địa chỉ
+của tôi đi?», «Sao bạn không quên …?», «Why don't you forget …?»; không bao giờ «Can / Could / Would / Will you
+not forget …?», vốn là lời nhờ giữ lại), còn «I»
+làm chủ ngữ của từ quên («Why would I forget my phone?») không yêu cầu gì,
+nên không xóa gì. Một câu đọc ra không nêu tên nhưng các
+từ khác có thể nêu một thứ («Quên nó đi, ý tôi là địa chỉ») không bao giờ
+xóa thứ được giữ gần nhất theo phỏng đoán: không xóa gì, và đèn hỏi lại một
+lần là thứ nào. Chỉ câu không nêu tên rõ ràng («quên cái đó đi») mới xóa thứ
+được giữ gần nhất.
+
 ## Nhật ký dừng sau một lệnh quên, rồi chạy lại
 
 Một lệnh quên đã xác nhận dừng việc ghi nhật ký của voice. Đây là chốt chặn

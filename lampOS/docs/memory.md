@@ -819,6 +819,52 @@ passed. Tests: the notes' exact texts in `remember::tests`.
     favourite colour." names "favourite colour"; "quên màu yêu thích của
     tôi" names "màu yêu thích"; "forget that", "forget what I just said",
     "never mind", "quên cái đó đi" and "quên điều vừa nói" name nothing.
+    The clause that asks names the thing when it names anything: "Forget
+    my address, the old one" names the address alone, never "old" things.
+    When it names nothing, the first later comma clause that is not only
+    fillers ("um", "like", "you know", `remember::FILLERS`) names it,
+    unless that clause opens with a pronoun as its subject
+    (`remember::OPENS_A_CLAUSE`): "Forget it, the plant schedule." and
+    "Forget, um, you know, my peanut allergy" are named, "Forget that, I
+    got it wrong" and "Forget it, it was wrong" are read as bare. A list
+    ("Forget my address, phone and email") is left to the model, which
+    sees the whole sentence and calls `forget` once per item: a call's own
+    `about` whose every word was heard in the line is that call's thing
+    (address, then phone, then email); one with a word not said is the
+    line's thing instead. Only words of the part that asks to forget
+    count. The line is read clause by clause, a clause starting after a
+    comma, colon or dash or at a joining word (`remember::CLAUSE_JOINS`:
+    "but", "and", "or", "except", "nhưng", "trừ", "và" …). A clause keeps
+    when it opens with a keeping word (`remember::KEEP_OPENS`: "keep",
+    "not", "except", "leave", "giữ", "trừ" …, after "but", "and",
+    "please", "nhưng", "hãy" …) or when a negation comes before its forget
+    word ("don't forget", "đừng quên"), wherever it sits; a clause with
+    neither goes with the one before it. So with "Forget my address, but
+    not my phone", "Forget my address, keep my phone" or "Keep my phone,
+    but forget my address" a call for the phone is refused, on every
+    switch (`ForgetPick::Kept`, `FORGET_KEPT`: nothing removed, the model
+    told they asked to keep it). A negation inside the thing forgotten is
+    that thing: "Forget that I don't eat pork" and "Quên rằng tôi không ăn
+    thịt heo" forget it. Sentences split clauses too: a sentence whose
+    every forget word is negated ("Don't forget my phone.", "Đừng quên số
+    điện thoại.") only keeps, wherever it sits, and the thing forgotten
+    comes only from the last sentence that asks without one, so "Forget my
+    address. Don't forget my phone." forgets the address and keeps the
+    phone; every sentence that asks without one adds what it forgets, so
+    with "Forget my address. Forget my phone." a call for each runs; a
+    line that only keeps forgets nothing. A negation in a polite request
+    asks to forget ("Why don't you forget my address?", "Why not …", "Won't
+    you …", "Sao không quên … đi?", `remember::asks_politely`; never "Can
+    / Could / Would / Will you not forget …", which keeps), and "I" as the forget's subject ("Why would
+    I forget my phone?") asks nothing, so nothing is removed; a
+    comma before the request ("Lamp, forget my colour") is passed over
+    too. A line read as bare whose other words may name something ("Forget
+    that, I got it wrong", "Forget it, I mean my address";
+    `remember::named_anywhere`) is never the last kept thing on a guess:
+    nothing is removed and the model is told to ask once which thing
+    (`remember::FORGET_UNCLEAR`, `ForgetPick::Unclear`). Only a plainly
+    bare line ("forget that", "forget what I just said") takes the last
+    kept thing.
     With nothing heard, the model's own `about`, if it gave one, names it.
   - **What is removed:** what the asker's own scope keeps and what was
     noticed of them (`kept` with `observations`) that has every one of
@@ -2331,10 +2377,18 @@ then use that person's scope:
     "Do you know I like tea?" and "Asked the lamp to remind them …" are kept
     (`tidy::only_asked`, [memory-days.md](memory-days.md)). Test:
     `it::days::a_question_is_never_kept_as_a_fact`.
+  - **A single-item forget** from a speaker whose face is still unknown
+    runs against what the room remembers. Older room observations can contain
+    a guest's own words, so the lamp may remove a matching room item and
+    tells the speaker that only the room's memory was changed. If nothing
+    matches, it says so; it never claims to have cleared a person's private
+    memory. The second voice route waits up to 300 ms for a late face before
+    choosing between that person's scope and the room's. A request to forget
+    everything about a person still needs a known face.
   - **The journal** says, with no words: "a remember about a person was not
     kept: speaker unknown (skipped=1)", or "observation pass: dropped N
     about a person: speaker unknown".
-  - Off, both are what they were. Tests: `remember::needs_face::tests`.
+  - Off, all of these are what they were. Tests: `remember::needs_face::tests`.
 
 ### A session for each person (#764 follow-up)
 
