@@ -94,7 +94,7 @@ impl Said {
         why: None,
     };
 
-    fn lost(why: &'static str) -> Said {
+    pub fn lost(why: &'static str) -> Said {
         Said {
             lease: State::Lost,
             why: Some(why),
@@ -190,6 +190,12 @@ impl Lease {
     /// Whether the body is held now: the lamp's own life stands back.
     pub fn holds(&self, now: Instant) -> bool {
         self.until.is_some_and(|until| now < until) && !self.suspended
+    }
+
+    /// Whether a lease is taken, held or suspended, and not yet ended or
+    /// lapsed by a step: what a run's end may still tell its holder.
+    pub fn taken(&self) -> bool {
+        self.until.is_some()
     }
 
     /// Given back, or its holder gone.
