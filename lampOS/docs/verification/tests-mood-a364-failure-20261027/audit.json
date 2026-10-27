@@ -1,0 +1,830 @@
+{
+  "schema": 1,
+  "scope": "Completed failed Mac host qualification and subsequent read-only integrity classification only",
+  "source": {
+    "head": "a364a97dc1dd6c0a711d0bb81d3a4f4e04da9500",
+    "base": "99b5161531791de7ed57ce57f6cacf988d509f25",
+    "private_source_entries": 10677,
+    "official_owner_entries": 10677,
+    "private_and_official_owner_unchanged": true,
+    "published_source_carry_reference": "287e37 (publication context only; qualification source is the full a364 SHA above)"
+  },
+  "outcome": {
+    "qualification": "FAIL",
+    "Cargo_exit": 101,
+    "native_controller_exit": 1,
+    "native_wrapper_exit": 1,
+    "controller_native_handle": 46537,
+    "native_handle_state": "CLOSED1",
+    "runtime_attempts": 1,
+    "runtime_reuse": false,
+    "counts": {
+      "passed": 337,
+      "failed": 3,
+      "ignored": 0
+    },
+    "documentation_counts": {
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0
+    },
+    "ordinary_filtered_out": 0,
+    "inventory_exact_match": true,
+    "driver_counts": [
+      {
+        "executable": "debug/deps/lamp_expression-97b0d6d78b5cc498",
+        "counts": {
+          "passed": 27,
+          "failed": 0,
+          "ignored": 0
+        }
+      },
+      {
+        "executable": "debug/deps/lamp_expression-7d5e7ac9619c42c0",
+        "counts": {
+          "passed": 4,
+          "failed": 0,
+          "ignored": 0
+        }
+      },
+      {
+        "executable": "debug/deps/it-707453661fb429d2",
+        "counts": {
+          "passed": 281,
+          "failed": 0,
+          "ignored": 0
+        }
+      },
+      {
+        "executable": "debug/deps/runtime-f9b92bb4002b831f",
+        "counts": {
+          "passed": 25,
+          "failed": 3,
+          "ignored": 0
+        }
+      }
+    ],
+    "required_affected_outcomes": [
+      {
+        "identity": "sleep_name::the_service_breathes_the_head_with_moods_breath_from_the_bus",
+        "outcomes": [
+          "FAILED"
+        ]
+      },
+      {
+        "identity": "sleep_name::an_expired_sleeping_name_is_journaled_once_by_the_service",
+        "outcomes": [
+          "ok"
+        ]
+      }
+    ],
+    "failures": [
+      {
+        "identity": "sleep_name::a_clock_not_set_gives_no_night_and_a_set_one_does",
+        "ordinary_result": {
+          "line": 343,
+          "text": "test sleep_name::a_clock_not_set_gives_no_night_and_a_set_one_does ... FAILED"
+        },
+        "panic_source": "crates/expression/tests/runtime.rs",
+        "panic_line": 791,
+        "panic_column": 13,
+        "raw_panic_line": 365,
+        "assertion": "counts.refused == 0",
+        "observed_left": 2,
+        "expected_right": 0,
+        "raw_assertion_lines": [
+          366,
+          367,
+          368
+        ],
+        "raw_refused_lines": [
+          362,
+          363
+        ],
+        "refused_count": 2,
+        "refused_count_note": null,
+        "raw_other_observation": null
+      },
+      {
+        "identity": "sleep_name::sleeping_name_requires_validated_speech_through_the_local_bus",
+        "ordinary_result": {
+          "line": 349,
+          "text": "test sleep_name::sleeping_name_requires_validated_speech_through_the_local_bus ... FAILED"
+        },
+        "panic_source": "crates/expression/tests/runtime.rs",
+        "panic_line": 993,
+        "panic_column": 9,
+        "raw_panic_line": 374,
+        "assertion": "has(&output, \"waking\")",
+        "observed_left": null,
+        "expected_right": null,
+        "raw_assertion_lines": [
+          375
+        ],
+        "raw_refused_lines": [],
+        "refused_count": null,
+        "refused_count_note": "No counts.refused assertion or refused-input line appears in this failure block; no zero count is inferred.",
+        "raw_other_observation": {
+          "line": 372,
+          "text": "ignored sleeping name (1): voice ownership, input readiness or freshness was lost"
+        }
+      },
+      {
+        "identity": "sleep_name::the_service_breathes_the_head_with_moods_breath_from_the_bus",
+        "ordinary_result": {
+          "line": 350,
+          "text": "test sleep_name::the_service_breathes_the_head_with_moods_breath_from_the_bus ... FAILED"
+        },
+        "panic_source": "crates/expression/tests/runtime.rs",
+        "panic_line": 791,
+        "panic_column": 13,
+        "raw_panic_line": 381,
+        "assertion": "counts.refused == 0",
+        "observed_left": 1,
+        "expected_right": 0,
+        "raw_assertion_lines": [
+          382,
+          383,
+          384
+        ],
+        "raw_refused_lines": [
+          379
+        ],
+        "refused_count": 1,
+        "refused_count_note": null,
+        "raw_other_observation": null
+      }
+    ],
+    "census_origin": "Read-only reconstruction from actual inventories and command raw output; original controller failed its boundary guard before its own census stage. Original terminal is unchanged.",
+    "no_rust_failure_waiver": true
+  },
+  "commands": {
+    "full_Cargo": [
+      "cargo",
+      "+1.96.0",
+      "test",
+      "--offline",
+      "--locked",
+      "--jobs",
+      "1",
+      "-p",
+      "lamp-expression",
+      "--no-fail-fast",
+      "--",
+      "--test-threads=1"
+    ],
+    "full_Cargo_started_utc": "2026-10-27T01:24:08.419573+00:00",
+    "full_Cargo_finished_utc": "2026-10-27T01:28:05.506288+00:00",
+    "full_Cargo_wall_seconds": 237.071714,
+    "native_started_utc": "2026-10-27T01:13:51.362097+00:00",
+    "native_finished_utc": "2026-10-27T01:28:31.442712+00:00",
+    "strict_reverse_closure_packages": [
+      "lamp-body",
+      "lamp-cloud",
+      "lamp-expression",
+      "lamp-keeper",
+      "lamp-lean",
+      "lamp-memory",
+      "lamp-peek",
+      "lamp-setup",
+      "lamp-skills",
+      "lamp-update",
+      "lamp-voice",
+      "lamp-voice-eval"
+    ],
+    "preceding_command_exit_codes": {
+      "cmd-fmt": 0,
+      "cmd-inventory-0-all": 0,
+      "cmd-inventory-0-ignored": 0,
+      "cmd-inventory-1-all": 0,
+      "cmd-inventory-1-ignored": 0,
+      "cmd-inventory-2-all": 0,
+      "cmd-inventory-2-ignored": 0,
+      "cmd-inventory-3-all": 0,
+      "cmd-inventory-3-ignored": 0,
+      "cmd-metadata": 0,
+      "cmd-strict": 0,
+      "cmd-test-compile": 0,
+      "cmd-workspace": 0
+    },
+    "no_Compiling_or_Checking_after_no_run": true,
+    "not_a_blanket_freshness_claim": true,
+    "timeout": false,
+    "owned_groups_closed": true,
+    "lease_released": true
+  },
+  "integrity": {
+    "read_only_audit_recorded_utc": "2026-10-27T01:39:04.020936+00:00",
+    "source_and_owner_unchanged": true,
+    "inherited_frozen": 270,
+    "new_frozen": 8,
+    "all_frozen": 278,
+    "all_frozen_sha_and_original_six_attributes_equal": true,
+    "six_attributes": [
+      "bytes",
+      "mode",
+      "mtime_ns",
+      "device",
+      "inode",
+      "sha256"
+    ],
+    "frozen_modes": {
+      "0o555": 276,
+      "0o755": 2
+    },
+    "actual_eight_sha_bytes_mode_mtime_device_equal": true,
+    "test_driver_all_six_attributes_equal": true,
+    "actual_executables": [
+      {
+        "executable": "debug/examples/recent_playout_cost",
+        "before": {
+          "sha256": "2eed00597e1d22cad1b5f5c826dda5e40237dfec6228b17efad57813101a1d64",
+          "bytes": 3732328,
+          "mode": 493,
+          "mtime_ns": 1793064179434337786,
+          "device": 16777222,
+          "inode": 485200963
+        },
+        "changes_after_full_Cargo": {
+          "inode": {
+            "before": 485200963,
+            "after": 485205120
+          }
+        },
+        "test_driver": false,
+        "legacy_non_test_alias": true
+      },
+      {
+        "executable": "debug/deps/runtime-f9b92bb4002b831f",
+        "before": {
+          "sha256": "cf6255680fc063f883a47dbbcc56188914a619b5a983191d21d87b56937ce97e",
+          "bytes": 6381904,
+          "mode": 493,
+          "mtime_ns": 1793064180888854670,
+          "device": 16777222,
+          "inode": 485201070
+        },
+        "changes_after_full_Cargo": {},
+        "test_driver": true,
+        "legacy_non_test_alias": false
+      },
+      {
+        "executable": "debug/examples/rest_cost",
+        "before": {
+          "sha256": "8711c7128027abd4d51501799d335d51147dc26b491b4637fa963982c6240a4d",
+          "bytes": 3737504,
+          "mode": 493,
+          "mtime_ns": 1793064181706562935,
+          "device": 16777222,
+          "inode": 485201140
+        },
+        "changes_after_full_Cargo": {
+          "inode": {
+            "before": 485201140,
+            "after": 485205115
+          }
+        },
+        "test_driver": false,
+        "legacy_non_test_alias": true
+      },
+      {
+        "executable": "debug/deps/it-707453661fb429d2",
+        "before": {
+          "sha256": "8b485a3fecc54233a80ebfa31f340b8b823f29eb4c387c7b2a038740b3ed76d1",
+          "bytes": 12734416,
+          "mode": 493,
+          "mtime_ns": 1793064186584482176,
+          "device": 16777222,
+          "inode": 485201458
+        },
+        "changes_after_full_Cargo": {},
+        "test_driver": true,
+        "legacy_non_test_alias": false
+      },
+      {
+        "executable": "debug/deps/lamp_expression-7d5e7ac9619c42c0",
+        "before": {
+          "sha256": "11abb549187b8a6ece5bc1ef8793c331b62f5f0e8a42cfe1676dfe1258934fb1",
+          "bytes": 2299560,
+          "mode": 493,
+          "mtime_ns": 1793064187283566200,
+          "device": 16777222,
+          "inode": 485201509
+        },
+        "changes_after_full_Cargo": {},
+        "test_driver": true,
+        "legacy_non_test_alias": false
+      },
+      {
+        "executable": "debug/lamp-expression",
+        "before": {
+          "sha256": "49586323e5f89fe8d3964cae6e8507b6e5d6be18bc1e8fdd377a47211abd7f6a",
+          "bytes": 8268920,
+          "mode": 493,
+          "mtime_ns": 1793064188330507768,
+          "device": 16777222,
+          "inode": 485201589
+        },
+        "changes_after_full_Cargo": {
+          "inode": {
+            "before": 485201589,
+            "after": 485205117
+          }
+        },
+        "test_driver": false,
+        "legacy_non_test_alias": true
+      },
+      {
+        "executable": "debug/examples/replay_cost",
+        "before": {
+          "sha256": "64203c1a085aae36e489a1569977a69ed240f6fb3c7eab178bd8f3821e02d0b7",
+          "bytes": 3714712,
+          "mode": 493,
+          "mtime_ns": 1793064189076878283,
+          "device": 16777222,
+          "inode": 485201641
+        },
+        "changes_after_full_Cargo": {
+          "inode": {
+            "before": 485201641,
+            "after": 485205114
+          }
+        },
+        "test_driver": false,
+        "legacy_non_test_alias": true
+      },
+      {
+        "executable": "debug/deps/lamp_expression-97b0d6d78b5cc498",
+        "before": {
+          "sha256": "a7f64912757036234c978506c77c5fda8fbc524f569b8bae410ac898ec19eb10",
+          "bytes": 5784864,
+          "mode": 493,
+          "mtime_ns": 1793064193190776864,
+          "device": 16777222,
+          "inode": 485201950
+        },
+        "changes_after_full_Cargo": {},
+        "test_driver": true,
+        "legacy_non_test_alias": false
+      }
+    ],
+    "original_prospective_alias_policy": "Only the four metadata-derived legacy non-test aliases could change inode, with every other field unchanged, at a successful full-Cargo exit-zero boundary. Cargo101 did not meet that condition.",
+    "original_boundary_guard": "FAIL",
+    "original_final_guard": "FAIL",
+    "original_receipts_and_manifests_untouched": true,
+    "guard_scope": "Full source/owner and all frozen SHA at initial/final; other boundaries source file-set/stat metadata/owner plus frozen bound metadata and actual-eight SHA; consumed executable SHA immediately before invocation. Read-only post-failure audit independently checked all278 SHA+six fields."
+  },
+  "control": {
+    "prepared_snapshot_before_Root_GO": {
+      "base": "99b5161531791de7ed57ce57f6cacf988d509f25",
+      "status": "DISABLED",
+      "allocation": "UNALLOCATED",
+      "executed": false,
+      "current_source_changed_for_control": false,
+      "planned_scope": "One unmodified-base runtime driver, all28 cases serially, source restoration required; no full340 replay. Root GO required.",
+      "publication_time_immutable_snapshots": [
+        "mood-99b-failure-disposition-prep/publication-records/disabled-control-launch-disabled-template.json",
+        "mood-99b-failure-disposition-prep/publication-records/disabled-control-plan.json",
+        "mood-99b-failure-disposition-prep/publication-records/disabled-control-review.json"
+      ],
+      "no_control_result": true,
+      "no_newer_Main_qualification": true
+    },
+    "subsequent_Root_action": "Root separately authorized and started the one-shot unmodified99b runtime28 control with exact private-source restoration. This failure packet records no control outcome; original337/3 and nativeFAIL1 remain unchanged.",
+    "no_control_result_in_this_packet": true
+  },
+  "limits": [
+    "No cause is established from these observations.",
+    "The common Mood refusal assertion failed before amplitude comparison; no claim that an amplitude assertion passed.",
+    "No native CI, Linux runtime or full-workspace runtime qualification is established for a364/99b here.",
+    "Earlier successful host/native results and controls retain their exact source scopes; none waives this failure.",
+    "No test replay, source change, target mutation, assertion or timeout change was performed for this publication."
+  ],
+  "receipt_manifest": {
+    "private_receipt": "mood-99b-failure-disposition-prep/publication-records/publication-input-manifest.json",
+    "sha256": "a311cc791dd2096e48c4e2f5c054223911f19f7d18c0c3d26b45efb59c86c425",
+    "bytes": 15687,
+    "entry_count": 80,
+    "entries": [
+      {
+        "receipt": "mood-99b-failure-disposition-prep/actual-eight-delta-disposition.json",
+        "sha256": "5b48228abe888fc8ca05f9b2068eeca41021152665e237a943efa9c3306c9fb1",
+        "bytes": 4300
+      },
+      {
+        "receipt": "mood-99b-failure-disposition-prep/all-278-frozen-readonly-verification.json",
+        "sha256": "f45adf551cc14da0db22061eaa5fd035fa144cce880f34e05ec05ac373996628",
+        "bytes": 211814
+      },
+      {
+        "receipt": "mood-99b-failure-disposition-prep/candidate-vs-unmodified-99b-runtime.patch",
+        "sha256": "20650315b66b302d2a4a899e883c78b58f3dcc7f467a3d5a0b3ed3b7b7c8f040",
+        "bytes": 6320
+      },
+      {
+        "receipt": "mood-99b-failure-disposition-prep/current-actual-eight-readonly.json",
+        "sha256": "3c7630eb5f1398250726fddaf80b4f99f7a5fd064397b046c2a3efdd1e198db4",
+        "bytes": 2884
+      },
+      {
+        "receipt": "mood-99b-failure-disposition-prep/failure-audit-summary.json",
+        "sha256": "2aac6ee41eef68aa96d87b3e6e6c8e928d87a6f36b7e50a68771f08d35a5661e",
+        "bytes": 3804
+      },
+      {
+        "receipt": "mood-99b-failure-disposition-prep/helper-static-audit.md",
+        "sha256": "6e1b24da16791e8ef859f7e614d36b5bae1a83df3d162b935013405172e7f9e9",
+        "bytes": 3902
+      },
+      {
+        "receipt": "mood-99b-failure-disposition-prep/original-cmd-tests-digest.json",
+        "sha256": "05f0668a8a0bf483d3e8bbb68ae3afbbf02272bef20022fcbbad66a32e8e1ab8",
+        "bytes": 304
+      },
+      {
+        "receipt": "mood-99b-failure-disposition-prep/original-native-controller-result-digest.json",
+        "sha256": "02b017bca29416dba74e266fc70bc1f90fbd29056719ae68dc276144ad5c0ca7",
+        "bytes": 318
+      },
+      {
+        "receipt": "mood-99b-failure-disposition-prep/original-plan-digest.json",
+        "sha256": "40600ba6456743de6b314be43d862123ddc7aee0ec356e6c2d3bf2eb94040d8a",
+        "bytes": 300
+      },
+      {
+        "receipt": "mood-99b-failure-disposition-prep/original-run.py-receipt-digest.json",
+        "sha256": "6058021a16dfb3ec7b2aa76703fa756263931541ead84e0dee1a3a4b626e4793",
+        "bytes": 297
+      },
+      {
+        "receipt": "mood-99b-failure-disposition-prep/original-terminal-digest.json",
+        "sha256": "892a727da4190457c0327d11c238d3804c5e190453441ad49e22573c5a982a59",
+        "bytes": 303
+      },
+      {
+        "receipt": "mood-99b-failure-disposition-prep/publication-records/disabled-control-launch-disabled-template.json",
+        "sha256": "c8d76b0771e7f6150756269209c257ce102ee2bb8104a15a60290cd2871bdada",
+        "bytes": 429
+      },
+      {
+        "receipt": "mood-99b-failure-disposition-prep/publication-records/disabled-control-plan.json",
+        "sha256": "5b67df566fab37b792931aa9f130869a46ecccd9fed31b2146d30b6af44b9ca4",
+        "bytes": 8245
+      },
+      {
+        "receipt": "mood-99b-failure-disposition-prep/publication-records/disabled-control-review.json",
+        "sha256": "d855dbd221877e9ceadc92039f6d3bbae79420b8afd91f2ccc7b44c76f05ddff",
+        "bytes": 1876
+      },
+      {
+        "receipt": "mood-99b-failure-disposition-prep/reconstructed-full-failure-census.json",
+        "sha256": "8d1041b410f1326ce8c6cbfa3e6b45c681af6f027dbf5e812633337011e2063d",
+        "bytes": 49058
+      },
+      {
+        "receipt": "mood-99b-failure-disposition-prep/source-readonly-after-failure.json",
+        "sha256": "7055e569a20556f16aac1c7405588de4c13012a2aadea53766ef457ec8486125",
+        "bytes": 682
+      },
+      {
+        "receipt": "mood-99b-fresh-gates/actual-executables.json",
+        "sha256": "c76269bec95239e6a337c206ed24fdbcb22719b2c55a7a87219072032ef2feac",
+        "bytes": 2884
+      },
+      {
+        "receipt": "mood-99b-fresh-gates/cmd-fmt.json",
+        "sha256": "64cbdfde00872e16977fa73a742836ec2c612475f469964cda9b1505132bd2ff",
+        "bytes": 1892
+      },
+      {
+        "receipt": "mood-99b-fresh-gates/cmd-fmt.stderr.txt",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0
+      },
+      {
+        "receipt": "mood-99b-fresh-gates/cmd-fmt.stdout.txt",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0
+      },
+      {
+        "receipt": "mood-99b-fresh-gates/cmd-inventory-0-all.json",
+        "sha256": "224caf2abbbc7bb8caa01f1d4e74cb4efae03c0c437469c62d04261e30e0c1e9",
+        "bytes": 2015
+      },
+      {
+        "receipt": "mood-99b-fresh-gates/cmd-inventory-0-all.stderr.txt",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0
+      },
+      {
+        "receipt": "mood-99b-fresh-gates/cmd-inventory-0-all.stdout.txt",
+        "sha256": "6249784e0118adda2c98a7330e7b66fa7778b521cbaea1398123bd967f45adb8",
+        "bytes": 1870
+      },
+      {
+        "receipt": "mood-99b-fresh-gates/cmd-inventory-0-ignored.json",
+        "sha256": "6b8f5ac353a8721de6956b59b0724d2b986e01a2e9d75db36ca612995ec15d51",
+        "bytes": 2037
+      },
+      {
+        "receipt": "mood-99b-fresh-gates/cmd-inventory-0-ignored.stderr.txt",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0
+      },
+      {
+        "receipt": "mood-99b-fresh-gates/cmd-inventory-0-ignored.stdout.txt",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0
+      },
+      {
+        "receipt": "mood-99b-fresh-gates/cmd-inventory-1-all.json",
+        "sha256": "bef4ad47e07f019843ec576334e016bb7205fe47b2b62869bbff5d3d402f3b10",
+        "bytes": 2010
+      },
+      {
+        "receipt": "mood-99b-fresh-gates/cmd-inventory-1-all.stderr.txt",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0
+      },
+      {
+        "receipt": "mood-99b-fresh-gates/cmd-inventory-1-all.stdout.txt",
+        "sha256": "4f5b0f578f8967d89194a2ae4ef2241f528a0f0e4380fc115de148cd2ecb39c9",
+        "bytes": 23489
+      },
+      {
+        "receipt": "mood-99b-fresh-gates/cmd-inventory-1-ignored.json",
+        "sha256": "a53d7ac1f99fce4ee892aa86459b055cb0f12766a7851747df8d05b65fdfbf42",
+        "bytes": 2032
+      },
+      {
+        "receipt": "mood-99b-fresh-gates/cmd-inventory-1-ignored.stderr.txt",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0
+      },
+      {
+        "receipt": "mood-99b-fresh-gates/cmd-inventory-1-ignored.stdout.txt",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0
+      },
+      {
+        "receipt": "mood-99b-fresh-gates/cmd-inventory-2-all.json",
+        "sha256": "1a3581c4150b1b4efa9116fc005ae9cacbb8a3db63e082d65f5da41b1052eeec",
+        "bytes": 2022
+      },
+      {
+        "receipt": "mood-99b-fresh-gates/cmd-inventory-2-all.stderr.txt",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0
+      },
+      {
+        "receipt": "mood-99b-fresh-gates/cmd-inventory-2-all.stdout.txt",
+        "sha256": "879f18a41c1bf6a82b6acf717f37cd966f9699b768e46b4bf09556221be3ca27",
+        "bytes": 252
+      },
+      {
+        "receipt": "mood-99b-fresh-gates/cmd-inventory-2-ignored.json",
+        "sha256": "218f7e1345d2c9dae52322f52b2f675c0f89057e6d9cd27e5e97daf595b9ca83",
+        "bytes": 2045
+      },
+      {
+        "receipt": "mood-99b-fresh-gates/cmd-inventory-2-ignored.stderr.txt",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0
+      },
+      {
+        "receipt": "mood-99b-fresh-gates/cmd-inventory-2-ignored.stdout.txt",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0
+      },
+      {
+        "receipt": "mood-99b-fresh-gates/cmd-inventory-3-all.json",
+        "sha256": "8311bb09b5e44e8aa62f39ddc5a7942958b946667fbcf261915ab770aa4a8ee7",
+        "bytes": 2023
+      },
+      {
+        "receipt": "mood-99b-fresh-gates/cmd-inventory-3-all.stderr.txt",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0
+      },
+      {
+        "receipt": "mood-99b-fresh-gates/cmd-inventory-3-all.stdout.txt",
+        "sha256": "34cef1e037f52a0b4b1610c00e236954880e2e11697845960c13728c4d1d0e75",
+        "bytes": 2325
+      },
+      {
+        "receipt": "mood-99b-fresh-gates/cmd-inventory-3-ignored.json",
+        "sha256": "905eb2f195bed2d8ae6ace92589b4578cd1053d7b82be1ecb25d91e862827df2",
+        "bytes": 2045
+      },
+      {
+        "receipt": "mood-99b-fresh-gates/cmd-inventory-3-ignored.stderr.txt",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0
+      },
+      {
+        "receipt": "mood-99b-fresh-gates/cmd-inventory-3-ignored.stdout.txt",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0
+      },
+      {
+        "receipt": "mood-99b-fresh-gates/cmd-metadata.json",
+        "sha256": "a2be49b62b4cc6806ca0cde9cef3b200d437e7232bd49bd7001b327ea6f3d5e6",
+        "bytes": 1947
+      },
+      {
+        "receipt": "mood-99b-fresh-gates/cmd-metadata.stderr.txt",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0
+      },
+      {
+        "receipt": "mood-99b-fresh-gates/cmd-metadata.stdout.txt",
+        "sha256": "4dac45a680949c7825507f5651ba95fd0c7125e51509b98d2ccb7aac1a3399ca",
+        "bytes": 2303833
+      },
+      {
+        "receipt": "mood-99b-fresh-gates/cmd-strict.json",
+        "sha256": "decd933dd3b91c0b457e3baa3615355131b9a2a0e39f5e247c4eec1266d25418",
+        "bytes": 2372
+      },
+      {
+        "receipt": "mood-99b-fresh-gates/cmd-strict.stderr.txt",
+        "sha256": "7ef5483904ff2cc472cc6409b1bc8a6f43d10da4cbb6341460b1e90c55533903",
+        "bytes": 2377
+      },
+      {
+        "receipt": "mood-99b-fresh-gates/cmd-strict.stdout.txt",
+        "sha256": "95e7d1c8251faa5057f089093788018f74bcb2b26f5e5b5e341c38c7836534b4",
+        "bytes": 390914
+      },
+      {
+        "receipt": "mood-99b-fresh-gates/cmd-test-compile.json",
+        "sha256": "d607930f120105dad5eba08a27faa5ef5bda8de4e7de609209ad754a820b8f29",
+        "bytes": 2023
+      },
+      {
+        "receipt": "mood-99b-fresh-gates/cmd-test-compile.stderr.txt",
+        "sha256": "33217bf1683b5ccbfd938a9032a64fbb4b00abdda848fab281269676a0f9627a",
+        "bytes": 360
+      },
+      {
+        "receipt": "mood-99b-fresh-gates/cmd-test-compile.stdout.txt",
+        "sha256": "942ae011d60a39f0f8360c7fa25957f199539a51c3ac9deeebaeb9e2ab00f5ee",
+        "bytes": 62208
+      },
+      {
+        "receipt": "mood-99b-fresh-gates/cmd-tests.json",
+        "sha256": "17c1ae92770eca3bf5b5835ac41004e37e2caafa96c0a888acf6b0ae7a0648c7",
+        "bytes": 2026
+      },
+      {
+        "receipt": "mood-99b-fresh-gates/cmd-tests.stderr.txt",
+        "sha256": "c56206cd4776d0936efcb453a299903daba70a69c5b97f06ec933636d34e75ba",
+        "bytes": 956
+      },
+      {
+        "receipt": "mood-99b-fresh-gates/cmd-tests.stdout.txt",
+        "sha256": "168150824d42884b5714a44e22c4f401b01d5a0cfac07cfaf5eb5f72e560dac6",
+        "bytes": 32158
+      },
+      {
+        "receipt": "mood-99b-fresh-gates/cmd-workspace.json",
+        "sha256": "8704ab437e92cf7e4e3fcbfe4133fd9dcab9d3acff16ecbeaf6fcacca2d7ba17",
+        "bytes": 1992
+      },
+      {
+        "receipt": "mood-99b-fresh-gates/cmd-workspace.stderr.txt",
+        "sha256": "9244099b2c854481275db8e5b128bb1524d5bf0d675e2c577fbaa291b6f66436",
+        "bytes": 2775
+      },
+      {
+        "receipt": "mood-99b-fresh-gates/cmd-workspace.stdout.txt",
+        "sha256": "aeee62b1c9d39bb48659dc1a55e52ffe1d9b44339493343509125f92362497c4",
+        "bytes": 424768
+      },
+      {
+        "receipt": "mood-99b-fresh-gates/consumed-executables-tests.json",
+        "sha256": "dfdb61beb802321d5373a040e2f03647a3a4a8259fbd148e5ff4f4ed11dc326e",
+        "bytes": 3178
+      },
+      {
+        "receipt": "mood-99b-fresh-gates/current-forward-input-bindings.json",
+        "sha256": "698694a18da5a6e90661efe72aecb6215daf4f506089edb620ae1888e42bfb1e",
+        "bytes": 93585
+      },
+      {
+        "receipt": "mood-99b-fresh-gates/environment-hashes.json",
+        "sha256": "0fab58101e2c9c9209cf99a335a30753266c655f07f0399271675c17f206bd5d",
+        "bytes": 5290
+      },
+      {
+        "receipt": "mood-99b-fresh-gates/guard-events.json",
+        "sha256": "31c757e1595b78f2b48f846fce7a439b351da15a263d0dbab5f343deab5e28c4",
+        "bytes": 102197
+      },
+      {
+        "receipt": "mood-99b-fresh-gates/inventory.json",
+        "sha256": "3cdbe14223bcbac963f49819a616339b4b9e37bf96ac68e84a51f67e881e8a36",
+        "bytes": 29750
+      },
+      {
+        "receipt": "mood-99b-fresh-gates/metadata-response.json",
+        "sha256": "ace4cb39f2c540605ad48a7ca298d171eabe93c69673c90ec11a655a054b1d01",
+        "bytes": 3738818
+      },
+      {
+        "receipt": "mood-99b-fresh-gates/native-controller-result.json",
+        "sha256": "34368c6c09b72a027de526f5d1724830597376828b45bc45c8fc4f15e15899da",
+        "bytes": 757
+      },
+      {
+        "receipt": "mood-99b-fresh-gates/new-frozen.json",
+        "sha256": "28037099eac5d2bf416578ec1ddd99a08d8da455c592eadfddfe834c94109aa9",
+        "bytes": 3149
+      },
+      {
+        "receipt": "mood-99b-fresh-gates/owner-source-after.json",
+        "sha256": "1d490d17201aee936449c8f67c4c73ba198c3f4b99e33da64bd65ed4acef28c8",
+        "bytes": 3185574
+      },
+      {
+        "receipt": "mood-99b-fresh-gates/owner-source-before.json",
+        "sha256": "1d490d17201aee936449c8f67c4c73ba198c3f4b99e33da64bd65ed4acef28c8",
+        "bytes": 3185574
+      },
+      {
+        "receipt": "mood-99b-fresh-gates/plan.json",
+        "sha256": "0aa8575af06fd4afcfc4fe8c0dcba3bcfc2abf86811947e356fc638fcfc8dd0c",
+        "bytes": 28880
+      },
+      {
+        "receipt": "mood-99b-fresh-gates/post-no-run-current-actual-binding.json",
+        "sha256": "c76269bec95239e6a337c206ed24fdbcb22719b2c55a7a87219072032ef2feac",
+        "bytes": 2884
+      },
+      {
+        "receipt": "mood-99b-fresh-gates/prepared-owner.json",
+        "sha256": "c993ab1ea066504f39b6b9daad2902572a4bc30134e4766529460d23fe70b9ba",
+        "bytes": 2406369
+      },
+      {
+        "receipt": "mood-99b-fresh-gates/prospective-alias-inode-policy.json",
+        "sha256": "7916787afeab7448141d6176a4c6b0cbf6d02e0be3a1373ef291369b9f2fafb8",
+        "bytes": 6183
+      },
+      {
+        "receipt": "mood-99b-fresh-gates/protected-before.json",
+        "sha256": "3ddcea6c1928c946fd92940274ff21b30ea306e16dcfc4f408db6f1149aad6d8",
+        "bytes": 111898
+      },
+      {
+        "receipt": "mood-99b-fresh-gates/registry-artifact-bindings-test-compile.json",
+        "sha256": "fa34861c35d59d6f2004d04af69ab20589b0975900d86d47129c38924944a2d2",
+        "bytes": 67218
+      },
+      {
+        "receipt": "mood-99b-fresh-gates/run.py",
+        "sha256": "f2a8a98e482ce9bfb3d3765ec988317706fb8901f7a534add4bb4d32c0d5aacc",
+        "bytes": 31153
+      },
+      {
+        "receipt": "mood-99b-fresh-gates/source-before.json",
+        "sha256": "ce147316722c9921f8c8168b65be5b59949ca45daf46eae8e6a24abcd3e579a4",
+        "bytes": 3185574
+      },
+      {
+        "receipt": "mood-99b-fresh-gates/strict-local-bindings.json",
+        "sha256": "b7981beb2c6ceb8f3a0a43cacfcc6638a553542205c44111c4803bfc5cd1573d",
+        "bytes": 3789670
+      },
+      {
+        "receipt": "mood-99b-fresh-gates/terminal.json",
+        "sha256": "043320513d397c2d89767c8732eedde922c5eba69b4cd57ba9cec502ac0d9560",
+        "bytes": 2608
+      },
+      {
+        "receipt": "mood-99b-fresh-gates/test-compiler-artifacts.json",
+        "sha256": "6611c297b8b0af40776b9be24a6d42f180ad01f291bd13a0df19190cb1fa5c44",
+        "bytes": 73481
+      }
+    ],
+    "explicit_scope_exclusions": [
+      "This manifest, publication verification outputs, publication script stdout and the two public output files are not manifest inputs.",
+      "Frozen binaries, source file contents, complete raw logs, archives and mutable future control originals are not published. Immutable disabled-control snapshots are included."
+    ],
+    "silent_entry_exclusions": 0
+  },
+  "post_close_verification": {
+    "status": "PASS",
+    "every_manifest_entry_verified": true,
+    "entries_verified": 80,
+    "failed": 0,
+    "excluded_manifest_entries": 0,
+    "recorded_at_utc": "2026-10-27T02:00:22.020687+00:00",
+    "producer_closed_exit": 0,
+    "receipt": "mood-99b-failure-disposition-prep/publication-records/publication-post-close-verification.json",
+    "sha256": "83fd1f7c2662035ff539c572aabf00591cdaed60bf1c023bd89dc2e4a8b6e829",
+    "bytes": 30713,
+    "source_outcomes_unchanged": true,
+    "no_replay": true
+  }
+}

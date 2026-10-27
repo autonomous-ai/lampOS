@@ -1,0 +1,598 @@
+{
+  "subject": "Completed a209/99b Mac Restart host gate",
+  "pull_request": 3572,
+  "head": "a209424d3c5f07ca3423447bc2bb8bcb6d0a18e0",
+  "base": "99b5161531791de7ed57ce57f6cacf988d509f25",
+  "status": "PASS within recorded Mac module/build scope",
+  "counts": {
+    "passed": 21,
+    "failed": 0,
+    "ignored": 0
+  },
+  "runtime_attempts": 1,
+  "source": {
+    "tracked_files": 10677,
+    "canonical_before_after_prepared_equal": true,
+    "canonical_snapshot_sha256": "a73377d7620483027191d1dc3d408ad9046d800f00060de8605178dc7438ebca",
+    "official_original_snapshot_sha256": "6690e0950a9245e781befe9752dcc51931ae428686d1d0ea7b2e8644e0c3f049",
+    "official_snapshot_head": "a209424d3c5f07ca3423447bc2bb8bcb6d0a18e0",
+    "official_snapshot_branch": "tests/1569-same-voice-restart-exit",
+    "canonical_and_official_semantic_equality_except_branch": true,
+    "source_stat6_before_after_equal_both_roots": true,
+    "own_files": {
+      "lampOS/crates/voice/src/same_voice.rs": {
+        "sha256": "151acd1d793723ba2ed1ac78ed9ca9517e376f52cf9119839de990107394ec72",
+        "bytes": 78068,
+        "mode": 420,
+        "kind": "file"
+      },
+      "lampOS/docs/same-voice.md": {
+        "sha256": "774451da969bbd1271f6ad143def758b0b1bb6acf0bd74e36ca3db104c1a5b0d",
+        "bytes": 40112,
+        "mode": 420,
+        "kind": "file"
+      }
+    },
+    "historical_owner_scope": "Recorded original a209 owner snapshot; current official source carry to1a8/737 does not rewrite this historical result"
+  },
+  "runtime_census": {
+    "command_exit": 0,
+    "rows": [
+      [
+        "same_voice::tests::a_call_takes_no_late_voice_from_before_it_at_its_verdict",
+        "ok"
+      ],
+      [
+        "same_voice::tests::a_child_that_hangs_after_it_is_ready_is_killed_and_started_again",
+        "ok"
+      ],
+      [
+        "same_voice::tests::a_child_that_never_gets_ready_is_started_three_times_and_then_the_check_is_off",
+        "ok"
+      ],
+      [
+        "same_voice::tests::a_late_print_from_too_little_speech_is_unsure",
+        "ok"
+      ],
+      [
+        "same_voice::tests::a_late_print_is_compared_before_it_becomes_the_conversations_voice",
+        "ok"
+      ],
+      [
+        "same_voice::tests::a_line_is_judged_from_its_first_1_8_s_when_it_is_long_enough_and_said_with_the_lamp_quiet",
+        "ok"
+      ],
+      [
+        "same_voice::tests::a_line_judged_without_the_check_says_which_print_was_missing",
+        "ok"
+      ],
+      [
+        "same_voice::tests::a_mixed_print_among_the_conversations_does_not_make_its_own_voice_another",
+        "ok"
+      ],
+      [
+        "same_voice::tests::a_new_conversation_ends_any_late_voice_of_the_one_before",
+        "ok"
+      ],
+      [
+        "same_voice::tests::a_print_is_coming_from_its_first_sample_until_it_comes",
+        "ok"
+      ],
+      [
+        "same_voice::tests::a_print_that_comes_after_its_answer_still_becomes_the_conversations",
+        "ok"
+      ],
+      [
+        "same_voice::tests::a_short_call_takes_its_voice_from_the_callers_first_follow_up_seen_spoken",
+        "ok"
+      ],
+      [
+        "same_voice::tests::a_voice_at_0_20_against_the_conversations_is_another",
+        "ok"
+      ],
+      [
+        "same_voice::tests::a_voice_at_0_35_was_another_at_0_45_and_is_the_conversations_at_0_30",
+        "ok"
+      ],
+      [
+        "same_voice::tests::an_unsure_print_let_out_is_not_the_conversations_voice",
+        "ok"
+      ],
+      [
+        "same_voice::tests::another_voice_is_known_only_against_the_conversation_the_lamp_last_answered_in",
+        "ok"
+      ],
+      [
+        "same_voice::tests::each_line_the_check_says_is_said_to_its_journal",
+        "ok"
+      ],
+      [
+        "same_voice::tests::the_childs_answers_are_read_as_its_serving_writes_them",
+        "ok"
+      ],
+      [
+        "same_voice::tests::the_conversation_keeps_its_last_prints_and_a_new_one_begins_afresh",
+        "ok"
+      ],
+      [
+        "same_voice::tests::the_model_path_is_absolute_and_its_flag_follows_the_spoken_to_one",
+        "ok"
+      ],
+      [
+        "same_voice::tests::with_the_caller_only_a_going_on_line_never_becomes_the_conversations_voice",
+        "ok"
+      ]
+    ],
+    "counts": {
+      "passed": 21,
+      "failed": 0,
+      "ignored": 0
+    },
+    "ordinary_filtered_out": 3811,
+    "scope": "Complete actual Mac same_voice::tests:: module once serial:21 independently source-derived cases reconciled to freshly compiled Voice-library all/ignored inventory. No fullVoice/native/device or Readerpatch qualification."
+  },
+  "inventory": {
+    "whole_Voice_library": 3832,
+    "module": [
+      "same_voice::tests::a_call_takes_no_late_voice_from_before_it_at_its_verdict",
+      "same_voice::tests::a_child_that_hangs_after_it_is_ready_is_killed_and_started_again",
+      "same_voice::tests::a_child_that_never_gets_ready_is_started_three_times_and_then_the_check_is_off",
+      "same_voice::tests::a_late_print_from_too_little_speech_is_unsure",
+      "same_voice::tests::a_late_print_is_compared_before_it_becomes_the_conversations_voice",
+      "same_voice::tests::a_line_is_judged_from_its_first_1_8_s_when_it_is_long_enough_and_said_with_the_lamp_quiet",
+      "same_voice::tests::a_line_judged_without_the_check_says_which_print_was_missing",
+      "same_voice::tests::a_mixed_print_among_the_conversations_does_not_make_its_own_voice_another",
+      "same_voice::tests::a_new_conversation_ends_any_late_voice_of_the_one_before",
+      "same_voice::tests::a_print_is_coming_from_its_first_sample_until_it_comes",
+      "same_voice::tests::a_print_that_comes_after_its_answer_still_becomes_the_conversations",
+      "same_voice::tests::a_short_call_takes_its_voice_from_the_callers_first_follow_up_seen_spoken",
+      "same_voice::tests::a_voice_at_0_20_against_the_conversations_is_another",
+      "same_voice::tests::a_voice_at_0_35_was_another_at_0_45_and_is_the_conversations_at_0_30",
+      "same_voice::tests::an_unsure_print_let_out_is_not_the_conversations_voice",
+      "same_voice::tests::another_voice_is_known_only_against_the_conversation_the_lamp_last_answered_in",
+      "same_voice::tests::each_line_the_check_says_is_said_to_its_journal",
+      "same_voice::tests::the_childs_answers_are_read_as_its_serving_writes_them",
+      "same_voice::tests::the_conversation_keeps_its_last_prints_and_a_new_one_begins_afresh",
+      "same_voice::tests::the_model_path_is_absolute_and_its_flag_follows_the_spoken_to_one",
+      "same_voice::tests::with_the_caller_only_a_going_on_line_never_becomes_the_conversations_voice"
+    ],
+    "module_ignored": [],
+    "scope": "All21 ordinary SameVoice cases once serial; other3811 Voice-library tests filtered out, not run"
+  },
+  "guards": {
+    "full_SHA_checkpoints": [
+      "initial",
+      "final"
+    ],
+    "consumed_SHA_checkpoints": [
+      {
+        "point": "before-inventory-all",
+        "actual_executable_SHA": true,
+        "consumed_new_frozen_SHA": true,
+        "consumed_frozen_count": 1,
+        "all_source_or_inherited_frozen_SHA_rehash": false
+      },
+      {
+        "point": "after-inventory-all",
+        "actual_executable_SHA": true,
+        "consumed_new_frozen_SHA": true,
+        "consumed_frozen_count": 1,
+        "all_source_or_inherited_frozen_SHA_rehash": false
+      },
+      {
+        "point": "before-inventory-ignored",
+        "actual_executable_SHA": true,
+        "consumed_new_frozen_SHA": true,
+        "consumed_frozen_count": 1,
+        "all_source_or_inherited_frozen_SHA_rehash": false
+      },
+      {
+        "point": "after-inventory-ignored",
+        "actual_executable_SHA": true,
+        "consumed_new_frozen_SHA": true,
+        "consumed_frozen_count": 1,
+        "all_source_or_inherited_frozen_SHA_rehash": false
+      },
+      {
+        "point": "before-inventory-module",
+        "actual_executable_SHA": true,
+        "consumed_new_frozen_SHA": true,
+        "consumed_frozen_count": 1,
+        "all_source_or_inherited_frozen_SHA_rehash": false
+      },
+      {
+        "point": "after-inventory-module",
+        "actual_executable_SHA": true,
+        "consumed_new_frozen_SHA": true,
+        "consumed_frozen_count": 1,
+        "all_source_or_inherited_frozen_SHA_rehash": false
+      },
+      {
+        "point": "before-inventory-module_ignored",
+        "actual_executable_SHA": true,
+        "consumed_new_frozen_SHA": true,
+        "consumed_frozen_count": 1,
+        "all_source_or_inherited_frozen_SHA_rehash": false
+      },
+      {
+        "point": "after-inventory-module_ignored",
+        "actual_executable_SHA": true,
+        "consumed_new_frozen_SHA": true,
+        "consumed_frozen_count": 1,
+        "all_source_or_inherited_frozen_SHA_rehash": false
+      },
+      {
+        "point": "before-module-runtime",
+        "actual_executable_SHA": true,
+        "consumed_new_frozen_SHA": true,
+        "consumed_frozen_count": 1,
+        "all_source_or_inherited_frozen_SHA_rehash": false
+      },
+      {
+        "point": "after-module-runtime",
+        "actual_executable_SHA": true,
+        "consumed_new_frozen_SHA": true,
+        "consumed_frozen_count": 1,
+        "all_source_or_inherited_frozen_SHA_rehash": false
+      }
+    ],
+    "policy": "NEW prospective99b policy: full canonical+official source and ALL frozen SHA only at initial/final. All other boundaries check entire source file sets/stat6, owner HEAD/parent/branch/index/clean and all frozen bound metadata. Actual module SHA/six fields remain strict at boundaries; only the consumed new frozen copy/executable SHA is checked adjacent to every list/runtime. Exclusive source/owner/target and no legitimate frozen writers required. No blanket all-boundary or all-source pre-consumption content-hash claim; all inherited modes/inodes preserved, no chmod or OS write-protection claim.",
+    "source_file_set_stat6_and_owner_at_other_boundaries": true,
+    "frozen_count": 242,
+    "frozen_mode_census_octal": {
+      "0o555": 237,
+      "0o755": 5
+    },
+    "final_frozen_map_receipt_sha256": "325785c9dfdb05faa4a1171506e87f80e2376b0e80bbbffa48a5e59e57c413a1",
+    "actual_module": {
+      "artifact": {
+        "reason": "compiler-artifact",
+        "package_id": "path+file://${CANONICAL}/lampOS/crates/voice#lamp-voice@0.1.0",
+        "manifest_path": "${CANONICAL}/lampOS/crates/voice/Cargo.toml",
+        "target": {
+          "kind": [
+            "lib"
+          ],
+          "crate_types": [
+            "lib"
+          ],
+          "name": "lamp_voice",
+          "src_path": "${CANONICAL}/lampOS/crates/voice/src/lib.rs",
+          "edition": "2024",
+          "doc": true,
+          "doctest": true,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": [],
+        "filenames": [
+          "${TARGET}/debug/deps/lamp_voice-6d619bbdd1df3a0d"
+        ],
+        "executable": "${TARGET}/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+        "fresh": false
+      },
+      "binding": {
+        "sha256": "417534a35776b6e33a206e1ffd36939e379dc287c99b02d41cbd3b0656251a6b",
+        "bytes": 116069816,
+        "mode": 493,
+        "mtime_ns": 1793064433526905413,
+        "device": 16777222,
+        "inode": 485229027
+      }
+    },
+    "all_immutable_frozen_metadata_preserved": true,
+    "all_source_preconsumption_hash_claim": false,
+    "blanket_all_boundary_content_hash_claim": false,
+    "OS_write_protection_claim": false,
+    "no_chmod": true
+  },
+  "strict_packages": [
+    "lamp-body",
+    "lamp-cloud",
+    "lamp-expression",
+    "lamp-keeper",
+    "lamp-lean",
+    "lamp-memory",
+    "lamp-peek",
+    "lamp-setup",
+    "lamp-skills",
+    "lamp-update",
+    "lamp-voice",
+    "lamp-voice-eval"
+  ],
+  "fmt": true,
+  "workspace_build": true,
+  "compiler_artifacts": {
+    "strict": {
+      "all_artifact_records": 459,
+      "local_artifact_records": 143,
+      "observed_local_freshness": {
+        "True": 24,
+        "False": 119
+      },
+      "scope": "Actual source/profile/features bound by completed controller; Boolean freshness observed only, no forced clean or fresh:false claim"
+    },
+    "workspace": {
+      "all_artifact_records": 436,
+      "local_artifact_records": 96,
+      "observed_local_freshness": {
+        "True": 33,
+        "False": 63
+      },
+      "scope": "Actual source/profile/features bound by completed controller; Boolean freshness observed only, no forced clean or fresh:false claim"
+    },
+    "compile-Voice-lib": {
+      "all_artifact_records": 295,
+      "local_artifact_records": 26,
+      "observed_local_freshness": {
+        "False": 14,
+        "True": 12
+      },
+      "scope": "Actual source/profile/features bound by completed controller; Boolean freshness observed only, no forced clean or fresh:false claim"
+    }
+  },
+  "stages": [
+    {
+      "stage": "fmt",
+      "exit": 0,
+      "elapsed_s": 13.12688573898049,
+      "owned_group_closed": true,
+      "unexpected_descendants": false,
+      "receipt_sha256": "5b64e6ba3bd06b4399d156fc1f51ba6a812dd8a92c1ef5f34c4052e447138ad5",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "stage": "metadata",
+      "exit": 0,
+      "elapsed_s": 1.1380857740005013,
+      "owned_group_closed": true,
+      "unexpected_descendants": false,
+      "receipt_sha256": "bdddcc75d4491909f81b2ebe7a4740dcf1e592d810b48c50912a0a71cdbcc8f3",
+      "stdout_sha256": "a6e3e83ee16d3ac0e7eeb4014dafd583d1c8c825995a1a161d1225c5b1e0bc11",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "stage": "strict",
+      "exit": 0,
+      "elapsed_s": 232.98343696599477,
+      "owned_group_closed": true,
+      "unexpected_descendants": false,
+      "receipt_sha256": "ab2432c8668f7bf88d9a36b738e85c0a044e4a34d665388ca5553abaaadc6e95",
+      "stdout_sha256": "5d66085f095625b777f03b307032299396bd7fdacdd454d025b65870a2bc2f1a",
+      "stderr_sha256": "42a36e0a1de87694035cd2fb09ffac6709060d0f8dd2fdb0a379bbc63f3964c4"
+    },
+    {
+      "stage": "workspace",
+      "exit": 0,
+      "elapsed_s": 236.47483043200918,
+      "owned_group_closed": true,
+      "unexpected_descendants": false,
+      "receipt_sha256": "02ff9ca953b6e0e8023f8551855aa47c34105313f0339578639697f4fb397177",
+      "stdout_sha256": "a22e748fbacdc5f0ffe4574bacbc62151ded5ac5203e1add68e1745062282805",
+      "stderr_sha256": "a5c688fbf16f17919e263b99f762de5b22c0a4dc36041da6186eddd423a185a9"
+    },
+    {
+      "stage": "compile-Voice-lib",
+      "exit": 0,
+      "elapsed_s": 203.56031072401674,
+      "owned_group_closed": true,
+      "unexpected_descendants": false,
+      "receipt_sha256": "bdf0bb47cd071a3c4263b07b9b03cb921b6d61fefbf30b235e5e11f0a8652692",
+      "stdout_sha256": "6ec638222902d24caf49dd1dfdb716e26515f806ddce485b1d08da69dde2406c",
+      "stderr_sha256": "da740c09831050d36af61dd1cc3df8eedb7c383512b8358c4d6a82ab9de6520a"
+    },
+    {
+      "stage": "inventory-all",
+      "exit": 0,
+      "elapsed_s": 15.14121457899455,
+      "owned_group_closed": true,
+      "unexpected_descendants": false,
+      "receipt_sha256": "056ee709284ba444f4175af84d00808c12186d6f484345ca9164142f98a2cbcd",
+      "stdout_sha256": "6889ee596302435a835e12e63b22f6e0aa0c1384961038f971f4ce29f239e75f",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "stage": "inventory-ignored",
+      "exit": 0,
+      "elapsed_s": 1.1317724190012086,
+      "owned_group_closed": true,
+      "unexpected_descendants": false,
+      "receipt_sha256": "722107a13f01487b19f05479ec252c6543201be25470ec74952f0c0959b869db",
+      "stdout_sha256": "5460a54eff06379661a554db4840fe29e11c241e26db2b69cb181abaff998dcf",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "stage": "inventory-module",
+      "exit": 0,
+      "elapsed_s": 1.117111326981103,
+      "owned_group_closed": true,
+      "unexpected_descendants": false,
+      "receipt_sha256": "e0ceff96bce7925f404719b47e5e9776584462c8404c1bb8a2b2ed70cfcfa237",
+      "stdout_sha256": "e2819f4e3b8e41d7ee8708d4e71a9558004ddc96ecaf45daead18f985c617287",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "stage": "inventory-module_ignored",
+      "exit": 0,
+      "elapsed_s": 1.0412964670103975,
+      "owned_group_closed": true,
+      "unexpected_descendants": false,
+      "receipt_sha256": "dbbf411252a2e50b91d8c11c9df015394628b6d550e0d4efe73277afcdb27a98",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "stage": "module-runtime",
+      "exit": 0,
+      "elapsed_s": 5.074173050001264,
+      "owned_group_closed": true,
+      "unexpected_descendants": false,
+      "receipt_sha256": "daaf32487968a79f8e3f7cf7f67387923db469551899c88eb8d361bfd1b1d469",
+      "stdout_sha256": "484b9573fc4d1cba5f21fd1911d161e04b3d61a1d344a351d48cdd8f0e5ad42e",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "native_controller": {
+    "controller_exit": 0,
+    "wrapper_exit": 0,
+    "exit_code": 0,
+    "controller_sha256": "3655939b667862fca849934b5d7b461a1669c34bc4eb74aff9a45523598bde8a",
+    "plan_sha256": "dc1ca6f0266eb4991bc756e4f4e21859b6b9e946ee3f08c033a0fc0299358c79",
+    "elapsed_s": 823.6185510689975,
+    "permission_mode": "require_escalated",
+    "activation_verified": true,
+    "terminal_status": "PASS",
+    "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "concurrency_context": {
+    "idle_host_claim": false,
+    "other_target_workloads": [
+      "Carrier direct runtime52264 on481853769, source4fd/4bff fixed",
+      "Root Mood full Expression gate on483454562, independent private source a364/99b; at most two own compilers with jobs1 each"
+    ],
+    "scope": "No target/source overlap; no idle-host or performance measurement claim."
+  },
+  "idle_host_or_performance_claim": false,
+  "all_owned_groups_closed": true,
+  "receipt_digests": {
+    "terminal.json": {
+      "sha256": "6c6130932858813df20a8738f22be3ec886aca67d3d6aa9ca8ef6a8d1e66649c",
+      "bytes": 4921
+    },
+    "native-controller-result.json": {
+      "sha256": "62764d9733e5502ae6e99475a964655dd2befdce9d0366534b663f3757c86f6e",
+      "bytes": 754
+    },
+    "source-before.json": {
+      "sha256": "a73377d7620483027191d1dc3d408ad9046d800f00060de8605178dc7438ebca",
+      "bytes": 2406364
+    },
+    "source-after.json": {
+      "sha256": "a73377d7620483027191d1dc3d408ad9046d800f00060de8605178dc7438ebca",
+      "bytes": 2406364
+    },
+    "prepared-source.json": {
+      "sha256": "a73377d7620483027191d1dc3d408ad9046d800f00060de8605178dc7438ebca",
+      "bytes": 2406364
+    },
+    "protected-before.json": {
+      "sha256": "0c77f774916dcb7015e53e4b9b013d84d06b68c478fe7032c7b4e1801daafdae",
+      "bytes": 100409
+    },
+    "protected-after.json": {
+      "sha256": "325785c9dfdb05faa4a1171506e87f80e2376b0e80bbbffa48a5e59e57c413a1",
+      "bytes": 100798
+    },
+    "new-frozen.json": {
+      "sha256": "94ed3898c1f24657ff08eda8954a4fb485eeb294f84ceec4db2268b0e32695bc",
+      "bytes": 392
+    },
+    "actual-executable.json": {
+      "sha256": "c19407d971c99b625af722d488cb8e4884238a3ceddbd4407ea7e50beaf5d383",
+      "bytes": 1355
+    },
+    "observed-census.json": {
+      "sha256": "9802d4ebcf5dea38d138b6ef9a2d585b36575607c5754b8944fd09dcbd3a82f7",
+      "bytes": 2832
+    },
+    "inventory.json": {
+      "sha256": "faf62903489b593d54e387c3272705ef4b199b88ec7499c3f859480f62736b5a",
+      "bytes": 363797
+    },
+    "fmt-result.json": {
+      "sha256": "5b64e6ba3bd06b4399d156fc1f51ba6a812dd8a92c1ef5f34c4052e447138ad5",
+      "bytes": 1445
+    },
+    "metadata-result.json": {
+      "sha256": "bdddcc75d4491909f81b2ebe7a4740dcf1e592d810b48c50912a0a71cdbcc8f3",
+      "bytes": 1489
+    },
+    "strict-result.json": {
+      "sha256": "ab2432c8668f7bf88d9a36b738e85c0a044e4a34d665388ca5553abaaadc6e95",
+      "bytes": 1910
+    },
+    "workspace-result.json": {
+      "sha256": "02ff9ca953b6e0e8023f8551855aa47c34105313f0339578639697f4fb397177",
+      "bytes": 1523
+    },
+    "compile-Voice-lib-result.json": {
+      "sha256": "bdf0bb47cd071a3c4263b07b9b03cb921b6d61fefbf30b235e5e11f0a8652692",
+      "bytes": 1561
+    },
+    "inventory-all-result.json": {
+      "sha256": "056ee709284ba444f4175af84d00808c12186d6f484345ca9164142f98a2cbcd",
+      "bytes": 1539
+    },
+    "inventory-ignored-result.json": {
+      "sha256": "722107a13f01487b19f05479ec252c6543201be25470ec74952f0c0959b869db",
+      "bytes": 1557
+    },
+    "inventory-module-result.json": {
+      "sha256": "e0ceff96bce7925f404719b47e5e9776584462c8404c1bb8a2b2ed70cfcfa237",
+      "bytes": 1566
+    },
+    "inventory-module_ignored-result.json": {
+      "sha256": "dbbf411252a2e50b91d8c11c9df015394628b6d550e0d4efe73277afcdb27a98",
+      "bytes": 1548
+    },
+    "module-runtime-result.json": {
+      "sha256": "daaf32487968a79f8e3f7cf7f67387923db469551899c88eb8d361bfd1b1d469",
+      "bytes": 1548
+    },
+    "source-physical-before.json": {
+      "sha256": "b376e03c73513ef73b6dd0a2d9ef04fca8adbef5f9b22878efe878d37320bb9a",
+      "bytes": 2310060
+    },
+    "source-physical-after.json": {
+      "sha256": "b376e03c73513ef73b6dd0a2d9ef04fca8adbef5f9b22878efe878d37320bb9a",
+      "bytes": 2310060
+    },
+    "official-source-initial.json": {
+      "sha256": "6690e0950a9245e781befe9752dcc51931ae428686d1d0ea7b2e8644e0c3f049",
+      "bytes": 2406376
+    },
+    "official-source-final.json": {
+      "sha256": "6690e0950a9245e781befe9752dcc51931ae428686d1d0ea7b2e8644e0c3f049",
+      "bytes": 2406376
+    },
+    "official-source-stat-initial.json": {
+      "sha256": "681c7e8a5fad712e20e16bc9840831f648a43e1e5efccfaa8dc7cf1f22609e19",
+      "bytes": 2310060
+    },
+    "official-source-stat-final.json": {
+      "sha256": "681c7e8a5fad712e20e16bc9840831f648a43e1e5efccfaa8dc7cf1f22609e19",
+      "bytes": 2310060
+    },
+    "run.py": {
+      "sha256": "3655939b667862fca849934b5d7b461a1669c34bc4eb74aff9a45523598bde8a",
+      "bytes": 22484
+    },
+    "plan.json": {
+      "sha256": "dc1ca6f0266eb4991bc756e4f4e21859b6b9e946ee3f08c033a0fc0299358c79",
+      "bytes": 22395
+    },
+    "native-controller.stdout": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "native-controller.stderr": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    }
+  },
+  "limits": [
+    "Historical Mac a209/99b source only; no current737 Mac qualification or runtime reuse",
+    "No full Voice runtime, ARM64/native/device qualification from this host gate",
+    "Observed Cargo freshness/source/profile bindings do not imply fresh compilation of every dependent artifact",
+    "Initial/final fullSHA only; intermediate guards are complete tracked file-set/stat6/owner/frozen metadata plus actual-module SHA; only consumed new witness hashed adjacent to direct invocation",
+    "Modes retained as recorded; no universal read-only filesystem claim; no idle host claim"
+  ]
+}

@@ -1,5 +1,15 @@
 # Tests work log
 
+## 2026-10-27 09:14 — Published Restart gates and retained Mood failure
+
+Ready for lamp-voice: no (latest 737 gates and Mood baseline diagnosis pending)
+
+Restart a209/99b is pushed with [host 21/0/0 proof](verification/tests-restart-a209-host-20261027/), all 242 witnesses/source/actual-module guards, and native controller 0. Its [original ARM 40433774956/Linux 40433775214 proof](verification/tests-restart-a209-native-20261027/) records actual preview b04d18720 with ordered 737/a209 parents, tree equal to the new local 1a8/737 carry, **7,552 unique PASS / zero bad / 53 skips**, all 21 SameVoice and 14 Reader cases once. Historical Mac coverage remains a209/99b; current 1a8/737 gate is now active separately.
+
+[Mood a364/99b full failure](verification/tests-mood-a364-failure-20261027/) retains **337 PASS / 3 FAIL / docs 0, Cargo 101, controller 1**. Exact cases/signatures are published. All 10,677 source entries, 278 frozen witnesses and executable bytes remain intact; four helper alias inodes changed outside the original success-only exception. That guard classification does not waive any Rust failure. The separately authorized unmodified99b runtime 28 control is active, with candidate source restored in finally; this packet contains no control result or historical-cause claim.
+
+Carrier 4fd/4bff finished 303 fresh Update cases and 25 promoter cases with controller 0/all 278 guards; explicit old 139 PASS/6IGNORE carry remains labeled. Update docs 0 completed; original doc phase stopped before promoter launch for capacity. After supported cleanup of only the released Journal target, all 409 anchors/eight source roots and other target identities verified unchanged. The single unstarted promoter doc continuation then passed 0 with no ordinary/Update-doc replay. Source 4fd remains fixed pending its latest carry. No device action.
+
 ## 2026-10-27 08:16 — New IPC base carries and fresh gates
 
 Ready for lamp-voice: no (current 99b gates and reads pending)
