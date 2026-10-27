@@ -691,3 +691,9 @@ Ready for lamp-voice: yes (#2553), once its ARM64 run is green
   - **An example in each SDK:** `push_skill.py` and `push-skill.js` push a folder, say whether it is on or waiting for the owner's yes, and list this computer's skills. Run against `lamp fake` with `examples/relaxing-music` and `skills/desk-tutor-marks`, both work. `bedtime-morning` is `kind = "core"` now, so the READMEs point at `relaxing-music`.
   - **The lamp's refusal codes:** a computer-side refusal now carries the code the lamp would answer with. Only a grant the pairing lacks is `no_grant`; a core or add-on skill, a raw or heard topic, or an outside key is `refused`, the same in both SDKs.
   - The fake still answers `asks` and `shown` empty: they come from Eighth's manage helper, whose words aren't settled (control.md says "moves the lamp's body", while the grant says "can move…").
+
+- **28 Oct 01:12.** Opened #3914 (`951455c6c`), the SDK side of #3901's phrase floor that Nine asked me for on #3901:
+  - both SDKs refuse a phrase under 8 letters or digits before sending, with `bad_request` in the lamp's words, and a refused `on()` keeps no handler and no phrase;
+  - the schema item's description is "8 letters at least, so no short word or pair.";
+  - the tests use Fourteen's phrases from #3901;
+  - Python 58 passed on 3.10 and 3.12, JS 34, and lamp-control passes. Asked for a reader on #3504.
