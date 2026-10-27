@@ -2193,6 +2193,7 @@ async fn a_later_decline_keeps_an_executed_scoped_requested_audio_call() {
             seen.lock().unwrap().push(scope);
             Box::pin(async move {
                 crate::tools::ToolAnswer {
+                    sleep: false,
                     told: json!({"next":"Confirm."}),
                     requested_audio: Some(lamp_msgs::RequestedAudioOffer {
                         skills_boot: "skills-test".into(),
@@ -11759,6 +11760,7 @@ async fn called_fallback_does_not_supply_words_for_a_music_identity() {
             seen.lock().unwrap().push(context.clone());
             Box::pin(async move {
                 crate::tools::ToolAnswer {
+                    sleep: false,
                     told: json!({"next":"Confirm."}),
                     requested_audio: Some(super::requested_audio_tests::offered(context)),
                 }
@@ -12220,6 +12222,7 @@ async fn prepared_music_calls_wait_for_final_admission_and_survive_only_matching
             executed.fetch_add(1, Ordering::Relaxed);
             Box::pin(async move {
                 crate::tools::ToolAnswer {
+                    sleep: false,
                     told: json!({"next":"Confirm."}),
                     requested_audio: Some(super::requested_audio_tests::offered(context)),
                 }
@@ -12455,6 +12458,7 @@ async fn carried_words_answered_for_a_held_request_have_no_new_music_identity() 
                 );
                 assert_eq!(call.id, "fresh-music");
                 crate::tools::ToolAnswer {
+                    sleep: false,
                     told: json!({"next":"Confirm."}),
                     requested_audio: Some(super::requested_audio_tests::offered(context)),
                 }
@@ -12591,6 +12595,7 @@ async fn carried_sound_alone_does_not_authorize_music_for_the_successor() {
             assert_eq!(context.request, 2);
             Box::pin(async move {
                 crate::tools::ToolAnswer {
+                    sleep: false,
                     told: json!({"next":"Confirm."}),
                     requested_audio: Some(super::requested_audio_tests::offered(context)),
                 }
@@ -12782,6 +12787,7 @@ async fn skipped_music_confirmation_has_no_audio_but_a_later_sentence_can_still_
                     assert!(audio_scope_current(&scope, &context));
                     Box::pin(async move {
                         crate::tools::ToolAnswer {
+                            sleep: false,
                             told: json!({"next":"Confirm."}),
                             requested_audio: Some(super::requested_audio_tests::offered(context)),
                         }
@@ -13012,6 +13018,7 @@ fn warm_music_engine(script: Arc<WarmScript>) -> (Engine, WarmContexts, WarmOrdi
             captured.lock().unwrap().push(context.clone());
             Box::pin(async move {
                 crate::tools::ToolAnswer {
+                    sleep: false,
                     told: json!({"next":"Confirm."}),
                     requested_audio: Some(super::requested_audio_tests::offered(context)),
                 }
@@ -13772,6 +13779,7 @@ async fn carried_music_after_unclear_handoff_cancels_pending_call_without_anothe
             );
             assert_eq!(call.id, "fresh-after-carried");
             crate::tools::ToolAnswer {
+                sleep: false,
                 told: json!({"next":"Confirm."}),
                 requested_audio: Some(super::requested_audio_tests::offered(context)),
             }

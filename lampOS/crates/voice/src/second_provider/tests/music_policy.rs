@@ -38,6 +38,7 @@ fn recording_engine(script: Arc<Script>) -> (Engine, Dispatches) {
         seen.lock().unwrap().push((context, call));
         Box::pin(async move {
             crate::tools::ToolAnswer {
+                sleep: false,
                 told: json!({"ok": true}),
                 requested_audio: Some(offer),
             }

@@ -1001,6 +1001,73 @@ impl ProviderSlice {
     }
 }
 
+/// A sleep the person asked aloud (#3748): its turn, and the latest it is
+/// asked while its line is still sounding. It is asked only once that turn
+/// is heard whole, or at the cap with its line still sounding; a turn cut by
+/// the person, or one that ends with no audio, drops it (the reviewer-lead
+/// on #3835).
+#[derive(Debug, Default)]
+struct SleepOwed {
+    owed: Option<(u64, u64)>,
+    due: Option<u64>,
+}
+
+impl SleepOwed {
+    fn asked(&mut self, request: u64, now_us: u64) {
+        self.owed = Some((request, now_us + crate::sleep_asked::LINE_PLAYED_WITHIN_US));
+    }
+
+    /// As a turn ends: its sleep is due if its line was heard whole.
+    fn turn_ended(
+        &mut self,
+        current: &Reply,
+        speaker_pending: &Option<PendingSpeaker>,
+        snapshot: Snapshot,
+    ) {
+        let turn = current.owner.turn();
+        if self.owed.is_none_or(|(request, _)| request != turn) {
+            return;
+        }
+        self.owed = None;
+        if current.heard_whole(speaker_pending, snapshot) {
+            self.due = Some(turn);
+        } else {
+            eprintln!(
+                "lamp-voice: request {turn}: its line was not heard whole ({}): no sleep",
+                current.delivery_outcome()
+            );
+        }
+    }
+
+    /// At a poll, with the reply in hand: the request to sleep now, if
+    /// any. Its turn gone without being heard whole drops it; at the cap it
+    /// is asked only if its line has sounded.
+    fn due(&mut self, reply: Option<&Reply>, now_us: u64) -> Option<u64> {
+        if let Some((request, latest_us)) = self.owed {
+            match reply.filter(|current| current.owner.turn() == request) {
+                None => {
+                    self.owed = None;
+                    eprintln!(
+                        "lamp-voice: request {request}: its line was not heard whole: no sleep"
+                    );
+                }
+                Some(current) if now_us >= latest_us => {
+                    self.owed = None;
+                    if current.sounded {
+                        self.due = Some(request);
+                    } else {
+                        eprintln!(
+                            "lamp-voice: request {request}: its line never sounded: no sleep"
+                        );
+                    }
+                }
+                Some(_) => {}
+            }
+        }
+        self.due.take()
+    }
+}
+
 struct Reply {
     owner: TurnOwner,
     cloud: CloudRequest,
@@ -3547,6 +3614,7 @@ fn observe_provider_output(
         // look is taken by the loop too (#941).
         ProviderOutput::Unclear { .. }
         | ProviderOutput::LookAsked { .. }
+        | ProviderOutput::SleepAsked { .. }
         | ProviderOutput::RequestedAudio { .. } => {}
         // A finished task's news the person asked about, answered in this
         // turn: the tasks part is told so only once the turn is heard whole
@@ -3663,6 +3731,7 @@ fn flush_provider_input_with(
             | ProviderInput::Paused { request, .. }
             | ProviderInput::CountOnly { request, .. }
             | ProviderInput::StepCall { request, .. }
+            | ProviderInput::Onboarding { request, .. }
             | ProviderInput::Reminder { request, .. }
             | ProviderInput::Written { request, .. } => *request,
         };
@@ -3942,13 +4011,18 @@ fn spawn_rig(
             "lamp-voice: LAMP_MESSAGES=on, but texts need the second route (LAMP_VOICE_SECOND_CONFIG), which is not set: each text is refused"
         );
     }
-    let arguments = provider_arguments(
+    let mut arguments = provider_arguments(
         source,
         &options,
         lifetime,
         camera.as_ref(),
         routes.standing_by(),
     )?;
+    // `go_to_sleep` only where a tap on the head can wake it (#3835).
+    crate::sleep_asked::only_with_head_sleep(
+        &mut arguments,
+        controls.as_ref().is_some_and(HandControls::head_sleep),
+    );
     let second::Workers {
         role,
         arguments,
@@ -5740,6 +5814,11 @@ fn conversation_with_gate_inner(
     // was answering when it was made: the look's turn goes to that session
     // on that route, or the look is dropped.
     let mut look_held: Option<(u64, u64, bool)> = None;
+    // A sleep the person asked aloud (#3748), asked once its line is heard.
+    let mut sleep_owed = SleepOwed::default();
+    // The last turn told the provider it began while onboarding was under
+    // way, so a `go_to_sleep` it calls is answered not now.
+    let mut onboarding_marked: Option<u64> = None;
     // A turn held as unclear in a conversation, and when (#926): asked again
     // with a written turn once it is over.
     let mut asking = AskAgainState::default();
@@ -6616,6 +6695,38 @@ fn conversation_with_gate_inner(
             controls.set_onboarding(under_way);
         }
         let walk_under_way = controls.as_ref().is_some_and(HandControls::onboarding);
+        // Every turn in hand while the walk is under way, whichever way it
+        // began, is told so before its `go_to_sleep` can be answered: never
+        // the line, then a sleep refused (#3835's P3).
+        if crate::sleep_asked::switched_on()
+            && (walk_under_way
+                || onboarding
+                    .as_ref()
+                    .and_then(crate::onboarding::Onboarding::under_way)
+                    .unwrap_or(false))
+            && let Some(current) = reply.as_ref()
+            && onboarding_marked != Some(current.owner.turn())
+        {
+            onboarding_marked = Some(current.owner.turn());
+            provider_queue.push_back(ProviderInput::Onboarding {
+                request: current.owner.turn(),
+                privacy_generation: snapshot.microphone_generation(),
+            });
+        }
+        // A sleep asked aloud whose turn is gone without being heard whole
+        // (cut by the person, or failed), or whose cap has passed: at the
+        // cap it is asked only if its line is still sounding.
+        // A sleep asked aloud, its line heard whole or still sounding at the
+        // cap (#3748): the hand controls ask it at this poll, refusing it
+        // if the walk is under way, and the mute path below takes it.
+        if let Some(request) = sleep_owed.due(reply.as_ref(), monotonic_us()) {
+            match controls.as_mut() {
+                Some(controls) => controls.ask_sleep(),
+                None => eprintln!(
+                    "lamp-voice: request {request}: asked to sleep, but there are no hand controls to sleep with"
+                ),
+            }
+        }
         let observation = match controls.as_mut() {
             Some(controls) => Some(controls.poll()?),
             None => None,
@@ -7411,6 +7522,14 @@ fn conversation_with_gate_inner(
                 }
                 ProviderOutput::HoldingAnswer { request, session } => {
                     holding_answer.observed(request, session, rig.provider.boot, reply.as_ref());
+                }
+                ProviderOutput::SleepAsked { request } => {
+                    // Asked once its line has been heard whole, or at the
+                    // cap while it is still sounding.
+                    sleep_owed.asked(request, monotonic_us());
+                    eprintln!(
+                        "lamp-voice: request {request}: asked to sleep; once its line has played"
+                    );
                 }
                 ProviderOutput::LookNoCall { request, session } => {
                     // Only the look's own turn, still in hand on its session.
@@ -9161,6 +9280,20 @@ fn conversation_with_gate_inner(
                             json!({"kind":"onboarding_step_call","turn":current.owner.turn(),"at_us":monotonic_us()}),
                         )?;
                     }
+                    // Begun while onboarding is under way (#3748): a
+                    // `go_to_sleep` it calls is answered not now.
+                    if crate::sleep_asked::switched_on()
+                        && onboarding
+                            .as_ref()
+                            .and_then(crate::onboarding::Onboarding::under_way)
+                            .unwrap_or(false)
+                        && let Some(current) = reply.as_ref()
+                    {
+                        provider_queue.push_back(ProviderInput::Onboarding {
+                            request: current.owner.turn(),
+                            privacy_generation: snapshot.microphone_generation(),
+                        });
+                    }
                     if goes_on_from_name {
                         open_name_turn = None;
                         eprintln!(
@@ -9963,6 +10096,7 @@ fn conversation_with_gate_inner(
             last_publish = monotonic_us();
             current.complete_reminder(&speaker_pending, snapshot);
             current.answer_say(&speaker_pending, snapshot);
+            sleep_owed.turn_ended(current, &speaker_pending, snapshot);
             if onboarding_invitation_turn == Some((current.owner.boot(), turn)) {
                 if let Some(walk) = onboarding.as_mut() {
                     // Nothing of it played is no ask at all (#3754).

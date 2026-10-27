@@ -161,6 +161,9 @@ pub struct Settings {
     pub reports_stop: bool,
     /// Typed local recording offers for an explicitly spoken request.
     pub requested_audio: bool,
+    /// The person may put the lamp to sleep by voice
+    /// ([`crate::sleep_asked`], `LAMP_SLEEP_ASKED=on`, #3748).
+    pub sleep_asked: bool,
 }
 
 /// The provider worker's arguments for what the environment says.
@@ -226,6 +229,11 @@ pub fn arguments_from_environment() -> Vec<String> {
             .as_deref(),
     ));
     flags.extend(crate::requested_audio::arguments_from_environment());
+    flags.extend(crate::sleep_asked::arguments(
+        std::env::var(crate::sleep_asked::ENVIRONMENT)
+            .ok()
+            .as_deref(),
+    ));
     flags
 }
 
@@ -427,6 +435,12 @@ pub fn take(flags: &[String]) -> std::io::Result<(Settings, &[String])> {
         && flag == crate::requested_audio::FLAG
     {
         settings.requested_audio = true;
+        flags = rest;
+    }
+    if let [flag, rest @ ..] = flags
+        && flag == crate::sleep_asked::FLAG
+    {
+        settings.sleep_asked = true;
         flags = rest;
     }
     Ok((settings, flags))
@@ -748,6 +762,9 @@ fn core_tools_within(settings: &Settings, bound: usize) -> Vec<Tool> {
         tools.push(crate::reports_stop::tool());
         tools.push(crate::reports_stop::state_tool());
     }
+    if settings.sleep_asked {
+        tools.push(crate::sleep_asked::tool());
+    }
     if let Some(directory) = &settings.exec {
         let room = bound.saturating_sub(tools.len());
         tools.extend(
@@ -813,6 +830,7 @@ fn voices_own(name: &str) -> bool {
         || name == crate::use_skill::NAME
         || crate::reports_stop::is_tool(name)
         || crate::reports_stop::is_state_tool(name)
+        || crate::sleep_asked::is_tool(name)
 }
 
 /// The skills' folder that runs `name`, when the executive does not.
@@ -910,6 +928,10 @@ pub enum Route {
     /// A skill named in a call of `use_skill` ([`crate::use_skill`]), with
     /// the settings that find it: made the skill's own call when it is run.
     UseSkill(Box<Settings>),
+    /// The person asked the lamp to sleep ([`crate::sleep_asked`]):
+    /// answered here, at once, with the line to say, or not now while
+    /// onboarding is under way.
+    Sleep,
     /// Nobody here runs that.
     Nobody,
 }
@@ -975,6 +997,13 @@ pub fn route(settings: &Settings, name: &str) -> Route {
     if crate::reports_stop::is_tool(name) {
         return if settings.reports_stop {
             Route::ReportsStop(false)
+        } else {
+            Route::Nobody
+        };
+    }
+    if crate::sleep_asked::is_tool(name) {
+        return if settings.sleep_asked {
+            Route::Sleep
         } else {
             Route::Nobody
         };
@@ -1049,6 +1078,10 @@ pub fn answer_keeping_news(
 pub(crate) struct ToolAnswer {
     pub told: Value,
     pub requested_audio: Option<lamp_msgs::RequestedAudioOffer>,
+    /// The person asked the lamp to sleep, and the model was told the line
+    /// to say first ([`crate::sleep_asked`]): the route tells the
+    /// coordinator, which asks the sleep once that line has played.
+    pub sleep: bool,
 }
 
 impl ToolAnswer {
@@ -1056,6 +1089,7 @@ impl ToolAnswer {
         Self {
             told,
             requested_audio: None,
+            sleep: false,
         }
     }
 }
@@ -1136,6 +1170,13 @@ fn answer_inner(
             &mut crate::reports_stop::Bus::of_the_lamp(),
         )),
         Route::Decline => ToolAnswer::plain(declined()),
+        Route::Sleep => {
+            let onboarding = crate::sleep_asked::during_onboarding(request);
+            ToolAnswer {
+                sleep: !onboarding,
+                ..ToolAnswer::plain(crate::sleep_asked::told(onboarding))
+            }
+        }
         Route::Nobody => ToolAnswer::plain(unavailable()),
         route => {
             if keeps_out(&route, &call.name) {
@@ -1671,7 +1712,7 @@ fn run_call_with_scope(
                 Err(told) => (crate::use_skill::NAME, (told, true)),
             }
         }
-        Route::Decline | Route::Clock | Route::ReportsState | Route::Nobody => {
+        Route::Decline | Route::Clock | Route::ReportsState | Route::Sleep | Route::Nobody => {
             ("nobody", (unavailable(), false))
         }
     };
@@ -1721,6 +1762,7 @@ fn ask_with_context(
                     ToolAnswer {
                         told,
                         requested_audio,
+                        sleep: false,
                     },
                     true,
                 )
@@ -2319,6 +2361,7 @@ mod tests {
     #[test]
     fn with_every_switch_on_the_voices_own_functions_are_a_list_the_link_takes() {
         let settings = Settings {
+            sleep_asked: false,
             decline: true,
             use_skill: false,
             requested_audio: true,
@@ -2584,6 +2627,7 @@ mod tests {
         assert_eq!(
             settings,
             Settings {
+                sleep_asked: false,
                 decline: true,
                 use_skill: false,
                 requested_audio: false,
@@ -4158,6 +4202,43 @@ mod tests {
         );
         let texted = answer_typed(&on, &call, crate::messages::REQUESTS_FROM + 1);
         assert_ne!(texted, unavailable());
+    }
+
+    /// #3748: `go_to_sleep` is declared and routed only with
+    /// `LAMP_SLEEP_ASKED=on`, its flag is taken last, and it is answered at
+    /// once with the line to say, or not now for a request begun while
+    /// onboarding was under way, on either route.
+    #[test]
+    fn go_to_sleep_is_the_voices_own_and_says_its_line_or_not_now() {
+        let untouched = ["--session".to_owned(), "7".to_owned()];
+        let mut flags = crate::requested_audio::arguments_from_environment();
+        flags.extend(crate::sleep_asked::arguments(Some("on")));
+        flags.extend(untouched.clone());
+        let (on, rest) = take(&flags).unwrap();
+        assert!(on.sleep_asked);
+        assert_eq!(rest, untouched);
+        let (off, _) = take(&untouched).unwrap();
+        assert!(!off.sleep_asked);
+        let named = |settings: &Settings| {
+            core_tools(settings)
+                .iter()
+                .any(|tool| tool.name == crate::sleep_asked::NAME)
+        };
+        assert!(named(&on) && !named(&off));
+        assert!(voices_own(crate::sleep_asked::NAME));
+        let call = call(crate::sleep_asked::NAME);
+        assert_eq!(route(&on, &call.name), Route::Sleep);
+        assert_eq!(route(&off, &call.name), Route::Nobody);
+        assert_eq!(answer(&off, &call, 7, true), unavailable());
+        // Asked: the line, and the route is told a sleep was asked.
+        let asked = answer_inner(&on, &call, 70_001, true, None, None, true);
+        assert_eq!(asked.told, crate::sleep_asked::told(false));
+        assert!(asked.sleep);
+        // Begun while onboarding was under way: not now, and no sleep.
+        crate::sleep_asked::mark_onboarding(70_002);
+        let walking = answer_inner(&on, &call, 70_002, true, None, None, true);
+        assert_eq!(walking.told, crate::sleep_asked::told(true));
+        assert!(!walking.sleep);
     }
 
     /// The reviewer on #1706: the setup line's two notes with `use_skill`,

@@ -109,6 +109,10 @@ const NOT_PASSED: &[(&str, &str)] = &[
     ),
     ("LAMP_USE_SKILL", "the coordinator's, given as an argument"),
     ("LAMP_REPORTS", "the coordinator's, given as an argument"),
+    (
+        "LAMP_SLEEP_ASKED",
+        "the coordinator's, given as an argument (--sleep-asked, #3748)",
+    ),
     // `thread::arguments_from_environment`, the same way.
     (
         "LAMP_THREAD_FILE",
