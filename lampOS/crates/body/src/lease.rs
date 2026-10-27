@@ -12,7 +12,7 @@
 //! - `{"lease":"held"}`;
 //! - `{"lease":"suspended","why":"conversation"}`, while someone talks to
 //!   the lamp, and `held` again after;
-//! - `{"lease":"lost","why":"hand|private|paused|asleep|lapsed"}`: a hand on
+//! - `{"lease":"lost","why":"hand|slumped|private|paused|asleep|lapsed"}`: a hand on
 //!   the head, the person's privacy, a pause or a sleep ends it, and so does
 //!   a hold not renewed within its `for_ms`, so a holder that dies gives
 //!   the lamp its own life back within 30 s;
@@ -41,6 +41,9 @@ pub struct Around {
     pub paused: bool,
     /// A hand's sleep (`voice/mute`, #1362).
     pub asleep: bool,
+    /// Let go under load or by a hand (`--overload release`, `--limp`): its
+    /// torque off, the body can't be moved (the reviewer-lead on #3791).
+    pub slumped: bool,
 }
 
 impl Around {
@@ -48,6 +51,7 @@ impl Around {
     fn ends(&self) -> Option<&'static str> {
         [
             (self.hand, "hand"),
+            (self.slumped, "slumped"),
             (self.private, "private"),
             (self.paused, "paused"),
             (self.asleep, "asleep"),
@@ -205,6 +209,7 @@ mod tests {
         private: false,
         paused: false,
         asleep: false,
+        slumped: false,
     };
 
     fn said(text: &str) -> String {
@@ -297,6 +302,13 @@ mod tests {
                     ..QUIET
                 },
                 "asleep",
+            ),
+            (
+                Around {
+                    slumped: true,
+                    ..QUIET
+                },
+                "slumped",
             ),
             (
                 Around {
