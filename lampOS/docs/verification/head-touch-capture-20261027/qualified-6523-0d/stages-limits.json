@@ -1,0 +1,197 @@
+{
+  "commands": [
+    {
+      "argv_public_labels": [
+        "cargo",
+        "+1.96.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit_code": 1,
+      "phase": "preparation",
+      "stage": "fmt-first-check"
+    },
+    {
+      "argv_public_labels": [
+        "cargo",
+        "+1.96.0",
+        "fmt",
+        "-p",
+        "lamp-update"
+      ],
+      "exit_code": 0,
+      "phase": "preparation",
+      "stage": "fmt-owned"
+    },
+    {
+      "argv_public_labels": [
+        "cargo",
+        "+1.96.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit_code": 0,
+      "phase": "preparation",
+      "stage": "fmt"
+    },
+    {
+      "argv_public_labels": [
+        "cargo",
+        "+1.96.0",
+        "clippy",
+        "--locked",
+        "-q",
+        "-p",
+        "lamp-update",
+        "--all-targets",
+        "--message-format=short",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "phase": "preparation",
+      "stage": "clippy"
+    },
+    {
+      "argv_public_labels": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--locked",
+        "-p",
+        "lamp-update",
+        "--no-run",
+        "--message-format=json"
+      ],
+      "exit_code": 0,
+      "phase": "preparation",
+      "stage": "compile"
+    },
+    {
+      "argv_public_labels": [
+        "cargo",
+        "+1.96.0",
+        "nextest",
+        "list",
+        "--locked",
+        "-p",
+        "lamp-update",
+        "--profile",
+        "pr",
+        "-E",
+        "all()",
+        "--config-file",
+        "lampOS/.config/nextest.toml",
+        "--user-config-file",
+        "none",
+        "--message-format",
+        "json"
+      ],
+      "exit_code": 0,
+      "phase": "preparation",
+      "stage": "list"
+    },
+    {
+      "argv_public_labels": [
+        "cargo",
+        "+1.96.0",
+        "nextest",
+        "run",
+        "--locked",
+        "-p",
+        "lamp-update",
+        "--profile",
+        "pr",
+        "-E",
+        "all()",
+        "--config-file",
+        "lampOS/.config/nextest.toml",
+        "--user-config-file",
+        "none",
+        "--test-threads",
+        "4",
+        "--retries",
+        "0",
+        "--no-fail-fast",
+        "--status-level",
+        "all",
+        "--final-status-level",
+        "none",
+        "--color",
+        "never"
+      ],
+      "exit_code": 0,
+      "phase": "runtime",
+      "stage": "nextest"
+    },
+    {
+      "argv_public_labels": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--locked",
+        "-p",
+        "lamp-update",
+        "--doc",
+        "--",
+        "--test-threads=4"
+      ],
+      "exit_code": 0,
+      "phase": "runtime",
+      "stage": "doctests"
+    },
+    {
+      "argv_public_labels": [
+        "<captured-custom-driver>",
+        "--exact",
+        "actual_cli_exec_confirms_before_the_next_round",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "phase": "runtime",
+      "stage": "custom-self-cli-exec"
+    },
+    {
+      "argv_public_labels": [
+        "<captured-custom-driver>",
+        "--exact",
+        "persisted_self_switches_survive_sigkill",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "phase": "runtime",
+      "stage": "custom-self-process-cuts"
+    }
+  ],
+  "commands_are_retained_invocation_labels_not_copy_run_scripts": true,
+  "coverage_limits": "Mac physical non-UTF8 filename capture UNVERIFIED. Portable raw OsString closed replay and real invalid-UTF8 file-content refusal pass. Explicit Linux physical subsection must execute in original native ARM64 before Ready. No authentication/path authority/exclusion/writes/restore/bootstrap/device/power-cut/atomic snapshot/kernel deadline or whole-round credit.",
+  "earlier_scopes": [
+    {
+      "facts": "Six EPERM fixture sites; two World failures have unestablished causes. Retained and unwaived.",
+      "failed": 8,
+      "ignored": 6,
+      "mode": "default sandbox",
+      "passed": 520,
+      "selected_unrun": 0,
+      "source": "5d866fd9c/992303fc8"
+    },
+    {
+      "facts": "EILSEQ92 creating physical raw filename before collector. Retained, not a demonstrated module failure.",
+      "failed": 1,
+      "ignored": 6,
+      "mode": "explicit fixture permission",
+      "passed": 530,
+      "selected_unrun": 0,
+      "source": "3c9838fea6"
+    },
+    {
+      "cargo_stages": 0,
+      "runtime_tests": 0,
+      "scope": "live-Main preflight stop",
+      "source": "197f215337"
+    }
+  ]
+}

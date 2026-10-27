@@ -1,0 +1,61 @@
+{
+  "four_concurrent_test_processes": true,
+  "matching_native_handle_drained": true,
+  "native_handle": 97108,
+  "no_fail_fast": true,
+  "old_counts_separate": {
+    "6490_3c_local": 219,
+    "dd76_197_local": 352,
+    "dd76_197_original_ARM": 7798,
+    "earlier_c3_full": 528
+  },
+  "old_failures_unwaived": true,
+  "permission_attribution": "Structured original request saved before execution explicitly requires elevated local fixture permissions. It makes no claim about prior failed-source causes.",
+  "requests": [
+    {
+      "chunk_id": "a1a86c",
+      "raw_sha256": "83d62b3bba98757027601d42dcdc166ca0aac4ef8a21785c1acb652897aa7da7",
+      "receipt": "continuation-1.json",
+      "session_id": 97108,
+      "wall_time_seconds": 5.002211959
+    },
+    {
+      "chunk_id": "a80099",
+      "raw_sha256": "06c3c1bac90355835e66ccdad020c1dc3f62f6495cbeda5ef39c98a3296337e7",
+      "receipt": "continuation-2.json",
+      "session_id": 97108,
+      "wall_time_seconds": 5.002928709
+    },
+    {
+      "chunk_id": "9452a9",
+      "raw_sha256": "868b574a5706abe142bdeda4f5a4ae640340488b47c59c89d64116b888d3ceed",
+      "receipt": "continuation-3.json",
+      "session_id": 97108,
+      "wall_time_seconds": 30.000622041
+    },
+    {
+      "chunk_id": "c302e5",
+      "exit_code": 0,
+      "raw_sha256": "ccc10de2dc2d739f4f06daf3bd8155351e2612ca5b221814de18979182480de8",
+      "receipt": "continuation-4.json",
+      "wall_time_seconds": 17.970457208
+    },
+    {
+      "chunk_id": "130c31",
+      "raw_sha256": "98165f4983814c6a92296323494e9d74806ef1d98873416eef342ca50c369f9e",
+      "receipt": "initial-result.json",
+      "session_id": 97108,
+      "wall_time_seconds": 1.003282833
+    },
+    {
+      "fixture_scope": "local TCP/Unix-socket/raw-filename fixtures only",
+      "raw_sha256": "71f6a66d3f44be31eda93f43537dda1ffc88e9863f9d67423c49da34e2ea1f0f",
+      "receipt": "request-before-exec.json",
+      "sandbox_permissions": "require_escalated",
+      "saved_before_exec": true
+    }
+  ],
+  "retries": 0,
+  "runtime_executions": 1,
+  "terminal_exit_code": 0
+}

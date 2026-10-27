@@ -1,0 +1,34 @@
+[
+  {
+    "line": 345,
+    "text": "HEAD is now at 5f6ee85 Merge 6490230d64e80dd2e2b4d1dd2d1972e18046f5cd into 3c9838fea6591410cdf534d27088615021c8df30"
+  },
+  {
+    "line": 347,
+    "text": "[command]/usr/bin/git log -1 --format=%H"
+  },
+  {
+    "line": 494,
+    "text": "Finished `dev` profile [unoptimized + debuginfo] target(s) in 13.84s"
+  },
+  {
+    "line": 495,
+    "text": "##[group]Run cargo +1.96.0 fmt --all --check"
+  },
+  {
+    "line": 496,
+    "text": "cargo +1.96.0 fmt --all --check"
+  },
+  {
+    "line": 559,
+    "text": "##[group]Run cargo clippy --locked --workspace --all-targets -- -D warnings"
+  },
+  {
+    "line": 560,
+    "text": "cargo clippy --locked --workspace --all-targets -- -D warnings"
+  },
+  {
+    "line": 575,
+    "text": "Finished `dev` profile [unoptimized + debuginfo] target(s) in 1m 26s"
+  }
+]

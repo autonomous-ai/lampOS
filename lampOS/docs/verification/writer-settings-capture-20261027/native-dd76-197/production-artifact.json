@@ -1,0 +1,429 @@
+{
+  "actual_preview": "63ad4a57246188dbee0a57e3806e9d2bd408b8cc",
+  "api_and_upload_log_digest_equal": true,
+  "artifact_id": 12751575880,
+  "artifact_name": "lampos-arm64-dd76b805ce0451376be99c636d9e18ad4a02516d",
+  "attempt": 1,
+  "authored_head": "dd76b805ce0451376be99c636d9e18ad4a02516d",
+  "base": "197f21533736cc99a1e1a819721a5a96ff8f3033",
+  "complete_manifest_inventory_verified": true,
+  "current_workspace_binaries": 48,
+  "limits": "Only production binaries and SHA256SUMS are uploaded; per-nextest executable bytes/hashes and Cargo JSON are not present. Package/case identities and exact checkout bind runtime; production executable provenance is separate. No helper copy, writer replacement, key use, signing, promotion, device or power-cut execution claimed.",
+  "run_id": 40540185925,
+  "selected_examples": 2,
+  "sha256sums_sha256": "e93db98396b796dec976312c87879929a5b07c0ba822b0209a2ee19167e76a62",
+  "source_binding": "The same original exact-checkout job executes the current-workspace Cargo release build, packages the complete current inventory and independent examples, and uploads this checksum-verified artifact.",
+  "tree": "869b43f6be2d7938568067fcf30676485b5b2359",
+  "update_executable": {
+    "bytes": 4916240,
+    "e_machine": 183,
+    "elf_class": 64,
+    "endianness": "little",
+    "sha256": "aaa494bebcbb1e17cb69a9619c843509d014c587f54863239379e8a9d440fd0f",
+    "target": "AArch64 Linux ELF"
+  },
+  "verified_members": {
+    "lamp-actions": {
+      "bytes": 4510440,
+      "e_machine": 183,
+      "elf_class": 64,
+      "endianness": "little",
+      "sha256": "c6feab047df9b7336e7d4cca22bb2b80ba513955396383258bf9be63f463a58c",
+      "target": "AArch64 Linux ELF"
+    },
+    "lamp-addons": {
+      "bytes": 1154744,
+      "e_machine": 183,
+      "elf_class": 64,
+      "endianness": "little",
+      "sha256": "1d1ca9bf054be4a646c23c70387cc0c430ad3f20aceba0cada082f01c1c640ea",
+      "target": "AArch64 Linux ELF"
+    },
+    "lamp-air": {
+      "bytes": 896272,
+      "e_machine": 183,
+      "elf_class": 64,
+      "endianness": "little",
+      "sha256": "23e727dcae09933bfa297b29b07de8620609d6d19664e00688617c900a850d77",
+      "target": "AArch64 Linux ELF"
+    },
+    "lamp-audio": {
+      "bytes": 2121152,
+      "e_machine": 183,
+      "elf_class": 64,
+      "endianness": "little",
+      "sha256": "2a47f6a8b753ea38ababf08732b205114e696386878ed2dda0879c4154d3620c",
+      "target": "AArch64 Linux ELF"
+    },
+    "lamp-body": {
+      "bytes": 2024088,
+      "e_machine": 183,
+      "elf_class": 64,
+      "endianness": "little",
+      "sha256": "3340151dd9346b71fd2dd6df627db5412d4e7fc7cb805db97a66127d28fc1aa7",
+      "target": "AArch64 Linux ELF"
+    },
+    "lamp-body-inspect": {
+      "bytes": 698520,
+      "e_machine": 183,
+      "elf_class": 64,
+      "endianness": "little",
+      "sha256": "d19acd1b4b9b9ae5d5f5a0e59efd6d9a864be61eb3b2c77947cb5d7a70f34ed2",
+      "target": "AArch64 Linux ELF"
+    },
+    "lamp-body-measure": {
+      "bytes": 1362656,
+      "e_machine": 183,
+      "elf_class": 64,
+      "endianness": "little",
+      "sha256": "a6cab7002b82efdd5303c3c49cb8f6255df1ee3ab76ea05adcbaf68c413f8b03",
+      "target": "AArch64 Linux ELF"
+    },
+    "lamp-body-mood": {
+      "bytes": 477072,
+      "e_machine": 183,
+      "elf_class": 64,
+      "endianness": "little",
+      "sha256": "bb7d3ec66f7c8957033d59290ff3cd3e3048d0d4a06cebe6faf37578446c315f",
+      "target": "AArch64 Linux ELF"
+    },
+    "lamp-body-worker": {
+      "bytes": 1171192,
+      "e_machine": 183,
+      "elf_class": 64,
+      "endianness": "little",
+      "sha256": "91155f98d1a3f4d89399acb8bba57492d11a6e7060a4df3b9e09c7b36c410010",
+      "target": "AArch64 Linux ELF"
+    },
+    "lamp-bus": {
+      "bytes": 1106576,
+      "e_machine": 183,
+      "elf_class": 64,
+      "endianness": "little",
+      "sha256": "bca4b1dc589c3522daeb6b5ff42d124fc6878f82cd8c9fb1436d1b1f0deab5a7",
+      "target": "AArch64 Linux ELF"
+    },
+    "lamp-cloud": {
+      "bytes": 10802392,
+      "e_machine": 183,
+      "elf_class": 64,
+      "endianness": "little",
+      "sha256": "dbf0cc8745c24119724d1bedf37621966a1db4ea8db69df1fa7767fa2df5225d",
+      "target": "AArch64 Linux ELF"
+    },
+    "lamp-control": {
+      "bytes": 4201168,
+      "e_machine": 183,
+      "elf_class": 64,
+      "endianness": "little",
+      "sha256": "205821e91caab0da32771974d2b01a96f30ae1c359e8f429a5e986f35b13bdbb",
+      "target": "AArch64 Linux ELF"
+    },
+    "lamp-controls": {
+      "bytes": 2469128,
+      "e_machine": 183,
+      "elf_class": 64,
+      "endianness": "little",
+      "sha256": "1c0bc99b5df6c404641130d45112badc62c9f9ac336b2654f91a6d70eae12d9c",
+      "target": "AArch64 Linux ELF"
+    },
+    "lamp-ears": {
+      "bytes": 24861328,
+      "e_machine": 183,
+      "elf_class": 64,
+      "endianness": "little",
+      "sha256": "c9f7c66b68949b4e7bc1ae68f5c7cd27517055ec3d8b18f3e9423c0708e85cb1",
+      "target": "AArch64 Linux ELF"
+    },
+    "lamp-expression": {
+      "bytes": 4200368,
+      "e_machine": 183,
+      "elf_class": 64,
+      "endianness": "little",
+      "sha256": "4bc9bb99ea22cb15646875d204a8e3e7405d9d0398588413d07356024534b58e",
+      "target": "AArch64 Linux ELF"
+    },
+    "lamp-eyes": {
+      "bytes": 26398688,
+      "e_machine": 183,
+      "elf_class": 64,
+      "endianness": "little",
+      "sha256": "fd069511b03d1e42868d01a490c095ffaa2bb4b5f2136f7d1932d7fd3e0034e4",
+      "target": "AArch64 Linux ELF"
+    },
+    "lamp-health": {
+      "bytes": 1315144,
+      "e_machine": 183,
+      "elf_class": 64,
+      "endianness": "little",
+      "sha256": "b9a2fa29867baecbef5ee04f2f9a55194029fd1a7d50fea126089bca90fd099e",
+      "target": "AArch64 Linux ELF"
+    },
+    "lamp-ipc-probe": {
+      "bytes": 667592,
+      "e_machine": 183,
+      "elf_class": 64,
+      "endianness": "little",
+      "sha256": "80a3898dde91c6109dbf55f0cc6d1fd49e491be7bb6ef941df914e02411296cb",
+      "target": "AArch64 Linux ELF"
+    },
+    "lamp-keeper": {
+      "bytes": 3244624,
+      "e_machine": 183,
+      "elf_class": 64,
+      "endianness": "little",
+      "sha256": "123c8b4e50daf49ab15a3e48f7b767f7761a286665bcc2bd6e635049fc4974fe",
+      "target": "AArch64 Linux ELF"
+    },
+    "lamp-memory": {
+      "bytes": 4891152,
+      "e_machine": 183,
+      "elf_class": 64,
+      "endianness": "little",
+      "sha256": "dd24fb3630ff1a8ca8efa6a0230b46951f937bafb33f6d0aefd40fee22a540af",
+      "target": "AArch64 Linux ELF"
+    },
+    "lamp-memory-eval": {
+      "bytes": 3048680,
+      "e_machine": 183,
+      "elf_class": 64,
+      "endianness": "little",
+      "sha256": "f7a46671b8b5c07e646b493af5474a39a80b2d15132d227cda970ed30ed2d5c9",
+      "target": "AArch64 Linux ELF"
+    },
+    "lamp-memory-fixture": {
+      "bytes": 5037064,
+      "e_machine": 183,
+      "elf_class": 64,
+      "endianness": "little",
+      "sha256": "de514ce2d6a93909e6d6fdaf01b4d336c0847067b2535e4fc4c929d593c41653",
+      "target": "AArch64 Linux ELF"
+    },
+    "lamp-mood": {
+      "bytes": 1985056,
+      "e_machine": 183,
+      "elf_class": 64,
+      "endianness": "little",
+      "sha256": "dbbdfadbaa344df043f098f1419fb09540d684668aa88b778e3d1f20102b9631",
+      "target": "AArch64 Linux ELF"
+    },
+    "lamp-name": {
+      "bytes": 24279344,
+      "e_machine": 183,
+      "elf_class": 64,
+      "endianness": "little",
+      "sha256": "ab3e89f9e415322b818bff5d34534b9820154ed54f3f3e01164883e6765488e8",
+      "target": "AArch64 Linux ELF"
+    },
+    "lamp-observer": {
+      "bytes": 884120,
+      "e_machine": 183,
+      "elf_class": 64,
+      "endianness": "little",
+      "sha256": "24d48e53babb9efc35b430d93579830ab0854f42011654c0f39ba019944fd670",
+      "target": "AArch64 Linux ELF"
+    },
+    "lamp-peek": {
+      "bytes": 2719208,
+      "e_machine": 183,
+      "elf_class": 64,
+      "endianness": "little",
+      "sha256": "7e55bb5f12003e3541a6f184ba618b169df9238c7ab2d9920cad4a2395b392fb",
+      "target": "AArch64 Linux ELF"
+    },
+    "lamp-policy": {
+      "bytes": 5028880,
+      "e_machine": 183,
+      "elf_class": 64,
+      "endianness": "little",
+      "sha256": "37e05d4aaa0629bce7dca5d447ab850ba3ec1ba9da87cdc960d88142c6a5502c",
+      "target": "AArch64 Linux ELF"
+    },
+    "lamp-policy-fit": {
+      "bytes": 919256,
+      "e_machine": 183,
+      "elf_class": 64,
+      "endianness": "little",
+      "sha256": "a576e4b7632a28d355ae8eefa07fdf149f9350e2e8c188c60ff67ee311816ccd",
+      "target": "AArch64 Linux ELF"
+    },
+    "lamp-policy-judges": {
+      "bytes": 4541792,
+      "e_machine": 183,
+      "elf_class": 64,
+      "endianness": "little",
+      "sha256": "df1c70d85c32071ee4bbc5e1d3b2bc0e90115a28311d8328d143f98c65d92667",
+      "target": "AArch64 Linux ELF"
+    },
+    "lamp-policy-replay": {
+      "bytes": 2959984,
+      "e_machine": 183,
+      "elf_class": 64,
+      "endianness": "little",
+      "sha256": "f13013138557b5a689877872f72a3056ec8e9315d8f575dbb745b71c87f4d7ec",
+      "target": "AArch64 Linux ELF"
+    },
+    "lamp-records": {
+      "bytes": 1406984,
+      "e_machine": 183,
+      "elf_class": 64,
+      "endianness": "little",
+      "sha256": "1aa5274dd33c3db7053a70dd45eec743d056ceede216a1360ccbb3d2e651ff57",
+      "target": "AArch64 Linux ELF"
+    },
+    "lamp-records-fixture": {
+      "bytes": 1450056,
+      "e_machine": 183,
+      "elf_class": 64,
+      "endianness": "little",
+      "sha256": "1627e88117fff3902c7e3cea8387974174555552ad632ab272a8db63bb68762c",
+      "target": "AArch64 Linux ELF"
+    },
+    "lamp-same-voice": {
+      "bytes": 24216664,
+      "e_machine": 183,
+      "elf_class": 64,
+      "endianness": "little",
+      "sha256": "4bea8b3d39e024184357b3fc7b4f759cbddad788fc4cfc6b2c5c9c0c21a55523",
+      "target": "AArch64 Linux ELF"
+    },
+    "lamp-schedule": {
+      "bytes": 4490344,
+      "e_machine": 183,
+      "elf_class": 64,
+      "endianness": "little",
+      "sha256": "67ed2af8b8e5848d1afb9a220fec4eeb623579db888b94f3a3ca29310b31e332",
+      "target": "AArch64 Linux ELF"
+    },
+    "lamp-seems-measure": {
+      "bytes": 16740592,
+      "e_machine": 183,
+      "elf_class": 64,
+      "endianness": "little",
+      "sha256": "7897a150776df32201335f05723b9fae489b21ca7d9dfadef91bd519d2626c4e",
+      "target": "AArch64 Linux ELF"
+    },
+    "lamp-selftest": {
+      "bytes": 1560016,
+      "e_machine": 183,
+      "elf_class": 64,
+      "endianness": "little",
+      "sha256": "1937c39b9c43f88f2bde710b9b95dbe7c22b8578d089c7acc4b9640ee479f418",
+      "target": "AArch64 Linux ELF"
+    },
+    "lamp-settings": {
+      "bytes": 1529768,
+      "e_machine": 183,
+      "elf_class": 64,
+      "endianness": "little",
+      "sha256": "7aca992aa1936ef35604eed9d647dcaab88571fca3f9fdcb450b01813a33ef24",
+      "target": "AArch64 Linux ELF"
+    },
+    "lamp-setup": {
+      "bytes": 7616168,
+      "e_machine": 183,
+      "elf_class": 64,
+      "endianness": "little",
+      "sha256": "fc0e7da48760cd4cd7ee692a9d98f65898abbb84ac219c00b81ee901e4bfb764",
+      "target": "AArch64 Linux ELF"
+    },
+    "lamp-skills": {
+      "bytes": 8857808,
+      "e_machine": 183,
+      "elf_class": 64,
+      "endianness": "little",
+      "sha256": "0476fdb7f3cc1e9886eaafac533007f379f782ff9e15f0e4e9cf5bbe8c98f294",
+      "target": "AArch64 Linux ELF"
+    },
+    "lamp-sound-fixtures": {
+      "bytes": 1006096,
+      "e_machine": 183,
+      "elf_class": 64,
+      "endianness": "little",
+      "sha256": "404cd34297318d5cb82f1fff194a3955b61923c48d3fc1b0d4ca601876a3e28f",
+      "target": "AArch64 Linux ELF"
+    },
+    "lamp-station": {
+      "bytes": 1816960,
+      "e_machine": 183,
+      "elf_class": 64,
+      "endianness": "little",
+      "sha256": "230700906735101ac097305a06efedffa30b9f87765fb8a071662abfe06fe636",
+      "target": "AArch64 Linux ELF"
+    },
+    "lamp-surround": {
+      "bytes": 14884520,
+      "e_machine": 183,
+      "elf_class": 64,
+      "endianness": "little",
+      "sha256": "1c5d78d995dfd02411cf8dfc8432abb027dfae023fd24901d662740bf633ceb0",
+      "target": "AArch64 Linux ELF"
+    },
+    "lamp-tasks": {
+      "bytes": 4725968,
+      "e_machine": 183,
+      "elf_class": 64,
+      "endianness": "little",
+      "sha256": "b6713b8a72747205eb8facac35a558405e8e61c8bf2c4526e299e9a46fef937c",
+      "target": "AArch64 Linux ELF"
+    },
+    "lamp-tasks-harness-fixture": {
+      "bytes": 752840,
+      "e_machine": 183,
+      "elf_class": 64,
+      "endianness": "little",
+      "sha256": "4f891bc0d3866cc56b3b0fa44de4141575d3602ae008ca9e806756b66a6a81f9",
+      "target": "AArch64 Linux ELF"
+    },
+    "lamp-turn-end": {
+      "bytes": 24796648,
+      "e_machine": 183,
+      "elf_class": 64,
+      "endianness": "little",
+      "sha256": "21404167a7b2fe26b809db57f03a869f482f62a7c8cdfadaacc01d77c24741aa",
+      "target": "AArch64 Linux ELF"
+    },
+    "lamp-update": {
+      "bytes": 4916240,
+      "e_machine": 183,
+      "elf_class": 64,
+      "endianness": "little",
+      "sha256": "aaa494bebcbb1e17cb69a9619c843509d014c587f54863239379e8a9d440fd0f",
+      "target": "AArch64 Linux ELF"
+    },
+    "lamp-voice": {
+      "bytes": 28652944,
+      "e_machine": 183,
+      "elf_class": 64,
+      "endianness": "little",
+      "sha256": "d46c71ca03a26af61d641656a46fcb35711454c6e7b2947b6569663cb616b904",
+      "target": "AArch64 Linux ELF"
+    },
+    "lamp-voice-eval": {
+      "bytes": 13286992,
+      "e_machine": 183,
+      "elf_class": 64,
+      "endianness": "little",
+      "sha256": "e0f36bd1110996f61481c82ec8d19d88258f4b9359c2b8731bd27f627c4ad658",
+      "target": "AArch64 Linux ELF"
+    },
+    "replay_cost": {
+      "bytes": 1572328,
+      "e_machine": 183,
+      "elf_class": 64,
+      "endianness": "little",
+      "sha256": "916ace17a3930b51a8f0ca9349123c7d4d5a8844e1d22d86aa69edf901935871",
+      "target": "AArch64 Linux ELF"
+    },
+    "schedule_check": {
+      "bytes": 4679632,
+      "e_machine": 183,
+      "elf_class": 64,
+      "endianness": "little",
+      "sha256": "e3b3d8c7921d4f4e3ffd06b3418840743d7aa653902973004f7a42b64acebd70",
+      "target": "AArch64 Linux ELF"
+    }
+  },
+  "zip_bytes": 118320553,
+  "zip_sha256": "0de749768c1b5f35c7db6ac2d88f53a77827a91a1bd60a43a0c7e187ddb942ab"
+}

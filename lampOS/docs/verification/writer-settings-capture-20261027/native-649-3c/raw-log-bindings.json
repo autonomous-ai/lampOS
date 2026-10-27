@@ -1,0 +1,37 @@
+[
+  {
+    "file": "arm-complete.log",
+    "sha256": "b104994020919d2b1265ff1d863aa4223d5e5d5496c1d6e40866bb2aa02ec07a",
+    "bytes": 1942248
+  },
+  {
+    "file": "arm-watch.log",
+    "sha256": "1643790062a302d07acbd282eb3d08978a6e6cb75a32ac32229d49de134ca8b0",
+    "bytes": 40161
+  },
+  {
+    "file": "linux-complete.log",
+    "sha256": "d20108d3326f3a01e50c04a3184e465edfebf023857421d085142483d9f22d82",
+    "bytes": 91158
+  },
+  {
+    "file": "linux-watch.log",
+    "sha256": "3fb0fcc7a8dcca229b2e34d376faf7f754fed53f3bce8a4ef5ca58af1b4b2924",
+    "bytes": 4954
+  },
+  {
+    "file": "arm-watch-v2-20261027.log",
+    "sha256": "f71c967b85841b9906dbc8c9b4f0e982d1beb065a39c705348268e00b1222ea7",
+    "bytes": 26868
+  },
+  {
+    "file": "arm-premature-empty-log-20261027.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  {
+    "file": "arm-premature-log-fetch.stderr",
+    "sha256": "6d021829e4f35d4e454849f0a4a575ea7faf6bce7bd3531398b349a4fb06bd7a",
+    "bytes": 81
+  }
+]

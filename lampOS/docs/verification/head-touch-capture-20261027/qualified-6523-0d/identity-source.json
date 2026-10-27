@@ -1,0 +1,103 @@
+{
+  "frozen_run_head": "0d1d1f2b944581169c9f96adba9f40ab88adba92",
+  "frozen_uncommitted_source": true,
+  "head": "6523fa886bf5aa5f6304732cdd23b58f4be3cbe9",
+  "nextest_config_sha256": "c4992da8d157df279011a424b5feb4833f001fd1d46ce3edd0a56992c848bb33",
+  "nextest_tool_sha256": "aad9d409cd2f0a81fcaed49d7672a133254179458436c1e957505e4a11655329",
+  "nextest_version": "0.9.150",
+  "parent": "0d1d1f2b944581169c9f96adba9f40ab88adba92",
+  "post_run_doc_delta": {
+    "all7497_other_source_index_mode_rows_unchanged": 7497,
+    "all_three_rust_test_bytes_modes_unchanged": true,
+    "doc_finalization_after_closed_runtime": true,
+    "files": {
+      "lampOS/docs/head-touch-capture.md": {
+        "after": {
+          "git_blob": null,
+          "git_mode": null,
+          "mode": 420,
+          "sha256": "9598ec0320f98523bcf3a648388141cf0c1f14ab3f0b1928b6a94bb154365a3e",
+          "type": 32768
+        },
+        "before": {
+          "git_blob": null,
+          "git_mode": null,
+          "mode": 420,
+          "sha256": "7521beebb5d74432e6f1d5788b5e2668507cd1748d38086d937d87cfeca2cac2",
+          "type": 32768
+        }
+      },
+      "lampOS/docs/updates.md": {
+        "after": {
+          "git_blob": "60151dfe4163e236a653af26712396eae353f797",
+          "git_mode": "100644",
+          "mode": 420,
+          "sha256": "521890f7bc9a773d32efb465790eb95d3a632044093f193bf783eb55e6aa3cff",
+          "type": 32768
+        },
+        "before": {
+          "git_blob": "60151dfe4163e236a653af26712396eae353f797",
+          "git_mode": "100644",
+          "mode": 420,
+          "sha256": "d888daf2fefe03ca87abffd963b4ceadf41cbfde6e66eda57d9cfd1916335140",
+          "type": 32768
+        }
+      }
+    },
+    "frozen_run_head": "0d1d1f2b944581169c9f96adba9f40ab88adba92",
+    "frozen_runtime_result": "531PASS/0bad/6ignored, all52once",
+    "no_runtime_replay_or_extra_credit": true,
+    "only_changed_since_frozen_guard": [
+      "lampOS/docs/head-touch-capture.md",
+      "lampOS/docs/updates.md"
+    ],
+    "reader_census": {
+      "argv": [
+        "rg",
+        "-n",
+        "head-touch-capture\\.md|include_str!\\([^\\n]*updates\\.md|read(_to_string)?\\([^\\n]*updates\\.md|read_text\\([^\\n]*updates\\.md",
+        "lampOS/crates",
+        ".github/scripts"
+      ],
+      "exit_code": 1,
+      "stderr": "",
+      "stdout": ""
+    }
+  },
+  "pr": 3892,
+  "runtime_controller_sha256": "8230aeedcb321bd3e85191bc7c188bb0ea986534ab2844fb196bc565376692b8",
+  "rust_toolchain": "1.96.0",
+  "six_committed_file_bindings": {
+    "lampOS/crates/update/src/head_touch.rs": {
+      "git_entry": "100644 blob f0f048d74a3010d0dd917b08b8eca0d31b239ad9\tlampOS/crates/update/src/head_touch.rs",
+      "sha256": "2e9bcd134f16744e622f813cc3f5e71fe55c1b2a7bb64a5bd14d63d157b3638c"
+    },
+    "lampOS/crates/update/src/head_touch/capture.rs": {
+      "git_entry": "100644 blob f25375f99386c7c78efc1b5ce9a172b7ac09248d\tlampOS/crates/update/src/head_touch/capture.rs",
+      "sha256": "4137a729709ccfb1ad5a9653fd570daa38a46d2c2988cbd767595bddac7bdf59"
+    },
+    "lampOS/crates/update/src/head_touch/capture/tests.rs": {
+      "git_entry": "100644 blob b227829af605ead004b4ff244ea604f282764b8d\tlampOS/crates/update/src/head_touch/capture/tests.rs",
+      "sha256": "e11b05b3206e9da3e4506a2b8c9da3dc24a9ed4a7c2defcd3a63392f48137e8d"
+    },
+    "lampOS/docs/head-touch-capture.md": {
+      "git_entry": "100644 blob 6e18a508a2a6f0cdda01bc0e5f40c380f837da64\tlampOS/docs/head-touch-capture.md",
+      "sha256": "9598ec0320f98523bcf3a648388141cf0c1f14ab3f0b1928b6a94bb154365a3e"
+    },
+    "lampOS/docs/reuse-decisions.md": {
+      "git_entry": "100644 blob b8c5d3768ae6d1035561e2827428ee14b19af2d5\tlampOS/docs/reuse-decisions.md",
+      "sha256": "a996f87675004d9330f3e8d3d45b76969cdc31cfafaff45cd23f66774848a40b"
+    },
+    "lampOS/docs/updates.md": {
+      "git_entry": "100644 blob b129d724563f8296257db43d90c031d8af15d2f8\tlampOS/docs/updates.md",
+      "sha256": "521890f7bc9a773d32efb465790eb95d3a632044093f193bf783eb55e6aa3cff"
+    }
+  },
+  "source_after_sha256": "a69ff80c7414564dae5a6127039c89f5c6be887255f6803ba777fcafc6fa608c",
+  "source_before_after_equal": true,
+  "source_before_sha256": "a69ff80c7414564dae5a6127039c89f5c6be887255f6803ba777fcafc6fa608c",
+  "source_count": 7499,
+  "three_rust_test_content_modes_equal_executed": true,
+  "tree": "78cde1e924170b46b968138d3a56e0c242a0150d",
+  "working_patch_sha256": "25d32ce083df82c42c55646b2d1d0f8d2a6e108ca5e4c7f74b0f7ff645ecd36d"
+}

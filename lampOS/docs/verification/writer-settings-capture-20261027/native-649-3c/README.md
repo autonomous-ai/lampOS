@@ -1,0 +1,15 @@
+# Current PR 3858 original native qualification
+
+Original ARM64 40532068059 and Linux 40532067750 attempt-one qualification on head 6490230d64e80dd2e2b4d1dd2d1972e18046f5cd / base 3c9838fea6591410cdf534d27088615021c8df30. Both required build/test and Linux Clippy jobs are completed/success in their actual job metadata. Preview 5f6ee85bc95b3ad7b384cdb980fd0a408aab4420 ordered parents/tree are API-bound; authored tree 8ee34531ed9b499606c000705cfb13f67dbc29a6 equals tested preview. This is original 649 source, not later Main/carry qualification.
+
+ARM unique terminal results: **7,797 PASS / zero bad or selected unrun / 53 skipped**, all 49 required once. Runtime selection 7797 across 70 binaries with 119 skipped binaries. Scope witnesses identify actual selected packages; do not call it workspace runtime. The 53 skip count is reported by selection/summary; suppressed skip-name rows are not claimed to be individually enumerated. Workspace release build is separate. Identical terminal echoes excluded: 34. Actual runner version and commands are retained in witnesses. Both custom Linux updater controls pass within the unique Nextest rows.
+
+Separate docs: 4 passes, own-process: 13 passing rows, relay: ['relay_signals: ok'], promotion helper: 25 passes. These are not extra Nextest passes. No production artifact provenance/test-executable-hash equivalence, physical lamp, unplug, root-guard activation or restoration acceptance is claimed.
+
+First ARM watcher drained exit 0 while direct metadata still showed in_progress/null; that is preserved as a nonterminal observer outcome, never CI success. One premature log fetch failed exit 1 because the run was still active; its empty stdout/error evidence remains private and hashed. The second watcher completed observation of the SAME original run, no workflow retry. Final job/run metadata, checkout binding and completed log census determine qualification. Watcher receipt preserves actual native handles and final closure.
+
+Earlier 41198/992 original 7783-pass scope and C3 full 528 dirty 2→09590 content binding remain separate. The 649 Mac gate was proportionate 219 cases, not full 528. All ten owned blobs/modes equal 09590; source comparison is recorded without transferring runtime counts. Main subsequently changed consumed Voice/unit/skill inputs, so this packet is no latest-Main admission.
+
+The reader's shared-process restart failure stays OPEN pending original error/errno/source/driver/workload. Original normal-libtest Raw 509/1/6 remains unwaived; the unchanged-Main 198-pass baseline stays INCONCLUSIVE. Isolated native success does not diagnose either failure. P3 ordinary-only action and ancestor-churn documentation is included without weakening checks. No retries, serialization or assertion changes.
+
+Raw complete logs remain private with SHA/size bindings. Public text contains unique outcome rows, selected scope witnesses and source/observer proofs; no binaries or Python source. Reversible EOF normalization is recorded before manifest. This packet is immutable once handed off.

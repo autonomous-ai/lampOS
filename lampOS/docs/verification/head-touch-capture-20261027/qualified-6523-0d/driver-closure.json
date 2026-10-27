@@ -1,0 +1,146 @@
+{
+  "custom_contracts": [
+    {
+      "binary": "lamp-update::self-cli-exec",
+      "exit_code": 0,
+      "matched": true,
+      "name": "actual_cli_exec_confirms_before_the_next_round",
+      "overlap_existing_six_ignored": true
+    },
+    {
+      "binary": "lamp-update::self-process-cuts",
+      "exit_code": 0,
+      "matched": true,
+      "name": "persisted_self_switches_survive_sigkill",
+      "overlap_existing_six_ignored": true
+    }
+  ],
+  "custom_passes_not_added": true,
+  "doctests": {
+    "exit_code": 0,
+    "summaries": [
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0
+      }
+    ]
+  },
+  "executables": [
+    {
+      "actual_preserved_closed_at_runtime": true,
+      "bytes": 23191800,
+      "format": "Mach-O 64-bit ARM64",
+      "preserved_still_matches": true,
+      "sha256": "9476264df8859da6129f4c7605f7ee39ef9a195ff90209a635cda053ddae79c7",
+      "target": "functions",
+      "test_profile": true
+    },
+    {
+      "actual_preserved_closed_at_runtime": true,
+      "bytes": 17461736,
+      "format": "Mach-O 64-bit ARM64",
+      "preserved_still_matches": true,
+      "sha256": "384ac027a5c248a71cea0bcbcf1b87a4f9402eedf8af397ae1f7250395d47b87",
+      "target": "install",
+      "test_profile": true
+    },
+    {
+      "actual_preserved_closed_at_runtime": true,
+      "bytes": 2008304,
+      "format": "Mach-O 64-bit ARM64",
+      "preserved_still_matches": true,
+      "sha256": "d919600199b481c8a96571a14c550e8f4d09428a7debd3979fb28d5799d7eaa4",
+      "target": "it",
+      "test_profile": true
+    },
+    {
+      "actual_preserved_closed_at_runtime": true,
+      "bytes": 1283760,
+      "format": "Mach-O 64-bit ARM64",
+      "preserved_still_matches": true,
+      "sha256": "69056562cf6f47c790520cafe4c8477e6cc2d69f2dbd2814c3331fcc727a4d8a",
+      "target": "lamp-update",
+      "test_profile": true
+    },
+    {
+      "actual_preserved_closed_at_runtime": true,
+      "bytes": 16286064,
+      "format": "Mach-O 64-bit ARM64",
+      "preserved_still_matches": true,
+      "sha256": "6cd3d23b55106ff2db040c144035d7281e6ab70e29a288bab0d3949a3c2baf30",
+      "target": "lamp_update",
+      "test_profile": true
+    },
+    {
+      "actual_preserved_closed_at_runtime": true,
+      "bytes": 3348656,
+      "format": "Mach-O 64-bit ARM64",
+      "preserved_still_matches": true,
+      "sha256": "5648174f15b5bf68ad7516f0fd6920bd4b29c6679b7a51a093e4714d7a8a3ab1",
+      "target": "release_pair",
+      "test_profile": true
+    },
+    {
+      "actual_preserved_closed_at_runtime": true,
+      "bytes": 20896536,
+      "format": "Mach-O 64-bit ARM64",
+      "preserved_still_matches": true,
+      "sha256": "8c75720832cd7828bcf37c8d4ee171b561d9cc76bd1d8e5fb356731be570efd7",
+      "target": "round",
+      "test_profile": true
+    },
+    {
+      "actual_preserved_closed_at_runtime": true,
+      "bytes": 565408,
+      "format": "Mach-O 64-bit ARM64",
+      "preserved_still_matches": true,
+      "sha256": "85f960e155ee673f7ff791fedd28579ec541859a9526319e091d4a61e9763310",
+      "target": "self-cli-exec",
+      "test_profile": true
+    },
+    {
+      "actual_preserved_closed_at_runtime": true,
+      "bytes": 565984,
+      "format": "Mach-O 64-bit ARM64",
+      "preserved_still_matches": true,
+      "sha256": "0b01a3101ac8213b2b325b58521f80a397b9e41cdf49e1f2d71f1e35a864a742",
+      "target": "self-process-cuts",
+      "test_profile": true
+    },
+    {
+      "actual_preserved_closed_at_runtime": true,
+      "bytes": 13800864,
+      "format": "Mach-O 64-bit ARM64",
+      "preserved_still_matches": true,
+      "sha256": "ae9bc44c9d996f07829a9d3e1d45e6f5113db8713339ba83435c84973c29c65c",
+      "target": "lamp-update",
+      "test_profile": false
+    }
+  ],
+  "filter": "all()",
+  "final_native_result_sha256": "f58e07ef009b935e700b80d00c91294c0d601365824646f814e62cd56ecf5bcf",
+  "no_fail_fast": true,
+  "original_request_sha256": "31388ccf12a39297ee834139a7374429230659d131e1a894e4ef71f9c4de4eb1",
+  "original_result_sha256": "cac8ef8942a74ad003d5b660f3f582719c0a4be0383cbd053d537b696b2981dd",
+  "outer_fixture_permission_request": "require_escalated",
+  "processes": 4,
+  "profile": "pr",
+  "retries": 0,
+  "scope": "Ten local compiler artifacts; nine Nextest-listed drivers. These are not native CI executable hashes. Only preserved bytes checked after releasing shared target; actual hashes are those sealed at runtime closure.",
+  "source_guards": {
+    "actual_preserved_executables_closed": true,
+    "all_runtime_stages_passed": true,
+    "configuration_unchanged": true,
+    "controller_error": null,
+    "head_unchanged": true,
+    "nextest_config_unchanged": true,
+    "nextest_tool_unchanged": true,
+    "runtime_controller_unchanged": true,
+    "source_count": 7499,
+    "source_unchanged": true,
+    "status_unchanged": true,
+    "working_patch_unchanged": true
+  },
+  "user_config": "none"
+}

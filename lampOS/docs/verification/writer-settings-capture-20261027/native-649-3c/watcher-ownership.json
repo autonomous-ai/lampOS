@@ -1,0 +1,40 @@
+{
+  "head": "6490230d64e80dd2e2b4d1dd2d1972e18046f5cd",
+  "base_at_discovery": "3c9838fea6591410cdf534d27088615021c8df30",
+  "authored_tree": "8ee34531ed9b499606c000705cfb13f67dbc29a6",
+  "original_runs": {
+    "ARM": {
+      "run": 40532068059,
+      "native_session": 66475,
+      "run_attempt": 1,
+      "first_watch_exit_code": 0,
+      "first_watch_terminal_metadata": false,
+      "first_watch_log_sha256": "b427ee59419690db9a0bfe1005a47fe333968c1f6d0998aa2471e2322a323006",
+      "premature_log_fetch": {
+        "exit": 1,
+        "error": "run is still in progress; logs will be available when it is complete",
+        "stdout_bytes": 0
+      },
+      "replacement_native_session": 43226,
+      "replacement_watch_exit_code": 0,
+      "final_run_and_required_job_terminal_success": true
+    },
+    "Linux": {
+      "run": 40532067750,
+      "native_session": 7007,
+      "run_attempt": 1,
+      "watch_exit_code": 0,
+      "final_run_and_required_job_terminal_success": true
+    }
+  },
+  "terminal_state": "Original runs and actual required jobs completed/success; watcher handles and full log fetch handles drained0; no success inferred from premature first watcher.",
+  "last_queue_cursor": 6446208942,
+  "PR_P3_load_failure": "OPEN, original error absent",
+  "old_native_source": "41198b14edda404b0333f3ad0e3b0e3d771c3d7e",
+  "old_7783_count_not_transferred": true,
+  "log_fetch_final_handles": {
+    "arm": 66271,
+    "linux": 21215,
+    "both_drained_exit0": true
+  }
+}

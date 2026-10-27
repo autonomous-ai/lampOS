@@ -1,0 +1,54 @@
+{
+  "current": {
+    "base": "197f21533736cc99a1e1a819721a5a96ff8f3033",
+    "evidence_kind": "Exact serialized tool arguments frozen before invocation, plus original native initial/continuation/terminal tool results retained; not a signed provider attestation.",
+    "head": "dd76b805ce0451376be99c636d9e18ad4a02516d",
+    "initial_result_sha256": "4edeb40cd5287824eeaeae14672fe899b1b426fed96a81be0ac6db4e7a00993f",
+    "native_handle": 97500,
+    "native_stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "native_stdout_sha256": "f232efb6357d2758acb9877e6e69ac9da877ace8b3ebd013cb918fc9760bbf19",
+    "observed_terminal_exit": 0,
+    "prelaunch_binding_sha256": "e3edea35c3ae4c0818305aa46c8f620bba57eb159940f3e640bbbad4d612f7fa",
+    "private_continuations": {
+      "continuation-1.json": "c89ab1926c665ee7401f4ddbc3c2402619003f8c6e8b4b7b6cec7c01be708af2",
+      "continuation-2.json": "b47a3d32d934e678462bc539d6233ee68beb016a9c03c9c73a31fbff1394e467"
+    },
+    "raw_request_sha256": "ddc13a31a98baacde849e830a7de133af9bff04ddd52bdd2a1f23fcc1e03a017",
+    "request_preserved_before_exec": true,
+    "sandbox_permissions": "require_escalated",
+    "terminal_result_sha256": "b47a3d32d934e678462bc539d6233ee68beb016a9c03c9c73a31fbff1394e467"
+  },
+  "donor_admission": {
+    "actual_and_preserved_eleven_verified_before_Cargo": true,
+    "both_cohort_passes_classification": "INCONCLUSIVE, no previous failure waiver",
+    "both_cohort_source_status_controller_configuration_guards_required": true,
+    "cache_runtime_equivalence_inferred": false,
+    "kind": "reconciled current actual/preserved union, not one source execution",
+    "manifest_sha256": "d9a31a70e70e720e35d2f676765aca026b82f6082eac80f8d757e173969dd760",
+    "records": 11
+  },
+  "limits": "Neither pre-Cargo stop ran test bodies. The current352 runtime executed once on its carried source. No source, test assertion, timeout or selection weakening repaired either stopped admission.",
+  "preserved_preCargo_attempts": [
+    {
+      "Cargo_started": false,
+      "OUT_created": false,
+      "kind": "legacy donor-schema KeyError source_unchanged",
+      "native_exit": 1,
+      "request_sha256": "408e2e4457022935790ce26425ea40e44cc3f040077df73319ea0f0a919da924",
+      "result_sha256": "9630db6c0018d11e4a25f853c54753e663b23ca7f85bb1db4141d454d711908a",
+      "stderr_sha256": "b8cbc5815e122b0dab47a64f3c886cc5180b26a46f8167d3c4876627da72729a",
+      "tests_run": 0,
+      "wrapper_note": "An attempt to store a nonexistent session handle failed after the native command had already ended; the previously stored exact terminal result was recovered without rerunning the command."
+    },
+    {
+      "Cargo_started": false,
+      "initial_result_sha256": "0f192174bb65d0db2aafe56b848c72f5b0e2377d577029b14f81b52318db974b",
+      "kind": "live Main advanced from0c0 to197, SDK-only delta",
+      "native_exit": 1,
+      "request_sha256": "d80dfcfae63cb968f33b4073bb1b6afe434e30fdbfe9af00f8b212761bb63d1a",
+      "stderr_sha256": "1e42bf544e2cf4ec1942ef69d1387667cc03875dbe9464f103acced29d53c084",
+      "terminal_result_sha256": "e40292cfe1066b4659a12f5f855a04b374337b6d3390e8e0d9d99681fbb96490",
+      "tests_run": 0
+    }
+  ]
+}

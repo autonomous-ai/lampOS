@@ -1,0 +1,3 @@
+# Original Linux qualification
+
+PR #3858 authored head `dd76b805ce0451376be99c636d9e18ad4a02516d`. Original attempt-1 [run 40540185941](https://github.com/autonomous-ai/lampOS/actions/runs/40540185941/attempts/1), required job 122316162153, and workflow both completed successfully. Exact checkout `63ad4a57246188dbee0a57e3806e9d2bd408b8cc`, with complete authored/preview tree equality, is recorded in identities.json. The original log records workspace fmt and strict workspace all-target Clippy. This is Linux lint evidence, not an additional runtime test count. No rerun or local compilation was requested.

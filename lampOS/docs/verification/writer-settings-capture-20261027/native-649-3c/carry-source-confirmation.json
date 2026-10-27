@@ -1,0 +1,71 @@
+{
+  "old_full_gate_bound_commit": "09590e12e320a8fafd1d1c45ee6e42e126dcff5f",
+  "current_head": "6490230d64e80dd2e2b4d1dd2d1972e18046f5cd",
+  "current_base": "3c9838fea6591410cdf534d27088615021c8df30",
+  "owned_paths": [
+    {
+      "path": "lampOS/crates/update/src/apply.rs",
+      "mode_blob_equal": true,
+      "tree_entry": "100644 blob 2e5e541d8eb974694cf451f27eac1a57897c1b69\tlampOS/crates/update/src/apply.rs"
+    },
+    {
+      "path": "lampOS/crates/update/src/lib.rs",
+      "mode_blob_equal": true,
+      "tree_entry": "100644 blob d10a9823678d0a044f126c120b394a11147cf25d\tlampOS/crates/update/src/lib.rs"
+    },
+    {
+      "path": "lampOS/crates/update/src/writer_files.rs",
+      "mode_blob_equal": true,
+      "tree_entry": "100644 blob 79b0f419624e2ed1f8416673844afd7e988531e7\tlampOS/crates/update/src/writer_files.rs"
+    },
+    {
+      "path": "lampOS/crates/update/src/writer_files/tests.rs",
+      "mode_blob_equal": true,
+      "tree_entry": "100644 blob 9dadf2e73c5db037d5126b95e78a7fcac768df1f\tlampOS/crates/update/src/writer_files/tests.rs"
+    },
+    {
+      "path": "lampOS/crates/update/src/writer_settings.rs",
+      "mode_blob_equal": true,
+      "tree_entry": "100644 blob 7afb9d0ddf4c2372dc95ece82f9bfa1ba42fc8c6\tlampOS/crates/update/src/writer_settings.rs"
+    },
+    {
+      "path": "lampOS/crates/update/src/writer_settings/tests.rs",
+      "mode_blob_equal": true,
+      "tree_entry": "100644 blob 00aaca5cffce778e7787b98bb3a4c3f66d85baa3\tlampOS/crates/update/src/writer_settings/tests.rs"
+    },
+    {
+      "path": "lampOS/docs/reuse-decisions.md",
+      "mode_blob_equal": true,
+      "tree_entry": "100644 blob a41755ffd97d653e52cda21a77e52f422dba661e\tlampOS/docs/reuse-decisions.md"
+    },
+    {
+      "path": "lampOS/docs/updates.md",
+      "mode_blob_equal": true,
+      "tree_entry": "100644 blob a349db54517ccdf056a567d1ddcda12476fe8b73\tlampOS/docs/updates.md"
+    },
+    {
+      "path": "lampOS/docs/writer-file-observation.md",
+      "mode_blob_equal": true,
+      "tree_entry": "100644 blob 62a923dabe6c1dd267742ddd5275c6e25f3dcbdc\tlampOS/docs/writer-file-observation.md"
+    },
+    {
+      "path": "lampOS/docs/writer-settings-capture.md",
+      "mode_blob_equal": true,
+      "tree_entry": "100644 blob b9c8d7ba9bc37b7c26acc19d9723139a211b3f90\tlampOS/docs/writer-settings-capture.md"
+    }
+  ],
+  "all_ten_full_owned_blobs_and_modes_equal": true,
+  "upstream_delta": [
+    "M\tlampOS/crates/memory/src/days.rs",
+    "M\tlampOS/crates/memory/src/tidy.rs",
+    "M\tlampOS/crates/memory/tests/it/days.rs",
+    "M\tlampOS/crates/voice/src/remember.rs",
+    "M\tlampOS/docs/memory-days.md",
+    "M\tlampOS/docs/memory.md",
+    "M\tlampOS/sdk/python/README.md",
+    "M\tlampOS/sdk/python/src/lampos/client.py",
+    "M\tlampOS/sdk/python/src/lampos/testing.py",
+    "M\tlampOS/sdk/python/tests/test_client.py"
+  ],
+  "this_is_source_comparison_not_runtime": true
+}
