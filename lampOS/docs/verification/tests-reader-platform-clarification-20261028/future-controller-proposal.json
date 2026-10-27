@@ -1,0 +1,27 @@
+{
+  "status": "PROPOSAL_ONLY_NOT_APPLIED",
+  "scope": "Future controller census serialization only; no runtime, assertion, timeout, filter, or platform selection change",
+  "replacement_categories": [
+    "portable_source_cases",
+    "linux_exclusive_source_cases",
+    "ordinary_linux_exclusive_unrun_on_mac",
+    "ignored_privileged_linux_source_cases",
+    "mac_only_source_cases"
+  ],
+  "derivation": {
+    "portable": "set(linux_all) & set(darwin_all)",
+    "linux_exclusive": "set(linux_all) - set(darwin_all)",
+    "ordinary_linux_exclusive_unrun_on_mac": "linux_exclusive - set(linux_ignored)",
+    "ignored_privileged_linux_source_cases": "set(linux_ignored)",
+    "mac_only": "set(darwin_all) - set(linux_all)"
+  },
+  "observed_execution": "Join actual module outcome rows to the derived source sets; report executed/ignored/unrun independently. A source catalog is never itself execution evidence.",
+  "checks": [
+    "Catalog sets are disjoint where declared and reconstruct original platform catalogs.",
+    "Observed Mac Reader identities match the actual compiled inventory; each outcome occurrence remains retained.",
+    "Ignored DAC identities cannot acquire ordinary runtime credit.",
+    "Derive counts from actual current source and inventory, never hardcode 3/12/1/1."
+  ],
+  "historical_compatibility": "Never rewrite an existing receipt. Preserve the legacy field as a source catalog if present and add corrected categories in new receipts or explicit additive post-run clarifications.",
+  "active_inputs_modified": false
+}

@@ -1,5 +1,11 @@
 # Tests work log
 
+## 2026-10-28 03:17 — Reader evidence catalog label clarified
+
+Ready for lamp-voice: no (latest-base gates and current reads remain).
+
+[Additive Reader platform clarification](verification/tests-reader-platform-clarification-20261028/) addresses Reviewer-two's packet P3. The old16-name field is the whole Linux source catalog: three portable cases already PASS on Mac, twelve ordinary Linux-exclusive cases are unrun on Mac, plus one Linux-exclusive ignored DAC; one ACL fallback is Mac-only PASS. Original raw/census/source/terminal bytes remain unchanged; no extra execution or qualification. Future schema proposal is unapplied, and the active AF gate's inherited label will receive its own hash-bound addendum after close if present. No source, assertion, bound or result changed.
+
 ## 2026-10-28 03:07 — original Mood and Restart native gates pass
 
 Ready for lamp-voice: no (latest-base qualification and current independent reads remain).

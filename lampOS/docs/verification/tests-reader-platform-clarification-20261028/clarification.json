@@ -1,0 +1,107 @@
+{
+  "schema": "additive-reader-platform-catalog-clarification-v1",
+  "created_utc": "2026-10-27T20:15:43.691806+00:00",
+  "review_comment": "https://github.com/autonomous-ai/lampOS/pull/3543#issuecomment-6452382467",
+  "scope": "Closed ECC host module census only; metadata classification, no runtime replay or new qualification",
+  "original_inputs": {
+    "observed-module-censuses.json": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/reader-a17-body-after-skills-gates-prep-20261028/observed-module-censuses.json",
+      "bytes": 5305,
+      "sha256": "a08a76b803953a62365ee3afb7dd1fd2dcd40992b3b448380fa68455a3a052dd"
+    },
+    "reader-source-reference.json": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/reader-a17-body-after-skills-gates-prep-20261028/reader-source-reference.json",
+      "bytes": 6491,
+      "sha256": "e4b1672810046dc8edd3ecbd6ef9d17260aabd73a5c13d2cdab963f1d3dc8694"
+    },
+    "terminal.json": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/reader-a17-body-after-skills-gates-prep-20261028/terminal.json",
+      "bytes": 1915,
+      "sha256": "d9a7c250433bc6bcde8c9715ea7b025019fb6bec277c0ae67832eb51858bb02a"
+    }
+  },
+  "original_field": "Linux_Reader_unrun_on_Mac",
+  "original_field_count": 16,
+  "original_field_actual_meaning": "Complete Linux source catalog, including portable cases and one ignored privileged DAC case; not a Linux-only unrun count",
+  "original_receipt_preserved": true,
+  "categories": {
+    "portable_executed_on_Mac": {
+      "count": 3,
+      "identities": [
+        "session_reader::tests::finite_and_unset_service_never_resolve_a_reader_group",
+        "session_reader::tests::group_lookup_failure_retains_private_logging_without_writer_failure",
+        "session_reader::tests::local_session_reader_group_is_exact_unique_and_bounded"
+      ],
+      "observed_status": "ok once each in the original four Reader rows"
+    },
+    "Linux_exclusive_unrun_on_Mac": {
+      "count": 13,
+      "identities": [
+        "session_reader::tests::linux::a_fixture_root_retains_ancestor_mode_acl_and_path_checks",
+        "session_reader::tests::linux::a_verified_failed_grant_keeps_private_original_records",
+        "session_reader::tests::linux::access_and_default_acl_are_refused_without_stripping_or_widening_them",
+        "session_reader::tests::linux::an_earlier_reader_refusal_keeps_a_verified_private_writer",
+        "session_reader::tests::linux::an_owned_fixture_root_ignores_only_changes_above_its_boundary",
+        "session_reader::tests::linux::dedicated_reader_can_only_read_new_events_under_dropped_identity",
+        "session_reader::tests::linux::every_grant_failure_restores_private_modes_and_original_groups",
+        "session_reader::tests::linux::failed_private_rollback_disables_only_metadata",
+        "session_reader::tests::linux::only_the_new_session_is_shared_after_one_pinned_lookup",
+        "session_reader::tests::linux::readable_or_linked_voice_siblings_deny_preparation_and_late_grant",
+        "session_reader::tests::linux::replaced_record_never_changes_an_outside_sentinel",
+        "session_reader::tests::linux::shared_session_writer_projects_every_segment_without_private_values",
+        "session_reader::tests::linux::unprepared_or_wrong_group_parent_never_grants_or_changes_ancestors"
+      ]
+    },
+    "ordinary_Linux_exclusive_unrun_on_Mac": {
+      "count": 12,
+      "identities": [
+        "session_reader::tests::linux::a_fixture_root_retains_ancestor_mode_acl_and_path_checks",
+        "session_reader::tests::linux::a_verified_failed_grant_keeps_private_original_records",
+        "session_reader::tests::linux::access_and_default_acl_are_refused_without_stripping_or_widening_them",
+        "session_reader::tests::linux::an_earlier_reader_refusal_keeps_a_verified_private_writer",
+        "session_reader::tests::linux::an_owned_fixture_root_ignores_only_changes_above_its_boundary",
+        "session_reader::tests::linux::every_grant_failure_restores_private_modes_and_original_groups",
+        "session_reader::tests::linux::failed_private_rollback_disables_only_metadata",
+        "session_reader::tests::linux::only_the_new_session_is_shared_after_one_pinned_lookup",
+        "session_reader::tests::linux::readable_or_linked_voice_siblings_deny_preparation_and_late_grant",
+        "session_reader::tests::linux::replaced_record_never_changes_an_outside_sentinel",
+        "session_reader::tests::linux::shared_session_writer_projects_every_segment_without_private_values",
+        "session_reader::tests::linux::unprepared_or_wrong_group_parent_never_grants_or_changes_ancestors"
+      ]
+    },
+    "ignored_privileged_DAC_unrun": {
+      "count": 1,
+      "identities": [
+        "session_reader::tests::linux::dedicated_reader_can_only_read_new_events_under_dropped_identity"
+      ],
+      "ordinary_Linux_CI_credit": false
+    },
+    "Mac_only_executed": {
+      "count": 1,
+      "identities": [
+        "session_reader::tests::unsupported_acl_verification_degrades_to_private_metadata"
+      ],
+      "observed_status": "ok once in the original four Reader rows"
+    }
+  },
+  "reconciliation": {
+    "Linux_source_catalog": 16,
+    "Mac_source_catalog": 4,
+    "ordinary_Linux_source_catalog": 15,
+    "ordinary_Linux_equation": "3 portable + 12 ordinary Linux-exclusive = 15",
+    "Mac_equation": "3 portable + 1 Mac-only fallback = 4",
+    "Linux_exclusive_equation": "12 ordinary + 1 ignored privileged DAC = 13"
+  },
+  "outcomes_unchanged": {
+    "Mac_Reader_pass": 4,
+    "Mac_ServiceTrace_pass": 6,
+    "runtime_attempts": 2,
+    "full_Voice_runtime_claim": false
+  },
+  "limits": [
+    "Linux-exclusive identities were not executed by this Mac gate.",
+    "The privileged DAC case receives no runtime credit.",
+    "This addendum changes no source, assertions, deadlines, raw outcomes, controller, plan, native evidence, or readiness condition.",
+    "Future active AF output may inherit the old field; this addendum does not anticipate or certify that future output."
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "files": [
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/reader-platform-label-clarification-20261028/README.md",
+      "bytes": 1600,
+      "sha256": "53c3ab1963b2b0e91aac52810d8b66d8d05611089d14f29dd5074730fe21cf67"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/reader-platform-label-clarification-20261028/clarification.json",
+      "bytes": 6287,
+      "sha256": "f6d7b4cdfc833a4b94e8e3ae99d87e429b274a46823fdac4a7577b07988be4a3"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/reader-platform-label-clarification-20261028/future-controller-proposal.json",
+      "bytes": 1548,
+      "sha256": "f42a14ee977c09a546f85209f127e8977ec65a89fa6eb8ac27fdd661956f6828"
+    }
+  ],
+  "original_inputs_reverified_unchanged": true
+}
