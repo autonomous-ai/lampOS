@@ -495,9 +495,49 @@ fn why_not(
     };
     match (preparation, fault, cleanup.first()) {
         (Some(preparation), _, _) => said(preparation),
-        (None, Some(fault), _) => format!("{fault:?}"),
+        (None, Some(fault), _) => fault_said(fault),
         (None, None, Some(cleanup)) => said(cleanup),
         (None, None, None) => "no reason was reported".into(),
+    }
+}
+
+/// The read plan's fault in words, from its serialized form, for a person
+/// at the lamp (Sixth's P3 on #3919): `plan: clock regression`, or
+/// `plan: deadline (partial_bytes 2, pending_ids [3, 4])`, its fields by
+/// name and one with no value left out.
+#[cfg(target_os = "linux")]
+fn fault_said(fault: &lamp_body::inspection::Fault) -> String {
+    let Ok(serde_json::Value::Object(mut fields)) = serde_json::to_value(fault) else {
+        return format!("plan: {fault:?}");
+    };
+    let kind = match fields.remove("kind") {
+        Some(serde_json::Value::String(kind)) => kind.replace('_', " "),
+        _ => format!("{fault:?}"),
+    };
+    let mut fields: Vec<_> = fields
+        .into_iter()
+        .filter(|(_, value)| !value.is_null())
+        .collect();
+    fields.sort_by(|(one, _), (other, _)| one.cmp(other));
+    let rest: Vec<String> = fields
+        .iter()
+        .map(|(name, value)| match value {
+            serde_json::Value::String(text) => format!("{name} {text}"),
+            serde_json::Value::Array(items) => format!(
+                "{name} [{}]",
+                items
+                    .iter()
+                    .map(ToString::to_string)
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ),
+            other => format!("{name} {other}"),
+        })
+        .collect();
+    if rest.is_empty() {
+        format!("plan: {kind}")
+    } else {
+        format!("plan: {kind} ({})", rest.join(", "))
     }
 }
 
@@ -559,7 +599,30 @@ mod tests {
                 Some(&lamp_body::inspection::Fault::ClockRegression),
                 &[]
             ),
-            "ClockRegression"
+            "plan: clock regression"
+        );
+        assert_eq!(
+            why_not(
+                None,
+                Some(&lamp_body::inspection::Fault::Deadline {
+                    pending_ids: vec![3, 4],
+                    partial_bytes: 2,
+                }),
+                &[]
+            ),
+            "plan: deadline (partial_bytes 2, pending_ids [3, 4])"
+        );
+        assert_eq!(
+            why_not(
+                None,
+                Some(&lamp_body::inspection::Fault::Io {
+                    operation: "tty_read",
+                    code: None,
+                    detail: "input/output error".into(),
+                }),
+                &[]
+            ),
+            "plan: io (detail input/output error, operation tty_read)"
         );
         assert_eq!(
             why_not(None, None, &[close]),
