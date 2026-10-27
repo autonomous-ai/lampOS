@@ -2366,6 +2366,18 @@ runs on the look as with it alone, one mesh a look whose points a
 Blendshape V2 read due on that face takes (above). The largest face in each look is cut out of the
 same 320 by 240 look: its box, widened by a quarter on every side and
 turned so the eyes are level, made 256 pixels square (`src/mesh.rs`).
+With `--full-look` (the product's 1280 by 960) it is cut from the frame at
+its own size instead (`mesh::crop_full`): the detector's box and marks are
+scaled back to the frame's pixels, as `LAMP_FACE_FULL_CROP=on` does for a
+print (`who::align_full`), and the frame is the one the look's picture was
+shrunk from, kept for the look, never a second decode. On lamp-52e6 a face
+seated at the desk, about 1 m away, has a box 0.20 to 0.25 of the height,
+48 to 60 of the picture's rows, its eyes 18 to 24 pixels apart: from the
+picture every look was `unknown` (`small`) and the voice never saw who
+spoke; from the frame the mesh sees four times as many pixels. A Blendshape
+V2 read takes the same look's points, or the same full-frame crop for
+another face: its points are in the 256-square crop's pixels and turned back
+by the eye line's angle, whatever the crop was cut from.
 The mesh reads it under tract, and with `--mouth-diagnostics on` (never in
 the product: it is a line a look, up to four a second) the journal says
 `lamp-eyes: mouth open 0.0123 eyes 31 px mesh 84 ms`. That is the inner
@@ -2441,7 +2453,14 @@ emitted without a valid largest box or without the already enabled judge. If
 that tallest box is clipped to zero area, it does not substitute a smaller face.
 
 Coordinates and the 24 px gate are in **working-detector pixels**, not the
-mesh crop's 256-square coordinates. `filled` excludes padding; the existing
+mesh crop's 256-square coordinates, with one exception: with `--full-look`,
+a window the mesh read on every look holds its mean eye distance to 24 px in
+the frame's own pixels (`Mouths::set_mesh_scale`, four a detector pixel at
+1280 by 960), since those are the pixels the mesh saw, and
+`window_mean_eyes_px` says that value; `eyes_px` stays the detector's. A
+window with a look the mesh missed is judged by the corners, on the
+detector's marks, so it is gated in the detector's pixels as before. Without
+`--full-look` nothing changes. `filled` excludes padding; the existing
 camera-open line gives capture dimensions. The frame is shrunk uniformly to
 fit 320 by 256, never enlarged; a 320 by 240 capture adds sixteen black rows,
 without stretching. Mesh crop upsampling does not change `eyes_px`. The box
