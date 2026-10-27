@@ -1,0 +1,38 @@
+[
+  {
+    "file": "census.json",
+    "raw_sha256": "c2af6b9b4a42aa87232a51816942175bfbddfd6b87815ccce510bdc16f8bdbd2",
+    "prior_sanitized_sha256": "c2af6b9b4a42aa87232a51816942175bfbddfd6b87815ccce510bdc16f8bdbd2",
+    "published_sha256": "c2af6b9b4a42aa87232a51816942175bfbddfd6b87815ccce510bdc16f8bdbd2",
+    "original_trailing_lf": 1,
+    "published_trailing_lf": 1,
+    "eof_reconstruction": "remove published trailing LF, append original_trailing_lf LFs; empty remains empty"
+  },
+  {
+    "file": "terminal-rows.json",
+    "raw_sha256": "01f32117e5c669f7228986d6804928285630cc2749797a7c40c4197159d66d71",
+    "prior_sanitized_sha256": "01f32117e5c669f7228986d6804928285630cc2749797a7c40c4197159d66d71",
+    "published_sha256": "01f32117e5c669f7228986d6804928285630cc2749797a7c40c4197159d66d71",
+    "original_trailing_lf": 1,
+    "published_trailing_lf": 1,
+    "eof_reconstruction": "remove published trailing LF, append original_trailing_lf LFs; empty remains empty"
+  },
+  {
+    "file": "extraction-history.json",
+    "raw_sha256": "f0c2c4632fc7cd6fea336a78ee6cdb78f5f51796fb29125ac66d9a88883117ad",
+    "prior_sanitized_sha256": "f0c2c4632fc7cd6fea336a78ee6cdb78f5f51796fb29125ac66d9a88883117ad",
+    "published_sha256": "f0c2c4632fc7cd6fea336a78ee6cdb78f5f51796fb29125ac66d9a88883117ad",
+    "original_trailing_lf": 1,
+    "published_trailing_lf": 1,
+    "eof_reconstruction": "remove published trailing LF, append original_trailing_lf LFs; empty remains empty"
+  },
+  {
+    "file": "reader-audit.json",
+    "raw_sha256": "4be247649ae81d66a96a1fb80258a6b362e29c5ab748b88641efd74198bbe378",
+    "prior_sanitized_sha256": "4be247649ae81d66a96a1fb80258a6b362e29c5ab748b88641efd74198bbe378",
+    "published_sha256": "4be247649ae81d66a96a1fb80258a6b362e29c5ab748b88641efd74198bbe378",
+    "original_trailing_lf": 1,
+    "published_trailing_lf": 1,
+    "eof_reconstruction": "remove published trailing LF, append original_trailing_lf LFs; empty remains empty"
+  }
+]

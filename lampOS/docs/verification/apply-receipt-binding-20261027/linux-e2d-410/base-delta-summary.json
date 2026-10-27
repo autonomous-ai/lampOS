@@ -1,0 +1,373 @@
+{
+  "old_base": "410faf6180d4dfeacb9021d1e272020c6037d18d",
+  "tested_base": "184532c6cbf929ba12a7d3fb3b61c94091d5bed4",
+  "commits": 10,
+  "files": [
+    {
+      "filename": "lampOS/crates/controls/src/touch.rs",
+      "status": "modified",
+      "additions": 19,
+      "deletions": 3
+    },
+    {
+      "filename": "lampOS/crates/controls/tests/it/touch.rs",
+      "status": "modified",
+      "additions": 66,
+      "deletions": 7
+    },
+    {
+      "filename": "lampOS/crates/expression/src/alive.rs",
+      "status": "modified",
+      "additions": 50,
+      "deletions": 10
+    },
+    {
+      "filename": "lampOS/crates/expression/tests/it/alive_engine.rs",
+      "status": "modified",
+      "additions": 6,
+      "deletions": 1
+    },
+    {
+      "filename": "lampOS/crates/msgs/src/controls.rs",
+      "status": "modified",
+      "additions": 14,
+      "deletions": 5
+    },
+    {
+      "filename": "lampOS/crates/msgs/tests/it/touch.rs",
+      "status": "modified",
+      "additions": 35,
+      "deletions": 6
+    },
+    {
+      "filename": "lampOS/crates/update/src/check_units.rs",
+      "status": "modified",
+      "additions": 28,
+      "deletions": 12
+    },
+    {
+      "filename": "lampOS/crates/update/src/install.rs",
+      "status": "modified",
+      "additions": 26,
+      "deletions": 13
+    },
+    {
+      "filename": "lampOS/crates/update/src/switches.rs",
+      "status": "modified",
+      "additions": 83,
+      "deletions": 13
+    },
+    {
+      "filename": "lampOS/crates/update/tests/install.rs",
+      "status": "modified",
+      "additions": 59,
+      "deletions": 3
+    },
+    {
+      "filename": "lampOS/crates/voice/src/coordinator.rs",
+      "status": "modified",
+      "additions": 63,
+      "deletions": 24
+    },
+    {
+      "filename": "lampOS/crates/voice/src/coordinator/tests/hand_controls.rs",
+      "status": "modified",
+      "additions": 106,
+      "deletions": 0
+    },
+    {
+      "filename": "lampOS/crates/voice/src/hand_controls.rs",
+      "status": "modified",
+      "additions": 58,
+      "deletions": 20
+    },
+    {
+      "filename": "lampOS/crates/voice/src/hand_controls/tests.rs",
+      "status": "modified",
+      "additions": 195,
+      "deletions": 29
+    },
+    {
+      "filename": "lampOS/crates/voice/src/onboarding.rs",
+      "status": "modified",
+      "additions": 263,
+      "deletions": 16
+    },
+    {
+      "filename": "lampOS/crates/voice/src/onboarding/giving_way.rs",
+      "status": "modified",
+      "additions": 36,
+      "deletions": 5
+    },
+    {
+      "filename": "lampOS/crates/voice/src/onboarding/giving_way_flow_tests.rs",
+      "status": "modified",
+      "additions": 59,
+      "deletions": 1
+    },
+    {
+      "filename": "lampOS/crates/voice/src/onboarding/near.rs",
+      "status": "modified",
+      "additions": 38,
+      "deletions": 6
+    },
+    {
+      "filename": "lampOS/crates/voice/src/onboarding/near_flow_tests.rs",
+      "status": "modified",
+      "additions": 3,
+      "deletions": 3
+    },
+    {
+      "filename": "lampOS/crates/voice/src/onboarding/privacy_flow_tests.rs",
+      "status": "modified",
+      "additions": 3,
+      "deletions": 3
+    },
+    {
+      "filename": "lampOS/crates/voice/src/process.rs",
+      "status": "modified",
+      "additions": 4,
+      "deletions": 0
+    },
+    {
+      "filename": "lampOS/crates/voice/src/remember.rs",
+      "status": "modified",
+      "additions": 371,
+      "deletions": 0
+    },
+    {
+      "filename": "lampOS/crates/voice/src/room_told.rs",
+      "status": "modified",
+      "additions": 16,
+      "deletions": 0
+    },
+    {
+      "filename": "lampOS/crates/voice/src/second_provider.rs",
+      "status": "modified",
+      "additions": 32,
+      "deletions": 1
+    },
+    {
+      "filename": "lampOS/crates/voice/src/second_provider/tests.rs",
+      "status": "modified",
+      "additions": 14,
+      "deletions": 3
+    },
+    {
+      "filename": "lampOS/crates/voice/src/second_provider/worker.rs",
+      "status": "modified",
+      "additions": 365,
+      "deletions": 4
+    },
+    {
+      "filename": "lampOS/crates/voice/src/tools.rs",
+      "status": "modified",
+      "additions": 9,
+      "deletions": 6
+    },
+    {
+      "filename": "lampOS/deploy/product/lamp-voice.service",
+      "status": "modified",
+      "additions": 5,
+      "deletions": 0
+    },
+    {
+      "filename": "lampOS/docs/alive.md",
+      "status": "modified",
+      "additions": 4,
+      "deletions": 2
+    },
+    {
+      "filename": "lampOS/docs/controls.md",
+      "status": "modified",
+      "additions": 20,
+      "deletions": 4
+    },
+    {
+      "filename": "lampOS/docs/creature.md",
+      "status": "modified",
+      "additions": 3,
+      "deletions": 3
+    },
+    {
+      "filename": "lampOS/docs/install.md",
+      "status": "modified",
+      "additions": 6,
+      "deletions": 2
+    },
+    {
+      "filename": "lampOS/docs/memory.md",
+      "status": "modified",
+      "additions": 35,
+      "deletions": 0
+    },
+    {
+      "filename": "lampOS/docs/onboarding.md",
+      "status": "modified",
+      "additions": 12,
+      "deletions": 4
+    },
+    {
+      "filename": "lampOS/docs/second-voice.md",
+      "status": "modified",
+      "additions": 40,
+      "deletions": 4
+    },
+    {
+      "filename": "lampOS/docs/switches.md",
+      "status": "modified",
+      "additions": 1,
+      "deletions": 0
+    },
+    {
+      "filename": "lampOS/sdk/js/.gitignore",
+      "status": "added",
+      "additions": 2,
+      "deletions": 0
+    },
+    {
+      "filename": "lampOS/sdk/js/README.md",
+      "status": "added",
+      "additions": 106,
+      "deletions": 0
+    },
+    {
+      "filename": "lampOS/sdk/js/examples/ci-light.js",
+      "status": "added",
+      "additions": 12,
+      "deletions": 0
+    },
+    {
+      "filename": "lampOS/sdk/js/examples/follow.js",
+      "status": "added",
+      "additions": 27,
+      "deletions": 0
+    },
+    {
+      "filename": "lampOS/sdk/js/examples/greet.js",
+      "status": "added",
+      "additions": 16,
+      "deletions": 0
+    },
+    {
+      "filename": "lampOS/sdk/js/examples/phrase.js",
+      "status": "added",
+      "additions": 11,
+      "deletions": 0
+    },
+    {
+      "filename": "lampOS/sdk/js/examples/pomodoro.js",
+      "status": "added",
+      "additions": 27,
+      "deletions": 0
+    },
+    {
+      "filename": "lampOS/sdk/js/package.json",
+      "status": "added",
+      "additions": 17,
+      "deletions": 0
+    },
+    {
+      "filename": "lampOS/sdk/js/src/cli.js",
+      "status": "added",
+      "additions": 51,
+      "deletions": 0
+    },
+    {
+      "filename": "lampOS/sdk/js/src/client.js",
+      "status": "added",
+      "additions": 306,
+      "deletions": 0
+    },
+    {
+      "filename": "lampOS/sdk/js/src/control.schema.json",
+      "status": "added",
+      "additions": 1409,
+      "deletions": 0
+    },
+    {
+      "filename": "lampOS/sdk/js/src/discovery.js",
+      "status": "added",
+      "additions": 26,
+      "deletions": 0
+    },
+    {
+      "filename": "lampOS/sdk/js/src/errors.js",
+      "status": "added",
+      "additions": 36,
+      "deletions": 0
+    },
+    {
+      "filename": "lampOS/sdk/js/src/fake.js",
+      "status": "added",
+      "additions": 37,
+      "deletions": 0
+    },
+    {
+      "filename": "lampOS/sdk/js/src/index.js",
+      "status": "added",
+      "additions": 7,
+      "deletions": 0
+    },
+    {
+      "filename": "lampOS/sdk/js/src/keys.js",
+      "status": "added",
+      "additions": 89,
+      "deletions": 0
+    },
+    {
+      "filename": "lampOS/sdk/js/src/schema.js",
+      "status": "added",
+      "additions": 21,
+      "deletions": 0
+    },
+    {
+      "filename": "lampOS/sdk/js/src/testing.js",
+      "status": "added",
+      "additions": 225,
+      "deletions": 0
+    },
+    {
+      "filename": "lampOS/sdk/js/test/client.test.js",
+      "status": "added",
+      "additions": 319,
+      "deletions": 0
+    },
+    {
+      "filename": "lampOS/sdk/mcp/.gitignore",
+      "status": "added",
+      "additions": 4,
+      "deletions": 0
+    },
+    {
+      "filename": "lampOS/sdk/mcp/README.md",
+      "status": "added",
+      "additions": 61,
+      "deletions": 0
+    },
+    {
+      "filename": "lampOS/sdk/mcp/pyproject.toml",
+      "status": "added",
+      "additions": 19,
+      "deletions": 0
+    },
+    {
+      "filename": "lampOS/sdk/mcp/src/lamp_mcp/__init__.py",
+      "status": "added",
+      "additions": 6,
+      "deletions": 0
+    },
+    {
+      "filename": "lampOS/sdk/mcp/src/lamp_mcp/server.py",
+      "status": "added",
+      "additions": 370,
+      "deletions": 0
+    },
+    {
+      "filename": "lampOS/sdk/mcp/tests/test_server.py",
+      "status": "added",
+      "additions": 251,
+      "deletions": 0
+    }
+  ]
+}

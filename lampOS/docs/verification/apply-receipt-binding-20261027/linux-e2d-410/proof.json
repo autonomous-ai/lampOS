@@ -1,0 +1,61 @@
+{
+  "pr": 3808,
+  "offered_head": "e2d393ad3ec634e089ac32ce58982a5252a66421",
+  "tested_base": "184532c6cbf929ba12a7d3fb3b61c94091d5bed4",
+  "actual_checkout": "3b24fb0e2fd5f8c51ef7da7fc8fe1389d48d0740",
+  "ordered_parents": [
+    "184532c6cbf929ba12a7d3fb3b61c94091d5bed4",
+    "e2d393ad3ec634e089ac32ce58982a5252a66421"
+  ],
+  "actual_preview_tree": "7d52e3732f640582bfe04cb099ab07cf1836995f",
+  "offered_tree": "92810984fc038533228785bfe002a330960f64ac",
+  "preview_equals_offered_full_tree": false,
+  "four_owned_blobs_equal": true,
+  "run": {
+    "id": 40492815101,
+    "run_attempt": 1,
+    "event": "pull_request",
+    "head_sha": "e2d393ad3ec634e089ac32ce58982a5252a66421",
+    "status": "completed",
+    "conclusion": "success"
+  },
+  "job": {
+    "id": 122150725700,
+    "name": "lampOS \u2014 clippy, every crate and target (x86 Linux)",
+    "status": "completed",
+    "conclusion": "success",
+    "started_at": "2026-10-27T11:00:12Z",
+    "completed_at": "2026-10-27T11:03:57Z"
+  },
+  "required_stages": [
+    {
+      "name": "stable promotion formatting and strict Clippy",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "name": "formatting (whole workspace, pinned Rust)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "name": "clippy (every crate and target, warnings as errors)",
+      "status": "completed",
+      "conclusion": "success"
+    }
+  ],
+  "commands": [
+    "cargo fmt --manifest-path .github/tools/lampos-promote/Cargo.toml --check",
+    "cargo clippy --locked --manifest-path .github/tools/lampos-promote/Cargo.toml --all-targets -- -D warnings",
+    "cargo +1.96.0 fmt --all --check",
+    "cargo clippy --locked --workspace --all-targets -- -D warnings"
+  ],
+  "log": {
+    "lines": 600,
+    "bytes": 46409,
+    "sha256": "1f3f6813c529373f95e974bfb0ea22b9186fd87bb0296360344825d4400a29b7"
+  },
+  "cache_note": "Existing restored cache and source-time reuse:7235/7355 unchanged,120 changed/new. Not a cache-free build.",
+  "completion_note": "Actual bash -e commands, Finished output and final required-stage conclusions corroborate success; numeric per-command exit codes are not separately printed.",
+  "scope": "Linux pinned fmt/strict workspace all-target Clippy on actual preview3b24/1845. Not the complete offered e2d/410 tree, newest Main, runtime, device or helper qualification."
+}

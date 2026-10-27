@@ -1,0 +1,11 @@
+{
+  "exit_code": 0,
+  "stdout": "lampOS/crates/cloud/src/reports/query_tests.rs:45:    let accepted = public_reports::bounded_output_within(\nlampOS/crates/cloud/src/reports/query_tests.rs:54:        public_reports::bounded_output_within(\nlampOS/crates/cloud/src/reports/query_tests.rs:67:        public_reports::bounded_output_within(\nlampOS/crates/cloud/src/reports/query_tests.rs:99:    let result = public_reports::bounded_output_within(\nlampOS/crates/cloud/src/reports.rs:589:pub fn bounded_output(program: &Path, args: &[&str]) -> Option<String> {\nlampOS/crates/cloud/src/reports.rs:590:    bounded_output_within(program, args, SYSTEMCTL_WITHIN)\nlampOS/crates/cloud/src/reports.rs:594:pub fn bounded_output_within(program: &Path, args: &[&str], within: Duration) -> Option<String> {\nlampOS/crates/cloud/src/reports.rs:1968:        let found = bounded_output_within(&self.systemctl, &args, self.systemctl_within)\nlampOS/crates/cloud/src/reports.rs:2002:            && bounded_output_within(\nlampOS/crates/cloud/src/main.rs:63:    let shown = reports::bounded_output(\n",
+  "stderr": "",
+  "direct_production_readers": [
+    "main::exit_note metadata",
+    "reports::Lamp::unit_states",
+    "reports::Lamp::waits"
+  ],
+  "external_readers": []
+}

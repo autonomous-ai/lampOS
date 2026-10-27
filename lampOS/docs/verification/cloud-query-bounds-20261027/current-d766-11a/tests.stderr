@@ -1,0 +1,6 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.13s
+     Running unittests src/lib.rs (<owned-target>/debug/deps/lamp_cloud-d547dc199ae9939d)
+     Running unittests src/main.rs (<owned-target>/debug/deps/lamp_cloud-36fc8773bc2a14e0)
+     Running tests/it/main.rs (<owned-target>/debug/deps/it-020796b45a19ec43)
+     Running tests/release_pair.rs (<owned-target>/debug/deps/release_pair-5f2e05b8ca835b18)
+   Doc-tests lamp_cloud

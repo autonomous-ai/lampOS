@@ -1,0 +1,45 @@
+{
+  "source_packet": "artifact-packet",
+  "source_manifest_sha256": "cca8a460679657412bcb4b5ecca9e97a41b85023ef381c3dbae55c8478c24efa",
+  "source_manifest_verified": true,
+  "raw_packet_unchanged": true,
+  "privacy_exceptions": [],
+  "files": [
+    {
+      "file": "README.md",
+      "raw_sha256": "6f6c55fa98f4a72fae852df92d85ac8cec9cb9bc77538b3b148bb5ab01258ae9",
+      "sanitized_sha256": "6f6c55fa98f4a72fae852df92d85ac8cec9cb9bc77538b3b148bb5ab01258ae9",
+      "published_sha256": "6f6c55fa98f4a72fae852df92d85ac8cec9cb9bc77538b3b148bb5ab01258ae9",
+      "raw_size": 808,
+      "published_size": 808,
+      "path_redaction_applied": false,
+      "prior_sanitized_trailing_lf": 1,
+      "published_trailing_lf": 1,
+      "reversible_EOF_rule": "Remove published trailing LF and append prior_sanitized_trailing_lf LFs; empty content remains empty."
+    },
+    {
+      "file": "artifact-SHA256SUMS.txt",
+      "raw_sha256": "936c429711e8a40839d14b3da517f21d33c9d984adb3f8c7b6fb18e34129770d",
+      "sanitized_sha256": "936c429711e8a40839d14b3da517f21d33c9d984adb3f8c7b6fb18e34129770d",
+      "published_sha256": "936c429711e8a40839d14b3da517f21d33c9d984adb3f8c7b6fb18e34129770d",
+      "raw_size": 4003,
+      "published_size": 4003,
+      "path_redaction_applied": false,
+      "prior_sanitized_trailing_lf": 1,
+      "published_trailing_lf": 1,
+      "reversible_EOF_rule": "Remove published trailing LF and append prior_sanitized_trailing_lf LFs; empty content remains empty."
+    },
+    {
+      "file": "artifact-proof.json",
+      "raw_sha256": "1352414db332f4ab6cf32cf24714ee54facf1c16206a1210b926de6da13fc93a",
+      "sanitized_sha256": "1352414db332f4ab6cf32cf24714ee54facf1c16206a1210b926de6da13fc93a",
+      "published_sha256": "1352414db332f4ab6cf32cf24714ee54facf1c16206a1210b926de6da13fc93a",
+      "raw_size": 10872,
+      "published_size": 10872,
+      "path_redaction_applied": false,
+      "prior_sanitized_trailing_lf": 1,
+      "published_trailing_lf": 1,
+      "reversible_EOF_rule": "Remove published trailing LF and append prior_sanitized_trailing_lf LFs; empty content remains empty."
+    }
+  ]
+}

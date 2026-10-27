@@ -1,0 +1,62 @@
+{
+  "pr": 3808,
+  "head": "09762d1a2a24cbb17c452512db09861715c7d6cc",
+  "base": "3b9bfb628e1c416926b958fecf56f65c539dc533",
+  "actual_checkout": "339edd90fcdc85a48971f93c703efeab6a388d05",
+  "ordered_parents": [
+    "3b9bfb628e1c416926b958fecf56f65c539dc533",
+    "09762d1a2a24cbb17c452512db09861715c7d6cc"
+  ],
+  "full_tree": "adcfb8aa245c1ae6e5f9d1e2476ac031c461a180",
+  "preview_authored_complete_tree_equal": true,
+  "run": {
+    "id": 40498250762,
+    "run_attempt": 1,
+    "event": "pull_request",
+    "head_sha": "09762d1a2a24cbb17c452512db09861715c7d6cc",
+    "status": "completed",
+    "conclusion": "success"
+  },
+  "job": {
+    "id": 122169102437,
+    "name": "lampOS \u2014 clippy, every crate and target (x86 Linux)",
+    "status": "completed",
+    "conclusion": "success",
+    "started_at": "2026-10-27T11:43:18Z",
+    "completed_at": "2026-10-27T11:47:10Z"
+  },
+  "required_stages": [
+    {
+      "name": "stable promotion formatting and strict Clippy",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "name": "formatting (whole workspace, pinned Rust)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "name": "clippy (every crate and target, warnings as errors)",
+      "status": "completed",
+      "conclusion": "success"
+    }
+  ],
+  "commands": [
+    "cargo fmt --manifest-path .github/tools/lampos-promote/Cargo.toml --check",
+    "cargo clippy --locked --manifest-path .github/tools/lampos-promote/Cargo.toml --all-targets -- -D warnings",
+    "cargo +1.96.0 fmt --all --check",
+    "cargo clippy --locked --workspace --all-targets -- -D warnings"
+  ],
+  "toolchain": "1.96.0-x86_64-unknown-linux-gnu",
+  "log": {
+    "lines": 553,
+    "bytes": 42464,
+    "sha256": "c70d1742809ba05599e173c092060e90f541f24e7026f5cc1e594f1a7e308aee"
+  },
+  "cache_note": [
+    "7228 of 7359 source files are as the cached build had them and get its times back; 131 changed or new keep the checkout's time."
+  ],
+  "completion_note": "Actual bash -e commands, Finished output and successful required-stage conclusions corroborate success; numeric per-command exit codes are not separately printed. Cache/source-time reuse is not a cache-free rebuild claim.",
+  "limits": "Actual097/3b9 Linux lint composition only; subsequent Main movement is not qualified. No runtime, lamp or helper result from this audit."
+}

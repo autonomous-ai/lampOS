@@ -1,0 +1,81 @@
+{
+  "source_packet": "packet",
+  "source_manifest_sha256": "9c6941f12a1c5c95de59b25a43f32847f5b3430e5e3e60840d520d226e56633c",
+  "source_manifest_verified": true,
+  "raw_packet_unchanged": true,
+  "privacy_exceptions": [],
+  "files": [
+    {
+      "file": "required-selectors.json",
+      "raw_sha256": "ecf2c70720c3f1c14b5ba960123cea0e3ae0764777f4906992a989c58ee80c23",
+      "sanitized_sha256": "ecf2c70720c3f1c14b5ba960123cea0e3ae0764777f4906992a989c58ee80c23",
+      "published_sha256": "ecf2c70720c3f1c14b5ba960123cea0e3ae0764777f4906992a989c58ee80c23",
+      "raw_size": 665,
+      "published_size": 665,
+      "path_redaction_applied": false,
+      "prior_sanitized_trailing_lf": 1,
+      "published_trailing_lf": 1,
+      "reversible_EOF_rule": "Remove published trailing LF and append prior_sanitized_trailing_lf LFs; empty content remains empty."
+    },
+    {
+      "file": "identities.json",
+      "raw_sha256": "d26d33fb45133067a9e6f214578f6b2995c5068a5093091297faa37dbea32045",
+      "sanitized_sha256": "d26d33fb45133067a9e6f214578f6b2995c5068a5093091297faa37dbea32045",
+      "published_sha256": "d26d33fb45133067a9e6f214578f6b2995c5068a5093091297faa37dbea32045",
+      "raw_size": 4763,
+      "published_size": 4763,
+      "path_redaction_applied": false,
+      "prior_sanitized_trailing_lf": 1,
+      "published_trailing_lf": 1,
+      "reversible_EOF_rule": "Remove published trailing LF and append prior_sanitized_trailing_lf LFs; empty content remains empty."
+    },
+    {
+      "file": "README.md",
+      "raw_sha256": "7ad204d2b7ce1b11a0e7dc76bbc5790ec10a2140072519e379576919ef58d2c3",
+      "sanitized_sha256": "7ad204d2b7ce1b11a0e7dc76bbc5790ec10a2140072519e379576919ef58d2c3",
+      "published_sha256": "7ad204d2b7ce1b11a0e7dc76bbc5790ec10a2140072519e379576919ef58d2c3",
+      "raw_size": 2449,
+      "published_size": 2449,
+      "path_redaction_applied": false,
+      "prior_sanitized_trailing_lf": 1,
+      "published_trailing_lf": 1,
+      "reversible_EOF_rule": "Remove published trailing LF and append prior_sanitized_trailing_lf LFs; empty content remains empty."
+    },
+    {
+      "file": "census.json",
+      "raw_sha256": "396eaa3bfeee8eacc27edd6b313cbdb8b4adae3458516acb586e9e24df8820ca",
+      "sanitized_sha256": "396eaa3bfeee8eacc27edd6b313cbdb8b4adae3458516acb586e9e24df8820ca",
+      "published_sha256": "396eaa3bfeee8eacc27edd6b313cbdb8b4adae3458516acb586e9e24df8820ca",
+      "raw_size": 15511,
+      "published_size": 15511,
+      "path_redaction_applied": false,
+      "prior_sanitized_trailing_lf": 1,
+      "published_trailing_lf": 1,
+      "reversible_EOF_rule": "Remove published trailing LF and append prior_sanitized_trailing_lf LFs; empty content remains empty."
+    },
+    {
+      "file": "source-bindings.json",
+      "raw_sha256": "21514c45fa0a120bc4a9e7505f040e092a8596cd401e18259ea5ba4ff07d07c4",
+      "sanitized_sha256": "21514c45fa0a120bc4a9e7505f040e092a8596cd401e18259ea5ba4ff07d07c4",
+      "published_sha256": "21514c45fa0a120bc4a9e7505f040e092a8596cd401e18259ea5ba4ff07d07c4",
+      "raw_size": 2224,
+      "published_size": 2224,
+      "path_redaction_applied": false,
+      "prior_sanitized_trailing_lf": 1,
+      "published_trailing_lf": 1,
+      "reversible_EOF_rule": "Remove published trailing LF and append prior_sanitized_trailing_lf LFs; empty content remains empty."
+    },
+    {
+      "file": "owned-preview-blobs.json",
+      "raw_sha256": "ea3d9920b19ebfb063ab8fe9eae8a12add9a2714b78983471efba2cfe372437b",
+      "sanitized_sha256": "ea3d9920b19ebfb063ab8fe9eae8a12add9a2714b78983471efba2cfe372437b",
+      "published_sha256": "ea3d9920b19ebfb063ab8fe9eae8a12add9a2714b78983471efba2cfe372437b",
+      "raw_size": 1288,
+      "published_size": 1288,
+      "path_redaction_applied": false,
+      "prior_sanitized_trailing_lf": 1,
+      "published_trailing_lf": 1,
+      "reversible_EOF_rule": "Remove published trailing LF and append prior_sanitized_trailing_lf LFs; empty content remains empty."
+    }
+  ]
+}

@@ -1,0 +1,234 @@
+
+running 178 tests
+test account::tests::write_a_rotated_fixture ... ignored, writes a fixture
+test chat::tests::a_chat_send_is_its_message_and_v1s_session_and_speak ... ok
+test account::tests::a_ping_reply_rotates_only_what_it_changes ... ok
+test account::tests::each_kept_rotated_login_reads_as_it_was_kept ... ok
+test answer::tests::a_volume_out_of_range_is_refused_before_anything_is_asked ... ok
+test answer::tests::unmuting_from_the_app_and_what_this_lamp_lacks_are_refused_plainly ... ok
+test chat::tests::each_run_has_its_own_name ... ok
+test chat::tests::a_summary_is_the_first_two_hundred_characters ... ok
+test account::tests::a_kept_account_is_complete_and_its_secret_is_never_printed ... ok
+test answer::tests::the_kinds_this_lamp_has_are_answered_by_its_parts ... ok
+test chat::tests::a_run_nothing_answers_ends_as_a_fault_after_a_minute ... ok
+test chat::tests::a_fault_and_task_news_go_as_v1s_events_and_news_has_no_run ... ok
+test faces::tests::a_remove_names_one_and_says_how_the_forget_went ... ok
+test answer::tests::the_light_row_reads_sets_and_previews_the_persons_light ... ok
+test chat::tests::words_are_gathered_for_a_quarter_second_and_the_whole_reply_ends_the_run ... ok
+test answer::tests::system_info_says_each_switchs_kinds_only_while_it_is_on ... ok
+test faces::tests::entirely_is_true_unless_said_false_and_a_flag_only ... ok
+test faces::tests::it_is_off_unless_switched_on_with_the_eyes_socket ... ok
+test account::tests::a_rotated_account_from_a_later_build_still_reads ... ok
+test faces::tests::memory_is_asked_for_the_persons_own_id_and_their_rules ... ok
+test faces::tests::memory_is_said_forgotten_only_when_every_forget_was_done ... ok
+test account::tests::a_rotated_account_is_kept_for_this_user_alone ... ok
+test faces::tests::the_list_is_names_and_whether_each_waits_for_a_yes ... ok
+test faces::tests::a_remove_of_the_face_only_never_asks_memory ... ok
+test lamp::tests::the_build_and_the_default_route_are_read_as_written ... ok
+test faces::tests::a_remove_takes_the_person_off_the_eyes_and_memory ... ok
+test faces::tests::the_eyes_are_asked_over_their_socket ... ok
+test light::tests::a_choice_is_checked_as_v1_checks_it_and_off_keeps_the_colour ... ok
+test light::tests::a_colour_is_the_nearest_tint_at_the_level_its_brightest_channel_reaches ... ok
+test faces::tests::a_remove_entirely_after_the_face_is_gone_still_forgets_the_memory ... ok
+test light::tests::each_of_the_fifty_lights_comes_back_from_its_own_colour ... ok
+test light::tests::the_snapshot_is_v1s_shape_with_the_light_by_its_own_names ... ok
+test guard::tests::guard_from_the_app_is_handed_to_lamp_skills_call_socket ... ok
+test answer::tests::the_skills_are_listed_for_the_app_only_with_their_switch ... ok
+test make_skill::tests::the_switch_and_the_socket_are_lamp_voices ... ok
+test faces::tests::a_remove_never_takes_the_memory_of_someone_renamed_from_the_name ... ok
+test make_skill::tests::a_make_is_handed_to_the_voice_and_its_answer_told ... ok
+test make_skill::tests::made_is_told_with_may_use_as_the_skills_page_says_it ... ok
+test make_skill::tests::the_played_command_tells_the_same_answers_in_plain_words ... ok
+test faces::tests::a_remove_entirely_forgets_the_person_in_memory_too ... ok
+test faces::tests::a_remove_with_the_eyes_on_and_the_voice_off_leaves_nothing_half_removed ... ok
+test online::tests::a_preview_done_is_not_answered_and_one_that_fails_is ... ok
+test online::tests::a_result_lost_before_its_ack_is_handed_back ... ok
+test lamp::tests::a_child_still_there_after_the_kill_is_handed_back_not_waited_for ... ok
+test online::tests::a_skills_line_goes_up_as_task_news_with_no_run_and_the_journal_has_no_text ... ok
+test answer::tests::reports_are_read_and_set_from_the_app_only_with_their_switch ... ok
+test lamp::tests::recovery_is_read_from_setups_file ... ok
+test lamp::tests::the_reset_is_read_from_the_controls_pins ... ok
+test lamp::tests::the_volume_is_asked_of_lamp_actions_and_the_host_read_from_proc ... ok
+test beat::tests::the_ping_says_the_lamp_and_takes_a_new_broker_from_its_reply ... ok
+test online::tests::only_the_lamps_own_account_channel_commands_it ... ok
+test online::tests::a_change_is_acked_starting_and_its_result_follows_on_the_channel ... ok
+test online::tests::a_dropped_connection_is_made_again_and_subscribed_again ... ok
+test online::tests::a_text_is_acked_with_its_run_and_its_answer_goes_out_as_chat_events ... ok
+test online::tests::an_own_key_is_acked_at_once_and_is_in_no_reply ... ok
+test online::tests::the_time_is_rfc3339_in_utc ... ok
+test online::tests::the_lamp_comes_online_as_v1_and_answers_on_its_channel ... ok
+test online::tests::with_its_switch_the_broker_is_reached_over_tls ... ok
+test online::tests::with_its_switch_the_broker_is_left_a_will_that_says_offline ... ok
+test photos::tests::it_is_off_unless_switched_on_with_both_places ... ok
+test online::tests::a_skills_line_lost_with_the_connection_goes_again_unchanged ... ok
+test photos::tests::the_eyes_reasons_are_said_plainly ... ok
+test photos::tests::the_photo_goes_to_the_eyes_and_is_never_kept ... ok
+test ping::tests::the_payload_is_v1s_and_a_reply_may_move_the_broker_or_the_id ... ok
+test ping::tests::the_ping_goes_above_the_v1_base_and_asks_for_a_broker_while_none_is_kept ... ok
+test ping::tests::the_wait_doubles_to_a_minute_and_starts_again_once_connected ... ok
+test online::tests::reports_go_below_the_channel_and_leave_the_queue_on_the_ack ... ok
+test online::tests::a_refused_login_backs_off_and_is_said_once ... ok
+test reports::query::tests::an_endless_writer_is_refused_at_the_cap_and_its_group_killed ... ok
+test photos::tests::the_apps_photo_is_a_name_and_a_jpeg_checked ... ok
+test reports::query::tests::an_endless_writer_whose_child_holds_the_pipe_is_refused_and_both_killed ... ok
+test reports::query::tests::public_output_refuses_invalid_utf8_instead_of_a_partial_string ... ok
+test online::tests::a_command_with_the_largest_photo_is_read_and_answered ... ok
+test reports::query::tests::query_reads_output_with_closed_stdin_and_discarded_stderr ... ok
+test reports::query::tests::public_output_accepts_256_kib_and_refuses_one_byte_more ... ok
+test reports::query::tests::query_refuses_nonzero_exit_and_spawn_failure ... ok
+test reports::tests::a_choice_is_kept_with_who_made_it_whether_held_and_when ... ok
+test online::tests::a_slow_connack_is_waited_for_while_texts_are_taken ... ok
+test online::tests::only_a_command_on_the_lamps_own_account_channel_is_done_and_answered ... ok
+test reports::tests::a_health_report_carries_numbers_enums_and_listed_names_only ... ok
+test reports::tests::a_crash_report_is_systemds_numbers_by_the_lists ... ok
+test online::tests::without_the_switch_no_skills_line_goes_up ... ok
+test reports::tests::a_local_template_exit_note_cannot_grant_consent_to_send ... ok
+test reports::tests::a_newer_builds_choice_reads_off_and_is_kept ... ok
+test reports::tests::a_no_given_offline_goes_when_connected_and_once_more_on_the_next ... ok
+test reports::tests::a_choice_it_cant_read_is_off_kept_whole_and_said ... ok
+test reports::tests::a_no_on_the_bus_reaches_lamp_cloud ... ok
+test reports::tests::a_no_deletes_what_waits_and_nothing_but_stopped_goes_after ... ok
+test reports::tests::a_report_over_four_kib_is_cut_or_counted ... ok
+test reports::tests::an_error_held_a_minute_sends_at_once_and_once_an_hour ... ok
+test reports::tests::a_report_sent_again_is_the_same_message_with_infos_id ... ok
+test lamp::tests::a_killed_iw_that_will_not_die_is_never_waited_for ... ok
+test reports::tests::failed_units_are_current_allowlisted_and_unambiguous ... ok
+test reports::tests::an_exit_note_it_cant_read_is_skipped_once_and_left_whole ... ok
+test reports::tests::each_kept_reports_record_reads_as_it_was_kept ... ok
+test online::tests::a_wifi_result_ready_while_offline_is_said_once_back_online ... ok
+test reports::tests::no_value_from_a_file_reaches_the_journal ... ok
+test reports::tests::handed_reports_go_on_the_ack_and_again_after_a_drop_with_the_same_seq ... ok
+test reports::tests::only_nonempty_instances_of_listed_templates_are_exit_notes ... ok
+test reports::tests::only_the_newest_health_waits ... ok
+test reports::tests::no_secret_planted_in_any_input_reaches_any_report ... ok
+test reports::tests::a_no_given_while_a_newer_yes_reads_off_is_kept_and_does_all_a_no_does ... ok
+test online::tests::a_named_text_behind_an_unacknowledged_publish_goes_unnamed ... ok
+test reports::tests::the_exit_note_drop_in_runs_this_binary_for_the_unit_stopped ... ok
+test reports::tests::the_lists_are_the_products ... ok
+test reports::tests::exit_notes_are_systemds_variables_and_success_writes_nothing ... ok
+test lamp::tests::the_wifis_name_is_asked_within_a_bound_and_kept_a_minute ... ok
+test reports::tests::queued_reports_read_one_release_forward ... ok
+test reports::tests::times_read_back_as_written ... ok
+test reports::tests::write_a_reports_fixture ... ignored, writes a reports fixture: run by hand with LAMP_CLOUD_REPORTS_FIXTURE set
+test settings::tests::a_broker_on_an_address_with_colons_is_bracketed ... ok
+test reports::tests::the_bus_can_only_turn_reports_off ... ok
+test lamp::tests::the_persons_light_is_asked_of_the_ring_and_a_preview_lapses_or_is_given_back ... ok
+test settings::tests::a_failure_with_no_join_is_said_on_the_link_there_is ... ok
+test online::tests::a_connection_made_again_on_a_wifi_join_keeps_its_will ... ok
+test reports::tests::the_queues_state_reads_forward_and_is_set_aside_when_it_cant ... ok
+test online::tests::p2_a_joined_wifi_on_a_stale_link_reconnects_at_once_and_its_window_starts_at_the_ack ... ok
+test settings::tests::each_kind_becomes_one_line_for_the_helper ... ok
+test settings::tests::every_keys_request_gets_a_coded_result_with_its_id ... ok
+test settings::tests::a_refusal_a_helper_not_running_and_one_that_never_answers_are_failures ... ok
+test settings::tests::a_change_is_acked_at_once_and_its_result_follows ... ok
+test reports::tests::the_voices_no_on_the_bus_sends_stopped_and_ends_the_health ... ok
+test settings::tests::off_each_kind_is_refused_as_one_this_lamp_lacks ... ok
+test settings::tests::off_the_wifi_is_refused_as_a_kind_this_lamp_lacks ... ok
+test settings::tests::own_keys_need_their_switch_and_their_lines_hold_only_what_the_helper_reads ... ok
+test reports::query::tests::a_failed_query_cleans_its_same_group_child_even_after_output_closes ... ok
+test settings::tests::a_wifi_change_is_one_at_a_time_and_its_result_carries_the_request_id ... ok
+test settings::tests::the_lamps_name_in_the_app_is_read_from_the_helpers_file ... ok
+test settings::tests::the_switch_needs_both_words ... ok
+test settings::tests::the_wifi_line_carries_the_broker_and_no_error_holds_a_value ... ok
+test settings::tests::the_wifi_needs_its_own_switch_beside_the_names ... ok
+test reports::tests::nothing_goes_without_each_of_the_three_gates ... ok
+test reports::query::tests::invalid_utf8_cleans_closed_output_child ... ok
+test skills::tests::a_core_skill_can_never_be_removed_and_an_installed_one_can ... ok
+test skills::tests::a_core_skill_is_never_removed ... ok
+test skills::tests::a_folder_that_cannot_be_changed_leaves_the_skill_whole ... ok
+test skills::tests::a_link_named_as_a_skill_is_left_as_it_is ... ok
+test skills::tests::a_request_that_is_not_an_entry_is_refused_here_and_the_store_can_be_off ... ok
+test reports::tests::template_exit_notes_keep_only_the_fixed_name_in_files_and_reports ... ok
+test reports::tests::failed_units_share_the_gated_restart_query_and_cached_recovery ... ok
+test skills::tests::a_skill_is_turned_off_and_on_and_one_of_the_lamp_itself_is_refused ... ok
+test skills::tests::a_skill_made_on_this_lamp_has_its_own_group_and_can_be_removed ... ok
+test skills::tests::a_signed_package_from_the_store_is_installed_by_the_helper_and_listed ... ok
+test skills::tests::a_skills_folder_that_cannot_be_read_is_said_plainly ... ok
+test skills::tests::a_skill_that_does_not_load_is_listed_with_why_and_what_it_says_of_itself ... ok
+test skills::tests::a_skill_made_here_is_removed_and_the_page_is_given_as_it_now_is ... ok
+test skills::tests::an_add_on_is_said_off_while_add_ons_are_off_on_this_lamp ... ok
+test skills::tests::each_kept_off_file_reads_the_same_skills_off ... ok
+test skills::tests::an_unknown_name_and_every_path_trick_are_refused_and_nothing_is_touched ... ok
+test skills::tests::an_installed_skill_is_removed ... ok
+test skills::tests::an_installed_skill_that_does_not_load_is_removed_too ... ok
+test skills::tests::the_store_is_on_only_with_its_own_switch_and_the_pages ... ok
+test skills::tests::the_switch_is_on_only_with_the_cloud ... ok
+test skills::tests::what_a_skill_may_use_is_said_in_plain_words_with_the_privacy_switch ... ok
+test skills::tests::only_a_skill_that_loads_can_be_turned_off ... ok
+test unasked::tests::a_named_text_goes_named_only_at_once_and_is_held_unnamed ... ok
+test unasked::tests::at_most_six_are_taken_in_any_hour ... ok
+test unasked::tests::only_lamp_skills_lines_are_taken_and_another_publisher_is_named_once ... ok
+test unasked::tests::pieces_keep_their_order_and_one_heard_again_is_dropped ... ok
+test unasked::tests::the_journals_lines_name_the_skill_and_never_the_text ... ok
+test unasked::tests::while_offline_the_newest_few_wait_in_order_and_owed_go_first ... ok
+test wire::tests::commands_are_read_as_v1_sends_them ... ok
+test skills::tests::the_reply_lists_each_skill_with_its_group_and_what_it_may_use ... ok
+test wire::tests::replies_carry_v1s_identity_fields ... ok
+test skills::tests::without_the_manage_helper_nothing_is_removed ... ok
+test settings::tests::followup_3_a_joined_never_acked_is_dropped_once_its_wait_ended ... ok
+test skills::tests::the_reply_is_bounded ... ok
+test reports::query::tests::query_deadline_applies_after_stdout_closes ... ok
+test skills::tests::a_remove_held_past_the_helpers_wait_is_refused_and_never_done_later ... ok
+test reports::tests::the_queue_keeps_its_bounds_and_the_rate_its_limits ... ok
+test online::tests::p2_a_joined_wifi_in_a_backoff_tries_at_once_and_the_backoff_is_reset ... ok
+test settings::tests::a_confirm_with_a_request_id_is_taken_for_a_change_without_one ... ok
+test settings::tests::followup_2_lamp_clouds_online_deadline_ends_before_the_helpers ... ok
+test settings::tests::followup_5_a_confirm_for_another_request_id_is_refused ... ok
+test reports::query::tests::query_timeout_cleans_the_exited_leaders_pipe_holding_descendant ... ok
+test settings::tests::p3_a_confirm_1_s_after_the_helpers_deadline_is_failure_only ... ok
+test settings::tests::p3_a_confirm_1_s_before_the_helpers_deadline_is_success_only ... ok
+test settings::tests::followup_3_a_failure_with_no_join_not_acked_in_a_few_seconds_relinks ... ok
+
+test result: ok. 176 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 6.63s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 30 tests
+test setup::the_generation_on_every_reply_is_the_one_setups_status_says ... ok
+test setup::the_unit_reads_the_account_where_the_products_setup_writes_it ... ok
+test switch::lamp_4aces_cloud_on_writes_the_units_whole_drop_in ... ok
+test switch::the_photo_folder_the_unit_may_write_is_the_one_made_at_boot ... ok
+test switch::the_product_unit_is_on_and_stops_v1s_os_server_only_as_it_really_starts ... ok
+test switch::the_unit_may_reach_lamp_skills_call_socket_where_lamp_skills_makes_it ... ok
+test switch::the_unit_may_reach_lamp_voices_app_make_socket ... ok
+test setup::what_setup_writes_from_the_apps_request_reads_as_a_complete_account ... ok
+test skills_contract::the_skills_page_reads_the_agreed_reply_and_its_refusal ... ok
+test report_contract::failed_units_are_canonical_in_schema_one_and_kept_on_retransmit ... ok
+test report_contract::every_report_carries_the_agreed_fields_and_sent_at_is_set_once ... ok
+test app_contract::schedule_list_and_cancel_answer_with_the_switch_and_are_not_here_without ... ok
+test report_contract::the_apps_switch_reads_the_agreed_reply_and_its_refusal ... ok
+test app_contract::a_restart_from_the_app_is_the_keepers_answered_first_and_refused_under_an_update ... ok
+test app_contract::the_faces_page_reads_names_and_removes_one ... ok
+test app_contract::the_software_update_is_answered_from_lamp_updates_status ... ok
+test texts::a_line_from_another_publisher_on_messages_out_is_not_sent ... ok
+test texts::with_nothing_listening_a_text_is_refused_at_once_and_off_it_is_not_here ... ok
+test app_contract::each_field_the_apps_page_reads_is_there_with_the_type_it_takes ... ok
+test texts::a_skills_line_on_messages_out_comes_off_the_bus_as_task_news ... ok
+test texts::task_news_comes_out_with_no_text_asked_first ... ok
+test texts::a_text_goes_on_the_bus_and_its_answer_comes_back_as_v1s_chat_events ... ok
+test texts::a_named_text_goes_named_only_while_its_yes_stands_as_it_goes ... ok
+test ring::a_light_asked_at_the_lamp_ends_the_apps_preview_and_a_drag_after_it_stays_given_way ... ok
+test skills_contract::removing_answers_the_page_as_it_now_is_and_refuses_in_the_envelope ... ok
+test skills_contract::a_skill_from_a_package_is_listed_with_its_sha256_and_version ... ok
+test report_contract::a_lamp_with_the_armed_way_back_or_the_switch_off_says_nothing_waits ... ok
+test switch::with_the_switch_on_it_connects_to_the_accounts_broker ... ok
+test switch::without_the_switch_it_says_so_and_connects_nowhere ... ok
+test report_contract::a_lamp_without_the_armed_way_back_says_lamp_update_waits ... ok
+
+test result: ok. 30 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.52s
+
+
+running 2 tests
+test release_6408_cloud_reads_6498_packages_and_6498_reads_the_replacement ... ignored, requires pinned releases in a fresh isolated native ARM64 container
+test release_6498_cloud_reads_6408_packages_and_6408_reads_the_replacement ... ignored, requires pinned releases in a fresh isolated native ARM64 container
+
+test result: ok. 0 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s

@@ -1,0 +1,23 @@
+{
+  "live-main-after.json": "7b0e04bbd0608e7a0666c7743263ecf21bab06fffd3845ebd6e710635a999039",
+  "compile-artifacts.json": "2db9e9fe0355605aef177b65c878f154dd5a7de275eadad5f5f514f3d6efa813",
+  "clippy.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "executables.json": "fc9a1d236ca85f0d51fdfb0bf36e1c6b0ce188ff97ff0314704018ab536c19ec",
+  "tests.stderr": "fe57154eecd3f244d387bea205b6c1e1fc80a318b94bd1b50310b89e3f3ad281",
+  "reader-census.json": "74d760e02147fd4fe5e0c7d8d8ad7c8b4ffc4112a58e4c1b18b28663e0963158",
+  "source-before.json": "10fffdfc72c5f4b8dde005252ca10f9708e4fd02b4dd706cf988fc8286b81013",
+  "source-after.json": "10fffdfc72c5f4b8dde005252ca10f9708e4fd02b4dd706cf988fc8286b81013",
+  "tests.stdout": "e7e7d418c49c70faddb6b8a2aff24a1e29d8a8c3c836c5a3f2231bc15a0cc7d0",
+  "results.json": "714696939c1d0565d630c1b00c7801a2e32c92dc32935170dd858a2f81c4ab0f",
+  "live-main-before.json": "e2ca76b3854f56549e8e8375b76b4b5da56299707e4d9014c4e3b58f039e269f",
+  "clippy.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "compile.stdout": "3b1cb0dd703ebbcfb54198b92c7c460335b9ca5508f82c43b4a36fcf63009b21",
+  "census.json": "06f233a3a5547be620f170695bcb0f2a5a57ca59d505634d140f9c4360646bc5",
+  "identity.json": "d7d5dc940a3452dc93089f71093d2b8686557b0fea90a444538fc9007a5f2103",
+  "fmt.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "fmt.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "closure.json": "1eab181a69af9fb87619302b84bc09a3f0c4422ac2f30662d65002bc0f9399c0",
+  "compile.stderr": "14014087034652e2abe7bb7ef8d4fd6eb3d7ecc253fcd7cba42c84df449330ad",
+  "target-reuse.json": "e0a8205bf67759ee1316986ae154b4077201690db32a00a2ebd9c91e3eaccf6b",
+  "main-foundation-control-names.json": "21c1652d62deb79e2b7e688a4a77fcfb237f58c0408c71a1caadebf7d6777fd8"
+}

@@ -1,0 +1,24 @@
+{
+  "old_base": "11a1c867ea709c77d6421b8870144e0e5bba8ecc",
+  "new_base": "3b9bfb628e1c416926b958fecf56f65c539dc533",
+  "paths": [
+    "lampOS/crates/body/src/bin/lamp-body.rs",
+    "lampOS/crates/body/src/body.rs",
+    "lampOS/crates/body/src/body/tests.rs",
+    "lampOS/crates/body/src/lease.rs",
+    "lampOS/crates/body/src/lib.rs",
+    "lampOS/crates/body/src/sleep_in.rs",
+    "lampOS/crates/update/src/lib.rs",
+    "lampOS/crates/update/src/writer_refresh.rs",
+    "lampOS/crates/update/src/writer_refresh/tests.rs",
+    "lampOS/crates/voice/src/second_provider.rs",
+    "lampOS/crates/voice/src/second_provider/tests.rs",
+    "lampOS/crates/voice/src/second_provider/worker.rs",
+    "lampOS/docs/body.md",
+    "lampOS/docs/reuse-decisions.md",
+    "lampOS/docs/settings-writer-refresh.md",
+    "lampOS/docs/switches.md",
+    "lampOS/docs/updates.md"
+  ],
+  "note": "Main writer_refresh, Body/Control lease, and Voice inputs must be classified from selected metadata plus changed source; fresh complete Cloud execution required, no unconsumed-only claim"
+}

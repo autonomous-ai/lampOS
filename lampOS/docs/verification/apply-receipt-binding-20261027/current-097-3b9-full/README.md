@@ -1,0 +1,7 @@
+# Receipt binding: latest 3b9 full Update gate
+
+Clean head `09762d1a2a24cbb17c452512db09861715c7d6cc` contains `3b9bfb628e1c416926b958fecf56f65c539dc533`. Both receipt commits retain equal range-diff entries. Three owned Rust full blobs and all four modes are identical; updates.md includes six new upstream foundation-design lines, while every authored receipt added/removed line remains unchanged. The merged foundation is preserved, not reapplied. The complete tree differs from the earlier qualified native preview; the exact delta is retained.
+
+Pinned fmt, strict Update all-target Clippy and Cargo JSON no-run compilation passed. Once, normal `cargo +1.96.0 test --locked -p lamp-update --no-fail-fast -- --test-threads=4` produced **502 passed, 0 failed, 6 ignored**. All eight receipt controls and all eighteen merged foundation controls pass once as subsets. Nine actual Running executable paths bind to preserved compiler records and post-run hashes. All 7,388 tracked lampOS/workflow source/mode guards, head/status and controller hash close. Live Main equals the base before and after this gate.
+
+These are artifact hashes at the completed local gate boundary. Preserved copies remain available after release of the shared target. Older e2d/410 local and actual 3b24/1845 native results retain their own sources; the original old-production failures are retained without rerunning them. This packet does not establish current Linux/ARM, full-workspace runtime, privileged helper activation, a lamp or power-cut qualification.

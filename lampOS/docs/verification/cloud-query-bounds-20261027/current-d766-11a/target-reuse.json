@@ -1,0 +1,11 @@
+{
+  "previous_head": "405f32be613538d863f659bfbac5e01a5e63567b",
+  "previous_base": "e362659ce65f15c0e1e708a86e786bcea8bc87a6",
+  "verified_artifacts_and_depfiles": 497,
+  "executable_count": 5,
+  "prior_complete_sha256": "a6714f2b90383848f1432be885eca3d02e4f792563698d17135843f28bda0465",
+  "prior_closure_sha256": "1e7bea44b25595a86e4362d2a83330d330a4c2df443d5f52a07db29174f6d14d",
+  "source": "405/e362 full206/0/4; no older failed actual paths are asserted",
+  "prior_resource_failure_retained": true,
+  "raw_old_logs_untouched": true
+}

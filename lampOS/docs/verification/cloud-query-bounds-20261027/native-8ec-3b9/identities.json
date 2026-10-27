@@ -1,0 +1,30 @@
+{
+  "authored_head": "8ec190c680ef28c1ff452592a02f834a70783f74",
+  "base": "3b9bfb628e1c416926b958fecf56f65c539dc533",
+  "preview": "c3f80b8d1b42c7793c116490ae55d2e0d9b3f122",
+  "ordered_parents": [
+    "3b9bfb628e1c416926b958fecf56f65c539dc533",
+    "8ec190c680ef28c1ff452592a02f834a70783f74"
+  ],
+  "authored_and_preview_tree": "b73b395ea85d460b66a662f06e2b6b3752f30cac",
+  "run": {
+    "id": 40498436971,
+    "run_attempt": 1,
+    "event": "pull_request",
+    "status": "completed",
+    "conclusion": "success",
+    "head_sha": "8ec190c680ef28c1ff452592a02f834a70783f74",
+    "html_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40498436971"
+  },
+  "raw_final_log_sha256": "4897c155d7dd8a47c1f2d2c1849fae16d54054a2cb7708ac63da09a06906e9cf",
+  "final_log_fetch_handle": 26673,
+  "final_log_fetch_exit": 0,
+  "parsed_only_after_final_fetch_drain": true,
+  "no_CI_rerun": true,
+  "all_watch_handles_drained": [
+    47236,
+    30683,
+    79254,
+    74747
+  ]
+}

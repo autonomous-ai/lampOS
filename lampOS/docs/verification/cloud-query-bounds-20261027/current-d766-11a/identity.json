@@ -1,0 +1,39 @@
+{
+  "head": "d7666663b067c79c76609c877c3a29c5856d7315",
+  "base": "11a1c867ea709c77d6421b8870144e0e5bba8ecc",
+  "tree": "c67892a82af48da1c3cb53b126556f8cfe13c462",
+  "owned": {
+    "lampOS/Cargo.lock": {
+      "sha256": "ec08a21213f56ace32e767512aa75e7a0b23338973b289e15d772fab30bc134a",
+      "mode": 420
+    },
+    "lampOS/crates/cloud/Cargo.toml": {
+      "sha256": "ba13fdee2a3ea4025b9153ca2fd04ac059e004c340fa9237c0f12edc6b0e0b8a",
+      "mode": 420
+    },
+    "lampOS/crates/cloud/src/reports.rs": {
+      "sha256": "d27bc36695ff82e4cba65cfb2749e48d7b9d38482543dffb039b8db0a4c73dbe",
+      "mode": 420
+    },
+    "lampOS/crates/cloud/src/reports/query.rs": {
+      "sha256": "23df4a7092a7c4829afb6afa9a95738c6b7aeb388fe5f0a8fc42d130c893e444",
+      "mode": 420
+    },
+    "lampOS/crates/cloud/src/reports/query_tests.rs": {
+      "sha256": "3b36f1c5089666b1fc39b4b7c373913127cc61c9c46b7946284d661704f3b5a1",
+      "mode": 420
+    },
+    "lampOS/docs/cloud.md": {
+      "sha256": "99d09c8539e81fdda1195e16f6959810e52a9c08bc1af4087cd26e59c797245c",
+      "mode": 420
+    },
+    "lampOS/docs/reuse-decisions.md": {
+      "sha256": "e66c5d7d59deeb378f0e783d4f0eb6a5d8a4b91afa3b7af2e78a0cdbf1ab3df9",
+      "mode": 420
+    }
+  },
+  "controller_sha256": "1719078433a0370472a937f0574b30280e6779547614518204f3b2d724624bd6",
+  "target": "<owned-target>",
+  "old_runtime": "405/e362 206/0/4 only; not transferred",
+  "no_old_negative_experiments": true
+}

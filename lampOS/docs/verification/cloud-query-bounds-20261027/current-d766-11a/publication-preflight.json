@@ -1,0 +1,11 @@
+{
+  "head": "d7666663b067c79c76609c877c3a29c5856d7315",
+  "base": "11a1c867ea709c77d6421b8870144e0e5bba8ecc",
+  "expected_own_remote": "405f32be613538d863f659bfbac5e01a5e63567b",
+  "refs": {
+    "refs/heads/lamp-voice": "11a1c867ea709c77d6421b8870144e0e5bba8ecc",
+    "refs/heads/second/cloud-query-bounds": "405f32be613538d863f659bfbac5e01a5e63567b"
+  },
+  "main_current": true,
+  "own_lease_current": true
+}

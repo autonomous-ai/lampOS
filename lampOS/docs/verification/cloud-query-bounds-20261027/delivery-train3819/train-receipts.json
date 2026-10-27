@@ -1,0 +1,31 @@
+{
+  "train": {
+    "state": "MERGED",
+    "mergedAt": "2026-10-27T11:45:37Z",
+    "mergeCommit": {
+      "oid": "db3d44d7303a1c026c4c0f1dcf995adf40b0605d"
+    },
+    "headRefOid": "4a0a9e034c7eac8bf275ecb0b6ed1f6ee0f2fb61",
+    "baseRefOid": "3b9bfb628e1c416926b958fecf56f65c539dc533",
+    "url": "https://github.com/autonomous-ai/lampOS/pull/3819"
+  },
+  "original_pr": {
+    "baseRefOid": "3b9bfb628e1c416926b958fecf56f65c539dc533",
+    "headRefOid": "8ec190c680ef28c1ff452592a02f834a70783f74",
+    "mergeCommit": null,
+    "mergedAt": null,
+    "state": "CLOSED",
+    "url": "https://github.com/autonomous-ai/lampOS/pull/3644"
+  },
+  "public_Main_at_verification": "db3d44d7303a1c026c4c0f1dcf995adf40b0605d\trefs/heads/lamp-voice",
+  "delivered_full_tree": "f694ab8c1958454d5df2a71b13713df1e478b09c",
+  "qualified_full_tree": "b73b395ea85d460b66a662f06e2b6b3752f30cac",
+  "full_trees_equal": false,
+  "reason": "Other train items precede the Cloud commits; no whole-tree or runtime equivalence is claimed.",
+  "raw_API_sha256": {
+    "second-cloud-8ec-delivered-tree-20261027.json": "bf77cbd03abf5eeb8399612302dff4ece651212e80de2f181d72f7b250072285",
+    "second-cloud-8ec-delivered-compare-20261027.json": "7d89fefa53640c307e4a168762fc993fd55e2c56c847a9ae5d0127fbf6c8f924",
+    "second-cloud-train3819-20261027.json": "d3503210ef9d22216f26dbb5cb1d51a0194944a0d57079b185ea3aa32f512ac7",
+    "second-cloud-8ec-train-state-20261027.json": "d4e708eb0683ed90f7bc699eb001c35882428efed39452c11f6d7282e6a6ea3d"
+  }
+}

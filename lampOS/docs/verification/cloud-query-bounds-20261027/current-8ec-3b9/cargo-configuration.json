@@ -1,0 +1,26 @@
+{
+  "paths": {
+    "<cloud-tree>/lampOS/.cargo/config": null,
+    "<cloud-tree>/lampOS/.cargo/config.toml": {
+      "sha256": "48a3e9ff36c92393a61c94924a7268fd9e732dc55afe239842fe7fdd2fa7db71",
+      "bytes": 210
+    },
+    "<cloud-tree>/.cargo/config": null,
+    "<cloud-tree>/.cargo/config.toml": null,
+    "<private-path>": null,
+    "<private-path>": null,
+    "/private/.cargo/config": null,
+    "/private/.cargo/config.toml": null,
+    "/.cargo/config": null,
+    "/.cargo/config.toml": null,
+    "<cargo-home>/config": null,
+    "<cargo-home>/config.toml": null
+  },
+  "inherited_compiler_variable_names": [],
+  "overrides": {
+    "CARGO_BUILD_JOBS": "1",
+    "CARGO_INCREMENTAL": "0",
+    "target": "owned Cloud target"
+  },
+  "registry_resolution": "normal locked; no offline foreign-target assumption"
+}

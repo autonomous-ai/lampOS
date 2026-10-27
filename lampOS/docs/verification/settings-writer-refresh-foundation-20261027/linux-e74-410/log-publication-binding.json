@@ -1,0 +1,33 @@
+{
+  "source_packet": "linux-packet",
+  "source_manifest_sha256": "139860efd3bfd3fc58a7a3d491b9dbeb79da51cc240105b928f5e7bef4e68c43",
+  "source_manifest_verified": true,
+  "raw_packet_unchanged": true,
+  "privacy_exceptions": [],
+  "files": [
+    {
+      "file": "README.md",
+      "raw_sha256": "0e297eef4b63c7700fa06e730834911b02032847896903da79b7771c2062482a",
+      "sanitized_sha256": "0e297eef4b63c7700fa06e730834911b02032847896903da79b7771c2062482a",
+      "published_sha256": "0e297eef4b63c7700fa06e730834911b02032847896903da79b7771c2062482a",
+      "raw_size": 789,
+      "published_size": 789,
+      "path_redaction_applied": false,
+      "prior_sanitized_trailing_lf": 1,
+      "published_trailing_lf": 1,
+      "reversible_EOF_rule": "Remove published trailing LF and append prior_sanitized_trailing_lf LFs; empty content remains empty."
+    },
+    {
+      "file": "proof.json",
+      "raw_sha256": "001c3064441f7e2253d047758162bc03f0131bab276a574a6f9c8e6f314f411f",
+      "sanitized_sha256": "001c3064441f7e2253d047758162bc03f0131bab276a574a6f9c8e6f314f411f",
+      "published_sha256": "001c3064441f7e2253d047758162bc03f0131bab276a574a6f9c8e6f314f411f",
+      "raw_size": 2908,
+      "published_size": 2908,
+      "path_redaction_applied": false,
+      "prior_sanitized_trailing_lf": 1,
+      "published_trailing_lf": 1,
+      "reversible_EOF_rule": "Remove published trailing LF and append prior_sanitized_trailing_lf LFs; empty content remains empty."
+    }
+  ]
+}

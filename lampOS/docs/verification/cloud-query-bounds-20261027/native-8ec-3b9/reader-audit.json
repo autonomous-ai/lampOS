@@ -1,0 +1,114 @@
+{
+  "preview": "c3f80b8d1b42c7793c116490ae55d2e0d9b3f122",
+  "tree": "b73b395ea85d460b66a662f06e2b6b3752f30cac",
+  "parents": [
+    "3b9bfb628e1c416926b958fecf56f65c539dc533",
+    "8ec190c680ef28c1ff452592a02f834a70783f74"
+  ],
+  "readers": {
+    "surround": {
+      "source_bound": true,
+      "source_unchanged": true,
+      "tests": "\nrunning 2 tests\ntest release_6408_surround_candidates_cross_6498_and_return ... Surround candidate release-pair evidence: /tmp/pair-output/sr-49-0\nok\ntest release_6498_surround_candidates_cross_6408_and_return ... Surround candidate release-pair evidence: /tmp/pair-output/sr-49-1\nok\n\ntest result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 3.01s\n\n",
+      "cases": [
+        {
+          "member": "tmp/pair-output/sr-49-1/result.json",
+          "result": {
+            "actual_released_pair": true,
+            "candidate_writes": 3,
+            "children_reaped": 7,
+            "exchanges": 25,
+            "groups_absent": 7,
+            "hardware_or_device_acceptance": false,
+            "identical_selected_artifacts": true,
+            "no_automatic_reexecution": true,
+            "no_selected_configuration": true,
+            "operation_ids": [
+              "237c31974ce49b38df153bc7ad6920c1",
+              "dee44cb7bb811033111f51e0e75d5a28",
+              "064eb49d598fbfa7a242b49cdfe3b84a"
+            ],
+            "result": "passed",
+            "synthetic_request_refusals": 3,
+            "synthetic_stored_refusals": 2,
+            "test": "release_6498_surround_candidates_cross_6408_and_return"
+          }
+        },
+        {
+          "member": "tmp/pair-output/sr-49-0/result.json",
+          "result": {
+            "actual_released_pair": true,
+            "candidate_writes": 3,
+            "children_reaped": 7,
+            "exchanges": 25,
+            "groups_absent": 7,
+            "hardware_or_device_acceptance": false,
+            "identical_selected_artifacts": true,
+            "no_automatic_reexecution": true,
+            "no_selected_configuration": true,
+            "operation_ids": [
+              "8961a2c870083e182855748827f20506",
+              "dfcd460ca3c841b3f021e12534f28d54",
+              "7796cf552e41dae6d5612269bcc23e90"
+            ],
+            "result": "passed",
+            "synthetic_request_refusals": 3,
+            "synthetic_stored_refusals": 2,
+            "test": "release_6408_surround_candidates_cross_6498_and_return"
+          }
+        }
+      ],
+      "cleanup": {
+        "name": "surround-candidate-40498436883-1",
+        "owner_verified": true,
+        "removed": true,
+        "remaining_empty": true
+      },
+      "native_archive_sha256": "cf1277d7663d85c30fdc9c9b7b85bdcd2b1954f04002cea1683b8d06391075e7"
+    },
+    "provenance": {
+      "source_bound": true,
+      "source_unchanged": true,
+      "tests": "\nrunning 2 tests\ntest release_6408_cloud_reads_6498_packages_and_6498_reads_the_replacement ... Cloud provenance release-pair evidence: /tmp/pair-output/cv-71-0\nok\ntest release_6498_cloud_reads_6408_packages_and_6408_reads_the_replacement ... Cloud provenance release-pair evidence: /tmp/pair-output/cv-71-1\nok\n\ntest result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.48s\n\n",
+      "cases": [
+        {
+          "member": "tmp/pair-output/cv-71-0/result.json",
+          "result": {
+            "actual_released_writers_and_readers": true,
+            "artifacts_unchanged": true,
+            "children_reaped": 7,
+            "cloud_queries": 9,
+            "fixed_paths_removed": true,
+            "provenance_parser_changed": false,
+            "result": "passed",
+            "synthetic_metadata_controls": 4,
+            "test": "release_6408_cloud_reads_6498_packages_and_6498_reads_the_replacement"
+          }
+        },
+        {
+          "member": "tmp/pair-output/cv-71-1/result.json",
+          "result": {
+            "actual_released_writers_and_readers": true,
+            "artifacts_unchanged": true,
+            "children_reaped": 7,
+            "cloud_queries": 9,
+            "fixed_paths_removed": true,
+            "provenance_parser_changed": false,
+            "result": "passed",
+            "synthetic_metadata_controls": 4,
+            "test": "release_6498_cloud_reads_6408_packages_and_6408_reads_the_replacement"
+          }
+        }
+      ],
+      "cleanup": {
+        "name": "cloud-provenance-40498436922-1",
+        "owner_verified": true,
+        "removed": true,
+        "remaining_empty": true
+      },
+      "native_archive_sha256": "061f914f82c7cd131cbc59395a9946834ce7cdd28bbc453bf8858ae4b7cd6db7"
+    }
+  },
+  "linux_actual_commands_present": true,
+  "linux_log_sha256": "0c0905b1eb0c26d0c729dbd9fd5530a787e5b5e1064a7dcbbdc4e1d522a70cb1"
+}

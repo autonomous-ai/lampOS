@@ -1,0 +1,33 @@
+{
+  "source_packet": "second-foundation-delivery-proof-20261027",
+  "source_manifest_sha256": "57619c315288ecf9301b892bbb0c7679082a20be0075dda20ae30bac730dff2d",
+  "source_manifest_verified": true,
+  "raw_packet_unchanged": true,
+  "privacy_exceptions": [],
+  "files": [
+    {
+      "file": "README.md",
+      "raw_sha256": "7717effba5a823fb14f754ae222106b5c2dda8056115a1eb8345c651ea819797",
+      "sanitized_sha256": "7717effba5a823fb14f754ae222106b5c2dda8056115a1eb8345c651ea819797",
+      "published_sha256": "7717effba5a823fb14f754ae222106b5c2dda8056115a1eb8345c651ea819797",
+      "raw_size": 1301,
+      "published_size": 1301,
+      "path_redaction_applied": false,
+      "prior_sanitized_trailing_lf": 1,
+      "published_trailing_lf": 1,
+      "reversible_EOF_rule": "Remove published trailing LF and append prior_sanitized_trailing_lf LFs; empty content remains empty."
+    },
+    {
+      "file": "proof.json",
+      "raw_sha256": "eded111ec94514e8cd3a28501007c0475588d08b4a995577929d829c29b5f017",
+      "sanitized_sha256": "eded111ec94514e8cd3a28501007c0475588d08b4a995577929d829c29b5f017",
+      "published_sha256": "eded111ec94514e8cd3a28501007c0475588d08b4a995577929d829c29b5f017",
+      "raw_size": 4139,
+      "published_size": 4139,
+      "path_redaction_applied": false,
+      "prior_sanitized_trailing_lf": 1,
+      "published_trailing_lf": 1,
+      "reversible_EOF_rule": "Remove published trailing LF and append prior_sanitized_trailing_lf LFs; empty content remains empty."
+    }
+  ]
+}

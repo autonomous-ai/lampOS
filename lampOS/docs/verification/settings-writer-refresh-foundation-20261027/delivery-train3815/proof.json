@@ -1,0 +1,65 @@
+{
+  "delivered_train": 3815,
+  "delivered_merge_commit": "ff5b21f3b832efdcb500ce03904e78770569c43f",
+  "current_main": "3b9bfb628e1c416926b958fecf56f65c539dc533",
+  "tree": "954cbd68bbef0c414e782f14b0c75394fa523ac7",
+  "train_is_ancestor": true,
+  "qualified_head": "e74e8c02cf82c6bcdd87d78eba617968796754fc",
+  "files": [
+    {
+      "path": "lampOS/crates/update/src/lib.rs",
+      "ls_tree": "100644 blob 77d5807ac882409e634840bbfda142623797a31d\tlampOS/crates/update/src/lib.rs",
+      "sha256": "573bd7b2cd44230661a5284cd8c9c68fb8500642dc53c73eae2d3eecae2f0e1d",
+      "qualified_e74_identical": true
+    },
+    {
+      "path": "lampOS/crates/update/src/writer_refresh.rs",
+      "ls_tree": "100644 blob 77ad2e38e7a3135fe56723cde18a822df5da8680\tlampOS/crates/update/src/writer_refresh.rs",
+      "sha256": "f90f1851020a0a8fa443e30f5dd496f8a2d142b255a46f3490bb54414aa935ca",
+      "qualified_e74_identical": true
+    },
+    {
+      "path": "lampOS/crates/update/src/writer_refresh/tests.rs",
+      "ls_tree": "100644 blob a9bb99c4ace0198232f37c658984f7d2a8ec79ae\tlampOS/crates/update/src/writer_refresh/tests.rs",
+      "sha256": "45aac2379e34fbf4585f2270e76ef445dbc09a7ca8e38bf849e3f47272616b9c",
+      "qualified_e74_identical": true
+    }
+  ],
+  "source_controls": [
+    "writer_refresh::tests::no_apply_does_not_qualify_but_one_exact_apply_can_enter_without_an_ordinary_round",
+    "writer_refresh::tests::a_restart_at_every_unqualified_prefix_requires_recovery_and_never_reissues_the_grant",
+    "writer_refresh::tests::qualified_writer_and_preimages_survive_a_restart_until_the_product_journal_closes",
+    "writer_refresh::tests::identity_substitution_never_changes_or_admits_the_saved_transaction",
+    "writer_refresh::tests::a_stale_or_modified_first_apply_cannot_consume_the_single_grant",
+    "writer_refresh::tests::unsupported_or_malformed_journals_are_retained_and_block_every_admission",
+    "writer_refresh::tests::missing_and_nonregular_records_do_not_turn_into_a_fresh_transaction",
+    "writer_refresh::tests::future_nonsemantic_metadata_is_preserved_without_becoming_admission_authority",
+    "writer_refresh::tests::write_bound_and_invalid_identities_leave_no_journal_or_partial_acceptance",
+    "writer_refresh::tests::diagnostics_hide_unknown_values_and_known_duplicate_or_shadowed_fields_are_refused",
+    "writer_refresh::tests::guard_lock_is_exclusive_and_independent_of_the_product_lock",
+    "writer_refresh::tests::failed_persist_after_publication_poisons_the_live_session_until_actual_disk_state_is_recovered",
+    "writer_refresh::tests::first_apply_binds_its_own_later_envelope_and_sequence_without_replacing_the_refresh_identity",
+    "writer_refresh::tests::restoring_an_apply_requires_its_original_grant_and_preimage_identity",
+    "writer_refresh::tests::reloaded_inputs_keep_the_exact_origin_and_distinguish_writer_from_apply_restoration",
+    "writer_refresh::tests::qualified_and_closed_inputs_keep_the_compatible_writer_and_bound_product_receipts",
+    "writer_refresh::tests::live_or_poisoned_sessions_cannot_expose_stale_recovery_inputs",
+    "writer_refresh::tests::recovery_views_retain_later_metadata_in_the_bound_inputs_without_reparsing"
+  ],
+  "source_control_count": 18,
+  "docs_only_paths": [
+    "lampOS/docs/reuse-decisions.md",
+    "lampOS/docs/settings-writer-refresh.md"
+  ],
+  "validation": "git diff --check and committed-source eighteen unique controls; no Cargo or ARM execution requested",
+  "old824_not_pushed": true,
+  "foundation_pr": 3775,
+  "foundation_pr_state": "closed by train; not a direct GitHub PR merge",
+  "docs_followup_pr": 3821,
+  "docs_followup_url": "https://github.com/autonomous-ai/lampOS/pull/3821",
+  "docs_head": "b7da417171ab23b511f66998ffce0c03e550a081",
+  "docs_base": "3b9bfb628e1c416926b958fecf56f65c539dc533",
+  "docs_label": "builder:second",
+  "docs_draft": false,
+  "old_foundation_824_carry": "retained locally, never pushed; full gate never started",
+  "limits": "Exact delivered source identity is not a claim of new runtime on current Main. Original7705 remains actual e74/410; docs follow-up runs only source count and diff check."
+}

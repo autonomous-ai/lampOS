@@ -1,0 +1,93 @@
+{
+  "train": 3819,
+  "delivered_head": "db3d44d7303a1c026c4c0f1dcf995adf40b0605d",
+  "delivered_base": "2de801b6b5ead7863c8a88588f17f8e556ac8157",
+  "delivered_commits": [
+    "102eb4e5706dbae2135279fe0e49bfff9e26bdb3",
+    "db3d44d7303a1c026c4c0f1dcf995adf40b0605d"
+  ],
+  "qualified_head": "8ec190c680ef28c1ff452592a02f834a70783f74",
+  "qualified_base": "3b9bfb628e1c416926b958fecf56f65c539dc533",
+  "all_seven_complete_hunks_equal": true,
+  "files": {
+    "lampOS/Cargo.lock": {
+      "normalized_hunk_lines_equal": true,
+      "added": 2,
+      "deleted": 0
+    },
+    "lampOS/crates/cloud/Cargo.toml": {
+      "normalized_hunk_lines_equal": true,
+      "added": 3,
+      "deleted": 0
+    },
+    "lampOS/crates/cloud/src/reports.rs": {
+      "normalized_hunk_lines_equal": true,
+      "added": 8,
+      "deleted": 29
+    },
+    "lampOS/crates/cloud/src/reports/query.rs": {
+      "normalized_hunk_lines_equal": true,
+      "added": 147,
+      "deleted": 0
+    },
+    "lampOS/crates/cloud/src/reports/query_tests.rs": {
+      "normalized_hunk_lines_equal": true,
+      "added": 303,
+      "deleted": 0
+    },
+    "lampOS/docs/cloud.md": {
+      "normalized_hunk_lines_equal": true,
+      "added": 21,
+      "deleted": 0
+    },
+    "lampOS/docs/reuse-decisions.md": {
+      "normalized_hunk_lines_equal": true,
+      "added": 25,
+      "deleted": 0
+    }
+  },
+  "all_seven_full_blobs_and_modes": {
+    "lampOS/Cargo.lock": {
+      "qualified_blob": "0ec4e85891c9d50487774eb8c9efa0d1ac556490",
+      "delivered_blob": "0ec4e85891c9d50487774eb8c9efa0d1ac556490",
+      "mode_equal": true,
+      "full_blob_equal": true
+    },
+    "lampOS/crates/cloud/Cargo.toml": {
+      "qualified_blob": "65558e699d91e56ed8447e3091bbda483666ac8e",
+      "delivered_blob": "65558e699d91e56ed8447e3091bbda483666ac8e",
+      "mode_equal": true,
+      "full_blob_equal": true
+    },
+    "lampOS/crates/cloud/src/reports.rs": {
+      "qualified_blob": "3416199eef9b60ad07f0a68b669c9caa6019df48",
+      "delivered_blob": "3416199eef9b60ad07f0a68b669c9caa6019df48",
+      "mode_equal": true,
+      "full_blob_equal": true
+    },
+    "lampOS/crates/cloud/src/reports/query.rs": {
+      "qualified_blob": "6d603d768711844dd2892419f27fdd063d1db349",
+      "delivered_blob": "6d603d768711844dd2892419f27fdd063d1db349",
+      "mode_equal": true,
+      "full_blob_equal": true
+    },
+    "lampOS/crates/cloud/src/reports/query_tests.rs": {
+      "qualified_blob": "03fde84f15e7ad5a22079bcea6e8805f3f5fdc57",
+      "delivered_blob": "03fde84f15e7ad5a22079bcea6e8805f3f5fdc57",
+      "mode_equal": true,
+      "full_blob_equal": true
+    },
+    "lampOS/docs/cloud.md": {
+      "qualified_blob": "048f90f4c56583b9de0bc463f8e35f8d5fe8e70e",
+      "delivered_blob": "048f90f4c56583b9de0bc463f8e35f8d5fe8e70e",
+      "mode_equal": true,
+      "full_blob_equal": true
+    },
+    "lampOS/docs/reuse-decisions.md": {
+      "qualified_blob": "2adba84a58e5406b2a6fa1ebfa96682a96a9f5f2",
+      "delivered_blob": "2adba84a58e5406b2a6fa1ebfa96682a96a9f5f2",
+      "mode_equal": true,
+      "full_blob_equal": true
+    }
+  }
+}

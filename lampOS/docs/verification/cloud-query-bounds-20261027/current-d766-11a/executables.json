@@ -1,0 +1,157 @@
+[
+  {
+    "path": "<owned-target>/debug/deps/release_pair-5f2e05b8ca835b18",
+    "sha256": "ad1d0acc519fa3ad00afde77221957df7943e3985b94036b0083c7604e8600e1",
+    "size": 2912864,
+    "preserved": "<evidence>/executables/0",
+    "preserved_sha256": "ad1d0acc519fa3ad00afde77221957df7943e3985b94036b0083c7604e8600e1",
+    "package_id": "path+file://<cloud-tree>/lampOS/crates/cloud#lamp-cloud@0.1.0",
+    "target": {
+      "kind": [
+        "test"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "release_pair",
+      "src_path": "<cloud-tree>/lampOS/crates/cloud/tests/release_pair.rs",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 2,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "fresh": false,
+    "post_run_sha256": "ad1d0acc519fa3ad00afde77221957df7943e3985b94036b0083c7604e8600e1"
+  },
+  {
+    "path": "<owned-target>/debug/deps/lamp_cloud-36fc8773bc2a14e0",
+    "sha256": "4bb53397f6b2ef698ed8e233aa31ba20ed5a4e958fa1c2e13529e9ad3cc06897",
+    "size": 1003512,
+    "preserved": "<evidence>/executables/1",
+    "preserved_sha256": "4bb53397f6b2ef698ed8e233aa31ba20ed5a4e958fa1c2e13529e9ad3cc06897",
+    "package_id": "path+file://<cloud-tree>/lampOS/crates/cloud#lamp-cloud@0.1.0",
+    "target": {
+      "kind": [
+        "bin"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "lamp-cloud",
+      "src_path": "<cloud-tree>/lampOS/crates/cloud/src/main.rs",
+      "edition": "2024",
+      "doc": true,
+      "doctest": false,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 2,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "fresh": false,
+    "post_run_sha256": "4bb53397f6b2ef698ed8e233aa31ba20ed5a4e958fa1c2e13529e9ad3cc06897"
+  },
+  {
+    "path": "<owned-target>/debug/lamp-cloud",
+    "sha256": "c7764ea744de8d0470b4d1196b290164abbe57b303609f7ca3a5d7cf18dcd528",
+    "size": 29445704,
+    "preserved": "<evidence>/executables/2",
+    "preserved_sha256": "c7764ea744de8d0470b4d1196b290164abbe57b303609f7ca3a5d7cf18dcd528",
+    "package_id": "path+file://<cloud-tree>/lampOS/crates/cloud#lamp-cloud@0.1.0",
+    "target": {
+      "kind": [
+        "bin"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "lamp-cloud",
+      "src_path": "<cloud-tree>/lampOS/crates/cloud/src/main.rs",
+      "edition": "2024",
+      "doc": true,
+      "doctest": false,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 2,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": false
+    },
+    "fresh": false,
+    "post_run_sha256": "c7764ea744de8d0470b4d1196b290164abbe57b303609f7ca3a5d7cf18dcd528"
+  },
+  {
+    "path": "<owned-target>/debug/deps/it-020796b45a19ec43",
+    "sha256": "18642c89182fe11a4bd248562ba1ff847a8ab973e46bc33379769ed04a020798",
+    "size": 18934832,
+    "preserved": "<evidence>/executables/3",
+    "preserved_sha256": "18642c89182fe11a4bd248562ba1ff847a8ab973e46bc33379769ed04a020798",
+    "package_id": "path+file://<cloud-tree>/lampOS/crates/cloud#lamp-cloud@0.1.0",
+    "target": {
+      "kind": [
+        "test"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "it",
+      "src_path": "<cloud-tree>/lampOS/crates/cloud/tests/it/main.rs",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 2,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "fresh": false,
+    "post_run_sha256": "18642c89182fe11a4bd248562ba1ff847a8ab973e46bc33379769ed04a020798"
+  },
+  {
+    "path": "<owned-target>/debug/deps/lamp_cloud-d547dc199ae9939d",
+    "sha256": "5b00b5ee812af9d12a100982add03715bb219d9e4c0388fd419cd191aa30ef63",
+    "size": 36794744,
+    "preserved": "<evidence>/executables/4",
+    "preserved_sha256": "5b00b5ee812af9d12a100982add03715bb219d9e4c0388fd419cd191aa30ef63",
+    "package_id": "path+file://<cloud-tree>/lampOS/crates/cloud#lamp-cloud@0.1.0",
+    "target": {
+      "kind": [
+        "lib"
+      ],
+      "crate_types": [
+        "lib"
+      ],
+      "name": "lamp_cloud",
+      "src_path": "<cloud-tree>/lampOS/crates/cloud/src/lib.rs",
+      "edition": "2024",
+      "doc": true,
+      "doctest": true,
+      "test": true
+    },
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 2,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "fresh": false,
+    "post_run_sha256": "5b00b5ee812af9d12a100982add03715bb219d9e4c0388fd419cd191aa30ef63"
+  }
+]

@@ -1,0 +1,8 @@
+{
+  "boundary_head": "d7666663b067c79c76609c877c3a29c5856d7315",
+  "boundary_base": "11a1c867ea709c77d6421b8870144e0e5bba8ecc",
+  "prior_closure_sha256": "72f72ff5c83d832db7511e2f31fc22dba4dc4ccfd1a53e2ecdc230e548733000",
+  "prior_executable_manifest_sha256": "30f0f8967845668942e239d5f5b3e74f86da165ff10e1c7c5d1370657ac62f44",
+  "actual_local_outputs_verified": 58,
+  "actual_and_preserved_executables_verified": 5
+}

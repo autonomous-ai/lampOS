@@ -1,0 +1,378 @@
+{
+  "head": "09762d1a2a24cbb17c452512db09861715c7d6cc",
+  "base": "3b9bfb628e1c416926b958fecf56f65c539dc533",
+  "tree": "adcfb8aa245c1ae6e5f9d1e2476ac031c461a180",
+  "commands": [
+    {
+      "stage": "fmt",
+      "argv": [
+        "cargo",
+        "+1.96.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 5.958
+    },
+    {
+      "stage": "clippy",
+      "argv": [
+        "cargo",
+        "+1.96.0",
+        "clippy",
+        "--locked",
+        "-q",
+        "-p",
+        "lamp-update",
+        "--all-targets",
+        "--message-format=short",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 21.615
+    },
+    {
+      "stage": "compile",
+      "argv": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--locked",
+        "-p",
+        "lamp-update",
+        "--no-run",
+        "--message-format=json"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 30.667
+    },
+    {
+      "stage": "tests",
+      "argv": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--locked",
+        "-p",
+        "lamp-update",
+        "--no-fail-fast",
+        "--",
+        "--test-threads=4"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 488.217
+    }
+  ],
+  "actual_cargo_totals": {
+    "passed": 502,
+    "failed": 0,
+    "ignored": 6
+  },
+  "ordered_summaries": [
+    {
+      "passed": 174,
+      "failed": 0,
+      "ignored": 2,
+      "line": "test result: ok. 174 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 7.86s"
+    },
+    {
+      "passed": 3,
+      "failed": 0,
+      "ignored": 0,
+      "line": "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    },
+    {
+      "passed": 5,
+      "failed": 0,
+      "ignored": 0,
+      "line": "test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s"
+    },
+    {
+      "passed": 106,
+      "failed": 0,
+      "ignored": 0,
+      "line": "test result: ok. 106 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 146.37s"
+    },
+    {
+      "passed": 13,
+      "failed": 0,
+      "ignored": 0,
+      "line": "test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.71s"
+    },
+    {
+      "passed": 0,
+      "failed": 0,
+      "ignored": 2,
+      "line": "test result: ok. 0 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    },
+    {
+      "passed": 201,
+      "failed": 0,
+      "ignored": 0,
+      "line": "test result: ok. 201 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 326.13s"
+    },
+    {
+      "passed": 0,
+      "failed": 0,
+      "ignored": 1,
+      "line": "test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out"
+    },
+    {
+      "passed": 0,
+      "failed": 0,
+      "ignored": 1,
+      "line": "test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out"
+    },
+    {
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0,
+      "line": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+    }
+  ],
+  "receipt_controls": [
+    [
+      "apply::tests::a_done_for_another_sequence_does_not_change_any_setting_record",
+      "ok"
+    ],
+    [
+      "apply::tests::a_done_for_another_operation_does_not_change_any_setting_record",
+      "ok"
+    ],
+    [
+      "apply::tests::a_matching_done_keeps_the_permanent_forward_read_contract",
+      "ok"
+    ],
+    [
+      "apply::tests::an_explicit_expected_identity_does_not_follow_a_rewritten_staged_request",
+      "ok"
+    ],
+    [
+      "apply::tests::an_unknown_done_operation_is_refused_without_changing_any_setting_record",
+      "ok"
+    ],
+    [
+      "a_rejected_apply_receipt_runs_real_back_and_restores_written_settings_modes_and_records",
+      "ok"
+    ],
+    [
+      "a_rejected_back_receipt_keeps_the_journal_until_real_back_is_acknowledged",
+      "ok"
+    ],
+    [
+      "the_round_rejects_a_done_matching_a_rewritten_request_instead_of_its_own_request",
+      "ok"
+    ]
+  ],
+  "merged_foundation_controls": [
+    [
+      "writer_refresh::tests::a_restart_at_every_unqualified_prefix_requires_recovery_and_never_reissues_the_grant",
+      "ok"
+    ],
+    [
+      "writer_refresh::tests::a_stale_or_modified_first_apply_cannot_consume_the_single_grant",
+      "ok"
+    ],
+    [
+      "writer_refresh::tests::diagnostics_hide_unknown_values_and_known_duplicate_or_shadowed_fields_are_refused",
+      "ok"
+    ],
+    [
+      "writer_refresh::tests::failed_persist_after_publication_poisons_the_live_session_until_actual_disk_state_is_recovered",
+      "ok"
+    ],
+    [
+      "writer_refresh::tests::first_apply_binds_its_own_later_envelope_and_sequence_without_replacing_the_refresh_identity",
+      "ok"
+    ],
+    [
+      "writer_refresh::tests::guard_lock_is_exclusive_and_independent_of_the_product_lock",
+      "ok"
+    ],
+    [
+      "writer_refresh::tests::future_nonsemantic_metadata_is_preserved_without_becoming_admission_authority",
+      "ok"
+    ],
+    [
+      "writer_refresh::tests::identity_substitution_never_changes_or_admits_the_saved_transaction",
+      "ok"
+    ],
+    [
+      "writer_refresh::tests::missing_and_nonregular_records_do_not_turn_into_a_fresh_transaction",
+      "ok"
+    ],
+    [
+      "writer_refresh::tests::live_or_poisoned_sessions_cannot_expose_stale_recovery_inputs",
+      "ok"
+    ],
+    [
+      "writer_refresh::tests::no_apply_does_not_qualify_but_one_exact_apply_can_enter_without_an_ordinary_round",
+      "ok"
+    ],
+    [
+      "writer_refresh::tests::qualified_and_closed_inputs_keep_the_compatible_writer_and_bound_product_receipts",
+      "ok"
+    ],
+    [
+      "writer_refresh::tests::qualified_writer_and_preimages_survive_a_restart_until_the_product_journal_closes",
+      "ok"
+    ],
+    [
+      "writer_refresh::tests::recovery_views_retain_later_metadata_in_the_bound_inputs_without_reparsing",
+      "ok"
+    ],
+    [
+      "writer_refresh::tests::restoring_an_apply_requires_its_original_grant_and_preimage_identity",
+      "ok"
+    ],
+    [
+      "writer_refresh::tests::write_bound_and_invalid_identities_leave_no_journal_or_partial_acceptance",
+      "ok"
+    ],
+    [
+      "writer_refresh::tests::unsupported_or_malformed_journals_are_retained_and_block_every_admission",
+      "ok"
+    ],
+    [
+      "writer_refresh::tests::reloaded_inputs_keep_the_exact_origin_and_distinguish_writer_from_apply_restoration",
+      "ok"
+    ]
+  ],
+  "actual_running_executable_count": 9,
+  "source_and_mode_guard_count": 7388,
+  "closure": {
+    "head_unchanged": true,
+    "status_unchanged": true,
+    "source_unchanged": true,
+    "source_count": 7388,
+    "controller_unchanged": true,
+    "all_stages_passed": true,
+    "controller_error": null
+  },
+  "executables": [
+    {
+      "target": "lamp-update",
+      "kind": [
+        "bin"
+      ],
+      "test_profile": false,
+      "fresh": false,
+      "bytes": 13776240,
+      "sha256": "7b520cd90b308abafdf146959ad8bfbbe7c7a2a649078f71e88d223faae4d31f",
+      "post_run_and_preserved_match": true
+    },
+    {
+      "target": "self-cli-exec",
+      "kind": [
+        "test"
+      ],
+      "test_profile": true,
+      "fresh": false,
+      "bytes": 565360,
+      "sha256": "27e29f662c41237670032f899618598796a83005da200ea95c6227843ac5abd5",
+      "post_run_and_preserved_match": true
+    },
+    {
+      "target": "lamp-update",
+      "kind": [
+        "bin"
+      ],
+      "test_profile": true,
+      "fresh": false,
+      "bytes": 1282640,
+      "sha256": "6231762fe5bd4885aca307443e24ae2c1787661f3b82626ab7889d9c3b29286f",
+      "post_run_and_preserved_match": true
+    },
+    {
+      "target": "self-process-cuts",
+      "kind": [
+        "test"
+      ],
+      "test_profile": true,
+      "fresh": false,
+      "bytes": 565920,
+      "sha256": "d8e8dafd77e701c18644671eff010be2466469ad61a8013cbbbf72148ada2b8c",
+      "post_run_and_preserved_match": true
+    },
+    {
+      "target": "release_pair",
+      "kind": [
+        "test"
+      ],
+      "test_profile": true,
+      "fresh": false,
+      "bytes": 3348288,
+      "sha256": "8e2f00db1844c351e011ea8362449724cef5b641ed3e0cbff19c895bdf0657e8",
+      "post_run_and_preserved_match": true
+    },
+    {
+      "target": "it",
+      "kind": [
+        "test"
+      ],
+      "test_profile": true,
+      "fresh": false,
+      "bytes": 2008192,
+      "sha256": "c110fe6e752b7695f11b9f95052955a981d8de56a1a096920a685dd4ba4e6a9c",
+      "post_run_and_preserved_match": true
+    },
+    {
+      "target": "functions",
+      "kind": [
+        "test"
+      ],
+      "test_profile": true,
+      "fresh": false,
+      "bytes": 23092584,
+      "sha256": "d20f370dbc59931266dea9e769d77b8608b079f5da6882f8d33aa3cc861339b7",
+      "post_run_and_preserved_match": true
+    },
+    {
+      "target": "install",
+      "kind": [
+        "test"
+      ],
+      "test_profile": true,
+      "fresh": false,
+      "bytes": 16792696,
+      "sha256": "89fd026e17ca00493e7271c6186332cf6b2eeaf4102bd80913d38c2b7c71b382",
+      "post_run_and_preserved_match": true
+    },
+    {
+      "target": "round",
+      "kind": [
+        "test"
+      ],
+      "test_profile": true,
+      "fresh": false,
+      "bytes": 20788696,
+      "sha256": "c8c33ad5ad87707cc39cde862e83e563255edc8f767dfb1b9f305e37be2d32bd",
+      "post_run_and_preserved_match": true
+    },
+    {
+      "target": "lamp_update",
+      "kind": [
+        "lib"
+      ],
+      "test_profile": true,
+      "fresh": false,
+      "bytes": 15279552,
+      "sha256": "b159dfa535635a67e2f78d12b8e8c6b0e497ce1456d980f9a979c43a1db9629b",
+      "post_run_and_preserved_match": true
+    }
+  ],
+  "live_main_before": {
+    "expected": "3b9bfb628e1c416926b958fecf56f65c539dc533",
+    "actual": "3b9bfb628e1c416926b958fecf56f65c539dc533"
+  },
+  "live_main_after": {
+    "expected": "3b9bfb628e1c416926b958fecf56f65c539dc533",
+    "actual": "3b9bfb628e1c416926b958fecf56f65c539dc533",
+    "latest_at_completion": true,
+    "scope_note": "Actual gates and source/executable closure remain tied to the captured head. Any Main advancement forbids a latest-base publication claim until inspected."
+  },
+  "limits": "Full normal native Mac Update Cargo selection only. Not current Linux/ARM, full workspace, helper activation, device or power-cut acceptance. Earlier native previews retain their actual complete trees."
+}

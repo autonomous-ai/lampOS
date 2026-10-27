@@ -1,0 +1,14 @@
+{
+  "lib": [
+    "a_done_for_another_operation_does_not_change_any_setting_record",
+    "a_done_for_another_sequence_does_not_change_any_setting_record",
+    "an_explicit_expected_identity_does_not_follow_a_rewritten_staged_request",
+    "a_matching_done_keeps_the_permanent_forward_read_contract",
+    "an_unknown_done_operation_is_refused_without_changing_any_setting_record"
+  ],
+  "round": [
+    "a_rejected_apply_receipt_runs_real_back_and_restores_written_settings_modes_and_records",
+    "a_rejected_back_receipt_keeps_the_journal_until_real_back_is_acknowledged",
+    "the_round_rejects_a_done_matching_a_rewritten_request_instead_of_its_own_request"
+  ]
+}

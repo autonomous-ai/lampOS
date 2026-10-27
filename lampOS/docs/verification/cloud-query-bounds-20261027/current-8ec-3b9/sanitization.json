@@ -1,0 +1,227 @@
+[
+  {
+    "file": "identity.json",
+    "raw_sha256": "986b53cf9c90b98e872bd6d4d63f7afafcf2ac7712e5f5f7826534fa838e448a",
+    "prior_sanitized_sha256": "cde452a51123fa9bcdafcaa916c3dae7775b71004e57684a8d3844585b4d147d",
+    "published_sha256": "cde452a51123fa9bcdafcaa916c3dae7775b71004e57684a8d3844585b4d147d",
+    "original_trailing_lf": 1,
+    "published_trailing_lf": 1,
+    "eof_reconstruction": "remove published trailing LF, append original_trailing_lf LFs; empty remains empty"
+  },
+  {
+    "file": "results.json",
+    "raw_sha256": "6dd6c4229255aa2ee55d6466f45cee14faedcd68d33fa021f049bdb60668f239",
+    "prior_sanitized_sha256": "1052472f4bf615e51326d842cb608c6913a07c0af3b44b25685747465a4adf1d",
+    "published_sha256": "1052472f4bf615e51326d842cb608c6913a07c0af3b44b25685747465a4adf1d",
+    "original_trailing_lf": 1,
+    "published_trailing_lf": 1,
+    "eof_reconstruction": "remove published trailing LF, append original_trailing_lf LFs; empty remains empty"
+  },
+  {
+    "file": "closure.json",
+    "raw_sha256": "3752d2308fd74d3044a60dc11cd2a6eacebd856faf90ef7eafcb4b5d13c42b61",
+    "prior_sanitized_sha256": "3752d2308fd74d3044a60dc11cd2a6eacebd856faf90ef7eafcb4b5d13c42b61",
+    "published_sha256": "3752d2308fd74d3044a60dc11cd2a6eacebd856faf90ef7eafcb4b5d13c42b61",
+    "original_trailing_lf": 1,
+    "published_trailing_lf": 1,
+    "eof_reconstruction": "remove published trailing LF, append original_trailing_lf LFs; empty remains empty"
+  },
+  {
+    "file": "census.json",
+    "raw_sha256": "439e6c78af68905ce5ef041db50e35f98675d673a36331b777a8d2f62e07d0bd",
+    "prior_sanitized_sha256": "5719b744994182f19611cc7adb7c89f37c542c00f050ad4ee46e97599fdfe1bb",
+    "published_sha256": "5719b744994182f19611cc7adb7c89f37c542c00f050ad4ee46e97599fdfe1bb",
+    "original_trailing_lf": 1,
+    "published_trailing_lf": 1,
+    "eof_reconstruction": "remove published trailing LF, append original_trailing_lf LFs; empty remains empty"
+  },
+  {
+    "file": "required-controls.json",
+    "raw_sha256": "caaeff07f4ed751756899e3972c4c54e2b5d04311c81b4342f133c00596b1f55",
+    "prior_sanitized_sha256": "caaeff07f4ed751756899e3972c4c54e2b5d04311c81b4342f133c00596b1f55",
+    "published_sha256": "caaeff07f4ed751756899e3972c4c54e2b5d04311c81b4342f133c00596b1f55",
+    "original_trailing_lf": 1,
+    "published_trailing_lf": 1,
+    "eof_reconstruction": "remove published trailing LF, append original_trailing_lf LFs; empty remains empty"
+  },
+  {
+    "file": "reader-census.json",
+    "raw_sha256": "bb9f75a42b3c81022950ca0183feb45c08095f1506303e65defd7617f2e1451b",
+    "prior_sanitized_sha256": "bb9f75a42b3c81022950ca0183feb45c08095f1506303e65defd7617f2e1451b",
+    "published_sha256": "bb9f75a42b3c81022950ca0183feb45c08095f1506303e65defd7617f2e1451b",
+    "original_trailing_lf": 1,
+    "published_trailing_lf": 1,
+    "eof_reconstruction": "remove published trailing LF, append original_trailing_lf LFs; empty remains empty"
+  },
+  {
+    "file": "selected-inputs.json",
+    "raw_sha256": "96790a6ad65629e451f11d2c4c5ab3012d76deb4b42163d06ad28eada9e2172d",
+    "prior_sanitized_sha256": "874ce763c883a1ad0434151cc44b51599cbb47f611255e6e1245efbcfbd78d40",
+    "published_sha256": "874ce763c883a1ad0434151cc44b51599cbb47f611255e6e1245efbcfbd78d40",
+    "original_trailing_lf": 1,
+    "published_trailing_lf": 1,
+    "eof_reconstruction": "remove published trailing LF, append original_trailing_lf LFs; empty remains empty"
+  },
+  {
+    "file": "main-changed-inputs.json",
+    "raw_sha256": "fdc82e7debf971acd0421c671b822c5c43a2205798eda0216e05c75554e4cb4b",
+    "prior_sanitized_sha256": "fdc82e7debf971acd0421c671b822c5c43a2205798eda0216e05c75554e4cb4b",
+    "published_sha256": "fdc82e7debf971acd0421c671b822c5c43a2205798eda0216e05c75554e4cb4b",
+    "original_trailing_lf": 1,
+    "published_trailing_lf": 1,
+    "eof_reconstruction": "remove published trailing LF, append original_trailing_lf LFs; empty remains empty"
+  },
+  {
+    "file": "executables.json",
+    "raw_sha256": "23d1f3f316397b7439a6bee08aa14f1909bd059680be51fe374b63447f17c36c",
+    "prior_sanitized_sha256": "3e65f47f57d6fdf96637645e77998d958e731e02586fcd2daf9ed142f3c3a72b",
+    "published_sha256": "3e65f47f57d6fdf96637645e77998d958e731e02586fcd2daf9ed142f3c3a72b",
+    "original_trailing_lf": 1,
+    "published_trailing_lf": 1,
+    "eof_reconstruction": "remove published trailing LF, append original_trailing_lf LFs; empty remains empty"
+  },
+  {
+    "file": "compile-artifacts.json",
+    "raw_sha256": "10da3726dbd709cd6f32242fe0871cb7c242d023bb502df0e0626d08d9f5e795",
+    "prior_sanitized_sha256": "0566dd0f2a52fa93578408f76394b0eb371360b9b749787751f58e46153ec81b",
+    "published_sha256": "0566dd0f2a52fa93578408f76394b0eb371360b9b749787751f58e46153ec81b",
+    "original_trailing_lf": 1,
+    "published_trailing_lf": 1,
+    "eof_reconstruction": "remove published trailing LF, append original_trailing_lf LFs; empty remains empty"
+  },
+  {
+    "file": "local-output-hashes.json",
+    "raw_sha256": "e98d47c669cb948d69693a85d4197c3cf83ac409534bbaccc003a7ef3176719a",
+    "prior_sanitized_sha256": "2e9195cc56f02f706aa0051ee6af4f8877a38749114ed91626e331b67b9f6539",
+    "published_sha256": "2e9195cc56f02f706aa0051ee6af4f8877a38749114ed91626e331b67b9f6539",
+    "original_trailing_lf": 1,
+    "published_trailing_lf": 1,
+    "eof_reconstruction": "remove published trailing LF, append original_trailing_lf LFs; empty remains empty"
+  },
+  {
+    "file": "target-reuse.json",
+    "raw_sha256": "1ba31db073659ce6e8f600c25141e88429082c3983b47ec550d1f18ca2355f87",
+    "prior_sanitized_sha256": "1ba31db073659ce6e8f600c25141e88429082c3983b47ec550d1f18ca2355f87",
+    "published_sha256": "1ba31db073659ce6e8f600c25141e88429082c3983b47ec550d1f18ca2355f87",
+    "original_trailing_lf": 1,
+    "published_trailing_lf": 1,
+    "eof_reconstruction": "remove published trailing LF, append original_trailing_lf LFs; empty remains empty"
+  },
+  {
+    "file": "cargo-configuration.json",
+    "raw_sha256": "d8678502c9f6a35fe3beac68b5fea3e75a4380b14c4413c6967bb8062450cabb",
+    "prior_sanitized_sha256": "8fff6dcc95578b42ff30293776804329fbe63bcae7f6dcebcec06597158a2a99",
+    "published_sha256": "8fff6dcc95578b42ff30293776804329fbe63bcae7f6dcebcec06597158a2a99",
+    "original_trailing_lf": 1,
+    "published_trailing_lf": 1,
+    "eof_reconstruction": "remove published trailing LF, append original_trailing_lf LFs; empty remains empty"
+  },
+  {
+    "file": "publication-preflight.json",
+    "raw_sha256": "d17168fb4510486f37237eb21e3064700058fe7946bf07a2c7e090d9d6aaa75e",
+    "prior_sanitized_sha256": "d17168fb4510486f37237eb21e3064700058fe7946bf07a2c7e090d9d6aaa75e",
+    "published_sha256": "d17168fb4510486f37237eb21e3064700058fe7946bf07a2c7e090d9d6aaa75e",
+    "original_trailing_lf": 1,
+    "published_trailing_lf": 1,
+    "eof_reconstruction": "remove published trailing LF, append original_trailing_lf LFs; empty remains empty"
+  },
+  {
+    "file": "publication.json",
+    "raw_sha256": "d89fc798985001ad97c2c6d6052a8a442b503f62ced74eefaec093ba17aaa7d7",
+    "prior_sanitized_sha256": "d89fc798985001ad97c2c6d6052a8a442b503f62ced74eefaec093ba17aaa7d7",
+    "published_sha256": "d89fc798985001ad97c2c6d6052a8a442b503f62ced74eefaec093ba17aaa7d7",
+    "original_trailing_lf": 1,
+    "published_trailing_lf": 1,
+    "eof_reconstruction": "remove published trailing LF, append original_trailing_lf LFs; empty remains empty"
+  },
+  {
+    "file": "tests.stdout",
+    "raw_sha256": "22590050004a12e7c33e5328d67cab1614aaa0fdcbbeeffa3bda247a45bf35cb",
+    "prior_sanitized_sha256": "22590050004a12e7c33e5328d67cab1614aaa0fdcbbeeffa3bda247a45bf35cb",
+    "published_sha256": "241c19643be5a9792ba4a3f07bb698e59385f4c089a2e382f53dede6f8939a1f",
+    "original_trailing_lf": 2,
+    "published_trailing_lf": 1,
+    "eof_reconstruction": "remove published trailing LF, append original_trailing_lf LFs; empty remains empty"
+  },
+  {
+    "file": "tests.stderr",
+    "raw_sha256": "9f8ec6276c3413bcac4bf91bc969b54920a2fb1913b1d1678c6ba487186c109b",
+    "prior_sanitized_sha256": "e969b493830534ba456d30dacbb36f0ab66446f538f53edcb48f0d7fc310223d",
+    "published_sha256": "e969b493830534ba456d30dacbb36f0ab66446f538f53edcb48f0d7fc310223d",
+    "original_trailing_lf": 1,
+    "published_trailing_lf": 1,
+    "eof_reconstruction": "remove published trailing LF, append original_trailing_lf LFs; empty remains empty"
+  },
+  {
+    "file": "compile.stderr",
+    "raw_sha256": "a9f1d890cc8b564361d6dc7eda8e62b4a5af2b3ce9309c978d5deb5c96cafac8",
+    "prior_sanitized_sha256": "4347f4b1f0e187d7312c4f09cae74a78d6fcbe06837a19a047a9315ecdd1e7ed",
+    "published_sha256": "4347f4b1f0e187d7312c4f09cae74a78d6fcbe06837a19a047a9315ecdd1e7ed",
+    "original_trailing_lf": 1,
+    "published_trailing_lf": 1,
+    "eof_reconstruction": "remove published trailing LF, append original_trailing_lf LFs; empty remains empty"
+  },
+  {
+    "file": "clippy.stdout",
+    "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "prior_sanitized_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "original_trailing_lf": 0,
+    "published_trailing_lf": 0,
+    "eof_reconstruction": "remove published trailing LF, append original_trailing_lf LFs; empty remains empty"
+  },
+  {
+    "file": "clippy.stderr",
+    "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "prior_sanitized_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "original_trailing_lf": 0,
+    "published_trailing_lf": 0,
+    "eof_reconstruction": "remove published trailing LF, append original_trailing_lf LFs; empty remains empty"
+  },
+  {
+    "file": "fmt.stdout",
+    "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "prior_sanitized_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "original_trailing_lf": 0,
+    "published_trailing_lf": 0,
+    "eof_reconstruction": "remove published trailing LF, append original_trailing_lf LFs; empty remains empty"
+  },
+  {
+    "file": "fmt.stderr",
+    "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "prior_sanitized_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "original_trailing_lf": 0,
+    "published_trailing_lf": 0,
+    "eof_reconstruction": "remove published trailing LF, append original_trailing_lf LFs; empty remains empty"
+  },
+  {
+    "file": "metadata.stderr",
+    "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "prior_sanitized_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "original_trailing_lf": 0,
+    "published_trailing_lf": 0,
+    "eof_reconstruction": "remove published trailing LF, append original_trailing_lf LFs; empty remains empty"
+  },
+  {
+    "file": "rustc-version.txt",
+    "raw_sha256": "aea7c77c2b0d24444d07240e4d785e4ba73b6c9e786748af2ddc22bbf4c104bf",
+    "prior_sanitized_sha256": "aea7c77c2b0d24444d07240e4d785e4ba73b6c9e786748af2ddc22bbf4c104bf",
+    "published_sha256": "aea7c77c2b0d24444d07240e4d785e4ba73b6c9e786748af2ddc22bbf4c104bf",
+    "original_trailing_lf": 1,
+    "published_trailing_lf": 1,
+    "eof_reconstruction": "remove published trailing LF, append original_trailing_lf LFs; empty remains empty"
+  },
+  {
+    "file": "carry.json",
+    "raw_sha256": "7bc390f2abd91d6e628a0cd6a8faaa56c888f281be1dc3f73f33572a603d769a",
+    "prior_sanitized_sha256": "7bc390f2abd91d6e628a0cd6a8faaa56c888f281be1dc3f73f33572a603d769a",
+    "published_sha256": "7bc390f2abd91d6e628a0cd6a8faaa56c888f281be1dc3f73f33572a603d769a",
+    "original_trailing_lf": 1,
+    "published_trailing_lf": 1,
+    "eof_reconstruction": "remove published trailing LF, append original_trailing_lf LFs; empty remains empty"
+  }
+]

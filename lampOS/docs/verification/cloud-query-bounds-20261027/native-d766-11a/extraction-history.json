@@ -1,0 +1,8 @@
+{
+  "first_extraction_error": "Step-name based separate doctest extraction found no docs because gh emitted UNKNOWN STEP. Nextest census closed. Fixed parser only; no CI rerun.",
+  "log_fetch_native_handle": 3690,
+  "log_fetch_final_exit": 0,
+  "early_copy_sha256": "9d51e67ebc55b3252b6678d713bf8bad45ec0179c33940be5a36ef077d308ac4",
+  "final_fetched_sha256": "e524960ef9c4ec67f3ca2d740980f7805883f362c4b6184d96efe31b432059e9",
+  "copies_equal_after_fetch_drain": false
+}

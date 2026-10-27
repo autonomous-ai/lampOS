@@ -1,0 +1,10 @@
+{
+  "time_utc": "2026-10-27T11:44:39.112895+00:00",
+  "head": "8ec190c680ef28c1ff452592a02f834a70783f74",
+  "base": "3b9bfb628e1c416926b958fecf56f65c539dc533",
+  "own_old_lease": "d7666663b067c79c76609c877c3a29c5856d7315",
+  "live_refs": {
+    "refs/heads/lamp-voice": "3b9bfb628e1c416926b958fecf56f65c539dc533",
+    "refs/heads/second/cloud-query-bounds": "d7666663b067c79c76609c877c3a29c5856d7315"
+  }
+}

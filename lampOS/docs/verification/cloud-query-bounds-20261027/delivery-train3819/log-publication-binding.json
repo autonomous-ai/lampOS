@@ -1,0 +1,57 @@
+{
+  "source_packet": "second-cloud-delivery-public-20261027",
+  "source_manifest_sha256": "7c549299385d27ac618d8d84334eb3a856d0d2b28072fc2c601fd4e36bd72985",
+  "source_manifest_verified": true,
+  "raw_packet_unchanged": true,
+  "privacy_exceptions": [],
+  "files": [
+    {
+      "file": "delivery-proof.json",
+      "raw_sha256": "75750de9c49e8eda992b6701e7efdb070f252028ff0928457f11979c7a17023f",
+      "sanitized_sha256": "75750de9c49e8eda992b6701e7efdb070f252028ff0928457f11979c7a17023f",
+      "published_sha256": "75750de9c49e8eda992b6701e7efdb070f252028ff0928457f11979c7a17023f",
+      "raw_size": 3085,
+      "published_size": 3085,
+      "path_redaction_applied": false,
+      "prior_sanitized_trailing_lf": 1,
+      "published_trailing_lf": 1,
+      "reversible_EOF_rule": "Remove published trailing LF and append prior_sanitized_trailing_lf LFs; empty content remains empty."
+    },
+    {
+      "file": "README.md",
+      "raw_sha256": "cd4ab426ad05b7b6c70f6f3718c6a4cc38cdcadb68d1bcb660059a4cf6adb921",
+      "sanitized_sha256": "cd4ab426ad05b7b6c70f6f3718c6a4cc38cdcadb68d1bcb660059a4cf6adb921",
+      "published_sha256": "cd4ab426ad05b7b6c70f6f3718c6a4cc38cdcadb68d1bcb660059a4cf6adb921",
+      "raw_size": 1098,
+      "published_size": 1098,
+      "path_redaction_applied": false,
+      "prior_sanitized_trailing_lf": 1,
+      "published_trailing_lf": 1,
+      "reversible_EOF_rule": "Remove published trailing LF and append prior_sanitized_trailing_lf LFs; empty content remains empty."
+    },
+    {
+      "file": "train-receipts.json",
+      "raw_sha256": "92e4cc342b3826e692ff21337ac4ac227cc0516cfa007adad9a70461676c7620",
+      "sanitized_sha256": "92e4cc342b3826e692ff21337ac4ac227cc0516cfa007adad9a70461676c7620",
+      "published_sha256": "92e4cc342b3826e692ff21337ac4ac227cc0516cfa007adad9a70461676c7620",
+      "raw_size": 1513,
+      "published_size": 1513,
+      "path_redaction_applied": false,
+      "prior_sanitized_trailing_lf": 1,
+      "published_trailing_lf": 1,
+      "reversible_EOF_rule": "Remove published trailing LF and append prior_sanitized_trailing_lf LFs; empty content remains empty."
+    },
+    {
+      "file": "publication-binding.json",
+      "raw_sha256": "fbe8ab0fa073f74c6cfa38956c2d36e910dd17ed2ebb385c09756c9d77aff58b",
+      "sanitized_sha256": "fbe8ab0fa073f74c6cfa38956c2d36e910dd17ed2ebb385c09756c9d77aff58b",
+      "published_sha256": "fbe8ab0fa073f74c6cfa38956c2d36e910dd17ed2ebb385c09756c9d77aff58b",
+      "raw_size": 270,
+      "published_size": 270,
+      "path_redaction_applied": false,
+      "prior_sanitized_trailing_lf": 1,
+      "published_trailing_lf": 1,
+      "reversible_EOF_rule": "Remove published trailing LF and append prior_sanitized_trailing_lf LFs; empty content remains empty."
+    }
+  ]
+}

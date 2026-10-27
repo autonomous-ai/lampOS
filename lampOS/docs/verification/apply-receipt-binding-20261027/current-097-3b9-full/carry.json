@@ -1,0 +1,294 @@
+{
+  "base": "3b9bfb628e1c416926b958fecf56f65c539dc533",
+  "head": "09762d1a2a24cbb17c452512db09861715c7d6cc",
+  "tree": "adcfb8aa245c1ae6e5f9d1e2476ac031c461a180",
+  "owned": {
+    "lampOS/crates/update/src/apply.rs": {
+      "ls_tree": "100644 blob 23233e73bed97907a4d3b9cf84d5a5a8616f6542\tlampOS/crates/update/src/apply.rs",
+      "sha256": "c0f4fb9f6cdfb5b2d175e8c554c5b60cc6261a335cf295fdf639ef6b6b7d3fda",
+      "full_file_equal_to_e2d": true
+    },
+    "lampOS/crates/update/src/round.rs": {
+      "ls_tree": "100644 blob 2ae7fa83504c7162c59b3fa279d517b35a579994\tlampOS/crates/update/src/round.rs",
+      "sha256": "7a712870ef8ef107f15810b526e2ce3ee02dc66a904c6c9914c5cedfa988b6aa",
+      "full_file_equal_to_e2d": true
+    },
+    "lampOS/crates/update/tests/round.rs": {
+      "ls_tree": "100644 blob 2b9cf68c94a0cb30ba30f68002e2a37f541c832c\tlampOS/crates/update/tests/round.rs",
+      "sha256": "a9afd0629cf3c0e5b1c5ffe3bca655e1f49a9d3301d3f6f62b3f10386f778422",
+      "full_file_equal_to_e2d": true
+    },
+    "lampOS/docs/updates.md": {
+      "ls_tree": "100644 blob 9f81c6150204e890f2b9d529f3d8f393d90a561d\tlampOS/docs/updates.md",
+      "sha256": "f1731cc4bb326da611ec005c1b0d6476f649204f9b96110467f09257b6ef9a7b",
+      "full_file_equal_to_e2d": false
+    }
+  },
+  "range_diff": "1:  24b6ea4604 = 1:  ddd713b47a lampOS: bind settings receipts to the requested operation and build\n2:  e2d393ad3e = 2:  09762d1a2a lampOS: exercise settings receipt rejection through real apply recovery",
+  "both_authored_patch_entries_equal": true,
+  "receipt_added_removed_lines_equal": true,
+  "doc_upstream_delta": "Six foundation design-link lines added by Main; receipt hunk remains identical. Whole updates.md blob not equal to e2d.",
+  "actual_qualified_preview": "3b24fb0e2fd5f8c51ef7da7fc8fe1389d48d0740",
+  "actual_qualified_preview_tree": "7d52e3732f640582bfe04cb099ab07cf1836995f",
+  "whole_tree_equal_to_actual_qualified_preview": false,
+  "actual_qualified_preview_delta": [
+    {
+      "path": "lampOS/crates/body/src/bin/lamp-body.rs",
+      "actual_preview": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "9cc119f56cbf927a42c3e8a6b026de9a78c4ca24"
+      },
+      "latest_carry": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "cec57dd3534200c0b9be0689a42ed6afc1844fe4"
+      }
+    },
+    {
+      "path": "lampOS/crates/body/src/body.rs",
+      "actual_preview": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "06557c5346b52be53c368d3799466fb569c9030d"
+      },
+      "latest_carry": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "6f53768a23e7acfa10b988c187701bd280665ac5"
+      }
+    },
+    {
+      "path": "lampOS/crates/body/src/body/tests.rs",
+      "actual_preview": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "39f4bff9674a21fb97b739b509d4a5cb73f7522b"
+      },
+      "latest_carry": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "dd3dda42a28ed8f3ecbb80b48ce04b343637f83b"
+      }
+    },
+    {
+      "path": "lampOS/crates/body/src/lease.rs",
+      "actual_preview": null,
+      "latest_carry": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "13efa929191490fe5763b26c1d4ec1a39538c671"
+      }
+    },
+    {
+      "path": "lampOS/crates/body/src/lib.rs",
+      "actual_preview": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "99c64e0d06d4bb72ddae2a5e49ba5c03954eb3ed"
+      },
+      "latest_carry": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "88bc949cd78295f805fb8dfe0c2d55671957856f"
+      }
+    },
+    {
+      "path": "lampOS/crates/body/src/sleep_in.rs",
+      "actual_preview": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "389b628c20b9f7b50f1863dc7bbffe9e595b8dd6"
+      },
+      "latest_carry": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "a3d12faa288789c9ee1ac02d12f8c22c38618cab"
+      }
+    },
+    {
+      "path": "lampOS/crates/control/src/server.rs",
+      "actual_preview": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "96cdfa1a73f862c5b020b13e069d0ab2e6c61591"
+      },
+      "latest_carry": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "74eebc7c0daa21cb49df5955a8bf3212b4dc4bee"
+      }
+    },
+    {
+      "path": "lampOS/crates/control/src/session.rs",
+      "actual_preview": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "a8ab15df585e9feb7cd1c4048ac9bf5c97032541"
+      },
+      "latest_carry": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "c1c34b51b55c8bc91d9dd900bd27cafb8ae7d11e"
+      }
+    },
+    {
+      "path": "lampOS/crates/control/tests/door.rs",
+      "actual_preview": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "e61f704128524cbdfe6faa9f1e8508b349f833ac"
+      },
+      "latest_carry": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "53ffcf270ffa699db18684ae78896943e7cc8067"
+      }
+    },
+    {
+      "path": "lampOS/crates/update/src/lib.rs",
+      "actual_preview": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "ebf220d038e520c9f4efd4aa117c6608cfac739b"
+      },
+      "latest_carry": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "77d5807ac882409e634840bbfda142623797a31d"
+      }
+    },
+    {
+      "path": "lampOS/crates/update/src/writer_refresh.rs",
+      "actual_preview": null,
+      "latest_carry": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "77ad2e38e7a3135fe56723cde18a822df5da8680"
+      }
+    },
+    {
+      "path": "lampOS/crates/update/src/writer_refresh/tests.rs",
+      "actual_preview": null,
+      "latest_carry": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "a9bb99c4ace0198232f37c658984f7d2a8ec79ae"
+      }
+    },
+    {
+      "path": "lampOS/crates/voice/src/second_provider.rs",
+      "actual_preview": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "83d5fe96aa222d3d0e500e642a4cc95eb7d13fd5"
+      },
+      "latest_carry": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "ea4319f1e32655b041fe4b31d4ce9e4b327c07d3"
+      }
+    },
+    {
+      "path": "lampOS/crates/voice/src/second_provider/tests.rs",
+      "actual_preview": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "bd5902dac1e2989ee7c457df3ba9b1fe96a0fdd3"
+      },
+      "latest_carry": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "4f29b4c24529c7d133ba86b5ae32fc9be0bbc0d6"
+      }
+    },
+    {
+      "path": "lampOS/crates/voice/src/second_provider/worker.rs",
+      "actual_preview": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "7f824fc198504afe69a493451cc66f4c8d37727f"
+      },
+      "latest_carry": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "9f5b8cc1eb30a6e26f34401f464ca6f5d88b9dca"
+      }
+    },
+    {
+      "path": "lampOS/docs/body.md",
+      "actual_preview": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "daff24c0ee2105b10b2680cb5921f79866a4c67b"
+      },
+      "latest_carry": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "997514c6d18fb350ca818efeefe50f65d7ad819b"
+      }
+    },
+    {
+      "path": "lampOS/docs/control.md",
+      "actual_preview": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "8133314f5344fee10bcd635638973009c7266e03"
+      },
+      "latest_carry": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "74313fb390e5ded49e997f9b44775aa6fabd1b90"
+      }
+    },
+    {
+      "path": "lampOS/docs/reuse-decisions.md",
+      "actual_preview": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "0b9833ffda7f271f84e2bac742f783f775127700"
+      },
+      "latest_carry": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "7ad8962418f1a2ba895dad8f8704ed257c8f0862"
+      }
+    },
+    {
+      "path": "lampOS/docs/settings-writer-refresh.md",
+      "actual_preview": null,
+      "latest_carry": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "4d595ce730e3569b98f1ca8c3bad22833a91181e"
+      }
+    },
+    {
+      "path": "lampOS/docs/switches.md",
+      "actual_preview": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "d81f59d976f9b15d1c5a19c570d29708038f9672"
+      },
+      "latest_carry": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "08a72ffc988f745c22d9f75e7d56f833ce6b4059"
+      }
+    },
+    {
+      "path": "lampOS/docs/updates.md",
+      "actual_preview": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "bbf199b2a6b970412908a42cf50159fef03e8c4a"
+      },
+      "latest_carry": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "9f81c6150204e890f2b9d529f3d8f393d90a561d"
+      }
+    }
+  ],
+  "state": "Clean local carry only; no Cargo/gate/push yet. No foundation commit reapplied."
+}

@@ -1,0 +1,324 @@
+{
+  "pr": 3808,
+  "run_id": 40492815294,
+  "run_attempt": 1,
+  "artifact_id": 12729413909,
+  "artifact_name": "lampos-arm64-e2d393ad3ec634e089ac32ce58982a5252a66421",
+  "head": "e2d393ad3ec634e089ac32ce58982a5252a66421",
+  "actual_checkout": "3b24fb0e2fd5f8c51ef7da7fc8fe1389d48d0740",
+  "tested_base": "184532c6cbf929ba12a7d3fb3b61c94091d5bed4",
+  "actual_preview_tree": "7d52e3732f640582bfe04cb099ab07cf1836995f",
+  "offered_complete_tree_equal": false,
+  "archive_bytes": 117917799,
+  "archive_sha256": "d3b1cc643ccea4d6cacf9f76f8585ca736bcffe8ceba2e8b8c6986a00b5c1aed",
+  "api_digest_equal": true,
+  "members": [
+    {
+      "name": "lamp-actions",
+      "sha256": "c6feab047df9b7336e7d4cca22bb2b80ba513955396383258bf9be63f463a58c",
+      "bytes": 4510440,
+      "format": "ELF64 little-endian AArch64"
+    },
+    {
+      "name": "lamp-addons",
+      "sha256": "1d1ca9bf054be4a646c23c70387cc0c430ad3f20aceba0cada082f01c1c640ea",
+      "bytes": 1154744,
+      "format": "ELF64 little-endian AArch64"
+    },
+    {
+      "name": "lamp-air",
+      "sha256": "23e727dcae09933bfa297b29b07de8620609d6d19664e00688617c900a850d77",
+      "bytes": 896272,
+      "format": "ELF64 little-endian AArch64"
+    },
+    {
+      "name": "lamp-audio",
+      "sha256": "2a47f6a8b753ea38ababf08732b205114e696386878ed2dda0879c4154d3620c",
+      "bytes": 2121152,
+      "format": "ELF64 little-endian AArch64"
+    },
+    {
+      "name": "lamp-body",
+      "sha256": "bb1020528fcc58d1e55f8f1d3af74f2e8dbb23e9c6f3ee9d57f1bf94c09c603f",
+      "bytes": 1995136,
+      "format": "ELF64 little-endian AArch64"
+    },
+    {
+      "name": "lamp-body-inspect",
+      "sha256": "d8f61f61ef8f6467e2dc1d08aaa4e3526eb5543e48e92352a416edf457467e9f",
+      "bytes": 703536,
+      "format": "ELF64 little-endian AArch64"
+    },
+    {
+      "name": "lamp-body-measure",
+      "sha256": "4cc638df5892bec1069067ccab3c57e6205192327b40a04dc986c270f8ea614d",
+      "bytes": 1367384,
+      "format": "ELF64 little-endian AArch64"
+    },
+    {
+      "name": "lamp-body-mood",
+      "sha256": "bb7d3ec66f7c8957033d59290ff3cd3e3048d0d4a06cebe6faf37578446c315f",
+      "bytes": 477072,
+      "format": "ELF64 little-endian AArch64"
+    },
+    {
+      "name": "lamp-body-worker",
+      "sha256": "f7a036794f320007350f4ae6e6b968697d9db9a7325dd48dec87b772bcf2a691",
+      "bytes": 1179656,
+      "format": "ELF64 little-endian AArch64"
+    },
+    {
+      "name": "lamp-bus",
+      "sha256": "bca4b1dc589c3522daeb6b5ff42d124fc6878f82cd8c9fb1436d1b1f0deab5a7",
+      "bytes": 1106576,
+      "format": "ELF64 little-endian AArch64"
+    },
+    {
+      "name": "lamp-cloud",
+      "sha256": "c0a19222797835b2b588ad0c0922e91cdd6a20eb3f8ae78a37363314d5b40acb",
+      "bytes": 10778352,
+      "format": "ELF64 little-endian AArch64"
+    },
+    {
+      "name": "lamp-control",
+      "sha256": "54054f6dcfa3b1b6a3ad5250908b1e31166572f28e795fea8bc7cca643023cb0",
+      "bytes": 3999920,
+      "format": "ELF64 little-endian AArch64"
+    },
+    {
+      "name": "lamp-controls",
+      "sha256": "1c0bc99b5df6c404641130d45112badc62c9f9ac336b2654f91a6d70eae12d9c",
+      "bytes": 2469128,
+      "format": "ELF64 little-endian AArch64"
+    },
+    {
+      "name": "lamp-ears",
+      "sha256": "c9f7c66b68949b4e7bc1ae68f5c7cd27517055ec3d8b18f3e9423c0708e85cb1",
+      "bytes": 24861328,
+      "format": "ELF64 little-endian AArch64"
+    },
+    {
+      "name": "lamp-expression",
+      "sha256": "8ddaf154c3a625d4d588d2789e759b30e1ebb78774c2ae534fde9de58b607a09",
+      "bytes": 4204448,
+      "format": "ELF64 little-endian AArch64"
+    },
+    {
+      "name": "lamp-eyes",
+      "sha256": "fd069511b03d1e42868d01a490c095ffaa2bb4b5f2136f7d1932d7fd3e0034e4",
+      "bytes": 26398688,
+      "format": "ELF64 little-endian AArch64"
+    },
+    {
+      "name": "lamp-health",
+      "sha256": "b9a2fa29867baecbef5ee04f2f9a55194029fd1a7d50fea126089bca90fd099e",
+      "bytes": 1315144,
+      "format": "ELF64 little-endian AArch64"
+    },
+    {
+      "name": "lamp-ipc-probe",
+      "sha256": "80a3898dde91c6109dbf55f0cc6d1fd49e491be7bb6ef941df914e02411296cb",
+      "bytes": 667592,
+      "format": "ELF64 little-endian AArch64"
+    },
+    {
+      "name": "lamp-keeper",
+      "sha256": "541c2b1e68f4a8944f7085818e285dfa3894191a2531cc798d0c31e53ab72fa0",
+      "bytes": 3246016,
+      "format": "ELF64 little-endian AArch64"
+    },
+    {
+      "name": "lamp-memory",
+      "sha256": "adafb7d5121312d4c43ca1e87284d58209627138ddab4449acf0b629412332eb",
+      "bytes": 4848456,
+      "format": "ELF64 little-endian AArch64"
+    },
+    {
+      "name": "lamp-memory-eval",
+      "sha256": "ff78f2a1d6d66847a40102c81e20da4f819b0d6ced9c0c3c94c3b9f788b78023",
+      "bytes": 3051712,
+      "format": "ELF64 little-endian AArch64"
+    },
+    {
+      "name": "lamp-memory-fixture",
+      "sha256": "f305428057ef72bd66a7eaa3d9bb18f9de252666ae34d15553b6dabcce8b9c84",
+      "bytes": 5006880,
+      "format": "ELF64 little-endian AArch64"
+    },
+    {
+      "name": "lamp-mood",
+      "sha256": "8612ab35c53d7ba427c5f3f08bc6dbd86ef4dfe385efaf73d85f28269cfdaeeb",
+      "bytes": 1985064,
+      "format": "ELF64 little-endian AArch64"
+    },
+    {
+      "name": "lamp-name",
+      "sha256": "ab3e89f9e415322b818bff5d34534b9820154ed54f3f3e01164883e6765488e8",
+      "bytes": 24279344,
+      "format": "ELF64 little-endian AArch64"
+    },
+    {
+      "name": "lamp-observer",
+      "sha256": "24d48e53babb9efc35b430d93579830ab0854f42011654c0f39ba019944fd670",
+      "bytes": 884120,
+      "format": "ELF64 little-endian AArch64"
+    },
+    {
+      "name": "lamp-peek",
+      "sha256": "880a6a0f2625587f079a0746dc748d3acc1aa91f4484261682eedbe915bbc42e",
+      "bytes": 2719208,
+      "format": "ELF64 little-endian AArch64"
+    },
+    {
+      "name": "lamp-policy",
+      "sha256": "37e05d4aaa0629bce7dca5d447ab850ba3ec1ba9da87cdc960d88142c6a5502c",
+      "bytes": 5028880,
+      "format": "ELF64 little-endian AArch64"
+    },
+    {
+      "name": "lamp-policy-fit",
+      "sha256": "a576e4b7632a28d355ae8eefa07fdf149f9350e2e8c188c60ff67ee311816ccd",
+      "bytes": 919256,
+      "format": "ELF64 little-endian AArch64"
+    },
+    {
+      "name": "lamp-policy-judges",
+      "sha256": "df1c70d85c32071ee4bbc5e1d3b2bc0e90115a28311d8328d143f98c65d92667",
+      "bytes": 4541792,
+      "format": "ELF64 little-endian AArch64"
+    },
+    {
+      "name": "lamp-policy-replay",
+      "sha256": "f13013138557b5a689877872f72a3056ec8e9315d8f575dbb745b71c87f4d7ec",
+      "bytes": 2959984,
+      "format": "ELF64 little-endian AArch64"
+    },
+    {
+      "name": "lamp-records",
+      "sha256": "1aa5274dd33c3db7053a70dd45eec743d056ceede216a1360ccbb3d2e651ff57",
+      "bytes": 1406984,
+      "format": "ELF64 little-endian AArch64"
+    },
+    {
+      "name": "lamp-records-fixture",
+      "sha256": "1627e88117fff3902c7e3cea8387974174555552ad632ab272a8db63bb68762c",
+      "bytes": 1450056,
+      "format": "ELF64 little-endian AArch64"
+    },
+    {
+      "name": "lamp-same-voice",
+      "sha256": "4bea8b3d39e024184357b3fc7b4f759cbddad788fc4cfc6b2c5c9c0c21a55523",
+      "bytes": 24216664,
+      "format": "ELF64 little-endian AArch64"
+    },
+    {
+      "name": "lamp-schedule",
+      "sha256": "67ed2af8b8e5848d1afb9a220fec4eeb623579db888b94f3a3ca29310b31e332",
+      "bytes": 4490344,
+      "format": "ELF64 little-endian AArch64"
+    },
+    {
+      "name": "lamp-seems-measure",
+      "sha256": "7897a150776df32201335f05723b9fae489b21ca7d9dfadef91bd519d2626c4e",
+      "bytes": 16740592,
+      "format": "ELF64 little-endian AArch64"
+    },
+    {
+      "name": "lamp-selftest",
+      "sha256": "1937c39b9c43f88f2bde710b9b95dbe7c22b8578d089c7acc4b9640ee479f418",
+      "bytes": 1560016,
+      "format": "ELF64 little-endian AArch64"
+    },
+    {
+      "name": "lamp-settings",
+      "sha256": "7aca992aa1936ef35604eed9d647dcaab88571fca3f9fdcb450b01813a33ef24",
+      "bytes": 1529768,
+      "format": "ELF64 little-endian AArch64"
+    },
+    {
+      "name": "lamp-setup",
+      "sha256": "d346862bf1bd244b8a58ff75edc871128b70b83688ab6d9b5c6feec388765b8a",
+      "bytes": 7616256,
+      "format": "ELF64 little-endian AArch64"
+    },
+    {
+      "name": "lamp-skills",
+      "sha256": "ef83ecdc7f77f714d94118ecdcb98fa0b2749e54e827439c7113de7151314da0",
+      "bytes": 8799376,
+      "format": "ELF64 little-endian AArch64"
+    },
+    {
+      "name": "lamp-sound-fixtures",
+      "sha256": "404cd34297318d5cb82f1fff194a3955b61923c48d3fc1b0d4ca601876a3e28f",
+      "bytes": 1006096,
+      "format": "ELF64 little-endian AArch64"
+    },
+    {
+      "name": "lamp-station",
+      "sha256": "230700906735101ac097305a06efedffa30b9f87765fb8a071662abfe06fe636",
+      "bytes": 1816960,
+      "format": "ELF64 little-endian AArch64"
+    },
+    {
+      "name": "lamp-surround",
+      "sha256": "fc54597ac1073b31bfe85cc967d2fa49934287e2da23032f268dc7171f492aa8",
+      "bytes": 13872272,
+      "format": "ELF64 little-endian AArch64"
+    },
+    {
+      "name": "lamp-tasks",
+      "sha256": "b6713b8a72747205eb8facac35a558405e8e61c8bf2c4526e299e9a46fef937c",
+      "bytes": 4725968,
+      "format": "ELF64 little-endian AArch64"
+    },
+    {
+      "name": "lamp-tasks-harness-fixture",
+      "sha256": "4f891bc0d3866cc56b3b0fa44de4141575d3602ae008ca9e806756b66a6a81f9",
+      "bytes": 752840,
+      "format": "ELF64 little-endian AArch64"
+    },
+    {
+      "name": "lamp-turn-end",
+      "sha256": "21404167a7b2fe26b809db57f03a869f482f62a7c8cdfadaacc01d77c24741aa",
+      "bytes": 24796648,
+      "format": "ELF64 little-endian AArch64"
+    },
+    {
+      "name": "lamp-update",
+      "sha256": "fd95e6095dcc33b8d508e9f8390f8908d0fd60d7abfd3de3ac7db3068e80605d",
+      "bytes": 4885664,
+      "format": "ELF64 little-endian AArch64"
+    },
+    {
+      "name": "lamp-voice",
+      "sha256": "a7cc2416478626efecea22f8d3ca62b72c7d6932aacc8fab020e969386cd6582",
+      "bytes": 28618408,
+      "format": "ELF64 little-endian AArch64"
+    },
+    {
+      "name": "lamp-voice-eval",
+      "sha256": "56c92228a011bb370ecf6be322d3cf8c8628dcfcead1103a9966a8001d10a529",
+      "bytes": 13264208,
+      "format": "ELF64 little-endian AArch64"
+    },
+    {
+      "name": "replay_cost",
+      "sha256": "4799d1af417912f944ec3b132b7ba760129c7af89ea9b5e8c84895133f1f67bc",
+      "bytes": 1572328,
+      "format": "ELF64 little-endian AArch64"
+    },
+    {
+      "name": "schedule_check",
+      "sha256": "e3b3d8c7921d4f4e3ffd06b3418840743d7aa653902973004f7a42b64acebd70",
+      "bytes": 4679632,
+      "format": "ELF64 little-endian AArch64"
+    }
+  ],
+  "checksums": {
+    "sha256": "141b47b5e1faec44c42079f7fec32599390aa4f57ba24d9c818c540a8fc5eba3",
+    "unique_executables": 50,
+    "all_match": true,
+    "exact_inventory": true
+  },
+  "limits": "Production release executables only. None executed by this audit. These are not nextest test executables or a device/signature/promotion result."
+}

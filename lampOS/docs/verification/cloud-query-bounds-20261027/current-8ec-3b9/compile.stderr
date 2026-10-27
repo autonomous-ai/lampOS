@@ -1,0 +1,8 @@
+   Compiling lamp-body v0.1.0 (<cloud-tree>/lampOS/crates/body)
+   Compiling lamp-update v0.1.0 (<cloud-tree>/lampOS/crates/update)
+   Compiling lamp-voice v0.1.0 (<cloud-tree>/lampOS/crates/voice)
+   Compiling lamp-expression v0.1.0 (<cloud-tree>/lampOS/crates/expression)
+   Compiling lamp-skills v0.1.0 (<cloud-tree>/lampOS/crates/skills)
+   Compiling lamp-setup v0.1.0 (<cloud-tree>/lampOS/crates/setup)
+   Compiling lamp-cloud v0.1.0 (<cloud-tree>/lampOS/crates/cloud)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 57.46s
