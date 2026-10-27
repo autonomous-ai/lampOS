@@ -3649,6 +3649,11 @@ impl Engine {
                     crate::thread::count_only(Some(request));
                 }
             }
+            // Begun while onboarding is under way (#3748): a sleep asked
+            // in it is not now.
+            ProviderInput::Onboarding { request, .. } => {
+                crate::sleep_asked::mark_onboarding(request);
+            }
             // Begun while onboarding waits for a call (#3504): read by the
             // turn's task once its words are in.
             ProviderInput::StepCall { request, .. } => {
@@ -4313,7 +4318,8 @@ pub(crate) fn output_request(event: &ProviderOutput) -> Option<u64> {
         | ProviderOutput::LookAsked { request, .. }
         | ProviderOutput::LookNoCall { request, .. }
         | ProviderOutput::WordsEnd { request, .. }
-        | ProviderOutput::NewsAnswered { request, .. } => Some(*request),
+        | ProviderOutput::NewsAnswered { request, .. }
+        | ProviderOutput::SleepAsked { request } => Some(*request),
         ProviderOutput::Transcript { request, .. } => *request,
     }
 }
@@ -8466,6 +8472,16 @@ async fn answer(
                         return Err(Stop::Gone);
                     }
                 }
+                // Asked to sleep, and told the line to say (#3748): the
+                // coordinator asks the sleep once this turn has played, as on
+                // the Live route. Not now during onboarding: told otherwise.
+                if (answer.sleep
+                    || (crate::sleep_asked::is_tool(&call.name)
+                        && answer.told == crate::sleep_asked::told(false)))
+                    && !shared.emit(ProviderOutput::SleepAsked { request }).await
+                {
+                    return Err(Stop::Gone);
+                }
                 if skill_looked.is_none()
                     && answer.told["look"] == true
                     && shared
@@ -9061,6 +9077,7 @@ mod requested_audio_tests {
                     contexts.lock().unwrap().push(context.clone());
                     Box::pin(async move {
                         crate::tools::ToolAnswer {
+                            sleep: false,
                             told: json!({"next":"Confirm."}),
                             requested_audio: Some(offered(context)),
                         }
@@ -9276,6 +9293,7 @@ mod requested_audio_tests {
                         offer.context.privacy_generation += 1;
                     }
                     crate::tools::ToolAnswer {
+                        sleep: false,
                         told: json!({"next":"Confirm."}),
                         requested_audio: Some(offer),
                     }
@@ -9426,6 +9444,7 @@ mod requested_audio_tests {
                         // Deliberately return even after revocation: the provider's
                         // final fence, not a cooperative runner, must suppress it.
                         crate::tools::ToolAnswer {
+                            sleep: false,
                             told: json!({"next":"Confirm."}),
                             requested_audio: Some(offered(context)),
                         }

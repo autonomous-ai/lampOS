@@ -1086,6 +1086,50 @@ fn a_hold_while_onboarding_is_under_way_asks_no_sleep() {
     assert_eq!(owner.shared.latch.load(Ordering::Acquire), LATCH_ASLEEP);
 }
 
+/// #3748: a sleep the person asked for aloud (`go_to_sleep`) is the same
+/// sleep a hand's hold asks: the durable mute with the reason `sleep`,
+/// saved and woken as that one is. Never while onboarding is under way,
+/// never over a mute already in force, never without head sleep (a tap
+/// on the head is how it is woken), and asked once.
+#[test]
+fn a_sleep_asked_aloud_is_a_hands_sleep_but_never_during_onboarding() {
+    // Without head touch, nothing could wake it as it says: not taken.
+    let directory = Directory::new();
+    let (mut owner, _sender) = fixture(options(false, Some(&directory.file())));
+    owner.ask_sleep();
+    let seen = owner.poll_at(START + 500_000).unwrap();
+    assert!(!seen.mute_changed && !seen.muted, "{seen:?}");
+    let directory = Directory::new();
+    let (mut owner, _sender) = fixture(head_options(Some(&directory)));
+    // Under way, it is not taken, and nothing is left asked after.
+    owner.set_onboarding(true);
+    owner.ask_sleep();
+    let seen = owner.poll_at(START + 1_000_000).unwrap();
+    assert!(
+        !seen.mute_changed && !seen.muted && !seen.asleep,
+        "{seen:?}"
+    );
+    owner.set_onboarding(false);
+    let seen = owner.poll_at(START + 1_100_000).unwrap();
+    assert!(!seen.mute_changed, "{seen:?}");
+    // Asked with the walk over: asleep at once.
+    owner.ask_sleep();
+    let seen = owner.poll_at(START + 2_000_000).unwrap();
+    assert!(seen.mute_changed && seen.muted && seen.asleep, "{seen:?}");
+    assert_eq!(seen.acquired_at_us, Some(START + 2_000_000));
+    owner.persist_muted().unwrap();
+    assert!(
+        directory.file().exists(),
+        "the sleep is saved as a hand's is"
+    );
+    owner.poll_at(START + 2_100_000).unwrap();
+    assert_eq!(owner.shared.latch.load(Ordering::Acquire), LATCH_ASLEEP);
+    // Asked again while asleep: nothing changes.
+    owner.ask_sleep();
+    let seen = owner.poll_at(START + 3_000_000).unwrap();
+    assert!(!seen.mute_changed && seen.muted && seen.asleep, "{seen:?}");
+}
+
 /// #3747: a sleeping lamp wakes at a hand kept a second on its head, at the
 /// stroke, not at its letting go, once the clear is saved, so a person who
 /// holds it to bring it back does; and the same hand, kept past three

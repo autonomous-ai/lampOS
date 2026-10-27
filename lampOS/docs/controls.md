@@ -119,6 +119,22 @@ since that mute wakes as sleep does. A pad that drifts high on a level read
 (#1764), or something resting on the head, now wakes a sleeping lamp after a
 second. Before, a drift held 3 s would have put an awake one to sleep.
 
+**Asked aloud (#3748, `LAMP_SLEEP_ASKED=on`, off unless on).** "Lamp, go
+to sleep" is the voice's own function `go_to_sleep`, on both routes. The
+model is told to say only "Going to sleep. Tap my head to wake me.". Once
+that turn ends heard whole (as a say's `spoken`), the voice asks the same
+sleep a hand held 3 s asks (`HandControls::ask_sleep`): the durable mute
+with the reason `sleep`, saved, the asleep face on the ring
+(`LAMP_RING_ASLEEP`) and a tap to wake it, as above. If the line is still
+sounding 8 s after the call, it asks then. The sleep is dropped if the
+person cuts in, if the turn ends with no audio, or if it ends not heard
+whole (`SleepOwed`, #3835). Never while onboarding is under way: the
+coordinator marks every turn in hand while it is
+(`ProviderInput::Onboarding`), and the model is told it is not now. Only with head sleep (`LAMP_HEAD_TOUCH=on` and the durable
+mute), since a tap on the head is how it wakes: without it the function is
+not declared at all, and the journal says so once. A held line's call is
+refused, as every action's is.
+
 Sleep and Wake are separate, idempotent requested transitions. They never
 toggle microphone mute. First's 18:23 decision in
 [#711](https://github.com/autonomous-ai/lampOS/issues/711) makes Voice close

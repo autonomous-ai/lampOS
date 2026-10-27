@@ -1022,3 +1022,93 @@ fn an_add_ons_quoted_say_is_taken_by_the_second_route_alone() {
     assert_eq!(quoted_refused(false, "provider"), None);
     assert_eq!(quoted_refused(false, "second"), None);
 }
+
+/// "Lamp, go to sleep" (#3748, the reviewer-lead's P2 on #3835): its sleep
+/// is asked only once its line was heard whole, through the same turn's end
+/// a say's `spoken` takes.
+#[test]
+fn a_sleep_asked_aloud_is_asked_once_its_line_is_heard_whole() {
+    let mut test = Test::new();
+    let turn = test.reply.as_ref().unwrap().owner.turn();
+    let mut sleep = SleepOwed::default();
+    sleep.asked(turn, monotonic_us());
+    let first = test.generation(17);
+    test.accept(&first, 240);
+    assert_eq!(
+        sleep.due(test.reply.as_ref(), monotonic_us()),
+        None,
+        "playing"
+    );
+    test.provider_complete();
+    test.retire(&first);
+    let current = test.reply.as_mut().unwrap();
+    assert!(current.settled(&test.pending));
+    test.owner.complete_turn(now(), current.owner).unwrap();
+    test.snapshot = test.owner.snapshot(now()).unwrap();
+    sleep.turn_ended(current, &test.pending, test.snapshot);
+    test.reply = None;
+    assert_eq!(sleep.due(None, monotonic_us()), Some(turn));
+    assert_eq!(sleep.due(None, monotonic_us()), None, "once");
+}
+
+/// The person cuts in ("wait, no") while the lamp says its line: the turn
+/// is cancelled, and no sleep is ever asked.
+#[test]
+fn a_sleep_asked_aloud_is_dropped_when_the_person_cuts_in() {
+    let mut test = Test::new();
+    let turn = test.reply.as_ref().unwrap().owner.turn();
+    let mut sleep = SleepOwed::default();
+    sleep.asked(turn, monotonic_us());
+    let first = test.generation(17);
+    test.accept(&first, 120);
+    cancel_reply(
+        &mut test.owner,
+        &mut test.reply,
+        &mut test.trace,
+        "user_interrupted",
+    )
+    .unwrap();
+    assert_eq!(sleep.due(test.reply.as_ref(), monotonic_us()), None);
+    // Nor later, past its cap.
+    let later = monotonic_us() + crate::sleep_asked::LINE_PLAYED_WITHIN_US + 1;
+    assert_eq!(sleep.due(None, later), None);
+}
+
+/// A turn that ends with nothing played closes no microphone.
+#[test]
+fn a_sleep_asked_aloud_is_dropped_when_its_turn_has_no_audio() {
+    let mut test = Test::new();
+    let turn = test.reply.as_ref().unwrap().owner.turn();
+    let mut sleep = SleepOwed::default();
+    sleep.asked(turn, monotonic_us());
+    test.provider_complete();
+    let current = test.reply.as_mut().unwrap();
+    assert!(current.settled(&test.pending));
+    test.owner.complete_turn(now(), current.owner).unwrap();
+    test.snapshot = test.owner.snapshot(now()).unwrap();
+    sleep.turn_ended(current, &test.pending, test.snapshot);
+    test.reply = None;
+    assert_eq!(sleep.due(None, monotonic_us()), None);
+}
+
+/// Its cap passed with the line still sounding: asked; passed with nothing
+/// sounded yet: dropped.
+#[test]
+fn at_its_cap_a_sleep_is_asked_only_if_its_line_has_sounded() {
+    let mut test = Test::new();
+    let turn = test.reply.as_ref().unwrap().owner.turn();
+    let at = monotonic_us();
+    let cap = at + crate::sleep_asked::LINE_PLAYED_WITHIN_US;
+    let mut sleep = SleepOwed::default();
+    sleep.asked(turn, at);
+    assert_eq!(sleep.due(test.reply.as_ref(), cap), None, "nothing sounded");
+    sleep.asked(turn, at);
+    let first = test.generation(17);
+    test.accept(&first, 240);
+    assert_eq!(
+        sleep.due(test.reply.as_ref(), cap - 1),
+        None,
+        "before the cap"
+    );
+    assert_eq!(sleep.due(test.reply.as_ref(), cap), Some(turn));
+}

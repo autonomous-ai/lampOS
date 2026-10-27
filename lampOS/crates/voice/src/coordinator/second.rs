@@ -118,6 +118,7 @@ fn request_of(command: &ProviderInput) -> u64 {
         | ProviderInput::Paused { request, .. }
         | ProviderInput::CountOnly { request, .. }
         | ProviderInput::StepCall { request, .. }
+        | ProviderInput::Onboarding { request, .. }
         | ProviderInput::Written { request, .. }
         | ProviderInput::Reminder { request, .. } => *request,
     }

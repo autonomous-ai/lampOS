@@ -695,6 +695,7 @@ fn provider_peer(
                 ProviderInput::Paused { .. } => seen.provider.push("paused"),
                 ProviderInput::CountOnly { .. } => seen.provider.push("count_only"),
                 ProviderInput::StepCall { .. } => seen.provider.push("step_call"),
+                ProviderInput::Onboarding { .. } => seen.provider.push("onboarding"),
                 ProviderInput::Reminder { .. } => panic!("reminders are disabled in this fixture"),
             }
         }
