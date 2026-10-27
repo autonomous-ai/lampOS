@@ -31,5 +31,5 @@ light = { colour = "white", level = 5, for = "2m" }
 body = { mood = "reading", for = "2m" }
 # One full look at the page: the model says "Let me take a look." and the
 # voice hands it the picture.
-look = true
+look = true             # the camera's picture for the model: its grant is camera, above (#3859)
 say = "Tutor, don't solve: say in a few words what is right, then, if a line goes wrong, point to the first one and give a hint or a question, never the answer unless they ask outright after trying. Say which part you cannot read (blurred, cut off, in shadow) and never guess it. A sentence or two, then wait."

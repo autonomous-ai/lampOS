@@ -230,27 +230,6 @@ speak = true                      # say, sound, the hum
 topics = ["humans/faces/tracked"] # every topic its triggers and conditions read
 ```
 
-**The protocol's grants, and what format 1 has for each:**
-
-| grant (control.md) | format 1 | shown before install | enforced on the lamp |
-|---|---|---|---|
-| `body` | `body = true` | "moves the lamp's body" | yes: at load for every body and rest step, and at the body's sockets |
-| `light` | `light = true` | "changes the light" | yes: at load, at `light/request` and the actions part's light functions |
-| `speak` | `speak = true` | "speaks" | yes: at load for say, sound and cue, and at the say service |
-| `look` | `look = true`, with the presence topics in `topics` (`humans/faces/tracked`, `room/stood_up`) | "knows when someone arrives" | yes, as topics: a trigger or condition on a topic not listed doesn't load |
-| (none: never through lamp-control) | `camera = true` | "can see a picture of your room through the lamp's camera when it runs", apart, with a strong warning | yes: at load for every `look = true` step, and at each call (`Call::Look`) |
-| `hear` | `voice/heard` or `name/heard` in `topics` | "hears its phrases" | partly: the topic is checked, the phrases aren't (see the gaps) |
-| `sound` | `ears/classes` in `topics` | "hears knocks, music…" | partly: the topic is checked, the classes aren't (see the gaps) |
-
-Format 1 also has, beyond the protocol's six:
-- `topics` and `actions`: raw topics and the actions part's functions;
-- `messages` and `known_faces`: a watch's;
-- `who`: Welcome back's note told who is at the lamp;
-- `output_limits`: private light and volume ceilings;
-- `say = "quoted"`: an add-on's grant only, with `propose` naming `say`, for a proposed say's words;
-- `propose`: an add-on's acts;
-- `core`: `onboarding`, `prepare_unplug`, `sleep` and `startle`, for core skills only.
-
 ### The camera
 
 `look` and `camera` are two grants (#3822's gap 1; the helper's decision
@@ -258,7 +237,9 @@ for the first builder on #3504, 27 Oct, from Ten's proposal there):
 
 - **`look`** is presence and face position only: whether someone is
   there, how near, which way they face. This is the protocol's `look`
-  (control.md), and it is never the picture.
+  (control.md), and it is never the picture. In format 1, a skill asks
+  presence through the topics alone, since a format 1 `look = true` is
+  the camera (below).
 - **`camera`** is the picture: the model may see what the lamp's camera
   sees when the skill runs (a `look = true` step). It is its own grant.
   - The app and the Store show it apart, with a strong warning.
@@ -279,9 +260,30 @@ for the first builder on #3504, 27 Oct, from Ten's proposal there):
 
   None of them reads presence through `look`, so none asks it. Every
   other repo skill asks neither: the ones that notice faces read
-  `humans/faces/tracked` through `topics`, as the table above says.
+  `humans/faces/tracked` through `topics`, as the grant table below says.
 - **An add-on** may ask neither `look` nor `camera`, as it may ask no
   other grant but `propose`.
+
+**The protocol's grants, and what format 1 has for each:**
+
+| grant (control.md) | format 1 | shown before install | enforced on the lamp |
+|---|---|---|---|
+| `body` | `body = true` | "moves the lamp's body" | yes: at load for every body and rest step, and at the body's sockets |
+| `light` | `light = true` | "changes the light" | yes: at load, at `light/request` and the actions part's light functions |
+| `speak` | `speak = true` | "speaks" | yes: at load for say, sound and cue, and at the say service |
+| `look` | the presence topics in `topics` (`humans/faces/tracked`, `room/stood_up`); in format 1 a `look = true` is the camera ("The camera", above) | "knows when someone arrives" | yes, as topics: a trigger or condition on a topic not listed doesn't load |
+| (none: never through lamp-control) | `camera = true` | "can see a picture of your room through the lamp's camera when it runs", apart, with a strong warning | yes: at load for every `look = true` step, and at each call (`Call::Look`) |
+| `hear` | `voice/heard` or `name/heard` in `topics` | "hears its phrases" | partly: the topic is checked, the phrases aren't (see the gaps) |
+| `sound` | `ears/classes` in `topics` | "hears knocks, music…" | partly: the topic is checked, the classes aren't (see the gaps) |
+
+Format 1 also has, beyond the protocol's six:
+- `topics` and `actions`: raw topics and the actions part's functions;
+- `messages` and `known_faces`: a watch's;
+- `who`: Welcome back's note told who is at the lamp;
+- `output_limits`: private light and volume ceilings;
+- `say = "quoted"`: an add-on's grant only, with `propose` naming `say`, for a proposed say's words;
+- `propose`: an add-on's acts;
+- `core`: `onboarding`, `prepare_unplug`, `sleep` and `startle`, for core skills only.
 
 ### The gaps
 
