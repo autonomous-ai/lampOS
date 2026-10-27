@@ -1,3 +1,7 @@
+## 2026-10-27 10:06 — independent Build/Quality snapshot read
+
+READ-OK #3654 `267799387`, bounded to document arithmetic, partition and snapshot structure. [Independent Decimal audit](verification/build-rows-read-3654-20261027/README.md) reproduces 91.4% Build across 72 shipping rows and 68.9% Quality across 16. Four deferred Mood rows are excluded. Mood's exact 29.25% displays as 29.2% with half-even rounding. No P1/P2 in that scope; P3 is the stale live Queue reference to #1722 rather than #3504. Git blob identity is verified; historical score assignments and lamp acceptance are not re-certified. Existing carry gates continue separately.
+
 ## 2026-10-27 09:40 — published737 gates; native Reader failure retained
 
 #3637 is pushed as642f7974a/737 after [focused host238/0/1 plus3docs](verification/privacy-kept-resync-fixture-20261027/carry-737-audit.json), sixteen witnesses/two expected hooks and stable65artifact/source/input guards. Its original ARM40437107774 remains [failed](verification/privacy-kept-resync-fixture-20261027/native-642-reader-failure.json): unchanged Linux only_the_new_session_is_shared_after_one_pinned_lookup at session_reader/tests.rs:289, report.acknowledged && !report.degraded. Summary6,246/1,53skips,1,308selected unrun after fail-fast; all nine privacy cases pass once. Actual097dbba/33d preview tree equals latest local17e/33d exactly; a rebase/new automatic run is not a source repair. Fault posted to existing Reader owner Tests on #3543 and Queue; no cause or waiver inferred. LinuxClippy passes.

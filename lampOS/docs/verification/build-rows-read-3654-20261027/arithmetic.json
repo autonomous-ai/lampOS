@@ -1,0 +1,43 @@
+{
+  "head": "2677993879f070f791d82bf6d710541330fe23b5",
+  "source_blob": "f79b5a2497edd0e495cb20075c0417037c90945d",
+  "source_sha256": "bb882d62f0034e435fcb7fd6cf4202b4d28394c7c3a082546da72e2018f0df7c",
+  "arithmetic": {
+    "build": {
+      "count": 72,
+      "sum": "65.80",
+      "exact_mean_percent": "91.38888888888888888888888889",
+      "one_decimal_half_even": "91.4",
+      "one_decimal_half_up": "91.4"
+    },
+    "quality": {
+      "count": 16,
+      "sum": "11.02",
+      "exact_mean_percent": "68.87500",
+      "one_decimal_half_even": "68.9",
+      "one_decimal_half_up": "68.9"
+    },
+    "mood": {
+      "count": 4,
+      "sum": "1.17",
+      "exact_mean_percent": "29.2500",
+      "one_decimal_half_even": "29.2",
+      "one_decimal_half_up": "29.3"
+    }
+  },
+  "all_build_rows": 76,
+  "excluded_mood_rows": [
+    "One inner state (mood) every behaviour reads, and familiarity *(mood, for later: not in the build figure)*",
+    "Music matched to your mood (for later) *(mood, for later: not in the build figure)*",
+    "Shows its feelings in body and light, as V1\u2019s emotions did (for later) *(mood, for later: not in the build figure)*",
+    "Reads your mood from your face or voice *(mood, for later: not in the build figure)*"
+  ],
+  "quality_targets_within_zero_to_one": true,
+  "issue_reference_count": 265,
+  "markdown_link_destinations": [],
+  "limits": [
+    "Checks table arithmetic/partition and snapshot content only, not independent product/lamp acceptance for every score.",
+    "Exact Mood mean is29.25%;29.2 useshalf-even whereas half-up gives29.3.",
+    "The opening live Queue reference#1722 is stale versuscurrent#3504."
+  ]
+}
