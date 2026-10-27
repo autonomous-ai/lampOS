@@ -180,6 +180,15 @@ impl Step {
         }
     }
 
+    /// A step the model can only skip, other than privacy: its skip is said
+    /// by the runner from the record, in the skill's words (#3769).
+    fn says_its_skip(self) -> bool {
+        matches!(
+            self,
+            Step::WhereYouSit | Step::Touch | Step::HowYouSound | Step::GivingWay
+        )
+    }
+
     /// Only the GivingWay step may request a completion movement.
     /// Other onboarding steps stay physically still (the owner's #841 decision).
     fn gesture(self) -> &'static str {
@@ -2349,6 +2358,12 @@ impl Onboarding {
                 } else {
                     self.finish(step, outcome, None, now_us);
                 }
+                // The step said is the step the record skipped (#3769).
+                if outcome == Outcome::Skipped
+                    && let Some(line) = self.definition.skipped(step)
+                {
+                    self.owed = Some(line.to_owned());
+                }
             } else {
                 self.records.push(
                     json!({"kind":"onboarding_report_refused","step":step.name(),
@@ -2668,6 +2683,18 @@ pub fn run(file: &Path, call: &ToolCall) -> (Value, bool) {
             let step = call.args.get("step").and_then(Value::as_str);
             let outcome = call.args.get("outcome").and_then(Value::as_str);
             match (step.and_then(Step::named), outcome.and_then(Outcome::named)) {
+                (Some(step), Some(Outcome::Skipped)) if step.says_its_skip() => {
+                    if post(file, &json!({"step": step.name(), "outcome": outcome})).is_err() {
+                        return (
+                            json!({"error": "I could not note that just now. Go on all the same."}),
+                            false,
+                        );
+                    }
+                    return (
+                        json!({"ok": true, "note": "I say that it is skipped myself. Say nothing about it, and nothing more until I do."}),
+                        true,
+                    );
+                }
                 (Some(step), Some(told)) if step.reportable(told) => {
                     json!({"step": step.name(), "outcome": outcome})
                 }
@@ -2776,7 +2803,8 @@ mod tests {
             name: STEP.into(),
             args: json!({"step": step, "outcome": outcome}),
         };
-        assert_eq!(run(&walk.file, &call), (json!({"ok": true}), true));
+        let (answer, ok) = run(&walk.file, &call);
+        assert!(ok && answer["ok"] == json!(true), "{answer}");
     }
 
     /// A room at rest: the lamp's own notes are the only thing said, and
@@ -3030,8 +3058,9 @@ mod tests {
         assert!(room.walk.leading());
         assert_eq!(room.walk.under_way(), Some(true));
         report(&room.walk, "where_you_sit", "skipped");
-        // Between two steps: the first ended, the next not yet asked.
-        assert_eq!(room.wait(S, None), NONE);
+        // Between two steps: the first ended (its skip said, #3769), the
+        // next not yet asked.
+        assert_eq!(room.wait(S, None), [WHERE_YOU_SIT_SKIPPED]);
         assert_eq!(room.outcome(Step::WhereYouSit), Some(Outcome::Skipped));
         assert!(!room.walk.leading());
         assert_eq!(room.walk.under_way(), Some(true), "between steps");
@@ -3064,7 +3093,10 @@ mod tests {
         let mut room = Room::new("skip");
         assert_eq!(room.wait(4 * S, Some(SIDE)), [SIT_NOTE]);
         report(&room.walk, "where_you_sit", "skipped");
-        assert_eq!(room.wait(4 * S, Some(SIDE)), [WHO_NOTE]);
+        assert_eq!(
+            room.wait(4 * S, Some(SIDE)),
+            [WHERE_YOU_SIT_SKIPPED, WHO_NOTE]
+        );
         assert_eq!(room.outcome(Step::WhereYouSit), Some(Outcome::Skipped));
         report(&room.walk, "who_you_are", "skipped");
         assert_eq!(room.wait(4 * S, Some(SIDE)), [PREFERENCES_NOTE]);
@@ -4171,7 +4203,12 @@ mod tests {
         }
         until_touch_ends(&mut room);
         assert_eq!(room.outcome(Step::Touch), Some(Outcome::Done));
-        assert_eq!(room.wait(8 * S, Some(NEAR_MIDDLE)), [PREFERENCES_NOTE]);
+        let next = room
+            .walk
+            .definition
+            .note(Step::Preferences, false)
+            .to_owned();
+        assert_eq!(room.wait(8 * S, Some(NEAR_MIDDLE)), [next]);
         std::fs::remove_dir_all(root).unwrap();
     }
 
@@ -4191,9 +4228,25 @@ mod tests {
         .unwrap();
         room.wait(S, Some(NEAR_MIDDLE));
         assert_eq!(room.outcome(Step::Touch), None);
-        // Skipped is theirs to ask.
-        report(&room.walk, "touch", "skipped");
-        room.wait(S, Some(NEAR_MIDDLE));
+        // Skipped is theirs to ask. The walk says which step it skipped,
+        // from the record, before the next (#3769); the model is told to
+        // say nothing of it.
+        let skip = ToolCall {
+            id: "c".into(),
+            name: STEP.into(),
+            args: json!({"step": "touch", "outcome": "skipped"}),
+        };
+        let (answer, _) = run(&room.walk.file, &skip);
+        assert!(
+            answer["note"]
+                .as_str()
+                .unwrap()
+                .contains("Say nothing about it")
+        );
+        assert_eq!(
+            room.wait(8 * S, Some(NEAR_MIDDLE)),
+            [TOUCH_SKIPPED, PREFERENCES_NOTE]
+        );
         assert_eq!(room.outcome(Step::Touch), Some(Outcome::Skipped));
         std::fs::remove_dir_all(root).unwrap();
     }

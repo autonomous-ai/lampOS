@@ -78,7 +78,10 @@ Repair the file and restart Voice to recover the automatic walk.
 `order` names each of the nine stable step IDs exactly once; `steps` provides
 `first` and `reoffer` notes for every ID. `reoffer_after_s` is 1 to 31,536,000
 (the shipped value is 86,400). Only `who_you_are` and `preferences` may have a
-`nudge`, with `words` and `after_answers` from 1 to 8. Every note is 1 to 900
+`nudge`, with `words` and `after_answers` from 1 to 8. `where_you_sit`,
+`how_you_sound`, `touch` and `giving_way`, and no other step, may have a
+`skipped` line (#3769, "Exact lines" below); without one, as in an older
+updater's built-in file, the skip is said by nobody. Every note is 1 to 900
 bytes with no control characters. Only the privacy step's notes have one
 `{location}` slot, and only `words.who_confirm` has one `{name}` slot; other
 notes have no slots. Consent remains a code-checked mechanism: both `first`
@@ -108,13 +111,14 @@ Skills uses the same validator when loading or packaging this core skill.
 Changing order or words cannot add a mechanism, grant physical authority,
 remove privacy's priority or change proof, timeout and cancellation rules.
 The shipped data reproduces the previous order and notes byte for byte,
-except touch's and giving way's lines, which are exact sentences since #3769
+except the measured steps' lines, which are exact sentences since #3769
 ("Exact lines" below); `onboarding/legacy_words.rs` is a test-only oracle,
 absent from production.
 
 ### Exact lines (#3769)
 
-Touch and giving way say lines written once in the skill, each note
+Where you sit, how they sound (the call and the sentence), touch, privacy's
+result and giving way say lines written once in the skill, each note
 `(Say only this, nothing before or after it: "…")`, so the model never words
 them itself, never says the arm, and never says another step's words. Each
 step has what to do, what to do when it didn't work, and that it worked,
@@ -123,10 +127,36 @@ said before the next step's invitation:
 | Step | What to do | Didn't work | Worked | Gave up |
 |---|---|---|---|---|
 | `touch` | `first`: "Tap the top of my head once, then let go." (`reoffer`: "One more thing: …") | `touch_remind`: "I didn't feel that. Tap a little firmer, right on top of my head." | `touch_done`: "Got it, I felt that." | `touch_failed`: "I didn't feel a tap this time. That's fine, you can redo the setup later." |
-| `giving_way` | `first`/`reoffer`: "My head gives way to your hand. Take it gently, move it a little, then let go." | `give_again`, the second try's invitation: "I didn't feel my head move. Take it gently, move it a little, then let go." | `give_done`: "Got it, my head moved with your hand." | `give_failed`: "I didn't feel my head move this time. That's fine, you can redo the setup later." |
+| `where_you_sit` | `first`/`reoffer`: "Hello, I'm glad to meet you. Please sit where you usually sit, and look at me." | `sit_no_face`: "I can't see your face yet. …"; `sit_closer`: "I can see you, but you're a little far. …"; `sit_turn`: "I can see you at the edge of my view. …" | `sit_done`: "Got it, I can see you well there." | `sit_failed`: "I still can't see you well there. That's fine, you can turn me toward your seat later." |
+| `how_you_sound`, the call | `first`/`reoffer`: "Now I'd like to learn how you call me. Stay in your seat, call my name once, the way you would to get my attention, then stay quiet." | `near_again`: "Call my name once more from your seat, the same way, then stay quiet." | `near_done`: "Got it, I know how you call me from there." | `near_failed`: "I couldn't learn how you call me this time. …" |
+| `how_you_sound`, the sentence | `sentence_first`: "Now say a sentence to me from your seat, anything at all, so I get used to your voice." | `sentence_louder`, `sentence_closer`, `sentence_again`: "Say another sentence from your seat, a little louder." and the like | `sentence_done`: "Got it, I hear you well from there." | `sentence_failed`: "I couldn't hear you well enough this time. I'll get used to your voice as we talk." |
+| `privacy`, its result | (its invitation, unchanged) | (a second invitation) | `privacy_done`: "Got it, the switch closes my microphones." (`privacy_done_camera`: "… and my camera.") | `privacy_failed`: "The switch check didn't finish. You can try it again later by redoing the setup." |
+| `giving_way` | `first`/`reoffer`: "My head gives way to your hand. Take it gently, move it a little, then let go." | `give_again`, the second try's invitation within the walk (a re-offer later opens as the first): "I didn't feel my head move. Take it gently, move it a little, then let go." | `give_done`: "Got it, my head moved with your hand." | `give_failed`: "I didn't feel my head move this time. That's fine, you can redo the setup later." |
 
 Giving way's lines never mention sleep: the step never puts the lamp to
-sleep (#3747). The other steps follow in their own change.
+sleep (#3747).
+
+The conversational steps keep their tool calls and consent clauses, but say
+their questions exactly: `who_you_are` asks "What should I call you?", then
+"May I remember your face, so I know you next time?", and on a skip or a
+failure says only "That's fine. You can tell me your name any time."
+(`who_again`: "Sorry, what should I call you?"). `preferences` asks "Are there
+hours when I should keep quiet?", then "May I say hello when you sit down?",
+and ends with "Got it, that's everything. You can ask me to redo the setup any
+time." The `room_sounds` and `face_expressions` questions keep their consent
+disclosures word for word, as before.
+
+**A skip is said from the record.** The model may only skip `where_you_sit`,
+`how_you_sound`, `touch` and `giving_way`. For those four, the walk itself says
+the step's `skipped` line once the skip is in the record, before the next
+step, and `setup_step`'s answer tells the model to say nothing about it
+(`{"ok": true, "note": "I say that it is skipped myself. …"}`). So the step
+named is the step skipped: on lamp-29e7 on 27 October the model said "I've
+skipped touch" when the record had skipped how they sound. The lines are "Okay,
+we'll skip where you sit for now.", "Okay, we'll skip how you call me for
+now.", "Okay, we'll skip the touch for now." and "Okay, we'll skip my head
+giving way for now." A privacy skip keeps `privacy_failed`. The
+conversational steps' skips stay the model's, as their notes ask.
 Host targets are under 50 ms for the startup read and validation and under
 1 ms for a cached note selection. These are local boundaries, not spoken or
 lamp latency measurements; the unchanged walk still needs its lamp run.

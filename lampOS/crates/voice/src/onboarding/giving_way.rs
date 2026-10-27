@@ -341,8 +341,11 @@ impl Onboarding {
         }
         offer.claimed = true;
         offer.ready = false;
-        // A second try says what didn't work and how to do it (#3769).
+        // A second try within the walk says what didn't work and how to do
+        // it (#3769); a re-offer later opens as the first did
+        // (Reviewer-three's P3 on #3781).
         if offer.attempt > 1
+            && !self.desired.steps.contains_key(Step::GivingWay.name())
             && let Some(again) = &self.definition.words.give_again
         {
             return Some(again.clone());
