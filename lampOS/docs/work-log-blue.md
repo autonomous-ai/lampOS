@@ -676,3 +676,4 @@ Ready for lamp-voice: yes (#2553), once its ARM64 run is green
 - 00:04: quiet tick; #3869 clippy green, ARM64 pending.
 - 00:09: #3868 (control part 5) merged; reviewer-lead next merges #3875. #3869 ARM64 pending.
 - 00:15: NEXT TRAIN #3869 7a04fd60c (Eighth READ-OK on head, Fourteen on a7820079d; green). Nine's #3900 (part 6) syncs schema+SDK copies; #3901 (phrase floor 8 letters) changes control.md only: P3 posted (schema description, or an SDK pre-check follow-up by me).
+- 00:19: the coordinator: tonight's build is Devin with a body (harness-reviewer); blue answers SDK questions first. Posted the SDK brief on #3504 (what lamp-control serves; express refused; 75c9 no body; pairing; lamp-mcp; rates). Found the fakes accepted ops lamp-control refuses: opened #3903 (blue/fake-like-control 79c8b394a, LAMP_CONTROL_REFUSES, lamp fake refuses them, --everything; Python 58, JS 34) and corrected my note.
