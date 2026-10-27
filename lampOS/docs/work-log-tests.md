@@ -1,5 +1,13 @@
 # Tests work log
 
+## 2026-10-27 07:38 — Sentinel latest gate passes and current head pushed
+
+Ready for lamp-voice: no (#3543 fresh native and current reads pending)
+
+Sentinel `59a2f5f00/4bff` is pushed after [current host qualification](verification/tests-sentinel-4bff-host-20261027/): **4/0/0 once**, formatting, strict twelve-package Clippy, workspace and Voice-library compilation. Actual Voice inventory is **3,832**, with **3,828** filtered. Full source/official owner, actual module and **240** witnesses passed the precisely recorded full-hash/stat guard schedule; controller/wrapper **0**, groups closed. A post-gate full official comparison matched all **10,675** source files. Inherited modes remain explicit. The changed Linux test is unrun on Mac. Fresh original ARM64 **40427034839** and Linux **40427035003** are collecting; old 0c/b234 native results remain separate.
+
+Carrier current compile/compare first stopped before compilation: my private expected reverse closure included Eyes and TurnEnd, but actual current Cargo metadata reports twelve affected packages. Its four tool/fmt/metadata commands all exited zero; source, **263** witnesses, **15** old executables and group closures passed. Original controller FAIL/1 is retained. A separately recorded corrected compile/compare attempt is active; no runtime/list/clean or old 442-to-current transfer is authorized. Restart’s current 21-case gate and Skills’ current artifact/input comparisons prepare in parallel. Mood current native is green with one current peer clearance; Ready will compose after Mood lands. No device action.
+
 ## 2026-10-27 07:26 — Mood latest exact-head native proof passes
 
 Ready for lamp-voice: no (#3623 second current peer clearance pending)

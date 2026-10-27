@@ -1,0 +1,1247 @@
+{
+  "schema": 1,
+  "subject": "Current Sentinel 59a/4bff Mac host Reader qualification",
+  "pull_request": 3543,
+  "head": "59a2f5f0045647714dc4d9704ffcdc3b0df43980",
+  "base": "4bff5f2c517bf64d4a32c31a90e0b24dc1a4810a",
+  "status": "PASS in recorded Mac Reader scope",
+  "runtime_attempts": 1,
+  "counts": {
+    "passed": 4,
+    "failed": 0,
+    "ignored": 0
+  },
+  "module_cases": [
+    {
+      "identity": "session_reader::tests::finite_and_unset_service_never_resolve_a_reader_group",
+      "outcome": "ok"
+    },
+    {
+      "identity": "session_reader::tests::group_lookup_failure_retains_private_logging_without_writer_failure",
+      "outcome": "ok"
+    },
+    {
+      "identity": "session_reader::tests::local_session_reader_group_is_exact_unique_and_bounded",
+      "outcome": "ok"
+    },
+    {
+      "identity": "session_reader::tests::unsupported_acl_verification_degrades_to_private_metadata",
+      "outcome": "ok"
+    }
+  ],
+  "command": [
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/ready-008-gates-20261026/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+    "session_reader::tests::",
+    "--test-threads=1"
+  ],
+  "supervised_runtime_seconds": 0.6058649769984186,
+  "libtest_summary": "4 passed; 0 failed; 0 ignored; 0 measured; 3828 filtered out",
+  "inventory": {
+    "all": 3832,
+    "declared_ignored": 15,
+    "declared_ignored_identities": [
+      "coordinator::tests::endpoint_session::real_worker_session_records_verdict_provenance",
+      "coordinator::tests::hand_controls::head_tap_cue_decision_to_speaker_dispatch_latency",
+      "coordinator::tests::hand_controls::local_hand_stop_dispatch_latency",
+      "hand_controls::tests::head_touch_bus_to_poll_latency",
+      "provider_worker::tests::sixty_second_answer_follows_output_capacity",
+      "provider_worker::tests::three_minute_answer_follows_output_capacity",
+      "reference::recovery::tests::recentred_the_fixed_margin_carries_an_hour_of_that_lamps_drift",
+      "reference::tests::four_virtual_hours_capture_clocked",
+      "remember::tests::hits_note_latency_on_a_200_entry_kept_list",
+      "reminders::tests::parent_poll_cost",
+      "reminders::transport::tests::poll_cost",
+      "second_provider::tests::policy::measure_the_wait_from_the_call_to_its_run",
+      "task_news::tests::work_whose_agent_never_answers_after_it_was_accepted_is_told",
+      "thread::tests::write_a_thread_fixture",
+      "tools::tests::use_skill_cost"
+    ],
+    "Reader_module": 4,
+    "Reader_ignored": 0,
+    "ordinary_filtered_out": 3828,
+    "all_inventory_receipt_sha256": "fc66bf9dd2360dda279d700b5c3effbee850c48f4b3e6a552ea25c8ea6e4518c",
+    "scope": "Inventory lists were read from the actual newly compiled library. Only the complete Mac Reader module was executed."
+  },
+  "changed_Linux_case": {
+    "identity": "session_reader::tests::linux::replaced_record_never_changes_an_outside_sentinel",
+    "present_in_Mac_inventory": false,
+    "run_on_Mac": false
+  },
+  "scope_limits": [
+    "No full Voice or reverse-dependent runtime claim",
+    "No changed Linux case execution on Mac",
+    "No isolated-root Linux DAC, device, acoustic or physical latency claim",
+    "GitHub ARM64/Linux CI is a separate source/preview-specific audit; local native-controller exit is not CI qualification",
+    "No retry or runtime reuse in this host gate"
+  ],
+  "compiler_gates": {
+    "fmt": true,
+    "strict_all_targets_actual_reverse_closure": [
+      "lamp-body",
+      "lamp-cloud",
+      "lamp-expression",
+      "lamp-keeper",
+      "lamp-lean",
+      "lamp-memory",
+      "lamp-peek",
+      "lamp-setup",
+      "lamp-skills",
+      "lamp-update",
+      "lamp-voice",
+      "lamp-voice-eval"
+    ],
+    "workspace_build": true,
+    "workspace_before_lib_test_compile": true,
+    "Voice_artifact_source_profile_bound": true,
+    "Voice_freshness_observed_only": true,
+    "package_clean_performed": false,
+    "required_fresh_false": false,
+    "blanket_transitive_freshness_claim": false,
+    "actual_local_bindings": [
+      {
+        "phase": "strict",
+        "local_artifact_count": 143,
+        "Voice_artifact_count": 17,
+        "Voice_fresh_observations": {
+          "false": 17
+        },
+        "receipt_sha256": "75d1b6d7c92d2092ada34b22e953a98267d012b7ec61a7055ac979d4fc52db1c"
+      },
+      {
+        "phase": "workspace",
+        "local_artifact_count": 96,
+        "Voice_artifact_count": 2,
+        "Voice_fresh_observations": {
+          "false": 2
+        },
+        "receipt_sha256": "ed4a1471c7fa3f2d8800f34779c4d3918c6a5c51b4f67fe7820b538c312b9fc7"
+      },
+      {
+        "phase": "compile-Voice-lib",
+        "local_artifact_count": 26,
+        "Voice_artifact_count": 1,
+        "Voice_fresh_observations": {
+          "false": 1
+        },
+        "receipt_sha256": "33bcc26622bac43690b7ee2f829358d33e051e645f8063b39e4e82e4c691bfb3"
+      }
+    ]
+  },
+  "source": {
+    "tracked_file_count": 10675,
+    "canonical_branch": "tests/3543-qualify-4bff",
+    "official_branch": "tests/1806-reader-sentinel-root",
+    "clean_status": "",
+    "index_sha256": "4f2119d4dca810c467e9b54fc25d810ddb41cdf61efa77216f27104e16d0c7b0",
+    "prepared_before_after_identical": true,
+    "physical_before_after_identical": true,
+    "official_full_initial_final_identical": true,
+    "canonical_equals_official_except_branch": true,
+    "source_sha256": "4ff6406d6269dada4d099f16db86ddc36d58bf07e1142536d2443c5113c5b333",
+    "physical_source_sha256": "b96df78f87bdd68d762da19993a5d2aa04786e16b5f90d26a099bfbbb3c6808b",
+    "official_source_sha256": "2a3cc00926e06a8410ae28b4ec5a630c672cc40e81bb10ab5d046bdac867bdb6",
+    "actual_parent_source_transition": {
+      "changed_paths": [
+        "lampOS/crates/memory/src/days.rs",
+        "lampOS/crates/memory/src/days_protocol.rs",
+        "lampOS/crates/memory/src/search.rs",
+        "lampOS/crates/memory/tests/it/days.rs",
+        "lampOS/crates/memory/tests/it/voice.rs",
+        "lampOS/crates/voice/src/remember.rs",
+        "lampOS/docs/memory-days.md",
+        "lampOS/docs/memory.md",
+        "lampOS/docs/vi/memory-days_vi.md"
+      ],
+      "parent_head": "8076057e847013fa1ecbb381a564d6f74810b301",
+      "current_head": "59a2f5f0045647714dc4d9704ffcdc3b0df43980"
+    }
+  },
+  "actual_executable": {
+    "artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/voice#lamp-voice@0.1.0",
+      "manifest_path": "/private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/voice/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_voice",
+        "src_path": "/private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/voice/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "filenames": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/ready-008-gates-20261026/debug/deps/lamp_voice-6d619bbdd1df3a0d"
+      ],
+      "executable": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/ready-008-gates-20261026/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+      "fresh": false
+    },
+    "binding": {
+      "sha256": "cfdbc3f6fd04cd41130a5d00fb8f5776bb229e9518b6d366da44cc7a4e255fd7",
+      "bytes": 116077992,
+      "mode": 493,
+      "mtime_ns": 1793060729978631640,
+      "device": 16777222,
+      "inode": 484988940
+    }
+  },
+  "independent_frozen_copy": {
+    "evidence_relative_path": "sentinel-4bff-after-807-gates/Voice-lib-frozen",
+    "binding": {
+      "sha256": "cfdbc3f6fd04cd41130a5d00fb8f5776bb229e9518b6d366da44cc7a4e255fd7",
+      "bytes": 116077992,
+      "mode": 493,
+      "mtime_ns": 1793060729978631640,
+      "device": 16777222,
+      "inode": 484989290
+    },
+    "physical_binary_exported": false
+  },
+  "witnesses": {
+    "inherited": 239,
+    "new": 1,
+    "final": 240,
+    "strict_fields": [
+      "sha256",
+      "bytes",
+      "mode",
+      "mtime_ns",
+      "device",
+      "inode"
+    ],
+    "mode_counts": {
+      "0o555": 237,
+      "0o755": 3
+    },
+    "inherited_modes_preserved": true,
+    "OS_write_protection_claim": false,
+    "parent_mutable_actual_release": {
+      "bindings": {
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/ready-008-gates-20261026/debug/deps/lamp_voice-6d619bbdd1df3a0d": {
+          "sha256": "a63a5993c473efd414aee8f06691d8430e6920e9343e639b10a6715ac4e954f9",
+          "bytes": 116048872,
+          "mode": 493,
+          "mtime_ns": 1793058179670261590,
+          "device": 16777222,
+          "inode": 484959067
+        }
+      },
+      "all_six_fields_verified_before_declared_release": true,
+      "scope": "Only parent mutable target executable binding; every external inherited frozen witness remains strict"
+    },
+    "guard_policy": "Prospective ONLY: full tracked source and every frozen SHA at initial/final and immediately before every direct module/list consumption. All other command boundaries compare exact tracked source set + six stat attributes, HEAD/parent/index/clean, all frozen bound metadata attributes, and full actual-module SHA/metadata. Every actual-module invocation also has adjacent executable SHA checks. Inherited modes preserved; no chmod or write-protection claim. Official owner HEAD/parent/branch/index/clean is checked at every boundary; its full prepared source equality is checked at initial/final.",
+    "full_hash_checkpoints": [
+      "initial",
+      "before-inventory-all",
+      "before-inventory-ignored",
+      "before-inventory-module",
+      "before-inventory-module_ignored",
+      "before-module-runtime",
+      "final"
+    ],
+    "non_full_hash_boundaries": "Exact tracked source set/stat attributes, owner HEAD/parent/branch/index/clean, all frozen bound metadata and actual module SHA/metadata; full content hashes are not claimed at every compiler boundary.",
+    "actual_module_guard": "Adjacent executable SHA256 and all six binding attributes around every direct invocation.",
+    "all_final_guards_pass": true,
+    "manifest_sha256": "0ac8a8ebd054f54886e53a4ff6137903b94c2cc75482516186731ceca9b712f6"
+  },
+  "closure": {
+    "owned_stage_count": 10,
+    "every_direct_exit_zero": true,
+    "every_owned_group_closed": true,
+    "unresolved_owned_pids": [],
+    "lease_released": true,
+    "local_native_controller": {
+      "controller_exit": 0,
+      "wrapper_exit": 0,
+      "started_at": "2026-10-27T00:18:17.121256+00:00",
+      "finished_at": "2026-10-27T00:27:04.146760+00:00",
+      "elapsed_s": 527.0347261090064,
+      "permission_mode": "require_escalated",
+      "activation_verified": true,
+      "controller_pid": 18168,
+      "exit_code": 0,
+      "controller_sha256": "73d8055f08c3e25a0162185bb152fd2d274848382bc587a793d1468bd6219f3b",
+      "plan_sha256": "c2b2a4f73c984fb1786d176beb65ca6648a2cc99d8a17ccd4674acabcd624685",
+      "terminal_present": true,
+      "terminal_status": "PASS",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_bytes": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_bytes": 0
+    }
+  },
+  "stage_receipts": [
+    {
+      "label": "compile-Voice-lib",
+      "receipt_sha256": "415e31ed0d19c085d5d292ff95811860929924dcb52a9d66685dffa74ef10dc6",
+      "argv": [
+        "/Users/autonomous/.cargo/bin/cargo",
+        "+1.96.0",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "--no-run",
+        "--message-format=json",
+        "--jobs",
+        "1"
+      ],
+      "timeout_s": 3600,
+      "available_bytes_before_launch": 5690191872,
+      "reserve_bytes": 2214592512,
+      "source_guard_scope": "All tracked file-set/stat6 and frozen metadata; HEAD/index/clean; actual executable SHA",
+      "source_stat_attributes": [
+        "bytes",
+        "mode",
+        "mtime_ns",
+        "device",
+        "inode",
+        "kind"
+      ],
+      "frozen_stat_attributes": [
+        "bytes",
+        "mode",
+        "mtime_ns",
+        "device",
+        "inode"
+      ],
+      "full_source_frozen_hash_before_command": false,
+      "full_source_frozen_hash_after_command": false,
+      "post_command_guard_scope": "All tracked file-set/stat6, all frozen metadata, HEAD/parent/index/clean and actual executable SHA",
+      "stop_reason": null,
+      "cleanup": [
+        {
+          "action": "leader exited unreaped; no other owned group members",
+          "members": [
+            {
+              "pid": 32334,
+              "state": "Z"
+            }
+          ]
+        }
+      ],
+      "minimum_free_bytes": 5417857024,
+      "exit": 0,
+      "error": null,
+      "group_closed": true,
+      "unresolved_owned_pids": [],
+      "elapsed_s": 127.83925308700418,
+      "stdout_sha256": "82747f3751da349719b9d846bcca9cf10292d234874eb4f8d831b11a40b81e05",
+      "stderr_sha256": "03216f68c85f5e31b45ddfddbc9ea77f6898a26f3d1d9910b291bef768227693"
+    },
+    {
+      "label": "fmt",
+      "receipt_sha256": "28cf7d863e1aa934a1e330bf67da60a05ce613aada6b48620c075e6bac6fb50e",
+      "argv": [
+        "/Users/autonomous/.cargo/bin/cargo",
+        "+1.96.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "timeout_s": 3600,
+      "available_bytes_before_launch": 5726826496,
+      "reserve_bytes": 2214592512,
+      "source_guard_scope": "All tracked file-set/stat6 and frozen metadata; HEAD/index/clean; actual executable SHA",
+      "source_stat_attributes": [
+        "bytes",
+        "mode",
+        "mtime_ns",
+        "device",
+        "inode",
+        "kind"
+      ],
+      "frozen_stat_attributes": [
+        "bytes",
+        "mode",
+        "mtime_ns",
+        "device",
+        "inode"
+      ],
+      "full_source_frozen_hash_before_command": false,
+      "full_source_frozen_hash_after_command": false,
+      "post_command_guard_scope": "All tracked file-set/stat6, all frozen metadata, HEAD/parent/index/clean and actual executable SHA",
+      "stop_reason": null,
+      "cleanup": [
+        {
+          "action": "leader exited unreaped; no other owned group members",
+          "members": [
+            {
+              "pid": 19120,
+              "state": "Z"
+            }
+          ]
+        }
+      ],
+      "minimum_free_bytes": 5726416896,
+      "exit": 0,
+      "error": null,
+      "group_closed": true,
+      "unresolved_owned_pids": [],
+      "elapsed_s": 12.568147136975313,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "inventory-all",
+      "receipt_sha256": "3bb1dda9873f1ac844683679212033f1f4a7cf6278d3636d634621d182144f47",
+      "argv": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/ready-008-gates-20261026/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+        "--list",
+        "--format",
+        "terse"
+      ],
+      "timeout_s": 60,
+      "available_bytes_before_launch": 5543886848,
+      "reserve_bytes": 2214592512,
+      "source_guard_scope": "Full tracked source/frozen SHA before direct consumption",
+      "source_stat_attributes": [
+        "bytes",
+        "mode",
+        "mtime_ns",
+        "device",
+        "inode",
+        "kind"
+      ],
+      "frozen_stat_attributes": [
+        "bytes",
+        "mode",
+        "mtime_ns",
+        "device",
+        "inode"
+      ],
+      "full_source_frozen_hash_before_command": true,
+      "full_source_frozen_hash_after_command": false,
+      "post_command_guard_scope": "All tracked file-set/stat6, all frozen metadata, HEAD/parent/index/clean and actual executable SHA",
+      "stop_reason": null,
+      "cleanup": [
+        {
+          "action": "leader exited unreaped; no other owned group members",
+          "members": [
+            {
+              "pid": 38021,
+              "state": "Z"
+            }
+          ]
+        }
+      ],
+      "minimum_free_bytes": 5543649280,
+      "exit": 0,
+      "error": null,
+      "group_closed": true,
+      "unresolved_owned_pids": [],
+      "elapsed_s": 2.501055544009432,
+      "stdout_sha256": "6889ee596302435a835e12e63b22f6e0aa0c1384961038f971f4ce29f239e75f",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "inventory-ignored",
+      "receipt_sha256": "5e8b9adbb7e662ea57bcfab2fdd38ab04b4b85aba39abe5f2f153a744ce2c1e9",
+      "argv": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/ready-008-gates-20261026/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+        "--ignored",
+        "--list",
+        "--format",
+        "terse"
+      ],
+      "timeout_s": 60,
+      "available_bytes_before_launch": 5551423488,
+      "reserve_bytes": 2214592512,
+      "source_guard_scope": "Full tracked source/frozen SHA before direct consumption",
+      "source_stat_attributes": [
+        "bytes",
+        "mode",
+        "mtime_ns",
+        "device",
+        "inode",
+        "kind"
+      ],
+      "frozen_stat_attributes": [
+        "bytes",
+        "mode",
+        "mtime_ns",
+        "device",
+        "inode"
+      ],
+      "full_source_frozen_hash_before_command": true,
+      "full_source_frozen_hash_after_command": false,
+      "post_command_guard_scope": "All tracked file-set/stat6, all frozen metadata, HEAD/parent/index/clean and actual executable SHA",
+      "stop_reason": null,
+      "cleanup": [
+        {
+          "action": "leader exited unreaped; no other owned group members",
+          "members": [
+            {
+              "pid": 39219,
+              "state": "Z"
+            }
+          ]
+        }
+      ],
+      "minimum_free_bytes": 5551366144,
+      "exit": 0,
+      "error": null,
+      "group_closed": true,
+      "unresolved_owned_pids": [],
+      "elapsed_s": 0.620052829006454,
+      "stdout_sha256": "5460a54eff06379661a554db4840fe29e11c241e26db2b69cb181abaff998dcf",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "inventory-module",
+      "receipt_sha256": "f8e925232de99f6de81d3e4c3a26a7838d4fade82bc07924c2413a3fc76b8d81",
+      "argv": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/ready-008-gates-20261026/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+        "session_reader::tests::",
+        "--list",
+        "--format",
+        "terse"
+      ],
+      "timeout_s": 60,
+      "available_bytes_before_launch": 5530943488,
+      "reserve_bytes": 2214592512,
+      "source_guard_scope": "Full tracked source/frozen SHA before direct consumption",
+      "source_stat_attributes": [
+        "bytes",
+        "mode",
+        "mtime_ns",
+        "device",
+        "inode",
+        "kind"
+      ],
+      "frozen_stat_attributes": [
+        "bytes",
+        "mode",
+        "mtime_ns",
+        "device",
+        "inode"
+      ],
+      "full_source_frozen_hash_before_command": true,
+      "full_source_frozen_hash_after_command": false,
+      "post_command_guard_scope": "All tracked file-set/stat6, all frozen metadata, HEAD/parent/index/clean and actual executable SHA",
+      "stop_reason": null,
+      "cleanup": [
+        {
+          "action": "leader exited unreaped; no other owned group members",
+          "members": [
+            {
+              "pid": 39498,
+              "state": "Z"
+            }
+          ]
+        }
+      ],
+      "minimum_free_bytes": 5530927104,
+      "exit": 0,
+      "error": null,
+      "group_closed": true,
+      "unresolved_owned_pids": [],
+      "elapsed_s": 0.6004678829922341,
+      "stdout_sha256": "b0df7fff9caa0edf6d6754caeb7f3e43fec5112fadf0bd5d7a0499803ee65e0c",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "inventory-module_ignored",
+      "receipt_sha256": "67e0fa9532a851a881bd3d8b404be9c7a48d746f13ed6875d83ddd24c307038f",
+      "argv": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/ready-008-gates-20261026/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+        "session_reader::tests::",
+        "--ignored",
+        "--list",
+        "--format",
+        "terse"
+      ],
+      "timeout_s": 60,
+      "available_bytes_before_launch": 5547995136,
+      "reserve_bytes": 2214592512,
+      "source_guard_scope": "Full tracked source/frozen SHA before direct consumption",
+      "source_stat_attributes": [
+        "bytes",
+        "mode",
+        "mtime_ns",
+        "device",
+        "inode",
+        "kind"
+      ],
+      "frozen_stat_attributes": [
+        "bytes",
+        "mode",
+        "mtime_ns",
+        "device",
+        "inode"
+      ],
+      "full_source_frozen_hash_before_command": true,
+      "full_source_frozen_hash_after_command": false,
+      "post_command_guard_scope": "All tracked file-set/stat6, all frozen metadata, HEAD/parent/index/clean and actual executable SHA",
+      "stop_reason": null,
+      "cleanup": [
+        {
+          "action": "leader exited unreaped; no other owned group members",
+          "members": [
+            {
+              "pid": 39742,
+              "state": "Z"
+            }
+          ]
+        }
+      ],
+      "minimum_free_bytes": 5547978752,
+      "exit": 0,
+      "error": null,
+      "group_closed": true,
+      "unresolved_owned_pids": [],
+      "elapsed_s": 0.5976525870210025,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "metadata",
+      "receipt_sha256": "f8b700e3d458a74fc5a8530200aeb6c12399a15705dbc787e64b02c7343480ec",
+      "argv": [
+        "/Users/autonomous/.cargo/bin/cargo",
+        "+1.96.0",
+        "metadata",
+        "--offline",
+        "--locked",
+        "--format-version",
+        "1"
+      ],
+      "timeout_s": 3600,
+      "available_bytes_before_launch": 5736771584,
+      "reserve_bytes": 2214592512,
+      "source_guard_scope": "All tracked file-set/stat6 and frozen metadata; HEAD/index/clean; actual executable SHA",
+      "source_stat_attributes": [
+        "bytes",
+        "mode",
+        "mtime_ns",
+        "device",
+        "inode",
+        "kind"
+      ],
+      "frozen_stat_attributes": [
+        "bytes",
+        "mode",
+        "mtime_ns",
+        "device",
+        "inode"
+      ],
+      "full_source_frozen_hash_before_command": false,
+      "full_source_frozen_hash_after_command": false,
+      "post_command_guard_scope": "All tracked file-set/stat6, all frozen metadata, HEAD/parent/index/clean and actual executable SHA",
+      "stop_reason": null,
+      "cleanup": [
+        {
+          "action": "leader exited unreaped; no other owned group members",
+          "members": [
+            {
+              "pid": 19359,
+              "state": "Z"
+            }
+          ]
+        }
+      ],
+      "minimum_free_bytes": 5736738816,
+      "exit": 0,
+      "error": null,
+      "group_closed": true,
+      "unresolved_owned_pids": [],
+      "elapsed_s": 0.895214741001837,
+      "stdout_sha256": "2a523fb3426bd4b0d5e15bde66a3ff74a4b79d082c1af04f52368202ea194365",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "module-runtime",
+      "receipt_sha256": "bbd7f6344639f810ba4b02fcaed04e3cd2bb0caefab849f2a3afbd9dbd46d79f",
+      "argv": [
+        "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/lampOS/target/ready-008-gates-20261026/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+        "session_reader::tests::",
+        "--test-threads=1"
+      ],
+      "timeout_s": 120,
+      "available_bytes_before_launch": 5538308096,
+      "reserve_bytes": 2214592512,
+      "source_guard_scope": "Full tracked source/frozen SHA before direct consumption",
+      "source_stat_attributes": [
+        "bytes",
+        "mode",
+        "mtime_ns",
+        "device",
+        "inode",
+        "kind"
+      ],
+      "frozen_stat_attributes": [
+        "bytes",
+        "mode",
+        "mtime_ns",
+        "device",
+        "inode"
+      ],
+      "full_source_frozen_hash_before_command": true,
+      "full_source_frozen_hash_after_command": false,
+      "post_command_guard_scope": "All tracked file-set/stat6, all frozen metadata, HEAD/parent/index/clean and actual executable SHA",
+      "stop_reason": null,
+      "cleanup": [
+        {
+          "action": "leader exited unreaped; no other owned group members",
+          "members": [
+            {
+              "pid": 40028,
+              "state": "Z"
+            }
+          ]
+        }
+      ],
+      "minimum_free_bytes": 5538254848,
+      "exit": 0,
+      "error": null,
+      "group_closed": true,
+      "unresolved_owned_pids": [],
+      "elapsed_s": 0.6058649769984186,
+      "stdout_sha256": "603d33680ba8af0a51240e3bc392e0f74616bbd87193e2c42c545d3e85925946",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "strict",
+      "receipt_sha256": "66826277a6f9d0a1883e2abff1e2a1e9112214795675f16e50874c5413cc5aae",
+      "argv": [
+        "/Users/autonomous/.cargo/bin/cargo",
+        "+1.96.0",
+        "clippy",
+        "--offline",
+        "--locked",
+        "--all-targets",
+        "--jobs",
+        "1",
+        "--message-format=json",
+        "-p",
+        "lamp-body",
+        "-p",
+        "lamp-cloud",
+        "-p",
+        "lamp-expression",
+        "-p",
+        "lamp-keeper",
+        "-p",
+        "lamp-lean",
+        "-p",
+        "lamp-memory",
+        "-p",
+        "lamp-peek",
+        "-p",
+        "lamp-setup",
+        "-p",
+        "lamp-skills",
+        "-p",
+        "lamp-update",
+        "-p",
+        "lamp-voice",
+        "-p",
+        "lamp-voice-eval",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "timeout_s": 3600,
+      "available_bytes_before_launch": 5734068224,
+      "reserve_bytes": 2214592512,
+      "source_guard_scope": "All tracked file-set/stat6 and frozen metadata; HEAD/index/clean; actual executable SHA",
+      "source_stat_attributes": [
+        "bytes",
+        "mode",
+        "mtime_ns",
+        "device",
+        "inode",
+        "kind"
+      ],
+      "frozen_stat_attributes": [
+        "bytes",
+        "mode",
+        "mtime_ns",
+        "device",
+        "inode"
+      ],
+      "full_source_frozen_hash_before_command": false,
+      "full_source_frozen_hash_after_command": false,
+      "post_command_guard_scope": "All tracked file-set/stat6, all frozen metadata, HEAD/parent/index/clean and actual executable SHA",
+      "stop_reason": null,
+      "cleanup": [
+        {
+          "action": "leader exited unreaped; no other owned group members",
+          "members": [
+            {
+              "pid": 19459,
+              "state": "Z"
+            }
+          ]
+        }
+      ],
+      "minimum_free_bytes": 5701840896,
+      "exit": 0,
+      "error": null,
+      "group_closed": true,
+      "unresolved_owned_pids": [],
+      "elapsed_s": 151.29584250799962,
+      "stdout_sha256": "fa5dd58e215a93410b3367dcd1bf634ef933f6e8601fb7eeada6d572382442a2",
+      "stderr_sha256": "2623af0b6b831b628c67222faf6ff0a9bea571bdc5121429531a6df3a33bebaa"
+    },
+    {
+      "label": "workspace",
+      "receipt_sha256": "a5580aa7cf8112384d74b6f2d2ba9aa853e02a4a798d3e17c4263f89ad4f303c",
+      "argv": [
+        "/Users/autonomous/.cargo/bin/cargo",
+        "+1.96.0",
+        "build",
+        "--offline",
+        "--locked",
+        "--workspace",
+        "--jobs",
+        "1",
+        "--message-format=json"
+      ],
+      "timeout_s": 3600,
+      "available_bytes_before_launch": 5702209536,
+      "reserve_bytes": 2214592512,
+      "source_guard_scope": "All tracked file-set/stat6 and frozen metadata; HEAD/index/clean; actual executable SHA",
+      "source_stat_attributes": [
+        "bytes",
+        "mode",
+        "mtime_ns",
+        "device",
+        "inode",
+        "kind"
+      ],
+      "frozen_stat_attributes": [
+        "bytes",
+        "mode",
+        "mtime_ns",
+        "device",
+        "inode"
+      ],
+      "full_source_frozen_hash_before_command": false,
+      "full_source_frozen_hash_after_command": false,
+      "post_command_guard_scope": "All tracked file-set/stat6, all frozen metadata, HEAD/parent/index/clean and actual executable SHA",
+      "stop_reason": null,
+      "cleanup": [
+        {
+          "action": "leader exited unreaped; no other owned group members",
+          "members": [
+            {
+              "pid": 28489,
+              "state": "Z"
+            }
+          ]
+        }
+      ],
+      "minimum_free_bytes": 5538840576,
+      "exit": 0,
+      "error": null,
+      "group_closed": true,
+      "unresolved_owned_pids": [],
+      "elapsed_s": 85.82484785202541,
+      "stdout_sha256": "438b1ec33bd21b346b5fae1a67770f1fcfa255d7620e59eff28e4f86357bd6a1",
+      "stderr_sha256": "aa31f592638bb947c2e13e2a3e8c70fc717cc66720dd0d06145f95a70f88f2f6"
+    }
+  ],
+  "historical_scope": "Original7cafe/008 Mac and original ARM64dc47[978,7cafe] receipts retain those sources. Readyeb/bdc338/2 remains FAIL; completed unmodifiedbdc runtime28/0 is an integrity/cache handoff only and no waiver or cause finding.",
+  "integrity_only_parent_handoff": {
+    "Ready_head": "eb617a785c3bb56752432dfc1482fd69d111dd4a",
+    "handoff_base": "bdc277e2667e11ab04daf60e25f8f9fcf8220dce",
+    "Ready_status": "FAIL",
+    "Ready_counts": {
+      "passed": 338,
+      "failed": 2,
+      "ignored": 0
+    },
+    "baseline_control_status": "CONTROL_COMPLETE",
+    "baseline_control_counts": {
+      "passed": 28,
+      "failed": 0,
+      "ignored": 0
+    },
+    "candidate_restored": true,
+    "parent_test_result_reused": false,
+    "failed_result_waived": false,
+    "initial_union_sealed_count": 226,
+    "receipt_sha256": {
+      "Ready_terminal": "5d18af9764793ce2f18ba21e553ff521da1a05c11affe7584cdbdf32731678db",
+      "Ready_census": "f6dde3a8665eacbf432c3fe46563b3557a61e8d54521fa262000623fa93ef3e1",
+      "baseline_control_terminal": "150c47742e6e2b6641e1b55bdccf30470c433b2fed4f18c97cfb4be89047318f",
+      "restored_Ready_source": "dfcadaa114f3a2e329faba0c1cde718353b9bebc60c80619afb8c0237dd8b3b3"
+    }
+  },
+  "retained_disabled_zero_work_launches": {
+    "Sentinel": {
+      "controller_exit": 0,
+      "no_compiler_or_runtime_started": true,
+      "qualification_credit": false,
+      "receipt_sha256": {
+        "disposition.json": "8a961bbc12879210accb61ed44cebd8ed4bbb85fa9996ea07b320831336b6024",
+        "native-controller-result.json": "3c6198b007e43acadebf99a27bfb35d2c3d4784d62917003312fa92de97412ff",
+        "native-controller.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "native-controller.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "Carrier": {
+      "controller_exit": 0,
+      "no_compiler_or_runtime_started": true,
+      "qualification_credit": false,
+      "receipt_sha256": {
+        "disposition.json": "8a961bbc12879210accb61ed44cebd8ed4bbb85fa9996ea07b320831336b6024",
+        "native-controller-result.json": "aa9122195696b66cb8859e025de698eda253286b12f82f3fcd309b2cb8c01b48",
+        "native-controller.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "native-controller.stdout": "78fcd516f8eb95d4bb0c2352b6e43084edae0fcb95e413ed7a39d97969e915a1"
+      }
+    }
+  },
+  "current_native_CI": {
+    "scope": "Separate audit; no current GitHub native result credited here",
+    "offered_head": "59a2f5f0045647714dc4d9704ffcdc3b0df43980",
+    "original_ARM64_run": 40427034839,
+    "original_Linux_Clippy_run": 40427035003
+  },
+  "private_receipts": {
+    "directory": "recovery/evidence/sentinel-4bff-after-807-gates",
+    "files": {
+      "Voice-compiler-artifacts.json": {
+        "sha256": "41498afdf3cde52e235d91b4f4bd9b5e54f3bb146bf5ee52a571ea781f8cc21e",
+        "bytes": 345642
+      },
+      "actual-executable.json": {
+        "sha256": "b4da03e3ad39d557fd568d672940e9b35a96d6b6d79edc5a9f4a870013d8afc3",
+        "bytes": 1355
+      },
+      "affected.json": {
+        "sha256": "1756318d25277c7154ef6bee532076cba0aba8847115fed3d1580d5fce8f4512",
+        "bytes": 281
+      },
+      "canonical-before-alias.json": {
+        "sha256": "5781991cbfd4cac42c852759df72dff05f088af9a0e85f79a19f4000d96dbea1",
+        "bytes": 2405760
+      },
+      "compile-Voice-lib-local-bindings.json": {
+        "sha256": "33bcc26622bac43690b7ee2f829358d33e051e645f8063b39e4e82e4c691bfb3",
+        "bytes": 250750
+      },
+      "compile-Voice-lib-result.json": {
+        "sha256": "415e31ed0d19c085d5d292ff95811860929924dcb52a9d66685dffa74ef10dc6",
+        "bytes": 1444
+      },
+      "compile-Voice-lib-started.json": {
+        "sha256": "f86910f46201ea25bcb16c72f5969ef309f2683b1aff81ec5ce593172a008d60",
+        "bytes": 411
+      },
+      "compile-Voice-lib.stderr": {
+        "sha256": "03216f68c85f5e31b45ddfddbc9ea77f6898a26f3d1d9910b291bef768227693",
+        "bytes": 161
+      },
+      "compile-Voice-lib.stdout": {
+        "sha256": "82747f3751da349719b9d846bcca9cf10292d234874eb4f8d831b11a40b81e05",
+        "bytes": 287816
+      },
+      "environment-hashes.json": {
+        "sha256": "9af8b4814ccbe9d6f8f3f141fc1c21afe94817b19879a3ef62d7718cbd6c93f2",
+        "bytes": 5290
+      },
+      "fmt-result.json": {
+        "sha256": "28cf7d863e1aa934a1e330bf67da60a05ce613aada6b48620c075e6bac6fb50e",
+        "bytes": 1329
+      },
+      "fmt-started.json": {
+        "sha256": "d8afb9cb49b63dea7b5531ba3e7d89edcd40b563c367983803802257d341b676",
+        "bytes": 296
+      },
+      "fmt.stderr": {
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0
+      },
+      "fmt.stdout": {
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0
+      },
+      "inventory-all-result.json": {
+        "sha256": "3bb1dda9873f1ac844683679212033f1f4a7cf6278d3636d634621d182144f47",
+        "bytes": 1391
+      },
+      "inventory-all-started.json": {
+        "sha256": "5fe0c4751d9abd90705d31ea632f9fa3a38bbc34824f46db6bdc79075fd56f1e",
+        "bytes": 360
+      },
+      "inventory-all.stderr": {
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0
+      },
+      "inventory-all.stdout": {
+        "sha256": "6889ee596302435a835e12e63b22f6e0aa0c1384961038f971f4ce29f239e75f",
+        "bytes": 356950
+      },
+      "inventory-ignored-result.json": {
+        "sha256": "5e8b9adbb7e662ea57bcfab2fdd38ab04b4b85aba39abe5f2f153a744ce2c1e9",
+        "bytes": 1408
+      },
+      "inventory-ignored-started.json": {
+        "sha256": "225cb80d7c9e3168100ac08d3c21f8a5cc6f8e60c1778323874161077e5c600c",
+        "bytes": 377
+      },
+      "inventory-ignored.stderr": {
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0
+      },
+      "inventory-ignored.stdout": {
+        "sha256": "5460a54eff06379661a554db4840fe29e11c241e26db2b69cb181abaff998dcf",
+        "bytes": 1015
+      },
+      "inventory-module-result.json": {
+        "sha256": "f8e925232de99f6de81d3e4c3a26a7838d4fade82bc07924c2413a3fc76b8d81",
+        "bytes": 1423
+      },
+      "inventory-module-started.json": {
+        "sha256": "b1db73a5c494b18bc990be4b68218268d3b4cd3e9d84224a17e0d3ede1282ec7",
+        "bytes": 391
+      },
+      "inventory-module.stderr": {
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0
+      },
+      "inventory-module.stdout": {
+        "sha256": "b0df7fff9caa0edf6d6754caeb7f3e43fec5112fadf0bd5d7a0499803ee65e0c",
+        "bytes": 351
+      },
+      "inventory-module_ignored-result.json": {
+        "sha256": "67e0fa9532a851a881bd3d8b404be9c7a48d746f13ed6875d83ddd24c307038f",
+        "bytes": 1440
+      },
+      "inventory-module_ignored-started.json": {
+        "sha256": "5464cc33c31a58b9a35993c2b30c4caf13c2a0d0c4b535e899145969f2cb3b01",
+        "bytes": 408
+      },
+      "inventory-module_ignored.stderr": {
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0
+      },
+      "inventory-module_ignored.stdout": {
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0
+      },
+      "inventory.json": {
+        "sha256": "fc66bf9dd2360dda279d700b5c3effbee850c48f4b3e6a552ea25c8ea6e4518c",
+        "bytes": 362246
+      },
+      "launch-template.json": {
+        "sha256": "ebefe75824f7a9b72847adc7165736faa2357de6489e57e4e1982fefcb39389a",
+        "bytes": 275
+      },
+      "launch.json": {
+        "sha256": "5b1b00211f75411796e26a7e3ab92504f3d9ebdd3b38a516be0e100861663628",
+        "bytes": 642
+      },
+      "metadata-result.json": {
+        "sha256": "f8b700e3d458a74fc5a8530200aeb6c12399a15705dbc787e64b02c7343480ec",
+        "bytes": 1371
+      },
+      "metadata-started.json": {
+        "sha256": "92d88edabe16b122de7ee1b4c11761766284d0c04cf31032b0d9cc6c605ff637",
+        "bytes": 339
+      },
+      "metadata.stderr": {
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0
+      },
+      "metadata.stdout": {
+        "sha256": "2a523fb3426bd4b0d5e15bde66a3ff74a4b79d082c1af04f52368202ea194365",
+        "bytes": 2304546
+      },
+      "minimal-controller.diff": {
+        "sha256": "e135c794348a78426a5786496c44364ae77c42e38d3911d7935b232086eb28db",
+        "bytes": 16705
+      },
+      "module-runtime-result.json": {
+        "sha256": "bbd7f6344639f810ba4b02fcaed04e3cd2bb0caefab849f2a3afbd9dbd46d79f",
+        "bytes": 1405
+      },
+      "module-runtime-started.json": {
+        "sha256": "e977ae3b70b44c3eaf3f609c56d71f0918bcfd7701d6c16f807d9135a1bc71fd",
+        "bytes": 373
+      },
+      "module-runtime.stderr": {
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0
+      },
+      "module-runtime.stdout": {
+        "sha256": "603d33680ba8af0a51240e3bc392e0f74616bbd87193e2c42c545d3e85925946",
+        "bytes": 491
+      },
+      "native-controller-result.json": {
+        "sha256": "d8e8d61c15d3cd4b696f4b0bd797bcbe9cc96324e9a9aa586c87fe6ee96510bb",
+        "bytes": 754
+      },
+      "native-controller.stderr": {
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0
+      },
+      "native-controller.stdout": {
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0
+      },
+      "native-wrapper.py": {
+        "sha256": "82ddbc6df90e59ddca1fb1b67eb933cfe21000b76ce5604846d5ab83629bd69c",
+        "bytes": 2739
+      },
+      "new-frozen.json": {
+        "sha256": "f4cbd8a3940ed2aaa2e377b3c18b5acda4cf0f61e96d8c9e9f932923c3b631f8",
+        "bytes": 394
+      },
+      "observed-census.json": {
+        "sha256": "432758d0ed95e9e05f754d1dbf86bcc7db0fc1b159acc0d18d4a2b16c0b8da74",
+        "bytes": 858
+      },
+      "official-source-final.json": {
+        "sha256": "2a3cc00926e06a8410ae28b4ec5a630c672cc40e81bb10ab5d046bdac867bdb6",
+        "bytes": 2405963
+      },
+      "official-source-initial.json": {
+        "sha256": "2a3cc00926e06a8410ae28b4ec5a630c672cc40e81bb10ab5d046bdac867bdb6",
+        "bytes": 2405963
+      },
+      "parent-source-transition.json": {
+        "sha256": "d27918b91a88547336dabb5976102e1838591ef73069469789806f3fb67f5b47",
+        "bytes": 519
+      },
+      "plan.json": {
+        "sha256": "c2b2a4f73c984fb1786d176beb65ca6648a2cc99d8a17ccd4674acabcd624685",
+        "bytes": 16805
+      },
+      "plan.json.before-root-allocation": {
+        "sha256": "edec4d56529532251d2a711f4b076c11edf1a1de9e8faf95b42215cd957ac26f",
+        "bytes": 16596
+      },
+      "preparation-review.json": {
+        "sha256": "67f2d92216d94e247e0f7a806f5802a403a125f5883f912a74f4ba265454826f",
+        "bytes": 3653
+      },
+      "prepared-source-original-ownWT.json": {
+        "sha256": "2a3cc00926e06a8410ae28b4ec5a630c672cc40e81bb10ab5d046bdac867bdb6",
+        "bytes": 2405963
+      },
+      "prepared-source.json": {
+        "sha256": "4ff6406d6269dada4d099f16db86ddc36d58bf07e1142536d2443c5113c5b333",
+        "bytes": 2405955
+      },
+      "prepared-source.json.before-root-allocation": {
+        "sha256": "2a3cc00926e06a8410ae28b4ec5a630c672cc40e81bb10ab5d046bdac867bdb6",
+        "bytes": 2405963
+      },
+      "protected-after.json": {
+        "sha256": "0ac8a8ebd054f54886e53a4ff6137903b94c2cc75482516186731ceca9b712f6",
+        "bytes": 100014
+      },
+      "protected-before.json": {
+        "sha256": "a01fd12b93b5fff5f61db227b938724109fccf5aa4dd127ce99dd72a424da8e4",
+        "bytes": 99623
+      },
+      "protected-handoff.json": {
+        "sha256": "a01fd12b93b5fff5f61db227b938724109fccf5aa4dd127ce99dd72a424da8e4",
+        "bytes": 99623
+      },
+      "released-parent-mutable-actual.json": {
+        "sha256": "251dfa1ac9296a093254d7b734792dc7ce71512391eee45e17fbecb9288053a0",
+        "bytes": 576
+      },
+      "run.py": {
+        "sha256": "73d8055f08c3e25a0162185bb152fd2d274848382bc587a793d1468bd6219f3b",
+        "bytes": 20522
+      },
+      "source-after.json": {
+        "sha256": "4ff6406d6269dada4d099f16db86ddc36d58bf07e1142536d2443c5113c5b333",
+        "bytes": 2405955
+      },
+      "source-before.json": {
+        "sha256": "4ff6406d6269dada4d099f16db86ddc36d58bf07e1142536d2443c5113c5b333",
+        "bytes": 2405955
+      },
+      "source-physical-after.json": {
+        "sha256": "b96df78f87bdd68d762da19993a5d2aa04786e16b5f90d26a099bfbbb3c6808b",
+        "bytes": 2309668
+      },
+      "source-physical-before.json": {
+        "sha256": "b96df78f87bdd68d762da19993a5d2aa04786e16b5f90d26a099bfbbb3c6808b",
+        "bytes": 2309668
+      },
+      "strict-all-artifacts.json": {
+        "sha256": "a0e14e18bc52ceb5f3ba2031de3e3a19848193f8dafce12bb308de47b0ff2525",
+        "bytes": 480676
+      },
+      "strict-local-bindings.json": {
+        "sha256": "75d1b6d7c92d2092ada34b22e953a98267d012b7ec61a7055ac979d4fc52db1c",
+        "bytes": 2824016
+      },
+      "strict-result.json": {
+        "sha256": "66826277a6f9d0a1883e2abff1e2a1e9112214795675f16e50874c5413cc5aae",
+        "bytes": 1793
+      },
+      "strict-started.json": {
+        "sha256": "3a56a4ec82e158f4732c97d99f69452407a80d01175f765ee5ab4c37c7c161e6",
+        "bytes": 760
+      },
+      "strict.stderr": {
+        "sha256": "2623af0b6b831b628c67222faf6ff0a9bea571bdc5121429531a6df3a33bebaa",
+        "bytes": 671
+      },
+      "strict.stdout": {
+        "sha256": "fa5dd58e215a93410b3367dcd1bf634ef933f6e8601fb7eeada6d572382442a2",
+        "bytes": 388070
+      },
+      "terminal.json": {
+        "sha256": "3d76cb3d882638e67432f7c387b0d1cf03b74a501ba30b6185df0c657f3c00e4",
+        "bytes": 2351
+      },
+      "workspace-artifacts.json": {
+        "sha256": "5569abc8dc83d566b6d633ce2358ef65d34d4decb97ff57c6ccda977d906150d",
+        "bytes": 508811
+      },
+      "workspace-local-bindings.json": {
+        "sha256": "ed4a1471c7fa3f2d8800f34779c4d3918c6a5c51b4f67fe7820b538c312b9fc7",
+        "bytes": 927618
+      },
+      "workspace-result.json": {
+        "sha256": "a5580aa7cf8112384d74b6f2d2ba9aa853e02a4a798d3e17c4263f89ad4f303c",
+        "bytes": 1406
+      },
+      "workspace-started.json": {
+        "sha256": "7b72620a9ded615ac2210a420f9962a133dfe428661c7ea4e861582f30c604ae",
+        "bytes": 374
+      },
+      "workspace.stderr": {
+        "sha256": "aa31f592638bb947c2e13e2a3e8c70fc717cc66720dd0d06145f95a70f88f2f6",
+        "bytes": 570
+      },
+      "workspace.stdout": {
+        "sha256": "438b1ec33bd21b346b5fae1a67770f1fcfa255d7620e59eff28e4f86357bd6a1",
+        "bytes": 419846
+      }
+    }
+  },
+  "publication": {
+    "exact_files": [
+      "README.md",
+      "audit.json"
+    ],
+    "binaries_or_full_raw_logs_exported": false,
+    "preparation_source_target_compiler_runtime_access": false,
+    "commit_push_ref_or_GitHub_write_by_preparer": false
+  }
+}
