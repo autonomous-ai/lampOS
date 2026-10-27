@@ -2131,3 +2131,17 @@ policy inputs without copying its rules. Reuse the ordinary reader unchanged;
 a strict regular-file observer cannot silently replace compatible read-only
 links or masks. Test replay is not a collector, filesystem transaction,
 authentication or restoration. See [the boundary](head-touch-inputs.md).
+
+## Capture the same head-pair inputs through bounded descriptors (#3689)
+
+Reuse that `HeadInputs` seam and its literal policy, with the pinned Rustix
+`openat`/`statat`/bounded `readlinkat_raw`/directory APIs already maintained in
+Records, Setup and Update. Reuse the strict observer's same-descriptor identity
+and cap-plus-one read pattern, but do not substitute its links/null/hardlink
+refusal for compatible head reads. A separate collector resolves bounded links,
+captures typed absence/null/regular facts and all directory names, and compares
+them again before returning closed replay. A future caller can explicitly
+revalidate that view at its write boundary. No dependency, ordinary-reader
+default, filesystem authority or shared privileged engine is added. The
+256-key and 16,384-work bounds are conservative collector-only limits, not
+measured deployment coverage. See [capture and its limits](head-touch-capture.md).
