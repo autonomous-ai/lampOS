@@ -572,3 +572,59 @@ async fn a_body_lease_holds_the_body_and_the_bodys_end_is_told() {
     );
     assert_eq!(lines.next_line().await.unwrap(), None);
 }
+
+/// Sixth's and Fourteen's P3s on #3900: a body that restarts (its end of the
+/// socket closes with nothing said) is held again at the next check, not at
+/// the next renewal 10 s on; and a hold the body refuses ends the computer's
+/// `body` lease, as `released`, so it never thinks the lamp stands back
+/// when it doesn't.
+#[tokio::test]
+async fn a_restarted_body_is_held_again_at_once_and_a_refused_hold_is_told() {
+    use tokio::io::{AsyncBufReadExt as _, AsyncWriteExt as _};
+    let lamp = lamp("body-lease-again").await;
+    let path = lamp.dir.join("lease.sock");
+    let body = tokio::net::UnixListener::bind(&path).unwrap();
+    tokio::spawn(lamp_control::body_lease::hold(
+        path.clone(),
+        lamp.shared.clone(),
+    ));
+    let mut socket = paired(&lamp, json!(["body"]), 12).await;
+    let take = send(
+        &mut socket,
+        json!({"id": 3, "op": "lease.take", "parts": ["body"], "for_ms": 30000}),
+    )
+    .await;
+    assert_eq!(take["lease"], "l_1", "{take}");
+    let accept = || async {
+        let (stream, _) = tokio::time::timeout(Duration::from_secs(2), body.accept())
+            .await
+            .expect("the door holds the body")
+            .unwrap();
+        let (read, write) = stream.into_split();
+        let mut lines = tokio::io::BufReader::new(read).lines();
+        assert_eq!(
+            lines.next_line().await.unwrap().unwrap(),
+            r#"{"hold":{"for_ms":30000}}"#
+        );
+        (lines, write)
+    };
+    // The body restarts: its end closes, saying nothing.
+    let first = accept().await;
+    let restarted = std::time::Instant::now();
+    drop(first);
+    let (_lines, mut write) = accept().await;
+    assert!(
+        restarted.elapsed() < Duration::from_secs(2),
+        "held again in {:?}, not at the next renewal",
+        restarted.elapsed()
+    );
+    // The new connection's hold is refused: the computer is told.
+    write
+        .write_all(b"{\"lease\":\"refused\",\"why\":\"one of hold or let_go\"}\n")
+        .await
+        .unwrap();
+    assert_eq!(
+        next(&mut socket).await,
+        json!({"ev": "lease", "lease": "l_1", "state": "lost", "why": "released"})
+    );
+}
