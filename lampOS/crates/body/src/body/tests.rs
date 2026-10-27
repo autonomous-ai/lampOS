@@ -6889,11 +6889,13 @@ fn arm_never_jumps(lamp: &Lamp, report: &BodyReport, most: u16) {
 /// `WatchdogSec=5` hears from the body each step, not 22 s later), the
 /// lamp counts as folded (it said `stand 1.00` and never stood again), the
 /// head is brought to its folded home, and the next time it is spoken to
-/// it stands by the ordinary way up. Under overload and by a hand alike.
+/// it stands by the ordinary way up. Under overload only: a hand never
+/// lets go of the arm (#3702).
 #[test]
 fn let_go_standing_with_the_elbow_fallen_it_is_folded_and_stands_again_when_spoken_to() {
     let secs = Duration::from_secs_f32;
-    for by_hand in [false, true] {
+    {
+        let by_hand = false;
         let (lamp, report, seen) = let_go_standing(by_hand, true, None);
         assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
         assert_eq!(report.released.len(), 1, "{report:?}");
@@ -6926,73 +6928,24 @@ fn let_go_standing_with_the_elbow_fallen_it_is_folded_and_stands_again_when_spok
     }
 }
 
-/// A hand that stops the shoulder coming down (its load 700 from 15 s to
-/// 17 s, while it is spoken to, the lowering under way from about 8 s): the lamp lets go again
-/// and the arm is never sent anywhere first. Before, the step that let go
-/// again wrote the standing pose, a jump of 520 counts into the hand.
-/// Taken up again, the rest of the way down goes on from where it is.
-#[test]
-fn a_hand_that_stops_the_shoulder_coming_down_lets_go_again_and_the_arm_stays() {
-    let (lamp, report, seen) = let_go_standing(true, true, Some((15.0, 17.0)));
-    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
-    assert_eq!(report.released.len(), 2, "{report:?}");
-    // The second is a slump again, not a hand on a joint that gave way.
-    assert_eq!(report.released_by_hand, [0, 0, 1]);
-    assert_eq!(report.standing_refused, None, "{report:?}");
-    let lowered = report.lowered.clone().unwrap();
-    assert!(lowered.from[0] < 2_600, "{lowered:?}");
-    assert_eq!(lowered.to, vec![2_053]);
-    arm_never_jumps(&lamp, &report, 2);
-    stood_when_spoken_to(&seen);
-}
-
-/// The hand that slumped the lamp still on it at the take-up, turning the
-/// base from 1.5 s to 20 s toward 3,500: the base held while the shoulder
-/// comes down drifts, and that is a hand too. It lets go again, the run
-/// goes on, and the arm never jumps. Before, the drift ended the run at
-/// about 8 s and let the whole lamp go.
-#[test]
-fn a_hand_that_turns_the_base_while_the_shoulder_comes_down_lets_go_again() {
-    let (lamp, report, _) = let_go_standing_turned(true, true, None, (20.0, 3_500.0), |_| {});
-    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
-    assert!(report.released.len() >= 2, "{report:?}");
-    arm_never_jumps(&lamp, &report, 2);
-}
-
-/// A hand that presses the held base without moving it while the shoulder
-/// comes down (a load of 400 from 10 s to 18 s, the lowering under way from
-/// about 7.5 s): the base is judged as the run judges it, so the lamp lets
-/// go again instead of holding against the hand for the whole lowering.
-#[test]
-fn a_hand_that_presses_the_base_while_the_shoulder_comes_down_lets_go_again() {
-    let (lamp, report, _) = let_go_standing_turned(true, true, None, (3.0, 2_065.0), |lamp| {
-        let secs = Duration::from_secs_f32;
-        lamp.strains.push((secs(10.0), secs(18.0), YAW, 400));
-    });
-    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
-    assert!(report.released.len() >= 2, "{report:?}");
-    let second = report.released[1].seconds;
-    assert!((10.0..12.0).contains(&second), "{second}");
-    arm_never_jumps(&lamp, &report, 2);
-}
-
 /// One reading off, under `READ_JUMP`, of the held base, the head's pitch or
-/// the elbow while the shoulder comes down (at 12 s): not a hand. Nothing
+/// the elbow while the shoulder comes down after an overload (at 127 s, the
+/// lowering under way from about 123 s): not a hand. Nothing
 /// happens: no second let-go, the run goes on, and no hold asks for it.
 #[test]
 fn one_reading_off_while_the_shoulder_comes_down_is_not_a_hand() {
     fn base(lamp: &mut Lamp) {
-        lamp.misreads = vec![(Duration::from_secs(12), YAW, 2_135, 1)];
+        lamp.misreads = vec![(Duration::from_secs(127), YAW, 2_135, 1)];
     }
     fn pitch(lamp: &mut Lamp) {
-        lamp.misreads = vec![(Duration::from_secs(12), PITCH, 1_872, 1)];
+        lamp.misreads = vec![(Duration::from_secs(127), PITCH, 1_872, 1)];
     }
     fn elbow(lamp: &mut Lamp) {
-        lamp.misreads = vec![(Duration::from_secs(12), 2, 2_200, 1)];
+        lamp.misreads = vec![(Duration::from_secs(127), 2, 2_200, 1)];
     }
     for misread in [base as fn(&mut Lamp), pitch, elbow] {
         let (lamp, report, seen) =
-            let_go_standing_turned(true, true, None, (3.0, 2_065.0), misread);
+            let_go_standing_turned(false, true, None, (3.0, 2_065.0), misread);
         assert!(lamp.misreads.iter().all(|misread| misread.3 == 0));
         assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
         assert_eq!(report.released.len(), 1, "{report:?}");
@@ -7004,42 +6957,43 @@ fn one_reading_off_while_the_shoulder_comes_down_is_not_a_hand() {
 
 /// The held joints' loads while the shoulder comes down are in the run's
 /// peaks (the reviewer on #1115): a press of 200 on the head's pitch from
-/// 10 s to 18 s, under its bound of 240 so nothing lets go, while only the
+/// 125 s to 133 s, after an overload, under its bound of 240 so nothing lets go, while only the
 /// lowering reads it (it reads about 25 otherwise), shows as its
 /// `peak_load`.
 #[test]
 fn a_press_on_a_held_joint_while_the_shoulder_comes_down_is_in_the_peaks() {
-    let (_, report, _) = let_go_standing_turned(true, true, None, (3.0, 2_065.0), |lamp| {
+    let (_, report, _) = let_go_standing_turned(false, true, None, (3.0, 2_065.0), |lamp| {
         let secs = Duration::from_secs_f32;
-        lamp.strains.push((secs(10.0), secs(18.0), PITCH, 200));
+        lamp.strains.push((secs(125.0), secs(133.0), PITCH, 200));
     });
     assert_eq!(report.released.len(), 1, "{report:?}");
     assert_eq!(report.peak_load[0], 200, "{:?}", report.peak_load);
 }
 
 /// The reviewer's 16:10 probe (#1115): a press on the base stops the
-/// lowering (a load of 400 from 10 s) while the elbow or the head's pitch
-/// reads off (2,200 or 1,872, five reads from 10.06 s). The hold writes
+/// lowering after an overload (a load of 400 from 125 s), which ends the
+/// run, while the elbow or the head's pitch reads off (2,200 or 1,872, five
+/// reads from 125.06 s). The hold writes
 /// where the joint was found, never the misread: no goal written asks for
 /// it. Without `now[index].position = was.position` it writes it once.
 #[test]
 fn a_press_that_stops_the_lowering_while_a_joint_reads_off_never_holds_the_misread() {
     fn elbow(lamp: &mut Lamp) {
         let secs = Duration::from_secs_f32;
-        lamp.strains.push((secs(10.0), secs(18.0), YAW, 400));
-        lamp.misreads = vec![(secs(10.06), 2, 2_200, 5)];
+        lamp.strains.push((secs(125.0), secs(133.0), YAW, 400));
+        lamp.misreads = vec![(secs(125.06), 2, 2_200, 5)];
     }
     fn pitch(lamp: &mut Lamp) {
         let secs = Duration::from_secs_f32;
-        lamp.strains.push((secs(10.0), secs(18.0), YAW, 400));
-        lamp.misreads = vec![(secs(10.06), PITCH, 1_872, 5)];
+        lamp.strains.push((secs(125.0), secs(133.0), YAW, 400));
+        lamp.misreads = vec![(secs(125.06), PITCH, 1_872, 5)];
     }
     for (misread, joint, reading) in [
         (elbow as fn(&mut Lamp), Joint::ElbowPitch, 2_200),
         (pitch, Joint::WristPitch, 1_872),
     ] {
-        let (lamp, report, _) = let_go_standing_turned(true, true, None, (3.0, 2_065.0), misread);
-        assert!(report.released.len() >= 2, "{joint}: {report:?}");
+        let (lamp, report, _) = let_go_standing_turned(false, true, None, (3.0, 2_065.0), misread);
+        assert!(report.held_at.is_some(), "{joint}: {report:?}");
         let asked = lamp
             .goals
             .iter()
@@ -7091,6 +7045,39 @@ fn let_go_standing_with_the_arm_still_up_nothing_is_lowered_and_it_stands_from_t
     assert!(taken.into_iter().all(|(_, g)| g.stand > 0.9), "{report:?}");
     arm_never_jumps(&lamp, &report, 2);
     stood_when_spoken_to(&seen);
+}
+
+/// #3702: a standing lamp under `--limp on` that a hand trips lets go of
+/// the head and the base only. Torque off is written to head pitch, head
+/// roll and base yaw, never to the shoulder or the elbow, and the lamp
+/// stays standing: no step while it is let go or after says it folded.
+#[test]
+fn a_hand_lets_go_of_the_head_and_base_only_and_a_standing_lamp_stays_up() {
+    let (lamp, report, seen) = let_go_standing(true, false, None);
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    assert_eq!(report.released_by_hand, [0, 0, 1]);
+    let off: Vec<u8> = lamp
+        .registers
+        .iter()
+        .filter(|(_, address, data)| *address == 40 && data == &vec![0])
+        .map(|(id, _, _)| *id)
+        .collect();
+    assert_eq!(off, COMMANDED.map(|joint| joint.id()), "{off:?}");
+    assert!(
+        lamp.registers
+            .iter()
+            .all(|(id, address, _)| *address != 40 || ARM.iter().all(|j| j.id() != *id)),
+        "an arm joint was written torque"
+    );
+    assert!(report.standing.is_some(), "{report:?}");
+    let tripped = Duration::from_secs_f32(report.released[0].seconds);
+    let after: Vec<&Glimpse> = seen
+        .iter()
+        .filter(|(t, _)| *t >= tripped && *t < Duration::from_secs(190))
+        .map(|(_, g)| g)
+        .collect();
+    assert!(after.iter().any(|g| g.limp));
+    assert!(after.iter().all(|g| g.stand > 0.9), "{report:?}");
 }
 
 /// A shoulder left up by a power cut that does not come down when it is
@@ -7421,9 +7408,10 @@ fn a_call_is_glanced_for_over_a_shift_at_rest() {
 }
 
 /// As V1: a base held by a hand a second after it stopped hands over to
-/// the overload cut-off. Torque off to all five, byte for byte; nothing
-/// written for `HAND_REST` (seconds, not V1's two minutes, which are for
-/// overload); then each joint held where it lies, goal first. Pushed again once it is up, it slumps again and the run goes on:
+/// the overload cut-off, of the head and the base only (#3702): torque off
+/// to those three, byte for byte, never to the shoulder or the elbow;
+/// nothing written for `HAND_REST` (seconds, not V1's two minutes, which
+/// are for overload); then each of the three held where it lies, goal first. Pushed again once it is up, it slumps again and the run goes on:
 /// a hand never ends it. Without the option no torque is ever written and
 /// the same hand ends the run as before.
 #[test]
@@ -7463,37 +7451,43 @@ fn a_base_still_pushed_a_second_after_it_stopped_makes_the_lamp_slump_as_v1() {
     assert_eq!(report.released[0].joint, "base_yaw");
     assert_eq!(report.released_by_hand, [0, 0, 2]);
     // The first: a second after it stopped (about 1.62 s), torque off to
-    // all five in servo order, nothing written for `HAND_REST`, then each
-    // joint taken hold of where it lies, its goal first.
+    // the head and the base, nothing written for `HAND_REST`, then each
+    // taken hold of where it lies, its goal first. The arm is never
+    // written torque, off or on.
     let tripped = secs(report.released[0].seconds);
     assert!((secs(2.5)..secs(2.8)).contains(&tripped), "{tripped:?}");
-    let off: Vec<(u8, u8, Vec<u8>)> = Joint::ALL.iter().map(|j| (j.id(), 40, vec![0])).collect();
+    let off: Vec<(u8, u8, Vec<u8>)> = COMMANDED.iter().map(|j| (j.id(), 40, vec![0])).collect();
     let at = lamp
         .registers
         .iter()
         .position(|(_, address, data)| *address == 40 && data == &vec![0])
         .unwrap();
-    assert_eq!(lamp.registers[at..at + 5], off[..]);
+    assert_eq!(lamp.registers[at..at + 3], off[..]);
+    assert!(
+        lamp.registers
+            .iter()
+            .all(|(id, address, _)| *address != 40 || ARM.iter().all(|j| j.id() != *id))
+    );
     let rest = tripped..tripped + HAND_REST;
     assert!(lamp.goal_times.iter().all(|t| !rest.contains(t)));
     // And no longer: taken hold of within a second of it.
     assert!(
-        lamp.register_times[at + 5..]
+        lamp.register_times[at + 3..]
             .iter()
             .any(|t| *t < tripped + HAND_REST + secs(1.0)),
         "{:?}",
-        &lamp.register_times[at + 5..]
+        &lamp.register_times[at + 3..]
     );
     assert!(
-        lamp.register_times[at + 5..]
+        lamp.register_times[at + 3..]
             .iter()
             .all(|t| !rest.contains(t))
     );
     assert_eq!(
-        lamp.registers[at + 9],
+        lamp.registers[at + 7],
         (1, 42, 2_045u16.to_le_bytes().to_vec())
     );
-    assert_eq!(lamp.registers[at + 10], (1, 40, vec![1]));
+    assert_eq!(lamp.registers[at + 8], (1, 40, vec![1]));
     // The second, from the push once it was up.
     assert!(report.released[1].seconds > 20.0, "{:?}", report.released);
 

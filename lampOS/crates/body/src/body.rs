@@ -14,7 +14,7 @@
 //! - It never touches torque unless told to take hold (`Limits::torque_on`),
 //!   to let go under overload or, with `Limits::limp`, under a hand, or as
 //!   it ends on a surprise or refuses a joint found hot or loaded: then, as
-//!   V1, torque off on all five.
+//!   V1, torque off on all five (under a hand, on the head and base only).
 //!   A joint whose torque is off, or whose status byte is not clear, is a
 //!   reason not to start; told to take hold, it first sets the goal of a
 //!   joint found without torque to where it is and then writes torque on.
@@ -110,10 +110,13 @@ const WAKE_COUNTS: f32 = 20.0;
 /// its load over the lower of the bound that stopped it and its floor, or
 /// held more than `LIMP_LAG` counts (V1's `CONTACT_RELEASE_LAG`, one
 /// degree) from where it stopped, and the lamp lets go as V1's contact
-/// stop handed over to its overload cut-off: torque off on all five, the
-/// lamp slumps, and `HAND_REST` later every joint is held where it lies
-/// and the head and base are brought home slowly, as under `--overload
-/// release`. V1 rested 120 s here too (`retry_s`), but that is for a servo
+/// stop handed over to its overload cut-off, but of the head and base
+/// only: torque off on head pitch, head roll and base yaw, while the
+/// shoulder and the elbow keep their torque and their last goal, so a
+/// standing lamp stays standing (#3702: onboarding asks a person to push
+/// the head, and a lamp whose arm collapsed under that read as broken).
+/// `HAND_REST` later the head and base are held where they lie and
+/// brought home slowly, as under `--overload release`. V1 rested 120 s here too (`retry_s`), but that is for a servo
 /// cooling from overload; a hand is not heat, and a lamp limp for two
 /// minutes after a push reads as broken. A creature pushed hard flops,
 /// then gathers itself within seconds (the first builder, #780). Unlike that, a hand never ends the run: it
@@ -749,7 +752,8 @@ pub struct Limits {
     /// this was chosen, exactly.
     pub give_way: Option<GiveWay>,
     /// With `give_way`, meet a hand as V1 did: one still pushed a second
-    /// after it stopped makes the lamp slump (see `CONTACT_FLOOR`). Off: it
+    /// after it stopped makes the head and base let go, the arm still
+    /// holding (see `CONTACT_FLOOR`). Off: it
     /// gives way again where it is, its torque on.
     pub limp: bool,
     /// Let go under overload as the old runtime did: any joint at 80% of
@@ -2934,17 +2938,20 @@ fn found_up(up: Standing, found: &[Sample; 5]) -> bool {
 }
 
 /// Under `--overload release`: let go. Nothing more is asked of the joints:
-/// torque off (register 40, 0) is written to all five, each acknowledged,
-/// and one that failed is tried again on the next step. For `rest` from
-/// then on it reads all five every step and acts on nothing: moods,
-/// gestures and the eyes are taken and dropped, and no goal is written (a
-/// goal written to one of these servos turns its torque back on). Returns
-/// what the joints read once all five are let go and the rest is over.
+/// torque off (register 40, 0) is written to each of `joints` (all five
+/// after an overload, the head and base only after a hand), each
+/// acknowledged, and one that failed is tried again on the next step. For
+/// `rest` from then on it reads all five every step and acts on nothing:
+/// moods, gestures and the eyes are taken and dropped, and no goal is
+/// written (a goal written to one of these servos turns its torque back
+/// on; a joint not let go keeps its torque and its last goal). Returns
+/// what the joints read once `joints` are let go and the rest is over.
 /// Asked to stop, or a wire that fails for half a second, ends it with
 /// torque off.
 fn let_go<P: PortIo, R: Runtime>(
     bus: &mut Bus<'_, P, R>,
     report: &mut BodyReport,
+    joints: &[Joint],
     rest: Duration,
     (news, asked): (
         &mut impl FnMut() -> Option<(Mood, u8)>,
@@ -2954,7 +2961,7 @@ fn let_go<P: PortIo, R: Runtime>(
     template: Glimpse,
 ) -> Result<[Sample; 5], Stop> {
     let started = bus.runtime.now();
-    let mut holding: Vec<Joint> = Joint::ALL.to_vec();
+    let mut holding: Vec<Joint> = joints.to_vec();
     let (mut ticks, mut misses) = (0u32, 0u8);
     loop {
         ticks += 1;
@@ -6668,12 +6675,16 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                 woke: None,
             });
             left_as_is = true;
-            // Nothing holds the arm up while it is let go.
+            // An overload lets go of all five, and nothing holds the arm up.
+            // A hand lets go of the head and base only (#3702): the arm
+            // keeps its torque and its last goal, so a standing lamp a
+            // person was asked to push does not collapse.
+            let released: &[Joint] = if by_hand { &COMMANDED } else { &Joint::ALL };
             let template = Glimpse {
                 released: report.released.len().try_into().unwrap_or(u16::MAX),
                 limp: true,
                 hand: false,
-                stand: 0.0,
+                stand: if by_hand { stand } else { 0.0 },
                 ..glimpse
             };
             let rest = match (again, by_hand) {
@@ -6689,6 +6700,7 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
             let slumped_at = match let_go(
                 bus,
                 &mut report,
+                released,
                 rest,
                 (&mut news, &mut during_rest),
                 &mut watch,
@@ -6710,10 +6722,11 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                     detail: "let go a second time within ten minutes; torque left off".into(),
                 };
             }
-            // Taken up again: every joint held where it is, as `--torque on`
-            // takes hold, its goal first and then its torque.
+            // Taken up again: every joint let go held where it is, as
+            // `--torque on` takes hold, its goal first and then its torque.
             let all: Vec<Joint> = COMMANDED.into_iter().chain(ARM).collect();
-            let now = match take_hold(bus, &mut report, &all, &slumped_at) {
+            let taken = if by_hand { &COMMANDED[..] } else { &all };
+            let now = match take_hold(bus, &mut report, taken, &slumped_at) {
                 Ok(now) => now,
                 Err(Stop::Refused { why }) => {
                     break Stop::Overload {
@@ -6758,7 +6771,8 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                 bus.sleep_until(due);
                 profiles = bus.arm_profiles();
             }
-            let lowered = match standing {
+            // An arm a hand did not let go has nothing to lower.
+            let lowered = match standing.filter(|_| !by_hand) {
                 Some(up) => match profiles {
                     Ok(profiles) if shoulder_to_lower(up, &now, profiles) => {
                         let head = COMMANDED.map(|joint| now[joint.index()].position);
@@ -6790,44 +6804,24 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                 Err(stop) => {
                     // Stop pushing, the arm included: each goal becomes
                     // where its joint is now.
-                    let mut hold = None;
                     if let Some(last) = report.last {
                         let at = |joint: Joint| last[joint.index()].position;
                         let (head, arm) = (COMMANDED.map(at), ARM.map(at));
                         if bus.send_holds(head, Some(arm)).is_ok() {
                             report.goal_writes += 1;
                             report.held_at = Some(head);
-                            arm_written = arm;
-                            hold = Some(head);
                         }
-                    }
-                    // A hand on it while the shoulder came down: as while
-                    // the head comes up, it lets go again, and nothing new
-                    // is asked of the arm before it does (`slump_again`).
-                    // The head, the base and the elbow are held while it
-                    // comes down, so a hand that moves one of them is a
-                    // drift. Only after a hand's slump: after an overload
-                    // the same stop ends the run.
-                    if let (
-                        true,
-                        Some(at),
-                        Stop::Load { .. } | Stop::Tracking { .. } | Stop::Drift { .. },
-                    ) = (by_hand, hold, &stop)
-                    {
-                        (stand, stand_velocity, slumped) = (0.0, 0.0, true);
-                        written = at;
-                        commanded = at.map(f32::from);
-                        velocity = [0.0; 3];
-                        easing = [EASE_STEPS; 3];
-                        slump_again = Some((joint, load));
-                        continue;
                     }
                     left_as_is = true;
                     break stop;
                 }
             };
-            arm_written = ARM.map(|joint| now[joint.index()].position);
-            if let Some(up) = standing {
+            // An arm a hand did not let go never moved: its goals and the
+            // stand are kept, and it stands on as it did.
+            if !by_hand {
+                arm_written = ARM.map(|joint| now[joint.index()].position);
+            }
+            if let Some(up) = standing.filter(|_| !by_hand) {
                 let (lift, off) = on_the_way(up, arm_written);
                 match (0..2).find(|index| off[*index] > f32::from(Standing::FOUND_SLACK)) {
                     Some(index) => {
