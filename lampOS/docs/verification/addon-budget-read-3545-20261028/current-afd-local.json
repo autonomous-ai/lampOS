@@ -1,0 +1,579 @@
+{
+  "additional_limits": [
+    "One unique committedtest coversbothdropvariants; nottwoindependentcases",
+    "No observermirror/full555/fullcrate/Routine/fmt/clippy/native/device orlatestMainclaim",
+    "NormalSkillschild andintegrationdriver fromsame currentCargo emission; no33productorconveniencealiasadmission",
+    "Originalhistoricalfailedcohorts/author555proof retainownscope; noeventloss/causeorwaiver inferred",
+    "Currenttestwatchdogs/assertions unmodified; localIOfinaldiagnostics dependonouterprocesswatchdog"
+  ],
+  "artifacts": {
+    "integration-driver": {
+      "cargo_emission": {
+        "executable": "<target>/debug/deps/it-aabcadd0c6d2694b",
+        "features": [],
+        "filenames": [
+          "<target>/debug/deps/it-aabcadd0c6d2694b"
+        ],
+        "fresh": false,
+        "manifest_path": "<worktree>/lampOS/crates/skills/Cargo.toml",
+        "package_id": "path+file://<worktree>/lampOS/crates/skills#lamp-skills@0.1.0",
+        "profile": {
+          "debug_assertions": true,
+          "debuginfo": 0,
+          "opt_level": "0",
+          "overflow_checks": true,
+          "test": true
+        },
+        "reason": "compiler-artifact",
+        "target": {
+          "crate_types": [
+            "bin"
+          ],
+          "doc": false,
+          "doctest": false,
+          "edition": "2024",
+          "kind": [
+            "test"
+          ],
+          "name": "it",
+          "src_path": "<worktree>/lampOS/crates/skills/tests/it/main.rs",
+          "test": true
+        }
+      },
+      "retained_copy": "retained-integration-driver",
+      "retained_sha256": "b5faa3f206ebc8f54e163e7729bf7bfcb174d5489a49f08739010e05016df135",
+      "sha256": "b5faa3f206ebc8f54e163e7729bf7bfcb174d5489a49f08739010e05016df135"
+    },
+    "normal-skills-child": {
+      "cargo_emission": {
+        "executable": "<target>/debug/lamp-skills",
+        "features": [],
+        "filenames": [
+          "<target>/debug/lamp-skills"
+        ],
+        "fresh": false,
+        "manifest_path": "<worktree>/lampOS/crates/skills/Cargo.toml",
+        "package_id": "path+file://<worktree>/lampOS/crates/skills#lamp-skills@0.1.0",
+        "profile": {
+          "debug_assertions": true,
+          "debuginfo": 0,
+          "opt_level": "0",
+          "overflow_checks": true,
+          "test": false
+        },
+        "reason": "compiler-artifact",
+        "target": {
+          "crate_types": [
+            "bin"
+          ],
+          "doc": true,
+          "doctest": false,
+          "edition": "2024",
+          "kind": [
+            "bin"
+          ],
+          "name": "lamp-skills",
+          "src_path": "<worktree>/lampOS/crates/skills/src/main.rs",
+          "test": true
+        }
+      },
+      "retained_copy": "retained-normal-skills-child",
+      "retained_sha256": "d6c1f771f0b2adb57e8c3a65252e7126bf598cb1a827d408aa90037673190966",
+      "sha256": "d6c1f771f0b2adb57e8c3a65252e7126bf598cb1a827d408aa90037673190966"
+    }
+  },
+  "bank_released": true,
+  "child_cleanup": "CommittedRunning::Drop kills andwaits bothnormalSkillschildren; childreninherit current-runtimePGID nowabsent. IndividualchildPIDs notexposed bytest.",
+  "counts": {
+    "FAIL": 0,
+    "PASS": 1,
+    "ignored": 0,
+    "retries": 0,
+    "selected": 1,
+    "unrun": 0
+  },
+  "disposition": "SCOPED_SOURCE_AND_ONE_CURRENT_COMMITTED_TEST_READ_OK",
+  "embedded_normal_child_path_verified": true,
+  "evidence_hashes": {
+    "current-artifacts.json": "7efca9fe5aa5678eff3f7d6709004c732981dc7c1151410460aff14e18f33698",
+    "current-compile.stderr": "755ae247e22545125b44886f3da1810f2e495e89ca150c682bf700a0ceb23547",
+    "current-compile.stdout": "760cb7a8161c695c6efb27dece4049f926b0d8fb6d53b09086c9ed59641eeb9e",
+    "current-discovery.stdout": "0a1f5aa8dcfb656c40df84a10908bc715fe1e921e0b95671ab221ebac484e999",
+    "current-runtime.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "current-runtime.stdout": "213532b7645050b868108027554a0baefb98e9d025ba094c6999506607400698",
+    "current-source-after.json": "c4208eaac0e62b9da0cd40348d56df4b3948238f75a87566f93db6366caadd43",
+    "current-source-before.json": "c4208eaac0e62b9da0cd40348d56df4b3948238f75a87566f93db6366caadd43",
+    "original-runtime-bounds.json": "bd81684e4b2a4b28526a3e4ef308636529748349b3928f17e7cd21098701e3b0",
+    "prior-saved-copies.json": "1e73f763512f54d8f27995e22d4265a8e5eeee75546a29b3881fc200ea8b7fee",
+    "qualified-current-local.json": "d220f1eac99dafada6a194450c9383056853b891796b42ab71075802c4f8975b",
+    "retained-integration-driver": "b5faa3f206ebc8f54e163e7729bf7bfcb174d5489a49f08739010e05016df135",
+    "retained-normal-skills-child": "d6c1f771f0b2adb57e8c3a65252e7126bf598cb1a827d408aa90037673190966",
+    "source-review.json": "50c4fc3691f164ba3cae71c77d0fa36b41f8c44daa8b1f6cae8e082b343f55ce"
+  },
+  "exact_env_overrides": {
+    "CARGO_BUILD_JOBS": "1",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_TARGET_DIR": "<approved-exclusive-target>",
+    "CARGO_TERM_COLOR": "never",
+    "RUST_TEST_THREADS": "1"
+  },
+  "head": "afd9585cf60435d96ff27593933b32b62c9684e1",
+  "helper_sha256": {
+    "bank-release.json": "b773b35c660e926ea22051774547e8254a3b362b3ff37e591b9cd261fac48b89",
+    "current-afd-proposal.json": "9cd48c319bfa34c383d1f0174c492fbf14cfb98bd71de1a91a044cad57327950",
+    "prior-saved-copies.json": "1e73f763512f54d8f27995e22d4265a8e5eeee75546a29b3881fc200ea8b7fee",
+    "root-approval.json": "3b16335092b59b790296ce0c1953318fd5b20dd03060f661dd1ba0f250d70d21",
+    "run-current-gate.py": "5448277b37a46912a1878e51b0f4e8a08da053ca3b666a9d730a2ee27cf02c27"
+  },
+  "limits": [
+    "No full555/otheraddon/Routine/journal_output or reverse-dependent runtime",
+    "No newfmt/clippy broadrepetition proposed",
+    "No realnetwork/device/provider requests; selectedfixtureusesonlyPropose branch andall service socket flags pointtempFS",
+    "No newobserverwrapper/mirror test or productcodechanges"
+  ],
+  "original_runtime_bounds": {
+    "head": "afd9585cf60435d96ff27593933b32b62c9684e1",
+    "limits": "These are exactcurrentfixturelimits/RAII source, not measuredlatency or standaloneuniversalIObounds; localread/finaldiagnostic remainouterwatchdog-limited.",
+    "source_lines": [
+      {
+        "line": 295,
+        "path": "lampOS/crates/skills/tests/it/addon.rs",
+        "text": "struct Running(Child);"
+      },
+      {
+        "line": 296,
+        "path": "lampOS/crates/skills/tests/it/addon.rs",
+        "text": ""
+      },
+      {
+        "line": 297,
+        "path": "lampOS/crates/skills/tests/it/addon.rs",
+        "text": "impl Running {"
+      },
+      {
+        "line": 298,
+        "path": "lampOS/crates/skills/tests/it/addon.rs",
+        "text": "    fn waiting(&mut self, deadline: Instant, root: &Path, what: &str) {"
+      },
+      {
+        "line": 299,
+        "path": "lampOS/crates/skills/tests/it/addon.rs",
+        "text": "        let status = self.0.try_wait().unwrap();"
+      },
+      {
+        "line": 300,
+        "path": "lampOS/crates/skills/tests/it/addon.rs",
+        "text": "        assert!("
+      },
+      {
+        "line": 301,
+        "path": "lampOS/crates/skills/tests/it/addon.rs",
+        "text": "            status.is_none(),"
+      },
+      {
+        "line": 302,
+        "path": "lampOS/crates/skills/tests/it/addon.rs",
+        "text": "            \"lamp-skills exited {status:?} while waiting for {what}; stderr:\\n{}\","
+      },
+      {
+        "line": 303,
+        "path": "lampOS/crates/skills/tests/it/addon.rs",
+        "text": "            fs::read_to_string(root.join(\"stderr\")).unwrap()"
+      },
+      {
+        "line": 304,
+        "path": "lampOS/crates/skills/tests/it/addon.rs",
+        "text": "        );"
+      },
+      {
+        "line": 305,
+        "path": "lampOS/crates/skills/tests/it/addon.rs",
+        "text": "        assert!("
+      },
+      {
+        "line": 306,
+        "path": "lampOS/crates/skills/tests/it/addon.rs",
+        "text": "            Instant::now() < deadline,"
+      },
+      {
+        "line": 307,
+        "path": "lampOS/crates/skills/tests/it/addon.rs",
+        "text": "            \"timed out waiting for {what}; stderr:\\n{}\","
+      },
+      {
+        "line": 308,
+        "path": "lampOS/crates/skills/tests/it/addon.rs",
+        "text": "            fs::read_to_string(root.join(\"stderr\")).unwrap()"
+      },
+      {
+        "line": 309,
+        "path": "lampOS/crates/skills/tests/it/addon.rs",
+        "text": "        );"
+      },
+      {
+        "line": 310,
+        "path": "lampOS/crates/skills/tests/it/addon.rs",
+        "text": "    }"
+      },
+      {
+        "line": 311,
+        "path": "lampOS/crates/skills/tests/it/addon.rs",
+        "text": "}"
+      },
+      {
+        "line": 312,
+        "path": "lampOS/crates/skills/tests/it/addon.rs",
+        "text": ""
+      },
+      {
+        "line": 313,
+        "path": "lampOS/crates/skills/tests/it/addon.rs",
+        "text": "impl Drop for Running {"
+      },
+      {
+        "line": 314,
+        "path": "lampOS/crates/skills/tests/it/addon.rs",
+        "text": "    fn drop(&mut self) {"
+      },
+      {
+        "line": 315,
+        "path": "lampOS/crates/skills/tests/it/addon.rs",
+        "text": "        let _ = self.0.kill();"
+      },
+      {
+        "line": 316,
+        "path": "lampOS/crates/skills/tests/it/addon.rs",
+        "text": "        let _ = self.0.wait();"
+      },
+      {
+        "line": 317,
+        "path": "lampOS/crates/skills/tests/it/addon.rs",
+        "text": "    }"
+      },
+      {
+        "line": 318,
+        "path": "lampOS/crates/skills/tests/it/addon.rs",
+        "text": "}"
+      },
+      {
+        "line": 653,
+        "path": "lampOS/crates/skills/tests/it/addon.rs",
+        "text": "    let deadline = Instant::now() + Duration::from_secs(10);"
+      },
+      {
+        "line": 668,
+        "path": "lampOS/crates/skills/tests/it/addon.rs",
+        "text": "    let completion_deadline = Instant::now() + Duration::from_secs(8);"
+      },
+      {
+        "line": 676,
+        "path": "lampOS/crates/skills/tests/it/addon.rs",
+        "text": "            let left = completion_deadline.saturating_duration_since(Instant::now());"
+      },
+      {
+        "line": 690,
+        "path": "lampOS/crates/skills/tests/it/addon.rs",
+        "text": "                journal.len() <= 1_048_576,"
+      },
+      {
+        "line": 694,
+        "path": "lampOS/crates/skills/tests/it/addon.rs",
+        "text": "                journal.starts_with(&journal_seen),"
+      },
+      {
+        "line": 705,
+        "path": "lampOS/crates/skills/tests/it/addon.rs",
+        "text": "                journal_cursor = end;"
+      },
+      {
+        "line": 709,
+        "path": "lampOS/crates/skills/tests/it/addon.rs",
+        "text": "                    && names.contains(&skill)"
+      },
+      {
+        "line": 710,
+        "path": "lampOS/crates/skills/tests/it/addon.rs",
+        "text": "                    && !seen.iter().any(|old| old.skill == skill)"
+      },
+      {
+        "line": 720,
+        "path": "lampOS/crates/skills/tests/it/addon.rs",
+        "text": "                    completion_deadline"
+      },
+      {
+        "line": 722,
+        "path": "lampOS/crates/skills/tests/it/addon.rs",
+        "text": "                        .min(Duration::from_millis(10)),"
+      },
+      {
+        "line": 727,
+        "path": "lampOS/crates/skills/tests/it/addon.rs",
+        "text": "            Instant::now() < completion_deadline,"
+      },
+      {
+        "line": 739,
+        "path": "lampOS/crates/skills/tests/it/addon.rs",
+        "text": "            .recv(Duration::from_secs(5))"
+      },
+      {
+        "line": 779,
+        "path": "lampOS/crates/skills/tests/it/addon.rs",
+        "text": "                Instant::now() < completion_deadline,"
+      },
+      {
+        "line": 788,
+        "path": "lampOS/crates/skills/tests/it/addon.rs",
+        "text": "                .all(|event| event.why == \"not proposed: 300 s after the judge dropped its say\")"
+      },
+      {
+        "line": 797,
+        "path": "lampOS/crates/skills/tests/it/addon.rs",
+        "text": "    let fifth = proposals.recv(Duration::from_secs(3)).unwrap();"
+      },
+      {
+        "line": 820,
+        "path": "lampOS/crates/skills/tests/it/addon.rs",
+        "text": "    assert!(journal.starts_with(\"proposed by says-e\"), \"{journal}\");"
+      },
+      {
+        "line": 823,
+        "path": "lampOS/crates/skills/tests/it/addon.rs",
+        "text": "        journal.contains(\"says-a Done: not proposed: 300 s after the judge dropped its say\"),"
+      }
+    ],
+    "source_sha256": "886d83f75fffd352ffc3f721af202bd152d8f2f500ef13f825b0e035fbc83c2b"
+  },
+  "parent": "a17ec9216e53f6a77931dd9686f83be8244d05a2",
+  "prior_saved_copies_38_unchanged": true,
+  "prior_saved_copy_manifest_sha256": "1e73f763512f54d8f27995e22d4265a8e5eeee75546a29b3881fc200ea8b7fee",
+  "source_before_after_manifest_sha256": {
+    "after": "c4208eaac0e62b9da0cd40348d56df4b3948238f75a87566f93db6366caadd43",
+    "before": "c4208eaac0e62b9da0cd40348d56df4b3948238f75a87566f93db6366caadd43"
+  },
+  "source_guard_count": 1907,
+  "source_review": {
+    "finding_P1_P2": [],
+    "head": "afd9585cf60435d96ff27593933b32b62c9684e1",
+    "limitations": [
+      "No localcompile/runtime yet; authoredheadparenta17 distinct from current PRbase908/actualnativepreview",
+      "Oldsourcefailurecohorts/author555 execution remainseparate, no retrospectivecauseorwaiver",
+      "No separate committed observer test found; inlineclosure cannotbe std-onlycompiledwithoutmirror or omittingrealchild/bus dependency"
+    ],
+    "line_bindings": {
+      "busy-clear": {
+        "line": 1497,
+        "path": "crates/skills/src/main.rs",
+        "text": "        self.busy.remove(skill);"
+      },
+      "cursor": {
+        "line": 672,
+        "path": "crates/skills/tests/it/addon.rs",
+        "text": "    let mut journal_cursor = 0;"
+      },
+      "done-drain": {
+        "line": 1066,
+        "path": "crates/skills/src/main.rs",
+        "text": "        while let Ok(event) = done.try_recv() {"
+      },
+      "drop-actual-reason": {
+        "line": 786,
+        "path": "crates/skills/tests/it/addon.rs",
+        "text": "            if completed(&names, \"the four drop refusals\")"
+      },
+      "next-input": {
+        "line": 1338,
+        "path": "crates/skills/src/main.rs",
+        "text": "        // A message a topic, as its turn did; one waiting still makes the"
+      },
+      "partial-lines": {
+        "line": 698,
+        "path": "crates/skills/tests/it/addon.rs",
+        "text": "            while let Some(end) = journal_seen[journal_cursor..]"
+      },
+      "phase-child-budget": {
+        "line": 677,
+        "path": "crates/skills/tests/it/addon.rs",
+        "text": "            let status = running.0.try_wait().unwrap();"
+      },
+      "phase-dedup": {
+        "line": 710,
+        "path": "crates/skills/tests/it/addon.rs",
+        "text": "                    && !seen.iter().any(|old| old.skill == skill)"
+      },
+      "prefix": {
+        "line": 694,
+        "path": "crates/skills/tests/it/addon.rs",
+        "text": "                journal.starts_with(&journal_seen),"
+      },
+      "producer-journal": {
+        "line": 503,
+        "path": "crates/skills/src/main.rs",
+        "text": "fn publish(out: &mut Publisher, mut event: SkillEvent) {"
+      },
+      "proposal-completion": {
+        "line": 2257,
+        "path": "crates/skills/src/main.rs",
+        "text": "        let _ = runner.finished.send(SkillEvent {"
+      }
+    },
+    "parent": "a17ec9216e53f6a77931dd9686f83be8244d05a2",
+    "read_scope": "Bothownedpaths/full_a_fifth_say/Running cleanup and relevant exactproducer mainloop, not Memory semantics",
+    "source_findings": [
+      "One cursor plus retained rawprefix across allphases; only newline-terminatedUTF8lines consumed, cursor advancesonce percomplete line; partialtails remain fornextread",
+      "Each phase resets matchedskills but sharescursor; accepts only expectedskill Done records anddeduplicateswithinphase; oldphase records cannotcredit laterphase",
+      "Initialfour actual proposals precedeDone barrier; dropbranch probesuntil ALLfour actual300s droprefusals beforefifth; fifth3s observation andfinalfour barrier preserve originalassertions",
+      "Producer proposal-onlybranch sendsDone to mainloop channel; journal publish precedesruns.done/busyclear, and nextvoiceinput consumed laterinthatsame mainloop; readingjournal early cannotcause reentrantinputbeforebusyclear",
+      "Original8s sharedcompletionbudget, startup10s,3s no-proposal,10s productionproposal allowance,300s dropassertions unchanged; bounded1MiB pendingread/prefixguard but sameprefixreplacement/truncate-rewrite undetectable asdocumented",
+      "Running Drop killsandwaits normalchild; whilephasepending childtrywait/budget checked; finalunboundedlocaldiagnosticread andkernelIO remainouterwatchdog limited"
+    ],
+    "tree": "fae939be34548ab513696217f1410594fe0f1187",
+    "unchanged_blocks": {
+      "Running-child-watchdog-cleanup": {
+        "byte_equal_parent": true,
+        "sha256": "e4854018a1db04ddd2ce214ee7e4d3589bba3857701259f2414feaf29968510b"
+      },
+      "budget-test-both-variants": {
+        "byte_equal_parent": true,
+        "sha256": "f5c3f8fa28c8a9971e0790bba56723f9abbedb2c7e4bca5cf55af9c3705a44ab"
+      }
+    },
+    "unchanged_production_skills": [
+      {
+        "path": "lampOS/crates/skills/src/addon.rs",
+        "sha256": "1d497446058d710d0c7663433403536068fc16778e6b73aef331574051cd11af"
+      },
+      {
+        "path": "lampOS/crates/skills/src/clock.rs",
+        "sha256": "ec85f68f7644491423814c9194ea458005bda36712eb9fa4428712248ea9c33a"
+      },
+      {
+        "path": "lampOS/crates/skills/src/daily.rs",
+        "sha256": "0d235ad368e10935fd365d4e05d8d7427a26440e4d27fcec4144cb49852a5916"
+      },
+      {
+        "path": "lampOS/crates/skills/src/glow.rs",
+        "sha256": "2a7699566f1dfc17ea398748b09bfa1e7f4e0059a8359e47e771a47140f18fbe"
+      },
+      {
+        "path": "lampOS/crates/skills/src/known.rs",
+        "sha256": "3975d9517f74c2da071f6b9f501ff8cfe6da369308fb6f3b70fa873bb4d5308b"
+      },
+      {
+        "path": "lampOS/crates/skills/src/lib.rs",
+        "sha256": "20d80d2f55d812c3eb6f4e73a634228cbfabbb8fe99c19b8d17549c66e6b0566"
+      },
+      {
+        "path": "lampOS/crates/skills/src/limits.rs",
+        "sha256": "3b11bbc541571d24c3744bb9b6530abeb14e824e436e91c774bb3d1699f3bf1c"
+      },
+      {
+        "path": "lampOS/crates/skills/src/main.rs",
+        "sha256": "74d35938cf988f4c5e7dc4c1a620683bc84a58e1e1e8422dccc65d935fdadb97"
+      },
+      {
+        "path": "lampOS/crates/skills/src/package.rs",
+        "sha256": "2ab4959691c7a6d5d1e3746b459f51bc7d0217457beb20d10b1db52db739405b"
+      },
+      {
+        "path": "lampOS/crates/skills/src/requested_audio.rs",
+        "sha256": "f4459837b0b129cf3f4645b07ba3bcb5d5310e7e9860adca11a42e22257bda56"
+      },
+      {
+        "path": "lampOS/crates/skills/src/routine.rs",
+        "sha256": "d75ba61b4d327600519c16111c3ca53ee9477406b800f1ba77f5c252780e01b4"
+      },
+      {
+        "path": "lampOS/crates/skills/src/unplug.rs",
+        "sha256": "4cac520cc9bdf09df466f6ad01b79f0f7b79bad3de923c209c91cf9ff0ffeec8"
+      },
+      {
+        "path": "lampOS/crates/skills/src/visits.rs",
+        "sha256": "7aad8e5a6cbedcd790d46bc3563093fc434590bf2256285427f5a52a2012d44b"
+      },
+      {
+        "path": "lampOS/crates/skills/src/watch.rs",
+        "sha256": "cb83df51c09174748928db5d709d868d81ae9a7c4bdbedfbe159ed966e674e4f"
+      }
+    ]
+  },
+  "source_tool_helper_artifact_guards_unchanged": true,
+  "stages": [
+    {
+      "argv": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-skills",
+        "--test",
+        "it",
+        "--no-run",
+        "--message-format=json"
+      ],
+      "cleanup": [],
+      "elapsed_seconds": 105.8564,
+      "exit": 0,
+      "group": "absent",
+      "pgid": 94793,
+      "pid": 94793,
+      "stage": "current-compile",
+      "stderr_sha256": "755ae247e22545125b44886f3da1810f2e495e89ca150c682bf700a0ceb23547",
+      "stdout_sha256": "760cb7a8161c695c6efb27dece4049f926b0d8fb6d53b09086c9ed59641eeb9e",
+      "timed_out": false
+    },
+    {
+      "argv": [
+        "<target>/debug/deps/it-aabcadd0c6d2694b",
+        "--list",
+        "--format",
+        "terse"
+      ],
+      "cleanup": [],
+      "elapsed_seconds": 1.0903,
+      "exit": 0,
+      "group": "absent",
+      "pgid": 96753,
+      "pid": 96753,
+      "stage": "current-discovery",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "0a1f5aa8dcfb656c40df84a10908bc715fe1e921e0b95671ab221ebac484e999",
+      "timed_out": false
+    },
+    {
+      "argv": [
+        "<target>/debug/deps/it-aabcadd0c6d2694b",
+        "--exact",
+        "addon::says_the_judge_dropped_do_not_spend_the_hour",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "cleanup": [],
+      "elapsed_seconds": 3.9651,
+      "exit": 0,
+      "group": "absent",
+      "pgid": 96766,
+      "pid": 96766,
+      "stage": "current-runtime",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "213532b7645050b868108027554a0baefb98e9d025ba094c6999506607400698",
+      "timed_out": false
+    }
+  ],
+  "status": "PASS",
+  "terminals": [
+    [
+      "addon::says_the_judge_dropped_do_not_spend_the_hour",
+      "ok"
+    ]
+  ],
+  "tool_sha256": {
+    "cargo": "425e08ffa69bcf047b2a82b08b42d1d26ba8488f774bade1c14a62623fc18bad",
+    "rustc": "6859de89ddecec2ebaaec50d25c9c471d47f33677a96f7c81666247be062d499"
+  },
+  "tree": "fae939be34548ab513696217f1410594fe0f1187",
+  "variants": "One committedRusttest executesdrop=true anddrop=false; two sequential normalSkillschildinstances insidecase, nottwo uniqueparentcases"
+}

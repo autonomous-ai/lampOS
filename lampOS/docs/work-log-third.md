@@ -1,3 +1,9 @@
+## 2026-10-28 02:30 — addon journal cursor source and committed budget control read
+
+READ-OK #3545 afd9585cf in [the source and one focused current fixture scope](verification/addon-budget-read-3545-20261028/current-afd-local.json). One byte cursor survives phases and consumes only complete lines; partial tails remain, exact expected skill names deduplicate per phase, append-prefix and1MiB guards bound reads. Actual proposal-only completion is published in the main loop before busy-state removal and before the next subscriber observation, so a queued next fixture trigger cannot be consumed first. Fourteen production Skills files, Running kill/wait cleanup, original outcome assertions and8/3/10/300 bounds remain exact. Same-prefix replacement and local-I/O watchdog limits stay documented.
+
+Current offline integration compile succeeds105.856s, with fresh:false current it driver and normal Skills child captured, exact embedded child path verified, and both saved. The one original committed addon budget case passes once in3.9651s,0failed/ignored/unrun/retry; it executes both dropped and undecided variants, not two unique cases. Root verifies its one exact raw PASS row and reads both variant assertions plus producer ordering. All1907 source guards,38 prior saved copies, helpers/tools/current two executables stay exact. Three numeric groups are waited and absent; bank releases. No observer mirror, full555/fmt/Clippy/native/physical claim or old failure explanation/waiver. Current-base/native carry remains the author's gate.
+
 ## 2026-10-28 02:21 — publication diagnostic delivered by train259
 
 Ready for lamp-voice: yes (#3912, delivered through #3927).
