@@ -1,0 +1,90 @@
+{
+  "after_exact_save": {
+    "live_tasks_told": {
+      "exists_following_links": false,
+      "is_symlink": true,
+      "lexists": true,
+      "readlink": "missing-told-target"
+    },
+    "saved_done": true,
+    "saved_owner_regular_sha256": "1375462294a0f38d6cf42ea4ef2349e5d4d77ba0c16a1e77a28b2e606ed0ab99",
+    "saved_restore": true,
+    "saved_tasks_told": {
+      "exists_following_links": false,
+      "is_symlink": false,
+      "lexists": false,
+      "readlink": null
+    }
+  },
+  "after_generated_restore": {
+    "live_tasks_told": {
+      "exists_following_links": false,
+      "is_symlink": false,
+      "lexists": false,
+      "readlink": null
+    },
+    "owner_regular_file_sha256": "1375462294a0f38d6cf42ea4ef2349e5d4d77ba0c16a1e77a28b2e606ed0ab99",
+    "saved_copy_exists": false
+  },
+  "blocked_real_tool_attempts": 0,
+  "confirmed": true,
+  "documented_allowed_types": "README does not declare a regular-only state type precondition or reject dangling links. Initial dangling tasks-told is silently treated as absent by -e, then removed by restore. Severity remains for Root disposition.",
+  "generated_restore_sha256": "6e82e2d1445e5ceef52854b56b0264d6e1d63e5405aeceeeff5bdacf2726bb38",
+  "head": "1c4d27e02f01fbe19050fe58533b2c9b2cc18e63",
+  "initial": {
+    "live_tasks_told": {
+      "exists_following_links": false,
+      "is_symlink": true,
+      "lexists": true,
+      "readlink": "missing-told-target"
+    },
+    "owner_regular_file_sha256": "1375462294a0f38d6cf42ea4ef2349e5d4d77ba0c16a1e77a28b2e606ed0ab99",
+    "saved_copy_exists": false
+  },
+  "private_helper_hashes": {
+    "exact-save-driver.sh": "b3ce0615991c3dd1e838a2ed11e7f85f1262b57ce44ba9e3a2393503aa77a6c1",
+    "local-command": "49e9010d482ac175c7717078b71873c138167af0e97c8ab2e342ec26eaca50a3",
+    "probe-dangling-type.py": "2bc0370472788b48dcd97acc81934dbdbeb475f69daf93987214cae6f3d88f19"
+  },
+  "restore_exit": 0,
+  "restore_function_sha256": "d7efb82f2a22ac8af71df707f6f80bfe73d17d26be86362c959cef8162e49e41",
+  "review_disposition": "P2: preserve unsupported state types or refuse before any mutation; this receipt binds old1c. New93f repair is under reread.",
+  "save_exit": 0,
+  "scope": "One temporary-FS type probe, not a played arm, whole make-skill suite, digest-failure repeat, nested-link or empty-directory proof. Exact save/restore functions with only temporary SAVED/VOICE paths and a local prefix-stripping command stub; no actual SSH/sudo/audio/systemctl/device.",
+  "source_helpers_unchanged": true,
+  "source_path": "lampOS/tools/played/make-skill.sh",
+  "source_sha256": "9b8611901b360eaddc992cd1b915ecf92a78d8f91a5a4f90ab92a90797dd5fa6",
+  "stages": [
+    {
+      "argv": [
+        "/bin/bash",
+        "<EVIDENCE>/dangling-type-probe/exact-save-driver.sh"
+      ],
+      "cleanup": [],
+      "elapsed_seconds": 0.740330257,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "process_group": "absent",
+      "reaped": true,
+      "returncode": 0,
+      "stage": "exact-save",
+      "timed_out": false
+    },
+    {
+      "argv": [
+        "/bin/sh",
+        "<EVIDENCE>/dangling-type-probe/type-n5r0aebt/saved/restore"
+      ],
+      "cleanup": [],
+      "elapsed_seconds": 0.044696236000000056,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "process_group": "absent",
+      "reaped": true,
+      "returncode": 0,
+      "stage": "exact-generated-restore",
+      "timed_out": false
+    }
+  ],
+  "status": "CONFIRMED_SILENT_DANGLING_STATE_LINK_LOSS",
+  "utc": "2026-10-27T17:43:54.367038+00:00",
+  "voice_state_function_sha256": "ca9c493008689100512750e46f4e4b68684e3a46fe07630aee321388865569a1"
+}

@@ -1,3 +1,9 @@
+## 2026-10-28 01:20 — state-type preservation added to cleanup read
+
+A separate [exact save/generated-restore temporary-filesystem control](verification/played-cleanup-read-3889-20261028/dangling-state-1c-HOLD.json) on #3889 1c4d27e02 silently loses a pre-existing dangling tasks-told link: save returns zero and records absence, restore returns zero and removes the live link and backup. An unrelated regular owner file remains exact. No customer state, SSH, audio, actual remote command, nested-link or concurrent-writer test. Both bounded child groups close. This is a P2 preservation fault: unsupported types must be kept or rejected before mutation. New93f0584c2 digest repair is under reread; this old-source receipt grants no new-head conclusion. The earlier digest failure and old timeout records stay intact.
+
+#3912 is open at00cc52828 with48 offline publisher tests passing and original ARM40557215577 running; path filters do not trigger separate Linux Clippy for its Python/doc-only diff. #3646 native proof/correction is posted on the PR; draft/broker holds remain. Requested #3913 PID-lock and current #3892 collector reads are claimed/queued without activation or devices.
+
 ## 2026-10-28 01:08 — current own-key native gates pass; historical stderr count corrected
 
 #3646 4d786be86 [original native receipt](verification/ownkeys-third-carry-20261027/original-native-4d786.json): ARM40550488846/job122352559434 and Linux40550489392/job122352562229 workflow aggregates and required jobs succeed on attempt one. Both logs name actual a35e972a4; API/Git ordered parents are Main3aa752f73 and offered4d786, tree2134de8d9. Preview differs from authored in thirty-six paths; no whole authored-tree execution equivalence is claimed.
