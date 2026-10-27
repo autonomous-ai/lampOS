@@ -2429,15 +2429,27 @@ const YES_PHRASES: [&[&str]; 5] = [
     &["go", "ahead"],
 ];
 
+/// Lines no longer than this are an answer as a whole: "Sure, go ahead."
+const SHORT_ANSWER_WORDS: usize = 4;
+
 /// A line's words with its [`YES_PHRASES`] taken out, and whether it had one.
+/// A phrase counts only as an answer: leading the line, or in a short one. In
+/// a statement ("I'll go ahead and sit down", "There is no problem with the
+/// wifi") it is only words (Fourteen's P2 on #3893).
 fn without_yes_phrases(words: &[String]) -> (Vec<&str>, bool) {
     let mut rest = Vec::with_capacity(words.len());
     let mut found = false;
     let mut at = 0;
+    let short = words.len() <= SHORT_ANSWER_WORDS;
     'words: while at < words.len() {
-        for phrase in YES_PHRASES {
+        for phrase in YES_PHRASES.iter().filter(|_| short || at == 0) {
             let end = at + phrase.len();
-            if end <= words.len() && words[at..end].iter().zip(phrase).all(|(w, p)| w == p) {
+            if end <= words.len()
+                && words[at..end]
+                    .iter()
+                    .zip(phrase.iter())
+                    .all(|(w, p)| w == p)
+            {
                 found = true;
                 at = end;
                 continue 'words;
@@ -3873,6 +3885,13 @@ mod tests {
             assert!(agrees(&words(yes)), "{yes}");
             assert!(!refuses(&words(yes)), "{yes}");
             assert_eq!(yes_or_no(yes), Some(true), "{yes}");
+        }
+        for statement in [
+            "I'll go ahead and sit down.",
+            "There is no problem with the wifi.",
+            "I don't mind the noise from the street.",
+        ] {
+            assert!(!agrees(&words(statement)), "{statement}");
         }
         for no in ["No", "Of course not", "No, don't", "Please don't"] {
             assert!(!agrees(&words(no)), "{no}");
