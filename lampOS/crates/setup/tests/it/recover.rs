@@ -211,3 +211,78 @@ fn the_switch_is_on_for_on_only() {
         assert!(!on(value), "{value:?}");
     }
 }
+
+/// The product unit's own command line runs (the lead's agent on #1711, 27
+/// Oct): build 7071's `lamp-setup` matched `recover` only after it required
+/// `--plan`, which the unit never gives, so on lamp-52e6 the unit restarted 76
+/// times in 85 min. Its `ExecStart`, the configuration swapped for a test
+/// file and the switch off, ends at once and well, saying recovery is off.
+/// Without `--enable` it says so; with a `--plan` it is refused.
+#[test]
+fn the_product_units_command_line_runs_and_ends_when_recovery_is_off() {
+    const UNIT: &str = include_str!("../../../../deploy/product/lamp-setup-recover.service");
+    let exec = UNIT
+        .lines()
+        .find_map(|line| line.strip_prefix("ExecStart="))
+        .expect("the unit's ExecStart");
+    let mut words = exec.split_whitespace();
+    assert!(words.next().unwrap().ends_with("/lamp-setup"), "{exec}");
+    let unit_args: Vec<&str> = words.collect();
+    assert_eq!(
+        unit_args,
+        [
+            "recover",
+            "--config",
+            "/etc/lampOS/setup/serve.json",
+            "--enable"
+        ]
+    );
+    let dir = std::env::temp_dir().join(format!("lamp-setup-recover-cli-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let config = dir.join("serve.json");
+    std::fs::write(&config, include_str!("../../fixtures/serve-own-page.json")).unwrap();
+    let run = |args: &[&str]| {
+        let args: Vec<std::ffi::OsString> = args
+            .iter()
+            .map(|arg| {
+                if *arg == "/etc/lampOS/setup/serve.json" {
+                    config.clone().into_os_string()
+                } else {
+                    (*arg).into()
+                }
+            })
+            .collect();
+        let output = std::process::Command::new(env!("CARGO_BIN_EXE_lamp-setup"))
+            .args(&args)
+            .env_remove(lamp_setup::recover::SWITCH)
+            .output()
+            .unwrap();
+        (
+            output.status.success(),
+            String::from_utf8_lossy(&output.stdout).into_owned(),
+            String::from_utf8_lossy(&output.stderr).into_owned(),
+        )
+    };
+    let (ok, _, said) = run(&unit_args);
+    assert!(ok, "{said}");
+    assert!(said.contains("recover: off"), "{said}");
+    assert!(!said.contains("--plan is required"), "{said}");
+    let (ok, out, said) = run(&["recover", "--config", "/etc/lampOS/setup/serve.json"]);
+    assert!(ok, "{said}");
+    assert!(out.contains("\"enabled\":false"), "{out}");
+    let (ok, _, said) = run(&[
+        "recover",
+        "--config",
+        "/etc/lampOS/setup/serve.json",
+        "--plan",
+        "/x",
+        "--enable",
+    ]);
+    assert!(!ok);
+    assert!(
+        said.contains("recover takes --config and --enable"),
+        "{said}"
+    );
+    std::fs::remove_dir_all(&dir).unwrap();
+}
