@@ -1,0 +1,330 @@
+{
+  "head": "f8625afe4171e95b28f60f58bca08a51c30209f2",
+  "base": "33d5627cadad7184f9ea2dcdc5b858f3aa3de58d",
+  "tree": "34f20defa563155a22d72f3d898987515e902caa",
+  "status": "VERIFIED_SELECTED_REMINDER_SCOPE",
+  "holds": [],
+  "limits": [
+    "Selected Skills/Update plus seven switch and one Welcome cases, and twelve-package docs; not current full twelve-package runtime.",
+    "Historical b490 full-suite privacy failure remains failed and separate.",
+    "No native, device or latency qualification."
+  ],
+  "selected_direct_counts": {
+    "failed": 0,
+    "ignored": 11,
+    "passed": 689
+  },
+  "integrity": {
+    "actual_and_saved_paths_rehashed": 133,
+    "raw_entries": 8722,
+    "source_files": 7262
+  },
+  "metadata": {
+    "after": [],
+    "before": [],
+    "current": []
+  },
+  "controller_sha256": "0754f325b5157f869c4c0819b536e809f4214aa1f0d288e20223e7c008321bc2",
+  "helper_sha256": "d9752669a919f8380fbdf8eaae2d7824f61bbd5b6dcfa634632ef39322dcb803",
+  "full_private_receipt_sha256": "d92846498d9ce69b54fe5a02bc9a1e6b93c6f9b74f046ad13f83348209ffb2c6",
+  "required_host_witnesses": 32,
+  "panic_hooks": {
+    "expected_occurrences": 2,
+    "unknown": 0
+  },
+  "commands": [
+    {
+      "label": "skills-lib",
+      "package": "lamp-skills",
+      "target": "lamp_skills",
+      "returncode": 0,
+      "log_sha256": "75645c9e2af62718295d5106c60b5f88042cc17cd1cc683b87ce08567d55d919",
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "line": 429,
+          "measured": 0,
+          "passed": 160,
+          "status": "ok"
+        }
+      ]
+    },
+    {
+      "label": "skills-bin",
+      "package": "lamp-skills",
+      "target": "lamp-skills",
+      "returncode": 0,
+      "log_sha256": "aceef6313846e8401b78f1a74b300720bfda3baa4d04297542584b92374031c5",
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "line": 63,
+          "measured": 0,
+          "passed": 20,
+          "status": "ok"
+        }
+      ]
+    },
+    {
+      "label": "skills-it",
+      "package": "lamp-skills",
+      "target": "it",
+      "returncode": 0,
+      "log_sha256": "33be03688f186373bb63a1aed143a9513a89d1193b55e0dd86afbfb7925a3915",
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 1,
+          "line": 1055,
+          "measured": 0,
+          "passed": 332,
+          "status": "ok"
+        }
+      ]
+    },
+    {
+      "label": "skills-release-pair",
+      "package": "lamp-skills",
+      "target": "release_pair",
+      "returncode": 0,
+      "log_sha256": "59e11777a0a496c5ce21df48ba07f4af9b0df6c73b6f000f97333bfd9e9d7f19",
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 8,
+          "line": 14,
+          "measured": 0,
+          "passed": 2,
+          "status": "ok"
+        }
+      ]
+    },
+    {
+      "label": "skills-requested-audio",
+      "package": "lamp-skills",
+      "target": "requested_audio",
+      "returncode": 0,
+      "log_sha256": "1c2001ab90984deb76623ee87cc4eea9c94e763ea9b1aace4d64ac77b5df16b9",
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "line": 38,
+          "measured": 0,
+          "passed": 31,
+          "status": "ok"
+        }
+      ]
+    },
+    {
+      "label": "update-lib",
+      "package": "lamp-update",
+      "target": "lamp_update",
+      "returncode": 0,
+      "log_sha256": "8ea14ef14ef1bb407b4598b28e53e855c98c4ee0f31cbffc91f6be182ad8fb60",
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 2,
+          "line": 129,
+          "measured": 0,
+          "passed": 123,
+          "status": "ok"
+        }
+      ]
+    },
+    {
+      "label": "update-it",
+      "package": "lamp-update",
+      "target": "it",
+      "returncode": 0,
+      "log_sha256": "f01b67ab7c1abd62ac88d09d22e638e7494c0fc029b79a3e4c2f7d78fb94ba77",
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "line": 19,
+          "measured": 0,
+          "passed": 13,
+          "status": "ok"
+        }
+      ]
+    },
+    {
+      "label": "voice-switch-census",
+      "package": "lamp-voice",
+      "target": "lamp_voice",
+      "returncode": 0,
+      "log_sha256": "f6ec4b20717cee78a8fd9a1585d181fb4378c99fff37c8d22ba09580199e9516",
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered": 3825,
+          "ignored": 0,
+          "line": 11,
+          "measured": 0,
+          "passed": 7,
+          "status": "ok"
+        }
+      ]
+    },
+    {
+      "label": "voice-welcome-source",
+      "package": "lamp-voice",
+      "target": "lamp_voice",
+      "returncode": 0,
+      "log_sha256": "e9640ae97fc87be48f83870b4036def78f8f82c027934f814bea318910f70283",
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered": 3831,
+          "ignored": 0,
+          "line": 5,
+          "measured": 0,
+          "passed": 1,
+          "status": "ok"
+        }
+      ]
+    },
+    {
+      "label": "doctests-12",
+      "package": null,
+      "target": null,
+      "returncode": 0,
+      "log_sha256": "883c7b29b94064b5e6f78fdec5ab61f94430a6dbd28cf3e946f81b04869dec99",
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "line": 6,
+          "measured": 0,
+          "passed": 0,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "line": 12,
+          "measured": 0,
+          "passed": 0,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "line": 18,
+          "measured": 0,
+          "passed": 0,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "line": 24,
+          "measured": 0,
+          "passed": 0,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "line": 30,
+          "measured": 0,
+          "passed": 0,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "line": 36,
+          "measured": 0,
+          "passed": 0,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "line": 42,
+          "measured": 0,
+          "passed": 0,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "line": 48,
+          "measured": 0,
+          "passed": 0,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "line": 54,
+          "measured": 0,
+          "passed": 0,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "line": 60,
+          "measured": 0,
+          "passed": 0,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "line": 66,
+          "measured": 0,
+          "passed": 0,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "line": 72,
+          "measured": 0,
+          "passed": 0,
+          "status": "ok"
+        }
+      ]
+    }
+  ],
+  "doc_headings": [
+    "lamp_body",
+    "lamp_cloud",
+    "lamp_expression",
+    "lamp_keeper",
+    "lamp_lean",
+    "lamp_memory",
+    "lamp_peek",
+    "lamp_setup",
+    "lamp_skills",
+    "lamp_update",
+    "lamp_voice",
+    "lamp_voice_eval"
+  ]
+}

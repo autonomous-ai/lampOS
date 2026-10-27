@@ -1,0 +1,170 @@
+{
+  "head": "17e2532d842a0e2d30040a8d744e6a3109094ff3",
+  "base": "33d5627cadad7184f9ea2dcdc5b858f3aa3de58d",
+  "tree": "0352c7b2a36d016ca915aaa71712b0193766ea77",
+  "status": "VERIFIED_FOCUSED_HOST_CARRY",
+  "holds": [],
+  "limits": [
+    "Focused host privacy carry on 17e/33d only; no current full host Voice claim.",
+    "Historical full Voice selection belongs to4bff; not reattributed.",
+    "Fresh original current native full Voice remains required before readiness; later base drift needs a separate carry.",
+    "Existing native097dbba Reader failure on identical source tree remains unresolved; host scope does not waive it.",
+    "No historical cause/device/physical-latency claim."
+  ],
+  "selected_direct_counts": {
+    "failed": 0,
+    "ignored": 1,
+    "passed": 238
+  },
+  "integrity": {
+    "actual_and_saved_paths_rehashed": 65,
+    "raw_entries": 8700,
+    "source_files": 7241
+  },
+  "metadata": {
+    "after": [],
+    "before": [],
+    "current": []
+  },
+  "controller_sha256": "b3d22e34473dd9eff5982ce657948fd6a8820b42bfa9d746cd51bee20a22499a",
+  "helper_sha256": "5a9c17ba03bf6c926f6308e42f0c1f6c2c8e3c5eb9f2d85afd6de9e510aaa862",
+  "full_private_receipt_sha256": "c5678ec279d766ba2073cda98c2538eb5035b89e8aa7ec189c4dba20789325c6",
+  "required_host_witnesses": 16,
+  "panic_hooks": {
+    "expected_occurrences": 2,
+    "unknown": 0
+  },
+  "commands": [
+    {
+      "label": "voice-privacy-carry",
+      "package": "lamp-voice",
+      "target": "lamp_voice",
+      "returncode": 0,
+      "log_sha256": "7c14e741e441132be3af2bcdd84aa51f981baf9af4609e918d99fdfa4a051e54",
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered": 3823,
+          "ignored": 0,
+          "line": 13,
+          "measured": 0,
+          "passed": 9,
+          "status": "ok"
+        }
+      ]
+    },
+    {
+      "label": "msgs-lib",
+      "package": "lamp-msgs",
+      "target": "lamp_msgs",
+      "returncode": 0,
+      "log_sha256": "ad601827aa3274c1589f733156f8024c3c43cf959359cd08d29a5c5025379b8d",
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "line": 96,
+          "measured": 0,
+          "passed": 92,
+          "status": "ok"
+        }
+      ]
+    },
+    {
+      "label": "msgs-it",
+      "package": "lamp-msgs",
+      "target": "it",
+      "returncode": 0,
+      "log_sha256": "ec39ab3e97ce5c1dfc48ff654b5f9bfa697fd34d0a6b244c449f6330cb40d834",
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "line": 84,
+          "measured": 0,
+          "passed": 80,
+          "status": "ok"
+        }
+      ]
+    },
+    {
+      "label": "bus-lib",
+      "package": "lamp-bus",
+      "target": "lamp_bus",
+      "returncode": 0,
+      "log_sha256": "aaab68476089861f1fcf231d2ecdc01b5f67ac45533aab48af4b55284fdb77c6",
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 1,
+          "line": 67,
+          "measured": 0,
+          "passed": 55,
+          "status": "ok"
+        }
+      ]
+    },
+    {
+      "label": "bus-liveness-controls",
+      "package": "lamp-bus",
+      "target": "it",
+      "returncode": 0,
+      "log_sha256": "79426336fc73bcfda9d9acdceceeab74fe14495f52d02902bb94b751a2243c12",
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered": 48,
+          "ignored": 0,
+          "line": 6,
+          "measured": 0,
+          "passed": 2,
+          "status": "ok"
+        }
+      ]
+    },
+    {
+      "label": "doctests-3",
+      "package": null,
+      "target": null,
+      "returncode": 0,
+      "log_sha256": "994a2bc960519d0e7df295066f30017b635011049e0a8990300d7e5e7fdcb44e",
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "line": 8,
+          "measured": 0,
+          "passed": 2,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "line": 16,
+          "measured": 0,
+          "passed": 1,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "line": 23,
+          "measured": 0,
+          "passed": 0,
+          "status": "ok"
+        }
+      ]
+    }
+  ],
+  "doc_headings": [
+    "lamp_bus",
+    "lamp_msgs",
+    "lamp_voice"
+  ]
+}

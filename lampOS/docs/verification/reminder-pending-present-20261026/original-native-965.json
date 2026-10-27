@@ -1,0 +1,150 @@
+{
+  "source": {
+    "authored_base": "737331535d0cab813170d288110fc44ff5d41a68",
+    "authored_head": "96506fb4218c419a0ff9c30430307d13159e109c",
+    "executed_preview": "c2d46ab42d844fb7216621432fc39be61f53086e",
+    "full_tree_equal": true,
+    "local_base": "33d5627cadad7184f9ea2dcdc5b858f3aa3de58d",
+    "local_f862": "f8625afe4171e95b28f60f58bca08a51c30209f2",
+    "local_tree": "34f20defa563155a22d72f3d898987515e902caa",
+    "ordered_parents": [
+      "33d5627cadad7184f9ea2dcdc5b858f3aa3de58d",
+      "96506fb4218c419a0ff9c30430307d13159e109c"
+    ],
+    "overlay_delta_from_authored": [
+      "lampOS/crates/body/src/body.rs",
+      "lampOS/crates/body/src/body/tests.rs",
+      "lampOS/crates/voice/src/remember.rs",
+      "lampOS/crates/voice/src/second_provider/probe/tools.rs",
+      "lampOS/docs/body.md",
+      "lampOS/docs/memory.md",
+      "lampOS/docs/switches.md"
+    ],
+    "preview_tree": "34f20defa563155a22d72f3d898987515e902caa"
+  },
+  "runs": {
+    "arm": {
+      "attempt": 1,
+      "checkout": "c2d46ab42d844fb7216621432fc39be61f53086e",
+      "conclusion": "success",
+      "event": "pull_request",
+      "head": "96506fb4218c419a0ff9c30430307d13159e109c",
+      "job": 121970501041,
+      "run": 40437771889
+    },
+    "linux": {
+      "attempt": 1,
+      "checkout": "c2d46ab42d844fb7216621432fc39be61f53086e",
+      "conclusion": "success",
+      "event": "pull_request",
+      "head": "96506fb4218c419a0ff9c30430307d13159e109c",
+      "job": 121970500965,
+      "run": 40437771881
+    }
+  },
+  "controls": {
+    "missing_or_nonpass": [],
+    "mock3_already_in32": true,
+    "once_pass": 32,
+    "required": 32
+  },
+  "nextest": {
+    "failed": 0,
+    "ipc_camera_authority_pass": 18,
+    "leak": 0,
+    "per_package_pass": {
+      "lamp-actions": 123,
+      "lamp-addons": 50,
+      "lamp-air": 27,
+      "lamp-audio": 193,
+      "lamp-body": 624,
+      "lamp-bus": 107,
+      "lamp-camera": 89,
+      "lamp-cloud": 196,
+      "lamp-controls": 516,
+      "lamp-ears": 76,
+      "lamp-environment": 12,
+      "lamp-expression": 340,
+      "lamp-eyes": 339,
+      "lamp-gemini": 285,
+      "lamp-health": 91,
+      "lamp-ipc": 45,
+      "lamp-keeper": 42,
+      "lamp-lean": 61,
+      "lamp-local-time": 11,
+      "lamp-memory": 336,
+      "lamp-mood": 118,
+      "lamp-msgs": 172,
+      "lamp-name": 44,
+      "lamp-near-call": 8,
+      "lamp-observer": 46,
+      "lamp-peek": 26,
+      "lamp-policy": 284,
+      "lamp-records": 193,
+      "lamp-ring": 53,
+      "lamp-same-voice": 5,
+      "lamp-schedule": 215,
+      "lamp-selftest": 84,
+      "lamp-settings": 49,
+      "lamp-setup": 185,
+      "lamp-skills": 548,
+      "lamp-sound-fixtures": 15,
+      "lamp-station": 69,
+      "lamp-surround": 268,
+      "lamp-tasks": 220,
+      "lamp-turn-end": 32,
+      "lamp-turn-end-wire": 5,
+      "lamp-turn-owner": 37,
+      "lamp-update": 427,
+      "lamp-voice": 4167,
+      "lamp-voice-eval": 623,
+      "lamp-voice-processes": 2
+    },
+    "skip_names_available": false,
+    "skipped_summary": 106,
+    "timeout": 0,
+    "unique_pass": 11458,
+    "verified_exact_post_summary_reprints": 35,
+    "voice_library_pass": 3849,
+    "whole_workspace_selector": true
+  },
+  "raw_hashes": {
+    "arm-job.log": "be62ec49420320f5c96114cae9569b26cc6c525b898662e9fe9f6929bcb59606",
+    "arm-jobs.json": "03867ed814336e5dc777718747411a2e80aa54be02aeaf8fafaf161b4bcf187b",
+    "arm-run.json": "cfd6b5fc8d05f24c04e6adcec827e40025bb25161621db8dd69f256d2cd2f664",
+    "commit-96506fb4218c419a0ff9c30430307d13159e109c.json": "7992a37f3d425bbea30e1e2bf78775faaf8a0be33e9e74b71997d8ba06efe193",
+    "commit-c2d46ab42d844fb7216621432fc39be61f53086e.json": "7fd35d780ec754150fbe2c7b09eba3f2ddfc72abbb9ce21b0e71c52591ca1df6",
+    "linux-job.log": "0a593367337a8d29cd5b5bec37b94f3d780711e596ff00999c16fb805f366927",
+    "linux-jobs.json": "f2270588c10c2bce94065c7933c15c7c6b2c43db04c022038bb930e698cc8a87",
+    "linux-run.json": "b5ad076be114119056afa79bccbbca92f08d74f458274e16b2230469d2eb090b",
+    "nextest-unique-cases.json": "f508d4c873abb33cd0d00e923eaff360903442744863f25710b4c69c5b80accf",
+    "required32-cases.json": "c747c69e2c4e40c4d97cd599acacf98a2ec18c4ca62bcf5f04b480d0029d19bf"
+  },
+  "limits": [
+    "Actual original965 event executed previewc2d with33d base; exact fulltree equals f862/33, not authored965/737.",
+    "Successful Reader/privacy observations on this source do not establish cause or waive original fixture642 Reader failure; no retry requested.",
+    "106summary skips have no per-case names in this log; no inferred waiver.",
+    "No signed-release/device/latency acceptance; artifact export/upload is separate.",
+    "No binary downloaded or executed and no workflow action."
+  ],
+  "status": "ORIGINAL_NATIVE_GREEN_EXACT_F862_TREE",
+  "full_private_receipt_sha256": "84aae1fe35e68b230417b5e8f505936b06045bc2e341e16bdc6f4d4b180e6216",
+  "separate_docs": {
+    "failed": 0,
+    "ignored": 0,
+    "passed": 4,
+    "sections": 47
+  },
+  "privacy9_and_reader_once_pass": {
+    "privacy_bus::tests::a_receipt_comes_only_with_a_slides_reading": true,
+    "privacy_bus::tests::after_a_datagram_a_gap_ends_the_lease_reader_inside_its_first_second": true,
+    "privacy_bus::tests::only_recovery_finishes_the_source_episode_and_allows_a_new_one": true,
+    "privacy_bus::tests::recovery_queued_after_a_source_stall_reports_the_old_expiry_first": true,
+    "privacy_bus::tests::selected_endpoints_bind_and_read_a_real_bus": true,
+    "privacy_bus::tests::source_expiry_is_ridden_only_when_enabled_after_permission": true,
+    "privacy_bus::tests::the_lease_reader_resyncs_on_kept_leases_only_before_its_first_datagram_in_its_first_second": true,
+    "privacy_bus::tests::the_lease_watch_answers_at_once_through_refused_input_and_lets_a_lease_expire": true,
+    "privacy_bus::tests::the_order_begins_again_only_before_the_first_datagram_in_the_first_second": true,
+    "session_reader::tests::linux::only_the_new_session_is_shared_after_one_pinned_lookup": true
+  }
+}
