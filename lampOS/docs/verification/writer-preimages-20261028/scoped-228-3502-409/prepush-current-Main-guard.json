@@ -1,0 +1,7 @@
+{
+  "tested_base": "40923624247a893a19e1d980a328424eedffa308",
+  "later_live_Main": "a17ec9216e53f6a77931dd9686f83be8244d05a2",
+  "push_performed": false,
+  "reason": "Main advanced after gate; current-source carry and fresh consumed-scope qualification required",
+  "historical_original_native_failure_not_waived": true
+}

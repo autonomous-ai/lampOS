@@ -1,0 +1,7 @@
+{
+  "old_base": "d8ca71f4dc6e65b00564afb1e67c1a33311aeab8",
+  "new_base": "a17ec9216e53f6a77931dd9686f83be8244d05a2",
+  "scope_audit": "<private-path>",
+  "old_full537_bound_to_d8": true,
+  "new_scope_not_full_package": true
+}

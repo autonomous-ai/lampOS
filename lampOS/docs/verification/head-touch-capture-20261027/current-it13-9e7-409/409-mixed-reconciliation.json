@@ -1,0 +1,26 @@
+{
+  "current_emitted": 2,
+  "current_it": 1,
+  "current_production_bins": 1,
+  "retained_donor_executables": 8,
+  "total_outputs": 10,
+  "all10_new_or_current_source_claimed": false,
+  "donor_manifest_sha256": "f129584e7ca445cbfd919b1e44b7022e8167b4212f86fd6a0d94a4d7066cfa09",
+  "current_target_keys": [
+    [
+      "it",
+      [
+        "test"
+      ],
+      true
+    ],
+    [
+      "lamp-update",
+      [
+        "bin"
+      ],
+      false
+    ]
+  ],
+  "runtime_scope": "ONLYcurrentit13; retained binaries never executed"
+}

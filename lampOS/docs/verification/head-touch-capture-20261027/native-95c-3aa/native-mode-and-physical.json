@@ -1,0 +1,43 @@
+{
+  "head": "95c1860e49132484256fb0c5d4bb758154adcabb",
+  "base": "3aa752f73914d0f29fc90edb010a3a7fa1cf526b",
+  "actual_checkout": "7a603e401cfee4e879289913fa99953b078c952f",
+  "native_host": "aarch64-unknown-linux-gnu",
+  "Rust": "1.96.0",
+  "Nextest": "0.9.149",
+  "profile": "pr",
+  "parallel_command": "-j num-cpus",
+  "logged_cores": 4,
+  "partition": "hash:1/1",
+  "observed_RETRY_rows": 0,
+  "run_attempt": 1,
+  "special_control_rows": [
+    {
+      "status": "PASS",
+      "ordinal": 2498,
+      "total": 7815,
+      "binary": "lamp-update",
+      "name": "head_touch::capture::tests::file_mutation_and_ancestor_replacement_refuse_before_freeze"
+    },
+    {
+      "status": "PASS",
+      "ordinal": 2501,
+      "total": 7815,
+      "binary": "lamp-update",
+      "name": "head_touch::capture::tests::raw_non_utf8_names_are_preserved_but_non_utf8_text_is_refused"
+    },
+    {
+      "status": "PASS",
+      "ordinal": 2506,
+      "total": 7815,
+      "binary": "lamp-update",
+      "name": "head_touch::capture::tests::same_descriptor_checks_reject_preopen_swap_and_postread_mutation"
+    }
+  ],
+  "physical_Linux_inference": "Actual native Linux test PASS plus exact source with unconditional cfg(Linux) physical subsection and uncaught assertions binds create/capture/revalidate/mutation. Individual filesystem syscalls are not traced.",
+  "Mac_physical_nonUTF8_name_capture": "UNVERIFIED",
+  "old_failed_subcase_and_cause": "UNESTABLISHED",
+  "no_failed_source_rerun": true,
+  "no_test_executable_hash_claim": true,
+  "no_f903_Main_runtime_transfer": true
+}

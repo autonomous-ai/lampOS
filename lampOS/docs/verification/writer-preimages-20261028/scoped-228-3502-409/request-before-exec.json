@@ -1,0 +1,18 @@
+{
+  "approved": true,
+  "head": "3502fd5b1b1765669665b7d73a76e89f160ba46d",
+  "raw_parent": "12d0e4fa21baf64a2d2fdffe73cb4c8470ac47a5",
+  "base": "40923624247a893a19e1d980a328424eedffa308",
+  "scope": "current preimages fullLIB functions it plus3receipt",
+  "projection_only": 228,
+  "all_required": 58,
+  "donor": "<private-path>",
+  "donor_sha256": "72816602057df757a5c2a216b6248601c46dba99cddc201f398b00521a5619be",
+  "donor_closure_sha256": "93fe11a4cd2c337cf806a34083cf99d3226c21c70c0cb5e826d889a9258ca289",
+  "donor_explicitly_released_by_Root": true,
+  "runtime": "AUTHORIZED UNRUN; Root explicit sole LOCAL START after Raw52968 drained0",
+  "controller": "<private-path>",
+  "controller_sha256": "a14b34c64df866ce321fca485debc6a5186b3f4035c23d8c022523377ec45591",
+  "original_ARM40552447404_failed_source_unchanged_and_unwaived": true,
+  "root_release": "Root: START authorized soleLOCAL preimages409228 NOW; exact donor728166...; oldnativefailureunwaived"
+}

@@ -1,0 +1,134 @@
+{
+  "actual_bad": 0,
+  "actual_pass": 13,
+  "cases": [
+    {
+      "binary": "lamp-update::it",
+      "case": "ci_paths::every_doc_a_crate_reads_is_named_back_in_the_workflows_pull_request_paths",
+      "driver_sha256": "c09bdee086b77d1ec716e58323978d84e350e0c5bc4cba2a981ed48a949d70bc",
+      "ordinal": 12,
+      "status": "PASS",
+      "total": 13
+    },
+    {
+      "binary": "lamp-update::it",
+      "case": "ci_paths::the_scan_sees_paths_in_strings_and_not_in_comments_or_prose",
+      "driver_sha256": "c09bdee086b77d1ec716e58323978d84e350e0c5bc4cba2a981ed48a949d70bc",
+      "ordinal": 2,
+      "status": "PASS",
+      "total": 13
+    },
+    {
+      "binary": "lamp-update::it",
+      "case": "image_journal::systemd_reads_it_last_beside_another_drop_in",
+      "driver_sha256": "c09bdee086b77d1ec716e58323978d84e350e0c5bc4cba2a981ed48a949d70bc",
+      "ordinal": 3,
+      "status": "PASS",
+      "total": 13
+    },
+    {
+      "binary": "lamp-update::it",
+      "case": "image_journal::the_journal_is_kept_well_inside_the_ram_disk",
+      "driver_sha256": "c09bdee086b77d1ec716e58323978d84e350e0c5bc4cba2a981ed48a949d70bc",
+      "ordinal": 1,
+      "status": "PASS",
+      "total": 13
+    },
+    {
+      "binary": "lamp-update::it",
+      "case": "image_ramlog::a_failed_move_keeps_the_kept_boots_and_says_so",
+      "driver_sha256": "c09bdee086b77d1ec716e58323978d84e350e0c5bc4cba2a981ed48a949d70bc",
+      "ordinal": 13,
+      "status": "PASS",
+      "total": 13
+    },
+    {
+      "binary": "lamp-update::it",
+      "case": "image_ramlog::logrotate_runs_the_lamps_copy_back_in_place_of_the_bases",
+      "driver_sha256": "c09bdee086b77d1ec716e58323978d84e350e0c5bc4cba2a981ed48a949d70bc",
+      "ordinal": 4,
+      "status": "PASS",
+      "total": 13
+    },
+    {
+      "binary": "lamp-update::it",
+      "case": "image_ramlog::ramlogs_copies_leave_the_journal_out",
+      "driver_sha256": "c09bdee086b77d1ec716e58323978d84e350e0c5bc4cba2a981ed48a949d70bc",
+      "ordinal": 5,
+      "status": "PASS",
+      "total": 13
+    },
+    {
+      "binary": "lamp-update::it",
+      "case": "image_ramlog::ramlogs_stop_keeps_the_journal_before_its_own_stop",
+      "driver_sha256": "c09bdee086b77d1ec716e58323978d84e350e0c5bc4cba2a981ed48a949d70bc",
+      "ordinal": 6,
+      "status": "PASS",
+      "total": 13
+    },
+    {
+      "binary": "lamp-update::it",
+      "case": "image_ramlog::the_copy_back_leaves_the_journal_alone",
+      "driver_sha256": "c09bdee086b77d1ec716e58323978d84e350e0c5bc4cba2a981ed48a949d70bc",
+      "ordinal": 8,
+      "status": "PASS",
+      "total": 13
+    },
+    {
+      "binary": "lamp-update::it",
+      "case": "image_ramlog::the_defaults_keep_the_bases_settings",
+      "driver_sha256": "c09bdee086b77d1ec716e58323978d84e350e0c5bc4cba2a981ed48a949d70bc",
+      "ordinal": 7,
+      "status": "PASS",
+      "total": 13
+    },
+    {
+      "binary": "lamp-update::it",
+      "case": "image_ramlog::the_last_two_boots_are_kept_at_shutdown_only",
+      "driver_sha256": "c09bdee086b77d1ec716e58323978d84e350e0c5bc4cba2a981ed48a949d70bc",
+      "ordinal": 11,
+      "status": "PASS",
+      "total": 13
+    },
+    {
+      "binary": "lamp-update::it",
+      "case": "scratch_paths::no_two_files_of_a_test_binary_build_the_same_scratch_folder",
+      "driver_sha256": "c09bdee086b77d1ec716e58323978d84e350e0c5bc4cba2a981ed48a949d70bc",
+      "ordinal": 9,
+      "status": "PASS",
+      "total": 13
+    },
+    {
+      "binary": "lamp-update::it",
+      "case": "scratch_paths::the_names_read_are_the_scratch_folders_only",
+      "driver_sha256": "c09bdee086b77d1ec716e58323978d84e350e0c5bc4cba2a981ed48a949d70bc",
+      "ordinal": 10,
+      "status": "PASS",
+      "total": 13
+    }
+  ],
+  "exit_code": 0,
+  "filtered_within_list": 0,
+  "full33_not_reexecuted": true,
+  "full_it_target": true,
+  "headers": [
+    "    Starting 13 tests across 1 binary"
+  ],
+  "ignored": 0,
+  "processes": 4,
+  "required_scanners": [
+    [
+      "lamp-update::it",
+      "ci_paths::every_doc_a_crate_reads_is_named_back_in_the_workflows_pull_request_paths"
+    ],
+    [
+      "lamp-update::it",
+      "scratch_paths::no_two_files_of_a_test_binary_build_the_same_scratch_folder"
+    ]
+  ],
+  "retries": 0,
+  "selected_unrun": 0,
+  "summary": [
+    "     Summary [   0.725s] 13 tests run: 13 passed, 0 skipped"
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "base": "f903659bba298cdee290ee4285038a8f46af930b",
+  "baseline_198_pass_INCONCLUSIVE": true,
+  "config_sha256": "c4992da8d157df279011a424b5feb4833f001fd1d46ce3edd0a56992c848bb33",
+  "controller_sha256": "cf4b2da7553dfc60e938770ce0f2c0d3aee511fa213cd3f0537542a58ad72039",
+  "dirty_files": [
+    "lampOS/crates/update/src/writer_refresh.rs",
+    "lampOS/crates/update/src/writer_refresh/tests.rs",
+    "lampOS/docs/settings-writer-refresh.md"
+  ],
+  "earlier_CI_runner_version": "0.9.149",
+  "earlier_failure_unwaived": true,
+  "head": "f903659bba298cdee290ee4285038a8f46af930b",
+  "merged_receipt_selector_sha256": "ecf2c70720c3f1c14b5ba960123cea0e3ae0764777f4906992a989c58ee80c23",
+  "nextest_tool_sha256": "aad9d409cd2f0a81fcaed49d7672a133254179458436c1e957505e4a11655329",
+  "nextest_version": "0.9.150",
+  "own_branch": "second/writer-refresh-drop",
+  "preferred_runner_scope": "FIRST FULL candidate lamp-update normal Nextest all();512 projection only; twenty foundation/model plus eight receipt plus five Head/mask controls=33; oldnegative/raw failures separate",
+  "source_count": 7500,
+  "tree": "c8272eb55620df0372bb0a43e013a3c87fa1393e",
+  "uncommitted_source_gate": true,
+  "verified_tool_proof_sha256": "5563f2b54904be2611512496701b75cb5d11f8a60fe3e60773a1579b82286c1f",
+  "working_patch_sha256": "1b2a583f67e123489014938324c4e2ee9629dd012b51717540f90a987ae0b0c5"
+}

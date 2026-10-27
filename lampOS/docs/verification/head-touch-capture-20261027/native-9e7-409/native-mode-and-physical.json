@@ -1,0 +1,37 @@
+{
+  "head": "9e7d5d45b57fb5ff6534da92e080feb490ab529d",
+  "base": "40923624247a893a19e1d980a328424eedffa308",
+  "actual_checkout": "a8b01bf9589322e27fa687ee8ab030772ce34c3c",
+  "native_host": "aarch64-unknown-linux-gnu",
+  "Rust": "1.96.0",
+  "Nextest": "0.9.149",
+  "profile": "pr",
+  "special_native_control_rows": [
+    {
+      "binary": "lamp-update",
+      "name": "head_touch::capture::tests::file_mutation_and_ancestor_replacement_refuse_before_freeze",
+      "ordinal": 2498,
+      "status": "PASS",
+      "total": 7815
+    },
+    {
+      "binary": "lamp-update",
+      "name": "head_touch::capture::tests::raw_non_utf8_names_are_preserved_but_non_utf8_text_is_refused",
+      "ordinal": 2501,
+      "status": "PASS",
+      "total": 7815
+    },
+    {
+      "binary": "lamp-update",
+      "name": "head_touch::capture::tests::same_descriptor_checks_reject_preopen_swap_and_postread_mutation",
+      "ordinal": 2506,
+      "status": "PASS",
+      "total": 7815
+    }
+  ],
+  "Linux_physical_inference": "Exact current source with unconditional cfgLinux subsection +actualnativePASS; individual syscalls nottraced.",
+  "Mac_physical_raw_names": "UNVERIFIED",
+  "old6523_failed_subcase_and_cause": "UNESTABLISHED",
+  "no_later_a17_credit": true,
+  "no_test_executable_hashes_claimed": true
+}

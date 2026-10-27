@@ -1,0 +1,98 @@
+[
+  {
+    "file": "source-binding.json",
+    "raw_sha256": "b0aa913e59fbf2c0e78c086c963182ea751b516636a63e067dd0bd69dbe7b8d8",
+    "sanitized_sha256": "b0aa913e59fbf2c0e78c086c963182ea751b516636a63e067dd0bd69dbe7b8d8",
+    "published_sha256": "b0aa913e59fbf2c0e78c086c963182ea751b516636a63e067dd0bd69dbe7b8d8",
+    "sanitized_terminal_LFs": 1,
+    "EOF_reconstruction": "Remove published terminal LF and append sanitized_terminal_LFs terminal LFs; empty remains empty."
+  },
+  {
+    "file": "census.json",
+    "raw_sha256": "81c95a9be1d5b0a5f033792f67eeef4175a2bc06459fe9cd4733b85be3a3af1c",
+    "sanitized_sha256": "81c95a9be1d5b0a5f033792f67eeef4175a2bc06459fe9cd4733b85be3a3af1c",
+    "published_sha256": "81c95a9be1d5b0a5f033792f67eeef4175a2bc06459fe9cd4733b85be3a3af1c",
+    "sanitized_terminal_LFs": 1,
+    "EOF_reconstruction": "Remove published terminal LF and append sanitized_terminal_LFs terminal LFs; empty remains empty."
+  },
+  {
+    "file": "terminal-rows.json",
+    "raw_sha256": "ec2b860511f57b0c141e39dcf1dde0ad696d407140d758d954f7b26e0fe2c36b",
+    "sanitized_sha256": "ec2b860511f57b0c141e39dcf1dde0ad696d407140d758d954f7b26e0fe2c36b",
+    "published_sha256": "ec2b860511f57b0c141e39dcf1dde0ad696d407140d758d954f7b26e0fe2c36b",
+    "sanitized_terminal_LFs": 1,
+    "EOF_reconstruction": "Remove published terminal LF and append sanitized_terminal_LFs terminal LFs; empty remains empty."
+  },
+  {
+    "file": "required-selectors.json",
+    "raw_sha256": "d5ac258bf95c4688dd682a784fa603b4a042be7b057dc624e80b8be0f804e61e",
+    "sanitized_sha256": "d5ac258bf95c4688dd682a784fa603b4a042be7b057dc624e80b8be0f804e61e",
+    "published_sha256": "d5ac258bf95c4688dd682a784fa603b4a042be7b057dc624e80b8be0f804e61e",
+    "sanitized_terminal_LFs": 1,
+    "EOF_reconstruction": "Remove published terminal LF and append sanitized_terminal_LFs terminal LFs; empty remains empty."
+  },
+  {
+    "file": "all58-control-bindings.json",
+    "raw_sha256": "80dd090b8cb9815ce0fb90596529ea75254e7bc3c2e5ad06fa5120cf27644c32",
+    "sanitized_sha256": "80dd090b8cb9815ce0fb90596529ea75254e7bc3c2e5ad06fa5120cf27644c32",
+    "published_sha256": "80dd090b8cb9815ce0fb90596529ea75254e7bc3c2e5ad06fa5120cf27644c32",
+    "sanitized_terminal_LFs": 1,
+    "EOF_reconstruction": "Remove published terminal LF and append sanitized_terminal_LFs terminal LFs; empty remains empty."
+  },
+  {
+    "file": "complete-original-failure-block.log",
+    "raw_sha256": "8e6ed15ddb9d0f7b42c3644bb5c042f165ab6d65352fe379d4ff9dedba1069c1",
+    "sanitized_sha256": "8e6ed15ddb9d0f7b42c3644bb5c042f165ab6d65352fe379d4ff9dedba1069c1",
+    "published_sha256": "8e6ed15ddb9d0f7b42c3644bb5c042f165ab6d65352fe379d4ff9dedba1069c1",
+    "sanitized_terminal_LFs": 1,
+    "EOF_reconstruction": "Remove published terminal LF and append sanitized_terminal_LFs terminal LFs; empty remains empty."
+  },
+  {
+    "file": "terminal-summary.log",
+    "raw_sha256": "da6b994bff5d3298a914b33435d258c14a22f486fc4cf6d6d2215ea053c8225e",
+    "sanitized_sha256": "da6b994bff5d3298a914b33435d258c14a22f486fc4cf6d6d2215ea053c8225e",
+    "published_sha256": "da6b994bff5d3298a914b33435d258c14a22f486fc4cf6d6d2215ea053c8225e",
+    "sanitized_terminal_LFs": 1,
+    "EOF_reconstruction": "Remove published terminal LF and append sanitized_terminal_LFs terminal LFs; empty remains empty."
+  },
+  {
+    "file": "arm-terminal-state.json",
+    "raw_sha256": "5a05d295f63e379b5cf1ec6c28b79068569e2076246ec6bde5c87948bb872ed6",
+    "sanitized_sha256": "5a05d295f63e379b5cf1ec6c28b79068569e2076246ec6bde5c87948bb872ed6",
+    "published_sha256": "5a05d295f63e379b5cf1ec6c28b79068569e2076246ec6bde5c87948bb872ed6",
+    "sanitized_terminal_LFs": 1,
+    "EOF_reconstruction": "Remove published terminal LF and append sanitized_terminal_LFs terminal LFs; empty remains empty."
+  },
+  {
+    "file": "linux-terminal-state.json",
+    "raw_sha256": "9c32a17fb11d0dad34e89bd29140de07db02c475a3f179f77be30589abc02dd1",
+    "sanitized_sha256": "9c32a17fb11d0dad34e89bd29140de07db02c475a3f179f77be30589abc02dd1",
+    "published_sha256": "9c32a17fb11d0dad34e89bd29140de07db02c475a3f179f77be30589abc02dd1",
+    "sanitized_terminal_LFs": 1,
+    "EOF_reconstruction": "Remove published terminal LF and append sanitized_terminal_LFs terminal LFs; empty remains empty."
+  },
+  {
+    "file": "raw-evidence-hashes.json",
+    "raw_sha256": "01c0f9cf768754b4c31ebe0028e06f4d5174ed5f2fd507025aa36aab625e6d6c",
+    "sanitized_sha256": "01c0f9cf768754b4c31ebe0028e06f4d5174ed5f2fd507025aa36aab625e6d6c",
+    "published_sha256": "01c0f9cf768754b4c31ebe0028e06f4d5174ed5f2fd507025aa36aab625e6d6c",
+    "sanitized_terminal_LFs": 1,
+    "EOF_reconstruction": "Remove published terminal LF and append sanitized_terminal_LFs terminal LFs; empty remains empty."
+  },
+  {
+    "file": "watch-completion-receipt.json",
+    "raw_sha256": "228a2c71ec5b218bbab5cb22685b0b6c1e342e8effc47c0d859038a8c71c0361",
+    "sanitized_sha256": "228a2c71ec5b218bbab5cb22685b0b6c1e342e8effc47c0d859038a8c71c0361",
+    "published_sha256": "228a2c71ec5b218bbab5cb22685b0b6c1e342e8effc47c0d859038a8c71c0361",
+    "sanitized_terminal_LFs": 1,
+    "EOF_reconstruction": "Remove published terminal LF and append sanitized_terminal_LFs terminal LFs; empty remains empty."
+  },
+  {
+    "file": "README.md",
+    "raw_sha256": "171a07d72cc0ad04bb1f896cec736767d8de7a15964e81c931c8966574c3fd36",
+    "sanitized_sha256": "171a07d72cc0ad04bb1f896cec736767d8de7a15964e81c931c8966574c3fd36",
+    "published_sha256": "171a07d72cc0ad04bb1f896cec736767d8de7a15964e81c931c8966574c3fd36",
+    "sanitized_terminal_LFs": 1,
+    "EOF_reconstruction": "Remove published terminal LF and append sanitized_terminal_LFs terminal LFs; empty remains empty."
+  }
+]

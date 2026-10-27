@@ -1,0 +1,21 @@
+{
+  "files": {
+    "<private-path>": null,
+    "<private-path>": {
+      "sha256": "48a3e9ff36c92393a61c94924a7268fd9e732dc55afe239842fe7fdd2fa7db71",
+      "bytes": 210
+    },
+    "<private-path>": null,
+    "<private-path>": null,
+    "<private-path>": null,
+    "<private-path>": null,
+    "/private/.cargo/config": null,
+    "/private/.cargo/config.toml": null,
+    "/.cargo/config": null,
+    "/.cargo/config.toml": null,
+    "<cargo-home>/config": null,
+    "<cargo-home>/config.toml": null
+  },
+  "inherited_compiler_variable_names": [],
+  "user_nextest_config": "none"
+}

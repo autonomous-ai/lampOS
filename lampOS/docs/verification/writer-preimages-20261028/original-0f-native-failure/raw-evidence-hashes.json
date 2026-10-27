@@ -1,0 +1,42 @@
+[
+  {
+    "evidence": "arm64.log",
+    "sha256": "515fec8563277f32776be6485db4b3fd371db9de5ab5835539bd87be6f37abad",
+    "bytes": 1285310
+  },
+  {
+    "evidence": "second-3907-linux-complete-20261028.log",
+    "sha256": "947a5ca2bc6352f367e5e8551b38390bb2b8207be00112a708ffe32bea576d13",
+    "bytes": 96355
+  },
+  {
+    "evidence": "second-3907-arm-final-run-20261028.json",
+    "sha256": "8081300f993d3fb52380204d8729cd4437190167f3b9574a2b8ecdb662916a0e",
+    "bytes": 12701
+  },
+  {
+    "evidence": "second-3907-arm-final-jobs-20261028.json",
+    "sha256": "e0dc7032b74008987891b07cca66611e8de0863de1cbe726d46853f40db59d1d",
+    "bytes": 8152
+  },
+  {
+    "evidence": "second-3907-linux-final-run-20261028.json",
+    "sha256": "72ee48019a555d066403892354e8d80967299c6c90e4597dd463c3c798ad4bb2",
+    "bytes": 12700
+  },
+  {
+    "evidence": "second-3907-linux-final-jobs-20261028.json",
+    "sha256": "acb4f61e67a695500ab625f28a5c4a918daa68b666917dc8e2c343f9403a7bbd",
+    "bytes": 3007
+  },
+  {
+    "evidence": "second-3907-original-preview-20261028.json",
+    "sha256": "861275e9e32f40b4169b0801d116161b3866e817a5ecb4ac3d56a297853caaec",
+    "bytes": 137392
+  },
+  {
+    "evidence": "second-3907-native-census-20261028.py",
+    "sha256": "325f58fdc77458b9d2fd24ae2be40ac7bbeb683779af462dc68708387b74819e",
+    "bytes": 5837
+  }
+]

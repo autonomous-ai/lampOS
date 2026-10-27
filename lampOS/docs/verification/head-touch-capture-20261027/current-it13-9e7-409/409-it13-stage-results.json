@@ -1,0 +1,37 @@
+[
+  {
+    "stage": "metadata",
+    "exit_code": 0,
+    "elapsed_seconds": 0.178
+  },
+  {
+    "stage": "fmt",
+    "exit_code": 0,
+    "elapsed_seconds": 5.762
+  },
+  {
+    "stage": "clippy",
+    "exit_code": 0,
+    "elapsed_seconds": 16.953
+  },
+  {
+    "stage": "compile",
+    "exit_code": 0,
+    "elapsed_seconds": 37.16
+  },
+  {
+    "stage": "full-list",
+    "exit_code": 0,
+    "elapsed_seconds": 1.151
+  },
+  {
+    "stage": "it-list",
+    "exit_code": 0,
+    "elapsed_seconds": 0.364
+  },
+  {
+    "stage": "nextest",
+    "exit_code": 0,
+    "elapsed_seconds": 0.99
+  }
+]

@@ -1,0 +1,25 @@
+[
+  {
+    "chunk_id": "5ae58d",
+    "exit_code": 0,
+    "raw_private_sha256": "d71252d779ab65391d9835703e7e87898a2c56631e0ba385d0da771bcaa1339a",
+    "receipt": "continuation-1.json",
+    "scope": "FOCUSED_37227",
+    "wall_time_seconds": 2.0167e-05
+  },
+  {
+    "chunk_id": "8c384d",
+    "raw_private_sha256": "d14483bfe310edb241766852c2e4f03c6a1e64a274e964e403ce007d949acb62",
+    "receipt": "initial-result.json",
+    "scope": "FOCUSED_37227",
+    "session_id": 37227,
+    "wall_time_seconds": 1.001521666
+  },
+  {
+    "raw_private_sha256": "c936f93ea53b14aaf5c1d12bd0dfd321ef19c08880a21c31c9abf17566b2a670",
+    "receipt": "request-before-exec.json",
+    "sandbox_permissions": "require_escalated",
+    "saved_before_exec": true,
+    "scope": "FOCUSED_37227"
+  }
+]

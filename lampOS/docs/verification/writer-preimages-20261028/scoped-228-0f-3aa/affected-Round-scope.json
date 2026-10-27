@@ -1,0 +1,49 @@
+{
+  "source": "<private-path>",
+  "sha256": "4a1dd66eb08ff1516dc16b19d2805f5a53e378567ff1eebe38933272a3fc8ea2",
+  "plan": {
+    "old_base": "28e7a63f238ed1f7078d15eb0eed705ea22baad4",
+    "latest": "3aa752f73914d0f29fc90edb010a3a7fa1cf526b",
+    "paths": [
+      "lampOS/crates/control/src/pairing.rs",
+      "lampOS/crates/voice/src/coordinator.rs",
+      "lampOS/crates/voice/src/lib.rs",
+      "lampOS/crates/voice/src/provider_worker.rs",
+      "lampOS/crates/voice/src/provider_worker/tests/going_on_asks.rs",
+      "lampOS/crates/voice/src/second_provider/worker.rs",
+      "lampOS/crates/voice/src/turned_away.rs",
+      "lampOS/docs/control.md",
+      "lampOS/docs/second-voice.md",
+      "lampOS/docs/switches.md",
+      "lampOS/sdk/js/src/client.js",
+      "lampOS/sdk/python/src/lampos/client.py"
+    ],
+    "normal_Voice_actual_compiler_artifact_retained": {
+      "profile_test": false,
+      "target": "lamp_voice"
+    },
+    "production_consumed_delta": [
+      "voice/coordinator",
+      "voice/lib mod turned_away",
+      "voice/provider_worker",
+      "voice/second_provider/worker",
+      "voice/turned_away new module"
+    ],
+    "test_only": "voice/provider_worker/tests/going_on_asks.rs",
+    "other_scope": "Control pairing and SDK clients comments/doc; door Control remains absent from normal Update artifacts",
+    "no_Update_unit_skill_model_lock_config_changes": true,
+    "runtime_scope_projection": {
+      "Raw": 219,
+      "preimages_with_9_new_controls": 228,
+      "source": "full Update LIB/functions/it plus3bound-receiptRound",
+      "Raw_required": 49,
+      "preimages_required": 58,
+      "fresh_discovery_required": true,
+      "old13_scope_stale_unrun": true,
+      "no_install_allRound_replay": true
+    },
+    "current_Raw_prerequisite": "c0319cb3372427e08ced477bc7b0298a197de675",
+    "counts_are_projection_not_execution": true
+  },
+  "projection228_only_until_discovery": true
+}

@@ -1,0 +1,172 @@
+[
+  {
+    "post_runtime_sha256": "16710ef208bf86189b4c2cd42298768cc29005d773954f59a86bd70252f8af7d",
+    "preserved_sha256": "16710ef208bf86189b4c2cd42298768cc29005d773954f59a86bd70252f8af7d",
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "sha256": "16710ef208bf86189b4c2cd42298768cc29005d773954f59a86bd70252f8af7d",
+    "size": 22852696,
+    "target": "functions",
+    "target_kinds": [
+      "test"
+    ]
+  },
+  {
+    "post_runtime_sha256": "c763df036e058cd3543a8a993bc276d136ae08f6071983247c673adca080f425",
+    "preserved_sha256": "c763df036e058cd3543a8a993bc276d136ae08f6071983247c673adca080f425",
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "sha256": "c763df036e058cd3543a8a993bc276d136ae08f6071983247c673adca080f425",
+    "size": 1277584,
+    "target": "lamp-update",
+    "target_kinds": [
+      "bin"
+    ]
+  },
+  {
+    "post_runtime_sha256": "c1990db310a2bda5204812753ece6ddb9891f9f98bc5c5812d6b8a99218696cd",
+    "preserved_sha256": "c1990db310a2bda5204812753ece6ddb9891f9f98bc5c5812d6b8a99218696cd",
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "sha256": "c1990db310a2bda5204812753ece6ddb9891f9f98bc5c5812d6b8a99218696cd",
+    "size": 550128,
+    "target": "self-process-cuts",
+    "target_kinds": [
+      "test"
+    ]
+  },
+  {
+    "post_runtime_sha256": "ae6ff2751d227a36659f87ba17425479a4925390e5a1127cdd07d2793b13d7de",
+    "preserved_sha256": "ae6ff2751d227a36659f87ba17425479a4925390e5a1127cdd07d2793b13d7de",
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "sha256": "ae6ff2751d227a36659f87ba17425479a4925390e5a1127cdd07d2793b13d7de",
+    "size": 1976832,
+    "target": "it",
+    "target_kinds": [
+      "test"
+    ]
+  },
+  {
+    "post_runtime_sha256": "a82373fc7e73303fe7cf091c113a096612e2956a6d8ef07b1a299b707acf40d1",
+    "preserved_sha256": "a82373fc7e73303fe7cf091c113a096612e2956a6d8ef07b1a299b707acf40d1",
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "sha256": "a82373fc7e73303fe7cf091c113a096612e2956a6d8ef07b1a299b707acf40d1",
+    "size": 3295136,
+    "target": "release_pair",
+    "target_kinds": [
+      "test"
+    ]
+  },
+  {
+    "post_runtime_sha256": "4d6f6a7fdb41c4e7532c32aad4e21dd9050ea269a8eb672f045de7f62cbf0797",
+    "preserved_sha256": "4d6f6a7fdb41c4e7532c32aad4e21dd9050ea269a8eb672f045de7f62cbf0797",
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "sha256": "4d6f6a7fdb41c4e7532c32aad4e21dd9050ea269a8eb672f045de7f62cbf0797",
+    "size": 15669008,
+    "target": "lamp_update",
+    "target_kinds": [
+      "lib"
+    ]
+  },
+  {
+    "post_runtime_sha256": "9e7b630cb26126688b40276c2d07b803f30d9b7a3a22f138660c6cfe24b7879b",
+    "preserved_sha256": "9e7b630cb26126688b40276c2d07b803f30d9b7a3a22f138660c6cfe24b7879b",
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "sha256": "9e7b630cb26126688b40276c2d07b803f30d9b7a3a22f138660c6cfe24b7879b",
+    "size": 20988472,
+    "target": "round",
+    "target_kinds": [
+      "test"
+    ]
+  },
+  {
+    "post_runtime_sha256": "f06bd2f5936050ed5873f7afa617227f38adff4c2e9170b06f42f136c3572449",
+    "preserved_sha256": "f06bd2f5936050ed5873f7afa617227f38adff4c2e9170b06f42f136c3572449",
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "sha256": "f06bd2f5936050ed5873f7afa617227f38adff4c2e9170b06f42f136c3572449",
+    "size": 550080,
+    "target": "self-cli-exec",
+    "target_kinds": [
+      "test"
+    ]
+  },
+  {
+    "post_runtime_sha256": "f159b5008f2e0fe9d355f46d632ffb51ebe0f471dd0830679f80dced94c5f804",
+    "preserved_sha256": "f159b5008f2e0fe9d355f46d632ffb51ebe0f471dd0830679f80dced94c5f804",
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "sha256": "f159b5008f2e0fe9d355f46d632ffb51ebe0f471dd0830679f80dced94c5f804",
+    "size": 17252872,
+    "target": "install",
+    "target_kinds": [
+      "test"
+    ]
+  },
+  {
+    "post_runtime_sha256": "6cbd25c61fa9ff936729703c5f1ef86076d040efb195ef8319b1f3fc78c610e1",
+    "preserved_sha256": "6cbd25c61fa9ff936729703c5f1ef86076d040efb195ef8319b1f3fc78c610e1",
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": false
+    },
+    "sha256": "6cbd25c61fa9ff936729703c5f1ef86076d040efb195ef8319b1f3fc78c610e1",
+    "size": 13557712,
+    "target": "lamp-update",
+    "target_kinds": [
+      "bin"
+    ]
+  }
+]

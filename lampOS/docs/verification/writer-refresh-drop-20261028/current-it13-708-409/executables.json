@@ -1,0 +1,200 @@
+[
+  {
+    "current_source_qualified": true,
+    "post_runtime_sha256": "c09bdee086b77d1ec716e58323978d84e350e0c5bc4cba2a981ed48a949d70bc",
+    "preserved_sha256": "c09bdee086b77d1ec716e58323978d84e350e0c5bc4cba2a981ed48a949d70bc",
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "sha256": "c09bdee086b77d1ec716e58323978d84e350e0c5bc4cba2a981ed48a949d70bc",
+    "size": 1976720,
+    "source_qualification": "CURRENT_TARGETED_IT_BUILD_NO_OTHER_RUNTIME_CLAIM",
+    "target": "it",
+    "target_kinds": [
+      "test"
+    ]
+  },
+  {
+    "current_source_qualified": true,
+    "post_runtime_sha256": "e984e358fbedcc09d52f3160e4228e8472b748ed74e19334a8b3c618e524739c",
+    "preserved_sha256": "e984e358fbedcc09d52f3160e4228e8472b748ed74e19334a8b3c618e524739c",
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": false
+    },
+    "sha256": "e984e358fbedcc09d52f3160e4228e8472b748ed74e19334a8b3c618e524739c",
+    "size": 13556960,
+    "source_qualification": "CURRENT_TARGETED_IT_BUILD_NO_OTHER_RUNTIME_CLAIM",
+    "target": "lamp-update",
+    "target_kinds": [
+      "bin"
+    ]
+  },
+  {
+    "current_source_qualified": false,
+    "donor_manifest_sha256": "9edeae7e01613e202f5493e2567c7b8ac0e15a68ddc90fcef3d6135aa29bc1e4",
+    "post_runtime_sha256": "5f0e04933283a300a0fc3e2d58131d01cc34cb6154deaad920e75c2af96ab389",
+    "preserved_sha256": "5f0e04933283a300a0fc3e2d58131d01cc34cb6154deaad920e75c2af96ab389",
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "sha256": "5f0e04933283a300a0fc3e2d58131d01cc34cb6154deaad920e75c2af96ab389",
+    "size": 17252984,
+    "source_qualification": "RETAINED_DONOR_EXECUTABLE_NOT_CURRENT_SOURCE",
+    "target": "install",
+    "target_kinds": [
+      "test"
+    ]
+  },
+  {
+    "current_source_qualified": false,
+    "donor_manifest_sha256": "9edeae7e01613e202f5493e2567c7b8ac0e15a68ddc90fcef3d6135aa29bc1e4",
+    "post_runtime_sha256": "8a03adb77e4a5e7669166daef54d14df4e4716892c407b2c6110706723eeef60",
+    "preserved_sha256": "8a03adb77e4a5e7669166daef54d14df4e4716892c407b2c6110706723eeef60",
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "sha256": "8a03adb77e4a5e7669166daef54d14df4e4716892c407b2c6110706723eeef60",
+    "size": 22852392,
+    "source_qualification": "RETAINED_DONOR_EXECUTABLE_NOT_CURRENT_SOURCE",
+    "target": "functions",
+    "target_kinds": [
+      "test"
+    ]
+  },
+  {
+    "current_source_qualified": false,
+    "donor_manifest_sha256": "9edeae7e01613e202f5493e2567c7b8ac0e15a68ddc90fcef3d6135aa29bc1e4",
+    "post_runtime_sha256": "67eaa4f131ae3d6163ecf37590430eef8e667d650dd03ff20f50cc25096fd42a",
+    "preserved_sha256": "67eaa4f131ae3d6163ecf37590430eef8e667d650dd03ff20f50cc25096fd42a",
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "sha256": "67eaa4f131ae3d6163ecf37590430eef8e667d650dd03ff20f50cc25096fd42a",
+    "size": 20987768,
+    "source_qualification": "RETAINED_DONOR_EXECUTABLE_NOT_CURRENT_SOURCE",
+    "target": "round",
+    "target_kinds": [
+      "test"
+    ]
+  },
+  {
+    "current_source_qualified": false,
+    "donor_manifest_sha256": "9edeae7e01613e202f5493e2567c7b8ac0e15a68ddc90fcef3d6135aa29bc1e4",
+    "post_runtime_sha256": "7a7be2a60f24acc27bb4fa3103f20201a15b721cd3c47a31d548c8ca71543494",
+    "preserved_sha256": "7a7be2a60f24acc27bb4fa3103f20201a15b721cd3c47a31d548c8ca71543494",
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "sha256": "7a7be2a60f24acc27bb4fa3103f20201a15b721cd3c47a31d548c8ca71543494",
+    "size": 3295824,
+    "source_qualification": "RETAINED_DONOR_EXECUTABLE_NOT_CURRENT_SOURCE",
+    "target": "release_pair",
+    "target_kinds": [
+      "test"
+    ]
+  },
+  {
+    "current_source_qualified": false,
+    "donor_manifest_sha256": "9edeae7e01613e202f5493e2567c7b8ac0e15a68ddc90fcef3d6135aa29bc1e4",
+    "post_runtime_sha256": "ab2ab213cee3c772c24e60781fc84e224ae4baf25f8b4f8f7b9da9b5d5012f08",
+    "preserved_sha256": "ab2ab213cee3c772c24e60781fc84e224ae4baf25f8b4f8f7b9da9b5d5012f08",
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "sha256": "ab2ab213cee3c772c24e60781fc84e224ae4baf25f8b4f8f7b9da9b5d5012f08",
+    "size": 15841696,
+    "source_qualification": "RETAINED_DONOR_EXECUTABLE_NOT_CURRENT_SOURCE",
+    "target": "lamp_update",
+    "target_kinds": [
+      "lib"
+    ]
+  },
+  {
+    "current_source_qualified": false,
+    "donor_manifest_sha256": "9edeae7e01613e202f5493e2567c7b8ac0e15a68ddc90fcef3d6135aa29bc1e4",
+    "post_runtime_sha256": "e425397163ad3027a1782c664ab73a734190ba52333297b8a687de040e2c6cbe",
+    "preserved_sha256": "e425397163ad3027a1782c664ab73a734190ba52333297b8a687de040e2c6cbe",
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "sha256": "e425397163ad3027a1782c664ab73a734190ba52333297b8a687de040e2c6cbe",
+    "size": 1276848,
+    "source_qualification": "RETAINED_DONOR_EXECUTABLE_NOT_CURRENT_SOURCE",
+    "target": "lamp-update",
+    "target_kinds": [
+      "bin"
+    ]
+  },
+  {
+    "current_source_qualified": false,
+    "donor_manifest_sha256": "9edeae7e01613e202f5493e2567c7b8ac0e15a68ddc90fcef3d6135aa29bc1e4",
+    "post_runtime_sha256": "344099ca5d40d9252637a9f2800e328ca1e9355e88b3ea6b6ecf379475196f78",
+    "preserved_sha256": "344099ca5d40d9252637a9f2800e328ca1e9355e88b3ea6b6ecf379475196f78",
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "sha256": "344099ca5d40d9252637a9f2800e328ca1e9355e88b3ea6b6ecf379475196f78",
+    "size": 550080,
+    "source_qualification": "RETAINED_DONOR_EXECUTABLE_NOT_CURRENT_SOURCE",
+    "target": "self-cli-exec",
+    "target_kinds": [
+      "test"
+    ]
+  },
+  {
+    "current_source_qualified": false,
+    "donor_manifest_sha256": "9edeae7e01613e202f5493e2567c7b8ac0e15a68ddc90fcef3d6135aa29bc1e4",
+    "post_runtime_sha256": "5c4d48cad283c58e7df4d4bc01acb9798bd8dba4701e6e6787a4c959d4057e78",
+    "preserved_sha256": "5c4d48cad283c58e7df4d4bc01acb9798bd8dba4701e6e6787a4c959d4057e78",
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "sha256": "5c4d48cad283c58e7df4d4bc01acb9798bd8dba4701e6e6787a4c959d4057e78",
+    "size": 550128,
+    "source_qualification": "RETAINED_DONOR_EXECUTABLE_NOT_CURRENT_SOURCE",
+    "target": "self-process-cuts",
+    "target_kinds": [
+      "test"
+    ]
+  }
+]

@@ -1,0 +1,15 @@
+{
+  "all_stages_passed": true,
+  "configuration_unchanged": true,
+  "controller_error": null,
+  "controller_unchanged": true,
+  "head_unchanged": true,
+  "mixed_current_vs_retained_provenance_explicit": true,
+  "nextest_config_unchanged": true,
+  "nextest_tool_unchanged": true,
+  "old_failed_driver_preserved_unchanged": true,
+  "source_count": 7500,
+  "source_unchanged": true,
+  "status_unchanged": true,
+  "working_patch_unchanged": true
+}

@@ -1,0 +1,6 @@
+{
+  "expression": "binary_id(=lamp-update) | binary_id(=lamp-update::functions) | binary_id(=lamp-update::it) | (binary_id(=lamp-update::round) & (test(=a_rejected_apply_receipt_runs_real_back_and_restores_written_settings_modes_and_records) | test(=a_rejected_back_receipt_keeps_the_journal_until_real_back_is_acknowledged) | test(=the_round_rejects_a_done_matching_a_rewritten_request_instead_of_its_own_request)))",
+  "DSL_reference": "https://nexte.st/docs/filtersets/reference/",
+  "projected228_projection_only": true,
+  "old537_full_scope": "d8 only"
+}

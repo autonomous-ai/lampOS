@@ -1,0 +1,192 @@
+{
+  "head": "a47fe22e56d181f6d7946bc5b98d90dd9560293e",
+  "prior_read": "2cc71e720",
+  "diagnostic_whole_blob_mode": "100644 blob a86c8e10871ac53cb79802addb177078ebc5e5be\tlampOS/crates/voice/tests/it/diagnostics.rs",
+  "diagnostic_whole_file_equal_prior_read": true,
+  "original_preview": {
+    "parents": [
+      "3aa752f73914d0f29fc90edb010a3a7fa1cf526b",
+      "a47fe22e56d181f6d7946bc5b98d90dd9560293e"
+    ],
+    "sha": "1fd8aacaa31bdd2486fbcc3d4810c64c7b90c6b7",
+    "tree": "a88b383c84d92beb258df392237899830eae2cba"
+  },
+  "census": {
+    "PASS": 5097,
+    "FAIL": 1,
+    "selected_total": 7796,
+    "selected_unrun": 2698,
+    "summary_skips": 53,
+    "terminal_echoes_excluded": 23
+  },
+  "diagnostic18": [
+    {
+      "test": "diagnostics::capture_files_preserve_pcm_offsets_hashes_and_full_acknowledgement",
+      "status": "UNRUN"
+    },
+    {
+      "test": "diagnostics::processing_provenance_matches_pending_result_and_acknowledged_summary",
+      "status": "UNRUN"
+    },
+    {
+      "test": "diagnostics::capture_processing_cannot_be_mislabelled_as_render_processing",
+      "status": "UNRUN"
+    },
+    {
+      "test": "diagnostics::render_records_only_accepted_prefix_and_typed_priming_silence",
+      "status": "UNRUN"
+    },
+    {
+      "test": "diagnostics::accepted_speech_gap_zeros_are_explicit_and_do_not_replace_neighboring_pcm",
+      "status": "UNRUN"
+    },
+    {
+      "test": "diagnostics::capture_sequence_gap_and_unannounced_epoch_change_fail",
+      "status": "UNRUN"
+    },
+    {
+      "test": "diagnostics::render_cursor_gap_does_not_insert_silence",
+      "status": "UNRUN"
+    },
+    {
+      "test": "diagnostics::explicit_reset_and_privacy_boundaries_are_retained_and_split_epochs",
+      "status": "UNRUN"
+    },
+    {
+      "test": "diagnostics::closed_privacy_cannot_be_overridden_by_pcm_metadata",
+      "status": "UNRUN"
+    },
+    {
+      "test": "diagnostics::no_overwrite_private_parent_and_symlink_rejection",
+      "status": "UNRUN"
+    },
+    {
+      "test": "diagnostics::replaced_artifact_never_receives_original_pcm_or_valid_marker",
+      "status": "UNRUN"
+    },
+    {
+      "test": "diagnostics::duration_and_frame_shape_limits_disable_evidence_without_blocking",
+      "status": "UNRUN"
+    },
+    {
+      "test": "diagnostics::omitted_open_privacy_and_missing_opening_frames_are_invalid",
+      "status": "UNRUN"
+    },
+    {
+      "test": "diagnostics::dsp_reset_preserves_capture_sequence_and_cannot_cover_a_gap",
+      "status": "UNRUN"
+    },
+    {
+      "test": "diagnostics::playback_reset_requires_matching_old_discard_and_advancing_epoch",
+      "status": "UNRUN"
+    },
+    {
+      "test": "diagnostics::audio_fault_end_is_incomplete_even_with_good_written_pcm",
+      "status": "UNRUN"
+    },
+    {
+      "test": "diagnostics::replacement_directory_and_existing_final_marker_cannot_be_certified",
+      "status": "UNRUN"
+    },
+    {
+      "test": "diagnostics::repeated_privacy_observation_does_not_reset_the_render_cursor",
+      "status": "UNRUN"
+    }
+  ],
+  "failed_terminal": [
+    {
+      "status": "FAIL",
+      "ordinal": 5095,
+      "total": 7796,
+      "binary": "lamp-voice",
+      "test": "remember::tests::after_a_forget_the_next_conversation_is_journalled_and_ended"
+    }
+  ],
+  "raw_log_sha256": "eba309aa16ac1f035b9d096eabfdd4c377e51d6c8d141b31f8afd9538c27661f",
+  "new_local_tests": 0,
+  "old_18_local_tests_retained_on_original_source": true,
+  "qualification": "HOLD: original native failed; source-only prior read carries, no wider privacy or latest-base waiver",
+  "two_owned_full_files": [
+    {
+      "path": "lampOS/crates/voice/tests/it/diagnostics.rs",
+      "mode_blob": "100644 blob a86c8e10871ac53cb79802addb177078ebc5e5be\tlampOS/crates/voice/tests/it/diagnostics.rs",
+      "sha256": "b368573cd5894ccfada720835d9d098297e1250ea61477702c6169a99db8e8eb",
+      "authored_preview_full_equal": true
+    },
+    {
+      "path": "lampOS/docs/voice-test-fixtures.md",
+      "mode_blob": "100644 blob 89924bf63ccd3230b8021cf9a189a30ab00dc1b2\tlampOS/docs/voice-test-fixtures.md",
+      "sha256": "daecb04228dff4bbbbd9d32014dd0392a81304eb52fa6ac54aafded1787fb21d",
+      "authored_preview_full_equal": true
+    }
+  ],
+  "actual_preview_remember_equals_3aa": true,
+  "remember_sha256": "a3eba22d4b8fb39895a12809160ce0af04692491afc187b75ca75f4ea71df018",
+  "linux_original": {
+    "run": 40551384353,
+    "job": 122355748392,
+    "success": true,
+    "actual_checkout": "1fd8aacaa31bdd2486fbcc3d4810c64c7b90c6b7",
+    "fmt_strict_commands_verified": true,
+    "raw_log_sha256": "749e614e7f1186343ed37d5960458696ad617c46386e9f2cd2a0e152193b3e0f"
+  },
+  "accepted_privacy_eleven": [
+    {
+      "path": "lampOS/crates/voice/src/privacy_bus.rs",
+      "sha256": "0f376c76bc9409f9d41c07187d4a58de553bfb5b49a6d600342bcd90714a67df",
+      "matches_accepted3637": true
+    },
+    {
+      "path": "lampOS/crates/msgs/src/privacy.rs",
+      "sha256": "32ec32a89137fc6e39e5fb9b66314f0349069d1321e63d7e0cd5fc2ce0b8e8a1",
+      "matches_accepted3637": true
+    },
+    {
+      "path": "lampOS/crates/msgs/tests/it/privacy.rs",
+      "sha256": "49877816630df846011d0c3a9fe3239e4bbdac0cdfffa31478a38c159ca03356",
+      "matches_accepted3637": true
+    },
+    {
+      "path": "lampOS/crates/bus/tests/it/bus.rs",
+      "sha256": "7040765d6d856c9e228a1211da736b8a891680a5bf90d4b0a3a6ced064a1f76a",
+      "matches_accepted3637": true
+    },
+    {
+      "path": "lampOS/crates/bus/src/subscribe.rs",
+      "sha256": "0404a4e881ee06ba41c4f5874d31dcf773a9aba818d2b4df410e6a05bf396e28",
+      "matches_accepted3637": true
+    },
+    {
+      "path": "lampOS/crates/bus/src/wire.rs",
+      "sha256": "2773cbc3f2dd0fe5accd28e1e940b57dc579dc48c922821e4b66e5b80abf6920",
+      "matches_accepted3637": true
+    },
+    {
+      "path": "lampOS/crates/bus/src/publish.rs",
+      "sha256": "3b760ef2169d8561750c0bf28f8bea176f729c8ba18de45354067068814016c1",
+      "matches_accepted3637": true
+    },
+    {
+      "path": "lampOS/crates/bus/src/live.rs",
+      "sha256": "b0a04b4b0a58ab8ca01a38de39931bf3657fc985187caee6db43499b2b6b6291",
+      "matches_accepted3637": true
+    },
+    {
+      "path": "lampOS/crates/bus/src/declare.rs",
+      "sha256": "60183bfa717674edc75d709417c7cb4f8366900bb598a8db627240a2a96c5995",
+      "matches_accepted3637": true
+    },
+    {
+      "path": "lampOS/crates/ipc/src/lib.rs",
+      "sha256": "f64aa5070b79991a58ed0fe772c6697c3d52f4c58b48e793046c753358703c44",
+      "matches_accepted3637": true
+    },
+    {
+      "path": "lampOS/crates/controls/src/privacy.rs",
+      "sha256": "3a22d4b087a9f6cf68b3fbcc753bed367d53354d2660c6c1057b7bdb04a60a2d",
+      "matches_accepted3637": true
+    }
+  ],
+  "whole_tree_equal": false,
+  "old18local_runtime_retained_only_prior2cc": true
+}

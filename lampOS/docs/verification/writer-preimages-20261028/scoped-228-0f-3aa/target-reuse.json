@@ -1,0 +1,25 @@
+{
+  "donor_manifest": "<private-path>",
+  "manifest_sha256": "464b9aa6f0c5d0a4b04a5c195a1befa7bc827092fa36c9974625c24c6aa98b1c",
+  "closure_sha256": "65023b3fc82b381127ae023751edc9b703623d4efd2e148f4a4fec6db545da72",
+  "donor_closure": {
+    "head_unchanged": true,
+    "status_unchanged": true,
+    "working_patch_unchanged": true,
+    "source_unchanged": true,
+    "source_count": 7502,
+    "configuration_unchanged": true,
+    "controller_unchanged": true,
+    "nextest_tool_unchanged": true,
+    "nextest_config_unchanged": true,
+    "retained_failed_driver_unchanged": true,
+    "receipt_selectors_unchanged": true,
+    "affected_scope_unchanged": true,
+    "all_stages_passed": true,
+    "controller_error": null
+  },
+  "cache_boundary_only_no_runtime_equivalence": true,
+  "actual_and_preserved_count": 10,
+  "artifact_boundary_only_no_runtime_equivalence": true,
+  "explicit_slot_release_required": true
+}

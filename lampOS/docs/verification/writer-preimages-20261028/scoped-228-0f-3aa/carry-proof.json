@@ -1,0 +1,40 @@
+{
+  "worktree": "<preimage-tree>",
+  "branch": "second/writer-preimages-latest",
+  "head": "c0319cb3372427e08ced477bc7b0298a197de675",
+  "base": "3aa752f73914d0f29fc90edb010a3a7fa1cf526b",
+  "tree": "7bf12be1fbb452418ec53a7b0b106eb30b935771",
+  "all_six_complete_bytes_modes_equal_to_537": true,
+  "owned_six": {
+    "lampOS/crates/update/src/lib.rs": {
+      "sha256": "bc0e2fef71dcb019d47de21df012bba6caffbce404648632e8a57eec2932bdec",
+      "mode": 420
+    },
+    "lampOS/crates/update/src/writer_preimages.rs": {
+      "sha256": "ae77c27a17dca18c42b8da10e7a959f74a1fe19225fea148f3dbbadcf47b2242",
+      "mode": 420
+    },
+    "lampOS/crates/update/src/writer_preimages/tests.rs": {
+      "sha256": "6d06b27283543a308d4d4b1ada60406235a10c2ccf28eadc05aa1ac82ea3270f",
+      "mode": 420
+    },
+    "lampOS/docs/reuse-decisions.md": {
+      "sha256": "c3925c5c6465db836cd8c3d287f1b3b3fb9a196329f16fa7ba5d5c3e1c568539",
+      "mode": 420
+    },
+    "lampOS/docs/updates.md": {
+      "sha256": "4e24ea01c6fae2087c91dee1fb3b73ee18d95d2dc13a40cca868ce76bfcd5a15",
+      "mode": 420
+    },
+    "lampOS/docs/writer-preimages.md": {
+      "sha256": "aaf450855a8cd84c257d2e64ffbf9577935cc45a1c751cbf64900467922beab9",
+      "mode": 420
+    }
+  },
+  "preserved_unrun_28e": "<private-path>",
+  "qualified_537_source": "6f/d8+sixWIP",
+  "Raw_prerequisite_proof": "<private-path>",
+  "consumed_delta_proof": "<private-path>",
+  "scope": "fresh fullLIB/functions/it+3receipt Round;228projection actualdiscoveryneeded;58required",
+  "runtime": "UNRUN on3aa; no537transfer"
+}

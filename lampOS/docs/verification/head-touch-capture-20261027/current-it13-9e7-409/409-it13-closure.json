@@ -1,0 +1,21 @@
+{
+  "head_unchanged": true,
+  "status_unchanged": true,
+  "working_patch_unchanged": true,
+  "source_unchanged": true,
+  "source_count": 7503,
+  "configuration_unchanged": true,
+  "controller_unchanged": true,
+  "nextest_tool_unchanged": true,
+  "nextest_config_unchanged": true,
+  "old_failed_driver_preserved_unchanged": true,
+  "mixed_current_vs_retained_provenance_explicit": true,
+  "all_stages_passed": true,
+  "controller_error": null,
+  "observed_native_exit": 0,
+  "raw_source_before_sha256": "4ad7e7b58236268e66a1c7d2f6180e0314addba9ee7e9ae06b7da07d6f4bc9dc",
+  "raw_source_after_sha256": "4ad7e7b58236268e66a1c7d2f6180e0314addba9ee7e9ae06b7da07d6f4bc9dc",
+  "raw_controller_stage_results_sha256": "92276c127c5a50f101817a5250d2f140c272d048d41431c0b9355896e3fd92f6",
+  "manifest_sha256": "d97fc092e4dca3279620742102dd819c507741a3ac9fe265d9dd7da4e149a62d",
+  "actual_hashes_are_recorded_at_gate_closure_not_after_target_reuse": true
+}

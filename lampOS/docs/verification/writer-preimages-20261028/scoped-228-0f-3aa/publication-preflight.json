@@ -1,0 +1,17 @@
+{
+  "Main": "3aa752f73914d0f29fc90edb010a3a7fa1cf526b",
+  "actor_verified_deehw": true,
+  "six_exact_staged": [
+    "lampOS/crates/update/src/lib.rs",
+    "lampOS/crates/update/src/writer_preimages.rs",
+    "lampOS/crates/update/src/writer_preimages/tests.rs",
+    "lampOS/docs/reuse-decisions.md",
+    "lampOS/docs/updates.md",
+    "lampOS/docs/writer-preimages.md"
+  ],
+  "all_tested_hashes_modes_match": true,
+  "current_gate": "<gate-evidence>",
+  "Root_final_review_approved": true,
+  "Raw_dependency_OPEN": true,
+  "commit_not_yet_created": true
+}

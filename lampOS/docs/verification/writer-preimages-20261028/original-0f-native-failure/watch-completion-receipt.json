@@ -1,0 +1,16 @@
+{
+  "ARM_original_run": 40552447404,
+  "ARM_watch_native_handle": 35890,
+  "ARM_watch_exit": 1,
+  "ARM_complete_log_handle": 81124,
+  "ARM_complete_log_exit": 0,
+  "Linux_original_run": 40552447167,
+  "Linux_watch_native_handle": 48393,
+  "Linux_watch_exit": 0,
+  "Linux_complete_log_handle": 68786,
+  "Linux_complete_log_exit": 0,
+  "original_attempt": 1,
+  "actual_terminal_job_metadata_checked": true,
+  "watch_exit_alone_not_success_proof": true,
+  "reruns": 0
+}

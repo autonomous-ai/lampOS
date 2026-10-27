@@ -1,0 +1,18 @@
+{
+  "actual_execution_clean_head": "3502fd5b1b1765669665b7d73a76e89f160ba46d",
+  "Raw_parent": "12d0e4fa21baf64a2d2fdffe73cb4c8470ac47a5",
+  "Main_base": "40923624247a893a19e1d980a328424eedffa308",
+  "tree": "fc1e301cae2c4ab9bf87bb2ae3087e4bd1583404",
+  "source_files_and_modes": 7509,
+  "before_after_equal": true,
+  "working_patch_empty": true,
+  "all_six_complete_owned_payloads_equal_537_and_0f420": true,
+  "runtime_on_old0f420_claimed": false,
+  "raw_source_before_SHA256": "502376084a2f78af555ed56e755960f77b94874b9771b9974990560f865fc4d8",
+  "raw_source_after_SHA256": "502376084a2f78af555ed56e755960f77b94874b9771b9974990560f865fc4d8",
+  "raw_compile_JSON_SHA256": "be18650b454881b91bc767c37a8f44e16ab782fb3807a403a396d6fa64c966ee",
+  "ten_current_CargoJSON_artifacts": true,
+  "ten_immutable_preserved_reverified": true,
+  "postrelease_actual_target_rehash_claimed": false,
+  "original_ARM40552447404_failure_unwaived": true
+}

@@ -1,0 +1,15 @@
+{
+  "approved": true,
+  "head": "c0319cb3372427e08ced477bc7b0298a197de675",
+  "base": "3aa752f73914d0f29fc90edb010a3a7fa1cf526b",
+  "scope": "current preimages fullLIB functions it plus3receipt",
+  "donor": "<private-path>",
+  "controller_sha256": "5c57729c41868a6fdd50a2e83c982cb34a7825a3656b131caa2142e46d76d861",
+  "Root_explicit_authorization": "Collector15314 CLOSED0 slot RELEASED NOW; latest preimages scoped228/all58 with exactlatestRawparent, latesttyped10donor; freshactualcounts/fullproof; nootherCargo untilclosure. ConditionalcommitpushDRAFT onPASS/currentMain/sixpayloadmatch/Rootfinalapproval.",
+  "old13plan": "approvedfalse/unrun/stale afterconsumedVoice delta",
+  "no_full537_replay_or_transfer": true,
+  "must_preserve_first_failure": true,
+  "fixture_request_requires_escalated": true,
+  "donor_sha256": "464b9aa6f0c5d0a4b04a5c195a1befa7bc827092fa36c9974625c24c6aa98b1c",
+  "retained_preCargo_adapter_rejection": "<private-path>"
+}

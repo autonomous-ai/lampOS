@@ -1,0 +1,7 @@
+{
+  "chunk_id": "a1c1d1",
+  "wall_time_seconds": 2.1583e-05,
+  "exit_code": 0,
+  "original_token_count": 116,
+  "output": "{\"head_unchanged\": true, \"status_unchanged\": true, \"working_patch_unchanged\": true, \"source_unchanged\": true, \"source_count\": 7509, \"configuration_unchanged\": true, \"controller_unchanged\": true, \"nextest_tool_unchanged\": true, \"nextest_config_unchanged\": true, \"retained_failed_driver_unchanged\": true, \"receipt_selectors_unchanged\": true, \"affected_scope_unchanged\": true, \"all_six_payloads_equal_537\": true, \"all_stages_passed\": true, \"controller_error\": null}\n"
+}

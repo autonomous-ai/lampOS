@@ -1,0 +1,13 @@
+{
+  "both_Rust_exact_full512": true,
+  "doc_only_actual_qualification_note": "later text only; no whole-source runtime transfer",
+  "files": {
+    "lampOS/crates/update/src/writer_refresh.rs": "791c3d84c26ecda383e5a1515f8dc1b2469e9d690c9fd5293bd8fd30f6215301",
+    "lampOS/crates/update/src/writer_refresh/tests.rs": "c0f4301d420258b17df454dee6ef7197ab72bc00828ce0481a4778abc804c58e",
+    "lampOS/docs/settings-writer-refresh.md": "6e75944cf45e138261de65be2e56f3642997e24760dae6947d4125dc5f120b84"
+  },
+  "new_base": "40923624247a893a19e1d980a328424eedffa308",
+  "old_base": "f903659bba298cdee290ee4285038a8f46af930b",
+  "scope": "UNRUN new409carry; proposedfreshfmt/strict/testit-only compilation/it13; oldfull512 remainsf903",
+  "three_current_WIP_hashes_preserved": true
+}

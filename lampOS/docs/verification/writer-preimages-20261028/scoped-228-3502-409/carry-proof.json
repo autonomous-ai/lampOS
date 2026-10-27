@@ -1,0 +1,42 @@
+{
+  "old_head": "0f4203624252fe2b744e15a23539a452bbb2d1fd",
+  "old_raw_parent": "c0319cb3372427e08ced477bc7b0298a197de675",
+  "preserved_qualified_ref": "second/preimages-qualified-0f420-20261028",
+  "head": "3502fd5b1b1765669665b7d73a76e89f160ba46d",
+  "raw_parent": "12d0e4fa21baf64a2d2fdffe73cb4c8470ac47a5",
+  "base": "40923624247a893a19e1d980a328424eedffa308",
+  "tree": "fc1e301cae2c4ab9bf87bb2ae3087e4bd1583404",
+  "all_six_complete_Git_blobs_modes_equal": true,
+  "own_paths": [
+    "lampOS/crates/update/src/lib.rs",
+    "lampOS/crates/update/src/writer_preimages.rs",
+    "lampOS/crates/update/src/writer_preimages/tests.rs",
+    "lampOS/docs/reuse-decisions.md",
+    "lampOS/docs/updates.md",
+    "lampOS/docs/writer-preimages.md"
+  ],
+  "before": {
+    "lampOS/crates/update/src/lib.rs": "100644 blob 81d50f1c786f8c60a0399a94ee44855bfdb339eb\tlampOS/crates/update/src/lib.rs",
+    "lampOS/crates/update/src/writer_preimages.rs": "100644 blob d1349892af75734dbb26940c671c3f0edb2bcdd6\tlampOS/crates/update/src/writer_preimages.rs",
+    "lampOS/crates/update/src/writer_preimages/tests.rs": "100644 blob d2f4499ce02ec8925d0daf36a4d9c67d1540ed0e\tlampOS/crates/update/src/writer_preimages/tests.rs",
+    "lampOS/docs/reuse-decisions.md": "100644 blob c14dbf2a1505992f4df128a963983547463ae348\tlampOS/docs/reuse-decisions.md",
+    "lampOS/docs/updates.md": "100644 blob fc630f31e81e26f3657b6d060adc96e9e8ef4510\tlampOS/docs/updates.md",
+    "lampOS/docs/writer-preimages.md": "100644 blob cf8983953621694a8b5c5e26cb62c9060cb2ad0b\tlampOS/docs/writer-preimages.md"
+  },
+  "after": {
+    "lampOS/crates/update/src/lib.rs": "100644 blob 81d50f1c786f8c60a0399a94ee44855bfdb339eb\tlampOS/crates/update/src/lib.rs",
+    "lampOS/crates/update/src/writer_preimages.rs": "100644 blob d1349892af75734dbb26940c671c3f0edb2bcdd6\tlampOS/crates/update/src/writer_preimages.rs",
+    "lampOS/crates/update/src/writer_preimages/tests.rs": "100644 blob d2f4499ce02ec8925d0daf36a4d9c67d1540ed0e\tlampOS/crates/update/src/writer_preimages/tests.rs",
+    "lampOS/docs/reuse-decisions.md": "100644 blob c14dbf2a1505992f4df128a963983547463ae348\tlampOS/docs/reuse-decisions.md",
+    "lampOS/docs/updates.md": "100644 blob fc630f31e81e26f3657b6d060adc96e9e8ef4510\tlampOS/docs/updates.md",
+    "lampOS/docs/writer-preimages.md": "100644 blob cf8983953621694a8b5c5e26cb62c9060cb2ad0b\tlampOS/docs/writer-preimages.md"
+  },
+  "range_diff": "1:  0f42036242 = 1:  3502fd5b1b lampOS: persist bounded private setting preimages",
+  "old_head_to_new_head_changes": "A\tlampOS/crates/control/src/body_lease.rs\nM\tlampOS/crates/control/src/lib.rs\nM\tlampOS/crates/control/src/main.rs\nM\tlampOS/crates/control/src/protocol.rs\nM\tlampOS/crates/control/src/server.rs\nM\tlampOS/crates/control/tests/door.rs\nM\tlampOS/crates/voice/src/remember.rs\nM\tlampOS/crates/voice/src/second_provider/worker.rs\nM\tlampOS/docs/control.md\nM\tlampOS/docs/control.schema.json\nM\tlampOS/sdk/js/src/control.schema.json\nM\tlampOS/sdk/python/src/lampos/control.schema.json",
+  "old_raw_to_new_raw_changes": "A\tlampOS/crates/control/src/body_lease.rs\nM\tlampOS/crates/control/src/lib.rs\nM\tlampOS/crates/control/src/main.rs\nM\tlampOS/crates/control/src/protocol.rs\nM\tlampOS/crates/control/src/server.rs\nM\tlampOS/crates/control/tests/door.rs\nM\tlampOS/crates/voice/src/remember.rs\nM\tlampOS/crates/voice/src/second_provider/worker.rs\nM\tlampOS/docs/control.md\nM\tlampOS/docs/control.schema.json\nM\tlampOS/sdk/js/src/control.schema.json\nM\tlampOS/sdk/python/src/lampos/control.schema.json",
+  "Raw_prerequisite_carry_proof": "<private-path>",
+  "source_only_UNRUN": true,
+  "old_current228_actual_source": "c031/3aa plus6WIP committed unchanged 0f420; no execution transferred",
+  "original_ARM40552447404_failure_unwaived": true,
+  "scope_required": "fresh fmt strict Clippy compile full/scoped discovery fullLIB functions it plus3receiptRound projected228 all58, explicit Root slot only"
+}

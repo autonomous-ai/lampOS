@@ -1,0 +1,1 @@
+Original9e7/409 Linux40557606820/job122377740520 passed pinned formatting and strict whole-workspace/all-target Clippy. Actual checkout a8b01bf9589322e27fa687ee8ab030772ce34c3c has exact ordered 409/9e7 parents and complete authored-tree equality. Command-stage/log completion and source hashes are in proof.json. No rerun, clean-build, later a17/runtime or device claim.

@@ -1,0 +1,36 @@
+{
+  "source": "<private-path>",
+  "sha256": "7ab23ea35f9c0a9fa835dc46a93a60c49b869fbb76d630b0f2807ec1e8b67d8b",
+  "plan": {
+    "old_base": "40923624247a893a19e1d980a328424eedffa308",
+    "latest": "a17ec9216e53f6a77931dd9686f83be8244d05a2",
+    "paths": [
+      "lampOS/crates/memory/src/days.rs",
+      "lampOS/crates/memory/src/days_protocol.rs",
+      "lampOS/crates/memory/tests/it/voice.rs",
+      "lampOS/crates/memory/tests/it/voice_submit.rs",
+      "lampOS/crates/voice/src/remember.rs",
+      "lampOS/docs/memory-days.md",
+      "lampOS/docs/memory.md",
+      "lampOS/docs/vi/memory-days_vi.md"
+    ],
+    "normal_Voice_consumed": true,
+    "production_change": "remember.rs END_ALL_FORGOTTEN const plus days_writer early return for ok=true/reason=forgotten",
+    "cfg_test_only": false,
+    "Memory_crate_actual_normal_artifact_present": false,
+    "normal_Voice_artifact_profile_test": false,
+    "no_Update_unit_skill_model_lock_config_changes": true,
+    "no_owned_Raw_PID_path_overlap": true,
+    "scope": "fullLIB/functions/it plus3receiptRound; normalVoiceproduction is consumed, not13only",
+    "projections_not_runtime_counts": {
+      "Raw": 219,
+      "preimages": 228,
+      "collector": 222,
+      "PID_Root_projection": 203
+    },
+    "actual_fresh_discovery_mandatory": true,
+    "Raw_current_parent": "c860efa352cdb6501d24a962b216fddf1987bec6",
+    "old_409_counts_remain_source_bound": true
+  },
+  "projection228_only_until_discovery": true
+}

@@ -1,0 +1,15 @@
+{
+  "head": "0f4203624252fe2b744e15a23539a452bbb2d1fd",
+  "parent": "c0319cb3372427e08ced477bc7b0298a197de675",
+  "base": "3aa752f73914d0f29fc90edb010a3a7fa1cf526b",
+  "tree": "c5ed20661f9947c2a12b89b39547af3d0ebce902",
+  "actual_gate_source": "c0319cb337 /3aa752f739 +6WIP",
+  "commit_binding_only_no_new_runtime": true,
+  "all7508_working_source_hashes_modes_equal": true,
+  "all_other_git_blobs_unchanged": true,
+  "all_six_committed_blob_bytes_match_tested": true,
+  "one_line_message_no_attribution": true,
+  "prepush_Main_current": true,
+  "remote_ownbranch_absent_exact_newbranch_lease": true,
+  "Raw3858_OPEN_dependency": true
+}

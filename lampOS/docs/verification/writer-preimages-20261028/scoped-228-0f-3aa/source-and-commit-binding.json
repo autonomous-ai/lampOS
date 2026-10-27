@@ -1,0 +1,17 @@
+{
+  "actual_execution_source": "c0319cb3372427e08ced477bc7b0298a197de675 / 3aa752f73914d0f29fc90edb010a3a7fa1cf526b plus SIX frozen WIP paths",
+  "head_alone_execution_claimed": false,
+  "later_commit": "0f4203624252fe2b744e15a23539a452bbb2d1fd",
+  "later_commit_tree": "c5ed20661f9947c2a12b89b39547af3d0ebce902",
+  "commit_binding_only_no_new_runtime": true,
+  "all7508_working_SHA_modes_equal_committed": true,
+  "raw_source_before_sha256": "9cf6a5a9626dfec05b555ed9fb40c1c954e3af142a114e1b26b379072dc30499",
+  "raw_source_after_sha256": "9cf6a5a9626dfec05b555ed9fb40c1c954e3af142a114e1b26b379072dc30499",
+  "raw_compile_stdout_sha256": "04c1b10450c5680671c2780e029955289a827b640b0c5d90f223e7cbe872fe2a",
+  "raw_nextest_stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "raw_nextest_stderr_sha256": "7de430f6f2015f7e942da4f266fa06a3aed440704dff683dc19e4a83194d6918",
+  "ten_current_compiler_JSON_artifacts_at_gate_boundary": true,
+  "ten_preserved_copies_reverified": true,
+  "postrelease_current_shared_target_hash_claimed": false,
+  "all_six_full_payloads_and_modes_equal_historical537": true
+}

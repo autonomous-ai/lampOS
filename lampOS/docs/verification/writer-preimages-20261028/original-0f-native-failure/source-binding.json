@@ -1,0 +1,67 @@
+{
+  "authored_head": "0f4203624252fe2b744e15a23539a452bbb2d1fd",
+  "authored_parent": "c0319cb3372427e08ced477bc7b0298a197de675",
+  "public_base_at_original_gate": "3aa752f73914d0f29fc90edb010a3a7fa1cf526b",
+  "authored_tree": "c5ed20661f9947c2a12b89b39547af3d0ebce902",
+  "preview": "d624e954b57eb2ae41fc47492f99f833868b4c9c",
+  "preview_parents": [
+    "3aa752f73914d0f29fc90edb010a3a7fa1cf526b",
+    "0f4203624252fe2b744e15a23539a452bbb2d1fd"
+  ],
+  "API_preview_tree": "c5ed20661f9947c2a12b89b39547af3d0ebce902",
+  "preview_tree_equals_authored_tree": true,
+  "actual_ARM_checkout_found_in_drained_log": true,
+  "actual_Linux_checkout_found_in_drained_log": true,
+  "six_owned_paths": [
+    "lampOS/crates/update/src/lib.rs",
+    "lampOS/crates/update/src/writer_preimages.rs",
+    "lampOS/crates/update/src/writer_preimages/tests.rs",
+    "lampOS/docs/reuse-decisions.md",
+    "lampOS/docs/updates.md",
+    "lampOS/docs/writer-preimages.md"
+  ],
+  "failed_file": "lampOS/crates/voice/src/remember.rs",
+  "failed_file_SHA256_parent": "a3eba22d4b8fb39895a12809160ce0af04692491afc187b75ca75f4ea71df018",
+  "failed_file_SHA256_head": "a3eba22d4b8fb39895a12809160ce0af04692491afc187b75ca75f4ea71df018",
+  "failed_file_unchanged": true,
+  "owned_payloads": [
+    {
+      "path": "lampOS/crates/update/src/lib.rs",
+      "mode": "100644",
+      "git_blob": "81d50f1c786f8c60a0399a94ee44855bfdb339eb",
+      "sha256": "bc0e2fef71dcb019d47de21df012bba6caffbce404648632e8a57eec2932bdec"
+    },
+    {
+      "path": "lampOS/crates/update/src/writer_preimages.rs",
+      "mode": "100644",
+      "git_blob": "d1349892af75734dbb26940c671c3f0edb2bcdd6",
+      "sha256": "ae77c27a17dca18c42b8da10e7a959f74a1fe19225fea148f3dbbadcf47b2242"
+    },
+    {
+      "path": "lampOS/crates/update/src/writer_preimages/tests.rs",
+      "mode": "100644",
+      "git_blob": "d2f4499ce02ec8925d0daf36a4d9c67d1540ed0e",
+      "sha256": "6d06b27283543a308d4d4b1ada60406235a10c2ccf28eadc05aa1ac82ea3270f"
+    },
+    {
+      "path": "lampOS/docs/reuse-decisions.md",
+      "mode": "100644",
+      "git_blob": "c14dbf2a1505992f4df128a963983547463ae348",
+      "sha256": "c3925c5c6465db836cd8c3d287f1b3b3fb9a196329f16fa7ba5d5c3e1c568539"
+    },
+    {
+      "path": "lampOS/docs/updates.md",
+      "mode": "100644",
+      "git_blob": "fc630f31e81e26f3657b6d060adc96e9e8ef4510",
+      "sha256": "4e24ea01c6fae2087c91dee1fb3b73ee18d95d2dc13a40cca868ce76bfcd5a15"
+    },
+    {
+      "path": "lampOS/docs/writer-preimages.md",
+      "mode": "100644",
+      "git_blob": "cf8983953621694a8b5c5e26cb62c9060cb2ad0b",
+      "sha256": "aaf450855a8cd84c257d2e64ffbf9577935cc45a1c751cbf64900467922beab9"
+    }
+  ],
+  "complete_archive_or_native_binary_hashes_available": false,
+  "reason_no_native_binaries": "The original workflow skipped export/upload after Nextest failed. No absent artifact or executable hash is fabricated."
+}

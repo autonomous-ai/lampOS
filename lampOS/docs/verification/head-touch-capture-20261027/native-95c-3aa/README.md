@@ -1,0 +1,13 @@
+# Collector #3892: corrected original native audit
+
+Head `95c1860e49132484256fb0c5d4bb758154adcabb`, base `3aa752f73914d0f29fc90edb010a3a7fa1cf526b`. Both actual original checkouts are `7a603e401cfee4e879289913fa99953b078c952f`, ordered parents `[3aa,95c]`, complete tree `c47a00de1fd3edf2797cde030139ca1dee1090e5` exactly equal to the offered head. Both watchers drained exit 0, attempt 1; no rerun/cancel.
+
+Original ARM [40551160231](https://github.com/autonomous-ai/lampOS/actions/runs/40551160231/job/122354974431): **7,815 unique PASS / zero bad or selected unrun / 53 summary skips**, 70 selected binaries/120 skipped binaries. All **52 required controls PASS once**, including both corrected fixture functions and the actual Linux physical raw-name control. There are 34 identical terminal echoes, not extra executions. Native Nextest 0.9.149/profile pr uses the dependency-selected 12 packages; it is not a full-workspace runtime claim. Separate docs 4 / process 13 / relay 1 / promotion helper 25 / Python 35, 12, 7 are not added to Nextest.
+
+Original Linux [40551160559](https://github.com/autonomous-ai/lampOS/actions/runs/40551160559/job/122354968704) passed pinned Rust 1.96.0 formatting and strict whole-workspace/all-target Clippy. The completed log actually checks Update and records command completion.
+
+Production artifact 12754899965: **48 current binaries + 2 selected examples**, complete SHA256SUMS inventory and every AArch64 ELF payload verified. ZIP 118,458,004 bytes, SHA256 `9b0f0930b84d87de188061c86abfa8f0aa5951ea55f4946a39beb136b17c7940`, equal to API digest and upload log. Production lamp-update is 4,920,040 bytes, SHA256 `543575504e05e6fbfc3577edb4b7a61547c8217c6e3bc33d39e00688e3851aa8`. This proves production-package provenance, not individual Nextest executable bytes; the latter are not uploaded or fabricated. No downloaded executable was run.
+
+The original 6523/0d native failure remains retained: required 25 PASS / 1 FAIL / 26 unrun, failed shared-assertion subcase and cause UNESTABLISHED. The new native pass does not diagnose or waive it. Mac physical non-UTF8 filename capture remains UNVERIFIED. Later Main f903 requires a separate current-source gate/read; no native or local count is transferred to it. The collector stays unwired and read-only; no helper activation, authentication, exclusion, atomic snapshot, restoration, device or power-cut acceptance.
+
+The arm/ and linux/ subpackets are copied byte-for-byte from their sealed originals, with their own manifests unchanged. This text-only aggregate adds production provenance and native-mode/physical-source inference. Raw logs, actor APIs, binaries and machine paths stay private. Verify the top SHA256SUMS before use.

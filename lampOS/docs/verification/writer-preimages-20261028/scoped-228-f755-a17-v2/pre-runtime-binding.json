@@ -1,0 +1,23 @@
+{
+  "head": "f75535e4356256b9749ddecf0099ba0675ff22b0",
+  "base": "a17ec9216e53f6a77931dd9686f83be8244d05a2",
+  "full_discovery_sha256": "9b408bef248d5f1f88024704fb94cf0a27799060706ffb93a035669ec4767958",
+  "scoped_discovery_sha256": "295b08b4c658d26e69871af3df03b82b4f757cde6340532c33193b6491ef4d20",
+  "compiler_stdout_sha256": "8c38e97dca23f0d72689b33bb3967acbda9239ad65d33cb3ce45b60c72389460",
+  "selected_cases": 228,
+  "policy_ignored": 2,
+  "filtered_nonignored": 198,
+  "excluded_binaries": [
+    "lamp-update::install",
+    "lamp-update::release_pair",
+    "lamp-update::self-cli-exec",
+    "lamp-update::self-process-cuts",
+    "lamp-update::bin/lamp-update"
+  ],
+  "required_controls": 58,
+  "profile": "pr",
+  "filter": "binary_id(=lamp-update) | binary_id(=lamp-update::functions) | binary_id(=lamp-update::it) | (binary_id(=lamp-update::round) & (test(=a_rejected_apply_receipt_runs_real_back_and_restores_written_settings_modes_and_records) | test(=a_rejected_back_receipt_keeps_the_journal_until_real_back_is_acknowledged) | test(=the_round_rejects_a_done_matching_a_rewritten_request_instead_of_its_own_request)))",
+  "processes": 4,
+  "retries": 0,
+  "no_fail_fast": true
+}

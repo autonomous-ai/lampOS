@@ -1,0 +1,322 @@
+[
+  {
+    "path": "<private-path>",
+    "sha256": "db6fe0d83c9af13b5723299df1a8dcdcf0c999b8f1703b97bf4b7e66e87f12e6",
+    "size": 1277568,
+    "preserved": "<private-path>",
+    "preserved_sha256": "db6fe0d83c9af13b5723299df1a8dcdcf0c999b8f1703b97bf4b7e66e87f12e6",
+    "fresh": false,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 2,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "target": {
+      "kind": [
+        "bin"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "lamp-update",
+      "src_path": "<private-path>",
+      "edition": "2024",
+      "doc": true,
+      "doctest": false,
+      "test": true
+    },
+    "package_id": "path+file://<private-path>",
+    "post_list_sha256": "db6fe0d83c9af13b5723299df1a8dcdcf0c999b8f1703b97bf4b7e66e87f12e6",
+    "post_runtime_sha256": "db6fe0d83c9af13b5723299df1a8dcdcf0c999b8f1703b97bf4b7e66e87f12e6"
+  },
+  {
+    "path": "<private-path>",
+    "sha256": "5805b2ffc458e0c6b34e4a13d1cb9b22f0585516b09514795b3869ee1ccc7b60",
+    "size": 3295120,
+    "preserved": "<private-path>",
+    "preserved_sha256": "5805b2ffc458e0c6b34e4a13d1cb9b22f0585516b09514795b3869ee1ccc7b60",
+    "fresh": false,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 2,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "target": {
+      "kind": [
+        "test"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "release_pair",
+      "src_path": "<private-path>",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": true
+    },
+    "package_id": "path+file://<private-path>",
+    "post_list_sha256": "5805b2ffc458e0c6b34e4a13d1cb9b22f0585516b09514795b3869ee1ccc7b60",
+    "post_runtime_sha256": "5805b2ffc458e0c6b34e4a13d1cb9b22f0585516b09514795b3869ee1ccc7b60"
+  },
+  {
+    "path": "<private-path>",
+    "sha256": "810f94389d275d7d96380f5c3e09c23aefa7e16d585c18ade04cc69edf7910b0",
+    "size": 16182736,
+    "preserved": "<private-path>",
+    "preserved_sha256": "810f94389d275d7d96380f5c3e09c23aefa7e16d585c18ade04cc69edf7910b0",
+    "fresh": false,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 2,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "target": {
+      "kind": [
+        "lib"
+      ],
+      "crate_types": [
+        "lib"
+      ],
+      "name": "lamp_update",
+      "src_path": "<private-path>",
+      "edition": "2024",
+      "doc": true,
+      "doctest": true,
+      "test": true
+    },
+    "package_id": "path+file://<private-path>",
+    "post_list_sha256": "810f94389d275d7d96380f5c3e09c23aefa7e16d585c18ade04cc69edf7910b0",
+    "post_runtime_sha256": "810f94389d275d7d96380f5c3e09c23aefa7e16d585c18ade04cc69edf7910b0"
+  },
+  {
+    "path": "<private-path>",
+    "sha256": "26b26e708b65cd87c339cc8ec304d425502c57e843203fe93aaad2ef6d1989a7",
+    "size": 20988840,
+    "preserved": "<private-path>",
+    "preserved_sha256": "26b26e708b65cd87c339cc8ec304d425502c57e843203fe93aaad2ef6d1989a7",
+    "fresh": false,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 2,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "target": {
+      "kind": [
+        "test"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "round",
+      "src_path": "<private-path>",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": true
+    },
+    "package_id": "path+file://<private-path>",
+    "post_list_sha256": "26b26e708b65cd87c339cc8ec304d425502c57e843203fe93aaad2ef6d1989a7",
+    "post_runtime_sha256": "26b26e708b65cd87c339cc8ec304d425502c57e843203fe93aaad2ef6d1989a7"
+  },
+  {
+    "path": "<private-path>",
+    "sha256": "210252f3c0eacfc171e429d98ca865159d7c2ca67605dc69a642f4ba7aa0984d",
+    "size": 550128,
+    "preserved": "<private-path>",
+    "preserved_sha256": "210252f3c0eacfc171e429d98ca865159d7c2ca67605dc69a642f4ba7aa0984d",
+    "fresh": false,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 2,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "target": {
+      "kind": [
+        "test"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "self-process-cuts",
+      "src_path": "<private-path>",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": true
+    },
+    "package_id": "path+file://<private-path>",
+    "post_list_sha256": "210252f3c0eacfc171e429d98ca865159d7c2ca67605dc69a642f4ba7aa0984d",
+    "post_runtime_sha256": "210252f3c0eacfc171e429d98ca865159d7c2ca67605dc69a642f4ba7aa0984d"
+  },
+  {
+    "path": "<private-path>",
+    "sha256": "d8ca4f3f73055844c6a66188206416542a5f421f8911ed9ee1f7fccfbd20dd44",
+    "size": 22853128,
+    "preserved": "<private-path>",
+    "preserved_sha256": "d8ca4f3f73055844c6a66188206416542a5f421f8911ed9ee1f7fccfbd20dd44",
+    "fresh": false,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 2,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "target": {
+      "kind": [
+        "test"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "functions",
+      "src_path": "<private-path>",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": true
+    },
+    "package_id": "path+file://<private-path>",
+    "post_list_sha256": "d8ca4f3f73055844c6a66188206416542a5f421f8911ed9ee1f7fccfbd20dd44",
+    "post_runtime_sha256": "d8ca4f3f73055844c6a66188206416542a5f421f8911ed9ee1f7fccfbd20dd44"
+  },
+  {
+    "path": "<private-path>",
+    "sha256": "bc72a92867ed1f5012cc34143684a9dbd4e58c39c0b46165447897c7c89b446d",
+    "size": 550064,
+    "preserved": "<private-path>",
+    "preserved_sha256": "bc72a92867ed1f5012cc34143684a9dbd4e58c39c0b46165447897c7c89b446d",
+    "fresh": false,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 2,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "target": {
+      "kind": [
+        "test"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "self-cli-exec",
+      "src_path": "<private-path>",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": true
+    },
+    "package_id": "path+file://<private-path>",
+    "post_list_sha256": "bc72a92867ed1f5012cc34143684a9dbd4e58c39c0b46165447897c7c89b446d",
+    "post_runtime_sha256": "bc72a92867ed1f5012cc34143684a9dbd4e58c39c0b46165447897c7c89b446d"
+  },
+  {
+    "path": "<private-path>",
+    "sha256": "6bfdb8976842581f743655fc39032b9b25b072b8cbdd83f976746a9c394db269",
+    "size": 17252824,
+    "preserved": "<private-path>",
+    "preserved_sha256": "6bfdb8976842581f743655fc39032b9b25b072b8cbdd83f976746a9c394db269",
+    "fresh": false,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 2,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "target": {
+      "kind": [
+        "test"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "install",
+      "src_path": "<private-path>",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": true
+    },
+    "package_id": "path+file://<private-path>",
+    "post_list_sha256": "6bfdb8976842581f743655fc39032b9b25b072b8cbdd83f976746a9c394db269",
+    "post_runtime_sha256": "6bfdb8976842581f743655fc39032b9b25b072b8cbdd83f976746a9c394db269"
+  },
+  {
+    "path": "<private-path>",
+    "sha256": "c5c1f08f194944764fc5510dded26a9e2fe4fb8a1c4c3cafc308beef9795cfeb",
+    "size": 1976784,
+    "preserved": "<private-path>",
+    "preserved_sha256": "c5c1f08f194944764fc5510dded26a9e2fe4fb8a1c4c3cafc308beef9795cfeb",
+    "fresh": false,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 2,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "target": {
+      "kind": [
+        "test"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "it",
+      "src_path": "<private-path>",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": true
+    },
+    "package_id": "path+file://<private-path>",
+    "post_list_sha256": "c5c1f08f194944764fc5510dded26a9e2fe4fb8a1c4c3cafc308beef9795cfeb",
+    "post_runtime_sha256": "c5c1f08f194944764fc5510dded26a9e2fe4fb8a1c4c3cafc308beef9795cfeb"
+  },
+  {
+    "path": "<private-path>",
+    "sha256": "909c38a81f994f8390591128cd06a9736d750aca56d4a7c8717b8539e184b012",
+    "size": 13556752,
+    "preserved": "<private-path>",
+    "preserved_sha256": "909c38a81f994f8390591128cd06a9736d750aca56d4a7c8717b8539e184b012",
+    "fresh": false,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 2,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": false
+    },
+    "target": {
+      "kind": [
+        "bin"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "lamp-update",
+      "src_path": "<private-path>",
+      "edition": "2024",
+      "doc": true,
+      "doctest": false,
+      "test": true
+    },
+    "package_id": "path+file://<private-path>",
+    "post_list_sha256": "909c38a81f994f8390591128cd06a9736d750aca56d4a7c8717b8539e184b012",
+    "post_runtime_sha256": "909c38a81f994f8390591128cd06a9736d750aca56d4a7c8717b8539e184b012"
+  }
+]

@@ -1,0 +1,11 @@
+{
+  "approved": false,
+  "head": "88f5e2c9d104c0f5944492bcee97fbd7171ac21e",
+  "base": "28e7a63f238ed1f7078d15eb0eed705ea22baad4",
+  "scope": "full Update it target only plus fmt strictClippy compile",
+  "donor": "WAIT_FOR_ROOT_LATEST_RELEASED_TYPED_DONOR",
+  "requires_explicit_local_slot_after_Queue222": true,
+  "controller_sha256": "4b93cf5286ed0e12825d282dbb8f5defe5b7bf57f07bb48012a88a439a314cb9",
+  "Root_final_source_read": "noP1/P2 private/unwired scope; allsixpayloads identical; currentit13 owed",
+  "qualified_537_source_is_d8_only": true
+}

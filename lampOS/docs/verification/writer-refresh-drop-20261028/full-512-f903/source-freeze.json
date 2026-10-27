@@ -1,0 +1,26 @@
+{
+  "candidate_runtime": "FIRST execution UNRUN at freeze",
+  "files": {
+    "lampOS/crates/update/src/writer_refresh.rs": {
+      "mode": "0o644",
+      "sha256": "791c3d84c26ecda383e5a1515f8dc1b2469e9d690c9fd5293bd8fd30f6215301"
+    },
+    "lampOS/crates/update/src/writer_refresh/tests.rs": {
+      "mode": "0o644",
+      "sha256": "c0f4301d420258b17df454dee6ef7197ab72bc00828ce0481a4778abc804c58e"
+    },
+    "lampOS/docs/settings-writer-refresh.md": {
+      "mode": "0o644",
+      "sha256": "7530d3c84f69e3020c4a69c21231c341a004223866516e4abc4328ed2cfe198f"
+    }
+  },
+  "full512": "projection only; fresh discovery required",
+  "head": "f903659bba298cdee290ee4285038a8f46af930b",
+  "negative_result": "one expectedFAIL/Nextest100/Os35; original controller1 retained; offline correction only",
+  "owned_paths": [
+    "lampOS/crates/update/src/writer_refresh.rs",
+    "lampOS/crates/update/src/writer_refresh/tests.rs",
+    "lampOS/docs/settings-writer-refresh.md"
+  ],
+  "source_controls": 20
+}

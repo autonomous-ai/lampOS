@@ -1,0 +1,174 @@
+{
+  "actual_source": "6f0677b8ecb1db563f8f015d03d28b4190647faf / d8ca71f4dc6e65b00564afb1e67c1a33311aeab8 plus six frozen preimage WIP paths, formatted and two reviewed compile/lint corrections",
+  "actual_gate_HEAD_alone_execution_claimed": false,
+  "all_7505_source_before_after_equal": true,
+  "source_before_raw_sha256": "353216787e98728bae6ef95509fd32de4cdd35def49b43c780e72c5176145b84",
+  "source_after_raw_sha256": "353216787e98728bae6ef95509fd32de4cdd35def49b43c780e72c5176145b84",
+  "owned_six": {
+    "lampOS/crates/update/src/lib.rs": {
+      "git_mode": "100644",
+      "git_blob": "d10a9823678d0a044f126c120b394a11147cf25d",
+      "sha256": "bc0e2fef71dcb019d47de21df012bba6caffbce404648632e8a57eec2932bdec",
+      "actual_mode": 420,
+      "kind": 32768
+    },
+    "lampOS/crates/update/src/writer_preimages.rs": {
+      "git_mode": null,
+      "git_blob": null,
+      "sha256": "ae77c27a17dca18c42b8da10e7a959f74a1fe19225fea148f3dbbadcf47b2242",
+      "actual_mode": 420,
+      "kind": 32768,
+      "untracked_owned_source": true
+    },
+    "lampOS/crates/update/src/writer_preimages/tests.rs": {
+      "git_mode": null,
+      "git_blob": null,
+      "sha256": "6d06b27283543a308d4d4b1ada60406235a10c2ccf28eadc05aa1ac82ea3270f",
+      "actual_mode": 420,
+      "kind": 32768,
+      "untracked_owned_source": true
+    },
+    "lampOS/docs/reuse-decisions.md": {
+      "git_mode": "100644",
+      "git_blob": "a41755ffd97d653e52cda21a77e52f422dba661e",
+      "sha256": "c3925c5c6465db836cd8c3d287f1b3b3fb9a196329f16fa7ba5d5c3e1c568539",
+      "actual_mode": 420,
+      "kind": 32768
+    },
+    "lampOS/docs/updates.md": {
+      "git_mode": "100644",
+      "git_blob": "a349db54517ccdf056a567d1ddcda12476fe8b73",
+      "sha256": "4e24ea01c6fae2087c91dee1fb3b73ee18d95d2dc13a40cca868ce76bfcd5a15",
+      "actual_mode": 420,
+      "kind": 32768
+    },
+    "lampOS/docs/writer-preimages.md": {
+      "git_mode": null,
+      "git_blob": null,
+      "sha256": "aaf450855a8cd84c257d2e64ffbf9577935cc45a1c751cbf64900467922beab9",
+      "actual_mode": 420,
+      "kind": 32768,
+      "untracked_owned_source": true
+    }
+  },
+  "unique_PASS": 537,
+  "bad_or_selected_unrun": 0,
+  "ignored": 6,
+  "required_once": 58,
+  "nine_new_exact_driver_bindings": [
+    {
+      "binary_id": "lamp-update",
+      "case": "writer_preimages::tests::actual_capture_keeps_binary_empty_missing_noops_records_and_every_identity_after_publication",
+      "status": "PASS",
+      "actual_path": "<private-path>",
+      "actual_sha256": "d10d67e0d3ed4392697b8c730b0660afcff33eb87273c5adff8ba68ea9d2b36c",
+      "preserved_path": "<private-path>",
+      "preserved_sha256": "d10d67e0d3ed4392697b8c730b0660afcff33eb87273c5adff8ba68ea9d2b36c",
+      "binding": "runtime binary ID joins exact discovery/compiled/preserved driver; skipped cases excluded"
+    },
+    {
+      "binary_id": "lamp-update",
+      "case": "writer_preimages::tests::diagnostic_surfaces_hide_values_and_empty_selection_observes_no_live_root",
+      "status": "PASS",
+      "actual_path": "<private-path>",
+      "actual_sha256": "d10d67e0d3ed4392697b8c730b0660afcff33eb87273c5adff8ba68ea9d2b36c",
+      "preserved_path": "<private-path>",
+      "preserved_sha256": "d10d67e0d3ed4392697b8c730b0660afcff33eb87273c5adff8ba68ea9d2b36c",
+      "binding": "runtime binary ID joins exact discovery/compiled/preserved driver; skipped cases excluded"
+    },
+    {
+      "binary_id": "lamp-update",
+      "case": "writer_preimages::tests::durable_prefix_and_lost_ack_failures_keep_bytes_without_admitting_retry_or_cleanup",
+      "status": "PASS",
+      "actual_path": "<private-path>",
+      "actual_sha256": "d10d67e0d3ed4392697b8c730b0660afcff33eb87273c5adff8ba68ea9d2b36c",
+      "preserved_path": "<private-path>",
+      "preserved_sha256": "d10d67e0d3ed4392697b8c730b0660afcff33eb87273c5adff8ba68ea9d2b36c",
+      "binding": "runtime binary ID joins exact discovery/compiled/preserved driver; skipped cases excluded"
+    },
+    {
+      "binary_id": "lamp-update",
+      "case": "writer_preimages::tests::exact_four_mib_of_binary_old_bytes_and_empty_files_survive_without_truncation",
+      "status": "PASS",
+      "actual_path": "<private-path>",
+      "actual_sha256": "d10d67e0d3ed4392697b8c730b0660afcff33eb87273c5adff8ba68ea9d2b36c",
+      "preserved_path": "<private-path>",
+      "preserved_sha256": "d10d67e0d3ed4392697b8c730b0660afcff33eb87273c5adff8ba68ea9d2b36c",
+      "binding": "runtime binary ID joins exact discovery/compiled/preserved driver; skipped cases excluded"
+    },
+    {
+      "binary_id": "lamp-update",
+      "case": "writer_preimages::tests::expected_identity_and_size_are_checked_before_parse_and_every_failed_load_retains_the_file",
+      "status": "PASS",
+      "actual_path": "<private-path>",
+      "actual_sha256": "d10d67e0d3ed4392697b8c730b0660afcff33eb87273c5adff8ba68ea9d2b36c",
+      "preserved_path": "<private-path>",
+      "preserved_sha256": "d10d67e0d3ed4392697b8c730b0660afcff33eb87273c5adff8ba68ea9d2b36c",
+      "binding": "runtime binary ID joins exact discovery/compiled/preserved driver; skipped cases excluded"
+    },
+    {
+      "binary_id": "lamp-update",
+      "case": "writer_preimages::tests::publication_never_replaces_existing_final_or_unknown_stage_and_load_never_follows_links",
+      "status": "PASS",
+      "actual_path": "<private-path>",
+      "actual_sha256": "d10d67e0d3ed4392697b8c730b0660afcff33eb87273c5adff8ba68ea9d2b36c",
+      "preserved_path": "<private-path>",
+      "preserved_sha256": "d10d67e0d3ed4392697b8c730b0660afcff33eb87273c5adff8ba68ea9d2b36c",
+      "binding": "runtime binary ID joins exact discovery/compiled/preserved driver; skipped cases excluded"
+    },
+    {
+      "binary_id": "lamp-update",
+      "case": "writer_preimages::tests::unknown_nonsemantic_fields_retain_the_complete_original_encoding_without_reserialization",
+      "status": "PASS",
+      "actual_path": "<private-path>",
+      "actual_sha256": "d10d67e0d3ed4392697b8c730b0660afcff33eb87273c5adff8ba68ea9d2b36c",
+      "preserved_path": "<private-path>",
+      "preserved_sha256": "d10d67e0d3ed4392697b8c730b0660afcff33eb87273c5adff8ba68ea9d2b36c",
+      "binding": "runtime binary ID joins exact discovery/compiled/preserved driver; skipped cases excluded"
+    },
+    {
+      "binary_id": "lamp-update",
+      "case": "writer_preimages::tests::shape_stamp_base64_and_collection_bounds_are_checked_before_old_byte_allocations",
+      "status": "PASS",
+      "actual_path": "<private-path>",
+      "actual_sha256": "d10d67e0d3ed4392697b8c730b0660afcff33eb87273c5adff8ba68ea9d2b36c",
+      "preserved_path": "<private-path>",
+      "preserved_sha256": "d10d67e0d3ed4392697b8c730b0660afcff33eb87273c5adff8ba68ea9d2b36c",
+      "binding": "runtime binary ID joins exact discovery/compiled/preserved driver; skipped cases excluded"
+    },
+    {
+      "binary_id": "lamp-update",
+      "case": "writer_preimages::tests::unknown_semantics_known_duplicates_duplicate_paths_and_invalid_records_block_without_deletion",
+      "status": "PASS",
+      "actual_path": "<private-path>",
+      "actual_sha256": "d10d67e0d3ed4392697b8c730b0660afcff33eb87273c5adff8ba68ea9d2b36c",
+      "preserved_path": "<private-path>",
+      "preserved_sha256": "d10d67e0d3ed4392697b8c730b0660afcff33eb87273c5adff8ba68ea9d2b36c",
+      "binding": "runtime binary ID joins exact discovery/compiled/preserved driver; skipped cases excluded"
+    }
+  ],
+  "preserved_ten_executables_verified_again": true,
+  "current_shared_target_hash_claimed_after_release": false,
+  "closure": {
+    "head_unchanged": true,
+    "status_unchanged": true,
+    "working_patch_unchanged": true,
+    "source_unchanged": true,
+    "source_count": 7505,
+    "configuration_unchanged": true,
+    "controller_unchanged": true,
+    "nextest_tool_unchanged": true,
+    "nextest_config_unchanged": true,
+    "retained_failed_driver_unchanged": true,
+    "receipt_selectors_unchanged": true,
+    "all_stages_passed": true,
+    "controller_error": null
+  },
+  "earlier_preparation_failures_retained": [
+    "<private-path>",
+    "<private-path>"
+  ],
+  "initial_unrun_snapshot_retained": "<private-path>",
+  "no_commit_or_push": true,
+  "latestMain_carry_requires_separate_affected_scope_gate": true
+}

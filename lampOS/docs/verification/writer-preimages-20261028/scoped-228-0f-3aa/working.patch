@@ -1,0 +1,56 @@
+diff --git a/lampOS/crates/update/src/lib.rs b/lampOS/crates/update/src/lib.rs
+index d10a982367..81d50f1c78 100644
+--- a/lampOS/crates/update/src/lib.rs
++++ b/lampOS/crates/update/src/lib.rs
+@@ -32,6 +32,7 @@ pub mod switches;
+ pub mod unit;
+ pub mod world;
+ pub mod writer_files;
++pub mod writer_preimages;
+ pub mod writer_refresh;
+ pub mod writer_settings;
+ 
+diff --git a/lampOS/docs/reuse-decisions.md b/lampOS/docs/reuse-decisions.md
+index a41755ffd9..c14dbf2a15 100644
+--- a/lampOS/docs/reuse-decisions.md
++++ b/lampOS/docs/reuse-decisions.md
+@@ -1,5 +1,22 @@
+ # Reuse decisions: V1, ROS 2 and existing Rust systems
+ 
++## Persist ordinary before-images without adding execution authority (2026-10-27)
++
++V1's existing-before/explicit-absence snapshots and durable pending intent are
++useful safeguards; its broad rootfs writer is not reused here. Reuse the new
++raw observer/capture, existing selected-record marker, serde_json/base64,
++manifest SHA-256 and writer_refresh Artifact identities. The bounded
++[private bundle](writer-preimages.md) retains original bytes for forward
++nonsemantic fields without widening the observer's serde/API surface.
++
++For this private artifact, reuse Rustix's descriptor-relative open/stat and
++Linux/Apple no-replace rename, complete file sync and parent sync. Existing
++records::write_whole atomically replaces a path and cleans its own sibling;
++those semantics do not fit refusing an unknown artifact/stage without cleanup.
++It is not reused as a live-path confinement or recovery writer. Authentication,
++independent restore and root bootstrap remain separate work; no new dependency
++or unsafe code is introduced.
++
+ ## Refresh the fixed settings writer with independent recovery (2026-10-27)
+ 
+ V1's `scripts/provision/software-update` snapshots absent rootfs entries as
+diff --git a/lampOS/docs/updates.md b/lampOS/docs/updates.md
+index a349db5451..fc630f31e8 100644
+--- a/lampOS/docs/updates.md
++++ b/lampOS/docs/updates.md
+@@ -33,6 +33,12 @@ files remain separate. The lamp trials below do not enable them elsewhere.
+ 
+ ## What exists and what we take
+ 
++The unwired [private before-image bundle](writer-preimages.md) preserves bounded
++ordinary captures as immutable, versioned bytes, with fixed-name durable
++publication in an existing private directory. This adds no live write, apply
++admission, restoration or helper bootstrap. Unknown semantics retain bytes
++and refuse; content identity does not authenticate the caller.
++
+ The unwired [setting-file observer](writer-file-observation.md), a #3689
+ prerequisite, provides bounded read-only descriptor observations for a
+ future independent writer guard. It grants no path authority and performs

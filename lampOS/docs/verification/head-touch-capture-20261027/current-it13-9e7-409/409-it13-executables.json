@@ -1,0 +1,142 @@
+[
+  {
+    "actual_filename": "it-7f2b1cc47b1a8b67",
+    "target_name": "it",
+    "target_kind": [
+      "test"
+    ],
+    "test_profile": true,
+    "sha256": "8e2055fe633868431b9763930dd69afe98b3abb3a37cbde36f0b41e9297e187e",
+    "preserved_sha256": "8e2055fe633868431b9763930dd69afe98b3abb3a37cbde36f0b41e9297e187e",
+    "post_runtime_sha256": "8e2055fe633868431b9763930dd69afe98b3abb3a37cbde36f0b41e9297e187e",
+    "current_source_qualified": true,
+    "source_qualification": "CURRENT_TARGETED_IT_BUILD_NO_OTHER_RUNTIME_CLAIM",
+    "runtime_scope": "409-it13"
+  },
+  {
+    "actual_filename": "lamp-update",
+    "target_name": "lamp-update",
+    "target_kind": [
+      "bin"
+    ],
+    "test_profile": false,
+    "sha256": "e984e358fbedcc09d52f3160e4228e8472b748ed74e19334a8b3c618e524739c",
+    "preserved_sha256": "e984e358fbedcc09d52f3160e4228e8472b748ed74e19334a8b3c618e524739c",
+    "post_runtime_sha256": "e984e358fbedcc09d52f3160e4228e8472b748ed74e19334a8b3c618e524739c",
+    "current_source_qualified": true,
+    "source_qualification": "CURRENT_TARGETED_IT_BUILD_NO_OTHER_RUNTIME_CLAIM",
+    "runtime_scope": "409-it13"
+  },
+  {
+    "actual_filename": "install-08004915d5b421f7",
+    "target_name": "install",
+    "target_kind": [
+      "test"
+    ],
+    "test_profile": true,
+    "sha256": "5f0e04933283a300a0fc3e2d58131d01cc34cb6154deaad920e75c2af96ab389",
+    "preserved_sha256": "5f0e04933283a300a0fc3e2d58131d01cc34cb6154deaad920e75c2af96ab389",
+    "post_runtime_sha256": "5f0e04933283a300a0fc3e2d58131d01cc34cb6154deaad920e75c2af96ab389",
+    "current_source_qualified": false,
+    "source_qualification": "RETAINED_DONOR_EXECUTABLE_NOT_CURRENT_SOURCE",
+    "runtime_scope": "409-it13"
+  },
+  {
+    "actual_filename": "functions-781cb61db13f0261",
+    "target_name": "functions",
+    "target_kind": [
+      "test"
+    ],
+    "test_profile": true,
+    "sha256": "8a03adb77e4a5e7669166daef54d14df4e4716892c407b2c6110706723eeef60",
+    "preserved_sha256": "8a03adb77e4a5e7669166daef54d14df4e4716892c407b2c6110706723eeef60",
+    "post_runtime_sha256": "8a03adb77e4a5e7669166daef54d14df4e4716892c407b2c6110706723eeef60",
+    "current_source_qualified": false,
+    "source_qualification": "RETAINED_DONOR_EXECUTABLE_NOT_CURRENT_SOURCE",
+    "runtime_scope": "409-it13"
+  },
+  {
+    "actual_filename": "round-42e77f9cbb014d5a",
+    "target_name": "round",
+    "target_kind": [
+      "test"
+    ],
+    "test_profile": true,
+    "sha256": "67eaa4f131ae3d6163ecf37590430eef8e667d650dd03ff20f50cc25096fd42a",
+    "preserved_sha256": "67eaa4f131ae3d6163ecf37590430eef8e667d650dd03ff20f50cc25096fd42a",
+    "post_runtime_sha256": "67eaa4f131ae3d6163ecf37590430eef8e667d650dd03ff20f50cc25096fd42a",
+    "current_source_qualified": false,
+    "source_qualification": "RETAINED_DONOR_EXECUTABLE_NOT_CURRENT_SOURCE",
+    "runtime_scope": "409-it13"
+  },
+  {
+    "actual_filename": "release_pair-587942a3dc3808c8",
+    "target_name": "release_pair",
+    "target_kind": [
+      "test"
+    ],
+    "test_profile": true,
+    "sha256": "7a7be2a60f24acc27bb4fa3103f20201a15b721cd3c47a31d548c8ca71543494",
+    "preserved_sha256": "7a7be2a60f24acc27bb4fa3103f20201a15b721cd3c47a31d548c8ca71543494",
+    "post_runtime_sha256": "7a7be2a60f24acc27bb4fa3103f20201a15b721cd3c47a31d548c8ca71543494",
+    "current_source_qualified": false,
+    "source_qualification": "RETAINED_DONOR_EXECUTABLE_NOT_CURRENT_SOURCE",
+    "runtime_scope": "409-it13"
+  },
+  {
+    "actual_filename": "lamp_update-e14d54c83f68ff7f",
+    "target_name": "lamp_update",
+    "target_kind": [
+      "lib"
+    ],
+    "test_profile": true,
+    "sha256": "ab2ab213cee3c772c24e60781fc84e224ae4baf25f8b4f8f7b9da9b5d5012f08",
+    "preserved_sha256": "ab2ab213cee3c772c24e60781fc84e224ae4baf25f8b4f8f7b9da9b5d5012f08",
+    "post_runtime_sha256": "ab2ab213cee3c772c24e60781fc84e224ae4baf25f8b4f8f7b9da9b5d5012f08",
+    "current_source_qualified": false,
+    "source_qualification": "RETAINED_DONOR_EXECUTABLE_NOT_CURRENT_SOURCE",
+    "runtime_scope": "409-it13"
+  },
+  {
+    "actual_filename": "lamp_update-93805432291f4475",
+    "target_name": "lamp-update",
+    "target_kind": [
+      "bin"
+    ],
+    "test_profile": true,
+    "sha256": "e425397163ad3027a1782c664ab73a734190ba52333297b8a687de040e2c6cbe",
+    "preserved_sha256": "e425397163ad3027a1782c664ab73a734190ba52333297b8a687de040e2c6cbe",
+    "post_runtime_sha256": "e425397163ad3027a1782c664ab73a734190ba52333297b8a687de040e2c6cbe",
+    "current_source_qualified": false,
+    "source_qualification": "RETAINED_DONOR_EXECUTABLE_NOT_CURRENT_SOURCE",
+    "runtime_scope": "409-it13"
+  },
+  {
+    "actual_filename": "self_cli_exec-7a8efcc313003c4d",
+    "target_name": "self-cli-exec",
+    "target_kind": [
+      "test"
+    ],
+    "test_profile": true,
+    "sha256": "344099ca5d40d9252637a9f2800e328ca1e9355e88b3ea6b6ecf379475196f78",
+    "preserved_sha256": "344099ca5d40d9252637a9f2800e328ca1e9355e88b3ea6b6ecf379475196f78",
+    "post_runtime_sha256": "344099ca5d40d9252637a9f2800e328ca1e9355e88b3ea6b6ecf379475196f78",
+    "current_source_qualified": false,
+    "source_qualification": "RETAINED_DONOR_EXECUTABLE_NOT_CURRENT_SOURCE",
+    "runtime_scope": "409-it13"
+  },
+  {
+    "actual_filename": "self_process_cuts-9807238ddc4f9970",
+    "target_name": "self-process-cuts",
+    "target_kind": [
+      "test"
+    ],
+    "test_profile": true,
+    "sha256": "5c4d48cad283c58e7df4d4bc01acb9798bd8dba4701e6e6787a4c959d4057e78",
+    "preserved_sha256": "5c4d48cad283c58e7df4d4bc01acb9798bd8dba4701e6e6787a4c959d4057e78",
+    "post_runtime_sha256": "5c4d48cad283c58e7df4d4bc01acb9798bd8dba4701e6e6787a4c959d4057e78",
+    "current_source_qualified": false,
+    "source_qualification": "RETAINED_DONOR_EXECUTABLE_NOT_CURRENT_SOURCE",
+    "runtime_scope": "409-it13"
+  }
+]

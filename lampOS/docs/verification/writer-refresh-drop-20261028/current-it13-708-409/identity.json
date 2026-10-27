@@ -1,0 +1,18 @@
+{
+  "base": "40923624247a893a19e1d980a328424eedffa308",
+  "both_Rust_exact_full512": true,
+  "dirty_paths": [
+    "lampOS/crates/update/src/writer_refresh.rs",
+    "lampOS/crates/update/src/writer_refresh/tests.rs",
+    "lampOS/docs/settings-writer-refresh.md"
+  ],
+  "docs_and_custom": "UNRUN unchanged scopes; earlier exact-source qualifications separate",
+  "earlier_CI_runner": "0.9.149",
+  "head": "40923624247a893a19e1d980a328424eedffa308",
+  "nextest_version": "0.9.150",
+  "old_negative_driver_sha256": "dda9c34c9552474010a0a1e6e904f1b8d91607b79552d9ab81afc6ef89dda8a9",
+  "scope": "PID current409 focusedit13 only; full512/all33 remains exactf903 Rust source; no currentfull runtime transfer",
+  "source_count": 7500,
+  "tree": "681ff09c59c666ef057165d1241e106e9c8c093e",
+  "working_patch_sha256": "802651002fd40289db9468affc864291e561ae0bafa97647d59a22f9d4059b71"
+}

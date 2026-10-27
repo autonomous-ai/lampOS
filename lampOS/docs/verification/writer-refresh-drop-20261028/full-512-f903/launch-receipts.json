@@ -1,0 +1,80 @@
+[
+  {
+    "chunk_id": "a59401",
+    "exit_code": 1,
+    "raw_private_sha256": "46f1c2a6462179b2b36c4fa8fc843f2b8bb4bbbc2c388392d3fb4697ba257f34",
+    "receipt": "continuation-1.json",
+    "scope": "PRE_CARGO_STOP_56407",
+    "wall_time_seconds": 4.584e-06
+  },
+  {
+    "chunk_id": "520f00",
+    "raw_private_sha256": "0de301eb8e8b24d22c0819ff33c9ab121b97dd0dd33f87396bb00aa29298e5f3",
+    "receipt": "initial-result.json",
+    "scope": "PRE_CARGO_STOP_56407",
+    "session_id": 56407,
+    "wall_time_seconds": 1.002807125
+  },
+  {
+    "raw_private_sha256": "8d802ea38d6f68f743d3a6acdfdded1b8e9723c9cf9e6f8ba727683976b92c9b",
+    "receipt": "request-before-exec.json",
+    "sandbox_permissions": "require_escalated",
+    "saved_before_exec": true,
+    "scope": "PRE_CARGO_STOP_56407"
+  },
+  {
+    "chunk_id": "10b03b",
+    "raw_private_sha256": "d10230b6da911ec20348047d7ad7ce2dd891644ee6f046911ae19db296c0019a",
+    "receipt": "continuation-1.json",
+    "scope": "FULL_FIRST_EXECUTION_56517",
+    "session_id": 56517,
+    "wall_time_seconds": 30.001283875
+  },
+  {
+    "chunk_id": "988f9a",
+    "raw_private_sha256": "4391b56e8b5a1e0f7a1b778b5aef5fe4e0ac2eb7ad1807e8dc2564c5e19a3742",
+    "receipt": "continuation-2.json",
+    "scope": "FULL_FIRST_EXECUTION_56517",
+    "session_id": 56517,
+    "wall_time_seconds": 30.002334292
+  },
+  {
+    "chunk_id": "4e99d7",
+    "raw_private_sha256": "c4e8941ac2c324b142cbf62bf6406a77acd215bd33af591c72186424f284b634",
+    "receipt": "continuation-3.json",
+    "scope": "FULL_FIRST_EXECUTION_56517",
+    "session_id": 56517,
+    "wall_time_seconds": 30.002287042
+  },
+  {
+    "chunk_id": "8f174f",
+    "raw_private_sha256": "d4b83a22be5b8fbf300db048f1e78027aa0f5f1f5cf6000927d6567c5e90370a",
+    "receipt": "continuation-4.json",
+    "scope": "FULL_FIRST_EXECUTION_56517",
+    "session_id": 56517,
+    "wall_time_seconds": 30.001967833
+  },
+  {
+    "chunk_id": "79e871",
+    "exit_code": 0,
+    "raw_private_sha256": "804152fa1d0811533505bc7d5c99da47256ed4d14e26a5b5b862c78bd209d1d1",
+    "receipt": "continuation-5.json",
+    "scope": "FULL_FIRST_EXECUTION_56517",
+    "wall_time_seconds": 14.655553041
+  },
+  {
+    "chunk_id": "244308",
+    "raw_private_sha256": "e05c9bdd03a63e93a90c584581c70248561a3ca73e03e3740ba14bd78a873a84",
+    "receipt": "initial-result.json",
+    "scope": "FULL_FIRST_EXECUTION_56517",
+    "session_id": 56517,
+    "wall_time_seconds": 1.001463458
+  },
+  {
+    "raw_private_sha256": "535b82bff87c4d44a30c0e6ee09e69039b74ed5556b1d9f9b5e9e0a1d3297490",
+    "receipt": "request-before-exec.json",
+    "sandbox_permissions": "require_escalated",
+    "saved_before_exec": true,
+    "scope": "FULL_FIRST_EXECUTION_56517"
+  }
+]

@@ -1,0 +1,42 @@
+{
+  "PR": 3892,
+  "head": "9e7d5d45b57fb5ff6534da92e080feb490ab529d",
+  "base": "40923624247a893a19e1d980a328424eedffa308",
+  "actual_checkout": "a8b01bf9589322e27fa687ee8ab030772ce34c3c",
+  "ordered_parents": [
+    "40923624247a893a19e1d980a328424eedffa308",
+    "9e7d5d45b57fb5ff6534da92e080feb490ab529d"
+  ],
+  "full_tree": "6923ca059163953e0fa2560b9499a3f5a09126ed",
+  "complete_authored_preview_tree_equal": true,
+  "run_id": 40557606820,
+  "job_id": 122377740520,
+  "attempt": 1,
+  "event": "pull_request",
+  "run_and_job": "success",
+  "observed_native_watch_exit": 0,
+  "platform": "x86_64-unknown-linux-gnu",
+  "pinned_Rust": "1.96.0",
+  "actual_commands": [
+    "cargo fmt --manifest-path .github/tools/lampos-promote/Cargo.toml --check",
+    "cargo clippy --locked --manifest-path .github/tools/lampos-promote/Cargo.toml --all-targets -- -D warnings",
+    "cargo +1.96.0 fmt --all --check",
+    "cargo clippy --locked --workspace --all-targets -- -D warnings"
+  ],
+  "actual_Checking_lamp_update": true,
+  "required_stage_conclusions": {
+    "Rust 1.96.0": "success",
+    "stable promotion formatting and strict Clippy": "success",
+    "formatting (whole workspace, pinned Rust)": "success",
+    "clippy (every crate and target, warnings as errors)": "success"
+  },
+  "whole_workspace_scope": true,
+  "complete_log_lines": 674,
+  "raw_private_log_sha256": "65b66d0dc7d5ada418f2cb33bf15cc734b2d73b2f23e666f3e422f97406f3ca5",
+  "raw_private_API_sha256": {
+    "linux-run-final.json": "8e52fd3a0b97374897794784c65154bfee933ddf22e86d71d101d7c08d48455b",
+    "linux-job-final.json": "5fcc2cb65a06ecaa0090821b8c7620483f9b2fc8224134bcc282f5c72a4d759e",
+    "preview-commit.json": "2f5e9963b1142eb844fc772d380502a36d033ace22d128ca9c64263bdb530d65"
+  },
+  "limits": "Original attempt1, no rerun. Actual completed steps/Bash-e/command completion bind success; numeric per-command exits are not printed. Cache/source-time reuse; no clean build. Latera17 is separate; no runtime/device credit from Clippy."
+}

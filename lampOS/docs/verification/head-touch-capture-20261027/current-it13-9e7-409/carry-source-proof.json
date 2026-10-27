@@ -1,0 +1,58 @@
+{
+  "head": "9e7d5d45b57fb5ff6534da92e080feb490ab529d",
+  "base": "40923624247a893a19e1d980a328424eedffa308",
+  "branch": "second/head-inputs-observe-409",
+  "prior_f903_qualified_ref_unchanged": "a220d05c5eba92a6b8a050f2c7c1876fabbbbae0",
+  "qualified_native_head": "95c1860e49132484256fb0c5d4bb758154adcabb",
+  "files": {
+    "lampOS/crates/update/src/head_touch.rs": {
+      "git_entry": "100644 blob f0f048d74a3010d0dd917b08b8eca0d31b239ad9\tlampOS/crates/update/src/head_touch.rs",
+      "sha256": "2e9bcd134f16744e622f813cc3f5e71fe55c1b2a7bb64a5bd14d63d157b3638c",
+      "mode": 420,
+      "full_blob_and_mode_equal_f903_and_native95c": true
+    },
+    "lampOS/crates/update/src/head_touch/capture.rs": {
+      "git_entry": "100644 blob f25375f99386c7c78efc1b5ce9a172b7ac09248d\tlampOS/crates/update/src/head_touch/capture.rs",
+      "sha256": "4137a729709ccfb1ad5a9653fd570daa38a46d2c2988cbd767595bddac7bdf59",
+      "mode": 420,
+      "full_blob_and_mode_equal_f903_and_native95c": true
+    },
+    "lampOS/crates/update/src/head_touch/capture/tests.rs": {
+      "git_entry": "100644 blob 442d2cb4598035b0974c5f3d7a39e7edd89f3b76\tlampOS/crates/update/src/head_touch/capture/tests.rs",
+      "sha256": "ae5af4ed21941b278391c7412706b36f352c28fb20453426df55ff59e65b7855",
+      "mode": 420,
+      "full_blob_and_mode_equal_f903_and_native95c": true
+    },
+    "lampOS/docs/head-touch-capture.md": {
+      "git_entry": "100644 blob 5aaff01db09dd8d1432dc226f002745ff9f9ff4a\tlampOS/docs/head-touch-capture.md",
+      "sha256": "295e987588d23a25eac0fb8155dd65fef718195e536760a08e1bff8058442bde",
+      "mode": 420,
+      "full_blob_and_mode_equal_f903_and_native95c": true
+    },
+    "lampOS/docs/updates.md": {
+      "git_entry": "100644 blob b129d724563f8296257db43d90c031d8af15d2f8\tlampOS/docs/updates.md",
+      "sha256": "521890f7bc9a773d32efb465790eb95d3a632044093f193bf783eb55e6aa3cff",
+      "mode": 420,
+      "full_blob_and_mode_equal_f903_and_native95c": true
+    },
+    "lampOS/docs/reuse-decisions.md": {
+      "git_entry": "100644 blob b8c5d3768ae6d1035561e2827428ee14b19af2d5\tlampOS/docs/reuse-decisions.md",
+      "sha256": "a996f87675004d9330f3e8d3d45b76969cdc31cfafaff45cd23f66774848a40b",
+      "mode": 420,
+      "full_blob_and_mode_equal_f903_and_native95c": true
+    }
+  },
+  "all6_full_blobs_modes_equal": true,
+  "all7501_other_source_rows_equal_f903_actual": true,
+  "changed_source_rows": [
+    "lampOS/crates/control/src/protocol.rs",
+    "lampOS/docs/control.md"
+  ],
+  "range_equal": true,
+  "source_only_carry_current_gate_UNRUN": true,
+  "no_runtime_count_transfer": true,
+  "prior_scope": "f903222/all52 and native95c7815/all52 separately bound",
+  "current_proposed_scope": "freshfmtstrictmetadata/compile/list +it13 only; all52 source-preservation proof, no current52runtimeclaim",
+  "scope_proof_sha256": "a0cbc1d6ffc13213b54a0602c5b5fa35f50ef084885b0a19d70028a989ed20ef",
+  "all52_source_owned_and_normal_inputs_preserved_not_reexecuted409": true
+}

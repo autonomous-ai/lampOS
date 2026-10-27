@@ -1,0 +1,32 @@
+{
+  "protocol": "publication_correction/1",
+  "old_packet_manifest_SHA256": "3afb83949b4b55a00378455610811bca891f2fffc7f925a774668774a50be39f",
+  "raw_native_result_SHA256": "e0cc07def218c0e4bab918b35f2c72be7e970a1033ec7fa511ed661484743409",
+  "raw_native_result_bytes": 4196,
+  "raw_native_result_JSON_valid": true,
+  "old_published_native_SHA256": "d3f70e44b3445ff87a4c76713c19bf55300fead76241b0cea857b4efc5b60062",
+  "old_published_native_bytes": 3678,
+  "old_JSON_parse_error": {
+    "message": "Expecting property name enclosed in double quotes",
+    "line": 6,
+    "column": 287,
+    "offset": 398
+  },
+  "new_published_native_SHA256": "88a5ec76ebc04fa6eb692e612e22a6a587dafcb8fe67f9fe75e5fd947b8bc127",
+  "new_published_native_bytes": 3686,
+  "new_native_JSON_valid": true,
+  "native_stdout_JSON_records_including_SCOPED_DISCOVERY_payload_validated": 10,
+  "native_handle": 40223,
+  "actual_native_exit_code": 0,
+  "cause": "Path regex ran over serialized JSON and consumed the backslash before a nested log argv closing quote. This damaged only the published JSON wrapper, not source, runtime, raw result or private log.",
+  "correction": "Load original JSON, recursively redact typed string values, JSON-dump the resulting outer object; never regex the serialized JSON wrapper.",
+  "old_packet_and_raw_untouched": true,
+  "test_or_runtime_replayed": false,
+  "source_changed": false,
+  "counts_or_case_membership_changed": false,
+  "sanitization_record_updates": [
+    "native-handle-closure.json",
+    "README.md"
+  ],
+  "all_other_original_member_bytes_unchanged_except_manifest_and_sanitization": true
+}

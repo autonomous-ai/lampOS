@@ -1,0 +1,42 @@
+{
+  "PR": 3892,
+  "head": "95c1860e49132484256fb0c5d4bb758154adcabb",
+  "base": "3aa752f73914d0f29fc90edb010a3a7fa1cf526b",
+  "actual_checkout": "7a603e401cfee4e879289913fa99953b078c952f",
+  "ordered_parents": [
+    "3aa752f73914d0f29fc90edb010a3a7fa1cf526b",
+    "95c1860e49132484256fb0c5d4bb758154adcabb"
+  ],
+  "full_tree": "c47a00de1fd3edf2797cde030139ca1dee1090e5",
+  "complete_authored_preview_tree_equal": true,
+  "run_id": 40551160559,
+  "job_id": 122354968704,
+  "attempt": 1,
+  "event": "pull_request",
+  "run_and_job": "success",
+  "observed_native_watch_exit": 0,
+  "platform": "x86_64-unknown-linux-gnu",
+  "pinned_Rust": "1.96.0",
+  "actual_commands": [
+    "cargo fmt --manifest-path .github/tools/lampos-promote/Cargo.toml --check",
+    "cargo clippy --locked --manifest-path .github/tools/lampos-promote/Cargo.toml --all-targets -- -D warnings",
+    "cargo +1.96.0 fmt --all --check",
+    "cargo clippy --locked --workspace --all-targets -- -D warnings"
+  ],
+  "actual_Checking_lamp_update": true,
+  "required_stage_conclusions": {
+    "Rust 1.96.0": "success",
+    "stable promotion formatting and strict Clippy": "success",
+    "formatting (whole workspace, pinned Rust)": "success",
+    "clippy (every crate and target, warnings as errors)": "success"
+  },
+  "whole_workspace_scope": true,
+  "complete_log_lines": 659,
+  "raw_private_log_sha256": "e0c7379aa0c420ff3d3160bb672db06ce72fd5e0d201621e4353807fc5d10332",
+  "raw_private_API_sha256": {
+    "linux-run-final.json": "2c308f4d3bbd52e905caa9d451a5b7a70942b609f80d93ad5fa848469b40bb83",
+    "linux-job-final.json": "f877fdfafaf0ad899a15c833be1d36a419ee2ebd73af8ed957e1a59d9c01aac4",
+    "preview-commit.json": "9e9fde705f8c96e1858e5cd8d8b560fdb7aabee4a98c3150cc10afa1b7cd4089"
+  },
+  "limits": "Original attempt1, no rerun. Step success plus Bash-e and completion markers establish command success; separate per-command numeric shell exits are not printed. Target/source-time cache reused, no clean rebuild. No runtime/device/ARM physical credit from Clippy; later Mainf903 remains unqualified."
+}

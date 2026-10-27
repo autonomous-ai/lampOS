@@ -1,0 +1,40 @@
+{
+  "Linux_rawname_physical_branch_present": true,
+  "all6full_blobs_modes_equal95c": true,
+  "base": "40923624247a893a19e1d980a328424eedffa308",
+  "head": "9e7d5d45b57fb5ff6534da92e080feb490ab529d",
+  "not_later_a17_runtime_credit": true,
+  "old6523_failed_subcase_and_cause": "UNESTABLISHED",
+  "owned_files": {
+    "lampOS/crates/update/src/head_touch.rs": {
+      "blob": "f0f048d74a3010d0dd917b08b8eca0d31b239ad9",
+      "mode": "100644",
+      "sha256": "2e9bcd134f16744e622f813cc3f5e71fe55c1b2a7bb64a5bd14d63d157b3638c"
+    },
+    "lampOS/crates/update/src/head_touch/capture.rs": {
+      "blob": "f25375f99386c7c78efc1b5ce9a172b7ac09248d",
+      "mode": "100644",
+      "sha256": "4137a729709ccfb1ad5a9653fd570daa38a46d2c2988cbd767595bddac7bdf59"
+    },
+    "lampOS/crates/update/src/head_touch/capture/tests.rs": {
+      "blob": "442d2cb4598035b0974c5f3d7a39e7edd89f3b76",
+      "mode": "100644",
+      "sha256": "ae5af4ed21941b278391c7412706b36f352c28fb20453426df55ff59e65b7855"
+    },
+    "lampOS/docs/head-touch-capture.md": {
+      "blob": "5aaff01db09dd8d1432dc226f002745ff9f9ff4a",
+      "mode": "100644",
+      "sha256": "295e987588d23a25eac0fb8155dd65fef718195e536760a08e1bff8058442bde"
+    },
+    "lampOS/docs/reuse-decisions.md": {
+      "blob": "b8c5d3768ae6d1035561e2827428ee14b19af2d5",
+      "mode": "100644",
+      "sha256": "a996f87675004d9330f3e8d3d45b76969cdc31cfafaff45cd23f66774848a40b"
+    },
+    "lampOS/docs/updates.md": {
+      "blob": "b129d724563f8296257db43d90c031d8af15d2f8",
+      "mode": "100644",
+      "sha256": "521890f7bc9a773d32efb465790eb95d3a632044093f193bf783eb55e6aa3cff"
+    }
+  }
+}

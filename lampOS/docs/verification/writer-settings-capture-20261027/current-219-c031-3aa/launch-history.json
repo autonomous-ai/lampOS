@@ -1,0 +1,48 @@
+{
+  "matching_handle_drained": true,
+  "native_handle": 21710,
+  "no_fail_fast": true,
+  "old_reported_failure_causes": "UNESTABLISHED",
+  "prior_counts_are_separate": {
+    "10ae_0d_local": 220,
+    "6f_d8_local": 219,
+    "6f_d8_original_ARM": 7807,
+    "dd76_197_local": 352,
+    "dd76_197_original_ARM": 7798,
+    "earlier_c3_full": 528
+  },
+  "processes": 4,
+  "receipts": [
+    {
+      "chunk_id": "39f51c",
+      "raw_sha256": "97e17bf582dca6137b087811d97989a4c628141159cf43fcc380b8ed284590a6",
+      "receipt": "continuation-1.json",
+      "session_id": 21710,
+      "wall_time_seconds": 30.002966333
+    },
+    {
+      "chunk_id": "516dc6",
+      "exit_code": 0,
+      "raw_sha256": "a1e2dcabbb8d9f03d670e61fe4e6fe60f3a43b2d40ac82732913e50f2eb43280",
+      "receipt": "continuation-2.json",
+      "wall_time_seconds": 2.0584e-05
+    },
+    {
+      "chunk_id": "01c3a9",
+      "raw_sha256": "62c9236daf3cd0c033fec023302e54b8af6d116008a37567ea01987bb434a3ad",
+      "receipt": "initial-result.json",
+      "session_id": 21710,
+      "wall_time_seconds": 1.002943083
+    },
+    {
+      "raw_sha256": "2e5c1d8d68ee1ad09792932c2eba8d4a58ee2459c254a3648748b52c18ddb99f",
+      "receipt": "request-before-exec.json",
+      "sandbox_permissions": "require_escalated",
+      "saved_before_exec": true
+    }
+  ],
+  "retained_failedRound_and_negative_failedLIB_witness_guards_close": true,
+  "retries": 0,
+  "runtime_executions": 1,
+  "terminal_exit_code": 0
+}
