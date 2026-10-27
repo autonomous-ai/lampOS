@@ -271,6 +271,133 @@ pub fn seated_lamp_env(
     Ok(text)
 }
 
+/// One turn of a joint, in counts.
+const TURN: i32 = 4096;
+/// A read farther than this (counts, the short way round) from the read
+/// after it is a single misread and dropped by the hand sweep (#3504):
+/// 45 degrees, more than a hand turns a joint between two reads.
+pub const SWEEP_OUTLIER: u16 = 512;
+/// What starts the sweep's comment line in `lamp.env`.
+pub const SWEPT_PREFIX: &str = "# Swept by hand:";
+/// The joints' names in [`RestRead`]'s order, as the sweep says them.
+pub const JOINT_NAMES: [&str; 5] = ["yaw", "shoulder", "elbow", "roll", "pitch"];
+
+/// The signed step from one read to the next, the short way round: a jump
+/// of more than half a turn is the 0/4095 seam crossed, not a move.
+fn step(from: u16, to: u16) -> i32 {
+    let forward = (i32::from(to) - i32::from(from)).rem_euclid(TURN);
+    if forward > TURN / 2 {
+        forward - TURN
+    } else {
+        forward
+    }
+}
+
+/// The arc one joint travels in a hand sweep (#3504), from its reads in
+/// order. Each read is unwrapped onto the last, so a joint crossing the
+/// 0/4095 seam keeps counting instead of reading the whole turn; a read is
+/// taken only once the read after it lies within [`SWEEP_OUTLIER`] of it.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct ArcTracker {
+    pending: Option<u16>,
+    last: Option<u16>,
+    at: i32,
+    low: i32,
+    high: i32,
+}
+
+/// What a sweep found for one joint.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Swept {
+    /// From `start` the positive way to `end`, wrapping past 4095 to 0 when
+    /// `start > end` (elbow 3900-300 is 3900..=4095 and 0..=300).
+    Arc { start: u16, end: u16, span: u16 },
+    /// A whole turn or more.
+    FullTurn,
+}
+
+impl ArcTracker {
+    /// One read of the joint's position; past 4095 is no position and ignored.
+    pub fn feed(&mut self, position: u16) {
+        if position >= 4096 {
+            return;
+        }
+        if let Some(pending) = self.pending.replace(position)
+            && step(pending, position).unsigned_abs() <= u32::from(SWEEP_OUTLIER)
+        {
+            self.take(pending);
+        }
+    }
+
+    fn take(&mut self, position: u16) {
+        self.at = match self.last {
+            None => {
+                self.low = i32::from(position);
+                self.high = self.low;
+                self.low
+            }
+            Some(last) => self.at + step(last, position),
+        };
+        self.last = Some(position);
+        self.low = self.low.min(self.at);
+        self.high = self.high.max(self.at);
+    }
+
+    /// The arc so far; none before two agreeing reads.
+    pub fn swept(&self) -> Option<Swept> {
+        self.last?;
+        let span = self.high - self.low;
+        if span >= TURN {
+            return Some(Swept::FullTurn);
+        }
+        let end = |count: i32| u16::try_from(count.rem_euclid(TURN)).expect("inside a turn");
+        Some(Swept::Arc {
+            start: end(self.low),
+            end: end(self.high),
+            span: u16::try_from(span).expect("under a turn"),
+        })
+    }
+}
+
+impl std::fmt::Display for Swept {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match *self {
+            Self::FullTurn => write!(f, "a full turn"),
+            Self::Arc { start, end, .. } if start > end => {
+                write!(f, "{start}-{end} (across the seam)")
+            }
+            Self::Arc { start, end, .. } => write!(f, "{start}-{end}"),
+        }
+    }
+}
+
+impl Swept {
+    /// The span in counts and degrees, for the person reading the sweep.
+    pub fn span(&self) -> String {
+        match *self {
+            Self::FullTurn => "4096 counts or more, 360 degrees or more".into(),
+            Self::Arc { span, .. } => format!(
+                "{span} counts, {:.0} degrees",
+                f64::from(span) * 360.0 / 4096.0
+            ),
+        }
+    }
+}
+
+/// The sweep's `lamp.env` comment line (#3504), the joints in
+/// [`JOINT_NAMES`]' order; a joint with no arc says "not read".
+pub fn swept_line(swept: &[Option<Swept>; 5]) -> String {
+    let joints: Vec<String> = JOINT_NAMES
+        .iter()
+        .zip(swept)
+        .map(|(name, swept)| match swept {
+            Some(swept) => format!("{name} {swept}"),
+            None => format!("{name} not read"),
+        })
+        .collect();
+    format!("{SWEPT_PREFIX} {}.", joints.join(", "))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -562,5 +689,129 @@ mod tests {
             assert!(text.contains(&format!("--home {pitch},2057,2034 ")));
             assert!(!text.contains("kept"));
         }
+    }
+
+    fn swept(reads: &[u16]) -> Option<Swept> {
+        let mut tracker = ArcTracker::default();
+        for read in reads {
+            tracker.feed(*read);
+        }
+        tracker.swept()
+    }
+
+    /// lamp-3e83's yaw (hw-first on #3558): a plain arc, end to end and back.
+    #[test]
+    fn a_plain_sweep_is_its_two_ends() {
+        let up = (855..=3283).step_by(37).chain([3283, 3283]);
+        let down = (855..=3283).rev().step_by(41).chain([855, 855]);
+        let found = swept(&up.chain(down).collect::<Vec<u16>>()).unwrap();
+        assert_eq!(
+            found,
+            Swept::Arc {
+                start: 855,
+                end: 3283,
+                span: 2428
+            }
+        );
+        assert_eq!(found.to_string(), "855-3283");
+        assert_eq!(found.span(), "2428 counts, 213 degrees");
+    }
+
+    /// lamp-3e83's elbow crossed the 0/4095 seam, where a min and max read
+    /// the whole turn: the arc keeps its two ends either side of the seam.
+    #[test]
+    fn a_sweep_across_the_seam_keeps_both_ends() {
+        let up: Vec<u16> = (3900..4096)
+            .step_by(13)
+            .chain((0..=300).step_by(17))
+            .chain([300, 300])
+            .collect();
+        let back: Vec<u16> = up.iter().rev().copied().collect();
+        let found = swept(&[up, back].concat()).unwrap();
+        assert_eq!(
+            found,
+            Swept::Arc {
+                start: 3900,
+                end: 300,
+                span: 496
+            }
+        );
+        assert_eq!(found.to_string(), "3900-300 (across the seam)");
+    }
+
+    #[test]
+    fn a_single_misread_is_dropped() {
+        let reads = [2000, 2010, 4000, 2020, 2030, 30, 2040, 2050, 2050];
+        assert_eq!(
+            swept(&reads),
+            Some(Swept::Arc {
+                start: 2000,
+                end: 2050,
+                span: 50
+            })
+        );
+    }
+
+    #[test]
+    fn a_whole_turn_or_more_is_a_full_turn() {
+        let turns: Vec<u16> = (0..2)
+            .flat_map(|_| (0..4096).step_by(100))
+            .map(|count| (count + 1000) % 4096)
+            .collect();
+        let found = swept(&turns).unwrap();
+        assert_eq!(found, Swept::FullTurn);
+        assert_eq!(found.to_string(), "a full turn");
+        // Just short of one stays an arc, across the seam.
+        let short: Vec<u16> = (1000..5000)
+            .step_by(100)
+            .chain([4999, 4999])
+            .map(|count| count % 4096)
+            .collect();
+        assert_eq!(
+            swept(&short),
+            Some(Swept::Arc {
+                start: 1000,
+                end: 903,
+                span: 3999
+            })
+        );
+    }
+
+    /// A joint left alone jitters a count or two, even sitting on the seam:
+    /// a short arc, never a turn.
+    #[test]
+    fn jitter_at_rest_is_a_short_arc() {
+        assert_eq!(
+            swept(&[2050, 2052, 2049, 2051, 2050, 2050]),
+            Some(Swept::Arc {
+                start: 2049,
+                end: 2052,
+                span: 3
+            })
+        );
+        assert_eq!(
+            swept(&[4095, 0, 4094, 1, 0, 4095, 4095]),
+            Some(Swept::Arc {
+                start: 4094,
+                end: 1,
+                span: 3
+            })
+        );
+        assert_eq!(swept(&[2050]), None);
+    }
+
+    #[test]
+    fn the_swept_line_names_every_joint() {
+        let arc = |start, end, span| Some(Swept::Arc { start, end, span });
+        assert_eq!(
+            swept_line(&[
+                arc(855, 3283, 2428),
+                arc(2056, 3989, 1933),
+                arc(3900, 300, 496),
+                Some(Swept::FullTurn),
+                None,
+            ]),
+            "# Swept by hand: yaw 855-3283, shoulder 2056-3989, elbow 3900-300 (across the seam), roll a full turn, pitch not read."
+        );
     }
 }
