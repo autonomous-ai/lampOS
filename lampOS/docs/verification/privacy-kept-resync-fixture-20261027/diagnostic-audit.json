@@ -1,0 +1,79 @@
+{
+  "all_four_owned_groups_closed_without_forced_cleanup": true,
+  "base": "b2344a07df6b38d2736e01297999751c26e477a5",
+  "commands_returncodes": [
+    0,
+    101,
+    0,
+    0
+  ],
+  "controller_sha256": "5c6239e3b69bce4f7dc112799565bc61ecaaa39ac30001d03c4b4ee781f94dec",
+  "fresh_shipping_qualification_required": true,
+  "historical_cause_proven": false,
+  "limits": [
+    "Only the controlled30ms fixture contrast is established; original generic Unavailable cause remains unknown.",
+    "Recorded runtime before/after stat+byte snapshots and independent saved copies bind historical execution; current WT/actual target already carried and are not revalidated here.",
+    "Stock101 remains an actual expected negative result; no retry or relabeling.",
+    "No native ARM64/device/latency/physical acceptance claim."
+  ],
+  "live_old_worktree_or_target_revalidated": false,
+  "matched_variants_differ_only_in_period": true,
+  "receipt_hashes": {
+    "restoration": "0ec5252b0ea38edeb0532a1b42b1914dbe508a68203482804965cf9066759e6e",
+    "terminal": "0a620bf0f0d0286acaf819c1c54ed27e1da080203665dddf16f3ad00ec56d4bc",
+    "variant_manifest": "ef871808d1a21a760262277ae0617f1e5ede5118865c477d3aa5a12e5a5dc165"
+  },
+  "restoration_receipt_verified_against_canonical_source_and_tree": true,
+  "shipping65_saved_preimages_rehashed": true,
+  "shipping_runtime_executed": false,
+  "shipping_staged_tree": "22c85356eced4579edae5cab4bcb861092685da8",
+  "source_and_raw_guards_verified": true,
+  "source_rows_per_variant": 7238,
+  "status": "VERIFIED_CONTROLLED_CONTRAST_ONLY",
+  "variants": {
+    "local1s": {
+      "actual_returncode": 0,
+      "buffer_overflow": false,
+      "buffer_records": 12,
+      "datagrams": 0,
+      "late": false,
+      "measured_delay_us": 33807,
+      "notice": "[]",
+      "notice_header_wall_age_ms": 1,
+      "notice_payload_age_us": 860,
+      "notice_since_open_us": 42592,
+      "raw_input_entries": 8697,
+      "recorded_features": [],
+      "saved_driver_sha256": "f1acf78e83597e31e9a2769b62fb6a2a999af55e5f53dcbb81527910dc83e53e",
+      "source_gone": false,
+      "test_summary": [
+        "ok",
+        1,
+        0,
+        0
+      ]
+    },
+    "stock10ms": {
+      "actual_returncode": 101,
+      "buffer_overflow": false,
+      "buffer_records": 7,
+      "datagrams": 0,
+      "late": true,
+      "measured_delay_us": 31055,
+      "notice": "[Late]",
+      "notice_header_wall_age_ms": 0,
+      "notice_payload_age_us": 412,
+      "notice_since_open_us": 34574,
+      "raw_input_entries": 8697,
+      "recorded_features": [],
+      "saved_driver_sha256": "e01649f39b1a4c9ba80d777f32812863a4ce008307af32173ab7738a1356fb59",
+      "source_gone": false,
+      "test_summary": [
+        "FAILED",
+        0,
+        1,
+        0
+      ]
+    }
+  }
+}

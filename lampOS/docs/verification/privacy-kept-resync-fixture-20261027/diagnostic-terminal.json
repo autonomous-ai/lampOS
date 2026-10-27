@@ -1,0 +1,643 @@
+{
+  "base": "b2344a07df6b38d2736e01297999751c26e477a5",
+  "commands": [
+    {
+      "argv": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "--no-run",
+        "--message-format=json"
+      ],
+      "before_cleanup": {
+        "driver_reaped": true,
+        "process_group": {
+          "state": "absent"
+        },
+        "returncode": 0
+      },
+      "cleanup_actions": [],
+      "cleanup_budget_seconds": 15,
+      "command_budget_seconds": 1800,
+      "driver_reaped": true,
+      "elapsed_seconds": 126.98919030900001,
+      "error": null,
+      "forced_cleanup": false,
+      "label": "stock10ms-compile",
+      "log": "stock10ms-compile.log",
+      "log_sha256": "60c6d0d12d79b43772a318991718f7b6129fc2274904e2a1629269ae2204721b",
+      "process_group": {
+        "state": "absent"
+      },
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "/Users/d/code/autonomous-os/.claude/worktrees/third-reset-onboarding-target/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+        "--exact",
+        "privacy_bus::tests::the_lease_reader_resyncs_on_kept_leases_only_before_its_first_datagram_in_its_first_second",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "before_cleanup": {
+        "driver_reaped": true,
+        "process_group": {
+          "state": "absent"
+        },
+        "returncode": 101
+      },
+      "cleanup_actions": [],
+      "cleanup_budget_seconds": 15,
+      "command_budget_seconds": 60,
+      "driver_reaped": true,
+      "elapsed_seconds": 2.1976587389999906,
+      "error": null,
+      "forced_cleanup": false,
+      "label": "stock10ms-case",
+      "log": "stock10ms-case.log",
+      "log_sha256": "d73318f665c423a78db45cc0b18022f1326de9abab783f577a0e8058c44d576b",
+      "process_group": {
+        "state": "absent"
+      },
+      "returncode": 101
+    },
+    {
+      "argv": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-voice",
+        "--lib",
+        "--no-run",
+        "--message-format=json"
+      ],
+      "before_cleanup": {
+        "driver_reaped": true,
+        "process_group": {
+          "state": "absent"
+        },
+        "returncode": 0
+      },
+      "cleanup_actions": [],
+      "cleanup_budget_seconds": 15,
+      "command_budget_seconds": 1800,
+      "driver_reaped": true,
+      "elapsed_seconds": 125.73955783099998,
+      "error": null,
+      "forced_cleanup": false,
+      "label": "local1s-compile",
+      "log": "local1s-compile.log",
+      "log_sha256": "90d5db877781bba2746d2b496d00273f3dd1fda3e3fe50b4bd109c2f9d4682cd",
+      "process_group": {
+        "state": "absent"
+      },
+      "returncode": 0
+    },
+    {
+      "argv": [
+        "/Users/d/code/autonomous-os/.claude/worktrees/third-reset-onboarding-target/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+        "--exact",
+        "privacy_bus::tests::the_lease_reader_resyncs_on_kept_leases_only_before_its_first_datagram_in_its_first_second",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "before_cleanup": {
+        "driver_reaped": true,
+        "process_group": {
+          "state": "absent"
+        },
+        "returncode": 0
+      },
+      "cleanup_actions": [],
+      "cleanup_budget_seconds": 15,
+      "command_budget_seconds": 60,
+      "driver_reaped": true,
+      "elapsed_seconds": 2.2633541839999793,
+      "error": null,
+      "forced_cleanup": false,
+      "label": "local1s-case",
+      "log": "local1s-case.log",
+      "log_sha256": "ca11a0bdab4c5b2b0464d05f3d2f4ef35e18480c3a8d11360c5b59dca65b7ccb",
+      "process_group": {
+        "state": "absent"
+      },
+      "returncode": 0
+    }
+  ],
+  "controller_sha256": "5c6239e3b69bce4f7dc112799565bc61ecaaa39ac30001d03c4b4ee781f94dec",
+  "failure": null,
+  "finished": "2026-10-27T00:16:34.665330+00:00",
+  "historical_cause_proven": false,
+  "interrupts": [],
+  "limitations": [
+    "Only controlled diagnostic contrast, not historical cause or physical acceptance.",
+    "Failed stock case remains an actual failure with its own source and raw log.",
+    "Unexpected/inconclusive observations stop; no retries.",
+    "Process groups do not cover descendants deliberately creating another session.",
+    "SIGKILL/filesystem failure can prevent restoration; dedicated source/target must remain exclusive."
+  ],
+  "matched_control_qualified": true,
+  "restoration": {
+    "identity": {
+      "base": "b2344a07df6b38d2736e01297999751c26e477a5",
+      "privacy_source_sha256": "0f376c76bc9409f9d41c07187d4a58de553bfb5b49a6d600342bcd90714a67df",
+      "shipping_index_tree": "22c85356eced4579edae5cab4bcb861092685da8",
+      "shipping_patch_sha256": "d3a7820f2f95270cbc8ae9edf2b17236475044f27fa414691aeaee3619c3d850",
+      "staged_state": "shipping two-file index unchanged; diagnostic is unstaged/private",
+      "variant": "shipping"
+    },
+    "note": "Exact bytes/index/base restored; source inode/mtime/ctime may differ and fresh shipping gates are mandatory.",
+    "restored": true,
+    "source_map_matches": true
+  },
+  "results": [
+    {
+      "actual_returncode": 101,
+      "controlled_result": "expected_failure",
+      "events": {
+        "BUFFER": [
+          {
+            "line": 7,
+            "overflow": false,
+            "records": 7
+          }
+        ],
+        "CURRENT": [
+          {
+            "datagrams": 0,
+            "discard_counters": "(0, 0, 0, 0)",
+            "expires_at_us": 148375355208,
+            "line": 9,
+            "now_us": 148375305748,
+            "observed_us": 148375305208,
+            "opened_us": 148375305204,
+            "payload_age_us": 540,
+            "payload_fresh": true,
+            "sequence": 2,
+            "stamp_at_us": 148375305208
+          },
+          {
+            "datagrams": 0,
+            "discard_counters": "(0, 0, 0, 0)",
+            "expires_at_us": 148375389366,
+            "line": 13,
+            "now_us": 148375339758,
+            "observed_us": 148375339366,
+            "opened_us": 148375305204,
+            "payload_age_us": 392,
+            "payload_fresh": true,
+            "sequence": 4,
+            "stamp_at_us": 148375339366
+          }
+        ],
+        "DELAY": [
+          {
+            "after_us": 148375338927,
+            "before_us": 148375307872,
+            "datagrams": 0,
+            "line": 11,
+            "past_first_second": false,
+            "read_sequence": 2
+          }
+        ],
+        "MESSAGE": [
+          {
+            "datagrams": 0,
+            "gap": 0,
+            "header_age_us": 414,
+            "header_at_us": 148375305208,
+            "header_expired": false,
+            "header_expires_ms": 50,
+            "header_wall_age_ms": 0,
+            "header_wall_ms": 1793060048523,
+            "line": 8,
+            "message_expired": false,
+            "now_us": 148375305622,
+            "now_wall_ms": 1793060048523,
+            "sequence": 2,
+            "validation_ok": true
+          },
+          {
+            "datagrams": 0,
+            "gap": 1,
+            "header_age_us": 360,
+            "header_at_us": 148375339366,
+            "header_expired": false,
+            "header_expires_ms": 50,
+            "header_wall_age_ms": 0,
+            "header_wall_ms": 1793060048557,
+            "line": 12,
+            "message_expired": false,
+            "now_us": 148375339726,
+            "now_wall_ms": 1793060048557,
+            "sequence": 4,
+            "validation_ok": true
+          }
+        ],
+        "NOTICE": [
+          {
+            "datagrams": 0,
+            "late": false,
+            "line": 10,
+            "nearest_payload": {
+              "datagrams": 0,
+              "discard_counters": "(0, 0, 0, 0)",
+              "expires_at_us": 148375355208,
+              "now_us": 148375305748,
+              "observed_us": 148375305208,
+              "opened_us": 148375305204,
+              "payload_age_us": 540,
+              "payload_fresh": true,
+              "sequence": 2,
+              "stamp_at_us": 148375305208
+            },
+            "notices": "[]",
+            "now_us": 148375305801,
+            "source_gone": false,
+            "wall_ms": 1793060048523
+          },
+          {
+            "datagrams": 0,
+            "late": true,
+            "line": 14,
+            "nearest_payload": {
+              "datagrams": 0,
+              "discard_counters": "(0, 0, 0, 0)",
+              "expires_at_us": 148375389366,
+              "now_us": 148375339758,
+              "observed_us": 148375339366,
+              "opened_us": 148375305204,
+              "payload_age_us": 392,
+              "payload_fresh": true,
+              "sequence": 4,
+              "stamp_at_us": 148375339366
+            },
+            "notices": "[Late]",
+            "now_us": 148375339778,
+            "source_gone": false,
+            "wall_ms": 1793060048557
+          }
+        ]
+      },
+      "first_branch_witnesses": {
+        "current": {
+          "datagrams": 0,
+          "discard_counters": "(0, 0, 0, 0)",
+          "expires_at_us": 148375389366,
+          "line": 13,
+          "now_us": 148375339758,
+          "observed_us": 148375339366,
+          "opened_us": 148375305204,
+          "payload_age_us": 392,
+          "payload_fresh": true,
+          "sequence": 4,
+          "stamp_at_us": 148375339366
+        },
+        "delay": {
+          "after_us": 148375338927,
+          "before_us": 148375307872,
+          "datagrams": 0,
+          "line": 11,
+          "past_first_second": false,
+          "read_sequence": 2
+        },
+        "message": {
+          "datagrams": 0,
+          "gap": 1,
+          "header_age_us": 360,
+          "header_at_us": 148375339366,
+          "header_expired": false,
+          "header_expires_ms": 50,
+          "header_wall_age_ms": 0,
+          "header_wall_ms": 1793060048557,
+          "line": 12,
+          "message_expired": false,
+          "now_us": 148375339726,
+          "now_wall_ms": 1793060048557,
+          "sequence": 4,
+          "validation_ok": true
+        },
+        "notice": {
+          "datagrams": 0,
+          "late": true,
+          "line": 14,
+          "nearest_payload": {
+            "datagrams": 0,
+            "discard_counters": "(0, 0, 0, 0)",
+            "expires_at_us": 148375389366,
+            "now_us": 148375339758,
+            "observed_us": 148375339366,
+            "opened_us": 148375305204,
+            "payload_age_us": 392,
+            "payload_fresh": true,
+            "sequence": 4,
+            "stamp_at_us": 148375339366
+          },
+          "notices": "[Late]",
+          "now_us": 148375339778,
+          "source_gone": false,
+          "wall_ms": 1793060048557
+        }
+      },
+      "historical_cause_proven": false,
+      "panic_hooks": [
+        {
+          "line": 4,
+          "text": "thread 'privacy_bus::tests::the_lease_reader_resyncs_on_kept_leases_only_before_its_first_datagram_in_its_first_second' (8337795) panicked at crates/voice/src/privacy_bus.rs:1400:40:"
+        }
+      ],
+      "summaries": [
+        {
+          "line": 22,
+          "text": "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3830 filtered out; finished in 0.04s"
+        }
+      ],
+      "variant": "stock10ms"
+    },
+    {
+      "actual_returncode": 0,
+      "controlled_result": "expected_pass",
+      "events": {
+        "BUFFER": [
+          {
+            "line": 3,
+            "overflow": false,
+            "records": 12
+          }
+        ],
+        "CURRENT": [
+          {
+            "datagrams": 0,
+            "discard_counters": "(0, 0, 0, 0)",
+            "expires_at_us": 148514503595,
+            "line": 5,
+            "now_us": 148514454168,
+            "observed_us": 148514453595,
+            "opened_us": 148514453591,
+            "payload_age_us": 573,
+            "payload_fresh": true,
+            "sequence": 2,
+            "stamp_at_us": 148514453595
+          },
+          {
+            "datagrams": 0,
+            "discard_counters": "(0, 0, 0, 0)",
+            "expires_at_us": 148514545323,
+            "line": 9,
+            "now_us": 148514496142,
+            "observed_us": 148514495323,
+            "opened_us": 148514453591,
+            "payload_age_us": 819,
+            "payload_fresh": true,
+            "sequence": 4,
+            "stamp_at_us": 148514495323
+          },
+          {
+            "datagrams": 0,
+            "discard_counters": "(0, 0, 0, 0)",
+            "expires_at_us": 148514552062,
+            "line": 12,
+            "now_us": 148514502485,
+            "observed_us": 148514502062,
+            "opened_us": 148514502062,
+            "payload_age_us": 423,
+            "payload_fresh": true,
+            "sequence": 2,
+            "stamp_at_us": 148514502062
+          }
+        ],
+        "DELAY": [
+          {
+            "after_us": 148514490118,
+            "before_us": 148514456311,
+            "datagrams": 0,
+            "line": 7,
+            "past_first_second": false,
+            "read_sequence": 2
+          },
+          {
+            "after_us": 148514539317,
+            "before_us": 148514504735,
+            "datagrams": 0,
+            "line": 14,
+            "past_first_second": true,
+            "read_sequence": 2
+          }
+        ],
+        "MESSAGE": [
+          {
+            "datagrams": 0,
+            "gap": 0,
+            "header_age_us": 446,
+            "header_at_us": 148514453595,
+            "header_expired": false,
+            "header_expires_ms": 50,
+            "header_wall_age_ms": 1,
+            "header_wall_ms": 1793060187671,
+            "line": 4,
+            "message_expired": false,
+            "now_us": 148514454041,
+            "now_wall_ms": 1793060187672,
+            "sequence": 2,
+            "validation_ok": true
+          },
+          {
+            "datagrams": 0,
+            "gap": 1,
+            "header_age_us": 745,
+            "header_at_us": 148514495323,
+            "header_expired": false,
+            "header_expires_ms": 50,
+            "header_wall_age_ms": 1,
+            "header_wall_ms": 1793060187713,
+            "line": 8,
+            "message_expired": false,
+            "now_us": 148514496068,
+            "now_wall_ms": 1793060187714,
+            "sequence": 4,
+            "validation_ok": true
+          },
+          {
+            "datagrams": 0,
+            "gap": 0,
+            "header_age_us": 391,
+            "header_at_us": 148514502062,
+            "header_expired": false,
+            "header_expires_ms": 50,
+            "header_wall_age_ms": 0,
+            "header_wall_ms": 1793060187720,
+            "line": 11,
+            "message_expired": false,
+            "now_us": 148514502453,
+            "now_wall_ms": 1793060187720,
+            "sequence": 2,
+            "validation_ok": true
+          },
+          {
+            "datagrams": 0,
+            "gap": 1,
+            "header_age_us": 728,
+            "header_at_us": 148514541490,
+            "header_expired": false,
+            "header_expires_ms": 50,
+            "header_wall_age_ms": 1,
+            "header_wall_ms": 1793060187759,
+            "line": 15,
+            "message_expired": false,
+            "now_us": 148514542218,
+            "now_wall_ms": 1793060187760,
+            "sequence": 4,
+            "validation_ok": true
+          }
+        ],
+        "NOTICE": [
+          {
+            "datagrams": 0,
+            "late": false,
+            "line": 6,
+            "nearest_payload": {
+              "datagrams": 0,
+              "discard_counters": "(0, 0, 0, 0)",
+              "expires_at_us": 148514503595,
+              "now_us": 148514454168,
+              "observed_us": 148514453595,
+              "opened_us": 148514453591,
+              "payload_age_us": 573,
+              "payload_fresh": true,
+              "sequence": 2,
+              "stamp_at_us": 148514453595
+            },
+            "notices": "[]",
+            "now_us": 148514454223,
+            "source_gone": false,
+            "wall_ms": 1793060187672
+          },
+          {
+            "datagrams": 0,
+            "late": false,
+            "line": 10,
+            "nearest_payload": {
+              "datagrams": 0,
+              "discard_counters": "(0, 0, 0, 0)",
+              "expires_at_us": 148514545323,
+              "now_us": 148514496142,
+              "observed_us": 148514495323,
+              "opened_us": 148514453591,
+              "payload_age_us": 819,
+              "payload_fresh": true,
+              "sequence": 4,
+              "stamp_at_us": 148514495323
+            },
+            "notices": "[]",
+            "now_us": 148514496183,
+            "source_gone": false,
+            "wall_ms": 1793060187714
+          },
+          {
+            "datagrams": 0,
+            "late": false,
+            "line": 13,
+            "nearest_payload": {
+              "datagrams": 0,
+              "discard_counters": "(0, 0, 0, 0)",
+              "expires_at_us": 148514552062,
+              "now_us": 148514502485,
+              "observed_us": 148514502062,
+              "opened_us": 148514502062,
+              "payload_age_us": 423,
+              "payload_fresh": true,
+              "sequence": 2,
+              "stamp_at_us": 148514502062
+            },
+            "notices": "[]",
+            "now_us": 148514502499,
+            "source_gone": false,
+            "wall_ms": 1793060187720
+          }
+        ]
+      },
+      "first_branch_witnesses": {
+        "current": {
+          "datagrams": 0,
+          "discard_counters": "(0, 0, 0, 0)",
+          "expires_at_us": 148514545323,
+          "line": 9,
+          "now_us": 148514496142,
+          "observed_us": 148514495323,
+          "opened_us": 148514453591,
+          "payload_age_us": 819,
+          "payload_fresh": true,
+          "sequence": 4,
+          "stamp_at_us": 148514495323
+        },
+        "delay": {
+          "after_us": 148514490118,
+          "before_us": 148514456311,
+          "datagrams": 0,
+          "line": 7,
+          "past_first_second": false,
+          "read_sequence": 2
+        },
+        "message": {
+          "datagrams": 0,
+          "gap": 1,
+          "header_age_us": 745,
+          "header_at_us": 148514495323,
+          "header_expired": false,
+          "header_expires_ms": 50,
+          "header_wall_age_ms": 1,
+          "header_wall_ms": 1793060187713,
+          "line": 8,
+          "message_expired": false,
+          "now_us": 148514496068,
+          "now_wall_ms": 1793060187714,
+          "sequence": 4,
+          "validation_ok": true
+        },
+        "notice": {
+          "datagrams": 0,
+          "late": false,
+          "line": 10,
+          "nearest_payload": {
+            "datagrams": 0,
+            "discard_counters": "(0, 0, 0, 0)",
+            "expires_at_us": 148514545323,
+            "now_us": 148514496142,
+            "observed_us": 148514495323,
+            "opened_us": 148514453591,
+            "payload_age_us": 819,
+            "payload_fresh": true,
+            "sequence": 4,
+            "stamp_at_us": 148514495323
+          },
+          "notices": "[]",
+          "now_us": 148514496183,
+          "source_gone": false,
+          "wall_ms": 1793060187714
+        }
+      },
+      "historical_cause_proven": false,
+      "panic_hooks": [],
+      "summaries": [
+        {
+          "line": 18,
+          "text": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3830 filtered out; finished in 0.25s"
+        }
+      ],
+      "variant": "local1s"
+    }
+  ],
+  "schema": 1,
+  "shipping_gates_required_after_diagnostic": true,
+  "shipping_runtime_executed": false,
+  "shipping_tree": "22c85356eced4579edae5cab4bcb861092685da8",
+  "started": "2026-10-27T00:11:46.391620+00:00"
+}

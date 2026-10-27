@@ -1,0 +1,174 @@
+--- a/lampOS/crates/voice/src/privacy_bus.rs
++++ b/lampOS/crates/voice/src/privacy_bus.rs
+@@ -475,8 +475,17 @@
+ }
+ 
+ fn notices(subscriber: &mut Subscriber) -> io::Result<()> {
+-    if subscriber
+-        .notices()
++    let diagnostic_notices = subscriber.notices();
++    #[cfg(test)]
++    lease_resync_diagnostic::record("NOTICE", serde_json::json!({
++        "now_us": lamp_ipc::monotonic_us(),
++        "wall_ms": wall_ms(),
++        "datagrams": subscriber.statistics().datagrams,
++        "notices": format!("{diagnostic_notices:?}"),
++        "late": diagnostic_notices.iter().any(|n| matches!(n, Notice::Late)),
++        "source_gone": diagnostic_notices.iter().any(|n| matches!(n, Notice::SourceGone)),
++    }));
++    if diagnostic_notices
+         .iter()
+         .any(|notice| matches!(notice, Notice::SourceGone | Notice::Late))
+     {
+@@ -544,6 +553,18 @@
+                 return Err(invalid("invalid privacy message discarded"));
+             }
+             let Some(message) = message else {
++                #[cfg(test)]
++                lease_resync_diagnostic::record("CURRENT", serde_json::json!({
++                    "now_us": now_us, "opened_us": self.opened_us,
++                    "datagrams": self.subscriber.statistics().datagrams,
++                    "sequence": self.current.as_ref().map(|v| v.stamp.sequence),
++                    "stamp_at_us": self.current.as_ref().map(|v| v.stamp.at_us),
++                    "payload_age_us": self.current.as_ref().map(|v| now_us.saturating_sub(v.stamp.at_us)),
++                    "payload_fresh": self.current.as_ref().map(|v| v.fresh_at(&self.clock, now_us)),
++                    "observed_us": self.current.as_ref().map(|v| v.observed_us),
++                    "expires_at_us": self.current.as_ref().map(|v| v.expires_at_us),
++                    "discard_counters": format!("{:?}", counters(&self.subscriber)),
++                }));
+                 notices(&mut self.subscriber)?;
+                 return Ok(self
+                     .current
+@@ -551,8 +572,24 @@
+                     .filter(|value| value.fresh_at(&self.clock, now_us))
+                     .cloned());
+             };
+-            let value = MicrophonePrivacy::from_message(&message, &self.clock, now_us, wall_ms())
+-                .map_err(io::Error::other)?;
++            let diagnostic_wall_ms = wall_ms();
++            let diagnostic_value = MicrophonePrivacy::from_message(&message, &self.clock, now_us, diagnostic_wall_ms);
++            #[cfg(test)]
++            lease_resync_diagnostic::record("MESSAGE", serde_json::json!({
++                "sequence": message.header.seq, "now_us": now_us,
++                "header_at_us": message.header.at_us,
++                "header_age_us": now_us.saturating_sub(message.header.at_us),
++                "now_wall_ms": diagnostic_wall_ms,
++                "header_wall_ms": message.header.at_unix_ms,
++                "header_wall_age_ms": diagnostic_wall_ms.saturating_sub(message.header.at_unix_ms),
++                "header_expires_ms": message.header.expires_ms,
++                "header_expired": message.header.expired_at(diagnostic_wall_ms),
++                "message_expired": message.expired,
++                "validation_ok": diagnostic_value.is_ok(),
++                "datagrams": self.subscriber.statistics().datagrams,
++                "gap": message.gap,
++            }));
++            let value = diagnostic_value.map_err(io::Error::other)?;
+             if (message.gap != 0 && !resync)
+                 || message.publisher_restarted
+                 || self.current.as_ref().is_some_and(|old| {
+@@ -1022,6 +1059,55 @@
+             }
+         }
+         std::thread::sleep(Duration::from_millis(2));
++    }
++}
++
++#[cfg(test)]
++mod lease_resync_diagnostic {
++    use std::cell::{Cell, RefCell};
++    use std::io::Write;
++    thread_local! {
++        static RECORDS: RefCell<Vec<(&'static str, serde_json::Value)>> = const { RefCell::new(Vec::new()) };
++        static LAST_CURRENT: RefCell<Option<serde_json::Value>> = const { RefCell::new(None) };
++        static OVERFLOW: Cell<bool> = const { Cell::new(false) };
++    }
++    pub(super) fn record(kind: &'static str, mut value: serde_json::Value) {
++        if kind == "CURRENT" {
++            LAST_CURRENT.with(|current| *current.borrow_mut() = Some(value.clone()));
++        }
++        if kind == "NOTICE" {
++            value["nearest_payload"] = LAST_CURRENT.with(|current| current.borrow().clone()).unwrap_or(serde_json::Value::Null);
++        }
++        RECORDS.with(|records| {
++            let mut records = records.borrow_mut();
++            if records.len() < 128 {
++                records.push((kind, value));
++            } else {
++                OVERFLOW.with(|overflow| overflow.set(true));
++            }
++        });
++    }
++    pub(super) struct Guard;
++    impl Guard {
++        pub(super) fn new() -> Self {
++            RECORDS.with(|records| records.borrow_mut().clear());
++            LAST_CURRENT.with(|current| *current.borrow_mut() = None);
++            OVERFLOW.with(|overflow| overflow.set(false));
++            Self
++        }
++    }
++    impl Drop for Guard {
++        fn drop(&mut self) {
++            // Flush after the case (including unwind), outside its lease window.
++            let records = RECORDS.with(|records| std::mem::take(&mut *records.borrow_mut()));
++            let overflow = OVERFLOW.with(Cell::get);
++            let mut stderr = std::io::stderr().lock();
++            let _ = writeln!(stderr, "PRIVACY_DIAGNOSTIC_BUFFER {}", serde_json::json!({"overflow": overflow, "records": records.len()}));
++            for (kind, value) in records {
++                let _ = writeln!(stderr, "PRIVACY_DIAGNOSTIC_{kind} {value}");
++            }
++            LAST_CURRENT.with(|current| *current.borrow_mut() = None);
++        }
+     }
+ }
+ 
+@@ -1216,6 +1302,7 @@
+     #[test]
+     fn the_lease_reader_resyncs_on_kept_leases_only_before_its_first_datagram_in_its_first_second()
+     {
++        let _diagnostic_flush = super::lease_resync_diagnostic::Guard::new();
+         static NEXT: AtomicU64 = AtomicU64::new(0);
+         const LOST: &str = "privacy lease stream changed or lost a value";
+         let sequence = |reader: &LeaseReader| reader.current.as_ref().map(|l| l.stamp.sequence);
+@@ -1253,7 +1340,7 @@
+             // Kept values do not renew the subscriber's datagram heartbeat.
+             // Isolate resync from its unrelated 20 ms Late notice: both reads
+             // remain bounded at 500 ms, and the actual lease still lasts 50 ms.
+-            let declaration = MicrophonePrivacy::declaration().every(Duration::from_secs(1));
++            let declaration = MicrophonePrivacy::declaration().every(Duration::from_millis(10));
+             let mut publisher = never_looks
+                 .publisher_declared(MicrophonePrivacy::TOPIC, &declaration, "voice")
+                 .unwrap();
+@@ -1285,6 +1372,13 @@
+             // Each lease read just after it is put down, so it is fresh.
+             lease(2);
+             read_on(&mut reader, 2)?;
++            let diagnostic_before_us = lamp_ipc::monotonic_us();
++            thread::sleep(Duration::from_millis(30));
++            super::lease_resync_diagnostic::record("DELAY", serde_json::json!({
++                "before_us": diagnostic_before_us, "after_us": lamp_ipc::monotonic_us(),
++                "read_sequence": sequence(&reader), "datagrams": reader.subscriber.statistics().datagrams,
++                "past_first_second": past_first_second,
++            }));
+             if past_first_second {
+                 reader.opened_us = lamp_ipc::monotonic_us().saturating_sub(RESYNC_FOR_US);
+             }
+@@ -1303,17 +1397,7 @@
+             Ok(())
+         };
+         for past_first_second in [false, true] {
+-            let mut tries = 0;
+-            loop {
+-                match attempt(past_first_second) {
+-                    Ok(()) => break,
+-                    Err(error) => {
+-                        assert!(stalled(&error), "{error}");
+-                        tries += 1;
+-                        assert!(tries < 10, "the host stalled in 10 of 10 attempts: {error}");
+-                    }
+-                }
+-            }
++            attempt(past_first_second).expect("private diagnostic attempt failed without retry");
+         }
+     }
+ 

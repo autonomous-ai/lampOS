@@ -1,3 +1,11 @@
+## 2026-10-27 07:30 — privacy fixture controlled contrast; latest-base gate active
+
+Ready for lamp-voice: no. [Controlled diagnostic](verification/privacy-kept-resync-fixture-20261027/README.md) retains stock 10 ms failure 0/1 with actual Late and fresh 412 us payload after a 31.055 ms pause; fixture-local 1 s passes 1/0 with fresh 860 us payload after 33.807 ms. No SourceGone, expiry or first-second bound was crossed. All four commands closed without forced cleanup, and exact shipping bytes/index were restored. This prospective contrast does not classify any historical generic unavailable failure.
+
+The unchanged two-file shipping patch is staged on 4bff, tree fb7e47dc1. Fresh fmt, strict Voice/Bus/Msgs Clippy, workspace build and test compilation passed; 65 executable paths were captured. Its full Voice library once, Msgs privacy controls, generic Bus liveness controls and docs are now running. The rejected incomplete controller hash before admission is retained separately; no test ran in that rejected invocation.
+
+Ownkeys' separate 3a97/b234 Voice run closed with summary 3,816/0/15 and all 29 witnesses. The parser's original missing-completion HOLD is retained: a source-bound addendum recognizes the merged `oklamp-voice second:` line, reconciling 3,815 standalone passes plus one merged completion. Nine panic hooks are expected, no unknown hook. All source/raw inputs and 140 actual/saved artifacts remained stable. After sealing, Ownkeys carried to 75f865b66/4bff with seven equal patches; its fresh compiler gate is active. No full fourteen-package, current native, real-key or device qualification is claimed.
+
 ## 2026-10-27 07:18 — unstarted-driver continuations closed; failures retained
 
 Ready for lamp-voice: no. These observations remain tied to their old sources.
