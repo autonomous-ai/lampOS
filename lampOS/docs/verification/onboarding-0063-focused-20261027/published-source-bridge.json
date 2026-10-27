@@ -1,0 +1,99 @@
+{
+  "status": "QUALIFIED_HOST_PROOF_FOLDED_NOT_PUSHED",
+  "runtime_qualified_tree": "0063ca3a3385aa8d8acb6d904cc2ae1f842f065e",
+  "proof_only_tree": "5efa5a3e970a2ac5a863a053cc044f46f7794a38",
+  "changed_paths": [
+    "lampOS/docs/verification/onboarding-speaking-face-20261025/README.md"
+  ],
+  "other_nine_owned_blobs_modes_exact": true,
+  "all_other_Main_and_repository_entries_modes_exact": true,
+  "before_source_mtimes_sha256": "023901bf4e7b54f99153ffe753ea3c2effd26db57057541a98e438680c48e63a",
+  "original_proof_mtime_ns": 1793113721745764342,
+  "new_proof_sha256": "e2da22578de45851e408cfa1ee6954677271a699fe660a4c740c3d5a14dea400",
+  "historical_tail_and_physical_limits_exact": true,
+  "runtime_code_qualification_transferred_to_any_code_delta": false,
+  "summary": {
+    "compiler_native": 38420,
+    "runtime_native": 29318,
+    "gate_source_tree": "0063ca3a3385aa8d8acb6d904cc2ae1f842f065e",
+    "selected_passed": 230,
+    "required_passed": 21,
+    "groups": {
+      "onboarding": 142,
+      "same-voice": 21,
+      "remember-speaker": 16,
+      "CLI-process": 17,
+      "switch-census": 7,
+      "ring-startup": 12,
+      "Eyes-enrollment": 7,
+      "Update-install": 3,
+      "workflow-readers": 2,
+      "Skills-format": 3
+    },
+    "docs": {
+      "passed": 4,
+      "ignored": 0,
+      "failed": 0
+    },
+    "skipped_total": 4416,
+    "natural_ignored": 22,
+    "filter_exclusions": 4394,
+    "natural_start_only": 6,
+    "JSON_ignored": 16,
+    "original_stops_preserved": [
+      {
+        "actual_native_session_id": 2623,
+        "actual_native_exit": 125,
+        "operations": 1,
+        "test_bodies_executed": 0
+      },
+      {
+        "actual_native_session_id": 27218,
+        "actual_native_exit": 125,
+        "operations": 0,
+        "test_bodies_executed": 0
+      }
+    ],
+    "old_partial_history_only": {
+      "source_tree": "9ab408b27bf1471382b58e35cca2fb4967af0e10",
+      "native": 85268,
+      "native_exit": 125,
+      "nextest_exit": 100,
+      "passed": 745,
+      "raw_failed_SIGINT": 2,
+      "unrun": 4874,
+      "docs": "UNRUN",
+      "record_url": "https://github.com/autonomous-ai/lampOS/commit/e11f40accd",
+      "qualification": false,
+      "release_sha256": "b34a9afecf4b0ba9f126f28d0f5e3477512173e91dab991452c3c7d85c8bb492"
+    },
+    "old12696_failed_history_only": {
+      "tree": "b202b4426b90675d05884f565df051c77f18bc12",
+      "native_exit": 125,
+      "nextest_exit": 100,
+      "selected": 958,
+      "passed": 844,
+      "failed": 114,
+      "docs": "UNRUN",
+      "qualification": false
+    },
+    "current_inputs_verified": 99,
+    "full_post_docs_metadata_exact": 98,
+    "single_post_docs_inode_ctime_exception": true,
+    "runtime_full_metadata_before_after_guard_passed": true,
+    "old_protected_files": 7890,
+    "new_interrupted_witnesses": 1,
+    "new_failed_witnesses": 2,
+    "protected_files_total": 7893,
+    "separate_durability_archive_files": 276,
+    "runtime_release_sha256": "a736e47e1faf961d40db718a5dd9926dc3a028c2c2190f3618b96fd1ca828eae",
+    "native_or_physical_acceptance_claimed": false
+  },
+  "new_head": "c0cf52f9690d178f81d105e31e22c7694cc5738f",
+  "new_proof_mtime_ns": 1793118453404460057,
+  "all_nonproof_source_mtimes_exact": true,
+  "original_author_committer_message_exact": true,
+  "one_commit_parent": "c3eb20be307d06a6d6278254ec54654b68698b0e",
+  "actual_new_commit_range_diff_sha256": "b349fee44ea06bd3bec6b22354abe7095054a7798ca8c209b8cdbf33a78be2b5",
+  "push_or_ready_action": false
+}

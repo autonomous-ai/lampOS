@@ -1,3 +1,16 @@
+## 2026-10-27 16:28 UTC — Onboarding folded into one qualified-source commit
+
+Ready for lamp-voice: no
+
+Published candidate `c0cf52f96` has one parent `c3eb20be3` and preserves the
+original commit's author, committer and one-line message. The [source bridge](verification/onboarding-0063-focused-20261027/published-source-bridge.json)
+changes only the verification README after actual local qualification; all
+other nine owned blobs/modes and all non-proof source mtimes remain exact.
+The [range-diff](verification/onboarding-0063-focused-20261027/range-diff.txt)
+records the current Main composition, consent-literal repair and socket
+positive/refusal control. Final published-head native/current-base, independent
+and physical gates remain open; historical checks are not transferred.
+
 ## 2026-10-27 16:24 UTC — Onboarding repair passes and current forgetting fence read completes
 
 Ready for lamp-voice: no

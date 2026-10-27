@@ -1,0 +1,343 @@
+1:  74dafff29e ! 1:  c0cf52f969 lampOS: require speaking-face proof for onboarding enrollment
+    @@ lampOS/crates/update/tests/install.rs: fn the_product_sees_who_speaks() {
+              assert!(
+                  section(unit(name), "Service").contains(&line),
+     
+    - ## lampOS/crates/voice/src/onboarding.rs ##
+    -@@ lampOS/crates/voice/src/onboarding.rs: pub mod skill;
+    - pub(crate) mod storage;
+    - #[cfg(test)]
+    - pub(crate) use legacy_words::*;
+    -+// The walk fixtures expect the current same-line enrollment invitation.
+    -+// Keep the original WHO_NOTE in legacy_words for the independent skill
+    -+// parity check, which allows only this consent wording to change.
+    -+#[cfg(test)]
+    -+pub(crate) const WHO_NOTE: &str = "(Nobody has spoken. Ask them, in a few words, what you should call them. When they have told you, and only if you have remember_my_face, ask whether you may remember their face and invite them to look at you and answer 'Yes, my name is ...' with their own name if they agree. A yes alone is not enough; only after a clear yes call remember_my_face with the name in that same line. If saving is refused, say it was not saved; never claim success. Never use remember for this. Then, as soon as that is settled, call setup_step with step \"who_you_are\": done once you know their name, skipped if they would rather not say, or failed if it could not be done, and then tell them in a few words what they can try later.)";
+    - #[cfg(test)]
+    - const OFFER_EVERY_S: u64 = 86_400;
+    - 
+    + ## lampOS/crates/voice/src/onboarding/legacy_words.rs ##
+    +@@ lampOS/crates/voice/src/onboarding/legacy_words.rs: pub const SIT_TURN: &str = "(Say only this, nothing before or after it: \"I can
+    + pub const SIT_DONE: &str =
+    +     "(Say only this, nothing before or after it: \"Got it, I can see you well there.\")";
+    + pub const SIT_FAILED: &str = "(Say only this, nothing before or after it: \"I still can't see you well there. That's fine, you can turn me toward your seat later.\")";
+    +-pub const WHO_NOTE: &str = "(Nobody has spoken. Ask exactly this: \"What should I call you?\" When they have told you, and only if you have remember_my_face, ask exactly this: \"May I remember your face, so I know you next time?\", and only after a clear yes call remember_my_face with their name. Never use remember for this. Then, as soon as that is settled, call setup_step with step \"who_you_are\": done once you know their name, skipped if they would rather not say, or failed if it could not be done. If it was skipped or failed, say only: \"That's fine. You can tell me your name any time.\")";
+    ++pub const WHO_NOTE: &str = "(Nobody has spoken. Ask exactly this: \"What should I call you?\" When they have told you, and only if you have remember_my_face, ask exactly this: \"May I remember your face, so I know you next time? If you'd like that, look at me and say, 'Yes, my name is ...' with your name.\", and only after a clear yes call remember_my_face with their own name from that same spoken reply. A yes alone is not enough. If saving is refused, say it was not saved; never claim success. Never use remember for this. Then, as soon as that is settled, call setup_step with step \"who_you_are\": done once you know their name, skipped if they would rather not say, or failed if it could not be done. If it was skipped or failed, say only: \"That's fine. You can tell me your name any time.\")";
+    + pub const WHO_NUDGE: &str = "(If you asked whether you may remember their face and they have not answered yet, wait for their answer. Otherwise call setup_step with step \"who_you_are\" now, before you say anything else: done once you know their name, skipped if they would rather not.)";
+    + pub const PREFERENCES_NUDGE: &str = "(They have answered. Call setup_step with step \"preferences\" now, before you say anything else.)";
+    + pub const WHO_AGAIN: &str =
+     
+    - ## lampOS/crates/voice/src/onboarding/skill/tests.rs ##
+    -@@ lampOS/crates/voice/src/onboarding/skill/tests.rs: impl Drop for Folder {
+    - }
+    + ## lampOS/crates/voice/src/remember_speaker.rs ##
+    +@@ lampOS/crates/voice/src/remember_speaker.rs: mod tests {
+    +         }
+    +     }
+    + 
+    ++    /// Voice's switch is on via switches(). Current Eyes with its enrollment
+    ++    /// switch off returns this same not_understood reply (eyes/main.rs), as
+    ++    /// an older peer does. This is Voice's actual reader/socket path, not a
+    ++    /// two-process switch or persistence test. The paired successful exchange
+    ++    /// below makes a regression that refuses every request fail as well.
+    +     #[test]
+    +     fn remember_speaker_wire_uses_internal_evidence_and_old_eyes_never_get_a_retry() {
+    +         let _serial = TESTS.lock().unwrap();
+    +@@ lampOS/crates/voice/src/remember_speaker.rs: mod tests {
+    +         assert!(answered);
+    +         assert!(answer.get("error").is_some());
+    +         assert_ne!(answer["ok"], true);
+    ++        assert!(answer.get("remembered").is_none());
+    +         let (actual, listener) = peer.join().unwrap();
+    +         assert_eq!(actual, expected);
+    +         assert_eq!(
+    +             listener.accept().unwrap_err().kind(),
+    +             std::io::ErrorKind::WouldBlock
+    +         );
+    ++        drop(listener);
+    ++
+    ++        // Same enabled Voice path with a supporting peer. The existing
+    ++        // bounded fixture records the actual guarded wire request, so an
+    ++        // all-refusal implementation cannot satisfy this positive control.
+    ++        let (paired, requests) = own_name_exchange(
+    ++            "My name is Kesh, remember my face",
+    ++            "Kesh",
+    ++            false,
+    ++            true,
+    ++            json!({"remembered": "Kesh"}),
+    ++        );
+    ++        assert_eq!(paired, json!({"ok": true, "remembered": "Kesh"}));
+    ++        assert_eq!(requests.len(), 1);
+    ++        assert_eq!(requests[0]["remember_speaker"]["name"], "Kesh");
+    ++        assert_eq!(requests[0]["remember_speaker"]["face"], "eyes/f1");
+    ++        assert!(requests[0].get("remember").is_none(), "no legacy save");
+    +     }
+      
+    - #[test]
+    --fn shipped_definition_matches_the_original_order_words_and_reoffers_byte_for_byte() {
+    -+fn shipped_definition_preserves_the_walk_except_same_line_face_consent() {
+    -     let definition = parse(SHIPPED).unwrap();
+    -+    // Enrollment now proves the name and face from one spoken request.
+    -+    // Keep the historical oracle intact for every other word of the walk.
+    -+    let who_note = WHO_NOTE.replace(
+    -+        "ask whether you may remember their face, and only after a clear yes call remember_my_face with their name.",
+    -+        "ask whether you may remember their face and invite them to look at you and answer 'Yes, my name is ...' with their own name if they agree. A yes alone is not enough; only after a clear yes call remember_my_face with the name in that same line. If saving is refused, say it was not saved; never claim success.",
+    -+    );
+    -     let expected = [
+    -         (Step::WhereYouSit, SIT_NOTE, SIT_NOTE),
+    --        (Step::WhoYouAre, WHO_NOTE, WHO_NOTE),
+    -+        (Step::WhoYouAre, who_note.as_str(), who_note.as_str()),
+    -         (Step::HowYouSound, NEAR_FIRST, NEAR_FIRST),
+    -         (Step::Touch, TOUCH_NOTE, TOUCH_OFFER),
+    -         (Step::Privacy, PRIVACY_INVITATION, PRIVACY_INVITATION),
+    +     #[test]
+     
+      ## lampOS/deploy/product/lamp-eyes.service ##
+     @@ lampOS/deploy/product/lamp-eyes.service: Environment=LAMP_ACTIVITY=place
+    @@ lampOS/deploy/product/lamp-eyes.service: Environment=LAMP_ACTIVITY=place
+      # never runs here: its training pictures are for research only. Nothing is read without the
+     
+      ## lampOS/deploy/product/lamp-voice.service ##
+    -@@ lampOS/deploy/product/lamp-voice.service: Environment=LAMP_CAMERA_FOLLOWS_EYES=on
+    - # A line another face was seen speaking is the room's, not the known person's (#2008, with lamp-eyes'
+    - # LAMP_EYES_SPEAKING): "seeing who speaks", which the lead's decision puts on with scoped context.
+    - Environment=LAMP_SECOND_SPEAKING_FACE=on
+    -+# A known person's scope requires their own face seen saying this line; a silent
+    -+# visible face gives an off-camera caller no personal scope (#3437).
+    -+Environment=LAMP_PERSON_SCOPE_SEEN=on
+    - # The eyes' own switch, read by the voice too: with it the voice reads the face seen saying a line that asks to
+    +@@ lampOS/deploy/product/lamp-voice.service: Environment=LAMP_SECOND_SPEAKING_FACE=on
+      # forget, so a room's "forget my face" forgets only a face seen saying it and a held forget's yes counts only from
+      # that face (#3038, #3037, #2377). Without it every room's forget is told NOT_THEIRS.
+      Environment=LAMP_EYES_SPEAKING=on
+    @@ lampOS/deploy/product/lamp-voice.service: Environment=LAMP_CAMERA_FOLLOWS_EYES=o
+      Environment=LAMP_EXPRESSION_OUT=on
+     
+      ## lampOS/docs/onboarding.md ##
+    -@@ lampOS/docs/onboarding.md: it was confirmed. Filled data is never interpreted as another slot.
+    - Skills uses the same validator when loading or packaging this core skill.
+    - Changing order or words cannot add a mechanism, grant physical authority,
+    - remove privacy's priority or change proof, timeout and cancellation rules.
+    --The shipped data reproduces the previous order and notes byte for byte;
+    --`onboarding/legacy_words.rs` is a test-only oracle, absent from production.
+    -+The shipped order and other notes preserve the previous walk. The name-and-face
+    -+note now asks for a clear yes and direct self-introduction in one spoken request,
+    -+so the enrollment guard can bind that name to the face seen saying it.
+    -+`onboarding/legacy_words.rs` remains the historical test-only oracle, absent from
+    -+production; its comparison allows only this deliberate consent-note change.
+    - Host targets are under 50 ms for the startup read and validation and under
+    - 1 ms for a cached note selection. These are local boundaries, not spoken or
+    - lamp latency measurements; the unchanged walk still needs its lamp run.
+    -@@ lampOS/docs/onboarding.md: guessed by default. The loader rejects symlink files, malformed/unknown fields,
+    - files above 4096 bytes, and empty/control-containing location phrases or
+    - phrases over 160 characters. Missing valid location evidence keeps privacy
+    - unavailable. Read the profile once in storage initialization, not on the interaction loop.
+    --The product path configuration does not enable `LAMP_ONBOARDING`.
+    -+The product enables `LAMP_ONBOARDING` (#3435). Its name-and-face step also
+    -+requires `LAMP_REMEMBER_SPEAKER=on` in both Voice and Eyes, beside
+    -+`LAMP_PERSON_SCOPE_SEEN` in Voice. Names remain checked. After asking permission,
+    -+the lamp asks the person to look at it and say "Yes, my name is ..." with their own
+    -+name. A bare yes does not borrow a name from an earlier speaker. Missing speaking
+    -+proof, two speakers, a changed face, stop or closed privacy refuses the save;
+    -+it never falls back to saving whichever face is nearest. The lamp reports a
+    -+refused save without claiming the face was remembered. The existing guard adds
+    -+no inference or polling to input handling; enrollment still waits for its five
+    -+fresh matching frames within the existing bounded request.
+    -+
+    -+This product activation is proposed for the release and is not yet qualified on
+    -+a lamp. The required two-person enrollment and cancellation check is recorded in
+    -+[the trial plan](verification/onboarding-speaking-face-20261025/README.md).
+    -+Fourth has no lamp; the lamp-owning builder records the actual build, counts and
+    -+times before this activation is ready. Host tests do not establish face-classifier
+    -+accuracy or acoustic response time.
+    +@@ lampOS/docs/onboarding.md: except the measured steps' lines, which are exact sentences since #3769
+    + ("Exact lines" below); `onboarding/legacy_words.rs` is a test-only oracle,
+    + absent from production.
+    + 
+    ++The speaking-face enrollment proposal keeps these exact questions and requires
+    ++a clear yes and the person's own name in that same spoken reply. A yes alone
+    ++cannot authorize saving from a name supplied earlier. A refused save is said
+    ++as not saved; the paired enrollment switches remain subject to the lamp trial.
+    ++
+    + ### Exact lines (#3769)
+      
+    - Immediate feedback remains independent of progress writes. A single storage
+    - worker belongs to the whole service, including its physical-mute cycles;
+    + Where you sit, how they sound (the call and the sentence), touch, privacy's
+    +@@ lampOS/docs/onboarding.md: sleep (#3747).
+    + 
+    + The conversational steps keep their tool calls and consent clauses, but say
+    + their questions exactly: `who_you_are` asks "What should I call you?", then
+    +-"May I remember your face, so I know you next time?", and on a skip or a
+    ++"May I remember your face, so I know you next time? If you'd like that, look at me and say, 'Yes, my name is ...' with your name.", and on a skip or a
+    + failure says only "That's fine. You can tell me your name any time."
+    + (`who_again`: "Sorry, what should I call you?"). `preferences` asks "Are there
+    + hours when I should keep quiet?", then "May I say hello when you sit down?",
+     
+      ## lampOS/docs/switches.md ##
+    -@@ lampOS/docs/switches.md: motion, since lamp-4ace's motors stay still until Monday: `LAMP_STAFF_NOTE`
+    - | LAMP_CAMERA_FOLLOWS_EYES | `on` exactly; off. With the eyes their own process (`LAMP_EYES_PERMIT_SOCKET`) and no camera of the voice's own, the camera is permitted in the authority with the microphone, and a mute denies both; a turn can then be the person's the eyes name (per-person memory, #764's per-person Live sessions, the second route's scoped context). Off: every turn is the room's on such a lamp (memory.md) | — | on | #2233 (#2176 finding 9, the first builder 16:08 on #1722) | #1895's two-person run on lamp-52e6: 0/12 turns a person's without it, 11/12 with it, no codes crossed; with the product's units on lamp-52e6 on 21 Oct (#2402): voices with no face the room's (7 of 7), a remembered face's turns theirs | on: the first builder, 09:36 on #2402 | Per-person memory and Live sessions on a product lamp. A name told before the lamp knows the face ("remember my face") is the room's, kept in the room's memory for everyone in the house (memory.md) | on |
+    - | LAMP_SECOND_SCOPED_CONTEXT | `on`; off. Backup voice tells and keeps each turn for the person (or room) admitted with its request, not the session's owner; its exchange is journalled (`append_linked`) for that scope too, so a line admitted as the room's after a known face is lost goes to the room, not the person the session was opened for. Off: journalled for the session's person (lamp-c0a4, #2449) | — | on | #1839 | a person A then B at the lamp, B's turn told none of A's exchanges (#1675): run on lamp-52e6 by Fifth on 20 Oct with #2233, 11 of 12, nothing crossed (#1895) | on: the lead's decision of 21 Oct (#1711) | Needs a memory, the eyes' known file and `LAMP_CAMERA_FOLLOWS_EYES=on` to change anything. The product has all three (`LAMP_MEMORY_DAYS`, `LAMP_EYES_WHO_SOCKET`, #2402). A keep in a line admitted as the room's may go to the known face the eyes name by its end plus 300 ms (#2807, memory.md): with the eyes' view (`LAMP_EYES_SPEAKING=on` and `LAMP_BUS=on`, whose `known-face` shows it), the face must be in view at the line's start, whether its face cache was cold as it started or went cold only during it (the eyes' known file changed mid-line, as on lamp-c0a4 on 23 Oct 05:13); without the eyes' view, a line begun while the cache is cold is kept to a person only if they're named within one refresh (200 ms) of its start, and one gone cold only during it keeps for nobody | on |
+    - | LAMP_SECOND_SPEAKING_FACE | `on`; off. Backup voice: a heard line any face other than the known person's was seen speaking through (the eyes' `speaking`, with `known-face`) is told, its memory calls run and its exchange filed in the room's scope, not the known person's; one way only | — | on (the lead, 21 Oct 07:19 on #1711: seeing who speaks, with LAMP_SECOND_SCOPED_CONTEXT, with LAMP_CAMERA_FOLLOWS_EYES on since #2402; pinned by install.rs, #2860) | #2008 (Ten) | lamp-52e6, 21 Oct 14:06 (#2407): with stand-ins for the eyes (a known face and another, each speaking on its own lines), the other's lines were the room's and told none of the known one's code, and the known one was answered | on | Needs LAMP_SECOND_SCOPED_CONTEXT, LAMP_EYES_SPEAKING and the eyes' known file; the run stood in for the eyes, so YuNet's own `speaking` on two real faces is still to see | on |
+    --| LAMP_PERSON_SCOPE_SEEN | `on` exactly; off. The second route only, with `LAMP_SECOND_SPEAKING_FACE`: a line is in a known person's scope only when their own face alone was seen speaking it (`speaking_faces::not_theirs`, `seen_saying`), each id and the known face read with the eyes' boot (`speakers_with_boot`, `known_with_boot`), so a reused id after the eyes restart is not theirs (Second's P1 on #3437), and with no eyes' reader (the bus would not open) no face is seen, so every line and late keeper is the room's (reviewer-two's P2 on #3437), and with `LAMP_SECOND_PREPARED` a person-scoped line is not prepared on its early words, so nothing is asked for them before its end is read (Second's P2 on #3437); else it is told, its memory calls run and its exchange filed and observed as the room's. Off, only another face seen speaking it narrows it, so no face seen speaking leaves it the person's. The same rule for a line's own admission and for a late look's keeper (`ScopeLease::keeper_within`); one way only, a narrowed lease never widens (`ScopeLease::late_open`). So with the owner's face in view and silent, an off-camera "forget everything about me" runs as the room's, where `forget_everything` refuses, and an off-camera "I'm flying to Tokyo" is not kept or observed as theirs | — | — | reviewer-three's P1 and P2 on #3435 (09:19), Second's late-keeper case (09:24), Sixth's plan on #3126 | Tests only (`second_provider/tests/person_scope_seen.rs`: the off-camera forget and line with the owner silent in view, the cold-cache late keeper with the owner silent, the owner seen speaking keeps their scope, a reused id after the eyes restart or no eyes' reader refuses the scope and the keeper, switch off as before; `speaking_faces` for the rule) | off until #3435 turns it on with the memory defaults (the voice freeze) | Known cost: an owner whose speaking read misses (fewer than 3 looks, a turned or covered mouth) gets the room's scope for that line, so a personal keep or forget is not done as theirs: `forget_everything` refuses, and a keep is the room's, or withheld with `LAMP_MEMORY_PERSONAL_NEEDS_FACE`; with `LAMP_SECOND_PREPARED` also on, the owner's own lines lose the early start too, even when their face is seen speaking (reviewer-three's P3 on #3437) | until |
+    -+| LAMP_PERSON_SCOPE_SEEN | `on` exactly; off. The second route only, with `LAMP_SECOND_SPEAKING_FACE`: a line is in a known person's scope only when their own face alone was seen speaking it (`speaking_faces::not_theirs`, `seen_saying`), each id and the known face read with the eyes' boot (`speakers_with_boot`, `known_with_boot`), so a reused id after the eyes restart is not theirs (Second's P1 on #3437), and with no eyes' reader (the bus would not open) no face is seen, so every line and late keeper is the room's (reviewer-two's P2 on #3437), and with `LAMP_SECOND_PREPARED` a person-scoped line is not prepared on its early words, so nothing is asked for them before its end is read (Second's P2 on #3437); else it is told, its memory calls run and its exchange filed and observed as the room's. Off, only another face seen speaking it narrows it, so no face seen speaking leaves it the person's. The same rule for a line's own admission and for a late look's keeper (`ScopeLease::keeper_within`); one way only, a narrowed lease never widens (`ScopeLease::late_open`). So with the owner's face in view and silent, an off-camera "forget everything about me" runs as the room's, where `forget_everything` refuses, and an off-camera "I'm flying to Tokyo" is not kept or observed as theirs | — | on | reviewer-three's P1 and P2 on #3435 (09:19), Second's late-keeper case (09:24), Sixth's plan on #3126 | Tests only (`second_provider/tests/person_scope_seen.rs`: the off-camera forget and line with the owner silent in view, the cold-cache late keeper with the owner silent, the owner seen speaking keeps their scope, a reused id after the eyes restart or no eyes' reader refuses the scope and the keeper, switch off as before; `speaking_faces` for the rule) | on beside the proposed onboarding speaking-face guard; the separate automatic-observation and forget-everything activation remains off pending its privacy fixes and qualification | Known cost: an owner whose speaking read misses (fewer than 3 looks, a turned or covered mouth) gets the room's scope for that line, so a personal keep or forget is not done as theirs: `forget_everything` refuses, and a keep is the room's, or withheld with `LAMP_MEMORY_PERSONAL_NEEDS_FACE`; with `LAMP_SECOND_PREPARED` also on, the owner's own lines lose the early start too, even when their face is seen speaking (reviewer-three's P3 on #3437) | on |
+    - | LAMP_SECOND_CUE_AFTER_MS | milliseconds, 500 to 4,000; unset, 1.5 s. With `LAMP_SECOND_WAIT_CUE=on`, the wait sound comes this long after the words; the first-chat deadline is 3 s after the scheduled sound if a clip is ready, otherwise the later of this time and 3 s from the words. A value it can't take is said and left at 1.5 s (second-voice.md) | — | — | #2602 (Fourth's breakdown of the silences, 21 Oct 20:41) | lamp-4ace's played test before and after, same hour: gaps over 300 ms per reply, with and without the cancelled ones | off until that run (3000 to try) | At 1.5 s the sound came before answers about to begin, "hmm" and then a gap: 13 of 21 resumed gaps in the terminal-event recount; 25 cancelled gaps counted separately | until |
+    - | LAMP_SECOND_WAIT_CUE | `on`; off. Backup voice makes one soft "Hm." if its first round is slow; a line begun over only that sound is begun in the clear, not a cut-in (#2602) | on | on | #1086 | "Draft until lamp-52e6": five questions with Gemini down, how often/when the sound played | off until that lamp-52e6 run | No result of the named run in the PR or second-voice.md (which notes 9 of 10 turns waited past 1.5 s on lamp-4ace) | until |
+    - | LAMP_SHORT_SOUNDS | `quiet-room`/`quiet-room-checked`; off. Short sounds still go to the model in a quiet room | quiet-room | quiet-room-checked (#1332) | commit 3e3de2d7a (direct) | not-speech.md: 13 of 36 short words lost on lamp-4ace 14 Oct; #800: a room sound answered under quiet-room | quiet-room-checked once played (quiet-room meanwhile) | not-speech.md #800 shows quiet-room answers room sounds; the checked form exists but has no lamp result | until |
+     @@ lampOS/docs/switches.md: its lamp-4ace run is Monday's, with a person there.
+      | `lamp-eyes --photo-dir` | an absolute folder (`/run/lampos-photos` on a lamp, made at boot by the product's tmpfiles; one not ready stops only photos, answered `photos_off`); none. With the recogniser, `{"remember":NAME,"photo":FILE}` on the `who` socket takes the one face in that JPEG, removes the file once read (no picture kept), and keeps the print **unconfirmed**, apart from `people.json`, never named or greeted, until its person says yes at the lamp; no, no answer in that meeting, or 30 days deletes it (eyes.md, "A face from a photo") | — | — | faces from a photo (the first builder on #1722, 21:51; consent, #1968 22:12) | the voice's asking and lamp-cloud's photo are built; owed on a lamp: a photo of one person added, the person at the lamp asked once, yes then recognised, no then gone | off until the lamp check | New data about a person, added by someone else: kept unconfirmed until they agree | until |
+      | LAMP_PHOTO_FACES (`lamp-voice`) | `on`; off. With the eyes' socket (`LAMP_EYES_WHO_SOCKET`) and their `--photo-dir`: when a face added from a photo is at the lamp, unconfirmed, the voice asks once, as its own written turn while quiet, "Someone added your face from a photo, as NAME. Shall I remember you?", and the person's spoken yes or no (`photo_face_yes`, `photo_face_no`) is told to the eyes; the eyes are asked off the voice's loop (`photo_faces::Watch`) | — | — | #1968's consent (the first builder, 22:12) | with `--photo-dir`: a photo of one person added, the person at the lamp asked once, yes then recognised, no then gone, silence then gone | off until lamp-cloud's side and the lamp check | Asking about a face someone else added; never names them before they agree | until |
+    @@ lampOS/docs/verification/onboarding-speaking-face-20261025/README.md (new)
+     @@
+     +# Onboarding: remember the speaking face
+     +
+    ++## Current frozen-source focused host qualification, 27 October 2026
+    ++
+    ++This current composition uses current Main after #3850. Its exact step lines,
+    ++skipped-record logic and permissions are retained; only the two face-consent
+    ++invitations and their current test oracle are composed with same-line proof.
+    ++This is the current focused host-qualified source; the old 9ab runtime epoch
+    ++remains separate and no old count or check is transferred.
+    ++
+    ++This standalone nine-file base proposal is carried onto frozen Main
+    ++`c3eb20be307d06a6d6278254ec54654b68698b0e`. Common and Photo are excluded.
+    ++Main already enables person scope, checked names and onboarding; this carry
+    ++preserves those settings once each and adds only the proposed paired
+    ++Voice/Eyes speaking-face enrollment setting. Main's current memory, schedule
+    ++and hearing settings remain unchanged. The nine-file base is independent of the separately reviewed Eyes-off
+    ++refusal/paired-success socket overlay below; this combined ten-file tree adds
+    ++that test-only follow-up in the same qualified source.
+    ++
+    ++Qualified focused host test source: `0063ca3a3385aa8d8acb6d904cc2ae1f842f065e`, based on frozen Main
+    ++`c3eb20be307d06a6d6278254ec54654b68698b0e`. Compiler procedure 38420 and the separate
+    ++focused discovery/runtime/docs procedure 29318 both ended with actual exit 0.
+    ++The earlier, different-source procedures 2623 and 27218 retain actual exit
+    ++**125** and zero test bodies: 2623 completed discovery only; 27218 launched
+    ++no command. They are not relabelled as successful runs, and no discovery,
+    ++compiler or runtime credit is transferred to this current source.
+    ++
+    ++| Current-source scope | Passed | Failed |
+    ++| --- | ---: | ---: |
+    ++| Unique focused selected runtime cases | 230 | 0 |
+    ++| Required named controls, subset of that runtime | 21 | 0 |
+    ++| onboarding group, subset | 142 | 0 |
+    ++| same-voice group, subset | 21 | 0 |
+    ++| remember-speaker group, subset | 16 | 0 |
+    ++| CLI-process group, subset | 17 | 0 |
+    ++| switch-census group, subset | 7 | 0 |
+    ++| ring-startup group, subset | 12 | 0 |
+    ++| Eyes-enrollment group, subset | 7 | 0 |
+    ++| Update-install group, subset | 3 | 0 |
+    ++| workflow-readers group, subset | 2 | 0 |
+    ++| Skills-format group, subset | 3 | 0 |
+    ++| Workspace doctests, separate | 4 | 0 |
+    ++
+    ++Group rows can overlap and are never added to the unique runtime total.
+    ++Runtime discovery retained 4416 skipped cases: 22 natural ignored
+    ++and 4394 filter exclusions. Of the natural ignored cases,
+    ++6 had start-only reporting; 16 raw JSON ignored terminals were retained.
+    ++These categories are not executions or additional passes. Doctests separately retained 0 ignored examples. No retry, leak or timeout is credited
+    ++as a pass. All 99 captured input bytes match; the runtime before/after full
+    ++metadata guard passed. At the post-doctest observation 98 inputs retained full
+    ++metadata; one build-script retained its bytes, mode, size and mtime but had a
+    ++different inode and ctime. No full post-doctest identity stability is claimed.
+    ++Source/index/modes and code mtimes stayed bound; the 7,890 old protected files plus one interrupted and two failed witnesses,
+    ++separate durability archives and owned closure passed.
+    ++All historical counts below retain their original source and do not qualify
+    ++this carry. Fresh published-head ARM64/Linux Clippy and the assigned lamp
+    ++trial remain gates. No product has been activated or installed.
+    ++
+    ++Earlier source `b202b4426b90675d05884f565df051c77f18bc12` failed:
+    ++procedure 12696 ended native **125**, raw nextest **100**, with all 958 selected
+    ++cases terminal: **844 PASS / 114 FAIL**, and doctests UNRUN. The failure was
+    ++our three invitation values splitting the unchanged required consent literal;
+    ++the correction preserves the validator, assertions and same-reply own-name rule.
+    ++Its 844 passes, including the 728 unaffected cases omitted from this fresh
+    ++focused scope, do not qualify this source. Its 4,311 skipped/nonselected cases
+    ++are not labelled natural ignores; its 16 raw JSON ignored terminals stay separate.
+    ++The retained original failures remain failed. Fresh published-head native
+    ++broad checks are still required.
+    ++
+    ++Earlier source `9ab408b27bf1471382b58e35cca2fb4967af0e10` remains a separate
+    ++[interrupted historical record](https://github.com/autonomous-ai/lampOS/commit/e11f40accd): native
+    ++85268 exited **125**, raw nextest exited **100**, with 745 PASS,
+    ++2 SIGINT/raw-failed and 4874 selected UNRUN;
+    ++doctests were UNRUN. This was not completed qualification, and none of its
+    ++passed or canceled cases is added to the current totals above.
+    ++
+    ++The successful normal-light, two-person intended-owner save within two tries,
+    ++miss/withheld-keep counts, cancellation and privacy trial remain required,
+    ++with the lamp-owning builder assigned by First. An all-refusal run cannot
+    ++qualify activation. Acoustic/device latency and physical accuracy are unproved.
+    ++
+    ++
+    ++## Reader mismatch follow-up and lamp run sheet — host control passed
+    ++
+    ++The existing `remember_speaker_wire_uses_internal_evidence_and_old_eyes_never_get_a_retry`
+    ++control passed once in the required ledger and once in the same unique runtime,
+    ++not as two executions. It retains the actual guarded Unix-socket denial,
+    ++no-legacy-retry checks and successful paired exchange; an all-refusal
+    ++implementation cannot satisfy its positive assertions. This source is the
+    ++same `0063ca3a3385aa8d8acb6d904cc2ae1f842f065e` and frozen Main named above. No environment,
+    ++runtime policy, two-process Eyes-off configuration or persisted-store result
+    ++is inferred from the fixture. The physical limits and run sheet remain:
+    ++
+    ++This fixture proves Voice's response to the exact Eyes-off `not_understood`
+    ++reply, not a real two-process switch configuration or a persisted Eyes store.
+    ++The mapping is read in the current Eyes request dispatcher; no existing Eyes unit
+    ++exercising that off-switch dispatch was found. That mapping and the physical
+    ++mismatch remain explicit test limits, not inferred executed results.
+    ++
+    ++First's intended-speaker gate and the readers' remaining physical check:
+    ++
+    ++1. Use normal room light and the usual seat, with two people present and the
+    ++   paired enrollment switches on. Count every intended enrollment attempt,
+    ++   speaking-read miss and refusal. The intended face/name must be saved
+    ++   within two tries; otherwise keep this activation off. All-refusal is not
+    ++   success. Also count intended-owner memory keeps withheld when a missed
+    ++   speaking read narrows their line to Room.
+    ++2. Check same-line consent and self-introduction, with the intended person
+    ++   speaking; verify the saved binding belongs to that face, not the other
+    ++   person. Record attempt/success/refusal counts and elapsed times only.
+    ++3. Split consent and name across replies: refuse the split save, then offer
+    ++   one natural same-line retry without nagging. Count the retry and outcome.
+    ++4. Cancel before persistence: require no new saved binding. Count attempted,
+    ++   cancelled and persisted operations; do not infer rollback after a commit.
+    ++5. Repeat the negative cases in low light and with a turned/covered mouth.
+    ++   Count speaking-read misses, refusals and unintended saves separately.
+    ++   These refusals do not replace the normal-light positive gate.
+    ++6. Voice enrollment on with Eyes enrollment off: refuse without binding an
+    ++   unproven face or retrying a legacy save. Restore the paired configuration
+    ++   and retain a successful intended-speaker control, so all-refusal cannot
+    ++   qualify the trial.
+    ++
+    ++The lamp-owning builder is still assigned by First. Report only counts and
+    ++times in journal results: no personal words, names, passing face IDs or prints.
+    ++No install, SSH, lamp round, account change or physical latency measurement
+    ++has been performed by this follow-up. No literal-consent runtime rule is added.
+    ++
+    ++
+     +## Current release-base source carry, 26 October
+     +
+     +The ten-file proposal rests directly on Main
+    @@ lampOS/skills/onboarding/SKILL.md: and keeps progress. It never changes micropho
+      or invalid data disables only the walk until that restart, with no built-in
+     
+      ## lampOS/skills/onboarding/skill.toml ##
+    -@@ lampOS/skills/onboarding/skill.toml: first = "(Nobody has spoken. You are meeting the person you will live with for t
+    - reoffer = "(Nobody has spoken. You are meeting the person you will live with for the first time. Say hello in a few warm words, then ask them to sit where they usually sit and look at you, so you learn where they are. Nothing more.)"
+    +@@ lampOS/skills/onboarding/skill.toml: reoffer = "(Say only this, nothing before or after it: \"Hello, I'm glad to meet
+    + skipped = "(Say only this, nothing before or after it: \"Okay, we'll skip where you sit for now.\")"
+      
+      [onboarding.steps.who_you_are]
+    --first = "(Nobody has spoken. Ask them, in a few words, what you should call them. When they have told you, and only if you have remember_my_face, ask whether you may remember their face, and only after a clear yes call remember_my_face with their name. Never use remember for this. Then, as soon as that is settled, call setup_step with step \"who_you_are\": done once you know their name, skipped if they would rather not say, or failed if it could not be done, and then tell them in a few words what they can try later.)"
+    --reoffer = "(Nobody has spoken. Ask them, in a few words, what you should call them. When they have told you, and only if you have remember_my_face, ask whether you may remember their face, and only after a clear yes call remember_my_face with their name. Never use remember for this. Then, as soon as that is settled, call setup_step with step \"who_you_are\": done once you know their name, skipped if they would rather not say, or failed if it could not be done, and then tell them in a few words what they can try later.)"
+    -+first = "(Nobody has spoken. Ask them, in a few words, what you should call them. When they have told you, and only if you have remember_my_face, ask whether you may remember their face and invite them to look at you and answer 'Yes, my name is ...' with their own name if they agree. A yes alone is not enough; only after a clear yes call remember_my_face with the name in that same line. If saving is refused, say it was not saved; never claim success. Never use remember for this. Then, as soon as that is settled, call setup_step with step \"who_you_are\": done once you know their name, skipped if they would rather not say, or failed if it could not be done, and then tell them in a few words what they can try later.)"
+    -+reoffer = "(Nobody has spoken. Ask them, in a few words, what you should call them. When they have told you, and only if you have remember_my_face, ask whether you may remember their face and invite them to look at you and answer 'Yes, my name is ...' with their own name if they agree. A yes alone is not enough; only after a clear yes call remember_my_face with the name in that same line. If saving is refused, say it was not saved; never claim success. Never use remember for this. Then, as soon as that is settled, call setup_step with step \"who_you_are\": done once you know their name, skipped if they would rather not say, or failed if it could not be done, and then tell them in a few words what they can try later.)"
+    +-first = "(Nobody has spoken. Ask exactly this: \"What should I call you?\" When they have told you, and only if you have remember_my_face, ask exactly this: \"May I remember your face, so I know you next time?\", and only after a clear yes call remember_my_face with their name. Never use remember for this. Then, as soon as that is settled, call setup_step with step \"who_you_are\": done once you know their name, skipped if they would rather not say, or failed if it could not be done. If it was skipped or failed, say only: \"That's fine. You can tell me your name any time.\")"
+    +-reoffer = "(Nobody has spoken. Ask exactly this: \"What should I call you?\" When they have told you, and only if you have remember_my_face, ask exactly this: \"May I remember your face, so I know you next time?\", and only after a clear yes call remember_my_face with their name. Never use remember for this. Then, as soon as that is settled, call setup_step with step \"who_you_are\": done once you know their name, skipped if they would rather not say, or failed if it could not be done. If it was skipped or failed, say only: \"That's fine. You can tell me your name any time.\")"
+    ++first = "(Nobody has spoken. Ask exactly this: \"What should I call you?\" When they have told you, and only if you have remember_my_face, ask exactly this: \"May I remember your face, so I know you next time? If you'd like that, look at me and say, 'Yes, my name is ...' with your name.\", and only after a clear yes call remember_my_face with their own name from that same spoken reply. A yes alone is not enough. If saving is refused, say it was not saved; never claim success. Never use remember for this. Then, as soon as that is settled, call setup_step with step \"who_you_are\": done once you know their name, skipped if they would rather not say, or failed if it could not be done. If it was skipped or failed, say only: \"That's fine. You can tell me your name any time.\")"
+    ++reoffer = "(Nobody has spoken. Ask exactly this: \"What should I call you?\" When they have told you, and only if you have remember_my_face, ask exactly this: \"May I remember your face, so I know you next time? If you'd like that, look at me and say, 'Yes, my name is ...' with your name.\", and only after a clear yes call remember_my_face with their own name from that same spoken reply. A yes alone is not enough. If saving is refused, say it was not saved; never claim success. Never use remember for this. Then, as soon as that is settled, call setup_step with step \"who_you_are\": done once you know their name, skipped if they would rather not say, or failed if it could not be done. If it was skipped or failed, say only: \"That's fine. You can tell me your name any time.\")"
+      [onboarding.steps.who_you_are.nudge]
+      after_answers = 1
+      words = "(If you asked whether you may remember their face and they have not answered yet, wait for their answer. Otherwise call setup_step with step \"who_you_are\" now, before you say anything else: done once you know their name, skipped if they would rather not.)"
