@@ -33,6 +33,12 @@ pub struct Definition {
 pub(crate) struct StepWords {
     pub(crate) first: String,
     pub(crate) reoffer: String,
+    /// Said by the runner when the model reports the step skipped: only a
+    /// step the model can only skip, and never privacy, may have one
+    /// (#3769). Optional, as #3781's lines are: an older updater's file has
+    /// none, and then the skip is said by nobody.
+    #[serde(default)]
+    pub(crate) skipped: Option<String>,
     pub(crate) nudge: Option<Nudge>,
 }
 
@@ -133,6 +139,15 @@ impl Definition {
             {
                 return Err("[onboarding] privacy words plus the location exceed one note".into());
             }
+            if words.skipped.is_some() && !step.says_its_skip() {
+                return Err(
+                    "[onboarding] only where_you_sit, how_you_sound, touch and giving_way may have a skipped line"
+                        .into(),
+                );
+            }
+            if let Some(skipped) = &words.skipped {
+                checked_words("onboarding step", &[("skipped", skipped, &[])])?;
+            }
             if let Some(nudge) = &words.nudge {
                 if !matches!(step, Step::WhoYouAre | Step::Preferences)
                     || !(1..=8).contains(&nudge.after_answers)
@@ -187,6 +202,10 @@ impl Definition {
     pub(crate) fn note(&self, step: Step, again: bool) -> &str {
         let words = &self.steps[&step];
         if again { &words.reoffer } else { &words.first }
+    }
+
+    pub(crate) fn skipped(&self, step: Step) -> Option<&str> {
+        self.steps[&step].skipped.as_deref()
     }
 
     pub(crate) fn nudge(&self, step: Step) -> Option<(&str, u8)> {

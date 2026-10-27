@@ -138,6 +138,15 @@ fn shipped_definition_matches_the_original_order_words_and_reoffers_byte_for_byt
     assert_eq!(definition.words.touch_done.as_deref(), Some(TOUCH_DONE));
     assert_eq!(definition.words.touch_failed.as_deref(), Some(TOUCH_FAILED));
     assert_eq!(definition.words.give_again.as_deref(), Some(GIVE_AGAIN));
+    for (step, line) in [
+        (Step::WhereYouSit, WHERE_YOU_SIT_SKIPPED),
+        (Step::HowYouSound, HOW_YOU_SOUND_SKIPPED),
+        (Step::Touch, TOUCH_SKIPPED),
+        (Step::GivingWay, GIVING_WAY_SKIPPED),
+    ] {
+        assert_eq!(definition.skipped(step), Some(line));
+    }
+    assert_eq!(definition.skipped(Step::Privacy), None);
     assert_eq!(definition.words.give_done.as_bytes(), GIVE_DONE.as_bytes());
     assert_eq!(
         definition.words.give_failed.as_bytes(),
@@ -166,6 +175,11 @@ fn invalid_sequence_bounds_words_and_slots_are_refused() {
         ("{name}", "{name"),
         ("[onboarding.words]", "[onboarding.typo]"),
         ("[onboarding.steps.touch]", "[onboarding.steps.typo]"),
+        // Only a measured step may have a skip line (#3769).
+        (
+            "[onboarding.steps.privacy]\n",
+            "[onboarding.steps.privacy]\nskipped = \"(Say only this.)\"\n",
+        ),
     ] {
         let changed = SHIPPED.replacen(from, to, 1);
         assert_ne!(changed, SHIPPED, "missing fixture replacement: {from}");
@@ -219,9 +233,14 @@ fn a_file_without_the_3769_lines_still_loads() {
     let removed: String = SHIPPED
         .lines()
         .filter(|line| {
-            !["touch_done = ", "touch_failed = ", "give_again = "]
-                .iter()
-                .any(|field| line.starts_with(field))
+            ![
+                "touch_done = ",
+                "touch_failed = ",
+                "give_again = ",
+                "skipped = ",
+            ]
+            .iter()
+            .any(|field| line.starts_with(field))
         })
         .map(|line| format!("{line}\n"))
         .collect();
