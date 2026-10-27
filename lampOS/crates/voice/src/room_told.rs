@@ -780,6 +780,22 @@ impl RoomTold {
         self.room
     }
 
+    /// Whether the room is unknown now only for want of history: watching
+    /// began less than the five quiet minutes ago, and since then nothing
+    /// was left alone as talk and no two people made it busy. Right after a
+    /// start that is every room, an empty one and a meeting alike; what
+    /// tells them apart is for the caller to measure
+    /// (`LAMP_FIRST_SECONDS_QUIET`, `second_provider::worker::Heeding`).
+    pub fn unknown_for_want_of_history(&mut self, now_us: u64) -> bool {
+        self.at(now_us) == Room::Unknown
+            && self
+                .watching_since_us
+                .is_some_and(|since| now_us.saturating_sub(since) < QUIET_AFTER_US)
+            && self.unanswered.is_empty()
+            && self.last_talk_us.is_none()
+            && self.talk_since_spoke == 0
+    }
+
     /// What `session` should now be told, if anything: how the room is,
     /// when it is known, differs from what this session was told, and
     /// nothing has been heard or said for a moment.

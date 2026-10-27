@@ -1167,7 +1167,24 @@ order is kept. A written turn is the same from the chat on.
     catch it and asks them to say it again: on lamp-4ace on 26 Oct the first line after a start, "Lamp." and
     then "Remember that the plant by the window needs water on Fridays." in
     a room not yet known to be quiet, got "Mm? I'm here." and the request
-    was lost with nothing asked. With no rule (`Engine::telling_one_speaker`
+    was lost with nothing asked. With `LAMP_FIRST_SECONDS_QUIET=on` (off
+    unless set, on in the product unit; #3711) that room is shown quiet
+    from what the ears measure, never just unknown: a line kept for the
+    join in a room unknown only for want of history
+    (`RoomTold::unknown_for_want_of_history`: watching began under five
+    minutes ago, nothing since left alone as talk or made it busy) is kept
+    as said in a quiet room when the ears' quiet (`ears/level`'s floor,
+    fresh within a second) is at or under -46 dBFS
+    (`FIRST_SECONDS_QUIET_FLOOR_DB`, about 5 dB over lamp-4ace's resting
+    quiet) and no line since the start was in another voice or seen spoken
+    by two faces (`Heeding::showing_the_first_seconds_quiet`). So the bare
+    name and its request, nobody in view, are joined and answered once. A
+    louder quiet, no fresh level, talk left alone, another voice, or two
+    faces in view keep it held; the rule's verdicts and the room told are
+    as before. The journal says `request N: the room is not known yet after
+    the start, and the ears' quiet is F dBFS with no talk left alone and no
+    other voice since: kept as said in a quiet room for a join
+    (LAMP_FIRST_SECONDS_QUIET)`. With no rule (`Engine::telling_one_speaker`
     unset), nothing carries. Carried, the line is never held as a short
     sound, and the rule is given its words with the name line's words before them when
     those begin with the name ("Lamp. So I have a meeting at three…"), or
@@ -1242,7 +1259,11 @@ order is kept. A written turn is the same from the chat on.
     `worker::tests::the_lamps_name_carries_only_on_a_sign_of_one_speaker`
     (a busy room, two faces, no eyes in a quiet and an unknown room, a
     print under 0.30) and
-    `a_line_kept_unjudged_is_read_for_one_speaker_as_a_judged_one`.
+    `a_line_kept_unjudged_is_read_for_one_speaker_as_a_judged_one`, and
+    `right_after_a_start_the_ears_quiet_room_lets_a_bare_name_join_its_request`
+    (`LAMP_FIRST_SECONDS_QUIET`: nobody in view and the ears' quiet room
+    joined; another voice since the start, a loud quiet, talk left alone,
+    no level, two faces, or the switch off held).
   - **For a lamp:** played name lines with a 0.4–2.4 s pause after
     "Lamp,", heard right and misheard, lone calls, and a colleague's line
     within 2.5 s of a call, in a quiet and a busy room: no request lost,
