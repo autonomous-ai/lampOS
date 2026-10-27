@@ -1,0 +1,13 @@
+{
+  "offline_analysis_only": true,
+  "no_Cargo_runner_or_application_tests": true,
+  "controller_sha256": "f463d3f3330fb6fdfba92c3d847140aa3670a62e74e21e7cbc321ca060db03ff",
+  "input_stderr_sha256": "d47ff2735505dd7f0a968fb0d0e79a1859536664afbf81a2da8637382e709964",
+  "existing_log_counts": {
+    "PASS": 499,
+    "SKIP": 6,
+    "required": 23
+  },
+  "protocol_errors_or_unknown_or_duplicates_or_unrun": 0,
+  "source_026_preparation_retained": true
+}

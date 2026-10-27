@@ -1,0 +1,14 @@
+{
+  "head_unchanged": true,
+  "status_clean": true,
+  "source_unchanged": true,
+  "source_count": 7402,
+  "configuration_unchanged": true,
+  "controller_unchanged": true,
+  "nextest_tool_unchanged": true,
+  "nextest_config_unchanged": true,
+  "retained_failed_driver_unchanged": true,
+  "receipt_selectors_unchanged": true,
+  "all_stages_passed": true,
+  "controller_error": null
+}

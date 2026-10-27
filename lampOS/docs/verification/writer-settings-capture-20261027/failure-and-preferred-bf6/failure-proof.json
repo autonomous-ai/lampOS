@@ -1,0 +1,53 @@
+{
+  "head": "4f25de19abc3d98780a5796cf6cf96539b3863d6",
+  "base": "3f4b87969113a89795c814051501c4ba581418e9",
+  "actual_totals": {
+    "passed": 509,
+    "failed": 1,
+    "ignored": 6
+  },
+  "unchanged_main_files": {
+    "lampOS/crates/update/tests/round.rs": {
+      "sha256": "c52595c943d50b63e78e26f8d6242679b79e4e3652014834495c040c4773efd4",
+      "mode": 420
+    },
+    "lampOS/crates/update/src/records.rs": {
+      "sha256": "8d561cb9619f6bee959ab666409043672cf71766e868c5b1f2f285f9137735f3",
+      "mode": 420
+    }
+  },
+  "failed_round_driver": {
+    "path": "<shared-update-target>/debug/deps/round-f8d7f0920c4648fb",
+    "sha256": "22bcce49ece2bd6059f496ce2579d064331f97948a3d731174ee86ed4645b3a9",
+    "size": 20685960,
+    "preserved": "<failed-evidence>/executables/8",
+    "preserved_sha256": "22bcce49ece2bd6059f496ce2579d064331f97948a3d731174ee86ed4645b3a9",
+    "fresh": false,
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 2,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "target": {
+      "kind": [
+        "test"
+      ],
+      "crate_types": [
+        "bin"
+      ],
+      "name": "round",
+      "src_path": "<raw-tree>/lampOS/crates/update/tests/round.rs",
+      "edition": "2024",
+      "doc": false,
+      "doctest": false,
+      "test": true
+    },
+    "package_id": "path+file://<raw-tree>/lampOS/crates/update#lamp-update@0.1.0",
+    "post_run_sha256": "22bcce49ece2bd6059f496ce2579d064331f97948a3d731174ee86ed4645b3a9"
+  },
+  "failure": "secondroundFailedanotherupdater; expectedUpToDate2",
+  "cause": "not established",
+  "no_retry_or_waiver": true
+}

@@ -1,0 +1,28 @@
+{
+  "classification": "INCONCLUSIVE",
+  "scope": "one complete round cohort, four libtest workers, unmodified Main36a with no Raw/Receipt patch",
+  "passed": 198,
+  "failed": 0,
+  "ignored": 0,
+  "runtime_invocations": 1,
+  "full_Update_gate": false,
+  "cause_or_waiver": false,
+  "original_logs": {
+    "tests.stdout": {
+      "sha256": "ad30a769cab77e8a6def9f1c706119cbda87ca62f7d5cd1950ee3611b620e0f0",
+      "bytes": 16770
+    },
+    "tests.stderr": {
+      "sha256": "ab03cc7c2634cc7ab3bd5811aad208a1cb48d5ed6a44bc925da307b724634890",
+      "bytes": 195
+    },
+    "compile.stdout": {
+      "sha256": "76bb52b7eb51740d3cfebf0702cf0b0466552fc152e9b974c0f6211b927fc137",
+      "bytes": 191425
+    }
+  },
+  "source_snapshot_sha256": {
+    "source-before.json": "a754fbe403ac6a28e523d4cc3463104395af91f96229f55e36fecc817f00601c",
+    "source-after.json": "a754fbe403ac6a28e523d4cc3463104395af91f96229f55e36fecc817f00601c"
+  }
+}

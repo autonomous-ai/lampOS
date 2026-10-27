@@ -1,0 +1,45 @@
+{
+  "tool": "cargo-nextest",
+  "version": "0.9.150",
+  "official_release_url": "https://github.com/nextest-rs/nextest/releases/tag/cargo-nextest-0.9.150",
+  "release_id": 424604168,
+  "release_tag": "cargo-nextest-0.9.150",
+  "release_published_at": "2026-10-26T18:31:35Z",
+  "release_immutable": true,
+  "official_docs": [
+    "https://nexte.st/docs/installation/pre-built-binaries/",
+    "https://nexte.st/docs/installation/release-urls/"
+  ],
+  "host": "Darwin arm64; macOS26.6.2; rustc1.96.0 hostaarch64-apple-darwin",
+  "assets": {
+    ".sha256": {
+      "asset_id": 679078145,
+      "name": "cargo-nextest-0.9.150-universal-apple-darwin.sha256",
+      "url": "https://github.com/nextest-rs/nextest/releases/download/cargo-nextest-0.9.150/cargo-nextest-0.9.150-universal-apple-darwin.sha256",
+      "bytes": 118,
+      "sha256": "79153f705b6f4d859dff6a475e178b1274974855db4ca4eecff74f494d179644"
+    },
+    ".tar.gz": {
+      "asset_id": 679078149,
+      "name": "cargo-nextest-0.9.150-universal-apple-darwin.tar.gz",
+      "url": "https://github.com/nextest-rs/nextest/releases/download/cargo-nextest-0.9.150/cargo-nextest-0.9.150-universal-apple-darwin.tar.gz",
+      "bytes": 16804268,
+      "sha256": "82a759b4d218d38359424196ab244c470e8f7c7d149c814fbbeef4d67c3c301a"
+    }
+  },
+  "archive_publisher_checksum_matches": true,
+  "archive_api_digest_matches": true,
+  "extracted_regular_member": "cargo-nextest",
+  "only_one_archive_member": true,
+  "binary_relative_path": "bin/cargo-nextest",
+  "binary_sha256": "aad9d409cd2f0a81fcaed49d7672a133254179458436c1e957505e4a11655329",
+  "binary_mode": "0o755",
+  "version_stdout": "cargo-nextest 0.9.150 (d225b1daf 2026-10-26)\nrelease: 0.9.150\ncommit-hash: d225b1daf362c1ca8e5e048132618c1a81c57a28\ncommit-date: 2026-10-26\nhost: aarch64-apple-darwin",
+  "version_exit_code": 0,
+  "earlier_ci_runner_version": "e74 original ARM40491553442 installed0.9.149; not identical version to staged0.9.150",
+  "build_or_tests_run": false,
+  "cargo_install": false,
+  "global_path_changed": false,
+  "project_files_changed": false,
+  "limits": "Future process-isolated execution is a new scope, not proof of the libtest lock failure cause or a waiver of that failed cohort."
+}

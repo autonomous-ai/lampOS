@@ -1,0 +1,18 @@
+---- a_round_with_nothing_to_change_only_checks stdout ----
+
+thread 'a_round_with_nothing_to_change_only_checks' (11490267) panicked at crates/update/tests/round.rs:830:5:
+assertion `left == right` failed
+  left: Failed("another lamp-update is at work")
+ right: UpToDate(2)
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+test result: ok. 185 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 7.66s
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+test result: ok. 106 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 144.63s
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.74s
+test result: ok. 0 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: FAILED. 197 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 324.34s
+test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out
+test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s

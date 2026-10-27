@@ -1,0 +1,13 @@
+{
+  "head": "86ad9ab34c58e5030aac03d0acca1adaf1a07c00",
+  "discovery_sha256": "2bf95babbefddc12c4055ec77a6c0abb3d2c13a813a5ac53348de243d286e30f",
+  "compiler_stdout_sha256": "672cb49cfcde7da0f2157de24afd1f81dfd66d8474e965fe5a8c93b38915e5c8",
+  "listed_binaries": 9,
+  "selected_cases": 518,
+  "ignored": 6,
+  "profile": "pr",
+  "filter": "all()",
+  "test_processes": 4,
+  "retries": 0,
+  "no_fail_fast": true
+}

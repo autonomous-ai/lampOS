@@ -1,0 +1,41 @@
+{
+  "head": "86ad9ab34c58e5030aac03d0acca1adaf1a07c00",
+  "base": "bf6f7bbdf5e936c2ef82621e1bb7592d511c1453",
+  "tree": "862846c34cf10d0af43cc0533027ac7b71786302",
+  "qualification": "New source and preferred nextest execution, never old-libtest failure fix/retry/waiver",
+  "counts": {
+    "PASS": 518,
+    "FAIL": 0,
+    "LEAK": 0,
+    "TIMEOUT": 0,
+    "EXECFAIL": 0,
+    "XPASS": 0,
+    "XFAIL": 0,
+    "CANCEL": 0
+  },
+  "selected": 518,
+  "ignored": 6,
+  "required_controls": 41,
+  "selected_unrun": 0,
+  "compiled_artifacts": 10,
+  "listed_binaries": 9,
+  "binaries_with_selected_results": 6,
+  "source_count": 7402,
+  "raw_artifact_hashes": {
+    "identity.json": "39e8d0ee196df05f71c01a05e1f0486edf49c850bb2e159546cf75ff08700e7f",
+    "source-before.json": "22971dc3bee229fb8b20acc3781013ba8f16ee150cc53d4dbc6816dcca0be6b9",
+    "source-after.json": "22971dc3bee229fb8b20acc3781013ba8f16ee150cc53d4dbc6816dcca0be6b9",
+    "compile.stdout": "672cb49cfcde7da0f2157de24afd1f81dfd66d8474e965fe5a8c93b38915e5c8",
+    "discovery.json": "2bf95babbefddc12c4055ec77a6c0abb3d2c13a813a5ac53348de243d286e30f",
+    "nextest.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "nextest.stderr": "6ae98020eac28ba508e12170fd6583a4e372d2ecdc15c004bf2f979576bcf138",
+    "runtime-census.json": "134816fd1bc5c01478dda59bfca15c3fb276445ef31747e2aae927acc3bb8252",
+    "case-executable-bindings.json": "d24a9c4dab90181af62106ffe5e90ef685e2677565c1f3605e834a629a7c745c",
+    "executables-final.json": "dd045e14bdefdb487cae1ac4918414604ddd00547412c502bc0b4aa4af605ce1",
+    "closure.json": "06713ac5acf9b6847cadacfdc628077e31e3a25a6bf3ea891ff86a488719f5b7"
+  },
+  "preserved_binaries_reverified_after_release": true,
+  "actual_target_may_be_reused_after_release": true,
+  "all_boundary_actual_hashes_previously_closed": true,
+  "no_Raw_source_push_or_PR": true
+}

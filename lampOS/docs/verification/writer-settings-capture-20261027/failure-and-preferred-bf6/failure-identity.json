@@ -1,0 +1,51 @@
+{
+  "head": "4f25de19abc3d98780a5796cf6cf96539b3863d6",
+  "base": "3f4b87969113a89795c814051501c4ba581418e9",
+  "tree": "929e5db8b586b34cbef8703a5e514e7d20c1aa36",
+  "scope": "actual clean 4f25/3f4 observer+raw carry; delivered writer_refresh preserved; no receipt patch present",
+  "owned": {
+    "lampOS/crates/update/src/apply.rs": {
+      "sha256": "74fc0cc534568e144449fbfdc5292686f2c53f60d953acda6cd8c404a37cfa3d",
+      "mode": 420
+    },
+    "lampOS/crates/update/src/lib.rs": {
+      "sha256": "d429a76236d320f916997619f4a1384705a8ee35c39f5c6d1333cec89a46ab47",
+      "mode": 420
+    },
+    "lampOS/crates/update/src/writer_files.rs": {
+      "sha256": "13657a14e71d7dd07f0bffe176a09585ef270051ed90dfb756ff96d85267b55c",
+      "mode": 420
+    },
+    "lampOS/crates/update/src/writer_files/tests.rs": {
+      "sha256": "8165868d61749055d934b068abad50bc8b514f366b51b8e3973e9e8c937baf95",
+      "mode": 420
+    },
+    "lampOS/crates/update/src/writer_settings.rs": {
+      "sha256": "7d8a2c8813db1b32e59a5419cd4a89da8670d10524d70c0b67b7e01ffefdd201",
+      "mode": 420
+    },
+    "lampOS/crates/update/src/writer_settings/tests.rs": {
+      "sha256": "3c02e3090d6b4989b0a98a185e8caec1f88e5352b2f95cf02e1cf324f2650763",
+      "mode": 420
+    },
+    "lampOS/docs/reuse-decisions.md": {
+      "sha256": "07526fcc42f17da2849a116983e6d0162feb5ed59c8482203c1e8b89cd509c8a",
+      "mode": 420
+    },
+    "lampOS/docs/updates.md": {
+      "sha256": "1e52a2341687cd7de5a03df3a98fbb210958e91983844d86ca4ae5a83823fe40",
+      "mode": 420
+    },
+    "lampOS/docs/writer-file-observation.md": {
+      "sha256": "3b31b6f8ed539bf5ea7429b7bd8047d90fef2af51048761b736a06ce36a6c684",
+      "mode": 420
+    },
+    "lampOS/docs/writer-settings-capture.md": {
+      "sha256": "9ea438eb4b9c9e386592e1d6388b941f832fa8925296c11734875f75925b2048",
+      "mode": 420
+    }
+  },
+  "status": "",
+  "controller_sha256": "3e1257069e4bf77112dd9ec4b717d58713349241810bf009b9900637d462efe8",
+  "target": "<shared-update-target>"
+}

@@ -1,0 +1,280 @@
+{
+  "source_head": "4f25de19abc3d98780a5796cf6cf96539b3863d6",
+  "source_base": "3f4b87969113a89795c814051501c4ba581418e9",
+  "total_source_guard_count": 7396,
+  "source_before_sha256": "ff009bfdc765c26c55a714d5b8953f1820bb1904157502cb061db8c23f1c8d89",
+  "source_after_sha256": "ff009bfdc765c26c55a714d5b8953f1820bb1904157502cb061db8c23f1c8d89",
+  "source_before_after_equal": true,
+  "original_complete_logs_retained_privately": {
+    "tests.stdout": {
+      "sha256": "bf6d4ce0bb1fd8689f6678d537a54501a6e6b5ffeb06d31fb79ccca5339a8e2a",
+      "bytes": 44375
+    },
+    "tests.stderr": {
+      "sha256": "f6db649626287e9f6a34608cdc16759d4f74056ffe925f05252cedd0a776e9bb",
+      "bytes": 1372
+    },
+    "compile.stdout": {
+      "sha256": "6ca5e512cc28878c4747925db58552302e71722a66043f8604ca74f7f759dace",
+      "bytes": 196467
+    },
+    "compile.stderr": {
+      "sha256": "05a6bd11b8b2d8b3f9ee8c48d3818fb846adf4561ccc0eacbd39fa099f68b6f2",
+      "bytes": 706
+    }
+  },
+  "original_guard_sha256": "a50230834667b24f84b3c8918c17f2bd0a277ea2c9e9ab1a9bb62811ad5e1939",
+  "failure_excerpt_origin": {
+    "source": "tests.stdout",
+    "full_source_sha256": "bf6d4ce0bb1fd8689f6678d537a54501a6e6b5ffeb06d31fb79ccca5339a8e2a",
+    "first_banner": "---- a_round_with_nothing_to_change_only_checks stdout ----",
+    "start_line": 552,
+    "end_line": 560,
+    "summary_rows_are_all_original_test_result_lines": true
+  },
+  "failed_runtime_exit_code": 101,
+  "critical_source_files": {
+    "lampOS/.config/nextest.toml": {
+      "sha256": "c4992da8d157df279011a424b5feb4833f001fd1d46ce3edd0a56992c848bb33",
+      "mode": 420
+    },
+    "lampOS/Cargo.lock": {
+      "sha256": "ec08a21213f56ace32e767512aa75e7a0b23338973b289e15d772fab30bc134a",
+      "mode": 420
+    },
+    "lampOS/Cargo.toml": {
+      "sha256": "2b1005b31d36511ed3c9d59429a4779f9579317ccead0c0a20d729a75d2ef940",
+      "mode": 420
+    },
+    "lampOS/crates/update/Cargo.toml": {
+      "sha256": "37aadd247a80b20ccdb284439d7e9d779f7bc7fe97447d49c9773070535bd71f",
+      "mode": 420
+    },
+    "lampOS/crates/update/src/apply.rs": {
+      "sha256": "74fc0cc534568e144449fbfdc5292686f2c53f60d953acda6cd8c404a37cfa3d",
+      "mode": 420
+    },
+    "lampOS/crates/update/src/lib.rs": {
+      "sha256": "d429a76236d320f916997619f4a1384705a8ee35c39f5c6d1333cec89a46ab47",
+      "mode": 420
+    },
+    "lampOS/crates/update/src/records.rs": {
+      "sha256": "8d561cb9619f6bee959ab666409043672cf71766e868c5b1f2f285f9137735f3",
+      "mode": 420
+    },
+    "lampOS/crates/update/src/round.rs": {
+      "sha256": "f7f02ae54d2c7b700f165645a0382cd6195c3d6fa02b8b7fbe8938f842520610",
+      "mode": 420
+    },
+    "lampOS/crates/update/src/writer_files.rs": {
+      "sha256": "13657a14e71d7dd07f0bffe176a09585ef270051ed90dfb756ff96d85267b55c",
+      "mode": 420
+    },
+    "lampOS/crates/update/src/writer_files/tests.rs": {
+      "sha256": "8165868d61749055d934b068abad50bc8b514f366b51b8e3973e9e8c937baf95",
+      "mode": 420
+    },
+    "lampOS/crates/update/src/writer_refresh.rs": {
+      "sha256": "f90f1851020a0a8fa443e30f5dd496f8a2d142b255a46f3490bb54414aa935ca",
+      "mode": 420
+    },
+    "lampOS/crates/update/src/writer_refresh/tests.rs": {
+      "sha256": "45aac2379e34fbf4585f2270e76ef445dbc09a7ca8e38bf849e3f47272616b9c",
+      "mode": 420
+    },
+    "lampOS/crates/update/src/writer_settings.rs": {
+      "sha256": "7d8a2c8813db1b32e59a5419cd4a89da8670d10524d70c0b67b7e01ffefdd201",
+      "mode": 420
+    },
+    "lampOS/crates/update/src/writer_settings/tests.rs": {
+      "sha256": "3c02e3090d6b4989b0a98a185e8caec1f88e5352b2f95cf02e1cf324f2650763",
+      "mode": 420
+    },
+    "lampOS/crates/update/tests/round.rs": {
+      "sha256": "c52595c943d50b63e78e26f8d6242679b79e4e3652014834495c040c4773efd4",
+      "mode": 420
+    },
+    "lampOS/crates/update/tests/round/asleep_quiet.rs": {
+      "sha256": "92e96323d0d8d3516efb28857c09e77db3e7d67986a23d6f107b7d671e769615",
+      "mode": 420
+    },
+    "lampOS/crates/update/tests/round/head_touch.rs": {
+      "sha256": "d077b778efaacc4d6115d19f46d6944104b525cdf38443d34fa06a82a6dc5638",
+      "mode": 420
+    },
+    "lampOS/crates/update/tests/round/process_cuts.rs": {
+      "sha256": "e5a04534cb6878c2f1656918d95677292167ddff1cee597800ed590ac6846d6c",
+      "mode": 420
+    },
+    "lampOS/crates/update/tests/round/product_carrier.rs": {
+      "sha256": "b34defff5b529d3861bd60371c91281e3f7bee7dcf902ebadd426f7757501bd5",
+      "mode": 420
+    },
+    "lampOS/crates/update/tests/round/restart_order.rs": {
+      "sha256": "a5ccc9f79612fbf2edb547e70910b17adc9dd0d01b3e21150ac7477c8ecf8acc",
+      "mode": 420
+    },
+    "lampOS/crates/update/tests/round/restart_quiet.rs": {
+      "sha256": "29b5404b6b61cfa8b44199dc06a7781bd18748d756e7b5a253d5c943993e9c73",
+      "mode": 420
+    },
+    "lampOS/crates/update/tests/round/runnable_event_controls.rs": {
+      "sha256": "a6fbd54021a7e89acd0b0b012a3d6b9df21035554ebf00792303b4f48ed5c0ac",
+      "mode": 420
+    },
+    "lampOS/crates/update/tests/round/runnable_events.rs": {
+      "sha256": "c9c7efcb0e758eae4d8f6c6f6ab36b80de57419dd0bc5719b2f9faf46d3a1fee",
+      "mode": 420
+    },
+    "lampOS/crates/update/tests/round/self_cuts.rs": {
+      "sha256": "0304acaead344bfbe3100395bb012f9bf913ab944ab08de25f5255a9cb9f2a06",
+      "mode": 420
+    },
+    "lampOS/crates/update/tests/round/self_recovery.rs": {
+      "sha256": "2cce3692a1376a60cec1752c8fbcd3e760561f38f3988648ed32013da45363de",
+      "mode": 420
+    },
+    "lampOS/crates/update/tests/round/setup_lifecycle.rs": {
+      "sha256": "73a24b6d78c7e3ee9a2b3ca9f30e62d330b0f4d499817968e5415046b2d7da7b",
+      "mode": 420
+    }
+  },
+  "all_owned15_and_foundation18_once": [
+    {
+      "name": "writer_files::tests::a_fifo_is_refused_without_waiting_for_a_writer_and_its_worker_is_always_joined",
+      "status": "ok"
+    },
+    {
+      "name": "writer_files::tests::a_hard_link_is_not_accepted_as_a_setting_and_directories_are_not_read",
+      "status": "ok"
+    },
+    {
+      "name": "writer_files::tests::descriptor_and_ancestor_metadata_changes_refuse_the_observation",
+      "status": "ok"
+    },
+    {
+      "name": "writer_files::tests::errors_and_debug_do_not_expose_relative_names_or_file_contents",
+      "status": "ok"
+    },
+    {
+      "name": "writer_files::tests::explicit_content_caps_and_the_hard_ceiling_are_enforced_without_truncating_success",
+      "status": "ok"
+    },
+    {
+      "name": "writer_files::tests::invalid_or_unbounded_relative_names_are_refused_before_opening_the_root",
+      "status": "ok"
+    },
+    {
+      "name": "writer_files::tests::missing_intermediate_and_leaf_are_distinct_and_keep_only_existing_ancestors",
+      "status": "ok"
+    },
+    {
+      "name": "writer_files::tests::no_follow_rejects_leaf_ancestor_and_root_links_without_reading_the_outside_witness",
+      "status": "ok"
+    },
+    {
+      "name": "writer_files::tests::pre_open_inode_or_metadata_substitution_and_disappearance_are_not_read_as_the_original_file",
+      "status": "ok"
+    },
+    {
+      "name": "writer_files::tests::regular_bytes_and_all_existing_ancestor_identities_are_observed_without_changing_them",
+      "status": "ok"
+    },
+    {
+      "name": "writer_refresh::tests::a_restart_at_every_unqualified_prefix_requires_recovery_and_never_reissues_the_grant",
+      "status": "ok"
+    },
+    {
+      "name": "writer_refresh::tests::a_stale_or_modified_first_apply_cannot_consume_the_single_grant",
+      "status": "ok"
+    },
+    {
+      "name": "writer_refresh::tests::diagnostics_hide_unknown_values_and_known_duplicate_or_shadowed_fields_are_refused",
+      "status": "ok"
+    },
+    {
+      "name": "writer_refresh::tests::failed_persist_after_publication_poisons_the_live_session_until_actual_disk_state_is_recovered",
+      "status": "ok"
+    },
+    {
+      "name": "writer_refresh::tests::first_apply_binds_its_own_later_envelope_and_sequence_without_replacing_the_refresh_identity",
+      "status": "ok"
+    },
+    {
+      "name": "writer_refresh::tests::guard_lock_is_exclusive_and_independent_of_the_product_lock",
+      "status": "ok"
+    },
+    {
+      "name": "writer_refresh::tests::identity_substitution_never_changes_or_admits_the_saved_transaction",
+      "status": "ok"
+    },
+    {
+      "name": "writer_refresh::tests::future_nonsemantic_metadata_is_preserved_without_becoming_admission_authority",
+      "status": "ok"
+    },
+    {
+      "name": "writer_refresh::tests::missing_and_nonregular_records_do_not_turn_into_a_fresh_transaction",
+      "status": "ok"
+    },
+    {
+      "name": "writer_refresh::tests::live_or_poisoned_sessions_cannot_expose_stale_recovery_inputs",
+      "status": "ok"
+    },
+    {
+      "name": "writer_refresh::tests::no_apply_does_not_qualify_but_one_exact_apply_can_enter_without_an_ordinary_round",
+      "status": "ok"
+    },
+    {
+      "name": "writer_refresh::tests::qualified_and_closed_inputs_keep_the_compatible_writer_and_bound_product_receipts",
+      "status": "ok"
+    },
+    {
+      "name": "writer_refresh::tests::qualified_writer_and_preimages_survive_a_restart_until_the_product_journal_closes",
+      "status": "ok"
+    },
+    {
+      "name": "writer_refresh::tests::recovery_views_retain_later_metadata_in_the_bound_inputs_without_reparsing",
+      "status": "ok"
+    },
+    {
+      "name": "writer_refresh::tests::restoring_an_apply_requires_its_original_grant_and_preimage_identity",
+      "status": "ok"
+    },
+    {
+      "name": "writer_refresh::tests::write_bound_and_invalid_identities_leave_no_journal_or_partial_acceptance",
+      "status": "ok"
+    },
+    {
+      "name": "writer_refresh::tests::unsupported_or_malformed_journals_are_retained_and_block_every_admission",
+      "status": "ok"
+    },
+    {
+      "name": "writer_settings::tests::captured_bytes_preserve_ordinary_ownership_and_keep_all_omitted_noops",
+      "status": "ok"
+    },
+    {
+      "name": "writer_settings::tests::oversized_or_invalid_new_inputs_are_bounded_and_redacted_before_observation",
+      "status": "ok"
+    },
+    {
+      "name": "writer_settings::tests::selected_invalid_values_refuse_before_filesystem_access_and_unrelated_values_are_ignored",
+      "status": "ok"
+    },
+    {
+      "name": "writer_settings::tests::shared_classifier_keeps_tmpfiles_marker_and_image_shipped_precedence",
+      "status": "ok"
+    },
+    {
+      "name": "writer_settings::tests::old_byte_limits_allow_exact_budget_then_empty_or_absent_but_never_a_prefix",
+      "status": "ok"
+    },
+    {
+      "name": "writer_refresh::tests::reloaded_inputs_keep_the_exact_origin_and_distinguish_writer_from_apply_restoration",
+      "status": "ok"
+    }
+  ],
+  "preserved_failed_driver_still_intact": true,
+  "hashes_of_actual_target_are_at_original_failed_boundary_not_a_claim_about_reused_target_now": true,
+  "cause": "not established; original flock errno was erased",
+  "unwaived_and_not_executed_again": true
+}

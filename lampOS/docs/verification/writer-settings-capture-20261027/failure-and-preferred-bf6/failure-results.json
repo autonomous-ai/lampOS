@@ -1,0 +1,64 @@
+[
+  {
+    "stage": "fmt",
+    "argv": [
+      "<cargo-home>/bin/cargo",
+      "+1.96.0",
+      "fmt",
+      "--all",
+      "--check"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 5.969
+  },
+  {
+    "stage": "clippy",
+    "argv": [
+      "<cargo-home>/bin/cargo",
+      "+1.96.0",
+      "clippy",
+      "--locked",
+      "-q",
+      "-p",
+      "lamp-update",
+      "--all-targets",
+      "--message-format=short",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 19.135
+  },
+  {
+    "stage": "compile",
+    "argv": [
+      "<cargo-home>/bin/cargo",
+      "+1.96.0",
+      "test",
+      "--locked",
+      "-p",
+      "lamp-update",
+      "--no-run",
+      "--message-format=json"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 29.457
+  },
+  {
+    "stage": "tests",
+    "argv": [
+      "<cargo-home>/bin/cargo",
+      "+1.96.0",
+      "test",
+      "--locked",
+      "-p",
+      "lamp-update",
+      "--no-fail-fast",
+      "--",
+      "--test-threads=4"
+    ],
+    "exit_code": 101,
+    "elapsed_seconds": 484.975
+  }
+]

@@ -1,0 +1,186 @@
+{
+  "old_head": "86ad9ab34c58e5030aac03d0acca1adaf1a07c00",
+  "old_base": "bf6f7bbdf5e936c2ef82621e1bb7592d511c1453",
+  "new_base": "992303fc8d72322bab46cdb18801c853ea43bb81",
+  "owned_paths": [
+    "lampOS/crates/update/src/apply.rs",
+    "lampOS/crates/update/src/lib.rs",
+    "lampOS/crates/update/src/writer_files.rs",
+    "lampOS/crates/update/src/writer_files/tests.rs",
+    "lampOS/crates/update/src/writer_settings.rs",
+    "lampOS/crates/update/src/writer_settings/tests.rs",
+    "lampOS/docs/reuse-decisions.md",
+    "lampOS/docs/updates.md",
+    "lampOS/docs/writer-file-observation.md",
+    "lampOS/docs/writer-settings-capture.md"
+  ],
+  "before": {
+    "lampOS/crates/update/src/apply.rs": {
+      "git_entry": "100644 blob 2e5e541d8eb974694cf451f27eac1a57897c1b69\tlampOS/crates/update/src/apply.rs",
+      "sha256": "db0720893ee7a085e2612000ca89a9a5066f1430d7ff96b6f6d2cb5489e52fb8"
+    },
+    "lampOS/crates/update/src/lib.rs": {
+      "git_entry": "100644 blob d10a9823678d0a044f126c120b394a11147cf25d\tlampOS/crates/update/src/lib.rs",
+      "sha256": "d429a76236d320f916997619f4a1384705a8ee35c39f5c6d1333cec89a46ab47"
+    },
+    "lampOS/crates/update/src/writer_files.rs": {
+      "git_entry": "100644 blob 79b0f419624e2ed1f8416673844afd7e988531e7\tlampOS/crates/update/src/writer_files.rs",
+      "sha256": "13657a14e71d7dd07f0bffe176a09585ef270051ed90dfb756ff96d85267b55c"
+    },
+    "lampOS/crates/update/src/writer_files/tests.rs": {
+      "git_entry": "100644 blob 9dadf2e73c5db037d5126b95e78a7fcac768df1f\tlampOS/crates/update/src/writer_files/tests.rs",
+      "sha256": "8165868d61749055d934b068abad50bc8b514f366b51b8e3973e9e8c937baf95"
+    },
+    "lampOS/crates/update/src/writer_settings.rs": {
+      "git_entry": "100644 blob 749ac3eef081db2e5e221118a5fde9b91c0ed0b4\tlampOS/crates/update/src/writer_settings.rs",
+      "sha256": "7d8a2c8813db1b32e59a5419cd4a89da8670d10524d70c0b67b7e01ffefdd201"
+    },
+    "lampOS/crates/update/src/writer_settings/tests.rs": {
+      "git_entry": "100644 blob 954c68e08cb157a062c54fb4890f3aecf2a06ac9\tlampOS/crates/update/src/writer_settings/tests.rs",
+      "sha256": "3c02e3090d6b4989b0a98a185e8caec1f88e5352b2f95cf02e1cf324f2650763"
+    },
+    "lampOS/docs/reuse-decisions.md": {
+      "git_entry": "100644 blob b27678f6aaabc6b8f2a04616c416ea6f495344cb\tlampOS/docs/reuse-decisions.md",
+      "sha256": "07526fcc42f17da2849a116983e6d0162feb5ed59c8482203c1e8b89cd509c8a"
+    },
+    "lampOS/docs/updates.md": {
+      "git_entry": "100644 blob a1e58b652b44621893e7819f2e73ecbd830241ca\tlampOS/docs/updates.md",
+      "sha256": "0a94a1424f217fa88584df6fbcb573250ea3b34448c0d525d70de29140406912"
+    },
+    "lampOS/docs/writer-file-observation.md": {
+      "git_entry": "100644 blob 5b310eaeca9bfcd1bf9e108d01e4dfe9b89d82f1\tlampOS/docs/writer-file-observation.md",
+      "sha256": "3b31b6f8ed539bf5ea7429b7bd8047d90fef2af51048761b736a06ce36a6c684"
+    },
+    "lampOS/docs/writer-settings-capture.md": {
+      "git_entry": "100644 blob f1dc78bc9c29706d448059b166c980e1e75280df\tlampOS/docs/writer-settings-capture.md",
+      "sha256": "9ea438eb4b9c9e386592e1d6388b941f832fa8925296c11734875f75925b2048"
+    }
+  },
+  "Main_producer_delta": "M\tlampOS/sdk/js/src/client.js\nM\tlampOS/sdk/js/src/testing.js\nM\tlampOS/sdk/js/test/client.test.js\n",
+  "head": "ea78acf5347c607e3907527914b0538ca9e64d67",
+  "tree": "af2123c4891eecfbccdc147dc1423718d1b70859",
+  "after": {
+    "lampOS/crates/update/src/apply.rs": {
+      "git_entry": "100644 blob 2e5e541d8eb974694cf451f27eac1a57897c1b69\tlampOS/crates/update/src/apply.rs",
+      "sha256": "db0720893ee7a085e2612000ca89a9a5066f1430d7ff96b6f6d2cb5489e52fb8",
+      "full_blob_equal": true,
+      "mode_equal": true
+    },
+    "lampOS/crates/update/src/lib.rs": {
+      "git_entry": "100644 blob d10a9823678d0a044f126c120b394a11147cf25d\tlampOS/crates/update/src/lib.rs",
+      "sha256": "d429a76236d320f916997619f4a1384705a8ee35c39f5c6d1333cec89a46ab47",
+      "full_blob_equal": true,
+      "mode_equal": true
+    },
+    "lampOS/crates/update/src/writer_files.rs": {
+      "git_entry": "100644 blob 79b0f419624e2ed1f8416673844afd7e988531e7\tlampOS/crates/update/src/writer_files.rs",
+      "sha256": "13657a14e71d7dd07f0bffe176a09585ef270051ed90dfb756ff96d85267b55c",
+      "full_blob_equal": true,
+      "mode_equal": true
+    },
+    "lampOS/crates/update/src/writer_files/tests.rs": {
+      "git_entry": "100644 blob 9dadf2e73c5db037d5126b95e78a7fcac768df1f\tlampOS/crates/update/src/writer_files/tests.rs",
+      "sha256": "8165868d61749055d934b068abad50bc8b514f366b51b8e3973e9e8c937baf95",
+      "full_blob_equal": true,
+      "mode_equal": true
+    },
+    "lampOS/crates/update/src/writer_settings.rs": {
+      "git_entry": "100644 blob 749ac3eef081db2e5e221118a5fde9b91c0ed0b4\tlampOS/crates/update/src/writer_settings.rs",
+      "sha256": "7d8a2c8813db1b32e59a5419cd4a89da8670d10524d70c0b67b7e01ffefdd201",
+      "full_blob_equal": true,
+      "mode_equal": true
+    },
+    "lampOS/crates/update/src/writer_settings/tests.rs": {
+      "git_entry": "100644 blob 954c68e08cb157a062c54fb4890f3aecf2a06ac9\tlampOS/crates/update/src/writer_settings/tests.rs",
+      "sha256": "3c02e3090d6b4989b0a98a185e8caec1f88e5352b2f95cf02e1cf324f2650763",
+      "full_blob_equal": true,
+      "mode_equal": true
+    },
+    "lampOS/docs/reuse-decisions.md": {
+      "git_entry": "100644 blob b27678f6aaabc6b8f2a04616c416ea6f495344cb\tlampOS/docs/reuse-decisions.md",
+      "sha256": "07526fcc42f17da2849a116983e6d0162feb5ed59c8482203c1e8b89cd509c8a",
+      "full_blob_equal": true,
+      "mode_equal": true
+    },
+    "lampOS/docs/updates.md": {
+      "git_entry": "100644 blob a1e58b652b44621893e7819f2e73ecbd830241ca\tlampOS/docs/updates.md",
+      "sha256": "0a94a1424f217fa88584df6fbcb573250ea3b34448c0d525d70de29140406912",
+      "full_blob_equal": true,
+      "mode_equal": true
+    },
+    "lampOS/docs/writer-file-observation.md": {
+      "git_entry": "100644 blob 5b310eaeca9bfcd1bf9e108d01e4dfe9b89d82f1\tlampOS/docs/writer-file-observation.md",
+      "sha256": "3b31b6f8ed539bf5ea7429b7bd8047d90fef2af51048761b736a06ce36a6c684",
+      "full_blob_equal": true,
+      "mode_equal": true
+    },
+    "lampOS/docs/writer-settings-capture.md": {
+      "git_entry": "100644 blob f1dc78bc9c29706d448059b166c980e1e75280df\tlampOS/docs/writer-settings-capture.md",
+      "sha256": "9ea438eb4b9c9e386592e1d6388b941f832fa8925296c11734875f75925b2048",
+      "full_blob_equal": true,
+      "mode_equal": true
+    }
+  },
+  "full_blobs_equal": [
+    "lampOS/crates/update/src/apply.rs",
+    "lampOS/crates/update/src/lib.rs",
+    "lampOS/crates/update/src/writer_files.rs",
+    "lampOS/crates/update/src/writer_files/tests.rs",
+    "lampOS/crates/update/src/writer_settings.rs",
+    "lampOS/crates/update/src/writer_settings/tests.rs",
+    "lampOS/docs/reuse-decisions.md",
+    "lampOS/docs/updates.md",
+    "lampOS/docs/writer-file-observation.md",
+    "lampOS/docs/writer-settings-capture.md"
+  ],
+  "all_modes_equal": true,
+  "lib_Main_preserved_plus_exact_modules": true,
+  "docs": {
+    "lampOS/docs/reuse-decisions.md": {
+      "own_exact_blocks": [
+        {
+          "sha256": "9a120a2ed830f4a2b76d03962739e53358a498cb9c65b4c70331168fd1ffd3f8",
+          "bytes": 1055,
+          "exactly_once": true
+        },
+        {
+          "sha256": "17e343043b2dc0fdb3904e043132214b7ac82cecdb953c6ab5fcea948e844761",
+          "bytes": 691,
+          "exactly_once": true
+        }
+      ],
+      "remove_own_blocks_yields_full_Main_blob": true
+    },
+    "lampOS/docs/updates.md": {
+      "own_exact_blocks": [
+        {
+          "sha256": "6ad541803f36123a568efd16569185c388af9186559a5a2a59f0c2927ba99b83",
+          "bytes": 269,
+          "exactly_once": true
+        },
+        {
+          "sha256": "3978b366f0be76695cf52a8cee20f589bbaf34ce3252337ba4dfea29eca55df3",
+          "bytes": 463,
+          "exactly_once": true
+        }
+      ],
+      "remove_own_blocks_yields_full_Main_blob": true
+    }
+  },
+  "foundation": {
+    "lampOS/crates/update/src/writer_refresh.rs": "100644 blob 77ad2e38e7a3135fe56723cde18a822df5da8680\tlampOS/crates/update/src/writer_refresh.rs",
+    "lampOS/crates/update/src/writer_refresh/tests.rs": "100644 blob a9bb99c4ace0198232f37c658984f7d2a8ec79ae\tlampOS/crates/update/src/writer_refresh/tests.rs",
+    "lampOS/docs/settings-writer-refresh.md": "100644 blob 505455b627bccddcc063650b079d1fb3bfc79fd5\tlampOS/docs/settings-writer-refresh.md",
+    "lampOS/Cargo.lock": "100644 blob 08d07c64a9b400b69e8124d45af9b8f206847dc9\tlampOS/Cargo.lock",
+    "lampOS/crates/cloud/Cargo.toml": "100644 blob 65558e699d91e56ed8447e3091bbda483666ac8e\tlampOS/crates/cloud/Cargo.toml",
+    "lampOS/crates/cloud/src/reports.rs": "100644 blob 3416199eef9b60ad07f0a68b669c9caa6019df48\tlampOS/crates/cloud/src/reports.rs",
+    "lampOS/crates/cloud/src/reports/query.rs": "100644 blob 6d603d768711844dd2892419f27fdd063d1db349\tlampOS/crates/cloud/src/reports/query.rs",
+    "lampOS/crates/cloud/src/reports/query_tests.rs": "100644 blob 03fde84f15e7ad5a22079bcea6e8805f3f5fdc57\tlampOS/crates/cloud/src/reports/query_tests.rs",
+    "lampOS/docs/cloud.md": "100644 blob 048f90f4c56583b9de0bc463f8e35f8d5fe8e70e\tlampOS/docs/cloud.md"
+  },
+  "authored_added_deleted_lines_equal": true,
+  "authored_semantic_patch_sha256": "90ae44f4ec15d97d0eedb7b6517b490e08e88827f92520e7c3084eedabf84460",
+  "range_diff": "1:  15fd681c84 = 1:  e1cf2da9f2 lampOS: observe bounded setting files through directory descriptors\n2:  86ad9ab34c = 2:  ea78acf534 lampOS: capture bounded raw setting ownership\n",
+  "status_clean": true,
+  "execution_claim": "NO Cargo or runtime on this carry; preferred518/0/6 remains86ad/bf6 only; latest992carryUNRUN; old509/1/6unwaived and baseline198INCONCLUSIVE"
+}

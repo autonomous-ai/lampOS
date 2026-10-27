@@ -1,0 +1,17 @@
+{
+  "head": "86ad9ab34c58e5030aac03d0acca1adaf1a07c00",
+  "base": "bf6f7bbdf5e936c2ef82621e1bb7592d511c1453",
+  "tree": "862846c34cf10d0af43cc0533027ac7b71786302",
+  "clean_own_branch": "second/frozen-settings-plan",
+  "source_count": 7402,
+  "controller_sha256": "f463d3f3330fb6fdfba92c3d847140aa3670a62e74e21e7cbc321ca060db03ff",
+  "nextest_tool_sha256": "aad9d409cd2f0a81fcaed49d7672a133254179458436c1e957505e4a11655329",
+  "nextest_version": "0.9.150",
+  "earlier_CI_runner_version": "0.9.149",
+  "verified_tool_proof_sha256": "5563f2b54904be2611512496701b75cb5d11f8a60fe3e60773a1579b82286c1f",
+  "merged_receipt_selector_sha256": "ecf2c70720c3f1c14b5ba960123cea0e3ae0764777f4906992a989c58ee80c23",
+  "config_sha256": "c4992da8d157df279011a424b5feb4833f001fd1d46ce3edd0a56992c848bb33",
+  "preferred_runner_scope": "New Raw source plus process-isolated nextest; never a fix or rerun of failed4f25 libtest",
+  "earlier_failure_unwaived": true,
+  "baseline_198_pass_INCONCLUSIVE": true
+}

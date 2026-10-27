@@ -1,0 +1,3 @@
+running 198 tests
+test a_round_with_nothing_to_change_only_checks ... ok
+test result: ok. 198 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 313.42s

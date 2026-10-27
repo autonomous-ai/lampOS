@@ -1,3 +1,11 @@
+## 27 October 2026, 21:08 +07 — raw capture keeps the failed cohort and separate preferred result
+
+[Raw failure and preferred-runner packet](verification/writer-settings-capture-20261027/failure-and-preferred-bf6/README.md) now publishes the original **509 passed / 1 failed / 6 ignored** on `4f25/3f4`, including the exact second-round busy failure, all 15 own and 18 foundation passing controls, source/log/driver bindings and original failed closure. Its cause remains unestablished. The separately included unmodified Main baseline is **198/0/0 and INCONCLUSIVE**; no retry or passing run waives the old failure.
+
+A distinct source and process-isolated execution on `86ad/bf6` passes **518 unique tests / zero bad or selected unrun / six ignored**, all 41 required controls once, fmt and strict Clippy. Its 7,402 source/mode and tool/controller/actual-preserved executable guards close. Doctests and overlapping custom Mac skips add no passes. The current `ea78/992` carry preserves all ten owned blobs and remains UNRUN by that evidence; Root's five-file recheck is in its own combined gate, with prep passed and runtime pending.
+
+The [receipt documentation carry addendum](verification/apply-receipt-binding-20261027/docs-carry-992/proof.md) records #3851 at `5fdc61e2a/992`. The earlier delivered-fix packet remains immutable, with no runtime counts transferred. No live writer refresh, independent restoration, root bootstrap or physical acceptance is claimed.
+
 ## 27 October 2026, 20:53 +07 — receipt delivery and final source-bound gates
 
 [Receipt delivery and qualification](verification/apply-receipt-binding-20261027/final-delivery-bf6/README.md) binds train #3841's delivered patches to the actual qualified source. Original `bf3/36a` ARM passes **7,758 unique tests / zero bad or selected unrun / 53 skips**, with all eight receipt and eighteen foundation controls once; original Linux formatting and strict Clippy pass. Its production archive and all fifty AArch64 members verify without inventing per-test executable hashes.
