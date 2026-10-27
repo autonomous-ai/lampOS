@@ -1,0 +1,378 @@
+{
+  "controls": {
+    "groups": {
+      "body_hand2": 2,
+      "camera_install1": 1,
+      "face_integration1": 1,
+      "faces_comfort3": 3,
+      "install_product3": 3,
+      "install_switch3": 3,
+      "mock3": 3,
+      "reminder21": 21,
+      "store_made2": 2,
+      "update_carrier12": 12,
+      "voice_exact_readers20": 20,
+      "voice_impact_modules39": 39,
+      "voice_made_app_task_news": 61,
+      "voice_switch7": 7,
+      "voice_welcome1": 1
+    },
+    "missing_or_nonpass": [],
+    "once_pass": 179,
+    "required": 179
+  },
+  "docs": {
+    "failed": 0,
+    "headings": 48,
+    "ignored": 0,
+    "interleaved_groups": [],
+    "passed": 4,
+    "summaries": 48
+  },
+  "helper_sha256": "2a8f143291cd6bf6b66a9283e7e4138468e927ade6d233585dc4dd09a447de56",
+  "holds": [],
+  "limits": [
+    "Original6bb attempt1 only; already completed at discovery; no watcher/rerun or binary artifacts.",
+    "Actual755/6bb integration preview is separate from authored6bb/f725 source and original4fcd exact-tree qualification.",
+    "Authored source SHA maps retained; actual preview whole-file SHAs are separately observed, with2changed bound files.",
+    "Tools production Faces route writes successful face saves to onboarding mailbox; named late-scope memory test body is compared but helper/whole-file identity is not assumed.",
+    "No device/physical latency/release acceptance; no Reader cause/repair waiver."
+  ],
+  "nextest": {
+    "bad_statuses": [],
+    "ipc_camera_authority_once_PASS": 18,
+    "ipc_selected": true,
+    "per_package_pass": {
+      "lamp-actions": 123,
+      "lamp-addons": 50,
+      "lamp-air": 27,
+      "lamp-audio": 193,
+      "lamp-body": 638,
+      "lamp-bus": 107,
+      "lamp-camera": 90,
+      "lamp-cloud": 196,
+      "lamp-control": 15,
+      "lamp-controls": 516,
+      "lamp-ears": 76,
+      "lamp-environment": 12,
+      "lamp-expression": 340,
+      "lamp-eyes": 342,
+      "lamp-gemini": 285,
+      "lamp-health": 91,
+      "lamp-ipc": 51,
+      "lamp-keeper": 42,
+      "lamp-lean": 61,
+      "lamp-local-time": 11,
+      "lamp-memory": 336,
+      "lamp-mood": 124,
+      "lamp-msgs": 177,
+      "lamp-name": 44,
+      "lamp-near-call": 8,
+      "lamp-observer": 46,
+      "lamp-peek": 26,
+      "lamp-policy": 284,
+      "lamp-records": 193,
+      "lamp-ring": 53,
+      "lamp-same-voice": 5,
+      "lamp-schedule": 215,
+      "lamp-selftest": 84,
+      "lamp-settings": 49,
+      "lamp-setup": 186,
+      "lamp-skills": 552,
+      "lamp-sound-fixtures": 15,
+      "lamp-station": 69,
+      "lamp-surround": 268,
+      "lamp-tasks": 225,
+      "lamp-turn-end": 32,
+      "lamp-turn-end-wire": 5,
+      "lamp-turn-owner": 37,
+      "lamp-update": 469,
+      "lamp-voice": 4182,
+      "lamp-voice-eval": 623,
+      "lamp-voice-processes": 2
+    },
+    "post_summary_exact_reprints": 35,
+    "selection_evidence": [
+      {
+        "line": 808,
+        "text": "  PICKED: "
+      },
+      {
+        "line": 865,
+        "text": "    Starting 11575 tests across 184 binaries (106 tests and 2 binaries skipped)"
+      }
+    ],
+    "status_counts": {
+      "PASS": 11575
+    },
+    "summary": {
+      "line": 12442,
+      "passed": 11575,
+      "skipped": 106,
+      "total": 11575
+    },
+    "unique_rows": 11575,
+    "unmatched_post_summary": []
+  },
+  "own_harness": {
+    "process13_0": true,
+    "process_started": true,
+    "relay_started": true
+  },
+  "runs": {
+    "arm": {
+      "actual_checkout": "aff5c5a5398adfb8387a126babe8ec2362a56a08",
+      "attempt": 1,
+      "conclusion": "success",
+      "event": "pull_request",
+      "head": "6bb73047156334a5bfba2cd94c771c976bdd1016",
+      "job": 122080547188,
+      "run": 40471838043
+    },
+    "linux": {
+      "actual_checkout": "aff5c5a5398adfb8387a126babe8ec2362a56a08",
+      "attempt": 1,
+      "conclusion": "success",
+      "event": "pull_request",
+      "head": "6bb73047156334a5bfba2cd94c771c976bdd1016",
+      "job": 122080548857,
+      "run": 40471838600
+    }
+  },
+  "selected_function_review": [
+    {
+      "actual_segment_sha256": "f58ed2070192eafa095e238a7cc2ba924bfd49575ddd30d4d04a42ce4b9a6490",
+      "authored_segment_sha256": "f58ed2070192eafa095e238a7cc2ba924bfd49575ddd30d4d04a42ce4b9a6490",
+      "method": "Exact named function text through next same-indent test attribute/function; surrounding helpers and whole-file source remain separately bound.",
+      "name": "scoped_memory_with_audio_context_keeps_admitted_identity_and_suppresses_late_reply",
+      "path": "crates/voice/src/tools.rs",
+      "segment_equal": true
+    },
+    {
+      "actual_segment_sha256": "e41799d6d84bc6c4180c2783f71c19987a7cdede2ea40539fc32187c42e7f186",
+      "authored_segment_sha256": "e41799d6d84bc6c4180c2783f71c19987a7cdede2ea40539fc32187c42e7f186",
+      "method": "Exact named function text through next same-indent test attribute/function; surrounding helpers and whole-file source remain separately bound.",
+      "name": "only_welcome_back_says_hello_on_an_arrival",
+      "path": "crates/voice/src/speak_up.rs",
+      "segment_equal": true
+    }
+  ],
+  "source_cohort": [
+    {
+      "actual_preview_blob": "39f4bff9674a21fb97b739b509d4a5cb73f7522b",
+      "actual_preview_sha256": "4b16498e685b5f33a978c1af1a2fec60a8a54db3e9f7915180e1b070fb377aab",
+      "authored_blob": "39f4bff9674a21fb97b739b509d4a5cb73f7522b",
+      "authored_sha256": "4b16498e685b5f33a978c1af1a2fec60a8a54db3e9f7915180e1b070fb377aab",
+      "path": "crates/body/src/body/tests.rs",
+      "whole_file_equal": true
+    },
+    {
+      "actual_preview_blob": "9b2116d7246f4e7c66c57afa4195c445fa3c099f",
+      "actual_preview_sha256": "90f08a96f32f38780e73773a4bf6034780d57c245350fcc92f0c0a6a3a4692cd",
+      "authored_blob": "9b2116d7246f4e7c66c57afa4195c445fa3c099f",
+      "authored_sha256": "90f08a96f32f38780e73773a4bf6034780d57c245350fcc92f0c0a6a3a4692cd",
+      "path": "crates/skills/src/lib.rs",
+      "whole_file_equal": true
+    },
+    {
+      "actual_preview_blob": "4394c6a34751a3a9d03d0b81492719dc32ec3a43",
+      "actual_preview_sha256": "1cc3c3ee270332e00c1af2269907ffad52f77ab04fd0710842bd0812ae070a75",
+      "authored_blob": "4394c6a34751a3a9d03d0b81492719dc32ec3a43",
+      "authored_sha256": "1cc3c3ee270332e00c1af2269907ffad52f77ab04fd0710842bd0812ae070a75",
+      "path": "crates/skills/tests/it/made.rs",
+      "whole_file_equal": true
+    },
+    {
+      "actual_preview_blob": "98bdb879e4a261eb03bc607631c19a95f20eb926",
+      "actual_preview_sha256": "189ffb1be28f84053fb2ba0a1a39bea6f0299239c2e51285294968bb2c3a78ec",
+      "authored_blob": "98bdb879e4a261eb03bc607631c19a95f20eb926",
+      "authored_sha256": "189ffb1be28f84053fb2ba0a1a39bea6f0299239c2e51285294968bb2c3a78ec",
+      "path": "crates/skills/tests/it/skills.rs",
+      "whole_file_equal": true
+    },
+    {
+      "actual_preview_blob": "e9eca338a162902b78130c2aaf33777680468363",
+      "actual_preview_sha256": "f6c11a9b135d531c0205362703d2556701d7d32a1c42b28456de8397113c4163",
+      "authored_blob": "e9eca338a162902b78130c2aaf33777680468363",
+      "authored_sha256": "f6c11a9b135d531c0205362703d2556701d7d32a1c42b28456de8397113c4163",
+      "path": "crates/skills/tests/it/store.rs",
+      "whole_file_equal": true
+    },
+    {
+      "actual_preview_blob": "574863113d915dff83699665a11f4b77e68cb2a3",
+      "actual_preview_sha256": "7fbaaf74c728a7c804621c89af679fac1cad17c95dd165eb350771716d9d2ff2",
+      "authored_blob": "574863113d915dff83699665a11f4b77e68cb2a3",
+      "authored_sha256": "7fbaaf74c728a7c804621c89af679fac1cad17c95dd165eb350771716d9d2ff2",
+      "path": "crates/update/src/check_units.rs",
+      "whole_file_equal": true
+    },
+    {
+      "actual_preview_blob": "0e0ac4ec1f8a900d1c3b15b9bb155724cf2b01cf",
+      "actual_preview_sha256": "8ae741f973dd2a9eaf0dc906ce176ea27c32dfe675edbd47a2919aa35e57dc2d",
+      "authored_blob": "0e0ac4ec1f8a900d1c3b15b9bb155724cf2b01cf",
+      "authored_sha256": "8ae741f973dd2a9eaf0dc906ce176ea27c32dfe675edbd47a2919aa35e57dc2d",
+      "path": "crates/update/src/install.rs",
+      "whole_file_equal": true
+    },
+    {
+      "actual_preview_blob": "59119c5ded5dc03ac4748f704e851d98051db12a",
+      "actual_preview_sha256": "ffb63cb67c02b7369775e3d4aa3cc388008b6f24338a8da94969d43273a4e95c",
+      "authored_blob": "59119c5ded5dc03ac4748f704e851d98051db12a",
+      "authored_sha256": "ffb63cb67c02b7369775e3d4aa3cc388008b6f24338a8da94969d43273a4e95c",
+      "path": "crates/update/src/switches.rs",
+      "whole_file_equal": true
+    },
+    {
+      "actual_preview_blob": "c239ff3b68cf41d88cc5ef1efc9ea202dc796798",
+      "actual_preview_sha256": "046e906a8ee0ab850e34853d4e1d1a996d43194d961b028e02299ee6c2085242",
+      "authored_blob": "c239ff3b68cf41d88cc5ef1efc9ea202dc796798",
+      "authored_sha256": "046e906a8ee0ab850e34853d4e1d1a996d43194d961b028e02299ee6c2085242",
+      "path": "crates/update/tests/install.rs",
+      "whole_file_equal": true
+    },
+    {
+      "actual_preview_blob": "87d8f11d08bbf4ea49414bf9a68e33e257b547f7",
+      "actual_preview_sha256": "686ba4128e012170b9e1f6dd2109b4706a1e66be2719fea8e021127501086009",
+      "authored_blob": "87d8f11d08bbf4ea49414bf9a68e33e257b547f7",
+      "authored_sha256": "686ba4128e012170b9e1f6dd2109b4706a1e66be2719fea8e021127501086009",
+      "path": "crates/update/tests/round.rs",
+      "whole_file_equal": true
+    },
+    {
+      "actual_preview_blob": "c8d9e7b455b91e68e4a5741e8b580703d3201dd1",
+      "actual_preview_sha256": "b34defff5b529d3861bd60371c91281e3f7bee7dcf902ebadd426f7757501bd5",
+      "authored_blob": "c8d9e7b455b91e68e4a5741e8b580703d3201dd1",
+      "authored_sha256": "b34defff5b529d3861bd60371c91281e3f7bee7dcf902ebadd426f7757501bd5",
+      "path": "crates/update/tests/round/product_carrier.rs",
+      "whole_file_equal": true
+    },
+    {
+      "actual_preview_blob": "d0c4ea2b6486dafc1fbb6c266ffa2c019bf3dc67",
+      "actual_preview_sha256": "f450d640e66f0ad69a0895f396e0ee446d87f74d6acda0d1b059d7417c5c7d2d",
+      "authored_blob": "d0c4ea2b6486dafc1fbb6c266ffa2c019bf3dc67",
+      "authored_sha256": "f450d640e66f0ad69a0895f396e0ee446d87f74d6acda0d1b059d7417c5c7d2d",
+      "path": "crates/voice/src/agent_tasks.rs",
+      "whole_file_equal": true
+    },
+    {
+      "actual_preview_blob": "2c7f300894e31d93cd8ea2740f1a96bda45e0235",
+      "actual_preview_sha256": "4f89c6beb69296964f811cdf427c9ebbba0e724307e54a5051489830108b834e",
+      "authored_blob": "2c7f300894e31d93cd8ea2740f1a96bda45e0235",
+      "authored_sha256": "4f89c6beb69296964f811cdf427c9ebbba0e724307e54a5051489830108b834e",
+      "path": "crates/voice/src/app_make.rs",
+      "whole_file_equal": true
+    },
+    {
+      "actual_preview_blob": "65ff3f5c3f4261f4e094c77a876f1b9c4164eef9",
+      "actual_preview_sha256": "2dbddee7abb0f73f0a387463f45a321522aa17e56911a175e4e62324f6b18f8b",
+      "authored_blob": "65ff3f5c3f4261f4e094c77a876f1b9c4164eef9",
+      "authored_sha256": "2dbddee7abb0f73f0a387463f45a321522aa17e56911a175e4e62324f6b18f8b",
+      "path": "crates/voice/src/made_skill.rs",
+      "whole_file_equal": true
+    },
+    {
+      "actual_preview_blob": "5a942ac0ece7c1c44153442e760d704f616178d8",
+      "actual_preview_sha256": "fcde16580d382f6dce67a5eacdd087da37a7eea67b8d207e4efa9847826b32cc",
+      "authored_blob": "5a942ac0ece7c1c44153442e760d704f616178d8",
+      "authored_sha256": "fcde16580d382f6dce67a5eacdd087da37a7eea67b8d207e4efa9847826b32cc",
+      "path": "crates/voice/src/onboarding/giving_way_flow_tests.rs",
+      "whole_file_equal": true
+    },
+    {
+      "actual_preview_blob": "d1647606c7c951ef9f56f7138e50012da4f1ee65",
+      "actual_preview_sha256": "82e9761359aa980a1b4d4fb57e03b6547c733a9e3fd496d2c8d6522fbfb8fcef",
+      "authored_blob": "d1647606c7c951ef9f56f7138e50012da4f1ee65",
+      "authored_sha256": "82e9761359aa980a1b4d4fb57e03b6547c733a9e3fd496d2c8d6522fbfb8fcef",
+      "path": "crates/voice/src/process.rs",
+      "whole_file_equal": true
+    },
+    {
+      "actual_preview_blob": "dc71041a9cdc4de112ef523df8ccd1fda28166f0",
+      "actual_preview_sha256": "e596c3e13ee57afb14000b1f75bae78b4476a28c06c1f7c35aeaa324884d263c",
+      "authored_blob": "dc71041a9cdc4de112ef523df8ccd1fda28166f0",
+      "authored_sha256": "e596c3e13ee57afb14000b1f75bae78b4476a28c06c1f7c35aeaa324884d263c",
+      "path": "crates/voice/src/process/switch_census_tests.rs",
+      "whole_file_equal": true
+    },
+    {
+      "actual_preview_blob": "92a031ac127f0cc825b41ed615a35ef73f8852b7",
+      "actual_preview_sha256": "c3771e07240801c982b77a038c20a1bcaf2daf13de9070e540d6ff6afb97f7d0",
+      "authored_blob": "92a031ac127f0cc825b41ed615a35ef73f8852b7",
+      "authored_sha256": "c3771e07240801c982b77a038c20a1bcaf2daf13de9070e540d6ff6afb97f7d0",
+      "path": "crates/voice/src/remember.rs",
+      "whole_file_equal": true
+    },
+    {
+      "actual_preview_blob": "ee1ca2edc43ed3135a67c3a146123a59b9e90eea",
+      "actual_preview_sha256": "e8b3019323f92f0fe46f669420c70bfa30313cbdee4841bd9594d7cc5d4c99bc",
+      "authored_blob": "ee1ca2edc43ed3135a67c3a146123a59b9e90eea",
+      "authored_sha256": "e8b3019323f92f0fe46f669420c70bfa30313cbdee4841bd9594d7cc5d4c99bc",
+      "path": "crates/voice/src/remember/heard.rs",
+      "whole_file_equal": true
+    },
+    {
+      "actual_preview_blob": "3cd4e45c19dbbfe75de988d10b70380770a40432",
+      "actual_preview_sha256": "bb77a07d13a38a210375a2e936ca9f46f98a0f1c6a480d2d85fd5140f4025e59",
+      "authored_blob": "3cd4e45c19dbbfe75de988d10b70380770a40432",
+      "authored_sha256": "bb77a07d13a38a210375a2e936ca9f46f98a0f1c6a480d2d85fd5140f4025e59",
+      "path": "crates/voice/src/remember/needs_face.rs",
+      "whole_file_equal": true
+    },
+    {
+      "actual_preview_blob": "ac5c425ee0cd007efc388ff9d937a8bb86883f76",
+      "actual_preview_sha256": "6f659a6380284a750999eee14a21e9e4642208ffb19774bb3fe2b053b54622f1",
+      "authored_blob": "ac5c425ee0cd007efc388ff9d937a8bb86883f76",
+      "authored_sha256": "6f659a6380284a750999eee14a21e9e4642208ffb19774bb3fe2b053b54622f1",
+      "path": "crates/voice/src/second_provider/tests.rs",
+      "whole_file_equal": true
+    },
+    {
+      "actual_preview_blob": "5a39bb903bf6111f806355c2441bf55ef8048704",
+      "actual_preview_sha256": "12e4e43eb4f2904e12a8240c9904919dbbca331a21a00c42b8832faefa0111c6",
+      "authored_blob": "2deb6a83f66fea66313bbe4d6adc819fdd15ac32",
+      "authored_sha256": "50432cb4fdecb722318d9401c3183b30e3544159397bf856f02190b74ddc6153",
+      "path": "crates/voice/src/speak_up.rs",
+      "whole_file_equal": false
+    },
+    {
+      "actual_preview_blob": "251c6ce83aa184909d522ba6cc5cf51bf6fdec51",
+      "actual_preview_sha256": "f3e585e732e9d8884fadcb60c200582d8ae9e06cf95d7069d2a4e40ef80c5457",
+      "authored_blob": "251c6ce83aa184909d522ba6cc5cf51bf6fdec51",
+      "authored_sha256": "f3e585e732e9d8884fadcb60c200582d8ae9e06cf95d7069d2a4e40ef80c5457",
+      "path": "crates/voice/src/task_news.rs",
+      "whole_file_equal": true
+    },
+    {
+      "actual_preview_blob": "905895f8cd51a7aebb42668191be3f05a6d11384",
+      "actual_preview_sha256": "b2825f7d614df72a3ea64663b628937252f08ca9c3673990bd1b9b8f30f03418",
+      "authored_blob": "905895f8cd51a7aebb42668191be3f05a6d11384",
+      "authored_sha256": "b2825f7d614df72a3ea64663b628937252f08ca9c3673990bd1b9b8f30f03418",
+      "path": "crates/voice/src/thread.rs",
+      "whole_file_equal": true
+    },
+    {
+      "actual_preview_blob": "9ce362f01be127e51b612703702eebb7ccf79beb",
+      "actual_preview_sha256": "3b60401b13021db6d5fe113156a55250a06971c3625b59fdabb8bca738aff90a",
+      "authored_blob": "78b3c17ef92237413de30d61d90f48e3290066f7",
+      "authored_sha256": "48239654b15f468d14d87a97886cf1ac1b1e3f74d5b4d140afd2437b964c3f9b",
+      "path": "crates/voice/src/tools.rs",
+      "whole_file_equal": false
+    }
+  ],
+  "status": "ORIGINAL_NATIVE_PASSED_INTEGRATION_PREVIEW_ONLY",
+  "strict_linux_clippy": [
+    {
+      "command": "cargo clippy --locked --manifest-path .github/tools/lampos-promote/Cargo.toml --all-targets -- -D warnings",
+      "line": 371
+    },
+    {
+      "command": "##[group]Run cargo clippy --locked --workspace --all-targets -- -D warnings",
+      "line": 544
+    },
+    {
+      "command": "cargo clippy --locked --workspace --all-targets -- -D warnings",
+      "line": 545
+    }
+  ],
+  "full_private_receipt_sha256": "f40c24c7cf9a645479e08df6bee5622f516484d08b3c4b069edfd0fc9f947746"
+}
