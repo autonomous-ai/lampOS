@@ -672,3 +672,4 @@ Ready for lamp-voice: yes (#2553), once its ARM64 run is green
 - 23:44: NEXT TRAIN #3880 ad095ae61 (Third READ-OK, Reviewer-two base-only HOLD, green). Nine's door side for skill push on nine/control-skill-push, opens after #3869 and part 5.
 - 23:49: Eighth names lamp-skills as the pushed-skill ceiling's enforcer (Fourteen's P3 answered). Waiting: #3869 re-looks, trains for #3875/#3880, #3878 green ARM64.
 - 23:54: #3869 adds the ceiling's owner (lamp-skills, Eighth/Nine) as 7a04fd60c, told Nine so their PR needn't touch control.md.
+- 23:59: Eighth READ-OK #3869 7a04fd60c (the three new lines). ARM64/clippy pending; NEXT TRAIN when green (Fourteen's READ-OK on a7820079d plus Eighth's on this head).
