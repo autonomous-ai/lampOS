@@ -1034,8 +1034,14 @@ impl People {
     /// over [`NEAR_PERSON`] to someone known by a name one letter from this
     /// one ([`near_name`]) are refused as [`Refused::NearTo`], naming the
     /// likeliest such person: the same person, recognised less well and
-    /// misheard (#2176 row 4). A face near alone, or a name near alone,
-    /// changes nothing.
+    /// misheard (#2176 row 4). A name near alone changes nothing. A face
+    /// near alone does (#3739): prints whose median is at or over
+    /// [`NEAR_PERSON`] to someone kept under another name, but not
+    /// recognised as them, are refused as [`Refused::NearTo`] whatever the
+    /// name and whatever `replace` says, so the name is spelled; only with
+    /// `apart` are they kept, as a new person. A rename (`replace`) is only
+    /// for a face recognised under another name, and keeps only the prints
+    /// at [`SAME_PERSON`] to them.
     ///
     /// Under a name already kept, prints are never put in place of theirs by
     /// a face that isn't theirs, whatever `apart` or `replace` say (the
@@ -1160,11 +1166,46 @@ impl People {
                 return Err(Refused::NearTo(person.name.clone()));
             }
         }
+        // Not recognised, but near someone kept under another name as a
+        // whole, whatever the name (#3739: one face was kept twice under a
+        // name misheard far from theirs): refused, so they spell it. Their
+        // own name spelled is judged against theirs, as above; another
+        // name goes in only `apart`, as a new person. Never renamed: a face
+        // not recognised as them may be a sibling's, and a yes would give
+        // them that person's name and memory (the HOLDs on #3792).
+        if known.is_empty() && !apart {
+            let near = self
+                .people
+                .iter()
+                .map(|person| (person, median_to(person)))
+                .filter(|(_, median)| *median >= NEAR_PERSON)
+                .max_by(|a, b| a.1.total_cmp(&b.1));
+            if let Some((person, _)) = near {
+                return Err(Refused::NearTo(person.name.clone()));
+            }
+        }
         let mut carried = None;
+        let mut prints = prints;
         if !known.is_empty() {
             if !replace {
                 return Err(Refused::KnownAs(known.join(" and ")));
             }
+            // Renamed, only the prints recognised as them go in (#3792's
+            // HOLDs): one of someone else's among them doesn't take their
+            // memory id with it.
+            let theirs: Vec<&Person> = self
+                .people
+                .iter()
+                .filter(|person| known.iter().any(|other| same_name(other, &person.name)))
+                .collect();
+            prints.retain(|print| {
+                theirs.iter().any(|person| {
+                    person
+                        .prints
+                        .iter()
+                        .any(|held| likeness(held, print) >= SAME_PERSON)
+                })
+            });
             // A rename (#2176): the new name keeps the memory id of the
             // likeliest name it replaces, `known`'s first, so what they
             // told the lamp stays theirs. Only with the stable id on.
@@ -3663,17 +3704,14 @@ mod tests {
             Err(Refused::NearTo("Ossa".into()))
         );
         assert_eq!(people.names().len(), 1, "nothing kept when asked about");
-        for (name, prints, why) in [
-            ("Ossb", vec![at(0.2)], "a far face"),
-            ("Minh", vec![at(0.33)], "a far name"),
-        ] {
-            let mut people = known(&format!("near-name-{name}"));
-            assert_eq!(
-                people.remember_one(name, prints, 2, false, false),
-                Ok(name.to_owned()),
-                "{why}"
-            );
-        }
+        // A far face is someone new; a far name with a near face is asked
+        // about too (#3739's test).
+        let mut far = known("near-name-Ossb");
+        assert_eq!(
+            far.remember_one("Ossb", vec![at(0.2)], 2, false, false),
+            Ok("Ossb".to_owned()),
+            "a far face"
+        );
         // Exactly their name with a near face: spelled first, then beside
         // theirs, and a full capture still leaves one of their own.
         let mut same = known("near-name-same");
@@ -3787,6 +3825,98 @@ mod tests {
             Ok("Ossi".into())
         );
         assert_eq!(apart.names().len(), 2, "both kept, as asked");
+    }
+
+    /// #3739, a tester's lamp on 27 Oct: one person was remembered under
+    /// their name and, 21 s later, under a name misheard but not one letter
+    /// off, and was kept twice. A capture whose median is at or over
+    /// [`NEAR_PERSON`] to someone kept under another name, but not
+    /// recognised as them, is refused with their name whatever the name,
+    /// and a yes (`replace`) renames nobody and shares no memory (the HOLDs
+    /// on #3792: it may be a sibling's); their own name spelled goes beside
+    /// theirs, `apart` adds a second person, and a capture under
+    /// [`NEAR_PERSON`] is added as before. A face recognised under another
+    /// name is renamed with only its prints at [`SAME_PERSON`] to them.
+    /// Made-up names only.
+    #[test]
+    fn a_new_name_for_a_face_near_someone_kept_is_asked_about_not_added() {
+        let known = |case: &str| {
+            let mut people = People::open(file(case)).unwrap().with_stable_ids(true);
+            people.remember("Ossa", vec![print(0.3)], 1).unwrap();
+            people
+        };
+        let capture = || vec![at(0.33); MOST_PRINTS];
+        assert!(!near_name("Ossa", "Kemal"), "a far name");
+        // The issue's case: under the recognition line, near as a whole.
+        let mut people = known("near-face-far-name");
+        assert_eq!(people.who(&at(0.33)), None, "not recognised");
+        let id = people.id_of("Ossa").unwrap();
+        let before = std::fs::read(&people.path).unwrap();
+        assert_eq!(
+            people.remember_one("Kemal", capture(), 2, false, false),
+            Err(Refused::NearTo("Ossa".into()))
+        );
+        // A yes from whoever is there renames nobody and shares no memory.
+        assert_eq!(
+            people.remember_one("Kemal", capture(), 3, true, false),
+            Err(Refused::NearTo("Ossa".into()))
+        );
+        assert_eq!(people.names(), vec!["Ossa".to_owned()], "one person kept");
+        assert_eq!(people.id_of("Ossa"), Some(id.clone()));
+        assert_eq!(people.id_of("Kemal"), None);
+        assert_eq!(
+            std::fs::read(&people.path).unwrap(),
+            before,
+            "people.json unchanged"
+        );
+        // The same person spelling their own name: beside theirs, one person.
+        assert_eq!(
+            people.remember_one("Ossa", capture(), 4, false, true),
+            Ok("Ossa".into())
+        );
+        assert_eq!(people.names(), vec!["Ossa".to_owned()]);
+        assert_eq!(people.id_of("Ossa"), Some(id));
+        // Someone else: kept apart, two people.
+        let mut apart = known("near-face-far-name-apart");
+        assert_eq!(
+            apart.remember_one("Kemal", capture(), 2, false, true),
+            Ok("Kemal".into())
+        );
+        assert_eq!(apart.names().len(), 2, "both kept, as asked");
+        assert_ne!(apart.id_of("Kemal"), apart.id_of("Ossa"));
+        // A face under `NEAR_PERSON` with a new name is someone new.
+        let mut far = known("near-face-far-face");
+        assert_eq!(
+            far.remember_one("Kemal", vec![at(0.2); MOST_PRINTS], 2, false, false),
+            Ok("Kemal".into())
+        );
+        assert_eq!(far.names().len(), 2);
+        // Judged by the median: two near prints among three far ones are
+        // not near as a whole.
+        let mut few = known("near-face-few");
+        let mut mixed = vec![at(0.33); 2];
+        mixed.extend(vec![at(0.2); 3]);
+        assert_eq!(
+            few.remember_one("Kemal", mixed, 2, false, false),
+            Ok("Kemal".into())
+        );
+        // Recognised under another name: asked, and a yes renames with the
+        // memory id and only the prints at `SAME_PERSON` to them.
+        let mut seen = known("near-face-recognised");
+        let id = seen.id_of("Ossa").unwrap();
+        let mut again = vec![at(0.9); 3];
+        again.extend([at(0.33), at(0.2)]);
+        assert_eq!(
+            seen.remember_one("Kemal", again.clone(), 2, false, false),
+            Err(Refused::KnownAs("Ossa".into()))
+        );
+        assert_eq!(
+            seen.remember_one("Kemal", again, 3, true, false),
+            Ok("Kemal".into())
+        );
+        assert_eq!(seen.names(), vec!["Kemal".to_owned()]);
+        assert_eq!(seen.id_of("Kemal"), Some(id), "their memory id kept");
+        assert_eq!(seen.people[0].prints.len(), 3, "only the recognised three");
     }
 
     #[test]
