@@ -1,3 +1,17 @@
+## 2026-10-27 12:31 UTC — Common 8d93 local gate and metadata fold complete
+
+Ready for lamp-voice: no
+
+[Current source receipt](verification/common-8d93-qualified-local-20261027/receipt.json):
+actual 35048/0 passes all nine fresh stages, 5,590 unique runtime cases and
+112 / current 525 controls; 25 overlaps are not added. Natural ignores split
+27 JSON / 16 start-only. Separate docs 4/0,
+relay 1/0 and process 13/0 remain separate.
+The fold preserves full 8d93 bytes/mtimes on Main 3b9, with fixture `=` then
+`!` for doc context only. All 7,890 protected files hold; archive 84403/0 adds
+no qualification or old protected count. Prior compiler/disk/artifact/native
+failures stay failed. Fresh Linux CI, readers, privacy and device holds remain.
+
 ## 2026-10-27 11:30 UTC — Common 3e9 native run fails in Linux fixture setup
 
 Ready for lamp-voice: no

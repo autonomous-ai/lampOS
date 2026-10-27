@@ -1,0 +1,17 @@
+# Common 8d93 local qualification, 27 October 2026
+
+Ready for lamp-voice: no
+
+Actual local gate 35048 exited 0 on tree `8d93ad178efd868fbf728d4d49bd81b48c28e2ed`, tested at `3e9b72125709d6da16daf15c8a9ec548ad66eaf1`. All nine fresh stages passed: fmt, metadata, strict workspace/all-targets Clippy, workspace build, discovery, runtime, doctests, relay and turn-end process. Runtime has **5,590 unique clean passes / 0 failures, leaks or timeouts**. All 112 required controls and all 525 current contracts pass; their 25 overlapping pairs are not added. Counts come from actual files, with every selected terminal checked against its raw JSON line and global ordinal.
+
+Discovery records 5,633 cases. Natural ignores are separate: 43 discovered, 27 JSON ignored terminals, 16 start-only cases not executed, and 0 unobserved. Filter exclusions are recorded separately. Doctests give 4 passes / 0 failures; relay gives 1 successful aggregate invocation and process gives 13 named passes. These counts are not added to runtime uniqueness.
+
+Compiler profiles stayed normal. Only test debug information was disabled; optimization, debug assertions and overflow checks were unchanged. Builds used one job and no incrementality; runtime used profile `pr`, two slots and no retries. Exact hashes and metadata for all 46 captured inputs were checked immediately before and after runtime by the sealed successful runner. The separate actual archive 84403/0 provides durability for those inputs; it provides no test qualification and does not increase the 7,890 protected-file count. All 7,890 old private files were fully verified initially and finally, and owned sessions closed.
+
+The [112 ledger](required112-terminal-ledger.json), [current 525 ledger](current525-terminal-ledger.json), [revision report](map-revisions.json) and [receipt](receipt.json) bind the actual source. Required controls are 111 exact bodies plus one approved mechanical arity repair. Current contracts are 520 exact historical bodies, four reviewed upstream revisions and that same mechanical repair. Its single declaration replacement includes the exact rustfmt newline and preserves all 71 assertions. Historical maps remain immutable; prior runtime credit was not transferred.
+
+Actual metadata fold 8595 exited 0 and produced `314a0f6bcb4061e360b85b8e0c9f0a9048cba8cd` on frozen Main `3b9bfb628e1c416926b958fecf56f65c539dc533`, with the identical full tested tree and all source mtimes. The two fixture range rows are `=` then `!` for documentation context only; runtime/test payloads and original metadata remain exact. One Common commit follows: three commits, 62 total changed paths and 57 Common-only paths. No author identities or raw range output are published.
+
+Earlier failures remain failed: 13286/125 with metadata101, 43280/125 with Clippy101, and 10427/125 before any command at the disk floor, each with zero test bodies. The [older 8cf proof](https://github.com/autonomous-ai/lampOS/commit/9ada69f837) preserves wrapper36537/125 despite runtime0 after artifact loss. [Old native evidence](https://github.com/autonomous-ai/lampOS/commit/0a5c4adb1a) preserves 3e9 ARM failure: 2,780 passes / one failure and 8,961 selected cases unrun. This local Mac gate gives zero coverage to the repaired Linux-only case; fresh CI must qualify it.
+
+Fresh ARM64/Linux CI, required readers, privacy acceptance and lamp/device/physical checks remain holds. No raw logs, private utterances, binaries or human handles are published. This packet does not mark the change ready or activate a product path.

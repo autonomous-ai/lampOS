@@ -1,0 +1,163 @@
+{
+  "status": "CURRENT_SOURCE_LOCAL_QUALIFIED_READY_NO",
+  "ready_for_lamp_voice": false,
+  "source": {
+    "tested_head": "3e9b72125709d6da16daf15c8a9ec548ad66eaf1",
+    "folded_head": "314a0f6bcb4061e360b85b8e0c9f0a9048cba8cd",
+    "tree": "8d93ad178efd868fbf728d4d49bd81b48c28e2ed",
+    "base": "3b9bfb628e1c416926b958fecf56f65c539dc533",
+    "full_source_content_and_mtimes_identical_across_metadata_fold": true,
+    "total_changed_paths": 62,
+    "Common_only_changed_paths": 57
+  },
+  "actual_local_gate": {
+    "native_session": 35048,
+    "exit": 0,
+    "operations": 9,
+    "all_stages_exit0": true,
+    "compiler_normal_profiles": true,
+    "test_DEBUG0_only": true,
+    "build_jobs": 1,
+    "incremental": false,
+    "runtime_profile": "pr",
+    "runtime_slots": 2,
+    "retries": 0,
+    "host": "macOS x86_64",
+    "runtime_unique_passed": 5590,
+    "runtime_failed": 0,
+    "leaks": 0,
+    "timeouts": 0,
+    "required112_passed": 112,
+    "current525_passed_separate": 525,
+    "overlap_not_added": 25,
+    "listed_cases": 5633,
+    "natural_ignored_discovery": 43,
+    "ignored_JSON_terminals": 27,
+    "natural_start_only_not_executed": 16,
+    "natural_not_observed": 0,
+    "filter_exclusions_separate": 43
+  },
+  "runtime_artifact_boundary": {
+    "captured_inputs": 46,
+    "exact_original_manifest_bytes_checked_before_and_after_runtime": true,
+    "proof": "Pinned runner success requires both immediate binaries_guard calls; no claim about target changes after later Cargo stages."
+  },
+  "separate_counts": {
+    "workspace_doctests": {
+      "passed": 4,
+      "failed": 0,
+      "ignored": 0
+    },
+    "own-relay-signals": {
+      "passed": 1,
+      "failed": 0
+    },
+    "own-turn-end-process": {
+      "passed": 13,
+      "failed": 0
+    },
+    "not_added_to_runtime_unique_count": true
+  },
+  "protection": {
+    "private_files_full_initial_final_verified": 7890,
+    "owned_sessions_closed": true
+  },
+  "metadata_fold": {
+    "actual_native_session": 8595,
+    "actual_exit": 0,
+    "fixture_rows": [
+      "=",
+      "! doc context only"
+    ],
+    "fixture_runtime_test_payloads_exact": true,
+    "original_fixture_author_committer_message_preserved_without_publishing_identities": true,
+    "three_commits_on_base": true,
+    "fixture_commits": [
+      "c68721be9264f4ce997616dc0c75dc743c3245f2",
+      "7977116c55549353a974de967c820998d50de8f1"
+    ]
+  },
+  "historical_failures_preserved": [
+    {
+      "native_session": 13286,
+      "exit": 125,
+      "failed_stage": "metadata",
+      "stage_exit": 101,
+      "test_bodies": 0,
+      "preserved": true
+    },
+    {
+      "native_session": 43280,
+      "exit": 125,
+      "failed_stage": "clippy",
+      "stage_exit": 101,
+      "test_bodies": 0,
+      "preserved": true
+    },
+    {
+      "native_session": 10427,
+      "exit": 125,
+      "commands": 0,
+      "test_bodies": 0,
+      "reason": "pre-fmt disk floor",
+      "preserved": true
+    },
+    {
+      "native_session": 36537,
+      "exit": 125,
+      "actual_runtime_exit": 0,
+      "reason": "8cf post-runtime artifact loss",
+      "preserved": true,
+      "published_proof_commit": "9ada69f837"
+    }
+  ],
+  "old_native_CI": {
+    "head": "3e9b72125709d6da16daf15c8a9ec548ad66eaf1",
+    "tree": "8cfcb464b38b74a83eac86438f4bf36a725e6ad5",
+    "ARM_run": 40492822862,
+    "passed": 2780,
+    "failed": 1,
+    "selected_unrun": 8961,
+    "failure_preserved": true,
+    "published_proof_commit": "0a5c4adb1a",
+    "current_Linux_repair_case": "tests::guarded_capture_revokes_known_authority_without_revoking_its_enrollment_guard",
+    "new_source_Linux_case_qualification": "UNRUN_UNTIL_FRESH_CI",
+    "Mac_case_coverage": 0
+  },
+  "durability_only_archive": {
+    "actual_native_session": 84403,
+    "actual_exit": 0,
+    "inputs": 46,
+    "qualification": false,
+    "old_private_protected_count_increased": false
+  },
+  "holds": [
+    "Fresh ARM64/Linux CI including the repaired Linux-only case",
+    "Required readers",
+    "Privacy acceptance",
+    "Lamp/device and physical latency checks"
+  ],
+  "raw_logs_private_words_binaries_or_human_handles_published": false,
+  "evidence_sha256": {
+    "actual-gate-release": "6e51d95d7b741c7e8324d2ade64694c5d0770fd921e4e450d38f0d215e03743c",
+    "actual-metadata-completion": "be2fc6658913ee922a8c85bdf1b09a5050a78ec712aa8df0d23629e01c021929",
+    "metadata-fold-result": "8af09599378d11203dd4aaaf19a5d4f64aa3fc45afa2581a1a7ccadd777d519a",
+    "full-runtime-JSON": "879520bd0a6f5390c96b39d05afe95453a9de9c32ddb91b5ee5493a6be5d600e",
+    "full-runtime-human": "86ee0fd47d066755fa0cee9f08666a4d1ace2ed8177433854245611565dbd0e8",
+    "runtime-counts": "611398550aa3d777c2a3b87c502dc579df7c72b01f3fcdb5b249b59d2ae7d629",
+    "runtime-input-manifest": "a09f24c239e1c92385086d096832bc5b74b2d08f6be17d650f8b58676df471ee",
+    "all-selected-private-ledger": "76566785964617a2874df0bd48cd5c43b6f8bc1e8d1ad8ea3ff93d6074d99d8f",
+    "source-freeze": "9e089b022be2c4f8c30b63707ec6e6603d307fcfd040893c500f37735edec463",
+    "source-mtimes": "179fb3467c43f90c8a498c34a7bb7b7cc4a6bce0ef3e996bfd876b76f10ef285",
+    "source-binding": "6bb9fb431071d2c7a9b0f271d7a82fe39f718396884f37aea74bb662a27e3f34",
+    "protected-final-bytes": "ebf30ea37bb837acdab3d80471519003977817d0af0a141c9d50b34a7afb66b2",
+    "fixture-actual-range-diff": "0142dbd330598fd1c09ca9ff4d52db317d275ee0160b220bdc124dd930a4986f",
+    "durability-only-archive-receipt": "a238be36cad8f1a2d7ff08640629853fedfefe0adb85fe0feb863f5e1fbbf435",
+    "durability-only-actual-completion": "dd9266b4aaca2fba29e3a92eab1293fd35a2eb8ed952865de2cd843012d637b8"
+  },
+  "public_files_sha256": {
+    "required112-terminal-ledger.json": "399388ddc6e6a0fc0e618035a95b75eed4402407d12b49478f9d47006e76a498",
+    "current525-terminal-ledger.json": "97c71a218b901eb72f4c24ad521649d6c3867800b5d6b6b2689dd7da013b9856",
+    "map-revisions.json": "aae4cfeafc243b3ec78bd2a57f0a3457eb4d60c93bc39dfd18e20c15ce50d699"
+  }
+}

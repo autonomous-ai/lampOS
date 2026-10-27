@@ -1,0 +1,67 @@
+{
+  "required112": {
+    "exact": 111,
+    "own_mechanical": 1
+  },
+  "current525": {
+    "historical_exact": 520,
+    "reviewed_upstream": 4,
+    "own_mechanical": 1
+  },
+  "map_sha256": {
+    "required112_map": "e28f2ea13d43a9b573fa671783201c62234313f6afffd9aff90e67c6cc86801f",
+    "current525_map": "e4cd1cf7a0d9bdbac11cb2e740e0a2678f7ac0e09c8884b0a29d7f18093f1711",
+    "reviewed_upstream_revisions": "10532cea69534e6012808fca82c3056518c9d95df23ce92b0da6acb93e55663d",
+    "own_mechanical_revision": "7a5537c24ec38237148e99c6b8884bdcc0dc828d4b1432814f20b5f55615189e"
+  },
+  "upstream_revisions": [
+    {
+      "historical_test": "second_provider::tests::a_chat_that_never_begins_says_the_down_line_at_most_once_a_minute",
+      "current_test": "second_provider::tests::a_chat_that_never_begins_says_a_slow_moment_then_a_shorter_one_never_the_same_twice",
+      "path": "lampOS/crates/voice/src/second_provider/tests.rs",
+      "upstream_introducing_commit": "2e6226e8ef07bc68089a1c23006d7241227eea46",
+      "historical_body_sha256": "03d39c598af1229cc800e8db6c89ba329571fb945d526e13ffd12ca6741cd56b",
+      "current_body_sha256": "c999209c52803a85f0eacf61ac758a55bcf203e40bafbf7970091ddb59831b46"
+    },
+    {
+      "historical_test": "second_provider::tests::a_chat_refused_before_any_word_says_the_down_line_at_most_once_a_minute",
+      "current_test": "second_provider::tests::a_chat_refused_before_any_word_says_the_down_line_then_the_shorter_one",
+      "path": "lampOS/crates/voice/src/second_provider/tests.rs",
+      "upstream_introducing_commit": "2e6226e8ef07bc68089a1c23006d7241227eea46",
+      "historical_body_sha256": "5d557e1866eea2afcc2a98398d9ebac7d2d1351b738e0b139ce4ab26ddd623b7",
+      "current_body_sha256": "0b2191a679cbcdb74dd0435aff26341ac56a898f39b00e613f1c9b206fa0a5b2"
+    },
+    {
+      "historical_test": "second_provider::tests::the_first_turn_after_a_start_says_the_down_line",
+      "current_test": "second_provider::tests::the_first_turn_after_a_start_says_the_down_line",
+      "path": "lampOS/crates/voice/src/second_provider/tests.rs",
+      "upstream_introducing_commit": "2e6226e8ef07bc68089a1c23006d7241227eea46",
+      "historical_body_sha256": "bd7b074c73d56bcc8cd8723c1cd4d2d2e849c2c95cea1ec4acd47c00688a7bf7",
+      "current_body_sha256": "6a61714661d0681737b77a7969fc6658b67bc737d101b478d9d3dd21cea89cd0"
+    },
+    {
+      "historical_test": "second_provider::tests::a_later_wait_sound_preserves_the_answer_window",
+      "current_test": "second_provider::tests::a_later_wait_sound_preserves_the_answer_window",
+      "path": "lampOS/crates/voice/src/second_provider/tests.rs",
+      "upstream_introducing_commit": "62a521f577b8d1946d346850afc9f8ff918bd247",
+      "historical_body_sha256": "027139c7a8d189e98527480f04a87f9322a16e16c1d6f35400359a434e4b9667",
+      "current_body_sha256": "9655b68d11e7bf59ab6acb2a99145f650fdac4c9759f5b9ef79d39d4549621be"
+    }
+  ],
+  "own_mechanical_revision": {
+    "kind": "OWN_MECHANICAL_FIXTURE_ROUTE_ARITY_ONLY",
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::face_forget::proved_face_tools_retire_private_work_before_actual_scoped_mutation",
+    "path": "lampOS/crates/voice/src/second_provider/tests/private_context/face_forget.rs",
+    "historical_body_sha256": "ec4103a73ac15b14038bf5ef8ab411f87103b2bdf1e09ee755c57a3d0b649c68",
+    "current_body_sha256": "79d7a112e9670d1bac560e66569dcc78a9790abe49e2f95b018a0377471b7650",
+    "expected_old_line": "let crate::tools::Route::Faces(_, switches) = crate::tools::route(&settings, tool) else {",
+    "expected_new_line": "let crate::tools::Route::Faces(_, switches, _) = crate::tools::route(&settings, tool)\n        else {",
+    "replacement_count": 1,
+    "original_assertion_macros": 71,
+    "current_assertion_macros": 71,
+    "all_other_control_bytes_exact": true
+  },
+  "historical_maps_immutable": true,
+  "prior_runtime_credit_transferred": 0
+}
