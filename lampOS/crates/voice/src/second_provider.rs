@@ -438,6 +438,24 @@ pub const SPEECH_TAGS_ENVIRONMENT: &str = "LAMP_SECOND_SPEECH_TAGS";
 /// (Fifth's row 24 on lamp-52e6, #2877).
 pub const SHORT_DONE_ENVIRONMENT: &str = "LAMP_SHORT_DONE";
 
+/// Where the worker reads whether a spoken line that begins with the lamp's
+/// name, answered with no words and no call at all, is asked once more, and
+/// given [`NO_WORDS_LINE`] if the second answer has none either; never a
+/// stop or "never mind" said with the name
+/// ([`Engine::asking_again_for_no_words`], #3704): `on`, and nothing else.
+/// On lamp-52e6 on 27 Oct "Lamp, What's my name?" got an empty answer and
+/// the lamp said nothing.
+pub const NO_WORDS_AGAIN_ENVIRONMENT: &str = "LAMP_NO_WORDS_AGAIN";
+
+/// What the model is told when its answer to a line said to the lamp by name
+/// had no words and called nothing ([`NO_WORDS_AGAIN_ENVIRONMENT`]).
+pub(crate) const NO_WORDS_AGAIN_NOTE: &str = "(For you to know: they called you by name and your answer had no words, so they heard nothing. Answer them now, in a few words. If you can't, say so briefly.)";
+
+/// What the lamp says when the model's second answer to a line said to it
+/// by name has no words either ([`NO_WORDS_AGAIN_ENVIRONMENT`]): never
+/// silence after its name.
+pub(crate) const NO_WORDS_LINE: &str = "Sorry, I lost my words there. Could you ask me again?";
+
 /// What a turn of short answers is said when its calls' own lines differ
 /// ("Brighter." with "Quieter."): one line, never two (#2877).
 pub(crate) const SHORT_DONE_TOGETHER: &str = "Done.";
@@ -847,6 +865,8 @@ struct Shared {
     speech_tags: Option<bool>,
     /// [`Engine::answering_short`] (#2877).
     short_done: bool,
+    /// [`Engine::asking_again_for_no_words`] (#3704).
+    no_words_again: bool,
     /// The lamp's own written turns may begin as late as
     /// [`WRITTEN_BEGIN_WITHIN`] ([`Engine::waiting_for_written`]).
     written_wait: bool,
@@ -1895,6 +1915,7 @@ impl Engine {
                 declines_in_words: false,
                 speech_tags: None,
                 short_done: false,
+                no_words_again: false,
                 written_wait: false,
                 resend: None,
                 hearing: None,
@@ -2550,6 +2571,20 @@ impl Engine {
     pub fn answering_short(mut self, on: bool) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.short_done = on;
+        }
+        self
+    }
+
+    /// `LAMP_NO_WORDS_AGAIN=on` ([`NO_WORDS_AGAIN_ENVIRONMENT`], #3704): a
+    /// spoken line that begins with the lamp's name, whose round gives no
+    /// words and calls nothing, with nothing said or called earlier in the
+    /// turn, is asked once more ([`NO_WORDS_AGAIN_NOTE`]); a second answer
+    /// with no words either is answered [`NO_WORDS_LINE`]. A turn that
+    /// called anything ends as before: a call may be told to say nothing.
+    /// Before any turn only.
+    pub fn asking_again_for_no_words(mut self, on: bool) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.no_words_again = on;
         }
         self
     }
@@ -7385,6 +7420,11 @@ async fn answer(
         .named_ask
         .as_ref()
         .map(|named| (named(&said), said.split_whitespace().count()));
+    // Whether the line began with the lamp's name and asks for no silence
+    // to be broken (`LAMP_NO_WORDS_AGAIN`): "Lamp, stop." or "Lamp, never
+    // mind." is rightly answered with nothing (the Reviewer-lead's P2 on
+    // #3712).
+    let by_name = crate::attention::begins_with_the_name(&said) && !says_stop(&said);
     let words = Message::user(said.clone());
     let event_words = said.clone();
     // A chat begun on the early words was asked without the held forget's
@@ -7528,6 +7568,9 @@ async fn answer(
         let mut resent = false;
         // A `not_for_me` not taken, once (#2191).
         let mut named_asked_again = false;
+        // A line said to the lamp by name answered with no words, asked once
+        // more (`LAMP_NO_WORDS_AGAIN`, #3704).
+        let mut no_words_asked_again = false;
         // Whether an earlier round of the turn called anything: a turn
         // answered with its calls' own line is one whose first calls are
         // all short (`LAMP_SHORT_DONE`, #2877).
@@ -7844,6 +7887,31 @@ async fn answer(
                     "lamp-voice second: request {request} chat round {round} added nothing to the calls answered short; said \"{line}\" (LAMP_SHORT_DONE)"
                 );
                 queue.push(line).await?;
+                return Ok(());
+            }
+            // No words and no call, after nothing said or called in the
+            // turn, to a line that began with the lamp's name: never silence
+            // (`LAMP_NO_WORDS_AGAIN`, #3704). Asked once more; with no words
+            // again, the lamp says it lost them.
+            if calls.is_empty()
+                && shared.no_words_again
+                && asked == Asker::Spoken
+                && !called_earlier
+                && !queue.started
+                && !text.chars().any(char::is_alphanumeric)
+                && by_name
+            {
+                if !std::mem::replace(&mut no_words_asked_again, true) {
+                    eprintln!(
+                        "lamp-voice second: request {request} chat round {round}: no words and no call for a line begun with the lamp's name; asked once more (LAMP_NO_WORDS_AGAIN)"
+                    );
+                    messages.push(Message::system(NO_WORDS_AGAIN_NOTE.to_owned()));
+                    continue;
+                }
+                eprintln!(
+                    "lamp-voice second: request {request} chat round {round}: no words again for a line begun with the lamp's name; said \"{NO_WORDS_LINE}\" (LAMP_NO_WORDS_AGAIN)"
+                );
+                queue.push(NO_WORDS_LINE.to_owned()).await?;
                 return Ok(());
             }
             if calls.is_empty() {

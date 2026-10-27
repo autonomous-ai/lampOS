@@ -1322,6 +1322,119 @@ async fn a_decline_of_a_line_named_to_a_face_is_not_taken_once() {
     }
 }
 
+/// #3704, `LAMP_NO_WORDS_AGAIN=on`: on lamp-52e6 on 27 Oct "Lamp, What's my
+/// name?" got an answer with no words, and the lamp said nothing. With the
+/// switch, a line begun with the lamp's name answered with no words and no
+/// call is asked once more, told it gave none; no words again, and the lamp
+/// says [`NO_WORDS_LINE`]. Without the switch (the empty answer as found), a
+/// line not begun with the name, a stop or "never mind" said with it (the
+/// Reviewer-lead's P2 on #3712), or a turn that called anything (a call may
+/// be told to say nothing), it ends in silence as before.
+#[tokio::test]
+async fn an_empty_answer_to_a_line_said_by_name_is_asked_again_never_silence() {
+    let empty = || vec![Ok(ChatEvent::Done)];
+    let answer = || vec![text("You told me you're Minh."), Ok(ChatEvent::Done)];
+    let timer = || {
+        vec![
+            Ok(ChatEvent::ToolCalls(vec![call(
+                "c1",
+                "set_timer",
+                json!({"minutes": 5}),
+            )])),
+            Ok(ChatEvent::Done),
+        ]
+    };
+    let named = "Lamp, what's my name?";
+    let sorry = format!("said:{NO_WORDS_LINE}");
+    let answered = "said:You told me you're Minh.".to_owned();
+    let cases = [
+        (
+            "asked again",
+            true,
+            named,
+            vec![empty(), answer()],
+            Some(answered.clone()),
+            2,
+        ),
+        (
+            "empty twice",
+            true,
+            named,
+            vec![empty(), empty()],
+            Some(sorry.clone()),
+            2,
+        ),
+        (
+            "hey lamp",
+            true,
+            "Hey Lamp, what's my name?",
+            vec![empty(), answer()],
+            Some(answered),
+            2,
+        ),
+        ("switch off", false, named, vec![empty(), answer()], None, 1),
+        (
+            "not named",
+            true,
+            "What's my name?",
+            vec![empty(), answer()],
+            None,
+            1,
+        ),
+        (
+            "a stop",
+            true,
+            "Lamp, stop.",
+            vec![empty(), answer()],
+            None,
+            1,
+        ),
+        (
+            "never mind",
+            true,
+            "Lamp, never mind.",
+            vec![empty(), answer()],
+            None,
+            1,
+        ),
+        (
+            "after a call",
+            true,
+            "Lamp, a five minute timer.",
+            vec![timer(), empty()],
+            None,
+            2,
+        ),
+    ];
+    for (case, on, heard, rounds, said, asked) in cases {
+        let script = Arc::new(Script {
+            heard: Mutex::new([Ok(heard.to_owned())].into()),
+            chats: Mutex::new(rounds.into()),
+            ..Script::default()
+        });
+        let (engine, _, _) = scripted(script.clone());
+        let mut engine = engine.asking_again_for_no_words(on);
+        engine.submit(start(1));
+        engine.submit(audio(1, 1));
+        engine.submit(end(1));
+        let out = turn(&mut engine).await;
+        assert_eq!(out.last().map(String::as_str), Some("complete"), "{case}");
+        let spoken: Vec<&String> = out.iter().filter(|o| o.starts_with("said:")).collect();
+        match &said {
+            Some(said) => assert_eq!(spoken, [said], "{case}: {out:?}"),
+            None => assert!(spoken.is_empty(), "{case}: {out:?}"),
+        }
+        let asked_rounds = script.asked.lock().unwrap();
+        assert_eq!(asked_rounds.len(), asked, "{case}");
+        let told = Message::system(NO_WORDS_AGAIN_NOTE);
+        assert_eq!(
+            asked_rounds.iter().any(|round| round.contains(&told)),
+            on && !["not named", "after a call", "a stop", "never mind"].contains(&case),
+            "{case}"
+        );
+    }
+}
+
 /// Words the heed judges not said to the lamp end the turn after them,
 /// with no chat asked; it is given the microphone's times of the line's
 /// first and last packets (#1014).
