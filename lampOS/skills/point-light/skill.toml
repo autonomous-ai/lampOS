@@ -31,7 +31,7 @@ default = "ahead"
 [[do]]
 body = { mood = "reading", for = "2m" }
 light = { colour = "white", level = 4, keep = true }
-look = true
+look = true             # the camera's picture for the model: its grant is camera, above (#3859)
 say = "Say in a few words whether you can see what they asked you to light, and stop. If it is off to the left or the right of the picture, call point_light once more with toward left or right, and only once. If it is not in the picture, say so and ask them to move it in front of you; never search for it."
 
 # Off to one side: the same pose, its base turned toward that side, a

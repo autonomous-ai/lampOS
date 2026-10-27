@@ -57,7 +57,7 @@ looked = { desk = "at the desk", left = "to the left", right = "to the right", f
 [[do]]
 body = { mood = "reading", for = "2m" }
 light = { colour = "white", level = 4, for = "2m" }
-look = true
+look = true             # the camera's picture for the model: its grant is camera, above (#3859)
 say = "Say in a few words what you see as you go, as \"Not on the desk...\". If you see what they are looking for, call look_for with found. If not, call look_for once more with the next place: left, then right, then far_left, then far_right. Never look toward a person."
 
 # A place to one side: the same pose, its base turned toward it, a quarter
