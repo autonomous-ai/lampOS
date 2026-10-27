@@ -52,7 +52,7 @@ body that never shows rest is stopped after 15 s; its stop folds it, and the
 let-go writes nothing to a lamp it finds up.
 
 `--dry-run` does everything but the poweroff: the lamp says its line, is paused, stopped, let
-go and lit, and stays so. `lamp-keeper start lamp` brings it back, or `systemctl restart lampos.target` on a lamp without the keeper. `systemctl stop lampos.target` warns that `lampos-setup-done.path` can start the target again: before a power-off that does not matter, and after a dry run the target may read active with its parts stopped until it is restarted.
+go and lit, and then starts again every `lamp*` unit that was active before its stop and is not after (`systemctl list-units --state=active lamp*` read before and after, then one `systemctl start`; an accepted connection's `@` instance is left to its socket), said as `dry run: started again ...`. The stop ends more than `lampos.target`'s parts: the reset's writers and starters (`reset::WRITERS`, `reset::STARTERS`), `lamp-update.service` among them (WantedBy `multi-user.target`), which `systemctl restart lampos.target` never brought back after a dry run on a real lamp. A real power-off reads and starts nothing. `systemctl stop lampos.target` warns that `lampos-setup-done.path` can start the target again: before a power-off that does not matter.
 
 ## The switch
 
