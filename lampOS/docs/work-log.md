@@ -1,5 +1,19 @@
 Ready for lamp-voice: no
 
+## Current checkpoint: 2026-10-27 08:44 +07, Cloud host gate and original native failure
+
+#3644 is open at **129774137f/737331535**. [Correctly permitted native Mac host proof](verification/cloud-query-bounds-20261027/enabled-129/README.md): fmt, strict all-target Cloud Clippy and full Cloud **204/0/4**, all eight query controls once, docs zero. Runtime command 9.436 s is not product latency. Source and five executables, 58 local outputs, 439 depfiles pass actual/preserved guards. The verified owned target was reused after recording the failed attempt, not called cold.
+
+[Restricted-sandbox failure](verification/cloud-query-bounds-20261027/restricted-failure/README.md) retains **131/73/4** on identical source: 69 explicit EPERM blocks and four timeout assertions not assigned an unproven cause. The supervisor used the wrong test environment; the separately recorded network-enabled qualification passed once. Earlier unfiltered offline metadata lacked a cached foreign-platform derive crate; locked host-filtered metadata passed. No source correction or repeated product-test attempt on unchanged test permissions. The isolated old-public-wrapper pipe-deadline control is compiling; fresh original ARM40434211639/Linux40434211673 plus Cloud provenance/Surround reader checks and current peer reads remain pending.
+
+[Updater994 original attempt1 proof](verification/update-output-bounds-20261027/native-994-attempt1-failure/README.md) binds actual preview a2f11eafd and ordered737/994 parents to the exact authored tree. Linux40432732912 passed. ARM40432733066 failed before runtime selection resolving a helper dependency on crates.io HTTP/2[16]; required nine controls and both Linux custom harnesses are unrun, selection totals unknown. The separately requested attempt2 passed that infrastructure point and is collecting its main test result. Original failure retained; no further rerun authorized.
+
+#3631 remains draft on its retained wake failure with Tests; no threshold relaxed. #3641 has Second's source HOLD for detached unbounded readers after query timeout, with Sixth owning the repair. No device, key, provider, signing or release action.
+
+---
+
+Ready for lamp-voice: no
+
 ## Current checkpoint: 2026-10-27 08:32 +07, latest-base outcomes retained
 
 [Full ff03/7373 failure](verification/reset-query-bounds-20261026/failed-ff03-7373/README.md) records **388/1/5**, the unchanged wake/privacy timing assertion at 163.064 ms, all eight query controls passing, and source/actual-preserved artifacts stable. [Clean public-Main baseline](verification/reset-wake-baseline-7373-20261027/README.md) ran only that case once: **1/0/0**, five filtered. It did not reproduce the full-suite failure or establish inherited attribution. Tests has the finding on #3631 and Queue; no PR retry or threshold relaxation. This local carry remains unpushed and draft.

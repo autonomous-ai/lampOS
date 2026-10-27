@@ -1,0 +1,53 @@
+{
+  "arm_job": 121954070260,
+  "arm_run": 40432733066,
+  "collection_watchers": {
+    "arm64": {
+      "deadline_seconds": 3600,
+      "elapsed_seconds": 1.026,
+      "error": null,
+      "exit_code": 1,
+      "interval_seconds": 30
+    },
+    "clippy": {
+      "deadline_seconds": 3600,
+      "elapsed_seconds": 195.03,
+      "error": null,
+      "exit_code": 0,
+      "interval_seconds": 30
+    }
+  },
+  "failed_step": "stable promotion tests (offline, disposable test key)",
+  "failure_category": "dependency download HTTP2 framing error before runtime selection",
+  "linux_custom_controls_unrun": [
+    "persisted_self_switches_survive_sigkill",
+    "actual_cli_exec_confirms_before_the_next_round"
+  ],
+  "nextest_selection_reached": false,
+  "original_attempt": 1,
+  "product_test_failure_demonstrated": false,
+  "receipt_hashes": {
+    "arm64-jobs-final.json": "a797fae6b06c1a8d54085942c156bfb39ff3530a98ed0b0de008ed8bada797dc",
+    "arm64-jobs-first.json": "a797fae6b06c1a8d54085942c156bfb39ff3530a98ed0b0de008ed8bada797dc",
+    "arm64-log-fetch.json": "030fc3878daaa0471dd27944f0a46e1b1dfa4fcdbdf97fd885c66ce2cf574619",
+    "arm64-run-final.json": "545aa40068857641b993a2a958443aed7b636f4cfd9f87e49b2cd032435dcd0f",
+    "arm64-run-first.json": "545aa40068857641b993a2a958443aed7b636f4cfd9f87e49b2cd032435dcd0f",
+    "arm64-watch.json": "74b30609aa17683e26ec89dba53fab36791ae3bfab943704926212010c5a304e",
+    "arm64-watch.log": "4b82fd198e6e41a3d71a5faf214886686e80d280f73e23824c7c7e62eb08c003",
+    "clippy-jobs-final.json": "eee25d4cc9ebf97866a97c5ab2a6c7bc70ee667c1480cd3ed05bb0574ce817f8",
+    "clippy-jobs-first.json": "e7005afe74eef242f0b30012c254fa1fedd54ed0f79812ba940ec2b7704613a2",
+    "clippy-log-fetch.json": "030fc3878daaa0471dd27944f0a46e1b1dfa4fcdbdf97fd885c66ce2cf574619",
+    "clippy-run-final.json": "07a2c6961bfd22e22cd9d0cbb63167e3e98154ee3a9e90f08ac1bd552e7e03f5",
+    "clippy-run-first.json": "535dd656acc6ac2f34e072edd12cef2db0b9a703f616d42f7acf0dcdcc7440e8",
+    "clippy-watch.json": "15ae2451c0200817e91696c169b4abc0b00ac5da07dd9d37a1d9e92e66339c67",
+    "clippy-watch.log": "0adc86c44302be6b9419b47b0d204e691e0da3fa44a13a8986db8361dc91dcfc"
+  },
+  "required_update_controls_unrun": 9,
+  "result": "failure",
+  "selected_log_lines": [
+    "2026-10-27T01:28:52.4348425Z error: failed to get `windows_aarch64_msvc` as a dependency of package `windows-targets v0.52.6`",
+    "2026-10-27T01:28:52.4352786Z   download of wi/nd/windows_aarch64_msvc failed",
+    "2026-10-27T01:28:52.4353536Z   [16] Error in the HTTP2 framing layer",
+    "2026-10-27T01:28:52.4383190Z ##[error]Process completed with exit code 101."
+  ]
+}

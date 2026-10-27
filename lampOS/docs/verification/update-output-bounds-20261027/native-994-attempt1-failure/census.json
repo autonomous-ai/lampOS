@@ -1,0 +1,68 @@
+{
+  "counts": {
+    "CANCEL": 0,
+    "EXECFAIL": 0,
+    "FAIL": 0,
+    "LEAK": 0,
+    "PASS": 0,
+    "TIMEOUT": 0,
+    "XFAIL": 0,
+    "XPASS": 0
+  },
+  "echo_keys": [],
+  "failures": [],
+  "full_terminal_census_sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+  "identical_echo_rows_excluded": 0,
+  "linux_custom_harnesses": {
+    "rows": [],
+    "scope": "Subset of the unique nextest census, not additional passes; historical Mac ignored outcomes are separate."
+  },
+  "missing_controls": [
+    "a_command_is_read_within_its_bound_and_killed_after",
+    "world::query::tests::a_failed_query_cleans_its_same_group_child_even_after_output_closes",
+    "world::query::tests::invalid_utf8_cleans_closed_output_child",
+    "world::query::tests::public_output_accepts_one_mib_and_refuses_one_byte_more",
+    "world::query::tests::public_output_refuses_invalid_utf8_instead_of_a_partial_string",
+    "world::query::tests::query_deadline_applies_after_stdout_closes",
+    "world::query::tests::query_reads_output_with_closed_stdin_and_discarded_stderr",
+    "world::query::tests::query_refuses_nonzero_exit_and_spawn_failure",
+    "world::query::tests::query_timeout_cleans_the_exited_leaders_pipe_holding_descendant"
+  ],
+  "picked_filter": null,
+  "raw_logs": {
+    "arm64": {
+      "bytes": 36170,
+      "sha256": "cf7c4a62b03ee72b126b1c18bba61e790b9adf4b7389cdf6830377b76f30fa65"
+    },
+    "clippy": {
+      "bytes": 47484,
+      "sha256": "e313711c07c13668a2a8c8577b9fcb0fc0daa9a48bc3d767b6b4edd4bd419c79"
+    }
+  },
+  "relay_signals": {
+    "success_rows": []
+  },
+  "required_controls": [],
+  "selected_unrun": null,
+  "selection": null,
+  "selection_scope": "Runtime selection not reached in failed attempt1; no selected count inferred",
+  "separate_process": {
+    "pass_rows": [],
+    "passed": 0
+  },
+  "stable_promotion_helper": {
+    "failed": 0,
+    "headers": [],
+    "ordered_summaries": [],
+    "passed": 0
+  },
+  "summary": [],
+  "unique_terminal_rows": 0,
+  "workspace_doctests": {
+    "failed": 0,
+    "headers": [],
+    "note": "Interleaved stdout/stderr: no fabricated per-crate summary association.",
+    "ordered_summaries": [],
+    "passed": 0
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "note": "Prior unfiltered metadata foreign-platform resolution failed before compilation; host-filtered resolution succeeded. Separate from runtime failure.",
+  "records": [
+    {
+      "bytes": 187596,
+      "name": "second-cloud-query-metadata-initial-20261027.json",
+      "sha256": "2b1588769bc5ee2601409e6173a4b6580c0997a3a256db3932a5a6ae6756a272"
+    },
+    {
+      "bytes": 1868902,
+      "name": "second-cloud-query-metadata-host-20261027.json",
+      "sha256": "2f2e31681cf60e662d18a617ab1c651919c267957d27a6093c29142256f1ca7b"
+    },
+    {
+      "bytes": 0,
+      "name": "second-cloud-query-metadata-resolved-20261027.json",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ]
+}

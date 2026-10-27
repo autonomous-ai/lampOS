@@ -1,0 +1,14 @@
+{
+  "actual_preserved_outputs_depfiles_executables_verified_before_compile": true,
+  "prior_closure": {
+    "actual_and_preserved_outputs_unchanged": true,
+    "depfile_count": 439,
+    "executable_count": 5,
+    "exit_code": 101,
+    "local_output_count": 58,
+    "source_unchanged": true
+  },
+  "prior_closure_sha256": "06c9e7ef720e47e30240056378af3f5ada4308dbf4cd1e541b2af318dfcf9695",
+  "prior_source_sha256": "5d88ec2d0dc8dfa6c8dd43ea5517948d0f4faca7e2ab6afbabc426307260a08e",
+  "reason": "Correct default-sandbox socket EPERM limitation with explicitly approved network-enabled execution. Retain prior 131/73/4 and eight query passes; do not infer all 73 failures were EPERM because only 69 blocks explicitly report it."
+}

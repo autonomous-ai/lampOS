@@ -1,0 +1,9 @@
+{
+  "correct_readers": [
+    "reports::bounded_output",
+    "reports::Lamp::unit_states",
+    "reports::Lamp::waits via SeenBy",
+    "main::exit_note"
+  ],
+  "note": "Corrects initial controller prose identifiers System and unit_active; actual grep evidence is reports.rs:1968,2002 and main.rs:63. Runtime selection remains full Cloud, no scope change."
+}

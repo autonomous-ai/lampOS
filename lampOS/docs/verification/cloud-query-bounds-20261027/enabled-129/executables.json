@@ -1,0 +1,102 @@
+[
+  {
+    "fresh": true,
+    "package_id": "path+file://<source>/lampOS/crates/cloud#lamp-cloud@0.1.0",
+    "path": "<target>/debug/deps/lamp_cloud-36fc8773bc2a14e0",
+    "sha256": "4bb53397f6b2ef698ed8e233aa31ba20ed5a4e958fa1c2e13529e9ad3cc06897",
+    "target": {
+      "crate_types": [
+        "bin"
+      ],
+      "doc": true,
+      "doctest": false,
+      "edition": "2024",
+      "kind": [
+        "bin"
+      ],
+      "name": "lamp-cloud",
+      "src_path": "<source>/lampOS/crates/cloud/src/main.rs",
+      "test": true
+    }
+  },
+  {
+    "fresh": true,
+    "package_id": "path+file://<source>/lampOS/crates/cloud#lamp-cloud@0.1.0",
+    "path": "<target>/debug/deps/it-020796b45a19ec43",
+    "sha256": "68a1b935d03742236eb79c8a4833d64e5ef78ab285daeb4db6b4ba020994e50a",
+    "target": {
+      "crate_types": [
+        "bin"
+      ],
+      "doc": false,
+      "doctest": false,
+      "edition": "2024",
+      "kind": [
+        "test"
+      ],
+      "name": "it",
+      "src_path": "<source>/lampOS/crates/cloud/tests/it/main.rs",
+      "test": true
+    }
+  },
+  {
+    "fresh": true,
+    "package_id": "path+file://<source>/lampOS/crates/cloud#lamp-cloud@0.1.0",
+    "path": "<target>/debug/deps/release_pair-5f2e05b8ca835b18",
+    "sha256": "ad1d0acc519fa3ad00afde77221957df7943e3985b94036b0083c7604e8600e1",
+    "target": {
+      "crate_types": [
+        "bin"
+      ],
+      "doc": false,
+      "doctest": false,
+      "edition": "2024",
+      "kind": [
+        "test"
+      ],
+      "name": "release_pair",
+      "src_path": "<source>/lampOS/crates/cloud/tests/release_pair.rs",
+      "test": true
+    }
+  },
+  {
+    "fresh": true,
+    "package_id": "path+file://<source>/lampOS/crates/cloud#lamp-cloud@0.1.0",
+    "path": "<target>/debug/lamp-cloud",
+    "sha256": "559e7dadea9b9ef99c3af53d5c06ff370a09d9b0ec5b3539a84e2b7579a83c78",
+    "target": {
+      "crate_types": [
+        "bin"
+      ],
+      "doc": true,
+      "doctest": false,
+      "edition": "2024",
+      "kind": [
+        "bin"
+      ],
+      "name": "lamp-cloud",
+      "src_path": "<source>/lampOS/crates/cloud/src/main.rs",
+      "test": true
+    }
+  },
+  {
+    "fresh": true,
+    "package_id": "path+file://<source>/lampOS/crates/cloud#lamp-cloud@0.1.0",
+    "path": "<target>/debug/deps/lamp_cloud-d547dc199ae9939d",
+    "sha256": "9f66e760d88b7faf90c43aa66200aed267203ecd972234100c129beea201a7b0",
+    "target": {
+      "crate_types": [
+        "lib"
+      ],
+      "doc": true,
+      "doctest": true,
+      "edition": "2024",
+      "kind": [
+        "lib"
+      ],
+      "name": "lamp_cloud",
+      "src_path": "<source>/lampOS/crates/cloud/src/lib.rs",
+      "test": true
+    }
+  }
+]

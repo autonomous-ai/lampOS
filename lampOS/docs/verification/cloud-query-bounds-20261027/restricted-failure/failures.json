@@ -1,0 +1,367 @@
+[
+  {
+    "case": "answer::tests::the_skills_are_listed_for_the_app_only_with_their_switch",
+    "details": "thread 'answer::tests::the_skills_are_listed_for_the_app_only_with_their_switch' (9209136) panicked at crates/cloud/src/skills.rs:726:79:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: \"Operation not permitted\" }\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace",
+    "permission_denied": true
+  },
+  {
+    "case": "beat::tests::the_ping_says_the_lamp_and_takes_a_new_broker_from_its_reply",
+    "details": "thread 'beat::tests::the_ping_says_the_lamp_and_takes_a_new_broker_from_its_reply' (9209138) panicked at crates/cloud/src/beat.rs:161:63:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: \"Operation not permitted\" }",
+    "permission_denied": true
+  },
+  {
+    "case": "faces::tests::a_remove_entirely_forgets_the_person_in_memory_too",
+    "details": "thread 'faces::tests::a_remove_entirely_forgets_the_person_in_memory_too' (9209146) panicked at crates/cloud/src/faces.rs:649:74:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: \"Operation not permitted\" }",
+    "permission_denied": true
+  },
+  {
+    "case": "faces::tests::a_remove_never_takes_the_memory_of_someone_renamed_from_the_name",
+    "details": "thread 'faces::tests::a_remove_never_takes_the_memory_of_someone_renamed_from_the_name' (9209148) panicked at crates/cloud/src/faces.rs:649:74:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: \"Operation not permitted\" }",
+    "permission_denied": true
+  },
+  {
+    "case": "faces::tests::a_remove_entirely_after_the_face_is_gone_still_forgets_the_memory",
+    "details": "thread 'faces::tests::a_remove_entirely_after_the_face_is_gone_still_forgets_the_memory' (9209145) panicked at crates/cloud/src/faces.rs:649:74:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: \"Operation not permitted\" }",
+    "permission_denied": true
+  },
+  {
+    "case": "faces::tests::a_remove_of_the_face_only_never_asks_memory",
+    "details": "thread 'faces::tests::a_remove_of_the_face_only_never_asks_memory' (9209149) panicked at crates/cloud/src/faces.rs:551:74:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: \"Operation not permitted\" }",
+    "permission_denied": true
+  },
+  {
+    "case": "faces::tests::a_remove_takes_the_person_off_the_eyes_and_memory",
+    "details": "thread 'faces::tests::a_remove_takes_the_person_off_the_eyes_and_memory' (9209150) panicked at crates/cloud/src/faces.rs:466:76:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: \"Operation not permitted\" }",
+    "permission_denied": true
+  },
+  {
+    "case": "faces::tests::a_remove_with_the_eyes_on_and_the_voice_off_leaves_nothing_half_removed",
+    "details": "thread 'faces::tests::a_remove_with_the_eyes_on_and_the_voice_off_leaves_nothing_half_removed' (9209151) panicked at crates/cloud/src/faces.rs:649:74:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: \"Operation not permitted\" }",
+    "permission_denied": true
+  },
+  {
+    "case": "guard::tests::guard_from_the_app_is_handed_to_lamp_skills_call_socket",
+    "details": "thread 'guard::tests::guard_from_the_app_is_handed_to_lamp_skills_call_socket' (9209158) panicked at crates/cloud/src/guard.rs:112:66:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: \"Operation not permitted\" }",
+    "permission_denied": true
+  },
+  {
+    "case": "faces::tests::the_eyes_are_asked_over_their_socket",
+    "details": "thread 'faces::tests::the_eyes_are_asked_over_their_socket' (9209156) panicked at crates/cloud/src/faces.rs:352:72:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: \"Operation not permitted\" }",
+    "permission_denied": true
+  },
+  {
+    "case": "online::tests::a_dropped_connection_is_made_again_and_subscribed_again",
+    "details": "thread 'online::tests::a_dropped_connection_is_made_again_and_subscribed_again' (9209194) panicked at crates/cloud/src/online.rs:836:63:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: \"Operation not permitted\" }",
+    "permission_denied": true
+  },
+  {
+    "case": "online::tests::a_connection_made_again_on_a_wifi_join_keeps_its_will",
+    "details": "thread 'online::tests::a_connection_made_again_on_a_wifi_join_keeps_its_will' (9209193) panicked at crates/cloud/src/online.rs:1489:71:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: \"Operation not permitted\" }",
+    "permission_denied": true
+  },
+  {
+    "case": "online::tests::a_change_is_acked_starting_and_its_result_follows_on_the_channel",
+    "details": "thread 'online::tests::a_change_is_acked_starting_and_its_result_follows_on_the_channel' (9209191) panicked at crates/cloud/src/online.rs:1130:72:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: \"Operation not permitted\" }",
+    "permission_denied": true
+  },
+  {
+    "case": "online::tests::a_named_text_behind_an_unacknowledged_publish_goes_unnamed",
+    "details": "thread 'online::tests::a_named_text_behind_an_unacknowledged_publish_goes_unnamed' (9209203) panicked at crates/cloud/src/online.rs:836:63:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: \"Operation not permitted\" }",
+    "permission_denied": true
+  },
+  {
+    "case": "make_skill::tests::a_make_is_handed_to_the_voice_and_its_answer_told",
+    "details": "thread 'make_skill::tests::a_make_is_handed_to_the_voice_and_its_answer_told' (9209174) panicked at crates/cloud/src/make_skill.rs:203:52:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: \"Operation not permitted\" }",
+    "permission_denied": true
+  },
+  {
+    "case": "make_skill::tests::made_is_told_with_may_use_as_the_skills_page_says_it",
+    "details": "thread 'make_skill::tests::made_is_told_with_may_use_as_the_skills_page_says_it' (9209187) panicked at crates/cloud/src/make_skill.rs:203:52:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: \"Operation not permitted\" }",
+    "permission_denied": true
+  },
+  {
+    "case": "make_skill::tests::the_played_command_tells_the_same_answers_in_plain_words",
+    "details": "thread 'make_skill::tests::the_played_command_tells_the_same_answers_in_plain_words' (9209188) panicked at crates/cloud/src/make_skill.rs:203:52:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: \"Operation not permitted\" }",
+    "permission_denied": true
+  },
+  {
+    "case": "online::tests::a_refused_login_backs_off_and_is_said_once",
+    "details": "thread 'online::tests::a_refused_login_backs_off_and_is_said_once' (9209211) panicked at crates/cloud/src/online.rs:836:63:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: \"Operation not permitted\" }",
+    "permission_denied": true
+  },
+  {
+    "case": "online::tests::a_skills_line_lost_with_the_connection_goes_again_unchanged",
+    "details": "thread 'online::tests::a_skills_line_lost_with_the_connection_goes_again_unchanged' (9209215) panicked at crates/cloud/src/online.rs:836:63:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: \"Operation not permitted\" }",
+    "permission_denied": true
+  },
+  {
+    "case": "online::tests::a_slow_connack_is_waited_for_while_texts_are_taken",
+    "details": "thread 'online::tests::a_slow_connack_is_waited_for_while_texts_are_taken' (9209216) panicked at crates/cloud/src/online.rs:836:63:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: \"Operation not permitted\" }",
+    "permission_denied": true
+  },
+  {
+    "case": "online::tests::a_skills_line_goes_up_as_task_news_with_no_run_and_the_journal_has_no_text",
+    "details": "thread 'online::tests::a_skills_line_goes_up_as_task_news_with_no_run_and_the_journal_has_no_text' (9209214) panicked at crates/cloud/src/online.rs:836:63:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: \"Operation not permitted\" }",
+    "permission_denied": true
+  },
+  {
+    "case": "online::tests::a_text_is_acked_with_its_run_and_its_answer_goes_out_as_chat_events",
+    "details": "thread 'online::tests::a_text_is_acked_with_its_run_and_its_answer_goes_out_as_chat_events' (9209217) panicked at crates/cloud/src/online.rs:836:63:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: \"Operation not permitted\" }",
+    "permission_denied": true
+  },
+  {
+    "case": "online::tests::only_a_command_on_the_lamps_own_account_channel_is_done_and_answered",
+    "details": "thread 'online::tests::only_a_command_on_the_lamps_own_account_channel_is_done_and_answered' (9209220) panicked at crates/cloud/src/online.rs:836:63:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: \"Operation not permitted\" }",
+    "permission_denied": true
+  },
+  {
+    "case": "online::tests::a_wifi_result_ready_while_offline_is_said_once_back_online",
+    "details": "thread 'online::tests::a_wifi_result_ready_while_offline_is_said_once_back_online' (9209218) panicked at crates/cloud/src/online.rs:1373:72:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: \"Operation not permitted\" }",
+    "permission_denied": true
+  },
+  {
+    "case": "online::tests::an_own_key_is_acked_at_once_and_is_in_no_reply",
+    "details": "thread 'online::tests::an_own_key_is_acked_at_once_and_is_in_no_reply' (9209219) panicked at crates/cloud/src/online.rs:1297:72:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: \"Operation not permitted\" }",
+    "permission_denied": true
+  },
+  {
+    "case": "online::tests::the_lamp_comes_online_as_v1_and_answers_on_its_channel",
+    "details": "thread 'online::tests::the_lamp_comes_online_as_v1_and_answers_on_its_channel' (9209225) panicked at crates/cloud/src/online.rs:836:63:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: \"Operation not permitted\" }",
+    "permission_denied": true
+  },
+  {
+    "case": "online::tests::with_its_switch_the_broker_is_left_a_will_that_says_offline",
+    "details": "thread 'online::tests::with_its_switch_the_broker_is_left_a_will_that_says_offline' (9209227) panicked at crates/cloud/src/online.rs:836:63:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: \"Operation not permitted\" }",
+    "permission_denied": true
+  },
+  {
+    "case": "online::tests::without_the_switch_no_skills_line_goes_up",
+    "details": "thread 'online::tests::without_the_switch_no_skills_line_goes_up' (9209229) panicked at crates/cloud/src/online.rs:836:63:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: \"Operation not permitted\" }",
+    "permission_denied": true
+  },
+  {
+    "case": "online::tests::p2_a_joined_wifi_on_a_stale_link_reconnects_at_once_and_its_window_starts_at_the_ack",
+    "details": "thread 'online::tests::p2_a_joined_wifi_on_a_stale_link_reconnects_at_once_and_its_window_starts_at_the_ack' (9209223) panicked at crates/cloud/src/online.rs:1489:71:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: \"Operation not permitted\" }",
+    "permission_denied": true
+  },
+  {
+    "case": "online::tests::p2_a_joined_wifi_in_a_backoff_tries_at_once_and_the_backoff_is_reset",
+    "details": "thread 'online::tests::p2_a_joined_wifi_in_a_backoff_tries_at_once_and_the_backoff_is_reset' (9209222) panicked at crates/cloud/src/online.rs:1489:71:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: \"Operation not permitted\" }",
+    "permission_denied": true
+  },
+  {
+    "case": "photos::tests::the_photo_goes_to_the_eyes_and_is_never_kept",
+    "details": "thread 'photos::tests::the_photo_goes_to_the_eyes_and_is_never_kept' (9209233) panicked at crates/cloud/src/photos.rs:221:72:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: \"Operation not permitted\" }",
+    "permission_denied": true
+  },
+  {
+    "case": "lamp::tests::the_volume_is_asked_of_lamp_actions_and_the_host_read_from_proc",
+    "details": "thread 'lamp::tests::the_volume_is_asked_of_lamp_actions_and_the_host_read_from_proc' (9209166) panicked at crates/cloud/src/lamp.rs:892:60:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: \"Operation not permitted\" }",
+    "permission_denied": true
+  },
+  {
+    "case": "lamp::tests::the_persons_light_is_asked_of_the_ring_and_a_preview_lapses_or_is_given_back",
+    "details": "thread 'lamp::tests::the_persons_light_is_asked_of_the_ring_and_a_preview_lapses_or_is_given_back' (9209163) panicked at crates/cloud/src/lamp.rs:993:14:\ncalled `Result::unwrap()` on an `Err` value: Custom { kind: PermissionDenied, error: \"bind /tmp/lcl-light-43624/bus/light/command/subs/ring.43624.0.new: Operation not permitted (os error 1)\" }",
+    "permission_denied": true
+  },
+  {
+    "case": "online::tests::reports_go_below_the_channel_and_leave_the_queue_on_the_ack",
+    "details": "thread 'online::tests::reports_go_below_the_channel_and_leave_the_queue_on_the_ack' (9209224) panicked at crates/cloud/src/online.rs:836:63:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: \"Operation not permitted\" }",
+    "permission_denied": true
+  },
+  {
+    "case": "reports::tests::a_no_on_the_bus_reaches_lamp_cloud",
+    "details": "lamp-cloud reports: can't take reports/request: bind /tmp/lcrq-43624/reports/request/subs/cloud_reports.43624.1.new: Operation not permitted (os error 1)\n\nthread 'reports::tests::a_no_on_the_bus_reaches_lamp_cloud' (9209300) panicked at crates/cloud/src/reports.rs:2313:9:\nlamp-cloud took reports/request",
+    "permission_denied": true
+  },
+  {
+    "case": "online::tests::a_command_with_the_largest_photo_is_read_and_answered",
+    "details": "thread 'online::tests::a_command_with_the_largest_photo_is_read_and_answered' (9209192) panicked at crates/cloud/src/online.rs:836:63:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: \"Operation not permitted\" }",
+    "permission_denied": true
+  },
+  {
+    "case": "settings::tests::a_change_is_acked_at_once_and_its_result_follows",
+    "details": "thread 'settings::tests::a_change_is_acked_at_once_and_its_result_follows' (9209351) panicked at crates/cloud/src/settings.rs:1159:49:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: \"Operation not permitted\" }",
+    "permission_denied": true
+  },
+  {
+    "case": "settings::tests::a_confirm_with_a_request_id_is_taken_for_a_change_without_one",
+    "details": "thread 'settings::tests::a_confirm_with_a_request_id_is_taken_for_a_change_without_one' (9209352) panicked at crates/cloud/src/settings.rs:1503:49:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: \"Operation not permitted\" }",
+    "permission_denied": true
+  },
+  {
+    "case": "settings::tests::a_failure_with_no_join_is_said_on_the_link_there_is",
+    "details": "thread 'settings::tests::a_failure_with_no_join_is_said_on_the_link_there_is' (9209353) panicked at crates/cloud/src/settings.rs:1159:49:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: \"Operation not permitted\" }",
+    "permission_denied": true
+  },
+  {
+    "case": "settings::tests::a_refusal_a_helper_not_running_and_one_that_never_answers_are_failures",
+    "details": "thread 'settings::tests::a_refusal_a_helper_not_running_and_one_that_never_answers_are_failures' (9209354) panicked at crates/cloud/src/settings.rs:1159:49:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: \"Operation not permitted\" }",
+    "permission_denied": true
+  },
+  {
+    "case": "settings::tests::a_wifi_change_is_one_at_a_time_and_its_result_carries_the_request_id",
+    "details": "thread 'settings::tests::a_wifi_change_is_one_at_a_time_and_its_result_carries_the_request_id' (9209357) panicked at crates/cloud/src/settings.rs:1159:49:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: \"Operation not permitted\" }",
+    "permission_denied": true
+  },
+  {
+    "case": "settings::tests::followup_2_lamp_clouds_online_deadline_ends_before_the_helpers",
+    "details": "thread 'settings::tests::followup_2_lamp_clouds_online_deadline_ends_before_the_helpers' (9209361) panicked at crates/cloud/src/settings.rs:1701:49:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: \"Operation not permitted\" }",
+    "permission_denied": true
+  },
+  {
+    "case": "settings::tests::followup_3_a_failure_with_no_join_not_acked_in_a_few_seconds_relinks",
+    "details": "thread 'settings::tests::followup_3_a_failure_with_no_join_not_acked_in_a_few_seconds_relinks' (9209362) panicked at crates/cloud/src/settings.rs:1159:49:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: \"Operation not permitted\" }",
+    "permission_denied": true
+  },
+  {
+    "case": "settings::tests::every_keys_request_gets_a_coded_result_with_its_id",
+    "details": "thread 'settings::tests::every_keys_request_gets_a_coded_result_with_its_id' (9209359) panicked at crates/cloud/src/settings.rs:1007:52:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: \"Operation not permitted\" }",
+    "permission_denied": true
+  },
+  {
+    "case": "settings::tests::followup_3_a_joined_never_acked_is_dropped_once_its_wait_ended",
+    "details": "thread 'settings::tests::followup_3_a_joined_never_acked_is_dropped_once_its_wait_ended' (9209363) panicked at crates/cloud/src/settings.rs:1701:49:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: \"Operation not permitted\" }",
+    "permission_denied": true
+  },
+  {
+    "case": "settings::tests::followup_5_a_confirm_for_another_request_id_is_refused",
+    "details": "thread 'settings::tests::followup_5_a_confirm_for_another_request_id_is_refused' (9209364) panicked at crates/cloud/src/settings.rs:1503:49:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: \"Operation not permitted\" }",
+    "permission_denied": true
+  },
+  {
+    "case": "settings::tests::p3_a_confirm_1_s_before_the_helpers_deadline_is_success_only",
+    "details": "thread 'settings::tests::p3_a_confirm_1_s_before_the_helpers_deadline_is_success_only' (9209369) panicked at crates/cloud/src/settings.rs:1503:49:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: \"Operation not permitted\" }",
+    "permission_denied": true
+  },
+  {
+    "case": "settings::tests::p3_a_confirm_1_s_after_the_helpers_deadline_is_failure_only",
+    "details": "thread 'settings::tests::p3_a_confirm_1_s_after_the_helpers_deadline_is_failure_only' (9209368) panicked at crates/cloud/src/settings.rs:1503:49:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: \"Operation not permitted\" }",
+    "permission_denied": true
+  },
+  {
+    "case": "skills::tests::a_folder_that_cannot_be_changed_leaves_the_skill_whole",
+    "details": "thread 'skills::tests::a_folder_that_cannot_be_changed_leaves_the_skill_whole' (9209376) panicked at crates/cloud/src/skills.rs:726:79:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: \"Operation not permitted\" }",
+    "permission_denied": true
+  },
+  {
+    "case": "skills::tests::a_core_skill_is_never_removed",
+    "details": "thread 'skills::tests::a_core_skill_is_never_removed' (9209375) panicked at crates/cloud/src/skills.rs:726:79:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: \"Operation not permitted\" }",
+    "permission_denied": true
+  },
+  {
+    "case": "skills::tests::a_link_named_as_a_skill_is_left_as_it_is",
+    "details": "thread 'skills::tests::a_link_named_as_a_skill_is_left_as_it_is' (9209377) panicked at crates/cloud/src/skills.rs:726:79:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: \"Operation not permitted\" }",
+    "permission_denied": true
+  },
+  {
+    "case": "skills::tests::a_remove_held_past_the_helpers_wait_is_refused_and_never_done_later",
+    "details": "thread 'skills::tests::a_remove_held_past_the_helpers_wait_is_refused_and_never_done_later' (9209378) panicked at crates/cloud/src/skills.rs:726:79:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: \"Operation not permitted\" }",
+    "permission_denied": true
+  },
+  {
+    "case": "skills::tests::a_skill_made_here_is_removed_and_the_page_is_given_as_it_now_is",
+    "details": "thread 'skills::tests::a_skill_made_here_is_removed_and_the_page_is_given_as_it_now_is' (9209384) panicked at crates/cloud/src/skills.rs:726:79:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: \"Operation not permitted\" }",
+    "permission_denied": true
+  },
+  {
+    "case": "skills::tests::a_skill_is_turned_off_and_on_and_one_of_the_lamp_itself_is_refused",
+    "details": "thread 'skills::tests::a_skill_is_turned_off_and_on_and_one_of_the_lamp_itself_is_refused' (9209383) panicked at crates/cloud/src/skills.rs:726:79:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: \"Operation not permitted\" }",
+    "permission_denied": true
+  },
+  {
+    "case": "reports::tests::the_voices_no_on_the_bus_sends_stopped_and_ends_the_health",
+    "details": "lamp-cloud reports: can't take reports/request: bind /tmp/lcrs-43624/reports/request/subs/cloud_reports.43624.2.new: Operation not permitted (os error 1)\n\nthread 'reports::tests::the_voices_no_on_the_bus_sends_stopped_and_ends_the_health' (9209339) panicked at crates/cloud/src/reports.rs:2380:9:\nassertion `left == right` failed: lamp-cloud is listening\n  left: 0\n right: 1",
+    "permission_denied": true
+  },
+  {
+    "case": "skills::tests::an_installed_skill_is_removed",
+    "details": "thread 'skills::tests::an_installed_skill_is_removed' (9209389) panicked at crates/cloud/src/skills.rs:726:79:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: \"Operation not permitted\" }",
+    "permission_denied": true
+  },
+  {
+    "case": "skills::tests::an_unknown_name_and_every_path_trick_are_refused_and_nothing_is_touched",
+    "details": "thread 'skills::tests::an_unknown_name_and_every_path_trick_are_refused_and_nothing_is_touched' (9209391) panicked at crates/cloud/src/skills.rs:726:79:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: \"Operation not permitted\" }",
+    "permission_denied": true
+  },
+  {
+    "case": "skills::tests::an_installed_skill_that_does_not_load_is_removed_too",
+    "details": "thread 'skills::tests::an_installed_skill_that_does_not_load_is_removed_too' (9209390) panicked at crates/cloud/src/skills.rs:726:79:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: \"Operation not permitted\" }",
+    "permission_denied": true
+  },
+  {
+    "case": "skills::tests::without_the_manage_helper_nothing_is_removed",
+    "details": "thread 'skills::tests::without_the_manage_helper_nothing_is_removed' (9209399) panicked at crates/cloud/src/skills.rs:726:79:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: \"Operation not permitted\" }",
+    "permission_denied": true
+  },
+  {
+    "case": "skills::tests::a_signed_package_from_the_store_is_installed_by_the_helper_and_listed",
+    "details": "thread 'skills::tests::a_signed_package_from_the_store_is_installed_by_the_helper_and_listed' (9209382) panicked at crates/cloud/src/skills.rs:1393:65:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: \"Operation not permitted\" }",
+    "permission_denied": true
+  },
+  {
+    "case": "switch::with_the_switch_on_it_connects_to_the_accounts_broker",
+    "details": "thread 'switch::with_the_switch_on_it_connects_to_the_accounts_broker' (9209545) panicked at crates/cloud/tests/it/switch.rs:108:53:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: \"Operation not permitted\" }\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace",
+    "permission_denied": true
+  },
+  {
+    "case": "switch::without_the_switch_it_says_so_and_connects_nowhere",
+    "details": "thread 'switch::without_the_switch_it_says_so_and_connects_nowhere' (9209547) panicked at crates/cloud/tests/it/switch.rs:89:53:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: \"Operation not permitted\" }",
+    "permission_denied": true
+  },
+  {
+    "case": "ring::a_light_asked_at_the_lamp_ends_the_apps_preview_and_a_drag_after_it_stays_given_way",
+    "details": "thread 'ring::a_light_asked_at_the_lamp_ends_the_apps_preview_and_a_drag_after_it_stays_given_way' (9209531) panicked at crates/cloud/tests/it/ring.rs:37:50:\ncalled `Result::unwrap()` on an `Err` value: Custom { kind: PermissionDenied, error: \"bind /tmp/lcr-43764/bus/light/command/subs/ring.43764.0.new: Operation not permitted (os error 1)\" }",
+    "permission_denied": true
+  },
+  {
+    "case": "app_contract::the_faces_page_reads_names_and_removes_one",
+    "details": "thread 'app_contract::the_faces_page_reads_names_and_removes_one' (9209524) panicked at crates/cloud/tests/it/app_contract.rs:242:48:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: \"Operation not permitted\" }",
+    "permission_denied": true
+  },
+  {
+    "case": "app_contract::a_restart_from_the_app_is_the_keepers_answered_first_and_refused_under_an_update",
+    "details": "thread 'app_contract::a_restart_from_the_app_is_the_keepers_answered_first_and_refused_under_an_update' (9209521) panicked at crates/cloud/tests/it/app_contract.rs:595:47:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: \"Operation not permitted\" }",
+    "permission_denied": true
+  },
+  {
+    "case": "app_contract::each_field_the_apps_page_reads_is_there_with_the_type_it_takes",
+    "details": "thread 'app_contract::each_field_the_apps_page_reads_is_there_with_the_type_it_takes' (9209522) panicked at crates/cloud/tests/it/app_contract.rs:114:56:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: \"Operation not permitted\" }",
+    "permission_denied": true
+  },
+  {
+    "case": "app_contract::schedule_list_and_cancel_answer_with_the_switch_and_are_not_here_without",
+    "details": "thread 'app_contract::schedule_list_and_cancel_answer_with_the_switch_and_are_not_here_without' (9209523) panicked at crates/cloud/tests/it/app_contract.rs:346:47:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: \"Operation not permitted\" }",
+    "permission_denied": true
+  },
+  {
+    "case": "texts::a_text_goes_on_the_bus_and_its_answer_comes_back_as_v1s_chat_events",
+    "details": "thread 'texts::a_text_goes_on_the_bus_and_its_answer_comes_back_as_v1s_chat_events' (9209551) panicked at crates/cloud/tests/it/texts.rs:65:10:\ncalled `Result::unwrap()` on an `Err` value: Custom { kind: PermissionDenied, error: \"bind /tmp/lct-answer-43764/bus/chat/in/subs/voice.43764.4.new: Operation not permitted (os error 1)\" }",
+    "permission_denied": true
+  },
+  {
+    "case": "skills_contract::removing_answers_the_page_as_it_now_is_and_refuses_in_the_envelope",
+    "details": "thread 'skills_contract::removing_answers_the_page_as_it_now_is_and_refuses_in_the_envelope' (9209536) panicked at crates/cloud/tests/it/skills_contract.rs:252:48:\ncalled `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: \"Operation not permitted\" }",
+    "permission_denied": true
+  },
+  {
+    "case": "texts::a_skills_line_on_messages_out_comes_off_the_bus_as_task_news",
+    "details": "thread 'texts::a_skills_line_on_messages_out_comes_off_the_bus_as_task_news' (9209550) panicked at crates/cloud/tests/it/texts.rs:310:9:\nassertion `left == right` failed: []\n  left: 0\n right: 1",
+    "permission_denied": false
+  },
+  {
+    "case": "texts::a_named_text_goes_named_only_while_its_yes_stands_as_it_goes",
+    "details": "thread 'texts::a_named_text_goes_named_only_while_its_yes_stands_as_it_goes' (9209549) panicked at crates/cloud/tests/it/texts.rs:217:5:\nassertion `left == right` failed: []\n  left: 0\n right: 1",
+    "permission_denied": false
+  },
+  {
+    "case": "texts::task_news_comes_out_with_no_text_asked_first",
+    "details": "thread 'texts::task_news_comes_out_with_no_text_asked_first' (9209552) panicked at crates/cloud/tests/it/texts.rs:161:5:\nassertion `left == right` failed: []\n  left: 0\n right: 1",
+    "permission_denied": false
+  },
+  {
+    "case": "texts::a_line_from_another_publisher_on_messages_out_is_not_sent",
+    "details": "thread 'texts::a_line_from_another_publisher_on_messages_out_is_not_sent' (9209548) panicked at crates/cloud/tests/it/texts.rs:364:9:\nthe skill's line never came",
+    "permission_denied": false
+  }
+]
