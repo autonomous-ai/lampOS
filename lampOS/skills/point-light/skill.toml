@@ -16,7 +16,7 @@ tool = "point_light"
 speak = true
 light = true
 body = true
-look = true
+camera = true
 
 [choice]
 name = "toward"

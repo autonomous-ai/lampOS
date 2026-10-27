@@ -233,7 +233,7 @@ fn a_package_installs_whole_its_files_checked_and_open_to_the_parts() {
         "{said}"
     );
     assert!(
-        said.contains("It may use: speak, light, body, look."),
+        said.contains("It may use: speak, light, body, camera."),
         "{said}"
     );
     // What its function costs a session is said, not left to be found.
@@ -726,11 +726,11 @@ fn a_disabled_installable_reserves_its_tool_but_adds_no_live_function() {
     let path = disabled.join("skill.toml");
     let text = fs::read_to_string(&path).unwrap();
     // Revoke the grant alone; the later [[do]] still asks for a look.
-    fs::write(&path, text.replacen("look = true", "look = false", 1)).unwrap();
+    fs::write(&path, text.replacen("camera = true", "camera = false", 1)).unwrap();
     let why = load(&disabled).unwrap_err();
-    assert!(why.contains("needs look = true"), "{why}");
+    assert!(why.contains("needs camera = true"), "{why}");
     let listed = package::list(&skills).unwrap();
-    assert!(listed.contains("not loaded: not permitted: look needs look = true"));
+    assert!(listed.contains("not loaded: not permitted: look needs camera = true"));
     assert!(
         package::install(&skills, &duplicate)
             .unwrap_err()
@@ -933,7 +933,7 @@ fn a_list_says_each_skills_name_kind_version_and_what_it_may_use() {
             "desk-tutor",
             "installable",
             "1.0.0",
-            "speak, light, body, look"
+            "speak, light, body, camera"
         ]
     );
     assert_eq!(&columns(lines[2])[..3], ["stuffy-air", "core", "1.0.0"]);

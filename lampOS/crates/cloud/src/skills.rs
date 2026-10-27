@@ -261,7 +261,8 @@ pub fn may_use(permissions: &Permissions) -> Vec<Use> {
         ("body", permissions.body),
         ("output_limits", permissions.output_limits),
         ("messages", permissions.messages),
-        ("camera", permissions.look),
+        // `camera`, or format 1's `look`, which still gives the picture.
+        ("camera", permissions.sees_picture()),
         ("known_faces", permissions.known_faces),
     ] {
         if given {
@@ -910,6 +911,29 @@ pub mod tests {
         );
         assert_eq!(rows[2]["can_remove"], true);
         assert_eq!(rows[2]["title"], "Water the plant");
+    }
+
+    /// The picture is the camera's row whether a skill asks `camera` or
+    /// says format 1's `look`, which still gives it (#3822's gap 1); a skill
+    /// that asks neither has no camera row.
+    #[test]
+    fn the_camera_row_is_the_picture_by_camera_or_format_1_look() {
+        let names = |permissions: Permissions| -> Vec<&'static str> {
+            may_use(&permissions).iter().map(|used| used.name).collect()
+        };
+        for given in [
+            Permissions {
+                camera: true,
+                ..Permissions::default()
+            },
+            Permissions {
+                look: true,
+                ..Permissions::default()
+            },
+        ] {
+            assert_eq!(names(given), ["camera"]);
+        }
+        assert!(names(Permissions::default()).is_empty());
     }
 
     #[test]
