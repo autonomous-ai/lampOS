@@ -111,10 +111,10 @@ pub const ONE_FORGET_HELD: &str =
 pub fn held_forget_told(name: &str) -> serde_json::Value {
     let (what, example) = match name {
         crate::known_faces::FORGET => ("forget their face", "Shall I forget your face?"),
-        FORGET_EVERYTHING => (
-            "forget everything about them",
-            "Shall I forget everything about you?",
-        ),
+        // Asked on every spoken ask (#3504, N3): only their yes runs it.
+        FORGET_EVERYTHING => {
+            return serde_json::json!({ "held": FORGET_EVERYTHING_ASKS });
+        }
         _ => ("forget that", "Shall I forget that?"),
     };
     serde_json::json!({
@@ -140,6 +140,13 @@ pub fn unseen_yes_told(name: &str) -> String {
     )
 }
 
+/// What the model is told of a spoken `forget_everything`, which is always
+/// held for the person's yes, even when their words ask for it (#3504, N3:
+/// on lamp-06c1 on 27 Oct speech to text heard "except my name" as "accept
+/// my name", and one person's whole memory went, 1 of 1). Their plain yes
+/// on the next turn runs it; anything else, asking again included, does not.
+pub const FORGET_EVERYTHING_ASKS: &str = "Not done yet: forgetting everything always waits for their yes, since a word may have been misheard. Ask them once, in plain words, whether you should forget everything you know about them, including their name (for example \"Shall I forget everything I know about you, including your name?\"), and then stop. Only a plain yes from them within a minute runs it; do not call it again for their yes.";
+
 /// What the forget functions add for the second route's spoken turns, where
 /// a forget nobody asked for in words is held for their yes
 /// ([`held_forget_told`]), so the description and the engine agree.
@@ -147,7 +154,7 @@ pub const HELD_DESCRIBED: &str = " If they didn't ask in their own words, the la
 /// `forget_everything` for those turns: called at once, as the engine
 /// confirms it, never only after a yes the model asked for (the reviewer
 /// on #2334: that yes alone was refused).
-const FORGET_EVERYTHING_HELD: &str = "Call this only when the person asks to forget everything about them. A request to forget one thing, such as 'forget that', does not ask for this. If you are unsure whether they mean everything, ask without calling this function. It removes what they asked you to remember, their conversations and what you noticed. It works only for someone you know by face; otherwise say what it tells you. Then tell them plainly what is gone, and anything the answer says is kept.";
+const FORGET_EVERYTHING_HELD: &str = "Call this only when the person asks to forget everything about them. A request to forget one thing, such as 'forget that', does not ask for this. When they ask, call it at once: the lamp holds it and asks them first, and only their yes runs it, so never say it is gone until it has run. It removes what they asked you to remember, their conversations and what you noticed. It works only for someone you know by face; otherwise say what it tells you. Then tell them plainly what is gone, and anything the answer says is kept.";
 
 /// The forget functions as told to the second route's spoken turns: with
 /// [`HELD_DESCRIBED`], unless `LAMP_FORGET_ASKED=off`, where they are as
