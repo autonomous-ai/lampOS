@@ -15,6 +15,9 @@
 #   The lamp's guard (cases 1 and 8 to 11): `in` arms a systemd-run timer before the drop-ins are written, which puts
 #   back as `out` does if the Mac never comes back; `out`, and a setup that fails after arming it, stop it; a setup
 #   refused before any write arms none.
+#   12. a lamp with no Harness CLI (lamp-06c1): the unit's ConditionPathExists=/usr/local/bin/harness would have
+#      systemd skip lamp-tasks, so the drop-in resets the conditions before its ExecStart swap, keeps the unit's
+#      others, needs the stand-in's own wrapper instead, and `out` removes it with the rest.
 here=$(cd "$(dirname "$0")" && pwd)
 root=$(mktemp -d)
 trap 'rm -rf "$root"' EXIT
@@ -50,7 +53,8 @@ run() {  # USER EXECSTART MODE [TASKS]: the setup against the stand-in; its outp
   printf '#!/bin/sh\n' > "$root/remote/harness-fixture"
   chmod 0755 "$root/remote/harness-fixture"
   printf 'Group=%s\nUser=%s\n' "$(id -gn)" "$1" > "$root/show"
-  printf '[Service]\nUser=%s\nExecStart=%s\n' "$1" "$2" > "$root/unit"
+  { [ -z "${unit_head:-}" ] || printf '[Unit]\n%s\n' "$unit_head"
+    printf '[Service]\nUser=%s\nExecStart=%s\n' "$1" "$2"; } > "$root/unit"
   STAND_IN=$root PLAYED_REMOTE=$root/remote PLAYED_UNITS=$root/units SYSTEMCTL=$root/systemctl \
     SYSTEMD_RUN=$root/systemd-run PLAYED_TASKS=${4:-} PLAYED_GUARD_S=${guard_s:-} \
     PLAYED_TARGET=${target:-} PLAYED_VOICE_ENV=${voice_env:-} PLAYED_PLAN=${plan:-} \
@@ -163,5 +167,23 @@ STAND_IN=$root PLAYED_REMOTE=$root/remote PLAYED_UNITS="$root/my units" SYSTEMCT
   sh "$here/stand-in.sh" in > "$root/out" 2>&1; code=$?
 check "11. a PLAYED_UNITS with a space is refused too" \
   '[ $code -ne 0 ] && grep -q "PLAYED_UNITS" "$root/out" && [ ! -e "$root/my units" ] && ! grep -qs "^systemd-run" "$root/calls"'
+
+unit_head="ConditionPathExists=/var/lib/lampos-setup/done
+ConditionPathExists=/usr/local/bin/harness"
+run "$(id -un)" "$line" in; code=$?
+unset unit_head
+check "12. setup on a lamp with no Harness CLI succeeds" '[ $code -eq 0 ]'
+check "12. the drop-in resets ConditionPathExists in [Unit], before its ExecStart swap" \
+  'r=$(grep -nx "ConditionPathExists=" "$tasks_drop" | cut -d: -f1); u=$(grep -nx "\[Unit\]" "$tasks_drop" | cut -d: -f1)
+   x=$(grep -nx "ExecStart=" "$tasks_drop" | cut -d: -f1); [ -n "$r" ] && [ -n "$u" ] && [ -n "$x" ] && [ "$u" -lt "$r" ] && [ "$r" -lt "$x" ]'
+check "12. it keeps the unit's other conditions and needs the stand-in's wrapper, not the real Harness" \
+  'grep -qx "ConditionPathExists=/var/lib/lampos-setup/done" "$tasks_drop" &&
+   grep -qx "ConditionPathExists=$root/remote/harness" "$tasks_drop" && ! grep -q "=/usr/local/bin/harness$" "$tasks_drop"'
+check "12. lamp-tasks is restarted, which starts a part that was skipped" 'grep -qx "restart lamp-tasks lamp-voice" "$root/calls"'
+rm -f "$root/calls"
+STAND_IN=$root PLAYED_REMOTE=$root/remote PLAYED_UNITS=$root/units SYSTEMCTL=$root/systemctl \
+  sh "$here/stand-in.sh" out > "$root/out" 2>&1
+check "12. out removes the drop-in, reloads and restarts, so a lamp with no Harness skips lamp-tasks again" \
+  '[ ! -e "$tasks_drop" ] && grep -n "" "$root/calls" | grep -A9 ":daemon-reload$" | grep -q ":restart lamp-tasks lamp-voice$"'
 
 exit $failed
