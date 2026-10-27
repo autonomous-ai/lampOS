@@ -175,6 +175,10 @@ def main():
         results.append(check("--auto-reset: the record command runs before the reset is answered",
                              "before-reset" in said and said.index("before-reset") < said.index("factory_resetting"),
                              " ".join(said)))
+    with tempfile.TemporaryDirectory() as tmp:
+        p, said = run(tmp, ["--unit-id", "x", "--write", "--from", "4"], [], extra=["--auto", "--decline-reset"])
+        results.append(check("--decline-reset: the reset is answered no", p.returncode == 1
+                             and "factory_resetting" not in said and "factory_reset_ready" in said, " ".join(said)))
     sys.path.insert(0, HERE)
     import importlib.util
     spec = importlib.util.spec_from_file_location("factory_voice", RUNNER)

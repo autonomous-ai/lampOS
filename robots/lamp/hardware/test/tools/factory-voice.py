@@ -26,7 +26,9 @@
 # With --auto the run goes in one go: at each question (the stand, letting a
 # held lamp go, the head pads, the self-test) the lamp says what to do, then
 # "Starting in five seconds", and after those 5 s answers the question itself.
-# The reset after a passed self-test is answered only with --auto-reset (a
+# With --decline-reset the reset is answered no (factory-run.sh then decides
+# and resets the lamp itself, as steps.sh would). The reset after a passed
+# self-test is answered yes only with --auto-reset (a
 # batch's explicit choice, factory-run.sh's RESET=yes), and after
 # --before-reset CMD has run, so a record can be written before the lamp
 # reboots. Ctrl-C stops at any time (steps.sh's own trap eases a standing
@@ -166,8 +168,9 @@ class Voice:
 class Watch:
     """Matches what steps.sh prints, across reads, each match once."""
 
-    def __init__(self, voice, answer=None, auto=AUTO, before_reset=None):
+    def __init__(self, voice, answer=None, auto=AUTO, before_reset=None, decline_reset=False):
         self.voice = voice
+        self.decline_reset = decline_reset
         self.answer = answer
         self.auto = auto
         self.before_reset = before_reset
@@ -203,6 +206,9 @@ class Watch:
             if self.question != question:
                 return
             self.question = None
+        if question == "reset" and self.decline_reset:
+            self.answer(b"n\r")
+            return
         if question == "reset" and self.before_reset:
             subprocess.run(self.before_reset, shell=True, check=False)
         if question in YES:
@@ -260,6 +266,8 @@ def main():
     ap.add_argument("--auto-reset", action="store_true",
                     help="with --auto: answer a passed self-test's reset too (a batch's explicit choice)")
     ap.add_argument("--before-reset", help="with --auto-reset: a command run before the reset is answered")
+    ap.add_argument("--decline-reset", action="store_true",
+                    help="with --auto: answer the reset no (the caller resets the lamp itself)")
     ap.add_argument("--dry-run", action="store_true", help="print each prompt, play nothing")
     ap.add_argument("command", nargs=argparse.REMAINDER, help="-- steps.sh and its options")
     args = ap.parse_args()
@@ -279,7 +287,8 @@ def main():
             os._exit(127)
 
     watch = Watch(voice, (lambda data: os.write(fd, data)) if args.auto else None,
-                  AUTO | ({"reset"} if args.auto_reset else set()), args.before_reset)
+                  AUTO | ({"reset"} if args.auto_reset or args.decline_reset else set()), args.before_reset,
+                  args.decline_reset)
     console = os.isatty(0)
     saved = termios.tcgetattr(0) if console else None
     if console:
