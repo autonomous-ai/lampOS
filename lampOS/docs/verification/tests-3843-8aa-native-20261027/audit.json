@@ -1,0 +1,2799 @@
+{
+  "schema": 1,
+  "subject": "update original native CI",
+  "audit_at": "2026-10-27T15:13:49.024133+00:00",
+  "original_run": {
+    "id": 40525835969,
+    "name": "lampOS on ARM64",
+    "head_sha": "8aa03c7d244dd36990e36c082a281eb8d92a3dce",
+    "run_attempt": 1,
+    "event": "pull_request",
+    "status": "completed",
+    "conclusion": "success",
+    "html_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40525835969"
+  },
+  "Linux_run": {
+    "id": 40525836374,
+    "name": "lampOS clippy",
+    "head_sha": "8aa03c7d244dd36990e36c082a281eb8d92a3dce",
+    "run_attempt": 1,
+    "event": "pull_request",
+    "status": "completed",
+    "conclusion": "success",
+    "html_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40525836374"
+  },
+  "source": {
+    "head": "8aa03c7d244dd36990e36c082a281eb8d92a3dce",
+    "preview": "c0b63d8d4ecf8f50643554b2c880d67e625ea303",
+    "preview_parents": [
+      "c3eb20be307d06a6d6278254ec54654b68698b0e",
+      "8aa03c7d244dd36990e36c082a281eb8d92a3dce"
+    ],
+    "preview_tree": "4d2e5b6e7649b08f8eb55cb08d8944711075d652",
+    "authored_tree": "73cff58c4eac0980ea355fdb6338618fbd1938f4",
+    "authored_parents": [
+      "f9926922d0f5c54057ad49f14917ae677e83b028"
+    ],
+    "immutable_preview_source": [
+      {
+        "source": ".github/workflows/lampos-arm64.yml",
+        "commit": "c0b63d8d4ecf8f50643554b2c880d67e625ea303",
+        "blob": "c1a4b4479b284e52f3ff37701cd55734783040b3",
+        "sha256": "5ddf0f7ae45bceaba81e899719ca199a4246a045b6f32f505edcccc61b3d170f",
+        "bytes": 20708,
+        "export": "update-workflow-arm.yml"
+      },
+      {
+        "source": ".github/workflows/lampos-clippy.yml",
+        "commit": "c0b63d8d4ecf8f50643554b2c880d67e625ea303",
+        "blob": "04d2b49b5065c00f567e91ce271e2ba04669bb16",
+        "sha256": "d2b21162ac7c05964816c147a0cfc10c0082e39f1c7775e247e43ddf02ee0909",
+        "bytes": 4721,
+        "export": "update-workflow-linux.yml"
+      },
+      {
+        "source": "lampOS/.config/nextest.toml",
+        "commit": "c0b63d8d4ecf8f50643554b2c880d67e625ea303",
+        "blob": "3463c6682e8126b0c02cedda3d67cfc5bc081169",
+        "sha256": "c4992da8d157df279011a424b5feb4833f001fd1d46ce3edd0a56992c848bb33",
+        "bytes": 5157,
+        "export": "update-nextest.toml"
+      },
+      {
+        "source": ".github/scripts/lampos-pr-crates.py",
+        "commit": "c0b63d8d4ecf8f50643554b2c880d67e625ea303",
+        "blob": "05ebfb6628f0caec9b5a4d462f183aa5d617b982",
+        "sha256": "943ca7f9d87f6a89b16ac80871003bc8bf9dd7c526fcf9ce4c23873467a9d658",
+        "bytes": 5523,
+        "export": "update-lampos-pr-crates.py"
+      },
+      {
+        "source": "lampOS/crates/voice/src/session_reader/tests.rs",
+        "commit": "c0b63d8d4ecf8f50643554b2c880d67e625ea303",
+        "blob": "2b3ea62843a2f8534d4c8a6532ddf167805ab227",
+        "sha256": "794a44b35d1025ee9f66035099d3fe1facc8233eb39f7d17878e08a7ea7f3e49",
+        "bytes": 36539,
+        "export": "update-reader-tests.rs"
+      },
+      {
+        "source": "lampOS/crates/body/src/bin/lamp-body.rs",
+        "commit": "c0b63d8d4ecf8f50643554b2c880d67e625ea303",
+        "blob": "67c2c6bd0d464fc8d4efdd59fbb894b60b664483",
+        "sha256": "1ce10ff0f2e2aa4585548215db8f842a4971001105d07e9075809a768d5a36dd",
+        "bytes": 166435,
+        "export": "update-body-bin.rs"
+      },
+      {
+        "source": "lampOS/crates/update/tests/round/product_carrier.rs",
+        "commit": "c0b63d8d4ecf8f50643554b2c880d67e625ea303",
+        "blob": "2982e363784de28c703b84dfd873541ae13189e6",
+        "sha256": "186f14125da71d8859dbb9587d59709c6a5f2fd2b7a191add351f4e4ad6ded16",
+        "bytes": 33721,
+        "export": "update-product-carrier-tests.rs"
+      }
+    ],
+    "collected_at": "2026-10-27T15:07:18.651777+00:00",
+    "both_raw_checkout_logs": {
+      "arm": [
+        "c0b63d8d4ecf8f50643554b2c880d67e625ea303"
+      ],
+      "linux": [
+        "c0b63d8d4ecf8f50643554b2c880d67e625ea303"
+      ]
+    },
+    "host_notes_and_document_preservation": {
+      "entire_authored_doc_is_preview_prefix": true,
+      "authored_doc_bytes": 171913,
+      "appended_upstream_bytes": 517,
+      "both_6c69_host_notes_preserved": true,
+      "note_hashes": [
+        "460f79b748bd819aed7dbe2761df87f2a2a9f4cea434a4a71d5c2d6ccd025dc7",
+        "2442b9049b0c80545231a6d31bae57f611101c49124094eeb13241e40427a336"
+      ],
+      "full_doc_blob_equal": false,
+      "no_authored_tree_equality_assumed": true
+    },
+    "authored_full_blob_pairs": [
+      {
+        "source": "lampOS/crates/update/src/round.rs",
+        "authored_sha256": "9e6982b020ab55f2906504ea6f0cd3c73878f59692531bb0988d933304953133",
+        "preview_sha256": "9e6982b020ab55f2906504ea6f0cd3c73878f59692531bb0988d933304953133",
+        "equal": true
+      },
+      {
+        "source": "lampOS/crates/update/tests/round/product_carrier.rs",
+        "authored_sha256": "186f14125da71d8859dbb9587d59709c6a5f2fd2b7a191add351f4e4ad6ded16",
+        "preview_sha256": "186f14125da71d8859dbb9587d59709c6a5f2fd2b7a191add351f4e4ad6ded16",
+        "equal": true
+      },
+      {
+        "source": "lampOS/docs/updates.md",
+        "authored_sha256": "ffbcb28feedc3d742e88197973603408cb460aa505000f4119f8b68c4303db4d",
+        "preview_sha256": "68aa0cd4440985c479ad42dec31e5543e80223982d36cbed25e4e1470ab12119",
+        "equal": false
+      }
+    ],
+    "full_preview_tree_equals_authored": false,
+    "source_tree_does_not_establish_binary_equality": true
+  },
+  "selection": {
+    "packages": [
+      "lamp-body",
+      "lamp-cloud",
+      "lamp-expression",
+      "lamp-keeper",
+      "lamp-lean",
+      "lamp-memory",
+      "lamp-peek",
+      "lamp-setup",
+      "lamp-skills",
+      "lamp-update",
+      "lamp-voice",
+      "lamp-voice-eval"
+    ],
+    "profile": "pr",
+    "release": true,
+    "partition": "hash:1/1",
+    "declared_selected": 7791,
+    "declared_binaries": 70,
+    "aggregate_skipped": 53,
+    "skipped_binaries": 119,
+    "individual_skipped_identities_emitted": false,
+    "scope": "Actual selected nextest runtime; build/workspace/docs separate"
+  },
+  "outcomes": {
+    "unique_records": 7791,
+    "counts": {
+      "PASS": 7791
+    },
+    "FAIL": 0,
+    "LEAK": 0,
+    "TIMEOUT": 0,
+    "other_bad": [],
+    "selected_unrun": 0,
+    "execution_duplicates": [],
+    "unique_ordinals": 7791,
+    "summary": "2026-10-27T15:10:52.0995340Z      Summary [ 171.374s] 7791 tests run: 7791 passed, 53 skipped",
+    "post_summary_reprints": 34,
+    "reprint_classes": {
+      "realtime_success_output_final": 22,
+      "privacy_worker_success_output_final": 12
+    },
+    "retry_or_flaky_lines": [],
+    "per_binary": [
+      {
+        "binary": "lamp-body",
+        "PASS": 474
+      },
+      {
+        "binary": "lamp-body::bin/lamp-body",
+        "PASS": 44
+      },
+      {
+        "binary": "lamp-body::bin/lamp-body-inspect",
+        "PASS": 2
+      },
+      {
+        "binary": "lamp-body::bin/lamp-body-measure",
+        "PASS": 7
+      },
+      {
+        "binary": "lamp-body::bin/lamp-body-mood",
+        "PASS": 3
+      },
+      {
+        "binary": "lamp-body::bin/lamp-body-worker",
+        "PASS": 1
+      },
+      {
+        "binary": "lamp-body::it",
+        "PASS": 125
+      },
+      {
+        "binary": "lamp-cloud",
+        "PASS": 177
+      },
+      {
+        "binary": "lamp-cloud::it",
+        "PASS": 30
+      },
+      {
+        "binary": "lamp-expression",
+        "PASS": 28
+      },
+      {
+        "binary": "lamp-expression::bin/lamp-expression",
+        "PASS": 4
+      },
+      {
+        "binary": "lamp-expression::it",
+        "PASS": 281
+      },
+      {
+        "binary": "lamp-expression::runtime",
+        "PASS": 28
+      },
+      {
+        "binary": "lamp-keeper",
+        "PASS": 40
+      },
+      {
+        "binary": "lamp-keeper::bin/lamp-keeper",
+        "PASS": 2
+      },
+      {
+        "binary": "lamp-lean",
+        "PASS": 10
+      },
+      {
+        "binary": "lamp-lean::it",
+        "PASS": 51
+      },
+      {
+        "binary": "lamp-memory",
+        "PASS": 101
+      },
+      {
+        "binary": "lamp-memory::bin/lamp-memory",
+        "PASS": 8
+      },
+      {
+        "binary": "lamp-memory::bin/lamp-memory-eval",
+        "PASS": 8
+      },
+      {
+        "binary": "lamp-memory::forget_person",
+        "PASS": 3
+      },
+      {
+        "binary": "lamp-memory::forget_shared_exchange",
+        "PASS": 4
+      },
+      {
+        "binary": "lamp-memory::forgot",
+        "PASS": 1
+      },
+      {
+        "binary": "lamp-memory::health_control",
+        "PASS": 23
+      },
+      {
+        "binary": "lamp-memory::it",
+        "PASS": 168
+      },
+      {
+        "binary": "lamp-memory::paraphrase_fixture",
+        "PASS": 1
+      },
+      {
+        "binary": "lamp-memory::voice_early_words",
+        "PASS": 1
+      },
+      {
+        "binary": "lamp-memory::voice_follows_face",
+        "PASS": 1
+      },
+      {
+        "binary": "lamp-memory::voice_forget",
+        "PASS": 5
+      },
+      {
+        "binary": "lamp-memory::voice_forget_about",
+        "PASS": 2
+      },
+      {
+        "binary": "lamp-memory::voice_forget_named",
+        "PASS": 2
+      },
+      {
+        "binary": "lamp-memory::voice_link_used",
+        "PASS": 2
+      },
+      {
+        "binary": "lamp-memory::voice_observe",
+        "PASS": 1
+      },
+      {
+        "binary": "lamp-memory::voice_observe_forget",
+        "PASS": 1
+      },
+      {
+        "binary": "lamp-memory::voice_observe_named_forget",
+        "PASS": 1
+      },
+      {
+        "binary": "lamp-memory::voice_observe_room",
+        "PASS": 1
+      },
+      {
+        "binary": "lamp-memory::voice_since_until",
+        "PASS": 2
+      },
+      {
+        "binary": "lamp-peek",
+        "PASS": 15
+      },
+      {
+        "binary": "lamp-peek::peek",
+        "PASS": 11
+      },
+      {
+        "binary": "lamp-setup",
+        "PASS": 26
+      },
+      {
+        "binary": "lamp-setup::it",
+        "PASS": 165
+      },
+      {
+        "binary": "lamp-setup::wake",
+        "PASS": 6
+      },
+      {
+        "binary": "lamp-skills",
+        "PASS": 160
+      },
+      {
+        "binary": "lamp-skills::bin/lamp-skills",
+        "PASS": 23
+      },
+      {
+        "binary": "lamp-skills::it",
+        "PASS": 342
+      },
+      {
+        "binary": "lamp-skills::release_pair",
+        "PASS": 2
+      },
+      {
+        "binary": "lamp-skills::requested_audio",
+        "PASS": 31
+      },
+      {
+        "binary": "lamp-update",
+        "PASS": 180
+      },
+      {
+        "binary": "lamp-update::bin/lamp-update",
+        "PASS": 3
+      },
+      {
+        "binary": "lamp-update::functions",
+        "PASS": 5
+      },
+      {
+        "binary": "lamp-update::install",
+        "PASS": 108
+      },
+      {
+        "binary": "lamp-update::it",
+        "PASS": 13
+      },
+      {
+        "binary": "lamp-update::round",
+        "PASS": 215
+      },
+      {
+        "binary": "lamp-update::self-cli-exec",
+        "PASS": 1
+      },
+      {
+        "binary": "lamp-update::self-process-cuts",
+        "PASS": 1
+      },
+      {
+        "binary": "lamp-voice",
+        "PASS": 3900
+      },
+      {
+        "binary": "lamp-voice-eval",
+        "PASS": 378
+      },
+      {
+        "binary": "lamp-voice-eval::bin/lamp-voice-eval",
+        "PASS": 7
+      },
+      {
+        "binary": "lamp-voice-eval::it",
+        "PASS": 238
+      },
+      {
+        "binary": "lamp-voice::bin/lamp-voice",
+        "PASS": 1
+      },
+      {
+        "binary": "lamp-voice::example/render_line_second",
+        "PASS": 4
+      },
+      {
+        "binary": "lamp-voice::example/stop_words_stt_replay",
+        "PASS": 6
+      },
+      {
+        "binary": "lamp-voice::it",
+        "PASS": 307
+      }
+    ]
+  },
+  "window": {
+    "start_line": 833,
+    "summary_line": 8626,
+    "following_step_line": 9043,
+    "start": "2026-10-27T15:08:00.7255304Z     Starting 7791 tests across 70 binaries (53 tests and 119 binaries skipped)"
+  },
+  "required14_updater": [
+    {
+      "line": 3702,
+      "timestamp": "2026-10-27T15:09:25.4309548Z",
+      "status": "PASS",
+      "seconds": 0.02,
+      "ordinal": 2869,
+      "total": 7791,
+      "binary": "lamp-update::round",
+      "test": "product_carrier::a_linked_part_uses_product_before_its_pinned_lamp_template"
+    },
+    {
+      "line": 3701,
+      "timestamp": "2026-10-27T15:09:25.4140901Z",
+      "status": "PASS",
+      "seconds": 0.017,
+      "ordinal": 2868,
+      "total": 7791,
+      "binary": "lamp-update::round",
+      "test": "product_carrier::a_linked_part_uses_product_after_its_pinned_lamp_template"
+    },
+    {
+      "line": 3697,
+      "timestamp": "2026-10-27T15:09:25.3800082Z",
+      "status": "PASS",
+      "seconds": 0.032,
+      "ordinal": 2864,
+      "total": 7791,
+      "binary": "lamp-update::round",
+      "test": "product_carrier::a_compatible_linked_lamp_template_still_wins_in_either_manifest_order"
+    },
+    {
+      "line": 3706,
+      "timestamp": "2026-10-27T15:09:25.4668474Z",
+      "status": "PASS",
+      "seconds": 0.027,
+      "ordinal": 2873,
+      "total": 7791,
+      "binary": "lamp-update::round",
+      "test": "product_carrier::a_pinned_part_keeps_its_pinned_lamp_template_beside_product_in_either_order"
+    },
+    {
+      "line": 3695,
+      "timestamp": "2026-10-27T15:09:25.3364998Z",
+      "status": "PASS",
+      "seconds": 0.023,
+      "ordinal": 2862,
+      "total": 7791,
+      "binary": "lamp-update::round",
+      "test": "product_carrier::a_climbed_updater_confirms_product_before_its_pinned_lamp_template"
+    },
+    {
+      "line": 3694,
+      "timestamp": "2026-10-27T15:09:25.3133359Z",
+      "status": "PASS",
+      "seconds": 0.02,
+      "ordinal": 2861,
+      "total": 7791,
+      "binary": "lamp-update::round",
+      "test": "product_carrier::a_climbed_updater_confirms_product_after_its_pinned_lamp_template"
+    },
+    {
+      "line": 3717,
+      "timestamp": "2026-10-27T15:09:25.7195888Z",
+      "status": "PASS",
+      "seconds": 0.021,
+      "ordinal": 2884,
+      "total": 7791,
+      "binary": "lamp-update::round",
+      "test": "product_carrier::skipping_a_pinned_host_logs_only_its_unit_host_and_installed_link"
+    },
+    {
+      "line": 3710,
+      "timestamp": "2026-10-27T15:09:25.5480386Z",
+      "status": "PASS",
+      "seconds": 0.021,
+      "ordinal": 2877,
+      "total": 7791,
+      "binary": "lamp-update::round",
+      "test": "product_carrier::an_invalid_linked_host_is_refused_instead_of_falling_back_to_product"
+    },
+    {
+      "line": 3703,
+      "timestamp": "2026-10-27T15:09:25.4397383Z",
+      "status": "PASS",
+      "seconds": 0.009,
+      "ordinal": 2870,
+      "total": 7791,
+      "binary": "lamp-update::round",
+      "test": "product_carrier::a_pinned_host_without_a_product_candidate_keeps_the_existing_refusal"
+    },
+    {
+      "line": 3719,
+      "timestamp": "2026-10-27T15:09:25.7463715Z",
+      "status": "PASS",
+      "seconds": 0.008,
+      "ordinal": 2886,
+      "total": 7791,
+      "binary": "lamp-update::round",
+      "test": "product_carrier::the_product_fallback_still_rejects_corrupt_signed_unit_bytes"
+    },
+    {
+      "line": 3714,
+      "timestamp": "2026-10-27T15:09:25.6596178Z",
+      "status": "PASS",
+      "seconds": 0.006,
+      "ordinal": 2881,
+      "total": 7791,
+      "binary": "lamp-update::round",
+      "test": "product_carrier::an_unreachable_product_fallback_does_not_switch_any_part"
+    },
+    {
+      "line": 3698,
+      "timestamp": "2026-10-27T15:09:25.3884652Z",
+      "status": "PASS",
+      "seconds": 0.008,
+      "ordinal": 2865,
+      "total": 7791,
+      "binary": "lamp-update::round",
+      "test": "product_carrier::a_corrupt_pinned_host_is_not_silently_skipped_for_product"
+    },
+    {
+      "line": 3713,
+      "timestamp": "2026-10-27T15:09:25.6533401Z",
+      "status": "PASS",
+      "seconds": 0.011,
+      "ordinal": 2880,
+      "total": 7791,
+      "binary": "lamp-update::round",
+      "test": "product_carrier::an_unreachable_pinned_host_is_not_silently_skipped_for_product"
+    },
+    {
+      "line": 3733,
+      "timestamp": "2026-10-27T15:09:25.9832049Z",
+      "status": "PASS",
+      "seconds": 0.514,
+      "ordinal": 2900,
+      "total": 7791,
+      "binary": "lamp-update::round",
+      "test": "product_carrier::a_product_voice_ignores_its_legacy_pinned_releases_template"
+    }
+  ],
+  "Body_holder_case": [
+    {
+      "line": 1446,
+      "timestamp": "2026-10-27T15:08:03.8208512Z",
+      "status": "PASS",
+      "seconds": 0.004,
+      "ordinal": 613,
+      "total": 7791,
+      "binary": "lamp-body::bin/lamp-body",
+      "test": "tests::a_step_reads_a_bounded_amount_of_its_holder"
+    }
+  ],
+  "Reader14": [
+    {
+      "line": 7313,
+      "timestamp": "2026-10-27T15:10:34.3503966Z",
+      "status": "PASS",
+      "seconds": 0.006,
+      "ordinal": 6480,
+      "total": 7791,
+      "binary": "lamp-voice",
+      "test": "session_reader::tests::local_session_reader_group_is_exact_unique_and_bounded"
+    },
+    {
+      "line": 7300,
+      "timestamp": "2026-10-27T15:10:34.3007750Z",
+      "status": "PASS",
+      "seconds": 0.005,
+      "ordinal": 6467,
+      "total": 7791,
+      "binary": "lamp-voice",
+      "test": "session_reader::tests::finite_and_unset_service_never_resolve_a_reader_group"
+    },
+    {
+      "line": 7302,
+      "timestamp": "2026-10-27T15:10:34.3072723Z",
+      "status": "PASS",
+      "seconds": 0.007,
+      "ordinal": 6469,
+      "total": 7791,
+      "binary": "lamp-voice",
+      "test": "session_reader::tests::group_lookup_failure_retains_private_logging_without_writer_failure"
+    },
+    {
+      "line": 7309,
+      "timestamp": "2026-10-27T15:10:34.3344490Z",
+      "status": "PASS",
+      "seconds": 0.009,
+      "ordinal": 6476,
+      "total": 7791,
+      "binary": "lamp-voice",
+      "test": "session_reader::tests::linux::only_the_new_session_is_shared_after_one_pinned_lookup"
+    },
+    {
+      "line": 7312,
+      "timestamp": "2026-10-27T15:10:34.3472641Z",
+      "status": "PASS",
+      "seconds": 0.007,
+      "ordinal": 6479,
+      "total": 7791,
+      "binary": "lamp-voice",
+      "test": "session_reader::tests::linux::unprepared_or_wrong_group_parent_never_grants_or_changes_ancestors"
+    },
+    {
+      "line": 7308,
+      "timestamp": "2026-10-27T15:10:34.3341589Z",
+      "status": "PASS",
+      "seconds": 0.007,
+      "ordinal": 6475,
+      "total": 7791,
+      "binary": "lamp-voice",
+      "test": "session_reader::tests::linux::readable_or_linked_voice_siblings_deny_preparation_and_late_grant"
+    },
+    {
+      "line": 7306,
+      "timestamp": "2026-10-27T15:10:34.3256583Z",
+      "status": "PASS",
+      "seconds": 0.01,
+      "ordinal": 6473,
+      "total": 7791,
+      "binary": "lamp-voice",
+      "test": "session_reader::tests::linux::every_grant_failure_restores_private_modes_and_original_groups"
+    },
+    {
+      "line": 7307,
+      "timestamp": "2026-10-27T15:10:34.3272161Z",
+      "status": "PASS",
+      "seconds": 0.007,
+      "ordinal": 6474,
+      "total": 7791,
+      "binary": "lamp-voice",
+      "test": "session_reader::tests::linux::failed_private_rollback_disables_only_metadata"
+    },
+    {
+      "line": 7305,
+      "timestamp": "2026-10-27T15:10:34.3205446Z",
+      "status": "PASS",
+      "seconds": 0.007,
+      "ordinal": 6472,
+      "total": 7791,
+      "binary": "lamp-voice",
+      "test": "session_reader::tests::linux::an_earlier_reader_refusal_keeps_a_verified_private_writer"
+    },
+    {
+      "line": 7301,
+      "timestamp": "2026-10-27T15:10:34.3068099Z",
+      "status": "PASS",
+      "seconds": 0.006,
+      "ordinal": 6468,
+      "total": 7791,
+      "binary": "lamp-voice",
+      "test": "session_reader::tests::linux::a_fixture_root_retains_ancestor_mode_acl_and_path_checks"
+    },
+    {
+      "line": 7303,
+      "timestamp": "2026-10-27T15:10:34.3131242Z",
+      "status": "PASS",
+      "seconds": 0.006,
+      "ordinal": 6470,
+      "total": 7791,
+      "binary": "lamp-voice",
+      "test": "session_reader::tests::linux::access_and_default_acl_are_refused_without_stripping_or_widening_them"
+    },
+    {
+      "line": 7310,
+      "timestamp": "2026-10-27T15:10:34.3405416Z",
+      "status": "PASS",
+      "seconds": 0.006,
+      "ordinal": 6477,
+      "total": 7791,
+      "binary": "lamp-voice",
+      "test": "session_reader::tests::linux::replaced_record_never_changes_an_outside_sentinel"
+    },
+    {
+      "line": 7311,
+      "timestamp": "2026-10-27T15:10:34.3438906Z",
+      "status": "PASS",
+      "seconds": 0.009,
+      "ordinal": 6478,
+      "total": 7791,
+      "binary": "lamp-voice",
+      "test": "session_reader::tests::linux::shared_session_writer_projects_every_segment_without_private_values"
+    },
+    {
+      "line": 7304,
+      "timestamp": "2026-10-27T15:10:34.3146553Z",
+      "status": "PASS",
+      "seconds": 0.008,
+      "ordinal": 6471,
+      "total": 7791,
+      "binary": "lamp-voice",
+      "test": "session_reader::tests::linux::a_verified_failed_grant_keeps_private_original_records"
+    }
+  ],
+  "known_platform_unrun": [
+    {
+      "test": "session_reader::tests::unsupported_acl_verification_degrades_to_private_metadata",
+      "reason": "not compiled on Linux"
+    },
+    {
+      "test": "session_reader::tests::linux::dedicated_reader_can_only_read_new_events_under_dropped_identity",
+      "reason": "explicit privileged isolated-root DAC ignore, not activated"
+    }
+  ],
+  "auxiliary_separate": {
+    "promoter": [
+      {
+        "line": 491,
+        "passed": 2,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 496,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 524,
+        "passed": 22,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 531,
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 537,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      }
+    ],
+    "workspace_docs": [
+      {
+        "line": 9054,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 9060,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 9066,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 9072,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 9078,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 9086,
+        "passed": 2,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 9093,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 9099,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 9105,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 9111,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 9117,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 9123,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 9129,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 9135,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 9141,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 9147,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 9154,
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 9161,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 9167,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 9173,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 9179,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 9185,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 9192,
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 9199,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 9205,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 9211,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 9217,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 9223,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 9229,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 9235,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 9241,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 9247,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 9253,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 9259,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 9265,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 9271,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 9277,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 9283,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 9289,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 9295,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 9301,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 9307,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 9313,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 9319,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 9325,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 9331,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      },
+      {
+        "line": 9337,
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered": 0
+      }
+    ],
+    "relay_signal_ok_rows": [
+      9341
+    ],
+    "process_test_rows": [
+      "test an_idle_worker_stays_ready_across_a_long_quiet ... ok (2008 ms)",
+      "test a_worker_reporting_another_model_is_refused_before_any_request ... ok (2 ms)",
+      "test no_outcome_is_delivered_after_close_even_for_an_answer_on_its_way ... ok (4 ms)",
+      "test verdict_carries_identity_and_one_request_at_a_time ... ok (56 ms)",
+      "test missing_model_is_final_and_never_restarted ... ok (165 ms)",
+      "test missing_executable_fails_at_once ... ok (2 ms)",
+      "test spawn_returns_while_worker_startup_is_held ... ok (6 ms)",
+      "test startup_failures_are_final ... ok (411 ms)",
+      "test serving_failures_are_replaced_within_budget ... ok (514 ms)",
+      "test protocol_violations_are_replaced ... ok (177 ms)",
+      "test cancelled_answers_are_never_delivered ... ok (155 ms)",
+      "test close_during_inference_never_waits ... ok (233 ms)",
+      "test sustained_requests_stay_bounded ... ok (692 ms)"
+    ],
+    "process_custom_summaries": [
+      "test result: 13 passed; 0 failed"
+    ],
+    "not_added_to_nextest": true
+  },
+  "build_warnings": [
+    {
+      "line": 135,
+      "text": "rehash: warning: skipping ca-certificates.crt,it does not contain exactly one certificate or CRL"
+    },
+    {
+      "line": 636,
+      "text": "warning: output filename collision at /home/runner/work/lampOS/lampOS/lampOS/target/release/examples/replay_cost"
+    },
+    {
+      "line": 641,
+      "text": "warning: output filename collision at /home/runner/work/lampOS/lampOS/lampOS/target/release/examples/replay_cost.dwp"
+    },
+    {
+      "line": 646,
+      "text": "warning: output filename collision at /home/runner/work/lampOS/lampOS/lampOS/target/release/examples/progress_cost"
+    },
+    {
+      "line": 651,
+      "text": "warning: output filename collision at /home/runner/work/lampOS/lampOS/lampOS/target/release/examples/progress_cost.dwp"
+    },
+    {
+      "line": 795,
+      "text": "warning: output filename collision at /home/runner/work/lampOS/lampOS/lampOS/target/release/examples/replay_cost"
+    },
+    {
+      "line": 800,
+      "text": "warning: output filename collision at /home/runner/work/lampOS/lampOS/lampOS/target/release/examples/replay_cost.dwp"
+    },
+    {
+      "line": 805,
+      "text": "warning: output filename collision at /home/runner/work/lampOS/lampOS/lampOS/target/release/examples/progress_cost"
+    },
+    {
+      "line": 810,
+      "text": "warning: output filename collision at /home/runner/work/lampOS/lampOS/lampOS/target/release/examples/progress_cost.dwp"
+    },
+    {
+      "line": 9418,
+      "text": "##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/cache/restore@v4, actions/checkout@v4, actions/upload-artifact@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/"
+    }
+  ],
+  "artifact_log_lines": [
+    {
+      "line": 9364,
+      "text": "Packaged 48 current workspace binaries and 2 selected examples with complete SHA256SUMS"
+    },
+    {
+      "line": 9398,
+      "text": "SHA256 digest of uploaded artifact zip is ad7be74bf978de9addda42a44a5f891c50aee462094a51d63f57f70d12bd435c"
+    },
+    {
+      "line": 9400,
+      "text": "Artifact lampos-arm64-8aa03c7d244dd36990e36c082a281eb8d92a3dce.zip successfully finalized. Artifact ID 12744822952"
+    },
+    {
+      "line": 9401,
+      "text": "Artifact lampos-arm64-8aa03c7d244dd36990e36c082a281eb8d92a3dce has been successfully uploaded! Final size is 118297200 bytes. Artifact ID is 12744822952"
+    },
+    {
+      "line": 9402,
+      "text": "Artifact download URL: https://github.com/autonomous-ai/lampOS/actions/runs/40525835969/artifacts/12744822952"
+    }
+  ],
+  "Linux_command_evidence": [
+    {
+      "line": 397,
+      "text": "##[group]Run cargo fmt --manifest-path .github/tools/lampos-promote/Cargo.toml --check"
+    },
+    {
+      "line": 398,
+      "text": "cargo fmt --manifest-path .github/tools/lampos-promote/Cargo.toml --check"
+    },
+    {
+      "line": 399,
+      "text": "cargo clippy --locked --manifest-path .github/tools/lampos-promote/Cargo.toml --all-targets -- -D warnings"
+    },
+    {
+      "line": 693,
+      "text": "##[group]Run cargo clippy --locked --workspace --all-targets -- -D warnings"
+    },
+    {
+      "line": 694,
+      "text": "cargo clippy --locked --workspace --all-targets -- -D warnings"
+    }
+  ],
+  "limitations": [
+    "No test reruns/CI writes/source refs/target actions/ARM build or execution on Mac",
+    "Full authored tree equality is not assumed; actual preview parents and source preserved",
+    "Historical Cloud11458PASS+LEAK is separate and not waived",
+    "Skip aggregates are not invented into individual identities; no privileged DAC acceptance"
+  ],
+  "exact_host_note_carry": {
+    "verified_at": "2026-10-27T15:04:00.191546+00:00",
+    "author_head": "8aa03c7d244dd36990e36c082a281eb8d92a3dce",
+    "source_note_commit": "6c69fc19a4fa0afd2d36c5d707625d7a4ac121fe",
+    "requested_by_comment": 6445004947,
+    "required_note_count": 2,
+    "authored_note_groups": [
+      {
+        "text": "  control), qualified on 27 October on Apple Silicon\n  (`aarch64-apple-darwin`, macOS 26.6.2, Rust 1.96.0), distinct from the\n  historical Intel host named above. On base `e362659ce`, fmt and",
+        "sha256": "460f79b748bd819aed7dbe2761df87f2a2a9f4cea434a4a71d5c2d6ccd025dc7",
+        "present_in_authored_doc": true
+      },
+      {
+        "text": "  A later gate on the same Apple Silicon host, on base `1fb93206e`, adds\n  two controls that wrap the actual",
+        "sha256": "2442b9049b0c80545231a6d31bae57f611101c49124094eeb13241e40427a336",
+        "present_in_authored_doc": true
+      }
+    ],
+    "rust_full_blobs_unchanged": [
+      {
+        "path": "lampOS/crates/update/src/round.rs",
+        "blob": "d3bff916f33b33740a60bce01fd737e2f3a34144",
+        "sha256": "9e6982b020ab55f2906504ea6f0cd3c73878f59692531bb0988d933304953133",
+        "bytes": 127859,
+        "equal_prior_bd0_full_blob": true,
+        "prior_source": "fresh-992-3843-3845-native-20261027/update-authored-0.txt"
+      },
+      {
+        "path": "lampOS/crates/update/tests/round/product_carrier.rs",
+        "blob": "2982e363784de28c703b84dfd873541ae13189e6",
+        "sha256": "186f14125da71d8859dbb9587d59709c6a5f2fd2b7a191add351f4e4ad6ded16",
+        "bytes": 33721,
+        "equal_prior_bd0_full_blob": true,
+        "prior_source": "fresh-992-3843-3845-native-20261027/update-authored-1.txt"
+      }
+    ],
+    "preview_note_verification": "DEFERRED until actual checkout log closes; no source/tree equivalence assumed"
+  },
+  "actual_preview_note_verification": {
+    "status": "COMPLETE",
+    "verified_at": "2026-10-27T15:15:28.532991+00:00",
+    "source_note_commit": "6c69fc19a4fa0afd2d36c5d707625d7a4ac121fe",
+    "request_comment": 6445004947,
+    "author_head": "8aa03c7d244dd36990e36c082a281eb8d92a3dce",
+    "author_parent": "f9926922d0f5c54057ad49f14917ae677e83b028",
+    "actual_preview": "c0b63d8d4ecf8f50643554b2c880d67e625ea303",
+    "actual_preview_parents": [
+      "c3eb20be307d06a6d6278254ec54654b68698b0e",
+      "8aa03c7d244dd36990e36c082a281eb8d92a3dce"
+    ],
+    "actual_preview_tree": "4d2e5b6e7649b08f8eb55cb08d8944711075d652",
+    "both_ARM_and_Linux_raw_checkout_logs_match": {
+      "arm": [
+        "c0b63d8d4ecf8f50643554b2c880d67e625ea303"
+      ],
+      "linux": [
+        "c0b63d8d4ecf8f50643554b2c880d67e625ea303"
+      ]
+    },
+    "full_Rust_blobs_match_prior_bd0_and_actual_preview": true,
+    "entire_authored_doc_retained_as_prefix": true,
+    "both_required_note_groups_preserved": true,
+    "host_note_hashes": [
+      "460f79b748bd819aed7dbe2761df87f2a2a9f4cea434a4a71d5c2d6ccd025dc7",
+      "2442b9049b0c80545231a6d31bae57f611101c49124094eeb13241e40427a336"
+    ],
+    "upstream_append_bytes": 517,
+    "full_document_equal": false,
+    "full_authored_tree_equal": false,
+    "upstream_changed_paths": 112,
+    "earlier_partial_note_receipt_retained_unchanged": {
+      "path": "preview-host-notes-verified.json",
+      "sha256": "9839962cbd3d9630f70884e69b8738a61b05b5b71b4761aecf3711e0732ecf36"
+    }
+  },
+  "original_stage_statuses": [
+    {
+      "label": "update-arm",
+      "run": {
+        "id": 40525835969,
+        "name": "lampOS on ARM64",
+        "node_id": "WFR_kwLOSxRYh88AAAAJb4cuwQ",
+        "head_branch": "tests/3796-compatible-host-templates",
+        "head_sha": "8aa03c7d244dd36990e36c082a281eb8d92a3dce",
+        "path": ".github/workflows/lampos-arm64.yml",
+        "display_title": "lampOS: skip pinned host templates for linked installs",
+        "run_number": 7685,
+        "event": "pull_request",
+        "status": "completed",
+        "conclusion": "success",
+        "workflow_id": 384179159,
+        "check_suite_id": 109841471711,
+        "check_suite_node_id": "CS_kwDOSxRYh88AAAAZkw_Y3w",
+        "url": "https://api.github.com/repos/autonomous-ai/lampOS/actions/runs/40525835969",
+        "html_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40525835969",
+        "pull_requests": [
+          {
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/pulls/3843",
+            "id": 5034716020,
+            "number": 3843,
+            "head": {
+              "ref": "tests/3796-compatible-host-templates",
+              "sha": "8aa03c7d244dd36990e36c082a281eb8d92a3dce",
+              "repo": {
+                "id": 1259624583,
+                "url": "https://api.github.com/repos/autonomous-ai/lampOS",
+                "name": "lampOS"
+              }
+            },
+            "base": {
+              "ref": "lamp-voice",
+              "sha": "c3eb20be307d06a6d6278254ec54654b68698b0e",
+              "repo": {
+                "id": 1259624583,
+                "url": "https://api.github.com/repos/autonomous-ai/lampOS",
+                "name": "lampOS"
+              }
+            }
+          }
+        ],
+        "created_at": "2026-10-27T14:55:24Z",
+        "updated_at": "2026-10-27T15:11:17Z",
+        "actor": {
+          "login": "deehw",
+          "id": 227991567,
+          "node_id": "U_kgDODZbgDw",
+          "avatar_url": "https://avatars.githubusercontent.com/u/227991567?v=4",
+          "gravatar_id": "",
+          "url": "https://api.github.com/users/deehw",
+          "html_url": "https://github.com/deehw",
+          "followers_url": "https://api.github.com/users/deehw/followers",
+          "following_url": "https://api.github.com/users/deehw/following{/other_user}",
+          "gists_url": "https://api.github.com/users/deehw/gists{/gist_id}",
+          "starred_url": "https://api.github.com/users/deehw/starred{/owner}{/repo}",
+          "subscriptions_url": "https://api.github.com/users/deehw/subscriptions",
+          "organizations_url": "https://api.github.com/users/deehw/orgs",
+          "repos_url": "https://api.github.com/users/deehw/repos",
+          "events_url": "https://api.github.com/users/deehw/events{/privacy}",
+          "received_events_url": "https://api.github.com/users/deehw/received_events",
+          "type": "User",
+          "user_view_type": "public",
+          "site_admin": false
+        },
+        "run_attempt": 1,
+        "referenced_workflows": [],
+        "run_started_at": "2026-10-27T14:55:24Z",
+        "triggering_actor": {
+          "login": "deehw",
+          "id": 227991567,
+          "node_id": "U_kgDODZbgDw",
+          "avatar_url": "https://avatars.githubusercontent.com/u/227991567?v=4",
+          "gravatar_id": "",
+          "url": "https://api.github.com/users/deehw",
+          "html_url": "https://github.com/deehw",
+          "followers_url": "https://api.github.com/users/deehw/followers",
+          "following_url": "https://api.github.com/users/deehw/following{/other_user}",
+          "gists_url": "https://api.github.com/users/deehw/gists{/gist_id}",
+          "starred_url": "https://api.github.com/users/deehw/starred{/owner}{/repo}",
+          "subscriptions_url": "https://api.github.com/users/deehw/subscriptions",
+          "organizations_url": "https://api.github.com/users/deehw/orgs",
+          "repos_url": "https://api.github.com/users/deehw/repos",
+          "events_url": "https://api.github.com/users/deehw/events{/privacy}",
+          "received_events_url": "https://api.github.com/users/deehw/received_events",
+          "type": "User",
+          "user_view_type": "public",
+          "site_admin": false
+        },
+        "jobs_url": "https://api.github.com/repos/autonomous-ai/lampOS/actions/runs/40525835969/jobs",
+        "logs_url": "https://api.github.com/repos/autonomous-ai/lampOS/actions/runs/40525835969/logs",
+        "check_suite_url": "https://api.github.com/repos/autonomous-ai/lampOS/check-suites/109841471711",
+        "artifacts_url": "https://api.github.com/repos/autonomous-ai/lampOS/actions/runs/40525835969/artifacts",
+        "cancel_url": "https://api.github.com/repos/autonomous-ai/lampOS/actions/runs/40525835969/cancel",
+        "rerun_url": "https://api.github.com/repos/autonomous-ai/lampOS/actions/runs/40525835969/rerun",
+        "previous_attempt_url": null,
+        "workflow_url": "https://api.github.com/repos/autonomous-ai/lampOS/actions/workflows/384179159",
+        "head_commit": {
+          "id": "8aa03c7d244dd36990e36c082a281eb8d92a3dce",
+          "tree_id": "73cff58c4eac0980ea355fdb6338618fbd1938f4",
+          "message": "lampOS: prefer compatible product templates for linked parts",
+          "timestamp": "2026-10-27T14:54:59Z",
+          "author": {
+            "name": "deehw",
+            "email": "dee@autonomous.ai"
+          },
+          "committer": {
+            "name": "deehw",
+            "email": "dee@autonomous.ai"
+          }
+        },
+        "repository": {
+          "id": 1259624583,
+          "node_id": "R_kgDOSxRYhw",
+          "name": "lampOS",
+          "full_name": "autonomous-ai/lampOS",
+          "private": false,
+          "owner": {
+            "login": "autonomous-ai",
+            "id": 98006261,
+            "node_id": "O_kgDOBdd09Q",
+            "avatar_url": "https://avatars.githubusercontent.com/u/98006261?v=4",
+            "gravatar_id": "",
+            "url": "https://api.github.com/users/autonomous-ai",
+            "html_url": "https://github.com/autonomous-ai",
+            "followers_url": "https://api.github.com/users/autonomous-ai/followers",
+            "following_url": "https://api.github.com/users/autonomous-ai/following{/other_user}",
+            "gists_url": "https://api.github.com/users/autonomous-ai/gists{/gist_id}",
+            "starred_url": "https://api.github.com/users/autonomous-ai/starred{/owner}{/repo}",
+            "subscriptions_url": "https://api.github.com/users/autonomous-ai/subscriptions",
+            "organizations_url": "https://api.github.com/users/autonomous-ai/orgs",
+            "repos_url": "https://api.github.com/users/autonomous-ai/repos",
+            "events_url": "https://api.github.com/users/autonomous-ai/events{/privacy}",
+            "received_events_url": "https://api.github.com/users/autonomous-ai/received_events",
+            "type": "Organization",
+            "user_view_type": "public",
+            "site_admin": false
+          },
+          "html_url": "https://github.com/autonomous-ai/lampOS",
+          "description": "The open-source operating system for physical AI.",
+          "fork": false,
+          "url": "https://api.github.com/repos/autonomous-ai/lampOS",
+          "forks_url": "https://api.github.com/repos/autonomous-ai/lampOS/forks",
+          "keys_url": "https://api.github.com/repos/autonomous-ai/lampOS/keys{/key_id}",
+          "collaborators_url": "https://api.github.com/repos/autonomous-ai/lampOS/collaborators{/collaborator}",
+          "teams_url": "https://api.github.com/repos/autonomous-ai/lampOS/teams",
+          "hooks_url": "https://api.github.com/repos/autonomous-ai/lampOS/hooks",
+          "issue_events_url": "https://api.github.com/repos/autonomous-ai/lampOS/issues/events{/number}",
+          "events_url": "https://api.github.com/repos/autonomous-ai/lampOS/events",
+          "assignees_url": "https://api.github.com/repos/autonomous-ai/lampOS/assignees{/user}",
+          "branches_url": "https://api.github.com/repos/autonomous-ai/lampOS/branches{/branch}",
+          "tags_url": "https://api.github.com/repos/autonomous-ai/lampOS/tags",
+          "blobs_url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs{/sha}",
+          "git_tags_url": "https://api.github.com/repos/autonomous-ai/lampOS/git/tags{/sha}",
+          "git_refs_url": "https://api.github.com/repos/autonomous-ai/lampOS/git/refs{/sha}",
+          "trees_url": "https://api.github.com/repos/autonomous-ai/lampOS/git/trees{/sha}",
+          "statuses_url": "https://api.github.com/repos/autonomous-ai/lampOS/statuses/{sha}",
+          "languages_url": "https://api.github.com/repos/autonomous-ai/lampOS/languages",
+          "stargazers_url": "https://api.github.com/repos/autonomous-ai/lampOS/stargazers",
+          "contributors_url": "https://api.github.com/repos/autonomous-ai/lampOS/contributors",
+          "subscribers_url": "https://api.github.com/repos/autonomous-ai/lampOS/subscribers",
+          "subscription_url": "https://api.github.com/repos/autonomous-ai/lampOS/subscription",
+          "commits_url": "https://api.github.com/repos/autonomous-ai/lampOS/commits{/sha}",
+          "git_commits_url": "https://api.github.com/repos/autonomous-ai/lampOS/git/commits{/sha}",
+          "comments_url": "https://api.github.com/repos/autonomous-ai/lampOS/comments{/number}",
+          "issue_comment_url": "https://api.github.com/repos/autonomous-ai/lampOS/issues/comments{/number}",
+          "contents_url": "https://api.github.com/repos/autonomous-ai/lampOS/contents/{+path}",
+          "compare_url": "https://api.github.com/repos/autonomous-ai/lampOS/compare/{base}...{head}",
+          "merges_url": "https://api.github.com/repos/autonomous-ai/lampOS/merges",
+          "archive_url": "https://api.github.com/repos/autonomous-ai/lampOS/{archive_format}{/ref}",
+          "downloads_url": "https://api.github.com/repos/autonomous-ai/lampOS/downloads",
+          "issues_url": "https://api.github.com/repos/autonomous-ai/lampOS/issues{/number}",
+          "pulls_url": "https://api.github.com/repos/autonomous-ai/lampOS/pulls{/number}",
+          "milestones_url": "https://api.github.com/repos/autonomous-ai/lampOS/milestones{/number}",
+          "notifications_url": "https://api.github.com/repos/autonomous-ai/lampOS/notifications{?since,all,participating}",
+          "labels_url": "https://api.github.com/repos/autonomous-ai/lampOS/labels{/name}",
+          "releases_url": "https://api.github.com/repos/autonomous-ai/lampOS/releases{/id}",
+          "deployments_url": "https://api.github.com/repos/autonomous-ai/lampOS/deployments"
+        },
+        "head_repository": {
+          "id": 1259624583,
+          "node_id": "R_kgDOSxRYhw",
+          "name": "lampOS",
+          "full_name": "autonomous-ai/lampOS",
+          "private": false,
+          "owner": {
+            "login": "autonomous-ai",
+            "id": 98006261,
+            "node_id": "O_kgDOBdd09Q",
+            "avatar_url": "https://avatars.githubusercontent.com/u/98006261?v=4",
+            "gravatar_id": "",
+            "url": "https://api.github.com/users/autonomous-ai",
+            "html_url": "https://github.com/autonomous-ai",
+            "followers_url": "https://api.github.com/users/autonomous-ai/followers",
+            "following_url": "https://api.github.com/users/autonomous-ai/following{/other_user}",
+            "gists_url": "https://api.github.com/users/autonomous-ai/gists{/gist_id}",
+            "starred_url": "https://api.github.com/users/autonomous-ai/starred{/owner}{/repo}",
+            "subscriptions_url": "https://api.github.com/users/autonomous-ai/subscriptions",
+            "organizations_url": "https://api.github.com/users/autonomous-ai/orgs",
+            "repos_url": "https://api.github.com/users/autonomous-ai/repos",
+            "events_url": "https://api.github.com/users/autonomous-ai/events{/privacy}",
+            "received_events_url": "https://api.github.com/users/autonomous-ai/received_events",
+            "type": "Organization",
+            "user_view_type": "public",
+            "site_admin": false
+          },
+          "html_url": "https://github.com/autonomous-ai/lampOS",
+          "description": "The open-source operating system for physical AI.",
+          "fork": false,
+          "url": "https://api.github.com/repos/autonomous-ai/lampOS",
+          "forks_url": "https://api.github.com/repos/autonomous-ai/lampOS/forks",
+          "keys_url": "https://api.github.com/repos/autonomous-ai/lampOS/keys{/key_id}",
+          "collaborators_url": "https://api.github.com/repos/autonomous-ai/lampOS/collaborators{/collaborator}",
+          "teams_url": "https://api.github.com/repos/autonomous-ai/lampOS/teams",
+          "hooks_url": "https://api.github.com/repos/autonomous-ai/lampOS/hooks",
+          "issue_events_url": "https://api.github.com/repos/autonomous-ai/lampOS/issues/events{/number}",
+          "events_url": "https://api.github.com/repos/autonomous-ai/lampOS/events",
+          "assignees_url": "https://api.github.com/repos/autonomous-ai/lampOS/assignees{/user}",
+          "branches_url": "https://api.github.com/repos/autonomous-ai/lampOS/branches{/branch}",
+          "tags_url": "https://api.github.com/repos/autonomous-ai/lampOS/tags",
+          "blobs_url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs{/sha}",
+          "git_tags_url": "https://api.github.com/repos/autonomous-ai/lampOS/git/tags{/sha}",
+          "git_refs_url": "https://api.github.com/repos/autonomous-ai/lampOS/git/refs{/sha}",
+          "trees_url": "https://api.github.com/repos/autonomous-ai/lampOS/git/trees{/sha}",
+          "statuses_url": "https://api.github.com/repos/autonomous-ai/lampOS/statuses/{sha}",
+          "languages_url": "https://api.github.com/repos/autonomous-ai/lampOS/languages",
+          "stargazers_url": "https://api.github.com/repos/autonomous-ai/lampOS/stargazers",
+          "contributors_url": "https://api.github.com/repos/autonomous-ai/lampOS/contributors",
+          "subscribers_url": "https://api.github.com/repos/autonomous-ai/lampOS/subscribers",
+          "subscription_url": "https://api.github.com/repos/autonomous-ai/lampOS/subscription",
+          "commits_url": "https://api.github.com/repos/autonomous-ai/lampOS/commits{/sha}",
+          "git_commits_url": "https://api.github.com/repos/autonomous-ai/lampOS/git/commits{/sha}",
+          "comments_url": "https://api.github.com/repos/autonomous-ai/lampOS/comments{/number}",
+          "issue_comment_url": "https://api.github.com/repos/autonomous-ai/lampOS/issues/comments{/number}",
+          "contents_url": "https://api.github.com/repos/autonomous-ai/lampOS/contents/{+path}",
+          "compare_url": "https://api.github.com/repos/autonomous-ai/lampOS/compare/{base}...{head}",
+          "merges_url": "https://api.github.com/repos/autonomous-ai/lampOS/merges",
+          "archive_url": "https://api.github.com/repos/autonomous-ai/lampOS/{archive_format}{/ref}",
+          "downloads_url": "https://api.github.com/repos/autonomous-ai/lampOS/downloads",
+          "issues_url": "https://api.github.com/repos/autonomous-ai/lampOS/issues{/number}",
+          "pulls_url": "https://api.github.com/repos/autonomous-ai/lampOS/pulls{/number}",
+          "milestones_url": "https://api.github.com/repos/autonomous-ai/lampOS/milestones{/number}",
+          "notifications_url": "https://api.github.com/repos/autonomous-ai/lampOS/notifications{?since,all,participating}",
+          "labels_url": "https://api.github.com/repos/autonomous-ai/lampOS/labels{/name}",
+          "releases_url": "https://api.github.com/repos/autonomous-ai/lampOS/releases{/id}",
+          "deployments_url": "https://api.github.com/repos/autonomous-ai/lampOS/deployments"
+        }
+      },
+      "jobs": [
+        {
+          "id": 122265039229,
+          "run_id": 40525835969,
+          "workflow_name": "lampOS on ARM64",
+          "head_branch": "tests/3796-compatible-host-templates",
+          "run_url": "https://api.github.com/repos/autonomous-ai/lampOS/actions/runs/40525835969",
+          "run_attempt": 1,
+          "node_id": "CR_kwDOSxRYh88AAAAcd5BxfQ",
+          "head_sha": "8aa03c7d244dd36990e36c082a281eb8d92a3dce",
+          "url": "https://api.github.com/repos/autonomous-ai/lampOS/actions/jobs/122265039229",
+          "html_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40525835969/job/122265039229",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-10-27T14:55:25Z",
+          "started_at": "2026-10-27T14:55:31Z",
+          "completed_at": "2026-10-27T15:11:16Z",
+          "name": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-10-27T14:55:31Z",
+              "completed_at": "2026-10-27T14:55:33Z"
+            },
+            {
+              "name": "system packages",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-10-27T14:55:33Z",
+              "completed_at": "2026-10-27T14:56:05Z"
+            },
+            {
+              "name": "Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-10-27T14:56:05Z",
+              "completed_at": "2026-10-27T14:56:12Z"
+            },
+            {
+              "name": "publication failure tests (offline, no signing secret)",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-10-27T14:56:12Z",
+              "completed_at": "2026-10-27T14:56:13Z"
+            },
+            {
+              "name": "Rust 1.96.0",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-10-27T14:56:13Z",
+              "completed_at": "2026-10-27T14:56:18Z"
+            },
+            {
+              "name": "artifact provenance regression (offline, disposable Cargo workspace)",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 6,
+              "started_at": "2026-10-27T14:56:18Z",
+              "completed_at": "2026-10-27T14:56:19Z"
+            },
+            {
+              "name": "stable promotion tests (offline, disposable test key)",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 7,
+              "started_at": "2026-10-27T14:56:19Z",
+              "completed_at": "2026-10-27T14:56:40Z"
+            },
+            {
+              "name": "restore the cache",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 8,
+              "started_at": "2026-10-27T14:56:40Z",
+              "completed_at": "2026-10-27T14:56:57Z"
+            },
+            {
+              "name": "unchanged source files get the cached build's times back",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 9,
+              "started_at": "2026-10-27T14:56:57Z",
+              "completed_at": "2026-10-27T14:56:59Z"
+            },
+            {
+              "name": "record fresh source times for a cold publication build",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 10,
+              "started_at": "2026-10-27T14:56:59Z",
+              "completed_at": "2026-10-27T14:56:59Z"
+            },
+            {
+              "name": "Run taiki-e/install-action@v2",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 11,
+              "started_at": "2026-10-27T14:56:59Z",
+              "completed_at": "2026-10-27T14:57:00Z"
+            },
+            {
+              "name": "build (release, the lamps' binaries)",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 12,
+              "started_at": "2026-10-27T14:57:00Z",
+              "completed_at": "2026-10-27T14:59:57Z"
+            },
+            {
+              "name": "every built lamp-* binary is classified for the lamp-os package",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 13,
+              "started_at": "2026-10-27T14:59:57Z",
+              "completed_at": "2026-10-27T14:59:57Z"
+            },
+            {
+              "name": "build the two selected artifact examples without filename collisions",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 14,
+              "started_at": "2026-10-27T14:59:57Z",
+              "completed_at": "2026-10-27T15:01:20Z"
+            },
+            {
+              "name": "publication CLI rehearsal (local test key and simulated GitHub only)",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 15,
+              "started_at": "2026-10-27T15:01:20Z",
+              "completed_at": "2026-10-27T15:01:21Z"
+            },
+            {
+              "name": "which crates a pull request tests",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 16,
+              "started_at": "2026-10-27T15:01:21Z",
+              "completed_at": "2026-10-27T15:01:21Z"
+            },
+            {
+              "name": "test (full run, every test one at a time; otherwise without the realtime group, in parallel)",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 17,
+              "started_at": "2026-10-27T15:01:21Z",
+              "completed_at": "2026-10-27T15:10:52Z"
+            },
+            {
+              "name": "doc tests and the own-harness tests (nextest runs neither)",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 18,
+              "started_at": "2026-10-27T15:10:52Z",
+              "completed_at": "2026-10-27T15:11:06Z"
+            },
+            {
+              "name": "export only current Cargo targets and their SHA-256",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 19,
+              "started_at": "2026-10-27T15:11:06Z",
+              "completed_at": "2026-10-27T15:11:06Z"
+            },
+            {
+              "name": "Run actions/upload-artifact@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 20,
+              "started_at": "2026-10-27T15:11:06Z",
+              "completed_at": "2026-10-27T15:11:14Z"
+            },
+            {
+              "name": "discard the isolated example target before saving the cache",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 21,
+              "started_at": "2026-10-27T15:11:14Z",
+              "completed_at": "2026-10-27T15:11:14Z"
+            },
+            {
+              "name": "save the cache",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 22,
+              "started_at": "2026-10-27T15:11:14Z",
+              "completed_at": "2026-10-27T15:11:14Z"
+            },
+            {
+              "name": "Post Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 44,
+              "started_at": "2026-10-27T15:11:14Z",
+              "completed_at": "2026-10-27T15:11:14Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 45,
+              "started_at": "2026-10-27T15:11:14Z",
+              "completed_at": "2026-10-27T15:11:14Z"
+            }
+          ],
+          "check_run_url": "https://api.github.com/repos/autonomous-ai/lampOS/check-runs/122265039229",
+          "labels": [
+            "ubuntu-22.04-arm"
+          ],
+          "runner_id": 1000088138,
+          "runner_name": "GitHub Actions 1000088138",
+          "runner_group_id": 0,
+          "runner_group_name": "GitHub Actions"
+        },
+        {
+          "id": 122265040075,
+          "run_id": 40525835969,
+          "workflow_name": "lampOS on ARM64",
+          "head_branch": "tests/3796-compatible-host-templates",
+          "run_url": "https://api.github.com/repos/autonomous-ai/lampOS/actions/runs/40525835969",
+          "run_attempt": 1,
+          "node_id": "CR_kwDOSxRYh88AAAAcd5B0yw",
+          "head_sha": "8aa03c7d244dd36990e36c082a281eb8d92a3dce",
+          "url": "https://api.github.com/repos/autonomous-ai/lampOS/actions/jobs/122265040075",
+          "html_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40525835969/job/122265040075",
+          "status": "completed",
+          "conclusion": "skipped",
+          "created_at": "2026-10-27T14:55:25Z",
+          "started_at": "2026-10-27T14:55:25Z",
+          "completed_at": "2026-10-27T14:55:25Z",
+          "name": "lampOS \u2014 promote a tested release to the stable feed",
+          "steps": [],
+          "check_run_url": "https://api.github.com/repos/autonomous-ai/lampOS/check-runs/122265040075",
+          "labels": [
+            "ubuntu-22.04-arm"
+          ],
+          "runner_id": null,
+          "runner_name": null,
+          "runner_group_id": null,
+          "runner_group_name": null
+        },
+        {
+          "id": 122274403946,
+          "run_id": 40525835969,
+          "workflow_name": "lampOS on ARM64",
+          "head_branch": "tests/3796-compatible-host-templates",
+          "run_url": "https://api.github.com/repos/autonomous-ai/lampOS/actions/runs/40525835969",
+          "run_attempt": 1,
+          "node_id": "CR_kwDOSxRYh88AAAAceB9Wag",
+          "head_sha": "8aa03c7d244dd36990e36c082a281eb8d92a3dce",
+          "url": "https://api.github.com/repos/autonomous-ai/lampOS/actions/jobs/122274403946",
+          "html_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40525835969/job/122274403946",
+          "status": "completed",
+          "conclusion": "skipped",
+          "created_at": "2026-10-27T15:11:16Z",
+          "started_at": "2026-10-27T15:11:16Z",
+          "completed_at": "2026-10-27T15:11:16Z",
+          "name": "report-full-run-failure",
+          "steps": [],
+          "check_run_url": "https://api.github.com/repos/autonomous-ai/lampOS/check-runs/122274403946",
+          "labels": [
+            "ubuntu-latest"
+          ],
+          "runner_id": null,
+          "runner_name": null,
+          "runner_group_id": null,
+          "runner_group_name": null
+        },
+        {
+          "id": 122274404376,
+          "run_id": 40525835969,
+          "workflow_name": "lampOS on ARM64",
+          "head_branch": "tests/3796-compatible-host-templates",
+          "run_url": "https://api.github.com/repos/autonomous-ai/lampOS/actions/runs/40525835969",
+          "run_attempt": 1,
+          "node_id": "CR_kwDOSxRYh88AAAAceB9YGA",
+          "head_sha": "8aa03c7d244dd36990e36c082a281eb8d92a3dce",
+          "url": "https://api.github.com/repos/autonomous-ai/lampOS/actions/jobs/122274404376",
+          "html_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40525835969/job/122274404376",
+          "status": "completed",
+          "conclusion": "skipped",
+          "created_at": "2026-10-27T15:11:16Z",
+          "started_at": "2026-10-27T15:11:16Z",
+          "completed_at": "2026-10-27T15:11:16Z",
+          "name": "lampOS \u2014 sign and publish the tested lamp-voice artifact",
+          "steps": [],
+          "check_run_url": "https://api.github.com/repos/autonomous-ai/lampOS/check-runs/122274404376",
+          "labels": [
+            "ubuntu-22.04-arm"
+          ],
+          "runner_id": null,
+          "runner_name": null,
+          "runner_group_id": null,
+          "runner_group_name": null
+        }
+      ]
+    },
+    {
+      "label": "update-linux",
+      "run": {
+        "id": 40525836374,
+        "name": "lampOS clippy",
+        "node_id": "WFR_kwLOSxRYh88AAAAJb4cwVg",
+        "head_branch": "tests/3796-compatible-host-templates",
+        "head_sha": "8aa03c7d244dd36990e36c082a281eb8d92a3dce",
+        "path": ".github/workflows/lampos-clippy.yml",
+        "display_title": "lampOS: skip pinned host templates for linked installs",
+        "run_number": 3652,
+        "event": "pull_request",
+        "status": "completed",
+        "conclusion": "success",
+        "workflow_id": 389977098,
+        "check_suite_id": 109841472681,
+        "check_suite_node_id": "CS_kwDOSxRYh88AAAAZkw_cqQ",
+        "url": "https://api.github.com/repos/autonomous-ai/lampOS/actions/runs/40525836374",
+        "html_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40525836374",
+        "pull_requests": [
+          {
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/pulls/3843",
+            "id": 5034716020,
+            "number": 3843,
+            "head": {
+              "ref": "tests/3796-compatible-host-templates",
+              "sha": "8aa03c7d244dd36990e36c082a281eb8d92a3dce",
+              "repo": {
+                "id": 1259624583,
+                "url": "https://api.github.com/repos/autonomous-ai/lampOS",
+                "name": "lampOS"
+              }
+            },
+            "base": {
+              "ref": "lamp-voice",
+              "sha": "c3eb20be307d06a6d6278254ec54654b68698b0e",
+              "repo": {
+                "id": 1259624583,
+                "url": "https://api.github.com/repos/autonomous-ai/lampOS",
+                "name": "lampOS"
+              }
+            }
+          }
+        ],
+        "created_at": "2026-10-27T14:55:24Z",
+        "updated_at": "2026-10-27T15:04:05Z",
+        "actor": {
+          "login": "deehw",
+          "id": 227991567,
+          "node_id": "U_kgDODZbgDw",
+          "avatar_url": "https://avatars.githubusercontent.com/u/227991567?v=4",
+          "gravatar_id": "",
+          "url": "https://api.github.com/users/deehw",
+          "html_url": "https://github.com/deehw",
+          "followers_url": "https://api.github.com/users/deehw/followers",
+          "following_url": "https://api.github.com/users/deehw/following{/other_user}",
+          "gists_url": "https://api.github.com/users/deehw/gists{/gist_id}",
+          "starred_url": "https://api.github.com/users/deehw/starred{/owner}{/repo}",
+          "subscriptions_url": "https://api.github.com/users/deehw/subscriptions",
+          "organizations_url": "https://api.github.com/users/deehw/orgs",
+          "repos_url": "https://api.github.com/users/deehw/repos",
+          "events_url": "https://api.github.com/users/deehw/events{/privacy}",
+          "received_events_url": "https://api.github.com/users/deehw/received_events",
+          "type": "User",
+          "user_view_type": "public",
+          "site_admin": false
+        },
+        "run_attempt": 1,
+        "referenced_workflows": [],
+        "run_started_at": "2026-10-27T14:55:24Z",
+        "triggering_actor": {
+          "login": "deehw",
+          "id": 227991567,
+          "node_id": "U_kgDODZbgDw",
+          "avatar_url": "https://avatars.githubusercontent.com/u/227991567?v=4",
+          "gravatar_id": "",
+          "url": "https://api.github.com/users/deehw",
+          "html_url": "https://github.com/deehw",
+          "followers_url": "https://api.github.com/users/deehw/followers",
+          "following_url": "https://api.github.com/users/deehw/following{/other_user}",
+          "gists_url": "https://api.github.com/users/deehw/gists{/gist_id}",
+          "starred_url": "https://api.github.com/users/deehw/starred{/owner}{/repo}",
+          "subscriptions_url": "https://api.github.com/users/deehw/subscriptions",
+          "organizations_url": "https://api.github.com/users/deehw/orgs",
+          "repos_url": "https://api.github.com/users/deehw/repos",
+          "events_url": "https://api.github.com/users/deehw/events{/privacy}",
+          "received_events_url": "https://api.github.com/users/deehw/received_events",
+          "type": "User",
+          "user_view_type": "public",
+          "site_admin": false
+        },
+        "jobs_url": "https://api.github.com/repos/autonomous-ai/lampOS/actions/runs/40525836374/jobs",
+        "logs_url": "https://api.github.com/repos/autonomous-ai/lampOS/actions/runs/40525836374/logs",
+        "check_suite_url": "https://api.github.com/repos/autonomous-ai/lampOS/check-suites/109841472681",
+        "artifacts_url": "https://api.github.com/repos/autonomous-ai/lampOS/actions/runs/40525836374/artifacts",
+        "cancel_url": "https://api.github.com/repos/autonomous-ai/lampOS/actions/runs/40525836374/cancel",
+        "rerun_url": "https://api.github.com/repos/autonomous-ai/lampOS/actions/runs/40525836374/rerun",
+        "previous_attempt_url": null,
+        "workflow_url": "https://api.github.com/repos/autonomous-ai/lampOS/actions/workflows/389977098",
+        "head_commit": {
+          "id": "8aa03c7d244dd36990e36c082a281eb8d92a3dce",
+          "tree_id": "73cff58c4eac0980ea355fdb6338618fbd1938f4",
+          "message": "lampOS: prefer compatible product templates for linked parts",
+          "timestamp": "2026-10-27T14:54:59Z",
+          "author": {
+            "name": "deehw",
+            "email": "dee@autonomous.ai"
+          },
+          "committer": {
+            "name": "deehw",
+            "email": "dee@autonomous.ai"
+          }
+        },
+        "repository": {
+          "id": 1259624583,
+          "node_id": "R_kgDOSxRYhw",
+          "name": "lampOS",
+          "full_name": "autonomous-ai/lampOS",
+          "private": false,
+          "owner": {
+            "login": "autonomous-ai",
+            "id": 98006261,
+            "node_id": "O_kgDOBdd09Q",
+            "avatar_url": "https://avatars.githubusercontent.com/u/98006261?v=4",
+            "gravatar_id": "",
+            "url": "https://api.github.com/users/autonomous-ai",
+            "html_url": "https://github.com/autonomous-ai",
+            "followers_url": "https://api.github.com/users/autonomous-ai/followers",
+            "following_url": "https://api.github.com/users/autonomous-ai/following{/other_user}",
+            "gists_url": "https://api.github.com/users/autonomous-ai/gists{/gist_id}",
+            "starred_url": "https://api.github.com/users/autonomous-ai/starred{/owner}{/repo}",
+            "subscriptions_url": "https://api.github.com/users/autonomous-ai/subscriptions",
+            "organizations_url": "https://api.github.com/users/autonomous-ai/orgs",
+            "repos_url": "https://api.github.com/users/autonomous-ai/repos",
+            "events_url": "https://api.github.com/users/autonomous-ai/events{/privacy}",
+            "received_events_url": "https://api.github.com/users/autonomous-ai/received_events",
+            "type": "Organization",
+            "user_view_type": "public",
+            "site_admin": false
+          },
+          "html_url": "https://github.com/autonomous-ai/lampOS",
+          "description": "The open-source operating system for physical AI.",
+          "fork": false,
+          "url": "https://api.github.com/repos/autonomous-ai/lampOS",
+          "forks_url": "https://api.github.com/repos/autonomous-ai/lampOS/forks",
+          "keys_url": "https://api.github.com/repos/autonomous-ai/lampOS/keys{/key_id}",
+          "collaborators_url": "https://api.github.com/repos/autonomous-ai/lampOS/collaborators{/collaborator}",
+          "teams_url": "https://api.github.com/repos/autonomous-ai/lampOS/teams",
+          "hooks_url": "https://api.github.com/repos/autonomous-ai/lampOS/hooks",
+          "issue_events_url": "https://api.github.com/repos/autonomous-ai/lampOS/issues/events{/number}",
+          "events_url": "https://api.github.com/repos/autonomous-ai/lampOS/events",
+          "assignees_url": "https://api.github.com/repos/autonomous-ai/lampOS/assignees{/user}",
+          "branches_url": "https://api.github.com/repos/autonomous-ai/lampOS/branches{/branch}",
+          "tags_url": "https://api.github.com/repos/autonomous-ai/lampOS/tags",
+          "blobs_url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs{/sha}",
+          "git_tags_url": "https://api.github.com/repos/autonomous-ai/lampOS/git/tags{/sha}",
+          "git_refs_url": "https://api.github.com/repos/autonomous-ai/lampOS/git/refs{/sha}",
+          "trees_url": "https://api.github.com/repos/autonomous-ai/lampOS/git/trees{/sha}",
+          "statuses_url": "https://api.github.com/repos/autonomous-ai/lampOS/statuses/{sha}",
+          "languages_url": "https://api.github.com/repos/autonomous-ai/lampOS/languages",
+          "stargazers_url": "https://api.github.com/repos/autonomous-ai/lampOS/stargazers",
+          "contributors_url": "https://api.github.com/repos/autonomous-ai/lampOS/contributors",
+          "subscribers_url": "https://api.github.com/repos/autonomous-ai/lampOS/subscribers",
+          "subscription_url": "https://api.github.com/repos/autonomous-ai/lampOS/subscription",
+          "commits_url": "https://api.github.com/repos/autonomous-ai/lampOS/commits{/sha}",
+          "git_commits_url": "https://api.github.com/repos/autonomous-ai/lampOS/git/commits{/sha}",
+          "comments_url": "https://api.github.com/repos/autonomous-ai/lampOS/comments{/number}",
+          "issue_comment_url": "https://api.github.com/repos/autonomous-ai/lampOS/issues/comments{/number}",
+          "contents_url": "https://api.github.com/repos/autonomous-ai/lampOS/contents/{+path}",
+          "compare_url": "https://api.github.com/repos/autonomous-ai/lampOS/compare/{base}...{head}",
+          "merges_url": "https://api.github.com/repos/autonomous-ai/lampOS/merges",
+          "archive_url": "https://api.github.com/repos/autonomous-ai/lampOS/{archive_format}{/ref}",
+          "downloads_url": "https://api.github.com/repos/autonomous-ai/lampOS/downloads",
+          "issues_url": "https://api.github.com/repos/autonomous-ai/lampOS/issues{/number}",
+          "pulls_url": "https://api.github.com/repos/autonomous-ai/lampOS/pulls{/number}",
+          "milestones_url": "https://api.github.com/repos/autonomous-ai/lampOS/milestones{/number}",
+          "notifications_url": "https://api.github.com/repos/autonomous-ai/lampOS/notifications{?since,all,participating}",
+          "labels_url": "https://api.github.com/repos/autonomous-ai/lampOS/labels{/name}",
+          "releases_url": "https://api.github.com/repos/autonomous-ai/lampOS/releases{/id}",
+          "deployments_url": "https://api.github.com/repos/autonomous-ai/lampOS/deployments"
+        },
+        "head_repository": {
+          "id": 1259624583,
+          "node_id": "R_kgDOSxRYhw",
+          "name": "lampOS",
+          "full_name": "autonomous-ai/lampOS",
+          "private": false,
+          "owner": {
+            "login": "autonomous-ai",
+            "id": 98006261,
+            "node_id": "O_kgDOBdd09Q",
+            "avatar_url": "https://avatars.githubusercontent.com/u/98006261?v=4",
+            "gravatar_id": "",
+            "url": "https://api.github.com/users/autonomous-ai",
+            "html_url": "https://github.com/autonomous-ai",
+            "followers_url": "https://api.github.com/users/autonomous-ai/followers",
+            "following_url": "https://api.github.com/users/autonomous-ai/following{/other_user}",
+            "gists_url": "https://api.github.com/users/autonomous-ai/gists{/gist_id}",
+            "starred_url": "https://api.github.com/users/autonomous-ai/starred{/owner}{/repo}",
+            "subscriptions_url": "https://api.github.com/users/autonomous-ai/subscriptions",
+            "organizations_url": "https://api.github.com/users/autonomous-ai/orgs",
+            "repos_url": "https://api.github.com/users/autonomous-ai/repos",
+            "events_url": "https://api.github.com/users/autonomous-ai/events{/privacy}",
+            "received_events_url": "https://api.github.com/users/autonomous-ai/received_events",
+            "type": "Organization",
+            "user_view_type": "public",
+            "site_admin": false
+          },
+          "html_url": "https://github.com/autonomous-ai/lampOS",
+          "description": "The open-source operating system for physical AI.",
+          "fork": false,
+          "url": "https://api.github.com/repos/autonomous-ai/lampOS",
+          "forks_url": "https://api.github.com/repos/autonomous-ai/lampOS/forks",
+          "keys_url": "https://api.github.com/repos/autonomous-ai/lampOS/keys{/key_id}",
+          "collaborators_url": "https://api.github.com/repos/autonomous-ai/lampOS/collaborators{/collaborator}",
+          "teams_url": "https://api.github.com/repos/autonomous-ai/lampOS/teams",
+          "hooks_url": "https://api.github.com/repos/autonomous-ai/lampOS/hooks",
+          "issue_events_url": "https://api.github.com/repos/autonomous-ai/lampOS/issues/events{/number}",
+          "events_url": "https://api.github.com/repos/autonomous-ai/lampOS/events",
+          "assignees_url": "https://api.github.com/repos/autonomous-ai/lampOS/assignees{/user}",
+          "branches_url": "https://api.github.com/repos/autonomous-ai/lampOS/branches{/branch}",
+          "tags_url": "https://api.github.com/repos/autonomous-ai/lampOS/tags",
+          "blobs_url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs{/sha}",
+          "git_tags_url": "https://api.github.com/repos/autonomous-ai/lampOS/git/tags{/sha}",
+          "git_refs_url": "https://api.github.com/repos/autonomous-ai/lampOS/git/refs{/sha}",
+          "trees_url": "https://api.github.com/repos/autonomous-ai/lampOS/git/trees{/sha}",
+          "statuses_url": "https://api.github.com/repos/autonomous-ai/lampOS/statuses/{sha}",
+          "languages_url": "https://api.github.com/repos/autonomous-ai/lampOS/languages",
+          "stargazers_url": "https://api.github.com/repos/autonomous-ai/lampOS/stargazers",
+          "contributors_url": "https://api.github.com/repos/autonomous-ai/lampOS/contributors",
+          "subscribers_url": "https://api.github.com/repos/autonomous-ai/lampOS/subscribers",
+          "subscription_url": "https://api.github.com/repos/autonomous-ai/lampOS/subscription",
+          "commits_url": "https://api.github.com/repos/autonomous-ai/lampOS/commits{/sha}",
+          "git_commits_url": "https://api.github.com/repos/autonomous-ai/lampOS/git/commits{/sha}",
+          "comments_url": "https://api.github.com/repos/autonomous-ai/lampOS/comments{/number}",
+          "issue_comment_url": "https://api.github.com/repos/autonomous-ai/lampOS/issues/comments{/number}",
+          "contents_url": "https://api.github.com/repos/autonomous-ai/lampOS/contents/{+path}",
+          "compare_url": "https://api.github.com/repos/autonomous-ai/lampOS/compare/{base}...{head}",
+          "merges_url": "https://api.github.com/repos/autonomous-ai/lampOS/merges",
+          "archive_url": "https://api.github.com/repos/autonomous-ai/lampOS/{archive_format}{/ref}",
+          "downloads_url": "https://api.github.com/repos/autonomous-ai/lampOS/downloads",
+          "issues_url": "https://api.github.com/repos/autonomous-ai/lampOS/issues{/number}",
+          "pulls_url": "https://api.github.com/repos/autonomous-ai/lampOS/pulls{/number}",
+          "milestones_url": "https://api.github.com/repos/autonomous-ai/lampOS/milestones{/number}",
+          "notifications_url": "https://api.github.com/repos/autonomous-ai/lampOS/notifications{?since,all,participating}",
+          "labels_url": "https://api.github.com/repos/autonomous-ai/lampOS/labels{/name}",
+          "releases_url": "https://api.github.com/repos/autonomous-ai/lampOS/releases{/id}",
+          "deployments_url": "https://api.github.com/repos/autonomous-ai/lampOS/deployments"
+        }
+      },
+      "jobs": [
+        {
+          "id": 122265038179,
+          "run_id": 40525836374,
+          "workflow_name": "lampOS clippy",
+          "head_branch": "tests/3796-compatible-host-templates",
+          "run_url": "https://api.github.com/repos/autonomous-ai/lampOS/actions/runs/40525836374",
+          "run_attempt": 1,
+          "node_id": "CR_kwDOSxRYh88AAAAcd5BtYw",
+          "head_sha": "8aa03c7d244dd36990e36c082a281eb8d92a3dce",
+          "url": "https://api.github.com/repos/autonomous-ai/lampOS/actions/jobs/122265038179",
+          "html_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40525836374/job/122265038179",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-10-27T14:55:25Z",
+          "started_at": "2026-10-27T14:55:29Z",
+          "completed_at": "2026-10-27T15:04:04Z",
+          "name": "lampOS \u2014 clippy, every crate and target (x86 Linux)",
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1,
+              "started_at": "2026-10-27T14:55:30Z",
+              "completed_at": "2026-10-27T14:55:30Z"
+            },
+            {
+              "name": "system packages",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2,
+              "started_at": "2026-10-27T14:55:30Z",
+              "completed_at": "2026-10-27T14:58:37Z"
+            },
+            {
+              "name": "Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3,
+              "started_at": "2026-10-27T14:58:37Z",
+              "completed_at": "2026-10-27T14:58:46Z"
+            },
+            {
+              "name": "Rust 1.96.0",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4,
+              "started_at": "2026-10-27T14:58:46Z",
+              "completed_at": "2026-10-27T14:58:54Z"
+            },
+            {
+              "name": "stable promotion formatting and strict Clippy",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5,
+              "started_at": "2026-10-27T14:58:54Z",
+              "completed_at": "2026-10-27T14:59:08Z"
+            },
+            {
+              "name": "formatting (whole workspace, pinned Rust)",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 6,
+              "started_at": "2026-10-27T14:59:08Z",
+              "completed_at": "2026-10-27T14:59:20Z"
+            },
+            {
+              "name": "restore the cache",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 7,
+              "started_at": "2026-10-27T14:59:20Z",
+              "completed_at": "2026-10-27T15:02:56Z"
+            },
+            {
+              "name": "unchanged source files get the cached build's times back",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 8,
+              "started_at": "2026-10-27T15:02:56Z",
+              "completed_at": "2026-10-27T15:02:58Z"
+            },
+            {
+              "name": "clippy (every crate and target, warnings as errors)",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 9,
+              "started_at": "2026-10-27T15:02:58Z",
+              "completed_at": "2026-10-27T15:04:01Z"
+            },
+            {
+              "name": "save the cache",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 10,
+              "started_at": "2026-10-27T15:04:01Z",
+              "completed_at": "2026-10-27T15:04:01Z"
+            },
+            {
+              "name": "Post Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 20,
+              "started_at": "2026-10-27T15:04:01Z",
+              "completed_at": "2026-10-27T15:04:01Z"
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 21,
+              "started_at": "2026-10-27T15:04:01Z",
+              "completed_at": "2026-10-27T15:04:01Z"
+            }
+          ],
+          "check_run_url": "https://api.github.com/repos/autonomous-ai/lampOS/check-runs/122265038179",
+          "labels": [
+            "ubuntu-22.04"
+          ],
+          "runner_id": 1000088136,
+          "runner_name": "GitHub Actions 1000088136",
+          "runner_group_id": 0,
+          "runner_group_name": "GitHub Actions"
+        }
+      ]
+    }
+  ],
+  "artifact_manifest_audit": {
+    "run": 40525835969,
+    "attempt": 1,
+    "head": "8aa03c7d244dd36990e36c082a281eb8d92a3dce",
+    "artifact": {
+      "id": 12744822952,
+      "name": "lampos-arm64-8aa03c7d244dd36990e36c082a281eb8d92a3dce",
+      "size_in_bytes": 118297200,
+      "digest": "sha256:ad7be74bf978de9addda42a44a5f891c50aee462094a51d63f57f70d12bd435c",
+      "workflow_run": {
+        "id": 40525835969,
+        "repository_id": 1259624583,
+        "head_repository_id": 1259624583,
+        "head_branch": "tests/3796-compatible-host-templates",
+        "head_sha": "8aa03c7d244dd36990e36c082a281eb8d92a3dce"
+      }
+    },
+    "download_started_at": "2026-10-27T15:14:03.120618+00:00",
+    "archive_binding": {
+      "API_size_in_bytes": 118297200,
+      "archive_bytes": 118297200,
+      "archive_sha256": "ad7be74bf978de9addda42a44a5f891c50aee462094a51d63f57f70d12bd435c",
+      "API_digest": "sha256:ad7be74bf978de9addda42a44a5f891c50aee462094a51d63f57f70d12bd435c",
+      "size_equal": true,
+      "digest_equal": true
+    },
+    "manifests": [
+      {
+        "zip_entry": "SHA256SUMS",
+        "export": "manifest-0-SHA256SUMS",
+        "sha256": "5ccc6b2f55d09f579aa4d14a57def07f85aad9321827c1a9d635676330651ee9",
+        "bytes": 4003
+      }
+    ],
+    "lamp_update_manifest_entry": {
+      "sha256": "bc49c27002c2ef1580476deb32b7c2736a391c4433640b1d5eeb08e9cd73ae8a",
+      "path": "lamp-update"
+    },
+    "refused_updater_sha256": "b35b4c9b0de12b6ff56002fb6d7847cfefeabbb428cf2634d47c4810cd754fbb",
+    "updater_digest_differs_from_refused": true,
+    "binary_member_read_or_extracted": false,
+    "ARM_binary_executed": false,
+    "limits": "Digest is authenticated artifact checksum manifest entry; payload lamp-update member not read or independently hashed. No per-nextest test executable digest claim."
+  },
+  "separate_historical_Cloud_LEAK": {
+    "scope": "Historical independent Cloud run only; never a current9dd CI result or clean PASS. Source differentiation is not causal proof.",
+    "source_receipt": ".harness/handoff/tests-preserved-20261026/recovery/evidence/restart-a8a-original-ci-20261027/separate-cloud-leak-audit.json",
+    "source_bytes": 3111,
+    "source_sha256": "0b190f155aa1bd5e045317b40e1274381245f37fa19558b55e0560fae941827f",
+    "prior_audit": {
+      "source_scope": "Independent Cloud pull-request run, not current Restarta8a/9e0 host or native result",
+      "run": 40439732017,
+      "head": "553e0d653eb9557a7b804e8fb6c469c102159808",
+      "branch": "second/cloud-query-bounds",
+      "event": "pull_request",
+      "attempt": 1,
+      "GitHub_conclusion": "success",
+      "actual_preview": "ac5bd8f6fe70eb181152a8c65639b23420f754b1",
+      "ordered_parents": [
+        "5982e4b7fa465177f55697ddb362d78b964809b7",
+        "553e0d653eb9557a7b804e8fb6c469c102159808"
+      ],
+      "tree": "7d25d6fcae8daf56384108fdb610c85c6640667a",
+      "source_same_voice_blob": "7c9b7231d8106c9d356d9f409612c296a3cfc7a8",
+      "execution_window": {
+        "start_line": 845,
+        "summary_line": 12306,
+        "starting": "2026-10-27T02:51:15.7344466Z     Starting 11459 tests across 183 binaries (106 tests and 2 binaries skipped)",
+        "summary": "2026-10-27T02:54:51.7305079Z      Summary [ 215.995s] 11459 tests run: 11459 passed (1 leaky), 106 skipped"
+      },
+      "unique_records": 11459,
+      "counts": {
+        "PASS": 11458,
+        "LEAK": 1
+      },
+      "aggregate_skipped": 106,
+      "selected_unrun": 0,
+      "leak_record": {
+        "line": 10047,
+        "timestamp": "2026-10-27T02:54:17.6302563Z",
+        "status": "LEAK",
+        "seconds": "0.436",
+        "ordinal": 9202,
+        "total": 11459,
+        "binary": "lamp-voice",
+        "case": "same_voice::tests::a_child_that_hangs_after_it_is_ready_is_killed_and_started_again"
+      },
+      "source_fixture_fact": "The Cloud snapshot still declares JournalWorker and uses a bare Prints::timed local in the hung-child case; current Restart adds FixtureWorker ownership. This is source differentiation, not causal proof.",
+      "no_causal_or_no_regression_proof": true,
+      "no_clean_PASS_relabel": true,
+      "raw_receipts": [
+        {
+          "receipt": "restart-cloud-leak-witness-20261027/arm-job.log",
+          "sha256": "208d1f5f5895f024407970ca066f7c19aad3ecaa66fb04fd38a9f890129ea88d",
+          "bytes": 1964635
+        },
+        {
+          "receipt": "restart-cloud-leak-witness-20261027/census.json",
+          "sha256": "fbd22477defc0af1388e40d953fec421b22d6f1397a2929c46fb979758cc2220",
+          "bytes": 2699733
+        },
+        {
+          "receipt": "restart-a8a-original-ci-20261027/cloud-witness-run-metadata.json",
+          "sha256": "f79d1bf2593b3788cf39f2e4568224cb986aab9ca1db787647807794cb83bdff",
+          "bytes": 12711
+        },
+        {
+          "receipt": "restart-a8a-original-ci-20261027/cloud-witness-jobs.json",
+          "sha256": "5c590c23b5676e979476ef10730cac0e10a880e11a2ba8319af710770ab255e9",
+          "bytes": 8130
+        },
+        {
+          "receipt": "restart-a8a-original-ci-20261027/cloud-witness-preview-commit.json",
+          "sha256": "682b5a70eff3f4709c4f9fdc683de5d61347dfd1249608074115f75fe27bb802",
+          "bytes": 2603
+        },
+        {
+          "receipt": "restart-a8a-original-ci-20261027/cloud-witness-same_voice-contents-metadata.json",
+          "sha256": "72330f44d056bc34c91fa3dacc076694e8e74e236620bb55d33f3ca7636f90a9",
+          "bytes": 108561
+        },
+        {
+          "receipt": "restart-a8a-original-ci-20261027/cloud-witness-same_voice.rs",
+          "sha256": "50305d296f5560272af70a42f8271447eb6d0983d4c86f5866a1df657b513fd0",
+          "bytes": 77970
+        }
+      ]
+    }
+  },
+  "physical_acceptance": "HOLD retained; no device state or acceptance is inferred",
+  "earlier_native_epochs": "ee6/026 and bd0/992 results, checksum manifests and host scopes remain separate, not current8aa executions",
+  "private_receipt_bindings": {
+    "update-arm/job-122265039229-log.raw": {
+      "sha256": "4c33495fc2e9213e69c914145ef4ae94be89ff594f3d8dc4956021d9820fe520",
+      "bytes": 1374483
+    },
+    "update-arm/audit.json": {
+      "sha256": "e1194ca78a40c3114ddc92ed5dd39b15339226ea33b304561da6be872fce4d0e",
+      "bytes": 34090
+    },
+    "update-arm/jobs.receipt.json": {
+      "sha256": "eb971f47392d3ebb3a8fbd306938ed0445e4986a62eff4ae0d2b5883a2bd7af4",
+      "bytes": 554
+    },
+    "update-arm/initial-run.stderr": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "update-arm/jobs.raw": {
+      "sha256": "f10e6286c0774509f06f91ccfef55e0ec503ebceb18e8e396bd7dad60dae9443",
+      "bytes": 8174
+    },
+    "update-arm/scope.json": {
+      "sha256": "ca0d3cd0a5f355efa7105bf2c9d985ce21eeea3aa1e3a15eca6b28bec9211428",
+      "bytes": 372
+    },
+    "update-arm/bounded-watch.receipt.json": {
+      "sha256": "3faaf9c8273783cb7c8375652b8c7b7341e7f0d2981da44860a4d6e42aa4a6f6",
+      "bytes": 601
+    },
+    "update-arm/bounded-watch.stderr": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "update-arm/post-summary-reprints.json": {
+      "sha256": "238693f3676f5b3c7657127b41500116adf26bc6364d41072220a7ed0449dbd8",
+      "bytes": 23747
+    },
+    "update-arm/final-run.receipt.json": {
+      "sha256": "05a0bb53202981df9b76f109fa682fcb91a56b9795541768f8e6c6abd53128d8",
+      "bytes": 537
+    },
+    "update-arm/job-122265039229-log.stderr": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "update-arm/job-122265039229-log.receipt.json": {
+      "sha256": "4d1d262c98c6ab14a5bc1a90cb5e6239e10a74a0754b4da9fd367e2ebd89a046",
+      "bytes": 544
+    },
+    "update-arm/final-run.raw": {
+      "sha256": "d3724cd453c5d148d48ad5bed623b6848f16ded8e3324c2c55ed1bba3fecbd9e",
+      "bytes": 12733
+    },
+    "update-arm/bounded-watch.raw": {
+      "sha256": "e1977155ff04b03bd4041993e8a6be5c03a738f60a1582d8f6a56d0b16d214fe",
+      "bytes": 31518
+    },
+    "update-arm/initial-run.raw": {
+      "sha256": "d1fb1a2e5f3e0fd7864ad97eb60a2249d8faf48b00e080f9a07d65c0e943f4c0",
+      "bytes": 12730
+    },
+    "update-arm/jobs.stderr": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "update-arm/execution-identities.json": {
+      "sha256": "23d1045b92d83d4d07b6e66eaabfb56ba5b5884306b31008eaab163fc7af7662",
+      "bytes": 2222085
+    },
+    "update-arm/final-run.stderr": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "update-arm/initial-run.receipt.json": {
+      "sha256": "0bef0fb783c79b372905edab39fa55376f2186900c41eb6457bfba9b629b28c3",
+      "bytes": 537
+    },
+    "update-linux/jobs.receipt.json": {
+      "sha256": "520b3df8a5a7e907e658405362794fc97db6841b5e039f502dd29a6cc0bb122b",
+      "bytes": 554
+    },
+    "update-linux/initial-run.stderr": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "update-linux/jobs.raw": {
+      "sha256": "fae46a4864fd7f3b33021d28921bcc89abad635fc8723b7e65a6eaec4f853705",
+      "bytes": 3011
+    },
+    "update-linux/scope.json": {
+      "sha256": "ad92526589286ad9c4a4615c05d53615f5a66b87b97d42b59f514cff29650121",
+      "bytes": 370
+    },
+    "update-linux/bounded-watch.receipt.json": {
+      "sha256": "cfb768e11a53e27b0ae92aa59f990d18365f6a670911af88c673894b3fd22fc3",
+      "bytes": 601
+    },
+    "update-linux/job-122265038179-log.receipt.json": {
+      "sha256": "7d7734d69b36b0a114499c1a71d6a4dc34c1f67176e58fe910eff55148f7c230",
+      "bytes": 543
+    },
+    "update-linux/bounded-watch.stderr": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "update-linux/final-run.receipt.json": {
+      "sha256": "0f038c166a111daa345ec8e54c640a0c6bf78f2de76561e3745398eb91d8ce8e",
+      "bytes": 537
+    },
+    "update-linux/final-run.raw": {
+      "sha256": "19e1d8297e673e7d78c8f3275217a10ede0b3ab3a489565a534918ffe7910d85",
+      "bytes": 12732
+    },
+    "update-linux/job-122265038179-log.raw": {
+      "sha256": "41efa18022379a73e3dae709b916751b1dc2c5a80fbcf87c5038d7126610bf25",
+      "bytes": 56901
+    },
+    "update-linux/job-122265038179-log.stderr": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "update-linux/bounded-watch.raw": {
+      "sha256": "c6ab240dc05774e94f439caf5868f1f8688e2477403c71769223c3c3deccbf85",
+      "bytes": 4973
+    },
+    "update-linux/initial-run.raw": {
+      "sha256": "1f6cd7217b9fe74187adee496ab9a4b20bb694f7cc6ac179c070bd49123a56e8",
+      "bytes": 12729
+    },
+    "update-linux/jobs.stderr": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "update-linux/final-run.stderr": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "update-linux/initial-run.receipt.json": {
+      "sha256": "57dd1ecd2827daae5332b678ef5d3f571e08f0100507b5bb8f40b1698ca40211",
+      "bytes": 536
+    },
+    "update-artifact-manifests/zip-entry-inventory.json": {
+      "sha256": "68e152d04af6a95dc929a9a842dbc72d33055309a0d5437e61519647ef7af694",
+      "bytes": 5833
+    },
+    "update-artifact-manifests/audit.json": {
+      "sha256": "748f643e79395d0245e04c605cc637ef04e12ec170ab9e2f4ec2039a3639bae2",
+      "bytes": 1725
+    },
+    "update-artifact-manifests/manifest-0-SHA256SUMS": {
+      "sha256": "5ccc6b2f55d09f579aa4d14a57def07f85aad9321827c1a9d635676330651ee9",
+      "bytes": 4003
+    },
+    "update-artifact-manifests/archive-binding.json": {
+      "sha256": "8c9728bb2caf8af0789bc9a2fe1b3ea7a43ae3f5768065c693caa1f8c19154b5",
+      "bytes": 292
+    },
+    "update-artifact-manifests/download-private.stderr": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "update-artifact-manifests/artifacts.json": {
+      "sha256": "f372c3a2a3ed48dff3ede464d3f518bbb9bc6e0cf20f4e0b27f5b628dfa014a3",
+      "bytes": 964
+    },
+    "update-body-bin.rs": {
+      "sha256": "1ce10ff0f2e2aa4585548215db8f842a4971001105d07e9075809a768d5a36dd",
+      "bytes": 166435
+    },
+    "update-preview-own-2.txt": {
+      "sha256": "68aa0cd4440985c479ad42dec31e5543e80223982d36cbed25e4e1470ab12119",
+      "bytes": 172430
+    },
+    "update-preview-own-1.txt.api.json": {
+      "sha256": "1d0fa6c808604c346d0f595569d7a190bb456eadeea32118a1367d1ab01de751",
+      "bytes": 47688
+    },
+    "R2-host-notes-request.json": {
+      "sha256": "21b905ecbaf38770dfcf23e387d85b6de03c142610a88dc24d43a02f3f3fc234",
+      "bytes": 2333
+    },
+    "update-preview-own-1.txt": {
+      "sha256": "186f14125da71d8859dbb9587d59709c6a5f2fd2b7a191add351f4e4ad6ded16",
+      "bytes": 33721
+    },
+    "update-preview-own-0.txt": {
+      "sha256": "9e6982b020ab55f2906504ea6f0cd3c73878f59692531bb0988d933304953133",
+      "bytes": 127859
+    },
+    "carry-authored-round.rs.api.json": {
+      "sha256": "dfe70fd689bc9b4863fa9dd9d5613796fbb2fe1f37014f8f2830a3073cd0e12b",
+      "bytes": 177342
+    },
+    "update-preview-own-0.txt.api.json": {
+      "sha256": "636bb05746aeaa543221798d7e441900433eafd079f5a94c9d8a79ffe66eb631",
+      "bytes": 177271
+    },
+    "verify-final-manifest.py": {
+      "sha256": "1501c3cfc8af3272b7eea761e7ddd4efeeea26956315d9c6e6e814bcb1ca77b5",
+      "bytes": 1245
+    },
+    "update-authored-commit.json": {
+      "sha256": "1cfaae43e6653dbe60f4d48a390023fb074a56bf2caf8ef7e49efc95d787e745",
+      "bytes": 1135
+    },
+    "update-product-carrier-tests.rs": {
+      "sha256": "186f14125da71d8859dbb9587d59709c6a5f2fd2b7a191add351f4e4ad6ded16",
+      "bytes": 33721
+    },
+    "update-preview-commit.json": {
+      "sha256": "052c01cb15738148d178e7ee315a57f778f054306b805e745c8ce0e9d1362afa",
+      "bytes": 2603
+    },
+    "update-reader-tests.rs": {
+      "sha256": "794a44b35d1025ee9f66035099d3fe1facc8233eb39f7d17878e08a7ea7f3e49",
+      "bytes": 36539
+    },
+    "update-lampos-pr-crates.py": {
+      "sha256": "943ca7f9d87f6a89b16ac80871003bc8bf9dd7c526fcf9ce4c23873467a9d658",
+      "bytes": 5523
+    },
+    "authored-carry-preservation.json": {
+      "sha256": "cc60b31c5747d04d8342326c07292c5eeaad4af1feb366719dfa47297c898af2",
+      "bytes": 1761
+    },
+    "update-authored-2.txt": {
+      "sha256": "ffbcb28feedc3d742e88197973603408cb460aa505000f4119f8b68c4303db4d",
+      "bytes": 171913
+    },
+    "update-reader-tests.rs.api.json": {
+      "sha256": "707aee7ae80c8d958e80c642ed7fd334c941004a60398426be0f8a9fb8be7071",
+      "bytes": 51534
+    },
+    "carry-authored-product-carrier.rs": {
+      "sha256": "186f14125da71d8859dbb9587d59709c6a5f2fd2b7a191add351f4e4ad6ded16",
+      "bytes": 33721
+    },
+    "preview-host-notes-verified.json": {
+      "sha256": "9839962cbd3d9630f70884e69b8738a61b05b5b71b4761aecf3711e0732ecf36",
+      "bytes": 986
+    },
+    "update-authored-1.txt.api.json": {
+      "sha256": "f888844fa87168d8f7886d9e007d7af875e28853f363cfae70bba52e944ef8fc",
+      "bytes": 47688
+    },
+    "update-workflow-arm.yml.api.json": {
+      "sha256": "ecec6dc040938ee46a1d46461bcde32e3657e8acb3391bbad76eb1199270361c",
+      "bytes": 29654
+    },
+    "update-authored-1.txt": {
+      "sha256": "186f14125da71d8859dbb9587d59709c6a5f2fd2b7a191add351f4e4ad6ded16",
+      "bytes": 33721
+    },
+    "audit-native-before-doc-append-adjustment.py": {
+      "sha256": "f9dfa55b9b8db14424447a32f10e9d45e19e0100de971fabed14ad4fb0ba841d",
+      "bytes": 11241
+    },
+    "update-authored-0.txt": {
+      "sha256": "9e6982b020ab55f2906504ea6f0cd3c73878f59692531bb0988d933304953133",
+      "bytes": 127859
+    },
+    "6c69-receipt-host-commit.json": {
+      "sha256": "bc54ab7ce35d1acb84dae75af3b9ab49ea6790d781f32772cfe2bef9482991ee",
+      "bytes": 5878
+    },
+    "update-authored-0.txt.api.json": {
+      "sha256": "9aa901dca9b91097dc2e662fee92a9d8406e41e5595bd6cf7f85366eff08b4ad",
+      "bytes": 177271
+    },
+    "update-nextest.toml.api.json": {
+      "sha256": "2364abbb996094d0fb294c6da39c2adadbf0760cf6a00ffe689d30c21b174984",
+      "bytes": 8179
+    },
+    "discovery.json": {
+      "sha256": "65c293f0f41ee2ccf229c55ec5ca90f9ff921985e132277c316b6e8b8b1c9dfa",
+      "bytes": 2064
+    },
+    "update-workflow-linux.yml.api.json": {
+      "sha256": "c6e4cefb37a843317086e634cde99cbc04d279a96e5290439bde064768c50cde",
+      "bytes": 7632
+    },
+    "update-authored-2.txt.api.json": {
+      "sha256": "34d656a11a2242a42a6855f02aacd7d8091e1392ff71bf3aeea3896e2b763fda",
+      "bytes": 237905
+    },
+    "collection-terminal.json": {
+      "sha256": "ccb0ae662e1da4fa7e8d2f9b51b24f346a4746bdbc5f6cd5aba82f110ea8f8c6",
+      "bytes": 314
+    },
+    "update-workflow-linux.yml": {
+      "sha256": "d2b21162ac7c05964816c147a0cfc10c0082e39f1c7775e247e43ddf02ee0909",
+      "bytes": 4721
+    },
+    "build-public-packet.py": {
+      "sha256": "71cb3397d6685d56710ecb561b5f6a267b996bd42b2b3e94788ac838ee07db31",
+      "bytes": 7109
+    },
+    "audit-native.py": {
+      "sha256": "200ef24b9ececfaf6be3de961b36ec056ae897b5a752a9bd8f043e309a584d31",
+      "bytes": 12057
+    },
+    "authored-updates.api.json": {
+      "sha256": "aa7f0c14194db5a4675d297d9ecceaeca7374e2dd29f287fc68c823905f30998",
+      "bytes": 237976
+    },
+    "update-authored-to-preview.json": {
+      "sha256": "898763dfbb4ce600469c2f290b8b0ad568ffd22da2e7d22608cab11f53da65e9",
+      "bytes": 1235573
+    },
+    "update-product-carrier-tests.rs.api.json": {
+      "sha256": "1d0fa6c808604c346d0f595569d7a190bb456eadeea32118a1367d1ab01de751",
+      "bytes": 47688
+    },
+    "collect-originals.py": {
+      "sha256": "c76a0aa1f5078f183b1b89fa719a21ac0de09633a490f3b3045a01899868fe5c",
+      "bytes": 3231
+    },
+    "update-nextest.toml": {
+      "sha256": "c4992da8d157df279011a424b5feb4833f001fd1d46ce3edd0a56992c848bb33",
+      "bytes": 5157
+    },
+    "update-body-bin.rs.api.json": {
+      "sha256": "ee5bfdc3eecc4788d20b26aa15b81da32d63f2974ea5ea7e302afbe0eab1929d",
+      "bytes": 230461
+    },
+    "update-preview-own-2.txt.api.json": {
+      "sha256": "3e81dda470cf86889f441032fed12632fc9fb391536dc27a3eb8509495d6eb82",
+      "bytes": 238615
+    },
+    "update-source-bindings.json": {
+      "sha256": "0733015e48ea5de3febb7609355dc85af52b1901caa3eb441c8b0d3c0b33f3c5",
+      "bytes": 4931
+    },
+    "current-checks-once.json": {
+      "sha256": "45bc01970f00f35a27f7966d063fd139c4a20e57338e6d0196d34520cee4a955",
+      "bytes": 35740
+    },
+    "carry-authored-round.rs": {
+      "sha256": "9e6982b020ab55f2906504ea6f0cd3c73878f59692531bb0988d933304953133",
+      "bytes": 127859
+    },
+    "authored-updates.md": {
+      "sha256": "ffbcb28feedc3d742e88197973603408cb460aa505000f4119f8b68c4303db4d",
+      "bytes": 171913
+    },
+    "original-stage-checks.json": {
+      "sha256": "439f4a936420df46c7f03339dcd74c26e09d6a5a10287b029a1ffca5bc72bae7",
+      "bytes": 16610
+    },
+    "final-host-notes-source-binding.json": {
+      "sha256": "319aac43ee3298fcd541ecd68ae344a9c24ace0532a5fe01c9fd05a8f2d7f492",
+      "bytes": 1416
+    },
+    "update-lampos-pr-crates.py.api.json": {
+      "sha256": "8b9ce3406608f5ec2d388aa8faa62d4c6728f8c24a6ce1fdad9bbfbf7e37cc1d",
+      "bytes": 8738
+    },
+    "collect-update-manifests.py": {
+      "sha256": "d6c9e41d93b3acc33c51573d8cea31378194aac18f8f586c80a2d529cbbee3ed",
+      "bytes": 4307
+    },
+    "collect-sources.py": {
+      "sha256": "23cd89f2db2bb43c9b0673ddecfc03e899ea6e72a1fb9d4f7782a28295a32156",
+      "bytes": 2831
+    },
+    "update-workflow-arm.yml": {
+      "sha256": "5ddf0f7ae45bceaba81e899719ca199a4246a045b6f32f505edcccc61b3d170f",
+      "bytes": 20708
+    },
+    "carry-authored-product-carrier.rs.api.json": {
+      "sha256": "ff73caf776920fb36df28951aff136c15c973bcf681fcfa446152d19cbc8bc54",
+      "bytes": 47759
+    }
+  }
+}

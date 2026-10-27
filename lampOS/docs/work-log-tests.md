@@ -1,5 +1,13 @@
 # Tests work log
 
+## 2026-10-27 22:18 — current updater native proof; Reader library passed
+
+Ready for lamp-voice: no (#3843 current readers and physical acceptance remain; #3543 latest carry/native gates next).
+
+[Current updater native proof](verification/tests-3843-8aa-native-20261027/) binds original ARM40525835969 and Linux40525836374 to offered8aa03c7d2: **7,791 unique PASS, zero bad or selected-unrun,53 aggregate skips**, Round215 and all fourteen regressions once. Actualc0b63d8d4 [c3eb20be3,8aa03c7d2] preserves both full Rust blobs and both host receipt notes; the complete authored document has an upstream appendix. No full authored-tree equality is claimed. The authenticated checksum manifest reports updaterbc49c2700; no ARM payload was read or executed on the Mac. Fifth's installed updater/normal-host/health-watch acceptance is still required; no new device action.
+
+The Reader fixture full local Voice library passed3866/0/15 once on exact folded0f4311d95 source over992303fc8, with all source/executable/group guards passing. This local result is not a current-base or Linux Reader claim. Carrying its own branch to fetched Main and fresh qualification are next. Body#3845 is already delivered through train242, not waiting for a duplicate merge.
+
 ## 2026-10-27 22:07 — Body delivered; privacy disposition scoped
 
 Ready for lamp-voice: #3845 delivered through train242; #3843 still draft for current carry checks and holder acceptance.
