@@ -56,6 +56,8 @@ class Report:
     folder: Path
     errors: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
+    # The format skill.toml says, or 1 when it names none.
+    format: int = 1
 
     @property
     def ok(self) -> bool:
@@ -298,9 +300,33 @@ def _files(folder: Path, report: Report) -> None:
             report.errors.append(f"{where}: {seconds:.1f} s, longer than 3 s")
 
 
+def _look_steps(value: Any, inside_do: bool = False) -> int:
+    """How many steps ask `look = true`: a table in a `do` list, anywhere."""
+    if isinstance(value, dict):
+        own = 1 if inside_do and value.get("look") is True else 0
+        return own + sum(_look_steps(v, key == "do") for key, v in value.items())
+    if isinstance(value, list):
+        return sum(_look_steps(item, inside_do) for item in value)
+    return 0
+
+
 def _permissions(rules: dict[str, Any], report: Report) -> None:
-    permissions = rules.get("permissions")
-    if isinstance(permissions, dict) and permissions.get("look") is True and permissions.get("camera") is not True:
+    """As lamp-skills reads them: `format` 1 or 2 (any other is refused),
+    and the picture as `sees_picture` = camera, or format 1's look."""
+    fmt = rules.get("format", 1)
+    # The lamp reads `format` as a whole number (u32): 2.0 or true is refused.
+    if not isinstance(fmt, int) or isinstance(fmt, bool) or fmt not in (1, 2):
+        report.errors.append(f"skill.toml: format {fmt} is not one this lamp reads (1 or 2)")
+        return
+    report.format = fmt
+    permissions = rules.get("permissions") if isinstance(rules.get("permissions"), dict) else {}
+    camera, look = permissions.get("camera") is True, permissions.get("look") is True
+    sees_picture = camera or (look and fmt != 2)
+    if _look_steps(rules) and not sees_picture:
+        report.errors.append(
+            "skill.toml: a look = true step takes the camera's picture, which needs camera = true in [permissions]"
+        )
+    if fmt == 1 and look and not camera:
         # Format 1's `look = true` alone gives the picture (lamp-skills'
         # `sees_picture`); `camera` is that grant's own name, and format 1's
         # presence is the presence topics (docs/skill-format.md).
