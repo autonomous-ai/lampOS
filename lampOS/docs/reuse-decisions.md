@@ -1,5 +1,18 @@
 # Reuse decisions: V1, ROS 2 and existing Rust systems
 
+## Compare existing saved observations before finite-plan derivation (2026-10-28)
+
+Reuse the validated bounded preimage bundle and saved Head codec rather than
+parsing their JSON again or constructing native Stat values. Compare only
+common selected fields with checked numeric conversions, canonical overlapping
+prefixes and exact regular bytes/typed absences. Directory membership adds
+negative evidence without implying file kind. Refuse unsupported link/null
+overlap instead of introducing another resolver. Both original encodings stay
+immutable; ordinary policy and wire readers remain unchanged. This supplies
+represented lexical agreement only, with authentication, protected root intent,
+writer exclusion, durable admission and independent restoration still separate.
+See [the coherence contract](head-preimage-coherence.md).
+
 ## Cap only the future plan's derived head-pins output (2026-10-28)
 
 Reuse the existing V2 head-pair evaluator, ordinary pretty-JSON bytes and
