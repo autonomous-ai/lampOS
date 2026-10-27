@@ -27,6 +27,14 @@ async fn lamp(name: &str) -> Lamp {
 }
 
 async fn lamp_with(name: &str, parts: Box<dyn session::Parts + Send>) -> Lamp {
+    lamp_built(name, parts, |door, _| door).await
+}
+
+async fn lamp_built(
+    name: &str,
+    parts: Box<dyn session::Parts + Send>,
+    build: impl FnOnce(session::Door, &std::path::Path) -> session::Door,
+) -> Lamp {
     let dir = std::env::temp_dir().join(format!("lamp-control-door-{name}-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
@@ -38,6 +46,7 @@ async fn lamp_with(name: &str, parts: Box<dyn session::Parts + Send>) -> Lamp {
         pairing::Clients::default(),
         Some(dir.join("clients.json")),
     );
+    let door = build(door, &dir);
     let shared = server::Shared::new(door, parts, identity.pin.clone());
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let address = listener.local_addr().unwrap();
@@ -135,6 +144,10 @@ async fn a_computer_pairs_says_hello_and_is_answered_over_tls() {
     let code = issued["code"].as_str().unwrap().to_owned();
     // The pin the app shows with the code is the certificate the TLS serves.
     assert_eq!(issued["pin"], lamp.identity.pin);
+    assert_eq!(
+        issued["shown"],
+        json!(["can move the lamp's body", "can change the light"])
+    );
 
     let mut socket = connect(&lamp, "/v1").await.unwrap();
     let welcome = next(&mut socket).await;
@@ -246,9 +259,10 @@ async fn paired(lamp: &Lamp, grants: Value, seed: u8) -> Socket {
     let nonce: [u8; 32] = pairing::bytes_of(welcome["nonce"].as_str().unwrap()).unwrap();
     let proof = pairing::pair_proof(&code, &lamp.identity.pin_bytes(), &key, &nonce);
     let pair = json!({"id": 1, "op": "pair", "name": "test", "key": STANDARD.encode(key), "proof": STANDARD.encode(proof)});
-    let client = send(&mut socket, pair).await["client"]
+    let paired = send(&mut socket, pair).await;
+    let client = paired["client"]
         .as_str()
-        .unwrap()
+        .unwrap_or_else(|| panic!("{paired}"))
         .to_owned();
     let sig = keys.sign(&[pairing::HELLO_CONTEXT, &nonce].concat());
     let hello = send(
@@ -684,5 +698,358 @@ async fn a_late_line_from_a_dropped_body_connection_never_ends_a_newer_lease() {
     assert!(
         told.is_err(),
         "the new lease was ended by a late line: {told:?}"
+    );
+}
+
+/// What the stand-in manage helper saw: each request as it came, and the
+/// kept package and `push.json` as it read them for an install.
+#[derive(Default)]
+struct Helper {
+    asked: Vec<Value>,
+    kept: Option<(Vec<u8>, Value)>,
+}
+
+/// A stand-in for root's manage helper, serving each connection on its own
+/// thread (nothing says the real one is serial), answering as lamp-skills
+/// would, `{"done": …}` or `{"refused": WHY}`. An install reads the kept
+/// files from `state`, as the helper does; an install and a list answer
+/// after `install_takes`.
+fn manage_helper(
+    socket: &std::path::Path,
+    state: &std::path::Path,
+    install_takes: Duration,
+) -> Arc<std::sync::Mutex<Helper>> {
+    use std::io::{BufRead as _, Write as _};
+    let seen = Arc::new(std::sync::Mutex::new(Helper::default()));
+    let listener = std::os::unix::net::UnixListener::bind(socket).unwrap();
+    let keep = seen.clone();
+    let state = state.to_path_buf();
+    std::thread::spawn(move || {
+        for stream in listener.incoming() {
+            let Ok(mut stream) = stream else { break };
+            let keep = keep.clone();
+            let state = state.clone();
+            std::thread::spawn(move || {
+                let mut line = String::new();
+                std::io::BufReader::new(&stream)
+                    .read_line(&mut line)
+                    .unwrap();
+                let request: Value = serde_json::from_str(&line).unwrap();
+                keep.lock().unwrap().asked.push(request.clone());
+                let answer = if request.get("install_pushed").is_some() {
+                    let package = std::fs::read(state.join("push/package.tar")).unwrap();
+                    let said: Value = serde_json::from_slice(
+                        &std::fs::read(state.join("push/push.json")).unwrap(),
+                    )
+                    .unwrap();
+                    keep.lock().unwrap().kept = Some((package, said));
+                    std::thread::sleep(install_takes);
+                    json!({"done": {"name": "desk-wave", "version": "0.1.0", "on": true, "held": null}})
+                } else if request.get("list_pushed_by").is_some() {
+                    std::thread::sleep(install_takes);
+                    json!({"done": [{"name": "desk-wave", "version": "0.1.0", "on": true}]})
+                } else if request["remove_pushed"]["name"] == "desk-wave" {
+                    json!({"done": "removed desk-wave"})
+                } else if request.get("remove_pushed").is_some() {
+                    json!({"refused": "no skill of this computer's has that name"})
+                } else {
+                    json!({"done": "turned off"})
+                };
+                let _ = writeln!(stream, "{answer}");
+            });
+        }
+    });
+    seen
+}
+
+/// A package of `size` bytes, its SHA-256, and its parts as `skill.push`
+/// frames from id `first`.
+fn package_frames(size: u32, first: usize) -> (Vec<u8>, String, Vec<Value>) {
+    let package: Vec<u8> = (0..size).map(|n| (n % 251) as u8).collect();
+    let sha256: String = {
+        use sha2::Digest as _;
+        sha2::Sha256::digest(&package)
+            .iter()
+            .map(|b| format!("{b:02x}"))
+            .collect()
+    };
+    let chunks: Vec<&[u8]> = package.chunks(36 * 1024).collect();
+    let frames = chunks
+        .iter()
+        .enumerate()
+        .map(|(n, chunk)| {
+            json!({"id": first + n, "op": "skill.push", "name": "desk-wave", "sha256": sha256,
+                "size": package.len(), "part": n, "parts": chunks.len(), "data": STANDARD.encode(chunk)})
+        })
+        .collect();
+    (package, sha256, frames)
+}
+
+/// Waits until the helper has been asked `request`.
+async fn until_asked(helper: &std::sync::Mutex<Helper>, request: &Value) {
+    for _ in 0..150 {
+        if helper.lock().unwrap().asked.contains(request) {
+            return;
+        }
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+    panic!("never asked {request}: {:?}", helper.lock().unwrap().asked);
+}
+
+/// #3869's wire: a `skills` grant pushes a package in parts, kept with
+/// `push.json` for the helper and installed by it; list and remove go to
+/// the helper as this computer's own; a revoke turns its pushed skills off.
+#[tokio::test]
+async fn a_skill_is_pushed_in_parts_installed_by_the_helper_listed_removed_and_turned_off_by_a_revoke()
+ {
+    let lamp = lamp_built("push", Box::new(session::Unrouted), |door, dir| {
+        door.with_push_folder(dir.to_path_buf())
+    })
+    .await;
+    let helper = manage_helper(&lamp.dir.join("manage.sock"), &lamp.dir, Duration::ZERO);
+    lamp.shared.set_manage_socket(lamp.dir.join("manage.sock"));
+    // Without the grant: refused, as every op is.
+    let mut without = paired(&lamp, json!(["body"]), 41).await;
+    let refused = send(&mut without, json!({"id": 3, "op": "skill.list"})).await;
+    assert_eq!(refused["error"]["code"], "no_grant", "{refused}");
+    drop(without);
+    // One pairing try a second.
+    tokio::time::sleep(Duration::from_millis(1_100)).await;
+
+    let mut socket = paired(&lamp, json!(["body", "light", "skills"]), 42).await;
+    let (package, sha256, frames) = package_frames(60_000, 10);
+    assert_eq!(frames.len(), 2);
+    let got = send(&mut socket, frames[0].clone()).await;
+    assert_eq!(got, json!({"re": 10, "ok": true, "got": 1}));
+    let installed = send(&mut socket, frames[1].clone()).await;
+    assert_eq!(installed["re"], 11, "{installed}");
+    assert_eq!(installed["skill"]["name"], "desk-wave", "{installed}");
+    // Kept for the helper, as it read them: the bytes, and push.json with
+    // this computer and its grants now; then removed once it answered.
+    let (kept, said) = helper
+        .lock()
+        .unwrap()
+        .kept
+        .clone()
+        .expect("read by the helper");
+    assert_eq!(kept, package);
+    assert_eq!(said["sha256"], sha256);
+    assert_eq!(said["grants"], json!(["body", "light", "skills"]));
+    let now_ms = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_millis() as u64;
+    let at = said["at_unix_ms"].as_u64().unwrap();
+    assert!(at <= now_ms && now_ms - at < 10_000, "{said}");
+    assert!(!lamp.dir.join("push/package.tar").exists());
+    assert!(!lamp.dir.join("push/push.json").exists());
+    let client = said["client"].as_str().unwrap().to_owned();
+    // A second push within 10 s is over its rate, before any byte is kept.
+    let rate = send(&mut socket, frames[0].clone()).await;
+    assert_eq!(rate["error"]["code"], "rate", "{rate}");
+
+    let listed = send(&mut socket, json!({"id": 20, "op": "skill.list"})).await;
+    assert_eq!(listed["skills"][0]["name"], "desk-wave", "{listed}");
+    let removed = send(
+        &mut socket,
+        json!({"id": 21, "op": "skill.remove", "name": "desk-wave"}),
+    )
+    .await;
+    assert_eq!(removed, json!({"re": 21, "ok": true}));
+    let not_its = send(
+        &mut socket,
+        json!({"id": 22, "op": "skill.remove", "name": "other"}),
+    )
+    .await;
+    assert_eq!(not_its["error"]["code"], "refused", "{not_its}");
+    assert_eq!(
+        admin(&lamp, json!({"revoke": client})).await["revoked"],
+        true
+    );
+    let off = json!({"off_pushed_by": client});
+    until_asked(&helper, &off).await;
+    assert_eq!(
+        helper.lock().unwrap().asked,
+        [
+            json!({"install_pushed": sha256}),
+            json!({"list_pushed_by": client}),
+            json!({"remove_pushed": {"client": client, "name": "desk-wave"}}),
+            json!({"remove_pushed": {"client": client, "name": "other"}}),
+            off,
+        ]
+    );
+}
+
+/// Fourteen's P2 on #3910: a revoke while an install is with the helper.
+/// The revoke's `off_pushed_by` can be served before the install finishes,
+/// so the door sends it again once the install is answered: the last word
+/// the helper has for that computer is always "off".
+#[tokio::test]
+async fn a_revoke_during_an_install_turns_the_skill_off_after_it() {
+    let lamp = lamp_built("push-revoke", Box::new(session::Unrouted), |door, dir| {
+        door.with_push_folder(dir.to_path_buf())
+    })
+    .await;
+    let helper = manage_helper(
+        &lamp.dir.join("manage.sock"),
+        &lamp.dir,
+        Duration::from_millis(1_500),
+    );
+    lamp.shared.set_manage_socket(lamp.dir.join("manage.sock"));
+    let mut socket = paired(&lamp, json!(["body", "skills"]), 44).await;
+    let (_, sha256, frames) = package_frames(1_000, 10);
+    socket
+        .send(Message::text(frames[0].to_string()))
+        .await
+        .unwrap();
+    let install = json!({"install_pushed": sha256});
+    until_asked(&helper, &install).await;
+    let client = helper.lock().unwrap().kept.clone().unwrap().1["client"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    assert_eq!(
+        admin(&lamp, json!({"revoke": client})).await["revoked"],
+        true
+    );
+    let off = json!({"off_pushed_by": client});
+    until_asked(&helper, &off).await;
+    // The first off came while the install was still with the helper.
+    tokio::time::sleep(Duration::from_millis(2_000)).await;
+    let asked = helper.lock().unwrap().asked.clone();
+    assert_eq!(asked, [install, off.clone(), off], "{asked:?}");
+}
+
+/// Fourteen's and Reviewer-two's P2 on #3910: revoked during an install,
+/// then the same key paired again with fewer grants. The same id is back,
+/// so "still paired" would have said the install was fine; the pairing's
+/// generation says it isn't, and after the install the helper is held to
+/// the new grants.
+#[tokio::test]
+async fn a_re_pair_during_an_install_holds_the_skill_to_the_new_grants_after_it() {
+    let lamp = lamp_built("push-repair", Box::new(session::Unrouted), |door, dir| {
+        door.with_push_folder(dir.to_path_buf())
+    })
+    .await;
+    let helper = manage_helper(
+        &lamp.dir.join("manage.sock"),
+        &lamp.dir,
+        Duration::from_millis(2_500),
+    );
+    lamp.shared.set_manage_socket(lamp.dir.join("manage.sock"));
+    let mut socket = paired(&lamp, json!(["body", "skills"]), 46).await;
+    let (_, sha256, frames) = package_frames(1_000, 10);
+    socket
+        .send(Message::text(frames[0].to_string()))
+        .await
+        .unwrap();
+    let install = json!({"install_pushed": sha256});
+    until_asked(&helper, &install).await;
+    let client = helper.lock().unwrap().kept.clone().unwrap().1["client"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    assert_eq!(
+        admin(&lamp, json!({"revoke": client})).await["revoked"],
+        true
+    );
+    let off = json!({"off_pushed_by": client});
+    until_asked(&helper, &off).await;
+    // One pairing try a second; the same key, now with "light" only.
+    tokio::time::sleep(Duration::from_millis(1_100)).await;
+    let _again = paired(&lamp, json!(["light"]), 46).await;
+    let held = json!({"grants_pushed_by": {"client": client, "grants": ["light"]}});
+    until_asked(&helper, &held).await;
+    let asked = helper.lock().unwrap().asked.clone();
+    assert_eq!(asked, [install, off, held], "{asked:?}");
+}
+
+/// Reviewer-two's P2 on #3910: the same key paired again with fewer grants,
+/// no revoke between, has its pushed skills held to the new grants; with
+/// the same grants, nothing is asked.
+#[tokio::test]
+async fn a_re_pair_with_other_grants_holds_pushed_skills_to_them() {
+    let lamp = lamp_built("push-grants", Box::new(session::Unrouted), |door, dir| {
+        door.with_push_folder(dir.to_path_buf())
+    })
+    .await;
+    let helper = manage_helper(&lamp.dir.join("manage.sock"), &lamp.dir, Duration::ZERO);
+    lamp.shared.set_manage_socket(lamp.dir.join("manage.sock"));
+    let mut first = paired(&lamp, json!(["body", "skills"]), 47).await;
+    let hello = send(&mut first, json!({"id": 2, "op": "skill.list"})).await;
+    assert_eq!(hello["re"], 2, "{hello}");
+    tokio::time::sleep(Duration::from_millis(1_100)).await;
+    let _same = paired(&lamp, json!(["body", "skills"]), 47).await;
+    tokio::time::sleep(Duration::from_millis(1_100)).await;
+    let _fewer = paired(&lamp, json!(["skills"]), 47).await;
+    let client = helper.lock().unwrap().asked[0]["list_pushed_by"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let held = json!({"grants_pushed_by": {"client": client, "grants": ["skills"]}});
+    until_asked(&helper, &held).await;
+    let asked = helper.lock().unwrap().asked.clone();
+    assert_eq!(
+        asked,
+        [json!({"list_pushed_by": client}), held],
+        "{asked:?}"
+    );
+}
+
+/// Reviewer-two's P2 on #3910: `skill.list` and `skill.remove` are bounded
+/// before the helper is asked: one at a time for a computer (`busy`), and
+/// 6 a minute (`rate`).
+#[tokio::test]
+async fn skill_requests_to_the_helper_are_one_at_a_time_and_rated() {
+    let lamp = lamp_built("push-bound", Box::new(session::Unrouted), |door, dir| {
+        door.with_push_folder(dir.to_path_buf())
+    })
+    .await;
+    let helper = manage_helper(
+        &lamp.dir.join("manage.sock"),
+        &lamp.dir,
+        Duration::from_millis(300),
+    );
+    lamp.shared.set_manage_socket(lamp.dir.join("manage.sock"));
+    let mut socket = paired(&lamp, json!(["skills"]), 48).await;
+    socket
+        .send(Message::text(
+            json!({"id": 2, "op": "skill.list"}).to_string(),
+        ))
+        .await
+        .unwrap();
+    let busy = send(
+        &mut socket,
+        json!({"id": 3, "op": "skill.remove", "name": "desk-wave"}),
+    )
+    .await;
+    assert_eq!(busy["re"], 3, "{busy}");
+    assert_eq!(busy["error"]["code"], "busy", "{busy}");
+    let listed = next(&mut socket).await;
+    assert_eq!(listed["re"], 2, "{listed}");
+    assert_eq!(listed["ok"], true, "{listed}");
+    for id in 4..9 {
+        let listed = send(&mut socket, json!({"id": id, "op": "skill.list"})).await;
+        assert_eq!(listed["ok"], true, "{listed}");
+    }
+    let rate = send(&mut socket, json!({"id": 9, "op": "skill.list"})).await;
+    assert_eq!(rate["error"]["code"], "rate", "{rate}");
+    assert_eq!(
+        rate["error"]["why"], "skill.list and skill.remove: 6 a minute",
+        "{rate}"
+    );
+    // The refused ones never reached the helper.
+    assert_eq!(helper.lock().unwrap().asked.len(), 6);
+}
+
+/// Without a manage socket, skill push is off on the lamp and says so.
+#[tokio::test]
+async fn skill_push_is_off_without_the_helper() {
+    let lamp = lamp("push-off").await;
+    let mut socket = paired(&lamp, json!(["skills"]), 43).await;
+    let refused = send(&mut socket, json!({"id": 3, "op": "skill.list"})).await;
+    assert_eq!(
+        refused["error"],
+        json!({"code": "refused", "why": session::PUSH_OFF})
     );
 }

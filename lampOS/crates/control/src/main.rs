@@ -121,7 +121,7 @@ fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
             None
         }
     };
-    let door = session::Door::new(
+    let mut door = session::Door::new(
         &host,
         &host,
         identity.pin_bytes(),
@@ -129,6 +129,12 @@ fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
         Some(clients_path),
     )
     .with_quiet_hours(session::Quiet::new(local_time));
+    // Skill push: on with the manage helper's socket, the packages kept in
+    // the state folder for it.
+    let manage = option(arguments, "--manage-socket").map(PathBuf::from);
+    if manage.is_some() {
+        door = door.with_push_folder(state.clone());
+    }
     let body = option(arguments, "--mood-socket").map(PathBuf::from);
     let say = option(arguments, "--say-socket").map(PathBuf::from);
     let bus = match option(arguments, "--bus-root") {
@@ -156,6 +162,9 @@ fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
     let shared = server::Shared::new_with(door, identity.pin.clone(), move |events| {
         Box::new(parts::Lamp::new(body, light, say, clock_id, events).watching(watching))
     });
+    if let Some(manage) = manage {
+        shared.set_manage_socket(manage);
+    }
     let tls = server::acceptor(&identity).map_err(|e| format!("tls: {e}"))?;
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
