@@ -120,7 +120,7 @@ fn deliver(walk: &mut Onboarding, token: u64, now: u64) {
             .contains("close it, then open it again")
     );
     assert!(walk.bind_privacy_invitation(token, boot, 4));
-    walk.privacy_invitation_finished(boot, 4, true, now);
+    walk.privacy_invitation_finished(boot, 4, Delivery::Whole, now);
     assert_eq!(
         walk.privacy_flow.attempt.as_ref().unwrap().phase(),
         privacy::Phase::Armed
@@ -182,12 +182,12 @@ fn cancellation_retries_once_and_model_success_is_refused() {
     let boot = BootId::new([7; 16]).unwrap();
     walk.take_privacy_invitation(token, T).unwrap();
     assert!(walk.bind_privacy_invitation(token, boot, 5));
-    walk.privacy_invitation_finished(boot, 999, true, T);
+    walk.privacy_invitation_finished(boot, 999, Delivery::Whole, T);
     assert!(
         walk.privacy_flow.attempt.is_some(),
         "armed as the turn began"
     );
-    walk.privacy_invitation_finished(boot, 5, false, T);
+    walk.privacy_invitation_finished(boot, 5, Delivery::Cut, T);
     assert!(walk.privacy_flow.attempt.is_none());
     assert_ne!(offer(&mut walk, 2 * T, 2), token);
     let call = ToolCall {

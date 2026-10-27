@@ -140,7 +140,7 @@ fn play(walk: &mut Onboarding, now: u64, turn: u64) -> Played {
     assert!(walk.bind_invitation(token, boot, turn));
     let ended_ms = 1_760_000_000_000 + now / 1_000;
     set_clock(ended_ms);
-    walk.invitation_finished(boot, turn, true, now);
+    walk.invitation_finished(boot, turn, Delivery::Whole, now);
     Played {
         ended_us: now,
         ended_ms,
@@ -601,4 +601,62 @@ fn the_same_turn_with_the_hand_never_said_is_not_done() {
             .iter()
             .any(|row| row["why"] == "no hand moved the head")
     );
+}
+
+/// The invitation is offered, taken and bound, and its turn ends with no
+/// audio at all (`no_audio_answer`): the voice never said it (#3754).
+fn unsaid(walk: &mut Onboarding, now: u64, turn: u64) {
+    let token = offer(walk, now);
+    assert_eq!(walk.take_invitation(token, now).unwrap(), GIVE_ASK);
+    let boot = BootId::new([4; 16]).unwrap();
+    assert!(walk.bind_invitation(token, boot, turn));
+    walk.invitation_finished(boot, turn, Delivery::Unsaid, now);
+}
+
+#[test]
+fn an_invitation_the_voice_never_said_is_no_try_and_is_asked_again() {
+    // lamp-29e7, 27 Oct 14:18:52: `say: dropped (no_audio_answer)` and
+    // `giving_way: failed` in the same second, the person never asked.
+    let store = Store::new(None);
+    let mut walk = store.cycle(S);
+    unsaid(&mut walk, 10 * S, 1);
+    walk.drain_storage_for_test(10 * S);
+    assert_eq!(
+        outcome(&walk),
+        None,
+        "a dropped ask is not the person's failure"
+    );
+    assert_eq!(walk.kept().giving_way_tries, 0, "its try is given back");
+    assert!(
+        walk.take_records()
+            .iter()
+            .any(|row| row["why"] == "invitation not said"),
+        "the record says why"
+    );
+    // Asked again once the voice can speak, and done on the person's push.
+    let played = play(&mut walk, 12 * S, 2);
+    assert_eq!(walk.kept().giving_way_tries, 1);
+    push(&mut walk, &played, 2_000, 30.0, 30.0, true);
+    let now = played.at(3_000);
+    assert_eq!(settle(&mut walk, now), [GIVE_DONE]);
+    assert_eq!(outcome(&walk), Some(Outcome::Done));
+}
+
+#[test]
+fn an_ask_never_said_three_times_is_not_available_never_failed() {
+    let store = Store::new(None);
+    let mut walk = store.cycle(S);
+    // Offered again twice at most after a dropped ask.
+    unsaid(&mut walk, 10 * S, 1);
+    unsaid(&mut walk, 12 * S, 2);
+    assert_eq!(outcome(&walk), None);
+    unsaid(&mut walk, 14 * S, 3);
+    walk.drain_storage_for_test(14 * S);
+    for _ in 0..2 {
+        walk.tick(16 * S, START_QUIET_US, true, false, face(), true);
+        walk.drain_storage_for_test(16 * S);
+    }
+    assert_eq!(outcome(&walk), Some(Outcome::NotAvailable));
+    assert_eq!(walk.kept().giving_way_tries, 0);
+    assert!(walk.pending().invitations.is_empty());
 }

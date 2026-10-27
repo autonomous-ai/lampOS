@@ -392,9 +392,17 @@ already being said spend no try: the same try is offered again once the
 switch reads open (an `onboarding_privacy_arm_failed` row), and the offer's
 90 s give-up bounds a failure that keeps coming. A close stamped before the
 invitation began is not its answer. An
-invitation that ends without being heard whole (cut off, a playback gap, no
-audio: the turn's shared `heard_whole` proof) drops the armed attempt and can
-be retried once, then skipped. Software mute, sleep, an initial open level,
+invitation that ends without being heard whole (cut off, a playback gap: the
+turn's shared `heard_whole` proof) drops the armed attempt and can be retried
+once, then skipped. One of which nothing played at all (`no_audio_answer`, or
+a turn that ended unsettled before its first audio: the route failed, the
+service stopped, a privacy gap) was never said, so it is no try (#3754): it is
+offered again once the voice can speak, `MOST_UNSAID` (2) times at most, then
+the step is `not_available`, never `failed`, with an
+`onboarding_privacy_try` row whose `why` is `"invitation not said"`. Giving
+way and how you sound do the same with their own rows. A model-led step whose
+90 s run out after its conversation ended (20 s of quiet) is asked again too,
+twice at most, and fails only after that. Software mute, sleep, an initial open level,
 and model `setup_step done` are not evidence of physical close followed by
 open.
 
