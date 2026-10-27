@@ -521,3 +521,78 @@ fn a_held_progress_write_never_holds_the_loop_and_nothing_is_done_before_it() {
     assert_eq!(settle(&mut walk, played.at(3_000)), [GIVE_DONE]);
     assert_eq!(outcome(&walk), Some(Outcome::Done));
 }
+
+/// lamp-52e6 on 2026-10-27 (#3504): a hand turned the base about 32 counts
+/// a hold from 1,903, under its load bound, a hold every 2.6 s. As the body
+/// says it with #3676 (Fifth's `a_base_turned_by_hand_in_small_steps_under_its_bound_says_a_hand`),
+/// a step at a time (80 ms): each turn is pushed back for a step with its
+/// goal where it was, then given way where the hand has it, its goal there;
+/// from the second hold, once the base is more than `HAND_MOVED` from where
+/// it first gave, `body/hand` says pushed, a step after that hold gave way,
+/// and it says released once the hand has gone after the last. `pushed`
+/// false is that day's body, which never said it.
+fn turn_base_as_on_52e6(walk: &mut Onboarding, played: &Played, holds: &[f64], pushed: bool) {
+    const MIDDLE: f64 = 2_048.0;
+    let mut at = 1_000;
+    let mut felt = |walk: &mut Onboarding, yaw: f64, goal: f64, said: bool| {
+        walk.giving_way_felt(
+            joints(played.ended_ms + at, yaw - MIDDLE, goal - MIDDLE),
+            played.at(at),
+        );
+        walk.giving_way_felt(hand(played.ended_ms + at, said), played.at(at));
+        at += 80;
+    };
+    let mut from = 1_903.0;
+    let mut said = false;
+    for (hold, &to) in holds.iter().enumerate() {
+        // The hand turns it; the body still asks for where it was.
+        felt(walk, to, from, said);
+        // It gives way where the hand has it.
+        felt(walk, to, to, said);
+        // Held there by the hand, under its bound, for the rest of the hold.
+        said = pushed && hold >= 1;
+        for _ in 0..30 {
+            felt(walk, to, to, said);
+        }
+        from = to;
+    }
+    // The hand has gone.
+    felt(walk, from, from, false);
+}
+
+#[test]
+fn the_base_turned_by_a_hand_as_on_52e6_is_done_once_the_body_says_the_hand() {
+    // Two holds, as in the body's test, and the day's five, to 1,744.
+    for holds in [
+        &[1_871.0, 1_839.0][..],
+        &[1_871.0, 1_839.0, 1_807.0, 1_775.0, 1_744.0],
+    ] {
+        let store = Store::new(None);
+        let mut walk = store.cycle(S);
+        let played = play(&mut walk, 10 * S, 1);
+        turn_base_as_on_52e6(&mut walk, &played, holds, true);
+        assert_eq!(
+            settle(&mut walk, played.at(20_000)),
+            [GIVE_DONE],
+            "{holds:?}"
+        );
+        assert_eq!(outcome(&walk), Some(Outcome::Done));
+    }
+}
+
+#[test]
+fn the_same_turn_with_the_hand_never_said_is_not_done() {
+    let store = Store::new(None);
+    let mut walk = store.cycle(S);
+    let played = play(&mut walk, 10 * S, 1);
+    let holds = [1_871.0, 1_839.0, 1_807.0, 1_775.0, 1_744.0];
+    turn_base_as_on_52e6(&mut walk, &played, &holds, false);
+    assert_eq!(settle(&mut walk, played.at(20_000)), Vec::<&str>::new());
+    assert_eq!(outcome(&walk), None);
+    walk.tick(played.at(60_000), START_QUIET_US, true, false, face(), true);
+    assert!(
+        walk.take_records()
+            .iter()
+            .any(|row| row["why"] == "no hand moved the head")
+    );
+}
