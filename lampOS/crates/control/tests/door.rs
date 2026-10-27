@@ -628,3 +628,61 @@ async fn a_restarted_body_is_held_again_at_once_and_a_refused_hold_is_told() {
         json!({"ev": "lease", "lease": "l_1", "state": "lost", "why": "released"})
     );
 }
+
+/// Fourteen's P3 on #3915: a late line from a connection the door dropped
+/// never ends a newer holder's lease. A computer takes `body`, releases it
+/// (the door lets go), takes it again; the old connection then says a late
+/// `lost`, and the new lease stands.
+#[tokio::test]
+async fn a_late_line_from_a_dropped_body_connection_never_ends_a_newer_lease() {
+    use tokio::io::{AsyncBufReadExt as _, AsyncWriteExt as _};
+    let lamp = lamp("body-lease-late").await;
+    let path = lamp.dir.join("lease.sock");
+    let body = tokio::net::UnixListener::bind(&path).unwrap();
+    tokio::spawn(lamp_control::body_lease::hold(
+        path.clone(),
+        lamp.shared.clone(),
+    ));
+    let mut socket = paired(&lamp, json!(["body"]), 13).await;
+    let take = |id: u64| json!({"id": id, "op": "lease.take", "parts": ["body"], "for_ms": 30000});
+    let accept = || async {
+        let (stream, _) = tokio::time::timeout(Duration::from_secs(2), body.accept())
+            .await
+            .expect("the door holds the body")
+            .unwrap();
+        let (read, write) = stream.into_split();
+        let mut lines = tokio::io::BufReader::new(read).lines();
+        assert_eq!(
+            lines.next_line().await.unwrap().unwrap(),
+            r#"{"hold":{"for_ms":30000}}"#
+        );
+        (lines, write)
+    };
+    assert_eq!(send(&mut socket, take(3)).await["lease"], "l_1");
+    let (mut old_lines, mut old_write) = accept().await;
+    let released = send(
+        &mut socket,
+        json!({"id": 4, "op": "lease.release", "lease": "l_1"}),
+    )
+    .await;
+    assert_eq!(released["ok"], true, "{released}");
+    assert_eq!(
+        tokio::time::timeout(Duration::from_secs(2), old_lines.next_line())
+            .await
+            .expect("let go in time")
+            .unwrap()
+            .as_deref(),
+        Some(r#"{"let_go":true}"#)
+    );
+    assert_eq!(send(&mut socket, take(5)).await["lease"], "l_2");
+    let _new = accept().await;
+    // The old connection's late word.
+    let _ = old_write
+        .write_all(b"{\"lease\":\"lost\",\"why\":\"hand\"}\n")
+        .await;
+    let told = tokio::time::timeout(Duration::from_millis(1_200), next(&mut socket)).await;
+    assert!(
+        told.is_err(),
+        "the new lease was ended by a late line: {told:?}"
+    );
+}

@@ -663,7 +663,10 @@ pub enum LeaseWhy {
     TakenByOwnerApp,
     /// The owner revoked the client.
     Revoked,
-    /// Released by the client, or its connection closed.
+    /// Released by the client, or its connection closed; for `body`, also
+    /// when the body refused the door's hold or ended it with a why the door
+    /// doesn't know, so the lamp's own life is not standing back (Sixth's
+    /// P3 on #3915).
     Released,
     /// The body gave way under load and let go (its torque off after a
     /// slump): moves stopped, and taking the lease straight back is no help
