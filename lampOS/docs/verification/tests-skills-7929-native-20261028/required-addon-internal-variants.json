@@ -1,0 +1,11 @@
+{
+  "single_Rust_identity": "addon::says_the_judge_dropped_do_not_spend_the_hour",
+  "source_path": "lampOS/crates/skills/tests/it/addon.rs",
+  "source_sha256": "886d83f75fffd352ffc3f721af202bd152d8f2f500ef13f825b0e035fbc83c2b",
+  "line": 818,
+  "internal_helper_variants": [
+    true,
+    false
+  ],
+  "Rust_test_rows_added_for_variants": 0
+}

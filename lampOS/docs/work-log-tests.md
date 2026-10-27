@@ -1,5 +1,23 @@
 # Tests work log
 
+## 2026-10-28 03:41 — published Reader and Skills original native audits
+
+Ready for lamp-voice: no (fresh82 qualifications and current reads remain).
+
+[Reader2671 original native](verification/tests-reader-2671-native-20261028/) records ARM40574485135/Linux40574485115 SUCCESS, **7,802 unique PASS, zero bad or selected unrun**,54 skips. All15 ordinary Reader and seven Trace cases pass once. Actual previewc296d42ca is onAF, with nine tracked differences from authored source; both owned blobs/modes and ten fetched inputs match. Mac4+6 and540/3 guards remain separate.
+
+[Skills7929 original native](verification/tests-skills-7929-native-20261028/) records ARM40575571481/Linux40575571282 SUCCESS, **7,803 unique PASS, zero bad or selected unrun**,54 skips. Actual Dad preview adds two upstream shared-package cases: Skills560 passes versus Mac555, including three Linux-only binary cases and allthree required controls once. The addon blob is equal; docs and five of43 fetched inputs differ explicitly. Both effective owned patches remain equal. Actual Reader14 is notReader15. Each run has34 verified final-summary reprints; separate Python counts49/12/7 and other auxiliary scopes are not added. Original raw logs/projections are public; private complete manifest entries58/107 are independently reverified. No archive or binary retrieved.
+
+Fresh Reader92fe22528 and Skills6c931b8cd on82 are now admitted and running in their own frozen caches. No later-source runtime credit is inferred. Matched Main3882/1/15 remains Rust101/failed, and all earlier failures remain explicit. No device access.
+
+## 2026-10-28 03:39 — completed AF catalog correction retained; current gates proceed
+
+Ready for lamp-voice: no (current qualification and independent reads remain).
+
+[AF Reader platform correction](verification/tests-reader-af-platform-clarification-20261028/) binds the completed AF run's original four Mac Reader rows: three portable passes plus one Mac-only pass. Twelve ordinary Linux-exclusive cases and the ignored privileged DAC remain unrun on Mac. The original source catalog, raw rows and terminal are unchanged; this is offline clarification, not another test run.
+
+Reader and Skills are now qualifying frozen Main82a62867c; later Main movement will be reported separately rather than interrupting an admitted run. Clean Moodbc8edd968 and Ready924821d95 are carried onto that same base, with both complete owned blobs/modes and patches identical to their preceding carries; they are unpushed and have zero new execution credit. Ready still waits for Mood to land. No device access.
+
 ## 2026-10-28 03:17 — Reader evidence catalog label clarified
 
 Ready for lamp-voice: no (latest-base gates and current reads remain).

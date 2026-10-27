@@ -1,0 +1,149 @@
+{
+  "status": "ADDITIVE_OFFLINE_PLATFORM_LABEL_CLARIFICATION",
+  "original_receipts_unmodified": true,
+  "source_reference": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/reader-af546-warm-modules-gates-prep-20261028/reader-source-reference.json",
+    "sha256": "e4b1672810046dc8edd3ecbd6ef9d17260aabd73a5c13d2cdab963f1d3dc8694",
+    "bytes": 6491
+  },
+  "actual_AF_reader_census": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/reader-af546-warm-modules-gates-prep-20261028/cmd-module-session_reader-census.json",
+    "sha256": "fc6c9e0a7733261081a6edc9f15c07e4f863239cacfae7818f3f5b775962e3b0",
+    "bytes": 1264
+  },
+  "prospective_controller": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/reader-dad-warm-modules-gates-prep-20261028/run.py",
+    "sha256": "6f84cf341d6f9f32e02999abd5b3430344a6262fa2da75fde09cd677cd4f2ff0",
+    "bytes": 26368
+  },
+  "scope": "Retained AF Mac module outcomes only; no new execution or latest-Dad credit",
+  "platform_execution": {
+    "Linux_source_catalog": [
+      "session_reader::tests::finite_and_unset_service_never_resolve_a_reader_group",
+      "session_reader::tests::group_lookup_failure_retains_private_logging_without_writer_failure",
+      "session_reader::tests::linux::a_fixture_root_retains_ancestor_mode_acl_and_path_checks",
+      "session_reader::tests::linux::a_verified_failed_grant_keeps_private_original_records",
+      "session_reader::tests::linux::access_and_default_acl_are_refused_without_stripping_or_widening_them",
+      "session_reader::tests::linux::an_earlier_reader_refusal_keeps_a_verified_private_writer",
+      "session_reader::tests::linux::an_owned_fixture_root_ignores_only_changes_above_its_boundary",
+      "session_reader::tests::linux::dedicated_reader_can_only_read_new_events_under_dropped_identity",
+      "session_reader::tests::linux::every_grant_failure_restores_private_modes_and_original_groups",
+      "session_reader::tests::linux::failed_private_rollback_disables_only_metadata",
+      "session_reader::tests::linux::only_the_new_session_is_shared_after_one_pinned_lookup",
+      "session_reader::tests::linux::readable_or_linked_voice_siblings_deny_preparation_and_late_grant",
+      "session_reader::tests::linux::replaced_record_never_changes_an_outside_sentinel",
+      "session_reader::tests::linux::shared_session_writer_projects_every_segment_without_private_values",
+      "session_reader::tests::linux::unprepared_or_wrong_group_parent_never_grants_or_changes_ancestors",
+      "session_reader::tests::local_session_reader_group_is_exact_unique_and_bounded"
+    ],
+    "portable_source_cases": [
+      "session_reader::tests::finite_and_unset_service_never_resolve_a_reader_group",
+      "session_reader::tests::group_lookup_failure_retains_private_logging_without_writer_failure",
+      "session_reader::tests::local_session_reader_group_is_exact_unique_and_bounded"
+    ],
+    "Linux_exclusive_source_cases": [
+      "session_reader::tests::linux::a_fixture_root_retains_ancestor_mode_acl_and_path_checks",
+      "session_reader::tests::linux::a_verified_failed_grant_keeps_private_original_records",
+      "session_reader::tests::linux::access_and_default_acl_are_refused_without_stripping_or_widening_them",
+      "session_reader::tests::linux::an_earlier_reader_refusal_keeps_a_verified_private_writer",
+      "session_reader::tests::linux::an_owned_fixture_root_ignores_only_changes_above_its_boundary",
+      "session_reader::tests::linux::dedicated_reader_can_only_read_new_events_under_dropped_identity",
+      "session_reader::tests::linux::every_grant_failure_restores_private_modes_and_original_groups",
+      "session_reader::tests::linux::failed_private_rollback_disables_only_metadata",
+      "session_reader::tests::linux::only_the_new_session_is_shared_after_one_pinned_lookup",
+      "session_reader::tests::linux::readable_or_linked_voice_siblings_deny_preparation_and_late_grant",
+      "session_reader::tests::linux::replaced_record_never_changes_an_outside_sentinel",
+      "session_reader::tests::linux::shared_session_writer_projects_every_segment_without_private_values",
+      "session_reader::tests::linux::unprepared_or_wrong_group_parent_never_grants_or_changes_ancestors"
+    ],
+    "Linux_exclusive_unrun_on_Mac": [
+      "session_reader::tests::linux::a_fixture_root_retains_ancestor_mode_acl_and_path_checks",
+      "session_reader::tests::linux::a_verified_failed_grant_keeps_private_original_records",
+      "session_reader::tests::linux::access_and_default_acl_are_refused_without_stripping_or_widening_them",
+      "session_reader::tests::linux::an_earlier_reader_refusal_keeps_a_verified_private_writer",
+      "session_reader::tests::linux::an_owned_fixture_root_ignores_only_changes_above_its_boundary",
+      "session_reader::tests::linux::dedicated_reader_can_only_read_new_events_under_dropped_identity",
+      "session_reader::tests::linux::every_grant_failure_restores_private_modes_and_original_groups",
+      "session_reader::tests::linux::failed_private_rollback_disables_only_metadata",
+      "session_reader::tests::linux::only_the_new_session_is_shared_after_one_pinned_lookup",
+      "session_reader::tests::linux::readable_or_linked_voice_siblings_deny_preparation_and_late_grant",
+      "session_reader::tests::linux::replaced_record_never_changes_an_outside_sentinel",
+      "session_reader::tests::linux::shared_session_writer_projects_every_segment_without_private_values",
+      "session_reader::tests::linux::unprepared_or_wrong_group_parent_never_grants_or_changes_ancestors"
+    ],
+    "ordinary_linux_exclusive_unrun_on_mac": [
+      "session_reader::tests::linux::a_fixture_root_retains_ancestor_mode_acl_and_path_checks",
+      "session_reader::tests::linux::a_verified_failed_grant_keeps_private_original_records",
+      "session_reader::tests::linux::access_and_default_acl_are_refused_without_stripping_or_widening_them",
+      "session_reader::tests::linux::an_earlier_reader_refusal_keeps_a_verified_private_writer",
+      "session_reader::tests::linux::an_owned_fixture_root_ignores_only_changes_above_its_boundary",
+      "session_reader::tests::linux::every_grant_failure_restores_private_modes_and_original_groups",
+      "session_reader::tests::linux::failed_private_rollback_disables_only_metadata",
+      "session_reader::tests::linux::only_the_new_session_is_shared_after_one_pinned_lookup",
+      "session_reader::tests::linux::readable_or_linked_voice_siblings_deny_preparation_and_late_grant",
+      "session_reader::tests::linux::replaced_record_never_changes_an_outside_sentinel",
+      "session_reader::tests::linux::shared_session_writer_projects_every_segment_without_private_values",
+      "session_reader::tests::linux::unprepared_or_wrong_group_parent_never_grants_or_changes_ancestors"
+    ],
+    "ignored_privileged_linux_source_cases": [
+      "session_reader::tests::linux::dedicated_reader_can_only_read_new_events_under_dropped_identity"
+    ],
+    "Mac_only": [
+      "session_reader::tests::unsupported_acl_verification_degrades_to_private_metadata"
+    ],
+    "catalog_is_not_execution_evidence": true,
+    "actual_observed_Mac_reader_rows": [
+      [
+        "session_reader::tests::finite_and_unset_service_never_resolve_a_reader_group",
+        "ok"
+      ],
+      [
+        "session_reader::tests::group_lookup_failure_retains_private_logging_without_writer_failure",
+        "ok"
+      ],
+      [
+        "session_reader::tests::local_session_reader_group_is_exact_unique_and_bounded",
+        "ok"
+      ],
+      [
+        "session_reader::tests::unsupported_acl_verification_degrades_to_private_metadata",
+        "ok"
+      ]
+    ],
+    "portable_Mac_observed_rows": [
+      [
+        "session_reader::tests::finite_and_unset_service_never_resolve_a_reader_group",
+        "ok"
+      ],
+      [
+        "session_reader::tests::group_lookup_failure_retains_private_logging_without_writer_failure",
+        "ok"
+      ],
+      [
+        "session_reader::tests::local_session_reader_group_is_exact_unique_and_bounded",
+        "ok"
+      ]
+    ],
+    "portable_Mac_PASS": [
+      "session_reader::tests::finite_and_unset_service_never_resolve_a_reader_group",
+      "session_reader::tests::group_lookup_failure_retains_private_logging_without_writer_failure",
+      "session_reader::tests::local_session_reader_group_is_exact_unique_and_bounded"
+    ],
+    "portable_Mac_status_counts": {
+      "ok": 3
+    },
+    "Mac_only_observed_rows": [
+      [
+        "session_reader::tests::unsupported_acl_verification_degrades_to_private_metadata",
+        "ok"
+      ]
+    ],
+    "Mac_only_status_counts": {
+      "ok": 1
+    },
+    "Linux_exclusive_observed_rows": [],
+    "unexpected_observed_reader_rows": [],
+    "Linux_execution_claim": false,
+    "source_catalog_never_supplies_runtime_credit": true
+  }
+}

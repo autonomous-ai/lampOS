@@ -1,0 +1,78 @@
+{
+  "head": "792937f432cd3bc88279f084b2ad2faba6df777b",
+  "declarations": [
+    {
+      "path": "lampOS/crates/skills/src/main.rs",
+      "function": "a_broken_socket_still_lets_a_wake_end_the_wait",
+      "line": 4414,
+      "attributes": "#[cfg(target_os = \"linux\")]\n    #[test]"
+    },
+    {
+      "path": "lampOS/crates/skills/src/main.rs",
+      "function": "a_broken_socket_still_lets_another_topics_message_end_the_wait",
+      "line": 4436,
+      "attributes": "#[cfg(target_os = \"linux\")]\n    #[test]"
+    },
+    {
+      "path": "lampOS/crates/skills/src/main.rs",
+      "function": "a_late_hang_up_waits_out_only_the_rest_of_the_wait",
+      "line": 4463,
+      "attributes": "#[cfg(target_os = \"linux\")]\n    #[test]"
+    },
+    {
+      "path": "lampOS/crates/skills/tests/it/skills.rs",
+      "function": "write_an_off_fixture",
+      "line": 9209,
+      "attributes": "#[test]\n#[ignore = \"writes a fixture\"]"
+    },
+    {
+      "path": "lampOS/crates/skills/tests/release_pair.rs",
+      "function": "release_6498_keeps_6408_daily_claims_and_6408_reads_them_back",
+      "line": 10,
+      "attributes": "#[test]\n#[ignore = \"requires pinned published executables on isolated native Linux ARM64\"]"
+    },
+    {
+      "path": "lampOS/crates/skills/tests/release_pair.rs",
+      "function": "release_6408_keeps_6498_daily_claims_and_6498_reads_them_back",
+      "line": 16,
+      "attributes": "#[test]\n#[ignore = \"requires pinned published executables on isolated native Linux ARM64\"]"
+    },
+    {
+      "path": "lampOS/crates/skills/tests/release_pair.rs",
+      "function": "release_6498_reads_6408_on_off_and_6408_reads_the_changes_back",
+      "line": 22,
+      "attributes": "#[test]\n#[ignore = \"requires pinned published executables on isolated native Linux ARM64\"]"
+    },
+    {
+      "path": "lampOS/crates/skills/tests/release_pair.rs",
+      "function": "release_6408_reads_6498_on_off_and_6498_reads_the_changes_back",
+      "line": 28,
+      "attributes": "#[test]\n#[ignore = \"requires pinned published executables on isolated native Linux ARM64\"]"
+    },
+    {
+      "path": "lampOS/crates/skills/tests/release_pair.rs",
+      "function": "release_6498_reads_6408_rested_night_and_6408_keeps_its_morning_spent",
+      "line": 34,
+      "attributes": "#[test]\n#[ignore = \"requires pinned published executables on isolated native Linux ARM64\"]"
+    },
+    {
+      "path": "lampOS/crates/skills/tests/release_pair.rs",
+      "function": "release_6408_reads_6498_rested_night_and_6498_keeps_its_morning_spent",
+      "line": 40,
+      "attributes": "#[test]\n#[ignore = \"requires pinned published executables on isolated native Linux ARM64\"]"
+    },
+    {
+      "path": "lampOS/crates/skills/tests/release_pair.rs",
+      "function": "release_6498_installs_6408_packages_and_6408_loads_the_replacement",
+      "line": 46,
+      "attributes": "#[test]\n#[ignore = \"requires pinned published executables on isolated native Linux ARM64\"]"
+    },
+    {
+      "path": "lampOS/crates/skills/tests/release_pair.rs",
+      "function": "release_6408_installs_6498_packages_and_6498_loads_the_replacement",
+      "line": 52,
+      "attributes": "#[test]\n#[ignore = \"requires pinned published executables on isolated native Linux ARM64\"]"
+    }
+  ],
+  "source_only_no_execution_credit": true
+}

@@ -1,0 +1,3779 @@
+{
+  "definition": "All .github files, Cargo manifests/locks/toolchains, build.rs, lampOS .cargo/.config and packaging input metadata. Full immutable actual tree binds all other tracked input paths. Remote action resolution remains in raw logs.",
+  "contexts": [
+    {
+      "label": "ARM64",
+      "count": 94,
+      "all_equal_authored": true,
+      "inputs": [
+        {
+          "path": ".github/scripts/lampos-pr-crates.py",
+          "authored": {
+            "path": ".github/scripts/lampos-pr-crates.py",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "05ebfb6628f0caec9b5a4d462f183aa5d617b982",
+            "size": 5523,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/05ebfb6628f0caec9b5a4d462f183aa5d617b982"
+          },
+          "actual": {
+            "path": ".github/scripts/lampos-pr-crates.py",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "05ebfb6628f0caec9b5a4d462f183aa5d617b982",
+            "size": 5523,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/05ebfb6628f0caec9b5a4d462f183aa5d617b982"
+          },
+          "equal": true
+        },
+        {
+          "path": ".github/scripts/lampos-publish-artifact-test.py",
+          "authored": {
+            "path": ".github/scripts/lampos-publish-artifact-test.py",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "528ec4ec02f12ac903d0d6d2c8329ead42f77399",
+            "size": 12051,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/528ec4ec02f12ac903d0d6d2c8329ead42f77399"
+          },
+          "actual": {
+            "path": ".github/scripts/lampos-publish-artifact-test.py",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "528ec4ec02f12ac903d0d6d2c8329ead42f77399",
+            "size": 12051,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/528ec4ec02f12ac903d0d6d2c8329ead42f77399"
+          },
+          "equal": true
+        },
+        {
+          "path": ".github/scripts/lampos-publish-artifact.py",
+          "authored": {
+            "path": ".github/scripts/lampos-publish-artifact.py",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "4a16795215f27369390858d4ad31e22e7fe65669",
+            "size": 6721,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/4a16795215f27369390858d4ad31e22e7fe65669"
+          },
+          "actual": {
+            "path": ".github/scripts/lampos-publish-artifact.py",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "4a16795215f27369390858d4ad31e22e7fe65669",
+            "size": 6721,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/4a16795215f27369390858d4ad31e22e7fe65669"
+          },
+          "equal": true
+        },
+        {
+          "path": ".github/scripts/lampos-publish-cli-test.py",
+          "authored": {
+            "path": ".github/scripts/lampos-publish-cli-test.py",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "97877b2eb242795908b8cf85cae1c97bfd1f511e",
+            "size": 7767,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/97877b2eb242795908b8cf85cae1c97bfd1f511e"
+          },
+          "actual": {
+            "path": ".github/scripts/lampos-publish-cli-test.py",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "97877b2eb242795908b8cf85cae1c97bfd1f511e",
+            "size": 7767,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/97877b2eb242795908b8cf85cae1c97bfd1f511e"
+          },
+          "equal": true
+        },
+        {
+          "path": ".github/scripts/lampos-publish-test.py",
+          "authored": {
+            "path": ".github/scripts/lampos-publish-test.py",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "37e55bc682a7e9f53437ab904c1c76c4b8b09ef0",
+            "size": 37457,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/37e55bc682a7e9f53437ab904c1c76c4b8b09ef0"
+          },
+          "actual": {
+            "path": ".github/scripts/lampos-publish-test.py",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "37e55bc682a7e9f53437ab904c1c76c4b8b09ef0",
+            "size": 37457,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/37e55bc682a7e9f53437ab904c1c76c4b8b09ef0"
+          },
+          "equal": true
+        },
+        {
+          "path": ".github/scripts/lampos-publish.py",
+          "authored": {
+            "path": ".github/scripts/lampos-publish.py",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "0bf124c39c41fb3e8eb397d935964b426b663cb2",
+            "size": 27224,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/0bf124c39c41fb3e8eb397d935964b426b663cb2"
+          },
+          "actual": {
+            "path": ".github/scripts/lampos-publish.py",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "0bf124c39c41fb3e8eb397d935964b426b663cb2",
+            "size": 27224,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/0bf124c39c41fb3e8eb397d935964b426b663cb2"
+          },
+          "equal": true
+        },
+        {
+          "path": ".github/scripts/lampos-records-pair-test.sh",
+          "authored": {
+            "path": ".github/scripts/lampos-records-pair-test.sh",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "c3dc4916625460bdd23020c9006649bc9d9071a9",
+            "size": 8883,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/c3dc4916625460bdd23020c9006649bc9d9071a9"
+          },
+          "actual": {
+            "path": ".github/scripts/lampos-records-pair-test.sh",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "c3dc4916625460bdd23020c9006649bc9d9071a9",
+            "size": 8883,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/c3dc4916625460bdd23020c9006649bc9d9071a9"
+          },
+          "equal": true
+        },
+        {
+          "path": ".github/scripts/lampos-records-pair.jq",
+          "authored": {
+            "path": ".github/scripts/lampos-records-pair.jq",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "24cbbde68bb69b94091883ec550236c2a18a4a6b",
+            "size": 5790,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/24cbbde68bb69b94091883ec550236c2a18a4a6b"
+          },
+          "actual": {
+            "path": ".github/scripts/lampos-records-pair.jq",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "24cbbde68bb69b94091883ec550236c2a18a4a6b",
+            "size": 5790,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/24cbbde68bb69b94091883ec550236c2a18a4a6b"
+          },
+          "equal": true
+        },
+        {
+          "path": ".github/scripts/lampos-records-pair.sh",
+          "authored": {
+            "path": ".github/scripts/lampos-records-pair.sh",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "9a5e5e9af45a3866abcde6a104dd047afeaeb91f",
+            "size": 22146,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/9a5e5e9af45a3866abcde6a104dd047afeaeb91f"
+          },
+          "actual": {
+            "path": ".github/scripts/lampos-records-pair.sh",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "9a5e5e9af45a3866abcde6a104dd047afeaeb91f",
+            "size": 22146,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/9a5e5e9af45a3866abcde6a104dd047afeaeb91f"
+          },
+          "equal": true
+        },
+        {
+          "path": ".github/scripts/lampos-source-times.py",
+          "authored": {
+            "path": ".github/scripts/lampos-source-times.py",
+            "mode": "100755",
+            "type": "blob",
+            "sha": "6ba72adaefbf719aaea4df6845af6f5232b71de6",
+            "size": 2918,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/6ba72adaefbf719aaea4df6845af6f5232b71de6"
+          },
+          "actual": {
+            "path": ".github/scripts/lampos-source-times.py",
+            "mode": "100755",
+            "type": "blob",
+            "sha": "6ba72adaefbf719aaea4df6845af6f5232b71de6",
+            "size": 2918,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/6ba72adaefbf719aaea4df6845af6f5232b71de6"
+          },
+          "equal": true
+        },
+        {
+          "path": ".github/tools/lampos-promote/Cargo.lock",
+          "authored": {
+            "path": ".github/tools/lampos-promote/Cargo.lock",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "4f44ec4b9b3d78dd6e98492ee25804ac6c5dda93",
+            "size": 13428,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/4f44ec4b9b3d78dd6e98492ee25804ac6c5dda93"
+          },
+          "actual": {
+            "path": ".github/tools/lampos-promote/Cargo.lock",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "4f44ec4b9b3d78dd6e98492ee25804ac6c5dda93",
+            "size": 13428,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/4f44ec4b9b3d78dd6e98492ee25804ac6c5dda93"
+          },
+          "equal": true
+        },
+        {
+          "path": ".github/tools/lampos-promote/Cargo.toml",
+          "authored": {
+            "path": ".github/tools/lampos-promote/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "b7324fd191bca0dda6a712f3af9da30a00f4d965",
+            "size": 311,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/b7324fd191bca0dda6a712f3af9da30a00f4d965"
+          },
+          "actual": {
+            "path": ".github/tools/lampos-promote/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "b7324fd191bca0dda6a712f3af9da30a00f4d965",
+            "size": 311,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/b7324fd191bca0dda6a712f3af9da30a00f4d965"
+          },
+          "equal": true
+        },
+        {
+          "path": ".github/tools/lampos-promote/src/github.rs",
+          "authored": {
+            "path": ".github/tools/lampos-promote/src/github.rs",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "083c63917466b45e60bab5149ece92b86ea3a26d",
+            "size": 11153,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/083c63917466b45e60bab5149ece92b86ea3a26d"
+          },
+          "actual": {
+            "path": ".github/tools/lampos-promote/src/github.rs",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "083c63917466b45e60bab5149ece92b86ea3a26d",
+            "size": 11153,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/083c63917466b45e60bab5149ece92b86ea3a26d"
+          },
+          "equal": true
+        },
+        {
+          "path": ".github/tools/lampos-promote/src/lib.rs",
+          "authored": {
+            "path": ".github/tools/lampos-promote/src/lib.rs",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "fba86b8256dd9501c9c2a1e2c1b96ffeba2f8660",
+            "size": 20168,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/fba86b8256dd9501c9c2a1e2c1b96ffeba2f8660"
+          },
+          "actual": {
+            "path": ".github/tools/lampos-promote/src/lib.rs",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "fba86b8256dd9501c9c2a1e2c1b96ffeba2f8660",
+            "size": 20168,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/fba86b8256dd9501c9c2a1e2c1b96ffeba2f8660"
+          },
+          "equal": true
+        },
+        {
+          "path": ".github/tools/lampos-promote/src/main.rs",
+          "authored": {
+            "path": ".github/tools/lampos-promote/src/main.rs",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "cceccbb28fbd78d796f14266e94d3a5bc873e49b",
+            "size": 946,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/cceccbb28fbd78d796f14266e94d3a5bc873e49b"
+          },
+          "actual": {
+            "path": ".github/tools/lampos-promote/src/main.rs",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "cceccbb28fbd78d796f14266e94d3a5bc873e49b",
+            "size": 946,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/cceccbb28fbd78d796f14266e94d3a5bc873e49b"
+          },
+          "equal": true
+        },
+        {
+          "path": ".github/tools/lampos-promote/tests/promotion.rs",
+          "authored": {
+            "path": ".github/tools/lampos-promote/tests/promotion.rs",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "4397c52fd7d5390f7e94224a36ae6b590f36c5f0",
+            "size": 22774,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/4397c52fd7d5390f7e94224a36ae6b590f36c5f0"
+          },
+          "actual": {
+            "path": ".github/tools/lampos-promote/tests/promotion.rs",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "4397c52fd7d5390f7e94224a36ae6b590f36c5f0",
+            "size": 22774,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/4397c52fd7d5390f7e94224a36ae6b590f36c5f0"
+          },
+          "equal": true
+        },
+        {
+          "path": ".github/tools/lampos-promote/tests/workflow.rs",
+          "authored": {
+            "path": ".github/tools/lampos-promote/tests/workflow.rs",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "caba122be5d6039e236396bb0468bdcd5ede5507",
+            "size": 1791,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/caba122be5d6039e236396bb0468bdcd5ede5507"
+          },
+          "actual": {
+            "path": ".github/tools/lampos-promote/tests/workflow.rs",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "caba122be5d6039e236396bb0468bdcd5ede5507",
+            "size": 1791,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/caba122be5d6039e236396bb0468bdcd5ede5507"
+          },
+          "equal": true
+        },
+        {
+          "path": ".github/workflows/ci.yml",
+          "authored": {
+            "path": ".github/workflows/ci.yml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "43c4fdfb5a5ebcac3a5362fa98ddf8b5027109ae",
+            "size": 4746,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/43c4fdfb5a5ebcac3a5362fa98ddf8b5027109ae"
+          },
+          "actual": {
+            "path": ".github/workflows/ci.yml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "43c4fdfb5a5ebcac3a5362fa98ddf8b5027109ae",
+            "size": 4746,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/43c4fdfb5a5ebcac3a5362fa98ddf8b5027109ae"
+          },
+          "equal": true
+        },
+        {
+          "path": ".github/workflows/lampos-arm64.yml",
+          "authored": {
+            "path": ".github/workflows/lampos-arm64.yml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "c1a4b4479b284e52f3ff37701cd55734783040b3",
+            "size": 20708,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/c1a4b4479b284e52f3ff37701cd55734783040b3"
+          },
+          "actual": {
+            "path": ".github/workflows/lampos-arm64.yml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "c1a4b4479b284e52f3ff37701cd55734783040b3",
+            "size": 20708,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/c1a4b4479b284e52f3ff37701cd55734783040b3"
+          },
+          "equal": true
+        },
+        {
+          "path": ".github/workflows/lampos-caps-state-pair.yml",
+          "authored": {
+            "path": ".github/workflows/lampos-caps-state-pair.yml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "f655d157cc28db5bf8f88363f36f86882dd2d5f3",
+            "size": 7570,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/f655d157cc28db5bf8f88363f36f86882dd2d5f3"
+          },
+          "actual": {
+            "path": ".github/workflows/lampos-caps-state-pair.yml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "f655d157cc28db5bf8f88363f36f86882dd2d5f3",
+            "size": 7570,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/f655d157cc28db5bf8f88363f36f86882dd2d5f3"
+          },
+          "equal": true
+        },
+        {
+          "path": ".github/workflows/lampos-clippy.yml",
+          "authored": {
+            "path": ".github/workflows/lampos-clippy.yml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "04d2b49b5065c00f567e91ce271e2ba04669bb16",
+            "size": 4721,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/04d2b49b5065c00f567e91ce271e2ba04669bb16"
+          },
+          "actual": {
+            "path": ".github/workflows/lampos-clippy.yml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "04d2b49b5065c00f567e91ce271e2ba04669bb16",
+            "size": 4721,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/04d2b49b5065c00f567e91ce271e2ba04669bb16"
+          },
+          "equal": true
+        },
+        {
+          "path": ".github/workflows/lampos-cloud-provenance-pair.yml",
+          "authored": {
+            "path": ".github/workflows/lampos-cloud-provenance-pair.yml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "e099d61677732ecdf33a35e5cd37e65d7b33acee",
+            "size": 20751,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/e099d61677732ecdf33a35e5cd37e65d7b33acee"
+          },
+          "actual": {
+            "path": ".github/workflows/lampos-cloud-provenance-pair.yml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "e099d61677732ecdf33a35e5cd37e65d7b33acee",
+            "size": 20751,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/e099d61677732ecdf33a35e5cd37e65d7b33acee"
+          },
+          "equal": true
+        },
+        {
+          "path": ".github/workflows/lampos-controls-pair.yml",
+          "authored": {
+            "path": ".github/workflows/lampos-controls-pair.yml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "8976a431704eb1206e66bb362692d175929fd289",
+            "size": 10432,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/8976a431704eb1206e66bb362692d175929fd289"
+          },
+          "actual": {
+            "path": ".github/workflows/lampos-controls-pair.yml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "8976a431704eb1206e66bb362692d175929fd289",
+            "size": 10432,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/8976a431704eb1206e66bb362692d175929fd289"
+          },
+          "equal": true
+        },
+        {
+          "path": ".github/workflows/lampos-records-pair.yml",
+          "authored": {
+            "path": ".github/workflows/lampos-records-pair.yml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "e68be6c1382f13932c317b5b6dd31f9f41cb036e",
+            "size": 8061,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/e68be6c1382f13932c317b5b6dd31f9f41cb036e"
+          },
+          "actual": {
+            "path": ".github/workflows/lampos-records-pair.yml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "e68be6c1382f13932c317b5b6dd31f9f41cb036e",
+            "size": 8061,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/e68be6c1382f13932c317b5b6dd31f9f41cb036e"
+          },
+          "equal": true
+        },
+        {
+          "path": ".github/workflows/lampos-routine-state-pair.yml",
+          "authored": {
+            "path": ".github/workflows/lampos-routine-state-pair.yml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "81693942e65935208d8fc776c7cbf0ff580261ba",
+            "size": 5240,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/81693942e65935208d8fc776c7cbf0ff580261ba"
+          },
+          "actual": {
+            "path": ".github/workflows/lampos-routine-state-pair.yml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "81693942e65935208d8fc776c7cbf0ff580261ba",
+            "size": 5240,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/81693942e65935208d8fc776c7cbf0ff580261ba"
+          },
+          "equal": true
+        },
+        {
+          "path": ".github/workflows/lampos-sdk.yml",
+          "authored": {
+            "path": ".github/workflows/lampos-sdk.yml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "7f71bb0d383156f3cc456b2e67878f061b5f258e",
+            "size": 3311,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/7f71bb0d383156f3cc456b2e67878f061b5f258e"
+          },
+          "actual": {
+            "path": ".github/workflows/lampos-sdk.yml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "7f71bb0d383156f3cc456b2e67878f061b5f258e",
+            "size": 3311,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/7f71bb0d383156f3cc456b2e67878f061b5f258e"
+          },
+          "equal": true
+        },
+        {
+          "path": ".github/workflows/lampos-settings-pair.yml",
+          "authored": {
+            "path": ".github/workflows/lampos-settings-pair.yml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "60dfe56ac767c7cafdf3cc1af9d0eed11a56f8ab",
+            "size": 10500,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/60dfe56ac767c7cafdf3cc1af9d0eed11a56f8ab"
+          },
+          "actual": {
+            "path": ".github/workflows/lampos-settings-pair.yml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "60dfe56ac767c7cafdf3cc1af9d0eed11a56f8ab",
+            "size": 10500,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/60dfe56ac767c7cafdf3cc1af9d0eed11a56f8ab"
+          },
+          "equal": true
+        },
+        {
+          "path": ".github/workflows/lampos-state-pair.yml",
+          "authored": {
+            "path": ".github/workflows/lampos-state-pair.yml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "f98c768e635da2e193451ed23592e4c63841e57f",
+            "size": 5824,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/f98c768e635da2e193451ed23592e4c63841e57f"
+          },
+          "actual": {
+            "path": ".github/workflows/lampos-state-pair.yml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "f98c768e635da2e193451ed23592e4c63841e57f",
+            "size": 5824,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/f98c768e635da2e193451ed23592e4c63841e57f"
+          },
+          "equal": true
+        },
+        {
+          "path": ".github/workflows/lampos-surround-candidate-pair.yml",
+          "authored": {
+            "path": ".github/workflows/lampos-surround-candidate-pair.yml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "80dba69c69ca63560ec585360817381be663d56a",
+            "size": 20974,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/80dba69c69ca63560ec585360817381be663d56a"
+          },
+          "actual": {
+            "path": ".github/workflows/lampos-surround-candidate-pair.yml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "80dba69c69ca63560ec585360817381be663d56a",
+            "size": 20974,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/80dba69c69ca63560ec585360817381be663d56a"
+          },
+          "equal": true
+        },
+        {
+          "path": ".github/workflows/publish-skills.yml",
+          "authored": {
+            "path": ".github/workflows/publish-skills.yml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "8b86020418bc6fcad112e8d834a4b258284896ff",
+            "size": 1843,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/8b86020418bc6fcad112e8d834a4b258284896ff"
+          },
+          "actual": {
+            "path": ".github/workflows/publish-skills.yml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "8b86020418bc6fcad112e8d834a4b258284896ff",
+            "size": 1843,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/8b86020418bc6fcad112e8d834a4b258284896ff"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/.cargo/config.toml",
+          "authored": {
+            "path": "lampOS/.cargo/config.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "b3515e952d3665dd4c6a26887a6812bc9c597dca",
+            "size": 210,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/b3515e952d3665dd4c6a26887a6812bc9c597dca"
+          },
+          "actual": {
+            "path": "lampOS/.cargo/config.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "b3515e952d3665dd4c6a26887a6812bc9c597dca",
+            "size": 210,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/b3515e952d3665dd4c6a26887a6812bc9c597dca"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/.config/nextest.toml",
+          "authored": {
+            "path": "lampOS/.config/nextest.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "3463c6682e8126b0c02cedda3d67cfc5bc081169",
+            "size": 5157,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/3463c6682e8126b0c02cedda3d67cfc5bc081169"
+          },
+          "actual": {
+            "path": "lampOS/.config/nextest.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "3463c6682e8126b0c02cedda3d67cfc5bc081169",
+            "size": 5157,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/3463c6682e8126b0c02cedda3d67cfc5bc081169"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/Cargo.lock",
+          "authored": {
+            "path": "lampOS/Cargo.lock",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "654c56da19747b0a1c613a416f8a4a7e02ce8f64",
+            "size": 122933,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/654c56da19747b0a1c613a416f8a4a7e02ce8f64"
+          },
+          "actual": {
+            "path": "lampOS/Cargo.lock",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "654c56da19747b0a1c613a416f8a4a7e02ce8f64",
+            "size": 122933,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/654c56da19747b0a1c613a416f8a4a7e02ce8f64"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/Cargo.toml",
+          "authored": {
+            "path": "lampOS/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "be7fabdad667551d2636c36e732b0a45bfb5e359",
+            "size": 1442,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/be7fabdad667551d2636c36e732b0a45bfb5e359"
+          },
+          "actual": {
+            "path": "lampOS/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "be7fabdad667551d2636c36e732b0a45bfb5e359",
+            "size": 1442,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/be7fabdad667551d2636c36e732b0a45bfb5e359"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/crates/actions/Cargo.toml",
+          "authored": {
+            "path": "lampOS/crates/actions/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "35c84874ef24e00dd785bcf14267b74f57455864",
+            "size": 860,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/35c84874ef24e00dd785bcf14267b74f57455864"
+          },
+          "actual": {
+            "path": "lampOS/crates/actions/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "35c84874ef24e00dd785bcf14267b74f57455864",
+            "size": 860,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/35c84874ef24e00dd785bcf14267b74f57455864"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/crates/addons/Cargo.toml",
+          "authored": {
+            "path": "lampOS/crates/addons/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "b16fb091cb3577be26b81b812c9edf89989af1d9",
+            "size": 356,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/b16fb091cb3577be26b81b812c9edf89989af1d9"
+          },
+          "actual": {
+            "path": "lampOS/crates/addons/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "b16fb091cb3577be26b81b812c9edf89989af1d9",
+            "size": 356,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/b16fb091cb3577be26b81b812c9edf89989af1d9"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/crates/air/Cargo.toml",
+          "authored": {
+            "path": "lampOS/crates/air/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "2abbcdb6b4175f3d04e7ef2a6b27c402cf76c77f",
+            "size": 455,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/2abbcdb6b4175f3d04e7ef2a6b27c402cf76c77f"
+          },
+          "actual": {
+            "path": "lampOS/crates/air/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "2abbcdb6b4175f3d04e7ef2a6b27c402cf76c77f",
+            "size": 455,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/2abbcdb6b4175f3d04e7ef2a6b27c402cf76c77f"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/crates/audio/Cargo.toml",
+          "authored": {
+            "path": "lampOS/crates/audio/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "c0e72355b32970fcd8e25a6e0640fb42d0b470ea",
+            "size": 537,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/c0e72355b32970fcd8e25a6e0640fb42d0b470ea"
+          },
+          "actual": {
+            "path": "lampOS/crates/audio/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "c0e72355b32970fcd8e25a6e0640fb42d0b470ea",
+            "size": 537,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/c0e72355b32970fcd8e25a6e0640fb42d0b470ea"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/crates/body/Cargo.toml",
+          "authored": {
+            "path": "lampOS/crates/body/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "c3279be1d708c25e12652b6eda2646624dd8c70d",
+            "size": 953,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/c3279be1d708c25e12652b6eda2646624dd8c70d"
+          },
+          "actual": {
+            "path": "lampOS/crates/body/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "c3279be1d708c25e12652b6eda2646624dd8c70d",
+            "size": 953,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/c3279be1d708c25e12652b6eda2646624dd8c70d"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/crates/bus/Cargo.toml",
+          "authored": {
+            "path": "lampOS/crates/bus/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "b0e6e0b65c67ca8ab5d286f63e06fca87d728c14",
+            "size": 568,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/b0e6e0b65c67ca8ab5d286f63e06fca87d728c14"
+          },
+          "actual": {
+            "path": "lampOS/crates/bus/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "b0e6e0b65c67ca8ab5d286f63e06fca87d728c14",
+            "size": 568,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/b0e6e0b65c67ca8ab5d286f63e06fca87d728c14"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/crates/camera/Cargo.toml",
+          "authored": {
+            "path": "lampOS/crates/camera/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "8bb5de6296059b631d165af58923093108d2053d",
+            "size": 485,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/8bb5de6296059b631d165af58923093108d2053d"
+          },
+          "actual": {
+            "path": "lampOS/crates/camera/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "8bb5de6296059b631d165af58923093108d2053d",
+            "size": 485,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/8bb5de6296059b631d165af58923093108d2053d"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/crates/camera/build.rs",
+          "authored": {
+            "path": "lampOS/crates/camera/build.rs",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "d596a866c9a50cab9747394b5082f0bab95267af",
+            "size": 3376,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/d596a866c9a50cab9747394b5082f0bab95267af"
+          },
+          "actual": {
+            "path": "lampOS/crates/camera/build.rs",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "d596a866c9a50cab9747394b5082f0bab95267af",
+            "size": 3376,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/d596a866c9a50cab9747394b5082f0bab95267af"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/crates/cloud/Cargo.toml",
+          "authored": {
+            "path": "lampOS/crates/cloud/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "65558e699d91e56ed8447e3091bbda483666ac8e",
+            "size": 2893,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/65558e699d91e56ed8447e3091bbda483666ac8e"
+          },
+          "actual": {
+            "path": "lampOS/crates/cloud/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "65558e699d91e56ed8447e3091bbda483666ac8e",
+            "size": 2893,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/65558e699d91e56ed8447e3091bbda483666ac8e"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/crates/control/Cargo.toml",
+          "authored": {
+            "path": "lampOS/crates/control/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "9b245428c4f98619eb5ea5dc90ad3f1a8514e14f",
+            "size": 1953,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/9b245428c4f98619eb5ea5dc90ad3f1a8514e14f"
+          },
+          "actual": {
+            "path": "lampOS/crates/control/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "9b245428c4f98619eb5ea5dc90ad3f1a8514e14f",
+            "size": 1953,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/9b245428c4f98619eb5ea5dc90ad3f1a8514e14f"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/crates/controls/Cargo.toml",
+          "authored": {
+            "path": "lampOS/crates/controls/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "cc473262de2992b46903f949a7a762a7a4f3a46b",
+            "size": 782,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/cc473262de2992b46903f949a7a762a7a4f3a46b"
+          },
+          "actual": {
+            "path": "lampOS/crates/controls/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "cc473262de2992b46903f949a7a762a7a4f3a46b",
+            "size": 782,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/cc473262de2992b46903f949a7a762a7a4f3a46b"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/crates/ears/Cargo.toml",
+          "authored": {
+            "path": "lampOS/crates/ears/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "506a85c7e2dd1d048b92c558227e9fb72c0b99b3",
+            "size": 652,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/506a85c7e2dd1d048b92c558227e9fb72c0b99b3"
+          },
+          "actual": {
+            "path": "lampOS/crates/ears/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "506a85c7e2dd1d048b92c558227e9fb72c0b99b3",
+            "size": 652,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/506a85c7e2dd1d048b92c558227e9fb72c0b99b3"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/crates/environment/Cargo.toml",
+          "authored": {
+            "path": "lampOS/crates/environment/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "210e2a8f4c766856679aa377201dfb90201ade57",
+            "size": 228,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/210e2a8f4c766856679aa377201dfb90201ade57"
+          },
+          "actual": {
+            "path": "lampOS/crates/environment/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "210e2a8f4c766856679aa377201dfb90201ade57",
+            "size": 228,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/210e2a8f4c766856679aa377201dfb90201ade57"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/crates/expression/Cargo.toml",
+          "authored": {
+            "path": "lampOS/crates/expression/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "9f180e0e1f52e1c8dad3bcd915d97026acb805e1",
+            "size": 745,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/9f180e0e1f52e1c8dad3bcd915d97026acb805e1"
+          },
+          "actual": {
+            "path": "lampOS/crates/expression/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "9f180e0e1f52e1c8dad3bcd915d97026acb805e1",
+            "size": 745,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/9f180e0e1f52e1c8dad3bcd915d97026acb805e1"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/crates/eyes/Cargo.toml",
+          "authored": {
+            "path": "lampOS/crates/eyes/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "79b1bfea21f41170f293b5b19f669be4990a912b",
+            "size": 2125,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/79b1bfea21f41170f293b5b19f669be4990a912b"
+          },
+          "actual": {
+            "path": "lampOS/crates/eyes/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "79b1bfea21f41170f293b5b19f669be4990a912b",
+            "size": 2125,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/79b1bfea21f41170f293b5b19f669be4990a912b"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/crates/gemini/Cargo.toml",
+          "authored": {
+            "path": "lampOS/crates/gemini/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "06a4381128d0561e86753927ffaca0cf4d745e16",
+            "size": 1313,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/06a4381128d0561e86753927ffaca0cf4d745e16"
+          },
+          "actual": {
+            "path": "lampOS/crates/gemini/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "06a4381128d0561e86753927ffaca0cf4d745e16",
+            "size": 1313,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/06a4381128d0561e86753927ffaca0cf4d745e16"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/crates/health/Cargo.toml",
+          "authored": {
+            "path": "lampOS/crates/health/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "7946804f0e6dbdba5d0b823cd7764c8217ae83fa",
+            "size": 808,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/7946804f0e6dbdba5d0b823cd7764c8217ae83fa"
+          },
+          "actual": {
+            "path": "lampOS/crates/health/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "7946804f0e6dbdba5d0b823cd7764c8217ae83fa",
+            "size": 808,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/7946804f0e6dbdba5d0b823cd7764c8217ae83fa"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/crates/ipc/Cargo.toml",
+          "authored": {
+            "path": "lampOS/crates/ipc/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "f68302724af898df670d0ec321fd59ed062804f0",
+            "size": 547,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/f68302724af898df670d0ec321fd59ed062804f0"
+          },
+          "actual": {
+            "path": "lampOS/crates/ipc/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "f68302724af898df670d0ec321fd59ed062804f0",
+            "size": 547,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/f68302724af898df670d0ec321fd59ed062804f0"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/crates/keeper/Cargo.toml",
+          "authored": {
+            "path": "lampOS/crates/keeper/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "a9836c41f12d3a965404b40da6dae4ae7b0a18ce",
+            "size": 1037,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/a9836c41f12d3a965404b40da6dae4ae7b0a18ce"
+          },
+          "actual": {
+            "path": "lampOS/crates/keeper/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "a9836c41f12d3a965404b40da6dae4ae7b0a18ce",
+            "size": 1037,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/a9836c41f12d3a965404b40da6dae4ae7b0a18ce"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/crates/lean/Cargo.toml",
+          "authored": {
+            "path": "lampOS/crates/lean/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "87920c3fb9f60aa3a2724b6b343df339780f014a",
+            "size": 410,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/87920c3fb9f60aa3a2724b6b343df339780f014a"
+          },
+          "actual": {
+            "path": "lampOS/crates/lean/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "87920c3fb9f60aa3a2724b6b343df339780f014a",
+            "size": 410,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/87920c3fb9f60aa3a2724b6b343df339780f014a"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/crates/local-time/Cargo.toml",
+          "authored": {
+            "path": "lampOS/crates/local-time/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "e62f09cecb9b94117b7c3087682ce3a45e665242",
+            "size": 429,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/e62f09cecb9b94117b7c3087682ce3a45e665242"
+          },
+          "actual": {
+            "path": "lampOS/crates/local-time/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "e62f09cecb9b94117b7c3087682ce3a45e665242",
+            "size": 429,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/e62f09cecb9b94117b7c3087682ce3a45e665242"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/crates/memory/Cargo.toml",
+          "authored": {
+            "path": "lampOS/crates/memory/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "f489eeb99b93a9be05e1f81a81a150b89368df45",
+            "size": 1405,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/f489eeb99b93a9be05e1f81a81a150b89368df45"
+          },
+          "actual": {
+            "path": "lampOS/crates/memory/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "f489eeb99b93a9be05e1f81a81a150b89368df45",
+            "size": 1405,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/f489eeb99b93a9be05e1f81a81a150b89368df45"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/crates/mood/Cargo.toml",
+          "authored": {
+            "path": "lampOS/crates/mood/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "f6c72fd384166bdc609543b78153d82d8a9f6e94",
+            "size": 501,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/f6c72fd384166bdc609543b78153d82d8a9f6e94"
+          },
+          "actual": {
+            "path": "lampOS/crates/mood/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "f6c72fd384166bdc609543b78153d82d8a9f6e94",
+            "size": 501,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/f6c72fd384166bdc609543b78153d82d8a9f6e94"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/crates/msgs/Cargo.toml",
+          "authored": {
+            "path": "lampOS/crates/msgs/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "1970d8b2deffec0d7f85d7c4159e440fa2eec141",
+            "size": 653,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/1970d8b2deffec0d7f85d7c4159e440fa2eec141"
+          },
+          "actual": {
+            "path": "lampOS/crates/msgs/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "1970d8b2deffec0d7f85d7c4159e440fa2eec141",
+            "size": 653,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/1970d8b2deffec0d7f85d7c4159e440fa2eec141"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/crates/name/Cargo.toml",
+          "authored": {
+            "path": "lampOS/crates/name/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "6096f58c59cf3a6009335b3d63045bd1da4ddd1b",
+            "size": 1269,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/6096f58c59cf3a6009335b3d63045bd1da4ddd1b"
+          },
+          "actual": {
+            "path": "lampOS/crates/name/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "6096f58c59cf3a6009335b3d63045bd1da4ddd1b",
+            "size": 1269,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/6096f58c59cf3a6009335b3d63045bd1da4ddd1b"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/crates/near-call/Cargo.toml",
+          "authored": {
+            "path": "lampOS/crates/near-call/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "e3579b9b19338f2e13c2e383c6a21840734b6acb",
+            "size": 267,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/e3579b9b19338f2e13c2e383c6a21840734b6acb"
+          },
+          "actual": {
+            "path": "lampOS/crates/near-call/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "e3579b9b19338f2e13c2e383c6a21840734b6acb",
+            "size": 267,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/e3579b9b19338f2e13c2e383c6a21840734b6acb"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/crates/observer/Cargo.toml",
+          "authored": {
+            "path": "lampOS/crates/observer/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "acceb58fe3313659a3daee23efc236c9bbc4acb8",
+            "size": 729,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/acceb58fe3313659a3daee23efc236c9bbc4acb8"
+          },
+          "actual": {
+            "path": "lampOS/crates/observer/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "acceb58fe3313659a3daee23efc236c9bbc4acb8",
+            "size": 729,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/acceb58fe3313659a3daee23efc236c9bbc4acb8"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/crates/peek/Cargo.toml",
+          "authored": {
+            "path": "lampOS/crates/peek/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "08368eb830e0ff9f03dc8368032b9f5ca37ec935",
+            "size": 1191,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/08368eb830e0ff9f03dc8368032b9f5ca37ec935"
+          },
+          "actual": {
+            "path": "lampOS/crates/peek/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "08368eb830e0ff9f03dc8368032b9f5ca37ec935",
+            "size": 1191,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/08368eb830e0ff9f03dc8368032b9f5ca37ec935"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/crates/policy/Cargo.toml",
+          "authored": {
+            "path": "lampOS/crates/policy/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "52ce73e5f4f890bf0b7d0260dace7b0612803dd5",
+            "size": 1390,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/52ce73e5f4f890bf0b7d0260dace7b0612803dd5"
+          },
+          "actual": {
+            "path": "lampOS/crates/policy/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "52ce73e5f4f890bf0b7d0260dace7b0612803dd5",
+            "size": 1390,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/52ce73e5f4f890bf0b7d0260dace7b0612803dd5"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/crates/records/Cargo.toml",
+          "authored": {
+            "path": "lampOS/crates/records/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "fbbd61e2440b022e87b06117d9c6e15e8ad20592",
+            "size": 557,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/fbbd61e2440b022e87b06117d9c6e15e8ad20592"
+          },
+          "actual": {
+            "path": "lampOS/crates/records/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "fbbd61e2440b022e87b06117d9c6e15e8ad20592",
+            "size": 557,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/fbbd61e2440b022e87b06117d9c6e15e8ad20592"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/crates/ring/Cargo.toml",
+          "authored": {
+            "path": "lampOS/crates/ring/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "048678f541ce44452f40b946511058f09c1fecfc",
+            "size": 320,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/048678f541ce44452f40b946511058f09c1fecfc"
+          },
+          "actual": {
+            "path": "lampOS/crates/ring/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "048678f541ce44452f40b946511058f09c1fecfc",
+            "size": 320,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/048678f541ce44452f40b946511058f09c1fecfc"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/crates/same-voice/Cargo.toml",
+          "authored": {
+            "path": "lampOS/crates/same-voice/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "fa6d943b580aeff1322ad38188c49e46a34c87c8",
+            "size": 696,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/fa6d943b580aeff1322ad38188c49e46a34c87c8"
+          },
+          "actual": {
+            "path": "lampOS/crates/same-voice/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "fa6d943b580aeff1322ad38188c49e46a34c87c8",
+            "size": 696,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/fa6d943b580aeff1322ad38188c49e46a34c87c8"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/crates/schedule/Cargo.toml",
+          "authored": {
+            "path": "lampOS/crates/schedule/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "07cb5fa06f3e8f1779be55f1f561445c66917fe1",
+            "size": 898,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/07cb5fa06f3e8f1779be55f1f561445c66917fe1"
+          },
+          "actual": {
+            "path": "lampOS/crates/schedule/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "07cb5fa06f3e8f1779be55f1f561445c66917fe1",
+            "size": 898,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/07cb5fa06f3e8f1779be55f1f561445c66917fe1"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/crates/selftest/Cargo.toml",
+          "authored": {
+            "path": "lampOS/crates/selftest/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "215b8b3bee9378575d0cb29e44c5d870fda8a7d8",
+            "size": 816,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/215b8b3bee9378575d0cb29e44c5d870fda8a7d8"
+          },
+          "actual": {
+            "path": "lampOS/crates/selftest/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "215b8b3bee9378575d0cb29e44c5d870fda8a7d8",
+            "size": 816,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/215b8b3bee9378575d0cb29e44c5d870fda8a7d8"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/crates/settings/Cargo.toml",
+          "authored": {
+            "path": "lampOS/crates/settings/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "c4d5d36911c8707244bdd523f52123f9147513c7",
+            "size": 539,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/c4d5d36911c8707244bdd523f52123f9147513c7"
+          },
+          "actual": {
+            "path": "lampOS/crates/settings/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "c4d5d36911c8707244bdd523f52123f9147513c7",
+            "size": 539,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/c4d5d36911c8707244bdd523f52123f9147513c7"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/crates/setup/Cargo.toml",
+          "authored": {
+            "path": "lampOS/crates/setup/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "01096122b56f647d33470bb96f3e2210cc17d6df",
+            "size": 2273,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/01096122b56f647d33470bb96f3e2210cc17d6df"
+          },
+          "actual": {
+            "path": "lampOS/crates/setup/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "01096122b56f647d33470bb96f3e2210cc17d6df",
+            "size": 2273,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/01096122b56f647d33470bb96f3e2210cc17d6df"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/crates/skills/Cargo.toml",
+          "authored": {
+            "path": "lampOS/crates/skills/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "2605527e6dc85157f8bea06a5838e29832f9df01",
+            "size": 2926,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/2605527e6dc85157f8bea06a5838e29832f9df01"
+          },
+          "actual": {
+            "path": "lampOS/crates/skills/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "2605527e6dc85157f8bea06a5838e29832f9df01",
+            "size": 2926,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/2605527e6dc85157f8bea06a5838e29832f9df01"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/crates/sound-fixtures/Cargo.toml",
+          "authored": {
+            "path": "lampOS/crates/sound-fixtures/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "9659c3a8e925d7bdb6d86d51288f2679f402c663",
+            "size": 282,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/9659c3a8e925d7bdb6d86d51288f2679f402c663"
+          },
+          "actual": {
+            "path": "lampOS/crates/sound-fixtures/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "9659c3a8e925d7bdb6d86d51288f2679f402c663",
+            "size": 282,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/9659c3a8e925d7bdb6d86d51288f2679f402c663"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/crates/station/Cargo.toml",
+          "authored": {
+            "path": "lampOS/crates/station/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "c1e6e8162acb5d6ed7d2a7ee6e7ed28c338f6be2",
+            "size": 1060,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/c1e6e8162acb5d6ed7d2a7ee6e7ed28c338f6be2"
+          },
+          "actual": {
+            "path": "lampOS/crates/station/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "c1e6e8162acb5d6ed7d2a7ee6e7ed28c338f6be2",
+            "size": 1060,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/c1e6e8162acb5d6ed7d2a7ee6e7ed28c338f6be2"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/crates/surround/Cargo.toml",
+          "authored": {
+            "path": "lampOS/crates/surround/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "1c2e01a6667983a8f42274fd95d97ea4e6f03cb2",
+            "size": 1302,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/1c2e01a6667983a8f42274fd95d97ea4e6f03cb2"
+          },
+          "actual": {
+            "path": "lampOS/crates/surround/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "1c2e01a6667983a8f42274fd95d97ea4e6f03cb2",
+            "size": 1302,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/1c2e01a6667983a8f42274fd95d97ea4e6f03cb2"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/crates/tasks/Cargo.toml",
+          "authored": {
+            "path": "lampOS/crates/tasks/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "97d3d910dbce159805bc935506eed57ad47e2c16",
+            "size": 907,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/97d3d910dbce159805bc935506eed57ad47e2c16"
+          },
+          "actual": {
+            "path": "lampOS/crates/tasks/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "97d3d910dbce159805bc935506eed57ad47e2c16",
+            "size": 907,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/97d3d910dbce159805bc935506eed57ad47e2c16"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/crates/turn-end-wire/Cargo.toml",
+          "authored": {
+            "path": "lampOS/crates/turn-end-wire/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "cbc355d3ee01a9c0ff3c046d84eea8d634344d61",
+            "size": 642,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/cbc355d3ee01a9c0ff3c046d84eea8d634344d61"
+          },
+          "actual": {
+            "path": "lampOS/crates/turn-end-wire/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "cbc355d3ee01a9c0ff3c046d84eea8d634344d61",
+            "size": 642,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/cbc355d3ee01a9c0ff3c046d84eea8d634344d61"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/crates/turn-end/Cargo.toml",
+          "authored": {
+            "path": "lampOS/crates/turn-end/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "b5e4e2416d7952dc096b1046f308a4c2219f01c5",
+            "size": 1734,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/b5e4e2416d7952dc096b1046f308a4c2219f01c5"
+          },
+          "actual": {
+            "path": "lampOS/crates/turn-end/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "b5e4e2416d7952dc096b1046f308a4c2219f01c5",
+            "size": 1734,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/b5e4e2416d7952dc096b1046f308a4c2219f01c5"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/crates/turn-owner/Cargo.toml",
+          "authored": {
+            "path": "lampOS/crates/turn-owner/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "c47c1fbef72bb70e30b4bccd8c567e032429c4f4",
+            "size": 253,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/c47c1fbef72bb70e30b4bccd8c567e032429c4f4"
+          },
+          "actual": {
+            "path": "lampOS/crates/turn-owner/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "c47c1fbef72bb70e30b4bccd8c567e032429c4f4",
+            "size": 253,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/c47c1fbef72bb70e30b4bccd8c567e032429c4f4"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/crates/update/Cargo.toml",
+          "authored": {
+            "path": "lampOS/crates/update/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "856efebb1928394acbf06fc05e2dfee1251671d4",
+            "size": 2172,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/856efebb1928394acbf06fc05e2dfee1251671d4"
+          },
+          "actual": {
+            "path": "lampOS/crates/update/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "856efebb1928394acbf06fc05e2dfee1251671d4",
+            "size": 2172,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/856efebb1928394acbf06fc05e2dfee1251671d4"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/crates/voice-eval/Cargo.toml",
+          "authored": {
+            "path": "lampOS/crates/voice-eval/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "493e1589b6fa2fd8a0430b80f3be0017d81f593b",
+            "size": 1850,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/493e1589b6fa2fd8a0430b80f3be0017d81f593b"
+          },
+          "actual": {
+            "path": "lampOS/crates/voice-eval/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "493e1589b6fa2fd8a0430b80f3be0017d81f593b",
+            "size": 1850,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/493e1589b6fa2fd8a0430b80f3be0017d81f593b"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/crates/voice-processes/Cargo.toml",
+          "authored": {
+            "path": "lampOS/crates/voice-processes/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "3fdd93848b9d147e0515af12cfb106ad072c46fd",
+            "size": 323,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/3fdd93848b9d147e0515af12cfb106ad072c46fd"
+          },
+          "actual": {
+            "path": "lampOS/crates/voice-processes/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "3fdd93848b9d147e0515af12cfb106ad072c46fd",
+            "size": 323,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/3fdd93848b9d147e0515af12cfb106ad072c46fd"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/crates/voice/Cargo.toml",
+          "authored": {
+            "path": "lampOS/crates/voice/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "8b4383b2bbfad0baf0d9993ce84f08b6994d63b2",
+            "size": 4468,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/8b4383b2bbfad0baf0d9993ce84f08b6994d63b2"
+          },
+          "actual": {
+            "path": "lampOS/crates/voice/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "8b4383b2bbfad0baf0d9993ce84f08b6994d63b2",
+            "size": 4468,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/8b4383b2bbfad0baf0d9993ce84f08b6994d63b2"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/deploy/package-binaries.json",
+          "authored": {
+            "path": "lampOS/deploy/package-binaries.json",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "324a0bb3767ce09367b1274c35226042ebd4c070",
+            "size": 1384,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/324a0bb3767ce09367b1274c35226042ebd4c070"
+          },
+          "actual": {
+            "path": "lampOS/deploy/package-binaries.json",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "324a0bb3767ce09367b1274c35226042ebd4c070",
+            "size": 1384,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/324a0bb3767ce09367b1274c35226042ebd4c070"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/docs/verification/gemini-capture-clock-20261016/review/reversed/crates/gemini/Cargo.toml",
+          "authored": {
+            "path": "lampOS/docs/verification/gemini-capture-clock-20261016/review/reversed/crates/gemini/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "be6ec76a51e8330d49ba4c10098ed09ec4c8833d",
+            "size": 1171,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/be6ec76a51e8330d49ba4c10098ed09ec4c8833d"
+          },
+          "actual": {
+            "path": "lampOS/docs/verification/gemini-capture-clock-20261016/review/reversed/crates/gemini/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "be6ec76a51e8330d49ba4c10098ed09ec4c8833d",
+            "size": 1171,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/be6ec76a51e8330d49ba4c10098ed09ec4c8833d"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/docs/verification/records-controlled-20261016/local/after/lampOS/crates/records/Cargo.toml",
+          "authored": {
+            "path": "lampOS/docs/verification/records-controlled-20261016/local/after/lampOS/crates/records/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "92e1ba07a5ad1c9e1f5c3f73c489d902ed5615c6",
+            "size": 502,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/92e1ba07a5ad1c9e1f5c3f73c489d902ed5615c6"
+          },
+          "actual": {
+            "path": "lampOS/docs/verification/records-controlled-20261016/local/after/lampOS/crates/records/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "92e1ba07a5ad1c9e1f5c3f73c489d902ed5615c6",
+            "size": 502,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/92e1ba07a5ad1c9e1f5c3f73c489d902ed5615c6"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/docs/verification/records-controlled-20261016/local/before/lampOS/crates/records/Cargo.toml",
+          "authored": {
+            "path": "lampOS/docs/verification/records-controlled-20261016/local/before/lampOS/crates/records/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "e0dc936aa97c2ffe9819057c97099cc6e916d93a",
+            "size": 395,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/e0dc936aa97c2ffe9819057c97099cc6e916d93a"
+          },
+          "actual": {
+            "path": "lampOS/docs/verification/records-controlled-20261016/local/before/lampOS/crates/records/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "e0dc936aa97c2ffe9819057c97099cc6e916d93a",
+            "size": 395,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/e0dc936aa97c2ffe9819057c97099cc6e916d93a"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/docs/verification/records-controlled-20261016/local/restored/lampOS/crates/records/Cargo.toml",
+          "authored": {
+            "path": "lampOS/docs/verification/records-controlled-20261016/local/restored/lampOS/crates/records/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "e0dc936aa97c2ffe9819057c97099cc6e916d93a",
+            "size": 395,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/e0dc936aa97c2ffe9819057c97099cc6e916d93a"
+          },
+          "actual": {
+            "path": "lampOS/docs/verification/records-controlled-20261016/local/restored/lampOS/crates/records/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "e0dc936aa97c2ffe9819057c97099cc6e916d93a",
+            "size": 395,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/e0dc936aa97c2ffe9819057c97099cc6e916d93a"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/docs/verification/records-controlled-release-20261016/current/new-Cargo.lock",
+          "authored": {
+            "path": "lampOS/docs/verification/records-controlled-release-20261016/current/new-Cargo.lock",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "a8f411e0571e2c658a29f9a89f6c81ff4eb9d728",
+            "size": 113084,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/a8f411e0571e2c658a29f9a89f6c81ff4eb9d728"
+          },
+          "actual": {
+            "path": "lampOS/docs/verification/records-controlled-release-20261016/current/new-Cargo.lock",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "a8f411e0571e2c658a29f9a89f6c81ff4eb9d728",
+            "size": 113084,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/a8f411e0571e2c658a29f9a89f6c81ff4eb9d728"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/docs/verification/records-controlled-release-20261016/current/old-Cargo.lock",
+          "authored": {
+            "path": "lampOS/docs/verification/records-controlled-release-20261016/current/old-Cargo.lock",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "8ee57433c188b5d395675352971e63b187e703e6",
+            "size": 113073,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/8ee57433c188b5d395675352971e63b187e703e6"
+          },
+          "actual": {
+            "path": "lampOS/docs/verification/records-controlled-release-20261016/current/old-Cargo.lock",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "8ee57433c188b5d395675352971e63b187e703e6",
+            "size": 113073,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/8ee57433c188b5d395675352971e63b187e703e6"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/rust-toolchain.toml",
+          "authored": {
+            "path": "lampOS/rust-toolchain.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "e3b40113e65befef4d5d198284b99c78c27136f0",
+            "size": 86,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/e3b40113e65befef4d5d198284b99c78c27136f0"
+          },
+          "actual": {
+            "path": "lampOS/rust-toolchain.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "e3b40113e65befef4d5d198284b99c78c27136f0",
+            "size": 86,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/e3b40113e65befef4d5d198284b99c78c27136f0"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/third_party/sonora/Cargo.toml",
+          "authored": {
+            "path": "lampOS/third_party/sonora/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "ef74895283a2559a6a6afaa2cd9144a0ac54d919",
+            "size": 2819,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/ef74895283a2559a6a6afaa2cd9144a0ac54d919"
+          },
+          "actual": {
+            "path": "lampOS/third_party/sonora/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "ef74895283a2559a6a6afaa2cd9144a0ac54d919",
+            "size": 2819,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/ef74895283a2559a6a6afaa2cd9144a0ac54d919"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/tools/package-binaries-test.sh",
+          "authored": {
+            "path": "lampOS/tools/package-binaries-test.sh",
+            "mode": "100755",
+            "type": "blob",
+            "sha": "76f2575d04b15a6f6e377a50b0d8cde852f5cbca",
+            "size": 1422,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/76f2575d04b15a6f6e377a50b0d8cde852f5cbca"
+          },
+          "actual": {
+            "path": "lampOS/tools/package-binaries-test.sh",
+            "mode": "100755",
+            "type": "blob",
+            "sha": "76f2575d04b15a6f6e377a50b0d8cde852f5cbca",
+            "size": 1422,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/76f2575d04b15a6f6e377a50b0d8cde852f5cbca"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/tools/package-binaries.sh",
+          "authored": {
+            "path": "lampOS/tools/package-binaries.sh",
+            "mode": "100755",
+            "type": "blob",
+            "sha": "1be4ee1c83992ef7d52bd644688f85157e246b4f",
+            "size": 1370,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/1be4ee1c83992ef7d52bd644688f85157e246b4f"
+          },
+          "actual": {
+            "path": "lampOS/tools/package-binaries.sh",
+            "mode": "100755",
+            "type": "blob",
+            "sha": "1be4ee1c83992ef7d52bd644688f85157e246b4f",
+            "size": 1370,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/1be4ee1c83992ef7d52bd644688f85157e246b4f"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/vendor/tough/Cargo.toml",
+          "authored": {
+            "path": "lampOS/vendor/tough/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "1f791517616542771d421e13dbea9e9055a0f2ca",
+            "size": 2673,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/1f791517616542771d421e13dbea9e9055a0f2ca"
+          },
+          "actual": {
+            "path": "lampOS/vendor/tough/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "1f791517616542771d421e13dbea9e9055a0f2ca",
+            "size": 2673,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/1f791517616542771d421e13dbea9e9055a0f2ca"
+          },
+          "equal": true
+        }
+      ]
+    },
+    {
+      "label": "Linux-clippy",
+      "count": 94,
+      "all_equal_authored": true,
+      "inputs": [
+        {
+          "path": ".github/scripts/lampos-pr-crates.py",
+          "authored": {
+            "path": ".github/scripts/lampos-pr-crates.py",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "05ebfb6628f0caec9b5a4d462f183aa5d617b982",
+            "size": 5523,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/05ebfb6628f0caec9b5a4d462f183aa5d617b982"
+          },
+          "actual": {
+            "path": ".github/scripts/lampos-pr-crates.py",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "05ebfb6628f0caec9b5a4d462f183aa5d617b982",
+            "size": 5523,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/05ebfb6628f0caec9b5a4d462f183aa5d617b982"
+          },
+          "equal": true
+        },
+        {
+          "path": ".github/scripts/lampos-publish-artifact-test.py",
+          "authored": {
+            "path": ".github/scripts/lampos-publish-artifact-test.py",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "528ec4ec02f12ac903d0d6d2c8329ead42f77399",
+            "size": 12051,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/528ec4ec02f12ac903d0d6d2c8329ead42f77399"
+          },
+          "actual": {
+            "path": ".github/scripts/lampos-publish-artifact-test.py",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "528ec4ec02f12ac903d0d6d2c8329ead42f77399",
+            "size": 12051,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/528ec4ec02f12ac903d0d6d2c8329ead42f77399"
+          },
+          "equal": true
+        },
+        {
+          "path": ".github/scripts/lampos-publish-artifact.py",
+          "authored": {
+            "path": ".github/scripts/lampos-publish-artifact.py",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "4a16795215f27369390858d4ad31e22e7fe65669",
+            "size": 6721,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/4a16795215f27369390858d4ad31e22e7fe65669"
+          },
+          "actual": {
+            "path": ".github/scripts/lampos-publish-artifact.py",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "4a16795215f27369390858d4ad31e22e7fe65669",
+            "size": 6721,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/4a16795215f27369390858d4ad31e22e7fe65669"
+          },
+          "equal": true
+        },
+        {
+          "path": ".github/scripts/lampos-publish-cli-test.py",
+          "authored": {
+            "path": ".github/scripts/lampos-publish-cli-test.py",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "97877b2eb242795908b8cf85cae1c97bfd1f511e",
+            "size": 7767,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/97877b2eb242795908b8cf85cae1c97bfd1f511e"
+          },
+          "actual": {
+            "path": ".github/scripts/lampos-publish-cli-test.py",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "97877b2eb242795908b8cf85cae1c97bfd1f511e",
+            "size": 7767,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/97877b2eb242795908b8cf85cae1c97bfd1f511e"
+          },
+          "equal": true
+        },
+        {
+          "path": ".github/scripts/lampos-publish-test.py",
+          "authored": {
+            "path": ".github/scripts/lampos-publish-test.py",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "37e55bc682a7e9f53437ab904c1c76c4b8b09ef0",
+            "size": 37457,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/37e55bc682a7e9f53437ab904c1c76c4b8b09ef0"
+          },
+          "actual": {
+            "path": ".github/scripts/lampos-publish-test.py",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "37e55bc682a7e9f53437ab904c1c76c4b8b09ef0",
+            "size": 37457,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/37e55bc682a7e9f53437ab904c1c76c4b8b09ef0"
+          },
+          "equal": true
+        },
+        {
+          "path": ".github/scripts/lampos-publish.py",
+          "authored": {
+            "path": ".github/scripts/lampos-publish.py",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "0bf124c39c41fb3e8eb397d935964b426b663cb2",
+            "size": 27224,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/0bf124c39c41fb3e8eb397d935964b426b663cb2"
+          },
+          "actual": {
+            "path": ".github/scripts/lampos-publish.py",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "0bf124c39c41fb3e8eb397d935964b426b663cb2",
+            "size": 27224,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/0bf124c39c41fb3e8eb397d935964b426b663cb2"
+          },
+          "equal": true
+        },
+        {
+          "path": ".github/scripts/lampos-records-pair-test.sh",
+          "authored": {
+            "path": ".github/scripts/lampos-records-pair-test.sh",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "c3dc4916625460bdd23020c9006649bc9d9071a9",
+            "size": 8883,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/c3dc4916625460bdd23020c9006649bc9d9071a9"
+          },
+          "actual": {
+            "path": ".github/scripts/lampos-records-pair-test.sh",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "c3dc4916625460bdd23020c9006649bc9d9071a9",
+            "size": 8883,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/c3dc4916625460bdd23020c9006649bc9d9071a9"
+          },
+          "equal": true
+        },
+        {
+          "path": ".github/scripts/lampos-records-pair.jq",
+          "authored": {
+            "path": ".github/scripts/lampos-records-pair.jq",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "24cbbde68bb69b94091883ec550236c2a18a4a6b",
+            "size": 5790,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/24cbbde68bb69b94091883ec550236c2a18a4a6b"
+          },
+          "actual": {
+            "path": ".github/scripts/lampos-records-pair.jq",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "24cbbde68bb69b94091883ec550236c2a18a4a6b",
+            "size": 5790,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/24cbbde68bb69b94091883ec550236c2a18a4a6b"
+          },
+          "equal": true
+        },
+        {
+          "path": ".github/scripts/lampos-records-pair.sh",
+          "authored": {
+            "path": ".github/scripts/lampos-records-pair.sh",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "9a5e5e9af45a3866abcde6a104dd047afeaeb91f",
+            "size": 22146,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/9a5e5e9af45a3866abcde6a104dd047afeaeb91f"
+          },
+          "actual": {
+            "path": ".github/scripts/lampos-records-pair.sh",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "9a5e5e9af45a3866abcde6a104dd047afeaeb91f",
+            "size": 22146,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/9a5e5e9af45a3866abcde6a104dd047afeaeb91f"
+          },
+          "equal": true
+        },
+        {
+          "path": ".github/scripts/lampos-source-times.py",
+          "authored": {
+            "path": ".github/scripts/lampos-source-times.py",
+            "mode": "100755",
+            "type": "blob",
+            "sha": "6ba72adaefbf719aaea4df6845af6f5232b71de6",
+            "size": 2918,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/6ba72adaefbf719aaea4df6845af6f5232b71de6"
+          },
+          "actual": {
+            "path": ".github/scripts/lampos-source-times.py",
+            "mode": "100755",
+            "type": "blob",
+            "sha": "6ba72adaefbf719aaea4df6845af6f5232b71de6",
+            "size": 2918,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/6ba72adaefbf719aaea4df6845af6f5232b71de6"
+          },
+          "equal": true
+        },
+        {
+          "path": ".github/tools/lampos-promote/Cargo.lock",
+          "authored": {
+            "path": ".github/tools/lampos-promote/Cargo.lock",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "4f44ec4b9b3d78dd6e98492ee25804ac6c5dda93",
+            "size": 13428,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/4f44ec4b9b3d78dd6e98492ee25804ac6c5dda93"
+          },
+          "actual": {
+            "path": ".github/tools/lampos-promote/Cargo.lock",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "4f44ec4b9b3d78dd6e98492ee25804ac6c5dda93",
+            "size": 13428,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/4f44ec4b9b3d78dd6e98492ee25804ac6c5dda93"
+          },
+          "equal": true
+        },
+        {
+          "path": ".github/tools/lampos-promote/Cargo.toml",
+          "authored": {
+            "path": ".github/tools/lampos-promote/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "b7324fd191bca0dda6a712f3af9da30a00f4d965",
+            "size": 311,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/b7324fd191bca0dda6a712f3af9da30a00f4d965"
+          },
+          "actual": {
+            "path": ".github/tools/lampos-promote/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "b7324fd191bca0dda6a712f3af9da30a00f4d965",
+            "size": 311,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/b7324fd191bca0dda6a712f3af9da30a00f4d965"
+          },
+          "equal": true
+        },
+        {
+          "path": ".github/tools/lampos-promote/src/github.rs",
+          "authored": {
+            "path": ".github/tools/lampos-promote/src/github.rs",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "083c63917466b45e60bab5149ece92b86ea3a26d",
+            "size": 11153,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/083c63917466b45e60bab5149ece92b86ea3a26d"
+          },
+          "actual": {
+            "path": ".github/tools/lampos-promote/src/github.rs",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "083c63917466b45e60bab5149ece92b86ea3a26d",
+            "size": 11153,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/083c63917466b45e60bab5149ece92b86ea3a26d"
+          },
+          "equal": true
+        },
+        {
+          "path": ".github/tools/lampos-promote/src/lib.rs",
+          "authored": {
+            "path": ".github/tools/lampos-promote/src/lib.rs",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "fba86b8256dd9501c9c2a1e2c1b96ffeba2f8660",
+            "size": 20168,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/fba86b8256dd9501c9c2a1e2c1b96ffeba2f8660"
+          },
+          "actual": {
+            "path": ".github/tools/lampos-promote/src/lib.rs",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "fba86b8256dd9501c9c2a1e2c1b96ffeba2f8660",
+            "size": 20168,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/fba86b8256dd9501c9c2a1e2c1b96ffeba2f8660"
+          },
+          "equal": true
+        },
+        {
+          "path": ".github/tools/lampos-promote/src/main.rs",
+          "authored": {
+            "path": ".github/tools/lampos-promote/src/main.rs",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "cceccbb28fbd78d796f14266e94d3a5bc873e49b",
+            "size": 946,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/cceccbb28fbd78d796f14266e94d3a5bc873e49b"
+          },
+          "actual": {
+            "path": ".github/tools/lampos-promote/src/main.rs",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "cceccbb28fbd78d796f14266e94d3a5bc873e49b",
+            "size": 946,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/cceccbb28fbd78d796f14266e94d3a5bc873e49b"
+          },
+          "equal": true
+        },
+        {
+          "path": ".github/tools/lampos-promote/tests/promotion.rs",
+          "authored": {
+            "path": ".github/tools/lampos-promote/tests/promotion.rs",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "4397c52fd7d5390f7e94224a36ae6b590f36c5f0",
+            "size": 22774,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/4397c52fd7d5390f7e94224a36ae6b590f36c5f0"
+          },
+          "actual": {
+            "path": ".github/tools/lampos-promote/tests/promotion.rs",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "4397c52fd7d5390f7e94224a36ae6b590f36c5f0",
+            "size": 22774,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/4397c52fd7d5390f7e94224a36ae6b590f36c5f0"
+          },
+          "equal": true
+        },
+        {
+          "path": ".github/tools/lampos-promote/tests/workflow.rs",
+          "authored": {
+            "path": ".github/tools/lampos-promote/tests/workflow.rs",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "caba122be5d6039e236396bb0468bdcd5ede5507",
+            "size": 1791,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/caba122be5d6039e236396bb0468bdcd5ede5507"
+          },
+          "actual": {
+            "path": ".github/tools/lampos-promote/tests/workflow.rs",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "caba122be5d6039e236396bb0468bdcd5ede5507",
+            "size": 1791,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/caba122be5d6039e236396bb0468bdcd5ede5507"
+          },
+          "equal": true
+        },
+        {
+          "path": ".github/workflows/ci.yml",
+          "authored": {
+            "path": ".github/workflows/ci.yml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "43c4fdfb5a5ebcac3a5362fa98ddf8b5027109ae",
+            "size": 4746,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/43c4fdfb5a5ebcac3a5362fa98ddf8b5027109ae"
+          },
+          "actual": {
+            "path": ".github/workflows/ci.yml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "43c4fdfb5a5ebcac3a5362fa98ddf8b5027109ae",
+            "size": 4746,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/43c4fdfb5a5ebcac3a5362fa98ddf8b5027109ae"
+          },
+          "equal": true
+        },
+        {
+          "path": ".github/workflows/lampos-arm64.yml",
+          "authored": {
+            "path": ".github/workflows/lampos-arm64.yml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "c1a4b4479b284e52f3ff37701cd55734783040b3",
+            "size": 20708,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/c1a4b4479b284e52f3ff37701cd55734783040b3"
+          },
+          "actual": {
+            "path": ".github/workflows/lampos-arm64.yml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "c1a4b4479b284e52f3ff37701cd55734783040b3",
+            "size": 20708,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/c1a4b4479b284e52f3ff37701cd55734783040b3"
+          },
+          "equal": true
+        },
+        {
+          "path": ".github/workflows/lampos-caps-state-pair.yml",
+          "authored": {
+            "path": ".github/workflows/lampos-caps-state-pair.yml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "f655d157cc28db5bf8f88363f36f86882dd2d5f3",
+            "size": 7570,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/f655d157cc28db5bf8f88363f36f86882dd2d5f3"
+          },
+          "actual": {
+            "path": ".github/workflows/lampos-caps-state-pair.yml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "f655d157cc28db5bf8f88363f36f86882dd2d5f3",
+            "size": 7570,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/f655d157cc28db5bf8f88363f36f86882dd2d5f3"
+          },
+          "equal": true
+        },
+        {
+          "path": ".github/workflows/lampos-clippy.yml",
+          "authored": {
+            "path": ".github/workflows/lampos-clippy.yml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "04d2b49b5065c00f567e91ce271e2ba04669bb16",
+            "size": 4721,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/04d2b49b5065c00f567e91ce271e2ba04669bb16"
+          },
+          "actual": {
+            "path": ".github/workflows/lampos-clippy.yml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "04d2b49b5065c00f567e91ce271e2ba04669bb16",
+            "size": 4721,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/04d2b49b5065c00f567e91ce271e2ba04669bb16"
+          },
+          "equal": true
+        },
+        {
+          "path": ".github/workflows/lampos-cloud-provenance-pair.yml",
+          "authored": {
+            "path": ".github/workflows/lampos-cloud-provenance-pair.yml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "e099d61677732ecdf33a35e5cd37e65d7b33acee",
+            "size": 20751,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/e099d61677732ecdf33a35e5cd37e65d7b33acee"
+          },
+          "actual": {
+            "path": ".github/workflows/lampos-cloud-provenance-pair.yml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "e099d61677732ecdf33a35e5cd37e65d7b33acee",
+            "size": 20751,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/e099d61677732ecdf33a35e5cd37e65d7b33acee"
+          },
+          "equal": true
+        },
+        {
+          "path": ".github/workflows/lampos-controls-pair.yml",
+          "authored": {
+            "path": ".github/workflows/lampos-controls-pair.yml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "8976a431704eb1206e66bb362692d175929fd289",
+            "size": 10432,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/8976a431704eb1206e66bb362692d175929fd289"
+          },
+          "actual": {
+            "path": ".github/workflows/lampos-controls-pair.yml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "8976a431704eb1206e66bb362692d175929fd289",
+            "size": 10432,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/8976a431704eb1206e66bb362692d175929fd289"
+          },
+          "equal": true
+        },
+        {
+          "path": ".github/workflows/lampos-records-pair.yml",
+          "authored": {
+            "path": ".github/workflows/lampos-records-pair.yml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "e68be6c1382f13932c317b5b6dd31f9f41cb036e",
+            "size": 8061,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/e68be6c1382f13932c317b5b6dd31f9f41cb036e"
+          },
+          "actual": {
+            "path": ".github/workflows/lampos-records-pair.yml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "e68be6c1382f13932c317b5b6dd31f9f41cb036e",
+            "size": 8061,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/e68be6c1382f13932c317b5b6dd31f9f41cb036e"
+          },
+          "equal": true
+        },
+        {
+          "path": ".github/workflows/lampos-routine-state-pair.yml",
+          "authored": {
+            "path": ".github/workflows/lampos-routine-state-pair.yml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "81693942e65935208d8fc776c7cbf0ff580261ba",
+            "size": 5240,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/81693942e65935208d8fc776c7cbf0ff580261ba"
+          },
+          "actual": {
+            "path": ".github/workflows/lampos-routine-state-pair.yml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "81693942e65935208d8fc776c7cbf0ff580261ba",
+            "size": 5240,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/81693942e65935208d8fc776c7cbf0ff580261ba"
+          },
+          "equal": true
+        },
+        {
+          "path": ".github/workflows/lampos-sdk.yml",
+          "authored": {
+            "path": ".github/workflows/lampos-sdk.yml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "7f71bb0d383156f3cc456b2e67878f061b5f258e",
+            "size": 3311,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/7f71bb0d383156f3cc456b2e67878f061b5f258e"
+          },
+          "actual": {
+            "path": ".github/workflows/lampos-sdk.yml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "7f71bb0d383156f3cc456b2e67878f061b5f258e",
+            "size": 3311,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/7f71bb0d383156f3cc456b2e67878f061b5f258e"
+          },
+          "equal": true
+        },
+        {
+          "path": ".github/workflows/lampos-settings-pair.yml",
+          "authored": {
+            "path": ".github/workflows/lampos-settings-pair.yml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "60dfe56ac767c7cafdf3cc1af9d0eed11a56f8ab",
+            "size": 10500,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/60dfe56ac767c7cafdf3cc1af9d0eed11a56f8ab"
+          },
+          "actual": {
+            "path": ".github/workflows/lampos-settings-pair.yml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "60dfe56ac767c7cafdf3cc1af9d0eed11a56f8ab",
+            "size": 10500,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/60dfe56ac767c7cafdf3cc1af9d0eed11a56f8ab"
+          },
+          "equal": true
+        },
+        {
+          "path": ".github/workflows/lampos-state-pair.yml",
+          "authored": {
+            "path": ".github/workflows/lampos-state-pair.yml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "f98c768e635da2e193451ed23592e4c63841e57f",
+            "size": 5824,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/f98c768e635da2e193451ed23592e4c63841e57f"
+          },
+          "actual": {
+            "path": ".github/workflows/lampos-state-pair.yml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "f98c768e635da2e193451ed23592e4c63841e57f",
+            "size": 5824,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/f98c768e635da2e193451ed23592e4c63841e57f"
+          },
+          "equal": true
+        },
+        {
+          "path": ".github/workflows/lampos-surround-candidate-pair.yml",
+          "authored": {
+            "path": ".github/workflows/lampos-surround-candidate-pair.yml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "80dba69c69ca63560ec585360817381be663d56a",
+            "size": 20974,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/80dba69c69ca63560ec585360817381be663d56a"
+          },
+          "actual": {
+            "path": ".github/workflows/lampos-surround-candidate-pair.yml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "80dba69c69ca63560ec585360817381be663d56a",
+            "size": 20974,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/80dba69c69ca63560ec585360817381be663d56a"
+          },
+          "equal": true
+        },
+        {
+          "path": ".github/workflows/publish-skills.yml",
+          "authored": {
+            "path": ".github/workflows/publish-skills.yml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "8b86020418bc6fcad112e8d834a4b258284896ff",
+            "size": 1843,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/8b86020418bc6fcad112e8d834a4b258284896ff"
+          },
+          "actual": {
+            "path": ".github/workflows/publish-skills.yml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "8b86020418bc6fcad112e8d834a4b258284896ff",
+            "size": 1843,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/8b86020418bc6fcad112e8d834a4b258284896ff"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/.cargo/config.toml",
+          "authored": {
+            "path": "lampOS/.cargo/config.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "b3515e952d3665dd4c6a26887a6812bc9c597dca",
+            "size": 210,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/b3515e952d3665dd4c6a26887a6812bc9c597dca"
+          },
+          "actual": {
+            "path": "lampOS/.cargo/config.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "b3515e952d3665dd4c6a26887a6812bc9c597dca",
+            "size": 210,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/b3515e952d3665dd4c6a26887a6812bc9c597dca"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/.config/nextest.toml",
+          "authored": {
+            "path": "lampOS/.config/nextest.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "3463c6682e8126b0c02cedda3d67cfc5bc081169",
+            "size": 5157,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/3463c6682e8126b0c02cedda3d67cfc5bc081169"
+          },
+          "actual": {
+            "path": "lampOS/.config/nextest.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "3463c6682e8126b0c02cedda3d67cfc5bc081169",
+            "size": 5157,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/3463c6682e8126b0c02cedda3d67cfc5bc081169"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/Cargo.lock",
+          "authored": {
+            "path": "lampOS/Cargo.lock",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "654c56da19747b0a1c613a416f8a4a7e02ce8f64",
+            "size": 122933,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/654c56da19747b0a1c613a416f8a4a7e02ce8f64"
+          },
+          "actual": {
+            "path": "lampOS/Cargo.lock",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "654c56da19747b0a1c613a416f8a4a7e02ce8f64",
+            "size": 122933,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/654c56da19747b0a1c613a416f8a4a7e02ce8f64"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/Cargo.toml",
+          "authored": {
+            "path": "lampOS/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "be7fabdad667551d2636c36e732b0a45bfb5e359",
+            "size": 1442,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/be7fabdad667551d2636c36e732b0a45bfb5e359"
+          },
+          "actual": {
+            "path": "lampOS/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "be7fabdad667551d2636c36e732b0a45bfb5e359",
+            "size": 1442,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/be7fabdad667551d2636c36e732b0a45bfb5e359"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/crates/actions/Cargo.toml",
+          "authored": {
+            "path": "lampOS/crates/actions/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "35c84874ef24e00dd785bcf14267b74f57455864",
+            "size": 860,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/35c84874ef24e00dd785bcf14267b74f57455864"
+          },
+          "actual": {
+            "path": "lampOS/crates/actions/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "35c84874ef24e00dd785bcf14267b74f57455864",
+            "size": 860,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/35c84874ef24e00dd785bcf14267b74f57455864"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/crates/addons/Cargo.toml",
+          "authored": {
+            "path": "lampOS/crates/addons/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "b16fb091cb3577be26b81b812c9edf89989af1d9",
+            "size": 356,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/b16fb091cb3577be26b81b812c9edf89989af1d9"
+          },
+          "actual": {
+            "path": "lampOS/crates/addons/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "b16fb091cb3577be26b81b812c9edf89989af1d9",
+            "size": 356,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/b16fb091cb3577be26b81b812c9edf89989af1d9"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/crates/air/Cargo.toml",
+          "authored": {
+            "path": "lampOS/crates/air/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "2abbcdb6b4175f3d04e7ef2a6b27c402cf76c77f",
+            "size": 455,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/2abbcdb6b4175f3d04e7ef2a6b27c402cf76c77f"
+          },
+          "actual": {
+            "path": "lampOS/crates/air/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "2abbcdb6b4175f3d04e7ef2a6b27c402cf76c77f",
+            "size": 455,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/2abbcdb6b4175f3d04e7ef2a6b27c402cf76c77f"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/crates/audio/Cargo.toml",
+          "authored": {
+            "path": "lampOS/crates/audio/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "c0e72355b32970fcd8e25a6e0640fb42d0b470ea",
+            "size": 537,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/c0e72355b32970fcd8e25a6e0640fb42d0b470ea"
+          },
+          "actual": {
+            "path": "lampOS/crates/audio/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "c0e72355b32970fcd8e25a6e0640fb42d0b470ea",
+            "size": 537,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/c0e72355b32970fcd8e25a6e0640fb42d0b470ea"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/crates/body/Cargo.toml",
+          "authored": {
+            "path": "lampOS/crates/body/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "c3279be1d708c25e12652b6eda2646624dd8c70d",
+            "size": 953,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/c3279be1d708c25e12652b6eda2646624dd8c70d"
+          },
+          "actual": {
+            "path": "lampOS/crates/body/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "c3279be1d708c25e12652b6eda2646624dd8c70d",
+            "size": 953,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/c3279be1d708c25e12652b6eda2646624dd8c70d"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/crates/bus/Cargo.toml",
+          "authored": {
+            "path": "lampOS/crates/bus/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "b0e6e0b65c67ca8ab5d286f63e06fca87d728c14",
+            "size": 568,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/b0e6e0b65c67ca8ab5d286f63e06fca87d728c14"
+          },
+          "actual": {
+            "path": "lampOS/crates/bus/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "b0e6e0b65c67ca8ab5d286f63e06fca87d728c14",
+            "size": 568,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/b0e6e0b65c67ca8ab5d286f63e06fca87d728c14"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/crates/camera/Cargo.toml",
+          "authored": {
+            "path": "lampOS/crates/camera/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "8bb5de6296059b631d165af58923093108d2053d",
+            "size": 485,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/8bb5de6296059b631d165af58923093108d2053d"
+          },
+          "actual": {
+            "path": "lampOS/crates/camera/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "8bb5de6296059b631d165af58923093108d2053d",
+            "size": 485,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/8bb5de6296059b631d165af58923093108d2053d"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/crates/camera/build.rs",
+          "authored": {
+            "path": "lampOS/crates/camera/build.rs",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "d596a866c9a50cab9747394b5082f0bab95267af",
+            "size": 3376,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/d596a866c9a50cab9747394b5082f0bab95267af"
+          },
+          "actual": {
+            "path": "lampOS/crates/camera/build.rs",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "d596a866c9a50cab9747394b5082f0bab95267af",
+            "size": 3376,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/d596a866c9a50cab9747394b5082f0bab95267af"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/crates/cloud/Cargo.toml",
+          "authored": {
+            "path": "lampOS/crates/cloud/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "65558e699d91e56ed8447e3091bbda483666ac8e",
+            "size": 2893,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/65558e699d91e56ed8447e3091bbda483666ac8e"
+          },
+          "actual": {
+            "path": "lampOS/crates/cloud/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "65558e699d91e56ed8447e3091bbda483666ac8e",
+            "size": 2893,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/65558e699d91e56ed8447e3091bbda483666ac8e"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/crates/control/Cargo.toml",
+          "authored": {
+            "path": "lampOS/crates/control/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "9b245428c4f98619eb5ea5dc90ad3f1a8514e14f",
+            "size": 1953,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/9b245428c4f98619eb5ea5dc90ad3f1a8514e14f"
+          },
+          "actual": {
+            "path": "lampOS/crates/control/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "9b245428c4f98619eb5ea5dc90ad3f1a8514e14f",
+            "size": 1953,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/9b245428c4f98619eb5ea5dc90ad3f1a8514e14f"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/crates/controls/Cargo.toml",
+          "authored": {
+            "path": "lampOS/crates/controls/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "cc473262de2992b46903f949a7a762a7a4f3a46b",
+            "size": 782,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/cc473262de2992b46903f949a7a762a7a4f3a46b"
+          },
+          "actual": {
+            "path": "lampOS/crates/controls/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "cc473262de2992b46903f949a7a762a7a4f3a46b",
+            "size": 782,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/cc473262de2992b46903f949a7a762a7a4f3a46b"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/crates/ears/Cargo.toml",
+          "authored": {
+            "path": "lampOS/crates/ears/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "506a85c7e2dd1d048b92c558227e9fb72c0b99b3",
+            "size": 652,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/506a85c7e2dd1d048b92c558227e9fb72c0b99b3"
+          },
+          "actual": {
+            "path": "lampOS/crates/ears/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "506a85c7e2dd1d048b92c558227e9fb72c0b99b3",
+            "size": 652,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/506a85c7e2dd1d048b92c558227e9fb72c0b99b3"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/crates/environment/Cargo.toml",
+          "authored": {
+            "path": "lampOS/crates/environment/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "210e2a8f4c766856679aa377201dfb90201ade57",
+            "size": 228,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/210e2a8f4c766856679aa377201dfb90201ade57"
+          },
+          "actual": {
+            "path": "lampOS/crates/environment/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "210e2a8f4c766856679aa377201dfb90201ade57",
+            "size": 228,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/210e2a8f4c766856679aa377201dfb90201ade57"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/crates/expression/Cargo.toml",
+          "authored": {
+            "path": "lampOS/crates/expression/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "9f180e0e1f52e1c8dad3bcd915d97026acb805e1",
+            "size": 745,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/9f180e0e1f52e1c8dad3bcd915d97026acb805e1"
+          },
+          "actual": {
+            "path": "lampOS/crates/expression/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "9f180e0e1f52e1c8dad3bcd915d97026acb805e1",
+            "size": 745,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/9f180e0e1f52e1c8dad3bcd915d97026acb805e1"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/crates/eyes/Cargo.toml",
+          "authored": {
+            "path": "lampOS/crates/eyes/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "79b1bfea21f41170f293b5b19f669be4990a912b",
+            "size": 2125,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/79b1bfea21f41170f293b5b19f669be4990a912b"
+          },
+          "actual": {
+            "path": "lampOS/crates/eyes/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "79b1bfea21f41170f293b5b19f669be4990a912b",
+            "size": 2125,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/79b1bfea21f41170f293b5b19f669be4990a912b"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/crates/gemini/Cargo.toml",
+          "authored": {
+            "path": "lampOS/crates/gemini/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "06a4381128d0561e86753927ffaca0cf4d745e16",
+            "size": 1313,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/06a4381128d0561e86753927ffaca0cf4d745e16"
+          },
+          "actual": {
+            "path": "lampOS/crates/gemini/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "06a4381128d0561e86753927ffaca0cf4d745e16",
+            "size": 1313,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/06a4381128d0561e86753927ffaca0cf4d745e16"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/crates/health/Cargo.toml",
+          "authored": {
+            "path": "lampOS/crates/health/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "7946804f0e6dbdba5d0b823cd7764c8217ae83fa",
+            "size": 808,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/7946804f0e6dbdba5d0b823cd7764c8217ae83fa"
+          },
+          "actual": {
+            "path": "lampOS/crates/health/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "7946804f0e6dbdba5d0b823cd7764c8217ae83fa",
+            "size": 808,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/7946804f0e6dbdba5d0b823cd7764c8217ae83fa"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/crates/ipc/Cargo.toml",
+          "authored": {
+            "path": "lampOS/crates/ipc/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "f68302724af898df670d0ec321fd59ed062804f0",
+            "size": 547,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/f68302724af898df670d0ec321fd59ed062804f0"
+          },
+          "actual": {
+            "path": "lampOS/crates/ipc/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "f68302724af898df670d0ec321fd59ed062804f0",
+            "size": 547,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/f68302724af898df670d0ec321fd59ed062804f0"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/crates/keeper/Cargo.toml",
+          "authored": {
+            "path": "lampOS/crates/keeper/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "a9836c41f12d3a965404b40da6dae4ae7b0a18ce",
+            "size": 1037,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/a9836c41f12d3a965404b40da6dae4ae7b0a18ce"
+          },
+          "actual": {
+            "path": "lampOS/crates/keeper/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "a9836c41f12d3a965404b40da6dae4ae7b0a18ce",
+            "size": 1037,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/a9836c41f12d3a965404b40da6dae4ae7b0a18ce"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/crates/lean/Cargo.toml",
+          "authored": {
+            "path": "lampOS/crates/lean/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "87920c3fb9f60aa3a2724b6b343df339780f014a",
+            "size": 410,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/87920c3fb9f60aa3a2724b6b343df339780f014a"
+          },
+          "actual": {
+            "path": "lampOS/crates/lean/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "87920c3fb9f60aa3a2724b6b343df339780f014a",
+            "size": 410,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/87920c3fb9f60aa3a2724b6b343df339780f014a"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/crates/local-time/Cargo.toml",
+          "authored": {
+            "path": "lampOS/crates/local-time/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "e62f09cecb9b94117b7c3087682ce3a45e665242",
+            "size": 429,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/e62f09cecb9b94117b7c3087682ce3a45e665242"
+          },
+          "actual": {
+            "path": "lampOS/crates/local-time/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "e62f09cecb9b94117b7c3087682ce3a45e665242",
+            "size": 429,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/e62f09cecb9b94117b7c3087682ce3a45e665242"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/crates/memory/Cargo.toml",
+          "authored": {
+            "path": "lampOS/crates/memory/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "f489eeb99b93a9be05e1f81a81a150b89368df45",
+            "size": 1405,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/f489eeb99b93a9be05e1f81a81a150b89368df45"
+          },
+          "actual": {
+            "path": "lampOS/crates/memory/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "f489eeb99b93a9be05e1f81a81a150b89368df45",
+            "size": 1405,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/f489eeb99b93a9be05e1f81a81a150b89368df45"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/crates/mood/Cargo.toml",
+          "authored": {
+            "path": "lampOS/crates/mood/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "f6c72fd384166bdc609543b78153d82d8a9f6e94",
+            "size": 501,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/f6c72fd384166bdc609543b78153d82d8a9f6e94"
+          },
+          "actual": {
+            "path": "lampOS/crates/mood/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "f6c72fd384166bdc609543b78153d82d8a9f6e94",
+            "size": 501,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/f6c72fd384166bdc609543b78153d82d8a9f6e94"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/crates/msgs/Cargo.toml",
+          "authored": {
+            "path": "lampOS/crates/msgs/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "1970d8b2deffec0d7f85d7c4159e440fa2eec141",
+            "size": 653,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/1970d8b2deffec0d7f85d7c4159e440fa2eec141"
+          },
+          "actual": {
+            "path": "lampOS/crates/msgs/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "1970d8b2deffec0d7f85d7c4159e440fa2eec141",
+            "size": 653,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/1970d8b2deffec0d7f85d7c4159e440fa2eec141"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/crates/name/Cargo.toml",
+          "authored": {
+            "path": "lampOS/crates/name/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "6096f58c59cf3a6009335b3d63045bd1da4ddd1b",
+            "size": 1269,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/6096f58c59cf3a6009335b3d63045bd1da4ddd1b"
+          },
+          "actual": {
+            "path": "lampOS/crates/name/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "6096f58c59cf3a6009335b3d63045bd1da4ddd1b",
+            "size": 1269,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/6096f58c59cf3a6009335b3d63045bd1da4ddd1b"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/crates/near-call/Cargo.toml",
+          "authored": {
+            "path": "lampOS/crates/near-call/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "e3579b9b19338f2e13c2e383c6a21840734b6acb",
+            "size": 267,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/e3579b9b19338f2e13c2e383c6a21840734b6acb"
+          },
+          "actual": {
+            "path": "lampOS/crates/near-call/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "e3579b9b19338f2e13c2e383c6a21840734b6acb",
+            "size": 267,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/e3579b9b19338f2e13c2e383c6a21840734b6acb"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/crates/observer/Cargo.toml",
+          "authored": {
+            "path": "lampOS/crates/observer/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "acceb58fe3313659a3daee23efc236c9bbc4acb8",
+            "size": 729,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/acceb58fe3313659a3daee23efc236c9bbc4acb8"
+          },
+          "actual": {
+            "path": "lampOS/crates/observer/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "acceb58fe3313659a3daee23efc236c9bbc4acb8",
+            "size": 729,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/acceb58fe3313659a3daee23efc236c9bbc4acb8"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/crates/peek/Cargo.toml",
+          "authored": {
+            "path": "lampOS/crates/peek/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "08368eb830e0ff9f03dc8368032b9f5ca37ec935",
+            "size": 1191,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/08368eb830e0ff9f03dc8368032b9f5ca37ec935"
+          },
+          "actual": {
+            "path": "lampOS/crates/peek/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "08368eb830e0ff9f03dc8368032b9f5ca37ec935",
+            "size": 1191,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/08368eb830e0ff9f03dc8368032b9f5ca37ec935"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/crates/policy/Cargo.toml",
+          "authored": {
+            "path": "lampOS/crates/policy/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "52ce73e5f4f890bf0b7d0260dace7b0612803dd5",
+            "size": 1390,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/52ce73e5f4f890bf0b7d0260dace7b0612803dd5"
+          },
+          "actual": {
+            "path": "lampOS/crates/policy/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "52ce73e5f4f890bf0b7d0260dace7b0612803dd5",
+            "size": 1390,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/52ce73e5f4f890bf0b7d0260dace7b0612803dd5"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/crates/records/Cargo.toml",
+          "authored": {
+            "path": "lampOS/crates/records/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "fbbd61e2440b022e87b06117d9c6e15e8ad20592",
+            "size": 557,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/fbbd61e2440b022e87b06117d9c6e15e8ad20592"
+          },
+          "actual": {
+            "path": "lampOS/crates/records/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "fbbd61e2440b022e87b06117d9c6e15e8ad20592",
+            "size": 557,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/fbbd61e2440b022e87b06117d9c6e15e8ad20592"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/crates/ring/Cargo.toml",
+          "authored": {
+            "path": "lampOS/crates/ring/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "048678f541ce44452f40b946511058f09c1fecfc",
+            "size": 320,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/048678f541ce44452f40b946511058f09c1fecfc"
+          },
+          "actual": {
+            "path": "lampOS/crates/ring/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "048678f541ce44452f40b946511058f09c1fecfc",
+            "size": 320,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/048678f541ce44452f40b946511058f09c1fecfc"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/crates/same-voice/Cargo.toml",
+          "authored": {
+            "path": "lampOS/crates/same-voice/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "fa6d943b580aeff1322ad38188c49e46a34c87c8",
+            "size": 696,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/fa6d943b580aeff1322ad38188c49e46a34c87c8"
+          },
+          "actual": {
+            "path": "lampOS/crates/same-voice/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "fa6d943b580aeff1322ad38188c49e46a34c87c8",
+            "size": 696,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/fa6d943b580aeff1322ad38188c49e46a34c87c8"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/crates/schedule/Cargo.toml",
+          "authored": {
+            "path": "lampOS/crates/schedule/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "07cb5fa06f3e8f1779be55f1f561445c66917fe1",
+            "size": 898,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/07cb5fa06f3e8f1779be55f1f561445c66917fe1"
+          },
+          "actual": {
+            "path": "lampOS/crates/schedule/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "07cb5fa06f3e8f1779be55f1f561445c66917fe1",
+            "size": 898,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/07cb5fa06f3e8f1779be55f1f561445c66917fe1"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/crates/selftest/Cargo.toml",
+          "authored": {
+            "path": "lampOS/crates/selftest/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "215b8b3bee9378575d0cb29e44c5d870fda8a7d8",
+            "size": 816,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/215b8b3bee9378575d0cb29e44c5d870fda8a7d8"
+          },
+          "actual": {
+            "path": "lampOS/crates/selftest/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "215b8b3bee9378575d0cb29e44c5d870fda8a7d8",
+            "size": 816,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/215b8b3bee9378575d0cb29e44c5d870fda8a7d8"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/crates/settings/Cargo.toml",
+          "authored": {
+            "path": "lampOS/crates/settings/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "c4d5d36911c8707244bdd523f52123f9147513c7",
+            "size": 539,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/c4d5d36911c8707244bdd523f52123f9147513c7"
+          },
+          "actual": {
+            "path": "lampOS/crates/settings/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "c4d5d36911c8707244bdd523f52123f9147513c7",
+            "size": 539,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/c4d5d36911c8707244bdd523f52123f9147513c7"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/crates/setup/Cargo.toml",
+          "authored": {
+            "path": "lampOS/crates/setup/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "01096122b56f647d33470bb96f3e2210cc17d6df",
+            "size": 2273,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/01096122b56f647d33470bb96f3e2210cc17d6df"
+          },
+          "actual": {
+            "path": "lampOS/crates/setup/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "01096122b56f647d33470bb96f3e2210cc17d6df",
+            "size": 2273,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/01096122b56f647d33470bb96f3e2210cc17d6df"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/crates/skills/Cargo.toml",
+          "authored": {
+            "path": "lampOS/crates/skills/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "2605527e6dc85157f8bea06a5838e29832f9df01",
+            "size": 2926,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/2605527e6dc85157f8bea06a5838e29832f9df01"
+          },
+          "actual": {
+            "path": "lampOS/crates/skills/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "2605527e6dc85157f8bea06a5838e29832f9df01",
+            "size": 2926,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/2605527e6dc85157f8bea06a5838e29832f9df01"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/crates/sound-fixtures/Cargo.toml",
+          "authored": {
+            "path": "lampOS/crates/sound-fixtures/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "9659c3a8e925d7bdb6d86d51288f2679f402c663",
+            "size": 282,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/9659c3a8e925d7bdb6d86d51288f2679f402c663"
+          },
+          "actual": {
+            "path": "lampOS/crates/sound-fixtures/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "9659c3a8e925d7bdb6d86d51288f2679f402c663",
+            "size": 282,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/9659c3a8e925d7bdb6d86d51288f2679f402c663"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/crates/station/Cargo.toml",
+          "authored": {
+            "path": "lampOS/crates/station/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "c1e6e8162acb5d6ed7d2a7ee6e7ed28c338f6be2",
+            "size": 1060,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/c1e6e8162acb5d6ed7d2a7ee6e7ed28c338f6be2"
+          },
+          "actual": {
+            "path": "lampOS/crates/station/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "c1e6e8162acb5d6ed7d2a7ee6e7ed28c338f6be2",
+            "size": 1060,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/c1e6e8162acb5d6ed7d2a7ee6e7ed28c338f6be2"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/crates/surround/Cargo.toml",
+          "authored": {
+            "path": "lampOS/crates/surround/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "1c2e01a6667983a8f42274fd95d97ea4e6f03cb2",
+            "size": 1302,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/1c2e01a6667983a8f42274fd95d97ea4e6f03cb2"
+          },
+          "actual": {
+            "path": "lampOS/crates/surround/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "1c2e01a6667983a8f42274fd95d97ea4e6f03cb2",
+            "size": 1302,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/1c2e01a6667983a8f42274fd95d97ea4e6f03cb2"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/crates/tasks/Cargo.toml",
+          "authored": {
+            "path": "lampOS/crates/tasks/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "97d3d910dbce159805bc935506eed57ad47e2c16",
+            "size": 907,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/97d3d910dbce159805bc935506eed57ad47e2c16"
+          },
+          "actual": {
+            "path": "lampOS/crates/tasks/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "97d3d910dbce159805bc935506eed57ad47e2c16",
+            "size": 907,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/97d3d910dbce159805bc935506eed57ad47e2c16"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/crates/turn-end-wire/Cargo.toml",
+          "authored": {
+            "path": "lampOS/crates/turn-end-wire/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "cbc355d3ee01a9c0ff3c046d84eea8d634344d61",
+            "size": 642,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/cbc355d3ee01a9c0ff3c046d84eea8d634344d61"
+          },
+          "actual": {
+            "path": "lampOS/crates/turn-end-wire/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "cbc355d3ee01a9c0ff3c046d84eea8d634344d61",
+            "size": 642,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/cbc355d3ee01a9c0ff3c046d84eea8d634344d61"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/crates/turn-end/Cargo.toml",
+          "authored": {
+            "path": "lampOS/crates/turn-end/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "b5e4e2416d7952dc096b1046f308a4c2219f01c5",
+            "size": 1734,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/b5e4e2416d7952dc096b1046f308a4c2219f01c5"
+          },
+          "actual": {
+            "path": "lampOS/crates/turn-end/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "b5e4e2416d7952dc096b1046f308a4c2219f01c5",
+            "size": 1734,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/b5e4e2416d7952dc096b1046f308a4c2219f01c5"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/crates/turn-owner/Cargo.toml",
+          "authored": {
+            "path": "lampOS/crates/turn-owner/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "c47c1fbef72bb70e30b4bccd8c567e032429c4f4",
+            "size": 253,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/c47c1fbef72bb70e30b4bccd8c567e032429c4f4"
+          },
+          "actual": {
+            "path": "lampOS/crates/turn-owner/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "c47c1fbef72bb70e30b4bccd8c567e032429c4f4",
+            "size": 253,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/c47c1fbef72bb70e30b4bccd8c567e032429c4f4"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/crates/update/Cargo.toml",
+          "authored": {
+            "path": "lampOS/crates/update/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "856efebb1928394acbf06fc05e2dfee1251671d4",
+            "size": 2172,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/856efebb1928394acbf06fc05e2dfee1251671d4"
+          },
+          "actual": {
+            "path": "lampOS/crates/update/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "856efebb1928394acbf06fc05e2dfee1251671d4",
+            "size": 2172,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/856efebb1928394acbf06fc05e2dfee1251671d4"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/crates/voice-eval/Cargo.toml",
+          "authored": {
+            "path": "lampOS/crates/voice-eval/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "493e1589b6fa2fd8a0430b80f3be0017d81f593b",
+            "size": 1850,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/493e1589b6fa2fd8a0430b80f3be0017d81f593b"
+          },
+          "actual": {
+            "path": "lampOS/crates/voice-eval/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "493e1589b6fa2fd8a0430b80f3be0017d81f593b",
+            "size": 1850,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/493e1589b6fa2fd8a0430b80f3be0017d81f593b"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/crates/voice-processes/Cargo.toml",
+          "authored": {
+            "path": "lampOS/crates/voice-processes/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "3fdd93848b9d147e0515af12cfb106ad072c46fd",
+            "size": 323,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/3fdd93848b9d147e0515af12cfb106ad072c46fd"
+          },
+          "actual": {
+            "path": "lampOS/crates/voice-processes/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "3fdd93848b9d147e0515af12cfb106ad072c46fd",
+            "size": 323,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/3fdd93848b9d147e0515af12cfb106ad072c46fd"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/crates/voice/Cargo.toml",
+          "authored": {
+            "path": "lampOS/crates/voice/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "8b4383b2bbfad0baf0d9993ce84f08b6994d63b2",
+            "size": 4468,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/8b4383b2bbfad0baf0d9993ce84f08b6994d63b2"
+          },
+          "actual": {
+            "path": "lampOS/crates/voice/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "8b4383b2bbfad0baf0d9993ce84f08b6994d63b2",
+            "size": 4468,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/8b4383b2bbfad0baf0d9993ce84f08b6994d63b2"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/deploy/package-binaries.json",
+          "authored": {
+            "path": "lampOS/deploy/package-binaries.json",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "324a0bb3767ce09367b1274c35226042ebd4c070",
+            "size": 1384,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/324a0bb3767ce09367b1274c35226042ebd4c070"
+          },
+          "actual": {
+            "path": "lampOS/deploy/package-binaries.json",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "324a0bb3767ce09367b1274c35226042ebd4c070",
+            "size": 1384,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/324a0bb3767ce09367b1274c35226042ebd4c070"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/docs/verification/gemini-capture-clock-20261016/review/reversed/crates/gemini/Cargo.toml",
+          "authored": {
+            "path": "lampOS/docs/verification/gemini-capture-clock-20261016/review/reversed/crates/gemini/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "be6ec76a51e8330d49ba4c10098ed09ec4c8833d",
+            "size": 1171,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/be6ec76a51e8330d49ba4c10098ed09ec4c8833d"
+          },
+          "actual": {
+            "path": "lampOS/docs/verification/gemini-capture-clock-20261016/review/reversed/crates/gemini/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "be6ec76a51e8330d49ba4c10098ed09ec4c8833d",
+            "size": 1171,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/be6ec76a51e8330d49ba4c10098ed09ec4c8833d"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/docs/verification/records-controlled-20261016/local/after/lampOS/crates/records/Cargo.toml",
+          "authored": {
+            "path": "lampOS/docs/verification/records-controlled-20261016/local/after/lampOS/crates/records/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "92e1ba07a5ad1c9e1f5c3f73c489d902ed5615c6",
+            "size": 502,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/92e1ba07a5ad1c9e1f5c3f73c489d902ed5615c6"
+          },
+          "actual": {
+            "path": "lampOS/docs/verification/records-controlled-20261016/local/after/lampOS/crates/records/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "92e1ba07a5ad1c9e1f5c3f73c489d902ed5615c6",
+            "size": 502,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/92e1ba07a5ad1c9e1f5c3f73c489d902ed5615c6"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/docs/verification/records-controlled-20261016/local/before/lampOS/crates/records/Cargo.toml",
+          "authored": {
+            "path": "lampOS/docs/verification/records-controlled-20261016/local/before/lampOS/crates/records/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "e0dc936aa97c2ffe9819057c97099cc6e916d93a",
+            "size": 395,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/e0dc936aa97c2ffe9819057c97099cc6e916d93a"
+          },
+          "actual": {
+            "path": "lampOS/docs/verification/records-controlled-20261016/local/before/lampOS/crates/records/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "e0dc936aa97c2ffe9819057c97099cc6e916d93a",
+            "size": 395,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/e0dc936aa97c2ffe9819057c97099cc6e916d93a"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/docs/verification/records-controlled-20261016/local/restored/lampOS/crates/records/Cargo.toml",
+          "authored": {
+            "path": "lampOS/docs/verification/records-controlled-20261016/local/restored/lampOS/crates/records/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "e0dc936aa97c2ffe9819057c97099cc6e916d93a",
+            "size": 395,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/e0dc936aa97c2ffe9819057c97099cc6e916d93a"
+          },
+          "actual": {
+            "path": "lampOS/docs/verification/records-controlled-20261016/local/restored/lampOS/crates/records/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "e0dc936aa97c2ffe9819057c97099cc6e916d93a",
+            "size": 395,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/e0dc936aa97c2ffe9819057c97099cc6e916d93a"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/docs/verification/records-controlled-release-20261016/current/new-Cargo.lock",
+          "authored": {
+            "path": "lampOS/docs/verification/records-controlled-release-20261016/current/new-Cargo.lock",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "a8f411e0571e2c658a29f9a89f6c81ff4eb9d728",
+            "size": 113084,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/a8f411e0571e2c658a29f9a89f6c81ff4eb9d728"
+          },
+          "actual": {
+            "path": "lampOS/docs/verification/records-controlled-release-20261016/current/new-Cargo.lock",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "a8f411e0571e2c658a29f9a89f6c81ff4eb9d728",
+            "size": 113084,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/a8f411e0571e2c658a29f9a89f6c81ff4eb9d728"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/docs/verification/records-controlled-release-20261016/current/old-Cargo.lock",
+          "authored": {
+            "path": "lampOS/docs/verification/records-controlled-release-20261016/current/old-Cargo.lock",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "8ee57433c188b5d395675352971e63b187e703e6",
+            "size": 113073,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/8ee57433c188b5d395675352971e63b187e703e6"
+          },
+          "actual": {
+            "path": "lampOS/docs/verification/records-controlled-release-20261016/current/old-Cargo.lock",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "8ee57433c188b5d395675352971e63b187e703e6",
+            "size": 113073,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/8ee57433c188b5d395675352971e63b187e703e6"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/rust-toolchain.toml",
+          "authored": {
+            "path": "lampOS/rust-toolchain.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "e3b40113e65befef4d5d198284b99c78c27136f0",
+            "size": 86,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/e3b40113e65befef4d5d198284b99c78c27136f0"
+          },
+          "actual": {
+            "path": "lampOS/rust-toolchain.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "e3b40113e65befef4d5d198284b99c78c27136f0",
+            "size": 86,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/e3b40113e65befef4d5d198284b99c78c27136f0"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/third_party/sonora/Cargo.toml",
+          "authored": {
+            "path": "lampOS/third_party/sonora/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "ef74895283a2559a6a6afaa2cd9144a0ac54d919",
+            "size": 2819,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/ef74895283a2559a6a6afaa2cd9144a0ac54d919"
+          },
+          "actual": {
+            "path": "lampOS/third_party/sonora/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "ef74895283a2559a6a6afaa2cd9144a0ac54d919",
+            "size": 2819,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/ef74895283a2559a6a6afaa2cd9144a0ac54d919"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/tools/package-binaries-test.sh",
+          "authored": {
+            "path": "lampOS/tools/package-binaries-test.sh",
+            "mode": "100755",
+            "type": "blob",
+            "sha": "76f2575d04b15a6f6e377a50b0d8cde852f5cbca",
+            "size": 1422,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/76f2575d04b15a6f6e377a50b0d8cde852f5cbca"
+          },
+          "actual": {
+            "path": "lampOS/tools/package-binaries-test.sh",
+            "mode": "100755",
+            "type": "blob",
+            "sha": "76f2575d04b15a6f6e377a50b0d8cde852f5cbca",
+            "size": 1422,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/76f2575d04b15a6f6e377a50b0d8cde852f5cbca"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/tools/package-binaries.sh",
+          "authored": {
+            "path": "lampOS/tools/package-binaries.sh",
+            "mode": "100755",
+            "type": "blob",
+            "sha": "1be4ee1c83992ef7d52bd644688f85157e246b4f",
+            "size": 1370,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/1be4ee1c83992ef7d52bd644688f85157e246b4f"
+          },
+          "actual": {
+            "path": "lampOS/tools/package-binaries.sh",
+            "mode": "100755",
+            "type": "blob",
+            "sha": "1be4ee1c83992ef7d52bd644688f85157e246b4f",
+            "size": 1370,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/1be4ee1c83992ef7d52bd644688f85157e246b4f"
+          },
+          "equal": true
+        },
+        {
+          "path": "lampOS/vendor/tough/Cargo.toml",
+          "authored": {
+            "path": "lampOS/vendor/tough/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "1f791517616542771d421e13dbea9e9055a0f2ca",
+            "size": 2673,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/1f791517616542771d421e13dbea9e9055a0f2ca"
+          },
+          "actual": {
+            "path": "lampOS/vendor/tough/Cargo.toml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "1f791517616542771d421e13dbea9e9055a0f2ca",
+            "size": 2673,
+            "url": "https://api.github.com/repos/autonomous-ai/lampOS/git/blobs/1f791517616542771d421e13dbea9e9055a0f2ca"
+          },
+          "equal": true
+        }
+      ]
+    }
+  ]
+}

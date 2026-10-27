@@ -1,0 +1,31 @@
+{
+  "entries_checked": 58,
+  "all_bytes_SHA256_match": true,
+  "manifest_sha256": "b73760edae110ad3e28e3d7e79cb1f2219c608d2c6e3665d1c9afd61b74433f4",
+  "mismatches": [],
+  "unlisted_nonexcluded": [],
+  "watch_results": {
+    "ARM64": {
+      "watch_started": false,
+      "reason": "Original attempt-one terminal state already observed at initial collection; no duplicate watch",
+      "watch_exit": 0,
+      "watch_timeout": false,
+      "subject": "Reader",
+      "label": "ARM64",
+      "run": 40574485135,
+      "started_at": "2026-10-27T20:33:05.362433+00:00",
+      "finished_at": "2026-10-27T20:33:05.363170+00:00"
+    },
+    "Linux-clippy": {
+      "watch_started": false,
+      "reason": "Original attempt-one terminal state already observed at initial collection; no duplicate watch",
+      "watch_exit": 0,
+      "watch_timeout": false,
+      "subject": "Reader",
+      "label": "Linux-clippy",
+      "run": 40574485115,
+      "started_at": "2026-10-27T20:33:05.363368+00:00",
+      "finished_at": "2026-10-27T20:33:05.363377+00:00"
+    }
+  }
+}

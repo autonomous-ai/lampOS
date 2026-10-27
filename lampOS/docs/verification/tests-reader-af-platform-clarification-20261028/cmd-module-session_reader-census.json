@@ -1,0 +1,55 @@
+{
+  "module_prefix": "session_reader::tests::",
+  "rows": [
+    [
+      "session_reader::tests::finite_and_unset_service_never_resolve_a_reader_group",
+      "ok"
+    ],
+    [
+      "session_reader::tests::group_lookup_failure_retains_private_logging_without_writer_failure",
+      "ok"
+    ],
+    [
+      "session_reader::tests::local_session_reader_group_is_exact_unique_and_bounded",
+      "ok"
+    ],
+    [
+      "session_reader::tests::unsupported_acl_verification_degrades_to_private_metadata",
+      "ok"
+    ]
+  ],
+  "raw_rows": [
+    [
+      "session_reader::tests::finite_and_unset_service_never_resolve_a_reader_group",
+      "ok"
+    ],
+    [
+      "session_reader::tests::group_lookup_failure_retains_private_logging_without_writer_failure",
+      "ok"
+    ],
+    [
+      "session_reader::tests::local_session_reader_group_is_exact_unique_and_bounded",
+      "ok"
+    ],
+    [
+      "session_reader::tests::unsupported_acl_verification_degrades_to_private_metadata",
+      "ok"
+    ]
+  ],
+  "libtest_annotation_mapping": [],
+  "counts": {
+    "ok": 4
+  },
+  "command_exit": 0,
+  "raw_summary": [
+    [
+      "4",
+      "0",
+      "0",
+      "0",
+      "3896"
+    ]
+  ],
+  "saved_before_post_runtime_guard": true,
+  "full_Voice_runtime_claim": false
+}

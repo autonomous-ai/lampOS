@@ -1,0 +1,55 @@
+{
+  "head": "792937f432cd3bc88279f084b2ad2faba6df777b",
+  "base": "2e66c1aded556f5f688dab729331eacb045eeffc",
+  "terminal_status": "PASS",
+  "protected_count": 157,
+  "actual_count": 7,
+  "source_unchanged": true,
+  "scope": "Fresh full unfiltered serial Skills Cargo package including docs/custom cases",
+  "receipt_bindings": [
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-2e66-body-after-mood-full-gates-prep-20261028/terminal.json",
+      "bytes": 1613,
+      "sha256": "690c41d7216a35e7c14550d3a737d06bb334fc8081ae747894fe36ca7e3b3325"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-2e66-body-after-mood-full-gates-prep-20261028/native-controller-result.json",
+      "bytes": 472,
+      "sha256": "efd9d7379c433a3b175f1b36b95735bf0268347b481df91b81f5a7f2e3c506e5"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-2e66-body-after-mood-full-gates-prep-20261028/source-before.json",
+      "bytes": 2457877,
+      "sha256": "3a2eb3e57eda0da777bc9da11bc4360e78691821c12ba416495c4f5cbc282acd"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-2e66-body-after-mood-full-gates-prep-20261028/source-after.json",
+      "bytes": 2457877,
+      "sha256": "3a2eb3e57eda0da777bc9da11bc4360e78691821c12ba416495c4f5cbc282acd"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-2e66-body-after-mood-full-gates-prep-20261028/protected-after.json",
+      "bytes": 66680,
+      "sha256": "d3fbd0df13c6235e14fe59b58f06a4ed549ce4aa6b20cdbb58408feae65c8a76"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-2e66-body-after-mood-full-gates-prep-20261028/actual-after.json",
+      "bytes": 11440,
+      "sha256": "1800e4c164c66285f13d9ac1c2e890747699b6bf2ea05e062a493019892f1791"
+    }
+  ],
+  "no_binary_or_target_rehash_in_this_audit": true,
+  "counts": {
+    "passed": 555,
+    "failed": 0,
+    "ignored": 9
+  },
+  "runtime_reuse": false,
+  "drivers": 5,
+  "helpers": 2,
+  "compiled_census": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-2e66-body-after-mood-full-gates-prep-20261028/compiled-census.json",
+    "bytes": 48509,
+    "sha256": "47b5be084f21c7b25ee15dd1531c4df9dc55b20967bf66c583da8ac4ddc44339"
+  }
+}

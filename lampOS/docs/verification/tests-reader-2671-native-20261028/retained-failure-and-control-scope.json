@@ -1,0 +1,38 @@
+{
+  "matched_Main_reference": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/mood-bc0-original-native-20261028/matched-Main-a17-failure-disposition.json",
+    "bytes": 4267,
+    "sha256": "f3db8b785649e2c420f47b81070cb769e703ee89f4a53caa6da48f9b15026f32"
+  },
+  "candidate_Rust_exit": 101,
+  "candidate_status": "FAILED",
+  "matched_Main": {
+    "head": "a17ec9216e53f6a77931dd9686f83be8244d05a2",
+    "actual_parent": "40923624247a893a19e1d980a328424eedffa308",
+    "controller_status": "CONTROL_COMPLETE",
+    "native_exit": 0,
+    "Rust_test_status": "FAILED",
+    "Rust_exit": 101,
+    "counts": {
+      "passed": 3882,
+      "failed": 1,
+      "ignored": 15
+    },
+    "protected_count": 537,
+    "actual_count": 3,
+    "is_baseline_test_PASS": false,
+    "is_latest_Main_2e66_qualification": false
+  },
+  "same_failed_identity": "session_reader::tests::group_lookup_failure_retains_private_logging_without_writer_failure",
+  "all21_Restart_PASS_in_each": true,
+  "is_causal_explanation": false,
+  "waives_any_failure": false,
+  "other_retained_failures": [
+    "Original b7 ARM5091/1 with2691 selected unrun and Reader15 unreached remains failed.",
+    "Both old Mac full-Voice3867/1/15 runs retain different failed identities.",
+    "Main isolated1/0 control remains inconclusive.",
+    "Old Skills521/1/9 remains failed; old525 is not reused.",
+    "No current61c or later source qualification is inferred from these original API heads."
+  ],
+  "preparatory_history_not_rewritten": true
+}

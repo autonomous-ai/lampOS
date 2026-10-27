@@ -1,0 +1,81 @@
+{
+  "scope": "Public text audit, raw original CI logs and selected projections; complete private collection manifest retained separately. No collector code or payload copied.",
+  "files": {
+    "effective-owned-patch-comparison.json": {
+      "sha256": "fd797f80a5b5136b79d75fe8bca26fea748b80127a9b6460d43d6d57a197ea60",
+      "bytes": 895
+    },
+    "audit.json": {
+      "sha256": "9e97bd1f102a2dbc502f96368b22713fcaa258d6bfc3f3ffb13215a4d0eb355f",
+      "bytes": 56099
+    },
+    "retained-failure-and-control-scope.json": {
+      "sha256": "5e021d0e51cc627b2f3c99a3798c3803a33312dfa19bd48df15d2badf3b6011d",
+      "bytes": 1590
+    },
+    "subject-case-audit.json": {
+      "sha256": "8ffddf72c57d0e6062b0bc382519a323d03b5de626e184d92398e54f6395276f",
+      "bytes": 243123
+    },
+    "execution-window.json": {
+      "sha256": "7916d31c80f036020130c3f28607d9feb07f1882b86d3241111aa6cb73ec4b4e",
+      "bytes": 1307
+    },
+    "all-tracked-CI-input-bindings.json": {
+      "sha256": "f9353ceba86e696bd3fc88708cf9702932887cc150c9db556f41f16dc9f36337",
+      "bytes": 158130
+    },
+    "final-reprints.json": {
+      "sha256": "c3c5f8c031e87563ef631a3c465cfe4a0814d29f38c62a27590413d6c8c0a696",
+      "bytes": 24559
+    },
+    "ARM64-job-122440971524.log": {
+      "sha256": "6e8eb6dbb360413e8e66810177c9b438c0fe21285b959a9bfdefac2ebbc30d67",
+      "bytes": 1376087
+    },
+    "actual-selection-and-profile.json": {
+      "sha256": "3fad127c540fd6b28c5f8ccf249d4a724baf68812a5c6b7f7601573f10f2bc76",
+      "bytes": 4699
+    },
+    "Trace-platform-audit.json": {
+      "sha256": "c5b0552207e376c571e1eba46d5f32ea6af563935b4e6bdb7c88e6f87f9acb2e",
+      "bytes": 5037
+    },
+    "README.md": {
+      "sha256": "79899817814772d8e4f2b74f1622e5f71c727801300f2f180c594ef1056cd01e",
+      "bytes": 4638
+    },
+    "source-platform-ignore-declarations.json": {
+      "sha256": "81bea7bea013bdfe0c806c93c555c83f7b0cd920d9314e355aaad9a576e8d156",
+      "bytes": 3336
+    },
+    "closed-source-host-reference.json": {
+      "sha256": "2705d26b169e35a6c847331d0bf25af9dc49acec53f692d048b1c6507b903c2a",
+      "bytes": 2859
+    },
+    "auxiliary-stage-audit.json": {
+      "sha256": "0162f70a75c9801e62b98ce4687a0a857d8b5e1263219e2ceed2e96f70cc5c06",
+      "bytes": 8199
+    },
+    "collection-manifest-verification.json": {
+      "sha256": "969e3b639e1a8b83ae870793f48fc0bab529c474dd47428a36c2a008a555df62",
+      "bytes": 1057
+    },
+    "Reader-platform-audit.json": {
+      "sha256": "5f66b8983eb7d40b4f700191a5bb92028ec36a851e85dfd49c0ef75a1ae2f959",
+      "bytes": 9997
+    },
+    "Linux-clippy-job-122440970486.log": {
+      "sha256": "c1fddde855d46fde2bb91921d02fc4ade0ce38edcc6f774e92e2f3204a856279",
+      "bytes": 46203
+    },
+    "required-addon-internal-variants.json": {
+      "sha256": "3414190829f955cf1c35b10d672f97e014721ce227b6da8632817fb32143c0f3",
+      "bytes": 344
+    },
+    "collection-manifest.json": {
+      "sha256": "ddf7e433ec29ff9c8aecd11f4a876a4841bd27fddf5e71a2f7f06f214ab62d5f",
+      "bytes": 17519
+    }
+  }
+}

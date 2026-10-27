@@ -1,0 +1,55 @@
+{
+  "head": "2671aeabd2ef3cadc6bdba7befb1f825c437cd76",
+  "base": "2e66c1aded556f5f688dab729331eacb045eeffc",
+  "terminal_status": "PASS",
+  "protected_count": 540,
+  "actual_count": 3,
+  "source_unchanged": true,
+  "scope": "Once complete actual Mac session_reader::tests:: module and once complete actual service_trace::tests:: module, disjoint; no full Voice runtime claim",
+  "receipt_bindings": [
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/reader-2e66-warm-modules-gates-prep-20261028/terminal.json",
+      "bytes": 1915,
+      "sha256": "798b30a434672858b11ce3286ab10667ca64cc87f9a47d917c1857db06ed1d6f"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/reader-2e66-warm-modules-gates-prep-20261028/native-controller-result.json",
+      "bytes": 472,
+      "sha256": "c53965b0aac531ae8be3bcbf1a40b12eeb4ccfd00e5407ef49c45e5c299976c2"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/reader-2e66-warm-modules-gates-prep-20261028/source-before.json",
+      "bytes": 2457872,
+      "sha256": "7b7420a4eb705bde05df304831e3f2eaef7bf7322fdeacf1cf4b4ffea2f113eb"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/reader-2e66-warm-modules-gates-prep-20261028/source-after.json",
+      "bytes": 2457872,
+      "sha256": "7b7420a4eb705bde05df304831e3f2eaef7bf7322fdeacf1cf4b4ffea2f113eb"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/reader-2e66-warm-modules-gates-prep-20261028/protected-after.json",
+      "bytes": 222091,
+      "sha256": "aaf7e46704ab28c0bd56b374966cca411b2bb849642ab1df9d2b5084b4c5d9fb"
+    },
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/reader-2e66-warm-modules-gates-prep-20261028/actual-after.json",
+      "bytes": 5987,
+      "sha256": "1685aba5b7fecbf8fa8ebe500e9cb9872a1ba07e2e2557ca8f47e93a82571326"
+    }
+  ],
+  "no_binary_or_target_rehash_in_this_audit": true,
+  "module_counts": {
+    "session_reader::tests::": {
+      "passed": 4,
+      "failed": 0,
+      "ignored": 0
+    },
+    "service_trace::tests::": {
+      "passed": 6,
+      "failed": 0,
+      "ignored": 0
+    }
+  },
+  "full_Voice_runtime_claim": false
+}

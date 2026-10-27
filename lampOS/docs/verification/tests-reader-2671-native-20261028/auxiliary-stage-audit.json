@@ -1,0 +1,414 @@
+{
+  "stages": [
+    {
+      "line": 356,
+      "title": "2026-10-27T20:03:19.3417586Z ##[group]Run cargo test --locked --manifest-path .github/tools/lampos-promote/Cargo.toml",
+      "summaries": [
+        {
+          "line": 459,
+          "passed": 2,
+          "failed": 0,
+          "ignored": 0,
+          "filtered": 0
+        },
+        {
+          "line": 464,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "filtered": 0
+        },
+        {
+          "line": 492,
+          "passed": 22,
+          "failed": 0,
+          "ignored": 0,
+          "filtered": 0
+        },
+        {
+          "line": 499,
+          "passed": 1,
+          "failed": 0,
+          "ignored": 0,
+          "filtered": 0
+        },
+        {
+          "line": 505,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "filtered": 0
+        }
+      ]
+    },
+    {
+      "line": 8999,
+      "title": "2026-10-27T20:12:15.2501883Z ##[group]Run cargo test --locked --release --workspace --doc -- --test-threads=1",
+      "summaries": [
+        {
+          "line": 9010,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "filtered": 0
+        },
+        {
+          "line": 9016,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "filtered": 0
+        },
+        {
+          "line": 9022,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "filtered": 0
+        },
+        {
+          "line": 9028,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "filtered": 0
+        },
+        {
+          "line": 9034,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "filtered": 0
+        },
+        {
+          "line": 9042,
+          "passed": 2,
+          "failed": 0,
+          "ignored": 0,
+          "filtered": 0
+        },
+        {
+          "line": 9049,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "filtered": 0
+        },
+        {
+          "line": 9055,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "filtered": 0
+        },
+        {
+          "line": 9061,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "filtered": 0
+        },
+        {
+          "line": 9067,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "filtered": 0
+        },
+        {
+          "line": 9073,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "filtered": 0
+        },
+        {
+          "line": 9079,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "filtered": 0
+        },
+        {
+          "line": 9085,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "filtered": 0
+        },
+        {
+          "line": 9091,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "filtered": 0
+        },
+        {
+          "line": 9097,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "filtered": 0
+        },
+        {
+          "line": 9103,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "filtered": 0
+        },
+        {
+          "line": 9110,
+          "passed": 1,
+          "failed": 0,
+          "ignored": 0,
+          "filtered": 0
+        },
+        {
+          "line": 9117,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "filtered": 0
+        },
+        {
+          "line": 9123,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "filtered": 0
+        },
+        {
+          "line": 9129,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "filtered": 0
+        },
+        {
+          "line": 9135,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "filtered": 0
+        },
+        {
+          "line": 9141,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "filtered": 0
+        },
+        {
+          "line": 9148,
+          "passed": 1,
+          "failed": 0,
+          "ignored": 0,
+          "filtered": 0
+        },
+        {
+          "line": 9155,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "filtered": 0
+        },
+        {
+          "line": 9161,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "filtered": 0
+        },
+        {
+          "line": 9167,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "filtered": 0
+        },
+        {
+          "line": 9173,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "filtered": 0
+        },
+        {
+          "line": 9179,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "filtered": 0
+        },
+        {
+          "line": 9185,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "filtered": 0
+        },
+        {
+          "line": 9191,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "filtered": 0
+        },
+        {
+          "line": 9197,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "filtered": 0
+        },
+        {
+          "line": 9203,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "filtered": 0
+        },
+        {
+          "line": 9209,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "filtered": 0
+        },
+        {
+          "line": 9215,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "filtered": 0
+        },
+        {
+          "line": 9221,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "filtered": 0
+        },
+        {
+          "line": 9227,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "filtered": 0
+        },
+        {
+          "line": 9233,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "filtered": 0
+        },
+        {
+          "line": 9239,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "filtered": 0
+        },
+        {
+          "line": 9245,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "filtered": 0
+        },
+        {
+          "line": 9251,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "filtered": 0
+        },
+        {
+          "line": 9257,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "filtered": 0
+        },
+        {
+          "line": 9263,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "filtered": 0
+        },
+        {
+          "line": 9269,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "filtered": 0
+        },
+        {
+          "line": 9275,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "filtered": 0
+        },
+        {
+          "line": 9281,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "filtered": 0
+        },
+        {
+          "line": 9287,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "filtered": 0
+        },
+        {
+          "line": 9293,
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "filtered": 0
+        }
+      ]
+    }
+  ],
+  "separate_totals": {
+    "promoter": {
+      "passed": 25,
+      "failed": 0,
+      "ignored": 0
+    },
+    "workspace_docs": {
+      "passed": 4,
+      "failed": 0,
+      "ignored": 0,
+      "summary_groups": 47
+    },
+    "process": {
+      "line": 9315,
+      "passed": 13,
+      "failed": 0
+    },
+    "relay_ok_line": 9297,
+    "offline_Python": [
+      {
+        "line": 283,
+        "count": 49
+      },
+      {
+        "line": 353,
+        "count": 12
+      },
+      {
+        "line": 729,
+        "count": 7
+      }
+    ],
+    "added_to_nextest": false
+  }
+}

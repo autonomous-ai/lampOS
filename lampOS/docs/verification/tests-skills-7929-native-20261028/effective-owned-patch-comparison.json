@@ -1,0 +1,20 @@
+{
+  "authored_base": "2e66c1aded556f5f688dab729331eacb045eeffc",
+  "actual_base": "dadacc1bc2fe2e285ed5125a32dd6fe483c01991",
+  "rows": [
+    {
+      "path": "lampOS/crates/skills/tests/it/addon.rs",
+      "authored_and_actual_full_blob_equal": true,
+      "effective_patch_equal_ignoring_only_hunk_line_numbers": true,
+      "original_patch_sha256": "68d6d0f16dee07df34717431f3a46ee2c6efb0c9a797c2cdcab0c3c1d6842fcc",
+      "actual_patch_sha256": "68d6d0f16dee07df34717431f3a46ee2c6efb0c9a797c2cdcab0c3c1d6842fcc"
+    },
+    {
+      "path": "lampOS/docs/skills.md",
+      "authored_and_actual_full_blob_equal": false,
+      "effective_patch_equal_ignoring_only_hunk_line_numbers": true,
+      "original_patch_sha256": "73d1ddcc43e37642b6a82401657faf5a57f4beca6fe930c122fb182db42bce5b",
+      "actual_patch_sha256": "73d1ddcc43e37642b6a82401657faf5a57f4beca6fe930c122fb182db42bce5b"
+    }
+  ]
+}

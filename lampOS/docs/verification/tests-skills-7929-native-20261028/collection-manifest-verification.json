@@ -1,0 +1,31 @@
+{
+  "entries_checked": 107,
+  "all_bytes_SHA256_match": true,
+  "manifest_sha256": "ddf7e433ec29ff9c8aecd11f4a876a4841bd27fddf5e71a2f7f06f214ab62d5f",
+  "mismatches": [],
+  "unlisted_nonexcluded": [],
+  "watch_results": {
+    "ARM64": {
+      "watch_started": false,
+      "reason": "Original attempt-one terminal state already observed at initial collection; no duplicate watch",
+      "watch_exit": 0,
+      "watch_timeout": false,
+      "subject": "Skills",
+      "label": "ARM64",
+      "run": 40575571481,
+      "started_at": "2026-10-27T20:33:05.363503+00:00",
+      "finished_at": "2026-10-27T20:33:05.363509+00:00"
+    },
+    "Linux-clippy": {
+      "watch_started": false,
+      "reason": "Original attempt-one terminal state already observed at initial collection; no duplicate watch",
+      "watch_exit": 0,
+      "watch_timeout": false,
+      "subject": "Skills",
+      "label": "Linux-clippy",
+      "run": 40575571282,
+      "started_at": "2026-10-27T20:33:05.363636+00:00",
+      "finished_at": "2026-10-27T20:33:05.363642+00:00"
+    }
+  }
+}

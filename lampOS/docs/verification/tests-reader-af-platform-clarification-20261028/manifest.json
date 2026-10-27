@@ -1,0 +1,30 @@
+{
+  "README.md": {
+    "sha256": "c31f5eb4688b80b3b2b995c960671795b14d6dd401eedf9d6853d482493e8d5b",
+    "bytes": 1157
+  },
+  "cmd-module-session_reader-census.json": {
+    "sha256": "fc6c9e0a7733261081a6edc9f15c07e4f863239cacfae7818f3f5b775962e3b0",
+    "bytes": 1264
+  },
+  "cmd-module-session_reader.stderr.txt": {
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  "cmd-module-session_reader.stdout.txt": {
+    "sha256": "fdcc49ad2609fa37aa98896c98ab6740a23d387a96e024fc4d70c1517c1a4d69",
+    "bytes": 491
+  },
+  "original-additive-audit.json": {
+    "sha256": "5df60d5bc663ad9ab9b3a0ebbc16be8f96e5969ffe2ef6a82234092c0ffff861",
+    "bytes": 9092
+  },
+  "reader-source-reference.json": {
+    "sha256": "e4b1672810046dc8edd3ecbd6ef9d17260aabd73a5c13d2cdab963f1d3dc8694",
+    "bytes": 6491
+  },
+  "terminal.json": {
+    "sha256": "bcd12d3ae250dd15fb4ed3fb5d367fd3996db08effb2fc266e5bf56ded8a44aa",
+    "bytes": 1915
+  }
+}

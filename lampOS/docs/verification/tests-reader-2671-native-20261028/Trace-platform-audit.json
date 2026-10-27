@@ -1,0 +1,156 @@
+{
+  "source_basis": "actual ARM checkout source",
+  "source_cases": [
+    {
+      "identity": "service_trace::tests::closure_flushes_final_accepted_event_without_inventing_complete_evidence",
+      "attributes": "#[test]",
+      "line": 606
+    },
+    {
+      "identity": "service_trace::tests::disk_failure_latches_health_without_an_audio_result_error",
+      "attributes": "#[test]",
+      "line": 620
+    },
+    {
+      "identity": "service_trace::tests::stalled_writer_has_fixed_capacity_and_bounded_finish_without_joining",
+      "attributes": "#[test]",
+      "line": 633
+    },
+    {
+      "identity": "service_trace::tests::oversized_event_is_dropped_not_truncated_into_a_misleading_record",
+      "attributes": "#[test]",
+      "line": 651
+    },
+    {
+      "identity": "service_trace::tests::shared_session_rotation_keeps_granted_descriptors_and_private_health",
+      "attributes": "#[cfg(target_os = \"linux\")]\n    #[test]",
+      "line": 664
+    },
+    {
+      "identity": "service_trace::tests::rotation_uses_only_pinned_files_and_bounded_disk_space",
+      "attributes": "#[test]",
+      "line": 713
+    },
+    {
+      "identity": "service_trace::tests::private_and_failed_reader_traces_keep_the_original_records_and_finite_state",
+      "attributes": "#[test]",
+      "line": 742
+    }
+  ],
+  "ordinary_required": 7,
+  "ordinary_rows": [
+    {
+      "test": "service_trace::tests::closure_flushes_final_accepted_event_without_inventing_complete_evidence",
+      "records": [
+        {
+          "line": 7238,
+          "timestamp": "2026-10-27T20:11:57.7078181Z",
+          "status": "PASS",
+          "seconds": 0.006,
+          "ordinal": 6460,
+          "total": 7802,
+          "binary": "lamp-voice",
+          "test": "service_trace::tests::closure_flushes_final_accepted_event_without_inventing_complete_evidence"
+        }
+      ],
+      "PASS_once": true
+    },
+    {
+      "test": "service_trace::tests::disk_failure_latches_health_without_an_audio_result_error",
+      "records": [
+        {
+          "line": 7239,
+          "timestamp": "2026-10-27T20:11:57.7097995Z",
+          "status": "PASS",
+          "seconds": 0.006,
+          "ordinal": 6461,
+          "total": 7802,
+          "binary": "lamp-voice",
+          "test": "service_trace::tests::disk_failure_latches_health_without_an_audio_result_error"
+        }
+      ],
+      "PASS_once": true
+    },
+    {
+      "test": "service_trace::tests::stalled_writer_has_fixed_capacity_and_bounded_finish_without_joining",
+      "records": [
+        {
+          "line": 7244,
+          "timestamp": "2026-10-27T20:11:57.7279265Z",
+          "status": "PASS",
+          "seconds": 0.006,
+          "ordinal": 6466,
+          "total": 7802,
+          "binary": "lamp-voice",
+          "test": "service_trace::tests::stalled_writer_has_fixed_capacity_and_bounded_finish_without_joining"
+        }
+      ],
+      "PASS_once": true
+    },
+    {
+      "test": "service_trace::tests::oversized_event_is_dropped_not_truncated_into_a_misleading_record",
+      "records": [
+        {
+          "line": 7240,
+          "timestamp": "2026-10-27T20:11:57.7134430Z",
+          "status": "PASS",
+          "seconds": 0.006,
+          "ordinal": 6462,
+          "total": 7802,
+          "binary": "lamp-voice",
+          "test": "service_trace::tests::oversized_event_is_dropped_not_truncated_into_a_misleading_record"
+        }
+      ],
+      "PASS_once": true
+    },
+    {
+      "test": "service_trace::tests::shared_session_rotation_keeps_granted_descriptors_and_private_health",
+      "records": [
+        {
+          "line": 7243,
+          "timestamp": "2026-10-27T20:11:57.7255025Z",
+          "status": "PASS",
+          "seconds": 0.008,
+          "ordinal": 6465,
+          "total": 7802,
+          "binary": "lamp-voice",
+          "test": "service_trace::tests::shared_session_rotation_keeps_granted_descriptors_and_private_health"
+        }
+      ],
+      "PASS_once": true
+    },
+    {
+      "test": "service_trace::tests::rotation_uses_only_pinned_files_and_bounded_disk_space",
+      "records": [
+        {
+          "line": 7242,
+          "timestamp": "2026-10-27T20:11:57.7216834Z",
+          "status": "PASS",
+          "seconds": 0.008,
+          "ordinal": 6464,
+          "total": 7802,
+          "binary": "lamp-voice",
+          "test": "service_trace::tests::rotation_uses_only_pinned_files_and_bounded_disk_space"
+        }
+      ],
+      "PASS_once": true
+    },
+    {
+      "test": "service_trace::tests::private_and_failed_reader_traces_keep_the_original_records_and_finite_state",
+      "records": [
+        {
+          "line": 7241,
+          "timestamp": "2026-10-27T20:11:57.7176568Z",
+          "status": "PASS",
+          "seconds": 0.008,
+          "ordinal": 6463,
+          "total": 7802,
+          "binary": "lamp-voice",
+          "test": "service_trace::tests::private_and_failed_reader_traces_keep_the_original_records_and_finite_state"
+        }
+      ],
+      "PASS_once": true
+    }
+  ],
+  "all_ordinary_PASS_once": true
+}
