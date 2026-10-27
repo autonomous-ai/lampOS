@@ -607,3 +607,4 @@ Ready for lamp-voice: yes (#2553), once its ARM64 run is green
 - 18:44: NEXT TRAIN #3817 b7bc17a96 posted (green, two READ-OKs). Third READ-OK #3799 4bc7768e3. #3759 0679b5254 clippy green, ARM64 pending, re-read asked. Eighth reading #3822 from the SDK side.
 - 18:45: opened #3823 (blue/sdk-ci f4c6de577, lampos-sdk.yml), labelled builder:blue; read asked on #3504.
 - 18:49: #3823 first run green (copies, python, js); harness-reviewer READ-OK f4c6de577 with a P3 (test the 3.10/Node 18 floors), which follows after merge; Third reading. #3759: reviewer-lead no finding on 0679b5254 (P3: whoever lands second of #3759/#3805 keeps the copies equal); Reviewer-two re-read pending; ARM64 pending.
+- 18:51: #3823 P3 prepared locally on blue/sdk-ci-matrix: Python 3.10 passes 24 (uv venv); Node 18 lacks --test-timeout (npm test fails "bad option"; the tests pass 25 without it) and is end-of-life, so engines >=20 and a Node 20/22 matrix; opens after #3823 lands.
