@@ -1680,11 +1680,19 @@ impl Onboarding {
                 if led.heard.name && agrees(&words) {
                     true
                 } else if names_someone(text, &words) {
+                    if !led.heard.name {
+                        eprintln!(
+                            "lamp-voice: onboarding: who_you_are heard a name; a yes ends it"
+                        );
+                    }
                     led.heard.name = true;
                     false
                 } else {
                     // "No" to the name the lamp checked: not known.
-                    if refuses(&words) {
+                    if refuses(&words) && led.heard.name {
+                        eprintln!(
+                            "lamp-voice: onboarding: who_you_are heard a no: the name is not known"
+                        );
                         led.heard.name = false;
                     }
                     false
@@ -2365,6 +2373,20 @@ impl Onboarding {
                     self.owed = Some(line.to_owned());
                 }
             } else {
+                let leading = self.led.as_ref().map(|led| {
+                    let asked = if led.asked_us.is_some() {
+                        ""
+                    } else {
+                        ", not asked yet"
+                    };
+                    format!("{}{asked}", led.step.name())
+                });
+                eprintln!(
+                    "lamp-voice: onboarding: {} {:?} not taken: the step led is {}",
+                    step.name(),
+                    outcome,
+                    leading.as_deref().unwrap_or("none")
+                );
                 self.records.push(
                     json!({"kind":"onboarding_report_refused","step":step.name(),
                     "outcome":outcome,"at_us":now_us}),
@@ -2395,13 +2417,47 @@ const YES: [&str; 11] = [
 ];
 const NO: [&str; 6] = ["no", "nope", "not", "don't", "never", "none"];
 
+/// Common ways of saying yes that hold a no word or none of [`YES`]: "No
+/// problem", "I don't mind", "Of course", "Go ahead". On lamp-29e7 on 27 Oct
+/// "who you are" took 5 minutes (#3883); a "no problem" there also cleared
+/// the name heard.
+const YES_PHRASES: [&[&str]; 5] = [
+    &["no", "problem"],
+    &["don't", "mind"],
+    &["do", "not", "mind"],
+    &["of", "course"],
+    &["go", "ahead"],
+];
+
+/// A line's words with its [`YES_PHRASES`] taken out, and whether it had one.
+fn without_yes_phrases(words: &[String]) -> (Vec<&str>, bool) {
+    let mut rest = Vec::with_capacity(words.len());
+    let mut found = false;
+    let mut at = 0;
+    'words: while at < words.len() {
+        for phrase in YES_PHRASES {
+            let end = at + phrase.len();
+            if end <= words.len() && words[at..end].iter().zip(phrase).all(|(w, p)| w == p) {
+                found = true;
+                at = end;
+                continue 'words;
+            }
+        }
+        rest.push(words[at].as_str());
+        at += 1;
+    }
+    (rest, found)
+}
+
 fn agrees(words: &[String]) -> bool {
-    words.iter().any(|word| YES.contains(&word.as_str()))
-        && !words.iter().any(|word| NO.contains(&word.as_str()))
+    let (rest, phrase) = without_yes_phrases(words);
+    (phrase || rest.iter().any(|word| YES.contains(word)))
+        && !rest.iter().any(|word| NO.contains(word))
 }
 
 fn refuses(words: &[String]) -> bool {
-    words.iter().any(|word| NO.contains(&word.as_str()))
+    let (rest, _) = without_yes_phrases(words);
+    rest.iter().any(|word| NO.contains(word))
 }
 
 /// Words that follow "I'm", "it's", "call me" or "my name is" without
@@ -2527,12 +2583,15 @@ fn yes_or_no(text: &str) -> Option<bool> {
     if words.is_empty() || words.len() > 4 {
         return None;
     }
-    let has = |set: &[&str]| words.iter().any(|word| set.contains(&word.as_str()));
+    let (rest, phrase) = without_yes_phrases(&words);
+    let has = |set: &[&str]| rest.iter().any(|word| set.contains(word));
     if has(&["no", "nope", "nah", "not", "wrong"]) {
         Some(false)
-    } else if has(&[
-        "yes", "yeah", "yep", "yup", "right", "correct", "exactly", "sure",
-    ]) {
+    } else if phrase
+        || has(&[
+            "yes", "yeah", "yep", "yup", "right", "correct", "exactly", "sure",
+        ])
+    {
         Some(true)
     } else {
         None
@@ -2675,8 +2734,26 @@ pub fn is_tool(name: &str) -> bool {
 }
 
 /// The provider worker's side: put what the model reported in the mailbox
-/// for the runner, and say what to tell the model.
+/// for the runner, and say what to tell the model. Each call's step,
+/// outcome and answer go in the journal: on lamp-29e7 on 27 Oct three
+/// setup_step calls left "the onboarding answered" and nothing more, so
+/// what held "who you are" for 5 minutes could not be read (#3883).
 pub fn run(file: &Path, call: &ToolCall) -> (Value, bool) {
+    let (told, answered) = answer(file, call);
+    let said = |key: &str| call.args.get(key).and_then(Value::as_str).unwrap_or("none");
+    eprintln!(
+        "lamp-voice: onboarding: {} step {} outcome {}: {}",
+        call.name,
+        said("step"),
+        said("outcome"),
+        told.get("error")
+            .and_then(Value::as_str)
+            .map_or_else(|| "noted".to_owned(), |error| format!("refused ({error})"))
+    );
+    (told, answered)
+}
+
+fn answer(file: &Path, call: &ToolCall) -> (Value, bool) {
     let line = match call.name.as_str() {
         REDO => json!({"redo": true}),
         STEP => {
@@ -3758,6 +3835,50 @@ mod tests {
         };
         assert_eq!(of_who("onboarding_step"), 1, "{records:?}");
         assert_eq!(of_who("onboarding_heard"), 1, "{records:?}");
+    }
+
+    /// #3883: on lamp-29e7 "who you are" took 5 minutes. A name and a yes
+    /// said as "no problem", "of course" or "go ahead" end it at once, and
+    /// the "no" in "no problem" no longer clears the name heard.
+    #[test]
+    fn a_name_and_a_yes_phrase_end_who_you_are_in_one_exchange() {
+        for yes in [
+            "No problem.",
+            "Of course!",
+            "Sure, go ahead.",
+            "I don't mind.",
+        ] {
+            let mut room = Room::new("yes-phrase");
+            assert_eq!(room.wait(7 * S, Some(NEAR_MIDDLE)), [SIT_NOTE, SIT_DONE]);
+            assert_eq!(room.wait(20 * S, Some(NEAR_MIDDLE)), [WHO_NOTE]);
+            room.walk.heard("I'm Marie.", room.at);
+            room.wait(S, Some(NEAR_MIDDLE));
+            assert_eq!(room.outcome(Step::WhoYouAre), None);
+            room.walk.heard(yes, room.at);
+            room.wait(S, Some(NEAR_MIDDLE));
+            assert_eq!(room.outcome(Step::WhoYouAre), Some(Outcome::Done), "{yes}");
+        }
+    }
+
+    #[test]
+    fn yes_phrases_are_a_yes_and_a_plain_no_stays_a_no() {
+        let words = |text: &str| words_of(text);
+        for yes in [
+            "No problem",
+            "of course",
+            "go ahead",
+            "I don't mind",
+            "I do not mind",
+        ] {
+            assert!(agrees(&words(yes)), "{yes}");
+            assert!(!refuses(&words(yes)), "{yes}");
+            assert_eq!(yes_or_no(yes), Some(true), "{yes}");
+        }
+        for no in ["No", "Of course not", "No, don't", "Please don't"] {
+            assert!(!agrees(&words(no)), "{no}");
+            assert!(refuses(&words(no)), "{no}");
+        }
+        assert_eq!(yes_or_no("of course not"), Some(false));
     }
 
     /// The first builder on #2526: with the nudge on, both of the
