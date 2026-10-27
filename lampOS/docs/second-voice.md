@@ -626,6 +626,36 @@ order is kept. A written turn is the same from the chat on.
   light. The journal says `speech tags: K given to the voice, D dropped`
   per reply, counts only. Off, a reply is said and written as the chat
   wrote it.
+- **With `LAMP_NO_WORDS_AGAIN=on` a line said to the lamp by name never
+  ends in silence from an empty answer** (off unless set; #3704). On
+  lamp-52e6 on 27 Oct at 09:52 "Lamp, What's my name?" got an answer with
+  no words, and the lamp said nothing: a round with no words and no call
+  ends the turn, and the line was counted as left alone, like room talk.
+  With the switch, a spoken line whose words begin with the lamp's name
+  (`attention::begins_with_the_name`: "Hey Lamp …", or "Lamp" set off by a
+  pause mark, "Lamp, …"; "Lamp what's my name" with no mark does not
+  count), that is not a stop or "never mind" ("Lamp, stop." is rightly
+  answered with nothing; the Reviewer-lead's P2 on #3712), whose
+  round gives no words and calls nothing, with nothing said or called
+  earlier in the turn, is asked once more, told it gave no words and to
+  answer in a few words or say it can't
+  (`second_provider::NO_WORDS_AGAIN_NOTE`). If that round has no words
+  either, the lamp says "Sorry, I lost my words there. Could you ask me
+  again?" (`second_provider::NO_WORDS_LINE`). A turn that called anything
+  ends as before, since a call's answer may tell the model to say nothing
+  (a held call, a search stopped by a hand, a stay after unplugging). A
+  line without the name ends as before too: the model may leave room talk
+  alone. The asked-again round has no first-event bound of its own (only
+  round 1 has), so a second chat that stalls still ends in silence. The
+  cost is one more chat round, about 0.8 s to its first event,
+  and only on a turn that would otherwise have been silent. The worker
+  says at start `a line begun with the lamp's name answered with no words
+  and no call is asked once more, and said a short sorry if it has none
+  again (LAMP_NO_WORDS_AGAIN)`; each such turn's journal says `no words
+  and no call for a line begun with the lamp's name; asked once more`,
+  then, if needed, `no words again …; said "Sorry, …"`, so the played
+  tests can count empty answers. Test:
+  `an_empty_answer_to_a_line_said_by_name_is_asked_again_never_silence`.
 - **With `LAMP_SHORT_DONE=on` a light or volume ask that worked is
   answered with the call's own short line** (off unless set; #2877). On
   lamp-52e6 (Fifth's row 24, 22 Oct) the model still spoke about ten words

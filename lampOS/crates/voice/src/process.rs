@@ -1550,6 +1550,8 @@ fn second_route_worker_environment(
         crate::second_provider::SPEECH_TAGS_ENVIRONMENT,
         // A light or volume turn answered with the call's own line (#2877).
         crate::second_provider::SHORT_DONE_ENVIRONMENT,
+        // An empty answer to a line said by name asked again (#3704).
+        crate::second_provider::NO_WORDS_AGAIN_ENVIRONMENT,
         crate::second_provider::NAMED_ALWAYS_ENVIRONMENT,
         crate::remember::HITS_ENVIRONMENT,
         crate::second_provider::SKILL_LOOK_ENVIRONMENT,
@@ -1637,6 +1639,7 @@ mod tests {
             crate::second_provider::SAID_ONCE_ENVIRONMENT,
             crate::second_provider::SPEECH_TAGS_ENVIRONMENT,
             crate::second_provider::SHORT_DONE_ENVIRONMENT,
+            crate::second_provider::NO_WORDS_AGAIN_ENVIRONMENT,
             crate::second_provider::NAMED_ALWAYS_ENVIRONMENT,
             crate::second_provider::SKILL_LOOK_ENVIRONMENT,
             crate::second_provider::GOING_ON_NOT_OWN_ENVIRONMENT,
@@ -2262,6 +2265,7 @@ mod tests {
                     || name == crate::second_provider::SAID_ONCE_ENVIRONMENT
                     || name == crate::second_provider::SPEECH_TAGS_ENVIRONMENT
                     || name == crate::second_provider::SHORT_DONE_ENVIRONMENT
+                    || name == crate::second_provider::NO_WORDS_AGAIN_ENVIRONMENT
                     || name == crate::second_provider::NAMED_ALWAYS_ENVIRONMENT
                     || name == crate::remember::HITS_ENVIRONMENT
                     || name == crate::second_provider::SKILL_LOOK_ENVIRONMENT
@@ -2399,6 +2403,7 @@ mod tests {
                     "LAMP_NAME_SECOND_SIGN=on",
                     "LAMP_NAME_STAYS_IN_ITS_LINE=on",
                     "LAMP_NOT_FOR_ME_WORDS=on",
+                    "LAMP_NO_WORDS_AGAIN=on",
                     "LAMP_OWN_KEYS=on",
                     "LAMP_PERSON_NAME=/etc/lampOS/person/name",
                     "LAMP_PERSON_NAME_OWNER_ONLY=on",
