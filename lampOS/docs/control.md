@@ -331,7 +331,7 @@ which back. An SDK's wait for them returns at the answer.
 |---|---|---|---|
 | `pair` | `name` (1–64 chars), `key` (Ed25519 public, base64), `proof` (base64) | — | — |
 | `hello` | `client` (`c_` + 1–32 lowercase hex), `sig` (base64) | — | — |
-| `subscribe` | `events` (at least one), `phrases` (≤ 16 across the computer's connections, each ≤ 64 chars and two words or more or one of 8 letters, only with `phrase.heard`, which needs them) | each event's grant | — |
+| `subscribe` | `events` (at least one), `phrases` (≤ 16 across the computer's connections, each ≤ 64 chars and of 8 letters at least, only with `phrase.heard`, which needs them) | each event's grant | — |
 | `unsubscribe` | `events` | — | — |
 | `get` | `state`: `presence` (`look`), `light`, `mood`, `lamp` | — | — |
 | `lease.take` | `parts` (`body`, `light`, `voice`), `for_ms` 1–30,000, `why` ≤ 200 chars | `body`, `light` or `speak` for each part | — |
@@ -391,7 +391,7 @@ Rates a client is held to:
 | `say`, `sound` | 6 a minute and 60 an hour |
 | `express` | 1 a minute |
 | actions a part refused | 20 a second, then the connection closes |
-| registered phrases | 16 a computer, across all its connections; each of 64 characters at most, and two words or more or one word of 8 letters or more |
+| registered phrases | 16 a computer, across all its connections; each of 64 characters at most and 8 letters at least, so no short word or pair ("is a"; "ok lamp" too, at 6 letters: "okay lamp" passes). The floor is friction, not a guard: what keeps `hear` narrow is the owner's grant, this cap, the rate on changing them, and that only the registered phrase leaves the lamp |
 | changing the phrases | 6 a minute; the same phrases again cost nothing |
 
 `gesture`, `move`, `play` and `look` share one class, `motion`. A refusal
