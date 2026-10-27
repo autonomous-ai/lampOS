@@ -6,6 +6,13 @@
   "type": "object",
   "additionalProperties": false,
   "properties": {
+    "format": {
+      "description": "The rules' format: left out, 1. In format 2, look is presence alone (the presence topics with it) and camera the only picture. A lamp refuses a format it does not read.",
+      "enum": [
+        1,
+        2
+      ]
+    },
     "enabled": {
       "type": "boolean"
     },

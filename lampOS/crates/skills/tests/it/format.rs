@@ -293,6 +293,12 @@ fn loads(toml_text: &str) -> Result<(), String> {
 fn the_schema_refuses_what_lamp_skills_refuses_in_shape() {
     assert_eq!(loads(GOOD), Ok(()));
     assert_eq!(check(&as_json(GOOD)), Vec::<String>::new());
+    // Formats 1 and 2 are both read (#3822's gap 7).
+    for format in ["format = 1\n", "format = 2\n"] {
+        let good = format!("{format}{GOOD}");
+        assert_eq!(loads(&good), Ok(()), "{format}");
+        assert_eq!(check(&as_json(&good)), Vec::<String>::new(), "{format}");
+    }
     let changed = |from: &str, to: &str| {
         assert!(GOOD.contains(from), "{from}");
         GOOD.replacen(from, to, 1)
@@ -343,6 +349,10 @@ fn the_schema_refuses_what_lamp_skills_refuses_in_shape() {
         (
             format!("{GOOD}[[do]]\nbody = {{ gesture = \"nodd\" }}\n"),
             "a gesture the body doesn't have",
+        ),
+        (
+            format!("format = 3\n{GOOD}"),
+            "a format this lamp doesn't read",
         ),
     ] {
         assert!(
