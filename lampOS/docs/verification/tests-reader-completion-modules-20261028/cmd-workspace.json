@@ -1,0 +1,59 @@
+{
+  "command": [
+    "/Users/autonomous/.cargo/bin/cargo",
+    "+1.96.0",
+    "build",
+    "--offline",
+    "--locked",
+    "--jobs",
+    "1",
+    "--workspace",
+    "--message-format=json"
+  ],
+  "cwd": "/private/tmp/tests-ready-speaking-1c-20261026/lampOS",
+  "started_at": "2026-10-27T17:25:36.031547+00:00",
+  "timeout_seconds": 3600,
+  "stdout": "cmd-workspace.stdout.txt",
+  "stderr": "cmd-workspace.stderr.txt",
+  "timeout_cleanup": [
+    {
+      "action": "leader exited unreaped; no other owned group members",
+      "members": [
+        {
+          "pid": 3270,
+          "state": "Z"
+        }
+      ]
+    }
+  ],
+  "timed_out": false,
+  "disk_reserve_breached": false,
+  "stop_reason": null,
+  "process_group_scope": "Owned group only; no detached-descendant cleanup claim.",
+  "group_closure_method": "WNOWAIT leader reservation and ps group inventory before reap",
+  "launch_state": "Popen_recorded",
+  "disk_reserve_bytes": 2214592512,
+  "disk_sample_interval_seconds": 1,
+  "disk_paths": [
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/sentinel-b7-reader-service-trace-gates-prep",
+    "/private/tmp/tests-restart-f9-cargo-20261027_root"
+  ],
+  "disk_samples": 177,
+  "disk_last_available_bytes": 12541145088,
+  "disk_minimum_available_bytes": 12398264320,
+  "available_bytes_before_Cargo": 12513124352,
+  "owned_pid": 3270,
+  "owned_process_group": 3270,
+  "direct_wait_status": 0,
+  "exit_code": 0,
+  "owned_group_absent_after_cleanup": true,
+  "unexpected_owned_descendants": false,
+  "unresolved_owned_pids": [],
+  "compiler_lease_held": false,
+  "wall_seconds": 178.707525,
+  "finished_at": "2026-10-27T17:28:34.735842+00:00",
+  "stdout_sha256": "b0d0fdf69bf552188894acb5b25d834ab8ae92772a8d8c4c34a5ff2213bc765f",
+  "stdout_bytes": 380766,
+  "stderr_sha256": "864bfaa2c67a2ef85c90766b3ad2c7ea9e9f78e804d4cbf34197f1833fbbb878",
+  "stderr_bytes": 3190
+}

@@ -1,0 +1,66 @@
+[
+  {
+    "phase": "cmd-inventory-all-before",
+    "actual_and_new_sealed_SHA": true,
+    "executables": [
+      "/private/tmp/tests-restart-f9-cargo-20261027_root/debug/deps/lamp_voice-6d619bbdd1df3a0d"
+    ],
+    "all_inherited_frozen_SHA_rehash": false
+  },
+  {
+    "phase": "cmd-inventory-all-after",
+    "actual_and_new_sealed_SHA": true,
+    "executables": [
+      "/private/tmp/tests-restart-f9-cargo-20261027_root/debug/deps/lamp_voice-6d619bbdd1df3a0d"
+    ],
+    "all_inherited_frozen_SHA_rehash": false
+  },
+  {
+    "phase": "cmd-inventory-ignored-before",
+    "actual_and_new_sealed_SHA": true,
+    "executables": [
+      "/private/tmp/tests-restart-f9-cargo-20261027_root/debug/deps/lamp_voice-6d619bbdd1df3a0d"
+    ],
+    "all_inherited_frozen_SHA_rehash": false
+  },
+  {
+    "phase": "cmd-inventory-ignored-after",
+    "actual_and_new_sealed_SHA": true,
+    "executables": [
+      "/private/tmp/tests-restart-f9-cargo-20261027_root/debug/deps/lamp_voice-6d619bbdd1df3a0d"
+    ],
+    "all_inherited_frozen_SHA_rehash": false
+  },
+  {
+    "phase": "cmd-module-session_reader-before",
+    "actual_and_new_sealed_SHA": true,
+    "executables": [
+      "/private/tmp/tests-restart-f9-cargo-20261027_root/debug/deps/lamp_voice-6d619bbdd1df3a0d"
+    ],
+    "all_inherited_frozen_SHA_rehash": false
+  },
+  {
+    "phase": "cmd-module-session_reader-after",
+    "actual_and_new_sealed_SHA": true,
+    "executables": [
+      "/private/tmp/tests-restart-f9-cargo-20261027_root/debug/deps/lamp_voice-6d619bbdd1df3a0d"
+    ],
+    "all_inherited_frozen_SHA_rehash": false
+  },
+  {
+    "phase": "cmd-module-service_trace-before",
+    "actual_and_new_sealed_SHA": true,
+    "executables": [
+      "/private/tmp/tests-restart-f9-cargo-20261027_root/debug/deps/lamp_voice-6d619bbdd1df3a0d"
+    ],
+    "all_inherited_frozen_SHA_rehash": false
+  },
+  {
+    "phase": "cmd-module-service_trace-after",
+    "actual_and_new_sealed_SHA": true,
+    "executables": [
+      "/private/tmp/tests-restart-f9-cargo-20261027_root/debug/deps/lamp_voice-6d619bbdd1df3a0d"
+    ],
+    "all_inherited_frozen_SHA_rehash": false
+  }
+]

@@ -1,0 +1,20 @@
+{
+  "qualified_dirty_head": "b7dc8ee598b7a8fdd6ff7577db6cb6ee142f6521",
+  "committed_head": "49abc9a60d772138f3167f2acea53de40c95607f",
+  "base": "0d1d1f2b944581169c9f96adba9f40ab88adba92",
+  "all_source_files_bytes_kind_mode_equal": 10908,
+  "module_counts": {
+    "session_reader::tests::": {
+      "passed": 4,
+      "failed": 0,
+      "ignored": 0
+    },
+    "service_trace::tests::": {
+      "passed": 6,
+      "failed": 0,
+      "ignored": 0
+    }
+  },
+  "compilation_predates_fold": true,
+  "no_full_Voice_or_Linux_runtime_claim": true
+}

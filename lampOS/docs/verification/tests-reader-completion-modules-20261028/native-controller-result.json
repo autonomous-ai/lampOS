@@ -1,0 +1,16 @@
+{
+  "exit_code": 0,
+  "completed_at": "2026-10-28T00:32:28.149840+07:00",
+  "native-controller.stdout": {
+    "sha256": "6be96ca387e7a0f10cc4363a8f9b6fbdd68df9224c25fa2b7f8753a6de1e67b5",
+    "bytes": 2908
+  },
+  "native-controller.stderr": {
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes": 0
+  },
+  "terminal.json": {
+    "sha256": "807a05559145d2c7ad73c1e29c20eab214455f1e4924de7c63b9d39884bafa82",
+    "bytes": 1924
+  }
+}

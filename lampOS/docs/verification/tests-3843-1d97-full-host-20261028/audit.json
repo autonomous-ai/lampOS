@@ -1,0 +1,244 @@
+{
+  "status": "COMPLETE_OFFLINE_CENSUS_OF_FAILED_GATE",
+  "Rust_exit": 101,
+  "original_controller_status": "FAIL",
+  "original_controller_exit": 1,
+  "original_controller_error": "KeyError('test_rows')",
+  "no_rerun": true,
+  "no_waiver": true,
+  "head": "192f0dfd4971e561d8ba64c529b278cee8289cc5",
+  "base": "1d97a2c6d0d27e0b1471e0b1bf39722a7bb3a5db",
+  "ordinary_counts": {
+    "passed": 7713,
+    "failed": 1,
+    "ignored": 52
+  },
+  "ordinary_driver_count": 70,
+  "doc_driver_count": 12,
+  "doc_counts": {
+    "passed": 0,
+    "failed": 0,
+    "ignored": 0
+  },
+  "nested_child_pass_excluded": 1,
+  "outer_complete_binding": true,
+  "unrun": [],
+  "incomplete": [],
+  "binding_errors": [],
+  "failures": [
+    {
+      "package": "lamp-skills",
+      "target": {
+        "kind": [
+          "test"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "it",
+        "src_path": "/private/tmp/tests-3796-compatible-host-20261027/lampOS/crates/skills/tests/it/main.rs",
+        "edition": "2024",
+        "doc": false,
+        "doctest": false,
+        "test": true
+      },
+      "executable_sha256": "ea9cafee96aa2ee387e73c77506c4dfbcac843beff2b2729b23d6a7406b77d94",
+      "case": "skills::thinking_after_a_moment_of_speaking_is_still_the_line"
+    }
+  ],
+  "required_14_Round": [
+    {
+      "case": "product_carrier::a_linked_part_uses_product_before_its_pinned_lamp_template",
+      "status": "PASS",
+      "outer_execution_count": 1,
+      "raw_byte_offset": 248000,
+      "raw_bytes": 87,
+      "raw_sha256": "bc6ea3ee5b1d38803bacad2b5a90f6e0dba3e1f571c20cc89d118f4b02f97616"
+    },
+    {
+      "case": "product_carrier::a_linked_part_uses_product_after_its_pinned_lamp_template",
+      "status": "PASS",
+      "outer_execution_count": 1,
+      "raw_byte_offset": 247913,
+      "raw_bytes": 86,
+      "raw_sha256": "feb5e233768d7e837945abd3168ec5cd5833b9c0f3d556517cfbb9c9f590852d"
+    },
+    {
+      "case": "product_carrier::a_compatible_linked_lamp_template_still_wins_in_either_manifest_order",
+      "status": "PASS",
+      "outer_execution_count": 1,
+      "raw_byte_offset": 247647,
+      "raw_bytes": 98,
+      "raw_sha256": "dfe0fa6282e94ab6f8bb503b5ece42ccc2ecd337a6dcfab9888115697ed8139c"
+    },
+    {
+      "case": "product_carrier::a_pinned_part_keeps_its_pinned_lamp_template_beside_product_in_either_order",
+      "status": "PASS",
+      "outer_execution_count": 1,
+      "raw_byte_offset": 248285,
+      "raw_bytes": 104,
+      "raw_sha256": "158d5dc78f3489a5dde81d19820fa235decf3711714f6aec1c74ea7fefd73bc5"
+    },
+    {
+      "case": "product_carrier::a_climbed_updater_confirms_product_before_its_pinned_lamp_template",
+      "status": "PASS",
+      "outer_execution_count": 1,
+      "raw_byte_offset": 247474,
+      "raw_bytes": 95,
+      "raw_sha256": "8b3955376f95cbcdf4fabaa341ac795348c8e0845cb08e4bdaee19cdf2a83a25"
+    },
+    {
+      "case": "product_carrier::a_climbed_updater_confirms_product_after_its_pinned_lamp_template",
+      "status": "PASS",
+      "outer_execution_count": 1,
+      "raw_byte_offset": 247379,
+      "raw_bytes": 94,
+      "raw_sha256": "39e821572379f3d204686bc893fbadc303bc5dfe8e75cdc9e81b55d84f188e8c"
+    },
+    {
+      "case": "product_carrier::skipping_a_pinned_host_logs_only_its_unit_host_and_installed_link",
+      "status": "PASS",
+      "outer_execution_count": 1,
+      "raw_byte_offset": 249500,
+      "raw_bytes": 94,
+      "raw_sha256": "9adae8a4dbfb3c69d5f842d0ce19be97ec4484e21afd1c3e3dde62bfca9fbcfe"
+    },
+    {
+      "case": "product_carrier::an_invalid_linked_host_is_refused_instead_of_falling_back_to_product",
+      "status": "PASS",
+      "outer_execution_count": 1,
+      "raw_byte_offset": 248858,
+      "raw_bytes": 97,
+      "raw_sha256": "c4092726afa5dc2d40ad7d3582fa68d8f2e139d4640cd8ef26bafcce829ce7e5"
+    },
+    {
+      "case": "product_carrier::a_pinned_host_without_a_product_candidate_keeps_the_existing_refusal",
+      "status": "PASS",
+      "outer_execution_count": 1,
+      "raw_byte_offset": 248187,
+      "raw_bytes": 97,
+      "raw_sha256": "35df608dc7a7d9d324c89c6114e42efaade75b480ebafe2c9968fa344c15f916"
+    },
+    {
+      "case": "product_carrier::the_product_fallback_still_rejects_corrupt_signed_unit_bytes",
+      "status": "PASS",
+      "outer_execution_count": 1,
+      "raw_byte_offset": 249675,
+      "raw_bytes": 89,
+      "raw_sha256": "be062c2ec83006c73e77575a522c90acd310d54d65a1b0b0763eabd6882a7ee0"
+    },
+    {
+      "case": "product_carrier::an_unreachable_product_fallback_does_not_switch_any_part",
+      "status": "PASS",
+      "outer_execution_count": 1,
+      "raw_byte_offset": 249229,
+      "raw_bytes": 85,
+      "raw_sha256": "f635a56e78981736e8d94b8f166acc12888b1f90257cc8dfb49cab22b6b1cc64"
+    },
+    {
+      "case": "product_carrier::a_corrupt_pinned_host_is_not_silently_skipped_for_product",
+      "status": "PASS",
+      "outer_execution_count": 1,
+      "raw_byte_offset": 247746,
+      "raw_bytes": 86,
+      "raw_sha256": "eaa4933b39184601398d9a8fd12954837ae2752b89dbf282d3d0c0a1f277182c"
+    },
+    {
+      "case": "product_carrier::an_unreachable_pinned_host_is_not_silently_skipped_for_product",
+      "status": "PASS",
+      "outer_execution_count": 1,
+      "raw_byte_offset": 249137,
+      "raw_bytes": 91,
+      "raw_sha256": "9dd6b6258d40293065019ac9432baf538ba6a6ec6d86b78d19735fb2de479212"
+    },
+    {
+      "case": "product_carrier::a_product_voice_ignores_its_legacy_pinned_releases_template",
+      "status": "PASS",
+      "outer_execution_count": 1,
+      "raw_byte_offset": 248666,
+      "raw_bytes": 88,
+      "raw_sha256": "352d158b83e762a4c3743298bd8d613726e86ede0f9d29b442a766ebdcb0dbfe"
+    }
+  ],
+  "source_before_after_record_equal": true,
+  "original_terminal_guard_fields": {
+    "status": "FAIL",
+    "head": "192f0dfd4971e561d8ba64c529b278cee8289cc5",
+    "base": "1d97a2c6d0d27e0b1471e0b1bf39722a7bb3a5db",
+    "runtime_attempts": 1,
+    "runtime_scope": "One complete serial Cargo test --no-fail-fast invocation for the actual Update reverse-closure union, no filters/skips; ordinary/customharness/doctest inventories and actual launch/result census",
+    "no_old_qualification_transfer": true,
+    "Body_old14_declared_retired_before_compiler": true,
+    "historical_failures_retained": true,
+    "no_retry": true,
+    "runtime_execution_count": 1,
+    "error": "KeyError('test_rows')",
+    "source_unchanged": true,
+    "sealed_guard_pass": true,
+    "sealed_count": 132,
+    "actual_guard_pass": true,
+    "unresolved_owned_pids": [],
+    "lease_released": true
+  },
+  "original_receipts": {
+    "cmd-full-closure.json": "83ba8117e060207015cb091611d3e26f2abf9e5d10cd3726f52f60da23854128",
+    "cmd-full-closure.stdout.txt": "b6ac638948c5e578d1e9674c6c2ddf0a0cc53fba40d6f2b9617ea7790d616460",
+    "cmd-full-closure.stderr.txt": "a5da055396d06d7772cef6a418fce04e0348edb2e94db95e0cc78af6a0f8af82",
+    "compiled-census.json": "114766257ed0d7161be5bdd391cb67c2e660bb73951a2f046b34024cb035f29e",
+    "compiler-artifacts.json": "b8e7f38c7399ea8c671c0078ce0cf4ffafe19e7f86630be8dd6ef19dc6a51eca",
+    "source-before.json": "171022f3b7736059c5283e149e7875f931709ccc6f1be64645ee8e7388fa9e48",
+    "source-after.json": "171022f3b7736059c5283e149e7875f931709ccc6f1be64645ee8e7388fa9e48",
+    "protected-before.json": "bc2fa7137c40dd06ec6997e95716d3314d4a2be8cb86eb51b8bf7d5d9c737ec8",
+    "protected-after.json": "d40dabbf379beef15f2ab8c24ca184580a55b5e35f0b193a9c3e3bd9940b7b97",
+    "actual-artifacts.json": "dbb7155c585eb6f66179f1b92612ee83a3a982dd0d923901cb83a2d8d88c29b0",
+    "actual-artifacts-after.json": "128265834a8389feec82d52e839ceafa0338095ed0f24756c529d891551b1036",
+    "terminal.json": "a3b763a7616eb4644e90516db31f98cd209ab5c4611b200ff8bde3d0a3fcdd0d",
+    "native-controller-result.json": "e18e2ca01dbfce0ad4f3382119b8f62700ba130a4b8a64da01a13e22b394bc0e"
+  },
+  "analysis_parser_path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/qualification/3218/census.py",
+  "analysis_parser_sha256": "037e1092a95db8f800009d2d0efaa8d561284c0788cf615d8c003ef70c992716",
+  "analysis_only_Path_override": "lexical absolute paths; no executable filesystem reads",
+  "projection_sha256": "07b8ebff87649c3bf8cc228d08c34098af39d7b88b07fe6365130c4fa51d8ee2",
+  "failure_excerpt": {
+    "raw_byte_offset": 207895,
+    "raw_bytes": 420,
+    "raw_sha256": "836f78702e0387a9832365ac490451701393cf6dd0185173882080ac2d77a6ff",
+    "utf8": "---- skills::thinking_after_a_moment_of_speaking_is_still_the_line stdout ----\n\nthread 'skills::thinking_after_a_moment_of_speaking_is_still_the_line' (40812694) panicked at crates/skills/tests/it/skills.rs:5244:5:\n584.221006ms; after the say: spoken from 92 ms after the call, the turn over 2039 ms later; light warm: done; gesture nod: told the body; gesture nod: told the body; light given back to on blue at 3: done\n",
+    "source": "lampOS/crates/skills/tests/it/skills.rs:5244",
+    "predicate": "first < Duration::from_millis(300)",
+    "observed": "584.221006ms",
+    "causality": "not established; no baseline control or product attribution inferred"
+  },
+  "recorded_witness_accounting": {
+    "inherited": 30,
+    "new_frozen": 102,
+    "final": 132,
+    "union_exact": true,
+    "actual_count": 102,
+    "recorded_guard_receipts_only_not_current_binary_rehash": true
+  },
+  "no_recompilation_runtime_receipt": true,
+  "audit_tool_sha256": "b0fda2156a3eec7d8a3e3be15597ccf88597382ad3b9aea3092357076b6243c1",
+  "analysis_outputs": {
+    "target-outcomes.json": {
+      "sha256": "15b0f321e9c389a07fb0d47a66488fb3c157cd8a949f7b251426a4f3be5fe7b7",
+      "bytes": 2104145
+    },
+    "analysis-projected.stdout.txt": {
+      "sha256": "8fb91a11ca0bd1ae1f62d11b507d9a6d8d8a66204e21506090ffb23cf567d3e5",
+      "bytes": 734213
+    },
+    "analysis-stderr-copy.txt": {
+      "sha256": "a5da055396d06d7772cef6a418fce04e0348edb2e94db95e0cc78af6a0f8af82",
+      "bytes": 62444
+    },
+    "source-backed-projection.json": {
+      "sha256": "07b8ebff87649c3bf8cc228d08c34098af39d7b88b07fe6365130c4fa51d8ee2",
+      "bytes": 4072
+    },
+    "audit-offline.py": {
+      "sha256": "b0fda2156a3eec7d8a3e3be15597ccf88597382ad3b9aea3092357076b6243c1",
+      "bytes": 8535
+    }
+  }
+}

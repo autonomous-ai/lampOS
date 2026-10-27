@@ -1,0 +1,9 @@
+
+running 4 tests
+test session_reader::tests::finite_and_unset_service_never_resolve_a_reader_group ... ok
+test session_reader::tests::group_lookup_failure_retains_private_logging_without_writer_failure ... ok
+test session_reader::tests::local_session_reader_group_is_exact_unique_and_bounded ... ok
+test session_reader::tests::unsupported_acl_verification_degrades_to_private_metadata ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 3882 filtered out; finished in 0.17s
+

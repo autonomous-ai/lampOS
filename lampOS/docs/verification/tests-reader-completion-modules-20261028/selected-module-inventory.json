@@ -1,0 +1,24 @@
+{
+  "modules": {
+    "session_reader::tests::": [
+      "session_reader::tests::finite_and_unset_service_never_resolve_a_reader_group",
+      "session_reader::tests::group_lookup_failure_retains_private_logging_without_writer_failure",
+      "session_reader::tests::local_session_reader_group_is_exact_unique_and_bounded",
+      "session_reader::tests::unsupported_acl_verification_degrades_to_private_metadata"
+    ],
+    "service_trace::tests::": [
+      "service_trace::tests::closure_flushes_final_accepted_event_without_inventing_complete_evidence",
+      "service_trace::tests::disk_failure_latches_health_without_an_audio_result_error",
+      "service_trace::tests::oversized_event_is_dropped_not_truncated_into_a_misleading_record",
+      "service_trace::tests::private_and_failed_reader_traces_keep_the_original_records_and_finite_state",
+      "service_trace::tests::rotation_uses_only_pinned_files_and_bounded_disk_space",
+      "service_trace::tests::stalled_writer_has_fixed_capacity_and_bounded_finish_without_joining"
+    ]
+  },
+  "ignored": {
+    "session_reader::tests::": [],
+    "service_trace::tests::": []
+  },
+  "disjoint": true,
+  "full_Voice_runtime_claim": false
+}

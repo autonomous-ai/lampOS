@@ -1,0 +1,1782 @@
+{
+  "depinfo_sha256": "65d9738bfb308eb2561c9964dcd725b2c3cbab65570bfa637b1c95a3f50033a8",
+  "actual_local_inputs": {
+    "lampOS/crates/voice/src/lib.rs": {
+      "sha256": "44c8ee26790876fa0fccffccf4724c3ce423d1422ef77a98afd35d355f0d8453",
+      "bytes": 4440,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/activity.rs": {
+      "sha256": "61046ef3234cf835c15f86fe430885809bb17a6d95ac96d1868536c3d8478134",
+      "bytes": 73044,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/addressed.rs": {
+      "sha256": "000db849681510ff1739a50f6a8d0306775bb67fabf3d80cdbc80266ef6c8286",
+      "bytes": 26069,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/admission.rs": {
+      "sha256": "f628e7a45989102dbec12b90faa1cf9ed89b91f970d9493a0b87590f96bdceb4",
+      "bytes": 61219,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/agent_tasks.rs": {
+      "sha256": "b34411c96084098f415737a8d3217537a689c166d482de55a5e2ee4b3eb2127c",
+      "bytes": 270578,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/air_told.rs": {
+      "sha256": "1952d103ccef2bc4f45aa9b267e9239687e07c1c15841ab662057ebf4f360f00",
+      "bytes": 5227,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/app_make.rs": {
+      "sha256": "4f89c6beb69296964f811cdf427c9ebbba0e724307e54a5051489830108b834e",
+      "bytes": 32360,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/asker_first.rs": {
+      "sha256": "6cd0d06efd73492672fc0c2fe829290299eca48944929b1d0e63dc2de3d906b0",
+      "bytes": 24946,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/attention.rs": {
+      "sha256": "a58f3b927005fa50269611c9c5109481ff415dc96b99f4c6bb118c49bf91db0b",
+      "bytes": 224855,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/body_ask.rs": {
+      "sha256": "e1eb3a3a4fb691539cb666f478c1c16730142aaabc78bbd2557b0a398c76809d",
+      "bytes": 13980,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/body_link.rs": {
+      "sha256": "0a9a933cda08d8318d427074b7f5bd88f70582623f340c1cfd2713873295e960",
+      "bytes": 32383,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/body_motion.rs": {
+      "sha256": "1c4798c6a5a2ed5b9849dc59434fca2ee978ac5bcebcc3f4e61eb2656a1ed2fd",
+      "bytes": 14368,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/bus_out.rs": {
+      "sha256": "30d90ccab787255c639db04e090db2a5301937c1e2b319f4ec2f07df12ae57a0",
+      "bytes": 92068,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/called.rs": {
+      "sha256": "1c3496b50c1db960e52733677f70076a70b83b61d5ea875922731f245662bbd7",
+      "bytes": 13413,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/camera_config.rs": {
+      "sha256": "e987745232bfac9d57598b695bbf0e239a37a5d293d86eb43c865496d2dd813b",
+      "bytes": 6736,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/camera_inspect.rs": {
+      "sha256": "afc08cfcec67b5d1fc0594124fc2fb32667e87d02bf015a4d153b322d63f741d",
+      "bytes": 16554,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/camera_inspect/supervision.rs": {
+      "sha256": "616454f06e5ec15ebc56b68f83b0aaf47142216462253fccc4440496af96705c",
+      "bytes": 24777,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/camera_worker.rs": {
+      "sha256": "98d18fba163eb5479ebbc48fd374c43069aad145e62f6e3ddc679525d2d03def",
+      "bytes": 24731,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/camera_worker/shutdown.rs": {
+      "sha256": "4f74d9b732d1e911356fb37f1add8bf92feb6d08002d5d20db92c2654661a7d2",
+      "bytes": 9704,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/capture_cores.rs": {
+      "sha256": "f9e909e9a846ced8010799bfadc86008f113a983c947e69474c98acd5f0e163e",
+      "bytes": 7666,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/choreography.rs": {
+      "sha256": "b01f068f5be247346cdd6658823d605ddd6568112562b4353d423b4a51ba1133",
+      "bytes": 52439,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/config.rs": {
+      "sha256": "9a2a08fd079cdfb2a2b85950391bf9e935b8494a7dce6727bc2db29fc1a0f71e",
+      "bytes": 41857,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/cut_in_told.rs": {
+      "sha256": "693362707985bc050b8806571271cae0ee7429f4b8744ff5c7178d396c255043",
+      "bytes": 2601,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/diagnostic_control.rs": {
+      "sha256": "30725a2c4469504d38b6333dff9469f998e8c229c3ac201b9148ab1abf22fee8",
+      "bytes": 8900,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/diagnostics.rs": {
+      "sha256": "8c28a7902dbcf08ac227389519d6f9c52ac9dd9da93799d6bb4b0af5f45aa8d0",
+      "bytes": 62863,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/early_words.rs": {
+      "sha256": "512f5a00e0c587b88f396a137dd662866a19224b437a25f91c45dc805aa25236",
+      "bytes": 12302,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/expression_out.rs": {
+      "sha256": "2810d6268b60c2e14092e18d3040f3610e7960c202cfcf6051a9a4a07b852feb",
+      "bytes": 57075,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/first_output.rs": {
+      "sha256": "590cc27f8eff4f1fe81fecb6255361fdf972836fc41690c251dce19f79930c31",
+      "bytes": 24759,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/fixture_provider.rs": {
+      "sha256": "57c55e01e79c9db022fec64dd86289008056c292257b40ffac9bfd7c862dda3c",
+      "bytes": 64301,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/follows_face.rs": {
+      "sha256": "15bdbb784b4e5ab40ef2f391ca14b3951357360f7a8428d3c0c866c0ee5c55ef",
+      "bytes": 23354,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/follows_on.rs": {
+      "sha256": "bbde9b60b9e920d36897fe374494d08fd7fcbbb364541bdd5aa1a863c6385713",
+      "bytes": 4387,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/going_on_asks.rs": {
+      "sha256": "db3bc3992f10fc4d502d7f4057ff511a004e84602b5fb9d8eaa85a1a51f7abed",
+      "bytes": 11835,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/going_on_same_one.rs": {
+      "sha256": "052516b09a2cb2400433c4ac6b7c02600190b85142d7a9419b40e3ba5d1ae8f8",
+      "bytes": 2674,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/hand_controls.rs": {
+      "sha256": "5cd774c5fd46b4948fd3a9081b65328c3a374ecba077cab400a9ec7c585c37b5",
+      "bytes": 87767,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/hand_controls/tests.rs": {
+      "sha256": "1881c12010000893d370ed3a7eec79a119ce3924545ede21c2c02eefd4fbb023",
+      "bytes": 112636,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/head_qualification.rs": {
+      "sha256": "0e7b52b27decd6f0f61b61d7a34fdb91194f329f16183d3ced30aea8e02d9813",
+      "bytes": 26557,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/health_told.rs": {
+      "sha256": "38661c435466bdb081248dc3511c2e9b2da8511003dd928c55c3768eb6fbb8db",
+      "bytes": 24022,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/holding_answer.rs": {
+      "sha256": "5165611d13d39cce40e5de53f5a169edc2f24ae36cc40faf86089a3958383fb8",
+      "bytes": 12200,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/known_faces.rs": {
+      "sha256": "db1c2b4a08d47b6eb81d9c6f31ff6f851bc90f3b11c95bb5e775bfe2dba80662",
+      "bytes": 132732,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/listen_gaps.rs": {
+      "sha256": "f0cf1c7010dd4c59c5e667f84b5ee0a35811eb0b0d2446c286d0f71ab0935c63",
+      "bytes": 15185,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/local_time.rs": {
+      "sha256": "e589d390cdc12f12ceceef423482ee2d299cb18aad2f691b17f7472e736026bc",
+      "bytes": 47795,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/made_skill.rs": {
+      "sha256": "2dbddee7abb0f73f0a387463f45a321522aa17e56911a175e4e62324f6b18f8b",
+      "bytes": 69833,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/marked.rs": {
+      "sha256": "36cf1568e825ace1c38f7eda98718ec61d49fd33705e675f4ec4528542e5987a",
+      "bytes": 16540,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/memory_scope.rs": {
+      "sha256": "f37f1efb5580d70ebc2c16c4830bc4b98e208b01abc4e93c1b65bd0340914a01",
+      "bytes": 75238,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/messages.rs": {
+      "sha256": "8fc4441fb1cb1a3eb6bf7f3f3bd9e1241364ce71233cf58ddf881ab0289cce49",
+      "bytes": 53540,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/mic_holder.rs": {
+      "sha256": "dec5dd34898f3d1b1835fc7c3734ecdb02dedb8b51c91d466a8dbd7824f158b1",
+      "bytes": 9613,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/misheard_hum.rs": {
+      "sha256": "7aa961f2742729eed339155e53ceb0278644aa47b93724206a67f91c8af73dd5",
+      "bytes": 3898,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/motion_voice.rs": {
+      "sha256": "a5c17e5c7a3f0dbf70fa56058f20fb4f1036bdd60da83b3fc40f2d0e6dbde8ea",
+      "bytes": 7980,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/person.rs": {
+      "sha256": "4d828aa8eafe473411ef4b4715009462a0ef2567a31b9127e45442ad2d22f126",
+      "bytes": 32544,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/photo_faces.rs": {
+      "sha256": "aa3d3e4f389608b1a9b86a1f646185da044416c1e2d21f67b4c5ffca2b83c446",
+      "bytes": 24857,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/remember_speaker.rs": {
+      "sha256": "cbd0f20278e5f2e9de14f8c7356139487c91403867b3411451fcbd6a38478814",
+      "bytes": 30383,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/scoped_session.rs": {
+      "sha256": "ed244c74006ec0e5e467f00a2fb346a96d226ccff963f1234e5cb8cfb7633d59",
+      "bytes": 3183,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/sign_in.rs": {
+      "sha256": "2714ab9cdc53a0c48a74b800be45c5098d88877f936d8d97d1e3aaf012cb27dd",
+      "bytes": 62684,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/head_cue.rs": {
+      "sha256": "b0f7f98883b84173d8c6925db665f2571314ed60bdd0bf622b7cb1c816f5acc1",
+      "bytes": 20923,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/name_or_follow_up.rs": {
+      "sha256": "910e419857ee6e95e7296819ed7cc1a030d14b9975d7df0c56bed4dee0ef537b",
+      "bytes": 13399,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/not_speech.rs": {
+      "sha256": "0dafff820bca32bd55a139b98f6ed8b11f8cd7e21f424594177df81473820cad",
+      "bytes": 52209,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/onboarding.rs": {
+      "sha256": "f9ea8b43746552091c697f26511c5d6d68a3e977b113411cd8ac32ec5fcdb4a3",
+      "bytes": 184214,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/onboarding/giving_way.rs": {
+      "sha256": "149929f0ca3e2b953ce42334732562518c177f3761735b1c90c07f573422064c",
+      "bytes": 24578,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/onboarding/hardware.rs": {
+      "sha256": "37352d867d9bb314e5d5883f6c7c0c6421050170e8e6ad5cf8b4464a3cf2c3cd",
+      "bytes": 4463,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/onboarding/legacy_words.rs": {
+      "sha256": "137868ef5763fbf9cb81061752a2859b12cc5df8c76a87f9ca588d8d6016b984",
+      "bytes": 7688,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/onboarding/near.rs": {
+      "sha256": "5e1f946b0a0a2b7bd06fd4a09ab17aff609b2eb4fef846a9a83a1a144d3f5d83",
+      "bytes": 44989,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/onboarding/privacy.rs": {
+      "sha256": "be2fa3e3f7654188df7cede5ec9913c645057dee20b2d79126862610eb8f3b32",
+      "bytes": 32265,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/onboarding/skill.rs": {
+      "sha256": "117c4313efd24a9c6ce03b305853e62aa2e54286e70dac3b4b7813fafe070538",
+      "bytes": 11740,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/onboarding/skill/tests.rs": {
+      "sha256": "0e10833f5af87724bb12e6f73fcc2497a809d7a88a84351bab80b9dd7617f764",
+      "bytes": 14108,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/onboarding/storage.rs": {
+      "sha256": "35c0ac93d7e193cab7d107f31b5a90dfdc5fc609245991b36d77a4b7f72795eb",
+      "bytes": 42790,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/onboarding/giving_way_flow_tests.rs": {
+      "sha256": "e25296eac12068e8589c24f15ee48bf2c00ffa811a1220e97e045ed16a4f85e7",
+      "bytes": 24605,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/onboarding/near_flow_tests.rs": {
+      "sha256": "c825dea592a7c722e8c5a0a41f86e65c852e82758a9b87d3ee77dd526ea33e4b",
+      "bytes": 46757,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/onboarding/privacy_flow_tests.rs": {
+      "sha256": "19350da7f270c41909c568a470edc639482c23fec788f215542b104d000e61f1",
+      "bytes": 33685,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/options.rs": {
+      "sha256": "58c43a3a577571b9123cd86696de64b6fcd428711fa22f8acfcfd13d1052fee3",
+      "bytes": 82952,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/others_answer.rs": {
+      "sha256": "977698bc2ca738d2ebe2bcde157119739762ed876009a390aedcc2998a283dd4",
+      "bytes": 4469,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/playback.rs": {
+      "sha256": "6b806332b855cf421f43641d0519881dc30062ce54ecf38a9aa6cc15d11cdd38",
+      "bytes": 27477,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/policy_holds.rs": {
+      "sha256": "3ddb55c405537dea2cdc563f68e536c7beb50442c3b75b8cae508c56401c57e9",
+      "bytes": 37058,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/privacy.rs": {
+      "sha256": "52855fd4d064d77c29661a3b7453fea244a40d2573b1211829a668906fbd1a54",
+      "bytes": 9265,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/privacy_bus.rs": {
+      "sha256": "0f376c76bc9409f9d41c07187d4a58de553bfb5b49a6d600342bcd90714a67df",
+      "bytes": 63417,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/privacy_gap.rs": {
+      "sha256": "d2e0f80b786396174cd946d97c4e48ce5e3b0666185b0ead9d4965fc962ccf6d",
+      "bytes": 8050,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/privacy_indicator.rs": {
+      "sha256": "ea86b3a1f6fa3d3a6c926249669ae4879ffe5f6c1a4deff4c517196b85ea0106",
+      "bytes": 21437,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/process.rs": {
+      "sha256": "6f953350bc4176ec56f697b45a9907db581b4e216bafbc2ed3a74954433e9875",
+      "bytes": 114398,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/process/ring_startup.rs": {
+      "sha256": "04a3c889d10af15a523cfe9f78a9fcecb03d21ee9929db875c4690031c0538a6",
+      "bytes": 7494,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/process/ring_startup_tests.rs": {
+      "sha256": "6e697ebd23fb85415629fc044b3d313b4ce8b18245221b097946629dcca247db",
+      "bytes": 19599,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/process/switch_census_tests.rs": {
+      "sha256": "e596c3e13ee57afb14000b1f75bae78b4476a28c06c1f7c35aeaa324884d263c",
+      "bytes": 31407,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/provider_flow.rs": {
+      "sha256": "d32f128506d1e5ab7dadaf422cdde9e308442c4409d14c1db35f22c443f74720",
+      "bytes": 4029,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/provider_flow/tests.rs": {
+      "sha256": "a69945ed74fec3ec034fc7c4e13ece37c2b74450c9f4b8aa042e385e057acb14",
+      "bytes": 19064,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/provider_link.rs": {
+      "sha256": "76c6463746ddac62eab9067ab60a0945a298d308642f5c12a6b09c1f62e84990",
+      "bytes": 37505,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/provider_worker.rs": {
+      "sha256": "ec0c8fede088eab9633228b6c54e73c8220238f6765e13c42db93041f8e17b3a",
+      "bytes": 690416,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/provider_worker/reminder_policy.rs": {
+      "sha256": "38af8040983bb412c1f62d42d8abceb2c6d4805e90e3f88c0932f23d15237b62",
+      "bytes": 15500,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/provider_worker/tests/holding_answer.rs": {
+      "sha256": "1af78b07ab96c0fb502cce7f02ea48e31b82f45961dcecccdc986d69971202ea",
+      "bytes": 10523,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/provider_worker/tests/reminders.rs": {
+      "sha256": "f4c145a9cf53684997c39c5d110c26e9783ca1bc392aa44561e4ee046ae279a8",
+      "bytes": 37165,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/provider_worker/tests/resend.rs": {
+      "sha256": "21bca4a29053684fe0521563ed724942ac973fb7e1e575eeb528da99d0a49950",
+      "bytes": 17536,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/provider_worker/tests/review_2026_10_14.rs": {
+      "sha256": "f7fb2c91885831645944e38c8da1d767f09ca2b850a82c33f77ab79c1a7ad963",
+      "bytes": 50113,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/provider_worker/tests/sounds.rs": {
+      "sha256": "5d4386593b153f2bc8fd529255a3d8ae7f3752b0f5ffba2087c45775b76b6cb5",
+      "bytes": 16568,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/provider_worker/tests/catalog.rs": {
+      "sha256": "b46a1b8c5b0769aedc8cf8d49984d178e2202af5324cc116c4b77d131cb8905b",
+      "bytes": 14391,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/provider_worker/tests/going_on_asks.rs": {
+      "sha256": "089481a11c7182c6497892f15842b9c9426968d1084758d84f398562d32931a4",
+      "bytes": 32281,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/provider_worker/tests/held_consent.rs": {
+      "sha256": "33ab552425c2f28d98f6c2d052b10d66fde94cdef28e0ba7c7259f0892731ee5",
+      "bytes": 12640,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/provider_worker/tests/names.rs": {
+      "sha256": "c3362b6192e8ae6c6fc9047df5fe06368174e099fa27bb8f5e4600db1662dcb3",
+      "bytes": 2643,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/provider_worker/tests/person_name.rs": {
+      "sha256": "2f422e7beeee657a786e7ea1adfd7fae15c995dca1bd227842b34810f11d2173",
+      "bytes": 18786,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/provider_worker/tests/policy_holds.rs": {
+      "sha256": "f4fd991f9035d663751454e14ba6eeac292f88580be4391e40fd70090661cb25",
+      "bytes": 44143,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/provider_worker/tests/spoken_to.rs": {
+      "sha256": "54ee28d9d34a489a22143d4b1c3410f6e35945416b4f098a3df33e3c8d861d6f",
+      "bytes": 80770,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/quiet_pace.rs": {
+      "sha256": "19a537b4e73eeb4fc1857e8fd51c7e5b00ed25727017cc25cbd2d34be2ac739d",
+      "bytes": 4701,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/reference.rs": {
+      "sha256": "3cbc5083f4d8b64f1c07f03109af7bd6129b6988a0f44fa0b77658e9336ece7c",
+      "bytes": 57512,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/reference/hold.rs": {
+      "sha256": "72e40e317a4da3c6f21563e9c53fce22d59cb297bbec33cb417ec20e7466ced6",
+      "bytes": 5577,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/reference/prime.rs": {
+      "sha256": "a55ccd75a5aded1c08cafabc38522b51d628f7923afe87407534b3c2f93b706f",
+      "bytes": 2937,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/reference/recovery.rs": {
+      "sha256": "3c2faebadb5d1d6fe2fce2fc7d23c815ad41d310bc6306be5534025660d6ad60",
+      "bytes": 32606,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/reference/recovery_tests.rs": {
+      "sha256": "3e43048243ca6bd23f186f6f8ce4a7d012c8f1e866ebacfb24b9ca3aa72067df",
+      "bytes": 35115,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/remarks.rs": {
+      "sha256": "3d1e79c3053432351527a60ae10a5e2a8935194399624fdd95918dec77ff3ea2",
+      "bytes": 21212,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/remember.rs": {
+      "sha256": "a248d2d47f8b18683d300b7de8ab678c472cce4879b3ed49c9721f4d39345360",
+      "bytes": 825532,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/remember/asked.rs": {
+      "sha256": "99e3b74bca7a7ff5ef99a6ce97b6c0a2f281835ebe1b448077d6a492d28d8825",
+      "bytes": 12448,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/remember/doubted.rs": {
+      "sha256": "9ecdb9ec637d00a0301cced520853f09a95c7bfc02e0ef6ebc5918d6f4dbc535",
+      "bytes": 3713,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/remember/heard.rs": {
+      "sha256": "e8b3019323f92f0fe46f669420c70bfa30313cbdee4841bd9594d7cc5d4c99bc",
+      "bytes": 35292,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/remember/needs_face.rs": {
+      "sha256": "bb77a07d13a38a210375a2e936ca9f46f98a0f1c6a480d2d85fd5140f4025e59",
+      "bytes": 8015,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/remember/noted.rs": {
+      "sha256": "b867b9a925e282d3a725347a2785b534d0e6afb90a1550647cca968bce364dc4",
+      "bytes": 12039,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/remember/on.rs": {
+      "sha256": "28adfc5969500eb76b34af5e415f4e430f15b13f7b9b9f855840de99c86696d8",
+      "bytes": 16873,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/remember_no_wait.rs": {
+      "sha256": "7df1d687c885797422cb7faf9427eac5be18adea712c2a46c7fd0d5cf8d31aa0",
+      "bytes": 4034,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/reminders.rs": {
+      "sha256": "9d0e1062876f69e1669dcfc6333d732aedc8e75ebaf625c2ae9ef96d97e18657",
+      "bytes": 20534,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/reminders/consumer.rs": {
+      "sha256": "0f4274cb87d742d5110e0a483f0b3d2f70bd213c11dfc831b94986a90db0fbc4",
+      "bytes": 26951,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/reminders/consumer/tests.rs": {
+      "sha256": "b4f8d89800a83447dee920b52d6e00887d023bce0b556cc784f6e0a9603f5f22",
+      "bytes": 46593,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/reminders/consumer/roundtrip_tests.rs": {
+      "sha256": "79e34df46c650a41137f6778a29b08ea8bd174f5ea48da7867d49eb750a3829d",
+      "bytes": 15609,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/reminders/scheduling.rs": {
+      "sha256": "1e168a42221dddd2352a99ef636311156c98bcf1f693e4a31b081aae7f34caac",
+      "bytes": 2601,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/reminders/tests.rs": {
+      "sha256": "12e2766bc529da2d3a37c5da3e600ab119d4ccf6e8940989830ccf776a50a1f8",
+      "bytes": 22499,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/reminders/transport.rs": {
+      "sha256": "85fd7138036b32b05b94750437ffca64e038dfea079e152a7b7749eb9f615307",
+      "bytes": 49308,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/reports_stop.rs": {
+      "sha256": "592cf6e796ba21efd3f207a6b1bd0bb428783a47b2592bb89b419e9b0775f87e",
+      "bytes": 17703,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/requested_audio.rs": {
+      "sha256": "d3f7da187e6209773daa5faf270b5b9175aa5598092fbc71af3f7fd4b7fa4f20",
+      "bytes": 4905,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/requested_audio/runtime.rs": {
+      "sha256": "9445ce1262c5654b678ac625d3ef91f2c953610ad10a7999e0530386711a4428",
+      "bytes": 77450,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/resend.rs": {
+      "sha256": "10d74d19fac0b48e22c906e624c8f2bf05d34181e7da4ae6d8e223c293c6a540",
+      "bytes": 12528,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/ring_asleep.rs": {
+      "sha256": "b7b865f97b3072f612dd15b6ec696bf7cf5663ea1a53c4818df22dcbe05d00da",
+      "bytes": 47567,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/ring_caps.rs": {
+      "sha256": "9c6711348162e2146e7617948fe20344895a882c5c423d9d0eb61e9ff848a975",
+      "bytes": 17390,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/ring_face.rs": {
+      "sha256": "fc0676ed54e23818ad7657c7cdee867993bd3cf4ba45bf82b92e7f65a207cbef",
+      "bytes": 99007,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/ring_head.rs": {
+      "sha256": "01c485d4dfc778dd70ebbc0dee9970f40e1a6aa0eea357b87c4658e3b5ce7189",
+      "bytes": 8735,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/ring_light.rs": {
+      "sha256": "1001f5d7a8d827273728f84baee3f23980a63b100a5d4fbf30f3b3cd5007c4f6",
+      "bytes": 81921,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/ring_mood.rs": {
+      "sha256": "92e718fbbc71834ef50d37b611294eeff02d8eafd3612308368dc810b451273a",
+      "bytes": 10635,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/ring_requests.rs": {
+      "sha256": "633c2573d2c5236cc50f0fb67d211b7bd04f3e04bb313fbdfe3b206284d52ac4",
+      "bytes": 18910,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/ring_sight.rs": {
+      "sha256": "c3d9341564a18346e63615522fd60ff2267d1a98e4e1e6429b58e3d81bb3bcdc",
+      "bytes": 7198,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/ring_unplug.rs": {
+      "sha256": "ccc8e7cd201cf90cfb24875102cb40200df454d99911cbd6d63f4314ff252de1",
+      "bytes": 12795,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/ring_wire.rs": {
+      "sha256": "cea1b895123b0d778ff269806fdb59b987e069f38d7cb4a03e3aed23c8d84556",
+      "bytes": 8283,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/ring_worker.rs": {
+      "sha256": "b3eb8740d4fb7be949a4729bc2c3ac3028345c89edfeba92e1f72ac04e7a71c2",
+      "bytes": 44836,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/room_floor.rs": {
+      "sha256": "5358aa1a03850ca6cc60ecc32ecaf258a95bc541f90fec5085d78187b505fa68",
+      "bytes": 17311,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/room_told.rs": {
+      "sha256": "ff114523da87da788d8b73186b710d5be4ece7e4fcc961d22156cb7f58618270",
+      "bytes": 103669,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/rules.rs": {
+      "sha256": "de4454e287fca392309c432c0772c7e40edc12e1e290a88018d2adac864dddcc",
+      "bytes": 45749,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/said_as_heard.rs": {
+      "sha256": "701f61a2021a014ead50546411b2e183ce7d9c1fe79272ae0ee6c8532771cf6a",
+      "bytes": 9793,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/same_voice.rs": {
+      "sha256": "50305d296f5560272af70a42f8271447eb6d0983d4c86f5866a1df657b513fd0",
+      "bytes": 77970,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/say.rs": {
+      "sha256": "d58b74188076b26ecffae6ef1e47d185da4f46f0037ca0f2f0de652d17ed02e3",
+      "bytes": 116738,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/say/unplug_guard.rs": {
+      "sha256": "44b7ccd5cff04ef8abf7fa72f8390b0491e9d939a782c42d651ff60f1f6bd5c8",
+      "bytes": 8715,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/search_pushed.rs": {
+      "sha256": "11f3d6e0938594e3a418741422c2e833a05ce34fc498698d4320b2300c591f8f",
+      "bytes": 15076,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/second_config.rs": {
+      "sha256": "9eab24f139c74558a41542c6eafefd57c3b5e68ddd7fc60c96f341a9728d181d",
+      "bytes": 67618,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/second_look.rs": {
+      "sha256": "81d9ac120a8a1e69d0afb0441e1126ff984d7ab51a5072f475df1038640296c3",
+      "bytes": 17912,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/second_provider.rs": {
+      "sha256": "35a4cde3a774f1c6b83b8fc857a746c73c4a565596af6308020bc26dda369bed",
+      "bytes": 417543,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/second_provider/link.rs": {
+      "sha256": "ab3d26cf6d57dac14e51de1ed8a272857fee52892b77c1c71cd9945b4816c70f",
+      "bytes": 21382,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/second_provider/net.rs": {
+      "sha256": "62c45db4f9662bc7e486f616a5b70833be41f7d730dacb6f39b3b94e6939d291",
+      "bytes": 17592,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/second_provider/net/chat.rs": {
+      "sha256": "134fd351e518ebd230bcdca410cedd7d71f7a30b529ddec240fd2801ad7b1c7b",
+      "bytes": 70276,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/second_provider/net/gemini_tts.rs": {
+      "sha256": "30247e6869ea3708bf76c1cae8f12530d7a28507bc876d699c34cb1d52efdf4c",
+      "bytes": 17010,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/second_provider/net/key_terms.rs": {
+      "sha256": "14379ee978b0c8e4ced81b35eb12fae522a8f5a87c25316f805c27cabe18ce85",
+      "bytes": 7062,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/second_provider/net/routes.rs": {
+      "sha256": "3278b4ed9637923e2c9fe3f31334bd4276c4629522c96fd76982e8d2faeadeba",
+      "bytes": 16843,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/second_provider/net/search.rs": {
+      "sha256": "662ac300cec56f112563149645a1812a834a65ac823e46d99ee1f35bf9471733",
+      "bytes": 19599,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/second_provider/net/sentences.rs": {
+      "sha256": "4ef56f977e30e647b8beb331c5ffebdf9b2e6194049c21bf68f8e3d2bb038afd",
+      "bytes": 6500,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/second_provider/net/stt.rs": {
+      "sha256": "dc30ec197a23b30446e2f1b68fcdcbf2efbdccdbc84355e439a6fa002567dbe2",
+      "bytes": 140477,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/second_provider/net/stt/flux.rs": {
+      "sha256": "98b6b74df569b7889033b64d93a410ed2c0e534c9c159aff59a9163dbb50a350",
+      "bytes": 44205,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/second_provider/net/tts.rs": {
+      "sha256": "ca38b5ddef065cb056c6b72bf90d3f5b6fc72227b2b180a198eade8fde43551a",
+      "bytes": 106494,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/second_provider/net/weather.rs": {
+      "sha256": "ffe7efaf7f7f0a07eff04091b77a74aa3d39062a2327df72b9d8682305d70d00",
+      "bytes": 54343,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/second_provider/own_echo.rs": {
+      "sha256": "7db730ad969b4db0f707dc4a9418b7fbf5a5625261d233f465ef184d3b935d21",
+      "bytes": 25312,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/second_provider/policy.rs": {
+      "sha256": "dbbb299c7df06e2de3799dcbd13ba75afc08d4cdf0411f9b94f51bec0121a32c",
+      "bytes": 17275,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/second_provider/probe.rs": {
+      "sha256": "97f51ae2e03b08a948a830741861b09a9d039634c836c3ede8c0f3947f465629",
+      "bytes": 37750,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/second_provider/probe/cache.rs": {
+      "sha256": "95dc270775287dac8e9e5bec72b246ccb62d2dc5b4053b0e5186f19a04e77a47",
+      "bytes": 14656,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/second_provider/probe/handover.rs": {
+      "sha256": "fe3e3ef5bf5307dcef394677b8c5159ea231444aec8d4bdc81bef55f6dcde3bf",
+      "bytes": 14965,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/second_provider/probe/kept_earlier.rs": {
+      "sha256": "b1efaac923d5571dacc42052bab8ba681263d2c8db500e78f18d1dbae8d61469",
+      "bytes": 14169,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/second_provider/probe/quality.rs": {
+      "sha256": "a52f7d09ff8bf3ad27e57a0cb9eb602f973b423539824574c6067b1749e3e128",
+      "bytes": 24918,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/second_provider/probe/says_kept.rs": {
+      "sha256": "b3421b09ce6303038e4df36289560dffed4de1a7f31b8e117267bbd771f38f8b",
+      "bytes": 16158,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/second_provider/probe/tools.rs": {
+      "sha256": "9b774811fce15ddda0039df89cc09cf11c8f4cdb40a4ac0018058db0c7748e37",
+      "bytes": 77891,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/second_provider/probe/wire.rs": {
+      "sha256": "5201fbd5e090fdafd3f245507d886917dbe1c015f7a6fc13fd9669942a884424",
+      "bytes": 106065,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/second_provider/services.rs": {
+      "sha256": "4591fdf3811f1a41faf75bd1c94bde33b7b02a80a7bdd33afb81926c0eb3c021",
+      "bytes": 79229,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/second_provider/speech_tags.rs": {
+      "sha256": "1534ee7c9e9dcb204d654aa910e4316e6ff3c6946f05bc50b1db03f5b7118918",
+      "bytes": 8674,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/second_provider/worker.rs": {
+      "sha256": "f70e299da98ecebd2d43f7f50d78cf4adfcf848bc70ac22715a3b5fc93475c74",
+      "bytes": 959350,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/second_provider/worker/carry_window.rs": {
+      "sha256": "3befac06f4dd70e4a126bc07ef13928570bfe1d99c9069f46063e84688e88548",
+      "bytes": 5637,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/second_provider/worker/held_colleagues.rs": {
+      "sha256": "e0217f3ec20493c0e89fc91afa23872589ee2af787adfbf427647899d52ab645",
+      "bytes": 5382,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/second_provider/worker/memory_note_retries.rs": {
+      "sha256": "41d200c735596c634060545f846a9a7bad3a5b940c7bf3c5b47ebdb9510c4b7d",
+      "bytes": 52375,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/second_provider/worker/route_checks.rs": {
+      "sha256": "8647deed0523701735e20c375e01cc71ca91807312b5a8b99cdc4213b5094d0a",
+      "bytes": 6227,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/second_provider/worker/kept_name_callback_tests.rs": {
+      "sha256": "f1fc9005535bc454dc24c8b8c8cd43d1eb79b5e47fc8dab12477eba71ec5d31a",
+      "bytes": 33915,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/second_provider/tests.rs": {
+      "sha256": "56f12da8dc57cdc6d8cdf32c61a9b511a59d760561d80f3d50c228008429f559",
+      "bytes": 549281,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/second_provider/tests/held_consent.rs": {
+      "sha256": "e69027f0406a5d6c6a39d98a8b47f9dcb52eabaede68b88decc2d614ffc2789d",
+      "bytes": 10374,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/second_provider/tests/held_forget.rs": {
+      "sha256": "a2792f70fe1823b1e7eff3c3e118dc05397674463b37712fe0276824919dd400",
+      "bytes": 38183,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/second_provider/tests/music_current.rs": {
+      "sha256": "53367f705a6cef277af1950625e8985ed62dcbbcd828994df99682ceac0f4699",
+      "bytes": 21975,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/second_provider/tests/music_policy.rs": {
+      "sha256": "07060512f5841d0e9e000957d6771795f5178f973adcc1fa426d8d53a3034640",
+      "bytes": 12720,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/second_provider/tests/music_scope.rs": {
+      "sha256": "804df689c1d4fe20313a1b453bb204dd7ee9479c3e58fc38814328d34f978c65",
+      "bytes": 13427,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/second_provider/tests/music_warm_name.rs": {
+      "sha256": "aee7ac72ba8863a1ed694fa5dc364866aad1afc80804323490f2040920514806",
+      "bytes": 5038,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/second_provider/tests/name_carries.rs": {
+      "sha256": "bb9855d8209fc469d416d7ad883097c2519b73e73197e3510c07f40bc922b7ea",
+      "bytes": 35595,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/second_provider/tests/name_near.rs": {
+      "sha256": "3515a1355957694e9cc83d9a3c64d54a98f893563594f6dc3b957129612eacc5",
+      "bytes": 9171,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/second_provider/tests/not_for_me_words.rs": {
+      "sha256": "7e78d2c21b3939f8d656f5dc8645c9f19402090d84044a444b7b2bf0fb98b741",
+      "bytes": 11522,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/second_provider/tests/person_scope_seen.rs": {
+      "sha256": "d08ce9c05738d6e0f09800bbffa3d4231df959f48c93acf1f931b92a8a829bb0",
+      "bytes": 20526,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/second_provider/tests/remember_speaker.rs": {
+      "sha256": "8e1b793dca9fb48ce212e6fe3357bfb032e1b20ba36adf7f35da8839ee403af0",
+      "bytes": 11656,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/second_provider/tests/short_done.rs": {
+      "sha256": "07fb722682246d47902398f34c8de76561b95c31b56cc73b4b184bc0444cc200",
+      "bytes": 9207,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/second_provider/tests/unplayed_join.rs": {
+      "sha256": "594d5063c7418796882e7966695e9612d56de7009df560d778b5f0b0a5ce75d1",
+      "bytes": 31732,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/second_provider/tests/policy.rs": {
+      "sha256": "6a6044ef6f375c2e19f25fc1fc9f143713a5519a3cb1298d9a935718df3f1399",
+      "bytes": 23904,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/seems_told.rs": {
+      "sha256": "0d56ac1862d083f1004aad9545cbccc2465a9837f72507e466fd1159fbc1f093",
+      "bytes": 8676,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/session_fact.rs": {
+      "sha256": "2f8a11c33988b35592c236e2dcc9c7b99d435c2062f503f9e24c03a63ea466ca",
+      "bytes": 3073,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/session_tools.rs": {
+      "sha256": "f2b8f9bb9ce5183cea0721771d4066af56f6c395221cdf1d29f6156cb283d457",
+      "bytes": 48546,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/short_turns.rs": {
+      "sha256": "618c8f47c8ed5b0056eed4fd54c4123f617490b982ac06f943dae713bab47ec6",
+      "bytes": 15289,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/sight.rs": {
+      "sha256": "b35e562413d323bf0dccbabb720162a2bb6b1ae43a428d15164203adc5c8bc78",
+      "bytes": 30561,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/skill_words.rs": {
+      "sha256": "8d27772166de0e2dbe2990c87271a8f8a793f64487b8c5bdd9a6f20c6e811f61",
+      "bytes": 33808,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/speak_up.rs": {
+      "sha256": "12e4e43eb4f2904e12a8240c9904919dbbca331a21a00c42b8832faefa0111c6",
+      "bytes": 15835,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/speaker_check.rs": {
+      "sha256": "bfbc383991505c516cdc958ecf70edc3f2636445ab8e5ab2a646ec99a33b838e",
+      "bytes": 11468,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/speaking_faces.rs": {
+      "sha256": "96bfe0bf9cc9e569b46d39c418d5d7e87e434ef3b5af74b93e1b0a183bde3033",
+      "bytes": 52076,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/staff_note.rs": {
+      "sha256": "c5b5f881a3258f54b2467b280c41702ad64160787aaffd8f012c2500872a2319",
+      "bytes": 8290,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/stage_cost.rs": {
+      "sha256": "4531322f0af3573cc13b040fabd8a815be3344fa5cc25683838294991b1ef852",
+      "bytes": 9052,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/stalls.rs": {
+      "sha256": "e1c05e64db5b89654bc252fff4eba9e930f8c3590a5150658b03e7cc978ca4ef",
+      "bytes": 43697,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/stop_words.rs": {
+      "sha256": "b1bbdc1e40b24d4786302e87f134a079f70876716b6372877f8ff64d2814081f",
+      "bytes": 161129,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/task_news.rs": {
+      "sha256": "f3e585e732e9d8884fadcb60c200582d8ae9e06cf95d7069d2a4e40ef80c5457",
+      "bytes": 204296,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/termination.rs": {
+      "sha256": "324cbfb161bc49d3f0b82d05633ebc09077cf16d6d7bf6a8992e20b34f869419",
+      "bytes": 2345,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/thread.rs": {
+      "sha256": "b2825f7d614df72a3ea64663b628937252f08ca9c3673990bd1b9b8f30f03418",
+      "bytes": 139702,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/tool_turns.rs": {
+      "sha256": "ff687e0037064e9f3fffeec4356d01c6f4c4c6ccd0063701ad34e7f6c456edca",
+      "bytes": 29687,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/tools.rs": {
+      "sha256": "32c8cec6499c02975eddd393721c329fecd1de4fd16d902d929e5fe8f9a50454",
+      "bytes": 192305,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/tools/schedule_integration_tests.rs": {
+      "sha256": "fdb09c46e740f010e93e594b09a2ec13aca2b9f6d42baab88399d24c976a1c08",
+      "bytes": 13814,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/tools/schedule_asked.rs": {
+      "sha256": "cbcfe2c95d2674b2c0a236c8bc52ed47d969d9ee8d66c4b3b77de87f836eefe2",
+      "bytes": 25351,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/transport.rs": {
+      "sha256": "1841fe337f3140999634a31506bc026d2cc9e23f170edf1941bd770dcd1c759a",
+      "bytes": 52435,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/transport_probe.rs": {
+      "sha256": "99f86fe4b888c9e61b4ddef1d1ad70c9d1795830667ed013f21d2a086de777e8",
+      "bytes": 13447,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/transport_probe_tests.rs": {
+      "sha256": "d2a1e5cca930741f727d7c9c4647a84ed532490adbb3663cc8f20edff571fa2b",
+      "bytes": 20701,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/turn_taking.rs": {
+      "sha256": "e309a7a664c152770e26e2728c32c2d240ce410e76195dacae62131592f90a41",
+      "bytes": 93283,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/turn_times.rs": {
+      "sha256": "61bf897e4ff88e5381967d328f669a1103642437a5eb19498720869fce091493",
+      "bytes": 40355,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/unfinished_words.rs": {
+      "sha256": "0eb5d1c68b8da1bc191a5c67bc1015cdeab4a2b8c2b8e30353ea5d31e730b3f7",
+      "bytes": 9317,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/use_skill.rs": {
+      "sha256": "2e81ac26376374525e98eadebcef1867fe1ffc044cbc9cc8fc74d3104d3aa120",
+      "bytes": 21148,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/visual_context.rs": {
+      "sha256": "ef294a995b377047debb0ff0d4ec2bbe515fddd1848a282acc7a1390dd5b3a79",
+      "bytes": 15795,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/visual_context/tests.rs": {
+      "sha256": "58eac7020676a2bf228b10f4ea3615c13568694d93ff4a9b1145067f588445e8",
+      "bytes": 12955,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/voice_tone.rs": {
+      "sha256": "e29e67d39b798fc43adc731521fa2175fe49b9ca395ee273742a95b55e104c96",
+      "bytes": 35401,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/wait_words.rs": {
+      "sha256": "e945bc4d3bf92dd0a2c7065a506f9666a0ec7f60389788b95b2f6f593a4d822b",
+      "bytes": 25251,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/wire.rs": {
+      "sha256": "d552ee2da4e22120848430ea495c272f713608b0795ddb3e9f932f32f7a1cb09",
+      "bytes": 33851,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/worker_scheduling.rs": {
+      "sha256": "15191c25a31b27a23dd2ff6d771d3e48ba08a17330f994d1d223c01e663ab571",
+      "bytes": 7070,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/coordinator.rs": {
+      "sha256": "ea20fcdfbb79543f8a3c4d8578405cec180ac809d18a904a93971cbe8d5888bc",
+      "bytes": 765512,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/coordinator/camera.rs": {
+      "sha256": "62e990052349fdeb999d82e7a6446ca408760f656be6dce38a119ab9a9ec850a",
+      "bytes": 28323,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/coordinator/motor.rs": {
+      "sha256": "f2fdc7d8e2c3e4135f83ca72207b19009b72f08fb79efb5b85490e6f82853d23",
+      "bytes": 38162,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/coordinator/motor/head.rs": {
+      "sha256": "4de64a3ab9fe22f6329e990bf1cc990d065fa781f2f38ff69b603fe9b05870b0",
+      "bytes": 8452,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/coordinator/motor/tests.rs": {
+      "sha256": "a4a2c75611c9c84b2587919d47d8a468687095cba0633101b7b8c8b0a7203328",
+      "bytes": 62040,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/coordinator/motor/tests/native_head.rs": {
+      "sha256": "d7340d7f084d4af288447a5d30685df20182d4fbbd4e170095f424868d56b1a6",
+      "bytes": 16131,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/coordinator/cleanup.rs": {
+      "sha256": "269282253f6d87fe62903b49b1815c125f59cb0eeb6f99eca9f1958fb4472a0b",
+      "bytes": 6989,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/coordinator/cloud.rs": {
+      "sha256": "26db95ccba2572be8e4dd6e54d7d7f5bea402f43e6bd2ce2060fbfd8364865e6",
+      "bytes": 43800,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/coordinator/early_end.rs": {
+      "sha256": "f12bf8a9927098ea3266132bcad8dcf44c14b35353d2dca76d4bf5b572549284",
+      "bytes": 16295,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/coordinator/early_finalize.rs": {
+      "sha256": "2c09f3dab797fdde80d81b8318608801446aad72842e1745b1e316565ba225b5",
+      "bytes": 4065,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/coordinator/endpoint.rs": {
+      "sha256": "6fb1d6de95248bf9896c561c9e4ddfbda6ed873d840a235563961121019755ff",
+      "bytes": 31239,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/coordinator/hand.rs": {
+      "sha256": "4e579b9e5bac74f17baad283bb2e383b494172616e0645ee5443284a6f0a9401",
+      "bytes": 3627,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/coordinator/holding.rs": {
+      "sha256": "3b0bff7b2bbe2f972f18844b7f82cd06c5236982920006df16a449cca4a4f39c",
+      "bytes": 11603,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/coordinator/key_refusals.rs": {
+      "sha256": "72bfc735fb1d2df48bd81fc12cf8c49a8348be493f72c6a26d1c221fd0018f27",
+      "bytes": 5106,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/coordinator/look_note.rs": {
+      "sha256": "a9fecae48e0828276fca7c7e4b06ecf62fd62b8eba700862c7c172a4d7d45d6a",
+      "bytes": 41298,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/coordinator/notices.rs": {
+      "sha256": "f72aa7dd3a5e24a8ba48a443848203762885f821f431775f39a84a69bb0a2abb",
+      "bytes": 28613,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/coordinator/open_name.rs": {
+      "sha256": "69bb9a6a6d93464442aa2e71be220b111ff90985ac06fc17e7e717903f99052b",
+      "bytes": 8383,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/coordinator/requested_media.rs": {
+      "sha256": "cfff15bf071cdaef684f496092252b804823078ba4c555300cd354330ea761a7",
+      "bytes": 9934,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/coordinator/second.rs": {
+      "sha256": "941a7af604381396a62953c7e2f02c4839c7caec1e6c7c0861e2b33e2f4a898b",
+      "bytes": 76347,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/coordinator/service.rs": {
+      "sha256": "786fc43058c65ca7fb8f4c3e451745b2a85f13b45f57021e34b67a69f318a3fa",
+      "bytes": 44219,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/coordinator/speaker_tone.rs": {
+      "sha256": "1460a55d281abc5549503d27491bd4f9c0822471070e16fe39af9d30f6941993",
+      "bytes": 8301,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/coordinator/optional_ring.rs": {
+      "sha256": "dda931330d5a563172f8d192668db9916a37c450b8067a4a7d470d611487b0a7",
+      "bytes": 33553,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/coordinator/ring_trace.rs": {
+      "sha256": "2db94224473ccc4d4e2a6b87526423372809b62bd4e97c8bf235f4c2c77968a4",
+      "bytes": 13192,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/coordinator/tests/call_wait.rs": {
+      "sha256": "44006175831a79320816843a41a2e8d6d2f0e9fe605ee7f6348a8a8bb455fcf6",
+      "bytes": 6532,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/coordinator/tests/duplex.rs": {
+      "sha256": "93c6589e7dc6956414afccfaebf82c9cc900e23e2d8bb285c6baa5e5ca317a0b",
+      "bytes": 133747,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/coordinator/tests/early_end.rs": {
+      "sha256": "b95ea36cdf9b8486d195aa064aaf725b04b5cc152570ff177fae918e185d001f",
+      "bytes": 75864,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/coordinator/tests/endpoint_session.rs": {
+      "sha256": "12a266681c10d9166abc2383aa8cbaeb500218e167e27ce4de2d03e7dd496025",
+      "bytes": 123719,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/coordinator/tests/failure_notice.rs": {
+      "sha256": "cb5f8b62222f2ad7c50f2ae9bf32fc497f1afc4629e3bbda2da89440be6db8d6",
+      "bytes": 40639,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/coordinator/tests/fixture_at.rs": {
+      "sha256": "80b9d1b2f6bc79f5cab0c028453e4c63ecc12fbed0ed8afa26627ca32d8bba94",
+      "bytes": 3910,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/coordinator/tests/hand_controls.rs": {
+      "sha256": "a3913a4193b90fc43bf92c76df1a0b6fba9bec33a15555bd7701f012c69f60c2",
+      "bytes": 137755,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/coordinator/tests/holding_answer.rs": {
+      "sha256": "8695c7ca00542ff59bdc509e19f254990ea371b9cdb7f02d02218aa9b17bdf9a",
+      "bytes": 10828,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/coordinator/tests/pilot_faults.rs": {
+      "sha256": "62261c964bdf751a7fb178ea15531418bfa3bf3287fd61b9c70bcd60adcd109d",
+      "bytes": 120558,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/coordinator/tests/playout_continuity.rs": {
+      "sha256": "c4f442629a9e83f16c5c6dba2883b347e8e7e41f8c71530c0decb76f26b6bc96",
+      "bytes": 17422,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/coordinator/tests/playout_start.rs": {
+      "sha256": "710489931ff28fbe6ed4e93ddaabc2531425fd03808659f2f06eeb035cd4dcaf",
+      "bytes": 18463,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/coordinator/tests/provider_pair.rs": {
+      "sha256": "dd05764b9ff2b919a8ec06ce6fe070a1aa785e1c1572db3e48137bf321c8c673",
+      "bytes": 67866,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/coordinator/tests/provider_terminal.rs": {
+      "sha256": "6df781d0d23d124fc64c46be0ec178f3759dee2b12329bffae6f594278047377",
+      "bytes": 45854,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/coordinator/tests/reminder_roundtrip.rs": {
+      "sha256": "11d06cdf6eb3808b1d3b80d48d60ad46a5400aee459a7a1a0eb5a27c61941258",
+      "bytes": 16790,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/coordinator/tests/reminders.rs": {
+      "sha256": "92df7fed35ffc5ecf5590bc4097ab1a856b719b4d81375885aaf99b7b841e352",
+      "bytes": 70233,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/coordinator/tests/requested_audio.rs": {
+      "sha256": "5ae99f09a6e20756671608093eaedcd8dcb49bb82dabb38724977272fa63c460",
+      "bytes": 65834,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/coordinator/tests/say.rs": {
+      "sha256": "ed7e90a2bdb40e7cc12a872f0e8b3fc1d146ce22000dbb7e3ada8b11159e26a0",
+      "bytes": 35418,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/coordinator/tests/second_route.rs": {
+      "sha256": "2719f9693792d9a31457fde1e74eff5489a8cc60cb5a702dc2f55e639d1336a8",
+      "bytes": 229965,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/coordinator/tests/service.rs": {
+      "sha256": "761d7c2ab99c5baa9e42f672354b8cf35bebcc3a7c08f2a870506aee53ddc265",
+      "bytes": 5184,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/coordinator/tests/service_mute.rs": {
+      "sha256": "f44b6c1be818247d5a4c5ff51735000fc618fd376f0b0f8e8df29d5dbae44c1b",
+      "bytes": 26040,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/coordinator/tests/speaker_lapse.rs": {
+      "sha256": "0949772491058ad653eeb3edc8b385a1ff8e0c54a0d4b8111862729b4dc27f04",
+      "bytes": 5867,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/coordinator/tests/speaker_tone.rs": {
+      "sha256": "912b0636532dcea4f23c6da1553a72aaec20c1d4a1f6b060731af49af7f9487c",
+      "bytes": 5134,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/coordinator/tests/startup_cues.rs": {
+      "sha256": "4ea3d53a3627c8efd1ce0769daba31b8db017dd0a0b7947f019be1c963247eae",
+      "bytes": 8034,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/coordinator/tests/termination.rs": {
+      "sha256": "dae0973e514ebbfcf076d83f23b9927815bbfcf5d14ac67805a69424e399db68",
+      "bytes": 46427,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/coordinator/tests/tool_look.rs": {
+      "sha256": "666887c1d10ceb6c8a68a591a76b286a2e77759154cdc49038ea32f234893d3b",
+      "bytes": 5280,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/coordinator/tests/turn_taking.rs": {
+      "sha256": "3960180c023e20fcbc75ab82e3d65ae59224e9a2a6b5b8c1d04d0e5b67ab1bbf",
+      "bytes": 109424,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/coordinator/ring_trace_tests.rs": {
+      "sha256": "2b8c0793e0fb06da11c11c4137ff86018c44712a43f54451618d94e995f9c1d0",
+      "bytes": 24586,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/coordinator/optional_ring_tests.rs": {
+      "sha256": "4615229b2fe33afe00a42c03eb36e5fa8678abd31f0e7d39e6a2f2eebe0d8df8",
+      "bytes": 40843,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/receipt_history.rs": {
+      "sha256": "2c3bdf4e3c7447a2bf939e8963e485837d454acea7f0bc684e1c79119ed59768",
+      "bytes": 14726,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/service_trace.rs": {
+      "sha256": "593290a4d1e64c2283bd6ae7b481b39449353bc70fd53e4c67318323ae4adafe",
+      "bytes": 30629,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/session_lifetime.rs": {
+      "sha256": "d245a541d56d424082f05444db68d6afd344f3deb8109ee573443502f4872867",
+      "bytes": 7745,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/session_reader.rs": {
+      "sha256": "d2fe9a6a847a5d2e825ddf4d8741b999f3ba0abd7ef0929cb7c290a3517a0e1c",
+      "bytes": 19983,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/session_reader/tests.rs": {
+      "sha256": "8300c327d3cd22649320721f6a5b7126693a395ebb19d31fa7c0df9c35b493f8",
+      "bytes": 40267,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/session_state.rs": {
+      "sha256": "3324e3e7fcb485001442dd6a1682cd98d1dae91211e5ce46e71822343feb9e2f",
+      "bytes": 17702,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/scenario_clock.rs": {
+      "sha256": "31ff62d7f45928bce43d97c13dfda09c30a628c0a8dd53527a3f4a9ed4e7f1f2",
+      "bytes": 19561,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/service_privacy.rs": {
+      "sha256": "5d1f8d54a1ef3b584da20fc8d3161f7c4257a56e8c0dada9f64a62a8f5a81736",
+      "bytes": 29423,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/service_privacy_controls.rs": {
+      "sha256": "20e1cfa06201d5263f55a5e8989a88dcba695dfbaee9959d2405106049d7487d",
+      "bytes": 43113,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/fixtures/piper-stop-16k.s16": {
+      "sha256": "a13629353431deaaafd761e3c38c10d8b0b84252aeabcabf858e561dfda59721",
+      "bytes": 57586,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/skills/onboarding/skill.toml": {
+      "sha256": "f20f15c1b76a0b0c8bf8d9f0868958bc691b6f90669ffabeaf6f88b82230a2cf",
+      "bytes": 10405,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/onboarding/skill/before_3769.toml": {
+      "sha256": "61f0144725c03e015ea155eee723b331ae09a6912bfae42a66f4692a8bf07c6f",
+      "bytes": 10629,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/gemini/examples/early_end_probe/trials.rs": {
+      "sha256": "6537b29399ea56f10f0bd6f1e77c740e2fa44aebb5888e07d53cbf14eb4a50cc",
+      "bytes": 14728,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/memory/src/search.rs": {
+      "sha256": "a8251fb9e2df697d09c4028fcee6e7d476d10ba09271392de24f66000855ba31",
+      "bytes": 6981,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/deploy/product/settings/second.json": {
+      "sha256": "e406c077fd51bc90d0b763c3cfb889d9e1ca12b65a354bfef86e896375b60997",
+      "bytes": 189,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/deploy/product/lamp-voice.service": {
+      "sha256": "02ecbdbd7ea46d046f3890cb77b9df75431fe4f77284aee6ce4eb4d345a93f32",
+      "bytes": 22588,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/deploy/product/own-keys-voice.conf": {
+      "sha256": "0d301205f8b182039ec5bea38691d3f3aff43cf69ca433341cd428a6e08ea619",
+      "bytes": 919,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/src/audio_workers.rs": {
+      "sha256": "6f32c5f24155fd7cf5708e587f60cde9e1ae49d8fe45486da4364c8b318dc740",
+      "bytes": 101082,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/voice/tests/fixtures/stores/thread-2026-10-21.json": {
+      "sha256": "091bf6c2ed4492fd27ba9645385ad8e1778a91b8d2e34ca75c3f1fd3fa3557b0",
+      "bytes": 349,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/audio/tests/it/playout_continuity/replies.tsv": {
+      "sha256": "21b1d50d0e068b450c5ea278d12fd8bf70698bd75a4cd4a382a4263e4edeb3a3",
+      "bytes": 37619,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/deploy/product/settings/expression.json": {
+      "sha256": "a3270298166f5b03c109005ef75b3c74d30ef6739cc27dce021f958bb9f6d79c",
+      "bytes": 10288,
+      "mode": 420,
+      "kind": "file"
+    },
+    "lampOS/crates/expression/alive-behaviours.json": {
+      "sha256": "fc8474cff5d5c85d379b3f9effe45bb8cfc12c30c8e102488beece21b1c83384",
+      "bytes": 10256,
+      "mode": 420,
+      "kind": "file"
+    }
+  },
+  "package_prefix_inputs_bound_separately": true
+}

@@ -1,0 +1,119 @@
+{
+  "scope": "Reader4/0/0 plus service-trace6/0/0 once each; no full Voice/Linux runtime claim",
+  "qualified_source": "b7 plus exact approved2dirtypayloads; folded49abc; latest495samefullownedblobs",
+  "source_files": 10908,
+  "witnesses": 523,
+  "before_runtime_manifest": "Inherited520 plus3 newly frozen after no-run",
+  "all_six_witness_fields_equal": true,
+  "original_Main_and_candidate_full_failures_retained": true,
+  "copies": {
+    "witnesses-before-runtime.json": {
+      "sha256": "3cc9584ddeccd15a21565cd8868539db80f221c9a70b4571782e1ed862a28dea",
+      "bytes": 214415
+    },
+    "folded-source-bridge.json": {
+      "sha256": "9ff8f4698875a586a6a15b68679c50c5dffa19124b0bdfea2e55d62b7fdf07fc",
+      "bytes": 545
+    },
+    "qualified-owned.patch": {
+      "sha256": "e7b7392ce83144191577abe63ddcdd270ee45fc379daca01bc0c23127ef2f563",
+      "bytes": 11382
+    },
+    "cmd-workspace.json": {
+      "sha256": "100a914551124f04e24d0cc1e7dae5c18ab544d7b8ba1b6666f5e5df8e685be0",
+      "bytes": 1956
+    },
+    "cmd-module-session_reader.json": {
+      "sha256": "7ef374b67e14ca50b4bbc5dfd2d9400e1a480c84277341d8eaf15d0deea3c02c",
+      "bytes": 1949
+    },
+    "source-before.json": {
+      "sha256": "0caa3583fbcfbcbb275ed7937bc122ed0592c16a058a420b40999464913d4ff3",
+      "bytes": 2457147
+    },
+    "cmd-metadata.json": {
+      "sha256": "31aeada48739cdfe334647115e395ba48b1ea86976029ad2ebecc639a054876e",
+      "bytes": 1915
+    },
+    "source-after.json": {
+      "sha256": "0caa3583fbcfbcbb275ed7937bc122ed0592c16a058a420b40999464913d4ff3",
+      "bytes": 2457147
+    },
+    "cmd-fmt.json": {
+      "sha256": "9b4b08d2ba28c1fe586f5fb0e198cff42da24f5648c3e5fe3f131c8ddf7bde86",
+      "bytes": 1858
+    },
+    "cmd-module-session_reader.stdout.txt": {
+      "sha256": "a5053f2d68155eb2e640abec7fbc6c2e60d68fb648e0d90733c017be254405b8",
+      "bytes": 491
+    },
+    "cmd-Voice-lib-compile.json": {
+      "sha256": "2804301a8733b8f48550240b539724f80c9a0f519a86392fffe4ca1d0184c449",
+      "bytes": 2012
+    },
+    "cmd-module-service_trace.json": {
+      "sha256": "1b50a4f73ff28bd8bc67f1180e104a022ca908341cf25ae4e45af88b7c66db71",
+      "bytes": 1946
+    },
+    "cmd-module-service_trace.stdout.txt": {
+      "sha256": "3e4f12210de74ad244ecf5e41c0b1de6bed10bd739da4e21b3f04ca19f388e6f",
+      "bytes": 717
+    },
+    "actual-after.json": {
+      "sha256": "fb96a119fc71f3d667cadb741186a69076005d2a8865a6b5077a4d6b8de21796",
+      "bytes": 5984
+    },
+    "selected-module-inventory.json": {
+      "sha256": "b5cc25c158a7907e5b548189bafb238876b55b400ed2b31985f0617f7d27621e",
+      "bytes": 1190
+    },
+    "actual-executables.json": {
+      "sha256": "7465bce4819940ac87ea544951acd377240fa0452bf0c58ae6e910c743a44490",
+      "bytes": 4885
+    },
+    "Voice-actual-depinfo.json": {
+      "sha256": "7f7b5fd23d60cc883c7d2c7ebfefe9d419cafa44548c2823035d5f85881232e2",
+      "bytes": 61995
+    },
+    "cmd-module-service_trace-census.json": {
+      "sha256": "60632a325e9a6e029bb001dbfc91934d9fe51f579be138cda4b499eab2a72069",
+      "bytes": 1799
+    },
+    "terminal.json": {
+      "sha256": "807a05559145d2c7ad73c1e29c20eab214455f1e4924de7c63b9d39884bafa82",
+      "bytes": 1924
+    },
+    "cmd-strict.json": {
+      "sha256": "f21adadc740bcb7d53bc3142c93a3f55975e78f5b963d37faa0d3d6f539abfa7",
+      "bytes": 2339
+    },
+    "native-controller-result.json": {
+      "sha256": "4ef604ee11c1b19f5772dca79e567422ea8c402f00e45df80d0710510a16a684",
+      "bytes": 472
+    },
+    "cmd-module-session_reader-census.json": {
+      "sha256": "a57d2bc9799f59d6fd3e3af12f44830ce190673665492c714c5552422ecd3904",
+      "bytes": 1264
+    },
+    "latest-source-bridge.json": {
+      "sha256": "523e0fa228caaf6d8fdef1bccc57438e1268a753cdd8edeef33a89b20ca0c5ba",
+      "bytes": 358
+    },
+    "witnesses-after.json": {
+      "sha256": "3cc9584ddeccd15a21565cd8868539db80f221c9a70b4571782e1ed862a28dea",
+      "bytes": 214415
+    },
+    "latest-range-diff.txt": {
+      "sha256": "f188fd18d18d50289b48bf7b8304eb8acb6119196d1e5fbd546922197dccd091",
+      "bytes": 94
+    },
+    "observed-module-censuses.json": {
+      "sha256": "7b8470d3434d208083139796355b33d206e1577dd65c48e8b1ae7a8c42023987",
+      "bytes": 5305
+    },
+    "consumed-SHA-checkpoints.json": {
+      "sha256": "b0cbed225dcbe0133cbd9fe49d4458ad4e22575d3333938c47d757ef1b10becc",
+      "bytes": 2109
+    }
+  }
+}

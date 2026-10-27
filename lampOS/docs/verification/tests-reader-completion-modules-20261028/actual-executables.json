@@ -1,0 +1,128 @@
+{
+  "/private/tmp/tests-restart-f9-cargo-20261027_root/debug/lamp-same-voice": {
+    "sha256": "c8767d2c2a22f7e746a912faa9b1016dfa6217778e06a66b719a47704807baff",
+    "bytes": 74262104,
+    "mode": 493,
+    "mtime_ns": 1793103137313800113,
+    "device": 16777222,
+    "inode": 489217716,
+    "kind": "file",
+    "artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/same-voice#lamp-same-voice@0.1.0",
+      "manifest_path": "/private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/same-voice/Cargo.toml",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-same-voice",
+        "src_path": "/private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/same-voice/src/main.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "filenames": [
+        "/private/tmp/tests-restart-f9-cargo-20261027_root/debug/lamp-same-voice"
+      ],
+      "executable": "/private/tmp/tests-restart-f9-cargo-20261027_root/debug/lamp-same-voice",
+      "fresh": true
+    },
+    "sealed_copy": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/sentinel-b7-reader-service-trace-gates-prep/frozen/current-helper-0-c8767d2c2a22f7e7-lamp-same-voice"
+  },
+  "/private/tmp/tests-restart-f9-cargo-20261027_root/debug/lamp-voice": {
+    "sha256": "86e4c394c13b677bfaf2bb8d326523e30110f80a43fa9f52868d8805eaa55f43",
+    "bytes": 42682168,
+    "mode": 493,
+    "mtime_ns": 1793122109521197150,
+    "device": 16777222,
+    "inode": 489218275,
+    "kind": "file",
+    "artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/voice#lamp-voice@0.1.0",
+      "manifest_path": "/private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/voice/Cargo.toml",
+      "target": {
+        "kind": [
+          "bin"
+        ],
+        "crate_types": [
+          "bin"
+        ],
+        "name": "lamp-voice",
+        "src_path": "/private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/voice/src/main.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": false,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": false
+      },
+      "features": [],
+      "filenames": [
+        "/private/tmp/tests-restart-f9-cargo-20261027_root/debug/lamp-voice"
+      ],
+      "executable": "/private/tmp/tests-restart-f9-cargo-20261027_root/debug/lamp-voice",
+      "fresh": false
+    },
+    "sealed_copy": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/sentinel-b7-reader-service-trace-gates-prep/frozen/current-helper-1-86e4c394c13b677b-lamp-voice"
+  },
+  "/private/tmp/tests-restart-f9-cargo-20261027_root/debug/deps/lamp_voice-6d619bbdd1df3a0d": {
+    "sha256": "cbfd31c00b72ee60e124c9b8b42866770a2ffd41d2af2bdcea320750f6942e91",
+    "bytes": 117187136,
+    "mode": 493,
+    "mtime_ns": 1793122292275013640,
+    "device": 16777222,
+    "inode": 489228750,
+    "kind": "file",
+    "artifact": {
+      "reason": "compiler-artifact",
+      "package_id": "path+file:///private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/voice#lamp-voice@0.1.0",
+      "manifest_path": "/private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/voice/Cargo.toml",
+      "target": {
+        "kind": [
+          "lib"
+        ],
+        "crate_types": [
+          "lib"
+        ],
+        "name": "lamp_voice",
+        "src_path": "/private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/voice/src/lib.rs",
+        "edition": "2024",
+        "doc": true,
+        "doctest": true,
+        "test": true
+      },
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "features": [],
+      "filenames": [
+        "/private/tmp/tests-restart-f9-cargo-20261027_root/debug/deps/lamp_voice-6d619bbdd1df3a0d"
+      ],
+      "executable": "/private/tmp/tests-restart-f9-cargo-20261027_root/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+      "fresh": false
+    },
+    "sealed_copy": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/sentinel-b7-reader-service-trace-gates-prep/frozen/Voice-lib-cbfd31c00b72ee60-lamp_voice-6d619bbdd1df3a0d"
+  }
+}

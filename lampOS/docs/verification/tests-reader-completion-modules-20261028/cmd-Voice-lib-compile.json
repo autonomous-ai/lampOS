@@ -1,0 +1,62 @@
+{
+  "command": [
+    "/Users/autonomous/.cargo/bin/cargo",
+    "+1.96.0",
+    "test",
+    "--offline",
+    "--locked",
+    "--jobs",
+    "1",
+    "-p",
+    "lamp-voice",
+    "--lib",
+    "--no-run",
+    "--message-format=json"
+  ],
+  "cwd": "/private/tmp/tests-ready-speaking-1c-20261026/lampOS",
+  "started_at": "2026-10-27T17:28:50.169139+00:00",
+  "timeout_seconds": 3600,
+  "stdout": "cmd-Voice-lib-compile.stdout.txt",
+  "stderr": "cmd-Voice-lib-compile.stderr.txt",
+  "timeout_cleanup": [
+    {
+      "action": "leader exited unreaped; no other owned group members",
+      "members": [
+        {
+          "pid": 11824,
+          "state": "Z"
+        }
+      ]
+    }
+  ],
+  "timed_out": false,
+  "disk_reserve_breached": false,
+  "stop_reason": null,
+  "process_group_scope": "Owned group only; no detached-descendant cleanup claim.",
+  "group_closure_method": "WNOWAIT leader reservation and ps group inventory before reap",
+  "launch_state": "Popen_recorded",
+  "disk_reserve_bytes": 2214592512,
+  "disk_sample_interval_seconds": 1,
+  "disk_paths": [
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/sentinel-b7-reader-service-trace-gates-prep",
+    "/private/tmp/tests-restart-f9-cargo-20261027_root"
+  ],
+  "disk_samples": 161,
+  "disk_last_available_bytes": 12221566976,
+  "disk_minimum_available_bytes": 12191592448,
+  "available_bytes_before_Cargo": 12540092416,
+  "owned_pid": 11824,
+  "owned_process_group": 11824,
+  "direct_wait_status": 0,
+  "exit_code": 0,
+  "owned_group_absent_after_cleanup": true,
+  "unexpected_owned_descendants": false,
+  "unresolved_owned_pids": [],
+  "compiler_lease_held": false,
+  "wall_seconds": 162.529561,
+  "finished_at": "2026-10-27T17:31:32.695781+00:00",
+  "stdout_sha256": "6a70766360fc3b1d4e0a0b93bfc56f7bc6f5ca579117eb17979340d19b8891ab",
+  "stdout_bytes": 256346,
+  "stderr_sha256": "649f7540c0079fcb2e1105cf261539b89475ce0b99952f99edabcd12b1f92f61",
+  "stderr_bytes": 1373
+}

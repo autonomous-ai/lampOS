@@ -1,0 +1,9 @@
+# Reader completion fixture gates
+
+The exact approved two-file payload over b7/Main0d passed formatting, metadata-derived twelve-package strict all-target Clippy, workspace build and fresh VoiceLIB compilation. One serial Reader module run passed4/0/0; one disjoint service-trace module passed6/0/0. The unchanged stalled-writer control preserves zero-budget degradation and the immutable bounded report; the disk-failure case retains failed-writer rejection. These are functional module results, not a full Voice library or native Linux result.
+
+Three Reader final-data fixtures retain the production finish report, then await the existing completion event before their original health/mode/group/lookup assertions. The writer sends that event only after draining and file finish/closure; failure flags remain latched. Production500ms is unchanged; the existing five-second test observer is an event guard. The original failed reports did not print their fields, so no natural-cause claim is made. Source review found no predicate or budget relaxation.
+
+All source/owner/523-witness/three-executable guards passed and owned groups closed. Raw source and artifact bookends, both module commands/censuses, compile receipts and witnesses are included. The523 before-runtime manifest is recorded inherited520 plus three no-run freezes. The source bridge verifies all10,908 qualified bytes/kinds/modes equal folded49abc; compilation predates that fold. The later495 carry onMain3aa has both complete owned blobs and patch unchanged, one equal range-diff, formatting passed; old runtime is not relabelled as newer upstream qualification.
+
+Both earlier failed full Mac runs, isolated Main1/0, and original b7 ARM5091/1 with15Reader unreached retain separate scopes. Native qualification for495 is pending; PR remains draft. No device action or ARM payload access on the Mac.

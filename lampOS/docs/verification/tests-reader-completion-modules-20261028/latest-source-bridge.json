@@ -1,0 +1,9 @@
+{
+  "old_head": "49abc9a60d772138f3167f2acea53de40c95607f",
+  "head": "495a476184d65010da0e3656af8488439993c648",
+  "base": "3aa752f73914d0f29fc90edb010a3a7fa1cf526b",
+  "both_full_blobs_equal": true,
+  "exact_patch_equal": true,
+  "patch_sha256": "e7b7392ce83144191577abe63ddcdd270ee45fc379daca01bc0c23127ef2f563",
+  "new_base_native_gates_pending": true
+}

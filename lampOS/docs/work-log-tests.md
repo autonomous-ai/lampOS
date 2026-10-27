@@ -1,5 +1,13 @@
 # Tests work log
 
+## 2026-10-28 00:45 — Reader completion checks pass; full updater census reconciled
+
+Ready for lamp-voice: no (fresh native checks, current readers and updater device acceptance remain).
+
+[Reader completion gates](verification/tests-reader-completion-modules-20261028/) passed Reader4/0/0 plus service-trace6/0/0 once each, strict twelve-package Clippy/workspace/fresh compilation and all523 witnesses/three current executable guards. The existing stalled-writer control retains bounded-report degradation and immutability. All10908 qualified file bytes/kinds/modes match folded49abc; latest495a47618 on Main3aa752f73 has both complete owned blobs/patch unchanged and is pushed as a draft. This is module qualification; old failed full runs and b7's15 unrun Linux Reader cases remain separate.
+
+[Updater full host disposition](verification/tests-3843-1d97-full-host-20261028/) reconciles the retained one-shot Cargo logs without rerun: **7713 PASS /1 FAIL /52 ignored**,70 drivers plus12 zero-case doctests. All14 required Round cases passed once; Round215/0. The sole failure is Skills thinking-after-speaking latency584ms against300ms. The original Rust101/controller1 parser failure remains failed. Exactly one nested memory child summary and two source-backed interleaved rows are projected for analysis, with byte offsets/hashes and full per-driver inventory binding. No cause or baseline waiver. The updater is carried cleanly to c9582a43f on3aa with all three full files unchanged from192f; current native qualification is next. No device action.
+
 ## 2026-10-28 00:22 — existing Main provenance extended; completion gates active
 
 Ready for lamp-voice: no (#3543 fresh local fixture modules active; native Reader remains unqualified).
