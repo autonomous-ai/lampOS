@@ -1,0 +1,26 @@
+{
+  "head": "f1d3366ea8b1d4261fdf96c4267c5d331d5845a3",
+  "base": "70b51f8fde277cc6cc9ef7e17724b2c34a08f208",
+  "tree": "f4b586bd4f36cdd0e8a16f91a427d1c10edc2747",
+  "status": "VERIFIED_SELECTED_REMINDER_SCOPE",
+  "selected_direct_counts": {
+    "failed": 0,
+    "ignored": 12,
+    "passed": 770
+  },
+  "tests_retried": 0,
+  "limits": [
+    "Selected Skills/Update plus three exact install policy cases, seven switch and one Welcome cases, full made_skill/app_make/task_news test modules and twelve-package docs; not current full Voice or twelve-package runtime. Eight comfort corpus inputs are source-bound, not eight independently observed passes. Current clean two-commit source tree is bound; prior staged execution keeps its original identity.",
+    "Historical b490 full-suite privacy failure remains failed and separate.",
+    "No native, device or latency qualification."
+  ],
+  "full_private_audit_sha256": "b7f2f88d58315a7fc572cba0fead8404f14ff5d8e0c9ef6d9ae64fede9169b01",
+  "required_controls": 102,
+  "required_controls_pass_once": true,
+  "panic_hooks_expected": 2,
+  "panic_hooks_unknown": 0,
+  "doc_sections": 12,
+  "doc_cases": 0,
+  "guards": "All 133 executable pairs and source/raw/metadata guards stable; no timeout or forced cleanup.",
+  "scope": "Twelve selected commands: five whole Skills drivers, Update lib/IT, three exact installer cases, Voice census/Welcome and the whole made_skill/app_make/task_news modules. Not full twelve-package runtime."
+}

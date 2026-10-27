@@ -1,0 +1,145 @@
+{
+  "status": "ORIGINAL_NATIVE_GREEN_EXACT_F1D_TREE",
+  "source": {
+    "authored_base": "3d5ea2dd792d42fd52f26b978daf5ddbe9c68487",
+    "authored_head": "643d60aa7e66569f01ff4eb98660fd470892fd7b",
+    "executed_preview": "c08c6b797e6898084c4d8731ac8fe7197ccd1f56",
+    "full_tree_equal": true,
+    "local_base": "70b51f8fde277cc6cc9ef7e17724b2c34a08f208",
+    "local_f1d": "f1d3366ea8b1d4261fdf96c4267c5d331d5845a3",
+    "local_tree": "f4b586bd4f36cdd0e8a16f91a427d1c10edc2747",
+    "ordered_parents": [
+      "70b51f8fde277cc6cc9ef7e17724b2c34a08f208",
+      "643d60aa7e66569f01ff4eb98660fd470892fd7b"
+    ],
+    "overlay_delta_from_authored": [
+      "lampOS/crates/skills/src/package.rs",
+      "lampOS/crates/skills/tests/it/made.rs",
+      "lampOS/crates/skills/tests/it/store.rs",
+      "lampOS/crates/voice/src/app_make.rs",
+      "lampOS/crates/voice/src/made_skill.rs",
+      "lampOS/crates/voice/src/task_news.rs",
+      "lampOS/docs/skills.md",
+      "lampOS/docs/vi/skills_vi.md",
+      "lampOS/tools/played/stand-in-test.sh",
+      "lampOS/tools/played/stand-in.sh"
+    ],
+    "preview_tree": "f4b586bd4f36cdd0e8a16f91a427d1c10edc2747"
+  },
+  "runs": {
+    "arm": {
+      "attempt": 1,
+      "checkout": "c08c6b797e6898084c4d8731ac8fe7197ccd1f56",
+      "conclusion": "success",
+      "event": "pull_request",
+      "head": "643d60aa7e66569f01ff4eb98660fd470892fd7b",
+      "job": 122020727918,
+      "run": 40453290830
+    },
+    "linux": {
+      "attempt": 1,
+      "checkout": "c08c6b797e6898084c4d8731ac8fe7197ccd1f56",
+      "conclusion": "success",
+      "event": "pull_request",
+      "head": "643d60aa7e66569f01ff4eb98660fd470892fd7b",
+      "job": 122020727359,
+      "run": 40453290743
+    }
+  },
+  "controls": {
+    "missing_or_nonpass": [],
+    "mock3_already_in102": true,
+    "once_pass": 102,
+    "required": 102
+  },
+  "nextest": {
+    "failed": 0,
+    "ipc_camera_authority_pass": 18,
+    "leak": 0,
+    "per_package_pass": {
+      "lamp-actions": 123,
+      "lamp-addons": 50,
+      "lamp-air": 27,
+      "lamp-audio": 193,
+      "lamp-body": 624,
+      "lamp-bus": 107,
+      "lamp-camera": 90,
+      "lamp-cloud": 196,
+      "lamp-controls": 516,
+      "lamp-ears": 76,
+      "lamp-environment": 12,
+      "lamp-expression": 340,
+      "lamp-eyes": 340,
+      "lamp-gemini": 285,
+      "lamp-health": 91,
+      "lamp-ipc": 45,
+      "lamp-keeper": 42,
+      "lamp-lean": 61,
+      "lamp-local-time": 11,
+      "lamp-memory": 336,
+      "lamp-mood": 118,
+      "lamp-msgs": 172,
+      "lamp-name": 44,
+      "lamp-near-call": 8,
+      "lamp-observer": 46,
+      "lamp-peek": 26,
+      "lamp-policy": 284,
+      "lamp-records": 193,
+      "lamp-ring": 53,
+      "lamp-same-voice": 5,
+      "lamp-schedule": 215,
+      "lamp-selftest": 84,
+      "lamp-settings": 49,
+      "lamp-setup": 186,
+      "lamp-skills": 552,
+      "lamp-sound-fixtures": 15,
+      "lamp-station": 69,
+      "lamp-surround": 268,
+      "lamp-tasks": 220,
+      "lamp-turn-end": 32,
+      "lamp-turn-end-wire": 5,
+      "lamp-turn-owner": 37,
+      "lamp-update": 443,
+      "lamp-voice": 4171,
+      "lamp-voice-eval": 623,
+      "lamp-voice-processes": 2
+    },
+    "skip_names_available": false,
+    "skipped_summary": 106,
+    "timeout": 0,
+    "unique_pass": 11485,
+    "verified_exact_post_summary_reprints": 35,
+    "voice_library_pass": 3853,
+    "whole_workspace_selector": true
+  },
+  "limits": [
+    "Original 643d preview has 70b/643d parents and exactly the local f1d/70b tree, not authored 643d/3d5.",
+    "Successful Reader/privacy observations on this source do not establish cause or waive original fixture642 Reader failure; no retry requested.",
+    "106summary skips have no per-case names in this log; no inferred waiver.",
+    "No signed-release/device/latency acceptance; artifact export/upload is separate.",
+    "No binary downloaded or executed and no workflow action."
+  ],
+  "full_private_receipt_sha256": "316426e4bbfc66ea6519f4194f5d1e049638387cf6943ecb140ed3082dfc7133",
+  "current_controls_source_bindings_verified": 102,
+  "separate_docs": {
+    "failed": 0,
+    "ignored": 0,
+    "passed": 4,
+    "sections": 47
+  },
+  "separate_harnesses": {
+    "relay_signals_ok": true,
+    "turn_end_process13_0": true
+  },
+  "raw_hashes": {
+    "arm-job.log": "fae0f60fbbe60a128f81aaf27d7b1cc7fc7379bda654a8150395e6dca8cddacf",
+    "arm-jobs.json": "e295c430210b90070567aaff18bb4c68c1d76181160edbc40558d07ad8c67218",
+    "arm-run.json": "86ba347b7b3decce42a14f39de2f5d31c798dcf092e0da54112cb196c96384d2",
+    "commit-c08c6b797e6898084c4d8731ac8fe7197ccd1f56.json": "8eb451e09daaae47c8061808a45d21c27f3713de5c3f1b53b145aa2bda799424",
+    "linux-job.log": "db7e74b6baf99744afc75717bd319746a076881f9b019998450a6da1569bcfcc",
+    "linux-jobs.json": "e40a59dd08d2e721bacf401a2a2ebe148ef203e9402eb4e082dd091587167d21",
+    "linux-run.json": "ea44894d56cba506de1ca97ff71b3ec7f04f6b3743a899b841a5c7205886b18c",
+    "nextest-unique-cases.json": "6e8f601ab88220a0d4b45e0bc136ae595d8a245523d9119fe1b0ccc1397b7bc3",
+    "required102-cases.json": "331d507050e388d7d171429b15da80bf23d5fc1d505783a6b3bd1a3bfa0c1432"
+  }
+}
