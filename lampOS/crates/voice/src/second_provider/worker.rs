@@ -5039,6 +5039,11 @@ const FIRST_SECONDS_RISE_DB: f32 = 6.0;
 /// At least this many of the ears' 100 ms readings outside the lines, a
 /// second's worth, before the stream shows anything.
 const FIRST_SECONDS_READINGS: usize = 10;
+/// `LAMP_FIRST_SECONDS_QUIET`: the fewest words of a held line that keep the
+/// first seconds' join off ([`Heeding::heed`]): one word is a hum, a
+/// sound's misheard word or the lamp's own "hm?" heard back, never a
+/// request someone else made.
+const HELD_LINE_WORDS: usize = 2;
 /// A line's own sound, for the stream: from this long before its first
 /// sound to this long after its end.
 const SAID_BEFORE_US: u64 = 300_000;
@@ -5162,7 +5167,9 @@ impl Heeding {
     /// line in another voice with no face seen speaking it shows no other
     /// person; held as said to nobody, it is no talk left alone for the room
     /// told either (`RoomTold::held`), so the hold itself keeps the join off
-    /// (#3801's P3). On lamp-4ace on 26 Oct, a bare
+    /// (#3801's P3), when its words could be a request ([`HELD_LINE_WORDS`]).
+    /// Never cleared while the room is unknown for want of history: one such
+    /// line turns the join off for the rest of it. On lamp-4ace on 26 Oct, a bare
     /// "Lamp.", a pause, then the request, the first line after a start
     /// with nobody in view, was held and had to be said twice: no eyes and
     /// an unknown room never joined. Only the join reads it: the rule's
@@ -6570,10 +6577,17 @@ impl Heeding {
         self.silence_turned(request, said, &mut signs);
         let verdict = self.judge(request, said, heard, signs.clone());
         // `LAMP_FIRST_SECONDS_QUIET`: a line held since the start keeps the
-        // first seconds' join off. A wait for the Policy is no hold; a bare
-        // name waiting for its request is never judged here.
+        // first seconds' join off, when its words could be someone's
+        // request: [`HELD_LINE_WORDS`] or more, not a short word or hum. No
+        // words, a hum, the lamp's own "hm?" heard back after a head tap, or
+        // the room's sounds, are no one talking (lamp-c0a4's run 1 on
+        // #3864); the lamp's own words heard back are held as its echo
+        // before the rule. A wait for the Policy is no hold; a bare name
+        // waiting for its request is never judged here.
         if self.first_seconds_quiet
             && verdict.is_some_and(|why| why != crate::second_provider::WAITS_FOR_POLICY)
+            && crate::not_speech::plain_words(heard).len() >= HELD_LINE_WORDS
+            && !crate::not_speech::short_word(heard)
         {
             self.held_since_start = true;
         }
@@ -18712,9 +18726,9 @@ mod tests {
             /// A line in another voice since the start, its conversation
             /// over before the name.
             other_voice: bool,
-            /// A line since the start that the rule held, said to nobody
-            /// with nobody in view, before the name.
-            held: bool,
+            /// Lines since the start that the rule held, said to nobody
+            /// with nobody in view, before the name: their words.
+            held: &'static [&'static str],
             on: bool,
         }
         let quiet = Start {
@@ -18723,7 +18737,7 @@ mod tests {
             in_view: 0,
             talk: false,
             other_voice: false,
-            held: false,
+            held: &[],
             on: true,
         };
         let run = |name: &str, start: Start| {
@@ -18759,18 +18773,15 @@ mod tests {
                 heeding.keep_line_room(98, Room::Unknown, true, true);
                 heeding.keep_line_room(99, Room::Unknown, false, false);
             }
-            if start.held {
-                // From 11.5 s to 10 s ago, before the name: no name, nobody
-                // in view, no conversation going on.
+            // From 11.5 s ago, 0.5 s each and 0.3 s apart, before the name:
+            // no name, nobody in view, no conversation going on.
+            for (n, words) in (0..).zip(start.held) {
+                let began = now - 11_500_000 + n * 800_000;
                 assert!(
                     heeding
-                        .heed(
-                            97,
-                            (now - 11_500_000, now - 10_000_000),
-                            "Did you see the match last night?",
-                            None
-                        )
-                        .is_some()
+                        .heed(95 + n, (began, began + 500_000), words, None)
+                        .is_some(),
+                    "{words:?} held"
                 );
             }
             // "Lamp." from 5 s to 4.4 s ago, a pause, the request from 3 s
@@ -18783,7 +18794,12 @@ mod tests {
             ];
             if let Some(rises) = start.room {
                 let levels: Levels = Arc::default();
-                let from = now - if start.held { 12_000_000 } else { 8_000_000 };
+                let from = now
+                    - if start.held.is_empty() {
+                        8_000_000
+                    } else {
+                        12_000_000
+                    };
                 for (n, at) in (from..=now).step_by(100_000).enumerate() {
                     let said = windows
                         .iter()
@@ -18894,11 +18910,27 @@ mod tests {
             held(run(
                 "d2",
                 Start {
-                    held: true,
+                    held: &["Did you see the match last night?"],
                     ..quiet
                 }
             )),
             "a line held since the start"
+        );
+        // lamp-c0a4's run 1 on #3864: after a restart, a head tap's "hm?"
+        // reopened the voice, and two lines of no words, its hum heard back
+        // or the room's sounds, came before the name.
+        assert!(
+            matches!(
+                run(
+                    "d3",
+                    Start {
+                        held: &["", "Hm?"],
+                        ..quiet
+                    }
+                ),
+                Joined::NoSecond(_)
+            ),
+            "lines of no words or a hum since the start"
         );
         assert!(
             held(run(
