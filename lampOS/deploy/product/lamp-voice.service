@@ -219,6 +219,9 @@ Environment=LAMP_FIRST_WORDS=kept
 Environment=LAMP_SOFT_START=on
 Environment=LAMP_TASKS_ASKED=on
 Environment=LAMP_TASKS_WHO=on
+# Work goes only to the agent named: one named who isn't set up is said so, never given to another (#1722; the
+# 27 Oct demo, where "have Hermes do it" went to Claude Code unsaid, #3504). Checked on lamp-75c9 on 22 Oct.
+Environment=LAMP_TASKS_NAMED_ONLY=on
 Environment=LAMP_CUT_KEEPS_NAME=on
 Environment=LAMP_SELFTEST_SPEAKER=on
 # Each stall of 50 ms or more in the voice's loops, with what held it, in /run/lampos-voice (#1179): cheap, and

@@ -84,7 +84,10 @@ fn persistence_kept<P: Persistence>(persistence: &P) -> Option<String> {
 /// 3: a target's engine may be `devin-cloud`, whose agents have Harness's
 /// `cloud_…` ids (#1854, openharness#1444). Only a state holding a Devin
 /// Cloud task is written as 3, by the same rule.
-const SCHEMA: u32 = 3;
+///
+/// 4: a target's engine may be `hermes` (#3504, 27 Oct). Only a state
+/// holding a Hermes task is written as 4, by the same rule.
+const SCHEMA: u32 = 4;
 /// The oldest `schema` this build reads and writes: a state with no Devin
 /// task.
 const OLDEST_SCHEMA: u32 = 1;
@@ -672,12 +675,13 @@ fn task_label(store_id: &str, id: u64) -> String {
 
 impl State {
     /// The `schema` this state is written with: the lowest that reads every
-    /// task in it: 3 with a Devin Cloud task, 2 with a Devin one, else
-    /// [`OLDEST_SCHEMA`].
+    /// task in it: 4 with a Hermes task, 3 with a Devin Cloud one, 2 with a
+    /// Devin one, else [`OLDEST_SCHEMA`].
     fn schema_needed(&self) -> u32 {
         self.tasks
             .iter()
             .map(|task| match task.launch.target.engine {
+                EngineKind::Hermes => 4,
                 EngineKind::DevinCloud => 3,
                 EngineKind::Devin => 2,
                 _ => OLDEST_SCHEMA,
@@ -4121,7 +4125,7 @@ mod tests {
         assert!(engine.summary()["set_aside"].is_null());
         let mut newer: Value =
             serde_json::from_slice(memory.0.borrow().bytes.as_ref().unwrap()).unwrap();
-        newer["schema"] = json!(4);
+        newer["schema"] = json!(5);
         let memory = Memory::default();
         memory.0.borrow_mut().bytes = Some(serde_json::to_vec(&newer).unwrap());
         let engine = Engine::open(
@@ -4133,7 +4137,7 @@ mod tests {
         )
         .unwrap();
         let kept = engine.summary()["set_aside"].as_str().unwrap().to_owned();
-        assert!(kept.starts_with("tasks.sqlite3.newer-4-"), "{kept}");
+        assert!(kept.starts_with("tasks.sqlite3.newer-5-"), "{kept}");
         drop(engine);
         let mut engine = Engine::open(
             memory.clone(),
@@ -4433,6 +4437,35 @@ mod tests {
         assert!(Engine::open(memory, cloud(), STORE, RESTART, &clock(2)).is_err());
     }
 
+    /// #3504: a store that holds a Hermes task is written as 4, which a
+    /// build before it sets aside; one that names Hermes under schema 3 is
+    /// refused. A store without one stays as low as its other tasks need.
+    #[test]
+    fn a_store_with_a_hermes_task_is_written_as_schema_four() {
+        let hermes = || {
+            let mut staff = targets();
+            staff.get_mut("desk").unwrap().engine = EngineKind::Hermes;
+            staff
+        };
+        let memory = Memory::default();
+        let mut engine = Engine::open(memory.clone(), hermes(), STORE, SESSION, &clock(0)).unwrap();
+        assert_eq!(written(&memory)["schema"], 1);
+        prepare(&mut engine, 0);
+        let stored = written(&memory);
+        assert_eq!(stored["schema"], 4);
+        assert_eq!(stored["tasks"][0]["launch"]["target"]["engine"], "hermes");
+        drop(engine);
+        let engine = Engine::open(memory.clone(), hermes(), STORE, RESTART, &clock(1))
+            .expect("a schema-4 store opens");
+        assert_eq!(engine.state.tasks.len(), 1);
+        drop(engine);
+        let mut wrong = written(&memory);
+        wrong["schema"] = json!(3);
+        let memory = Memory::default();
+        memory.0.borrow_mut().bytes = Some(serde_json::to_vec(&wrong).unwrap());
+        assert!(Engine::open(memory, hermes(), STORE, RESTART, &clock(2)).is_err());
+    }
+
     /// A store from a newer `schema` is set aside whole and this build
     /// starts with an empty one, never destroying it (#1505).
     #[test]
@@ -4441,7 +4474,7 @@ mod tests {
         accepted(&mut engine, 0);
         let mut newer: Value =
             serde_json::from_slice(memory.0.borrow().bytes.as_ref().unwrap()).unwrap();
-        newer["schema"] = json!(4);
+        newer["schema"] = json!(5);
         newer["tasks"][0]["dispatch"]["state"] = json!("a_state_from_later");
         let bytes = serde_json::to_vec(&newer).unwrap();
         let memory = Memory::default();
@@ -4455,7 +4488,7 @@ mod tests {
         )
         .expect("a newer store is set aside, not refused");
         let kept = engine.set_aside().unwrap().to_owned();
-        assert!(kept.starts_with("tasks.sqlite3.newer-4-"), "{kept}");
+        assert!(kept.starts_with("tasks.sqlite3.newer-5-"), "{kept}");
         assert_eq!(
             memory.0.borrow().kept,
             [(kept, bytes)],
@@ -5445,6 +5478,7 @@ mod tests {
             EngineKind::Opencode,
             EngineKind::Devin,
             EngineKind::DevinCloud,
+            EngineKind::Hermes,
         ];
         for value in engine {
             match value {
@@ -5452,7 +5486,8 @@ mod tests {
                 | EngineKind::Claude
                 | EngineKind::Opencode
                 | EngineKind::Devin
-                | EngineKind::DevinCloud => {}
+                | EngineKind::DevinCloud
+                | EngineKind::Hermes => {}
             }
         }
         let vocabulary = [
@@ -5466,10 +5501,10 @@ mod tests {
         assert_eq!(
             (SCHEMA, vocabulary.as_str()),
             (
-                3,
+                4,
                 "dispatch: prepared queued attempting accepted pending not_sent uncertain cancelled invalidated; \
                  read: requested attempting finished failed; speech: claimed spoken uncertain; \
-                 close: attempting closed refused left failed; engine: codex claude opencode devin devin-cloud"
+                 close: attempting closed refused left failed; engine: codex claude opencode devin devin-cloud hermes"
             ),
             "a new stored value needs a `schema` bump (see SCHEMA): raise it, then write this line again"
         );
