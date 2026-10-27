@@ -653,3 +653,4 @@ Ready for lamp-voice: yes (#2553), once its ARM64 run is green
 - 22:14: NEXT TRAIN #3840 c727057e8 (harness READ-OK, reviewer-lead no P1/P2, ARM64 green). Eighth READ-OK #3869 f357f9cd1 (its HOLD closed); Fourteen's re-read pending. #3847 ARM64 pending.
 - 22:19: #3829 merged (3c9838fea, reviewer-lead). NEXT TRAIN #3847 c3faf2150 posted. #3836 next for the reviewer-lead after the gap. Eighth starts lamp-skills --dev-dir for #3869.
 - 22:24: quiet tick for my PRs. Nine will write lamp-control.service after part 6 for Eighth's helper PR (#3869 path).
+- 22:29: quiet tick for my PRs.
