@@ -1175,6 +1175,67 @@ fn every_dispatch_says_one_journal_line_without_the_ask() {
     assert!(rig.calls().is_empty());
 }
 
+/// The Reviewer-lead's P2 on #3727: a Mac's default name and hostname
+/// ("Lan’s MacBook Air", `lans-macbook-air.local`) hide the owner's name
+/// alone too, and so does a two-letter one (`Vy-PC`) and an inner slug
+/// (`lan-mbp` of `dev-lan-mbp`). `local` is kept for the diagnostics.
+#[test]
+fn a_dispatch_line_keeps_no_owner_of_a_macs_default_name() {
+    let mut rig = Rig::new();
+    rig.plan(json!({
+        "machines": {"stdout": format!(
+            "{}\n{}\n{}\n",
+            json!({"machineId": MACHINE, "current": false, "name": "Lan’s MacBook Air", "hostname": "lans-macbook-air.local"}),
+            json!({"machineId": "fedcba9876543210fedcba9876543210", "current": false, "name": "Vy-PC"}),
+            json!({"machineId": "00112233445566778899aabbccddeeff", "current": true, "hostname": "dev-lan-mbp"})
+        )},
+        "new": {
+            "exit": 1,
+            "stdout": "{\"ok\":false,\"error\":\"SPAWN_FAILED\"}\n",
+            "stderr": "error: user lan refused on lan-mbp, vy and could not reach local daemon\n",
+        }
+    }));
+    let (_, lines) = journal_of(&mut rig, &launch());
+    assert_eq!(lines.len(), 1, "{lines:?}");
+    let line = &lines[0];
+    assert!(
+        line.ends_with(", stderr: error: user … refused on … and could not reach local daemon)"),
+        "{line}"
+    );
+    for private in [" lan", "vy", "mbp"] {
+        assert!(!line.contains(private), "{private}: {line}");
+    }
+}
+
+/// The P3s of Reviewer-three, Fourteen and the Reviewer-lead on #3700: a
+/// listed name's parts (`lan` of `lan-macbook-air`) and its shorter slugs
+/// (`lan-macbook`) are put as "…" too.
+#[test]
+fn a_dispatch_line_keeps_no_part_of_a_machine_name_from_stderr() {
+    let mut rig = Rig::new();
+    rig.plan(json!({
+        "machines": {"stdout": format!(
+            "{}\n",
+            json!({"machineId": MACHINE, "current": false, "name": "Minh_PC", "hostname": "lan-macbook-air.local"})
+        )},
+        "new": {
+            "exit": 1,
+            "stdout": "{\"ok\":false,\"error\":\"SPAWN_FAILED\"}\n",
+            "stderr": "error: user lan refused on lan-macbook and minh for air\n",
+        }
+    }));
+    let (_, lines) = journal_of(&mut rig, &launch());
+    assert_eq!(lines.len(), 1, "{lines:?}");
+    let line = &lines[0];
+    assert!(
+        line.ends_with(", stderr: error: user … refused on … and … for …)"),
+        "{line}"
+    );
+    for private in ["lan", "minh", "macbook", "air"] {
+        assert!(!line.contains(private), "{private}: {line}");
+    }
+}
+
 /// The P3 Fourteen and the Reviewer-lead left on #3234: a lowercase
 /// computer name passes as a plain word, and hostnames often carry the
 /// owner's name. Every name and hostname the preflight's `machines` listed,
