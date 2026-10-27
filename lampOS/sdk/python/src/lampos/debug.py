@@ -38,7 +38,8 @@ SHOWN = frozenset({
     # A camera picture's size, age and a stream's rate (never the picture).
     "age_ms", "bytes", "fast", "fps", "fps_now", "stream",
     # A computer's own clips (`sound.upload`, `sound.list`, `sound.remove`)
-    # and hello's limits for them: names, sizes and lengths, never the bytes.
+    # and hello's limits for them: names, sizes and lengths, never the bytes; a
+    # pushed skill's whole hash and each part's number (`skill.push`).
     "sound", "sounds", "removed", "ms", "sha256", "part", "rate_hz", "clip_max_ms",
     "clip_max_bytes", "part_max_chars", "parts_max", "clips_max", "store_max_bytes",
     "asleep", "at", "clamped", "class", "client", "code", "colour", "confidence", "count", "elbow", "error", "ev", "events",

@@ -116,8 +116,15 @@ Ranges, from lamp-control and the body:
 | what | Python | JavaScript | command line |
 |---|---|---|---|
 | check a skill folder | `lamp skill check FOLDER` | — | `lamp skill check FOLDER` |
+| put a skill folder on the lamp | `await lamp.push_skill(folder)` | `await lamp.pushSkill(folder)` | `lamp skill push FOLDER` |
+| this computer's pushed skills | `await lamp.skills()` | `await lamp.skills()` | `lamp skill list` |
+| take one off | `await lamp.remove_skill(name)` | `await lamp.removeSkill(name)` | `lamp skill remove NAME` |
 
-Pushing a skill to your own lamp (`skills` grant) is coming with `skill.push`.
+These need the `skills` grant. A pushed skill runs on the lamp after the
+computer goes, never beyond the computer's other grants, and a revoke turns it
+off. `lamp skill push` checks the folder first, as `lamp skill check` does.
+From lamp-mcp, with the same grant: `lamp_skill_push(folder)`, `lamp_skills()`
+and `lamp_skill_remove(name)`.
 
 ## Errors
 
@@ -131,5 +138,6 @@ Every refusal is a `LampError` (Python `lampos.errors.BY_CODE[code]`, JS
 
 `lamp find`, `lamp pair CODE --pin PIN --host HOST [--port 7731] [--name NAME]`,
 `lamp hello [LAMP_ID]`, `lamp fake [--every 10] [--cycles N] [--everything] [--hands]`,
-`lamp skill check FOLDER...`. `LAMPOS_HOME` sets where the key and pairings
+`lamp skill check FOLDER...`, `lamp skill push FOLDER`, `lamp skill list`,
+`lamp skill remove NAME`. `LAMPOS_HOME` sets where the key and pairings
 are kept; `LAMPOS_LOG=debug` prints every frame.
