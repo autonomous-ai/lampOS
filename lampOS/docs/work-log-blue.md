@@ -654,3 +654,4 @@ Ready for lamp-voice: yes (#2553), once its ARM64 run is green
 - 22:19: #3829 merged (3c9838fea, reviewer-lead). NEXT TRAIN #3847 c3faf2150 posted. #3836 next for the reviewer-lead after the gap. Eighth starts lamp-skills --dev-dir for #3869.
 - 22:24: quiet tick for my PRs. Nine will write lamp-control.service after part 6 for Eighth's helper PR (#3869 path).
 - 22:29: quiet tick for my PRs.
+- 22:36: #3847 merged in train 246 (f943086b3). Opened its comment P3 follow-up (blue/pin-comment 1be302a37; three comments "before any frame"; Python 36, JS 33, clippy clean).
