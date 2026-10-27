@@ -204,6 +204,36 @@ mod tests {
         std::fs::remove_dir_all(dir).unwrap();
     }
 
+    /// #3504: a helper started for one port never touches the camera at
+    /// another, with the same ids or not: the port is its unit's, and
+    /// nothing at that port is no device, not a camera found elsewhere.
+    #[test]
+    fn the_helper_acts_only_at_the_port_it_was_started_with() {
+        let dir = folder("port");
+        let devices = dir.join("devices");
+        camera_at(&devices, "3-1.3.4", "01da", "5875");
+        camera_at(&devices, "3-1.2", "046d", "0825");
+        let stamp = dir.join("last");
+        let at = |now| reauthorize_at(&devices, "3-1.1.4", 0x01da, 0x5875, &stamp, now);
+        assert_eq!(at(1_000).unwrap(), Outcome::NoDevice);
+        assert!(!stamp.exists());
+        for other in ["3-1.3.4", "3-1.2"] {
+            assert_eq!(
+                std::fs::read_to_string(devices.join(other).join("authorized")).unwrap(),
+                "1\n",
+                "{other}"
+            );
+        }
+        // Once the camera is at its own port, that one only.
+        camera_at(&devices, "3-1.1.4", "01da", "5875");
+        assert_eq!(at(1_000).unwrap(), Outcome::Reauthorized);
+        assert_eq!(
+            std::fs::read_to_string(devices.join("3-1.3.4/authorized")).unwrap(),
+            "1\n"
+        );
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
     /// The eyes ask after the third open that did not open, about 10 s, then
     /// at most once a minute while it stays so.
     #[test]

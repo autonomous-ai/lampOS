@@ -10,7 +10,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-const USAGE: &str = "lamp-eyes (--device ABSOLUTE_PATH --usb VENDOR:PRODUCT@TOPOLOGY | --usb VENDOR:PRODUCT) --lock-directory PRIVATE_ABSOLUTE_DIRECTORY --model ABSOLUTE_PATH --permit-socket ABSOLUTE_PATH --body-socket ABSOLUTE_PATH [--sight-file ABSOLUTE_PATH] [--presence-file ABSOLUTE_PATH] [--recogniser ABSOLUTE_PATH --people ABSOLUTE_PATH --who-socket ABSOLUTE_PATH [--known-file ABSOLUTE_PATH] [--visits on|off]] [--leave-still-faces on|off] [--steady-rate on|off] [--look-on-change on|off [--change-persist on|off] [--glance-log /var/lib/lampos-eyes/glance.log]] [--full-look WIDTHxHEIGHT --full-look-file ABSOLUTE_PATH [--full-look-movement on|off] [--sight-from-look on|off]] [--mouth-model ABSOLUTE_PATH [--mouth-on-heard on|off] [--mouth-runtime ABSOLUTE_PATH]] [--seems ABSOLUTE_PATH] [--seems-blendshapes ABSOLUTE_PATH] [--seems-log ABSOLUTE_PATH] [--photo-dir ABSOLUTE_PATH] [--mouth-diagnostics on|off] [--camera-helper ABSOLUTE_PATH]\n\nOwns the camera at --device (checked against the USB identity given, hex vendor and\nproduct and the port topology, for example 01da:5875@3-1.1.4; with VENDOR:PRODUCT alone,\nthe one camera with those ids on any port, found at each open, and none or two refused\nwith a reason) and looks for a face in\nits frames four times a second while there is one and less than twice a second when\nthere is none, with the pinned YuNet model at --model. With --steady-rate on, it looks\ntwice a second while one face has sat still for 3 s (off unless given). With\n--look-on-change on, once no face has been found for 4 s, a frame like the last one the\ndetector ran on is said to hold no face without it, and the detector runs at least every\n3 s (off unless given). With --change-persist on (with --look-on-change on), a cell
+const USAGE: &str = "lamp-eyes (--usb VENDOR:PRODUCT@TOPOLOGY [--device ABSOLUTE_PATH] | --usb VENDOR:PRODUCT) --lock-directory PRIVATE_ABSOLUTE_DIRECTORY --model ABSOLUTE_PATH --permit-socket ABSOLUTE_PATH --body-socket ABSOLUTE_PATH [--sight-file ABSOLUTE_PATH] [--presence-file ABSOLUTE_PATH] [--recogniser ABSOLUTE_PATH --people ABSOLUTE_PATH --who-socket ABSOLUTE_PATH [--known-file ABSOLUTE_PATH] [--visits on|off]] [--leave-still-faces on|off] [--steady-rate on|off] [--look-on-change on|off [--change-persist on|off] [--glance-log /var/lib/lampos-eyes/glance.log]] [--full-look WIDTHxHEIGHT --full-look-file ABSOLUTE_PATH [--full-look-movement on|off] [--sight-from-look on|off]] [--mouth-model ABSOLUTE_PATH [--mouth-on-heard on|off] [--mouth-runtime ABSOLUTE_PATH]] [--seems ABSOLUTE_PATH] [--seems-blendshapes ABSOLUTE_PATH] [--seems-log ABSOLUTE_PATH] [--photo-dir ABSOLUTE_PATH] [--mouth-diagnostics on|off] [--camera-helper ABSOLUTE_PATH]\n\nOwns the camera at --device (checked against the USB identity given, hex vendor and\nproduct and the port topology, for example 01da:5875@3-1.1.4; without --device, the one\ncamera with those ids at that port, found at each open, never one on another port; with\nVENDOR:PRODUCT alone, the one camera with those ids on any port; none or two refused\nwith a reason) and looks for a face in\nits frames four times a second while there is one and less than twice a second when\nthere is none, with the pinned YuNet model at --model. With --steady-rate on, it looks\ntwice a second while one face has sat still for 3 s (off unless given). With\n--look-on-change on, once no face has been found for 4 s, a frame like the last one the\ndetector ran on is said to hold no face without it, and the detector runs at least every\n3 s (off unless given). With --change-persist on (with --look-on-change on), a cell
 counts as changed only if it changed in this glance and the one compared before it, so a
 one-glance flicker is not a change and a person costs at most one glance more (off unless
 given). With --glance-log /var/lib/lampos-eyes/glance.log (with --look-on-change on;
@@ -25,14 +25,16 @@ and it stops after 20 minutes or 50 MB. A test flag: no unit lampOS deploys pass
 struct Usb {
     vendor: u16,
     product: u16,
-    /// The port, or empty for any (#2190): then the one camera with the ids
-    /// is found at each open.
+    /// The port, or empty for any (#2190). Without `--device` the one camera
+    /// with the ids, at this port when it is named (#3504), is found at each
+    /// open.
     topology: String,
 }
 
 #[derive(Debug, Eq, PartialEq)]
 struct Arguments {
-    /// The camera's node; none when `--usb` names no port and it is found.
+    /// The camera's node; none when it is found at each open by `--usb`,
+    /// at its port when it names one (#3504).
     device: Option<PathBuf>,
     lock_directory: PathBuf,
     usb: Usb,
@@ -381,14 +383,13 @@ fn parse(args: impl IntoIterator<Item = OsString>) -> Result<Option<Arguments>, 
         mouth_diagnostics: mouth_diagnostics.unwrap_or(false),
         camera_helper,
     };
-    match (&result.device, result.usb.topology.is_empty()) {
-        (None, false) => return Err("--device is required with --usb VENDOR:PRODUCT@TOPOLOGY"),
-        (Some(_), true) => {
-            return Err(
-                "--usb VENDOR:PRODUCT finds the camera on any port; leave out --device, or name the port",
-            );
-        }
-        _ => {}
+    // Without --device the camera is found by --usb, at its port when it
+    // names one (#3504): a second camera that enumerated first as video0 is
+    // not taken in its place.
+    if result.device.is_some() && result.usb.topology.is_empty() {
+        return Err(
+            "--usb VENDOR:PRODUCT finds the camera on any port; leave out --device, or name the port",
+        );
     }
     if result.full_look.is_some() != result.full_look_file.is_some()
         || (result.full_look_file.is_some() && result.full_look_file == result.sight_file)
@@ -1086,8 +1087,8 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
     // also set.
     let mut reopen = lamp_eyes::reopen::Reopen::default();
     let mut helper_asked = None;
-    // With `--usb VENDOR:PRODUCT` alone: why no one camera was found, said
-    // once while it stays so, and the port it was last found on.
+    // Without `--device`: why no one camera was found, said once while it
+    // stays so, and the port it was last found on.
     let (mut not_found, mut found_on): (Option<String>, Option<String>) = (None, None);
     let mut upgrade = lamp_eyes::full_look::Upgrade::default();
     let joints_bus = arguments
@@ -1830,20 +1831,36 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error + Send + Sy
                 std::thread::sleep(Duration::from_millis(50));
                 continue;
             }
-            // The node and port: as given, or the one camera with the ids
-            // on any port, found now, since a reset or a replug may move it
-            // (#2190).
+            // The node and port: as given, or the one camera with the ids,
+            // at --usb's port when it names one (#3504) or else on any port,
+            // found now, since a reset or a replug may move it (#2190).
             let (device, usb_port) = match &arguments.device {
                 Some(device) => (device.clone(), arguments.usb.topology.clone()),
                 None => match lamp_camera::linux::find_camera(
                     arguments.usb.vendor,
                     arguments.usb.product,
+                    &arguments.usb.topology,
                 ) {
                     Ok(Ok(found)) => found,
                     other => {
                         let why = match &other {
-                            Ok(Err(lamp_camera::linux::NotFound::None)) => {
+                            Ok(Err(lamp_camera::linux::NotFound::None))
+                                if arguments.usb.topology.is_empty() =>
+                            {
                                 "no camera with those ids".to_owned()
+                            }
+                            Ok(Err(lamp_camera::linux::NotFound::None)) => format!(
+                                "no camera with those ids at port {}",
+                                arguments.usb.topology
+                            ),
+                            Ok(Err(lamp_camera::linux::NotFound::Several(ports)))
+                                if !arguments.usb.topology.is_empty() =>
+                            {
+                                format!(
+                                    "{} capture nodes with those ids at port {}",
+                                    ports.len(),
+                                    arguments.usb.topology
+                                )
                             }
                             Ok(Err(lamp_camera::linux::NotFound::Several(ports))) => format!(
                                 "{} cameras with those ids, on {}: name one's port in --usb",
@@ -3183,7 +3200,8 @@ mod tests {
             Some(PathBuf::from("/run/lampos-eyes/present"))
         );
         assert!(parse(args(&[&FULL[..], &["--presence-file", "present"]].concat())).is_err());
-        for missing in 0..6 {
+        // Each but `--device`, which a named port may go without (#3504).
+        for missing in 1..6 {
             let mut some = FULL.to_vec();
             some.drain(missing * 2..missing * 2 + 2);
             assert!(parse(args(&some)).is_err());
@@ -3214,7 +3232,8 @@ mod tests {
 
     /// #2190: `--usb VENDOR:PRODUCT` alone takes the one camera with those
     /// ids on any port, found at each open, so no `--device` goes with it;
-    /// with a port, `--device` is still required.
+    /// with a port, `--device` may be given, or left out to find the camera
+    /// at that port only (#3504).
     #[test]
     fn the_camera_by_its_ids_alone_is_on_any_port_and_needs_no_device() {
         assert_eq!(
@@ -3232,8 +3251,12 @@ mod tests {
         // chosen by the device and not checked.
         let both = [&FULL[..4], &["--usb", "01da:5875"], &FULL[6..]].concat();
         assert!(parse(args(&both)).is_err());
-        // With a port, the device is still needed.
-        assert!(parse(args(&[&FULL[2..]].concat())).is_err());
+        // With a port and no device: found at that port (#3504).
+        let at_port = parse(args(&FULL[2..])).unwrap().unwrap();
+        assert_eq!(
+            (at_port.device, at_port.usb.topology.as_str()),
+            (None, "3-1.1.4")
+        );
         assert_eq!(
             parse(args(&FULL)).unwrap().unwrap().device,
             Some(PathBuf::from("/dev/video0"))
