@@ -58,7 +58,11 @@ in)
   [ -x "$REMOTE/harness-fixture" ] || fail "no stand-in at $REMOTE/harness-fixture"
   # lamp-tasks' own ExecStart, and the lamp-tasks to run: the unit's own, or PLAYED_TASKS for this run only. It
   # must know --sign-in-by-code (#1676): lamp-4ace's lamp-tasks didn't, and crash-looped on the flag (22 Oct 03:1x).
+  # Only the unit file's own section of `systemctl cat`, its first: from its `# /path` header up to the next one. A
+  # second `in` finds the first's drop-in printed after it, whose ExecStart is the stand-in's and whose conditions
+  # name the wrapper, so lamp-tasks would keep the real Harness's condition and be skipped again (El's P3 on #3652).
   unit=$($SYSTEMCTL cat lamp-tasks) || fail "systemctl cat lamp-tasks failed"
+  unit=$(printf '%s\n' "$unit" | awk 'NR == 1 && /^# \// { next } /^# \// { exit } { print }')
   exec_line=$(printf '%s\n' "$unit" | awk '/^ExecStart=./ { line = substr($0, 11) } END { print line }')
   case "$exec_line" in *"--harness "*) ;; *) fail "lamp-tasks' ExecStart has no --harness";; esac
   # The unit's ConditionPathExists, but the one on its real Harness (#811): on a lamp with no Harness CLI (lamp-06c1)
