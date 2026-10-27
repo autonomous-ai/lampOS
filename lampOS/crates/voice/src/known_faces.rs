@@ -2647,10 +2647,14 @@ mod tests {
     /// answer it gives to each.
     fn eyes(answers: Vec<Value>) -> (PathBuf, std::thread::JoinHandle<Vec<Value>>) {
         use std::io::{BufRead, BufReader, Write};
+        // One folder per call (#3792's P3: two tests with as many answers
+        // shared a socket).
+        static NEXT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
         let directory = std::env::temp_dir().join(format!(
-            "lamp-voice-names-{}-{}",
+            "lamp-voice-names-{}-{}-{}",
             std::process::id(),
-            answers.len()
+            answers.len(),
+            NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
         ));
         let _ = std::fs::remove_dir_all(&directory);
         std::fs::create_dir_all(&directory).unwrap();
@@ -2913,6 +2917,73 @@ mod tests {
                 json!({"remember": "Minh", "one_face": true, "replace": false}),
                 json!({"remember": "Minh", "one_face": true, "replace": false}),
                 json!({"remember": "Minh", "one_face": true, "replace": false}),
+            ]
+        );
+        let _ = std::fs::remove_dir_all(socket.parent().unwrap());
+    }
+
+    /// #3739, a tester's lamp on 27 Oct: one face was kept twice, under its
+    /// name and a name misheard far from it. The eyes' refusal for a face
+    /// near someone kept under another name asks for a spelling and says no
+    /// name (the HOLDs on #3792); a no, or "someone else" alone, sends
+    /// nothing; only the name spelled goes `apart` (Third's 18:02 HOLD).
+    #[test]
+    fn a_new_name_for_a_near_face_says_no_name_and_a_no_sends_nothing() {
+        let call = |args: Value| ToolCall {
+            id: "1".into(),
+            name: REMEMBER.into(),
+            args,
+        };
+        let (socket, asked) = eyes(vec![
+            json!({"error": "near_to", "near_to": "Ossa"}),
+            json!({"remembered": "Kemal"}),
+        ]);
+        let (words, _) = run_with(
+            &socket,
+            &call(json!({"name": "Kemal"})),
+            true,
+            &Said::now("Remember my face, I'm Kemal."),
+        );
+        let told = words["error"].as_str().unwrap();
+        assert!(told.contains("spell") && !told.contains("Ossa"), "{told}");
+        let asked_back = || {
+            vec![(
+                "Remember my face, I'm Kemal.".to_owned(),
+                "Sorry, could you spell Kemal for me?".to_owned(),
+            )]
+        };
+        // A no, or "someone else" alone: nothing reaches the eyes, whatever
+        // the model calls.
+        for this in ["No.", "No, I'm someone else."] {
+            for args in [
+                json!({"name": "Kemal", "replace": true}),
+                json!({"name": "Kemal", "apart": true}),
+            ] {
+                let (words, answered) = run_with(
+                    &socket,
+                    &call(args),
+                    true,
+                    &Said {
+                        this: this.into(),
+                        before: asked_back(),
+                    },
+                );
+                assert!(answered && words.get("ok").is_none(), "{this}: {words}");
+            }
+        }
+        // Spelled: kept apart.
+        let (words, _) = run_with(
+            &socket,
+            &call(json!({"name": "Kemal", "apart": true})),
+            true,
+            &Said::now("K E M A L."),
+        );
+        assert_eq!(words, json!({"ok": true, "remembered": "Kemal"}));
+        assert_eq!(
+            asked.join().unwrap(),
+            [
+                json!({"remember": "Kemal", "one_face": true, "replace": false}),
+                json!({"remember": "Kemal", "one_face": true, "replace": false, "apart": true}),
             ]
         );
         let _ = std::fs::remove_dir_all(socket.parent().unwrap());
