@@ -1,0 +1,30 @@
+{
+  "head": "c7c197f986e870577ef2af34043d92a52b882160",
+  "base": "f9a9404de4d6cad65e6f3945ab2e60c50eb5eacc",
+  "tree": "63794bcb3da8bee41c1b6cbb7720669a051b1700",
+  "status": "VERIFIED_FOCUSED_HOST_CARRY",
+  "holds": [],
+  "selected_direct_counts": {
+    "failed": 0,
+    "ignored": 1,
+    "passed": 238
+  },
+  "tests_retried": 0,
+  "limits": [
+    "Focused host privacy carry on c7c197f98/f9a9404de only; no current full host Voice claim.",
+    "Historical full Voice selection belongs to4bff; not reattributed.",
+    "Fresh original current native full Voice remains required before readiness; later base drift needs a separate carry.",
+    "Existing native642 Reader failure remains unresolved; this selected host carry does not establish its cause or waive it.",
+    "No historical cause/device/physical-latency claim."
+  ],
+  "full_private_audit_sha256": "11c81225b6a78f484ced12d6c87e95ed1ba028960dc74ab0a462a5259f49975d",
+  "required_witnesses": 16,
+  "required_pass_once": 16,
+  "expected_caught_hooks": 2,
+  "unknown_hooks": 0,
+  "artifact_pairs": 65,
+  "local_packages": 49,
+  "product_children": 47,
+  "docs_passed": 3,
+  "guard_result": "All source/raw/artifact guards stable; metadata unchanged; groups absent, no timeout or forced cleanup."
+}
