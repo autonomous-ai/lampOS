@@ -2380,9 +2380,10 @@ another face: its points are in the 256-square crop's pixels and turned back
 by the eye line's angle, whatever the crop was cut from.
 The mesh reads it under tract, and with `--mouth-diagnostics on` (never in
 the product: it is a line a look, up to four a second) the journal says
-`lamp-eyes: mouth open 0.0123 eyes 31 px mesh 84 ms`. That is the inner
-lips' gap (points 13 and 14) over the face's height (10 to 152), the eye
-distance in detector pixels, and the time. No picture is kept.
+`lamp-eyes: mouth open 0.0123 eyes 31 px (124 px meshed) mesh 84 ms`. That
+is the inner lips' gap (points 13 and 14) over the face's height (10 to
+152), the eye distance in detector pixels and in the pixels the mesh's crop
+was cut from (the same without `--full-look`), and the time. No picture is kept.
 
 With `LAMP_EYES_SPEAKING=on` as well, that face's `speaking` reads the
 mesh instead of the corners whenever every look in its 2 s window had the
