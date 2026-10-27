@@ -622,6 +622,11 @@ units stopped:
    gaze off, said in the body's first line (thirteen-P1; before it, the body
    refused them and never started on a factory `lamp.env`). Without
    `--write` it only prints, so a lamp can be read first and written later.
+   Not a factory step yet: `lamp-body-measure sweep ... --seconds 25
+   [--write /etc/lampOS/body/lamp.env]`, torque off, while a person moves
+   each joint from end to end, records each joint's range of motion as an
+   arc (across the 0/4095 seam where it crosses it) and can add it to that
+   file as one comment line (#3504; [body.md](body.md)).
 2. **The touch pads**, `/etc/lampOS/controls/controls-pins.json`, with a
    person at the lamp. GPIO head pads differ by unit: the hardware team's test
    passes when two or more of four candidate lines (37, 96, 97, 98) read a

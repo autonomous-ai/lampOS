@@ -5,7 +5,7 @@
 use lamp_body::calibration::UnitId;
 use std::{ffi::OsString, path::PathBuf};
 
-const USAGE: &str = "lamp-body-measure --device ABSOLUTE_PATH --unit-id EXPLICIT_ID --lock-directory PRIVATE_ABSOLUTE_DIRECTORY [--write ABSOLUTE_FILE] [--seated]\n\nThe factory's per-lamp body step: reads the lamp at rest with torque off (lamp-body-inspect's\nread-only plan: no register writes, no torque, no motion) and prints this lamp's own\nlamp.env (BODY_POSES: --home, --folded-arm, --stand, --pitch-window, --torque). With --write\nit also writes that file, which must not exist yet (/etc/lampOS/body/lamp.env on the product).\nRefused, with why, where the body would refuse the poses. {home}--gaze is not measured here (body.md).\nWith --seated the file holds only --home, --pitch-window and --torque on: a lamp whose first stand\nno person has confirmed yet, whose body then holds and moves the head and base only, never the arm (#2163).\nStop the body and every other bus owner first. Linux only.\n\nlamp-body-measure first-stand --device ABSOLUTE_PATH --unit-id EXPLICIT_ID --lock-directory PRIVATE_ABSOLUTE_DIRECTORY --body-user USER [--bus-root DIR] [--presence-file FILE] [--say-socket FILE] [--lamp-env FILE] [--record FILE]\n\nA seated lamp's first stand, confirmed at the lamp (lamp_body::first_stand, #2396): once someone is near\nit asks through the voice's say service, and a touch on the head or a button held a second, or a short\nspoken yes with a face near, is the yes;\nthen the body is stopped, the arm stood at 30% and 100% as the factory's steps stand it, this arm's\nstand written into --lamp-env (/etc/lampOS/body/lamp.env), and the body started again. A second touch\nwhile it moves stops it, and nothing is written. Nothing moves without the yes. As root.\n";
+const USAGE: &str = "lamp-body-measure --device ABSOLUTE_PATH --unit-id EXPLICIT_ID --lock-directory PRIVATE_ABSOLUTE_DIRECTORY [--write ABSOLUTE_FILE] [--seated]\n\nThe factory's per-lamp body step: reads the lamp at rest with torque off (lamp-body-inspect's\nread-only plan: no register writes, no torque, no motion) and prints this lamp's own\nlamp.env (BODY_POSES: --home, --folded-arm, --stand, --pitch-window, --torque). With --write\nit also writes that file, which must not exist yet (/etc/lampOS/body/lamp.env on the product).\nRefused, with why, where the body would refuse the poses. {home}--gaze is not measured here (body.md).\nWith --seated the file holds only --home, --pitch-window and --torque on: a lamp whose first stand\nno person has confirmed yet, whose body then holds and moves the head and base only, never the arm (#2163).\nStop the body and every other bus owner first. Linux only.\n\nlamp-body-measure first-stand --device ABSOLUTE_PATH --unit-id EXPLICIT_ID --lock-directory PRIVATE_ABSOLUTE_DIRECTORY --body-user USER [--bus-root DIR] [--presence-file FILE] [--say-socket FILE] [--lamp-env FILE] [--record FILE]\n\nA seated lamp's first stand, confirmed at the lamp (lamp_body::first_stand, #2396): once someone is near\nit asks through the voice's say service, and a touch on the head or a button held a second, or a short\nspoken yes with a face near, is the yes;\nthen the body is stopped, the arm stood at 30% and 100% as the factory's steps stand it, this arm's\nstand written into --lamp-env (/etc/lampOS/body/lamp.env), and the body started again. A second touch\nwhile it moves stops it, and nothing is written. Nothing moves without the yes. As root.\n\nlamp-body-measure sweep --device ABSOLUTE_PATH --unit-id EXPLICIT_ID --lock-directory PRIVATE_ABSOLUTE_DIRECTORY --seconds N [--write ABSOLUTE_FILE]\n\nA hand sweep of each joint's range of motion (#3504, #3558): the same read-only plan, run again and\nagain on one open port for N seconds (1 to 600) while a person moves each joint from end to end. No\nregister is written; refused, with why, unless torque is off on all five. Prints each joint's arc, the\npositive way from one end to the other (one across the 0/4095 seam says so: elbow 3900-300), and a\nlamp.env comment line, \"# Swept by hand: ...\". With --write it appends that line to an existing\nlamp.env that has none yet, and changes nothing else. Stop the body and every other bus owner first.\nLinux only.\n";
 
 /// [`USAGE`] with the home pitch clamp said from the code's own numbers
 /// (`Limits::FOLDED.pitch_home`, `poses::HOME_PITCH_TOLERANCE`), never a
@@ -214,6 +214,163 @@ fn first_stand_options(
     Ok(options)
 }
 
+/// `sweep`'s options (#3504).
+#[derive(Debug)]
+struct Sweep {
+    device: PathBuf,
+    unit_id: UnitId,
+    lock_directory: PathBuf,
+    seconds: u64,
+    write: Option<PathBuf>,
+}
+
+fn sweep_options(args: impl IntoIterator<Item = OsString>) -> Result<Sweep, &'static str> {
+    let mut args = args.into_iter();
+    let mut values = std::collections::BTreeMap::new();
+    while let Some(key) = args.next() {
+        let key = key
+            .into_string()
+            .map_err(|_| "every option must be UTF-8")?;
+        let value = args.next().ok_or("every option requires a value")?;
+        let value = value
+            .into_string()
+            .map_err(|_| "every value must be UTF-8")?;
+        if !matches!(
+            key.as_str(),
+            "--device" | "--unit-id" | "--lock-directory" | "--seconds" | "--write"
+        ) || values.insert(key, value).is_some()
+        {
+            return Err("unknown or duplicate option");
+        }
+    }
+    let required = "--device, --unit-id, --lock-directory and --seconds are required";
+    let mut take = |key: &str| values.remove(key);
+    let options = Sweep {
+        device: take("--device").ok_or(required)?.into(),
+        unit_id: UnitId::new(&take("--unit-id").ok_or(required)?)
+            .map_err(|_| "invalid explicit unit ID")?,
+        lock_directory: take("--lock-directory").ok_or(required)?.into(),
+        seconds: take("--seconds")
+            .ok_or(required)?
+            .parse()
+            .ok()
+            .filter(|seconds| (1..=600).contains(seconds))
+            .ok_or("--seconds must be a whole number from 1 to 600")?,
+        write: take("--write").map(PathBuf::from),
+    };
+    if ![&options.device, &options.lock_directory]
+        .into_iter()
+        .chain(options.write.as_ref())
+        .all(|path| bounded(path))
+    {
+        return Err("paths must be bounded absolute UTF-8 paths without parent traversal");
+    }
+    Ok(options)
+}
+
+/// Appends the sweep's line to a `lamp.env` already there, once: never
+/// creates the file, never a second sweep line (one starting as `line`
+/// does up to its colon, `poses::SWEPT_PREFIX`), nothing else changed.
+fn append_swept(path: &std::path::Path, line: &str) -> std::io::Result<()> {
+    use std::io::Write;
+    let prefix = line.split_inclusive(':').next().unwrap_or(line);
+    let text = std::fs::read_to_string(path)?;
+    if text.lines().any(|old| old.starts_with(prefix)) {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::AlreadyExists,
+            "it already has a sweep line; nothing was changed",
+        ));
+    }
+    let gap = if text.is_empty() || text.ends_with('\n') {
+        ""
+    } else {
+        "\n"
+    };
+    let mut file = std::fs::OpenOptions::new().append(true).open(path)?;
+    file.write_all(format!("{gap}{line}\n").as_bytes())?;
+    file.sync_all()
+}
+
+#[cfg(not(target_os = "linux"))]
+fn sweep(options: &Sweep) -> Result<(), Box<dyn std::error::Error>> {
+    let _ = (
+        &options.device,
+        &options.unit_id,
+        &options.lock_directory,
+        options.seconds,
+        &options.write,
+        append_swept as fn(&std::path::Path, &str) -> std::io::Result<()>,
+    );
+    Err("the hand sweep requires Linux; no device was opened".into())
+}
+
+/// The hand sweep (#3504): the read-only plan on one open port for the
+/// given seconds, each read's five positions fed to their joint's arc.
+/// Every read must show torque off on all five (`poses::rest_read`), or
+/// the sweep stops there, refused.
+#[cfg(target_os = "linux")]
+fn sweep(options: &Sweep) -> Result<(), Box<dyn std::error::Error>> {
+    use lamp_body::linux::{InspectionConfig, inspect_repeatedly};
+    use lamp_body::poses::{ArcTracker, JOINT_NAMES, rest_read, swept_line};
+    let config = InspectionConfig::new(
+        options.device.clone(),
+        options.unit_id.clone(),
+        options.lock_directory.clone(),
+    )?;
+    let mut arcs = [ArcTracker::default(); 5];
+    let (mut reads, mut refused) = (0_u32, None);
+    let until = std::time::Instant::now() + std::time::Duration::from_secs(options.seconds);
+    eprintln!(
+        "lamp-body-measure sweep: reading for {} s: move each joint by hand from one end to the other",
+        options.seconds
+    );
+    let result = inspect_repeatedly(
+        &config,
+        || Ok(false),
+        |report| match rest_read(report) {
+            Ok(read) => {
+                let positions = [read.yaw, read.shoulder, read.elbow, read.roll, read.pitch];
+                for (arc, position) in arcs.iter_mut().zip(positions) {
+                    arc.feed(position);
+                }
+                reads += 1;
+                std::time::Instant::now() < until
+            }
+            Err(why) => {
+                refused = Some(why);
+                false
+            }
+        },
+    );
+    if let Some(why) = refused {
+        return Err(format!("refused: {why}; nothing was written").into());
+    }
+    if !result.completed {
+        return Err(format!(
+            "the read-only reads did not complete after {reads}; nothing was written"
+        )
+        .into());
+    }
+    let swept = arcs.map(|arc| arc.swept());
+    println!("{reads} reads in {} s.", options.seconds);
+    for (name, swept) in JOINT_NAMES.iter().zip(&swept) {
+        match swept {
+            Some(swept) => println!("{name}: {swept}, {}", swept.span()),
+            None => println!("{name}: not read"),
+        }
+    }
+    let line = swept_line(&swept);
+    println!("{line}");
+    if let Some(path) = &options.write {
+        append_swept(path, &line).map_err(|error| format!("{}: {error}", path.display()))?;
+        eprintln!(
+            "lamp-body-measure sweep: added the line to {}",
+            path.display()
+        );
+    }
+    Ok(())
+}
+
 fn main() -> std::process::ExitCode {
     let mut args = std::env::args_os().skip(1).peekable();
     if args.peek().is_some_and(|first| first == "first-stand") {
@@ -224,6 +381,23 @@ fn main() -> std::process::ExitCode {
                 std::process::ExitCode::from(2)
             }
             Ok(options) => first_stand(&options),
+        };
+    }
+    if args.peek().is_some_and(|first| first == "sweep") {
+        args.next();
+        let result = match sweep_options(args) {
+            Err(error) => {
+                eprintln!("{error}\n{}", usage());
+                return std::process::ExitCode::from(2);
+            }
+            Ok(options) => sweep(&options),
+        };
+        return match result {
+            Ok(()) => std::process::ExitCode::SUCCESS,
+            Err(error) => {
+                eprintln!("lamp-body-measure sweep: {error}");
+                std::process::ExitCode::FAILURE
+            }
         };
     }
     let arguments = match parse(args) {
@@ -467,6 +641,61 @@ mod tests {
         assert_eq!(
             std::fs::read_to_string(&path).unwrap(),
             "BODY_POSES=\"--home 1,2,3\"\n"
+        );
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn sweep_needs_its_device_unit_lock_and_seconds() {
+        let base = [
+            "--device",
+            "/dev/ttyACM0",
+            "--unit-id",
+            "lamp-3e83",
+            "--lock-directory",
+            "/var/lib/lampos-locks/motor",
+            "--seconds",
+            "25",
+        ];
+        let options = sweep_options(args(&base)).unwrap();
+        assert_eq!((options.seconds, options.write), (25, None));
+        let writing = sweep_options(args(
+            &[&base[..], &["--write", "/etc/lampOS/body/lamp.env"]].concat(),
+        ))
+        .unwrap();
+        assert_eq!(
+            writing.write.as_deref(),
+            Some(std::path::Path::new("/etc/lampOS/body/lamp.env"))
+        );
+        for bad in [
+            base[..6].to_vec(),
+            [&base[..6], &["--seconds", "0"]].concat(),
+            [&base[..6], &["--seconds", "601"]].concat(),
+            [&base[..6], &["--seconds", "ten"]].concat(),
+            [&base[..], &["--seconds", "25"]].concat(),
+            [&base[..], &["--torque", "on"]].concat(),
+            [&base[..], &["--write", "lamp.env"]].concat(),
+        ] {
+            assert!(sweep_options(args(&bad)).is_err(), "{bad:?}");
+        }
+    }
+
+    /// The sweep's line goes only into a file already there, once, after
+    /// what it holds, which stays as it was.
+    #[test]
+    fn the_sweep_line_is_appended_once_to_an_existing_file() {
+        let path = std::env::temp_dir().join(format!("lamp-env-sweep-{}", std::process::id()));
+        let _ = std::fs::remove_file(&path);
+        let line = "# Swept by hand: yaw 855-3283, shoulder 2056-3989, elbow 3900-300 (across the seam), roll 1223-3237, pitch 1470-3103.";
+        assert!(append_swept(&path, line).is_err());
+        assert!(!path.exists());
+        let poses = "# lamp-3e83\nBODY_POSES=\"--home 1,2,3\"";
+        std::fs::write(&path, poses).unwrap();
+        append_swept(&path, line).unwrap();
+        assert!(append_swept(&path, line).is_err());
+        assert_eq!(
+            std::fs::read_to_string(&path).unwrap(),
+            format!("{poses}\n{line}\n")
         );
         let _ = std::fs::remove_file(&path);
     }

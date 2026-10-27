@@ -324,6 +324,51 @@ fn inspect_once_with(
     result
 }
 
+/// The same fixed read-only plan as [`inspect_once`], run again and again on
+/// one open port until `each` returns false, a plan does not complete, or
+/// `cancelled` says so (#3504's hand sweep: no register written, no torque).
+/// `inspection` holds the last plan's report; `completed` means every plan
+/// completed and the port was given back cleanly.
+#[must_use]
+pub fn inspect_repeatedly(
+    config: &InspectionConfig,
+    mut cancelled: impl FnMut() -> io::Result<bool>,
+    mut each: impl FnMut(&InspectionReport) -> bool,
+) -> InspectionResult {
+    let origin = Instant::now();
+    let mut result = empty_result(config);
+    let mut owner = Owner::default();
+    match owner.prepare(config, None, &mut result, origin, &mut cancelled) {
+        Ok(()) => {
+            result.prepared_us = Some(micros(origin));
+            let mut runtime = HostRuntime {
+                origin,
+                cancelled: &mut cancelled,
+                recovery_inhibited: None,
+            };
+            let mut port = LinuxPort {
+                fd: owner.fd.as_ref().expect("prepared tty"),
+            };
+            loop {
+                let report = inspection::run_with(&mut port, &mut runtime, false);
+                let more = report.completed && each(&report);
+                result.inspection = Some(report);
+                if !more {
+                    break;
+                }
+            }
+        }
+        Err(error) => result.preparation_error = Some(error),
+    }
+    let flush = result.inspection.as_ref().is_some_and(|r| !r.completed);
+    result.cleanup = owner.finish(origin, flush);
+    result.elapsed_us = micros(origin);
+    result.completed = result.preparation_error.is_none()
+        && result.inspection.as_ref().is_some_and(|r| r.completed)
+        && result.cleanup.errors.is_empty();
+    result
+}
+
 fn empty_result(config: &InspectionConfig) -> InspectionResult {
     InspectionResult {
         schema_version: 2,

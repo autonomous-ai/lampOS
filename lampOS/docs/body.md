@@ -242,7 +242,8 @@ which V1's calibration wrote on its lamps), says them in its report
   the range, a standing arm is checked against the range itself, and the
   arm's goals keep their own window);
 - a joint that stores the whole turn, 0 to 4,095 (lamp-52e6's elbow), was
-  never calibrated by V1 and keeps today's guard;
+  never calibrated by V1 and keeps today's guard; its range can only be
+  swept by hand (`lamp-body-measure sweep`, below), which nothing reads yet;
 - a stored limit past 4,095, or a lower limit above the upper, is a failed
   read: the lamp does not start (`first read: <joint> stores position
   limits …`), writing nothing, rather than run on a range clamped wider
@@ -1943,6 +1944,33 @@ no person has confirmed yet. Its standing file comes later, from the
 factory's watched stand. A read with torque on is refused here too: the tool
 never turns torque off to get a read, since an arm that is up would drop
 (Fifth on #2163).
+
+**`lamp-body-measure sweep`** (#3504, #3558's read side) records each
+joint's range of motion by hand, as V1's `record_ranges_of_motion()` did:
+the same read-only plan, run again and again on one open port
+(`linux::inspect_repeatedly`) for `--seconds N` (1 to 600) while a person
+moves each joint from one end to the other. It writes no register; every read
+must show torque off on all five, or the sweep stops there, refused with
+why. Each joint's reads are unwrapped one onto the next
+(`poses::ArcTracker`): a jump of more than half a turn between two reads is
+the 0/4095 seam crossed, not a move, and a read farther than
+`poses::SWEEP_OUTLIER` (512 counts) from the read after it is a single
+misread and dropped. So a joint is an arc, the positive way from one end to
+the other, not a min and max: hw-first's elbow on lamp-3e83 read 3 to 4,095
+as a min and max (#3558), where the arc is its two ends either side of the
+seam, said as `3900-300 (across the seam)`; a whole turn or more is "a full
+turn". It prints each arc with its span in counts and degrees, and a comment
+line, `# Swept by hand: yaw 855-3283, shoulder 2056-3989, elbow 3900-300
+(across the seam), roll 1223-3237, pitch 1470-3103.` With `--write FILE` it
+appends that line to a `lamp.env` already there that has no sweep line yet,
+and changes nothing else in it (never creates the file, never touches
+`BODY_POSES`). Nothing reads the line yet: it is evidence for a per-unit
+bound on the joints whose servos store 0 to 4,095 (the shoulder and elbow
+V1 never calibrated), as #3558 asks
+(`a_sweep_across_the_seam_keeps_both_ends`, `a_single_misread_is_dropped`,
+`a_whole_turn_or_more_is_a_full_turn`, `jitter_at_rest_is_a_short_arc`,
+`the_sweep_line_is_appended_once_to_an_existing_file`). Stop the body and
+every other bus owner first.
 
 **The first stand of a moved lamp, confirmed at the lamp** (#2396; the
 first builder on #1711, 21 Oct). `lamp-body-measure first-stand`
