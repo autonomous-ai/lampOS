@@ -223,8 +223,13 @@ fn switches() {
     observe_with(Box::new(|input: &Value| {
         Some(json!({"observations":[{
             // Words of both conversations' heard lines: an observation
-            // rests on what the person said (finding M on #3504).
-            "text":"Their sister's wedding is in June, they need a gift and ask what to keep",
+            // rests on what the person said (finding M on #3504). With how
+            // many lines it was made from, so the second conversation's is
+            // no restatement of the first's (`tidy::restates`).
+            "text":format!(
+                "Their sister's wedding is in June, they need a gift and ask what to keep, over {} lines",
+                input["source_ids"].as_array().map_or(0, Vec::len)
+            ),
             "category":"thread",
             "source_ids":input["source_ids"],
             "supersedes":null
