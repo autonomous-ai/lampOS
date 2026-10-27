@@ -658,3 +658,4 @@ Ready for lamp-voice: yes (#2553), once its ARM64 run is green
 - 22:39: #3836 merged (1d97a2c6d, reviewer-lead). Reviewer-lead no finding on #3875 1be302a37; NEXT TRAIN when CI is green.
 - 22:44: Reviewer-two on #3875: P1/P2 none, gate-only HOLD (ARM64 completion, latest base); ARM64 pending. NEXT TRAIN when green. Nine's #3876 (lamp-control product unit, off) up for the skill-push path.
 - 22:49: quiet tick; #3875 ARM64 pending.
+- 22:54: NEXT TRAIN #3875 1be302a37 (ARM64 green). #3813 merged; #3840 next for the reviewer-lead. Ten's #3878 (format 2): order note posted (copy the skill schema to the SDK if it lands after #3840; skill check will follow format 2).
