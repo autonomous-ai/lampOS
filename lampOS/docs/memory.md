@@ -809,6 +809,41 @@ passed. Tests: the notes' exact texts in `remember::tests`.
     what those were shown (#2003), and never what else derives from those
     exchanges, such as a kept thing remembered in the same conversation
     (#3113).
+  - **A bare "forget that" asks which before a guessed id** (#3504,
+    Friday's N1; with `LAMP_MEMORY_FORGET_ALL`, which a `source_id` needs;
+    both voice routes and texts). On lamp-06c1
+    on 27 Oct, "Alone. Forget that." with no follow-up asked was called
+    as `forget {source_id}` with an id the model chose from the note: an
+    old observation went, and only then did the lamp ask what was meant.
+    Now the guard (`remember::named_forget`) marks a `forget` with a
+    `source_id` whose heard line asks to forget and names nothing ("forget
+    that", "forget it", "quên cái đó đi"), with no named forget just
+    before, as `heard_bare`. The memory runs such an id only when it is
+    plainly "that": the only thing this session was shown of that scope,
+    the one thing the session's last `remember` or `recall` gave
+    (`DaysContext::last_given`) within 60 s (`HELD_FORGET_FOR`) and in the
+    same session, or the follow-up just asked about. `last_given` is
+    emptied as each `remember` or `recall` is sent, so one that fails gives
+    nothing, as a session opens under another name, and as one closes (the
+    reviewer-lead's P2 on #3737). With
+    more than one shown otherwise it forgets nothing and tells the model
+    `remember::forget_which`: ask once which one, naming at most two of
+    their own (of the room's, naming nothing kept), and forget only the one
+    they then name. A known person's answer ("the graduation date") names
+    it, so the next call runs. In the room's scope on the second route, an
+    answer with no forget word ("the plant one") is not a forget asked for
+    (`NOT_ASKED_TO_FORGET`), so it takes a line that asks again. Nothing
+    remembers that "which?" was asked: a second bare line ("just forget
+    it") is asked about again; asking once is the model's instruction. The journal says `a bare forget's source_id N is not
+    run: M shown could be meant, asked which`.
+  - **Every forget's arguments are journalled, content-free** (#3504,
+    Friday's N1): `lamp-voice provider: forget called: source_id N, about
+    W words, heard named B, heard bare B` (and `forget_everything called:
+    …`), ids and counts only, never `about`'s words
+    (`remember::forget_args_logged`).
+  - Tests: `remember::tests::a_bare_forget_asks_which_before_running_a_guessed_id`,
+    `remember::tests::what_the_last_recall_gave_is_that_only_soon_in_its_session`
+    and `remember::tests::a_forgets_arguments_are_logged_with_ids_and_counts_only`.
   - `forget_everything {}`, asked once and said yes to, is for **someone
     known only**: it sends `forget_all` for their own scope (never `null`,
     which would be everyone's), and for their rules' scope (`r-<person>`)
