@@ -53,6 +53,14 @@ pub(crate) struct Words {
     pub(crate) sit_failed: String,
     pub(crate) who_again: String,
     pub(crate) touch_remind: String,
+    /// #3769's lines are optional: an older updater's `install` writes its
+    /// own built-in onboarding file, without them, and the walk must still
+    /// run. Without one, the walk says what it said before (Reviewer-two's
+    /// P2 on #3781).
+    #[serde(default)]
+    pub(crate) touch_done: Option<String>,
+    #[serde(default)]
+    pub(crate) touch_failed: Option<String>,
     pub(crate) privacy_done: String,
     pub(crate) privacy_done_camera: String,
     pub(crate) privacy_failed: String,
@@ -65,6 +73,8 @@ pub(crate) struct Words {
     pub(crate) sentence_again: String,
     pub(crate) sentence_done: String,
     pub(crate) sentence_failed: String,
+    #[serde(default)]
+    pub(crate) give_again: Option<String>,
     pub(crate) give_done: String,
     pub(crate) give_failed: String,
     pub(crate) who_confirm: String,
@@ -162,6 +172,15 @@ impl Definition {
                 ("who_confirm", &self.words.who_confirm, &["name"]),
             ],
         )?;
+        for (name, line) in [
+            ("touch_done", &self.words.touch_done),
+            ("touch_failed", &self.words.touch_failed),
+            ("give_again", &self.words.give_again),
+        ] {
+            if let Some(line) = line {
+                checked_words("onboarding words", &[(name, line, &[])])?;
+            }
+        }
         Ok(self)
     }
 
@@ -252,4 +271,4 @@ pub(crate) fn fixture() -> std::sync::Arc<Definition> {
 }
 
 #[cfg(test)]
-mod tests;
+pub(crate) mod tests;
