@@ -244,6 +244,17 @@ voice/text, emotion, movement, look, or delegation. The tool description allows
 rejecting an overheard request even when the device could fulfill it. Uncertainty,
 silent completion, and errors retain the existing fallback behavior.
 
+Right after `DEVICE IDENTITY`, `build_instructions()` adds a `# HOW PEOPLE CALL YOU`
+section (`wake_names=` in the floor breakdown, ~120 tokens) listing the owner's
+wake phrases (config.json `wake_phrases`) or, when the owner kept the defaults,
+the built-in wake words. It tells the model that such a name at the start or end
+of an utterance, including a misheard form ("Sam" heard as "Exam"), is only the
+call to the device: not part of the request, not another language and not a
+reason to reject or delegate. Without it, Gemini rejected "Sam, mấy giờ rồi?" as
+Spanish or delegated "Exam mấy giờ rồi?" to the main agent instead of answering.
+The list is read when a session's instructions are built, so an edit applies
+from the next realtime session.
+
 A device can opt in to answering overheard speech with `answer_overheard_speech: true` in its ROBOT.md front
 matter (Intern v2 sets it; Lamp does not). `build_instructions()` then appends
 `resources/answer_overheard_override.md` as the last prompt section (`overheard=`

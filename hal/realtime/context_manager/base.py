@@ -162,6 +162,38 @@ def _device_answers_overheard_speech() -> bool:
         return False
 
 
+def _wake_names() -> list[str]:
+    """What people call the device: the owner's wake phrases, else the built-in ones."""
+    phrases: list[str] = app_config.custom_wake_phrases()
+    if not phrases:
+        try:
+            from hal.drivers.voice._internal.config import DEFAULT_WAKE_WORDS
+            phrases = [p.casefold() for p in DEFAULT_WAKE_WORDS]
+        except Exception:
+            return []
+    return list(dict.fromkeys(p.strip() for p in phrases if p.strip()))
+
+
+def wake_names_section(names: list[str]) -> str:
+    """Tell the model that a wake name in the audio is the call to it, not the request.
+
+    Without it Gemini hears "Sam, mấy giờ rồi?" as "Exam mấy giờ rồi?" or as
+    another language, then delegates or rejects a question it could answer.
+    """
+    if not names:
+        return ""
+    listed: str = ", ".join(f'"{n}"' for n in names)
+    return (
+        "# HOW PEOPLE CALL YOU\n\n"
+        f"People wake you by saying one of these: {listed}. Such a name at the "
+        "start or end of what they say (\"Sam, what time is it?\") is only the "
+        "call to you: it is not part of the request, not another language, and "
+        "not a reason to reject or delegate. Transcription often mishears it "
+        "(\"Sam\" as \"Exam\" or \"some\"); treat a similar-sounding word there "
+        "the same way and answer the rest normally."
+    )
+
+
 class ContextManagerBase(ABC):
     """Abstract base for realtime voice agent context managers."""
 
@@ -376,6 +408,8 @@ class ContextManagerBase(ABC):
             "identity",
             f"# DEVICE IDENTITY\n\n{identity_rules}\n\n{identity}" if identity else "",
         )
+
+        add("wake_names", wake_names_section(_wake_names()))
 
         catalog: str = self.load_skills_catalog()
         add("skills", f"# SKILLS CATALOG\n\n{catalog}" if catalog else "")
