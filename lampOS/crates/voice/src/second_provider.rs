@@ -2662,6 +2662,17 @@ impl Engine {
         self
     }
 
+    /// The chat's and the voice's connections opened as the route starts,
+    /// as [`Services::warm`] opens them as each line begins: the first turn
+    /// after a start, a written one above all, otherwise opens them inside
+    /// its first round's [`BEGIN_WITHIN`]. On lamp-29e7 an onboarding
+    /// invitation 3 s after the second route started over had not begun in
+    /// 3 s and ended unanswered (`no_audio_answer`, #3754). Within a Tokio
+    /// runtime; no turn waits for it.
+    pub fn warm_ahead(&self) {
+        tokio::spawn(self.shared.services.warm());
+    }
+
     /// `LAMP_SECOND_WRITTEN_WAIT=on` ([`WRITTEN_WAIT_ENVIRONMENT`]): a turn
     /// the lamp wrote itself, news above all, waits as long as
     /// [`WRITTEN_BEGIN_WITHIN`] for its first round, not [`BEGIN_WITHIN`].
