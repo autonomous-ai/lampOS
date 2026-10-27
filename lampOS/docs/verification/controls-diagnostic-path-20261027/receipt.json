@@ -1,0 +1,77 @@
+{
+  "base": "f9a9404de4d6cad65e6f3945ab2e60c50eb5eacc",
+  "source_before": {
+    "lampOS/crates/controls/tests/it/touch_pins.rs": "16b27e2a59a6f7f051c338c5dcb5873b8fff9977eb08ff03ec2b844e0ff7a77a"
+  },
+  "source_after": {
+    "lampOS/crates/controls/tests/it/touch_pins.rs": "16b27e2a59a6f7f051c338c5dcb5873b8fff9977eb08ff03ec2b844e0ff7a77a"
+  },
+  "commands": [
+    {
+      "command": [
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit": 0,
+      "seconds": 12.311,
+      "timeout": false,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "clippy",
+        "-q",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-controls",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit": 0,
+      "seconds": 17.422,
+      "timeout": false,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "test",
+        "-q",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-controls",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "seconds": 96.849,
+      "timeout": false,
+      "log_sha256": "01d864e36435891950837e7520c96494a5dfcb77b897251c54ad1c7d46754d0f"
+    }
+  ],
+  "working_diff": "15\t7\tlampOS/crates/controls/tests/it/touch_pins.rs",
+  "limits": "Mac host checks. No production behavior change, Linux compilation or device action. Idle review target reused through normal Cargo compilation; not a cold build.",
+  "host_counts": {
+    "passed": 516,
+    "failed": 0,
+    "ignored": 3
+  },
+  "deterministic_before": {
+    "exit": 101,
+    "path_component": "diagnostic-high-900",
+    "expected_fault": "Original substring assertion fails even though only the diagnostic path contains the values.",
+    "log_sha256": "84c38a6ae45f7af5409383c78a0e55e89e2637b4e5420c402a18ee3ed2c42b6d"
+  },
+  "focused_after": {
+    "exit": 0,
+    "passed": 1,
+    "log_sha256": "8db33405122a17becbf2cb7447200c03a84c4053ae3f6741ff557c0d6488f720"
+  },
+  "commit": "64987f2a436849ea9407398b8c610fc712af751e",
+  "commit_tree": "808d3840a1fa2d5877faa26b356a8056ff8ff092",
+  "private_qualification_sha256": "4c0d90d01ecbd7b41afd776b5c093dd2eea0660b2b2c960eddcadd95e2ffa1d2"
+}

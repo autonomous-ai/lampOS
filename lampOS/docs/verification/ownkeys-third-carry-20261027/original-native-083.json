@@ -1,0 +1,273 @@
+{
+  "controls": {
+    "linux_only_once_pass": 6,
+    "missing_or_nonpass": [],
+    "once_pass": 71,
+    "required": 71
+  },
+  "holds": [],
+  "limits": [
+    "Only this original event and executed preview; no newer Main or device acceptance.",
+    "Successful Reader observation does not establish cause or waive original642 Reader failure held by Tests under #3543.",
+    "No CI rerun, binary download/execution or device action.",
+    "Summary skips have no per-case names in log and are not waived."
+  ],
+  "nextest": {
+    "ipc_camera_authority_pass": 18,
+    "per_package_pass": {
+      "lamp-actions": 123,
+      "lamp-addons": 50,
+      "lamp-air": 27,
+      "lamp-audio": 193,
+      "lamp-body": 626,
+      "lamp-bus": 107,
+      "lamp-camera": 90,
+      "lamp-cloud": 196,
+      "lamp-controls": 516,
+      "lamp-ears": 76,
+      "lamp-environment": 12,
+      "lamp-expression": 340,
+      "lamp-eyes": 340,
+      "lamp-gemini": 285,
+      "lamp-health": 91,
+      "lamp-ipc": 45,
+      "lamp-keeper": 42,
+      "lamp-lean": 61,
+      "lamp-local-time": 11,
+      "lamp-memory": 336,
+      "lamp-mood": 118,
+      "lamp-msgs": 172,
+      "lamp-name": 44,
+      "lamp-near-call": 8,
+      "lamp-observer": 46,
+      "lamp-peek": 26,
+      "lamp-policy": 284,
+      "lamp-records": 193,
+      "lamp-ring": 53,
+      "lamp-same-voice": 5,
+      "lamp-schedule": 215,
+      "lamp-selftest": 85,
+      "lamp-settings": 49,
+      "lamp-setup": 186,
+      "lamp-skills": 531,
+      "lamp-sound-fixtures": 15,
+      "lamp-station": 69,
+      "lamp-surround": 268,
+      "lamp-tasks": 220,
+      "lamp-turn-end": 32,
+      "lamp-turn-end-wire": 5,
+      "lamp-turn-owner": 37,
+      "lamp-update": 452,
+      "lamp-voice": 4172,
+      "lamp-voice-eval": 623,
+      "lamp-voice-processes": 2
+    },
+    "skip_names_available": false,
+    "status_counts": {
+      "PASS": 11477
+    },
+    "summary_skips": 106,
+    "unique_rows": 11477,
+    "verified_post_summary_reprints_excluded": 35,
+    "voice_library_pass": 3854
+  },
+  "raw_hashes": {
+    "arm-job.log": "08edf1ae98b54c3190a25e90c58467c6110da1751391d39b561d42b3a939cb3d",
+    "arm-jobs.json": "45e3931919305141db0c962854a83bdb789d03c5bfb32a4d2f30644f9908746c",
+    "arm-run.json": "2085712547f09576d401dfd2450ca87822c03bd8e37607640f96e018065aa45c",
+    "commit-018b6d18652193c0f20e056a1d94d4092ed7618f.json": "7d62555da6c28d817480451850a7092682f390c0a6b16669c0b0484ef4930aff",
+    "linux-job.log": "ed57d01b5237b55c595a4e7bbffcdf2d65b6339a11d3658f49c770682943dc6a",
+    "linux-jobs.json": "910b90671028f2a2b0b50d4a562883488a16518e5b9dab5a41aacc8d843e3c85",
+    "linux-run.json": "3860c5380f1f6878f5c81928efd500891eaa7e3bf18d53b034324068a3678fbc"
+  },
+  "runs": {
+    "arm": {
+      "actual_checkout": "018b6d18652193c0f20e056a1d94d4092ed7618f",
+      "attempt": 1,
+      "conclusion": "success",
+      "head": "083536db6ce4379ead3b147b24db136a7f42aa16",
+      "job": 122026496277,
+      "run": 40455106327,
+      "steps": [
+        {
+          "conclusion": "success",
+          "name": "Set up job"
+        },
+        {
+          "conclusion": "success",
+          "name": "system packages"
+        },
+        {
+          "conclusion": "success",
+          "name": "Run actions/checkout@v4"
+        },
+        {
+          "conclusion": "success",
+          "name": "publication failure tests (offline, no signing secret)"
+        },
+        {
+          "conclusion": "success",
+          "name": "Rust 1.96.0"
+        },
+        {
+          "conclusion": "success",
+          "name": "artifact provenance regression (offline, disposable Cargo workspace)"
+        },
+        {
+          "conclusion": "success",
+          "name": "stable promotion tests (offline, disposable test key)"
+        },
+        {
+          "conclusion": "success",
+          "name": "restore the cache"
+        },
+        {
+          "conclusion": "success",
+          "name": "unchanged source files get the cached build's times back"
+        },
+        {
+          "conclusion": "skipped",
+          "name": "record fresh source times for a cold publication build"
+        },
+        {
+          "conclusion": "success",
+          "name": "Run taiki-e/install-action@v2"
+        },
+        {
+          "conclusion": "success",
+          "name": "build (release, the lamps' binaries)"
+        },
+        {
+          "conclusion": "success",
+          "name": "every built lamp-* binary is classified for the lamp-os package"
+        },
+        {
+          "conclusion": "success",
+          "name": "build the two selected artifact examples without filename collisions"
+        },
+        {
+          "conclusion": "success",
+          "name": "publication CLI rehearsal (local test key and simulated GitHub only)"
+        },
+        {
+          "conclusion": "success",
+          "name": "which crates a pull request tests"
+        },
+        {
+          "conclusion": "success",
+          "name": "test (full run, every test one at a time; otherwise without the realtime group, in parallel)"
+        },
+        {
+          "conclusion": "success",
+          "name": "doc tests and the own-harness tests (nextest runs neither)"
+        },
+        {
+          "conclusion": "success",
+          "name": "export only current Cargo targets and their SHA-256"
+        },
+        {
+          "conclusion": "success",
+          "name": "Run actions/upload-artifact@v4"
+        },
+        {
+          "conclusion": "skipped",
+          "name": "discard the isolated example target before saving the cache"
+        },
+        {
+          "conclusion": "skipped",
+          "name": "save the cache"
+        },
+        {
+          "conclusion": "success",
+          "name": "Post Run actions/checkout@v4"
+        },
+        {
+          "conclusion": "success",
+          "name": "Complete job"
+        }
+      ]
+    },
+    "linux": {
+      "actual_checkout": "018b6d18652193c0f20e056a1d94d4092ed7618f",
+      "attempt": 1,
+      "conclusion": "success",
+      "head": "083536db6ce4379ead3b147b24db136a7f42aa16",
+      "job": 122026495687,
+      "run": 40455106219,
+      "steps": [
+        {
+          "conclusion": "success",
+          "name": "Set up job"
+        },
+        {
+          "conclusion": "success",
+          "name": "system packages"
+        },
+        {
+          "conclusion": "success",
+          "name": "Run actions/checkout@v4"
+        },
+        {
+          "conclusion": "success",
+          "name": "Rust 1.96.0"
+        },
+        {
+          "conclusion": "success",
+          "name": "stable promotion formatting and strict Clippy"
+        },
+        {
+          "conclusion": "success",
+          "name": "formatting (whole workspace, pinned Rust)"
+        },
+        {
+          "conclusion": "success",
+          "name": "restore the cache"
+        },
+        {
+          "conclusion": "success",
+          "name": "unchanged source files get the cached build's times back"
+        },
+        {
+          "conclusion": "success",
+          "name": "clippy (every crate and target, warnings as errors)"
+        },
+        {
+          "conclusion": "skipped",
+          "name": "save the cache"
+        },
+        {
+          "conclusion": "success",
+          "name": "Post Run actions/checkout@v4"
+        },
+        {
+          "conclusion": "success",
+          "name": "Complete job"
+        }
+      ]
+    }
+  },
+  "separate_custom_harnesses": {
+    "relay_signals_ok": true,
+    "turn_end_process13_0": true
+  },
+  "source": {
+    "actual_preview": "018b6d18652193c0f20e056a1d94d4092ed7618f",
+    "event_head": "083536db6ce4379ead3b147b24db136a7f42aa16",
+    "local_comparison_head": "d5550edfabf8bf6fd8df7ba4c344bcf794d0bff4",
+    "local_tree": "9d6b82acb765d0b50f4cb7a60567f499ca00e704",
+    "ordered_parents": [
+      "5cf73706750f2e3f6925b2e8a268d2f33ff5d29e",
+      "083536db6ce4379ead3b147b24db136a7f42aa16"
+    ],
+    "preview_tree": "9d6b82acb765d0b50f4cb7a60567f499ca00e704",
+    "whole_tree_equal": true
+  },
+  "status": "ORIGINAL_NATIVE_PASSED",
+  "full_private_receipt_sha256": "327051a67401657b0af9b63876b220c2591eddc7e726a6f66f2d96b07af4840d",
+  "separate_docs": {
+    "failed": 0,
+    "ignored": 0,
+    "passed": 4,
+    "sections": 47
+  }
+}

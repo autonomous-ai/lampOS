@@ -1,0 +1,290 @@
+{
+  "controls": {
+    "missing_or_nonpass": [],
+    "mock3_already_in105": true,
+    "once_pass": 105,
+    "required": 105
+  },
+  "limits": [
+    "Original f1d preview has 5cf/f1d parents and exactly the local 4fcd/5cf tree, not authored f1d/70b.",
+    "Successful Reader/privacy observations on this source do not establish cause or waive original fixture642 Reader failure; no retry requested.",
+    "106summary skips have no per-case names in this log; no inferred waiver.",
+    "No signed-release/device/latency acceptance; artifact export/upload is separate.",
+    "No binary downloaded or executed and no workflow action."
+  ],
+  "nextest": {
+    "failed": 0,
+    "ipc_camera_authority_pass": 18,
+    "leak": 0,
+    "per_package_pass": {
+      "lamp-actions": 123,
+      "lamp-addons": 50,
+      "lamp-air": 27,
+      "lamp-audio": 193,
+      "lamp-body": 626,
+      "lamp-bus": 107,
+      "lamp-camera": 90,
+      "lamp-cloud": 196,
+      "lamp-controls": 516,
+      "lamp-ears": 76,
+      "lamp-environment": 12,
+      "lamp-expression": 340,
+      "lamp-eyes": 340,
+      "lamp-gemini": 285,
+      "lamp-health": 91,
+      "lamp-ipc": 45,
+      "lamp-keeper": 42,
+      "lamp-lean": 61,
+      "lamp-local-time": 11,
+      "lamp-memory": 336,
+      "lamp-mood": 118,
+      "lamp-msgs": 172,
+      "lamp-name": 44,
+      "lamp-near-call": 8,
+      "lamp-observer": 46,
+      "lamp-peek": 26,
+      "lamp-policy": 284,
+      "lamp-records": 193,
+      "lamp-ring": 53,
+      "lamp-same-voice": 5,
+      "lamp-schedule": 215,
+      "lamp-selftest": 84,
+      "lamp-settings": 49,
+      "lamp-setup": 186,
+      "lamp-skills": 552,
+      "lamp-sound-fixtures": 15,
+      "lamp-station": 69,
+      "lamp-surround": 268,
+      "lamp-tasks": 220,
+      "lamp-turn-end": 32,
+      "lamp-turn-end-wire": 5,
+      "lamp-turn-owner": 37,
+      "lamp-update": 443,
+      "lamp-voice": 4172,
+      "lamp-voice-eval": 623,
+      "lamp-voice-processes": 2
+    },
+    "skip_names_available": false,
+    "skipped_summary": 106,
+    "timeout": 0,
+    "unique_pass": 11488,
+    "verified_exact_post_summary_reprints": 35,
+    "voice_library_pass": 3854,
+    "whole_workspace_selector": true
+  },
+  "raw_hashes": {
+    "arm-job.log": "1ba7d7505689e2960f79bc31a4c5a8dd874856d1dd270137368f8b0cc9531b70",
+    "arm-jobs.json": "4d7ed9e421581afd0b3cb9d744e51dc11a11f145d99d58edda143ac06570ed02",
+    "arm-run.json": "696465f0794ddd9738ff9c47a87cde322fb71ce7f96c1f61f4f0b24fcaed86a1",
+    "commit-9d4e103191c56997c7eeb8ef3b07c3d7b3078b45.json": "aaf08f7dab2edebcff6fe5a7cc7272ff8348c0a84049738656264d52de3d5391",
+    "linux-job.log": "0c38bca09928ec5a46bfd47e6f203b6b7ab3ed4019edd457a14841d05c55cdc7",
+    "linux-jobs.json": "776b977dc948d97126b38ff893f9a2caf3d17f09701d9c14fa7d23dd079cdb59",
+    "linux-run.json": "2d4b62fb8cb64cae6be590037848ec1331d43113e8f4b858f2b8d1fed31530c9",
+    "nextest-unique-cases.json": "105913eb23dbd68c70bb9969065aab6173e0da1ce8daa1796a63ee9b5a14dda2",
+    "required105-cases.json": "4e1fc71718a5a52bcf20d2c147b0c112cb492b9e56d89bfbc9b9624703c16001"
+  },
+  "runs": {
+    "arm": {
+      "attempt": 1,
+      "checkout": "9d4e103191c56997c7eeb8ef3b07c3d7b3078b45",
+      "conclusion": "success",
+      "event": "pull_request",
+      "head": "f1d3366ea8b1d4261fdf96c4267c5d331d5845a3",
+      "job": 122028375472,
+      "run": 40455689832
+    },
+    "linux": {
+      "attempt": 1,
+      "checkout": "9d4e103191c56997c7eeb8ef3b07c3d7b3078b45",
+      "conclusion": "success",
+      "event": "pull_request",
+      "head": "f1d3366ea8b1d4261fdf96c4267c5d331d5845a3",
+      "job": 122028375787,
+      "run": 40455689917
+    }
+  },
+  "separate_harnesses": {
+    "relay_signals_ok": true,
+    "turn_end_process13_0": true
+  },
+  "source": {
+    "authored_base": "70b51f8fde277cc6cc9ef7e17724b2c34a08f208",
+    "authored_head": "f1d3366ea8b1d4261fdf96c4267c5d331d5845a3",
+    "executed_preview": "9d4e103191c56997c7eeb8ef3b07c3d7b3078b45",
+    "full_tree_equal": true,
+    "local_4fcd": "4fcd2ebe6f92362203cb54fd81280385b37baee6",
+    "local_base": "5cf73706750f2e3f6925b2e8a268d2f33ff5d29e",
+    "local_tree": "2e8fcd34c4004a746daa7159c0f0981fde5e0b7f",
+    "ordered_parents": [
+      "5cf73706750f2e3f6925b2e8a268d2f33ff5d29e",
+      "f1d3366ea8b1d4261fdf96c4267c5d331d5845a3"
+    ],
+    "overlay_delta_from_authored": [
+      "lampOS/crates/body/src/body.rs",
+      "lampOS/crates/body/src/body/tests.rs",
+      "lampOS/crates/voice/src/made_skill.rs",
+      "lampOS/crates/voice/src/task_news.rs",
+      "lampOS/docs/body.md",
+      "lampOS/docs/skills.md"
+    ],
+    "preview_tree": "2e8fcd34c4004a746daa7159c0f0981fde5e0b7f"
+  },
+  "status": "ORIGINAL_NATIVE_GREEN_EXACT_4FCD_TREE",
+  "steps": {
+    "arm": [
+      {
+        "conclusion": "success",
+        "name": "Set up job"
+      },
+      {
+        "conclusion": "success",
+        "name": "system packages"
+      },
+      {
+        "conclusion": "success",
+        "name": "Run actions/checkout@v4"
+      },
+      {
+        "conclusion": "success",
+        "name": "publication failure tests (offline, no signing secret)"
+      },
+      {
+        "conclusion": "success",
+        "name": "Rust 1.96.0"
+      },
+      {
+        "conclusion": "success",
+        "name": "artifact provenance regression (offline, disposable Cargo workspace)"
+      },
+      {
+        "conclusion": "success",
+        "name": "stable promotion tests (offline, disposable test key)"
+      },
+      {
+        "conclusion": "success",
+        "name": "restore the cache"
+      },
+      {
+        "conclusion": "success",
+        "name": "unchanged source files get the cached build's times back"
+      },
+      {
+        "conclusion": "skipped",
+        "name": "record fresh source times for a cold publication build"
+      },
+      {
+        "conclusion": "success",
+        "name": "Run taiki-e/install-action@v2"
+      },
+      {
+        "conclusion": "success",
+        "name": "build (release, the lamps' binaries)"
+      },
+      {
+        "conclusion": "success",
+        "name": "every built lamp-* binary is classified for the lamp-os package"
+      },
+      {
+        "conclusion": "success",
+        "name": "build the two selected artifact examples without filename collisions"
+      },
+      {
+        "conclusion": "success",
+        "name": "publication CLI rehearsal (local test key and simulated GitHub only)"
+      },
+      {
+        "conclusion": "success",
+        "name": "which crates a pull request tests"
+      },
+      {
+        "conclusion": "success",
+        "name": "test (full run, every test one at a time; otherwise without the realtime group, in parallel)"
+      },
+      {
+        "conclusion": "success",
+        "name": "doc tests and the own-harness tests (nextest runs neither)"
+      },
+      {
+        "conclusion": "success",
+        "name": "export only current Cargo targets and their SHA-256"
+      },
+      {
+        "conclusion": "success",
+        "name": "Run actions/upload-artifact@v4"
+      },
+      {
+        "conclusion": "skipped",
+        "name": "discard the isolated example target before saving the cache"
+      },
+      {
+        "conclusion": "skipped",
+        "name": "save the cache"
+      },
+      {
+        "conclusion": "success",
+        "name": "Post Run actions/checkout@v4"
+      },
+      {
+        "conclusion": "success",
+        "name": "Complete job"
+      }
+    ],
+    "linux": [
+      {
+        "conclusion": "success",
+        "name": "Set up job"
+      },
+      {
+        "conclusion": "success",
+        "name": "system packages"
+      },
+      {
+        "conclusion": "success",
+        "name": "Run actions/checkout@v4"
+      },
+      {
+        "conclusion": "success",
+        "name": "Rust 1.96.0"
+      },
+      {
+        "conclusion": "success",
+        "name": "stable promotion formatting and strict Clippy"
+      },
+      {
+        "conclusion": "success",
+        "name": "formatting (whole workspace, pinned Rust)"
+      },
+      {
+        "conclusion": "success",
+        "name": "restore the cache"
+      },
+      {
+        "conclusion": "success",
+        "name": "unchanged source files get the cached build's times back"
+      },
+      {
+        "conclusion": "success",
+        "name": "clippy (every crate and target, warnings as errors)"
+      },
+      {
+        "conclusion": "skipped",
+        "name": "save the cache"
+      },
+      {
+        "conclusion": "success",
+        "name": "Post Run actions/checkout@v4"
+      },
+      {
+        "conclusion": "success",
+        "name": "Complete job"
+      }
+    ]
+  },
+  "full_private_receipt_sha256": "28582c36a7907c1ee7357a5d456ce568dd6747d2a22becab918889d85fdd768e",
+  "separate_docs": {
+    "failed": 0,
+    "ignored": 0,
+    "passed": 4,
+    "sections": 47
+  }
+}
