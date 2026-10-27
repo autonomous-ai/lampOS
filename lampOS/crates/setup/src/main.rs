@@ -181,6 +181,26 @@ fn run() -> Result<bool, Box<dyn std::error::Error>> {
         ));
     }
     let (mut options, enabled) = options(given)?;
+    // Recovery takes no plan (#3020): its unit gives `--config` and
+    // `--enable` only, as its usage says. Matched after the plan was
+    // required, it never ran on a lamp: lamp-52e6 on build 7071 restarted
+    // its unit 76 times in 85 min, each start "--plan is required" (the
+    // lead's agent on #1711, 27 Oct).
+    if command == "recover" {
+        let config_path = PathBuf::from(options.remove("--config").ok_or("--config is required")?);
+        if !options.is_empty() {
+            return Err("recover takes --config and --enable".into());
+        }
+        let config = serve_config(&config_path)?;
+        if !enabled {
+            println!(
+                "{}",
+                serde_json::json!({"enabled": false, "reason": "--enable was not set"})
+            );
+            return Ok(true);
+        }
+        return recover(config);
+    }
     let plan_path = PathBuf::from(options.remove("--plan").ok_or("--plan is required")?);
     let plan = match plan(&plan_path) {
         Ok(plan) => plan,
@@ -289,22 +309,6 @@ fn run() -> Result<bool, Box<dyn std::error::Error>> {
                 return Ok(true);
             }
             serve(config, plan, seconds)
-        }
-        "recover" => {
-            let config_path =
-                PathBuf::from(options.remove("--config").ok_or("--config is required")?);
-            if !options.is_empty() {
-                return Err("recover takes --config and --enable".into());
-            }
-            let config = serve_config(&config_path)?;
-            if !enabled {
-                println!(
-                    "{}",
-                    serde_json::json!({"enabled": false, "reason": "--enable was not set"})
-                );
-                return Ok(true);
-            }
-            recover(config)
         }
         _ => Err(format!("unknown command {command}").into()),
     }
