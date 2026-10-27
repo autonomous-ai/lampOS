@@ -346,8 +346,16 @@ fn sweep(options: &Sweep) -> Result<(), Box<dyn std::error::Error>> {
         return Err(format!("refused: {why}; nothing was written").into());
     }
     if !result.completed {
+        let why = why_not(
+            result.preparation_error.as_ref(),
+            result
+                .inspection
+                .as_ref()
+                .and_then(|report| report.fault.as_ref()),
+            &result.cleanup.errors,
+        );
         return Err(format!(
-            "the read-only reads did not complete after {reads}; nothing was written"
+            "the read-only reads did not complete after {reads} ({why}); nothing was written"
         )
         .into());
     }
@@ -472,6 +480,27 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error>> {
     Err("the read-only rest read requires Linux; no device was opened".into())
 }
 
+/// Why a read-only read stopped short, as its result says: the port's
+/// preparation (the lock folder, the device, its settings) first, then the
+/// plan's own fault, then the port's cleanup; never only "did not complete"
+/// (lamp-75c9, 28 Oct: a lock folder refused, twice, with no word of why).
+#[cfg(target_os = "linux")]
+fn why_not(
+    preparation: Option<&lamp_body::linux::Diagnostic>,
+    fault: Option<&lamp_body::inspection::Fault>,
+    cleanup: &[lamp_body::linux::Diagnostic],
+) -> String {
+    let said = |diagnostic: &lamp_body::linux::Diagnostic| {
+        format!("{}: {}", diagnostic.operation, diagnostic.detail)
+    };
+    match (preparation, fault, cleanup.first()) {
+        (Some(preparation), _, _) => said(preparation),
+        (None, Some(fault), _) => format!("{fault:?}"),
+        (None, None, Some(cleanup)) => said(cleanup),
+        (None, None, None) => "no reason was reported".into(),
+    }
+}
+
 #[cfg(target_os = "linux")]
 fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error>> {
     use lamp_body::linux::{InspectionConfig, inspect_once};
@@ -485,13 +514,59 @@ fn run(arguments: Arguments) -> Result<(), Box<dyn std::error::Error>> {
         .inspection
         .as_ref()
         .filter(|_| result.completed)
-        .ok_or("the read-only inspection did not complete; nothing was written")?;
+        .ok_or_else(|| {
+            format!(
+                "the read-only inspection did not complete ({}); nothing was written",
+                why_not(
+                    result.preparation_error.as_ref(),
+                    result
+                        .inspection
+                        .as_ref()
+                        .and_then(|report| report.fault.as_ref()),
+                    &result.cleanup.errors,
+                )
+            )
+        })?;
     finish(&arguments, report)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A read that stops short says why (lamp-75c9, 28 Oct): the port's
+    /// preparation first, then the plan's fault, then its cleanup.
+    #[test]
+    #[cfg(target_os = "linux")]
+    fn a_read_that_stops_short_says_why() {
+        let lock = lamp_body::linux::Diagnostic {
+            operation: "pre_open_lock",
+            code: None,
+            detail: "lock directory ancestor has an untrusted owner".into(),
+        };
+        let close = lamp_body::linux::Diagnostic {
+            operation: "tty_close",
+            code: Some(5),
+            detail: "input/output error".into(),
+        };
+        assert_eq!(
+            why_not(Some(&lock), None, std::slice::from_ref(&close)),
+            "pre_open_lock: lock directory ancestor has an untrusted owner"
+        );
+        assert_eq!(
+            why_not(
+                None,
+                Some(&lamp_body::inspection::Fault::ClockRegression),
+                &[]
+            ),
+            "ClockRegression"
+        );
+        assert_eq!(
+            why_not(None, None, &[close]),
+            "tty_close: input/output error"
+        );
+        assert_eq!(why_not(None, None, &[]), "no reason was reported");
+    }
     fn args(values: &[&str]) -> Vec<OsString> {
         values.iter().map(OsString::from).collect()
     }
