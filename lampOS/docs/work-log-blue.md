@@ -645,3 +645,4 @@ Ready for lamp-voice: yes (#2553), once its ARM64 run is green
 - 21:49: #3859 has a NEXT TRAIN; asked the train not to combine #3840 and #3859 (the SDK skill-format copy would mismatch); #3859 first, then I carry #3840.
 - 21:50: prepared #3840's carry onto #3859 (new skill-format copy; warning fires only for look = true without camera, points to camera); on #3859's tree all 31 repo skills pass with no warnings, 50 tests pass; patch kept as skchk-on-3859.patch.
 - 21:55: #3859 merged in train 242 (ca741c82a). Carried #3840 onto it as c727057e8 (new skill-format copy, re-copied from the merged doc; warning only for look without camera); 50 passed on 3.12/3.10, 32 repo skills clean. Re-reads asked.
+- 22:00: #3805 merged (c3eb20be3). Carried #3847 onto it as c3faf2150 (range-diff =; copies equal; gates green). Eighth's local skill push proposal: agreed, took the schema ops + control.md + Python push_skill; wire-first docs PR tonight, six SDK-side points posted.
