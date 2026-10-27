@@ -1,0 +1,9 @@
+Original ARM40582497143/job122465293086 and Linux40582497137/job122465293002 completed successfully, attempt1. Both logged checkout51b494f73faa166a7f59042841635d90be697acd. API and fetched Git bind ordered parents a808ef04b5885ccb35e8e7693eee16ae331e3a7f / fb5846a1d3c3a80f6db384291c3a44762e097712 and tree c82bbb17f72376b3eafd0dc47965320097b29d3e.
+
+337 release-applicable required identities passed once, including all71 own controls and9 Linux controls. The338-source-candidate inventory contains one additional debug_assertions-only Body test excluded by the actual Cargo --release profile; it receives no PASS, SKIP or unrun credit. Initial candidate HOLD and subsequent cfg-attribution HOLD remain preserved; correction required no CI or test replay.
+
+ARM primary nextest:11806 unique PASS,0 bad,35 exact post-summary reprints,107 summary skips. No attempt/retry/failure markers were observed; no retry policy is inferred.21 stderr headings all follow the nextest summary. Docs4 PASS across47 summaries, IPC18/18, relay success and process13/0 are separate auxiliary results. Linux strict workspace/all-target Clippy succeeded; it supplies no runtime credit.
+
+69/69 declaration files and338/338 required function bodies match authored fb.37/38 owned blobs/modes match; install.md is the exact clean Main overlay.7554/7555 guarded committed source blobs/modes match, with only that doc changed. Private host helpers/dep-info/artifacts are outside preview Git bindings. Whole authored-tree equivalence is not claimed.
+
+All observer handles closed0 and local groups were reaped. No rerun, cancel or dispatch was requested. PR3646 remains DRAFT with broker2094; old539 Reader failure and3890 parallel fixture report remain unwaived. No artifact binary, device, provider, activation or signature acceptance is claimed.
