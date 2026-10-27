@@ -1,0 +1,1078 @@
+{
+  "approved_scope": {
+    "admission_requirements": [
+      "Fresh compiler JSON actual opaque package_id/features/target/profile/executable and dep-info; no package_id tail decoding.",
+      "Canonical comparison maps only exact known workspace URI prefixes; external IDs pass through; unmatched/one-sided emissions explicit comparison limits.",
+      "Capture/list exact cases before any execution, verify each303 once across14drivers, no additional names silently executed.",
+      "Source/lock/helpers/raw/artifacts frozen guards; separate old savedpreimages; currentbytes may be Cargo-fresh only with current source/depinfo proof.",
+      "Only current normal Setup/Skills children admitted, including exact CARGO_BIN_EXE and PATH resolution; no blanket33 normal inventory.",
+      "Explicit escalated bounded socket-test controllers, current matching handles, source/target exclusive; preserve failures, no automatic retries."
+    ],
+    "alltarget_source_impact_reverse_closure": 14,
+    "approval": "Root explicitly approved303Mac/14drivers/65own +8Linux, strict17 addsMood, targeted normal13 addsControl/Memory/Mood, five selected host compiles. Product compile coverage distinct from selected normal child demand; only Setup/Skills admitted. No push/device/native until Root proof review.",
+    "closure_distinction": "Control, Memory and Mood add changed normal library inputs; actual selected executable children remain Setup/Skills within the normal10 roots. No blanket normal13 build and no blanket alltarget14 runtime. Current emissions/depinfo/source/artifact guard and actual child admission required.",
+    "compiler_commands": [
+      [
+        "fmt",
+        [
+          "cargo",
+          "+1.96.0",
+          "fmt",
+          "--all",
+          "--check"
+        ]
+      ],
+      [
+        "clippy",
+        [
+          "cargo",
+          "+1.96.0",
+          "clippy",
+          "-q",
+          "--offline",
+          "--locked",
+          "-p",
+          "lamp-audio",
+          "-p",
+          "lamp-body",
+          "-p",
+          "lamp-cloud",
+          "-p",
+          "lamp-control",
+          "-p",
+          "lamp-controls",
+          "-p",
+          "lamp-expression",
+          "-p",
+          "lamp-keeper",
+          "-p",
+          "lamp-lean",
+          "-p",
+          "lamp-memory",
+          "-p",
+          "lamp-mood",
+          "-p",
+          "lamp-peek",
+          "-p",
+          "lamp-selftest",
+          "-p",
+          "lamp-setup",
+          "-p",
+          "lamp-skills",
+          "-p",
+          "lamp-update",
+          "-p",
+          "lamp-voice",
+          "-p",
+          "lamp-voice-eval",
+          "--all-targets",
+          "--message-format=json",
+          "--",
+          "-D",
+          "warnings"
+        ]
+      ],
+      [
+        "build",
+        [
+          "cargo",
+          "+1.96.0",
+          "build",
+          "-q",
+          "--offline",
+          "--locked",
+          "-p",
+          "lamp-body",
+          "-p",
+          "lamp-cloud",
+          "-p",
+          "lamp-control",
+          "-p",
+          "lamp-expression",
+          "-p",
+          "lamp-keeper",
+          "-p",
+          "lamp-memory",
+          "-p",
+          "lamp-mood",
+          "-p",
+          "lamp-peek",
+          "-p",
+          "lamp-setup",
+          "-p",
+          "lamp-skills",
+          "-p",
+          "lamp-update",
+          "-p",
+          "lamp-voice",
+          "-p",
+          "lamp-voice-eval",
+          "--message-format=json"
+        ]
+      ],
+      [
+        "compile-02-bin-lamp-update",
+        [
+          "cargo",
+          "+1.96.0",
+          "test",
+          "--offline",
+          "--locked",
+          "-p",
+          "lamp-update",
+          "--bin",
+          "lamp-update",
+          "--no-run",
+          "--message-format=json"
+        ]
+      ],
+      [
+        "compile-03-lib-libs",
+        [
+          "cargo",
+          "+1.96.0",
+          "test",
+          "--offline",
+          "--locked",
+          "-p",
+          "lamp-body",
+          "-p",
+          "lamp-cloud",
+          "-p",
+          "lamp-memory",
+          "-p",
+          "lamp-selftest",
+          "-p",
+          "lamp-skills",
+          "-p",
+          "lamp-update",
+          "-p",
+          "lamp-voice",
+          "--lib",
+          "--no-run",
+          "--message-format=json"
+        ]
+      ],
+      [
+        "compile-04-test-install",
+        [
+          "cargo",
+          "+1.96.0",
+          "test",
+          "--offline",
+          "--locked",
+          "-p",
+          "lamp-update",
+          "--test",
+          "install",
+          "--no-run",
+          "--message-format=json"
+        ]
+      ],
+      [
+        "compile-05-test-it",
+        [
+          "cargo",
+          "+1.96.0",
+          "test",
+          "--offline",
+          "--locked",
+          "-p",
+          "lamp-controls",
+          "-p",
+          "lamp-setup",
+          "-p",
+          "lamp-skills",
+          "-p",
+          "lamp-voice-eval",
+          "--test",
+          "it",
+          "--no-run",
+          "--message-format=json"
+        ]
+      ],
+      [
+        "compile-06-test-round",
+        [
+          "cargo",
+          "+1.96.0",
+          "test",
+          "--offline",
+          "--locked",
+          "-p",
+          "lamp-update",
+          "--test",
+          "round",
+          "--no-run",
+          "--message-format=json"
+        ]
+      ]
+    ],
+    "compiler_stages": 8,
+    "expected_hooks_sha256": "eb9463c9a19a2c56bc50d21a9cd3f7c9b04c66433495729ac4dc025dccbbc6ae",
+    "identity": {
+      "base": "3c9838fea6591410cdf534d27088615021c8df30",
+      "head": "f43b550430ac65be20c218681be3b8fc4fbda43e"
+    },
+    "normal_build_roots": 13,
+    "normal_source_impact_reverse_closure": 13,
+    "omitted_previous_compile": "Mac Body binary has only the two selected Linux-deferred witnesses, no host selected driver; strict alltargets still compiles its host target.",
+    "original_proposal_sha256": "1047c38067451114e431a18ca4de16e2029053ec22e741c6ec69340cd6f4738e",
+    "parsed_unit_environment_sha256": "bb00c2559b793b4d42d30ca1b598d1c2df2a9314ff48a1570f818802621cb382",
+    "required_selector_sha256": "6db36edec3503c274e7f6ec7c89a4078cb352dcb6aa9896e61fe20b11ecd38a4",
+    "runtime": {
+      "Linux_deferred": 8,
+      "drivers": 14,
+      "expected_caught_Round_hooks": 4,
+      "host_required": 303,
+      "inherited_ignored_source_only": 1,
+      "own_required": 65,
+      "selected_unrun_required": 0,
+      "unknown_panics": "FAIL"
+    },
+    "scope_limits": [
+      "No whole Install/Voice/Round or workspace/full14 no-run reprise.",
+      "No Memory implementation or Friday semantic review; retain exactly3 authorized known Memory env/document fixtures with current source/artifact binding.",
+      "Product corpus controls consume changed skills, schemas, Feelings-disabled product inventory and recorded fixtures; bind all current raw input hashes.",
+      "No device/activation/keys/ARM link; original native Linux/ARM must qualify actual future preview separately.",
+      "Old cd288 qualified source/runtime proof remains historical; no old executable or source credit reused.",
+      "No new Cargo/tests/native or push before Root source report check."
+    ],
+    "source_audit_sha256": "4722724cf09ed57fad8a1d6b2fc30c948439f4efbd82f1c62bdaaa3531108f1e",
+    "status": "ROOT_APPROVED_V2",
+    "strict_all_targets_packages": [
+      "lamp-audio",
+      "lamp-body",
+      "lamp-cloud",
+      "lamp-control",
+      "lamp-controls",
+      "lamp-expression",
+      "lamp-keeper",
+      "lamp-lean",
+      "lamp-memory",
+      "lamp-mood",
+      "lamp-peek",
+      "lamp-selftest",
+      "lamp-setup",
+      "lamp-skills",
+      "lamp-update",
+      "lamp-voice",
+      "lamp-voice-eval"
+    ],
+    "target": "<WORKSPACE>/.claude/worktrees/third-reminder-carry-target",
+    "targeted_normal_build_packages": [
+      "lamp-body",
+      "lamp-cloud",
+      "lamp-control",
+      "lamp-expression",
+      "lamp-keeper",
+      "lamp-memory",
+      "lamp-mood",
+      "lamp-peek",
+      "lamp-setup",
+      "lamp-skills",
+      "lamp-update",
+      "lamp-voice",
+      "lamp-voice-eval"
+    ],
+    "worktree": "<WORKSPACE>/.claude/worktrees/third-ownkeys-992-prep"
+  },
+  "publication": "Pre-compiler source audit was approved for the later strict17/normal13/303-case gate. Original pending/no-compiler fields are retained as phase-local facts. Root subsequently pushed the qualified f43 with exact cd288 lease; required original workflows started.",
+  "publication_normalization": "Both JSON string values and pathname keys are normalized. Initial publication validation caught pathname keys left absolute; corrected before commit with no source/compiler/test rerun.",
+  "raw_private_sha256": "4722724cf09ed57fad8a1d6b2fc30c948439f4efbd82f1c62bdaaa3531108f1e",
+  "receipt": {
+    "alltarget_static_reverse_closure": [
+      "lamp-body",
+      "lamp-cloud",
+      "lamp-control",
+      "lamp-expression",
+      "lamp-keeper",
+      "lamp-lean",
+      "lamp-memory",
+      "lamp-mood",
+      "lamp-peek",
+      "lamp-setup",
+      "lamp-skills",
+      "lamp-update",
+      "lamp-voice",
+      "lamp-voice-eval"
+    ],
+    "base_changed_files": 157,
+    "base_tree": "d6a030d68527726024d657d795305bdef9731e47",
+    "branch": "third/ownkeys-current-3c98",
+    "compiler_test_native_commands_run": 0,
+    "extra_normal_roots_not_yet_authorized_or_built": true,
+    "identity": {
+      "base": "3c9838fea6591410cdf534d27088615021c8df30",
+      "head": "f43b550430ac65be20c218681be3b8fc4fbda43e",
+      "tree": "248ccb038ca25b37ee50ce0f35d714db39f1f631"
+    },
+    "integrated_owned_paths": [
+      "lampOS/crates/update/src/install.rs",
+      "lampOS/crates/update/tests/install.rs",
+      "lampOS/docs/install.md",
+      "lampOS/docs/switches.md"
+    ],
+    "manual_doc_conflicts": 3,
+    "manual_rows_unchanged": true,
+    "modified_new_inputs_mtimes_not_restored": true,
+    "mtime_eligible": 10769,
+    "mtime_restored_only_exact_path_mode_bytes": 34,
+    "no_Memory_or_Friday_semantic_review": true,
+    "no_compiled_binary_copy_or_forcefresh": true,
+    "normal_static_reverse_closure": [
+      "lamp-body",
+      "lamp-cloud",
+      "lamp-control",
+      "lamp-expression",
+      "lamp-keeper",
+      "lamp-memory",
+      "lamp-mood",
+      "lamp-peek",
+      "lamp-setup",
+      "lamp-skills",
+      "lamp-update",
+      "lamp-voice",
+      "lamp-voice-eval"
+    ],
+    "old_qualified_ref": {
+      "head": "cd288db20fa62838b1c8bbad1573620149b8061f",
+      "ref": "refs/heads/third/ownkeys-992-prep",
+      "unchanged": true
+    },
+    "only_conflict_file": "lampOS/docs/switches.md",
+    "owned_blobs_exact": 34,
+    "owned_total": 38,
+    "raw7_author_message_payloads_preserved_against_all3_epochs": true,
+    "receipt_sha256": {
+      "cargo-source-closure.json": "bc839cedb31fca2d1a327dfc4006441247ef76f27ab6b8554811352d249d1930",
+      "inherited-base-files.json": "de1b5e291a4aeb1bc0ac2df8081451f411d52094803e6ba8fa5b70da3ebd0e4e",
+      "mtime-preservation.json": "38434d117603c65e9470b54aa44481f13a9ca00936398738483cd78080fccc17",
+      "old-cd288/git-data/bundle-verification.json": "6c18f459ae6ba02e3bb8d2349c3c0e3891944db763476771855ce2f868e35901",
+      "old-cd288/qualified-proof-preservation.json": "5de27974e59970bb4fea934b9b0becdf95e0ae7c5e415a29c8bb38641af9aa90",
+      "old-cd288/source-snapshot-complete.json": "523fac2bc8eb4d06092104f8aa72c406d18e15fe4405170be885bf0bddad0ba7",
+      "owned38-blobs.json": "08b507cb720d111fb3a42b8a860aef29e97464af5f78aef2dbb736592867303a",
+      "raw-authored-preservation.json": "8b66866670331bca8e9d892a8972208c943a8dfaef154a315b4d771f315ad22e",
+      "source-after-audit.json": "ec76977d7399000a73c82682ce07e3ac62e3b475def7c317167edc7b05d6dc8a",
+      "source-before-audit.json": "ec76977d7399000a73c82682ce07e3ac62e3b475def7c317167edc7b05d6dc8a"
+    },
+    "source_guard_files": 7546,
+    "source_guard_unchanged": true,
+    "status": "SOURCE_AUDIT_PASSED_FRESH_GATE_PROPOSAL_PENDING_ROOT",
+    "worktree": "<WORKSPACE>/.claude/worktrees/third-ownkeys-992-prep"
+  },
+  "unit_environment": {
+    "all_parsed_environment_vectors_equal_cd288": true,
+    "parsed_units": [
+      {
+        "current": {},
+        "file_sha256": "f43cc0303435ed800435e6ee13b6faf2580bf4003125a5824aec364394bfad65",
+        "old": {},
+        "parsed_environment_equal": true,
+        "path": "lampOS/deploy/product/README.md"
+      },
+      {
+        "current": {},
+        "file_sha256": "bd4bd677a345a5d742666c8214d1b3d0e70e7c146ba0b671abf963e2a101f46c",
+        "old": {},
+        "parsed_environment_equal": true,
+        "path": "lampOS/deploy/product/exit-note.conf"
+      },
+      {
+        "current": {
+          "LAMP_OUTPUT_CAPS_DIR": "/var/lib/lampos-output-caps",
+          "LAMP_SCHEDULE_SOCKET": "/run/lampos-schedule/call.sock",
+          "LAMP_SCHEDULE_TOOLS": "on"
+        },
+        "file_sha256": "4a5c4fd9453490d6c6ae44b4c1e5d056a902752944a27c93362401bc0ba22713",
+        "old": {
+          "LAMP_OUTPUT_CAPS_DIR": "/var/lib/lampos-output-caps",
+          "LAMP_SCHEDULE_SOCKET": "/run/lampos-schedule/call.sock",
+          "LAMP_SCHEDULE_TOOLS": "on"
+        },
+        "parsed_environment_equal": true,
+        "path": "lampOS/deploy/product/lamp-actions.service"
+      },
+      {
+        "current": {},
+        "file_sha256": "682e52ce43e60eda3df6781587033244773493b835bb89e9eed48ce931934adf",
+        "old": {},
+        "parsed_environment_equal": true,
+        "path": "lampOS/deploy/product/lamp-addons.service"
+      },
+      {
+        "current": {},
+        "file_sha256": "4ee0097764d5b825f4080937fb2f9bd7ebeca634a1d68d9fe49476b0a0120275",
+        "old": {},
+        "parsed_environment_equal": true,
+        "path": "lampOS/deploy/product/lamp-air-clock.service"
+      },
+      {
+        "current": {},
+        "file_sha256": "187e37b871a48942f0ae190b679378778a8354b8407ccc6458bce20a9284b4c1",
+        "old": {},
+        "parsed_environment_equal": true,
+        "path": "lampOS/deploy/product/lamp-air.service"
+      },
+      {
+        "current": {
+          "LAMP_BUS": "on",
+          "LAMP_EXPRESSION_BODY": "on",
+          "LAMP_HEAD_TOUCH": "on"
+        },
+        "file_sha256": "bf5e5fc2a2cf0573c9fdbbc86c302dbe37d9534550572cb40fac4de083a7d12b",
+        "old": {
+          "LAMP_BUS": "on",
+          "LAMP_EXPRESSION_BODY": "on",
+          "LAMP_HEAD_TOUCH": "on"
+        },
+        "parsed_environment_equal": true,
+        "path": "lampOS/deploy/product/lamp-body.service"
+      },
+      {
+        "current": {
+          "LAMP_APP_UPDATE": "on",
+          "LAMP_CLOUD": "on",
+          "LAMP_CLOUD_KNOWN_FILE": "/run/lampos-eyes/known",
+          "LAMP_CLOUD_OFFLINE_WILL": "on",
+          "LAMP_OWN_KEYS": "on",
+          "LAMP_SETTINGS_CHANGE": "on",
+          "LAMP_SKILLS_PAGE": "on",
+          "LAMP_SKILLS_STORE": "off"
+        },
+        "file_sha256": "7a3b4df7c7d4b5545d95cb8be2dae72459a9a946b5a0086b1af661636ac5f46f",
+        "old": {
+          "LAMP_APP_UPDATE": "on",
+          "LAMP_CLOUD": "on",
+          "LAMP_CLOUD_KNOWN_FILE": "/run/lampos-eyes/known",
+          "LAMP_CLOUD_OFFLINE_WILL": "on",
+          "LAMP_OWN_KEYS": "on",
+          "LAMP_SETTINGS_CHANGE": "on",
+          "LAMP_SKILLS_PAGE": "on",
+          "LAMP_SKILLS_STORE": "off"
+        },
+        "parsed_environment_equal": true,
+        "path": "lampOS/deploy/product/lamp-cloud.service"
+      },
+      {
+        "current": {
+          "LAMP_PRIVACY_CONTROLS": "on"
+        },
+        "file_sha256": "7386cdea9174c9d6d94613e439e13d544abc61ad7a0f3945d15b73eea3015860",
+        "old": {
+          "LAMP_PRIVACY_CONTROLS": "on"
+        },
+        "parsed_environment_equal": true,
+        "path": "lampOS/deploy/product/lamp-controls.service"
+      },
+      {
+        "current": {
+          "LAMP_PRIVACY_CONTROLS": "on"
+        },
+        "file_sha256": "fa17ba7b92f2802ba6cbca1b3cbc377df90c8cdbbb58bcf963a129da1aeb0ccc",
+        "old": {
+          "LAMP_PRIVACY_CONTROLS": "on"
+        },
+        "parsed_environment_equal": true,
+        "path": "lampOS/deploy/product/lamp-ears.service"
+      },
+      {
+        "current": {
+          "LAMP_REST_REQUESTS": "on"
+        },
+        "file_sha256": "e7b74d8b2754a3fcdffceb6358849c73d12f3fe48e0d4fb0ede0f9cdc911de85",
+        "old": {
+          "LAMP_REST_REQUESTS": "on"
+        },
+        "parsed_environment_equal": true,
+        "path": "lampOS/deploy/product/lamp-expression.service"
+      },
+      {
+        "current": {},
+        "file_sha256": "0480dee692403d2ae5bb3737df8cf85b62c70df8c5fdb2f7fbdb71306982a371",
+        "old": {},
+        "parsed_environment_equal": true,
+        "path": "lampOS/deploy/product/lamp-eyes-camera.socket"
+      },
+      {
+        "current": {},
+        "file_sha256": "d973575392dc7324eb6e7b9c36d13342dabffe7879c2a8649589ccea4562c21f",
+        "old": {},
+        "parsed_environment_equal": true,
+        "path": "lampOS/deploy/product/lamp-eyes-camera@.service"
+      },
+      {
+        "current": {
+          "LAMP_ACTIVITY": "place",
+          "LAMP_BUS": "on",
+          "LAMP_EYES_SPEAKING": "on"
+        },
+        "file_sha256": "d8dd69b236a7e7d415772a12a871cfb388e05dac5ff2615b464899fc840aa414",
+        "old": {
+          "LAMP_ACTIVITY": "place",
+          "LAMP_BUS": "on",
+          "LAMP_EYES_SPEAKING": "on"
+        },
+        "parsed_environment_equal": true,
+        "path": "lampOS/deploy/product/lamp-eyes.service"
+      },
+      {
+        "current": {},
+        "file_sha256": "d61f8f29b534d2e43789f5ddb942342f365d2b5dde2a1a8d8afa5f39d6e919c3",
+        "old": {},
+        "parsed_environment_equal": true,
+        "path": "lampOS/deploy/product/lamp-health.service"
+      },
+      {
+        "current": {},
+        "file_sha256": "372c2ea5b53bb65d23f628714b2ddc50158bebafaacd9c555d3dc0f5b446389f",
+        "old": {},
+        "parsed_environment_equal": true,
+        "path": "lampOS/deploy/product/lamp-keeper-restart.socket"
+      },
+      {
+        "current": {},
+        "file_sha256": "89f8a31d41d86583933500e501b674870bf808c79bd8984dd924fa4504e727c4",
+        "old": {},
+        "parsed_environment_equal": true,
+        "path": "lampOS/deploy/product/lamp-keeper-restart@.service"
+      },
+      {
+        "current": {},
+        "file_sha256": "56e15728e6be22424d782463a5d9fb3a887dfc675ef5c80a17114bddb44f6b49",
+        "old": {},
+        "parsed_environment_equal": true,
+        "path": "lampOS/deploy/product/lamp-memory.service"
+      },
+      {
+        "current": {
+          "LAMP_MOOD_SEEMS": "on"
+        },
+        "file_sha256": "5e06481b4dffbdaf290e970ffb5a65abac2173ceb17f224241961f8d78f95cb5",
+        "old": {
+          "LAMP_MOOD_SEEMS": "on"
+        },
+        "parsed_environment_equal": true,
+        "path": "lampOS/deploy/product/lamp-mood.service"
+      },
+      {
+        "current": {},
+        "file_sha256": "8da82a4a7a5620a91850adfee456139a092fabdad50c65319d9e492eb8cc7205",
+        "old": {},
+        "parsed_environment_equal": true,
+        "path": "lampOS/deploy/product/lamp-name.service"
+      },
+      {
+        "current": {},
+        "file_sha256": "686df23f189912d88be530372e33c458a8ff326b5fc1708014ba3c3fb7f75aa2",
+        "old": {},
+        "parsed_environment_equal": true,
+        "path": "lampOS/deploy/product/lamp-policy.service"
+      },
+      {
+        "current": {},
+        "file_sha256": "494fc5c1073d9ec4fa94264881450e6b0ccd2740554f7a19a5d4b54de05df3d3",
+        "old": {},
+        "parsed_environment_equal": true,
+        "path": "lampOS/deploy/product/lamp-records.service"
+      },
+      {
+        "current": {},
+        "file_sha256": "5e0a975c32a5cb49b9da40750a5031a10e8abfbebbf20bc7b83c0d8df316cc1b",
+        "old": {},
+        "parsed_environment_equal": true,
+        "path": "lampOS/deploy/product/lamp-records.timer"
+      },
+      {
+        "current": {},
+        "file_sha256": "d99f87f88d2dc9a87ce8d027b5dd986258428d0b9c80dfd46c03d8fb6ff3167c",
+        "old": {},
+        "parsed_environment_equal": true,
+        "path": "lampOS/deploy/product/lamp-schedule.service"
+      },
+      {
+        "current": {},
+        "file_sha256": "c0cfc8fde31431ef9238a0ad899703c2b6c496a39273a7003062dac6c6744270",
+        "old": {},
+        "parsed_environment_equal": true,
+        "path": "lampOS/deploy/product/lamp-selftest.service"
+      },
+      {
+        "current": {},
+        "file_sha256": "b6a55a36ae1bb7fceac98f1c87a39c621cd59210522af68e0bdb524bf93716df",
+        "old": {},
+        "parsed_environment_equal": true,
+        "path": "lampOS/deploy/product/lamp-selftest.timer"
+      },
+      {
+        "current": {},
+        "file_sha256": "e6b9f284eb12ee248562c4f87d2de53cba9552b0200ef73d010c377a8ccf0317",
+        "old": {},
+        "parsed_environment_equal": true,
+        "path": "lampOS/deploy/product/lamp-setup-change.socket"
+      },
+      {
+        "current": {},
+        "file_sha256": "defe224d0d5ea9d30ad800a7baa3482a0ddd10a0a68437eba807deed0cadf749",
+        "old": {},
+        "parsed_environment_equal": true,
+        "path": "lampOS/deploy/product/lamp-setup-change@.service"
+      },
+      {
+        "current": {},
+        "file_sha256": "27f4d2127223156eae29a6500f86ef1b0895c5c3eca9380e54085262dd40777a",
+        "old": {},
+        "parsed_environment_equal": true,
+        "path": "lampOS/deploy/product/lamp-setup-keys.socket"
+      },
+      {
+        "current": {},
+        "file_sha256": "0ed844d094a96298bd5b60a39a684d90a060dfbb98c6a62d627ff97023c1e4e1",
+        "old": {},
+        "parsed_environment_equal": true,
+        "path": "lampOS/deploy/product/lamp-setup-keys@.service"
+      },
+      {
+        "current": {},
+        "file_sha256": "0b3b93c9020045669ae91bd97a1b8432ea0cb0aa72c0e5fda36021feae04b15f",
+        "old": {},
+        "parsed_environment_equal": true,
+        "path": "lampOS/deploy/product/lamp-setup-recover.service"
+      },
+      {
+        "current": {},
+        "file_sha256": "f0bab1f7f8e8b858a3dd69ce3501a95763546d670f213983f7abc6d1f348a248",
+        "old": {},
+        "parsed_environment_equal": true,
+        "path": "lampOS/deploy/product/lamp-setup-reset.service"
+      },
+      {
+        "current": {},
+        "file_sha256": "460d50ac298751592c3211a02a10c69fbc86c13df410d4c20d2f512b9516e5e9",
+        "old": {},
+        "parsed_environment_equal": true,
+        "path": "lampOS/deploy/product/lamp-setup-wifi-restore.service"
+      },
+      {
+        "current": {},
+        "file_sha256": "2b2bdd437ed76f0477c7e6526e9912ab6ded5c38d975371e69ba615d4fe49a4e",
+        "old": {},
+        "parsed_environment_equal": true,
+        "path": "lampOS/deploy/product/lamp-setup-wifi.socket"
+      },
+      {
+        "current": {},
+        "file_sha256": "415bbce98e08ebda2abc136f2b49fec6bd9db04b6133e7a4138deeafc22b1955",
+        "old": {},
+        "parsed_environment_equal": true,
+        "path": "lampOS/deploy/product/lamp-setup-wifi@.service"
+      },
+      {
+        "current": {
+          "LAMP_OWN_KEYS": "on"
+        },
+        "file_sha256": "5a190537d2f663378a1011c78b08cd5b967db473c9ff407e562582a34c5bbacd",
+        "old": {
+          "LAMP_OWN_KEYS": "on"
+        },
+        "parsed_environment_equal": true,
+        "path": "lampOS/deploy/product/lamp-setup.service"
+      },
+      {
+        "current": {},
+        "file_sha256": "cccc47802af2eaf914e751755eb383a7aa550b5974892e63708a9f0bf3e75cb1",
+        "old": {},
+        "parsed_environment_equal": true,
+        "path": "lampOS/deploy/product/lamp-skills-manage.socket"
+      },
+      {
+        "current": {
+          "LAMP_SKILLS_STORE": "off"
+        },
+        "file_sha256": "7b9e63409f79790e1802aa35517ec6c41ab064da73f03f077e095969ea9085fe",
+        "old": {
+          "LAMP_SKILLS_STORE": "off"
+        },
+        "parsed_environment_equal": true,
+        "path": "lampOS/deploy/product/lamp-skills-manage@.service"
+      },
+      {
+        "current": {
+          "LAMP_LIGHT_REQUESTS": "on",
+          "LAMP_SKILLS_ASK": "skip",
+          "LAMP_SKILLS_DAILY_FILE": "/var/lib/lampos-skills-state/daily.json",
+          "LAMP_SKILLS_KNOWN_FILE": "/run/lampos-eyes/known",
+          "LAMP_SKILL_ROUTINES": "on"
+        },
+        "file_sha256": "52f4073401a72ad758c16ec6c0b8db87171c0503372a98832ca006d5bfdb2944",
+        "old": {
+          "LAMP_LIGHT_REQUESTS": "on",
+          "LAMP_SKILLS_ASK": "skip",
+          "LAMP_SKILLS_DAILY_FILE": "/var/lib/lampos-skills-state/daily.json",
+          "LAMP_SKILLS_KNOWN_FILE": "/run/lampos-eyes/known",
+          "LAMP_SKILL_ROUTINES": "on"
+        },
+        "parsed_environment_equal": true,
+        "path": "lampOS/deploy/product/lamp-skills.service"
+      },
+      {
+        "current": {
+          "HOME": "/var/lib/lampos-tasks",
+          "PATH": "/usr/local/bin:/usr/bin:/bin"
+        },
+        "file_sha256": "11eca895835818547f6cdbe47ee0a1b2bba854ff902ecf81ad4076336b1a51b2",
+        "old": {
+          "HOME": "/var/lib/lampos-tasks",
+          "PATH": "/usr/local/bin:/usr/bin:/bin"
+        },
+        "parsed_environment_equal": true,
+        "path": "lampOS/deploy/product/lamp-tasks.service"
+      },
+      {
+        "current": {},
+        "file_sha256": "7486254d8ccb9ad0129705075a72501d1e772ef196503a0f18d8476e4feb13f2",
+        "old": {},
+        "parsed_environment_equal": true,
+        "path": "lampOS/deploy/product/lamp-update-apply.service"
+      },
+      {
+        "current": {},
+        "file_sha256": "75310aad1d27da3abb1cd5365a2640dfb0710247a0986e4450138bd8c1ce97fa",
+        "old": {},
+        "parsed_environment_equal": true,
+        "path": "lampOS/deploy/product/lamp-update-back.service"
+      },
+      {
+        "current": {},
+        "file_sha256": "a479cb208cc186eed53cf9672f195d6ba226797ed38cee83ec6f8b295ad92580",
+        "old": {},
+        "parsed_environment_equal": true,
+        "path": "lampOS/deploy/product/lamp-update-back.timer"
+      },
+      {
+        "current": {
+          "LAMP_BUS_ROOT": "/run/lampos-bus",
+          "LAMP_UPDATE_APPLY": "on",
+          "LAMP_UPDATE_SELF": "on"
+        },
+        "file_sha256": "24f13f6e8f49c51de44183056686e4eda40094a9e167d03e52a54e7ca8b8dad7",
+        "old": {
+          "LAMP_BUS_ROOT": "/run/lampos-bus",
+          "LAMP_UPDATE_APPLY": "on",
+          "LAMP_UPDATE_SELF": "on"
+        },
+        "parsed_environment_equal": true,
+        "path": "lampOS/deploy/product/lamp-update.service"
+      },
+      {
+        "current": {
+          "LAMP_ACTIONS_DIR": "/run/lampos-actions",
+          "LAMP_AIR_FACTS": "on",
+          "LAMP_ASKER_FIRST": "record",
+          "LAMP_ATTENTION": "busy-near",
+          "LAMP_BODY_MOOD_SOCKET": "/run/lampos-body/mood.sock",
+          "LAMP_BUS": "on",
+          "LAMP_BUSY_ENDS_SOONER": "on",
+          "LAMP_BUS_AUDIO": "on",
+          "LAMP_BUS_ROOT": "/run/lampos-bus",
+          "LAMP_CALL_TAKES_NEXT_LINE": "on",
+          "LAMP_CAMERA_FOLLOWS_EYES": "on",
+          "LAMP_CLOCK": "on",
+          "LAMP_CUT_IN_TOLD": "on",
+          "LAMP_CUT_KEEPS_NAME": "on",
+          "LAMP_ENDPOINT_LEAST_SPEECH_MS": "500",
+          "LAMP_ENDPOINT_SHORT_VERDICT": "on",
+          "LAMP_ENDPOINT_UNFINISHED_BELOW": "0.5",
+          "LAMP_ENDPOINT_UNSURE_MS": "1200",
+          "LAMP_EXPRESSION_OUT": "on",
+          "LAMP_EYES_FULL_LOOK_FILE": "/run/lampos-eyes/look.jpg",
+          "LAMP_EYES_LOOK_FILE": "/run/lampos-eyes/sight.jpg",
+          "LAMP_EYES_PERMIT_SOCKET": "/run/lampos-eyes/permit.sock",
+          "LAMP_EYES_PRESENCE_FILE": "/run/lampos-eyes/present",
+          "LAMP_EYES_SPEAKING": "on",
+          "LAMP_EYES_WHO_SOCKET": "/run/lampos-eyes/who.sock",
+          "LAMP_FAINT_HOLD_MS": "400",
+          "LAMP_FIRST_OUTPUT": "/var/lib/lampOS/voice/first-output",
+          "LAMP_FIRST_SECONDS_QUIET": "on",
+          "LAMP_FIRST_WORDS": "kept",
+          "LAMP_HEAD_TOUCH": "on",
+          "LAMP_JOIN_CUT_WORDS": "on",
+          "LAMP_KERNEL_CLOCK": "on",
+          "LAMP_LIGHT_REQUESTS": "on",
+          "LAMP_LOOK_FULL": "on",
+          "LAMP_MEMORY_DAYS": "on",
+          "LAMP_MEMORY_EVENTS": "on",
+          "LAMP_MEMORY_FORGET_ALL": "on",
+          "LAMP_MEMORY_FORGET_ASKS": "on",
+          "LAMP_MEMORY_KEEP_ASKED": "on",
+          "LAMP_MEMORY_OBSERVE": "on",
+          "LAMP_MEMORY_PERSONAL_NEEDS_FACE": "on",
+          "LAMP_MEMORY_ROOM_NOT_ASKER": "on",
+          "LAMP_MEMORY_RULES": "on",
+          "LAMP_MEMORY_SOCKET": "/run/lampos-memory/memory.sock",
+          "LAMP_MEMORY_THREADS": "on",
+          "LAMP_NAMES": "checked",
+          "LAMP_NAME_IN_PASSING": "ignored",
+          "LAMP_NAME_NEAR": "on",
+          "LAMP_NAME_NOTE": "on",
+          "LAMP_NAME_NOTE_BUSY": "face",
+          "LAMP_NAME_SECOND_SIGN": "on",
+          "LAMP_NAME_STAYS_IN_ITS_LINE": "on",
+          "LAMP_NOT_FOR_ME_WORDS": "on",
+          "LAMP_OFFLINE_VOICE": "on",
+          "LAMP_ONBOARDING": "on",
+          "LAMP_ONBOARDING_FILE": "/var/lib/lampOS/voice/onboarding/progress.json",
+          "LAMP_OTHER_LANGUAGE": "sorry",
+          "LAMP_OWN_KEYS": "on",
+          "LAMP_PERSON_NAME": "/etc/lampOS/person/name",
+          "LAMP_PERSON_SCOPE_SEEN": "on",
+          "LAMP_PRIVACY_CONTROLS": "on",
+          "LAMP_PROVIDER_PATIENCE": "on",
+          "LAMP_QUIET_PACE": "on",
+          "LAMP_RELAY_ROUTES": "on",
+          "LAMP_REPLY_END_REACH": "on",
+          "LAMP_RESTORED_MUTE": "on",
+          "LAMP_RING_ASLEEP": "on",
+          "LAMP_RING_EYE": "strong",
+          "LAMP_ROOM_FACTS": "on",
+          "LAMP_SAY": "on",
+          "LAMP_SAY_GROUP": "lampos",
+          "LAMP_SCHEDULE_ASKED": "on",
+          "LAMP_SCHEDULE_DELIVERY_DIR": "/var/lib/lampOS/voice/schedule-delivery",
+          "LAMP_SCHEDULE_SOCKET": "/run/lampos-schedule/call.sock",
+          "LAMP_SCHEDULE_SPEAK": "skill",
+          "LAMP_SCHEDULE_TOOLS": "on",
+          "LAMP_SECOND_CHAT": "deepseek",
+          "LAMP_SECOND_CHAT_KEPT": "on",
+          "LAMP_SECOND_CHAT_WARM": "on",
+          "LAMP_SECOND_DOWN_LINE": "on",
+          "LAMP_SECOND_LOOK": "on",
+          "LAMP_SECOND_NAME_CARRIES": "on",
+          "LAMP_SECOND_OPEN_NAME": "on",
+          "LAMP_SECOND_OWN_ECHO": "on",
+          "LAMP_SECOND_PLAYOUT_START_MS": "100",
+          "LAMP_SECOND_SAID_ONCE": "on",
+          "LAMP_SECOND_SCOPED_CONTEXT": "on",
+          "LAMP_SECOND_SEARCH": "deepseek",
+          "LAMP_SECOND_SPEAKING_FACE": "on",
+          "LAMP_SECOND_SPEECH_MODEL": "eleven_v4_turbo",
+          "LAMP_SECOND_SPEECH_WARM": "on",
+          "LAMP_SECOND_STEADY_FIRST": "on",
+          "LAMP_SECOND_STT_WARM": "on",
+          "LAMP_SECOND_UNFINISHED_WAIT": "on",
+          "LAMP_SECOND_WAIT_CUE": "on",
+          "LAMP_SECOND_WEATHER": "on",
+          "LAMP_SELFTEST_SPEAKER": "on",
+          "LAMP_SESSION_FACT": "on",
+          "LAMP_SHORT_SOUNDS": "quiet-room-checked",
+          "LAMP_SKILLS_DIR": "/run/lampos-skills",
+          "LAMP_SOFT_START": "on",
+          "LAMP_SPOKEN_TO": "on",
+          "LAMP_STAFF_NOTE": "on",
+          "LAMP_STALLS": "on",
+          "LAMP_START_OFFLINE": "on",
+          "LAMP_STOP_TOLD": "on",
+          "LAMP_TASKS_ASKED": "on",
+          "LAMP_TASKS_DIR": "/run/lampos-tasks",
+          "LAMP_TASKS_NAMED_ONLY": "on",
+          "LAMP_TASKS_NEEDS": "/usr/local/bin/harness",
+          "LAMP_TASKS_WHO": "on",
+          "LAMP_TASK_NEWS": "skill",
+          "LAMP_TASK_NEWS_AT_PAUSE": "on",
+          "LAMP_THREAD_FILE": "/run/lampos-voice/thread.json",
+          "LAMP_TIME_PLACES": "on",
+          "LAMP_TOOLS": "on",
+          "LAMP_TOOL_LEAD_IN": "on",
+          "LAMP_TURN_END_NO_SPIN": "on",
+          "LAMP_TURN_END_PRIORITY": "10",
+          "LAMP_VOICE_LINK": "on",
+          "LAMP_VOICE_ROUTE": "second",
+          "LAMP_VOICE_SECOND_CONFIG": "/etc/lampOS/voice/second.json",
+          "LAMP_WAIT_KEEPS_ANSWER": "on"
+        },
+        "file_sha256": "c33c969f79f1ecb6c7866ae6e2470603da6fd045d190ad59f4a294fbf9484bef",
+        "old": {
+          "LAMP_ACTIONS_DIR": "/run/lampos-actions",
+          "LAMP_AIR_FACTS": "on",
+          "LAMP_ASKER_FIRST": "record",
+          "LAMP_ATTENTION": "busy-near",
+          "LAMP_BODY_MOOD_SOCKET": "/run/lampos-body/mood.sock",
+          "LAMP_BUS": "on",
+          "LAMP_BUSY_ENDS_SOONER": "on",
+          "LAMP_BUS_AUDIO": "on",
+          "LAMP_BUS_ROOT": "/run/lampos-bus",
+          "LAMP_CALL_TAKES_NEXT_LINE": "on",
+          "LAMP_CAMERA_FOLLOWS_EYES": "on",
+          "LAMP_CLOCK": "on",
+          "LAMP_CUT_IN_TOLD": "on",
+          "LAMP_CUT_KEEPS_NAME": "on",
+          "LAMP_ENDPOINT_LEAST_SPEECH_MS": "500",
+          "LAMP_ENDPOINT_SHORT_VERDICT": "on",
+          "LAMP_ENDPOINT_UNFINISHED_BELOW": "0.5",
+          "LAMP_ENDPOINT_UNSURE_MS": "1200",
+          "LAMP_EXPRESSION_OUT": "on",
+          "LAMP_EYES_FULL_LOOK_FILE": "/run/lampos-eyes/look.jpg",
+          "LAMP_EYES_LOOK_FILE": "/run/lampos-eyes/sight.jpg",
+          "LAMP_EYES_PERMIT_SOCKET": "/run/lampos-eyes/permit.sock",
+          "LAMP_EYES_PRESENCE_FILE": "/run/lampos-eyes/present",
+          "LAMP_EYES_SPEAKING": "on",
+          "LAMP_EYES_WHO_SOCKET": "/run/lampos-eyes/who.sock",
+          "LAMP_FAINT_HOLD_MS": "400",
+          "LAMP_FIRST_OUTPUT": "/var/lib/lampOS/voice/first-output",
+          "LAMP_FIRST_SECONDS_QUIET": "on",
+          "LAMP_FIRST_WORDS": "kept",
+          "LAMP_HEAD_TOUCH": "on",
+          "LAMP_JOIN_CUT_WORDS": "on",
+          "LAMP_KERNEL_CLOCK": "on",
+          "LAMP_LIGHT_REQUESTS": "on",
+          "LAMP_LOOK_FULL": "on",
+          "LAMP_MEMORY_DAYS": "on",
+          "LAMP_MEMORY_EVENTS": "on",
+          "LAMP_MEMORY_FORGET_ALL": "on",
+          "LAMP_MEMORY_FORGET_ASKS": "on",
+          "LAMP_MEMORY_KEEP_ASKED": "on",
+          "LAMP_MEMORY_OBSERVE": "on",
+          "LAMP_MEMORY_PERSONAL_NEEDS_FACE": "on",
+          "LAMP_MEMORY_ROOM_NOT_ASKER": "on",
+          "LAMP_MEMORY_RULES": "on",
+          "LAMP_MEMORY_SOCKET": "/run/lampos-memory/memory.sock",
+          "LAMP_MEMORY_THREADS": "on",
+          "LAMP_NAMES": "checked",
+          "LAMP_NAME_IN_PASSING": "ignored",
+          "LAMP_NAME_NEAR": "on",
+          "LAMP_NAME_NOTE": "on",
+          "LAMP_NAME_NOTE_BUSY": "face",
+          "LAMP_NAME_SECOND_SIGN": "on",
+          "LAMP_NAME_STAYS_IN_ITS_LINE": "on",
+          "LAMP_NOT_FOR_ME_WORDS": "on",
+          "LAMP_OFFLINE_VOICE": "on",
+          "LAMP_ONBOARDING": "on",
+          "LAMP_ONBOARDING_FILE": "/var/lib/lampOS/voice/onboarding/progress.json",
+          "LAMP_OTHER_LANGUAGE": "sorry",
+          "LAMP_OWN_KEYS": "on",
+          "LAMP_PERSON_NAME": "/etc/lampOS/person/name",
+          "LAMP_PERSON_SCOPE_SEEN": "on",
+          "LAMP_PRIVACY_CONTROLS": "on",
+          "LAMP_PROVIDER_PATIENCE": "on",
+          "LAMP_QUIET_PACE": "on",
+          "LAMP_RELAY_ROUTES": "on",
+          "LAMP_REPLY_END_REACH": "on",
+          "LAMP_RESTORED_MUTE": "on",
+          "LAMP_RING_ASLEEP": "on",
+          "LAMP_RING_EYE": "strong",
+          "LAMP_ROOM_FACTS": "on",
+          "LAMP_SAY": "on",
+          "LAMP_SAY_GROUP": "lampos",
+          "LAMP_SCHEDULE_ASKED": "on",
+          "LAMP_SCHEDULE_DELIVERY_DIR": "/var/lib/lampOS/voice/schedule-delivery",
+          "LAMP_SCHEDULE_SOCKET": "/run/lampos-schedule/call.sock",
+          "LAMP_SCHEDULE_SPEAK": "skill",
+          "LAMP_SCHEDULE_TOOLS": "on",
+          "LAMP_SECOND_CHAT": "deepseek",
+          "LAMP_SECOND_CHAT_KEPT": "on",
+          "LAMP_SECOND_CHAT_WARM": "on",
+          "LAMP_SECOND_DOWN_LINE": "on",
+          "LAMP_SECOND_LOOK": "on",
+          "LAMP_SECOND_NAME_CARRIES": "on",
+          "LAMP_SECOND_OPEN_NAME": "on",
+          "LAMP_SECOND_OWN_ECHO": "on",
+          "LAMP_SECOND_PLAYOUT_START_MS": "100",
+          "LAMP_SECOND_SAID_ONCE": "on",
+          "LAMP_SECOND_SCOPED_CONTEXT": "on",
+          "LAMP_SECOND_SEARCH": "deepseek",
+          "LAMP_SECOND_SPEAKING_FACE": "on",
+          "LAMP_SECOND_SPEECH_MODEL": "eleven_v4_turbo",
+          "LAMP_SECOND_SPEECH_WARM": "on",
+          "LAMP_SECOND_STEADY_FIRST": "on",
+          "LAMP_SECOND_STT_WARM": "on",
+          "LAMP_SECOND_UNFINISHED_WAIT": "on",
+          "LAMP_SECOND_WAIT_CUE": "on",
+          "LAMP_SECOND_WEATHER": "on",
+          "LAMP_SELFTEST_SPEAKER": "on",
+          "LAMP_SESSION_FACT": "on",
+          "LAMP_SHORT_SOUNDS": "quiet-room-checked",
+          "LAMP_SKILLS_DIR": "/run/lampos-skills",
+          "LAMP_SOFT_START": "on",
+          "LAMP_SPOKEN_TO": "on",
+          "LAMP_STAFF_NOTE": "on",
+          "LAMP_STALLS": "on",
+          "LAMP_START_OFFLINE": "on",
+          "LAMP_STOP_TOLD": "on",
+          "LAMP_TASKS_ASKED": "on",
+          "LAMP_TASKS_DIR": "/run/lampos-tasks",
+          "LAMP_TASKS_NAMED_ONLY": "on",
+          "LAMP_TASKS_NEEDS": "/usr/local/bin/harness",
+          "LAMP_TASKS_WHO": "on",
+          "LAMP_TASK_NEWS": "skill",
+          "LAMP_TASK_NEWS_AT_PAUSE": "on",
+          "LAMP_THREAD_FILE": "/run/lampos-voice/thread.json",
+          "LAMP_TIME_PLACES": "on",
+          "LAMP_TOOLS": "on",
+          "LAMP_TOOL_LEAD_IN": "on",
+          "LAMP_TURN_END_NO_SPIN": "on",
+          "LAMP_TURN_END_PRIORITY": "10",
+          "LAMP_VOICE_LINK": "on",
+          "LAMP_VOICE_ROUTE": "second",
+          "LAMP_VOICE_SECOND_CONFIG": "/etc/lampOS/voice/second.json",
+          "LAMP_WAIT_KEEPS_ANSWER": "on"
+        },
+        "parsed_environment_equal": true,
+        "path": "lampOS/deploy/product/lamp-voice.service"
+      },
+      {
+        "current": {
+          "LAMP_WAKING_FACE": "on"
+        },
+        "file_sha256": "88c4d568b4e10547ebd7288556c1e36cc3eb9cc8008910a327e677adbd71fa71",
+        "old": {
+          "LAMP_WAKING_FACE": "on"
+        },
+        "parsed_environment_equal": true,
+        "path": "lampOS/deploy/product/lamp-waking.service"
+      },
+      {
+        "current": {},
+        "file_sha256": "b3b61552b34a4cc6b29158d5636aedacca3411afcc7a02aa37d8d88e5b738a50",
+        "old": {},
+        "parsed_environment_equal": true,
+        "path": "lampOS/deploy/product/lampos-parts.slice"
+      },
+      {
+        "current": {},
+        "file_sha256": "e47c332e1a5ed3a76804cb5754bac40c41c1a99a64a8efee224e914ac6c2958e",
+        "old": {},
+        "parsed_environment_equal": true,
+        "path": "lampOS/deploy/product/lampos-setup-done.path"
+      },
+      {
+        "current": {},
+        "file_sha256": "2d3671fe59c8cba051fe72c3b45a886aeb7561a7eb5975f5d06e7fcff0d32206",
+        "old": {},
+        "parsed_environment_equal": true,
+        "path": "lampOS/deploy/product/lampos-voice.slice"
+      },
+      {
+        "current": {},
+        "file_sha256": "3d5ae5d6c2351dbebc0f5e142441f1637f405c8258b3a6beb30f6f848571bf24",
+        "old": {},
+        "parsed_environment_equal": true,
+        "path": "lampOS/deploy/product/lampos.conf"
+      },
+      {
+        "current": {},
+        "file_sha256": "cdc90f174f669a873ef44ac575a6628b9de37f62b5dc6adfabf2b17731221b9b",
+        "old": {},
+        "parsed_environment_equal": true,
+        "path": "lampOS/deploy/product/lampos.target"
+      },
+      {
+        "current": {},
+        "file_sha256": "9ebb34a60c912d56b50ab854e26536fac6a7901336f11546b6877c6a6eaf51b4",
+        "old": {},
+        "parsed_environment_equal": true,
+        "path": "lampOS/deploy/product/models.json"
+      }
+    ],
+    "skills_service_delta": "Comments only; no added or removed product Environment setting. LAMP_YAWN_SOONER remains absent/off."
+  }
+}
