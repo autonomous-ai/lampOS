@@ -1060,3 +1060,31 @@ fn delayed_base_sample_and_ticks_cannot_cross_a_hold_tier_without_acquisition() 
     assert_eq!(stale.state.base_tier, HoldTier::None);
     assert!(stale.gestures.is_empty());
 }
+
+/// #3697: with the shutdown switch on, the legacy engine (the voice's mute
+/// in touch mode) asks no mute for a hold of 5 s or more, which is the touch
+/// path's shutdown or its cancel; under 5 s the mute is as before, and off,
+/// every hold of 2 s or more is.
+#[test]
+fn with_the_shutdown_switch_a_hold_of_five_seconds_or_more_is_no_mute() {
+    for (on, held, mute) in [
+        (true, 1_000_000, false),
+        (true, 3_000_000, true),
+        (true, 6_000_000, false),
+        (true, 20_000_000, false),
+        (false, 6_000_000, true),
+        (false, 20_000_000, true),
+    ] {
+        let mut rig = Rig::new(config());
+        rig.engine.set_shutdown(on);
+        rig.button(10_000, 0, true);
+        rig.to(9_000 + held);
+        rig.button(10_000 + held, 0, false);
+        let mutes = rig
+            .events
+            .iter()
+            .filter(|event| event.intent == ControlIntent::SoftwareMute)
+            .count();
+        assert_eq!(mutes, usize::from(mute), "on {on}, held {held}");
+    }
+}
