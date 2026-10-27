@@ -107,6 +107,8 @@ struct Lamp {
     misreads: Vec<(Duration, usize, u16, u8)>,
     /// When each read of the positions was answered.
     read_times: Vec<Duration>,
+    /// Each servo id asked for its position limits (registers 9..=12).
+    limit_reads: Vec<u8>,
 }
 
 struct Clock {
@@ -183,6 +185,7 @@ fn folded(cancel_at: Duration) -> (Lamp, Clock) {
             hands: Vec::new(),
             misreads: Vec::new(),
             read_times: Vec::new(),
+            limit_reads: Vec::new(),
         },
         Clock {
             time,
@@ -380,6 +383,9 @@ impl Lamp {
                     let now = self.time.get();
                     if address == 56 {
                         self.read_times.push(now);
+                    }
+                    if address == 9 {
+                        self.limit_reads.extend(parameters[2..].iter().copied());
                     }
                     for asked in parameters[2..].iter().copied() {
                         let index = usize::from(asked) - 1;
@@ -13823,6 +13829,49 @@ fn with_own_ranges_all_five_are_read_and_a_lamp_inside_them_runs_as_before() {
     let (read, goals) = writes(own());
     assert_eq!(read, Some(LAMP_52E6_RANGES));
     assert_eq!(goals, writes(Limits::FOLDED).1);
+}
+
+/// #3504: with a window of its own and own ranges, the head pitch servo's
+/// limits are read once at start, not once for each.
+#[test]
+fn with_own_ranges_and_a_pitch_window_the_pitch_limits_are_read_once() {
+    let limits = Limits {
+        pitch_window: (1_740, 2_040),
+        ..own()
+    };
+    let (mut lamp, mut clock) = ranged(LAMP_52E6_RANGES, Duration::from_secs(2));
+    let news = script(&clock.time);
+    let report = run(&mut lamp, &mut clock, limits, Some(HOME), news, |_| {});
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    assert_eq!(report.own_ranges, Some(LAMP_52E6_RANGES));
+    let pitch = Joint::WristPitch.id();
+    let reads = lamp.limit_reads.iter().filter(|id| **id == pitch).count();
+    assert_eq!(reads, 1, "{:?}", lamp.limit_reads);
+}
+
+/// #3504: a stored limit past the encoder, or a range upside down, is a
+/// failed read: the lamp does not start, writing nothing, and says which.
+#[test]
+fn with_own_ranges_a_stored_range_past_the_encoder_or_upside_down_is_refused() {
+    for (joint, range) in [
+        (Joint::BaseYaw, (809, 5_000)),
+        (Joint::WristPitch, (3_000, 2_000)),
+    ] {
+        let mut ranges = LAMP_52E6_RANGES;
+        ranges[joint.index()] = range;
+        let (mut lamp, mut clock) = ranged(ranges, Duration::from_secs(2));
+        let news = script(&clock.time);
+        let report = run(&mut lamp, &mut clock, own(), Some(HOME), news, |_| {});
+        match &report.stop {
+            Stop::Refused { why } => {
+                assert!(why.starts_with("first read: "), "{why}");
+                assert!(why.contains(joint.name()), "{why}");
+            }
+            stop => panic!("{stop:?}"),
+        }
+        assert_eq!(report.own_ranges, None);
+        assert!(lamp.nothing_was_written());
+    }
 }
 
 /// #3558: a home outside a joint's own limits (less the margin) does not

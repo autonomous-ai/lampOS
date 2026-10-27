@@ -242,7 +242,12 @@ which V1's calibration wrote on its lamps), says them in its report
   the range, a standing arm is checked against the range itself, and the
   arm's goals keep their own window);
 - a joint that stores the whole turn, 0 to 4,095 (lamp-52e6's elbow), was
-  never calibrated by V1 and keeps today's guard.
+  never calibrated by V1 and keeps today's guard;
+- a stored limit past 4,095, or a lower limit above the upper, is a failed
+  read: the lamp does not start (`first read: <joint> stores position
+  limits …`), writing nothing, rather than run on a range clamped wider
+  (#3504). With a pitch window of its own, the head pitch servo's limits
+  are read once and serve both that window's check and its own range.
 
 It is a bound, never a remap: poses and clips stay shared. Off, the limits
 are not read and the body runs exactly as before
