@@ -1360,9 +1360,9 @@ With the switch:
   such person, and nothing is kept. Near names (`who::near_name`) are two
   names of three letters or more that aren't the same name but are one
   letter apart (one put in, left out or changed), or no letters apart,
-  once lower-cased with accents and tone marks taken off. A near face with
-  a far name, or a near name with a far face, changes nothing, so a Linh
-  is never asked about unless their face is near Minh's too.
+  once lower-cased with accents and tone marks taken off. A near name with
+  a far face changes nothing, so a Linh is never asked about unless their
+  face is near Minh's too.
   - **No known name is said back.** The model is told only that it may
     have misheard, and to ask them to spell their name. A name the person
     hasn't said or spelled never passes (`known_faces::name_heard`), so a
@@ -1381,6 +1381,29 @@ With the switch:
     as does a yes, and is asked about again (both reviewers' P2 on #2269).
     `apart` is sent only when true, since eyes from before it refuse a
     field they don't know.
+- **A new name for a face near someone kept is asked about** (#3739). On a
+  tester's lamp on 27 Oct one person was remembered under their name and,
+  21 s later, under a name misheard far from it; the second capture wasn't
+  recognised as them, and the lamp kept two people for one face. Now, with
+  no print recognised as anyone, a capture whose **median** print is at or
+  over `NEAR_PERSON` to someone kept under another name is refused with
+  `{"error":"near_to","near_to":NAME}` whatever the name, and nothing is
+  kept. The voice answers it as above: no known name is said, and they
+  are asked to spell their name.
+  - **Their own name spelled** (`apart`) is judged against theirs, as
+    below: the near prints go beside theirs, still one person.
+  - **Another name** goes in only with `apart`, as a new person: spelled
+    in the turn in hand, as below. "I'm someone else" alone sends nothing
+    (Third's 18:02 HOLD on #3792). Siblings who look alike spell it once.
+  - **A yes renames nobody.** `replace` on a face not recognised is
+    refused the same way, so a relative's yes never takes the kept
+    person's name or memory id (the HOLDs on #3792). A plain no sends
+    nothing.
+  - A rename stays for a face **recognised** under another name
+    (`known_as` above), and keeps only the new prints at `SAME_PERSON` to
+    them, under their memory id.
+  - A capture under `NEAR_PERSON` to everyone kept is someone new, as
+    before.
 - **A known name never takes a face that isn't theirs**, whatever is asked
   or said yes to (the reviewer's P1s on #2202 and #2211, Jarvis's on
   #2235). A capture is judged as a whole by its **median** print's
