@@ -1,3 +1,11 @@
+## 2026-10-27 22:43 — current pinned-host carry software verified; latest-base/device holds retained
+
+#3843 8aa03c7d2 [source/current native read](verification/pinned-host-read-3843-20261027/current-8aa.json): both complete Rust blobs equal reviewed bd0 and actual preview; every added receipt-host line survives authored and composed docs. Original ARM40525835969/Linux40525836374 pass attempt1 on c0b63d8d4 [c3eb/8aa]; read-only merge-tree exactly reconstructs the tested tree and fourteen regressions pass once. These are new-run outcomes, not bd0 transfers. No broad Round/native census, local Rust rerun, artifact member bytes or physical claim.
+
+Overall HOLD remains current-base and declared device acceptance: authored parent is f992 while Main has advanced through3c98. Fifth/holder still owes installed updater head/digest, normal host after stopgap removal and health-watch result. The older interrupted host cohort remains unwaived.
+
+Own #3646's completed cd288/992 epoch is preserved with source bytes/modes/nanosecond times, bounded seven-commit Git bundle/ref and all thirty saved executables. The next branch rebases at the same path onto frozen3c98; the sole switches.md conflict keeps the authored Own Keys row and all of Main's new Control row. No new Cargo or push before source audit and a fresh gate scope; only identical source paths/modes/bytes may retain their prior timestamps.
+
 ## 2026-10-27 22:29 — qualified own-key source pushed; current native scheduling blocked by Main drift
 
 Pushed #3646 cd288db20 on frozen 992 with the exact430 lease, retaining draft. [Source](verification/ownkeys-third-carry-20261027/current-cd288-source.json) preserves all seven authored payloads/messages and37/38 blobs; setup.md integrates Main prose. [Fresh host packet](verification/ownkeys-third-carry-20261027/current-cd288-host.json) records fmt, strict16, normal10 and six targeted compiles;286 unique host PASS, zero failed/ignored/unrun, all65 own, four expected caught hooks/zero unknown. All7,450 source/raw entries and30 actual+30 saved artifact guards match. Only current Setup/Skills normal children admitted; no historical execution credit.

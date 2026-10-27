@@ -1,0 +1,60 @@
+{
+  "head": "8aa03c7d244dd36990e36c082a281eb8d92a3dce",
+  "authored_parent": "f9926922d0f5c54057ad49f14917ae677e83b028",
+  "disposition": "Software/source finding clear; overall HOLD current-base and declared device acceptance",
+  "both_Rust_blobs_equal_bd0_and_actual_preview": true,
+  "receipt_host_added_lines_preserved_authored_and_preview": 5,
+  "original_native": {
+    "preview": "c0b63d8d4ecf8f50643554b2c880d67e625ea303",
+    "parents": [
+      "c3eb20be307d06a6d6278254ec54654b68698b0e",
+      "8aa03c7d244dd36990e36c082a281eb8d92a3dce"
+    ],
+    "tree": "4d2e5b6e7649b08f8eb55cb08d8944711075d652",
+    "reconstructed_merge_tree_equal": true,
+    "runs": {
+      "arm": {
+        "run": {
+          "conclusion": "success",
+          "head_sha": "8aa03c7d244dd36990e36c082a281eb8d92a3dce",
+          "id": 40525835969,
+          "run_attempt": 1,
+          "status": "completed"
+        },
+        "log_sha256": "78ddcd1c49fc72303cc7bd2618ab16a641982d14a3e0e5a5b2c4ea2e629fb62a"
+      },
+      "linux": {
+        "run": {
+          "conclusion": "success",
+          "head_sha": "8aa03c7d244dd36990e36c082a281eb8d92a3dce",
+          "id": 40525836374,
+          "run_attempt": 1,
+          "status": "completed"
+        },
+        "log_sha256": "1e9c3e1565b5bb5649c860ceee6e90457377badce2b9145adf1a891200312416"
+      }
+    },
+    "fourteen_selected_cases": [
+      "2026-10-27T15:09:25.4309548Z         PASS [   0.020s] (2869/7791) lamp-update::round product_carrier::a_linked_part_uses_product_before_its_pinned_lamp_template",
+      "2026-10-27T15:09:25.4140901Z         PASS [   0.017s] (2868/7791) lamp-update::round product_carrier::a_linked_part_uses_product_after_its_pinned_lamp_template",
+      "2026-10-27T15:09:25.3800082Z         PASS [   0.032s] (2864/7791) lamp-update::round product_carrier::a_compatible_linked_lamp_template_still_wins_in_either_manifest_order",
+      "2026-10-27T15:09:25.4668474Z         PASS [   0.027s] (2873/7791) lamp-update::round product_carrier::a_pinned_part_keeps_its_pinned_lamp_template_beside_product_in_either_order",
+      "2026-10-27T15:09:25.3364998Z         PASS [   0.023s] (2862/7791) lamp-update::round product_carrier::a_climbed_updater_confirms_product_before_its_pinned_lamp_template",
+      "2026-10-27T15:09:25.3133359Z         PASS [   0.020s] (2861/7791) lamp-update::round product_carrier::a_climbed_updater_confirms_product_after_its_pinned_lamp_template",
+      "2026-10-27T15:09:25.7195888Z         PASS [   0.021s] (2884/7791) lamp-update::round product_carrier::skipping_a_pinned_host_logs_only_its_unit_host_and_installed_link",
+      "2026-10-27T15:09:25.5480386Z         PASS [   0.021s] (2877/7791) lamp-update::round product_carrier::an_invalid_linked_host_is_refused_instead_of_falling_back_to_product",
+      "2026-10-27T15:09:25.4397383Z         PASS [   0.009s] (2870/7791) lamp-update::round product_carrier::a_pinned_host_without_a_product_candidate_keeps_the_existing_refusal",
+      "2026-10-27T15:09:25.7463715Z         PASS [   0.008s] (2886/7791) lamp-update::round product_carrier::the_product_fallback_still_rejects_corrupt_signed_unit_bytes",
+      "2026-10-27T15:09:25.6596178Z         PASS [   0.006s] (2881/7791) lamp-update::round product_carrier::an_unreachable_product_fallback_does_not_switch_any_part",
+      "2026-10-27T15:09:25.3884652Z         PASS [   0.008s] (2865/7791) lamp-update::round product_carrier::a_corrupt_pinned_host_is_not_silently_skipped_for_product",
+      "2026-10-27T15:09:25.6533401Z         PASS [   0.011s] (2880/7791) lamp-update::round product_carrier::an_unreachable_pinned_host_is_not_silently_skipped_for_product",
+      "2026-10-27T15:09:25.9832049Z         PASS [   0.514s] (2900/7791) lamp-update::round product_carrier::a_product_voice_ignores_its_legacy_pinned_releases_template"
+    ]
+  },
+  "limits": [
+    "Only fourteen current original regression outcomes are independently counted; no broad Round215/native7791 census, artifact member bytes or device acceptance.",
+    "Actual preview is c3eb/8aa, not whole authored f992/8aa or later3c98 runtime; latest carry/current actual train remains required.",
+    "Fifth/holder installed updater head/digest, normal hostname after stopgap removal and health-watch result remain outstanding.",
+    "No local Rust rerun, source push/merge/draft change or old interrupted-host waiver."
+  ]
+}
