@@ -1,0 +1,42 @@
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-27T17:52:45.4899610Z         FAIL [   0.011s] (5120/7821) lamp-voice remember::tests::after_a_forget_the_next_conversation_is_journalled_and_ended
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-27T17:52:45.4900847Z   stdout ───
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-27T17:52:45.4900991Z 
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-27T17:52:45.4901072Z     running 1 test
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-27T17:52:45.4901466Z     test remember::tests::after_a_forget_the_next_conversation_is_journalled_and_ended ... FAILED
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-27T17:52:45.4901864Z 
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-27T17:52:45.4901936Z     failures:
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-27T17:52:45.4902038Z 
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-27T17:52:45.4902110Z     failures:
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-27T17:52:45.4902433Z         remember::tests::after_a_forget_the_next_conversation_is_journalled_and_ended
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-27T17:52:45.4902739Z 
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-27T17:52:45.4903295Z     test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3931 filtered out; finished in 0.01s
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-27T17:52:45.4903664Z 
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-27T17:52:45.4903823Z   stderr ───
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-27T17:52:45.4903986Z 
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-27T17:52:45.4904421Z     thread 'remember::tests::after_a_forget_the_next_conversation_is_journalled_and_ended' (37577) panicked at crates/voice/src/remember.rs:17339:9:
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-27T17:52:45.4904940Z 
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-27T17:52:45.4905015Z     running 1 test
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-27T17:52:45.4905373Z     test remember::tests::after_a_forget_the_next_conversation_is_journalled_and_ended ... FAILED
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-27T17:52:45.4905719Z 
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-27T17:52:45.4905791Z     failures:
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-27T17:52:45.4905905Z 
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-27T17:52:45.4905971Z     failures:
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-27T17:52:45.4906276Z         remember::tests::after_a_forget_the_next_conversation_is_journalled_and_ended
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-27T17:52:45.4906574Z 
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-27T17:52:45.4907265Z     test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3931 filtered out; finished in 0.00s
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-27T17:52:45.4907640Z 
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-27T17:52:45.4907644Z 
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-27T17:52:45.4907917Z     lamp-voice provider: forget called: source_id 7, about 0 words, heard named false, heard bare false
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-27T17:52:45.4908491Z     lamp-voice provider: memory journal stopped until a fresh worker: why=forgotten
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-27T17:52:45.4909086Z     lamp-voice provider: memory journal resumes with a fresh session: why=forgotten uncertain_writes_settled=0
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-27T17:52:45.4909583Z     lamp-voice provider: Days memory is answering
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-27T17:52:45.4909784Z 
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-27T17:52:45.4910195Z     thread 'remember::tests::after_a_forget_the_next_conversation_is_journalled_and_ended' (37579) panicked at crates/voice/src/remember.rs:17540:9:
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-27T17:52:45.4910795Z     assertion `left == right` failed
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-27T17:52:45.4911226Z       left: ["session_open", "forget", "session_close", "session_open", "append_linked", "conversation_end"]
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-27T17:52:45.4911845Z      right: ["session_open", "forget", "session_open", "session_close", "append_linked", "conversation_end"]
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-27T17:52:45.4912403Z     note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-27T17:52:45.4912691Z 
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-27T17:52:45.4913232Z     note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-27T17:52:45.4913530Z 
+lampOS — build and test on Linux ARM64 (1/1)	UNKNOWN STEP	2026-10-27T17:52:45.4913656Z   Cancelling due to test failure: 3 tests still running

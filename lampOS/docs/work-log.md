@@ -1,3 +1,11 @@
+## 28 October 2026, 01:56 +07 — evidence publication membership correction
+
+Ready for lamp-voice: no (the four current code PRs still follow their own latest-base, original CI and reader conditions).
+
+Two archived text logs were omitted from the 4ded evidence commit because Git's ignore rules excluded `*.log` during directory staging. They are now added by exact path with their original bytes: `complete-original-failure-block.log` and `terminal-summary.log` in the original #3907 native-failure packet. The existing manifest is unchanged. The original run remains 5,122 PASS / one N13 FAIL / 2,698 selected unrun; no source or runtime changed.
+
+The publication audit now checks the committed Git tree, in addition to workspace hashes, for every member of all 17 packets introduced by 4ded. All 257 member paths are checked. An older signed-release checksum list is explicitly an external binary inventory; no executable is added to Git. The missing-log fix and this record do not create any new test or native qualification.
+
 ## 28 October 2026, 01:48 +07 — four offered prerequisites and source-bound native evidence
 
 Ready for lamp-voice: no (latest-base, new original CI and current reader conditions remain; #3907 also depends on #3858).
