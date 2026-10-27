@@ -1118,7 +1118,10 @@ impl Life {
 
     /// A request from the head (#711), from `--touch` Controls. A tap wakes
     /// it; a hand kept a second is leaned into while it stays; a hold of
-    /// three seconds puts it to sleep. Asleep, only the tap does anything.
+    /// three seconds puts it to sleep, unless the voice's fresh word says it
+    /// is awake (as while onboarding is under way, #3747). Asleep, a tap or
+    /// a hand kept a second wakes it (#3747, the lead's table), so a person
+    /// who holds it longer to bring it back still does.
     pub(crate) fn head_touch(&mut self, stamp_us: u64, event: &TouchEvent) {
         if !event.enabled || event.source != TouchSource::Head {
             return;
@@ -1134,8 +1137,11 @@ impl Life {
                     self.tapped_muted_us = Some(stamp_us);
                 }
             }
-            // Asleep, a tap wakes it; awake, it looks up at it.
-            TouchGesture::Tap if self.asleep() => self.called(),
+            // Muted and asleep, a stroke doesn't wake it either: the voice's
+            // own opening does ([`Life::voice_mute`]). Awake, it leans in.
+            TouchGesture::Stroke if self.muted() && self.asleep() => {}
+            // Asleep, a tap or a stroke wakes it; awake, it looks up at a tap.
+            TouchGesture::Tap | TouchGesture::Stroke if self.asleep() => self.called(),
             TouchGesture::Tap => {
                 self.supersede_routine();
                 self.looking_until_us = Some(stamp_us + LOOK_UP_FOR_US);
@@ -1660,10 +1666,23 @@ mod routine_tests {
 
     fn head(gesture: TouchGesture, now_us: u64) -> TouchEvent {
         let tap = gesture == TouchGesture::Tap;
-        let intent = if tap {
-            TouchIntent::Attend
-        } else {
-            TouchIntent::Sleep
+        // Each gesture as Controls says it: a touch at 20 ms, a stroke at a
+        // second, which wakes a sleeping lamp (#3747), and a hold at three.
+        let (intent, quiet, asleep, held) = match gesture {
+            TouchGesture::Tap => (
+                TouchIntent::Attend,
+                TouchIntent::Attend,
+                Some(TouchIntent::Wake),
+                200_000,
+            ),
+            TouchGesture::Touch => (TouchIntent::Stop, TouchIntent::Notice, None, 20_000),
+            TouchGesture::Stroke => (
+                TouchIntent::Stroke,
+                TouchIntent::Stroke,
+                Some(TouchIntent::Wake),
+                SECOND,
+            ),
+            _ => (TouchIntent::Sleep, TouchIntent::Sleep, None, 3 * SECOND),
         };
         let event = TouchEvent {
             stamp: stamp(now_us),
@@ -1675,9 +1694,9 @@ mod routine_tests {
             contact_id: 1,
             gesture,
             when_speaking: intent,
-            when_quiet: intent,
-            when_asleep: tap.then_some(TouchIntent::Wake),
-            began_us: now_us - if tap { 200_000 } else { 3 * SECOND },
+            when_quiet: quiet,
+            when_asleep: asleep,
+            began_us: now_us - held,
             observed_us: now_us,
             released_us: tap.then_some(now_us),
             active_mask: u16::from(!tap),
@@ -1935,6 +1954,27 @@ mod routine_tests {
             assert!(!life.release_routine(now), "reflex {reflex}");
             assert!(!life.wake_routine(now, &resting()), "reflex {reflex}");
         }
+    }
+
+    /// #3747: asleep, a hand that stays on the head wakes it at the stroke,
+    /// not only a short tap; its first touch alone doesn't (a lone edge is
+    /// noise).
+    #[test]
+    fn a_hand_kept_on_the_head_wakes_a_sleeping_lamp() {
+        let mut life = routine();
+        let now = START + 5 * SECOND;
+        assert!(life.step(now, &resting()).asleep);
+        let mut touch = head(TouchGesture::Touch, now);
+        touch.began_us = now - 20_000;
+        life.head_touch(now, &touch);
+        assert!(life.step(now, &resting()).asleep, "a touch alone");
+        let later = now + SECOND;
+        let mut stroke = head(TouchGesture::Stroke, later);
+        stroke.began_us = later - SECOND;
+        stroke.when_asleep = None;
+        life.head_touch(later, &stroke);
+        assert!(life.step(later, &resting()).names.contains(&"waking"));
+        assert!(!life.routine_owned());
     }
 
     #[test]

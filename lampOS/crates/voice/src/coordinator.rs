@@ -5566,6 +5566,11 @@ fn conversation_with_gate_inner(
     } else {
         None
     };
+    // Its progress read at once, where storage has it, so the walk can say
+    // from the first pass whether it is under way (#3747).
+    if let Some(walk) = onboarding.as_mut() {
+        walk.poll_storage(monotonic_us());
+    }
     let onboarding_epoch = onboarding.as_ref().and_then(|_| {
         lamp_controls::runtime::clock_id(None).ok().map(|clock_id| {
             crate::onboarding::privacy::Epoch {
@@ -6543,6 +6548,19 @@ fn conversation_with_gate_inner(
                 }
             }
         }
+        // No sleep from the head while the walk is under way, its gaps
+        // between steps too (#3747, the lead on #1711): giving way tells the
+        // person to hold the head. Told before each poll; kept while the
+        // walk hasn't read its progress yet, and between conversations,
+        // where there is no walk to ask.
+        if let Some(controls) = controls.as_mut()
+            && let Some(under_way) = onboarding
+                .as_ref()
+                .map_or(Some(false), crate::onboarding::Onboarding::under_way)
+        {
+            controls.set_onboarding(under_way);
+        }
+        let walk_under_way = controls.as_ref().is_some_and(HandControls::onboarding);
         let observation = match controls.as_mut() {
             Some(controls) => Some(controls.poll()?),
             None => None,
@@ -11067,23 +11085,29 @@ fn conversation_with_gate_inner(
         {
             sighed_for = Some(contact);
             let at_us = monotonic_us();
-            let decided = crate::head_cue::may_sigh(&crate::head_cue::Now {
-                at_us,
-                began_us: at_us.saturating_sub(held_us),
-                allowed: snapshot.microphone_permission() == Permission::Allowed,
-                quiet: reply.is_none()
-                    && provider_queue.is_empty()
-                    && speaker_pending.is_none()
-                    && !admission.owns_stream()
-                    && admission.idle_for_reminder()
-                    && !submission_draining
-                    && !paused
-                    && playback_mask.available(at_us),
-                listening_ready: snapshot.listening_ready(MonoTime::from_micros(at_us)),
-                reply_owed: look_wanted.is_some(),
-                last_said_us: last_spoke_us,
-                last_hum_us,
-            });
+            // No sigh while the walk is under way: the hold puts nothing to
+            // sleep then (#3747).
+            let decided = if walk_under_way {
+                Err("onboarding_under_way")
+            } else {
+                crate::head_cue::may_sigh(&crate::head_cue::Now {
+                    at_us,
+                    began_us: at_us.saturating_sub(held_us),
+                    allowed: snapshot.microphone_permission() == Permission::Allowed,
+                    quiet: reply.is_none()
+                        && provider_queue.is_empty()
+                        && speaker_pending.is_none()
+                        && !admission.owns_stream()
+                        && admission.idle_for_reminder()
+                        && !submission_draining
+                        && !paused
+                        && playback_mask.available(at_us),
+                    listening_ready: snapshot.listening_ready(MonoTime::from_micros(at_us)),
+                    reply_owed: look_wanted.is_some(),
+                    last_said_us: last_spoke_us,
+                    last_hum_us,
+                })
+            };
             record(
                 trace,
                 json!({"kind":"head_sleep_breath","held_us":held_us,"at_us":at_us,
