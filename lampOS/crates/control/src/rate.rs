@@ -1,0 +1,175 @@
+//! Each client's rates (docs/control.md, "Safety, rates and quiet hours").
+//!
+//! Counted per client and per kind of action over sliding windows, on the
+//! caller's monotonic clock: a refusal says how long until the oldest
+//! counted action leaves its window. A refused action is not counted.
+
+use std::collections::{HashMap, VecDeque};
+
+use crate::protocol::Op;
+
+/// A kind of action, each with its own windows.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum Class {
+    /// `joints` goals: 20 a second.
+    Joints,
+    /// `gesture`, `move`, `play`, `look`: one each 2 s.
+    Motion,
+    /// `light`: 5 a second.
+    Light,
+    /// `say` and `sound`: 6 a minute and 60 an hour.
+    Say,
+    /// `express`: one a minute.
+    Express,
+}
+
+impl Class {
+    /// The class an op is counted in, if any.
+    pub fn of(op: &Op) -> Option<Self> {
+        match op {
+            Op::Joints { .. } => Some(Self::Joints),
+            Op::Gesture { .. } | Op::Move { .. } | Op::Play { .. } | Op::Look { .. } => {
+                Some(Self::Motion)
+            }
+            Op::Light { .. } => Some(Self::Light),
+            Op::Say { .. } | Op::Sound { .. } => Some(Self::Say),
+            Op::Express { .. } => Some(Self::Express),
+            _ => None,
+        }
+    }
+
+    /// (most, within µs) pairs, each holding.
+    pub fn windows(self) -> &'static [(usize, u64)] {
+        const S: u64 = 1_000_000;
+        match self {
+            Self::Joints => &[(20, S)],
+            Self::Motion => &[(1, 2 * S)],
+            Self::Light => &[(5, S)],
+            Self::Say => &[(6, 60 * S), (60, 3_600 * S)],
+            Self::Express => &[(1, 60 * S)],
+        }
+    }
+
+    fn longest(self) -> u64 {
+        self.windows()
+            .iter()
+            .map(|(_, within)| *within)
+            .max()
+            .unwrap_or(0)
+    }
+}
+
+/// The actions counted, by client and class.
+#[derive(Debug, Default)]
+pub struct Rates {
+    seen: HashMap<(String, Class), VecDeque<u64>>,
+}
+
+impl Rates {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Counts `client`'s action of `class` at `now_us`, or refuses it with
+    /// how many ms until it would be allowed.
+    pub fn take(&mut self, client: &str, class: Class, now_us: u64) -> Result<(), u64> {
+        let seen = self.seen.entry((client.to_owned(), class)).or_default();
+        let longest = class.longest();
+        while seen.front().is_some_and(|at| at + longest <= now_us) {
+            seen.pop_front();
+        }
+        let mut wait_us = 0;
+        for (most, within) in class.windows() {
+            let inside: Vec<u64> = seen
+                .iter()
+                .copied()
+                .filter(|at| at + within > now_us)
+                .collect();
+            if inside.len() >= *most {
+                // The action that must leave for one more to fit.
+                let oldest = inside[inside.len() - most];
+                wait_us = wait_us.max(oldest + within - now_us);
+            }
+        }
+        if wait_us > 0 {
+            return Err(wait_us.div_ceil(1_000));
+        }
+        seen.push_back(now_us);
+        Ok(())
+    }
+
+    /// Forgets a client's counts (revoked or unpaired).
+    pub fn forget(&mut self, client: &str) {
+        self.seen.retain(|(of, _), _| of != client);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const S: u64 = 1_000_000;
+
+    #[test]
+    fn each_class_holds_its_windows_and_says_when_to_try_again() {
+        let mut rates = Rates::new();
+        assert_eq!(rates.take("c_1", Class::Motion, 0), Ok(()));
+        assert_eq!(rates.take("c_1", Class::Motion, S), Err(1_000));
+        assert_eq!(rates.take("c_1", Class::Motion, 2 * S), Ok(()));
+        // Another client counts on its own.
+        assert_eq!(rates.take("c_2", Class::Motion, 2 * S), Ok(()));
+        for n in 0..20 {
+            assert_eq!(rates.take("c_1", Class::Joints, n * 10_000), Ok(()), "{n}");
+        }
+        assert_eq!(rates.take("c_1", Class::Joints, 500_000), Err(500));
+        assert_eq!(rates.take("c_1", Class::Joints, S), Ok(()));
+    }
+
+    #[test]
+    fn say_holds_six_a_minute_and_sixty_an_hour() {
+        let mut rates = Rates::new();
+        let mut now = 0;
+        let mut said = 0;
+        // Asked every 5 s for an hour: 6 in each minute, 60 in the hour.
+        while now < 3_600 * S {
+            if rates.take("c_1", Class::Say, now).is_ok() {
+                said += 1;
+            }
+            now += 5 * S;
+        }
+        assert_eq!(said, 60);
+        let mut rates = Rates::new();
+        for n in 0..6 {
+            assert_eq!(rates.take("c_1", Class::Say, n * S), Ok(()));
+        }
+        assert_eq!(rates.take("c_1", Class::Say, 6 * S), Err(54_000));
+        rates.forget("c_1");
+        assert_eq!(rates.take("c_1", Class::Say, 6 * S), Ok(()));
+    }
+
+    #[test]
+    fn ops_fall_in_their_classes() {
+        let op = |frame: &str| crate::protocol::parse(frame).unwrap().op;
+        assert_eq!(
+            Class::of(&op(r#"{"id":1,"op":"gesture","name":"nod"}"#)),
+            Some(Class::Motion)
+        );
+        assert_eq!(
+            Class::of(&op(r#"{"id":1,"op":"say","text":"Hi."}"#)),
+            Some(Class::Say)
+        );
+        assert_eq!(
+            Class::of(&op(r#"{"id":1,"op":"sound","name":"chime"}"#)),
+            Some(Class::Say)
+        );
+        assert_eq!(
+            Class::of(&op(r#"{"id":1,"op":"express","feeling":"glad"}"#)),
+            Some(Class::Express)
+        );
+        assert_eq!(Class::of(&op(r#"{"id":1,"op":"stop"}"#)), None);
+        assert_eq!(
+            Class::of(&op(r#"{"id":1,"op":"get","state":["lamp"]}"#)),
+            None
+        );
+    }
+}
