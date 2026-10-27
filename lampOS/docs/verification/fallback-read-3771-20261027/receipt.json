@@ -1,0 +1,164 @@
+{
+  "all_sessions_terminal_exit0_groups_absent": true,
+  "commands": {
+    "changed-four": [
+      "cargo",
+      "+1.96.0",
+      "test",
+      "-q",
+      "--offline",
+      "--locked",
+      "-p",
+      "lamp-voice",
+      "--lib",
+      "--",
+      "--exact",
+      "second_provider::tests::a_chat_that_never_begins_says_a_slow_moment_then_a_shorter_one_never_the_same_twice",
+      "second_provider::tests::a_chat_refused_before_any_word_says_the_down_line_then_the_shorter_one",
+      "second_provider::tests::the_first_turn_after_a_start_says_the_down_line",
+      "second_provider::tests::a_short_line_that_never_rendered_falls_back_to_the_long_one_never_silence",
+      "--nocapture",
+      "--test-threads=1"
+    ],
+    "fmt": [
+      "cargo",
+      "+1.96.0",
+      "fmt",
+      "--all",
+      "--check"
+    ],
+    "probe-lock": [
+      "cargo",
+      "+1.96.0",
+      "generate-lockfile",
+      "--offline"
+    ],
+    "probe-tests": [
+      "cargo",
+      "+1.96.0",
+      "test",
+      "-q",
+      "--offline",
+      "--locked",
+      "--",
+      "--nocapture",
+      "--test-threads=1"
+    ],
+    "voice-clippy": [
+      "cargo",
+      "+1.96.0",
+      "clippy",
+      "-q",
+      "--offline",
+      "--locked",
+      "-p",
+      "lamp-voice",
+      "--all-targets",
+      "--message-format=short",
+      "--",
+      "-D",
+      "warnings"
+    ]
+  },
+  "exact_route_case_counts": {
+    "failed": 0,
+    "ignored": 0,
+    "passed": 4
+  },
+  "exact_route_case_names": [
+    "second_provider::tests::a_chat_that_never_begins_says_a_slow_moment_then_a_shorter_one_never_the_same_twice",
+    "second_provider::tests::a_chat_refused_before_any_word_says_the_down_line_then_the_shorter_one",
+    "second_provider::tests::the_first_turn_after_a_start_says_the_down_line",
+    "second_provider::tests::a_short_line_that_never_rendered_falls_back_to_the_long_one_never_silence"
+  ],
+  "gates": {
+    "changed_four": 0,
+    "fmt": 0,
+    "strict_voice_all_targets_clippy": 0
+  },
+  "hashes": {
+    "changed-four.exit": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+    "changed-four.log": "e02591b01f66cde70a82238fb187f0313f328e4d575897bf7d4ee8b891f7f99c",
+    "changed-four.started.json": "9a44fe6e6174fc38278d1c865966f9cc268c740bebab427963c1d01aca3e95dd",
+    "changed-four.terminal.json": "7f0f9d396d19bea52d57bcb3fa84b4eccad5d07419cfdc5b8af1c61b628418ef",
+    "fmt.exit": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+    "fmt.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "fmt.started.json": "5dd5942f84b69bc34629fca2ba02d82408d6e7f1bde7ef2fbfad0d2db1f09949",
+    "fmt.terminal.json": "bb1fef6d8ecae2194201b273c9c42033f16abd6011846fa854d487b498d7893e",
+    "probe-lock.exit": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+    "probe-lock.log": "9f7121abafdbb4d6d7e9a18ed194c75128e4d1d0a0c56c20595ee42ea0020376",
+    "probe-lock.started.json": "4a38b99d6f7d5d2622ad358154a7d5f51bb112fc7f2bb1f96874444c49082b18",
+    "probe-lock.terminal.json": "9b47b1d935071f84caea5ea341fbde568fe84e43fab8f3d66168d08c35197eca",
+    "probe-tests.exit": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+    "probe-tests.log": "13d0b19fffdf987debccc38a776ab32688a82eef97c26b0300bac05fa267934e",
+    "probe-tests.started.json": "59091e23b10db170bc55a37a770f831e16380486e72a9288f85932e97221f02c",
+    "probe-tests.terminal.json": "2fb2a5b361da84bdca5458ae2945394814ffdf2b9daab4eb2730d820f9a6d7c6",
+    "probe/Cargo.lock": "d6fbe27f947e59de903a1e7cc67b3558edfbc7cb1cc5bb0ae0c3943bf48ee97f",
+    "probe/Cargo.toml": "ec336dcd0dfeae9ee837573f3255a46ce1f0bb6533d024c3e53d4d97ea540b02",
+    "probe/src/constants.rs": "e964a0e005c9a5d3a62806b900d1e752e6302a77dffd6b3e832430599a5aebdf",
+    "probe/src/extracted.rs": "3b6c544f2af1a170b91e3843cfe5ce033c8a1ecdf3340738b752b052a4b2bf6c",
+    "probe/src/lib.rs": "9c0916198094ce8bd42d9040e11226ed9d493ba021e2ff2076c298f803038b19",
+    "run-supervised.py": "edc5023bca8ee266e98bc14622c35c065df6010990bbbae33c32bcfedcc4c0db",
+    "source-before.json": "cd1092e557879d279e9c80530e3dc774562ec8d4231b0eb028474e7ab7a48c5a",
+    "source-extraction.json": "1749a5582f01aa2233b4f578458d01052c401ac79bca388c9905db90793f4e37",
+    "voice-clippy.exit": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+    "voice-clippy.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "voice-clippy.started.json": "c0e504bf1620195c72fef2d0bdec2b1ec386c727dd63ba4da085ab7a0c5f401d",
+    "voice-clippy.terminal.json": "88d3ba4ea219103f0bcb3a545e67cb830fd65764f703a43737b4101de7bfa379"
+  },
+  "head": "aee99c27b0a010ab8077b4bf9f07451edd064080",
+  "limits": [
+    "Exact helper probe uses minimal speech-only trait with error payload simplification; it does not execute the full provider route.",
+    "Four current real Engine unit cases use scripted Services; no realTTS, IPC/process, device, acoustic latency or fullVoice test qualification.",
+    "Warm isolated target; no cold build claim. No product edits, posts, staging, commits or pushes performed."
+  ],
+  "old_source_scope": {
+    "closed_summary_sha256": "7429da71089bdd2efcaf2acfcdf2666b5f673aa74b685d30f151ace5e9693982",
+    "fault_probe": "2/0/0 observation+positivecontrol; confirmed missing-short rendering latch",
+    "gate_and_route_scope": "fmt/strictVoiceClippy0;3/0/0 exact changed cases",
+    "head": "c03d287366250fecd5817886f04af75117947233",
+    "offset_receipt": "source-extraction-audited.json corrects original character offsets mislabeled byte offsets, with extracted bytes/hash unchanged"
+  },
+  "probe_counts": {
+    "failed": 0,
+    "ignored": 0,
+    "passed": 3
+  },
+  "recovery_observations": [
+    "Missing short clip leaves rendering retryable and yields usable long fallback. Retry calls only short; existing long/cannot clips preserved; alternation restored.",
+    "Missing cannot clip leaves rendering retryable. Retry calls only cannot; existing long/short clips preserved; cannot becomes available and its60s rate limit rearms.",
+    "All-success control alternates long/short/long, keeps cannot available and does not rerender cached clips."
+  ],
+  "sessions": {
+    "changed_four": 61968,
+    "fmt": 1670,
+    "probe_lock": 61913,
+    "probe_tests": 47018,
+    "voice_clippy": 93677
+  },
+  "source_extraction": {
+    "block": {
+      "end_byte_exclusive": 82394,
+      "end_line_exclusive": 1691,
+      "sha256": "3b6c544f2af1a170b91e3843cfe5ce033c8a1ecdf3340738b752b052a4b2bf6c",
+      "start_byte": 77676,
+      "start_line": 1568
+    },
+    "cases": [
+      "short first failure then missing-only recovery with long fallback",
+      "cannot first failure then missing-only recovery",
+      "all-success alternation without rerendering"
+    ],
+    "constants_sha256": "e964a0e005c9a5d3a62806b900d1e752e6302a77dffd6b3e832430599a5aebdf",
+    "head": "aee99c27b0a010ab8077b4bf9f07451edd064080",
+    "source_blob_id": "5e9ea53f51f41ce246c4fa700c5ca486ae90a7f9",
+    "source_files": 7282,
+    "source_path": "lampOS/crates/voice/src/second_provider.rs",
+    "source_sha256": "420adf5ea5f1100452d1379fb1e2bbb4f95ac1c67c5c1f4b9b1b2857b3c46777",
+    "stub_limit": "Minimal speak-only trait; Err(_) payload simplified to static text; immediate streams and paused current-thread clock. No realTTS, coordinator, IPC or device."
+  },
+  "source_files_hashed": 7282,
+  "source_unchanged": true,
+  "status": "VERIFIED_BOUNDED_AEE_PARTIAL_RENDER_RECOVERY",
+  "superseded2693_scope": "Source/lock prepared only; no executable probe or route gates executed."
+}

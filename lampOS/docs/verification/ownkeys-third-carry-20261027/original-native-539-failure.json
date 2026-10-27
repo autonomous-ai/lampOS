@@ -1,0 +1,712 @@
+{
+  "actual_bound_source_changes": [
+    {
+      "actual_preview_blob": "785c72907a9f614de975609a12a4625f2899c8f5",
+      "actual_preview_sha256": "d34c2efad939f6d7ad8db6760af24aaa9af642ef032aed438ba3c60b23a89c31",
+      "authored_blob": "d0c4ea2b6486dafc1fbb6c266ffa2c019bf3dc67",
+      "authored_sha256": "f450d640e66f0ad69a0895f396e0ee446d87f74d6acda0d1b059d7417c5c7d2d",
+      "path": "lampOS/crates/voice/src/agent_tasks.rs",
+      "whole_file_equal": false
+    },
+    {
+      "actual_preview_blob": "5a39bb903bf6111f806355c2441bf55ef8048704",
+      "actual_preview_sha256": "12e4e43eb4f2904e12a8240c9904919dbbca331a21a00c42b8832faefa0111c6",
+      "authored_blob": "2deb6a83f66fea66313bbe4d6adc819fdd15ac32",
+      "authored_sha256": "50432cb4fdecb722318d9401c3183b30e3544159397bf856f02190b74ddc6153",
+      "path": "lampOS/crates/voice/src/speak_up.rs",
+      "whole_file_equal": false
+    }
+  ],
+  "actual_preview": "e306540c2013058c1e348ba780afea4df4a7e52d",
+  "actual_preview_tree": "46d068e9efba89e72502cdba7ce4c84ba07504c8",
+  "authored_tree": "6dea39a87c430dbec13cb1f1d18e57b50db49bac",
+  "coverage": {
+    "active212": {
+      "failed": 0,
+      "once_PASS": 161,
+      "required": 212,
+      "without_completion": 51,
+      "without_completion_names": [
+        {
+          "binary": "lamp-voice::it",
+          "name": "speaker_lapse_worker::a_late_prime_from_before_a_lapse_is_dropped"
+        },
+        {
+          "binary": "lamp-voice::it",
+          "name": "speaker_lapse_worker::a_speaker_whose_authority_lapses_before_its_prime_stays_up"
+        },
+        {
+          "binary": "lamp-voice::it",
+          "name": "speaker_lapse_worker::a_stale_renewal_alone_or_a_stale_connect_reference_still_ends_the_speaker"
+        },
+        {
+          "binary": "lamp-voice::it",
+          "name": "speaker_lapse_worker::a_stale_renewal_with_a_fresh_one_behind_it_keeps_the_speaker_going"
+        },
+        {
+          "binary": "lamp-voice::it",
+          "name": "speaker_lapse_worker::an_aged_first_reference_prepare_reaches_the_real_speakers_validation"
+        },
+        {
+          "binary": "lamp-voice-eval::it",
+          "name": "switches::every_switch_says_how_it_is_counted"
+        },
+        {
+          "binary": "lamp-voice-eval::it",
+          "name": "switches::the_counts_by_table_and_in_all"
+        },
+        {
+          "binary": "lamp-voice",
+          "name": "transport::tests::initial_capture_prepared_still_requires_age_boot_order_and_nonfuture_time"
+        },
+        {
+          "binary": "lamp-voice",
+          "name": "transport::tests::initial_capture_prepared_survives_bounded_speaker_startup"
+        },
+        {
+          "binary": "lamp-voice",
+          "name": "transport::tests::later_capture_prepared_keeps_the_existing_single_sender_stall_allowance"
+        },
+        {
+          "binary": "lamp-voice",
+          "name": "transport::tests::reference_startup_allowance_does_not_cover_primes_data_or_capture_input"
+        },
+        {
+          "binary": "lamp-voice",
+          "name": "speak_up::tests::only_welcome_back_says_hello_on_an_arrival"
+        },
+        {
+          "binary": "lamp-voice",
+          "name": "task_news::tests::task_news_words_are_what_the_voice_said_before_byte_for_byte"
+        },
+        {
+          "binary": "lamp-voice",
+          "name": "task_news::tests::a_sign_in_question_heard_is_told_with_its_own_request"
+        },
+        {
+          "binary": "lamp-voice",
+          "name": "task_news::tests::the_newest_finished_look_in_this_boot_is_the_news_and_work_in_progress_is_not"
+        },
+        {
+          "binary": "lamp-voice",
+          "name": "task_news::tests::an_answer_that_went_on_is_told_from_where_the_earlier_one_ended"
+        },
+        {
+          "binary": "lamp-voice",
+          "name": "task_news::tests::the_note_names_the_agent_quotes_safely_and_says_how_fresh_it_is"
+        },
+        {
+          "binary": "lamp-voice",
+          "name": "task_news::tests::every_note_fits_in_one_written_turn"
+        },
+        {
+          "binary": "lamp-voice",
+          "name": "task_news::tests::an_agent_waiting_with_no_question_is_told_as_waiting_on_their_computer"
+        },
+        {
+          "binary": "lamp-voice",
+          "name": "task_news::tests::a_stop_or_a_failure_is_told_as_before"
+        },
+        {
+          "binary": "lamp-voice",
+          "name": "task_news::tests::a_long_result_keeps_enough_for_a_gist_and_asks_for_it_first"
+        },
+        {
+          "binary": "lamp-voice",
+          "name": "task_news::tests::a_skill_made_by_voice_is_told_as_kept_and_never_read_out"
+        },
+        {
+          "binary": "lamp-voice",
+          "name": "task_news::tests::a_made_skill_the_check_refuses_is_repaired_once"
+        },
+        {
+          "binary": "lamp-voice",
+          "name": "task_news::tests::a_repair_not_handed_over_tells_the_first_answer_not_kept"
+        },
+        {
+          "binary": "lamp-voice",
+          "name": "task_news::tests::each_piece_of_news_is_offered_once_and_told_news_is_kept"
+        },
+        {
+          "binary": "lamp-voice",
+          "name": "task_news::tests::a_skill_made_by_text_is_told_as_kept_by_the_texts_reader"
+        },
+        {
+          "binary": "lamp-voice",
+          "name": "task_news::tests::news_for_texts_is_read_beside_them_and_kept_told_once_given"
+        },
+        {
+          "binary": "lamp-voice",
+          "name": "task_news::tests::an_apps_ask_is_settled_when_its_work_never_reached_or_failed"
+        },
+        {
+          "binary": "lamp-voice",
+          "name": "task_news::tests::work_said_yes_to_that_never_reached_its_agent_is_told_soon_after"
+        },
+        {
+          "binary": "lamp-voice",
+          "name": "task_news::tests::a_hand_over_to_a_missing_folder_says_the_folder_is_not_on_that_computer"
+        },
+        {
+          "binary": "lamp-voice",
+          "name": "task_news::tests::a_failed_hand_over_note_fits_one_written_turn_whatever_the_task"
+        },
+        {
+          "binary": "lamp-voice",
+          "name": "task_news::tests::only_a_fresh_acting_say_now_about_the_newest_change_of_this_store_is_told"
+        },
+        {
+          "binary": "lamp-voice",
+          "name": "task_news::tests::a_progress_note_says_who_what_how_far_and_fits_in_one_written_turn"
+        },
+        {
+          "binary": "lamp-voice",
+          "name": "task_news::tests::words_that_come_back_past_the_decisions_time_are_let_go"
+        },
+        {
+          "binary": "lamp-voice",
+          "name": "task_news::tests::progress_not_told_in_time_is_let_go"
+        },
+        {
+          "binary": "lamp-voice",
+          "name": "task_news::tests::a_sign_ins_news_is_put_first"
+        },
+        {
+          "binary": "lamp-voice",
+          "name": "task_news::tests::news_waits_once_and_telling_takes_it"
+        },
+        {
+          "binary": "lamp-voice",
+          "name": "task_news::tests::news_keeps_when_it_came_in_while_it_waits"
+        },
+        {
+          "binary": "lamp-voice",
+          "name": "task_news::tests::news_names_its_task_from_its_key"
+        },
+        {
+          "binary": "lamp-voice",
+          "name": "task_news::tests::tasks_finished_together_are_told_in_one_turn"
+        },
+        {
+          "binary": "lamp-voice",
+          "name": "task_news::tests::tasks_finished_together_are_told_one_by_one_without_the_switch"
+        },
+        {
+          "binary": "lamp-voice",
+          "name": "task_news::tests::long_answers_told_together_each_keep_their_gist"
+        },
+        {
+          "binary": "lamp-voice",
+          "name": "task_news::tests::a_task_left_out_of_a_turn_keeps_its_place_and_cut_answers_keep_their_gist"
+        },
+        {
+          "binary": "lamp-voice",
+          "name": "task_news::tests::a_task_newly_settled_wakes_the_reader_once"
+        },
+        {
+          "binary": "lamp-voice",
+          "name": "task_news::tests::a_told_refused_across_a_restart_of_the_tasks_part_is_sent_again"
+        },
+        {
+          "binary": "lamp-voice",
+          "name": "task_news::tests::a_sign_ins_question_cut_short_is_offered_again_until_heard_whole"
+        },
+        {
+          "binary": "lamp-voice",
+          "name": "task_news::tests::a_task_newly_settled_is_read_at_once_and_told_news_reads_nothing"
+        },
+        {
+          "binary": "lamp-voice",
+          "name": "task_news::tests::a_task_settled_on_the_bus_wakes_the_reader_once"
+        },
+        {
+          "binary": "lamp-voice",
+          "name": "task_news::tests::news_is_told_at_the_first_pause_of_a_second_only_with_the_switch"
+        },
+        {
+          "binary": "lamp-voice",
+          "name": "task_news::tests::after_the_lamps_own_words_news_waits_for_the_persons_turn"
+        },
+        {
+          "binary": "lamp-voice",
+          "name": "task_news::tests::news_names_the_agent_each_engine_is"
+        }
+      ]
+    },
+    "host206": {
+      "failed": 0,
+      "once_PASS": 160,
+      "required": 206,
+      "without_completion": 46,
+      "without_completion_names": [
+        {
+          "binary": "lamp-voice-eval::it",
+          "name": "switches::every_switch_says_how_it_is_counted"
+        },
+        {
+          "binary": "lamp-voice-eval::it",
+          "name": "switches::the_counts_by_table_and_in_all"
+        },
+        {
+          "binary": "lamp-voice",
+          "name": "transport::tests::initial_capture_prepared_still_requires_age_boot_order_and_nonfuture_time"
+        },
+        {
+          "binary": "lamp-voice",
+          "name": "transport::tests::initial_capture_prepared_survives_bounded_speaker_startup"
+        },
+        {
+          "binary": "lamp-voice",
+          "name": "transport::tests::later_capture_prepared_keeps_the_existing_single_sender_stall_allowance"
+        },
+        {
+          "binary": "lamp-voice",
+          "name": "transport::tests::reference_startup_allowance_does_not_cover_primes_data_or_capture_input"
+        },
+        {
+          "binary": "lamp-voice",
+          "name": "speak_up::tests::only_welcome_back_says_hello_on_an_arrival"
+        },
+        {
+          "binary": "lamp-voice",
+          "name": "task_news::tests::task_news_words_are_what_the_voice_said_before_byte_for_byte"
+        },
+        {
+          "binary": "lamp-voice",
+          "name": "task_news::tests::a_sign_in_question_heard_is_told_with_its_own_request"
+        },
+        {
+          "binary": "lamp-voice",
+          "name": "task_news::tests::the_newest_finished_look_in_this_boot_is_the_news_and_work_in_progress_is_not"
+        },
+        {
+          "binary": "lamp-voice",
+          "name": "task_news::tests::an_answer_that_went_on_is_told_from_where_the_earlier_one_ended"
+        },
+        {
+          "binary": "lamp-voice",
+          "name": "task_news::tests::the_note_names_the_agent_quotes_safely_and_says_how_fresh_it_is"
+        },
+        {
+          "binary": "lamp-voice",
+          "name": "task_news::tests::every_note_fits_in_one_written_turn"
+        },
+        {
+          "binary": "lamp-voice",
+          "name": "task_news::tests::an_agent_waiting_with_no_question_is_told_as_waiting_on_their_computer"
+        },
+        {
+          "binary": "lamp-voice",
+          "name": "task_news::tests::a_stop_or_a_failure_is_told_as_before"
+        },
+        {
+          "binary": "lamp-voice",
+          "name": "task_news::tests::a_long_result_keeps_enough_for_a_gist_and_asks_for_it_first"
+        },
+        {
+          "binary": "lamp-voice",
+          "name": "task_news::tests::a_skill_made_by_voice_is_told_as_kept_and_never_read_out"
+        },
+        {
+          "binary": "lamp-voice",
+          "name": "task_news::tests::a_made_skill_the_check_refuses_is_repaired_once"
+        },
+        {
+          "binary": "lamp-voice",
+          "name": "task_news::tests::a_repair_not_handed_over_tells_the_first_answer_not_kept"
+        },
+        {
+          "binary": "lamp-voice",
+          "name": "task_news::tests::each_piece_of_news_is_offered_once_and_told_news_is_kept"
+        },
+        {
+          "binary": "lamp-voice",
+          "name": "task_news::tests::a_skill_made_by_text_is_told_as_kept_by_the_texts_reader"
+        },
+        {
+          "binary": "lamp-voice",
+          "name": "task_news::tests::news_for_texts_is_read_beside_them_and_kept_told_once_given"
+        },
+        {
+          "binary": "lamp-voice",
+          "name": "task_news::tests::an_apps_ask_is_settled_when_its_work_never_reached_or_failed"
+        },
+        {
+          "binary": "lamp-voice",
+          "name": "task_news::tests::work_said_yes_to_that_never_reached_its_agent_is_told_soon_after"
+        },
+        {
+          "binary": "lamp-voice",
+          "name": "task_news::tests::a_hand_over_to_a_missing_folder_says_the_folder_is_not_on_that_computer"
+        },
+        {
+          "binary": "lamp-voice",
+          "name": "task_news::tests::a_failed_hand_over_note_fits_one_written_turn_whatever_the_task"
+        },
+        {
+          "binary": "lamp-voice",
+          "name": "task_news::tests::only_a_fresh_acting_say_now_about_the_newest_change_of_this_store_is_told"
+        },
+        {
+          "binary": "lamp-voice",
+          "name": "task_news::tests::a_progress_note_says_who_what_how_far_and_fits_in_one_written_turn"
+        },
+        {
+          "binary": "lamp-voice",
+          "name": "task_news::tests::words_that_come_back_past_the_decisions_time_are_let_go"
+        },
+        {
+          "binary": "lamp-voice",
+          "name": "task_news::tests::progress_not_told_in_time_is_let_go"
+        },
+        {
+          "binary": "lamp-voice",
+          "name": "task_news::tests::a_sign_ins_news_is_put_first"
+        },
+        {
+          "binary": "lamp-voice",
+          "name": "task_news::tests::news_waits_once_and_telling_takes_it"
+        },
+        {
+          "binary": "lamp-voice",
+          "name": "task_news::tests::news_keeps_when_it_came_in_while_it_waits"
+        },
+        {
+          "binary": "lamp-voice",
+          "name": "task_news::tests::news_names_its_task_from_its_key"
+        },
+        {
+          "binary": "lamp-voice",
+          "name": "task_news::tests::tasks_finished_together_are_told_in_one_turn"
+        },
+        {
+          "binary": "lamp-voice",
+          "name": "task_news::tests::tasks_finished_together_are_told_one_by_one_without_the_switch"
+        },
+        {
+          "binary": "lamp-voice",
+          "name": "task_news::tests::long_answers_told_together_each_keep_their_gist"
+        },
+        {
+          "binary": "lamp-voice",
+          "name": "task_news::tests::a_task_left_out_of_a_turn_keeps_its_place_and_cut_answers_keep_their_gist"
+        },
+        {
+          "binary": "lamp-voice",
+          "name": "task_news::tests::a_task_newly_settled_wakes_the_reader_once"
+        },
+        {
+          "binary": "lamp-voice",
+          "name": "task_news::tests::a_told_refused_across_a_restart_of_the_tasks_part_is_sent_again"
+        },
+        {
+          "binary": "lamp-voice",
+          "name": "task_news::tests::a_sign_ins_question_cut_short_is_offered_again_until_heard_whole"
+        },
+        {
+          "binary": "lamp-voice",
+          "name": "task_news::tests::a_task_newly_settled_is_read_at_once_and_told_news_reads_nothing"
+        },
+        {
+          "binary": "lamp-voice",
+          "name": "task_news::tests::a_task_settled_on_the_bus_wakes_the_reader_once"
+        },
+        {
+          "binary": "lamp-voice",
+          "name": "task_news::tests::news_is_told_at_the_first_pause_of_a_second_only_with_the_switch"
+        },
+        {
+          "binary": "lamp-voice",
+          "name": "task_news::tests::after_the_lamps_own_words_news_waits_for_the_persons_turn"
+        },
+        {
+          "binary": "lamp-voice",
+          "name": "task_news::tests::news_names_the_agent_each_engine_is"
+        }
+      ]
+    },
+    "linux6": {
+      "failed": 0,
+      "once_PASS": 1,
+      "required": 6,
+      "without_completion": 5,
+      "without_completion_names": [
+        {
+          "binary": "lamp-voice::it",
+          "name": "speaker_lapse_worker::a_late_prime_from_before_a_lapse_is_dropped"
+        },
+        {
+          "binary": "lamp-voice::it",
+          "name": "speaker_lapse_worker::a_speaker_whose_authority_lapses_before_its_prime_stays_up"
+        },
+        {
+          "binary": "lamp-voice::it",
+          "name": "speaker_lapse_worker::a_stale_renewal_alone_or_a_stale_connect_reference_still_ends_the_speaker"
+        },
+        {
+          "binary": "lamp-voice::it",
+          "name": "speaker_lapse_worker::a_stale_renewal_with_a_fresh_one_behind_it_keeps_the_speaker_going"
+        },
+        {
+          "binary": "lamp-voice::it",
+          "name": "speaker_lapse_worker::an_aged_first_reference_prepare_reaches_the_real_speakers_validation"
+        }
+      ]
+    },
+    "own71": {
+      "failed": 0,
+      "once_PASS": 60,
+      "required": 71,
+      "without_completion": 11,
+      "without_completion_names": [
+        {
+          "binary": "lamp-voice::it",
+          "name": "speaker_lapse_worker::a_late_prime_from_before_a_lapse_is_dropped"
+        },
+        {
+          "binary": "lamp-voice::it",
+          "name": "speaker_lapse_worker::a_speaker_whose_authority_lapses_before_its_prime_stays_up"
+        },
+        {
+          "binary": "lamp-voice::it",
+          "name": "speaker_lapse_worker::a_stale_renewal_alone_or_a_stale_connect_reference_still_ends_the_speaker"
+        },
+        {
+          "binary": "lamp-voice::it",
+          "name": "speaker_lapse_worker::a_stale_renewal_with_a_fresh_one_behind_it_keeps_the_speaker_going"
+        },
+        {
+          "binary": "lamp-voice::it",
+          "name": "speaker_lapse_worker::an_aged_first_reference_prepare_reaches_the_real_speakers_validation"
+        },
+        {
+          "binary": "lamp-voice-eval::it",
+          "name": "switches::every_switch_says_how_it_is_counted"
+        },
+        {
+          "binary": "lamp-voice-eval::it",
+          "name": "switches::the_counts_by_table_and_in_all"
+        },
+        {
+          "binary": "lamp-voice",
+          "name": "transport::tests::initial_capture_prepared_still_requires_age_boot_order_and_nonfuture_time"
+        },
+        {
+          "binary": "lamp-voice",
+          "name": "transport::tests::initial_capture_prepared_survives_bounded_speaker_startup"
+        },
+        {
+          "binary": "lamp-voice",
+          "name": "transport::tests::later_capture_prepared_keeps_the_existing_single_sender_stall_allowance"
+        },
+        {
+          "binary": "lamp-voice",
+          "name": "transport::tests::reference_startup_allowance_does_not_cover_primes_data_or_capture_input"
+        }
+      ]
+    }
+  },
+  "failure": {
+    "assertion": "assert_eq!(bounded.degraded, !bounded.acknowledged);",
+    "assertion_values": {
+      "left": true,
+      "right": false
+    },
+    "cause": "Not investigated or inferred; no retry requested.",
+    "failing_source_whole_file_equal_to_authored_head": true,
+    "panic_log_line": 11115,
+    "sanitized_preceding_message": "lamp-voice serve: session reader unavailable; metadata remains private",
+    "source": "lampOS/crates/voice/src/session_reader/tests.rs:788",
+    "source_blob": "2b3ea62843a2f8534d4c8a6532ddf167805ab227",
+    "source_line_sha256": "91acbc8bf6086ad0bd1b82babced2e9fc8ef1a51fd19036666ac36ae8119e89f",
+    "source_sha256": "794a44b35d1025ee9f66035099d3fe1facc8233eb39f7d17878e08a7ea7f3e49",
+    "test": {
+      "binary": "lamp-voice",
+      "duration": "0.009s",
+      "line": 11099,
+      "name": "session_reader::tests::linux::shared_session_writer_projects_every_segment_without_private_values",
+      "ordinal": 10250,
+      "status": "FAIL",
+      "total": 11565
+    }
+  },
+  "handles": {
+    "audit": 63596,
+    "collector": 77323,
+    "new_watcher": 87440
+  },
+  "hashes": {
+    "arm-job.log": "d59dc01762254c488ea1991c4e49a26e0cebf1f855414ad4e7af85fb18205ec5",
+    "audit-original.py": "75a7070f2f9b4a2f2c6e70f48c382d70c7e41d3d46f7d47439aba48b351a77ca",
+    "collect-text.py": "6301004dbcc9dfc5fdac2e3d9b888c5765d2e7eaf024ad48ba3ea6328b54ae4f",
+    "linux-job.log": "7b7961936bd6b55d9a535ff604b1534a2c094ae9aa1160ca2c31e7a8e6b30bff",
+    "prepare-census-v1-failure.json": "93fade0907da4f0740b1ea4d765f3032b7368f4831388d9ae42f2db6986f5a4c",
+    "prepare-census-v2.py": "5e48a270a6f9317726ff3621dfa6384dc816853d3fe44d8325518c7b45a09739",
+    "prepare-census.py": "5b8e19a01de131341c1c8de4dc06d43b7a70543aeb56c88a3b95d8a8e9adbddd",
+    "prepared-census.json": "f9c8b830b32d1e0049ba3fa6ebbf7b758eed5f50c3bdfc9d5c1ed2e609e437a0",
+    "receipt-sanitized.json": "cf7c3c8405059b7cc46d9b633ff2537cab663e1d4ae2992f86265d4b54fd1f47",
+    "source-bindings.json": "332e4ddff138e423ae842e72a5be71b94e0f3eb0f8bd073763262b750fe6c7f9",
+    "watch-original.py": "7938e51a4d32af68ec2fd7cc3c2369216440fc3cceb47ec00b27b37d660c97a5"
+  },
+  "limits": [
+    "No binaries downloaded/executed, workflow rerun/cancel, source/branch/target/device change.",
+    "Linux success stays separate from ARM failure; no authored-tree or native-gate qualification.",
+    "No Memory implementation/PR review or causal diagnosis; required witness source metadata and Voice failing assertion only.",
+    "Draft activation/broker hold remains; Root owns all external posts."
+  ],
+  "linux_strict_clippy": {
+    "commands": [
+      {
+        "command": "cargo clippy --locked --manifest-path .github/tools/lampos-promote/Cargo.toml --all-targets -- -D warnings",
+        "line": 400
+      },
+      {
+        "command": "##[group]Run cargo clippy --locked --workspace --all-targets -- -D warnings",
+        "line": 594
+      },
+      {
+        "command": "cargo clippy --locked --workspace --all-targets -- -D warnings",
+        "line": 595
+      }
+    ],
+    "conclusion": "success"
+  },
+  "nextest": {
+    "bad_statuses": [
+      {
+        "binary": "lamp-voice",
+        "duration": "0.009s",
+        "line": 11099,
+        "name": "session_reader::tests::linux::shared_session_writer_projects_every_segment_without_private_values",
+        "ordinal": 10250,
+        "status": "FAIL",
+        "total": 11565
+      }
+    ],
+    "executed": 10253,
+    "limits": "106 summary skips have no per-case completion rows; no named skip inference. Missing required completions receive no PASS credit.",
+    "selected": 11565,
+    "selected_unrun_after_failfast": 1312,
+    "selection_evidence": [
+      {
+        "line": 808,
+        "text": "  PICKED: "
+      },
+      {
+        "line": 849,
+        "text": "    Starting 11565 tests across 184 binaries (106 tests and 2 binaries skipped)"
+      }
+    ],
+    "summary_skipped": 106,
+    "unique_FAIL": 1,
+    "unique_PASS": 10252,
+    "unique_rows": 10253,
+    "unmatched_post_summary": [],
+    "verified_post_summary_reprints": 24
+  },
+  "ordered_parents": [
+    "3d8c75558e235c125b9cf953a66a6c193888fd9e",
+    "539ef86a20330c5724c01b60ff7f032ed6865a1c"
+  ],
+  "overlay_paths": [
+    "lampOS/crates/addons/src/situation.rs",
+    "lampOS/crates/addons/tests/judge.rs",
+    "lampOS/crates/controls/tests/it/touch_pins.rs",
+    "lampOS/crates/expression/tests/runtime.rs",
+    "lampOS/crates/mood/src/engine.rs",
+    "lampOS/crates/mood/src/runtime.rs",
+    "lampOS/crates/mood/tests/it/engine.rs",
+    "lampOS/crates/msgs/src/mood.rs",
+    "lampOS/crates/tasks/tests/harness.rs",
+    "lampOS/crates/voice-eval/src/mood_minute.rs",
+    "lampOS/crates/voice/src/agent_tasks.rs",
+    "lampOS/crates/voice/src/onboarding.rs",
+    "lampOS/crates/voice/src/privacy_bus.rs",
+    "lampOS/crates/voice/src/remember_speaker.rs",
+    "lampOS/crates/voice/src/ring_mood.rs",
+    "lampOS/crates/voice/src/second_provider.rs",
+    "lampOS/crates/voice/src/speak_up.rs",
+    "lampOS/crates/voice/src/speaking_faces.rs",
+    "lampOS/crates/voice/src/tools.rs",
+    "lampOS/docs/mood.md",
+    "lampOS/docs/onboarding.md",
+    "lampOS/docs/second-voice.md",
+    "lampOS/docs/voice-test-fixtures.md"
+  ],
+  "prior_watchers_completed": {
+    "arm": {
+      "receipt": "prior-arm-watch.terminal.json",
+      "sha256": "475b2a7befc8111c51751ab21ed4a37b89c517fa6a75db2d218114ed8e7e5d58",
+      "terminal": {
+        "at": "2026-10-27T08:46:20.069312+00:00",
+        "driver_reaped": true,
+        "elapsed_seconds": 613.592407802,
+        "error": null,
+        "process_group": "absent",
+        "returncode": 1,
+        "run": 40474050468,
+        "timed_out": false,
+        "watcher_only_cleanup": [],
+        "workflow_modified": false
+      }
+    },
+    "linux": {
+      "receipt": "prior-linux-watch.terminal.json",
+      "sha256": "bff5afa0967f9903becf93281aa819234390697ccd0876b686cbabf58a46a170",
+      "terminal": {
+        "at": "2026-10-27T08:36:11.341545+00:00",
+        "driver_reaped": true,
+        "elapsed_seconds": 1.004438838,
+        "error": null,
+        "process_group": "absent",
+        "returncode": 0,
+        "run": 40474050456,
+        "timed_out": false,
+        "watcher_only_cleanup": [],
+        "workflow_modified": false
+      }
+    }
+  },
+  "runs": {
+    "arm": {
+      "actual_checkout": "e306540c2013058c1e348ba780afea4df4a7e52d",
+      "attempt": 1,
+      "conclusion": "failure",
+      "event": "pull_request",
+      "head": "539ef86a20330c5724c01b60ff7f032ed6865a1c",
+      "job": 122087782426,
+      "run": 40474050468
+    },
+    "linux": {
+      "actual_checkout": "e306540c2013058c1e348ba780afea4df4a7e52d",
+      "attempt": 1,
+      "conclusion": "success",
+      "event": "pull_request",
+      "head": "539ef86a20330c5724c01b60ff7f032ed6865a1c",
+      "job": 122087782446,
+      "run": 40474050456
+    }
+  },
+  "status": "HOLD_ORIGINAL_ARM_TEST_FAILURE",
+  "watcher": {
+    "at": "2026-10-27T08:46:41.294225+00:00",
+    "driver_reaped": true,
+    "elapsed_seconds": 292.69694622000003,
+    "error": null,
+    "process_group": "absent",
+    "returncode": 1,
+    "run": 40474050468,
+    "timed_out": false,
+    "watcher_only_cleanup": [],
+    "workflow_modified": false
+  },
+  "whole_tree_equal": false,
+  "workspace_docs_and_custom_harness": {
+    "conclusion": "skipped",
+    "earlier_promote_helper_doc_heading_is_separate": true,
+    "process13_claim": false,
+    "relay_claim": false,
+    "step": "doc tests and the own-harness tests (nextest runs neither)",
+    "workspace_docs_claim": false
+  }
+}
