@@ -1,5 +1,27 @@
 # Reuse decisions: V1, ROS 2 and existing Rust systems
 
+## Persist closed head-input observations without native Stat layout (2026-10-28)
+
+V1's signed-payload and pending-intent recovery patterns retain exact verified
+bytes and recover before normal work. Reuse that exact-input intent for a future
+authenticated plan, without copying its broad rootfs execution permissions.
+The existing V2 head evaluator and bounded collector already define compatible
+read semantics; keep those policies and native identity equality unchanged.
+
+The private [saved-input codec](head-touch-codec.md) uses existing Serde, base64
+and Ring dependencies with explicit portable fields, bounded streaming seeds and
+a capped encoder. Decoding returns a different immutable closed provider rather
+than inventing a native `Stat` or reopening uncaptured live paths. Preserve raw
+OS bytes, null-device witnesses, negative facts and directory order. Unknown
+nonsemantic fields retain their original encoded bytes; unknown semantics and
+duplicate known fields refuse.
+
+An external hash/size match identifies bytes, not trust, root ownership or
+admission. Explicit fresh comparison is separate from decode/replay. No new
+storage, command, unit, allowlist, grant, privileged writer or restoration path
+is introduced. Authenticated finite-plan preparation, durable publication,
+independent restoration and physical cuts remain later work.
+
 ## Refresh the fixed settings writer with independent recovery (2026-10-27)
 
 V1's `scripts/provision/software-update` snapshots absent rootfs entries as
