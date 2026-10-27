@@ -704,6 +704,8 @@ fn take_sound(
         monotonic_us(),
         owner,
         reply,
+        &mut VecDeque::new(),
+        &mut None,
         PlayoutStart::default(),
         trace,
         |_| Ok(()),
@@ -972,6 +974,98 @@ fn a_skill_sound_is_refused_while_a_reply_or_a_candidate_is_open() {
         Ok(Answer::Done(Outcome::Refused(
             "the lamp is listening".into()
         )))
+    );
+}
+
+/// #3697: the shutdown's last words play right after a turn, within 30 s of
+/// another sound and over the lamp's own speech, which they cut; another
+/// skill's sound is refused in each case, and a muted lamp refuses both.
+#[test]
+fn the_shutdowns_last_words_play_where_another_sound_is_refused() {
+    let busy = |owner: &mut Controller, reply: &Option<Reply>, says: &crate::say::Says| {
+        let at_rest = sound_now(owner, reply, &InputAdmission::default(), says);
+        [
+            crate::say::SoundNow {
+                since_turn_us: 0,
+                ..at_rest
+            },
+            crate::say::SoundNow {
+                since_sound_us: Some(0),
+                ..at_rest
+            },
+        ]
+    };
+    let mut trace = SessionState::default();
+    for case in 0..2 {
+        let mut owner = resting_owner();
+        let mut reply = None;
+        let (mut chime, chime_answer) = crate::say::Says::sound_for_test("chime", vec![500; 480]);
+        let now_is = busy(&mut owner, &reply, &chime)[case];
+        assert!(!take_sound(
+            &mut chime, &now_is, &mut owner, &mut reply, &mut trace
+        ));
+        assert!(matches!(
+            chime_answer.try_recv(),
+            Ok(Answer::Done(Outcome::Refused(_)))
+        ));
+        let (mut last, last_answer) = crate::say::Says::sound_for_test("shutdown", vec![500; 480]);
+        assert!(take_sound(
+            &mut last, &now_is, &mut owner, &mut reply, &mut trace
+        ));
+        assert!(matches!(last_answer.try_recv(), Ok(Answer::Begun(_))));
+    }
+    // Over the lamp's own speech: another sound is refused, the last words
+    // cut it and play.
+    let mut owner = resting_owner();
+    let mut reply = None;
+    commit_written_turn(
+        &mut owner,
+        &mut reply,
+        &mut VecDeque::new(),
+        "Remind them to call the bank.",
+        false,
+        "skill_says",
+        1,
+        PlayoutStart::default(),
+        &mut trace,
+        |_| Ok(()),
+    )
+    .unwrap();
+    let speaking = reply.as_ref().unwrap().owner;
+    let (mut chime, chime_answer) = crate::say::Says::sound_for_test("chime", vec![500; 480]);
+    let now_is = sound_now(&mut owner, &reply, &InputAdmission::default(), &chime);
+    assert!(now_is.speaking);
+    assert!(!take_sound(
+        &mut chime, &now_is, &mut owner, &mut reply, &mut trace
+    ));
+    assert_eq!(
+        chime_answer.try_recv(),
+        Ok(Answer::Done(Outcome::Refused(
+            "the lamp is speaking".into()
+        )))
+    );
+    let (mut last, last_answer) = crate::say::Says::sound_for_test("shutdown", vec![500; 480]);
+    assert!(take_sound(
+        &mut last, &now_is, &mut owner, &mut reply, &mut trace
+    ));
+    assert!(matches!(last_answer.try_recv(), Ok(Answer::Begun(_))));
+    let current = reply.as_ref().unwrap();
+    assert_ne!(current.owner, speaking, "the speech was cut");
+    assert_eq!(current.notice.origin(), SpeechOrigin::SkillSound);
+    // Muted: the last words are refused too.
+    let mut owner = resting_owner();
+    let mut reply = None;
+    let (mut last, last_answer) = crate::say::Says::sound_for_test("shutdown", vec![500; 480]);
+    let now_is = crate::say::SoundNow {
+        muted: true,
+        ..sound_now(&mut owner, &reply, &InputAdmission::default(), &last)
+    };
+    assert!(!take_sound(
+        &mut last, &now_is, &mut owner, &mut reply, &mut trace
+    ));
+    assert_eq!(
+        last_answer.try_recv(),
+        Ok(Answer::Done(Outcome::Refused("the lamp is muted".into())))
     );
 }
 
