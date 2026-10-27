@@ -14439,3 +14439,61 @@ async fn a_late_looks_keeper_is_the_face_seen_speaking_by_the_lines_end() {
     }
     std::fs::remove_dir_all(&directory).unwrap();
 }
+
+/// #3504 finding N5: a `remember` called in a round whose own words doubt
+/// what was heard is not run, and the model is told to ask again; the
+/// same call beside a plain say-back runs.
+#[tokio::test]
+async fn a_keep_its_own_round_doubts_is_not_run() {
+    use crate::memory_scope::{FaceCache, ScopeLease};
+    for (said, runs) in [
+        ("Did you say tulip, or the two?", false),
+        ("I may have misheard that.", false),
+        ("Kept.", true),
+    ] {
+        let script = Arc::new(Script {
+            heard: Mutex::new([Ok("Remember my favorite flower is the two.".to_owned())].into()),
+            chats: Mutex::new(
+                [
+                    vec![
+                        text(said),
+                        Ok(ChatEvent::ToolCalls(vec![call(
+                            "c1",
+                            crate::remember::REMEMBER,
+                            json!({"text": "Their favorite flower is the two."}),
+                        )])),
+                        Ok(ChatEvent::Done),
+                    ],
+                    vec![text("Okay."), Ok(ChatEvent::Done)],
+                ]
+                .into(),
+            ),
+            ..Script::default()
+        });
+        let (engine, _, _) = scripted(script.clone());
+        let ran = Arc::new(Mutex::new(Vec::new()));
+        let running = ran.clone();
+        let runner: ScopedToolRunner = Arc::new(move |_, _, name, _, _: ScopeLease| {
+            running.lock().unwrap().push(name);
+            Box::pin(async { json!({"remembered":true}) })
+        });
+        let mut engine = engine.with_memory_scope(
+            lamp_turn_owner::BootId::new([9; 16]).unwrap(),
+            Arc::new(FaceCache::default()),
+            runner,
+            None,
+        );
+        engine.submit(start(1));
+        engine.submit(audio(1, 1));
+        engine.submit(end(1));
+        turn(&mut engine).await;
+        assert_eq!(ran.lock().unwrap().len(), usize::from(runs), "{said}");
+        let asked = script.asked.lock().unwrap();
+        let told = format!("{:?}", asked.last().unwrap());
+        assert_eq!(
+            told.contains("Not kept: in this same reply"),
+            !runs,
+            "{said}: {told}"
+        );
+    }
+}

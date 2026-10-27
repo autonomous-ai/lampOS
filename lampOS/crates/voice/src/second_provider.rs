@@ -7960,6 +7960,9 @@ async fn answer(
                 && !text.chars().any(char::is_alphanumeric);
             // What each call was told, while every one may be answered short.
             let mut short_told: Vec<Value> = Vec::new();
+            // Its own words doubt what was heard: a keep in it is not run
+            // (#3504 finding N5).
+            let doubted = crate::remember::doubted::doubts_what_was_heard(&text);
             messages.push(Message::assistant_calls_with(
                 Some(text),
                 &calls,
@@ -8119,6 +8122,23 @@ async fn answer(
                     messages.push(Message::tool(
                         call.id.clone(),
                         serde_json::json!({ "error": HELD_MEMORY_CALL }).to_string(),
+                    ));
+                    continue;
+                }
+                // A keep its own round's words doubt is not run (#3504
+                // finding N5): asked again, kept once they say it.
+                if call.name == crate::remember::REMEMBER && doubted {
+                    eprintln!(
+                        "lamp-voice second: request {request} chat round {round}: {}",
+                        crate::remember::doubted::SKIPPED
+                    );
+                    messages.push(Message::tool(
+                        call.id.clone(),
+                        serde_json::json!({
+                            "remembered": false,
+                            "note": crate::remember::doubted::NOT_KEPT
+                        })
+                        .to_string(),
                     ));
                     continue;
                 }
