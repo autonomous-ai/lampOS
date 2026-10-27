@@ -25,8 +25,8 @@
 pub use super::legacy_words::{GIVE_ASK, GIVE_DONE, GIVE_FAILED};
 
 use super::{
-    FRESH_MS, GONE_US, Onboarding, Outcome, SIT_GIVE_UP_US, START_QUIET_US, STEP_GIVE_UP_US, Step,
-    TIMED_OUT_QUIET_US, fresh_token, near::CLOCK_SLACK_MS,
+    Delivery, FRESH_MS, GONE_US, MOST_UNSAID, NOT_SAID, Onboarding, Outcome, SIT_GIVE_UP_US,
+    START_QUIET_US, STEP_GIVE_UP_US, Step, TIMED_OUT_QUIET_US, fresh_token, near::CLOCK_SLACK_MS,
 };
 use lamp_turn_owner::BootId;
 use serde_json::json;
@@ -217,6 +217,8 @@ pub(super) struct GivingWayFlow {
     moved: Option<Moved>,
     /// Pushes the body said in this try, for the journal.
     pushes: u32,
+    /// Invitations the voice never said, offered again ([`MOST_UNSAID`]).
+    unsaid: u8,
 }
 
 /// A head joint read during a push, in radians.
@@ -278,6 +280,7 @@ impl Onboarding {
     pub(super) fn redo_giving(&mut self) {
         self.forget_giving();
         self.giving.generation = 0;
+        self.giving.unsaid = 0;
     }
 
     /// Drop everything in flight for this step. An offer never handed to the
@@ -386,14 +389,42 @@ impl Onboarding {
         &mut self,
         voice_boot: BootId,
         turn: u64,
-        delivered_whole: bool,
+        delivery: Delivery,
         now_us: u64,
     ) {
         if self.giving_binding() != Some((voice_boot, turn)) {
             return;
         }
-        self.giving.offer = None;
-        if !delivered_whole {
+        let Some(offer) = self.giving.offer.take() else {
+            return;
+        };
+        if delivery == Delivery::Unsaid {
+            // Never said, never asked: its try is given back (#3754).
+            if self.desired.giving_way_tries == offer.attempt {
+                self.desired.giving_way_tries = offer.attempt - 1;
+                self.save();
+            }
+            self.giving.unsaid = self.giving.unsaid.saturating_add(1);
+            let again = self.giving.unsaid <= MOST_UNSAID;
+            eprintln!(
+                "lamp-voice: giving_way: the invitation was not said; {}",
+                if again {
+                    "asked again"
+                } else {
+                    "left for later"
+                }
+            );
+            self.records.push(json!({"kind":"onboarding_giving_way_try",
+                "felt":false,"why":NOT_SAID,"offered_again":again,"at_us":now_us}));
+            self.forget_giving();
+            if again {
+                self.giving.retry_after_us = now_us.saturating_add(1_000_000);
+            } else {
+                self.finish(Step::GivingWay, Outcome::NotAvailable, None, now_us);
+            }
+            return;
+        }
+        if delivery != Delivery::Whole {
             self.records.push(json!({"kind":"onboarding_giving_way_try",
                 "felt":false,"why":"the invitation was not played whole","at_us":now_us}));
             flow_end(self, now_us);
