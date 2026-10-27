@@ -92,6 +92,15 @@ pub struct Proposal {
     /// after it. Checked and kept by `Days::tidy_apply`; absent, as before.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub on: Option<String>,
+    /// Finding N11 on #3504: the id of a kept thing of this scope the
+    /// observation clearly corrects ("Works at a library now, not the
+    /// bakery." for "works at a bakery"), which the voice found with its
+    /// correction matcher. `Days::tidy_apply` retires it with a
+    /// replacement edge, as a `remember` with `replaces` does; one that is
+    /// not this scope's current kept thing is kept plainly beside. Never
+    /// with `supersedes`. Absent, as before.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub replaces: Option<u64>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -237,7 +246,15 @@ pub fn validate_output(input: &Input, output: &Output) -> Result<(), ModelError>
         return Err(bad("more than eight observations"));
     }
     let mut replaced = BTreeSet::new();
+    let mut retired = BTreeSet::new();
     for observation in &output.observations {
+        if let Some(id) = observation.replaces
+            && (observation.supersedes.is_some() || id == 0 || !retired.insert(id))
+        {
+            return Err(bad(
+                "a kept thing is replaced by one observation, never with a supersession",
+            ));
+        }
         if !text_is_valid(&observation.text, MAX_FACT_BYTES) {
             return Err(bad(
                 "observation text must be nonblank and at most 300 UTF-8 bytes",
@@ -806,6 +823,7 @@ mod tests {
                 category: Category::Preference,
                 source_ids: vec![2],
                 supersedes: Some(1),
+                replaces: None,
                 on: None,
             }],
         }
@@ -1313,10 +1331,12 @@ mod tests {
             },
             Proposal {
                 supersedes: Some(2),
+                replaces: None,
                 ..output().observations[0].clone()
             },
             Proposal {
                 supersedes: Some(99),
+                replaces: None,
                 ..output().observations[0].clone()
             },
             Proposal {
@@ -1338,6 +1358,7 @@ mod tests {
         too_many.observations = vec![
             Proposal {
                 supersedes: None,
+                replaces: None,
                 ..output().observations[0].clone()
             };
             MAX_OBSERVATIONS + 1

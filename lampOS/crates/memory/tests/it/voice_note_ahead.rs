@@ -69,6 +69,7 @@ impl Lamp {
                 category: Category::Thread,
                 source_ids: vec![said],
                 supersedes: None,
+                replaces: None,
                 on: None,
             }],
         };

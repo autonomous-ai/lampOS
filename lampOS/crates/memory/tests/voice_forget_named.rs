@@ -84,6 +84,7 @@ impl Fixture {
                     category: Category::Preference,
                     source_ids: vec![heard],
                     supersedes: None,
+                    replaces: None,
                     on: None,
                 }],
             };

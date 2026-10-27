@@ -526,6 +526,7 @@ fn forget_that_after(events: bool, asked: bool, journalled: bool) -> (Fixture, V
                         category: Category::Thread,
                         source_ids: vec![said],
                         supersedes: None,
+                        replaces: None,
                         on: None,
                     }],
                 };
@@ -679,6 +680,7 @@ fn a_follow_up_forget_preserves_an_unrelated_keep_with_shared_evidence() {
                             category: Category::Thread,
                             source_ids: vec![said],
                             supersedes: None,
+                            replaces: None,
                             on: None,
                         }],
                     },
@@ -875,6 +877,7 @@ fn a_refused_follow_up_forget_survives_the_next_turn_note_refresh() {
                             category: Category::Thread,
                             source_ids: vec![said],
                             supersedes: None,
+                            replaces: None,
                             on: None,
                         }],
                     },
