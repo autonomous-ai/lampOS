@@ -1,0 +1,468 @@
+{
+  "scope": "Pinned99b diagnostic observations, not qualification of newer Main or a historical-cause proof.",
+  "receipts": [
+    {
+      "receipt": "mood-99b-failure-disposition-prep/unmodified-99b-runtime-control/terminal.json",
+      "sha256": "875390b051784e90ef80c583bbf3aa165d9d34663a7ba1cef022c71f74fcf64b",
+      "bytes": 681,
+      "data": {
+        "status": "CONTROL_COMPLETE",
+        "original_candidate_status": "FAIL",
+        "original_candidate_counts": {
+          "passed": 337,
+          "failed": 3,
+          "ignored": 0
+        },
+        "candidate_result_waived": false,
+        "runtime_attempts": 1,
+        "control_test_outcome": "PASS",
+        "control_counts": {
+          "passed": 28,
+          "failed": 0,
+          "ignored": 0
+        },
+        "control_direct_exit": 0,
+        "candidate_source_restored_exact": true,
+        "official_owner_unchanged": true,
+        "all_original_278_and_new_frozen_guards_pass": true,
+        "control_actual_guards_pass": true,
+        "mutable_candidate_cache_restoration_claim": false,
+        "owned_groups_closed": true,
+        "unresolved_owned_pids": [],
+        "lease_released": true
+      }
+    },
+    {
+      "receipt": "mood-99b-failure-disposition-prep/unmodified-99b-runtime-control/native-controller-result.json",
+      "sha256": "0acd4be07d602b8f9183ddb975b1c2fb8eacbbbb3ba87a57a366409724ea66ee",
+      "bytes": 769,
+      "data": {
+        "controller_exit": 0,
+        "wrapper_exit": 0,
+        "started_at": "2026-10-27T02:10:32.014854+00:00",
+        "finished_at": "2026-10-27T02:11:59.002762+00:00",
+        "elapsed_s": 86.98939897000673,
+        "permission_mode": "require_escalated",
+        "activation_verified": true,
+        "controller_pid": 46456,
+        "exit_code": 0,
+        "controller_sha256": "b9a5f0956faf16399d516bc7f286061de9c6efb26f5730eb7dbef316dacd32c1",
+        "plan_sha256": "13c9cd4f2a0b4cd70fd69157b3378f0d6ab630ee4ac753611b112e34be78711c",
+        "terminal_present": true,
+        "terminal_status": "CONTROL_COMPLETE",
+        "stdout_sha256": "27cf57eb9aaae982169e8ece059262e6279cfedaf3701e29d524ebef2178780a",
+        "stdout_bytes": 1334,
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_bytes": 0
+      }
+    },
+    {
+      "receipt": "mood-99b-shared-input-pause-control-prep/terminal.json",
+      "sha256": "b5d8fd61061781c2597bac57d56f1985e5a87f0aad31991191f51d260596976f",
+      "bytes": 586,
+      "data": {
+        "status": "CONTROL_FAIL",
+        "original_candidate_status": "FAIL",
+        "original_candidate_counts": {
+          "passed": 337,
+          "failed": 3,
+          "ignored": 0
+        },
+        "candidate_result_waived": false,
+        "runtime_attempts": 1,
+        "error": "FileExistsError(17, 'File exists')",
+        "candidate_source_restored_exact": true,
+        "official_owner_unchanged": true,
+        "all_inherited_280_and_new_frozen_guards_pass": true,
+        "control_actual_guards_pass": true,
+        "mutable_candidate_cache_restoration_claim": false,
+        "owned_groups_closed": true,
+        "unresolved_owned_pids": [],
+        "lease_released": true
+      }
+    },
+    {
+      "receipt": "mood-99b-shared-input-pause-control-prep/native-controller-result.json",
+      "sha256": "15b6ea3242885bca4529d9f2ac4abb6dea81c46cb7493f13b97efab3bdceffee",
+      "bytes": 764,
+      "data": {
+        "controller_exit": 1,
+        "wrapper_exit": 1,
+        "started_at": "2026-10-27T02:31:40.151687+00:00",
+        "finished_at": "2026-10-27T02:33:08.482737+00:00",
+        "elapsed_s": 88.30816044899984,
+        "permission_mode": "require_escalated",
+        "activation_verified": true,
+        "controller_pid": 3474,
+        "exit_code": 1,
+        "controller_sha256": "a6b23117fc67d3a646521ee0698ea87eaccef26cb2d3f21ddb119164f8dc2211",
+        "plan_sha256": "0bac77bbf3ddc488ab19f60c24992443726402874f161df9677aa39ae7548dba",
+        "terminal_present": true,
+        "terminal_status": "CONTROL_FAIL",
+        "stdout_sha256": "341524918a13b1127743eccf278459708745e49a7c983f18192f7d806d6b9851",
+        "stdout_bytes": 1280,
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_bytes": 0
+      }
+    },
+    {
+      "receipt": "mood-99b-shared-input-pause-control-prep/base-observation.json",
+      "sha256": "00b91c8393a95ed1cde6bcf4356269719534c53707bf9826fc1abb2992944c37",
+      "bytes": 1793,
+      "data": {
+        "arm": "base",
+        "direct_exit": 101,
+        "rows": [
+          [
+            "sleep_name::a_clock_not_set_gives_no_night_and_a_set_one_does",
+            "FAILED"
+          ]
+        ],
+        "counts": {
+          "passed": 0,
+          "failed": 1,
+          "ignored": 0
+        },
+        "filtered_out": 27,
+        "runtime_attempts": 1,
+        "trace": {
+          "actual_pause_us": 806325,
+          "final_publication_wall_ms": 1793068346673,
+          "input_errors_before_original_assert": 0,
+          "logical_later_us": 1000807000,
+          "mood_none": true,
+          "pause_requested_us": 800000,
+          "publishing_wall_ms": 1793068345866,
+          "refused_before_original_assert": 1,
+          "room_published_wall_ms": 1793068345866,
+          "room_success": true,
+          "service_clock_samples_us": [
+            1000807000,
+            1000807000,
+            1000807000,
+            1000807000,
+            1000807000,
+            1000807000,
+            1000807000,
+            1000807000
+          ],
+          "step_us": 200000,
+          "typed_voice_stamp_us": 1000200000,
+          "voice_publish_began_wall_ms": 1793068346672,
+          "voice_published_wall_ms": 1793068346673
+        },
+        "typed_voice_age_at_first_service_clock_us": 607000,
+        "matches_expected_stale_refusal": true,
+        "unexpected_PASS": false,
+        "original_common_assertion_line": 772,
+        "injected_common_assertion_line": 805,
+        "raw_stdout": "base-runtime-once.stdout.txt",
+        "raw_stderr": "base-runtime-once.stderr.txt",
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": [],
+        "target": {
+          "kind": [
+            "test"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "runtime",
+          "src_path": "/private/tmp/tests-mood-pair-source-20261027/lampOS/crates/expression/tests/runtime.rs",
+          "edition": "2024",
+          "doc": false,
+          "doctest": false,
+          "test": true
+        },
+        "fresh_observed": false
+      }
+    },
+    {
+      "receipt": "mood-99b-shared-input-pause-candidate-continuation/terminal.json",
+      "sha256": "a38b88e5f26bc52f9e1492e04b9d3fab9acf6a342af66edeb689cadfc60dc47f",
+      "bytes": 4925,
+      "data": {
+        "status": "CANDIDATE_CONTINUATION_COMPLETE",
+        "original_candidate_status": "FAIL",
+        "original_candidate_counts": {
+          "passed": 337,
+          "failed": 3,
+          "ignored": 0
+        },
+        "candidate_result_waived": false,
+        "runtime_attempts": 1,
+        "candidate_observation": {
+          "arm": "candidate",
+          "direct_exit": 101,
+          "rows": [
+            [
+              "sleep_name::a_clock_not_set_gives_no_night_and_a_set_one_does",
+              "FAILED"
+            ]
+          ],
+          "counts": {
+            "passed": 0,
+            "failed": 1,
+            "ignored": 0
+          },
+          "filtered_out": 27,
+          "runtime_attempts": 1,
+          "trace": {
+            "actual_pause_us": 808161,
+            "final_publication_wall_ms": 1793069558642,
+            "input_errors_before_original_assert": 0,
+            "logical_later_us": 1000810000,
+            "mood_none": true,
+            "pause_requested_us": 800000,
+            "publishing_wall_ms": 1793069557832,
+            "refused_before_original_assert": 1,
+            "room_published_wall_ms": 1793069557832,
+            "room_success": true,
+            "service_clock_samples_us": [
+              1000810000,
+              1000810000,
+              1000810000,
+              1000810000,
+              1000810000,
+              1000810000,
+              1000810000,
+              1000810000
+            ],
+            "step_us": 200000,
+            "typed_voice_stamp_us": 1000200000,
+            "voice_publish_began_wall_ms": 1793069558641,
+            "voice_published_wall_ms": 1793069558641
+          },
+          "typed_voice_age_at_first_service_clock_us": 610000,
+          "matches_expected_stale_refusal": true,
+          "unexpected_PASS": false,
+          "original_common_assertion_line": 791,
+          "injected_common_assertion_line": 824,
+          "raw_stdout": "candidate-runtime-once.stdout.txt",
+          "raw_stderr": "candidate-runtime-once.stderr.txt",
+          "profile": {
+            "opt_level": "0",
+            "debuginfo": 0,
+            "debug_assertions": true,
+            "overflow_checks": true,
+            "test": true
+          },
+          "features": [],
+          "target": {
+            "kind": [
+              "test"
+            ],
+            "crate_types": [
+              "bin"
+            ],
+            "name": "runtime",
+            "src_path": "/private/tmp/tests-mood-pair-source-20261027/lampOS/crates/expression/tests/runtime.rs",
+            "edition": "2024",
+            "doc": false,
+            "doctest": false,
+            "test": true
+          },
+          "fresh_observed": false
+        },
+        "prior_base_observation": {
+          "arm": "base",
+          "direct_exit": 101,
+          "rows": [
+            [
+              "sleep_name::a_clock_not_set_gives_no_night_and_a_set_one_does",
+              "FAILED"
+            ]
+          ],
+          "counts": {
+            "passed": 0,
+            "failed": 1,
+            "ignored": 0
+          },
+          "filtered_out": 27,
+          "runtime_attempts": 1,
+          "trace": {
+            "actual_pause_us": 806325,
+            "final_publication_wall_ms": 1793068346673,
+            "input_errors_before_original_assert": 0,
+            "logical_later_us": 1000807000,
+            "mood_none": true,
+            "pause_requested_us": 800000,
+            "publishing_wall_ms": 1793068345866,
+            "refused_before_original_assert": 1,
+            "room_published_wall_ms": 1793068345866,
+            "room_success": true,
+            "service_clock_samples_us": [
+              1000807000,
+              1000807000,
+              1000807000,
+              1000807000,
+              1000807000,
+              1000807000,
+              1000807000,
+              1000807000
+            ],
+            "step_us": 200000,
+            "typed_voice_stamp_us": 1000200000,
+            "voice_publish_began_wall_ms": 1793068346672,
+            "voice_published_wall_ms": 1793068346673
+          },
+          "typed_voice_age_at_first_service_clock_us": 607000,
+          "matches_expected_stale_refusal": true,
+          "unexpected_PASS": false,
+          "original_common_assertion_line": 772,
+          "injected_common_assertion_line": 805,
+          "raw_stdout": "base-runtime-once.stdout.txt",
+          "raw_stderr": "base-runtime-once.stderr.txt",
+          "profile": {
+            "opt_level": "0",
+            "debuginfo": 0,
+            "debug_assertions": true,
+            "overflow_checks": true,
+            "test": true
+          },
+          "features": [],
+          "target": {
+            "kind": [
+              "test"
+            ],
+            "crate_types": [
+              "bin"
+            ],
+            "name": "runtime",
+            "src_path": "/private/tmp/tests-mood-pair-source-20261027/lampOS/crates/expression/tests/runtime.rs",
+            "edition": "2024",
+            "doc": false,
+            "doctest": false,
+            "test": true
+          },
+          "fresh_observed": false
+        },
+        "combined_pair_evidence_scope": "Two observations across separate controllers; original partial controller remains CONTROL_FAIL/native1.",
+        "prior_controller_status": "CONTROL_FAIL",
+        "prior_controller_exit": 1,
+        "prior_runtime_attempts": 1,
+        "combined_runtime_attempts": 2,
+        "possible_mechanism_only": true,
+        "historical_cause_or_regression_proof": false,
+        "candidate_source_restored_exact": true,
+        "official_owner_unchanged": true,
+        "all_inherited_and_new_frozen_guards_pass": true,
+        "inherited_frozen_count": 282,
+        "sealed_final_count": 284,
+        "control_actual_guards_pass": true,
+        "mutable_candidate_cache_restoration_claim": false,
+        "owned_groups_closed": true,
+        "unresolved_owned_pids": [],
+        "lease_released": true
+      }
+    },
+    {
+      "receipt": "mood-99b-shared-input-pause-candidate-continuation/native-controller-result.json",
+      "sha256": "acfe2cd4bd24a52ca55370c111e765054788287e70e1e0366b8dcdc4f6e5db59",
+      "bytes": 784,
+      "data": {
+        "controller_exit": 0,
+        "wrapper_exit": 0,
+        "started_at": "2026-10-27T02:51:50.166509+00:00",
+        "finished_at": "2026-10-27T02:53:27.093239+00:00",
+        "elapsed_s": 96.92963494299329,
+        "permission_mode": "require_escalated",
+        "activation_verified": true,
+        "controller_pid": 54964,
+        "exit_code": 0,
+        "controller_sha256": "2588038eb9827681210ff9c770b35f67cd881a74057da1a0864c026345064266",
+        "plan_sha256": "65174c07ea4d046546c847eb311c5e1c6be04885f62adedc134c4adec53fbb55",
+        "terminal_present": true,
+        "terminal_status": "CANDIDATE_CONTINUATION_COMPLETE",
+        "stdout_sha256": "6bf5a41861789b7b6fa36c7a1de915af16a032472b6b95eb8e0a4d08ca17f904",
+        "stdout_bytes": 1360,
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_bytes": 0
+      }
+    },
+    {
+      "receipt": "mood-99b-shared-input-pause-candidate-continuation/candidate-observation.json",
+      "sha256": "6c07306782e60d1330899abd79875305d57fbefac599346265a6fe2b6f35a360",
+      "bytes": 1808,
+      "data": {
+        "arm": "candidate",
+        "direct_exit": 101,
+        "rows": [
+          [
+            "sleep_name::a_clock_not_set_gives_no_night_and_a_set_one_does",
+            "FAILED"
+          ]
+        ],
+        "counts": {
+          "passed": 0,
+          "failed": 1,
+          "ignored": 0
+        },
+        "filtered_out": 27,
+        "runtime_attempts": 1,
+        "trace": {
+          "actual_pause_us": 808161,
+          "final_publication_wall_ms": 1793069558642,
+          "input_errors_before_original_assert": 0,
+          "logical_later_us": 1000810000,
+          "mood_none": true,
+          "pause_requested_us": 800000,
+          "publishing_wall_ms": 1793069557832,
+          "refused_before_original_assert": 1,
+          "room_published_wall_ms": 1793069557832,
+          "room_success": true,
+          "service_clock_samples_us": [
+            1000810000,
+            1000810000,
+            1000810000,
+            1000810000,
+            1000810000,
+            1000810000,
+            1000810000,
+            1000810000
+          ],
+          "step_us": 200000,
+          "typed_voice_stamp_us": 1000200000,
+          "voice_publish_began_wall_ms": 1793069558641,
+          "voice_published_wall_ms": 1793069558641
+        },
+        "typed_voice_age_at_first_service_clock_us": 610000,
+        "matches_expected_stale_refusal": true,
+        "unexpected_PASS": false,
+        "original_common_assertion_line": 791,
+        "injected_common_assertion_line": 824,
+        "raw_stdout": "candidate-runtime-once.stdout.txt",
+        "raw_stderr": "candidate-runtime-once.stderr.txt",
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": [],
+        "target": {
+          "kind": [
+            "test"
+          ],
+          "crate_types": [
+            "bin"
+          ],
+          "name": "runtime",
+          "src_path": "/private/tmp/tests-mood-pair-source-20261027/lampOS/crates/expression/tests/runtime.rs",
+          "edition": "2024",
+          "doc": false,
+          "doctest": false,
+          "test": true
+        },
+        "fresh_observed": false
+      }
+    }
+  ]
+}

@@ -1,5 +1,15 @@
 # Tests work log
 
+## 2026-10-27 10:09 — Native drafts pass and input controls close
+
+Ready for lamp-voice: no (current authored-base gates and reads pending)
+
+[Restart original native proof](verification/tests-restart-1a8-native-20261027/) records **7,555 unique PASS / zero bad / 53 skips**, all 21 SameVoice and 14 Reader cases once, original ARM40438366476/Linux40438366553 green. Actual checkout is the 33d/1a8 preview, seven upstream paths beyond authored1a8/737. [Carrier original native proof](verification/tests-carrier-4fd-native-20261027/) records **11,455 unique PASS / zero bad / 106 skips**, original ARM40438377375/Linux40438377384 green, source-derived carrier/round/setup controls once. Its 33d/4fd preview differs from authored4fd/4bff at19paths, including newer text in two authored docs. Neither packet substitutes for latest authored-base gates. Both post-close manifests verify completely; no archives or ARM binaries were downloaded or executed locally.
+
+[Mood pinned input controls](verification/tests-mood-99b-input-controls-20261027/) preserve the unmodified28/0 observation, partial controller failure and candidate-only continuation separately. Both pause arms fail the unchanged NoMood assertion with typed age over500ms; this is a shared controlled mechanism, not historical-cause or no-regression proof. Original337/3 remains. Candidate source restored exactly/all284 witnesses pass. Current clean carry75d5/9e0 is separate.
+
+Own Restart a8a/9e0 and Carrier de353/9e0 carry one and six equal patches. Restart's first current-source gate stopped before any Cargo/test admission as capacity fell below its limit; allsource/243 witnesses held. Supported Cargo clean retired only the closed Carrier mutable target, preserving all278 frozen witnesses and independent copies of15 actual executables; raw/source outcomes remain. The unstarted Restart gates now run on its released exclusive warm target. Reader's synchronous grant-refusal finding and wake's blocked-write readiness/cleanup seams are in test-only source review; no product or device action.
+
 ## 2026-10-27 09:14 — Published Restart gates and retained Mood failure
 
 Ready for lamp-voice: no (latest 737 gates and Mood baseline diagnosis pending)
