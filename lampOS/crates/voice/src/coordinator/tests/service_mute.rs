@@ -431,6 +431,18 @@ fn shutdown_after_unreadable(
     killed: bool,
     aged: bool,
 ) -> Result<()> {
+    shutdown_after_unreadable_exit(privacy_controls, fault, killed, aged, false)
+}
+
+/// With `late`, the privacy worker's socket is closed and its process ends
+/// 50 ms later, after the shutdown has begun, as on a busy reboot.
+fn shutdown_after_unreadable_exit(
+    privacy_controls: bool,
+    fault: Option<&str>,
+    killed: bool,
+    aged: bool,
+    late: bool,
+) -> Result<()> {
     let directory = SessionDirectory::create().unwrap();
     let mut peers = Vec::new();
     let mut fixture = |role: &str| {
@@ -470,11 +482,21 @@ fn shutdown_after_unreadable(
         let pid = rustix::process::Pid::from_raw(privacy.fixture_pid() as i32).unwrap();
         rustix::process::kill_process(pid, rustix::process::Signal::KILL).unwrap();
     }
-    drop(privacy_input);
-    let deadline = Instant::now() + Duration::from_secs(3);
-    while privacy.try_exit().unwrap().is_none() {
-        assert!(Instant::now() < deadline);
-        thread::sleep(Duration::from_millis(1));
+    let mut privacy_channels = Some(privacy_channels);
+    let mut late_exit = None;
+    if late {
+        drop(privacy_channels.take());
+        late_exit = Some(thread::spawn(move || {
+            thread::sleep(Duration::from_millis(50));
+            drop(privacy_input);
+        }));
+    } else {
+        drop(privacy_input);
+        let deadline = Instant::now() + Duration::from_secs(3);
+        while privacy.try_exit().unwrap().is_none() {
+            assert!(Instant::now() < deadline);
+            thread::sleep(Duration::from_millis(1));
+        }
     }
     let mut rig = Rig {
         expression_out: None,
@@ -524,10 +546,45 @@ fn shutdown_after_unreadable(
     for peer in peers {
         let _ = peer.join();
     }
+    if let Some(late_exit) = late_exit {
+        late_exit.join().unwrap();
+    }
     drop(privacy_channels);
     drop(rig);
     let _ = fs::remove_dir_all(&directory.path);
     result
+}
+
+/// lamp-52e6's reboot, 27 Oct 16:37 (#3697): Controls stopped first, the
+/// conversation's privacy worker closed its socket and ended a moment
+/// later. Neither the refused authority send nor the closed socket's
+/// receive is a fault: the switch is unreadable, the microphones close and
+/// the voice waits (or ends with 0 when asked to stop), never exits with 1
+/// to come back muted by the restart guard. Its exit is still verified.
+#[test]
+fn a_privacy_worker_whose_exit_comes_after_its_socket_closed_is_no_fault() {
+    let kept = shutdown_after_unreadable_exit(true, None, false, false, true).unwrap_err();
+    assert!(crate::service_privacy::is_unavailable(&*kept), "{kept}");
+    // The authority send it refused, its exit not yet read.
+    let directory = SessionDirectory::create().unwrap();
+    let (mut privacy, peer, input) = Worker::cooperative_fixture(&directory.path, "privacy");
+    drop(peer);
+    let refused = privacy
+        .channels
+        .control
+        .send(Control::Stop)
+        .err()
+        .unwrap_or_else(|| io::Error::from(io::ErrorKind::ConnectionRefused));
+    let late = thread::spawn(move || {
+        thread::sleep(Duration::from_millis(200));
+        drop(input);
+    });
+    let error = authority_refused(&mut privacy, true, refused);
+    assert!(crate::service_privacy::is_unavailable(&error), "{error}");
+    late.join().unwrap();
+    privacy.shutdown().unwrap();
+    drop(privacy);
+    let _ = fs::remove_dir_all(&directory.path);
 }
 
 /// The reviewer on #795 (15:50): on the Controls route the privacy worker

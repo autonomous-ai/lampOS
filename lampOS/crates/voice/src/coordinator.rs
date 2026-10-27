@@ -1578,6 +1578,9 @@ fn muted_wait_pulsing<
             if let Some(reminders) = reminders.borrow_mut().as_mut() {
                 reminders.poll(monotonic_us());
             }
+            // The say socket answers through the wait; nothing is said
+            // while the microphones are closed (#3697).
+            crate::say::Says::refuse_parked("the lamp is muted");
             // The person's light, said and taken; nothing is drawn (#1816).
             if let Some(light) = light.borrow_mut().as_mut() {
                 light.tick(monotonic_us());
@@ -1768,7 +1771,12 @@ fn mandatory(worker: &Worker, standby: bool) -> bool {
 /// 22:32:43: the session's new worker had ended on `physical privacy source
 /// expired` before the first publish, and `privacy.c.p: Connection refused`
 /// ended the voice). Its end is waited for at most [`ENDED_WITHIN`]; one that
-/// crashed, or hasn't ended by then, ends the voice as before.
+/// crashed ends the voice as before. One that hasn't ended by then is still
+/// the switch unreadable: it closed its socket as it ends, and on a busy
+/// host (a reboot, Controls stopping first: lamp-52e6, 27 Oct 16:37, #3697)
+/// its exit comes later. The run's shutdown still verifies that exit within
+/// its 300 ms, and a worker it has to force is a failed cleanup that ends
+/// the voice.
 fn authority_refused(worker: &mut Worker, privacy_controls: bool, error: io::Error) -> io::Error {
     if !privacy_controls || worker.role != "privacy" {
         return error;
@@ -1780,6 +1788,7 @@ fn authority_refused(worker: &mut Worker, privacy_controls: bool, error: io::Err
             Ok(None) if std::time::Instant::now() < until => {
                 std::thread::sleep(Duration::from_millis(5));
             }
+            Ok(None) => return service_privacy::unavailable_io(error),
             _ => return error,
         }
     }
@@ -2096,11 +2105,14 @@ impl Rig {
                         Ok(None) => break,
                         Err(error) => {
                             // What it queued before ending cleanly may have
-                            // aged out on the way; its exit is the check.
-                            let ended_cleanly = privacy_controls
-                                && worker.role == "privacy"
-                                && matches!(worker.try_exit(), Ok(Some(status)) if status.success());
-                            if !ended_cleanly {
+                            // aged out on the way; its exit, read below
+                            // within the grace, is the check. Its socket
+                            // closes before that exit can be read, so the
+                            // receive error alone is no failure (lamp-52e6's
+                            // reboot, 27 Oct 16:37: `Transport endpoint is
+                            // not connected`, #3697).
+                            let ends_itself = privacy_controls && worker.role == "privacy";
+                            if !ends_itself {
                                 failure.push(CleanupStage::ControlReceive, &worker.role, error);
                             }
                             break;
@@ -2716,6 +2728,11 @@ fn run_source(
     record(&mut trace, run_start)?;
     // Bounded local reads happen once before any capture/speaker worker.
     let notices = FailureNotices::load(notice_options);
+    // The say service listens from the start, through the privacy wait,
+    // not only once a run has opened the microphones (#3697).
+    if lifetime.continuous() {
+        crate::say::Says::start(notices.recordings());
+    }
     let mut motor_rearm = true;
     record(
         &mut trace,
@@ -2892,6 +2909,7 @@ fn run_source(
         .as_mut()
         .map_or(Ok(()), HandControls::persist_muted);
     let result = service_privacy::finish(result, persistence);
+    crate::say::Says::stop();
     finish_run(output, &mut trace, &mut cues, result, termination)
 }
 
@@ -5640,7 +5658,7 @@ fn conversation_with_gate_inner(
     #[cfg(not(test))]
     let given_says = None;
     let mut says = if lifetime.continuous() {
-        given_says.or_else(|| crate::say::Says::from_environment(notices.recordings()))
+        given_says.or_else(|| crate::say::Says::for_run(notices.recordings()))
     } else {
         None
     };

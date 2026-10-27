@@ -433,17 +433,22 @@ impl Waiting {
 fn cleanup(privacy: &mut Worker, mut indicator: Option<&mut Worker>) -> io::Result<()> {
     let stopped_at = monotonic_us();
     let deadline = Instant::now() + Duration::from_millis(300);
-    // A worker that already ended on its own (an unreadable switch, #795)
-    // cannot take a Stop: its exit status, read below, is the verification.
-    let mut error = match privacy.channels.control.send(Control::Stop) {
+    // A worker that ended on its own (an unreadable switch, #795) cannot
+    // take a Stop: its exit status, read below within the same grace, is the
+    // verification. It closes its socket before its exit can be read, so a
+    // refused Stop is no failure by itself: lamp-52e6's cold boot, 27 Oct,
+    // `privacy.c.p: Connection refused` with the publisher not yet up ended
+    // the voice and left the restart guard's mute (#3697). A worker that
+    // does not end within the grace is still forced and a failure.
+    let mut refused: Option<io::Error> = None;
+    let mut error = None;
+    match privacy.channels.control.send(Control::Stop) {
         Ok(()) => {
             #[cfg(test)]
             privacy.run_on_stop();
-            None
         }
-        Err(_) if matches!(privacy.try_exit(), Ok(Some(_))) => None,
-        Err(failure) => Some(failure),
-    };
+        Err(failure) => refused = Some(failure),
+    }
     if let Some(child) = &mut indicator {
         match child.channels.control.send(Control::Stop) {
             Ok(()) => {
@@ -499,10 +504,11 @@ fn cleanup(privacy: &mut Worker, mut indicator: Option<&mut Worker>) -> io::Resu
         }
         if Instant::now() >= deadline {
             if !privacy_exited {
-                let failure = privacy.terminate_and_reap(
-                    io::ErrorKind::TimedOut,
-                    "privacy wait shared stop deadline exceeded".into(),
-                );
+                let mut reason = "privacy wait shared stop deadline exceeded".to_owned();
+                if let Some(refused) = &refused {
+                    reason.push_str(&format!("; stop delivery failed: {refused}"));
+                }
+                let failure = privacy.terminate_and_reap(io::ErrorKind::TimedOut, reason);
                 error.get_or_insert(failure);
             }
             if !indicator_exited && let Some(child) = &mut indicator {
@@ -698,6 +704,77 @@ pub(crate) mod tests {
         cleanup(&mut worker, None).unwrap();
         drop(worker);
         let _ = fs::remove_dir(&directory.path);
+    }
+
+    /// lamp-52e6's cold boot, 27 Oct (#3697): the voice started before
+    /// Controls' privacy publisher was up. Each worker found no publisher,
+    /// closed its socket and ended cleanly, and its Stop was refused before
+    /// its exit could be read: that cleanup, taken as failed, ended the
+    /// voice, and the restart guard muted the lamp. Now the switch stays
+    /// unreadable, the microphones closed, and it is read again until the
+    /// publisher is up and reads open.
+    #[test]
+    fn a_publisher_not_up_yet_keeps_the_microphones_closed_until_it_reads_open() {
+        let states = std::cell::RefCell::new(Vec::new());
+        let mut refused = 0;
+        let outcome = unreadable_retried(
+            &Termination::inactive(),
+            Duration::from_millis(1),
+            || {
+                let fixtures = SessionDirectory::create().unwrap();
+                let directory = SessionDirectory::create().unwrap();
+                if refused < 3 {
+                    refused += 1;
+                    // The worker that found no publisher: its socket is
+                    // closed, its process ends a moment later.
+                    let (mut worker, peer, input) =
+                        Worker::cooperative_fixture(&fixtures.path, "privacy");
+                    drop(peer);
+                    let late = std::thread::spawn(move || {
+                        std::thread::sleep(Duration::from_millis(50));
+                        drop(input);
+                    });
+                    let ended = finish(
+                        Err(unavailable("privacy publisher unavailable")),
+                        cleanup(&mut worker, None),
+                    );
+                    late.join().unwrap();
+                    drop(worker);
+                    let _ = fs::remove_dir(&directory.path);
+                    return ended;
+                }
+                // The publisher is up and the switch reads open.
+                let (worker, peer) = mock(
+                    &fixtures.path,
+                    Script::Unmute,
+                    Arc::new(AtomicBool::new(false)),
+                );
+                let outcome = run(
+                    worker,
+                    directory,
+                    new_boot().unwrap(),
+                    &Termination::inactive(),
+                    |state, _, _| {
+                        states.borrow_mut().push(state);
+                        Ok(())
+                    },
+                    || Ok(true),
+                    false,
+                    |_| unreachable!("no indicator on this wait"),
+                );
+                assert!(peer.join().unwrap().received_stop);
+                outcome
+            },
+            |_| {
+                states.borrow_mut().push(PrivacyState::Unavailable);
+                Ok(())
+            },
+        )
+        .unwrap();
+        assert_eq!((outcome, refused), (WaitOutcome::Allowed, 3));
+        let states = states.into_inner();
+        assert_eq!(states[..3], [PrivacyState::Unavailable; 3]);
+        assert_eq!(states.last(), Some(&PrivacyState::Allowed));
     }
 
     #[test]
