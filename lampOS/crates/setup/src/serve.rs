@@ -1105,17 +1105,128 @@ pub fn failure(message: &str) -> Value {
 }
 
 /// The station address the home network gave `interface`, if any: not the
-/// hotspot's own.
+/// hotspot's own. None, too, when `ip` can't answer in five seconds.
 pub fn station_ip(interface: &str, hotspot: &str) -> Option<String> {
-    let output = std::process::Command::new("ip")
-        .args(["-4", "-o", "addr", "show", "dev", interface])
-        .output()
-        .ok()?;
-    String::from_utf8_lossy(&output.stdout)
+    station_ip_within(
+        std::process::Command::new("ip").args(["-4", "-o", "addr", "show", "dev", interface]),
+        crate::reset::query::QUERY_WITHIN,
+        hotspot,
+    )
+}
+
+fn station_ip_within(
+    command: &mut std::process::Command,
+    within: Duration,
+    hotspot: &str,
+) -> Option<String> {
+    let stdout =
+        crate::reset::query::output_within(command, std::time::Instant::now() + within).ok()?;
+    String::from_utf8_lossy(&stdout)
         .split_whitespace()
         .skip_while(|word| *word != "inet")
         .nth(1)
         .and_then(|cidr| cidr.split('/').next())
         .filter(|address| *address != hotspot)
         .map(String::from)
+}
+
+/// Phones on the hotspot, from `iw dev IF station dump`: None when it can't
+/// be read in five seconds, which the policy counts as some.
+pub fn phones(interface: &str) -> Option<u16> {
+    phones_within(
+        std::process::Command::new("iw").args(["dev", interface, "station", "dump"]),
+        crate::reset::query::QUERY_WITHIN,
+    )
+}
+
+fn phones_within(command: &mut std::process::Command, within: Duration) -> Option<u16> {
+    let stdout =
+        crate::reset::query::output_within(command, std::time::Instant::now() + within).ok()?;
+    Some(
+        String::from_utf8_lossy(&stdout)
+            .lines()
+            .filter(|line| line.starts_with("Station "))
+            .count()
+            .try_into()
+            .unwrap_or(u16::MAX),
+    )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::{process::Command, time::Instant};
+
+    const STATIONS: &str =
+        "printf 'Station aa:bb (on wlan0)\\n\\trx: 1\\nStation cc:dd (on wlan0)\\n'";
+    const ADDRESS: &str =
+        "printf '3: wlan0    inet 192.168.1.42/24 brd 192.168.1.255 scope global wlan0\\n'";
+
+    fn shell(script: &str) -> Command {
+        let mut command = Command::new("/bin/sh");
+        command.args(["-c", script]);
+        command
+    }
+
+    /// `read` on a stand-in that runs `script` with $1 = a fresh witness path,
+    /// returning what it read, how long it took, and the witness.
+    fn timed<T>(
+        read: impl Fn(&mut Command) -> T,
+        script: &str,
+    ) -> (T, Duration, std::path::PathBuf) {
+        let witness = std::env::temp_dir().join(format!(
+            "setup-read-{}-{:?}",
+            std::process::id(),
+            Instant::now()
+        ));
+        let started = Instant::now();
+        let read = read(shell(script).arg("stand-in").arg(&witness));
+        (read, started.elapsed(), witness)
+    }
+
+    fn bounded<T: std::fmt::Debug + PartialEq>(
+        read: impl Fn(&mut Command) -> T,
+        good: &str,
+        none: T,
+    ) {
+        let (stalled, took, _) = timed(&read, "/bin/sleep 30");
+        assert_eq!(stalled, none);
+        assert!(
+            took < Duration::from_secs(3),
+            "a stalled read took {took:?}"
+        );
+        // As reset's own held-pipe control: the child writes its witness
+        // only if it outlives the bound.
+        let (held, took, escaped) = timed(
+            &read,
+            &format!("(/bin/sleep 2; printf escaped > \"$1\") & {good}"),
+        );
+        assert_eq!(held, none);
+        assert!(took < Duration::from_secs(3), "a held pipe took {took:?}");
+        std::thread::sleep(Duration::from_millis(1500));
+        let survived = escaped.exists();
+        let _ = std::fs::remove_file(&escaped);
+        assert!(!survived, "the pipe-holding child outlived the read");
+    }
+
+    #[test]
+    fn phones_are_counted_as_before_and_none_when_stalled_or_held() {
+        let read = |command: &mut Command| phones_within(command, Duration::from_secs(1));
+        assert_eq!(timed(read, STATIONS).0, Some(2));
+        assert_eq!(timed(read, "exit 1").0, None);
+        bounded(read, STATIONS, None);
+    }
+
+    #[test]
+    fn station_ip_is_parsed_as_before_and_none_when_stalled_or_held() {
+        let read = |command: &mut Command| {
+            station_ip_within(command, Duration::from_secs(1), "192.168.100.1")
+        };
+        assert_eq!(timed(read, ADDRESS).0.as_deref(), Some("192.168.1.42"));
+        let hotspot = |command: &mut Command| {
+            station_ip_within(command, Duration::from_secs(1), "192.168.1.42")
+        };
+        assert_eq!(timed(hotspot, ADDRESS).0, None);
+        bounded(read, ADDRESS, None);
+    }
 }
