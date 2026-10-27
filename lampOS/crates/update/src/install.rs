@@ -932,7 +932,7 @@ impl Host for System {
     }
 
     fn harness_version(&mut self, user: &str, home: &str) -> Result<String, String> {
-        let mut quick = |argv: &[String]| output_of_within(argv, JOURNAL_WITHIN);
+        let mut quick = |argv: &[String]| output_of_within(argv, VERSION_WITHIN);
         let uid = uid_of(&mut quick, user)?;
         quick(&harness_argv(user, home, &uid, &["version"]))
     }
@@ -986,6 +986,10 @@ fn uid_of(run: &mut Runner, user: &str) -> Result<String, String> {
 /// and fails on demand.
 pub type Runner<'a> = dyn FnMut(&[String]) -> Result<String, String> + 'a;
 
+/// The longest `harness version` may take: a cold start under `runuser` on
+/// a busy lamp. One past it is not known, and the Harness there is kept.
+pub const VERSION_WITHIN: Duration = Duration::from_secs(30);
+
 /// The longest Harness's installer (`curl … | sh`) may take: it fetches over
 /// the lamp's own network, which can be slow.
 pub const INSTALLER_WITHIN: Duration = Duration::from_secs(15 * 60);
@@ -1019,10 +1023,20 @@ fn output_of_within(argv: &[String], within: Duration) -> Result<String, String>
 /// A bounded command's error as `"{shown}: …"`: its own trimmed stderr (or
 /// exit status) when it failed, that it ran past `within` (its group then
 /// killed), or why it could not run.
+/// What an install command that ran past its bound says, and how
+/// [`timed_out`] knows it.
+const DID_NOT_END: &str = "did not end within";
+
+/// Whether `why` is a command that ran past its bound: not known, rather
+/// than failed.
+pub fn timed_out(why: &str) -> bool {
+    why.contains(DID_NOT_END)
+}
+
 fn shown_error(shown: &str, within: Duration, error: &io::Error) -> String {
     if error.kind() == io::ErrorKind::TimedOut {
         format!(
-            "{shown}: did not end within {} s: it ran on, or a child it left held its output",
+            "{shown}: {DID_NOT_END} {} s: it ran on, or a child it left held its output",
             within.as_secs()
         )
     } else {
@@ -2222,14 +2236,15 @@ pub fn harness_on(
     if fs::symlink_metadata(&link).is_ok() {
         let launcher = format!("{HARNESS_HOME}/.local/bin/harness");
         let ours = fs::read_link(&link).is_ok_and(|to| to == Path::new(&launcher));
-        let mut version = || {
-            host.harness_version(USER, HARNESS_HOME)
-                .ok()
-                .as_deref()
-                .and_then(harness_version_of)
-        };
         let least = shown_version(Some(HARNESS_LEAST));
-        match version() {
+        let first = host.harness_version(USER, HARNESS_HOME);
+        match first.as_deref().ok().and_then(harness_version_of) {
+            // Too slow to say is not known, not missing: never installed
+            // over, and asked again on the next run.
+            _ if first.as_ref().is_err_and(|why| timed_out(why)) => say(&format!(
+                "Harness at {HARNESS} is kept as it is: its version could not be read in time ({}); asked again on the next run",
+                first.as_ref().unwrap_err()
+            )),
             Some(found) if found >= HARNESS_LEAST => say(&format!(
                 "Harness {} is already at {HARNESS}: kept as it is",
                 shown_version(Some(found))
@@ -2237,12 +2252,15 @@ pub fn harness_on(
             found if ours => {
                 let was = shown_version(found);
                 let installed = host.harness_on(USER, HARNESS_HOME);
-                let now = host
-                    .harness_version(USER, HARNESS_HOME)
-                    .ok()
-                    .as_deref()
-                    .and_then(harness_version_of);
+                let after = host.harness_version(USER, HARNESS_HOME);
+                let now = after.as_deref().ok().and_then(harness_version_of);
                 match (installed, now) {
+                    (Ok(()), None) if after.as_ref().is_err_and(|why| timed_out(why)) => {
+                        say(&format!(
+                            "Harness's own installer ran, from {was}; its version could not be read in time ({}); asked again on the next run",
+                            after.as_ref().unwrap_err()
+                        ))
+                    }
                     (Ok(()), Some(now)) if now >= HARNESS_LEAST => changed.push(format!(
                         "Harness updated from {was} to {} by its own installer, for signing in by a spoken code",
                         shown_version(Some(now))

@@ -1028,6 +1028,13 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      `/usr/local/bin/harness` wasn't put there by `harness-on` (one put
      there by hand is never installed over). The Harness there is kept,
      and hand-overs go on with it; only signing in by voice waits.
+   - **Each step is bounded** (`world::query`, group-safe): `systemctl`
+     and Harness's service steps 120 s, Harness's installer, which fetches,
+     15 min, `id -u` 5 s and `harness version` 30 s. One that runs past its
+     bound is an error naming it and the bound. A `harness version` past
+     30 s is not known rather than missing: the Harness there is kept as it
+     is, never installed over, and it is asked again on the next run
+     (`harness_on_keeps_a_harness_whose_version_cannot_be_read_in_time`).
    - **A failing step stops there,** before the link, so a lamp is never
      left with a link to nothing. Nothing is recorded, and the next run
      starts again.

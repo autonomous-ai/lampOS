@@ -1569,8 +1569,9 @@ On the development Mac (Intel, macOS 26.6, Rust 1.96.0), not on a lamp:
   Install's own commands go through the same helper: its `systemctl`
   steps and Harness's service steps within 120 s (`RESTART_WITHIN`),
   Harness's installer, which fetches, within 15 min (`INSTALLER_WITHIN`),
-  `systemd-tmpfiles`, `date +%z` and `harness version`
-  within 5 s; one that stalls or leaves a child holding its pipes is an
+  `systemd-tmpfiles` and `date +%z` within 5 s, `harness version` within
+  30 s (`VERSION_WITHIN`; past it, the Harness there is kept as not
+  known, never installed over); one that stalls or leaves a child holding its pipes is an
   error naming it and the bound, a failed one says its trimmed stderr.
 - With product parts (task #811, `cargo test -p lamp-update --test round`,
   19 rounds): a lamp with both kinds switched in one round, the voice by its
