@@ -3627,6 +3627,7 @@ fn flush_provider_input_with(
             | ProviderInput::Called { request, .. }
             | ProviderInput::Paused { request, .. }
             | ProviderInput::CountOnly { request, .. }
+            | ProviderInput::StepCall { request, .. }
             | ProviderInput::Reminder { request, .. }
             | ProviderInput::Written { request, .. } => *request,
         };
@@ -5166,6 +5167,21 @@ fn near_call_window(
         return held;
     }
     onboarding.is_some_and(|walk| walk.near_holds_reply(began_us, at_us))
+}
+
+/// Whether onboarding's `how_you_sound` waits for a call now (#3504), from
+/// its name prompt to its try's judgement: a line begun now is told the
+/// second route as `StepCall`, so only the lamp's name is never answered.
+fn step_call(onboarding: Option<&crate::onboarding::Onboarding>) -> bool {
+    #[cfg(test)]
+    if let Some(waits) = TEST_NEAR.with(|near| {
+        near.borrow()
+            .as_ref()
+            .map(crate::onboarding::near::NearFlow::waits_for_call)
+    }) {
+        return waits;
+    }
+    onboarding.is_some_and(crate::onboarding::Onboarding::near_waits_for_call)
 }
 
 /// Whether the sentence part's window of onboarding's `how_you_sound` is
@@ -9057,6 +9073,22 @@ fn conversation_with_gate_inner(
                         |state| rig.publish(state),
                     )?;
                     last_publish = monotonic_us();
+                    // Begun while how_you_sound waits for a call (#3504):
+                    // the second route leaves a line that is only the name
+                    // to the step. Its Start and opening are queued already.
+                    if !count_only
+                        && step_call(onboarding.as_ref())
+                        && let Some(current) = reply.as_ref()
+                    {
+                        provider_queue.push_back(ProviderInput::StepCall {
+                            request: current.owner.turn(),
+                            privacy_generation: snapshot.microphone_generation(),
+                        });
+                        record(
+                            trace,
+                            json!({"kind":"onboarding_step_call","turn":current.owner.turn(),"at_us":monotonic_us()}),
+                        )?;
+                    }
                     if goes_on_from_name {
                         open_name_turn = None;
                         eprintln!(
