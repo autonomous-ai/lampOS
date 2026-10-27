@@ -35,6 +35,7 @@ shutdown: ...`) and one JSON line of the steps at the end:
 | Step | What | Bound |
 |---|---|---|
 | Refused | While `lamp-update` holds its lock (an update installs), or the lock cannot be checked, nothing is done: `{"refused": ...}`, exit 1. Otherwise the lock is held to the end, so no update starts under the shutdown. | taken without waiting |
+| Say | The lamp says `shutdown::GOING_TO_SLEEP`, "Going to sleep now. Unplug me when my light turns green.", through the voice's say service (`LAMP_SAY_SOCKET`, `/run/lampos-say/say.sock`; speaking-first.md, "the say service") as `text` from the skill `shutdown` at priority 9, and waits for its `{"outcome":"spoken"}`, played whole. Whether it may be said now (muted, paused, busy) is the say service's own judgement; nothing is added here. Not there (`LAMP_SAY` off, the voice down), refused, dropped, expired or not spoken in time: said as "not said (...)", and the shutdown goes on. A dry run says it too, so that it can be heard. | 10 s (`SAY_WITHIN`) |
 | Pause | `lamp-keeper pause`: each part that honours `lamp/pause` takes no new work, and the body goes to rest, folding if it stands. A product lamp has no keeper (lamp-52e6 on 7071): that is said as "no keeper on this lamp: the body rests as it stops", and no resume is asked; any other failed pause is said too. Either way the body's own stop folds it. | one command |
 | Rest | The body's `body/joint_states`, fresh, every 100 ms: every joint still within 0.01 rad (about 6 counts) for 2 s (`STILL_FOR`, HAL-4.12's two seconds). | 15 s (`REST_WITHIN`): a standing lamp folds over its 6 s stand time and is then still for 2 s. After it the shutdown goes on and says so. |
 | Stop | `systemctl stop lampos.target` with every part named and each read back `inactive` or `failed`, and the reset's starters and writers stopped with it (`reset::stop_and_wait`). The body folds on its stop and keeps its torque. Stopped, the pause is cleared, so a lamp started again without a power-up is not left paused. | each part's own `TimeoutStopSec` (the body's 25 s) |
@@ -50,7 +51,7 @@ This is the reset's policy for a stop that fails (it reboots all the same). A
 body that never shows rest is stopped after 15 s; its stop folds it, and the
 let-go writes nothing to a lamp it finds up.
 
-`--dry-run` does everything but the poweroff: the lamp is paused, stopped, let
+`--dry-run` does everything but the poweroff: the lamp says its line, is paused, stopped, let
 go and lit, and stays so. `lamp-keeper start lamp` brings it back, or `systemctl restart lampos.target` on a lamp without the keeper. `systemctl stop lampos.target` warns that `lampos-setup-done.path` can start the target again: before a power-off that does not matter, and after a dry run the target may read active with its parts stopped until it is restarted.
 
 ## The switch
@@ -65,8 +66,8 @@ it is only ever started by one of those, or by hand.
    app's restart is asked (`lamp-keeper restart-asked`, keeper.md).
 2. The button held, acting on release by hold time (HAL-5.7), with warning
    lights while it is held.
-3. Voice: "Lamp, turn off", only with a spoken yes, never on a guess; the lamp
-   says it is going to sleep first.
+3. Voice: "Lamp, turn off", only with a spoken yes, never on a guess. The
+   runner itself says it is going to sleep first (the Say step).
 
 Each starts `lamp-setup shutdown` and is behind `LAMP_SHUTDOWN`.
 

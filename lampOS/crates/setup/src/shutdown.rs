@@ -1,7 +1,8 @@
 //! The safe shutdown (#3697, `docs/shutdown.md`): the lamp is turned off
 //! the way V1 parked it before the power went (HAL-4.12, HAL-5.18), so that
-//! nobody has to pull the plug on a running lamp. In order: the lamp is
-//! paused and the body rests, still for [`STILL_FOR`]; every part is
+//! nobody has to pull the plug on a running lamp. In order: the lamp says
+//! [`GOING_TO_SLEEP`] through the voice's say service, waited for at most
+//! [`SAY_WITHIN`]; the lamp is paused and the body rests, still for [`STILL_FOR`]; every part is
 //! stopped ([`crate::reset::stop_and_wait`]); [`LET_GO_AFTER`] later the
 //! body lets go, torque off on all five and each read back
 //! (`lamp-body-measure let-go`); the ring shows that it is safe to unplug
@@ -11,7 +12,22 @@
 //! lets go or powers anything off. Every step says one line.
 
 use serde::Serialize;
-use std::{io, time::Duration};
+use std::{
+    io::{self, BufRead, BufReader, Write},
+    os::unix::net::UnixStream,
+    path::Path,
+    time::{Duration, Instant},
+};
+
+/// What the lamp says before anything stops (the owner at the lamp: a
+/// silent shutdown reads wrong). The ring's unplug light is soft green.
+pub const GOING_TO_SLEEP: &str = "Going to sleep now. Unplug me when my light turns green.";
+
+/// The longest the shutdown waits for [`GOING_TO_SLEEP`] to be played:
+/// a second of quiet at priority 9, about a second to the model's first
+/// sound, about four of speech. A say service that is not there, refuses,
+/// or has not said it by then is said, and the shutdown goes on.
+pub const SAY_WITHIN: Duration = Duration::from_secs(10);
 
 /// The product switch for the ways a person asks (the app, a long press,
 /// a spoken yes), which later changes add. Off unless `on`. The runner
@@ -54,6 +70,9 @@ pub const LET_GO_AFTER: Duration = Duration::from_millis(400);
 /// What the shutdown does outside its own order. The lamp's is in
 /// `lamp-setup`'s `main`; a test's records each call.
 pub trait Host {
+    /// Say `line` aloud and return once it was played whole, or why not,
+    /// within `within`.
+    fn say_aloud(&mut self, line: &str, within: Duration) -> Result<(), String>;
     /// Time since some fixed start.
     fn now(&self) -> Duration;
     fn sleep(&mut self, pause: Duration);
@@ -76,6 +95,8 @@ pub trait Host {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case", tag = "step", content = "why")]
 pub enum Step {
+    Said,
+    NotSaid(String),
     Paused,
     NotPaused(String),
     Rested,
@@ -103,6 +124,17 @@ pub fn run(host: &mut impl Host, dry_run: bool, say: &mut impl FnMut(&str)) -> V
         say(&line);
         steps.push(step);
     };
+    // Said first, while every part still runs: the voice speaks it, and
+    // the green light it names comes last. A dry run says it too, so it
+    // can be heard.
+    match host.say_aloud(GOING_TO_SLEEP, SAY_WITHIN) {
+        Ok(()) => step(Step::Said, format!("said: {GOING_TO_SLEEP}"), say),
+        Err(why) => step(
+            Step::NotSaid(why.clone()),
+            format!("not said ({why}); going on"),
+            say,
+        ),
+    }
     // A product lamp has no keeper (lamp-52e6 on 7071): its body rests
     // as it stops, so no keeper is the plain path, not a fault.
     let paused = match host.pause(true) {
@@ -198,6 +230,59 @@ pub fn run(host: &mut impl Host, dry_run: bool, say: &mut impl FnMut(&str)) -> V
     steps
 }
 
+/// The voice's say service on `socket` (`docs/speaking-first.md`, "the
+/// say service"): `line` as `text`, from the skill `shutdown`, priority 9,
+/// expiring at `within`; `Ok` only on its `{"outcome":"spoken"}`, played
+/// whole. Not there, refused, dropped, expired or no outcome within
+/// `within`: why. Muted, paused or busy is the say service's own to judge.
+pub fn say_through(socket: &Path, line: &str, within: Duration) -> Result<(), String> {
+    let until = Instant::now() + within;
+    let ask = serde_json::json!({"skill": "shutdown", "text": line, "priority": 9,
+        "expires_in_ms": within.as_millis() as u64});
+    let mut stream = UnixStream::connect(socket)
+        .map_err(|why| format!("the voice's say service is not there: {why}"))?;
+    stream
+        .write_all(format!("{ask}\n").as_bytes())
+        .map_err(|why| format!("the say service did not take the ask: {why}"))?;
+    let mut reader = BufReader::new(stream);
+    loop {
+        let left = until.saturating_duration_since(Instant::now());
+        if left.is_zero() {
+            return Err(format!("not played within {} ms", within.as_millis()));
+        }
+        reader
+            .get_ref()
+            .set_read_timeout(Some(left))
+            .map_err(|why| why.to_string())?;
+        let mut answer = String::new();
+        match reader.read_line(&mut answer) {
+            Ok(0) => return Err("the say service closed without an outcome".into()),
+            Ok(_) => {}
+            Err(why)
+                if matches!(
+                    why.kind(),
+                    io::ErrorKind::WouldBlock | io::ErrorKind::TimedOut
+                ) =>
+            {
+                return Err(format!("not played within {} ms", within.as_millis()));
+            }
+            Err(why) => return Err(why.to_string()),
+        }
+        let answer: serde_json::Value = serde_json::from_str(answer.trim_end()).unwrap_or_default();
+        match answer["outcome"].as_str() {
+            Some("spoken") => return Ok(()),
+            Some(outcome) => {
+                return Err(match answer["why"].as_str() {
+                    Some(why) => format!("{outcome}: {why}"),
+                    None => outcome.to_owned(),
+                });
+            }
+            // `begun`: the outcome follows.
+            None => {}
+        }
+    }
+}
+
 /// Whether the body shows rest within [`REST_WITHIN`]: every joint still,
 /// within [`STILL_RADIANS`], for [`STILL_FOR`] of fresh reads.
 fn rested(host: &mut impl Host) -> bool {
@@ -261,10 +346,22 @@ mod tests {
         stop_fails: bool,
         /// No keeper on this lamp, as on a product image.
         no_keeper: bool,
+        /// The say service is not there: answered after the whole wait.
+        say_fails: bool,
         calls: Vec<(Duration, &'static str)>,
     }
 
     impl Host for Fake {
+        fn say_aloud(&mut self, line: &str, within: Duration) -> Result<(), String> {
+            assert_eq!(line, GOING_TO_SLEEP);
+            self.calls.push((self.now, "say"));
+            if self.say_fails {
+                self.now += within;
+                return Err("the voice's say service is not there".into());
+            }
+            self.now += Duration::from_secs(4);
+            Ok(())
+        }
         fn now(&self) -> Duration {
             self.now
         }
@@ -323,7 +420,7 @@ mod tests {
     }
 
     #[test]
-    fn it_rests_stops_waits_lets_go_lights_syncs_and_powers_off_in_that_order() {
+    fn it_says_rests_stops_waits_lets_go_lights_syncs_and_powers_off_in_that_order() {
         // Folding for a second, then still.
         let mut joints = vec![Some(vec![0.0, 1.0]); 1];
         for step in 0..10 {
@@ -339,6 +436,7 @@ mod tests {
         assert_eq!(
             names(&fake),
             [
+                "say",
                 "pause",
                 "stop",
                 "resume",
@@ -351,6 +449,7 @@ mod tests {
         assert_eq!(
             steps,
             [
+                Step::Said,
                 Step::Paused,
                 Step::Rested,
                 Step::Stopped,
@@ -361,10 +460,12 @@ mod tests {
             ]
         );
         assert_eq!(lines.len(), steps.len(), "one line a step: {lines:?}");
-        // Still for 2 s after the fold ended at 1 s, then stopped.
+        // Said first, for 4 s; still for 2 s after the fold ended at 1 s
+        // later, then stopped.
+        assert_eq!(at(&fake, "say"), Duration::ZERO);
         let stop = at(&fake, "stop");
         assert!(
-            stop >= Duration::from_secs(3) && stop < REST_WITHIN,
+            stop >= Duration::from_secs(7) && stop < Duration::from_secs(4) + REST_WITHIN,
             "{stop:?}"
         );
         // The let-go waits 0.4 s from the end of the stop.
@@ -382,12 +483,13 @@ mod tests {
                 ..Fake::default()
             };
             let steps = run(&mut fake, false, &mut |_| {});
-            assert_eq!(steps[1], Step::NotRested);
-            let stop = at(&fake, "stop");
+            assert_eq!(steps[2], Step::NotRested);
+            let stop = at(&fake, "stop") - Duration::from_secs(4);
             assert!(stop >= REST_WITHIN && stop < REST_WITHIN + Duration::from_secs(1));
             assert_eq!(
                 names(&fake),
                 [
+                    "say",
                     "pause",
                     "stop",
                     "resume",
@@ -408,10 +510,18 @@ mod tests {
             ..Fake::default()
         };
         let steps = run(&mut fake, false, &mut |_| {});
-        assert!(matches!(steps[2], Step::NotStopped(_)));
+        assert!(matches!(steps[3], Step::NotStopped(_)));
         assert_eq!(
             names(&fake),
-            ["pause", "stop", "let go", "light", "sync", "power off"]
+            [
+                "say",
+                "pause",
+                "stop",
+                "let go",
+                "light",
+                "sync",
+                "power off"
+            ]
         );
     }
 
@@ -426,15 +536,15 @@ mod tests {
         };
         let mut said = Vec::new();
         let steps = run(&mut fake, false, &mut |line| said.push(line.to_owned()));
-        assert_eq!(steps[0], Step::NotPaused("no keeper".into()));
+        assert_eq!(steps[1], Step::NotPaused("no keeper".into()));
         assert_eq!(
-            said[0],
+            said[1],
             "no keeper on this lamp: the body rests as it stops"
         );
         assert!(!said.iter().any(|line| line.contains("pause is left kept")));
         assert_eq!(
             names(&fake),
-            ["stop", "let go", "light", "sync", "power off"]
+            ["say", "stop", "let go", "light", "sync", "power off"]
         );
     }
 
@@ -445,9 +555,79 @@ mod tests {
             ..Fake::default()
         };
         let steps = run(&mut fake, true, &mut |_| {});
+        // Said, so that a dry run can be heard.
+        assert_eq!(steps[0], Step::Said);
+        assert_eq!(names(&fake)[0], "say");
         assert!(!names(&fake).contains(&"power off"));
         assert_eq!(names(&fake).last(), Some(&"sync"));
         assert_eq!(steps.last(), Some(&Step::WouldPowerOff));
+    }
+
+    #[test]
+    fn a_say_that_fails_is_said_and_still_powers_off_within_its_bound() {
+        let mut fake = Fake {
+            joints: vec![Some(vec![0.0])],
+            say_fails: true,
+            ..Fake::default()
+        };
+        let mut said = Vec::new();
+        let steps = run(&mut fake, false, &mut |line| said.push(line.to_owned()));
+        assert!(matches!(steps[0], Step::NotSaid(_)));
+        assert!(said[0].starts_with("not said ("), "{said:?}");
+        assert_eq!(at(&fake, "pause"), SAY_WITHIN);
+        assert_eq!(names(&fake).last(), Some(&"power off"));
+    }
+
+    /// The say service's answers as the voice writes them: spoken, refused,
+    /// and begun with no outcome, the stream held open past the bound.
+    #[test]
+    fn say_through_is_ok_only_on_spoken_and_bounded_otherwise() {
+        use std::os::unix::net::UnixListener;
+        let dir = std::env::temp_dir().join(format!("lss-say-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let socket = dir.join("say.sock");
+        let within = Duration::from_millis(300);
+        assert!(
+            say_through(&socket, GOING_TO_SLEEP, within)
+                .unwrap_err()
+                .contains("not there")
+        );
+        let listener = UnixListener::bind(&socket).unwrap();
+        for (answer, said) in [
+            (
+                "{\"event\":\"begun\",\"at_us\":1}\n{\"outcome\":\"spoken\"}\n",
+                Ok(()),
+            ),
+            (
+                "{\"outcome\":\"refused\",\"why\":\"the lamp is paused\"}\n",
+                Err("refused: the lamp is paused".to_owned()),
+            ),
+            (
+                "{\"event\":\"begun\",\"at_us\":1}\n",
+                Err("not played within 300 ms".to_owned()),
+            ),
+        ] {
+            let asked = std::thread::scope(|scope| {
+                let server = scope.spawn(|| {
+                    let (stream, _) = listener.accept().unwrap();
+                    let mut asked = String::new();
+                    BufReader::new(&stream).read_line(&mut asked).unwrap();
+                    (&stream).write_all(answer.as_bytes()).unwrap();
+                    std::thread::sleep(within * 2);
+                    asked
+                });
+                let started = Instant::now();
+                assert_eq!(say_through(&socket, GOING_TO_SLEEP, within), said);
+                assert!(started.elapsed() < within * 2);
+                server.join().unwrap()
+            });
+            let asked: serde_json::Value = serde_json::from_str(&asked).unwrap();
+            assert_eq!(asked["text"], GOING_TO_SLEEP);
+            assert_eq!(asked["skill"], "shutdown");
+            assert_eq!(asked["priority"], 9);
+        }
+        let _ = std::fs::remove_dir_all(dir);
     }
 
     #[test]
