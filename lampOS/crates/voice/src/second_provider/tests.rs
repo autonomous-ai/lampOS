@@ -4847,21 +4847,23 @@ async fn a_stop_goes_with_a_request_going_on_and_never_past_two_minutes() {
 }
 
 /// The first builder, 2026-10-17 02:48: with the down line on, a spoken
-/// turn whose chat never began says "I can't think right now; give me a
-/// minute." as audio only, not as words, at most once a minute; a written
-/// turn (the lamp's own) never says it; with it off, nothing.
+/// turn whose chat never began says [`DOWN_LINE`] as audio only, not as
+/// words; again within the minute, the shorter [`DOWN_LINE_AGAIN`], never the
+/// same line twice in a row (#3755); a written turn (the lamp's own) never
+/// says it; with it off, nothing.
 #[tokio::test(start_paused = true)]
-async fn a_chat_that_never_begins_says_the_down_line_at_most_once_a_minute() {
+async fn a_chat_that_never_begins_says_a_slow_moment_then_a_shorter_one_never_the_same_twice() {
     async fn turns(on: bool) -> Vec<Vec<String>> {
         let script = Arc::new(Script {
             heard: Mutex::new(
                 std::iter::repeat_with(|| Ok("What time is it?".to_owned()))
-                    .take(5)
+                    .take(6)
                     .collect(),
             ),
             chats: Mutex::new(
                 [
                     vec![text("It is noon."), Ok(ChatEvent::Done)],
+                    vec![],
                     vec![],
                     vec![],
                     vec![],
@@ -4882,7 +4884,8 @@ async fn a_chat_that_never_begins_says_the_down_line_at_most_once_a_minute() {
             (2, 1, false),
             (3, 1, true),
             (4, 1, true),
-            (5, 61, true),
+            (5, 1, true),
+            (6, 61, true),
         ] {
             tokio::time::sleep(Duration::from_secs(wait)).await;
             if spoken {
@@ -4897,23 +4900,33 @@ async fn a_chat_that_never_begins_says_the_down_line_at_most_once_a_minute() {
         heard
     }
     let line = format!("audio:{}", DOWN_LINE.len());
+    let again = format!("audio:{}", DOWN_LINE_AGAIN.len());
     let on = turns(true).await;
     assert!(!on[0].contains(&line), "{on:?}");
     assert_eq!(on[1], ["complete"], "a written turn: {on:?}");
     assert!(on[2].contains(&line), "{on:?}");
     assert!(!on[2].iter().any(|event| event == "said"), "{on:?}");
-    assert_eq!(on[3], ["complete"]);
-    assert!(on[4].contains(&line), "{on:?}");
+    assert!(
+        on[3].contains(&again) && !on[3].contains(&line),
+        "within the minute, the shorter line: {on:?}"
+    );
+    assert!(
+        on[4].contains(&line) && !on[4].contains(&again),
+        "never the same line twice in a row: {on:?}"
+    );
+    assert!(on[5].contains(&line), "{on:?}");
     let off = turns(false).await;
     assert!(off[1..].iter().all(|turn| turn == &["complete"]), "{off:?}");
 }
 
-/// #1844's B: a chat that refuses before any word (429, 401, a 5xx) says the
-/// down line as a chat that never begins does, at most once a minute, then
-/// fails the turn as before; a written turn never says it; with it off,
+/// #1844's B: a chat that refuses before any word says a line as a chat
+/// that never begins does, then fails the turn as before: the slow line for
+/// a refusal that passes (429, a 5xx), and "I can't answer just now" for one
+/// asking again won't mend (401: the Reviewer-lead's P3 on #3771, never the
+/// promise of a moment); a written turn never says either; with it off,
 /// nothing.
 #[tokio::test(start_paused = true)]
-async fn a_chat_refused_before_any_word_says_the_down_line_at_most_once_a_minute() {
+async fn a_chat_refused_before_any_word_says_the_down_line_then_the_shorter_one() {
     async fn turns(on: bool) -> Vec<Vec<String>> {
         let refused = |status| vec![Err(net::Error::Status(status))];
         let script = Arc::new(Script {
@@ -4957,6 +4970,7 @@ async fn a_chat_refused_before_any_word_says_the_down_line_at_most_once_a_minute
         heard
     }
     let line = format!("audio:{}", DOWN_LINE.len());
+    let again = format!("audio:{}", DOWN_LINE_AGAIN.len());
     let on = turns(true).await;
     assert!(!on[0].contains(&line), "{on:?}");
     assert!(on[1].contains(&line), "the first refusal: {on:?}");
@@ -4965,10 +4979,51 @@ async fn a_chat_refused_before_any_word_says_the_down_line_at_most_once_a_minute
         "still a failed turn: {on:?}"
     );
     assert!(!on[2].contains(&line), "a written turn: {on:?}");
-    assert!(!on[3].contains(&line), "within the minute: {on:?}");
-    assert!(on[4].contains(&line), "past the minute: {on:?}");
+    let cannot = format!("audio:{}", DOWN_LINE_CANNOT.len());
+    assert!(
+        on[3].contains(&cannot) && !on[3].contains(&line) && !on[3].contains(&again),
+        "a 401 never promises a moment: {on:?}"
+    );
+    assert!(on[4].contains(&line), "a 503 past the minute: {on:?}");
     let off = turns(false).await;
-    assert!(off.iter().all(|turn| !turn.contains(&line)), "{off:?}");
+    assert!(
+        off.iter()
+            .all(|turn| !turn.contains(&line) && !turn.contains(&again) && !turn.contains(&cannot)),
+        "{off:?}"
+    );
+}
+
+/// Third's P2 on #3771: the long line renders but the short one doesn't
+/// (its speech gave nothing). Within the minute the lamp says the long line
+/// again rather than nothing, and the short one is asked again after each
+/// turn, never latched as done.
+#[tokio::test(start_paused = true)]
+async fn a_short_line_that_never_rendered_falls_back_to_the_long_one_never_silence() {
+    let script = Arc::new(Script {
+        heard: Mutex::new(
+            std::iter::repeat_with(|| Ok("What time is it?".to_owned()))
+                .take(3)
+                .collect(),
+        ),
+        chats: Mutex::new([vec![], vec![], vec![]].into()),
+        hold_chat: true,
+        skipped: Some(DOWN_LINE_AGAIN),
+        ..Script::default()
+    });
+    let (engine, _, _) = scripted(script);
+    let mut engine = engine.saying_when_down(true);
+    let line = format!("audio:{}", DOWN_LINE.len());
+    for request in 1..=3 {
+        engine.submit(start(request));
+        engine.submit(audio(request, 1));
+        engine.submit(end(request));
+        let turn = sent(&mut engine).await;
+        assert!(
+            turn.contains(&line),
+            "turn {request}, never silent: {turn:?}"
+        );
+        tokio::time::sleep(Duration::from_secs(1)).await;
+    }
 }
 
 /// lamp-52e6, 21 Oct (#1195's run): the very first spoken turn after a start,
@@ -5000,7 +5055,11 @@ async fn the_first_turn_after_a_start_says_the_down_line() {
     engine.submit(audio(2, 1));
     engine.submit(end(2));
     let second = sent(&mut engine).await;
-    assert!(!second.contains(&line), "within the minute: {second:?}");
+    let again = format!("audio:{}", DOWN_LINE_AGAIN.len());
+    assert!(
+        second.contains(&again) && !second.contains(&line),
+        "within the minute: {second:?}"
+    );
 }
 
 /// The rule is told which request a turn goes on from (`continues`): the one
