@@ -20,6 +20,9 @@ use ring_startup::RingResources;
 pub(crate) use ring_startup::RingStartup;
 
 pub const WORKER_STARTUP_TIMEOUT: Duration = Duration::from_secs(3);
+/// How long a worker whose peer went during startup is waited for to end
+/// ([`Worker::ended_or`]).
+const ENDED_WITHIN: Duration = Duration::from_millis(100);
 
 /// The clock a worker's startup wait reads its deadline on: the host's. A
 /// test build adds what a test has moved it on by (`startup_clock`), so a
@@ -425,6 +428,24 @@ impl Worker {
         Ok(worker)
     }
 
+    /// A peer gone during startup is most often its process ending, its
+    /// sockets removed before its exit can be read: that exit, read within
+    /// [`ENDED_WITHIN`], says why, so a worker that ended cleanly (the
+    /// privacy worker with Controls stopped) is told as such, not as the
+    /// socket's `No such file or directory` (lamp-52e6, 27 Oct 17:16:43,
+    /// #3697: the voice exited 1 and came back muted by the restart guard).
+    /// One still running then keeps `error`.
+    pub(crate) fn ended_or(&mut self, error: io::Error) -> io::Error {
+        let until = Instant::now() + ENDED_WITHIN;
+        loop {
+            match self.check_running() {
+                Err(ended) => return ended,
+                Ok(()) if Instant::now() < until => std::thread::sleep(Duration::from_millis(5)),
+                Ok(()) => return error,
+            }
+        }
+    }
+
     fn wait_until_ready(
         &mut self,
         directory: &Path,
@@ -453,11 +474,17 @@ impl Worker {
             }
             std::thread::sleep(Duration::from_millis(5));
         }
-        self.channels.connect(directory, &role, false)?;
+        if let Err(error) = self.channels.connect(directory, &role, false) {
+            return Err(self.ended_or(error));
+        }
         loop {
             on_wait()?;
             self.check_running()?;
-            match self.channels.control.receive()? {
+            let received = match self.channels.control.receive() {
+                Ok(received) => received,
+                Err(error) => return Err(self.ended_or(error)),
+            };
+            match received {
                 Some(WorkerEvent::Ready) => return Ok(()),
                 Some(WorkerEvent::DiagnosticsStarted { started })
                     if self.diagnostic_start.is_none()
@@ -1604,6 +1631,38 @@ fn unplug_worker_environment(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// lamp-52e6, 27 Oct 17:16:43 (#3697): Controls stopped under a running
+    /// voice; the wait's new privacy worker ended at once, its sockets gone
+    /// before its exit could be read, and the voice's connect found `No
+    /// such file or directory` and exited 1. That ENOENT is now the
+    /// worker's clean end, an unreadable switch the wait reads again; a
+    /// worker still running keeps the error, and a crash stays a crash.
+    #[test]
+    fn a_peer_gone_at_startup_is_told_as_the_workers_own_end() {
+        let gone = || io::Error::from(io::ErrorKind::NotFound);
+        let ended = |command: &str| {
+            let directory = SessionDirectory::create().unwrap();
+            let (mut worker, peer) = Worker::command_fixture(&directory.path, "privacy", command);
+            drop(peer);
+            let error = worker.ended_or(gone());
+            let _ = worker.shutdown();
+            drop(worker);
+            let _ = fs::remove_dir_all(&directory.path);
+            error
+        };
+        let clean = ended("sleep 0.03; exit 0");
+        assert!(Worker::ended_cleanly(&clean), "{clean}");
+        let error = crate::service_privacy_controls::started(Err(clean))
+            .err()
+            .unwrap();
+        assert!(crate::service_privacy::is_unavailable(&*error), "{error}");
+        let crashed = ended("sleep 0.03; exit 101");
+        assert!(!Worker::ended_cleanly(&crashed), "{crashed}");
+        assert!(crashed.to_string().contains("worker exited"), "{crashed}");
+        let running = ended("sleep 5");
+        assert_eq!(running.kind(), io::ErrorKind::NotFound, "{running}");
+    }
 
     /// #1712: the Gemini endpoint and voice go to the second route's worker
     /// only.
