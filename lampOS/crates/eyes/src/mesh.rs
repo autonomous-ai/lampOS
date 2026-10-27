@@ -6,7 +6,7 @@
 //! `LAMP_EYES_SPEAKING=on` to that face's speaking judge.
 use crate::{
     faces::Face,
-    picture::{HEIGHT, Picture, WIDTH},
+    picture::{Frame, HEIGHT, Picture, WIDTH},
 };
 use sha2::{Digest, Sha256};
 use std::{fs::File, io::Read, path::Path, sync::Arc};
@@ -48,12 +48,60 @@ pub fn eye_line(face: &Face) -> Option<(f32, f32)> {
 /// row by row (NHWC). Outside the frame is black. `None` for a face whose
 /// eyes sit on one point.
 pub fn crop(picture: &Picture, face: &Face) -> Option<Vec<f32>> {
+    let plane = WIDTH * HEIGHT;
+    // The picture's planes are blue, green, red; the model's channels red,
+    // green, blue.
+    crop_with(face, picture.filled, |colour, u, v| {
+        picture.planes[(2 - colour) * plane + v * WIDTH + u]
+    })
+}
+
+/// As [`crop`], from the frame at its own size (`--full-look`): the face
+/// the detector found in the picture, scaled back to the frame's pixels and
+/// cut there, so a face seated at the desk, its eyes about 20 of the
+/// picture's pixels apart at 1280 by 960, is meshed from about 80. `None`
+/// for a frame whose bytes are not its size, or eyes on one point.
+pub fn crop_full(frame: &Frame, face: &Face) -> Option<Vec<f32>> {
+    if frame.width == 0 || frame.height == 0 || frame.rgb.len() != frame.width * frame.height * 3 {
+        return None;
+    }
+    // A picture pixel's centre, in the frame's pixels (`who::align_full`).
+    let back = |p: f32| (p + 0.5) / frame.scale - 0.5;
+    let face = Face {
+        x: back(face.x),
+        y: back(face.y),
+        width: face.width / frame.scale,
+        height: face.height / frame.scale,
+        marks: face.marks.map(|(x, y)| (back(x), back(y))),
+        ..*face
+    };
+    crop_with(&face, (frame.width, frame.height), |colour, u, v| {
+        f32::from(frame.rgb[(v * frame.width + u) * 3 + colour])
+    })
+}
+
+/// [`crop_full`] when the look kept the frame at its own size for the
+/// mouth, else [`crop`].
+pub fn crop_of(picture: &Picture, frame: Option<&Frame>, face: &Face) -> Option<Vec<f32>> {
+    match frame {
+        Some(frame) => crop_full(frame, face),
+        None => crop(picture, face),
+    }
+}
+
+/// The crop of `face` from a frame `filled` across and down, read pixel by
+/// pixel through `at(colour, x, y)`, colour 0 red, 1 green, 2 blue, each 0
+/// to 255.
+fn crop_with(
+    face: &Face,
+    filled: (usize, usize),
+    at: impl Fn(usize, usize, usize) -> f32,
+) -> Option<Vec<f32>> {
     let (sin, cos) = eye_line(face)?;
     let centre = (face.x + face.width / 2.0, face.y + face.height / 2.0);
     let side = face.width.max(face.height) * (1.0 + 2.0 * MARGIN);
     let step = side / SIDE as f32;
-    let (filled_x, filled_y) = (picture.filled.0, picture.filled.1);
-    let plane = WIDTH * HEIGHT;
+    let (filled_x, filled_y) = filled;
     let mut out = vec![0.0f32; SIDE * SIDE * 3];
     for row in 0..SIDE {
         for column in 0..SIDE {
@@ -70,15 +118,12 @@ pub fn crop(picture: &Picture, face: &Face) -> Option<Vec<f32>> {
             let (u0, v0) = (u.floor() as usize, v.floor() as usize);
             let (u1, v1) = ((u0 + 1).min(filled_x - 1), (v0 + 1).min(filled_y - 1));
             let (du, dv) = (u - u0 as f32, v - v0 as f32);
-            let at = |c: usize, uu: usize, vv: usize| picture.planes[c * plane + vv * WIDTH + uu];
-            // The picture's planes are blue, green, red; the model's
-            // channels red, green, blue.
-            for (to, from) in [(0usize, 2usize), (1, 1), (2, 0)] {
-                let value = at(from, u0, v0) * (1.0 - du) * (1.0 - dv)
-                    + at(from, u1, v0) * du * (1.0 - dv)
-                    + at(from, u0, v1) * (1.0 - du) * dv
-                    + at(from, u1, v1) * du * dv;
-                out[(row * SIDE + column) * 3 + to] = value / 255.0;
+            for colour in 0..3 {
+                let value = at(colour, u0, v0) * (1.0 - du) * (1.0 - dv)
+                    + at(colour, u1, v0) * du * (1.0 - dv)
+                    + at(colour, u0, v1) * (1.0 - du) * dv
+                    + at(colour, u1, v1) * du * dv;
+                out[(row * SIDE + column) * 3 + colour] = value / 255.0;
             }
         }
     }
@@ -453,6 +498,53 @@ mod tests {
             x.abs_diff(128 + 107) <= 2 && y.abs_diff(128) <= 2,
             "red at {x}, {y}"
         );
+    }
+
+    /// The same face cut from a 1280 by 960 frame, by the box the detector
+    /// found in its 320 by 240 picture scaled back, covers the same part of
+    /// it: a red mark at the face's middle and a blue one 40 picture pixels
+    /// to its left land where the picture's own crop puts them.
+    #[test]
+    fn a_crop_from_the_full_frame_covers_the_face_the_picture_shows() {
+        let (width, height) = (1_280, 960);
+        let mut rgb = vec![0u8; width * height * 3];
+        // Four by four frame pixels each: one picture pixel.
+        for (x0, y0, colour) in [(640, 480, 0), (480, 480, 2)] {
+            for y in y0..y0 + 4 {
+                for x in x0..x0 + 4 {
+                    rgb[(y * width + x) * 3 + colour] = 255;
+                }
+            }
+        }
+        let picture = Picture::from_rgb(&rgb, width, height).unwrap();
+        assert_eq!(picture.filled, (320, 240));
+        let frame = Frame {
+            rgb,
+            width,
+            height,
+            scale: 0.25,
+        };
+        let face = face(128.0, 88.0, 64.0, [(144.0, 110.0), (176.0, 110.0)]);
+        let small = crop(&picture, &face).unwrap();
+        let full = crop_of(&picture, Some(&frame), &face).unwrap();
+        assert_eq!(crop_of(&picture, None, &face), Some(small.clone()));
+        for (channel, expected) in [(0, (128, 128)), (2, (128 - 107, 128))] {
+            let (a, b) = (brightest(&small, channel), brightest(&full, channel));
+            for (x, y) in [a, b] {
+                assert!(
+                    x.abs_diff(expected.0) <= 3 && y.abs_diff(expected.1) <= 3,
+                    "channel {channel}: picture {a:?}, frame {b:?}"
+                );
+            }
+        }
+        // A frame whose bytes are not its size gives none.
+        let broken = Frame {
+            rgb: vec![0; 10],
+            width,
+            height,
+            scale: 0.25,
+        };
+        assert!(crop_full(&broken, &face).is_none());
     }
 
     #[test]
