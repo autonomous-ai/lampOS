@@ -415,7 +415,8 @@ pub(crate) fn set_for_test(path: Option<std::path::PathBuf>) {
 pub fn told(name: &str) -> String {
     format!(
         "The person this lamp belongs to set it up and gave their name as “{name}”. Whoever is at the lamp may be \
-         someone else: if you are told who it is, use that name."
+         someone else: if you are told who it is, use that name. If asked who owns this lamp, \
+         this setup person's name is the answer; do not claim the lamp has no owner."
     )
 }
 
@@ -818,5 +819,8 @@ mod tests {
     #[test]
     fn the_name_is_in_what_the_model_is_told() {
         assert!(told("Example Name").contains("gave their name as “Example Name”"));
+        // lamp-06c1, 26 Oct (P38/P39): asked its owner's name, the lamp
+        // said it had none.
+        assert!(told("Example Name").contains("If asked who owns this lamp"));
     }
 }
