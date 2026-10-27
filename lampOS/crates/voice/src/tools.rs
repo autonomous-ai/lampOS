@@ -891,8 +891,9 @@ pub enum Route {
     /// Work for an agent elsewhere, through the tasks part.
     Tasks(crate::agent_tasks::Place),
     /// Remember or forget a face, or say yes or no to being named, through
-    /// the eyes on this socket, as switched.
-    Faces(PathBuf, crate::known_faces::FaceSwitches),
+    /// the eyes on this socket, as switched; with the onboarding file, if
+    /// any, which a face saved tells (#3740).
+    Faces(PathBuf, crate::known_faces::FaceSwitches, Option<PathBuf>),
     /// Mark the last minute of this session for review.
     Mark(PathBuf),
     /// A step of the first meeting reported, through this onboarding file.
@@ -951,7 +952,7 @@ pub fn route(settings: &Settings, name: &str) -> Route {
     }
     if crate::known_faces::is_tool(name) || crate::photo_faces::is_tool(name) {
         return settings.who.clone().map_or(Route::Nobody, |socket| {
-            Route::Faces(socket, face_switches(settings))
+            Route::Faces(socket, face_switches(settings), settings.onboarding.clone())
         });
     }
     if crate::marked::is_tool(name) {
@@ -1552,13 +1553,13 @@ fn run_call_with_scope(
         // may keep or forget one, never a request the lamp wrote or a text
         // from the app (the reviewer on #1713), as for marks.
         Route::Faces(..) if !heard => ("the eyes", (json!({"error": FACES_IN_PERSON}), false)),
-        Route::Faces(socket, _) if crate::photo_faces::is_tool(&call.name) => {
+        Route::Faces(socket, ..) if crate::photo_faces::is_tool(&call.name) => {
             ("the eyes", crate::photo_faces::run(socket, call))
         }
         // A yes to being named is taken only from the line's own admitted
         // scope, the named person's (#1997): none, revoked or narrowed to
         // the room is nobody's.
-        Route::Faces(socket, switches) => {
+        Route::Faces(socket, switches, onboarding) => {
             let person = lease
                 .and_then(|lease| lease.scope())
                 .and_then(|scope| scope.person());
@@ -1601,6 +1602,14 @@ fn run_call_with_scope(
                 && let Some(lease) = lease
             {
                 lease.face_remembered();
+            }
+            // A face saved while the walk leads "who you are" ends that step
+            // (#3740), through the mailbox `setup_step` writes.
+            if call.name == crate::known_faces::REMEMBER
+                && told.0["ok"] == true
+                && let Some(file) = onboarding
+            {
+                crate::onboarding::face_saved(file);
             }
             // A face saved in a line of the room's: the caller's own lines
             // before it follow them (`LAMP_MEMORY_FOLLOWS_FACE`, #2176).
@@ -1938,7 +1947,7 @@ mod tests {
         let socket = dir.join("eyes.sock");
         let listener = std::os::unix::net::UnixListener::bind(&socket).unwrap();
         listener.set_nonblocking(true).unwrap();
-        let route = Route::Faces(socket.clone(), Default::default());
+        let route = Route::Faces(socket.clone(), Default::default(), None);
         for name in [crate::known_faces::REMEMBER, crate::known_faces::FORGET] {
             let call = ToolCall {
                 id: String::new(),
@@ -2018,6 +2027,53 @@ mod tests {
     /// person's, one narrowed to the room (#2008) or none is refused with
     /// nothing sent. A no is sent from any scope. Neither is run unheard, nor
     /// with the switch off.
+    /// A face the eyes saved tells the onboarding walk (#3740), through the
+    /// mailbox `setup_step` writes; a refused one tells it nothing.
+    #[test]
+    fn a_face_saved_tells_the_onboarding_walk() {
+        let dir = std::env::temp_dir().join(format!("tools-face-saved-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let socket = dir.join("eyes.sock");
+        let listener = std::os::unix::net::UnixListener::bind(&socket).unwrap();
+        std::thread::spawn(move || {
+            for mut stream in listener.incoming().flatten() {
+                let mut line = String::new();
+                BufReader::new(&stream).read_line(&mut line).unwrap();
+                let answer = if line.contains("Sam") {
+                    "{\"remembered\":\"Sam\"}\n"
+                } else {
+                    "{\"error\":\"busy\"}\n"
+                };
+                stream.write_all(answer.as_bytes()).unwrap();
+            }
+        });
+        let file = dir.join("onboarding.json");
+        let route = Route::Faces(socket.clone(), Default::default(), Some(file.clone()));
+        let remember = |name: &str| ToolCall {
+            id: String::new(),
+            name: crate::known_faces::REMEMBER.into(),
+            args: json!({"name": name}),
+        };
+        let mailbox =
+            || std::fs::read_to_string(crate::onboarding::mailbox_of(&file)).unwrap_or_default();
+        let (_, (told, _)) = run_call(&route, &remember("Alex"), 1, true);
+        assert_ne!(told["ok"], true, "{told}");
+        assert_eq!(mailbox(), "", "a refused save tells nothing");
+        let (_, (told, _)) = run_call(&route, &remember("Sam"), 2, true);
+        assert_eq!(told["ok"], true, "{told}");
+        let lines: Vec<Value> = mailbox()
+            .lines()
+            .map(|line| serde_json::from_str(line).unwrap())
+            .collect();
+        assert_eq!(lines, [json!({"step": "who_you_are", "outcome": "done"})]);
+        // With no onboarding file, a save writes nothing anywhere.
+        let none = Route::Faces(socket.clone(), Default::default(), None);
+        let _ = run_call(&none, &remember("Sam"), 3, true);
+        assert_eq!(mailbox().lines().count(), 1);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
     #[test]
     fn a_yes_to_being_named_is_taken_only_from_the_named_persons_own_scope() {
         use crate::known_faces::{DONT_TELL, FaceSwitches, NOT_SURE_WHOSE_YES, TELL};
@@ -2047,7 +2103,7 @@ mod tests {
             visits: true,
             remember_speaker: false,
         };
-        let route = Route::Faces(socket.clone(), on);
+        let route = Route::Faces(socket.clone(), on, None);
         let call = |name: &str| ToolCall {
             id: String::new(),
             name: name.into(),
@@ -2099,7 +2155,7 @@ mod tests {
         for name in [TELL, DONT_TELL] {
             let unheard = run_call(&route, &call(name), 1, false).1.0;
             assert_eq!(unheard["error"], FACES_IN_PERSON, "{name}");
-            let off = Route::Faces(socket.clone(), FaceSwitches::default());
+            let off = Route::Faces(socket.clone(), FaceSwitches::default(), None);
             assert_eq!(
                 scoped(&off, name, ScopeSnapshot::of("Sam"), false),
                 unavailable()
@@ -2141,7 +2197,7 @@ mod tests {
             assert!(names(&settings).iter().any(|told| told == name), "{name}");
             assert!(matches!(
                 route(&settings, name),
-                Route::Faces(_, switches) if switches.visits && switches.checked
+                Route::Faces(_, switches, _) if switches.visits && switches.checked
             ));
         }
         // Without the memory, no line is a known person's: neither is offered,
@@ -2154,7 +2210,7 @@ mod tests {
             assert!(names(&forgetful).iter().all(|told| told != name), "{name}");
             assert!(matches!(
                 route(&forgetful, name),
-                Route::Faces(_, switches) if !switches.visits
+                Route::Faces(_, switches, _) if !switches.visits
             ));
         }
         let (settings, _) = take(&flags(&[])).unwrap();
@@ -2578,7 +2634,7 @@ mod tests {
         for name in [crate::known_faces::REMEMBER, crate::known_faces::FORGET] {
             assert_eq!(
                 route(&settings, name),
-                Route::Faces(eyes.clone(), Default::default())
+                Route::Faces(eyes.clone(), Default::default(), None)
             );
             let blind = Settings {
                 who: None,
