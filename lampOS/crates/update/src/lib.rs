@@ -31,6 +31,8 @@ pub mod status;
 pub mod switches;
 pub mod unit;
 pub mod world;
+pub mod writer_files;
 pub mod writer_refresh;
+pub mod writer_settings;
 
 pub use round::{Config, Outcome, World, round};

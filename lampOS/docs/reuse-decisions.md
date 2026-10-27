@@ -65,6 +65,24 @@ tests; authentication, guard bootstrap and actual restore execution remain
 unimplemented. First-use failure, process cuts, real Bookworm systemd and
 a 7071 lamp rehearsal remain owed.
 
+## Observe a future writer's files through directory descriptors (2026-10-27)
+
+V1's `scripts/provision/apply-overrides.py` refuses symlinked/nonregular
+top-level device JSON inputs before preparing writes. Keep that preflight
+intent, not a claim that it supplies descriptor-safe recovery snapshots.
+Reuse Setup reset's existing rustix `openat`/`DIRECTORY`/`NOFOLLOW` pattern
+and Update head-pair reading's same-descriptor metadata check. The new
+[read-only observer](writer-file-observation.md) has a stricter separate
+file policy; existing symlink/null-mask compatibility does not change.
+
+Bound relative path/component counts and content, refuse known special
+files before open, and retain observed ancestor/file identities. This is
+unwired and grants no authority. Stable root ancestry, caller ownership
+and exclusive writer coordination remain preconditions. Metadata checks
+are not race-proof snapshots, ACL/xattr capture or evidence that exact
+restoration or privileged helper refresh works. Those belong to later
+#3689 pieces and their own gates.
+
 ## Reuse one kernel socket witness for a camera hold (2026-10-27)
 
 V1's `hal/privacy.py` publishes camera/speaker gates before slow teardown and
@@ -2183,3 +2201,22 @@ revalidate that view at its write boundary. No dependency, ordinary-reader
 default, filesystem authority or shared privileged engine is added. The
 256-key and 16,384-work bounds are conservative collector-only limits, not
 measured deployment coverage. See [capture and its limits](head-touch-capture.md).
+
+## Raw setting ownership capture (#3689)
+
+Keep Update's existing three-party ownership decision, including local
+deletions, omitted no-ops, writing records and legacy tmpfiles/image
+ownership. Extract its pure table without changing the ordinary planner's
+filesystem behavior; the future guard's read-only adapter uses hashes of
+bounded descriptor observations rather than rereading paths. Reuse the
+existing `writer_files` boundary and borrow only selected input records.
+Do not clone/default whole state, treat a raw Write as authority, or claim
+head-touch projection, authenticated execution or restoration from this
+intermediate capture. See [the contract](writer-settings-capture.md).
+
+Recheck retained observations through the same bounded descriptor observer,
+including negative entries and ancestor identities. Cap each reread at its
+original byte count and compare complete evidence; do not recalculate an
+ownership plan from changed files. This remains a read-only prerequisite:
+exclusion through the mutation boundary, projection dependencies and durable
+independent recovery are separate requirements.
