@@ -1,5 +1,13 @@
 # Tests work log
 
+## 2026-10-28 01:02 — Reader current native green; ready for current readers
+
+Ready for lamp-voice: yes (#3543, 495a47618; current reader marks pending).
+
+[Original current native proof](verification/tests-sentinel-495-native-20261028/) records ARM40552928354 and Linux40552928367 success, attempt one: **7795 unique PASS, zero FAIL/LEAK/TIMEOUT**,53 aggregate skips. All15 ordinary Linux Reader cases and all7 service-trace cases pass once, including boundary, final completion and bounded-finish controls. Actual checkout a9d54d47a [f903659bb,495a47618] contains12 upstream blob deltas from authored495/3aa; both owned blobs and all10 bound CI inputs match. No full authored-tree equality or privileged DAC/physical result is claimed. Earlier failures remain separate, not waived.
+
+#3543 is ready for current-head source reads. The updater c958 original native gate is still running, Linux strict passed and device acceptance remains with the assigned holder. Mood d168 on3aa is now in its full current Expression package gates on the verified local cache; no runtime result yet. No device action.
+
 ## 2026-10-28 00:45 — Reader completion checks pass; full updater census reconciled
 
 Ready for lamp-voice: no (fresh native checks, current readers and updater device acceptance remain).

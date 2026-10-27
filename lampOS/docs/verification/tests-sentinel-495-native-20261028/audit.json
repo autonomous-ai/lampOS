@@ -1,0 +1,239 @@
+{
+  "subject": "Sentinel 495 original native CI",
+  "head": "495a476184d65010da0e3656af8488439993c648",
+  "authored_base": "3aa752f73914d0f29fc90edb010a3a7fa1cf526b",
+  "run": {
+    "id": 40552928354,
+    "html_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40552928354",
+    "event": "pull_request",
+    "run_attempt": 1,
+    "head_sha": "495a476184d65010da0e3656af8488439993c648",
+    "status": "completed",
+    "conclusion": "success",
+    "created_at": "2026-10-27T17:41:17Z",
+    "updated_at": "2026-10-27T17:55:25Z"
+  },
+  "ARM64_job": {
+    "id": 122361196208,
+    "runner_labels": [
+      "ubuntu-22.04-arm"
+    ],
+    "conclusion": "success"
+  },
+  "actual_source": {
+    "authority": "Raw checkout git log -1 --format=%H output; immutable commit/tree APIs",
+    "raw_log": "ARM64-job-122361196208.log",
+    "raw_log_sha256": "5ec837178de353338aac879e386cd544bcd60da12b8eea78c6b2e433ef4cc1e5",
+    "checkout_record": {
+      "sha": "a9d54d47ae0c82b1ca96a36ebdede204bcfbbdba",
+      "command_line": 272,
+      "sha_line": 273
+    },
+    "preview": "a9d54d47ae0c82b1ca96a36ebdede204bcfbbdba",
+    "ordered_parents": [
+      "f903659bba298cdee290ee4285038a8f46af930b",
+      "495a476184d65010da0e3656af8488439993c648"
+    ],
+    "tree": "3ccd6d7e3e582ac8a5a632d3b660c3b200eabe45",
+    "full_tree_equals_authored": false,
+    "blob_count": 10912,
+    "both_authored_blobs_equal_actual": true,
+    "same_as_Linux_checkout": true
+  },
+  "nextest": {
+    "starting_line": 818,
+    "summary_line": 8615,
+    "following_group_line": 9032,
+    "start_raw": "2026-10-27T17:52:03.3843222Z     Starting 7795 tests across 70 binaries (53 tests and 120 binaries skipped)",
+    "summary_raw": "2026-10-27T17:54:52.6252833Z      Summary [ 169.241s] 7795 tests run: 7795 passed, 53 skipped",
+    "selected": 7795,
+    "binaries": 70,
+    "aggregate_skips": 53,
+    "skipped_binaries": 120,
+    "execution_records": 7795,
+    "unique_identities": 7795,
+    "unique_ordinals": 7795,
+    "status_counts": {
+      "PASS": 7795
+    },
+    "duplicate_execution_identities": [],
+    "outside_terminal_records": [],
+    "post_summary_records": 34,
+    "reprints_all_classified": true,
+    "retry_flaky_records": [],
+    "selected_packages": [
+      "lamp-body",
+      "lamp-cloud",
+      "lamp-expression",
+      "lamp-keeper",
+      "lamp-lean",
+      "lamp-memory",
+      "lamp-peek",
+      "lamp-setup",
+      "lamp-skills",
+      "lamp-update",
+      "lamp-voice",
+      "lamp-voice-eval"
+    ],
+    "actual_selection_commands": [
+      {
+        "line": 774,
+        "raw": "2026-10-27T17:46:28.0119954Z filter='not (binary_id(lamp-ipc::relay_signals) | binary_id(lamp-turn-end-wire::process))'"
+      },
+      {
+        "line": 776,
+        "raw": "2026-10-27T17:46:28.0121065Z cargo nextest run --locked --release --workspace \\"
+      },
+      {
+        "line": 777,
+        "raw": "2026-10-27T17:46:28.0121390Z   --profile pr \\"
+      },
+      {
+        "line": 779,
+        "raw": "2026-10-27T17:46:28.0121887Z   --partition hash:1/1 \\"
+      },
+      {
+        "line": 783,
+        "raw": "2026-10-27T17:46:28.0139346Z   PICKED: package(=lamp-body) | package(=lamp-cloud) | package(=lamp-expression) | package(=lamp-keeper) | package(=lamp-lean) | package(=lamp-memory) | package(=lamp-peek) | package(=lamp-setup) | package(=lamp-skills) | package(=lamp-update) | package(=lamp-voice) | package(=lamp-voice-eval)"
+      }
+    ],
+    "post_summary_classification_counts": {
+      "success-output=final exact source override": 34
+    },
+    "selected_not_observed": 0,
+    "scope": "One actual selected twelve-package ordinary nextest execution window; custom harnesses and docs are separate"
+  },
+  "Reader_audit": "Reader-case-audit.json",
+  "auxiliary_audit": "auxiliary-stage-audit.json",
+  "artifacts_metadata_only": [
+    {
+      "id": 12756811735,
+      "name": "lampos-arm64-495a476184d65010da0e3656af8488439993c648",
+      "size_in_bytes": 118466934,
+      "digest": "sha256:408948bc28e5453f553515373a9ba6b3ee9a3d67c415414a6f4e270aa9928b5a",
+      "expired": false,
+      "workflow_run": {
+        "id": 40552928354,
+        "repository_id": 1259624583,
+        "head_repository_id": 1259624583,
+        "head_branch": "tests/1806-reader-sentinel-root",
+        "head_sha": "495a476184d65010da0e3656af8488439993c648"
+      },
+      "digest_in_upload_log": true,
+      "size_and_id_in_upload_log": true,
+      "archive_downloaded": false,
+      "digest_independently_rehashed": false
+    }
+  ],
+  "Linux_original": 40552928367,
+  "Linux_conclusion": "success",
+  "Trace_audit": "Trace-case-audit.json",
+  "historical_limits": [
+    "Old b7 native5091/1 with2691 selected not run and all15Reader unreached remains FAILED.",
+    "Qualified dirtyb7 Mac modules4+6 are separate and supply no fullVoice/native result.",
+    "Mac candidate full VoiceLIB 3867 PASS/1 FAIL/15 ignored remains FAILED (Rust101/native1).",
+    "Main exact-case control1/0/0 is isolated and inconclusive; all3 Mac executables equal candidate bytes.",
+    "Full Main context control is separately owned by Root; its result is not inferred here.",
+    "Current native success does not establish a cause or waiver of any earlier failure.",
+    "Privileged dropped-identity DAC remains ignored/unrun; ordinary Reader success is not privileged/device acceptance.",
+    "No rerun/dispatch/source/ref/target/device mutation, compiler/test, archive or ARM binary access in this audit."
+  ],
+  "qualification_status": "PASS selected original native scope",
+  "Reader_ordinary_PASS_once": true,
+  "Trace_ordinary_PASS_once": true,
+  "non_PASS_execution_records": [],
+  "raw_not_run_warnings": [],
+  "raw_command_exit_records": [],
+  "actual_tree_delta": "ARM64-actual-versus-authored-tree-delta.json",
+  "actual_inputs": "ARM64-actual-input-bindings.json",
+  "exact_head_checks": [
+    {
+      "id": 122368962658,
+      "name": "report-full-run-failure",
+      "head_sha": "495a476184d65010da0e3656af8488439993c648",
+      "status": "completed",
+      "conclusion": "skipped",
+      "details_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40552928354/job/122368962658"
+    },
+    {
+      "id": 122368961944,
+      "name": "lampOS \u2014 sign and publish the tested lamp-voice artifact",
+      "head_sha": "495a476184d65010da0e3656af8488439993c648",
+      "status": "completed",
+      "conclusion": "skipped",
+      "details_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40552928354/job/122368961944"
+    },
+    {
+      "id": 122361198417,
+      "name": "lampOS \u2014 promote a tested release to the stable feed",
+      "head_sha": "495a476184d65010da0e3656af8488439993c648",
+      "status": "completed",
+      "conclusion": "skipped",
+      "details_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40552928354/job/122361198417"
+    },
+    {
+      "id": 122361196208,
+      "name": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "head_sha": "495a476184d65010da0e3656af8488439993c648",
+      "status": "completed",
+      "conclusion": "success",
+      "details_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40552928354/job/122361196208"
+    },
+    {
+      "id": 122361196172,
+      "name": "lampOS \u2014 clippy, every crate and target (x86 Linux)",
+      "head_sha": "495a476184d65010da0e3656af8488439993c648",
+      "status": "completed",
+      "conclusion": "success",
+      "details_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40552928367/job/122361196172"
+    }
+  ],
+  "classic_status_count": 0,
+  "branch_protection_requirement_set_audited": false,
+  "collection_manifest": "collection-manifest.json",
+  "post_close_verification": "collection-manifest-verification.json",
+  "collected_at_utc": "2026-10-27T17:58:10.731717+00:00",
+  "auxiliary_results_separate": {
+    "promoter": {
+      "passed": 25,
+      "failed": 0,
+      "ignored": 0
+    },
+    "workspace_doctests": {
+      "passed": 4,
+      "failed": 0,
+      "ignored": 0,
+      "summary_groups": 47
+    },
+    "relay_signals": {
+      "ok_line": 9337
+    },
+    "process": {
+      "line": 9356,
+      "passed": 13,
+      "failed": 0
+    },
+    "offline_python": [
+      {
+        "line": 315,
+        "count": 35
+      },
+      {
+        "line": 385,
+        "count": 12
+      },
+      {
+        "line": 763,
+        "count": 7
+      }
+    ],
+    "added_to_nextest": false
+  },
+  "artifact_export_report": {
+    "workspace_binaries": 48,
+    "selected_examples": 2,
+    "uploaded_files": 51,
+    "API_upload_digest_and_size_bound": true,
+    "archive_or_binary_downloaded": false
+  }
+}
