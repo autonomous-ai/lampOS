@@ -2667,7 +2667,14 @@ the one `--overload release` makes ("Letting go under overload"):
   `stand 0.00`, read as broken; V1 dropped the arm too). Nothing is
   written for 5 s, then the head and the base are held where they lie
   and brought home slowly, as after an overload; the arm, which never
-  moved, is not lowered and its stand is kept. V1
+  moved, is not lowered and its stand is kept. The arm held through
+  those 5 s keeps the overload rule (the main loop's `trip_at` level for
+  `OVERLOAD_STEPS` steps in a row, whether or not `--overload release` is
+  on): a person pressing the limp head down into a standing lamp strains
+  the shoulder or the elbow, and one that trips lets go of all five as an
+  overload does, a second entry in `released`, its 120 s rest and its
+  second-within-ten-minutes end, rather than let a servo be damaged. The
+  report's `arm_peak_load` and `arm_peak_temperature` include the rest. V1
   rested 120 s here too, its `retry_s`, which is for a servo cooling
   from overload; a hand is not heat, and a lamp limp for two minutes
   after a push reads as broken, where a creature pushed hard flops and

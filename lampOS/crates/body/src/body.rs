@@ -2946,22 +2946,27 @@ fn found_up(up: Standing, found: &[Sample; 5]) -> bool {
 /// written (a goal written to one of these servos turns its torque back
 /// on; a joint not let go keeps its torque and its last goal). Returns
 /// what the joints read once `joints` are let go and the rest is over.
+/// With `arm_trip` (a hand's rest, the arm still held), the shoulder and
+/// the elbow keep the run's overload rule: one at its `trip_at` load for
+/// `OVERLOAD_STEPS` steps in a row ends the rest early with that joint and
+/// its load, for the caller to let go of all five as an overload.
 /// Asked to stop, or a wire that fails for half a second, ends it with
 /// torque off.
 fn let_go<P: PortIo, R: Runtime>(
     bus: &mut Bus<'_, P, R>,
     report: &mut BodyReport,
     joints: &[Joint],
-    rest: Duration,
+    (rest, arm_trip): (Duration, Option<[u16; 5]>),
     (news, asked): (
         &mut impl FnMut() -> Option<(Mood, u8)>,
         &mut impl FnMut() -> (Asked, Priority, Option<Source>),
     ),
     watch: &mut impl FnMut(&Glimpse),
     template: Glimpse,
-) -> Result<[Sample; 5], Stop> {
+) -> Result<([Sample; 5], Option<Strained>), Stop> {
     let started = bus.runtime.now();
     let mut holding: Vec<Joint> = joints.to_vec();
+    let mut strained = [0u16; 2];
     let (mut ticks, mut misses) = (0u32, 0u8);
     loop {
         ticks += 1;
@@ -2980,6 +2985,19 @@ fn let_go<P: PortIo, R: Runtime>(
                 report.peak_load[index] = report.peak_load[index].max(is.load);
                 report.peak_temperature[index] = report.peak_temperature[index].max(is.temperature);
             }
+            for (index, joint) in ARM.iter().enumerate() {
+                let is = now[joint.index()];
+                report.arm_peak_load[index] = report.arm_peak_load[index].max(is.load);
+                report.arm_peak_temperature[index] =
+                    report.arm_peak_temperature[index].max(is.temperature);
+                if let Some(trip_at) = arm_trip {
+                    strained[index] = if is.load >= trip_at[joint.index()] {
+                        strained[index].saturating_add(1)
+                    } else {
+                        0
+                    };
+                }
+            }
             let mut glimpse = glimpse_of(template, report.steps, now, template.goals);
             if let Some(clip) = asked_now.gesture {
                 glimpse.gesture_fates.push_told(
@@ -2995,8 +3013,17 @@ fn let_go<P: PortIo, R: Runtime>(
         match (failed, read) {
             (None, Ok(now)) => {
                 misses = 0;
+                let tripped = ARM
+                    .into_iter()
+                    .zip(strained)
+                    .filter(|(_, steps)| *steps >= OVERLOAD_STEPS)
+                    .map(|(joint, _)| (joint, now[joint.index()].load))
+                    .max_by_key(|(_, load)| *load);
+                if tripped.is_some() {
+                    return Ok((now, tripped));
+                }
                 if holding.is_empty() && bus.runtime.now() - started >= rest {
-                    return Ok(now);
+                    return Ok((now, None));
                 }
             }
             (Some(detail), _) | (None, Err(detail)) => {
@@ -3012,6 +3039,10 @@ fn let_go<P: PortIo, R: Runtime>(
         bus.sleep_until(due);
     }
 }
+
+/// An arm joint that tripped the overload rule during a hand's rest, and
+/// its load.
+type Strained = (Joint, u16);
 
 /// Torque off (register 40, 0) to each of `holding`, each acknowledged;
 /// one that took it is dropped from `holding`. The first failure, if any.
@@ -6661,51 +6692,65 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
         }
         // It lets go before anything else this step would end the run with:
         // that is the old runtime's answer to a servo pushed this hard.
-        if let Some((joint, load)) = tripped {
-            let now = bus.runtime.now();
-            let again =
-                !by_hand && overload_at.is_some_and(|at| now.saturating_sub(at) < OVERLOAD_AGAIN);
-            if !by_hand {
-                overload_at = Some(now);
-            }
-            report.released.push(Released {
-                joint: joint.name(),
-                load,
-                seconds: now.as_secs_f32(),
-                woke: None,
-            });
-            left_as_is = true;
-            // An overload lets go of all five, and nothing holds the arm up.
-            // A hand lets go of the head and base only (#3702): the arm
-            // keeps its torque and its last goal, so a standing lamp a
-            // person was asked to push does not collapse.
-            let released: &[Joint] = if by_hand { &COMMANDED } else { &Joint::ALL };
-            let template = Glimpse {
-                released: report.released.len().try_into().unwrap_or(u16::MAX),
-                limp: true,
-                hand: false,
-                stand: if by_hand { stand } else { 0.0 },
-                ..glimpse
-            };
-            let rest = match (again, by_hand) {
-                (true, _) => Duration::ZERO,
-                (false, true) => HAND_REST,
-                (false, false) => OVERLOAD_REST,
-            };
+        if let Some((mut joint, mut load)) = tripped {
+            let mut by_hand = by_hand;
             let mut during_rest = || {
                 let next = asked();
                 unplug_latched |= next.0.unplug;
                 next
             };
-            let slumped_at = match let_go(
-                bus,
-                &mut report,
-                released,
-                rest,
-                (&mut news, &mut during_rest),
-                &mut watch,
-                template,
-            ) {
+            // A hand's rest that strains the held arm past its cut-off ends
+            // as an overload: all five let go, and its rest and its second
+            // time within ten minutes are an overload's.
+            let (again, template, slumped_at) = loop {
+                let now = bus.runtime.now();
+                let again = !by_hand
+                    && overload_at.is_some_and(|at| now.saturating_sub(at) < OVERLOAD_AGAIN);
+                if !by_hand {
+                    overload_at = Some(now);
+                }
+                report.released.push(Released {
+                    joint: joint.name(),
+                    load,
+                    seconds: now.as_secs_f32(),
+                    woke: None,
+                });
+                left_as_is = true;
+                // An overload lets go of all five, and nothing holds the arm up.
+                // A hand lets go of the head and base only (#3702): the arm
+                // keeps its torque and its last goal, so a standing lamp a
+                // person was asked to push does not collapse.
+                let released: &[Joint] = if by_hand { &COMMANDED } else { &Joint::ALL };
+                let template = Glimpse {
+                    released: report.released.len().try_into().unwrap_or(u16::MAX),
+                    limp: true,
+                    hand: false,
+                    stand: if by_hand { stand } else { 0.0 },
+                    ..glimpse
+                };
+                let rest = match (again, by_hand) {
+                    (true, _) => Duration::ZERO,
+                    (false, true) => HAND_REST,
+                    (false, false) => OVERLOAD_REST,
+                };
+                match let_go(
+                    bus,
+                    &mut report,
+                    released,
+                    (rest, by_hand.then_some(trip_at)),
+                    (&mut news, &mut during_rest),
+                    &mut watch,
+                    template,
+                ) {
+                    Ok((now, None)) => break (again, template, Ok(now)),
+                    Ok((_, Some(strained))) => {
+                        (joint, load) = strained;
+                        by_hand = false;
+                    }
+                    Err(stop) => break (again, template, Err(stop)),
+                }
+            };
+            let slumped_at = match slumped_at {
                 Ok(now) => now,
                 Err(stop) => break stop,
             };
