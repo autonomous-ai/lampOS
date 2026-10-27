@@ -411,6 +411,41 @@ fn devin_cloud_is_asked_for_with_no_folder_or_mode_and_its_cloud_receipt_binds()
     assert_eq!(request.target.validate(), Err("invalid_project".into()));
 }
 
+/// Hermes (my person on #3504, 27 Oct: an ask for Hermes went to Claude
+/// Code). Harness launches it with its first prompt as `hermes chat -q`,
+/// and it has no permission modes (openharness `engineLaunch.ts`:
+/// `PERMISSION_MODES` has no `hermes`, `BYPASS_PERMISSION_FLAGS` is null),
+/// so it is asked for by name with no `--mode`, as Devin is, and its
+/// receipt is taken only when it claims no mode that approves on its own.
+#[test]
+fn hermes_is_asked_for_by_name_with_no_mode() {
+    let rig = Rig::new();
+    let mut request = launch();
+    request.target.engine = EngineKind::Hermes;
+    assert_eq!(
+        rig.cli().launch(&request),
+        LaunchOutcome::Created {
+            agent_id: AGENT.into()
+        }
+    );
+    let args = rig.calls()[1]["args"].as_array().unwrap().clone();
+    assert_eq!(args[1], "hermes");
+    assert!(!args.iter().any(|arg| arg == "--mode"), "{args:?}");
+    assert_eq!(EngineKind::Hermes.bus_name(), "hermes");
+    assert_eq!(
+        serde_json::from_value::<EngineKind>(json!("hermes")).unwrap(),
+        EngineKind::Hermes
+    );
+    // A receipt claiming auto mode is not one Harness gives Hermes.
+    let rig = Rig::new();
+    rig.new_step(step(json!({"ok":true,"machineId":MACHINE,"agent":{
+        "id":AGENT,"name":"lamp-task-001","engine":"hermes","permissionMode":"auto","bypassPermission":true}})));
+    assert!(matches!(
+        rig.cli().launch(&request),
+        LaunchOutcome::Uncertain { .. }
+    ));
+}
+
 /// The reviewer's P1 on #2240: every engine's name on the bus passes
 /// `tasks/status`' check, Devin Cloud's as `devin_cloud`, while Harness is
 /// still asked for `devin-cloud`.
@@ -422,6 +457,7 @@ fn every_engines_bus_name_passes_the_status_check() {
         EngineKind::Opencode,
         EngineKind::Devin,
         EngineKind::DevinCloud,
+        EngineKind::Hermes,
     ] {
         let settled = lamp_msgs::TaskSettled {
             task: 1,
