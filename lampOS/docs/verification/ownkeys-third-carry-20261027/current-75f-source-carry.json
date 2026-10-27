@@ -1,0 +1,62 @@
+{
+  "original_pr": 3510,
+  "replacement_draft_pr": 3646,
+  "published_head": "75f865b66999515e34865c9873988fb0029dad24",
+  "published_base": "4bff5f2c517bf64d4a32c31a90e0b24dc1a4810a",
+  "latest_local_head": "e220b5fafc0f3b19d066a4fbb6e8d901bf9ae3cf",
+  "latest_local_base": "737331535d0cab813170d288110fc44ff5d41a68",
+  "seven_authored_patches_range_diff_equal": true,
+  "checks": [
+    {
+      "original": "c10d0e62ba9f93d32216d4a1ae949614ed7b7c8a",
+      "published": "af36274a65b1097b38b942e4bf2a4a7ecfd9be3b",
+      "latest_local": "65ecf328ac709dd5ea4b8800843d085c228a2e1c",
+      "author_name_email_date_and_one_line_message_identical": true,
+      "metadata_digest": "20226d4fb4115fb4d67c379fb807f03187613b07f41c468172b7994ae082811d"
+    },
+    {
+      "original": "f7f576fbd118213d7358525785ca2c3ee6f313ba",
+      "published": "9bf34b49e1278556c56d62f7d07ee9d0d26503d4",
+      "latest_local": "e2b27450141210748e69946b76fe68f8950986a9",
+      "author_name_email_date_and_one_line_message_identical": true,
+      "metadata_digest": "042f522b36e03b378646eabe88010ee9e992566f4b72524e389fb065ae624e5f"
+    },
+    {
+      "original": "4991346bb209d50b1433af8ce182dcaa5c717776",
+      "published": "562080b96aba28cafbaf17b7fce6cd6e81f766c9",
+      "latest_local": "d5a5e19186fa67867d70851ab9eb05f21d45f0af",
+      "author_name_email_date_and_one_line_message_identical": true,
+      "metadata_digest": "b1bbbf22396e178884e65f96c5b6ecd21c7cab3d38a865425ce2b65231d9ec48"
+    },
+    {
+      "original": "894799fcd84f65a7b89e01e0a7048a430d03c67d",
+      "published": "7db9d078582eba34220433e7cd0519f8c827bcce",
+      "latest_local": "f9a09b580cefdd1b310c111f3cc6e4640473ebc6",
+      "author_name_email_date_and_one_line_message_identical": true,
+      "metadata_digest": "63fc1a293073bd85c22771555a490c7aa6bace54f3d5c1b2a03c701cb8262930"
+    },
+    {
+      "original": "562133cb941d4a2b6583737fc8d95996fcad718c",
+      "published": "3e8e4dc45b2a2748cee78f0c5b8137c4d55c412c",
+      "latest_local": "caa0234aa6970ff90a4b0dc946f304f57d3d8e4b",
+      "author_name_email_date_and_one_line_message_identical": true,
+      "metadata_digest": "6258f08e3ceeb7b33864347893bd136f2add75c7024279275bc58623d9933779"
+    },
+    {
+      "original": "6e37cd441a2a33d60a696d8c3ee112557916ad07",
+      "published": "9dc02f02bb02eba64440cac63dc7691a298ce76b",
+      "latest_local": "ecd0d5b28129ef86e658151567922afc66e94018",
+      "author_name_email_date_and_one_line_message_identical": true,
+      "metadata_digest": "37762abb06bc33030f813da683ad57f1566e0ce35ed28c63822902eeeedfa97b"
+    },
+    {
+      "original": "273c1b6f1c67288d7904d98909edddb1eed40a69",
+      "published": "75f865b66999515e34865c9873988fb0029dad24",
+      "latest_local": "e220b5fafc0f3b19d066a4fbb6e8d901bf9ae3cf",
+      "author_name_email_date_and_one_line_message_identical": true,
+      "metadata_digest": "5bd643580981cb050aa9a8b14342ab4b564e9d0f111cf445f7fc0e77e5b9135a"
+    }
+  ],
+  "latest_local_runtime_qualified": false,
+  "activation_physical_hold": "2094/current-lamp app/provider acceptance remains required"
+}

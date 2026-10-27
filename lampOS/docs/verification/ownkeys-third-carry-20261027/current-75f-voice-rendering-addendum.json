@@ -1,0 +1,94 @@
+{
+  "base": "4bff5f2c517bf64d4a32c31a90e0b24dc1a4810a",
+  "case": "second_provider::worker::tests::a_note_asked_as_the_turn_is_told_is_waited_for_longer_than_one_asked_ahead",
+  "disposition": {
+    "classification": "one_interleaved_ok_completion_recognized",
+    "expected_panic_hooks": {
+      "caught_fault_injection": 6,
+      "declared_should_panic": 3
+    },
+    "failed": 0,
+    "ignored": 15,
+    "manually_recognized_interleaved_passes": 1,
+    "reason": "The known NoteAsk diagnostic prefix is followed by an inserted ok and newline, then exactly its selected as-the-turn-is-told/incomplete/time suffix. Removing only that ok token and newline yields the pinned diagnostic. The pinned formatter and branch labels cannot emit ok at this position. The pair is between this test start and the next; this test launches NoteAsk threads. This source-bound manual interpretation recognizes the libtest success token interleaved inside thread stderr.",
+    "reconciled_passes": 3817,
+    "required30_standalone_witnesses_passed": 30,
+    "standalone_parsed_passes": 3816,
+    "unexpected_panic_hooks": 0,
+    "unique_test_starts": 3832
+  },
+  "execution": {
+    "auditor_reruns": 0,
+    "basis": "closed current log and immutable pinned Git source only",
+    "source_or_target_mutations": false,
+    "test_runs": 0
+  },
+  "head": "75f865b66999515e34865c9873988fb0029dad24",
+  "kind": "manual_current_rendered_completion_addendum",
+  "limits": [
+    "This is an explicit interpretation of these two current lines, not a general parser relaxation or transplanted3a97 addendum.",
+    "Combined stdout/stderr interleaving is inferred from exact source and rendered bytes; syscall write boundaries were not traced.",
+    "The original auditor exit2 and two holds remain immutable; no assertion failure, missing required witness or unknown panic is waived.",
+    "3817 is the libtest summary and the3816-plus-one reconciled result; only3816 pass completions were recognized as standalone by the original parser.",
+    "Only the current full Voice library is covered, not all14 packages, native or physical acceptance."
+  ],
+  "log_sha256": "8e2b6ed05359a3eac448599cfff51cb5a72acdefac8ce38aae217711032f8acb",
+  "observation": {
+    "all_starts_unique": 3832,
+    "diagnostic_continuation_line": 14875,
+    "exact_lines": [
+      {
+        "line": 14874,
+        "text": "lamp-voice second: memory note asked ok"
+      },
+      {
+        "line": 14875,
+        "text": "as the turn is told; incomplete in 0 ms"
+      }
+    ],
+    "interleaved_ok_line": 14874,
+    "matching_pair_occurrences_in_log": 1,
+    "next_test_start_line": 14876,
+    "reassembled_diagnostic_without_ok_token": "lamp-voice second: memory note asked as the turn is told; incomplete in 0 ms",
+    "standalone_case_completion_missing": true,
+    "test_start_line": 14871
+  },
+  "original_auditor_preserved_unchanged": true,
+  "original_auditor_receipt_sha256": "beff91baddcfb56880f89904637df494caaaecdaaad0fdc602a112604aaf9092",
+  "original_auditor_status": "FAILED_OR_HELD_CURRENT_VOICE_LIBRARY",
+  "original_holds": [
+    "test not uniquely completed: second_provider::worker::tests::a_note_asked_as_the_turn_is_told_is_waited_for_longer_than_one_asked_ahead",
+    "per-test and summary counts differ"
+  ],
+  "pinned_source": {
+    "path": "lampOS/crates/voice/src/second_provider/worker.rs",
+    "references": [
+      {
+        "line": 8186,
+        "line_sha256": "423fc244ff3e05ed2d8806c5c06ffc02566f93645b60acdb5bb5b7a3fef47067",
+        "text": "\"lamp-voice second: memory note asked {}; {} in {} ms\","
+      },
+      {
+        "line": 8190,
+        "line_sha256": "dcfcfe0b3cde23990082c127d6da39b54fee80770665e7ea99ffbaa8c275f891",
+        "text": "\"as the turn is told\""
+      },
+      {
+        "line": 8213,
+        "line_sha256": "39d6c482a2a530059d8593c24bafedad83c2f512cc5c08e2271a8416490e55a9",
+        "text": ".name(\"lamp-voice-note\".into())"
+      },
+      {
+        "line": 15392,
+        "line_sha256": "a8ace38f852fd80cb83a66b531310455ca7d0ea474faa0ac25ce00f13cd08691",
+        "text": "fn a_note_asked_as_the_turn_is_told_is_waited_for_longer_than_one_asked_ahead() {"
+      },
+      {
+        "line": 15401,
+        "line_sha256": "83f4a83b87e4255d79773ee7015e9bdf809fca431e095e34b5bc66df0fcac281",
+        "text": "let asked = |ahead: bool| NoteAsk::start(1, None, (now, 1), &ask, ahead);"
+      }
+    ],
+    "sha256": "daa04146817f397225de51ca3a1295137b5e29c358c6ace3367d9f498548bee3"
+  }
+}

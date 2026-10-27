@@ -1,3 +1,11 @@
+## 2026-10-27 08:57 — Ownkeys draft carry published after scoped host gate
+
+Opened #3646 at 75f865b66 on 4bff, carrying #3510 with all seven authors and one-line messages unchanged. [Scoped host audit](verification/ownkeys-third-carry-20261027/current-75f-selected-audit.json): remaining 2,632/0/17 plus separate Voice 3,817/0/15 compose 6,449/0/32, not all fourteen packages. All 65 own-key controls, three Skills mock controls and the repaired Expression journal witness pass once. Twenty remaining hooks and nine separate Voice hooks are source-expected, none unknown. All 140 actual/saved artifact pairs and source/raw inputs stay stable; no forced cleanup, timeout or retry.
+
+The original Voice parser holds remain unchanged; [current rendering addendum](verification/ownkeys-third-carry-20261027/current-75f-voice-rendering-addendum.json) identifies one interleaved success token without normalizing other output. The original a775 journal failure remains failed. [Source/author carry proof](verification/ownkeys-third-carry-20261027/current-75f-source-carry.json) also records clean latest local head e220b5faf/737 with seven equal patches, still unqualified. Draft gates remain latest-base checks, original native/Linux, two current reads and the material #2094 app/provider/lamp acceptance. No keys, providers, install or device action.
+
+Fixture #3637 has qualified da5/99b pushed, with the next local642/737 compiler active. Reminder965/737 compiler continues; earlier qualified7a and unrun0c preparation keep their own scopes.
+
 ## 2026-10-27 08:45 — qualified fixture draft pushed; newer base continues
 
 #3637 is pushed as da5ed5b30/99b after [focused current-source gate](verification/privacy-kept-resync-fixture-20261027/carry-99b-audit.json): 238/0/1 plus three doctests, all sixteen witnesses/two expected hooks, stable source/raw/65 artifact pairs and no forced cleanup. Four warm compiler stages pass. It remains draft. Main then advanced to 737; local equal-patch head 642f7974a awaits its own qualification and fresh original native full Voice. Earlier 4bff full host/native results and R3's57f read retain their sources.
