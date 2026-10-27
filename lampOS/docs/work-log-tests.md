@@ -1,5 +1,12 @@
 # Tests work log
 
+## 2026-10-27 18:48 — #3796 lasting host-template fix claimed
+
+Ready for lamp-voice: no (unchanged-source regression and product gates pending).
+
+#3796 gives explicit authorization for the lasting `crates/update` change. Tests owns `tests/3796-compatible-host-templates`, pinned initially to `3b9bfb628`; Fifth owns tonight's independent product-name stopgap. The 52e6 lock remains released and Tests has made no further device access. Six ordinary regression cases cover both manifest orders, current-linked host priority, truly pinned installs, and signed updater dry confirmation. The test payload is applied over unchanged product source; expected control is four exact linked-template refusals and two preservation passes. No compiler or runtime result is claimed yet. The unused old Mood allocation was released only after all 405 frozen witnesses and the current parent executable passed full hash/metadata verification. Existing evidence and earlier failures remain intact.
+
+
 ## 2026-10-27 15:46 — 7403 host-template HOLD safely closed; Restart current gates pass
 
 Ready for lamp-voice: no (fixture PRs need current reader marks and latest-base handling; #3466 already landed).
