@@ -1,0 +1,224 @@
+{
+  "actual_nextest_version": "0.9.149",
+  "additional_direct_install_doc_reader": 1,
+  "combined_paths": 12,
+  "completed_job_stage_results": [
+    {
+      "conclusion": "success",
+      "name": "Set up job",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "system packages",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "Run actions/checkout@v4",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "publication failure tests (offline, no signing secret)",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "Rust 1.96.0",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "artifact provenance regression (offline, disposable Cargo workspace)",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "stable promotion tests (offline, disposable test key)",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "restore the cache",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "unchanged source files get the cached build's times back",
+      "status": "completed"
+    },
+    {
+      "conclusion": "skipped",
+      "name": "record fresh source times for a cold publication build",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "Run taiki-e/install-action@v2",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "build (release, the lamps' binaries)",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "every built lamp-* binary is classified for the lamp-os package",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "build the two selected artifact examples without filename collisions",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "publication CLI rehearsal (local test key and simulated GitHub only)",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "which crates a pull request tests",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "test (full run, every test one at a time; otherwise without the realtime group, in parallel)",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "doc tests and the own-harness tests (nextest runs neither)",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "export only current Cargo targets and their SHA-256",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "Run actions/upload-artifact@v4",
+      "status": "completed"
+    },
+    {
+      "conclusion": "skipped",
+      "name": "discard the isolated example target before saving the cache",
+      "status": "completed"
+    },
+    {
+      "conclusion": "skipped",
+      "name": "save the cache",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "Post Run actions/checkout@v4",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "Complete job",
+      "status": "completed"
+    }
+  ],
+  "downloaded_artifact_executed": false,
+  "final_owned_paths": 6,
+  "final_six_blobs_modes_equal_first_full563_frozen_source": true,
+  "first_full_freeze_sha256": "4f57e7d2122b3778f1ad6980223de84eac3d0932ec302f38e1de5fe9e42b0c53",
+  "native_physical_raw_name_functions": [
+    {
+      "binary": "lamp-update",
+      "name": "head_touch::capture::codec::tests::portable_raw_names_and_link_bytes_are_exact_without_a_physical_mac_claim",
+      "ordinal": 2508,
+      "status": "PASS",
+      "total": 7856
+    },
+    {
+      "binary": "lamp-update",
+      "name": "head_touch::capture::tests::raw_non_utf8_names_are_preserved_but_non_utf8_text_is_refused",
+      "ordinal": 2534,
+      "status": "PASS",
+      "total": 7856
+    }
+  ],
+  "new_output_controls_subset": [
+    {
+      "binary": "lamp-update",
+      "name": "head_touch::plan_output::tests::compact_input_that_expands_past_the_cap_refuses_only_the_new_plan_path",
+      "ordinal": 2544,
+      "status": "PASS",
+      "total": 7856
+    },
+    {
+      "binary": "lamp-update",
+      "name": "head_touch::plan_output::tests::keep_step_has_no_derived_output_and_moves_oversized_existing_text_without_copying",
+      "ordinal": 2545,
+      "status": "PASS",
+      "total": 7856
+    },
+    {
+      "binary": "lamp-update",
+      "name": "head_touch::plan_output::tests::late_provider_failure_returns_no_owned_partial_plan_or_private_diagnostic",
+      "ordinal": 2546,
+      "status": "PASS",
+      "total": 7856
+    },
+    {
+      "binary": "lamp-update",
+      "name": "head_touch::plan_output::tests::ordinary_policy_bytes_hashes_and_request_order_match_all_eight_closed_replays",
+      "ordinal": 2547,
+      "status": "PASS",
+      "total": 7856
+    },
+    {
+      "binary": "lamp-update",
+      "name": "head_touch::plan_output::tests::refusing_an_append_happens_before_buffer_growth_or_partial_write",
+      "ordinal": 2548,
+      "status": "PASS",
+      "total": 7856
+    },
+    {
+      "binary": "lamp-update",
+      "name": "head_touch::plan_output::tests::streaming_pretty_bytes_and_newline_obey_the_exact_utf8_byte_limit",
+      "ordinal": 2549,
+      "status": "PASS",
+      "total": 7856
+    }
+  ],
+  "original_commands_present": [
+    "cargo build --locked --release --workspace --bins --examples --message-format=json-render-diagnostics",
+    "cargo nextest run --locked --release --workspace",
+    "cargo test --locked --release --workspace --doc -- --test-threads=1"
+  ],
+  "per_nextest_executable_byte_hashes_available": false,
+  "pinned_rust_aarch64_1_96_observed": true,
+  "pr": 3946,
+  "production_archive_audited": false,
+  "required_owned_controls": 84,
+  "stack": [
+    {
+      "parents": [
+        "2fa602a0a84164fd74d1d944830cd4a3257e389b"
+      ],
+      "sha": "d682ee30e52eefd1e760d899f5c178724f40a1ec",
+      "tree": "dcc6bdd12163015d5ebced13f8c8d2260d0b2e4b"
+    },
+    {
+      "parents": [
+        "a5e700e07a71ec4a3bbe7afd40a6629181f0f893"
+      ],
+      "sha": "2fa602a0a84164fd74d1d944830cd4a3257e389b",
+      "tree": "f8cd61e30b52a84ad75ea78144387355f5e43a49"
+    },
+    {
+      "parents": [
+        "c1fa2bc9f327f5d553bb3dcc355053d8e7e94bfa"
+      ],
+      "sha": "a5e700e07a71ec4a3bbe7afd40a6629181f0f893",
+      "tree": "d4393da3e657ba0e46d678415f4530450ec63cfb"
+    }
+  ]
+}

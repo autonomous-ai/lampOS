@@ -1,3 +1,13 @@
+## 28 October 2026, 04:57 +07 — bounded projection original native qualification
+
+Ready for lamp-voice: no (current original checks are green; independent external reads and prerequisite disposition remain separate).
+
+#3946 d682/c1fa [original ARM and Linux audit](verification/head-plan-output-20261028/native-d682-c1fa/README.md) passes **7,856 unique tests**, zero bad or selected unrun and **54** reported skips. All **84** required controls pass once (the six new output controls are a subset), plus the exact install-doc reader as an additional required identity. Both Linux physical raw-name functions pass. Original ARM40588028085 and Linux40588028060 use actual checkout4ec12bd779 with ordered c1fa/d682 parents; complete tree dcc6bdd121 exactly equals the authored source. The final six blobs/modes match the frozen first563 Mac gate. Original build/runtime, pinned Rust and strict Linux formatting/Clippy commands are verified. No optional archive or individual test-executable byte evidence is invented. Separate docs, processes, relay, helper and Python counts are not added.
+
+Current [Raw a784/c1fa](verification/writer-settings-capture-20261027/native-a784-c1fa/README.md) independently passes **7,821/all49 plus the doc reader**, and [PID ced0/c1fa](verification/writer-refresh-drop-20261028/native-ced0-c1fa/README.md) passes **7,805/all33 plus that reader**, each zero bad/unrun and54 skips, with exact authored preview trees and original Linux green. Their current14 Mac maintenance stays separate from older broad gates. Both PRs are now ready for review, not merged; current external carry markers remain the readers' lane.
+
+Three immutable text packets, all20 manifest members and23 committed member files are verified before publication. Historical failures stay unwaived. Coherence's first full changed-crate gate has passed metadata, formatting and strict all-target Clippy; remaining stages have no result yet. No authenticated executable plan, privileged effect, independent restoration, signing, deployment or real power-cut acceptance is claimed.
+
 ## 28 October 2026, 04:52 +07 — current maintenance and original collector evidence
 
 Ready for lamp-voice: no (all original current-head native checks and external read dispositions remain separate).
