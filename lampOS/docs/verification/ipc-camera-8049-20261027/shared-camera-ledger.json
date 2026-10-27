@@ -1,0 +1,87 @@
+{
+  "LEAK_classification": "Direct libtest does not provide nextest LEAK classification.",
+  "additional_unique_cases": 0,
+  "configuration": "Direct libtest executable, native default thread configuration with no override; actual concurrency count unmeasured.",
+  "exit": 0,
+  "failed": 0,
+  "head": "8049a8c57dd16b992608cd96dbeea5e57bbfe129",
+  "ignored": 0,
+  "observations": [
+    {
+      "event": "ok",
+      "test": "deadline_does_not_renew_while_waiting_for_reply"
+    },
+    {
+      "event": "ok",
+      "test": "cancellation_drops_a_retained_partial_frame_fd"
+    },
+    {
+      "event": "ok",
+      "test": "token_refuses_empty_incarnation_zero_hold_and_wraparound"
+    },
+    {
+      "event": "ok",
+      "test": "revoke_during_prepared_grant_transfers_only_a_terminal_observer"
+    },
+    {
+      "event": "ok",
+      "test": "revoke_before_grant_refuses_and_pinned_arc_does_not_delay_explicit_revoke"
+    },
+    {
+      "event": "ok",
+      "test": "unexpected_data_never_disappears_between_observers"
+    },
+    {
+      "event": "ok",
+      "test": "completed_frame_with_closed_or_nonsilent_observer_never_exposes_ready"
+    },
+    {
+      "event": "ok",
+      "test": "incremental_frame_retains_fd_until_exact_frame_and_control_eof"
+    },
+    {
+      "event": "ok",
+      "test": "one_revocation_closes_two_independently_transferred_observers"
+    },
+    {
+      "event": "ok",
+      "test": "old_ticket_never_revives_with_a_new_hold"
+    },
+    {
+      "event": "ok",
+      "test": "witness_drop_revokes_even_when_a_prepared_grant_keeps_an_observer"
+    },
+    {
+      "event": "ok",
+      "test": "dropping_one_client_does_not_shutdown_the_shared_endpoint"
+    },
+    {
+      "event": "ok",
+      "test": "wrong_fd_kinds_and_unconnected_stream_refuse"
+    },
+    {
+      "event": "ok",
+      "test": "missing_extra_and_truncated_rights_refuse_without_leaking_descriptors"
+    },
+    {
+      "event": "ok",
+      "test": "wrong_binding_magic_reserved_size_and_trailing_bytes_refuse_and_close_rights"
+    },
+    {
+      "event": "ok",
+      "test": "full_control_recovers_one_grant_after_exact_drain_without_renewing_deadline"
+    },
+    {
+      "event": "ok",
+      "test": "partial_receive_deadline_immediately_closes_retained_rights"
+    },
+    {
+      "event": "ok",
+      "test": "full_control_socket_keeps_grant_pending_until_its_original_deadline"
+    }
+  ],
+  "overlap_with_host_IPC44": 18,
+  "passed": 18,
+  "source": "lampOS/crates/ipc/tests/camera_authority.rs",
+  "tree": "09495effa5aacf6078f5ef9b08e3468391079d6b"
+}
