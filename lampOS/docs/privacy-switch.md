@@ -97,7 +97,11 @@ run's shutdown) is the switch unreadable, never a fault by itself, its exit
 still verified within the shutdown's 300 ms (lamp-52e6's reboot of 27 Oct
 16:37: `privacy.c.p: Connection refused; verified cleanup failed: ...
 Transport endpoint is not connected`). With a stop already asked for, the
-voice then ends with 0. Any other
+voice then ends with 0. A worker that ends so fast that its sockets are
+gone before the voice connects to them (Controls stopped under a running
+voice: lamp-52e6, 27 Oct 17:16:43, `No such file or directory (os error
+2)`, exit 1) is told by its exit, read within 100 ms, not by that error:
+a clean end is the switch unreadable, read again. Any other
 failure of the worker, a crash at its start included, is still an abnormal
 exit that ends the service.
 Source acquisition sequence can advance several times between publications;
