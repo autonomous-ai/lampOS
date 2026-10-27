@@ -5223,14 +5223,22 @@ fn the_second_worker_renders_its_lines_at_the_start_after_its_link_is_ready() {
     };
     assert!(matches!(first(), WorkerEvent::Ready));
     assert!(matches!(first(), WorkerEvent::ProviderLink { .. }));
-    // No turn: only the start's renders ask the voice.
+    // No turn: only the start's renders ask the voice, once for each clip,
+    // the wait sounds and the three down lines both (the Reviewer-lead's P3
+    // on #3814: one render dropped must fail this).
+    let clips = crate::second_provider::CUE_WORDS.len() + 3;
     let started = Instant::now();
-    while services.asked.load(Ordering::SeqCst) == 0 && started.elapsed() < Duration::from_secs(2) {
+    while services.asked.load(Ordering::SeqCst) < clips
+        && started.elapsed() < Duration::from_secs(2)
+    {
         std::thread::sleep(Duration::from_millis(5));
     }
-    assert!(
-        services.asked.load(Ordering::SeqCst) > 0,
-        "nothing rendered at the start"
+    // A moment more: nothing beyond them.
+    std::thread::sleep(Duration::from_millis(50));
+    assert_eq!(
+        services.asked.load(Ordering::SeqCst),
+        clips,
+        "the start's renders"
     );
     parent.control.send(Control::Stop).unwrap();
     let stopping = Instant::now();
