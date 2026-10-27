@@ -563,7 +563,9 @@ reads itself:
 - For the optional Skills Store, its separate trust root,
   `/etc/lampOS/skills/store-key.pub`, provisioned by factory step 3 with
   `--store-key FILE`. Its absence does not block the rest of installation;
-  the Store remains off and never borrows the update key.
+  the Store remains off and never borrows the update key. A build may ship
+  the Store's key later, in `/var/lib/lampOS/skills/store-key.pub`, which
+  wins over the factory's (#3692).
 - No voice key: it is the user's (the owner on #806, 2026-10-16 16:13).
   Setup takes it from the account page or the app; on a lamp that ran V1,
   install copies V1's `llm_api_key` once (step 6). The factory writes none.
@@ -677,7 +679,10 @@ units stopped:
    root's 0755 directory. A missing Store key is skipped, leaving Store
    installs disabled; a supplied key that is malformed fails the step.
    The same existing key is kept, and a different one is never replaced.
-   This step writes no Store switch and restarts no service.
+   This step writes no Store switch and restarts no service. A lamp
+   already shipped gets the Store's key, and its rotations, over the air
+   instead: a build's `/var/lib/lampOS/skills/store-key.pub` wins over
+   this one (#3692, [skills.md](skills.md), "From the Skills Store").
 
 Then `lamp-selftest --occasion factory` ([selftest.md](selftest.md)), **on a
 lamp set up from the app**. The self-test reads each part from its running

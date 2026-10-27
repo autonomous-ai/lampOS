@@ -72,18 +72,20 @@ fn store_readiness_requires_its_own_key_and_an_explicit_on() {
     fs::create_dir_all(&update).unwrap();
     fs::create_dir_all(store.parent().unwrap()).unwrap();
     let update_key = key_file(&update, &key(1));
-    assert!(!package::store_ready(Some("on"), &store));
+    // No build's key in this skills folder: the factory's file alone.
+    let folder = dir.path().join("no-build-key");
+    assert!(!package::store_ready(Some("on"), &folder, &store));
     fs::write(&store, "not a key").unwrap();
-    assert!(!package::store_ready(Some("on"), &store));
+    assert!(!package::store_ready(Some("on"), &folder, &store));
     let separate = key_file(dir.path(), &key(2));
     fs::copy(separate, &store).unwrap();
     for switch in [None, Some("off"), Some("ON"), Some("")] {
-        assert!(!package::store_ready(switch, &store));
+        assert!(!package::store_ready(switch, &folder, &store));
     }
-    assert!(package::store_ready(Some("on"), &store));
+    assert!(package::store_ready(Some("on"), &folder, &store));
     assert_ne!(package::store_key(&store), package::store_key(&update_key));
     fs::remove_file(&store).unwrap();
-    assert!(!package::store_ready(Some("on"), &store));
+    assert!(!package::store_ready(Some("on"), &folder, &store));
 }
 
 /// Every name in a folder, hidden ones too.
@@ -896,6 +898,129 @@ fn only_the_store_key_in_its_file_is_taken_and_a_new_file_rotates_it() {
         )),
         "{answer}"
     );
+}
+
+/// The Store's key as a build ships it (#3692): `store-key.pub` in the
+/// skills folder wins over the factory's file; a key file of two lines (a
+/// rotation) takes either key, by the signature's fingerprint, and no
+/// third; the update key is never taken; a damaged one refuses every
+/// install and never falls back to the factory's key. The file is no
+/// skill: the loader and the list pass over it, and no install, remove or
+/// sweep of the manage helper takes it away.
+#[test]
+fn a_builds_key_in_the_skills_folder_wins_and_rotates_and_a_damaged_one_refuses() {
+    use base64::Engine;
+    let dir = tempfile::tempdir().unwrap();
+    let skills = skills(dir.path());
+    let (update, factory, new, newer, other) = (key(1), key(2), key(3), key(4), key(5));
+    let line = |key: &Ed25519KeyPair| {
+        format!(
+            "{}\n",
+            base64::engine::general_purpose::STANDARD.encode(key.public_key().as_ref())
+        )
+    };
+    let fingerprint = |key: &Ed25519KeyPair| {
+        lamp_update::manifest::fingerprint(key.public_key().as_ref().try_into().unwrap())
+    };
+    let factory_file = key_file(dir.path(), &factory);
+    let build_file = skills.join(package::BUILD_STORE_KEY);
+    let mut at = 0;
+    let mut install_signed = |key: &Ed25519KeyPair| {
+        at += 1;
+        let bytes = packed(&dir.path().join(format!("at-{at}")), Some(key));
+        let (port, _) = serve(vec![ok(&bytes)]);
+        ask(&skills, &factory_file, port, install(URL))
+    };
+    let taken = |(answer, done): (serde_json::Value, bool), key: &Ed25519KeyPair| {
+        assert!(done, "{answer}");
+        assert!(
+            answer["done"]
+                .as_str()
+                .unwrap()
+                .contains(&format!("signed with the Store's key {}", fingerprint(key))),
+            "{answer}"
+        );
+    };
+    let refused_as = |(answer, done): (serde_json::Value, bool), said: &str| {
+        assert!(!done, "{answer}");
+        assert!(refused(&answer).contains(said), "{answer}");
+    };
+    let ready = || package::store_ready(Some("on"), &skills, &factory_file);
+
+    // No build's key: the factory's is used.
+    assert!(ready());
+    taken(install_signed(&factory), &factory);
+    // A build's key wins: the factory's is refused, the build's taken.
+    fs::write(&build_file, line(&new)).unwrap();
+    refused_as(
+        install_signed(&factory),
+        &format!(
+            "signed with key {}, and this lamp takes skills signed with the Store's key {}",
+            fingerprint(&factory),
+            fingerprint(&new)
+        ),
+    );
+    taken(install_signed(&new), &new);
+    // A rotation: two lines, either key taken by its fingerprint, no third,
+    // and never the update key.
+    fs::write(&build_file, format!("{}{}", line(&newer), line(&new))).unwrap();
+    taken(install_signed(&new), &new);
+    taken(install_signed(&newer), &newer);
+    let both = format!(
+        "the Store's key {} or {}",
+        fingerprint(&newer),
+        fingerprint(&new)
+    );
+    refused_as(install_signed(&other), &both);
+    refused_as(install_signed(&update), &both);
+    refused_as(install_signed(&factory), &both);
+    // A damaged build's key refuses every install, the factory's key's
+    // among them, and is said with its name.
+    for damaged in [
+        String::new(),
+        "not a key\n".to_owned(),
+        format!(" {}", line(&new)),
+        format!("{}\n{}", line(&new), line(&newer)),
+        format!("{}{}{}", line(&new), line(&newer), line(&other)),
+        line(&new).replace('=', ""),
+    ] {
+        fs::write(&build_file, &damaged).unwrap();
+        assert!(!ready(), "{damaged:?}");
+        for signer in [&factory, &new] {
+            let said = format!(
+                "the Store's key ({})",
+                skills.join(package::BUILD_STORE_KEY).display()
+            );
+            let answer = install_signed(signer);
+            refused_as(answer.clone(), &said);
+            refused_as(answer, "the factory's key is not taken in its place");
+        }
+    }
+    // No skill: the loader, the list and the manage helper pass it over.
+    fs::write(&build_file, line(&new)).unwrap();
+    assert!(
+        lamp_skills::load_each(&skills)
+            .iter()
+            .all(|(folder, _)| !folder.ends_with(package::BUILD_STORE_KEY))
+    );
+    let listed = package::list(&skills).unwrap();
+    assert!(!listed.contains("store-key"), "{listed}");
+    let (answer, done) = ask(
+        &skills,
+        &factory_file,
+        0,
+        serde_json::json!({ "remove": package::BUILD_STORE_KEY }),
+    );
+    assert!(!done, "{answer}");
+    let (answer, done) = ask(
+        &skills,
+        &factory_file,
+        0,
+        serde_json::json!({ "remove": "desk-tutor" }),
+    );
+    assert!(done, "{answer}");
+    assert_eq!(left(&skills), ["dance", "store-key.pub"]);
+    assert_eq!(fs::read_to_string(&build_file).unwrap(), line(&new));
 }
 
 /// A Store package never puts a skill back to an older version, so an old

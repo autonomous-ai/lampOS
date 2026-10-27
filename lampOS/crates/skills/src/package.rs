@@ -13,8 +13,9 @@
 //! installed by hand from a file on the lamp is not held to its signature;
 //! one from the Skills Store, fetched from a URL by root's manage helper
 //! ([`install_from_url`], `docs/skills.md`, "From the Skills Store"), is
-//! installed only when it is signed with the Store's key
-//! ([`STORE_KEY`]), checked before anything is written.
+//! installed only when it is signed with the Store's key ([`store_keys`]:
+//! the build's [`BUILD_STORE_KEY`], else the factory's [`STORE_KEY`]),
+//! checked before anything is written.
 use super::{Skill, SkillKind, load, load_each, plain_name, version_ok};
 use base64::{Engine, engine::general_purpose::STANDARD};
 use lamp_update::fetch::Channel;
@@ -41,9 +42,21 @@ pub const MANIFEST: &str = "lamp-skill.json";
 /// the Ed25519 signature. The manifest names every file with its SHA-256,
 /// so the signature covers every byte of the skill.
 pub const SIGNATURE: &str = "lamp-skill.sig";
-/// The Skills Store's own public key. Provisioned separately from the
-/// update channel's key; an update key is never a fallback for this one.
+/// The Skills Store's own public key, as the factory provisions it (step
+/// 3's `--store-key`). Provisioned separately from the update channel's
+/// key; an update key is never a fallback for this one. A build's key
+/// ([`BUILD_STORE_KEY`]) wins over it.
 pub const STORE_KEY: &str = "/etc/lampOS/skills/store-key.pub";
+/// The Store's key as a build ships it (#3692), in the skills folder
+/// itself (`/var/lib/lampOS/skills/store-key.pub` on a product lamp): the
+/// one place under the five a fixed settings writer from build 7071 on
+/// takes (`lamp_update::manifest::SETTING_FOLDERS`) that the Store's
+/// readers can see. Root's, 0644, a plain file the loader passes over
+/// ([`super::load_each`] loads folders only), with a name no skill can
+/// have (a skill's has no dot), so no remove or install reaches it. One or
+/// two keys, one a line (a rotation: the Store's new and old), as
+/// `lamp_update::manifest::read_public_keys` reads them.
+pub const BUILD_STORE_KEY: &str = "store-key.pub";
 /// The Store's switch, `on` or off: `lamp-cloud` answers `skills.install`
 /// only with it, and the manage helper itself takes an `install` only with
 /// it in its own environment (`lamp-skills-manage@.service`'s drop-in), so
@@ -58,11 +71,12 @@ pub const STORE_OFF: &str = "not on this lamp: skills.install";
 pub fn store_switched_on(value: Option<&str>) -> bool {
     value == Some("on")
 }
-/// The Store is usable only when explicitly on and its own key is readable
-/// and valid. Check before constructing an HTTP client; removal never needs
-/// a Store key. The install path reads the key again before every fetch.
-pub fn store_ready(value: Option<&str>, key_file: &Path) -> bool {
-    store_switched_on(value) && store_key(key_file).is_ok()
+/// The Store is usable only when explicitly on and its own keys are
+/// readable and valid ([`store_keys`]). Check before constructing an HTTP
+/// client; removal never needs a Store key. The install path reads the keys
+/// again before every fetch.
+pub fn store_ready(value: Option<&str>, skills: &Path, key_file: &Path) -> bool {
+    store_switched_on(value) && store_keys(skills, key_file).is_ok()
 }
 /// The longest a package's URL may be.
 pub const MOST_URL: usize = 2_048;
@@ -196,16 +210,21 @@ pub fn signature_for(manifest: &[u8], key: &Ed25519KeyPair) -> Result<Vec<u8>, S
     Ok(bytes)
 }
 
-/// Whether `signature`, a package's `lamp-skill.sig`, is `key`'s over the
-/// `manifest` bytes: the key's fingerprint, or why not. Asked before the
+/// Whether `signature`, a package's `lamp-skill.sig`, is one of `keys`'
+/// over the `manifest` bytes, the key its fingerprint names (two during a
+/// rotation): that key's fingerprint, or why not. Asked before the
 /// manifest is even read, so nothing a package says is taken before its
 /// signature is known to be the channel's.
 pub fn check_signature(
     manifest: &[u8],
     signature: Option<&[u8]>,
-    key: &[u8; 32],
+    keys: &[[u8; 32]],
 ) -> Result<String, String> {
-    let ours = lamp_update::manifest::fingerprint(key);
+    let ours = keys
+        .iter()
+        .map(lamp_update::manifest::fingerprint)
+        .collect::<Vec<_>>()
+        .join(" or ");
     let signature = signature.ok_or(format!(
         "it carries no {SIGNATURE}: a package from the Skills Store must be signed with the Store's \
          key ({ours})"
@@ -215,7 +234,10 @@ pub fn check_signature(
     }
     let signed: Signed = serde_json::from_slice(signature)
         .map_err(|_| format!("{SIGNATURE} is not a signature: {{\"key\", \"signature\"}}"))?;
-    if signed.key != ours {
+    let Some(key) = keys
+        .iter()
+        .find(|key| lamp_update::manifest::fingerprint(key) == signed.key)
+    else {
         // Said back only when it is a fingerprint's shape: nothing else a
         // package carries is echoed.
         let theirs =
@@ -227,7 +249,7 @@ pub fn check_signature(
         return Err(format!(
             "signed with key {theirs}, and this lamp takes skills signed with the Store's key {ours}"
         ));
-    }
+    };
     let raw = STANDARD
         .decode(&signed.signature)
         .map_err(|_| format!("{SIGNATURE}: the signature is not base64"))?;
@@ -238,7 +260,7 @@ pub fn check_signature(
                 "{SIGNATURE} does not match {MANIFEST}: the package was changed after it was signed"
             )
         })?;
-    Ok(ours)
+    Ok(signed.key)
 }
 
 /// Lowercase hex of `bytes`' SHA-256.
@@ -456,7 +478,7 @@ pub fn pack_signed(
             .as_ref()
             .try_into()
             .map_err(|_| "the key's public half is not 32 bytes".to_owned())?;
-        check_signature(&json, read.signature.as_deref(), &public)
+        check_signature(&json, read.signature.as_deref(), &[public])
             .map_err(|why| format!("{}: packed, then its signature: {why}", path.display()))?;
     }
     Ok(path)
@@ -486,11 +508,11 @@ pub fn read_package(path: &Path) -> Result<Package, String> {
 }
 
 /// A package from its bytes, read in memory and checked as [`read_package`]
-/// checks it, with nothing written anywhere. With `key`, its signature must
-/// be that key's over the manifest's exact bytes ([`check_signature`]),
+/// checks it, with nothing written anywhere. With `keys`, its signature must
+/// be one of those keys' over the manifest's exact bytes ([`check_signature`]),
 /// checked once the tar is read and before the manifest is parsed or any
 /// file is compared with it.
-pub fn read_package_bytes(bytes: &[u8], key: Option<&[u8; 32]>) -> Result<Package, String> {
+pub fn read_package_bytes(bytes: &[u8], keys: Option<&[[u8; 32]]>) -> Result<Package, String> {
     if bytes.len() as u64 > MOST_PACKAGE_BYTES {
         return Err(format!(
             "more than {MOST_PACKAGE_BYTES} bytes: too big for a skill"
@@ -571,8 +593,8 @@ pub fn read_package_bytes(bytes: &[u8], key: Option<&[u8; 32]>) -> Result<Packag
         }
     }
     let manifest = manifest.ok_or(format!("no {MANIFEST}: not a skill's package"))?;
-    let signed_by = match key {
-        Some(key) => Some(check_signature(&manifest, signature.as_deref(), key)?),
+    let signed_by = match keys {
+        Some(keys) => Some(check_signature(&manifest, signature.as_deref(), keys)?),
         None => None,
     };
     let manifest: Manifest =
@@ -1472,8 +1494,42 @@ pub fn sha256_ok(text: &str) -> bool {
             .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
-/// The Store's public key from `key_file`, as `lamp-update` reads
-/// it.
+/// The Store's keys a package from it is checked against: the build's
+/// ([`BUILD_STORE_KEY`] in `skills`) when it is there, else the factory's
+/// one in `key_file` ([`STORE_KEY`]). Read again for every install, so a
+/// round that writes or rotates the build's key needs no restart here.
+///
+/// A build's key file that is there but can't be read or is not one or two
+/// keys refuses every install, said with the file's name; the factory's key
+/// is not taken in its place. The build's file is there because the Store
+/// moved off the factory's key, which may be the very key it rotated away
+/// from (lost or leaked): falling back to it on a damaged file would quietly
+/// trust that key again. Refusing costs only installs until the file is
+/// put right (a build's own copy is rewritten by a round only while it is
+/// still the build's, so a damaged one is mended by hand); a remove, the
+/// app's off and on and every skill already installed go on as before.
+pub fn store_keys(skills: &Path, key_file: &Path) -> Result<Vec<[u8; 32]>, String> {
+    let built = skills.join(BUILD_STORE_KEY);
+    match fs::read_to_string(&built) {
+        Ok(text) => lamp_update::manifest::read_public_keys(&text).map_err(|why| {
+            format!(
+                "the Store's key ({}): {}; the factory's key is not taken in its place",
+                built.display(),
+                why.0
+            )
+        }),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => {
+            store_key(key_file).map(|key| vec![key])
+        }
+        Err(error) => Err(format!(
+            "the Store's key ({}) can't be read: {error}; the factory's key is not taken in its place",
+            built.display()
+        )),
+    }
+}
+
+/// The Store's public key from `key_file`, the factory's ([`STORE_KEY`]),
+/// as `lamp-update` reads it.
 pub fn store_key(key_file: &Path) -> Result<[u8; 32], String> {
     let text = fs::read_to_string(key_file).map_err(|error| {
         format!(
@@ -1493,7 +1549,7 @@ pub fn store_key(key_file: &Path) -> Result<[u8; 32], String> {
 /// https ([`store_url_ok`]); the package is fetched through `channel` into
 /// memory, at most [`MOST_PACKAGE_BYTES`], within [`FETCH_WITHIN`]; its
 /// bytes must have `sha256` when one is given; its signature must be the
-/// Store's key's ([`STORE_KEY`]) over its manifest, checked before
+/// Store's key's ([`store_keys`]) over its manifest, checked before
 /// the manifest is read; its files, their paths (no `..`, no absolute path,
 /// no hidden name, at most four parts), sizes, count and kinds (no link, no
 /// device) as [`read_package_bytes`] checks them. Then it is installed as
@@ -1517,7 +1573,7 @@ pub fn install_from_url(
     if !fs::metadata(skills).is_ok_and(|meta| meta.is_dir()) {
         return Err(format!("no skills folder at {}", skills.display()));
     }
-    let key = store_key(key_file).map_err(|why| format!("not installed: {why}"))?;
+    let keys = store_keys(skills, key_file).map_err(|why| format!("not installed: {why}"))?;
     let mut bytes = Vec::new();
     channel
         .fetch(url, MOST_PACKAGE_BYTES, &mut bytes)
@@ -1531,7 +1587,7 @@ pub fn install_from_url(
         );
     }
     let mut package =
-        read_package_bytes(&bytes, Some(&key)).map_err(|why| format!("not installed: {why}"))?;
+        read_package_bytes(&bytes, Some(&keys)).map_err(|why| format!("not installed: {why}"))?;
     drop(bytes);
     // What the catalogue's entry said, against what the channel signed.
     if let Some(name) = asked.name
