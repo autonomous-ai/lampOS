@@ -864,6 +864,11 @@ impl lamp_setup::shutdown::Host for Shutdown {
             .map(|state| state.position)
     }
     fn stop(&mut self) -> io::Result<()> {
+        // The voice first, while the switch it reads is still there; one
+        // that will not stop is left to the target's stop below.
+        if let Err(why) = System.run(&lamp_setup::shutdown::VOICE_FIRST.map(str::to_owned)) {
+            eprintln!("lamp-setup: shutdown: the voice did not stop first ({why}); stopping all");
+        }
         reset::stop_and_wait(&lamp_setup::shutdown::STOP.map(str::to_owned), &mut System)
     }
     /// `lamp-body-measure let-go` as the body's user, as the body runs
