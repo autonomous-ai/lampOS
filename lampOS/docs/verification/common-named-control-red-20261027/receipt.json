@@ -1,0 +1,66 @@
+{
+  "status": "EXPECTED_OLD_PRODUCTION_FAILURE_OBSERVED_NOT_A_PASS",
+  "source": {
+    "head": "ed9aff39b609676535343f8979631c909e2a430a",
+    "test_only_tree": "0d8d6c683c651f3a681631607612cafa75f054c4",
+    "old_production_tree": "218c1d5f25e1bee8b8a1d706bdf0e9247ea7efd8",
+    "tracked_files": 10726,
+    "production_unchanged": true
+  },
+  "execution": {
+    "host": "macOS x86_64",
+    "test_binary": "lamp-ipc::camera_authority",
+    "test": "named_control_eof_after_both_write_halves_close_delivers_live_observers",
+    "actual_executions": 1,
+    "actual_test_exit": 101,
+    "passed": 0,
+    "failed": 1,
+    "ignored": 0,
+    "filtered_not_executed": 18,
+    "failure_source": "lampOS/crates/ipc/tests/camera_authority.rs",
+    "failure_line": 747,
+    "failure_boundary": "first ReceiveGrant::try_receive after named CONTROL write EOF and server drop",
+    "errno": 22,
+    "error": "Invalid argument",
+    "fixed_code_pass_claimed": false
+  },
+  "helper": {
+    "actual_native_exit": 0,
+    "native_session": 89555,
+    "native_chunk": "977879",
+    "success_meaning": "Expected old-production test failure was observed and retained; test exit101 remains failed.",
+    "all_owned_sessions_closed": true,
+    "source_stable": true,
+    "no_runtime_replay": true
+  },
+  "retention": {
+    "failed_driver_sha256": "173a7f23cbf0b0697ac9854f26e70300956aed57e07743e73e505227522bae99",
+    "independent_regular_file": true,
+    "mode": "0600",
+    "hardlinks": false,
+    "actual_dsymutil_exit": 0,
+    "independent_MachO_N_OSO_entries": 0,
+    "actual_debug_backing_inputs": 0,
+    "zero_observed_not_assumed": true,
+    "prior_protected_files_full_byte_verified": 7886,
+    "target_release_permitted": true
+  },
+  "protocol_boundary": {
+    "CONTROL": "Queued valid bytes and transferred rights remain readable after both write halves close and the server disappears.",
+    "OBSERVER": "Connected observer validation and shutdown-based revocation remain authoritative; this regression authorizes no weakening."
+  },
+  "pending_fixed_source": {
+    "tree": "e927f8518fba011625cb17be57113e5900feb46c",
+    "fresh_qualification": "PENDING_SEPARATE_GATES",
+    "all_previous86_failures_repaired_claimed": false,
+    "native_or_physical_acceptance": false
+  },
+  "evidence_sha256": {
+    "actual-native-release.json": "3b22d1b4efbd7e9e59a5a5cbe4dad56e352eaffc2cf17b369109ffef5e332f96",
+    "source-binding.json": "d26aefaf26c960a9e616054f0785b84551c1c0e1cd3b70d54cceda8224d2682b",
+    "red-process.json": "77f0bd2c1b34ffad0991061e1b3025fa4f728c5d40cbd0bebc6c09b95f04b6a9",
+    "debug-map-process.json": "68d9a11dc69335a7f5448d55e042aba3bf7adba1e49da0070b2457429fc9141c",
+    "independent-MachO.json": "725a148176fa48993a7887ad0fb29c16514ed5045a2858d4ad3d413ed5271cee",
+    "red.stderr": "76efffe8f30a1b1e1087d0bea51b19cf0d988c108845c79c5d4d3f0e5a30a885"
+  }
+}

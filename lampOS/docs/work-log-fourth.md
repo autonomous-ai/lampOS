@@ -1,3 +1,22 @@
+## 2026-10-27 07:48 UTC — Named CONTROL EOF regression fails on old production
+
+Ready for lamp-voice: no
+
+[Named CONTROL RED receipt](verification/common-named-control-red-20261027/receipt.json):
+test-only tree `0d8d6c683` preserves old `218c` production. The new named-socket
+EOF regression ran once: actual exit 101, 0 passes / 1 failure, 18 filtered
+not executed. The first ReceiveGrant read rejects valid queued CONTROL
+bytes/rights after write EOF with EINVAL 22 at camera_authority.rs:747.
+OBSERVER connection checks and shutdown revocation remain authoritative.
+
+Actual helper exit 0 confirms the expected failed test was observed and
+retained, not a fixed-code pass. The independent mode 0600 failed driver has
+actual dsymutil and Mach-O inspections with zero backing inputs. All 7,886
+prior protected files and 10,726 source files remain verified; owned cleanup
+closed before target release. Separate corrected e927 source needs fresh
+gates. This does not claim all 86 prior failures repaired, native green or
+physical acceptance.
+
 ## 2026-10-27 07:39 UTC — Completed Common host gate failed; evidence retained
 
 Ready for lamp-voice: no
