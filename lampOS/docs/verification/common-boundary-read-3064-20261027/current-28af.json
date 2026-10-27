@@ -1,0 +1,256 @@
+{
+  "head": "28af4573a66c2844cdd0a91936d2eca8c566fd5b",
+  "prior": "314a0f6bc",
+  "source_files": [
+    {
+      "path": "lampOS/crates/ipc/src/camera_authority.rs",
+      "mode_blob": "100644 blob bbebb19489c99a1b0d9cdc029ec088dfec03f0d1",
+      "equal_prior_314": true,
+      "equal_actual_preview": true
+    },
+    {
+      "path": "lampOS/crates/ipc/tests/camera_authority.rs",
+      "mode_blob": "100644 blob 0ef3f80a0d8d727c7eac89df3f685ab7b77420c3",
+      "equal_prior_314": true,
+      "equal_actual_preview": true
+    },
+    {
+      "path": "lampOS/crates/eyes/src/camera_authority.rs",
+      "mode_blob": "100644 blob b5f5bff5bf006e4653d610c6b043bc937338558f",
+      "equal_prior_314": true,
+      "equal_actual_preview": true
+    },
+    {
+      "path": "lampOS/crates/eyes/src/permit.rs",
+      "mode_blob": "100644 blob 0c2c44d1f4429e2a56b3961f3a5da41e76c01f24",
+      "equal_prior_314": true,
+      "equal_actual_preview": true
+    },
+    {
+      "path": "lampOS/crates/eyes/src/permit/camera_authority_tests.rs",
+      "mode_blob": "100644 blob 98254b19022b9d7f5f0e889a70c285f69ed35d7c",
+      "equal_prior_314": true,
+      "equal_actual_preview": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/camera_authority.rs",
+      "mode_blob": "100644 blob 767b1fbd8ac203584124488fcd9617cc4e1b9ae4",
+      "equal_prior_314": true,
+      "equal_actual_preview": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/memory_scope.rs",
+      "mode_blob": "100644 blob 89ca2b7466142947fea89739bc04efc5085cb965",
+      "equal_prior_314": true,
+      "equal_actual_preview": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/second_provider.rs",
+      "mode_blob": "100644 blob dee999c72e72ff75596ed8fc188427e75af0a65b",
+      "equal_prior_314": true,
+      "equal_actual_preview": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/second_provider/worker.rs",
+      "mode_blob": "100644 blob 2929eb94f4c4356a65ff110ace17f8771b19a277",
+      "equal_prior_314": true,
+      "equal_actual_preview": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/second_provider/services.rs",
+      "mode_blob": "100644 blob c07389f486841d547faf0d6bc054fd492e58d872",
+      "equal_prior_314": true,
+      "equal_actual_preview": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/second_provider/net.rs",
+      "mode_blob": "100644 blob 55836bad5abc523f72dc670768803e5767430520",
+      "equal_prior_314": true,
+      "equal_actual_preview": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/second_provider/net/chat.rs",
+      "mode_blob": "100644 blob f16804af1f9530ca28a206f599034dfc663ca22b",
+      "equal_prior_314": true,
+      "equal_actual_preview": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/second_provider/net/tts.rs",
+      "mode_blob": "100644 blob 11445181dcd9b335ff8f64b02e3d8d1ba0c5d3a5",
+      "equal_prior_314": true,
+      "equal_actual_preview": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/second_provider/tests/private_context/face_forget.rs",
+      "mode_blob": "100644 blob 04252ae8ba4e41663899e5b91202aa8a54f2d577",
+      "equal_prior_314": true,
+      "equal_actual_preview": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/second_provider/worker/camera_ticket_exec_tests.rs",
+      "mode_blob": "100644 blob 7ea52c551b642807c8bcfd6b2665655711cf1aee",
+      "equal_prior_314": true,
+      "equal_actual_preview": true
+    }
+  ],
+  "scope": "Source closures and selected original native controls only; no full runtime census, crates/memory semantic read, hardware, new local Cargo or release acceptance.",
+  "disposition": "No new P1/P2 found in the requested source slices; overall HOLD remains",
+  "closures": {
+    "CONTROL": "Peer UID authenticated before request; native Unix stream control may reach protocol-complete EOF, exact bytes/one FD/token/nonce/deadline retained. OBSERVER must remain connected, silent, CLOEXEC, with sticky loss. UID is account trust, not executable identity.",
+    "camera_close": "Explicit close calls kernel witness shutdown before publication timestamp mutex. Stale conditional close returns false and cannot authorize a rollover capture floor. New floor follows completed old shutdown, original heartbeat age retained.",
+    "HTTP": "Body serialization precedes final permission check; same prepared request survives Pending. Lost drops guarded work; each near/own/refused-key fallback rechecks. No atomic recall of bytes already sent.",
+    "face_receipt": "Original private futures and speech tasks are retired/joined before scoped face operation; separate original owner/audio guard carries only whitelisted fixed public outcomes. Original private clones stay lost.",
+    "speaker_expiry": "ScopeLease speaker checks original valid_until; expiry from Ready or Pending latches private loss, fresh Seen cannot renew it; microphone owner remains independently current. Room/Unknown/unproved remain distinct."
+  },
+  "original_native": {
+    "arm": {
+      "conclusion": "success",
+      "head_sha": "28af4573a66c2844cdd0a91936d2eca8c566fd5b",
+      "id": 40513174138,
+      "run_attempt": 1,
+      "status": "completed"
+    },
+    "linux": {
+      "conclusion": "success",
+      "head_sha": "28af4573a66c2844cdd0a91936d2eca8c566fd5b",
+      "id": 40513174060,
+      "run_attempt": 1,
+      "status": "completed"
+    },
+    "preview": "0bacfde9a344c1b7cd07d21cde6a23b1967daaa5",
+    "parents": [
+      "bf6f7bbdf5e936c2ef82621e1bb7592d511c1453",
+      "28af4573a66c2844cdd0a91936d2eca8c566fd5b"
+    ],
+    "tree": "66435569942c9118e5bf84ee1e3dad89448e8b7a",
+    "selected_cases": [
+      {
+        "name": "named_control_eof_after_both_write_halves_close_delivers_live_observers",
+        "package_target": "lamp-ipc::camera_authority",
+        "full_case": "named_control_eof_after_both_write_halves_close_delivers_live_observers",
+        "ordinal": 3246,
+        "duration_s": 0.004,
+        "observed_passes": 1
+      },
+      {
+        "name": "explicit_close_revokes_two_exec_consumers_while_publication_lock_is_held",
+        "package_target": "lamp-eyes",
+        "full_case": "permit::camera_authority_tests::explicit_close_revokes_two_exec_consumers_while_publication_lock_is_held",
+        "ordinal": 2610,
+        "duration_s": 0.07,
+        "observed_passes": 1
+      },
+      {
+        "name": "stale_expected_close_cannot_roll_capture_before_real_shutdown_completes",
+        "package_target": "lamp-eyes",
+        "full_case": "camera_authority::tests::stale_expected_close_cannot_roll_capture_before_real_shutdown_completes",
+        "ordinal": 2519,
+        "duration_s": 0.007,
+        "observed_passes": 1
+      },
+      {
+        "name": "retired_equal_hold_requests_rollover_and_genuinely_larger_hold_recovers",
+        "package_target": "lamp-eyes",
+        "full_case": "camera_authority::tests::retired_equal_hold_requests_rollover_and_genuinely_larger_hold_recovers",
+        "ordinal": 2518,
+        "duration_s": 0.005,
+        "observed_passes": 1
+      },
+      {
+        "name": "actual_eyes_close_with_publication_held_stops_two_exec_voice_consumers",
+        "package_target": "lamp-voice",
+        "full_case": "second_provider::worker::camera_ticket_exec_tests::actual_eyes_close_with_publication_held_stops_two_exec_voice_consumers",
+        "ordinal": 10273,
+        "duration_s": 0.091,
+        "observed_passes": 1
+      },
+      {
+        "name": "expired_v3_speaker_latches_loss_without_renewing_the_request",
+        "package_target": "lamp-voice",
+        "full_case": "second_provider::worker::private_speaker_expiry_tests::expired_v3_speaker_latches_loss_without_renewing_the_request",
+        "ordinal": 10484,
+        "duration_s": 4.025,
+        "observed_passes": 1
+      },
+      {
+        "name": "declaration_barrier_rechecks_permission_before_each_http_attempt",
+        "package_target": "lamp-voice",
+        "full_case": "second_provider::services::tests::declaration_barrier_rechecks_permission_before_each_http_attempt",
+        "ordinal": 9894,
+        "duration_s": 0.012,
+        "observed_passes": 1
+      },
+      {
+        "name": "pending_after_declaration_keeps_one_prepared_http_request",
+        "package_target": "lamp-voice",
+        "full_case": "second_provider::services::tests::pending_after_declaration_keeps_one_prepared_http_request",
+        "ordinal": 9903,
+        "duration_s": 0.029,
+        "observed_passes": 1
+      },
+      {
+        "name": "key_refusal_notification_cannot_authorize_a_later_relay_send",
+        "package_target": "lamp-voice",
+        "full_case": "second_provider::services::tests::key_refusal_notification_cannot_authorize_a_later_relay_send",
+        "ordinal": 9898,
+        "duration_s": 0.008,
+        "observed_passes": 1
+      },
+      {
+        "name": "proved_face_tools_retire_private_work_before_actual_scoped_mutation",
+        "package_target": "lamp-voice",
+        "full_case": "second_provider::tests::private_context::face_forget::proved_face_tools_retire_private_work_before_actual_scoped_mutation",
+        "ordinal": 10189,
+        "duration_s": 0.542,
+        "observed_passes": 1
+      },
+      {
+        "name": "fixed_face_outcomes_keep_consent_and_partial_failure_without_raw_values",
+        "package_target": "lamp-voice",
+        "full_case": "second_provider::tests::private_context::face_forget::fixed_face_outcomes_keep_consent_and_partial_failure_without_raw_values",
+        "ordinal": 10162,
+        "duration_s": 0.006,
+        "observed_passes": 1
+      },
+      {
+        "name": "fixed_face_receipt_never_mints_from_prior_loss_or_outlives_its_owner",
+        "package_target": "lamp-voice",
+        "full_case": "second_provider::tests::private_context::face_forget::fixed_face_receipt_never_mints_from_prior_loss_or_outlives_its_owner",
+        "ordinal": 10165,
+        "duration_s": 0.027,
+        "observed_passes": 1
+      },
+      {
+        "name": "observed_disclosure_loss_wins_the_atomic_fixed_receipt_claim",
+        "package_target": "lamp-voice",
+        "full_case": "second_provider::tests::private_context::face_forget::observed_disclosure_loss_wins_the_atomic_fixed_receipt_claim",
+        "ordinal": 10163,
+        "duration_s": 0.007,
+        "observed_passes": 1
+      },
+      {
+        "name": "queued_fixed_face_receipt_keeps_the_original_audio_expiry",
+        "package_target": "lamp-voice",
+        "full_case": "second_provider::tests::private_context::face_forget::queued_fixed_face_receipt_keeps_the_original_audio_expiry",
+        "ordinal": 10292,
+        "duration_s": 2.017,
+        "observed_passes": 1
+      }
+    ],
+    "arm_log_sha256": "17da804b041d67fd8eed4519f44c4c8e008a5c36d5ca010410dfb7432d61842e",
+    "linux_log_sha256": "560d8ee2ea2d154233c8c725be3c9bd80aa74fc8c76d4da1feb6323b2dee8bd9"
+  },
+  "unresolved_holds": [
+    "#3564 second-landing composition/Engine case",
+    "Independent privacy #3315 disposition",
+    "Compatible installed/mixed-build pins",
+    "First physical known-person/other-person/look-away/privacy round",
+    "Draft and latest actual train qualification"
+  ],
+  "limits": [
+    "No local Cargo rerun, full ARM/native census, 112/525 mapped-control census, artifact audit, Memory implementation semantic review, production bootstrap, physical/acoustic or new release acceptance.",
+    "Selected tests execute unit/test-driver APIs and local endpoints, not shipping binaries or real lamp camera/actuators.",
+    "Stale-close fixture deliberately constructs the paused scalar state, then uses actual kernel shutdown; it is not an independently scheduled concurrent stress test.",
+    "Actual preview is bf6/28af; whole authored and latest Main trees differ. Prior failed/incomplete gates remain unwaived."
+  ]
+}
