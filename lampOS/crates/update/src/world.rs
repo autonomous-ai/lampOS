@@ -3,7 +3,7 @@
 //! health), the disk's free room and the clock. The real ones are here.
 use crate::{judge::UnitState, quiet::Heard};
 use lamp_bus::{Bus, Subscriber};
-use lamp_msgs::{Health, Speech, VoiceState};
+use lamp_msgs::{Health, Speech, VoiceMute, VoiceState};
 use std::{
     collections::BTreeMap,
     io,
@@ -410,6 +410,7 @@ pub fn parse_show(text: &str) -> Vec<UnitState> {
 pub struct BusEars {
     bus: Option<Bus>,
     state: Option<Subscriber>,
+    mute: Option<Subscriber>,
     speech: Vec<Subscriber>,
 }
 
@@ -417,7 +418,8 @@ pub struct BusEars {
 pub(crate) const NAME: &str = "update";
 
 impl BusEars {
-    /// Subscribed to `voice/state`, `voice/heard` and `voice/said`. A bus
+    /// Subscribed to `voice/state`, `voice/mute`, `voice/heard` and
+    /// `voice/said`. A bus
     /// that cannot be used is said once, and then nothing is heard: the
     /// voice can then not be judged quiet.
     pub fn new(root: &Path, say: &mut dyn FnMut(&str)) -> Self {
@@ -431,6 +433,7 @@ impl BusEars {
                 return Self {
                     bus: None,
                     state: None,
+                    mute: None,
                     speech: Vec::new(),
                 };
             }
@@ -444,6 +447,7 @@ impl BusEars {
                 }
             };
         let state = subscribe(VoiceState::TOPIC, VoiceState::TYPE);
+        let mute = subscribe(VoiceMute::TOPIC, VoiceMute::TYPE);
         let speech = Speech::TOPICS
             .iter()
             .filter_map(|topic| subscribe(topic, Speech::TYPE))
@@ -451,6 +455,7 @@ impl BusEars {
         Self {
             bus: Some(bus),
             state,
+            mute,
             speech,
         }
     }
@@ -483,6 +488,20 @@ impl Ears for BusEars {
                     }
                 }
                 None => thread::sleep(left.min(Duration::from_millis(250))),
+            }
+            // A muted voice says no state, only its mute, once a second
+            // (#3770): read as the state is, a kept old one or one that
+            // does not parse heard as nothing.
+            if let Some(mute) = &mut self.mute {
+                while let Ok(Some(message)) = mute.recv(Duration::ZERO) {
+                    let age = unix_ms().saturating_sub(message.header.at_unix_ms);
+                    if age <= crate::quiet::STATE_LASTS.as_millis() as u64
+                        && let Ok(said) = message.parse::<VoiceMute>()
+                        && said.check().is_ok()
+                    {
+                        heard.push(Heard::Mute(said));
+                    }
+                }
             }
             for speech in &mut self.speech {
                 while let Ok(Some(_)) = speech.recv(Duration::ZERO) {
@@ -834,5 +853,42 @@ mod tests {
         );
         assert!(heard.contains(&Heard::Speech), "{heard:?}");
         assert_eq!(ears.health(), None);
+    }
+
+    #[test]
+    fn the_bus_hears_a_muted_voice_and_not_a_mute_it_cannot_read() {
+        let root = tempfile::Builder::new()
+            .prefix("lu-")
+            .tempdir_in("/tmp")
+            .unwrap();
+        let bus = Bus::new(root.path()).unwrap();
+        let mut mute = bus
+            .publisher_declared(VoiceMute::TOPIC, &VoiceMute::declaration(), "voice")
+            .unwrap();
+        let mut said = |_: &str| {};
+        let mut ears = BusEars::new(root.path(), &mut said);
+        thread::sleep(Duration::from_millis(300));
+        let mutes = |heard: &[Heard]| {
+            heard
+                .iter()
+                .filter(|heard| matches!(heard, Heard::Mute(_)))
+                .count()
+        };
+        // Neither a mute that does not parse nor one that is not a mute's.
+        for wrong in [
+            serde_json::json!({"muted": "yes"}),
+            serde_json::json!({"muted": false, "reason": "sleep"}),
+        ] {
+            mute.publish_json(1, &wrong).unwrap();
+            let heard = ears.listen(Duration::from_millis(500));
+            assert_eq!(mutes(&heard), 0, "{wrong}: {heard:?}");
+        }
+        let asleep = VoiceMute {
+            muted: true,
+            reason: Some(lamp_msgs::MuteReason::Sleep),
+        };
+        mute.publish_json(2, &asleep).unwrap();
+        let heard = ears.listen(Duration::from_millis(500));
+        assert!(heard.contains(&Heard::Mute(asleep)), "{heard:?}");
     }
 }

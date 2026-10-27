@@ -2738,7 +2738,7 @@ fn describe(
             model.fetch_bytes() as f64 / 1e6
         ));
     }
-    lines.push("switched at a quiet moment: nobody heard or answered for 45 s".into());
+    lines.push("switched at a quiet moment: nobody heard or answered for 45 s, or the voice muted (asleep or for privacy)".into());
     lines
 }
 

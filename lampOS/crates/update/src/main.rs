@@ -38,9 +38,9 @@ lamp-update --help
 check   says what the newest build of the channel would change on this lamp, and
         writes nothing (with any --apply).
 once    one round: with --apply on, fetches what changed, installs it beside the old
-        build, switches at a quiet moment (nobody heard or answered for 45 s), watches
-        each part for --watch-s (60) and puts the previous build back if one is not
-        well. Without --apply on (the default) it is check.
+        build, switches at a quiet moment (nobody heard or answered for 45 s, or the
+        lamp asleep or muted), watches each part for --watch-s (60) and puts the
+        previous build back if one is not well. Without --apply on (the default) it is check.
 serve   a round every --every-s (900), until stopped.
 install lampOS on a blank lamp (docs/install.md): the newest build's binary of every
         product part, in its folder with its current link; the product units, tmpfiles,

@@ -10,8 +10,13 @@
 //! anything but resting is someone in a turn. A voice that says nothing on
 //! the bus cannot be judged quiet: what cannot be seen is not quiet.
 //!
+//! A muted voice says no state, so its mute is read too (`voice/mute`, said
+//! once a second, #3770): muted, asleep or not, is quiet at once, since its
+//! microphones are closed and no turn can be cut. Under the same 3 s as the
+//! state, and never while a fresh state says a turn.
+//!
 //! Pure: it is told what was heard and when, and asked at a time.
-use lamp_msgs::Voice;
+use lamp_msgs::{Voice, VoiceMute};
 use std::time::Duration;
 
 /// How long nobody has been heard or answered before the voice is switched.
@@ -30,6 +35,8 @@ pub enum Heard {
     Speech,
     /// Its state (`voice/state`).
     State(Voice),
+    /// Its mute (`voice/mute`).
+    Mute(VoiceMute),
 }
 
 #[derive(Clone, Debug)]
@@ -40,6 +47,8 @@ pub struct Quiet {
     noise_ms: Option<u64>,
     /// The last state said, and when.
     state: Option<(Voice, u64)>,
+    /// The last mute said, and when.
+    mute: Option<(VoiceMute, u64)>,
 }
 
 impl Quiet {
@@ -48,6 +57,7 @@ impl Quiet {
             since_ms: now_ms,
             noise_ms: None,
             state: None,
+            mute: None,
         }
     }
 
@@ -60,6 +70,7 @@ impl Quiet {
                 }
                 self.state = Some((state, at_ms));
             }
+            Heard::Mute(mute) => self.mute = Some((mute, at_ms)),
         }
     }
 
@@ -77,10 +88,23 @@ impl Quiet {
 
     /// Ok when the voice has said it is resting within the last three
     /// seconds, and for at least `long` nobody has been heard, nothing has
-    /// been said and the voice has been in no other state. Otherwise why
-    /// not, for a person.
+    /// been said and the voice has been in no other state. Ok at once when
+    /// the voice has said within three seconds that it is muted (asleep or
+    /// for privacy), unless a fresh state says it is in a turn. Otherwise
+    /// why not, for a person.
     pub fn for_at_least(&self, long: Duration, now_ms: u64) -> Result<(), String> {
         let long_ms = long.as_millis() as u64;
+        let fresh = |said_ms: u64| now_ms.saturating_sub(said_ms) <= STATE_LASTS.as_millis() as u64;
+        let in_turn = self
+            .state
+            .is_some_and(|(state, said_ms)| fresh(said_ms) && state != Voice::Resting);
+        if !in_turn
+            && self
+                .mute
+                .is_some_and(|(mute, said_ms)| mute.muted && fresh(said_ms))
+        {
+            return Ok(());
+        }
         let Some((state, said_ms)) = self.state else {
             return Err(
                 "the voice says nothing on the bus (voice/state): quiet cannot be judged".into(),
@@ -189,5 +213,53 @@ mod tests {
         quiet.hear(Heard::Speech, 14 * S);
         assert!(quiet.for_at_least(BETWEEN_TURNS, 18 * S).is_err());
         assert_eq!(quiet.for_at_least(BETWEEN_TURNS, 19 * S), Ok(()));
+    }
+
+    fn muted(reason: Option<lamp_msgs::MuteReason>) -> Heard {
+        Heard::Mute(VoiceMute {
+            muted: true,
+            reason,
+        })
+    }
+
+    #[test]
+    fn a_voice_asleep_or_muted_for_privacy_is_quiet_at_once() {
+        for reason in [Some(lamp_msgs::MuteReason::Sleep), None] {
+            // Muted, it says no state: only its mute, once a second.
+            let mut quiet = Quiet::new(0);
+            quiet.hear(muted(reason), S);
+            assert_eq!(quiet.for_at_least(QUIET, S), Ok(()));
+            // Someone was heard just before the mute: no turn can be cut.
+            let mut quiet = Quiet::new(0);
+            quiet.hear(Heard::Speech, S);
+            quiet.hear(muted(reason), 2 * S);
+            assert_eq!(quiet.for_at_least(QUIET, 2 * S), Ok(()));
+        }
+    }
+
+    #[test]
+    fn a_stale_mute_or_one_in_a_turn_is_not_quiet() {
+        let mut quiet = Quiet::new(0);
+        quiet.hear(muted(Some(lamp_msgs::MuteReason::Sleep)), 10 * S);
+        assert_eq!(quiet.for_at_least(QUIET, 13 * S), Ok(()));
+        let why = quiet.for_at_least(QUIET, 14 * S).unwrap_err();
+        assert!(why.contains("cannot be judged"), "{why}");
+        // A fresh state that says a turn wins over the mute.
+        let mut quiet = Quiet::new(0);
+        quiet.hear(muted(None), 10 * S);
+        quiet.hear(Heard::State(Voice::Speaking), 10 * S);
+        let why = quiet.for_at_least(QUIET, 10 * S).unwrap_err();
+        assert!(why.starts_with("the voice is"), "{why}");
+        // Open again: judged by its state, as before.
+        let mut quiet = Quiet::new(0);
+        quiet.hear(
+            Heard::Mute(VoiceMute {
+                muted: false,
+                reason: None,
+            }),
+            10 * S,
+        );
+        let why = quiet.for_at_least(QUIET, 10 * S).unwrap_err();
+        assert!(why.contains("cannot be judged"), "{why}");
     }
 }
