@@ -833,6 +833,11 @@ struct Shutdown {
 }
 
 impl lamp_setup::shutdown::Host for Shutdown {
+    /// The voice's say service, at the socket setup's other lines use.
+    fn say_aloud(&mut self, line: &str, within: Duration) -> Result<(), String> {
+        let socket = lamp_setup::wifi_change::SayService::product().socket;
+        lamp_setup::shutdown::say_through(&socket, line, within)
+    }
     fn now(&self) -> Duration {
         self.started.elapsed()
     }
