@@ -2368,10 +2368,12 @@ same 320 by 240 look: its box, widened by a quarter on every side and
 turned so the eyes are level, made 256 pixels square (`src/mesh.rs`).
 With `LAMP_EYES_MOUTH_FULL_LOOK=on` and `--full-look` (the product's 1280
 by 960) it is cut from the frame at its own size instead
-(`mesh::crop_full`). The switch is off in the product until a silent, still
-face at the desk is measured to read `no` on those crops at
-`MESH_SPEAKING_AT`, and someone off camera speaking is not given that face
-(a false `yes` would give a silent known person another's line, #3679): the detector's box and marks are
+(`mesh::crop_full`). The switch is on in the product
+(`deploy/product/lamp-eyes.service`) since #3699's stand-in runs on
+lamp-52e6 measured the case it was held for: a silent, still known face read
+`no` in 268 of 268 looks while a voice talked off camera, and no line went to
+it (a false `yes` would give a silent known person another's line, #3679).
+The detector's box and marks are
 scaled back to the frame's pixels, as `LAMP_FACE_FULL_CROP=on` does for a
 print (`who::align_full`), and the frame is the one the look's picture was
 shrunk from, kept for the look, never a second decode. On lamp-52e6 a face

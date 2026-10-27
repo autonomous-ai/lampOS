@@ -1067,6 +1067,11 @@ fn the_product_sees_who_speaks() {
     };
     for (name, line) in [
         ("lamp-eyes.service", "Environment=LAMP_EYES_SPEAKING=on"),
+        // A seated face's mouth, read from the look's own frame (#3699).
+        (
+            "lamp-eyes.service",
+            "Environment=LAMP_EYES_MOUTH_FULL_LOOK=on",
+        ),
         (
             "lamp-voice.service",
             "Environment=LAMP_SECOND_SPEAKING_FACE=on",

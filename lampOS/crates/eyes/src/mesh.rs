@@ -151,9 +151,10 @@ pub fn mouth_open(landmarks: &[f32]) -> Option<f32> {
 pub const ALL_FACES_ENVIRONMENT: &str = "LAMP_EYES_SPEAKING_ALL_FACES";
 /// With this `on` and `--full-look`, the mouths are cut from the frame at its
 /// own size ([`crop_full`]), so a seated face's eyes are counted in those
-/// pixels (#1711). Off until a silent, still face at the desk is measured to
-/// read `no` at [`crate::speaking::MESH_SPEAKING_AT`] on those crops: a false
-/// `yes` would name a silent known person as a line's speaker.
+/// pixels (#1711). Off unless set; the product sets it since #3699 measured a
+/// silent, still face at the desk reading `no` at
+/// [`crate::speaking::MESH_SPEAKING_AT`] on those crops (a false `yes` would
+/// name a silent known person as a line's speaker).
 pub const FULL_LOOK_ENVIRONMENT: &str = "LAMP_EYES_MOUTH_FULL_LOOK";
 /// The faces meshed a look with [`ALL_FACES_ENVIRONMENT`] on.
 pub const MOST_MESHED_FACES: usize = 3;

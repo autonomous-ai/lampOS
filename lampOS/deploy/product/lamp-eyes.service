@@ -30,6 +30,11 @@ Environment=LAMP_ACTIVITY=place
 # Whether each face is speaking, from YuNet's five marks, on humans/faces/tracked: the voice's
 # LAMP_SECOND_SPEAKING_FACE reads it (#720, #2008; the lead, 21 Oct 07:19 on #1711).
 Environment=LAMP_EYES_SPEAKING=on
+# The mouth read from the look's own 1280x960 frame, not the 320 picture, so a face seated at
+# the desk (eyes about 20 picture pixels apart) is judged at all (#3679, #3717). On after #3699's
+# stand-in runs on lamp-52e6: a silent, still known face read `no` in 268 of 268 looks while a
+# voice talked off camera, and lines went to it only when it was seen speaking them.
+Environment=LAMP_EYES_MOUTH_FULL_LOOK=on
 # How the near face seems, on humans/seems for Mood's LAMP_MOOD_SEEMS (#1671, #2799): Google's
 # Blendshape V2 from Face Mesh V2's points, both placed by install (models.json). FER+ (`--seems`)
 # never runs here: its training pictures are for research only. Nothing is read without the
