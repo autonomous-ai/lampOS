@@ -1406,7 +1406,15 @@ With `LAMP_UPDATE_APPLY=on` in `lamp-update.service`'s environment:
   it before the first write, writes each file whole, then runs
   `systemd-tmpfiles --create /etc/tmpfiles.d/lampos.conf` if that file
   changed and is there, then writes `apply/done.json` (the records the state takes). The
-  round takes those into `state.json` and removes the request. Its unit:
+  round checks the receipt's operation and build sequence against the values
+  it actually asked for, before changing any setting record in `state.json`.
+  It does not take that expected identity from a request the helper can
+  rewrite. A mismatched or malformed receipt fails the apply and follows
+  the existing recovery path. Additive fields and later versions keep their
+  permanent read-through behavior; an unknown operation is still refused.
+  This identity check does not authenticate the helper or validate the
+  receipt's record paths or file contents. The round takes matching records
+  into `state.json` and removes the request. Its unit:
   `ProtectSystem=strict`, writable only `/etc` (for the image's
   `/etc/asound.conf`, replaced by a rename beside it; what is written
   there is only what the path rules allow), `/var/lib/lampOS`, the records,
@@ -1705,6 +1713,19 @@ On the development Mac (Intel, macOS 26.6, Rust 1.96.0), not on a lamp:
   there; a new skill's folder goes with it and one the person added to
   stays; a link left beside a temp file is replaced, never written
   through. Each fails with its fix taken out.
+- Apply receipt identity (#3689, `apply::merge_for` and the parent-round
+  control), Mac qualification on 27 October on base `e362659ce`: fmt and
+  strict Update all-target Clippy passed; the full library passed
+  **152 / 0 / 2 ignored**, and 65 selected settings, image, reset-plan,
+  head-touch and product-carrier round tests passed **65 / 0**, with 132
+  filtered out. Both wrong-identity library controls failed on the original
+  production, as did the rewritten-request round control, which incorrectly
+  returned `Switched(2)`. That old round stopped at its first operation case;
+  the separate library test proved the sequence failure. All six new test
+  functions pass with the fix, including both parent-round variants and
+  later-version/additive-field acceptance. These local results do not cover
+  the whole round suite, Linux/ARM64, a device, helper authentication or the
+  frozen writer guard.
 - Models in the manifest (#1680, `tests/round.rs`, `LAMP_UPDATE_MODELS`
   on unless said): a changed eyes model is fetched once, checked, and its
   path linked into the store with the eyes switched, install's file kept
