@@ -1045,6 +1045,11 @@ impl Peers {
                     | ProviderInput::StepCall { .. }
                     | ProviderInput::Onboarding { .. },
                 )) => {}
+                Ok(Some(
+                    ProviderInput::FaceQuestion { .. } | ProviderInput::FaceConsentDelivery { .. },
+                )) => {
+                    panic!("face consent is disabled in this fixture")
+                }
                 Ok(Some(ProviderInput::Reminder { .. })) => {
                     panic!("reminders are disabled in this fixture")
                 }

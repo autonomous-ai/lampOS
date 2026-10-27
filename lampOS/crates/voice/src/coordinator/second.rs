@@ -76,6 +76,12 @@ pub(super) struct Line {
 
 impl Line {
     fn keep(&mut self, command: &ProviderInput) {
+        if matches!(
+            command,
+            ProviderInput::FaceQuestion { .. } | ProviderInput::FaceConsentDelivery { .. }
+        ) {
+            return;
+        }
         let request = request_of(command);
         if matches!(
             command,
@@ -111,7 +117,9 @@ impl Line {
 
 fn request_of(command: &ProviderInput) -> u64 {
     match command {
-        ProviderInput::Start { request, .. }
+        ProviderInput::FaceQuestion { request, .. }
+        | ProviderInput::FaceConsentDelivery { request, .. }
+        | ProviderInput::Start { request, .. }
         | ProviderInput::Audio { request, .. }
         | ProviderInput::End { request, .. }
         | ProviderInput::Called { request, .. }
@@ -661,6 +669,7 @@ pub(super) fn rebind(
     for command in commands {
         if let ProviderInput::Start { session: s, .. }
         | ProviderInput::Written { session: s, .. }
+        | ProviderInput::FaceQuestion { session: s, .. }
         | ProviderInput::Reminder { session: s, .. } = command
         {
             *s = session;
@@ -672,6 +681,16 @@ pub(super) fn rebind(
 
 /// A held request: to Gemini once its link is Ready; to the second route
 /// once the hold is over or Gemini's link has ended; let go with its turn.
+fn fixed_face_question(
+    queue: &VecDeque<ProviderInput>,
+    replay: &VecDeque<ProviderInput>,
+    turn: u64,
+) -> bool {
+    queue.iter().chain(replay.iter()).any(|command| {
+        matches!(command, ProviderInput::FaceQuestion { request, .. } if *request == turn)
+    })
+}
+
 fn resolve_hold(
     provider: &mut Worker,
     cloud: &mut CloudAvailability,
@@ -684,6 +703,10 @@ fn resolve_hold(
     let Some((turn, since)) = route.hold else {
         return Ok(());
     };
+    if fixed_face_question(queue, &route.replay, turn) {
+        route.hold = None;
+        return Ok(());
+    }
     let Some(current) = reply.as_mut().filter(|current| {
         current.owner.turn() == turn
             && !current.cloud.same_session_only
@@ -895,6 +918,9 @@ pub(super) fn flush(
                 && !current.requested_audio_bound()
                 && current.cloud.outcome.is_none()
                 && current.reminder.is_none()
+                // This fixed question was created on this worker; it is not
+                // a Gemini continuation and must not migrate before submit.
+                && !fixed_face_question(queue, &route.replay, current.owner.turn())
         })
     {
         swap(provider, cloud, flow, route);
@@ -906,8 +932,40 @@ pub(super) fn flush(
             "why":"live_link_ready","turn":current.owner.turn(),"replayed_commands":0}),
         )?;
     }
+    // Completed-question receipts belong to the captured originating worker,
+    // even if C retired and Gemini became active again before a later Stop.
+    // They are never part of a replay of the next caller's input.
+    for _ in 0..8 {
+        let Some(command) = queue
+            .front()
+            .filter(|command| matches!(command, ProviderInput::FaceConsentDelivery { .. }))
+        else {
+            break;
+        };
+        let ProviderInput::FaceConsentDelivery { candidate, .. } = command else {
+            unreachable!()
+        };
+        let channel = if candidate.worker == <[u8; 16]>::from(provider.boot) {
+            Some(&mut provider.channels.data)
+        } else if candidate.worker == <[u8; 16]>::from(route.worker.boot) {
+            Some(&mut route.worker.channels.data)
+        } else {
+            None // That worker exited; its in-memory capability exited with it.
+        };
+        if let Some(channel) = channel {
+            match channel.send(command) {
+                Ok(()) => {}
+                Err(error) if error.kind() == io::ErrorKind::WouldBlock => return Ok(()),
+                Err(error) => return Err(error.into()),
+            }
+        }
+        queue.pop_front();
+    }
     let channel = &mut provider.channels.data;
-    if route.holds(reply.as_ref()) {
+    let fixed_question = reply
+        .as_ref()
+        .is_some_and(|current| fixed_face_question(queue, &route.replay, current.owner.turn()));
+    if !fixed_question && route.holds(reply.as_ref()) {
         route.replay.extend(queue.drain(..));
         return Ok(());
     }
@@ -947,6 +1005,10 @@ pub(super) fn flush(
 
 #[cfg(test)]
 mod tests {
+    mod face_consent {
+        include!("second/face_consent_tests.rs");
+    }
+
     use super::*;
     use crate::provider_worker::{FailedStage, Fault};
 

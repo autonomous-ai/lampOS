@@ -2,9 +2,12 @@
 //! No model argument can supply this proof. Eyes independently checks its
 //! image captured during the same interval and its final write permission.
 use std::sync::{
-    Arc,
+    Arc, Mutex,
     atomic::{AtomicBool, AtomicU64, Ordering},
 };
+
+#[path = "remember_speaker/consent.rs"]
+pub mod consent;
 
 pub const ENVIRONMENT: &str = "LAMP_REMEMBER_SPEAKER";
 pub const FLAG: &str = "--remember-speaker";
@@ -45,6 +48,7 @@ pub(crate) fn generation() -> Generation {
 /// Invalidates both stored proofs and one being collected while speech to
 /// text runs. An in-flight exchange observes this before its next I/O.
 pub fn forget() {
+    consent::clear();
     let generation = generation();
     generation.epoch.fetch_add(1, Ordering::AcqRel);
     crate::speaking_faces::clear_enrollment(generation);
@@ -59,6 +63,7 @@ pub struct Proof {
     pub(crate) heard: String,
     pub(crate) generation: Generation,
     active: Arc<AtomicBool>,
+    pub(crate) consent: Arc<Mutex<Option<crate::memory_scope::RequestKey>>>,
 }
 
 impl PartialEq for Proof {
@@ -93,6 +98,7 @@ impl Proof {
             heard: heard.to_owned(),
             generation,
             active: Arc::new(AtomicBool::new(true)),
+            consent: Arc::new(Mutex::new(None)),
         };
         proof.is_current(lamp_ipc::monotonic_us()).then_some(proof)
     }
@@ -118,6 +124,13 @@ impl Proof {
 }
 
 #[cfg(test)]
+pub(crate) use tests::{TESTS as TEST_CONSENT, exchange_proof as test_consent_exchange};
+
+#[cfg(test)]
+#[path = "remember_speaker/consent_flow_tests.rs"]
+mod consent_flow_tests;
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use crate::{known_faces, memory_scope, speaking_faces, tools};
@@ -133,7 +146,7 @@ mod tests {
 
     // These tests deliberately invalidate the process's enrollment epoch.
     // Keep those actions apart from each other's otherwise independent proof.
-    static TESTS: Mutex<()> = Mutex::new(());
+    pub(crate) static TESTS: Mutex<()> = Mutex::new(());
     const REQUEST: u64 = 3_298_500;
 
     fn proof(words: &str) -> Proof {
@@ -194,6 +207,25 @@ mod tests {
         guarded: bool,
         reply: Value,
     ) -> (Value, Vec<Value>) {
+        let owner = owner();
+        exchange_proof(
+            proof(words),
+            owner.lease().key(),
+            json!({"name": name, "apart": apart}),
+            guarded,
+            reply,
+        )
+    }
+
+    /// Use the actual scoped tool, request lease, JSON writer and socket reader.
+    /// In particular, this does not write the proof's private consent token.
+    pub(crate) fn exchange_proof(
+        proof: Proof,
+        key: memory_scope::RequestKey,
+        arguments: Value,
+        guarded: bool,
+        reply: Value,
+    ) -> (Value, Vec<Value>) {
         let home = crate::process::SessionDirectory::create().unwrap();
         let socket = home.path.join("eyes.sock");
         let listener = UnixListener::bind(&socket).unwrap();
@@ -225,11 +257,15 @@ mod tests {
                 }
             }
         });
-        let owner = owner();
-        let line = seen(proof(words));
+        let owner = memory_scope::RequestScope::new(key, memory_scope::ScopeSnapshot::room());
+        let line = speaking_faces::LineSeen {
+            request: key.request,
+            enrollment: Some(proof),
+            ..Default::default()
+        };
         let answer = known_faces::run_scoped(
             &socket,
-            &call(json!({"name": name, "apart": apart})),
+            &call(arguments),
             if guarded {
                 switches()
             } else {
@@ -237,7 +273,7 @@ mod tests {
             },
             None,
             Some(&line),
-            REQUEST,
+            key.request,
             Some(&owner.lease()),
         )
         .0;
@@ -381,10 +417,46 @@ mod tests {
         ] {
             let (answer, requests) =
                 own_name_exchange(words, name, true, true, json!({"remembered": name}));
-            assert_eq!(answer, json!({"ok": true, "remembered": name}), "{words}");
-            assert_eq!(requests.len(), 1, "{words}");
-            assert_eq!(requests[0]["remember_speaker"]["name"], name, "{words}");
-            assert_eq!(requests[0]["remember_speaker"]["apart"], spelled, "{words}");
+            // The original explicit face requests remain positive. The other
+            // rows still prove their name grammar, without treating a name
+            // request or a bare introduction as biometric consent.
+            let explicit_face_request = [
+                "My name is Kesh, remember my face.",
+                "Lamp, remember my face, I’m Kesh.",
+                "Please remember my face. My name is Kesh.",
+                "Can you remember my face? I'm Kesh.",
+                "Could you remember my face? My name is Kesh.",
+                "I'm Kesh, can you remember my face?",
+                "My name is Kesh and remember my face, please.",
+            ]
+            .contains(&words);
+            assert_eq!(
+                known_faces::asks_to_save_face(name, words),
+                explicit_face_request,
+                "{words}"
+            );
+            if explicit_face_request {
+                assert_eq!(answer, json!({"ok": true, "remembered": name}), "{words}");
+                assert_eq!(requests.len(), 1, "{words}");
+                assert_eq!(
+                    requests[0]["remember_speaker_consented"]["name"], name,
+                    "{words}"
+                );
+                assert_eq!(
+                    requests[0]["remember_speaker_consented"]["apart"], spelled,
+                    "{words}"
+                );
+            } else {
+                // Every original name/spelling row still reaches the consent
+                // fence after its name checks, but a name is not a face yes.
+                assert!(requests.is_empty(), "{words}: {requests:?}");
+                assert!(
+                    answer["error"].as_str().is_some_and(
+                        |error| error.starts_with("They have not agreed to saving their face")
+                    ),
+                    "{words}: {answer}"
+                );
+            }
         }
     }
 
@@ -416,7 +488,7 @@ mod tests {
             format!("{}Kesh", "\u{2003}".repeat(HEARD_BYTES / 3 + 1)),
         ] {
             let (answer, requests) = own_name_exchange(
-                "My name is Kesh.",
+                "Please remember my face. My name is Kesh.",
                 &name,
                 false,
                 true,
@@ -427,7 +499,7 @@ mod tests {
         }
         let name = format!("{}Kesh", " ".repeat(HEARD_BYTES - "Kesh".len()));
         let (answer, requests) = own_name_exchange(
-            "My name is Kesh.",
+            "Please remember my face. My name is Kesh.",
             &name,
             false,
             true,
@@ -435,14 +507,14 @@ mod tests {
         );
         assert_eq!(answer, json!({"ok": true, "remembered": "Kesh"}));
         assert_eq!(requests.len(), 1);
-        assert_eq!(requests[0]["remember_speaker"]["name"], "Kesh");
+        assert_eq!(requests[0]["remember_speaker_consented"]["name"], "Kesh");
     }
 
     #[test]
     fn remember_speaker_own_name_known_as_does_not_disclose_or_offer_replacement() {
         let _serial = TESTS.lock().unwrap_or_else(|poison| poison.into_inner());
         let (answer, requests) = own_name_exchange(
-            "My name is Kesh.",
+            "Please remember my face. My name is Kesh.",
             "Kesh",
             false,
             true,
@@ -508,6 +580,11 @@ mod tests {
         }
     }
 
+    /// Voice's switch is on via switches(). Current Eyes with its enrollment
+    /// switch off returns this same not_understood reply (eyes/main.rs), as
+    /// an older peer does. This is Voice's actual reader/socket path, not a
+    /// two-process switch or persistence test. The paired successful exchange
+    /// below makes a regression that refuses every request fail as well.
     #[test]
     fn remember_speaker_wire_uses_internal_evidence_and_old_eyes_never_get_a_retry() {
         let _serial = TESTS.lock().unwrap();
@@ -524,8 +601,8 @@ mod tests {
             listener.set_nonblocking(true).unwrap();
             (serde_json::from_str::<Value>(&line).unwrap(), listener)
         });
-        let proof = proof("My name is Kesh, remember my face");
-        let expected = json!({"remember_speaker": {
+        let proof = proof("Please remember my face. My name is Kesh");
+        let expected = json!({"remember_speaker_consented": {
             "name": "Kesh", "face": "eyes/f1", "began_us": proof.began_us,
             "ended_us": proof.ended_us, "replace": false, "apart": false,
         }});
@@ -543,12 +620,30 @@ mod tests {
         assert!(answered);
         assert!(answer.get("error").is_some());
         assert_ne!(answer["ok"], true);
+        assert!(answer.get("remembered").is_none());
         let (actual, listener) = peer.join().unwrap();
         assert_eq!(actual, expected);
         assert_eq!(
             listener.accept().unwrap_err().kind(),
             std::io::ErrorKind::WouldBlock
         );
+        drop(listener);
+
+        // Same enabled Voice path with a supporting peer. The existing
+        // bounded fixture records the actual guarded wire request, so an
+        // all-refusal implementation cannot satisfy this positive control.
+        let (paired, requests) = own_name_exchange(
+            "Please remember my face. My name is Kesh",
+            "Kesh",
+            false,
+            true,
+            json!({"remembered": "Kesh"}),
+        );
+        assert_eq!(paired, json!({"ok": true, "remembered": "Kesh"}));
+        assert_eq!(requests.len(), 1);
+        assert_eq!(requests[0]["remember_speaker_consented"]["name"], "Kesh");
+        assert_eq!(requests[0]["remember_speaker_consented"]["face"], "eyes/f1");
+        assert!(requests[0].get("remember").is_none(), "no legacy save");
     }
 
     #[test]
@@ -561,7 +656,7 @@ mod tests {
         let owner = owner();
         let lease = owner.lease();
         let call = call(json!({"name": "Kesh"}));
-        let good = seen(proof("My name is Kesh"));
+        let good = seen(proof("Please remember my face. My name is Kesh"));
         let refused = |line: Option<&speaking_faces::LineSeen>, lease| {
             let (answer, _) = run(&socket, &call, line, lease);
             assert_ne!(answer["ok"], true);
@@ -635,7 +730,7 @@ mod tests {
                 .unwrap()
                 .starts_with("You did not hear that name")
         );
-        let line = seen(proof("Yes, my name is Kesh"));
+        let line = seen(proof("Please remember my face. My name is Kesh"));
         let refused_replace = run(
             &socket,
             &call(json!({"name":"Kesh", "replace":true})),
@@ -674,7 +769,7 @@ mod tests {
             stream.read(&mut byte).unwrap()
         });
         let owner = owner();
-        let proof = proof("My name is Kesh");
+        let proof = proof("Please remember my face. My name is Kesh");
         let line = seen(proof.clone());
         speaking_faces::saw_line(line.clone());
         let lease = owner.lease();

@@ -696,6 +696,9 @@ fn provider_peer(
                 ProviderInput::CountOnly { .. } => seen.provider.push("count_only"),
                 ProviderInput::StepCall { .. } => seen.provider.push("step_call"),
                 ProviderInput::Onboarding { .. } => seen.provider.push("onboarding"),
+                ProviderInput::FaceQuestion { .. } | ProviderInput::FaceConsentDelivery { .. } => {
+                    panic!("face consent is disabled in this fixture")
+                }
                 ProviderInput::Reminder { .. } => panic!("reminders are disabled in this fixture"),
             }
         }

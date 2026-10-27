@@ -452,6 +452,9 @@ fn whole_line(inputs: &[ProviderInput], request: u64) -> usize {
 
 fn request_of(input: &ProviderInput) -> u64 {
     match input {
+        ProviderInput::FaceQuestion { .. } | ProviderInput::FaceConsentDelivery { .. } => {
+            panic!("face consent is disabled in this fixture")
+        }
         ProviderInput::Start { request, .. }
         | ProviderInput::Audio { request, .. }
         | ProviderInput::End { request, .. }

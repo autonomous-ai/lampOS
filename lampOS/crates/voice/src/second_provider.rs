@@ -3599,6 +3599,57 @@ impl Engine {
 
     pub fn submit(&mut self, input: ProviderInput) {
         match input {
+            ProviderInput::FaceConsentDelivery {
+                request,
+                candidate,
+                voice_boot,
+                delivered_us,
+                whole,
+                by_output,
+                pending_only,
+                ..
+            } => {
+                if pending_only && !whole {
+                    crate::remember_speaker::consent::expired(&candidate, voice_boot, request);
+                } else {
+                    crate::remember_speaker::consent::delivered_from(
+                        &candidate,
+                        voice_boot,
+                        request,
+                        whole,
+                        delivered_us,
+                        by_output,
+                    );
+                }
+            }
+            ProviderInput::FaceQuestion {
+                request,
+                session,
+                candidate,
+                voice_boot,
+                ..
+            } => {
+                if !self.shared.remember_speaker
+                    || candidate.session != session
+                    || !crate::remember_speaker::consent::bind(&candidate, voice_boot, request)
+                    || !self.begin(request, session)
+                {
+                    crate::remember_speaker::consent::canceled(&candidate);
+                    return;
+                }
+                crate::remember::keep_out(request);
+                let shared = self.shared.clone();
+                let task = tokio::spawn(async move { say_face_question(&shared, request).await });
+                self.turn = Some(Turn {
+                    request,
+                    audio: None,
+                    sound: Arc::default(),
+                    said: Arc::default(),
+                    marks: Arc::default(),
+                    task,
+                    memory_scope: None,
+                });
+            }
             ProviderInput::Start {
                 request,
                 session,
@@ -3643,6 +3694,7 @@ impl Engine {
                 // The first line after a stop: what was stopped is never
                 // asked again, in its place or joined to it.
                 if after_stop {
+                    crate::remember_speaker::consent::clear();
                     self.let_go_cut(&format!("request {request} is the first line after a stop"));
                     // The rule hears of it before this line is judged.
                     if let Some(did) = &self.shared.did {
@@ -4124,6 +4176,7 @@ impl Engine {
                 quoted,
                 ..
             } => {
+                crate::remember_speaker::consent::clear();
                 // A skill's note for the picture of the look it asked, kept
                 // for this session's look turn ([`picture_note`]): taken
                 // here, once, as any other turn would let it go.
@@ -4736,7 +4789,8 @@ pub(crate) fn output_request(event: &ProviderOutput) -> Option<u64> {
         | ProviderOutput::NewsAnswered { request, .. }
         | ProviderOutput::SleepAsked { request }
         | ProviderOutput::StepCallHeard { request }
-        | ProviderOutput::OwnWordsSaid { request } => Some(*request),
+        | ProviderOutput::OwnWordsSaid { request }
+        | ProviderOutput::FaceConsentCandidate { request, .. } => Some(*request),
         ProviderOutput::Transcript { request, .. } => *request,
     }
 }
@@ -4746,6 +4800,77 @@ pub(crate) fn output_request(event: &ProviderOutput) -> Option<u64> {
 /// when it is switched on and kept: as audio only, so it is no answer in the
 /// thread. Only to someone who spoke: a lamp's own turn (a hello, a skill's
 /// say) never says it (the reviewer on #1195).
+async fn say_face_question(shared: &Shared, request: u64) {
+    use crate::remember_speaker::consent::QUESTION;
+    let result = tokio::time::timeout(Duration::from_secs(30), async {
+        let mut speech = shared.services.speak_for(
+            QUESTION.to_owned(),
+            net::Turn {
+                request,
+                heard_at: Instant::now(),
+            },
+        );
+        let mut total = 0usize;
+        shared.said_piece(request, Some(QUESTION));
+        while let Some(packet) = speech.next().await {
+            let packet = packet.map_err(|_| Stop::Gone)?;
+            total = total.checked_add(packet.len()).ok_or(Stop::Gone)?;
+            if total > net::TTS_SAMPLE_RATE as usize * 30 {
+                return Err(Stop::Gone);
+            }
+            for samples in packet.chunks(PACKET_SAMPLES) {
+                if !shared
+                    .emit(ProviderOutput::Audio {
+                        request,
+                        sequence: shared.sequence.fetch_add(1, Ordering::Relaxed) + 1,
+                        provider_event_at_us: monotonic_us(),
+                        source_frames: samples.len(),
+                        source_offset: 0,
+                        samples: samples.to_vec(),
+                    })
+                    .await
+                {
+                    return Err(Stop::Gone);
+                }
+                shared.said_samples(request, samples.len());
+            }
+        }
+        if total == 0 {
+            return Err(Stop::Gone);
+        }
+        if !shared
+            .emit(ProviderOutput::Transcript {
+                request: Some(request),
+                text: QUESTION.into(),
+                finished: true,
+            })
+            .await
+        {
+            return Err(Stop::Gone);
+        }
+        shared
+            .emit(ProviderOutput::GenerationComplete { request })
+            .await;
+        shared
+            .emit(ProviderOutput::TurnComplete {
+                request,
+                idle: true,
+            })
+            .await;
+        Ok::<(), Stop>(())
+    })
+    .await;
+    if !matches!(result, Ok(Ok(()))) {
+        shared
+            .emit(ProviderOutput::TurnFailed {
+                request,
+                stage: FailedStage::AwaitingResponse,
+                reason: Fault::Local,
+            })
+            .await;
+    }
+}
+
 async fn say_down(shared: &Shared, request: u64, heard: bool) -> Result<(), Stop> {
     if let Some((down, clip)) = shared
         .down
@@ -5181,7 +5306,7 @@ async fn spoken(
     let enrollment_allowed = shared.remember_speaker
         && !marks.count_only.load(Ordering::Acquire)
         && scope.as_ref().is_some_and(|lease| lease.is_current());
-    let enrollment = if enrollment_allowed && enrollment_audio_valid {
+    let mut enrollment = if enrollment_allowed && enrollment_audio_valid {
         shared.enrollment_sight.as_ref().and_then(|eyes| {
             let (began_us, ended_us) = enrollment_audio?;
             let now_us = monotonic_us();
@@ -5200,6 +5325,15 @@ async fn spoken(
     } else {
         None
     };
+    let face_candidate = match (enrollment.as_mut(), scope.as_ref()) {
+        (Some(proof), Some(lease)) => {
+            crate::remember_speaker::consent::heard(proof, lease.key(), monotonic_us())
+        }
+        _ => {
+            crate::remember_speaker::consent::clear();
+            None
+        }
+    };
     if enrollment_allowed && let Some(lease) = scope.as_ref() {
         crate::speaking_faces::saw_line_scoped(
             crate::speaking_faces::LineSeen {
@@ -5209,6 +5343,11 @@ async fn spoken(
             },
             lease,
         );
+    }
+    if let Some(candidate) = face_candidate {
+        shared
+            .emit(ProviderOutput::FaceConsentCandidate { request, candidate })
+            .await;
     }
     // Seeing someone speak: a line admitted as the known person's that any
     // other face spoke is the room's, before anything is told or filed with
@@ -8097,6 +8236,10 @@ async fn answer(
 ) {
     let (request, scope) = context;
     let heard = asked == Asker::Spoken;
+    let mut notes = notes;
+    if heard && shared.remember_speaker {
+        notes.push(format!("{} During setup the voice controller asks the actual face-consent question separately after an introduction; do not ask that face question again as ordinary model speech.", crate::known_faces::CONSENT_NAME_TOLD_NOTE));
+    }
     let looking = matches!(asked, Asker::Written { looking: true, .. });
     let searching = matches!(asked, Asker::Written { search: true, .. });
     let quoted = matches!(asked, Asker::Written { quoted: true, .. });

@@ -181,6 +181,9 @@ Environment=LAMP_SECOND_SPEAKING_FACE=on
 # forget, so a room's "forget my face" forgets only a face seen saying it and a held forget's yes counts only from
 # that face (#3038, #3037, #2377). Without it every room's forget is told NOT_THEIRS.
 Environment=LAMP_EYES_SPEAKING=on
+# Enrollment uses the same line's sole speaking face, never the nearer bystander.
+# Keep this paired with Eyes and LAMP_PERSON_SCOPE_SEEN; see docs/onboarding.md.
+Environment=LAMP_REMEMBER_SPEAKER=on
 Environment=LAMP_NAME_NOTE=on
 Environment=LAMP_NAME_NOTE_BUSY=face
 Environment=LAMP_EXPRESSION_OUT=on

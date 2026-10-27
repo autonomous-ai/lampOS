@@ -66,6 +66,7 @@ pub mod motor;
 use motor::{OptionalMotor, PreparedMotor};
 mod cleanup;
 mod cloud;
+mod face_consent;
 use cleanup::{Failures as ShutdownFailures, Stage as CleanupStage};
 mod early_end;
 pub mod early_finalize;
@@ -3671,6 +3672,7 @@ fn observe_provider_output(
         // Evidence about input of a request that is already retired: it
         // changes no request's delivery state.
         ProviderOutput::Ready { .. }
+        | ProviderOutput::FaceConsentCandidate { .. }
         | ProviderOutput::Transcript { .. }
         | ProviderOutput::Stages { .. }
         | ProviderOutput::ReminderDeferred { .. }
@@ -3790,6 +3792,18 @@ fn flush_provider_input_with(
         let Some(command) = queue.front() else {
             break;
         };
+        if matches!(command, ProviderInput::FaceConsentDelivery { .. }) {
+            // A bounded receipt for a completed output owner, not fresh
+            // input: it need not borrow the next reply's ownership.
+            match send(command) {
+                Ok(()) => {
+                    queue.pop_front();
+                    continue;
+                }
+                Err(error) if error.kind() == io::ErrorKind::WouldBlock => break,
+                Err(error) => return Err(error),
+            }
+        }
         let current = reply
             .as_mut()
             .ok_or_else(|| io::Error::other("provider input lost its owner"))?;
@@ -3797,7 +3811,9 @@ fn flush_provider_input_with(
             break;
         }
         let request = match command {
-            ProviderInput::Start { request, .. }
+            ProviderInput::FaceQuestion { request, .. }
+            | ProviderInput::FaceConsentDelivery { request, .. }
+            | ProviderInput::Start { request, .. }
             | ProviderInput::Audio { request, .. }
             | ProviderInput::End { request, .. }
             | ProviderInput::Called { request, .. }
@@ -5916,6 +5932,7 @@ fn conversation_with_gate_inner(
             }
         })
     });
+    let mut face_questions = crate::remember_speaker::consent::Questions::default();
     let mut onboarding_invitation_turn: Option<(BootId, u64)> = None;
     // The latest request the second route said an onboarding line's own
     // words for (`OwnWordsSaid`).
@@ -6570,7 +6587,8 @@ fn conversation_with_gate_inner(
                 .as_ref()
                 .is_some_and(|current| !current.local_input_ended);
             cancel_reply(owner, reply, trace, "second_route_failed")?;
-            provider_queue.clear();
+            provider_queue
+                .retain(|command| matches!(command, ProviderInput::FaceConsentDelivery { .. }));
             speaker_pending = None;
             if input_active {
                 admission.discard_stream_until_end(monotonic_us())?;
@@ -7037,6 +7055,15 @@ fn conversation_with_gate_inner(
                 }
             );
         }
+        // A hand/head Stop is cancellation even after the question retired
+        // and no answer currently owns output. Normal retirement is not Stop.
+        let face_cancel =
+            if stop || muted || gap_cut || head_touch_at_us.is_some() || spoken_stop || body_pushed
+            {
+                face_questions.cancel(monotonic_us())
+            } else {
+                None
+            };
         {
             if stop || muted || gap_cut || head_stop || spoken_stop || body_pushed {
                 let observed_at_us = monotonic_us();
@@ -7220,6 +7247,9 @@ fn conversation_with_gate_inner(
                 )?;
             }
         }
+        if let Some(receipt) = face_cancel {
+            provider_queue.push_back(receipt);
+        }
         if let Some(observation) = observation {
             record_hand_pats(trace, observation.pets)?;
         }
@@ -7229,7 +7259,8 @@ fn conversation_with_gate_inner(
             .is_some_and(|ticket| !ticket.authority_valid(monotonic_us()))
         {
             cancel_reply(owner, reply, trace, "unplug_authority_lost")?;
-            provider_queue.clear();
+            provider_queue
+                .retain(|command| matches!(command, ProviderInput::FaceConsentDelivery { .. }));
             speaker_pending = None;
             snapshot = owner.snapshot(now())?;
             rig.publish(snapshot)?;
@@ -7249,7 +7280,8 @@ fn conversation_with_gate_inner(
                 current.reminder.is_some() && !reminders.active_valid(current.owner, monotonic_us())
             }) {
                 cancel_reply(owner, reply, trace, "reminder_authority_lost")?;
-                provider_queue.clear();
+                provider_queue
+                    .retain(|command| matches!(command, ProviderInput::FaceConsentDelivery { .. }));
                 speaker_pending = None;
                 snapshot = owner.snapshot(now())?;
                 rig.publish(snapshot)?;
@@ -7289,7 +7321,8 @@ fn conversation_with_gate_inner(
                 // next pass's cancel (admission's reset) is skipped only when
                 // a capture gap still open has already run it.
                 cancel_reply(owner, reply, trace, "privacy_gap")?;
-                provider_queue.clear();
+                provider_queue
+                    .retain(|command| matches!(command, ProviderInput::FaceConsentDelivery { .. }));
                 speaker_pending = None;
                 gap_cut_utterance = true;
                 // The speaker hears of the cut at once, not at the next
@@ -7417,13 +7450,20 @@ fn conversation_with_gate_inner(
             trace,
             &mut speaker_lapsed,
         )?;
+        face_consent::interposed(
+            rig.provider.boot,
+            reply,
+            &mut face_questions,
+            &mut provider_queue,
+            monotonic_us(),
+        );
         latch_invitation_sounded(
             reply,
             onboarding_invitation_turn,
             &mut onboarding_invitation_audio,
         );
         if let Some(lapsed) = speaker_lapsed.take()
-            && cut_after_speaker_lapse(
+            && cut_provider_after_speaker_lapse(
                 lapsed,
                 owner,
                 reply,
@@ -7529,7 +7569,9 @@ fn conversation_with_gate_inner(
                         let mut reminder =
                             reply.as_mut().and_then(|current| current.reminder.take());
                         cancel_reply(owner, reply, trace, "reminder_deferred")?;
-                        provider_queue.clear();
+                        provider_queue.retain(|command| {
+                            matches!(command, ProviderInput::FaceConsentDelivery { .. })
+                        });
                         speaker_pending = None;
                         snapshot = owner.snapshot(now())?;
                         rig.publish(snapshot)?;
@@ -7581,7 +7623,9 @@ fn conversation_with_gate_inner(
                     {
                         cancel_reply(owner, reply, trace, "onboarding_sentence")?;
                         speaker_pending = None;
-                        provider_queue.clear();
+                        provider_queue.retain(|command| {
+                            matches!(command, ProviderInput::FaceConsentDelivery { .. })
+                        });
                         snapshot = owner.snapshot(now())?;
                         rig.publish(snapshot)?;
                         last_publish = monotonic_us();
@@ -7592,7 +7636,9 @@ fn conversation_with_gate_inner(
                         .is_some_and(|ticket| !ticket.authority_valid(monotonic_us()))
                     {
                         cancel_reply(owner, reply, trace, "unplug_authority_lost")?;
-                        provider_queue.clear();
+                        provider_queue.retain(|command| {
+                            matches!(command, ProviderInput::FaceConsentDelivery { .. })
+                        });
                         speaker_pending = None;
                         snapshot = owner.snapshot(now())?;
                         rig.publish(snapshot)?;
@@ -7861,10 +7907,30 @@ fn conversation_with_gate_inner(
                     {
                         cancel_reply(owner, reply, trace, "onboarding_sentence")?;
                         speaker_pending = None;
-                        provider_queue.clear();
+                        provider_queue.retain(|command| {
+                            matches!(command, ProviderInput::FaceConsentDelivery { .. })
+                        });
                         snapshot = owner.snapshot(now())?;
                         rig.publish(snapshot)?;
                         last_publish = monotonic_us();
+                    }
+                }
+                ProviderOutput::FaceConsentCandidate { request, candidate } => {
+                    // Freeze eligibility from the trusted walk, before a model
+                    // setup_step call can move it. The save guard itself is
+                    // independent of this mutable onboarding phase.
+                    if onboarding
+                        .as_ref()
+                        .is_some_and(|walk| walk.face_question_allowed())
+                        && reply
+                            .as_ref()
+                            .is_some_and(|current| current.owner.turn() == request)
+                    {
+                        face_questions.offer(
+                            candidate,
+                            snapshot.microphone_generation(),
+                            monotonic_us(),
+                        );
                     }
                 }
                 ProviderOutput::Transcript {
@@ -8077,7 +8143,9 @@ fn conversation_with_gate_inner(
                                 )?;
                             }
                             speaker_pending = None;
-                            provider_queue.clear();
+                            provider_queue.retain(|command| {
+                                matches!(command, ProviderInput::FaceConsentDelivery { .. })
+                            });
                             snapshot = owner.snapshot(now())?;
                             rig.publish(snapshot)?;
                             last_publish = monotonic_us();
@@ -8129,7 +8197,9 @@ fn conversation_with_gate_inner(
                             .is_some_and(|current| !current.local_input_ended);
                         cancel_reply(owner, reply, trace, "provider_interrupted")?;
                         speaker_pending = None;
-                        provider_queue.clear();
+                        provider_queue.retain(|command| {
+                            matches!(command, ProviderInput::FaceConsentDelivery { .. })
+                        });
                         // Keep the detector's utterance boundary. Reconnecting or
                         // cancellation must never reinterpret its tail as a new input.
                         if input_active {
@@ -8838,7 +8908,7 @@ fn conversation_with_gate_inner(
                     // Control and PCM travel independently. Recheck the original
                     // write receipts after reading this candidate, with the same
                     // finite tick budget; exhaustion keeps the input pending.
-                    if !service_speaker_control(
+                    let speaker_controls_ready = service_speaker_control(
                         rig,
                         owner,
                         reply,
@@ -8849,7 +8919,15 @@ fn conversation_with_gate_inner(
                         &mut speaker_control_budget,
                         trace,
                         &mut speaker_lapsed,
-                    )? {
+                    )?;
+                    face_consent::interposed(
+                        rig.provider.boot,
+                        reply,
+                        &mut face_questions,
+                        &mut provider_queue,
+                        monotonic_us(),
+                    );
+                    if !speaker_controls_ready {
                         latch_invitation_sounded(
                             reply,
                             onboarding_invitation_turn,
@@ -8863,7 +8941,7 @@ fn conversation_with_gate_inner(
                         &mut onboarding_invitation_audio,
                     );
                     if let Some(lapsed) = speaker_lapsed.take()
-                        && cut_after_speaker_lapse(
+                        && cut_provider_after_speaker_lapse(
                             lapsed,
                             owner,
                             reply,
@@ -9509,7 +9587,9 @@ fn conversation_with_gate_inner(
                         let mut interrupted = take_interrupted_reminder(reply);
                         let (state, draining) =
                             accepted_without_cloud(accepted, owner, reply, &mut admission, trace)?;
-                        provider_queue.clear();
+                        provider_queue.retain(|command| {
+                            matches!(command, ProviderInput::FaceConsentDelivery { .. })
+                        });
                         speaker_pending = None;
                         submission_draining = draining;
                         snapshot = state;
@@ -9840,7 +9920,9 @@ fn conversation_with_gate_inner(
                                 cancel_reply(owner, reply, trace, "user_interrupted")?;
                                 admission.discard_stream_until_end(monotonic_us())?;
                                 submission_draining = true;
-                                provider_queue.clear();
+                                provider_queue.retain(|command| {
+                                    matches!(command, ProviderInput::FaceConsentDelivery { .. })
+                                });
                                 speaker_pending = None;
                                 record(
                                     trace,
@@ -9957,7 +10039,9 @@ fn conversation_with_gate_inner(
                         },
                     )?;
                     speaker_pending = None;
-                    provider_queue.clear();
+                    provider_queue.retain(|command| {
+                        matches!(command, ProviderInput::FaceConsentDelivery { .. })
+                    });
                     snapshot = owner.snapshot(now())?;
                     rig.publish(snapshot)?;
                     last_publish = monotonic_us();
@@ -10280,7 +10364,9 @@ fn conversation_with_gate_inner(
                                 )?;
                             }
                             speaker_pending = None;
-                            provider_queue.clear();
+                            provider_queue.retain(|command| {
+                                matches!(command, ProviderInput::FaceConsentDelivery { .. })
+                            });
                             snapshot = owner.snapshot(now())?;
                             rig.publish(snapshot)?;
                             last_publish = monotonic_us();
@@ -10321,7 +10407,8 @@ fn conversation_with_gate_inner(
             })
         {
             cancel_reply(owner, reply, trace, "reminder_lease_expired")?;
-            provider_queue.clear();
+            provider_queue
+                .retain(|command| matches!(command, ProviderInput::FaceConsentDelivery { .. }));
             speaker_pending = None;
             snapshot = owner.snapshot(now())?;
             rig.publish(snapshot)?;
@@ -10346,7 +10433,8 @@ fn conversation_with_gate_inner(
         }) {
             eprintln!("lamp-voice: request {request}: requested audio revoked: {why}");
             cancel_reply(owner, reply, trace, "requested_audio_revoked")?;
-            provider_queue.clear();
+            provider_queue
+                .retain(|command| matches!(command, ProviderInput::FaceConsentDelivery { .. }));
             speaker_pending = None;
             snapshot = owner.snapshot(now())?;
             rig.publish(snapshot)?;
@@ -10397,7 +10485,8 @@ fn conversation_with_gate_inner(
             .is_some_and(|ticket| !ticket.authority_valid(monotonic_us()))
         {
             cancel_reply(owner, reply, trace, "unplug_authority_lost")?;
-            provider_queue.clear();
+            provider_queue
+                .retain(|command| matches!(command, ProviderInput::FaceConsentDelivery { .. }));
             speaker_pending = None;
             snapshot = owner.snapshot(now())?;
             rig.publish(snapshot)?;
@@ -10463,10 +10552,17 @@ fn conversation_with_gate_inner(
             if current.had_audio {
                 lamp_words_ended_us = Some(monotonic_us());
             }
-            owner.complete_turn(now(), current.owner)?;
-            current.complete_requested_audio(monotonic_us());
+            face_questions.source_finished(
+                turn,
+                matches!(current.cloud.outcome, Some(RequestOutcome::Complete)),
+            );
+            let (completed_snapshot, face_receipt) =
+                face_consent::completed(owner, current, &speaker_pending, &mut face_questions)?;
+            snapshot = completed_snapshot;
             trace.receipts.completed(current.owner)?;
-            snapshot = owner.snapshot(now())?;
+            if let Some(receipt) = face_receipt {
+                provider_queue.push_back(receipt);
+            }
             admission.owner_completed(current.owner, snapshot, monotonic_us())?;
             rig.publish(snapshot)?;
             last_publish = monotonic_us();
@@ -10961,7 +11057,9 @@ fn conversation_with_gate_inner(
                     // nothing said does: an End still queued after a full
                     // socket would otherwise reach the flush with no owner.
                     speaker_pending = None;
-                    provider_queue.clear();
+                    provider_queue.retain(|command| {
+                        matches!(command, ProviderInput::FaceConsentDelivery { .. })
+                    });
                     snapshot = owner.snapshot(now())?;
                     rig.publish(snapshot)?;
                     last_publish = monotonic_us();
@@ -11530,6 +11628,15 @@ fn conversation_with_gate_inner(
         if let Some(check) = speaker_echo.as_mut() {
             check.answer_requests(monotonic_us());
         }
+        if let Some(receipt) = face_questions.unsettled(
+            reply
+                .as_ref()
+                .map(|current| (current.owner.boot().into(), current.owner.turn())),
+            snapshot.microphone_generation(),
+            monotonic_us(),
+        ) {
+            provider_queue.push_back(receipt);
+        }
         if let Some(walk) = onboarding.as_mut() {
             #[cfg(test)]
             if let Some(polls) = trace.onboarding_test_polls.as_ref() {
@@ -11561,6 +11668,46 @@ fn conversation_with_gate_inner(
                 && !submission_draining
                 && snapshot.listening_ready(now())
                 && unasked_session(&cloud, paused).is_some();
+            if can_speak
+                && rig.provider.role == "second"
+                && let Some(candidate) =
+                    face_questions.ready(snapshot.microphone_generation(), monotonic_us())
+                && let Some(provider_session) = unasked_session(&cloud, paused)
+            {
+                snapshot = commit_written_turn(
+                    owner,
+                    reply,
+                    &mut provider_queue,
+                    crate::remember_speaker::consent::QUESTION_NOTE,
+                    false,
+                    "onboarding_face_consent_question",
+                    provider_session,
+                    rig.playout_start,
+                    trace,
+                    |state| rig.publish(state),
+                )?;
+                if let Some(current) = reply.as_mut() {
+                    current.cloud.movable = false;
+                    let boot: [u8; 16] = current.owner.boot().into();
+                    let turn = current.owner.turn();
+                    if face_questions.bind(&candidate, boot, turn) {
+                        let command = provider_queue
+                            .back_mut()
+                            .ok_or_else(|| io::Error::other("face question has no command"))?;
+                        *command = ProviderInput::FaceQuestion {
+                            request: turn,
+                            session: provider_session,
+                            privacy_generation: snapshot.microphone_generation(),
+                            candidate,
+                            voice_boot: boot,
+                        };
+                    }
+                }
+                last_publish = monotonic_us();
+            }
+            // The fixed question, if admitted above, owns output now; do not
+            // stack a different model-led onboarding note over its purpose.
+            let can_speak = can_speak && reply.is_none();
             let face = walk.face_now(clock);
             let still = walk.still_now(clock);
             // The model service refusing (#4265): the walk begins nothing
@@ -13795,7 +13942,7 @@ fn commit_admitted_input(
         AdmittedInput::NewTurn
     };
     *speaker_pending = None;
-    provider_queue.clear();
+    provider_queue.retain(|command| matches!(command, ProviderInput::FaceConsentDelivery { .. }));
     let turn = owner.admit(now(), input)?;
     let plan = owner.plan_output(now(), turn, OutputKind::Speech, None)?;
     let mut snapshot = owner.snapshot(now())?;
@@ -13947,7 +14094,7 @@ fn commit_offline_input(
         AdmittedInput::NewTurn
     };
     *speaker_pending = None;
-    provider_queue.clear();
+    provider_queue.retain(|command| matches!(command, ProviderInput::FaceConsentDelivery { .. }));
     let turn = owner.admit(now(), input)?;
     let plan = owner.plan_output(now(), turn, OutputKind::Speech, None)?;
     let mut snapshot = owner.snapshot(now())?;
@@ -14203,7 +14350,7 @@ fn continue_after_early_end(
     let mut interrupted = take_interrupted_reminder(reply);
     cancel_reply(owner, reply, trace, "user_interrupted")?;
     *speaker_pending = None;
-    provider_queue.clear();
+    provider_queue.retain(|command| matches!(command, ProviderInput::FaceConsentDelivery { .. }));
     let turn = owner.admit(now(), AdmittedInput::Interruption)?;
     let plan = owner.plan_output(now(), turn, OutputKind::Speech, None)?;
     let snapshot = owner.snapshot(now())?;
@@ -15045,6 +15192,30 @@ fn handle_playback_discard(
 
 /// Why a reply is cut when the speaker's authority lapsed (#1178).
 const SPEAKER_LAPSED: &str = "speaker_lapsed";
+
+/// Preserve purpose-specific cancellation receipts independently of the
+/// lapsed answer's queued input. The generic cancellation still drops all
+/// queued audio; no samples are copied into the retained control queue.
+fn cut_provider_after_speaker_lapse(
+    lapsed: TurnOwner,
+    owner: &mut Controller,
+    reply: &mut Option<Reply>,
+    provider_queue: &mut VecDeque<ProviderInput>,
+    speaker_pending: &mut Option<PendingSpeaker>,
+    trace: &mut SessionState,
+) -> Result<bool> {
+    let receipts: VecDeque<_> = provider_queue
+        .iter()
+        .filter(|command| matches!(command, ProviderInput::FaceConsentDelivery { .. }))
+        .cloned()
+        .collect();
+    let cut =
+        cut_after_speaker_lapse(lapsed, owner, reply, provider_queue, speaker_pending, trace)?;
+    if cut {
+        provider_queue.extend(receipts);
+    }
+    Ok(cut)
+}
 
 /// #1178: the speaker's authority lapsed while it was held up, and what
 /// `lapsed`'s answer had queued or waiting is gone. If it is still the

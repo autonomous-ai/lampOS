@@ -20,10 +20,12 @@ new creature, not filling in a form.
 The installed core skill (`skills/onboarding/skill.toml`) owns the step order,
 first and repeat notes, re-offer interval, nudge notes and answer counts, and
 completion and coaching notes. The voice's coordinator owns the physical
-checks, cancellation and interaction timing. Every line is the model's: each step begins as a written note in place of speech
-(`ProviderInput::Written`, as the hello in [speaking-first.md](speaking-first.md)),
-and only when the lamp is at rest (nothing heard, nothing owed, a provider
-ready, not paused) and a face is in front of it.
+checks, cancellation and interaction timing. Ordinary model-led steps begin
+as written notes in place of speech (`ProviderInput::Written`, as the hello
+in [speaking-first.md](speaking-first.md)), only when the lamp is at rest
+(nothing heard, nothing owed, a provider ready, not paused) and a face is in
+front of it. The strict face-consent invitation uses the fixed speech and
+whole-delivery receipt described below.
 
 | # | Step | The lamp | Ends when | Kept |
 |---|---|---|---|---|
@@ -198,7 +200,77 @@ except the measured steps' lines, which are exact sentences since #3769
 ("Exact lines" below); `onboarding/legacy_words.rs` is a test-only oracle,
 absent from production.
 
-### Exact lines (#3769)
+The speaking-face enrollment proposal keeps these exact questions and requires
+a clear yes and the person's own name in that same spoken reply. A yes alone
+cannot authorize saving from a name supplied earlier. A refused save is said
+as not saved; the paired enrollment switches remain subject to the lamp trial.
+
+#### Strict face-save consent with the speaking-face switch
+
+With `LAMP_REMEMBER_SPEAKER=on`, an introduction alone does not authorize
+saving a face. This applies to every initial live save, even if a model
+marks `who_you_are` done first. Voice requires its own current request lease,
+the current line's single speaking-face proof and the speaker's own name.
+It then requires either an explicit request in that line to save their face,
+or the same caller's affirmative own-name reply to the controller's actual
+face question. A request only to remember a name is not biometric consent.
+A tool argument, a model instruction, an earlier name/yes, or a yes to a
+different question cannot supply this permission. The legacy switch-off
+name policy is unchanged.
+
+During `who_you_are`, the controller can ask a fixed face-consent question
+after the current caller introduces themselves. The question is sent straight
+to speech synthesis, without another chat-model round or any functions. Only
+whole speaker delivery of that exact typed output owner arms its one-shot
+reply window; a generic transcript, the first name question, a cut, an
+unsaid question or a failed synthesis arms nothing. The actor is the request's
+internal eyes boot/face id and worker/session/privacy epoch, not the room's
+scope or a model-supplied name. A different caller, privacy change, canceled
+or replaced question, unrelated reply/question, session change or expiry
+cannot lend that permission to a later request. B's own request/proof must
+still be live at the final send; A's completed request lease is not kept alive.
+A Stop after the question finishes still cancels it. Its delivery/cancellation
+receipt goes to the captured worker even if the active voice route has since
+changed; it is never replayed as another route's conversational input.
+
+The candidate keeps the original line-end time and its existing 30-second
+evidence limit. The separate reply window is the existing 10-second
+onboarding name-readback budget after whole question delivery. Expiry ends
+only an unconsumed invitation; a timely admitted reply keeps its own original
+proof/scope lifetime, while a Stop or unrelated output still revokes it.
+Enrollment's 30-second proof limit and the six-second Eyes RPC ceiling remain unchanged.
+Question synthesis is streamed off the input loop with a 30-second/full-size
+ceiling and cancellation owned by its output turn. The local admission and
+publication work has a 1 ms design budget, bounded by the existing input/name
+limits; that is not a hardware latency measurement.
+
+The strict reader owns this question text. An older updater's installed WHO
+manifest may still have its older model invitation, loaded once at Voice
+startup, but that model output does not arm runtime consent. The strict
+controller uses its canonical same-reply yes-and-name question instead; the
+model guidance tells it not to repeat the face question. This supersedes the
+older invitation-wording P3 for the new strict reader, without changing what
+older Voice builds did. Other installed step data still reloads only after
+Voice restarts, not when setup is redone in the running process.
+
+The internal operation is `remember_speaker_consented`, with the same six
+name/face/audio-interval/replace/apart proof fields. No raw consent words cross
+the wire. New Eyes with the switch on refuses both the old `remember_speaker`
+operation and plain live `remember`; old Eyes refuses the new unknown key.
+New Voice never retries an old enrollment operation after refusal, including
+when the Eyes switch is off. Both mixed directions fail closed; they are not
+successful compatibility/enrollment trials. When Eyes refuse a consented
+save as `near_to` (a face near someone kept under another name, #3739),
+that call has used its one-shot consent: the model is told nothing was
+saved, to say no kept name, and to ask for "Remember my face, my name is
+..." with the name spelled in that same sentence, which carries its own
+consent and the spelling `apart` needs. A spelling alone sends nothing.
+Photo enrollment retains its
+separate existing protocol. Two-person intended-save, canceled/privacy and
+normal-light within-two-tries lamp checks remain required; a host fixture or
+an all-refusal run does not activate this feature.
+
+## Exact lines (#3769)
 
 Where you sit, how they sound (the call and the sentence), touch, privacy's
 result and giving way say lines written once in the skill, each note
@@ -249,7 +321,7 @@ a person's line, a look and an add-on's quoted line.
 
 The conversational steps keep their tool calls and consent clauses, but say
 their questions exactly: `who_you_are` asks "What should I call you?", then
-"May I remember your face, so I know you next time?", and on a skip or a
+"May I remember your face, so I know you next time? If you'd like that, look at me and say, 'Yes, my name is ...' with your name.", and on a skip or a
 failure says only "That's fine. You can tell me your name any time."
 (`who_again`: "Sorry, what should I call you?"). `preferences` asks "Are there
 hours when I should keep quiet? For example, 'after ten at night', or 'no'.", then "May I say hello when you sit down?",
@@ -516,8 +588,8 @@ room stopping the step being led; the nearest face as its framing.
 A lamp run with a person (lamp-52e6, by the coordinator), which is to
 measure: seconds per step from asked to outcome, steps redone or skipped,
 step 1's guiding notes before the framing held and the face size and
-centre reached, whether every line was the model's and short, and the
-whole time. Whether the model calls `setup_step` reliably, and whether
+centre reached, whether the model-led lines were short and the fixed
+face-consent invitation was delivered as specified, and the whole time. Whether the model calls `setup_step` reliably, and whether
 "turn my head toward you until I'm facing you" without a side is enough for a
 person.
 

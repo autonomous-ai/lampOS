@@ -605,6 +605,12 @@ fn run_with_notice_policy(
                                     assert!(samples.iter().all(|sample| *sample == first));
                                     evidence.successor_audio.push((sequence, first));
                                 }
+                                Some(
+                                    ProviderInput::FaceQuestion { .. }
+                                    | ProviderInput::FaceConsentDelivery { .. },
+                                ) => {
+                                    panic!("face consent is disabled in this fixture")
+                                }
                                 Some(ProviderInput::Reminder { .. }) => {
                                     panic!("reminders are disabled in this fixture")
                                 }

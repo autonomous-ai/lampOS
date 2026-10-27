@@ -194,7 +194,9 @@ impl CloudRequest {
                 Ok(())
             }
             // A whole request in writing is its own start and end.
-            ProviderInput::Written { session, .. } | ProviderInput::Reminder { session, .. }
+            ProviderInput::Written { session, .. }
+            | ProviderInput::Reminder { session, .. }
+            | ProviderInput::FaceQuestion { session, .. }
                 if !self.start_submitted && *session == self.session =>
             {
                 Ok(())
@@ -206,6 +208,7 @@ impl CloudRequest {
     pub(super) fn submitted(&mut self, command: &ProviderInput) -> io::Result<()> {
         self.validate_submission(command)?;
         match command {
+            ProviderInput::FaceConsentDelivery { .. } => {}
             ProviderInput::Start { .. } => self.start_submitted = true,
             ProviderInput::End { .. } => self.input_end_submitted = true,
             ProviderInput::Audio { .. }
@@ -214,7 +217,9 @@ impl CloudRequest {
             | ProviderInput::CountOnly { .. }
             | ProviderInput::StepCall { .. }
             | ProviderInput::Onboarding { .. } => {}
-            ProviderInput::Written { .. } | ProviderInput::Reminder { .. } => {
+            ProviderInput::Written { .. }
+            | ProviderInput::Reminder { .. }
+            | ProviderInput::FaceQuestion { .. } => {
                 self.start_submitted = true;
                 self.input_end_submitted = true;
             }

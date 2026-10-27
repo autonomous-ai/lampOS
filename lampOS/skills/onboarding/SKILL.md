@@ -13,8 +13,12 @@ and keeps progress. It never changes microphone or camera permission.
 
 Its `skill.toml` contains the nine-step `order`, every first and re-offer
 note, the re-offer interval, optional nudge notes and answer counts, and the
-coaching and outcome notes under `[onboarding]`. The shipped notes and order
-match the previous runner word for word. Voice checks and snapshots this data
+coaching and outcome notes under `[onboarding]`. The order and other notes retain
+the previous walk. The name-and-face note
+asks for consent and a direct self-introduction in the same spoken request:
+"Yes, my name is ...", using the person's own name. A bare yes cannot authorize
+saving the name heard in an earlier turn; report a refused save truthfully.
+Voice checks and snapshots this data
 once before audio opens; mute/reopen and repeated walks reuse it. A later
 skill-only update or repair needs an operator-managed Voice restart. Missing
 or invalid data disables only the walk until that restart, with no built-in

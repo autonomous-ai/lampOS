@@ -116,6 +116,24 @@ impl Anchors {
         }
     }
 
+    /// The same guarded collector constructed by the live socket dispatcher.
+    /// Consent-capable operation admission happens before this call; all original
+    /// face, interval, camera-hold and final-write fences remain in `Guard`.
+    pub fn capture(
+        &mut self,
+        request: &Request,
+        now_us: u64,
+        hold: Option<u64>,
+    ) -> Result<crate::who::Taking, &'static str> {
+        let name = crate::who::plain_name(&request.name).ok_or("not_a_name")?;
+        let guard = self.begin(request, now_us, hold)?;
+        let mut taking = crate::who::Taking::new(name, now_us);
+        taking.one_face = Some(request.replace);
+        taking.apart = request.apart;
+        taking.speaker = Some(guard);
+        Ok(taking)
+    }
+
     pub fn begin(
         &mut self,
         request: &Request,

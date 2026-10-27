@@ -76,7 +76,7 @@ const GUIDE_EVERY_US: u64 = 8_000_000;
 const STEP_GIVE_UP_US: u64 = 90_000_000;
 /// "Who you are", with the nudge on: the name heard is asked back no
 /// sooner than this after the nudge, so an answer on the face can come.
-const ASK_BACK_AFTER_US: u64 = 10_000_000;
+pub(crate) const ASK_BACK_AFTER_US: u64 = 10_000_000;
 const TIMED_OUT_QUIET_US: u64 = 20_000_000;
 /// Nobody in front of the lamp this long: the step being led is dropped and
 /// asked again when someone is back.
@@ -1975,6 +1975,14 @@ impl Onboarding {
         &self.committed
     }
 
+    /// Whether the strict face-consent question may be asked now: only
+    /// while "who you are" is being led and has been asked.
+    pub(crate) fn face_question_allowed(&self) -> bool {
+        self.led
+            .as_ref()
+            .is_some_and(|led| led.step == Step::WhoYouAre && led.asked_us.is_some())
+    }
+
     /// Whether the lamp is in the middle of leading a step.
     pub fn leading(&self) -> bool {
         self.owed.is_some() || self.led.as_ref().is_some_and(|led| led.asked_us.is_some())
@@ -3443,7 +3451,7 @@ fn yes_or_no(text: &str) -> Option<bool> {
 
 /// A line that could be only a name: one or two words, after an "I'm",
 /// and no question, yes, no, greeting or thanks. English words only.
-fn name_in(text: &str) -> Option<String> {
+pub(crate) fn name_in(text: &str) -> Option<String> {
     let greets = ["hello", "hi", "hey", "okay", "ok", "thanks", "thank"];
     if text.contains('?')
         || yes_or_no(text).is_some()

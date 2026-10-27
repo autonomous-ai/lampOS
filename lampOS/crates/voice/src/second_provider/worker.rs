@@ -159,7 +159,17 @@ impl Gate {
     /// microphone generation. Input for a retired request is dropped.
     fn admits(&self, now_us: u64, command: &ProviderInput) -> io::Result<bool> {
         let (request, privacy) = match command {
-            ProviderInput::Start {
+            ProviderInput::FaceQuestion {
+                request,
+                privacy_generation,
+                ..
+            }
+            | ProviderInput::FaceConsentDelivery {
+                request,
+                privacy_generation,
+                ..
+            }
+            | ProviderInput::Start {
                 request,
                 privacy_generation,
                 ..
@@ -209,10 +219,15 @@ impl Gate {
             .guard
             .state()
             .ok_or_else(|| invalid("second route has no authority"))?;
-        if request == 0
-            || !state.listening_ready(MonoTime::from_micros(now_us))
-            || privacy != state.microphone_generation()
-        {
+        let current_epoch = request != 0
+            && state.listening_ready(MonoTime::from_micros(now_us))
+            && privacy == state.microphone_generation();
+        if matches!(command, ProviderInput::FaceConsentDelivery { .. }) {
+            // Privacy already invalidated the worker's pending question. A
+            // delayed receipt is harmless metadata, never fresh input rights.
+            return Ok(current_epoch);
+        }
+        if !current_epoch {
             return Err(invalid(
                 "second route input lost privacy or retention authority",
             ));
@@ -23941,3 +23956,7 @@ mod memory_observer {
 #[cfg(test)]
 #[path = "worker/kept_name_callback_tests.rs"]
 mod kept_name_callback;
+
+#[cfg(test)]
+#[path = "worker/face_consent_gate_tests.rs"]
+mod face_consent_gate_tests;
