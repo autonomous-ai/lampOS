@@ -3455,6 +3455,37 @@ mod tests {
         assert!(looked.unmeasured_gaze_socket.is_none());
     }
 
+    /// Phase 0 of the lamp programming protocol (Nine's design on #3504,
+    /// 27 Oct, §4): the product's body weighs who asks (#940), so a skill's
+    /// or an outside controller's gesture gives way to the conversation's
+    /// and a person's, and lamp-skills stamps its own (`LAMP_BODY_REQUESTS`,
+    /// pinned in lamp-skills' tests). Read from the unit file.
+    #[test]
+    fn the_product_unit_weighs_who_asks_for_a_gesture() {
+        const UNIT: &str = include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../deploy/product/lamp-body.service"
+        ));
+        let exec = UNIT
+            .lines()
+            .find_map(|line| line.strip_prefix("ExecStart="))
+            .expect("the product unit has an ExecStart");
+        let poses = "--home 1772,2052,2038 --folded-arm 2047,2046 --stand 1772,2052,2038,2657,2602 --pitch-window 1740,2030 --torque on";
+        let words: Vec<String> = exec
+            .split_whitespace()
+            .skip(1)
+            .flat_map(|word| match word {
+                "$BODY_POSES" => poses.split_whitespace().map(str::to_owned).collect(),
+                "%H" => vec!["lamp-a63e".to_owned()],
+                word => vec![word.to_owned()],
+            })
+            .collect();
+        let started = parse(words.iter().map(OsString::from))
+            .expect("the product body starts")
+            .unwrap();
+        assert!(started.arbitration, "{exec}");
+    }
+
     #[test]
     fn a_gesture_is_asked_for_by_the_name_of_a_clip_and_nothing_else() {
         const WIGGLE: lamp_body::clips::Clip = lamp_body::clips::Clip {
