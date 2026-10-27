@@ -4,6 +4,7 @@ refusals, as docs/control.md says them. No lamp needed."""
 from __future__ import annotations
 
 import asyncio
+import base64
 import hashlib
 import hmac
 import json
@@ -744,6 +745,52 @@ def test_lamp_skill_push_list_and_remove_run_as_the_js_clis_do(tmp_path):
             assert fake.asked("skill.remove") == [{"name": "desk-wave"}]
 
     run(go())
+
+
+def test_a_signed_package_names_its_author_and_any_change_is_refused(tmp_path):
+    import io
+    import tarfile
+
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
+    from lampos.push import SIGNATURE, open_package, pack
+
+    folder = _skill(tmp_path, "desk-wave")
+    assert open_package(pack(folder).data).author is None
+    ring = Keyring(tmp_path / "home")
+    assert ring.author_key() is None
+    key = ring.author_key(make=True)
+    assert ring.author_key() is not None and (tmp_path / "home" / "author.pem").stat().st_mode & 0o777 == 0o600
+    data = pack(folder, author=key).data
+    with tarfile.open(fileobj=io.BytesIO(data)) as tar:
+        # The signature is the second entry, as lamp-skills writes it.
+        assert tar.getnames()[:2] == ["lamp-skill.json", SIGNATURE]
+        signed = json.loads(tar.extractfile(SIGNATURE).read())
+    opened = open_package(data)
+    assert opened.author == signed["key"] and len(signed["key"]) == 16
+    assert set(opened.files) == {"SKILL.md", "skill.toml"}
+
+    def changed(rename=None, body=None):
+        out = io.BytesIO()
+        with tarfile.open(fileobj=io.BytesIO(data)) as src, tarfile.open(fileobj=out, mode="w", format=tarfile.USTAR_FORMAT) as dst:
+            for member in src.getmembers():
+                content = src.extractfile(member).read()
+                if member.name == "desk-wave/skill.toml" and body is not None:
+                    content, member.size = body, len(body)
+                if member.name == SIGNATURE and rename is not None:
+                    content = json.dumps({**json.loads(content), **rename}).encode()
+                    member.size = len(content)
+                dst.addfile(member, io.BytesIO(content))
+        return out.getvalue()
+
+    for bad, says in [
+        (changed(body=b'version = "0.1.0"\n[permissions]\nbody = true\n'), "does not match"),
+        (changed(rename={"key": "0" * 16}), "not the fingerprint"),
+        (changed(rename={"public": base64.b64encode(bytes(32)).decode()}), "not the fingerprint"),
+    ]:
+        with pytest.raises(LampError) as raised:
+            open_package(bad)
+        assert says in raised.value.why
 
 
 def test_a_skill_is_packed_as_lamp_skills_packs_it(tmp_path):

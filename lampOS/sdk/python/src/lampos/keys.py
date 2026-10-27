@@ -89,11 +89,24 @@ class Keyring:
 
     def key(self) -> Ed25519PrivateKey:
         """The computer's key, made on first use."""
-        path = self.folder / "key"
+        key = self._key_file("key", make=True)
+        assert key is not None
+        return key
+
+    def author_key(self, *, make: bool = False) -> Ed25519PrivateKey | None:
+        """The key this person signs their skills with (`lamp skill keygen`),
+        kept apart from the pairing key: revoking a pairing never changes
+        who wrote a skill. None if it hasn't been made."""
+        return self._key_file("author.pem", make=make)
+
+    def _key_file(self, name: str, *, make: bool) -> Ed25519PrivateKey | None:
+        path = self.folder / name
         if path.exists():
             loaded = serialization.load_pem_private_key(path.read_bytes(), password=None)
             assert isinstance(loaded, Ed25519PrivateKey)
             return loaded
+        if not make:
+            return None
         key = Ed25519PrivateKey.generate()
         self._own_folder()
         pem = key.private_bytes(

@@ -14,9 +14,11 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import io
 import json
 import re
 import sys
+import tarfile
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -25,9 +27,18 @@ if sys.version_info >= (3, 11):
 else:  # pragma: no cover - Python 3.10
     import tomli as tomllib
 
+from cryptography.exceptions import InvalidSignature
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey, Ed25519PublicKey
+
 from .errors import LampError
 
 MANIFEST = "lamp-skill.json"
+# The author's signature, the package's second entry (lamp-skills'
+# package.rs): {"key": FPR16, "public": B64, "signature": B64} over the
+# manifest's exact bytes.
+SIGNATURE = "lamp-skill.sig"
+SIGNATURE_MAX = 1_024
 PACKAGE_MAX = 1 << 20
 # A part's bytes, so its base64 is at most 48 KiB and a frame stays under 64 KiB.
 PART_BYTES = 36 * 1024
@@ -136,9 +147,105 @@ def _entry(path: str, data: bytes) -> bytes:
     return bytes(header) + data + bytes(-len(data) % 512)
 
 
-def pack(folder: str | Path) -> Package:
+def fingerprint(public: bytes) -> str:
+    """A key's fingerprint, as the lamp shows it: the first 16 hex of the
+    SHA-256 of its 32 bytes (lamp-update's `manifest::fingerprint`)."""
+    return hashlib.sha256(public).hexdigest()[:16]
+
+
+def _public_bytes(key: Ed25519PrivateKey) -> bytes:
+    return key.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
+
+
+def signature_for(manifest: bytes, author: Ed25519PrivateKey) -> bytes:
+    """`lamp-skill.sig` for these manifest bytes, compact JSON and a newline,
+    as lamp-skills writes it, with the author's `public` beside `key`."""
+    public = _public_bytes(author)
+    signed = {
+        "key": fingerprint(public),
+        "public": base64.b64encode(public).decode("ascii"),
+        "signature": base64.b64encode(author.sign(manifest)).decode("ascii"),
+    }
+    return (json.dumps(signed, separators=(",", ":")) + "\n").encode()
+
+
+def _bad(why: str) -> LampError:
+    return LampError(f"not a skill package: {why}", code="bad_request")
+
+
+@dataclass
+class Opened:
+    """A package read back and checked: its manifest, the author's key
+    fingerprint (None when it isn't signed), and its files by path."""
+
+    name: str
+    version: str
+    author: str | None
+    files: dict[str, bytes]
+
+
+def open_package(data: bytes) -> Opened:
+    """Check a package as the lamp does before anything is written: the
+    manifest first, the signature (if any) over its exact bytes by the key
+    it names, then every file against the manifest, no more and no fewer."""
+    try:
+        with tarfile.open(fileobj=io.BytesIO(data), mode="r:") as tar:
+            members = tar.getmembers()
+            if not members or members[0].name != MANIFEST:
+                raise _bad(f"{MANIFEST} must come first")
+            read = {}
+            for member in members:
+                if not member.isfile():
+                    raise _bad(f"{member.name}: a package holds only plain files")
+                if member.name in read:
+                    raise _bad(f"{member.name} twice")
+                read[member.name] = tar.extractfile(member).read()
+    except tarfile.TarError as error:
+        raise _bad(str(error)) from error
+    manifest_bytes = read.pop(MANIFEST)
+    try:
+        manifest = json.loads(manifest_bytes)
+        name, version, entries = manifest["name"], manifest["version"], manifest["files"]
+    except (ValueError, KeyError, TypeError) as error:
+        raise _bad(f"{MANIFEST}: {error}") from error
+    author = None
+    signed = read.pop(SIGNATURE, None)
+    if signed is not None:
+        if members[1].name != SIGNATURE:
+            raise _bad(f"{SIGNATURE} must come second")
+        if len(signed) > SIGNATURE_MAX:
+            raise _bad(f"{SIGNATURE} is too large to be a signature")
+        try:
+            fields = json.loads(signed)
+            public = base64.b64decode(fields["public"], validate=True)
+            signature = base64.b64decode(fields["signature"], validate=True)
+            key = fields["key"]
+        except (ValueError, KeyError, TypeError) as error:
+            raise _bad(f"{SIGNATURE}: an author's signature is {{\"key\", \"public\", \"signature\"}}") from error
+        if len(public) != 32 or fingerprint(public) != key:
+            raise _bad(f"{SIGNATURE}: key is not the fingerprint of public")
+        try:
+            Ed25519PublicKey.from_public_bytes(public).verify(signature, manifest_bytes)
+        except InvalidSignature as error:
+            raise _bad(f"{SIGNATURE} does not match {MANIFEST}: the package was changed after it was signed") from error
+        author = key
+    files = {}
+    for entry in entries:
+        body = read.pop(f"{name}/{entry['path']}", None)
+        if body is None:
+            raise _bad(f"{entry['path']} is in {MANIFEST} but not in the package")
+        if len(body) != entry["size"] or hashlib.sha256(body).hexdigest() != entry["sha256"]:
+            raise _bad(f"{entry['path']} does not match {MANIFEST}")
+        files[entry["path"]] = body
+    if read:
+        raise _bad(f"{sorted(read)[0]} is in the package but not in {MANIFEST}")
+    return Opened(name, version, author, files)
+
+
+def pack(folder: str | Path, author: Ed25519PrivateKey | None = None) -> Package:
     """The skill folder as a package, `lamp-skills pack`'s shape. Its name is
-    the folder's, and `skill.toml` must say a `version`."""
+    the folder's, and `skill.toml` must say a `version`. With `author`, the
+    package carries that author's signature, to share it."""
     folder = Path(folder).resolve()
     try:
         rules = tomllib.loads((folder / "skill.toml").read_text("utf-8"))
@@ -159,9 +266,12 @@ def pack(folder: str | Path) -> Package:
     }
     # Two zero blocks end it, as the tar crate's `finish`, with no padding to
     # a 10 KiB record (Python's tarfile pads).
+    manifest_bytes = (json.dumps(manifest, indent=2) + "\n").encode()
+    signed = [_entry(SIGNATURE, signature_for(manifest_bytes, author))] if author is not None else []
     data = b"".join(
         [
-            _entry(MANIFEST, (json.dumps(manifest, indent=2) + "\n").encode()),
+            _entry(MANIFEST, manifest_bytes),
+            *signed,
             *(_entry(f"{folder.name}/{path}", data) for path, data in files.items()),
             bytes(1024),
         ]
