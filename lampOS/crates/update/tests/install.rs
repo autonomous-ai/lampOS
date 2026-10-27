@@ -2225,7 +2225,7 @@ fn the_pinned_models_are_the_ones_their_parts_check() {
     let (notices, models): (Vec<_>, Vec<_>) = all
         .iter()
         .partition(|model| model.path.starts_with(NOTICES));
-    assert_eq!((models.len(), notices.len()), (9, 5));
+    assert_eq!((models.len(), notices.len()), (9, 6));
     let release = "https://github.com/autonomous-ai/lampOS/releases/download/models-2026-10-16/";
     for model in &all {
         assert!(model.path.starts_with("/opt/lampOS/"), "{}", model.path);
@@ -2342,12 +2342,19 @@ const NOTICES: &str = "/opt/lampOS/voice/notices/";
 
 /// #1844 (lamp-06c1, 20 Oct): the product unit named a notice folder
 /// nothing filled, so the offline line and "back online" were silent. Now
-/// install places the four recordings and their manifest, from their own
-/// release, in the folder the product voice reads.
+/// install places the five recordings and their manifest, from their own
+/// releases (the shutdown's line and the manifest naming it from the later
+/// one, #3697), in the folder the product voice reads.
 #[test]
 fn install_places_the_voices_recorded_lines_where_the_product_voice_reads_them() {
     let all = install::models().unwrap();
-    let release = "https://github.com/autonomous-ai/lampOS/releases/download/notices-2026-10-20/";
+    let release = |file: &str| {
+        let day = match file {
+            "manifest.json" | "going-to-sleep.en-US.wav" => "27",
+            _ => "20",
+        };
+        format!("https://github.com/autonomous-ai/lampOS/releases/download/notices-2026-10-{day}/")
+    };
     let mut placed: Vec<&str> = all
         .iter()
         .filter_map(|model| model.path.strip_prefix(NOTICES))
@@ -2357,6 +2364,7 @@ fn install_places_the_voices_recorded_lines_where_the_product_voice_reads_them()
         placed,
         [
             "back-online.en-US.wav",
+            "going-to-sleep.en-US.wav",
             "manifest.json",
             "provider-unavailable.en-US.wav",
             "voice-service-unreachable.en-US.wav",
@@ -2365,7 +2373,7 @@ fn install_places_the_voices_recorded_lines_where_the_product_voice_reads_them()
     );
     for model in all.iter().filter(|model| model.path.starts_with(NOTICES)) {
         let file = model.path.strip_prefix(NOTICES).unwrap();
-        assert_eq!(model.url, format!("{release}{file}"));
+        assert_eq!(model.url, format!("{}{file}", release(file)));
         assert!(model.archive.is_none(), "{file}");
     }
     let voice = include_str!("../../../deploy/product/lamp-voice.service");
@@ -2484,9 +2492,9 @@ fn prepare_places_the_recorded_lines_a_moved_lamps_voice_reads() {
 }
 
 /// The pinned lines `lamp-keeper prepare` places are install's own: the
-/// five under the product's folder, nothing else.
+/// six under the product's folder, nothing else.
 #[test]
-fn a_moved_lamp_is_given_the_product_voices_five_lines() {
+fn a_moved_lamp_is_given_the_product_voices_six_lines() {
     let root = tempfile::tempdir().unwrap();
     let mut channel = FakeChannel::default();
     let mut said = Vec::new();
@@ -2494,7 +2502,7 @@ fn a_moved_lamp_is_given_the_product_voices_five_lines() {
         said.push(line.to_owned())
     });
     assert!(wrote.is_empty());
-    assert_eq!(said.len(), 5, "{said:?}");
+    assert_eq!(said.len(), 6, "{said:?}");
     for line in &said {
         assert!(line.starts_with(install::NOTICES_MOVED), "{line}");
     }
