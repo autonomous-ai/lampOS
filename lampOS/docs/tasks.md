@@ -298,9 +298,11 @@ timeout, or refused before any call); LAST is stderr's last line with words,
 at most 160 characters, with only what can't be the person's kept: quoted
 spans go whole, and a word stays only if it is plain lowercase ASCII
 (`error:`, `refused`) or an upper-case code (`SPAWN_FAILED`), is none of the
-ask's words at any length, has no `/` or `@` and doesn't look secret. A name,
-a computer's label, a folder or a word with an accent is `…`, one per run
-(Fourteen's privacy read). The ask is never in it. Before (lamp-0c89, 23 October), an `uncertain` hand-over said
+ask's words at any length, has no `/` or `@`, doesn't look secret, and is
+none of the machines' names, hostnames or ids that the preflight's `machines`
+listed, nor a long run with digits (an id). A name, a computer's label
+(`lan-macbook` too), a folder or a word with an accent is `…`, one per run
+(Fourteen's privacy read; their and the Reviewer-lead's P3 on #3234). The ask is never in it. Before (lamp-0c89, 23 October), an `uncertain` hand-over said
 nothing in the journal, only in the task store.
 
 The executable is resolved once to an absolute canonical regular file, owned
