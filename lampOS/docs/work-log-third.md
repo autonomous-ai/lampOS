@@ -1,3 +1,11 @@
+## 2026-10-28 02:14 — cleanup preservation repair passes full current mock suites
+
+READ-OK #3889 facc06e8aa with [current focused and full mock proof](verification/played-cleanup-read-3889-20261028/current-facc-READ-OK-P3.json). Prior digest/enumeration and symlink P2 paths close: incomplete manifests refuse with backup kept, initial unsupported links refuse before changes, and all live paths are prevalidated before any restore deletion. Ten focused scenarios include nested FIFO and saved-kind mismatch; four syntax checks pass. All twenty-eight focused numeric groups close.
+
+Original committed make-skill-test.sh runs once, exit0/all-passed in771.3592s, with unchanged sleeps/assertions; stand-in-test.sh runs once,56ok/0FAIL,exit0 in3.0054s. Both numeric groups are awaited and absent, with no timeout/cleanup/retry. All35 played-source files,33 tools and helpers stay exact; zero blocked real-tool attempts. Root verifies both full raw log hashes, the all-passed marker and56 raw stand-in OK rows. No actual customer state, SSH/sudo/audio/network/device or physical acceptance. Earlier663/1c/93f failure and timeout scopes remain intact.
+
+One P3 remains accepted: the file-only manifest does not witness nested empty directories. An injected incomplete copy omits only an empty subtree, restore returns0/deletes backup, and all file bytes stay exact. This is not a reported real storage or writer race. The author has agreed to add directory entries in a follow-up after this frozen read, keeping full-suite credit on facc. Lamp replay remains its holder's separate gate.
+
 ## 2026-10-28 01:57 — corrected publication diagnostic original ARM gate reconciled
 
 Ready for lamp-voice: no (Reviewer-two's second source read is active, #3912).

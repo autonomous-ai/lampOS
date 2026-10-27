@@ -1,0 +1,944 @@
+{
+  "disposition": "SCOPED_CURRENT_MOCK_SUITES_PASS; earlier digest/type P2paths closed; injected empty-directory-copy omission remains P3",
+  "evidence_hashes": {
+    "focused-probe.py": "29da34edcd25ae1c65494fbc3ec916bd94e1f85b2f61c835def1a0f5ea2ec53a",
+    "full-make-skill-suite.log": "3d82800a43a2ba84fd2c9a326d0946d3b2721ff7045976aa1110a874f7f7d2b6",
+    "full-qualified-local.json": "6dafb82e458056a3d99aa80335c8b753203ca249c37cb98f563d4aa68e5d13e2",
+    "full-source-after.json": "f77ee5d8b02ac0c83741a4fb3aac8784aa4fc204bf900a33bccc9a891bd18091",
+    "full-source-before.json": "f77ee5d8b02ac0c83741a4fb3aac8784aa4fc204bf900a33bccc9a891bd18091",
+    "full-stand-in-suite.log": "3b85b21694c917352f6b96790f4d7167da9f38f7d02b366116e4b430bca063f2",
+    "full-tool-metadata.json": "7ada413144fb513008953decdefadce2d693f9f2718c543e28062b159e3ef4f4",
+    "full-tools-after.json": "77a4b5a503e0161ebc67d496339efe9a3e766986378b0a0bab4a2470be6604e5",
+    "full-tools-before.json": "77a4b5a503e0161ebc67d496339efe9a3e766986378b0a0bab4a2470be6604e5",
+    "publication-focused-P3.json": "42b0f09940718b428165756b6fb12888a4c682317c5a9b2b1f8303f2f3867e20",
+    "run-full-current.py": "4fb5a7e9d54580a90d86f5367e8c6b1a29f51a19efc9f069c7a7a406cd9d7669"
+  },
+  "exact_argv": [
+    [
+      "/bin/bash",
+      "<worktree>/lampOS/tools/played/make-skill-test.sh"
+    ],
+    [
+      "/bin/sh",
+      "<worktree>/lampOS/tools/played/stand-in-test.sh"
+    ]
+  ],
+  "focused_gate": {
+    "P3": "Manifests witness regular-file paths/bytes and top-level kind, but not nested directory membership. Injected cp omission removed an empty subtree without changing filebytes; restore returned0 and deleted backup.",
+    "blocked_actual_tool_attempts": 0,
+    "cases": [
+      {
+        "backup_retained": true,
+        "case": "digest-fails-copy-differs",
+        "check_exit": 0,
+        "fault_tools_sha256": {
+          "cp": "febc82c135390e5b1b0c6f77ce1b4fe358e9bc057dd4e86969b32b13576a8c8c",
+          "sha256sum": "00586759062d7c4300717af573b0c855cbf7898e8e9817c70e671580e14f1e5d",
+          "shasum": "00586759062d7c4300717af573b0c855cbf7898e8e9817c70e671580e14f1e5d"
+        },
+        "generated_restore_sha256": "b4571bf7f65be863a51b4788156e1f26827fe2bed356a14e1a1262a6e18493ea",
+        "initial": {
+          "owner_sha256": "1375462294a0f38d6cf42ea4ef2349e5d4d77ba0c16a1e77a28b2e606ed0ab99",
+          "tasks_told_is_symlink": false,
+          "tasks_told_lexists": true
+        },
+        "live_owner_unchanged_before_restore": false,
+        "restore_exit": 1,
+        "save_exit": 0,
+        "saved_kinds_at_save": "made-skills dir\ntasks-told file\n",
+        "status": "RESTORE_REFUSED_BACKUP_RETAINED"
+      },
+      {
+        "backup_retained": true,
+        "case": "digest-fails-copy-matches",
+        "check_exit": 0,
+        "fault_tools_sha256": {
+          "sha256sum": "00586759062d7c4300717af573b0c855cbf7898e8e9817c70e671580e14f1e5d",
+          "shasum": "00586759062d7c4300717af573b0c855cbf7898e8e9817c70e671580e14f1e5d"
+        },
+        "generated_restore_sha256": "59a1d9868cbe0f36865a66d1edc8c0c338ac6791efd92ec104559645534ffd01",
+        "initial": {
+          "owner_sha256": "1375462294a0f38d6cf42ea4ef2349e5d4d77ba0c16a1e77a28b2e606ed0ab99",
+          "tasks_told_is_symlink": false,
+          "tasks_told_lexists": true
+        },
+        "live_owner_unchanged_before_restore": true,
+        "restore_exit": 1,
+        "save_exit": 0,
+        "saved_kinds_at_save": "made-skills dir\ntasks-told file\n",
+        "status": "RESTORE_REFUSED_BACKUP_RETAINED"
+      },
+      {
+        "backup_retained": true,
+        "case": "find-fails",
+        "check_exit": 0,
+        "fault_tools_sha256": {
+          "find": "88623ee8f34be3a852b2a5493976d293c9dd4705954e965ca26d74885d2e23c1"
+        },
+        "generated_restore_sha256": "2d855b54d4fcd70bee6a1f2d78eed7668254cbda2bfae2a62695f287d14f4183",
+        "initial": {
+          "owner_sha256": "1375462294a0f38d6cf42ea4ef2349e5d4d77ba0c16a1e77a28b2e606ed0ab99",
+          "tasks_told_is_symlink": false,
+          "tasks_told_lexists": true
+        },
+        "live_owner_unchanged_before_restore": true,
+        "restore_exit": 1,
+        "save_exit": 0,
+        "saved_kinds_at_save": "made-skills dir\ntasks-told file\n",
+        "status": "RESTORE_REFUSED_BACKUP_RETAINED"
+      },
+      {
+        "backup_retained": true,
+        "case": "sort-fails",
+        "check_exit": 0,
+        "fault_tools_sha256": {
+          "sort": "88623ee8f34be3a852b2a5493976d293c9dd4705954e965ca26d74885d2e23c1"
+        },
+        "generated_restore_sha256": "60aecc81c6b8727ff60ac12b20c38bc18f18e01d9b7e36db37fd67ab53349d50",
+        "initial": {
+          "owner_sha256": "1375462294a0f38d6cf42ea4ef2349e5d4d77ba0c16a1e77a28b2e606ed0ab99",
+          "tasks_told_is_symlink": false,
+          "tasks_told_lexists": true
+        },
+        "live_owner_unchanged_before_restore": true,
+        "restore_exit": 1,
+        "save_exit": 0,
+        "saved_kinds_at_save": "made-skills dir\ntasks-told file\n",
+        "status": "RESTORE_REFUSED_BACKUP_RETAINED"
+      },
+      {
+        "backup_created": false,
+        "case": "preflight-dangling",
+        "check_exit": 3,
+        "initial": {
+          "owner_sha256": "1375462294a0f38d6cf42ea4ef2349e5d4d77ba0c16a1e77a28b2e606ed0ab99",
+          "tasks_told_is_symlink": true,
+          "tasks_told_lexists": true
+        },
+        "status": "PREFLIGHT_REFUSED_UNCHANGED"
+      },
+      {
+        "backup_created": false,
+        "case": "preflight-filelink",
+        "check_exit": 3,
+        "initial": {
+          "owner_sha256": "1375462294a0f38d6cf42ea4ef2349e5d4d77ba0c16a1e77a28b2e606ed0ab99",
+          "tasks_told_is_symlink": true,
+          "tasks_told_lexists": true
+        },
+        "status": "PREFLIGHT_REFUSED_UNCHANGED"
+      },
+      {
+        "backup_retained": true,
+        "case": "postsave-dangling",
+        "check_exit": 0,
+        "fault_tools_sha256": {},
+        "generated_restore_sha256": "54064c54a1c773f50595bad0a027a1477ff8ce51928108576fbbea82789f6ba6",
+        "initial": {
+          "owner_sha256": "1375462294a0f38d6cf42ea4ef2349e5d4d77ba0c16a1e77a28b2e606ed0ab99",
+          "tasks_told_is_symlink": false,
+          "tasks_told_lexists": true
+        },
+        "live_owner_unchanged_before_restore": true,
+        "restore_exit": 1,
+        "save_exit": 0,
+        "saved_kinds_at_save": "made-skills dir\ntasks-told file\n",
+        "status": "RESTORE_REFUSED_BACKUP_RETAINED"
+      },
+      {
+        "backup_created": false,
+        "case": "preflight-nested-fifo",
+        "check_exit": 3,
+        "initial": {
+          "owner_sha256": "1375462294a0f38d6cf42ea4ef2349e5d4d77ba0c16a1e77a28b2e606ed0ab99",
+          "tasks_told_is_symlink": false,
+          "tasks_told_lexists": true
+        },
+        "status": "PREFLIGHT_REFUSED_UNCHANGED"
+      },
+      {
+        "backup_retained": true,
+        "case": "saved-kind-mismatch",
+        "check_exit": 0,
+        "fault_tools_sha256": {},
+        "generated_restore_sha256": "bafb512603d8ebb5b972dfaf2a617c763a56bfd305d937e011c7b72fc060fb09",
+        "initial": {
+          "owner_sha256": "1375462294a0f38d6cf42ea4ef2349e5d4d77ba0c16a1e77a28b2e606ed0ab99",
+          "tasks_told_is_symlink": false,
+          "tasks_told_lexists": true
+        },
+        "live_owner_unchanged_before_restore": true,
+        "restore_exit": 1,
+        "save_exit": 0,
+        "saved_kinds_at_save": "made-skills dir\ntasks-told file\n",
+        "status": "RESTORE_REFUSED_BACKUP_RETAINED"
+      },
+      {
+        "backup_retained": false,
+        "case": "empty-directory-omitted",
+        "check_exit": 0,
+        "fault_tools_sha256": {
+          "cp": "08116572f59b8d6196fa3ad9c04a9e14060c7e9f7521bd53af1cde59a6926156"
+        },
+        "generated_restore_sha256": "d9c7bdb824cddadd2fc34fbd0c564f423473e04969d39b701d6ed29e43e22383",
+        "initial": {
+          "owner_sha256": "1375462294a0f38d6cf42ea4ef2349e5d4d77ba0c16a1e77a28b2e606ed0ab99",
+          "tasks_told_is_symlink": false,
+          "tasks_told_lexists": true
+        },
+        "live_owner_unchanged_before_restore": true,
+        "restore_exit": 0,
+        "save_exit": 0,
+        "saved_kinds_at_save": "made-skills dir\ntasks-told file\n",
+        "status": "CONFIRMED_EMPTY_DIRECTORY_OMISSION_UNDETECTED"
+      }
+    ],
+    "checks": {
+      "all_numeric_groups_awaited_absent": true,
+      "no_timeout_or_cleanup": true,
+      "numeric_groups_total": 28,
+      "scenario_count": 10,
+      "syntax_pass": 4
+    },
+    "disposition": "Prior state-type and digest P2 paths closed by focused controls; nested-empty-directory incomplete-copy omission remains P3, no real storage/writer-race claim; full exact current suites approved separately",
+    "emptydir_observation": {
+      "backup_after_restore_exists": false,
+      "destination_empty_subtree_after_exists": false,
+      "injection": "Temp-only cp stub calls /bin/cp unchanged, then removes only destination made-skills/empty subtree; no content file altered",
+      "limits": "No writer race, nested link or physicaldevice failure inferred; severity/disposition Rootowned",
+      "live_nested_empty_dir_before_save": true,
+      "regular_owner_file_sha_unchanged": true,
+      "restore_exit": 0,
+      "save_exit": 0,
+      "saved_nested_empty_dir_after_save": true
+    },
+    "guards_unchanged": true,
+    "head": "facc06e8aaadec5ae7eac4e5e33da12afe23b86a",
+    "helper_sha256": {
+      "blocked-tools/afplay": "177f1ecdde05e0ae8b652249075afcd0ff736f684d46b357cf7978b09ac6fb6f",
+      "blocked-tools/say": "177f1ecdde05e0ae8b652249075afcd0ff736f684d46b357cf7978b09ac6fb6f",
+      "blocked-tools/scp": "177f1ecdde05e0ae8b652249075afcd0ff736f684d46b357cf7978b09ac6fb6f",
+      "blocked-tools/sftp": "177f1ecdde05e0ae8b652249075afcd0ff736f684d46b357cf7978b09ac6fb6f",
+      "blocked-tools/ssh": "177f1ecdde05e0ae8b652249075afcd0ff736f684d46b357cf7978b09ac6fb6f",
+      "blocked-tools/sshpass": "177f1ecdde05e0ae8b652249075afcd0ff736f684d46b357cf7978b09ac6fb6f",
+      "blocked-tools/sudo": "177f1ecdde05e0ae8b652249075afcd0ff736f684d46b357cf7978b09ac6fb6f",
+      "blocked-tools/systemctl": "177f1ecdde05e0ae8b652249075afcd0ff736f684d46b357cf7978b09ac6fb6f",
+      "blocked-tools/systemd-run": "177f1ecdde05e0ae8b652249075afcd0ff736f684d46b357cf7978b09ac6fb6f",
+      "focused-probe.py": "29da34edcd25ae1c65494fbc3ec916bd94e1f85b2f61c835def1a0f5ea2ec53a",
+      "local-command": "49e9010d482ac175c7717078b71873c138167af0e97c8ab2e342ec26eaca50a3"
+    },
+    "limits": [
+      "Exact extracted committed functions/preflight, temporarypaths/localcommandstub only",
+      "4priorrestorefaultcontrols+2toplinkpreflight+1postsave link+1nestedFIFOpreflight+1recordedkindmismatch+1emptydirectoryomission control; each once",
+      "Direct generated restore exit1 tested; whole-script exit8 source-reviewed only",
+      "No full make-skill/stand-in suite, no device/SSH/sudo/audio/network/Cargo",
+      "No writer race, authentication, arbitrary path-threat or secret-handling claim"
+    ],
+    "parent": "e43fd36f6aee55e4fe9a2ee73acc2e261765fa5f",
+    "preflight_line": "restore_script | \"$LAMP_SSH\" \"sudo -n sh -s -- check\" || { echo \"make-skill.sh: the voice's made skills or told news is not a plain file or folder (above); nothing changed\" >&2; exit 3; }",
+    "private_focused_receipt_sha256": "74e68f348140565dee36a389e0100e80826cf57ca096be95faa0b370b8a2a177",
+    "raw_focused_outputs": [
+      {
+        "case": "digest-fails-copy-differs",
+        "output": "injected-digest-failure\nrestore: the saved copy in <evidence>/digest-fails-copy-differs-nn1xnn08/saved could not be read whole; it is kept\n",
+        "phase": "restore",
+        "raw_sha256": "53b7adab4fd82d042148e771a263d6e1180cb248345c8b5ddc69b36ddac7d1ef"
+      },
+      {
+        "case": "digest-fails-copy-matches",
+        "output": "injected-digest-failure\nrestore: the saved copy in <evidence>/digest-fails-copy-matches-qjszlvm8/saved could not be read whole; it is kept\n",
+        "phase": "restore",
+        "raw_sha256": "6b3e6db1186739e43a697c620660e19242934a44165d833b4897d0c8e01dadf3"
+      },
+      {
+        "case": "find-fails",
+        "output": "injected-enumeration-failure\n<evidence>/find-fails-ffzjlezj/saved/made-skills could not be read whole\nrestore: the copy of made-skills in <evidence>/find-fails-ffzjlezj/saved is not as saved; it is kept\n",
+        "phase": "restore",
+        "raw_sha256": "fa202f6ddc67c5e36fd0a977b0dec73b7924eeb63456e283614a0263c1c324cf"
+      },
+      {
+        "case": "sort-fails",
+        "output": "injected-enumeration-failure\nrestore: the saved copy in <evidence>/sort-fails-s7_skawl/saved could not be read whole; it is kept\n",
+        "phase": "restore",
+        "raw_sha256": "4058dc30eef40f30a1325f7c0c5eb6d74a1fbda6582a57d915ea63b38685deed"
+      },
+      {
+        "case": "preflight-dangling",
+        "output": "<evidence>/preflight-dangling-k_rrc2em/voice/tasks-told is a symbolic link\nmake-skill.sh: the voice's made skills or told news is not a plain file or folder (above); nothing changed\n",
+        "phase": "check",
+        "raw_sha256": "e100028d6a1cac1454fd00fc3ade24714ed774e1e9a8fbbf535790e492e52b28"
+      },
+      {
+        "case": "preflight-filelink",
+        "output": "<evidence>/preflight-filelink-x2fizuey/voice/tasks-told is a symbolic link\nmake-skill.sh: the voice's made skills or told news is not a plain file or folder (above); nothing changed\n",
+        "phase": "check",
+        "raw_sha256": "358336ab13ff9491b9fd4abc2ce363e7089e77eacea92095ae29dfc677fc50e2"
+      },
+      {
+        "case": "postsave-dangling",
+        "output": "<evidence>/postsave-dangling-hg7b723a/voice/tasks-told is a symbolic link\nrestore: <evidence>/postsave-dangling-hg7b723a/voice/tasks-told is not a plain file or folder, so not this run's to replace; the copy in <evidence>/postsave-dangling-hg7b723a/saved is kept\n",
+        "phase": "restore",
+        "raw_sha256": "06c0fb7476c1bf115f6debd325853d3b905c94f855b776c6f95ef1de195cfd33"
+      },
+      {
+        "case": "preflight-nested-fifo",
+        "output": "<evidence>/preflight-nested-fifo-68uqdhqf/voice/made-skills holds more than folders and regular files: <evidence>/preflight-nested-fifo-68uqdhqf/voice/made-skills/own/fifo\nmake-skill.sh: the voice's made skills or told news is not a plain file or folder (above); nothing changed\n",
+        "phase": "check",
+        "raw_sha256": "cf2be61ee4912dc8d0b83d09416d0aa509538ec11b52308d459d5d3b0406baa1"
+      },
+      {
+        "case": "saved-kind-mismatch",
+        "output": "restore: the copy of tasks-told in <evidence>/saved-kind-mismatch-6ffao14k/saved is a file, recorded a dir; it is kept\n",
+        "phase": "restore",
+        "raw_sha256": "88a6b3011a38d7d215861c42ade3529fbdf49b7e9a22eb54f9f6eb484d090fdd"
+      },
+      {
+        "case": "empty-directory-omitted",
+        "output": "",
+        "phase": "restore",
+        "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    ],
+    "restore_function_sha256": "974ceab5a00047f0cf28d7a61baffc28e4b2ab5672cde12f8f2d59d60a923b2f",
+    "source_line_bindings": {
+      "backup_deletion": {
+        "line": 163,
+        "path": "lampOS/tools/played/make-skill.sh",
+        "text": "[ \"${1:-all}\" = reset ] || rm -rf \"$S\""
+      },
+      "backup_kind_comparison": {
+        "line": 153,
+        "path": "lampOS/tools/played/make-skill.sh",
+        "text": "  [ \"$c\" = \"$saved_kind\" ] || { echo \"restore: the copy of $x in $S is a $c, recorded a $saved_kind; it is kept\" >&2; exit 1; }"
+      },
+      "link_refusal": {
+        "line": 86,
+        "path": "lampOS/tools/played/make-skill.sh",
+        "text": "  if [ -L \"$1\" ]; then echo \"$1 is a symbolic link\" >&2; return 1"
+      },
+      "live_deletion": {
+        "line": 157,
+        "path": "lampOS/tools/played/make-skill.sh",
+        "text": "  rm -rf \"$V/$x\" && { [ ! -e \"$S/$x\" ] || cp -a \"$S/$x\" \"$V/\"; } || { echo \"restore: $x could not be put back from $S\" >&2; exit 1; }"
+      },
+      "live_kind_predelete": {
+        "line": 154,
+        "path": "lampOS/tools/played/make-skill.sh",
+        "text": "  kind \"$V/$x\" >/dev/null || { echo \"restore: $V/$x is not a plain file or folder, so not this run's to replace; the copy in $S is kept\" >&2; exit 1; }"
+      },
+      "main_preflight": {
+        "line": 199,
+        "path": "lampOS/tools/played/make-skill.sh",
+        "text": "restore_script | \"$LAMP_SSH\" \"sudo -n sh -s -- check\" || { echo \"make-skill.sh: the voice's made skills or told news is not a plain file or folder (above); nothing changed\" >&2; exit 3; }"
+      },
+      "manifest_file_only": {
+        "line": 111,
+        "path": "lampOS/tools/played/make-skill.sh",
+        "text": "      found=$(find \"$x\" -type f) || return 1"
+      },
+      "nested_type_check": {
+        "line": 89,
+        "path": "lampOS/tools/played/make-skill.sh",
+        "text": "    odd=$(find \"$1\" ! -type f ! -type d) || { echo \"$1 could not be read whole\" >&2; return 1; }"
+      },
+      "save_complete_compare": {
+        "line": 140,
+        "path": "lampOS/tools/played/make-skill.sh",
+        "text": "    a=$(sums \"$S\" $NAMES) && b=$(sums \"$V\" $NAMES) && [ \"$a\" = \"$b\" ] || { echo \"save: the copy in $S is not as $V\" >&2; exit 1; }"
+      },
+      "save_kind_record": {
+        "line": 138,
+        "path": "lampOS/tools/played/make-skill.sh",
+        "text": "      echo \"$x $k\" >> \"$S/kinds\" || exit 1"
+      },
+      "saved_kind_read": {
+        "line": 150,
+        "path": "lampOS/tools/played/make-skill.sh",
+        "text": "  saved_kind=$(sed -n \"s/^$x //p\" \"$S/kinds\") || { echo \"restore: $S/kinds could not be read; the copy is kept\" >&2; exit 1; }"
+      }
+    },
+    "source_review": {
+      "empty_directories": "Admitted nested directories are not enumerated in sums; only top-level kind, regular-file paths+hashes and filecount compared. Exact temporary-FS incomplete-copy control confirms nested-empty-dir omission is not detected before backup deletion. No ordinary cp failure cause inferred.",
+      "path_kinds": "-L first; file/dir/trulyabsent only; nested links/FIFO/devices rejected by checkedfind; main preflight before uploads and save rechecks",
+      "saved_kinds": "Each knownpath kind recorded, current backupkind must match one recognized single savedkind; missing/duplicate values refuse via case. All selected saved/live kinds prevalidated before deleting either livepath. File manifests must succeed and agree before done or backup removal. Private recovery metadata is not authenticated; external-tamper/writer-race excluded from this review."
+    },
+    "source_sha256": {
+      "lampOS/tools/played/README.md": "fe66cfad4fa4368f0790459c997178b0011a1024ad79dd9538621469f385dc07",
+      "lampOS/tools/played/make-skill-test.sh": "982bdf8c611183510b018186b909c5e54f0676b402926802fff66636cccee6f3",
+      "lampOS/tools/played/make-skill.sh": "e26bea28f68253e7aca85c998fe61d788ff34e628ce1c34cb0d68948cb21ba3e",
+      "lampOS/tools/played/stand-in-test.sh": "c18ec34dff356029cfbf74529f66c22df365e495cd3ca3c42f4e8dc61d30ad5d",
+      "lampOS/tools/played/stand-in.sh": "4be23b62b781d2a64e98392593c8af1394e0e6f3b87b518e39a3e68747fd0c02"
+    },
+    "stages": [
+      {
+        "argv": [
+          "/bin/bash",
+          "-n",
+          "<worktree>/lampOS/tools/played/make-skill.sh"
+        ],
+        "cleanup": [],
+        "elapsed_seconds": 0.006,
+        "exit": 0,
+        "group": "absent",
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "pgid": 40833,
+        "pid": 40833,
+        "stage": "syntax-make-skill.sh",
+        "timed_out": false
+      },
+      {
+        "argv": [
+          "/bin/bash",
+          "-n",
+          "<worktree>/lampOS/tools/played/make-skill-test.sh"
+        ],
+        "cleanup": [],
+        "elapsed_seconds": 0.0054,
+        "exit": 0,
+        "group": "absent",
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "pgid": 40834,
+        "pid": 40834,
+        "stage": "syntax-make-skill-test.sh",
+        "timed_out": false
+      },
+      {
+        "argv": [
+          "/bin/sh",
+          "-n",
+          "<worktree>/lampOS/tools/played/stand-in.sh"
+        ],
+        "cleanup": [],
+        "elapsed_seconds": 0.0098,
+        "exit": 0,
+        "group": "absent",
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "pgid": 40839,
+        "pid": 40839,
+        "stage": "syntax-stand-in.sh",
+        "timed_out": false
+      },
+      {
+        "argv": [
+          "/bin/sh",
+          "-n",
+          "<worktree>/lampOS/tools/played/stand-in-test.sh"
+        ],
+        "cleanup": [],
+        "elapsed_seconds": 0.0117,
+        "exit": 0,
+        "group": "absent",
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "pgid": 40840,
+        "pid": 40840,
+        "stage": "syntax-stand-in-test.sh",
+        "timed_out": false
+      },
+      {
+        "argv": [
+          "/bin/bash",
+          "<evidence>/digest-fails-copy-differs-nn1xnn08/exact-preflight.sh"
+        ],
+        "cleanup": [],
+        "elapsed_seconds": 0.6909,
+        "exit": 0,
+        "group": "absent",
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "pgid": 40841,
+        "pid": 40841,
+        "stage": "digest-fails-copy-differs-check",
+        "timed_out": false
+      },
+      {
+        "argv": [
+          "/bin/bash",
+          "<evidence>/digest-fails-copy-differs-nn1xnn08/exact-save.sh"
+        ],
+        "cleanup": [],
+        "elapsed_seconds": 0.1414,
+        "exit": 0,
+        "group": "absent",
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "pgid": 40862,
+        "pid": 40862,
+        "stage": "digest-fails-copy-differs-save",
+        "timed_out": false
+      },
+      {
+        "argv": [
+          "/bin/sh",
+          "<evidence>/digest-fails-copy-differs-nn1xnn08/saved/restore"
+        ],
+        "cleanup": [],
+        "elapsed_seconds": 1.1013,
+        "exit": 1,
+        "group": "absent",
+        "log_sha256": "53b7adab4fd82d042148e771a263d6e1180cb248345c8b5ddc69b36ddac7d1ef",
+        "pgid": 40904,
+        "pid": 40904,
+        "stage": "digest-fails-copy-differs-restore",
+        "timed_out": false
+      },
+      {
+        "argv": [
+          "/bin/bash",
+          "<evidence>/digest-fails-copy-matches-qjszlvm8/exact-preflight.sh"
+        ],
+        "cleanup": [],
+        "elapsed_seconds": 0.0383,
+        "exit": 0,
+        "group": "absent",
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "pgid": 40935,
+        "pid": 40935,
+        "stage": "digest-fails-copy-matches-check",
+        "timed_out": false
+      },
+      {
+        "argv": [
+          "/bin/bash",
+          "<evidence>/digest-fails-copy-matches-qjszlvm8/exact-save.sh"
+        ],
+        "cleanup": [],
+        "elapsed_seconds": 0.1319,
+        "exit": 0,
+        "group": "absent",
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "pgid": 40940,
+        "pid": 40940,
+        "stage": "digest-fails-copy-matches-save",
+        "timed_out": false
+      },
+      {
+        "argv": [
+          "/bin/sh",
+          "<evidence>/digest-fails-copy-matches-qjszlvm8/saved/restore"
+        ],
+        "cleanup": [],
+        "elapsed_seconds": 0.3571,
+        "exit": 1,
+        "group": "absent",
+        "log_sha256": "6b3e6db1186739e43a697c620660e19242934a44165d833b4897d0c8e01dadf3",
+        "pgid": 40982,
+        "pid": 40982,
+        "stage": "digest-fails-copy-matches-restore",
+        "timed_out": false
+      },
+      {
+        "argv": [
+          "/bin/bash",
+          "<evidence>/find-fails-ffzjlezj/exact-preflight.sh"
+        ],
+        "cleanup": [],
+        "elapsed_seconds": 0.0409,
+        "exit": 0,
+        "group": "absent",
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "pgid": 41003,
+        "pid": 41003,
+        "stage": "find-fails-check",
+        "timed_out": false
+      },
+      {
+        "argv": [
+          "/bin/bash",
+          "<evidence>/find-fails-ffzjlezj/exact-save.sh"
+        ],
+        "cleanup": [],
+        "elapsed_seconds": 0.1302,
+        "exit": 0,
+        "group": "absent",
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "pgid": 41008,
+        "pid": 41008,
+        "stage": "find-fails-save",
+        "timed_out": false
+      },
+      {
+        "argv": [
+          "/bin/sh",
+          "<evidence>/find-fails-ffzjlezj/saved/restore"
+        ],
+        "cleanup": [],
+        "elapsed_seconds": 0.5236,
+        "exit": 1,
+        "group": "absent",
+        "log_sha256": "fa202f6ddc67c5e36fd0a977b0dec73b7924eeb63456e283614a0263c1c324cf",
+        "pgid": 41050,
+        "pid": 41050,
+        "stage": "find-fails-restore",
+        "timed_out": false
+      },
+      {
+        "argv": [
+          "/bin/bash",
+          "<evidence>/sort-fails-s7_skawl/exact-preflight.sh"
+        ],
+        "cleanup": [],
+        "elapsed_seconds": 0.0382,
+        "exit": 0,
+        "group": "absent",
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "pgid": 41059,
+        "pid": 41059,
+        "stage": "sort-fails-check",
+        "timed_out": false
+      },
+      {
+        "argv": [
+          "/bin/bash",
+          "<evidence>/sort-fails-s7_skawl/exact-save.sh"
+        ],
+        "cleanup": [],
+        "elapsed_seconds": 0.1236,
+        "exit": 0,
+        "group": "absent",
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "pgid": 41064,
+        "pid": 41064,
+        "stage": "sort-fails-save",
+        "timed_out": false
+      },
+      {
+        "argv": [
+          "/bin/sh",
+          "<evidence>/sort-fails-s7_skawl/saved/restore"
+        ],
+        "cleanup": [],
+        "elapsed_seconds": 0.3652,
+        "exit": 1,
+        "group": "absent",
+        "log_sha256": "4058dc30eef40f30a1325f7c0c5eb6d74a1fbda6582a57d915ea63b38685deed",
+        "pgid": 41106,
+        "pid": 41106,
+        "stage": "sort-fails-restore",
+        "timed_out": false
+      },
+      {
+        "argv": [
+          "/bin/bash",
+          "<evidence>/preflight-dangling-k_rrc2em/exact-preflight.sh"
+        ],
+        "cleanup": [],
+        "elapsed_seconds": 0.039,
+        "exit": 3,
+        "group": "absent",
+        "log_sha256": "e100028d6a1cac1454fd00fc3ade24714ed774e1e9a8fbbf535790e492e52b28",
+        "pgid": 41124,
+        "pid": 41124,
+        "stage": "preflight-dangling-check",
+        "timed_out": false
+      },
+      {
+        "argv": [
+          "/bin/bash",
+          "<evidence>/preflight-filelink-x2fizuey/exact-preflight.sh"
+        ],
+        "cleanup": [],
+        "elapsed_seconds": 0.0427,
+        "exit": 3,
+        "group": "absent",
+        "log_sha256": "358336ab13ff9491b9fd4abc2ce363e7089e77eacea92095ae29dfc677fc50e2",
+        "pgid": 41129,
+        "pid": 41129,
+        "stage": "preflight-filelink-check",
+        "timed_out": false
+      },
+      {
+        "argv": [
+          "/bin/bash",
+          "<evidence>/postsave-dangling-hg7b723a/exact-preflight.sh"
+        ],
+        "cleanup": [],
+        "elapsed_seconds": 0.0434,
+        "exit": 0,
+        "group": "absent",
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "pgid": 41134,
+        "pid": 41134,
+        "stage": "postsave-dangling-check",
+        "timed_out": false
+      },
+      {
+        "argv": [
+          "/bin/bash",
+          "<evidence>/postsave-dangling-hg7b723a/exact-save.sh"
+        ],
+        "cleanup": [],
+        "elapsed_seconds": 0.138,
+        "exit": 0,
+        "group": "absent",
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "pgid": 41139,
+        "pid": 41139,
+        "stage": "postsave-dangling-save",
+        "timed_out": false
+      },
+      {
+        "argv": [
+          "/bin/sh",
+          "<evidence>/postsave-dangling-hg7b723a/saved/restore"
+        ],
+        "cleanup": [],
+        "elapsed_seconds": 0.04,
+        "exit": 1,
+        "group": "absent",
+        "log_sha256": "06c0fb7476c1bf115f6debd325853d3b905c94f855b776c6f95ef1de195cfd33",
+        "pgid": 41181,
+        "pid": 41181,
+        "stage": "postsave-dangling-restore",
+        "timed_out": false
+      },
+      {
+        "argv": [
+          "/bin/bash",
+          "<evidence>/preflight-nested-fifo-68uqdhqf/exact-preflight.sh"
+        ],
+        "cleanup": [],
+        "elapsed_seconds": 0.0405,
+        "exit": 3,
+        "group": "absent",
+        "log_sha256": "cf2be61ee4912dc8d0b83d09416d0aa509538ec11b52308d459d5d3b0406baa1",
+        "pgid": 41189,
+        "pid": 41189,
+        "stage": "preflight-nested-fifo-check",
+        "timed_out": false
+      },
+      {
+        "argv": [
+          "/bin/bash",
+          "<evidence>/saved-kind-mismatch-6ffao14k/exact-preflight.sh"
+        ],
+        "cleanup": [],
+        "elapsed_seconds": 0.0404,
+        "exit": 0,
+        "group": "absent",
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "pgid": 41195,
+        "pid": 41195,
+        "stage": "saved-kind-mismatch-check",
+        "timed_out": false
+      },
+      {
+        "argv": [
+          "/bin/bash",
+          "<evidence>/saved-kind-mismatch-6ffao14k/exact-save.sh"
+        ],
+        "cleanup": [],
+        "elapsed_seconds": 0.1215,
+        "exit": 0,
+        "group": "absent",
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "pgid": 41200,
+        "pid": 41200,
+        "stage": "saved-kind-mismatch-save",
+        "timed_out": false
+      },
+      {
+        "argv": [
+          "/bin/sh",
+          "<evidence>/saved-kind-mismatch-6ffao14k/saved/restore"
+        ],
+        "cleanup": [],
+        "elapsed_seconds": 0.0399,
+        "exit": 1,
+        "group": "absent",
+        "log_sha256": "88a6b3011a38d7d215861c42ade3529fbdf49b7e9a22eb54f9f6eb484d090fdd",
+        "pgid": 41243,
+        "pid": 41243,
+        "stage": "saved-kind-mismatch-restore",
+        "timed_out": false
+      },
+      {
+        "argv": [
+          "/bin/bash",
+          "<evidence>/empty-directory-omitted-st0cq5xf/exact-preflight.sh"
+        ],
+        "cleanup": [],
+        "elapsed_seconds": 0.0421,
+        "exit": 0,
+        "group": "absent",
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "pgid": 41251,
+        "pid": 41251,
+        "stage": "empty-directory-omitted-check",
+        "timed_out": false
+      },
+      {
+        "argv": [
+          "/bin/bash",
+          "<evidence>/empty-directory-omitted-st0cq5xf/exact-save.sh"
+        ],
+        "cleanup": [],
+        "elapsed_seconds": 0.1369,
+        "exit": 0,
+        "group": "absent",
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "pgid": 41256,
+        "pid": 41256,
+        "stage": "empty-directory-omitted-save",
+        "timed_out": false
+      },
+      {
+        "argv": [
+          "/bin/sh",
+          "<evidence>/empty-directory-omitted-st0cq5xf/saved/restore"
+        ],
+        "cleanup": [],
+        "elapsed_seconds": 0.6517,
+        "exit": 0,
+        "group": "absent",
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "pgid": 41298,
+        "pid": 41298,
+        "stage": "empty-directory-omitted-restore",
+        "timed_out": false
+      }
+    ],
+    "tool_sha256": {
+      "bash": "16303dedab719ddb63efd9dd68092a0da37b397bfd4fcb856d5f1c86c5ee414b",
+      "cp": "f0629f462c6535f7b1a19f559b7093638e714961bea9228cfb2ae7896f8557f4",
+      "find": "9cd3b4bbb80ac290fd188172e5fcbc48a6fe10ff3374313e4f01efea0101be1b",
+      "sed": "6ac57d91d32dda62f954dbcfe29e43dd55e69946821092b542dbbbe7dca86997",
+      "sh": "c0eaf44f9242d5bbc2e14f4e8b7dccc1eff7f2976d64dc18914d5ef9f373e100",
+      "sha256sum": "0e948a75f5773aebdfc38e28b289a27e04627eb933cf884d72788d5e5d9ccb67",
+      "shasum": "7b4a2ceaa5ba5d712b056b6415ca641f5516e58116eafd33b4467768fbf1b4b0",
+      "sort": "54c29f342722dffb3413a3a628f9bb37efccf4b26dd1ea5598e10edb82b4c33d"
+    },
+    "tree": "f7d99a96cffb42816ba6cd86974bfefd8a36345a",
+    "utc": "2026-10-27T18:48:41.055935+00:00",
+    "voice_state_sha256": "59132010f8201db1dd4825cc29636b1db4b0e84237577ca6e56db0dce766913a"
+  },
+  "full_gate": {
+    "P3_open": "Exact injected copy may omit nested empty directories without manifest detection; verifiedfilebytes intact; no realstorage or writer-race claim",
+    "blocked_real_tool_attempts": 0,
+    "head": "facc06e8aaadec5ae7eac4e5e33da12afe23b86a",
+    "helper_sha256": {
+      "afplay": "177f1ecdde05e0ae8b652249075afcd0ff736f684d46b357cf7978b09ac6fb6f",
+      "full-root-approval.json": "c041ddd212e7291d8a4812f0cd906958c67652ae98ca5c4b4c7f459b9d19e12b",
+      "run-full-current.py": "4fb5a7e9d54580a90d86f5367e8c6b1a29f51a19efc9f069c7a7a406cd9d7669",
+      "say": "177f1ecdde05e0ae8b652249075afcd0ff736f684d46b357cf7978b09ac6fb6f",
+      "scp": "177f1ecdde05e0ae8b652249075afcd0ff736f684d46b357cf7978b09ac6fb6f",
+      "sftp": "177f1ecdde05e0ae8b652249075afcd0ff736f684d46b357cf7978b09ac6fb6f",
+      "ssh": "177f1ecdde05e0ae8b652249075afcd0ff736f684d46b357cf7978b09ac6fb6f",
+      "sshpass": "177f1ecdde05e0ae8b652249075afcd0ff736f684d46b357cf7978b09ac6fb6f",
+      "sudo": "177f1ecdde05e0ae8b652249075afcd0ff736f684d46b357cf7978b09ac6fb6f",
+      "systemctl": "177f1ecdde05e0ae8b652249075afcd0ff736f684d46b357cf7978b09ac6fb6f",
+      "systemd-run": "177f1ecdde05e0ae8b652249075afcd0ff736f684d46b357cf7978b09ac6fb6f"
+    },
+    "helper_tool_guards_unchanged": true,
+    "limits": [
+      "Mock suites only; no physical played arms/device/SSH/sudo/sound/network/Cargo",
+      "Original old full-suite timeouts remain unqualified; author852s evidence separate",
+      "Currentfacc result only even if publishedhead moves"
+    ],
+    "make_skill_full_suite": {
+      "assertion": "original committed all passed marker; no FAILlines",
+      "attempts": 1,
+      "exit": 0,
+      "no_time_or_assertion_edits": true
+    },
+    "source_before_after_equal": true,
+    "source_guard_count": 35,
+    "source_guard_manifest_sha256": "f77ee5d8b02ac0c83741a4fb3aac8784aa4fc204bf900a33bccc9a891bd18091",
+    "stages": [
+      {
+        "argv": [
+          "/bin/bash",
+          "<worktree>/lampOS/tools/played/make-skill-test.sh"
+        ],
+        "cleanup": [],
+        "elapsed_seconds": 771.3592,
+        "exit": 0,
+        "group": "absent",
+        "log_sha256": "3d82800a43a2ba84fd2c9a326d0946d3b2721ff7045976aa1110a874f7f7d2b6",
+        "pgid": 44392,
+        "pid": 44392,
+        "stage": "full-make-skill-suite",
+        "timed_out": false
+      },
+      {
+        "argv": [
+          "/bin/sh",
+          "<worktree>/lampOS/tools/played/stand-in-test.sh"
+        ],
+        "cleanup": [],
+        "elapsed_seconds": 3.0054,
+        "exit": 0,
+        "group": "absent",
+        "log_sha256": "3b85b21694c917352f6b96790f4d7167da9f38f7d02b366116e4b430bca063f2",
+        "pgid": 69738,
+        "pid": 69738,
+        "stage": "full-stand-in-suite",
+        "timed_out": false
+      }
+    ],
+    "stand_in": {
+      "FAIL": 0,
+      "attempts": 1,
+      "ok": 56
+    },
+    "status": "PASS",
+    "syntax": "four checks already passed current frozenhead in focusedpacket; not repeated",
+    "tools_sha256": {
+      "awk": "74eca1b2aa59d4af94ad0ba8294ddb544f7db9f1a68d4b0ade2a70ea6c533940",
+      "bash": "16303dedab719ddb63efd9dd68092a0da37b397bfd4fcb856d5f1c86c5ee414b",
+      "cat": "2b6e8f3f90c42a9d8d1e5471efb4173ad3499fc8ca4039b39327b394616cf39e",
+      "chmod": "b0451fa7b5995805519855783cc208a2ade4925b30735258639bc0cca68da10d",
+      "chown": "e2970091ee40ee88be84d249e6fd02b2e46df3e0363cd1f3781b7d7455c4eba0",
+      "cksum": "48a6871e7b036fb79246fea90593c25e4461d712d8cf8eb951fa6dada6cdd3cb",
+      "cmp": "5d8cc18082edf0e4baac34ad3ced05ca843bd02f25662765693d46b5ceafa30d",
+      "cp": "f0629f462c6535f7b1a19f559b7093638e714961bea9228cfb2ae7896f8557f4",
+      "cut": "18333d7eacc3e7d01c891957ff48cebda01b4362778c2fcd3da77c5129b4a936",
+      "date": "0c7f77e19bc79013bc5bc4e67beea3b9d546d6d09a36799c2eed2693967af8c6",
+      "env": "75690864f0e7397db05bcc0f4439915559ce24c2d834d530e4e619c14b938556",
+      "find": "9cd3b4bbb80ac290fd188172e5fcbc48a6fe10ff3374313e4f01efea0101be1b",
+      "grep": "e70a05960005b01d94abb0715bddafe20473e5854a6ef461ea12915801596550",
+      "head": "189b01920af37ff1defbc26fdf2ba4696fdf735f5894a0b1fc6ea3343c782dad",
+      "id": "77c738fb7a80a8a3198d3c544d3d0342cb387989c88f6166f1b5dedc7eb5d6b3",
+      "mkdir": "a84382b7827e7bfb285321413f9a89b7d2805fa6afd0369a8f32f4f0241e18cd",
+      "mktemp": "3d96bc692701750562e5bc995d6b6f6855fd9294caa3fe5bcca680eeb150554e",
+      "python3": "3a717f69a4bfc12c373da8489a8fc88d53e9117723e00490fbe5e84e153125a6",
+      "rm": "4faf0408bb0c5dcb8ea47c08ff03cb44aedfe2712220111586b71cb93cd1d43f",
+      "sed": "6ac57d91d32dda62f954dbcfe29e43dd55e69946821092b542dbbbe7dca86997",
+      "seq": "c784acaf932b5348fcc557965a4d78e36f62da0172e330438ea14ea2cb2310ad",
+      "sh": "c0eaf44f9242d5bbc2e14f4e8b7dccc1eff7f2976d64dc18914d5ef9f373e100",
+      "sha256sum": "0e948a75f5773aebdfc38e28b289a27e04627eb933cf884d72788d5e5d9ccb67",
+      "shasum": "7b4a2ceaa5ba5d712b056b6415ca641f5516e58116eafd33b4467768fbf1b4b0",
+      "sleep": "c30e72b2e2d6a4eb32b6f38f07815346bc734d031d3c712d9123f28d8b237051",
+      "sort": "54c29f342722dffb3413a3a628f9bb37efccf4b26dd1ea5598e10edb82b4c33d",
+      "stat": "7a0f851abf47184dc85a859e17f276608f41b77259729a91829a0bce20d3b54f",
+      "tail": "0820e3b855044a4c3d92701a14cb30c14515cc5329bb723b04cda680afb0dd2a",
+      "tee": "2cf19c854bae9f465ac8b3244b3448316d08f525dc63c0a9ac0c69cc2e7e1105",
+      "touch": "f63b07192f180955fe1566ff2d7c24db044b28aa38a6df4b714330f6ddc5eb83",
+      "tr": "b8ac76bef7c61d9a462e6054d7887108ea632d250049aa5a2abee0ab906aefb4",
+      "wc": "ad2cb3bf11b83cc8d301de5dc0c38b9823e16c0a13a6f89b66a38f05b30a0151",
+      "xargs": "e1e710ff1f15f067b1ec0ba47a0d0f14a11ae1010be0dcc84df5459eead2dba9"
+    },
+    "utc": "2026-10-27T19:04:20.892484+00:00"
+  },
+  "head": "facc06e8aaadec5ae7eac4e5e33da12afe23b86a",
+  "limits": [
+    "Exactfacc local mocks only; no installed/device/physical played-arm or latency claim",
+    "Prior oldhead timeouts remain unqualified and author852s/56scope separate",
+    "EmptydirP3: injectedcp omits nestedemptydir only; verifiedfilebytes intact; no realstorage/writerrace diagnosis",
+    "Full make-skill once with original committed sleeps/deadlines/assertions, thenstand-in once;4syntaxpreviouslypassedcurrenthead withoutrepeat",
+    "No commits/publicposts/push/sourceedits/Cargo/realSSH/audio/device"
+  ],
+  "log_summaries": {
+    "make_skill": "make-skill-test: all passed\n",
+    "stand_in": {
+      "FAIL": 0,
+      "ok": 56
+    }
+  },
+  "parent": "e43fd36f6aee55e4fe9a2ee73acc2e261765fa5f",
+  "tool_metadata": {
+    "bash": "GNU bash, version 3.2.57(1)-release (x86_64-apple-darwin25)",
+    "full_suite_scope": "Exact committed make-skill-test once <=1200s then stand-in-test once<=120s; syntax already fourpass; no modified sleeps/assertions",
+    "platform": "macOS-26.6.2-x86_64-i386-64bit",
+    "python": "3.9.1",
+    "source_guard_count": 35
+  },
+  "tree": "f7d99a96cffb42816ba6cd86974bfefd8a36345a"
+}
