@@ -1,8 +1,10 @@
 //! Exclusively held Linux tty lifecycle for read-only inspection and guarded motion.
 //!
 //! Opening an unqualified USB adapter can change modem lines in the kernel.
-//! No modem, break, reset or torque operations exist. The separate motion
-//! adapter exposes only the guarded finite position-control API.
+//! No modem, break or reset operations exist. Torque is written only by the
+//! body's own code: [`run_body`], and [`let_go_once`] (off, to a lamp found
+//! down, before the power goes, #3697). The
+//! separate motion adapter exposes only the guarded finite position-control API.
 //! All deadlines are observed between syscalls, not kernel preemption guarantees.
 
 use crate::{
@@ -289,6 +291,53 @@ pub fn run_body(
     port.cleanup = owner.finish(origin, false);
     port.elapsed_us = micros(origin);
     BodyResult { port, body }
+}
+
+/// How the servo port was taken and given back around one let-go, and what
+/// the let-go found and did (`crate::body::let_go_stopped`).
+#[derive(Debug, Serialize)]
+pub struct LetGoResult {
+    pub port: InspectionResult,
+    pub let_go: Option<crate::body::LetGo>,
+}
+
+/// Own the servo port once, after the body has stopped, and let a lamp
+/// that is down go (#3697): torque off on all five, each read back. Only
+/// torque off is ever written, and only to a lamp found down.
+#[must_use]
+pub fn let_go_once(
+    config: &InspectionConfig,
+    home: [u16; 3],
+    folded: Option<[u16; 2]>,
+) -> LetGoResult {
+    let origin = Instant::now();
+    let mut port = empty_result(config);
+    let mut owner = Owner::default();
+    let mut cancelled = || Ok(false);
+    let mut let_go = None;
+    match owner.prepare(config, None, &mut port, origin, &mut cancelled) {
+        Ok(()) => {
+            port.prepared_us = Some(micros(origin));
+            let mut runtime = HostRuntime {
+                origin,
+                cancelled: &mut cancelled,
+                recovery_inhibited: None,
+            };
+            let mut io = LinuxPort {
+                fd: owner.fd.as_ref().expect("prepared tty"),
+            };
+            let_go = Some(crate::body::let_go_stopped(
+                &mut io,
+                &mut runtime,
+                home,
+                folded,
+            ));
+        }
+        Err(error) => port.preparation_error = Some(error),
+    }
+    port.cleanup = owner.finish(origin, false);
+    port.elapsed_us = micros(origin);
+    LetGoResult { port, let_go }
 }
 
 fn inspect_once_with(
