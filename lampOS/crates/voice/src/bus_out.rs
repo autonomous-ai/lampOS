@@ -485,7 +485,13 @@ fn room_at(state: Room, at_ms: u64, now_ms: u64) -> crate::room_told::Room {
 /// when they have said nothing still fresh (not running, the camera closed,
 /// the look older than its two seconds).
 pub fn someone_turned_to_lamp(bus: &Bus) -> Option<bool> {
+    #[cfg(test)]
+    let mut diagnostic = crate::second_provider::worker::two_faces_diagnostic::LatestRead::begin(
+        "someone_turned_to_lamp",
+    );
     let message = bus.latest(lamp_msgs::Faces::TOPIC).ok()??;
+    #[cfg(test)]
+    diagnostic.message(&message);
     turned_in(&message)
 }
 
@@ -524,7 +530,12 @@ pub fn someone_in_view_turned_away(bus: &Bus) -> bool {
 /// (`LAMP_JOIN_CUT_WORDS`). The second route reads it once a verdict for
 /// both.
 pub fn faces_in_view(bus: &Bus) -> Option<usize> {
+    #[cfg(test)]
+    let mut diagnostic =
+        crate::second_provider::worker::two_faces_diagnostic::LatestRead::begin("faces_in_view");
     let message = bus.latest(lamp_msgs::Faces::TOPIC).ok()??;
+    #[cfg(test)]
+    diagnostic.message(&message);
     if message.expired {
         return None;
     }

@@ -4126,6 +4126,179 @@ struct FacesLook {
     expires_ms: Option<u64>,
 }
 
+/// Receipts belong to one explicitly enabled fixture observer. This module is
+/// absent from normal builds; it never supplies policy inputs or a clock.
+#[cfg(test)]
+pub(crate) mod two_faces_diagnostic {
+    use serde_json::{Value, json};
+    use std::{
+        cell::RefCell,
+        rc::{Rc, Weak},
+    };
+
+    const MAX_RECORDS: usize = 64;
+
+    #[derive(Clone, Default, serde::Serialize)]
+    pub(super) struct Records {
+        events: Vec<Value>,
+        dropped: usize,
+    }
+
+    impl Records {
+        pub(super) fn push(&mut self, event: Value) {
+            if self.events.len() < MAX_RECORDS {
+                self.events.push(event);
+            } else {
+                self.dropped = self.dropped.saturating_add(1);
+            }
+        }
+    }
+
+    // Only a weak lookup lives in TLS. The log belongs to the non-Send Scope,
+    // not to a global collector, and other threads cannot see that observer.
+    thread_local! {
+        static OBSERVER: RefCell<Option<Weak<RefCell<Records>>>> = const { RefCell::new(None) };
+    }
+
+    pub(crate) fn stamp() -> Value {
+        json!({
+            "mono_us": lamp_ipc::monotonic_us(),
+            "unix_ms": super::unix_ms(std::time::SystemTime::now()),
+        })
+    }
+
+    fn observer() -> Option<Rc<RefCell<Records>>> {
+        OBSERVER
+            .try_with(|slot| slot.try_borrow().ok()?.as_ref()?.upgrade())
+            .ok()
+            .flatten()
+    }
+
+    fn record(event: impl FnOnce() -> Value) {
+        if let Some(log) = observer()
+            && let Ok(mut records) = log.try_borrow_mut()
+        {
+            records.push(event());
+        }
+    }
+
+    pub(super) struct Scope {
+        log: Rc<RefCell<Records>>,
+        previous: Option<Weak<RefCell<Records>>>,
+    }
+
+    impl Scope {
+        pub(super) fn begin() -> Self {
+            let log = Rc::new(RefCell::new(Records::default()));
+            let previous = OBSERVER.with(|slot| slot.replace(Some(Rc::downgrade(&log))));
+            Self { log, previous }
+        }
+
+        pub(super) fn published(
+            &self,
+            before: Value,
+            at_us: u64,
+            after: Value,
+            outcome: lamp_bus::Published,
+        ) {
+            self.log.borrow_mut().push(json!({
+                "event": "publish_return", "before": before, "at_us_argument": at_us,
+                "after": after, "delivered": outcome.delivered,
+                "dropped": outcome.dropped, "removed": outcome.removed,
+                "meaning": "queue delivery only; match at_us with actual ingestion/header receipts",
+            }));
+        }
+
+        pub(super) fn report(
+            &self,
+            heeding: &super::Heeding,
+            query_us: u64,
+            room: crate::room_told::Room,
+            held: Option<&str>,
+            held_on: bool,
+            privacy: bool,
+        ) {
+            let ingestion = heeding
+                .faces_held
+                .as_ref()
+                .and_then(|held| held.lock().ok().and_then(|held| held.diagnostic.clone()));
+            eprintln!(
+                "two_faces_diagnostic {}",
+                json!({
+                    "held_on": held_on, "privacy": privacy, "query_at_us_argument": query_us,
+                    "after_verdict": stamp(), "room": format!("{room:?}"), "held": held,
+                    "calling_thread": &*self.log.borrow(), "reader_and_policy": ingestion,
+                    "bound_per_log": MAX_RECORDS,
+                    "observation_only": true,
+                })
+            );
+        }
+    }
+
+    impl Drop for Scope {
+        fn drop(&mut self) {
+            let previous = self.previous.take();
+            let _ = OBSERVER.try_with(|slot| {
+                if let Ok(mut slot) = slot.try_borrow_mut() {
+                    *slot = previous;
+                }
+            });
+        }
+    }
+
+    /// Covers the existing read, including its early None/error return. It
+    /// performs no read itself; no message means absent-or-error, not expiry.
+    pub(crate) struct LatestRead {
+        reader: &'static str,
+        log: Option<Rc<RefCell<Records>>>,
+        before: Option<Value>,
+        message: Option<Value>,
+    }
+
+    impl LatestRead {
+        pub(crate) fn begin(reader: &'static str) -> Self {
+            let log = observer();
+            let before = log.as_ref().map(|_| stamp());
+            Self {
+                reader,
+                log,
+                before,
+                message: None,
+            }
+        }
+
+        pub(crate) fn message(&mut self, message: &lamp_bus::Message) {
+            if self.log.is_some() {
+                self.message = Some(json!({
+                    "seq": message.header.seq, "at_us": message.header.at_us,
+                    "at_unix_ms": message.header.at_unix_ms,
+                    "expires_ms": message.header.expires_ms, "expired": message.expired,
+                }));
+            }
+        }
+    }
+
+    impl Drop for LatestRead {
+        fn drop(&mut self) {
+            if let Some(log) = &self.log
+                && let Ok(mut records) = log.try_borrow_mut()
+            {
+                records.push(json!({
+                    "event": "existing_latest_read", "reader": self.reader,
+                    "before": self.before, "after": stamp(), "message": self.message,
+                    "none_means": "existing read returned absent-or-error; no extra read was performed",
+                }));
+            }
+        }
+    }
+
+    pub(super) fn signs(turned: Option<bool>, in_view: Option<usize>) {
+        record(
+            || json!({"event": "actual_signs_read", "at": stamp(), "turned": turned, "in_view": in_view}),
+        );
+    }
+}
+
 /// Every look the eyes published (`humans/faces/tracked`), read on a
 /// thread of its own as they come (`LAMP_TWO_FACES_HELD=on`): two faces
 /// make the room busy only when the newest fresh look sees two and at
@@ -4138,16 +4311,60 @@ struct FacesLook {
 /// queued before it never come back.
 #[derive(Default)]
 struct FacesHeld {
+    #[cfg(test)]
+    diagnostic: Option<two_faces_diagnostic::Records>,
     looks: std::collections::VecDeque<FacesLook>,
     epoch: u64,
     cutoff_us: Option<u64>,
 }
 
 impl FacesHeld {
+    #[cfg(test)]
+    fn diagnostic_event(
+        &mut self,
+        event: &'static str,
+        now_us: u64,
+        fields: impl FnOnce() -> serde_json::Value,
+    ) {
+        if self.diagnostic.is_some() {
+            let looks: Vec<_> = self
+                .looks
+                .iter()
+                .map(|look| {
+                    serde_json::json!({
+                        "at_us": look.at_us, "faces": look.faces, "expires_ms": look.expires_ms,
+                    })
+                })
+                .collect();
+            let record = serde_json::json!({
+                "event": event, "now_us": now_us, "observed_at": two_faces_diagnostic::stamp(),
+                "epoch": self.epoch, "cutoff_us": self.cutoff_us, "looks": looks,
+                "fields": fields(),
+            });
+            if let Some(log) = &mut self.diagnostic {
+                log.push(record);
+            }
+        }
+    }
+
+    #[cfg(test)]
+    fn diagnostic_received(&mut self, message: &lamp_bus::Message, epoch: u64) {
+        self.diagnostic_event("received_after_parse", lamp_ipc::monotonic_us(), || {
+            serde_json::json!({
+                "seq": message.header.seq, "at_us": message.header.at_us,
+                "at_unix_ms": message.header.at_unix_ms, "expires_ms": message.header.expires_ms,
+                "expired": message.expired, "receive_epoch": epoch,
+            })
+        });
+    }
     /// Keep a look the reader took at `now_us`, `epoch` read before it
     /// began to wait for it.
     fn look(&mut self, look: FacesLook, epoch: u64, now_us: u64) {
+        #[cfg(test)]
+        self.diagnostic_event("admission_begin", now_us, || serde_json::json!({"look_at_us": look.at_us, "faces": look.faces, "receive_epoch": epoch}));
         if epoch != self.epoch || self.cutoff_us.is_some_and(|cutoff| look.at_us <= cutoff) {
+            #[cfg(test)]
+            self.diagnostic_event("rejected_privacy", now_us, || serde_json::json!({}));
             return;
         }
         let ahead = look.at_us > now_us + lamp_bus::EXPIRY_GRACE_MS * 1_000;
@@ -4159,12 +4376,20 @@ impl FacesHeld {
             self.looks.clear();
         }
         if ahead || Self::stale(&look, now_us) {
+            #[cfg(test)]
+            self.diagnostic_event(
+                "rejected_future_or_stale",
+                now_us,
+                || serde_json::json!({"ahead": ahead}),
+            );
             return;
         }
         if self.looks.len() == FACES_LOOKS_KEPT {
             self.looks.pop_front();
         }
         self.looks.push_back(look);
+        #[cfg(test)]
+        self.diagnostic_event("admitted", now_us, || serde_json::json!({}));
     }
 
     /// Whether a look is over [`LOOK_GAP_MS`] old at `now_us`, or expired
@@ -4187,6 +4412,8 @@ impl FacesHeld {
     /// Whether two faces have stayed at `now_us`. A missing or expired
     /// newest look ends what was kept.
     fn two_stayed(&mut self, now_us: u64) -> bool {
+        #[cfg(test)]
+        self.diagnostic_event("policy_enter", now_us, || serde_json::json!({}));
         while self
             .looks
             .front()
@@ -4195,19 +4422,43 @@ impl FacesHeld {
             self.looks.pop_front();
         }
         let Some(newest) = self.looks.back().copied() else {
+            #[cfg(test)]
+            self.diagnostic_event(
+                "policy_empty",
+                now_us,
+                || serde_json::json!({"result": false}),
+            );
             return false;
         };
         if Self::stale(&newest, now_us) {
+            #[cfg(test)]
+            self.diagnostic_event(
+                "policy_stale",
+                now_us,
+                || serde_json::json!({"result": false}),
+            );
             self.looks.clear();
             return false;
         }
         if newest.faces < 2 {
+            #[cfg(test)]
+            self.diagnostic_event(
+                "policy_newest_under_two",
+                now_us,
+                || serde_json::json!({"result": false}),
+            );
             return false;
         }
         let mut two = self.looks.iter().filter(|look| look.faces >= 2);
         let count = two.clone().count();
         let first = two.next().map_or(0, |look| look.at_us);
         let last = two.next_back().map_or(first, |look| look.at_us);
+        #[cfg(test)]
+        self.diagnostic_event(
+            "policy_threshold_operands",
+            now_us,
+            || serde_json::json!({"count": count, "first_us": first, "last_us": last}),
+        );
         count >= TWO_FACES_LOOKS && last.saturating_sub(first) >= TWO_FACES_FOR_MS * 1_000
     }
 }
@@ -5411,6 +5662,10 @@ impl Heeding {
                                 if let Ok(seen) = message.parse::<lamp_msgs::Faces>()
                                     && let Ok(mut held) = held.lock()
                                 {
+                                    #[cfg(test)]
+                                    if held.diagnostic.is_some() {
+                                        held.diagnostic_received(&message, epoch);
+                                    }
                                     let look = FacesLook {
                                         at_us: message.header.at_us,
                                         faces: seen.faces.len(),
@@ -6986,6 +7241,8 @@ impl Heeding {
         if self.rooms.is_some() {
             self.in_view = Some((request, in_view));
         }
+        #[cfg(test)]
+        two_faces_diagnostic::signs(signs.turned, in_view);
         // With `LAMP_TWO_FACES_HELD`, only two faces that stay.
         let two_faces = match &self.faces_held {
             Some(held) => held
@@ -10649,6 +10906,7 @@ mod tests {
             (true, vec![2; 8], true, (Room::Unknown, None)),
             (false, vec![2], false, busy),
         ] {
+            let diagnostic = two_faces_diagnostic::Scope::begin();
             *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
             {
                 let mut room = crate::room_told::room().lock().unwrap();
@@ -10661,6 +10919,10 @@ mod tests {
             heeding.needing_name_or_follow_up();
             if held_on {
                 heeding.holding_two_faces(Some(&root));
+                if let Some(held) = &heeding.faces_held {
+                    held.lock().unwrap().diagnostic =
+                        Some(two_faces_diagnostic::Records::default());
+                }
                 // The reader subscribes before the first look.
                 std::thread::sleep(Duration::from_millis(100));
             }
@@ -10669,8 +10931,12 @@ mod tests {
                     std::thread::sleep(Duration::from_millis(300));
                 }
                 let faces = [face("a", true), face("b", false)][..count].to_vec();
-                eyes.publish_json(lamp_ipc::monotonic_us(), &lamp_msgs::Faces { faces })
+                let before = two_faces_diagnostic::stamp();
+                let at_us = lamp_ipc::monotonic_us();
+                let published = eyes
+                    .publish_json(at_us, &lamp_msgs::Faces { faces })
                     .unwrap();
+                diagnostic.published(before, at_us, two_faces_diagnostic::stamp(), published);
             }
             std::thread::sleep(Duration::from_millis(100));
             if privacy {
@@ -10678,14 +10944,19 @@ mod tests {
                 heeding.privacy_changed();
                 heeding.privacy_changed();
                 let faces = vec![face("a", true), face("b", false)];
-                eyes.publish_json(lamp_ipc::monotonic_us(), &lamp_msgs::Faces { faces })
+                let before = two_faces_diagnostic::stamp();
+                let at_us = lamp_ipc::monotonic_us();
+                let published = eyes
+                    .publish_json(at_us, &lamp_msgs::Faces { faces })
                     .unwrap();
+                diagnostic.published(before, at_us, two_faces_diagnostic::stamp(), published);
                 std::thread::sleep(Duration::from_millis(100));
             }
             let now_us = monotonic_us();
             let held = heeding.heed(1, (now_us, now_us + 1_000_000), "Okay yeah sure.", None);
             let room = crate::room_told::room().lock().unwrap().at(now_us);
             *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
+            diagnostic.report(&heeding, now_us, room, held, held_on, privacy);
             assert_eq!((room, held), expected, "{held_on} {looks:?} {privacy}");
         }
         let _ = std::fs::remove_dir_all(&root);
