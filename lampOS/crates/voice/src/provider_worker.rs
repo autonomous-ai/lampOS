@@ -327,6 +327,10 @@ pub struct Files {
     /// (`--going-on-same-one`, `LAMP_GOING_ON_SAME_ONE`,
     /// [`crate::going_on_same_one`], #2191).
     pub going_on_same_one: bool,
+    /// Whether, in a busy room, the second route's rule holds a line let
+    /// out only as the conversation going on that turns to someone else
+    /// (`--turned-away`, `LAMP_TURNED_AWAY`, [`crate::turned_away`], #3882).
+    pub turned_away: bool,
     /// Whether the second route holds an answer's hand-on to memory until
     /// it is known how much of it was heard (`--said-as-heard`,
     /// `LAMP_SAID_AS_HEARD`, [`crate::said_as_heard`]).
@@ -495,6 +499,7 @@ pub fn parse_flags(dir: &std::path::Path, flags: &[String]) -> io::Result<Parsed
     let (messages, flags) = crate::messages::take(flags);
     let (others_answer, flags) = crate::others_answer::take(flags);
     let (going_on_same_one, flags) = crate::going_on_same_one::take(flags);
+    let (turned_away, flags) = crate::turned_away::take(flags);
     let (said_as_heard, flags) = crate::said_as_heard::take(flags);
     let (scoped_session, flags) = crate::scoped_session::take(flags);
     let (name_or_follow_up, flags) = crate::name_or_follow_up::take(flags);
@@ -554,6 +559,7 @@ pub fn parse_flags(dir: &std::path::Path, flags: &[String]) -> io::Result<Parsed
         messages,
         others_answer,
         going_on_same_one,
+        turned_away,
         said_as_heard,
         scoped_session,
         name_or_follow_up,

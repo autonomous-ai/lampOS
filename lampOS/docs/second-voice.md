@@ -2698,6 +2698,20 @@ after a take-over, but now for every turn:
   the talk held. With or without `LAMP_SPOKEN_TO`
   (`Attention::played_only_as_going_on`): it first read a mark only
   `LAMP_SPOKEN_TO` sets, and lamp-52e6 and lamp-4ace run without it.
+  **A line turned to someone else** (`LAMP_TURNED_AWAY=on`,
+  `crate::turned_away`, #3882): in a busy room, a line let out only as the
+  conversation going on, answering no question of the lamp's, is held when
+  it turns to someone else: a role called at its start ("Mom,", "Guys,"),
+  an object asked for ("pass me", "hand me", "grab the"), or an errand
+  between people ("Do you want coffee?", "I'm going downstairs"), `held
+  back: a busy room: a conversation with the lamp is going on, but the line
+  turns to someone else: a role called, an object asked for, or an errand`.
+  On lamp-4ace on 27 Oct, on stable 7632, "Can you pass me the charger? The
+  white one." and "Do you want coffee? I'm going downstairs." were answered
+  after a conversation with the lamp; desk talk held went from 5/6 to 1/6
+  on the same build, as the lines fell inside or outside the 15 s window
+  behind answers of different lengths. A follow-up ("And what about
+  tomorrow?") shows none of the signs and plays.
 - **"Not for me" written as words, with `LAMP_NOT_FOR_ME_WORDS=on`** (off
   unless set): on a line told `worker::CONVERSATION_ALONE`, a reply that
   is "not for me" (`not_speech::opens_not_for_me`) ends as the

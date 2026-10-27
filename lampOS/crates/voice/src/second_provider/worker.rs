@@ -2951,6 +2951,13 @@ pub fn serve(
         {
             heeding.going_on_only_for_the_same_one();
         }
+        // A line going on that turns to someone else ends the conversation
+        // for that line (`LAMP_TURNED_AWAY=on`, #3882).
+        if files.turned_away
+            && let Ok(mut heeding) = heeding.lock()
+        {
+            heeding.holding_lines_turned_away();
+        }
         if let Some(hook) = hearing_hook(&heeding, hears, files.others_answer || declines) {
             engine = engine.hearing(hook);
         }
@@ -4320,6 +4327,9 @@ pub(crate) struct Heeding {
     /// In a busy room, a conversation going on holds only for the one the
     /// lamp answered ([`crate::going_on_same_one`]).
     going_on_same_one: bool,
+    /// In a busy room, a line going on that turns to someone else is held
+    /// ([`crate::turned_away`]).
+    turned_away: bool,
     /// `LAMP_SAME_SPEAKER_CARRIES` ([`Self::carrying_the_same_speaker`]):
     /// whether it is on; whether a conversation is open for it, from the
     /// lamp's last answer until a stop, a privacy change, or two lines in a
@@ -5123,6 +5133,7 @@ impl Heeding {
             cut_in: None,
             others_answer: false,
             going_on_same_one: false,
+            turned_away: false,
             carries: false,
             carrying: false,
             carry_window: carry_window::CarryWindow::default(),
@@ -6398,6 +6409,12 @@ impl Heeding {
         self.going_on_same_one = true;
     }
 
+    /// In a busy room, hold a line going on that turns to someone else
+    /// ([`crate::turned_away`], `LAMP_TURNED_AWAY=on`).
+    pub(crate) fn holding_lines_turned_away(&mut self) {
+        self.turned_away = true;
+    }
+
     /// `request` ended as a cut-in over the lamp's answer: judged as one.
     pub(crate) fn ended_as_cut_in(&mut self, request: u64) {
         self.cut_in = Some(request);
@@ -7490,6 +7507,19 @@ impl Heeding {
             verdict = Some(crate::attention::Verdict::Hold(
                 crate::going_on_same_one::HELD,
             ));
+        }
+        // In a busy room, a line going on that turns to someone else ends
+        // the conversation for that line (#3882): "Can you pass me the
+        // charger?" to a colleague, after the lamp's answer. A reply to the
+        // lamp's own question is the person's answer, whatever it says.
+        if self.turned_away
+            && busy
+            && attention.played_only_as_going_on()
+            && matches!(verdict, Some(crate::attention::Verdict::Play(_)))
+            && !lamp_asked
+            && crate::turned_away::turns_to_another(heard)
+        {
+            verdict = Some(crate::attention::Verdict::Hold(crate::turned_away::HELD));
         }
         if busy && let Some(crate::attention::Verdict::Play(why)) = verdict {
             verdict = busy_bar(why, heard, lamp_asked)
@@ -12704,6 +12734,71 @@ mod tests {
             judge(true),
             Some(crate::going_on_same_one::HELD),
             "on: held"
+        );
+    }
+
+    /// #3882: with the switch on in a busy room, after the lamp answered,
+    /// desk talk turned to someone else is held; a real follow-up, a request
+    /// with no name mid-conversation, and a reply to the lamp's own question
+    /// still play. Off, everything plays as today.
+    #[test]
+    fn turned_away_holds_desk_talk_and_plays_follow_ups() {
+        use crate::room_told::Room;
+        let signs = |going_on, lamp_asked| Signs {
+            room: Room::Busy,
+            going_on,
+            lamp_asked,
+            turned: Some(false),
+            names: Vec::new(),
+            near: false,
+            continues_from: None,
+        };
+        let said = (10_000_000, 11_000_000);
+        let judge = |on: bool, line: &str, lamp_asked: bool| {
+            let mut heeding = Heeding::new(true, true, None, None);
+            heeding.as_the_only_voice(false, false, false);
+            if on {
+                heeding.holding_lines_turned_away();
+            }
+            heeding.judge(
+                1,
+                said,
+                "Lamp, what's the weather today?",
+                signs(false, false),
+            );
+            heeding.judge(2, said, line, signs(true, lamp_asked))
+        };
+        for desk_talk in [
+            "Can you pass me the charger? The white one.",
+            "Do you want coffee? I'm going downstairs.",
+            "Guys, the meeting moved to three.",
+        ] {
+            assert_eq!(
+                judge(false, desk_talk, false),
+                None,
+                "off: played, as today: {desk_talk}"
+            );
+            assert_eq!(
+                judge(true, desk_talk, false),
+                Some(crate::turned_away::HELD),
+                "on: held: {desk_talk}"
+            );
+        }
+        for to_the_lamp in [
+            "And what about tomorrow?",
+            "What about the weekend?",
+            "Make it a bit warmer.",
+        ] {
+            assert_eq!(
+                judge(true, to_the_lamp, false),
+                None,
+                "on: still played: {to_the_lamp}"
+            );
+        }
+        assert_eq!(
+            judge(true, "Yes, grab the umbrella.", true),
+            None,
+            "on: a reply to the lamp's own question plays"
         );
     }
 

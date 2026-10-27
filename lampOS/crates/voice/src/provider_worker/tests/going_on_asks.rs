@@ -682,6 +682,28 @@ fn going_on_same_one_is_read_after_others_answer() {
     assert!(parse_flags(dir, &wrong).is_err());
 }
 
+/// #3882: `--turned-away` comes right after `--going-on-same-one`, as the
+/// coordinator writes them, on both routes' parsers.
+#[test]
+fn turned_away_is_read_after_going_on_same_one() {
+    let dir = std::path::Path::new("/run/test");
+    let flags: Vec<String> = [crate::going_on_same_one::FLAG, crate::turned_away::FLAG]
+        .map(String::from)
+        .into();
+    let (_, _, files, _) = parse_flags(dir, &flags).unwrap();
+    assert!(files.going_on_same_one && files.turned_away);
+    let (_, _, files, _) = crate::second_provider::worker::parse_flags(dir, &flags).unwrap();
+    assert!(files.turned_away);
+    let (_, _, files, _) = parse_flags(dir, &flags[1..]).unwrap();
+    assert!(files.turned_away && !files.going_on_same_one);
+    let (_, _, files, _) = parse_flags(dir, &flags[..1]).unwrap();
+    assert!(!files.turned_away);
+    let wrong: Vec<String> = [crate::turned_away::FLAG, crate::going_on_same_one::FLAG]
+        .map(String::from)
+        .into();
+    assert!(parse_flags(dir, &wrong).is_err());
+}
+
 /// `--name-or-follow-up` comes right after `--live-scoped-session`, and
 /// `--follow-up-for-ms` with its value right after it, as the coordinator
 /// writes them, on both routes' parsers.
