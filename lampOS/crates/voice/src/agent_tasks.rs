@@ -6079,6 +6079,11 @@ pub(crate) mod tests {
             named_in_words(&on, "Ask Hermes to summarise my inbox."),
             ["Hermes"]
         );
+        // A brand said in passing names nobody: one word counts only right
+        // after an asking word, and "Hermès" is `herms` once plain (Fourteen's
+        // P3 on #3723).
+        assert!(named_in_words(&on, "Ask Lumi about my Hermès bag.").is_empty());
+        assert!(named_in_words(&on, "I left my hermes scarf at home.").is_empty());
         STAFF.lock().unwrap().clear();
     }
 
