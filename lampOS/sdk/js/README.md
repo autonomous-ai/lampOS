@@ -86,7 +86,9 @@ await lamp.closed();
 
 - **Actions:** `express`, `gesture`, `look`, `move`, `play`, `joints`,
   `light`, `say`, `sound`, `stop`. Each resolves when the lamp has taken it;
-  `{ wait: true }` on a gesture, move or play resolves when it has finished.
+  `{ wait: true }` on a gesture, move or play resolves when it has finished,
+  or, where the lamp hands it on and says no more (today `gesture` and
+  `move`, answered `{"to": "body"}`), at that answer.
 - **Leases:** `await lamp.withLease(['body'], async (lease) => ...)` holds
   the body for looks, moves and joints, renewed for you, until the callback
   ends or the lamp takes it back: `lease.state`, `lease.lostWhy`.

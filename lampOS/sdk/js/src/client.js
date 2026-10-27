@@ -214,7 +214,11 @@ export class Lamp {
   // Send one request; resolves with its reply, rejects with its typed error.
   request(op, fields = {}) {
     try { check(op, fields); } catch (error) { return Promise.reject(error); }
-    const id = this.nextId++;
+    return this.send(this.nextId++, op, fields);
+  }
+
+  // Send a checked request under its own id.
+  send(id, op, fields) {
     return new Promise((resolve, reject) => {
       this.waiting.set(id, { resolve, reject });
       this.ws.send(JSON.stringify({ id, op, ...fields }));
@@ -224,13 +228,26 @@ export class Lamp {
     });
   }
 
-  // An action: its reply when taken, or with `wait` its `done` event.
+  // An action: its reply when taken, or with `wait` its `done` event, unless
+  // the reply says which part took it (`to`) and no `done` follows.
   act(op, fields, wait = false) {
     const clean = Object.fromEntries(Object.entries(fields).filter(([, v]) => v !== undefined));
-    const id = this.nextId;
+    // Checked before an id is taken, so an action refused here has no id,
+    // and every id is this call's own.
+    try { check(op, clean); } catch (error) { return Promise.reject(error); }
+    const id = this.nextId++;
     const done = wait ? new Promise((resolve, reject) => this.done.set(id, { resolve, reject })) : null;
-    const taken = this.request(op, clean);
-    return wait ? taken.then(() => done) : taken;
+    const taken = this.send(id, op, clean);
+    if (!wait) return taken;
+    // A refused action takes its `done` back, so nothing is left to reject,
+    // unheard, when the connection closes.
+    return taken.then((reply) => {
+      // Handed to a part that says nothing back, as lamp-control does with
+      // `gesture` and `move` (`{"to":"body"}`, docs/control.md): no `done`
+      // follows, so the wait ends at the answer.
+      if ('to' in reply) { this.done.delete(id); return reply; }
+      return done;
+    }, (error) => { this.done.delete(id); throw error; });
   }
 
   frame(frame) {
@@ -257,7 +274,15 @@ export class Lamp {
     }
     this.handlers.set(event, [...(this.handlers.get(event) ?? []), handler]);
     if (phrases) this.phrases = [...new Set([...this.phrases, ...phrases])].sort();
-    return schema.events.includes(event) ? this.subscribe([event]) : Promise.resolve();
+    if (!schema.events.includes(event)) return Promise.resolve();
+    // A refused subscription takes its handler back off, so a later `on()`
+    // for the event, once granted, doesn't call both.
+    return this.subscribe([event]).catch((error) => {
+      const left = (this.handlers.get(event) ?? []).filter((h) => h !== handler);
+      if (left.length) this.handlers.set(event, left);
+      else this.handlers.delete(event);
+      throw error;
+    });
   }
 
   // Stop calling `handler` for `event`; with none left for an event the lamp
