@@ -1,0 +1,20 @@
+{
+  "actual_executables_reverified_before_any_compiler": true,
+  "actual_preserved_outputs_and_depfiles_reverified_before_any_compiler": true,
+  "changed_source_entries": [
+    "lampOS/crates/body/src/clips.rs",
+    "lampOS/crates/msgs/src/arbitration.rs",
+    "lampOS/docs/control.md",
+    "lampOS/docs/control.schema.json",
+    "lampOS/docs/vi/control_vi.md"
+  ],
+  "new_empty_target": false,
+  "note": "Same exclusively owned target and worktree. Latest2ba/a9d3 full serial gate succeeded390/0/5; its actual and preserved source/artifact boundary is verified. Current newf725 composition uses one runtime thread. Old ff03/737 failure remains historical only, with no causal attribution or waiver. No cold-target or automatic retry claim.",
+  "previous_artifact_closure_sha256": "e26eda5df48e44800ec113f8915c78bd0fe3a80fcd70c41ca532471d09ca9cbd",
+  "previous_head": "2ba1da04d17d83066ea86b4b4d17ebed72842598",
+  "previous_runtime_exit_code": 0,
+  "previous_runtime_receipt_sha256": "b872ba83de63e30ec637078852cb16e12ea693f9479a96201ef6da1c53b8c7dc",
+  "previous_source_inventory_sha256": "d57ea05be05af0063641da24b02d6b9d666bd1037a72184be98c3f94320e0a8c",
+  "source_worktree": "<review-scratch>",
+  "target": "<review-scratch>"
+}

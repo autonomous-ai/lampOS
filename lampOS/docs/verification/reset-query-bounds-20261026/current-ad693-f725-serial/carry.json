@@ -1,0 +1,23 @@
+{
+  "all_four_authored_full_blobs_modes_identical": true,
+  "base_changed_paths": [
+    "lampOS/crates/body/src/clips.rs",
+    "lampOS/crates/msgs/src/arbitration.rs",
+    "lampOS/docs/control.md",
+    "lampOS/docs/control.schema.json",
+    "lampOS/docs/vi/control_vi.md"
+  ],
+  "base_runtime_changes": false,
+  "base_test_only_changes": "Body/Msgs cfg(test) schema-drift tests plus docs, inspected actual diff",
+  "files": {
+    "lampOS/crates/setup/src/reset.rs": "100644 blob 754a4b7dfa1c62bd01c07a0c5c1d35bb9514ade0\tlampOS/crates/setup/src/reset.rs",
+    "lampOS/crates/setup/src/reset/query.rs": "100644 blob 8684e05e8b92250225d794403fb60af1c25b1594\tlampOS/crates/setup/src/reset/query.rs",
+    "lampOS/docs/reuse-decisions.md": "100644 blob d9e1644dc2a13638afa72826f95a77aa73d71132\tlampOS/docs/reuse-decisions.md",
+    "lampOS/docs/setup.md": "100644 blob 8001d51e6f8a1bff3332962987cb8c7889b41643\tlampOS/docs/setup.md"
+  },
+  "new_base": "f7252d81dc2e72494afc6ea842bd8b0445f1991c",
+  "new_head": "ad693e626823eeea856f6cb45b749be8082eb83f",
+  "old_base": "a9d3a827439de1605e62b90cde9d9dcb8f571280",
+  "old_head": "2ba1da04d17d83066ea86b4b4d17ebed72842598",
+  "range_diff": "1:  2ba1da04d1 = 1:  ad693e6268 lampOS: bound reset read-only queries and retain failed-reset recovery\n"
+}

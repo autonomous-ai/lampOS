@@ -1,0 +1,4 @@
+{
+  "reason": "First qualification of newf725 reset carry with one runtime thread. Previousff/737 full16-thread failure is retained; no threshold, assertion or source change, no proven old-failure cause, no automatic rerun if this gate fails.",
+  "test_threads": 1
+}

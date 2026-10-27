@@ -1,3 +1,33 @@
+Ready for lamp-voice: no (current query CI/readiness); #3689 protocol foundation active
+
+## Current checkpoint: 2026-10-27 14:53 +07, both query carries pushed
+
+Reset #3631 is **ad693e626 / f7252d81d** with its exact repaired patch
+unchanged, all four authored blobs/modes equal and range-diff `=`.
+[Current host evidence](verification/reset-query-bounds-20261026/current-ad693-f725-serial/README.txt)
+passes fmt, strict all-target Setup/Cloud Clippy and full serial suites
+**390/0/5**, all eight query controls and six wake cases. Reviewer-two's
+cleanup P2 is closed; current carry read and fresh x86/ARM disposition
+continue. Earlier original887 native evidence remains on its actual head.
+
+Cloud #3644 is **238c12bf9 / f7252d81d**, two carried patches: unchanged
+runtime plus the offered two endless-writer controls. [Current host proof](verification/cloud-query-bounds-20261027/current-238c-f725-endless/README.txt)
+passes fmt, strict all-target Cloud Clippy and full **206/0/4**, ten controls
+once. Both patches have range-diff `=` from the validated a9d3 composition,
+with all seven full authored blobs/modes equal. The added tests require
+fresh original native qualification; no earlier run is relabelled. The
+malformed maintenance argument preflight failed before Cargo and stays
+recorded. Original553 Voice LEAK and ff03/737 wake failure remain separate.
+
+#3689 design review found and corrected circular admission: pending writer
+qualification now permits exactly one authenticated first-apply grant,
+while other mutations remain held. An uncommitted refresh restores before
+boot admission; qualified executor and preimages remain referenced until
+the product journal closes. A bounded versioned record/admission foundation
+is being implemented without privileged activation. No device or promotion.
+
+---
+
 Ready for lamp-voice: no (#3631 current carry, #3644 added-test native); #3689 taken
 
 ## Current checkpoint: 2026-10-27 14:48 +07, transport restored and writer-first work taken

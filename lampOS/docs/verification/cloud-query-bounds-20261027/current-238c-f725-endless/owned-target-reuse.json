@@ -1,0 +1,22 @@
+{
+  "actual_preserved_outputs_depfiles_executables_verified_before_compile": true,
+  "changed_source_entries": [
+    "lampOS/crates/body/src/clips.rs",
+    "lampOS/crates/msgs/src/arbitration.rs",
+    "lampOS/docs/control.md",
+    "lampOS/docs/control.schema.json",
+    "lampOS/docs/vi/control_vi.md"
+  ],
+  "previous_head": "ebca092c430640c078dde5d0de1089a5308a837a",
+  "prior_closure": {
+    "actual_and_preserved_outputs_unchanged": true,
+    "depfile_count": 439,
+    "executable_count": 5,
+    "exit_code": 0,
+    "local_output_count": 58,
+    "source_unchanged": true
+  },
+  "prior_closure_sha256": "1e7bea44b25595a86e4362d2a83330d330a4c2df443d5f52a07db29174f6d14d",
+  "prior_source_sha256": "d8e885b8f414b972abf521522ee04138731023eec709cca3c77a353d357f66c3",
+  "reason": "Exact two-patch carry ontof725, using latestebca/a9d3 successful206/0/4 completed boundary. Earlier sandbox-failed131/73/4 remains separate; its old actual paths are not reasserted after subsequent compilation."
+}

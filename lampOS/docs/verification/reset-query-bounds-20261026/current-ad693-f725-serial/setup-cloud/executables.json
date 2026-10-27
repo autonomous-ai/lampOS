@@ -1,0 +1,202 @@
+[
+  {
+    "fresh": false,
+    "package_id": "path+file://<review-scratch>/lampOS/crates/cloud#lamp-cloud@0.1.0",
+    "path": "<review-scratch>/debug/deps/it-22ec483085f489b5",
+    "sha256": "1c1080ececc12a2368958bf81f005c184c9e54f71e085355d12f091d2a8306f7",
+    "target": {
+      "crate_types": [
+        "bin"
+      ],
+      "doc": false,
+      "doctest": false,
+      "edition": "2024",
+      "kind": [
+        "test"
+      ],
+      "name": "it",
+      "src_path": "<review-scratch>/lampOS/crates/cloud/tests/it/main.rs",
+      "test": true
+    }
+  },
+  {
+    "fresh": false,
+    "package_id": "path+file://<review-scratch>/lampOS/crates/cloud#lamp-cloud@0.1.0",
+    "path": "<review-scratch>/debug/lamp-cloud",
+    "sha256": "06940b4f4fd083db6b52a2d6105e79fdf2c25230d01b18801476dbe4cf2938d8",
+    "target": {
+      "crate_types": [
+        "bin"
+      ],
+      "doc": true,
+      "doctest": false,
+      "edition": "2024",
+      "kind": [
+        "bin"
+      ],
+      "name": "lamp-cloud",
+      "src_path": "<review-scratch>/lampOS/crates/cloud/src/main.rs",
+      "test": true
+    }
+  },
+  {
+    "fresh": false,
+    "package_id": "path+file://<review-scratch>/lampOS/crates/cloud#lamp-cloud@0.1.0",
+    "path": "<review-scratch>/debug/deps/lamp_cloud-1c47c58298f82759",
+    "sha256": "3a8332972b3f20be4f403e72b51a4496d5d4569ca212b2e6731c76a7522cae2a",
+    "target": {
+      "crate_types": [
+        "bin"
+      ],
+      "doc": true,
+      "doctest": false,
+      "edition": "2024",
+      "kind": [
+        "bin"
+      ],
+      "name": "lamp-cloud",
+      "src_path": "<review-scratch>/lampOS/crates/cloud/src/main.rs",
+      "test": true
+    }
+  },
+  {
+    "fresh": false,
+    "package_id": "path+file://<review-scratch>/lampOS/crates/cloud#lamp-cloud@0.1.0",
+    "path": "<review-scratch>/debug/deps/release_pair-5789435aefd285ed",
+    "sha256": "e3a1bfbfd03509904d7a0800471332ff207755ab06a8e266084e4b2dec559806",
+    "target": {
+      "crate_types": [
+        "bin"
+      ],
+      "doc": false,
+      "doctest": false,
+      "edition": "2024",
+      "kind": [
+        "test"
+      ],
+      "name": "release_pair",
+      "src_path": "<review-scratch>/lampOS/crates/cloud/tests/release_pair.rs",
+      "test": true
+    }
+  },
+  {
+    "fresh": false,
+    "package_id": "path+file://<review-scratch>/lampOS/crates/cloud#lamp-cloud@0.1.0",
+    "path": "<review-scratch>/debug/deps/lamp_cloud-a5bd7092cbd06c22",
+    "sha256": "a0d85b9e2342a02b5c98906a1538ee151a18941d5a05d56cb325453ba2a34709",
+    "target": {
+      "crate_types": [
+        "lib"
+      ],
+      "doc": true,
+      "doctest": true,
+      "edition": "2024",
+      "kind": [
+        "lib"
+      ],
+      "name": "lamp_cloud",
+      "src_path": "<review-scratch>/lampOS/crates/cloud/src/lib.rs",
+      "test": true
+    }
+  },
+  {
+    "fresh": false,
+    "package_id": "path+file://<review-scratch>/lampOS/crates/setup#lamp-setup@0.1.0",
+    "path": "<review-scratch>/debug/deps/lamp_setup-4d754dc858adcfd1",
+    "sha256": "c6adf7bfe28d447a6a1a43913f855fd3ee391c7b0a4775bb401a8cd8f7b158cc",
+    "target": {
+      "crate_types": [
+        "bin"
+      ],
+      "doc": true,
+      "doctest": false,
+      "edition": "2024",
+      "kind": [
+        "bin"
+      ],
+      "name": "lamp-setup",
+      "src_path": "<review-scratch>/lampOS/crates/setup/src/main.rs",
+      "test": true
+    }
+  },
+  {
+    "fresh": false,
+    "package_id": "path+file://<review-scratch>/lampOS/crates/setup#lamp-setup@0.1.0",
+    "path": "<review-scratch>/debug/deps/wake-5c5bb89a9b6429fc",
+    "sha256": "f8988b50248f0363f4940432383d0994e4fae2cf550b446e092408510de081f9",
+    "target": {
+      "crate_types": [
+        "bin"
+      ],
+      "doc": false,
+      "doctest": false,
+      "edition": "2024",
+      "kind": [
+        "test"
+      ],
+      "name": "wake",
+      "src_path": "<review-scratch>/lampOS/crates/setup/tests/wake.rs",
+      "test": true
+    }
+  },
+  {
+    "fresh": false,
+    "package_id": "path+file://<review-scratch>/lampOS/crates/setup#lamp-setup@0.1.0",
+    "path": "<review-scratch>/debug/lamp-setup",
+    "sha256": "65cc380a086e7bbc46da0d2fd32ebe24fef653895303e0ff69a40630e5fb69bc",
+    "target": {
+      "crate_types": [
+        "bin"
+      ],
+      "doc": true,
+      "doctest": false,
+      "edition": "2024",
+      "kind": [
+        "bin"
+      ],
+      "name": "lamp-setup",
+      "src_path": "<review-scratch>/lampOS/crates/setup/src/main.rs",
+      "test": true
+    }
+  },
+  {
+    "fresh": false,
+    "package_id": "path+file://<review-scratch>/lampOS/crates/setup#lamp-setup@0.1.0",
+    "path": "<review-scratch>/debug/deps/it-b746a6002254d9b5",
+    "sha256": "b7ca1b80d6f4fe7afcbca741ebe61deec98f6495e82d73ba430159a7b7b0c7a8",
+    "target": {
+      "crate_types": [
+        "bin"
+      ],
+      "doc": false,
+      "doctest": false,
+      "edition": "2024",
+      "kind": [
+        "test"
+      ],
+      "name": "it",
+      "src_path": "<review-scratch>/lampOS/crates/setup/tests/it/main.rs",
+      "test": true
+    }
+  },
+  {
+    "fresh": false,
+    "package_id": "path+file://<review-scratch>/lampOS/crates/setup#lamp-setup@0.1.0",
+    "path": "<review-scratch>/debug/deps/lamp_setup-f0a62477763d1dfe",
+    "sha256": "dd05e54235d84ef1b89f9a0102bedbe0738b296df22a1504c9b8aab263a921f1",
+    "target": {
+      "crate_types": [
+        "lib"
+      ],
+      "doc": true,
+      "doctest": true,
+      "edition": "2024",
+      "kind": [
+        "lib"
+      ],
+      "name": "lamp_setup",
+      "src_path": "<review-scratch>/lampOS/crates/setup/src/lib.rs",
+      "test": true
+    }
+  }
+]

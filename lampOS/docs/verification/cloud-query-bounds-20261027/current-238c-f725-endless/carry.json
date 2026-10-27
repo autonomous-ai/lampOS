@@ -1,0 +1,27 @@
+{
+  "all_seven_authored_full_blobs_modes_identical": true,
+  "base_changed_paths": [
+    "lampOS/crates/body/src/clips.rs",
+    "lampOS/crates/msgs/src/arbitration.rs",
+    "lampOS/docs/control.md",
+    "lampOS/docs/control.schema.json",
+    "lampOS/docs/vi/control_vi.md"
+  ],
+  "base_runtime_changes": false,
+  "base_test_only_changes": "Body/Msgs cfg(test) schema-drift tests plus docs, inspected actual diff",
+  "files": {
+    "lampOS/Cargo.lock": "100644 blob 1239bb909b57b2aa8c2df5034814b2f32f78eeae\tlampOS/Cargo.lock",
+    "lampOS/crates/cloud/Cargo.toml": "100644 blob 65558e699d91e56ed8447e3091bbda483666ac8e\tlampOS/crates/cloud/Cargo.toml",
+    "lampOS/crates/cloud/src/reports.rs": "100644 blob 3416199eef9b60ad07f0a68b669c9caa6019df48\tlampOS/crates/cloud/src/reports.rs",
+    "lampOS/crates/cloud/src/reports/query.rs": "100644 blob 6d603d768711844dd2892419f27fdd063d1db349\tlampOS/crates/cloud/src/reports/query.rs",
+    "lampOS/crates/cloud/src/reports/query_tests.rs": "100644 blob 03fde84f15e7ad5a22079bcea6e8805f3f5fdc57\tlampOS/crates/cloud/src/reports/query_tests.rs",
+    "lampOS/docs/cloud.md": "100644 blob 8311a75c9248bf7e54f2c98869c4106a2a29d3aa\tlampOS/docs/cloud.md",
+    "lampOS/docs/reuse-decisions.md": "100644 blob 077e3b8148950d335486865ba83fb324d61c2506\tlampOS/docs/reuse-decisions.md"
+  },
+  "new_base": "f7252d81dc2e72494afc6ea842bd8b0445f1991c",
+  "new_head": "238c12bf981c157029e5962a59a345b761626126",
+  "new_tests_vs_original_dcd": 2,
+  "old_base": "a9d3a827439de1605e62b90cde9d9dcb8f571280",
+  "old_head": "ebca092c430640c078dde5d0de1089a5308a837a",
+  "range_diff": "1:  3f633c9132 = 1:  5770cf75b5 lampOS: bound report query pipes and require complete output\n2:  ebca092c43 = 2:  238c12bf98 lampOS: test cloud query caps against endless writers\n"
+}
