@@ -1,0 +1,167 @@
+{
+  "head": "4fd14a8edeff7bd24ba6382a23da34155ddb6882",
+  "tree": "9be4bf038325a205732edaa58d5001914d6a6388",
+  "source_before": {
+    ".github/tools/lampos-promote/tests/promotion.rs": "a4109fc5f82d3d5968b175af8daa32150222d0161ab0423dfab89ee3e977bd70",
+    "lampOS/crates/update/src/apply.rs": "4329ce1dc0a01d11da1611fbcae3125ed90f5dbf128c3773c9d57a85a5e35a64",
+    "lampOS/crates/update/src/main.rs": "a5dc33e8a6d6c951e14386d1f63164ca73680a48d4223d9215d8bbbc5d2c79a1",
+    "lampOS/crates/update/src/manifest.rs": "1187a73b6aea258dc8af7b0b9e9a4c9f8c42aa7a9ad6e1789685e259e7ff7a6e",
+    "lampOS/crates/update/src/publish.rs": "d7799a5d0f8151f26872b77ef3ac16d4a85e1b11ee2b8824f2628fbefb11294c",
+    "lampOS/crates/update/src/round.rs": "24c9700648458251cecdca9f2fa41da7b5b1a635928afbdbc4f6313a44ec9c5a",
+    "lampOS/crates/update/tests/round.rs": "b3a1fd7bf64c0fead131f32071ab2a8a1498c75b2db474931cb2bcf64501a7ec",
+    "lampOS/crates/update/tests/round/head_touch.rs": "d077b778efaacc4d6115d19f46d6944104b525cdf38443d34fa06a82a6dc5638",
+    "lampOS/crates/update/tests/round/product_carrier.rs": "b34defff5b529d3861bd60371c91281e3f7bee7dcf902ebadd426f7757501bd5",
+    "lampOS/deploy/product/lamp-update.service": "24f13f6e8f49c51de44183056686e4eda40094a9e167d03e52a54e7ca8b8dad7",
+    "lampOS/docs/reuse-decisions.md": "b90ee2640fc55c0e26f86986a16ecce9446fa9cfb58a2b10897465bba1e511f6",
+    "lampOS/docs/switches.md": "fe78f70c922338be21c193af03bc4170ca11cd61ad9e2366d1230b3bc8deda59",
+    "lampOS/docs/updates.md": "a2c01c5f4379ccfa70cda1840443accfcf5baed590656e862a1316ec8efa7b37",
+    "lampOS/docs/verification/product-carrier-20261025/README.md": "58926ce471257662fda669a0768ea2f292a95f428788cd7786b53626c222e24a"
+  },
+  "source_after": {
+    ".github/tools/lampos-promote/tests/promotion.rs": "a4109fc5f82d3d5968b175af8daa32150222d0161ab0423dfab89ee3e977bd70",
+    "lampOS/crates/update/src/apply.rs": "4329ce1dc0a01d11da1611fbcae3125ed90f5dbf128c3773c9d57a85a5e35a64",
+    "lampOS/crates/update/src/main.rs": "a5dc33e8a6d6c951e14386d1f63164ca73680a48d4223d9215d8bbbc5d2c79a1",
+    "lampOS/crates/update/src/manifest.rs": "1187a73b6aea258dc8af7b0b9e9a4c9f8c42aa7a9ad6e1789685e259e7ff7a6e",
+    "lampOS/crates/update/src/publish.rs": "d7799a5d0f8151f26872b77ef3ac16d4a85e1b11ee2b8824f2628fbefb11294c",
+    "lampOS/crates/update/src/round.rs": "24c9700648458251cecdca9f2fa41da7b5b1a635928afbdbc4f6313a44ec9c5a",
+    "lampOS/crates/update/tests/round.rs": "b3a1fd7bf64c0fead131f32071ab2a8a1498c75b2db474931cb2bcf64501a7ec",
+    "lampOS/crates/update/tests/round/head_touch.rs": "d077b778efaacc4d6115d19f46d6944104b525cdf38443d34fa06a82a6dc5638",
+    "lampOS/crates/update/tests/round/product_carrier.rs": "b34defff5b529d3861bd60371c91281e3f7bee7dcf902ebadd426f7757501bd5",
+    "lampOS/deploy/product/lamp-update.service": "24f13f6e8f49c51de44183056686e4eda40094a9e167d03e52a54e7ca8b8dad7",
+    "lampOS/docs/reuse-decisions.md": "b90ee2640fc55c0e26f86986a16ecce9446fa9cfb58a2b10897465bba1e511f6",
+    "lampOS/docs/switches.md": "fe78f70c922338be21c193af03bc4170ca11cd61ad9e2366d1230b3bc8deda59",
+    "lampOS/docs/updates.md": "a2c01c5f4379ccfa70cda1840443accfcf5baed590656e862a1316ec8efa7b37",
+    "lampOS/docs/verification/product-carrier-20261025/README.md": "58926ce471257662fda669a0768ea2f292a95f428788cd7786b53626c222e24a"
+  },
+  "clean_after": true,
+  "commands": [
+    {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit": 0,
+      "timeout": false,
+      "seconds": 12.257,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "-q",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-update",
+        "--test",
+        "round",
+        "product_carrier::",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "timeout": false,
+      "seconds": 149.679,
+      "log_sha256": "5eb0f933329ae86b251932368020e8726d2b3c211b790ab976d7885a0fefe74d"
+    },
+    {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "-q",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-update",
+        "--lib",
+        "manifest::tests::product_units_require_the_signed_updater_level_before_older_readers_select_them",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "timeout": false,
+      "seconds": 8.362,
+      "log_sha256": "5d660ddbc413312a639f744487ee19cb85c50f6415c6a20b53ee20829fee630c"
+    },
+    {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "-q",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-update",
+        "--lib",
+        "publish::tests::product_services_and_linked_lamp_overrides_are_carried_with_level_six",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "timeout": false,
+      "seconds": 0.361,
+      "log_sha256": "019df5a2d265ea859f4c72ec5492b1b11d2a2d0b1bb5721f0c9e379fe3bcc2d3"
+    },
+    {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "-q",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-update",
+        "--bin",
+        "lamp-update",
+        "product_settings_tests::",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "timeout": false,
+      "seconds": 1.456,
+      "log_sha256": "63741c7c31e9f330e8c12d990394516601906d291bde208357bf981268fa0771"
+    }
+  ],
+  "scope": "Independent exact-head selected OTA carrier host read; not full Update/promoter/native or installed/device acceptance. Shared review target is idle after closed3660read; standardCargo fresh compilation used, no binary equivalence claim.",
+  "counts": {
+    "passed": 17,
+    "failed": 0,
+    "ignored": 0
+  },
+  "source_review": {
+    "head": "4fd14a8edeff7bd24ba6382a23da34155ddb6882",
+    "scope": [
+      "signed min_updater6 admission and old-updater climb before units/settings writes",
+      "allowlisted product publication excludes own updater and fixed helper units",
+      "matching lamp-specific unit wins regardless manifest ordering",
+      "pinned installs skip product templates; linked templates retain installed binary/build folder",
+      "existing quiet switch/journal/health fallback reused; unchanged-binary semantic unit update accounted",
+      "explicit off/invalid/nonUTF8 and unmanaged settings auto-apply refusal"
+    ],
+    "findings": [
+      {
+        "severity": "P3",
+        "file": "lampOS/docs/updates.md",
+        "anchor": "The commands, install paragraph",
+        "finding": "The older paragraph says a round writes only units carried for the lamp by name and that new product units come only through install. The new product carrier supersedes that general statement; keep any 7071 historical note explicitly scoped to that release."
+      }
+    ],
+    "product_P1_P2_found": false,
+    "limits": [
+      "Source review only until focused host commands close.",
+      "No independent installed GOOD/BAD/fallback or 7071 round; those stay with Tests/First.",
+      "Offered4fd/4bff source only; no current-base or preview-tree qualification inferred."
+    ]
+  }
+}
