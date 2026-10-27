@@ -2037,8 +2037,25 @@ impl<P: PortIo, R: Runtime> Bus<'_, P, R> {
     }
 
     /// The goals of the head and base, and with them the arm's for a body
-    /// that may stand. Every arm goal is checked first (`goal_refused`).
+    /// that may stand. Every goal is checked first (`goal_refused`).
     fn send_goals(&mut self, goals: [u16; 3], arm: Option<[u16; 2]>) -> Result<(), String> {
+        self.write_goals(goals, arm, Self::goal_refused)
+    }
+
+    /// The same for a hold: each goal where its joint is, or the one already
+    /// written to it (stop pushing, the settle at rest). Nothing moves, so a
+    /// head or base goal is checked against its own stored range
+    /// (`hold_refused`), as `write_goal`'s is (#3558).
+    fn send_holds(&mut self, goals: [u16; 3], arm: Option<[u16; 2]>) -> Result<(), String> {
+        self.write_goals(goals, arm, Self::hold_refused)
+    }
+
+    fn write_goals(
+        &mut self,
+        goals: [u16; 3],
+        arm: Option<[u16; 2]>,
+        refused: fn(&Self, Joint, u16) -> Option<Stop>,
+    ) -> Result<(), String> {
         if let Some(stop) = COMMANDED
             .into_iter()
             .zip(goals)
@@ -2048,7 +2065,7 @@ impl<P: PortIo, R: Runtime> Bus<'_, P, R> {
                     .flatten(),
             )
             .filter(|(joint, _)| !self.left[joint.index()])
-            .find_map(|(joint, goal)| self.goal_refused(joint, goal))
+            .find_map(|(joint, goal)| refused(self, joint, goal))
         {
             return Err(self.refuse(stop));
         }
@@ -3973,7 +3990,7 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                     if let Some(last) = report.last {
                         let at = |joint: Joint| last[joint.index()].position;
                         let hold = COMMANDED.map(at);
-                        if bus.send_goals(hold, Some(ARM.map(at))).is_ok() {
+                        if bus.send_holds(hold, Some(ARM.map(at))).is_ok() {
                             report.goal_writes += 1;
                             report.held_at = Some(hold);
                         }
@@ -4452,7 +4469,7 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                     }
                 }
                 if goals != to {
-                    if let Err(detail) = bus.send_goals(goals, standing.map(|_| arm_written)) {
+                    if let Err(detail) = bus.send_holds(goals, standing.map(|_| arm_written)) {
                         report.stop = bus.refused.take().unwrap_or(Stop::Bus {
                             detail: format!("waking: {detail}"),
                         });
@@ -4467,7 +4484,7 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                 // Stop pushing: each goal becomes where its joint is now.
                 if let Some(last) = report.last {
                     let hold = COMMANDED.map(|joint| last[joint.index()].position);
-                    if bus.send_goals(hold, standing.map(|_| arm_written)).is_ok() {
+                    if bus.send_holds(hold, standing.map(|_| arm_written)).is_ok() {
                         report.goal_writes += 1;
                         report.held_at = Some(hold);
                     }
@@ -6004,7 +6021,7 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
             });
             if near {
                 let sent = positions == written
-                    || match bus.send_goals(positions, standing.map(|_| arm_written)) {
+                    || match bus.send_holds(positions, standing.map(|_| arm_written)) {
                         Ok(()) => {
                             written = positions;
                             report.goal_writes += 1;
@@ -6051,7 +6068,7 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
         }
         let sent = failed.is_none()
             && (rested == written
-                || match bus.send_goals(rested, standing.map(|_| arm_written)) {
+                || match bus.send_holds(rested, standing.map(|_| arm_written)) {
                     Ok(()) => {
                         written = rested;
                         report.goal_writes += 1;
@@ -6710,7 +6727,7 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                     if let Some(last) = report.last {
                         let at = |joint: Joint| last[joint.index()].position;
                         let (head, arm) = (COMMANDED.map(at), ARM.map(at));
-                        if bus.send_goals(head, Some(arm)).is_ok() {
+                        if bus.send_holds(head, Some(arm)).is_ok() {
                             report.goal_writes += 1;
                             report.held_at = Some(head);
                             arm_written = arm;
@@ -6797,7 +6814,7 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                     let mut hold = None;
                     if let Some(last) = report.last {
                         let at = COMMANDED.map(|joint| last[joint.index()].position);
-                        if bus.send_goals(at, standing.map(|_| arm_written)).is_ok() {
+                        if bus.send_holds(at, standing.map(|_| arm_written)).is_ok() {
                             report.goal_writes += 1;
                             report.held_at = Some(at);
                             hold = Some(at);
@@ -6836,7 +6853,7 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                 }
             }
             if goals != to {
-                if let Err(detail) = bus.send_goals(goals, standing.map(|_| arm_written)) {
+                if let Err(detail) = bus.send_holds(goals, standing.map(|_| arm_written)) {
                     break bus.refused.take().unwrap_or(Stop::Bus {
                         detail: format!("waking: {detail}"),
                     });
@@ -7035,7 +7052,7 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
         // The arm likewise where it is: the goal last written may be the
         // one that ended the run.
         let arm_at = ARM.map(|joint| last[joint.index()].position);
-        if bus.send_goals(hold, standing.map(|_| arm_at)).is_ok() {
+        if bus.send_holds(hold, standing.map(|_| arm_at)).is_ok() {
             report.goal_writes += 1;
             report.held_at = Some(hold);
         }
