@@ -177,7 +177,7 @@ fn a_made_skill_goes_on_by_its_sha256_and_only_by_it() {
     let wait = std::time::Duration::from_millis(200);
     // Another hash puts nothing on.
     let other = "0".repeat(64);
-    let refused = install_made(&skills, &keeping.directory, &other, wait).unwrap_err();
+    let refused = install_made(&skills, None, &keeping.directory, &other, wait).unwrap_err();
     assert!(
         refused.contains("no made skill is kept with that SHA-256"),
         "{refused}"
@@ -235,6 +235,7 @@ fn a_made_skill_whose_package_changed_does_not_go_on() {
     fs::write(&made.package, &bytes).unwrap();
     let refused = install_made(
         &skills,
+        None,
         &keeping.directory,
         &made.sha256,
         std::time::Duration::from_millis(200),
@@ -287,6 +288,7 @@ fn a_made_skill_past_the_cap_or_not_made_here_does_not_go_on() {
         offer(&keeping, &sha256);
         let refused = install_made(
             &skills,
+            None,
             &keeping.directory,
             &sha256,
             std::time::Duration::from_millis(200),
@@ -311,11 +313,11 @@ fn a_made_skill_never_takes_the_place_of_one_put_on_another_way() {
     fs::create_dir_all(&store).unwrap();
     fs::write(store.join("skill.toml"), TOML).unwrap();
     fs::write(store.join("SKILL.md"), card("evening-dim")).unwrap();
-    package::install(&skills, &store).unwrap();
+    package::install(&skills, None, &store).unwrap();
     let made = keep(&answer(TOML, "evening-dim"), false, "s1:7:1", &keeping).unwrap();
     offer(&keeping, &made.sha256);
     let wait = std::time::Duration::from_millis(200);
-    let refused = install_made(&skills, &keeping.directory, &made.sha256, wait).unwrap_err();
+    let refused = install_made(&skills, None, &keeping.directory, &made.sha256, wait).unwrap_err();
     assert!(
         refused.contains("evening-dim is already on the lamp, put on another way"),
         "{refused}"
@@ -328,7 +330,7 @@ fn a_made_skill_never_takes_the_place_of_one_put_on_another_way() {
     );
     // One made here before is the person's own: the new one replaces it.
     package::remove(&skills, None, "evening-dim").unwrap();
-    install_made(&skills, &keeping.directory, &made.sha256, wait).unwrap();
+    install_made(&skills, None, &keeping.directory, &made.sha256, wait).unwrap();
     let again = keep(
         &answer(&TOML.replace("1.0.0", "1.0.1"), "evening-dim"),
         false,
@@ -337,11 +339,25 @@ fn a_made_skill_never_takes_the_place_of_one_put_on_another_way() {
     )
     .unwrap();
     offer(&keeping, &again.sha256);
-    let replaced = install_made(&skills, &keeping.directory, &again.sha256, wait).unwrap();
+    // A made skill put in place under a name the owner said yes to the
+    // camera for takes that yes away (#3504's piece C).
+    let state = dir.path().join("state");
+    fs::create_dir_all(&state).unwrap();
+    let camera = state.join(lamp_skills::CAMERA_FILE);
+    lamp_skills::keep_names(&camera, &["evening-dim".to_owned()].into()).unwrap();
+    let replaced = install_made(
+        &skills,
+        Some(&state),
+        &keeping.directory,
+        &again.sha256,
+        wait,
+    )
+    .unwrap();
     assert!(
         replaced.starts_with("replaced evening-dim 1.0.0 with 1.0.1"),
         "{replaced}"
     );
+    assert_eq!(fs::read_to_string(&camera).unwrap(), "");
 }
 
 /// End to end: the lamp makes a skill, asks to put it on, and on a spoken
@@ -410,7 +426,15 @@ fn a_made_skill_goes_on_only_within_its_ask_and_only_the_newest() {
     };
     // Kept, never asked about.
     not_asked(
-        install_made_at(&skills, &keeping.directory, &first.sha256, wait, 10_000).unwrap_err(),
+        install_made_at(
+            &skills,
+            None,
+            &keeping.directory,
+            &first.sha256,
+            wait,
+            10_000,
+        )
+        .unwrap_err(),
     );
     // Asked about, then too long ago.
     offered(&keeping.directory, &first.sha256, 10_000).unwrap();
@@ -418,6 +442,7 @@ fn a_made_skill_goes_on_only_within_its_ask_and_only_the_newest() {
     not_asked(
         install_made_at(
             &skills,
+            None,
             &keeping.directory,
             &first.sha256,
             wait,
@@ -428,10 +453,26 @@ fn a_made_skill_goes_on_only_within_its_ask_and_only_the_newest() {
     // Another asked about since: only the newest.
     offered(&keeping.directory, &second.sha256, 20_000).unwrap();
     not_asked(
-        install_made_at(&skills, &keeping.directory, &first.sha256, wait, 20_001).unwrap_err(),
+        install_made_at(
+            &skills,
+            None,
+            &keeping.directory,
+            &first.sha256,
+            wait,
+            20_001,
+        )
+        .unwrap_err(),
     );
     assert!(!skills.join("evening-dim").exists());
-    let done = install_made_at(&skills, &keeping.directory, &second.sha256, wait, 20_001).unwrap();
+    let done = install_made_at(
+        &skills,
+        None,
+        &keeping.directory,
+        &second.sha256,
+        wait,
+        20_001,
+    )
+    .unwrap();
     assert!(done.contains("morning-glow"), "{done}");
     // Put on, as the voice marks it after the helper's done: the older ask
     // never stands in for it (reviewer-two's P2 on #2874).
@@ -445,7 +486,15 @@ fn a_made_skill_goes_on_only_within_its_ask_and_only_the_newest() {
     }
     fs::write(&index, serde_json::to_vec(&entries).unwrap()).unwrap();
     not_asked(
-        install_made_at(&skills, &keeping.directory, &first.sha256, wait, 20_002).unwrap_err(),
+        install_made_at(
+            &skills,
+            None,
+            &keeping.directory,
+            &first.sha256,
+            wait,
+            20_002,
+        )
+        .unwrap_err(),
     );
     // Two asks and a clock gone back between them: neither, never the
     // older one in the newer's place.
@@ -457,7 +506,15 @@ fn a_made_skill_goes_on_only_within_its_ask_and_only_the_newest() {
     offered(&keeping.directory, &newer.sha256, 20_000).unwrap();
     for made in [&older, &newer] {
         not_asked(
-            install_made_at(&skills, &keeping.directory, &made.sha256, wait, 19_999).unwrap_err(),
+            install_made_at(
+                &skills,
+                None,
+                &keeping.directory,
+                &made.sha256,
+                wait,
+                19_999,
+            )
+            .unwrap_err(),
         );
     }
     // A clock that went back before the ask counts as no ask.
@@ -466,7 +523,15 @@ fn a_made_skill_goes_on_only_within_its_ask_and_only_the_newest() {
     let made = keep(&answer(TOML, "evening-dim"), false, "s1:7:1", &keeping).unwrap();
     offered(&keeping.directory, &made.sha256, 30_000).unwrap();
     not_asked(
-        install_made_at(&skills, &keeping.directory, &made.sha256, wait, 29_999).unwrap_err(),
+        install_made_at(
+            &skills,
+            None,
+            &keeping.directory,
+            &made.sha256,
+            wait,
+            29_999,
+        )
+        .unwrap_err(),
     );
 }
 
@@ -512,6 +577,7 @@ fn once_the_newest_is_on_an_older_ask_puts_nothing_on() {
     assert_eq!(told["put_on"], "morning-glow", "{told}");
     let refused = install_made(
         &skills,
+        None,
         &keeping.directory,
         &older.sha256,
         std::time::Duration::from_millis(200),

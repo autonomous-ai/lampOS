@@ -37,7 +37,7 @@ const USAGE: &str = "usage: lamp-skills [--dir DIR] [--bus-root DIR] [--gaze-soc
                      [--known-file PATH] (or LAMP_SKILLS_KNOWN_FILE) [--daily-state PATH] (or LAMP_SKILLS_DAILY_FILE)\n       \
                      [--zone system|NAME | --utc-offset-minutes N] [--trust-clock]\n       \
                      lamp-skills test SKILL_DIR...\n       \
-                     lamp-skills install [--dir DIR] SKILL_DIR|PACKAGE.tar\n       \
+                     lamp-skills install [--dir DIR] [--state-dir DIR] SKILL_DIR|PACKAGE.tar\n       \
                      lamp-skills remove [--dir DIR] [--state-dir DIR] NAME\n       \
                      lamp-skills list [--dir DIR]\n       \
                      lamp-skills pack [--out DIR] [--key-file PRIVATE [--author]] SKILL_DIR\n       \
@@ -326,8 +326,9 @@ fn test(dirs: &[String]) -> ExitCode {
 fn manage(command: &str, given: &[String]) -> ExitCode {
     let mut dir = PathBuf::from(SKILLS_DIR);
     let mut out = PathBuf::from(".");
-    // `asked` and `remove`: the running program's `--state-dir`, for the
-    // app's off and on, and the camera yes a remove takes back.
+    // `asked`, `remove` and `install`: the running program's `--state-dir`,
+    // for the app's off and on, and the camera yes a remove or a hand
+    // install takes back.
     let mut state = PathBuf::from(package::STATE_DIR);
     // `asked`: the Store's public key a package must be
     // signed with. `pack`: the private key it is signed with, if any.
@@ -341,7 +342,7 @@ fn manage(command: &str, given: &[String]) -> ExitCode {
         let flag = match word.as_str() {
             "--dir" if command != "pack" => &mut dir,
             "--out" if command == "pack" => &mut out,
-            "--state-dir" if matches!(command, "asked" | "remove") => &mut state,
+            "--state-dir" if matches!(command, "asked" | "remove" | "install") => &mut state,
             "--author" if command == "pack" => {
                 author = true;
                 continue;
@@ -370,7 +371,7 @@ fn manage(command: &str, given: &[String]) -> ExitCode {
         *flag = value.into();
     }
     let done = match (command, named.as_slice()) {
-        ("install", [from]) => package::install(&dir, Path::new(from)),
+        ("install", [from]) => package::install(&dir, Some(&state), Path::new(from)),
         ("remove", [name]) => package::remove(&dir, Some(&state), name),
         ("list", []) => package::list(&dir).map(|listed| listed.trim_end().to_owned()),
         // The manage helper (#1722): one request on the standard input, its
