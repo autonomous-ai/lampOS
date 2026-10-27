@@ -1,3 +1,11 @@
+## 2026-10-28 03:36 — authorization CLI review fix pushed on latest Main
+
+Ready for lamp-voice: no (#3934 protected credential, current native and read gates remain).
+
+[Original99 native proof](verification/publish-auth-3934-20261028/original-99bd9b195-sanitized.json) seals ARM40577443921/job122447546854 attempt1 SUCCESS: logged69e3e645e with exact Dad/99 parents and all five authored blobs/modes,51 unique unit and7 unique CLI PASS, required stages succeed, publication skipped. Root independently checks all58 rows and authored Git identities. This result stays99-only; original9e fixture failure remains red.
+
+Pushed40ad5f445 onto live-checked61c2a7264 with exact99 lease. [Current source/local proof](verification/publish-auth-3934-20261028/stronger-reasons-current-source.json) records the sole authored delta: four broad CLI refusals now observe their actual updater subprocess once, require ordered successful candidate check then old-head exit1, and inspect the intended signature/channel/schema/minimum-updater reason. No publication production blob changed. Localunit51/0 in1.017s andCLI7/0 in4.892s pass; four injected missing-authorization controls each fail the stronger assertions, with zero errors. Early assertion-label/check-count/output-stream preparation mistakes are retained. Saved native x86 compatibility is separate from current original ARM40579301593, now watched without rerun/cancel. Disposable test keys and simulated GitHub only; no release credential value, live publication, policy change, Mac ARM64 link or device action. Current source reads requested; provisioning remains with the protected environment owner. #3936 is being read for stop-failure behavior while own-key Dad's closed gates are assembled without rerun after a controller-label assertion.
+
 ## 2026-10-28 03:33 — release authorization failure isolated; Reader and trace controls qualified
 
 Ready for lamp-voice: no (#3934 remains draft for protected release authorization, current native and independent read gates).

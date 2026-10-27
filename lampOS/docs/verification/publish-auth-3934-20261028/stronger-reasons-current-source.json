@@ -1,0 +1,56 @@
+{
+  "head": "40ad5f4455fe848d2f7d8fb514a4c9c26e923c7d",
+  "base": "61c2a7264744a851ba18334ff4bcffd4668310ed",
+  "old": "99bd9b195cbe3a3f85b9e8afa1e5089c10d9f1f2",
+  "changed_files": [
+    ".github/scripts/lampos-publish-cli-test.py",
+    ".github/scripts/lampos-publish-test.py",
+    ".github/scripts/lampos-publish.py",
+    ".github/workflows/lampos-arm64.yml",
+    "lampOS/docs/updates.md"
+  ],
+  "only_delta_from_old_authored_files": [
+    ".github/scripts/lampos-publish-cli-test.py"
+  ],
+  "bindings": [
+    "100644 blob d58295237f5da65e12debfa3cad5a4c856042755\t.github/scripts/lampos-publish-cli-test.py",
+    "100644 blob a0c7d50d2270ce799c56d5c90a8ada7c9ca0f9e2\t.github/scripts/lampos-publish-test.py",
+    "100644 blob 7ec7a7604d98545bba5018a803d1c948259851d7\t.github/scripts/lampos-publish.py",
+    "100644 blob 423815723541d87b139fa6a67b5698953153b116\t.github/workflows/lampos-arm64.yml",
+    "100644 blob 61b4d4c046ecfe70b40a1fe2084535d05ff74f2d\tlampOS/docs/updates.md"
+  ],
+  "negative_control": "Injected missing GH_TOKEN in all four existing-head fixtures yields four expected assertion failures, zero errors; no unrelated refusal can pass",
+  "tests": {
+    "unit": {
+      "command": "python3 -B -I .github/scripts/lampos-publish-test.py",
+      "PASS": 51,
+      "FAIL": 0,
+      "seconds": 1.017
+    },
+    "cli": {
+      "command": "python3 -B -I .github/scripts/lampos-publish-cli-test.py --updater <retained-native-x86-updater>",
+      "PASS": 7,
+      "FAIL": 0,
+      "seconds": 4.892,
+      "updater_sha256": "fc7cb94c1a8441af3f56345b19cfe1ec1dd85d44f83d249f03eb428422b2bd8c"
+    },
+    "wrong_reason_negative": {
+      "cases": 4,
+      "expected_failures": 4,
+      "errors": 0
+    }
+  },
+  "limits": [
+    "Saved native x86 updater compatibility only; original99 ARM result stays99-bound",
+    "No token provisioning, live release, workflow retry, device or ARM64 Mac linking"
+  ],
+  "raw_log_sha256": {
+    "third-auth-current-unit.log": "72158f857e882e0f6b02e2142cdcc317406a02602a4dce926a8351421cab00c3",
+    "third-auth-current-cli.log": "ce4b611e97f70b89f34975713103e6a1be3bed4f623c42c2b48f15a235b8a0a3",
+    "third-auth-cli-wrong-reason-negative.log": "5339cf9d80ba0ed1f3a8082306b22cc2bf2ba184fbc7e57f7672af5b1ee02ce4",
+    "third-auth-cli-reasons.log": "0711535ebd9ffbc3a09de291e69b4296ebbda880ae4f2588327cc0c16023d815",
+    "third-auth-cli-reasons-fixed.log": "f3ffb4e8946552167460b7c81952a81f607f078b9292c20ec6893cab908ee9c7",
+    "third-auth-cli-reasons-final.log": "922deed30eb9bc7e9a42988ffb55a40d940d20117ed373f44ca522d9b7a3212b"
+  },
+  "preparation_failures": "Earlier fixture assertion attempts failed for command-label expectation, two checks instead of one, and stderr versus stdout. Preserved as local helper/test preparation failures; final assertions use actual labels and ordered0/1 stdout reasons. No production code changed."
+}
