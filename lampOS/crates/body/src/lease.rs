@@ -28,6 +28,11 @@ use std::time::{Duration, Instant};
 /// The longest one hold lasts: the holder renews what it keeps.
 pub const MOST_MS: u64 = 30_000;
 
+/// Every why a lease is `lost` with: a closed set, which lamp-control's
+/// `LeaseWhy` knows in full (Fourteen on #3900). A new one is added there
+/// in the same change, or the door would keep a lease the body has lost.
+pub const LOST_WHYS: [&str; 6] = ["hand", "slumped", "private", "paused", "asleep", "lapsed"];
+
 /// What the lamp is doing besides, as the body sees it this step.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Around {
@@ -95,6 +100,9 @@ impl Said {
     };
 
     pub fn lost(why: &'static str) -> Said {
+        // Every why the body says comes through here: a seventh fails the
+        // first test that says it (Fourteen on #3904).
+        debug_assert!(LOST_WHYS.contains(&why), "{why} is not in LOST_WHYS");
         Said {
             lease: State::Lost,
             why: Some(why),
@@ -275,6 +283,39 @@ mod tests {
         let asked = lease.ask(br#"{"hold":{"for_ms":10000}}"#, talking, now);
         assert_eq!(asked, Said::SUSPENDED);
         assert!(!lease.holds(now));
+    }
+
+    /// The whys are a closed set (Fourteen on #3900): every one the body
+    /// can say is in `LOST_WHYS`, and there are six, so a seventh can't
+    /// land without that list, and lamp-control's `LeaseWhy`, changing.
+    /// A why outside the six is refused where every `lost` is made.
+    #[test]
+    #[cfg(debug_assertions)]
+    #[should_panic(expected = "cold is not in LOST_WHYS")]
+    fn a_seventh_why_is_refused_where_it_is_said() {
+        Said::lost("cold");
+    }
+
+    #[test]
+    fn every_lost_why_is_one_of_the_closed_six() {
+        let flags: [fn(&mut Around); 5] = [
+            |around| around.hand = true,
+            |around| around.slumped = true,
+            |around| around.private = true,
+            |around| around.paused = true,
+            |around| around.asleep = true,
+        ];
+        let mut said: Vec<&str> = flags
+            .iter()
+            .map(|set| {
+                let mut around = QUIET;
+                set(&mut around);
+                around.ends().unwrap()
+            })
+            .collect();
+        // A hold not renewed in time.
+        said.push("lapsed");
+        assert_eq!(said, LOST_WHYS);
     }
 
     #[test]
