@@ -1,0 +1,15 @@
+# From 10:00, a face in view and the voice resting; Mood glad from 40 s to 60 s:
+# the lift and a warm breath at the person's level, once, at 40 s.
+clock = "10:00"
+
+[[expect]]
+at = "40s"
+within = "1s"
+call = "body.move"
+args = { move = "glad-lift" }
+
+[[expect]]
+at = "40s"
+within = "1s"
+call = "light"
+args = { relative = { warmer = 1, dimmer = 1 }, for = "12s", breathe_ms = 6000 }

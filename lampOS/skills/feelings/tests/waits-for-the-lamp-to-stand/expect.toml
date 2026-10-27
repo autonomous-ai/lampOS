@@ -1,0 +1,15 @@
+# Glad at 40 s, a face from 45 s: the lift once the face has been in view 10 s
+# (the body stands for it in its 6 s), at 55 s.
+clock = "10:00"
+
+[[expect]]
+at = "55s"
+within = "1s"
+call = "body.move"
+args = { move = "glad-lift" }
+
+[[expect]]
+at = "55s"
+within = "1s"
+call = "light"
+args = { relative = { warmer = 1, dimmer = 1 }, for = "12s", breathe_ms = 6000 }

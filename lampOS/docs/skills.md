@@ -296,7 +296,10 @@ runtime gives are:
 - `body.move`: `move` (its name)
 - `body.mood`: `mood`, `for_ms`, `toward` when it turns, and `until_spoken` in a search
 - `light`: `colour`, `level`, `for`, `pattern`, `keep` when kept, `until` when held
-  (#1681), or `dim`, `until`, or `out`, `over_ms`, `until` (#1677)
+  (#1681), or `dim`, `until`, or `out`, `over_ms`, `until` (#1677), or
+  `relative` (`warmer`, `dimmer`) with its `for` and, with a breath, its
+  `breathe_ms` (#3691): the level and colour are made against the light
+  shown as the run begins, which a replay has none of
 - `show`: `show` (its name in `shows/`), `frames` (how many)
 - `say`: `note`, or `from` for what the voice keeps (`say = { from = … }`), and `task` when an item's run names its task (#1237); from a say table (#1684), `text` for exact words or `note`, with `priority` and `expires_ms`
 - `sound`: `sound`, the name in `sounds/`
@@ -633,8 +636,8 @@ skills".)
 `/var/lib/lampOS/skills` (since 19 October: Welcome back, Reminders, Task
 news, Stretch break, Stuffy air and Dance, plus Bedtime and Morning installed
 but disabled pending its lamp comparison, `install::PRODUCT_SKILLS`, which
-is every core skill; Light out, Watches you leave, Music sway, Light
-scenes, Point the light, Light show, Smoky air and Dusty air are installed
+is every core skill; Light out, Light
+scenes, Point the light, Light show, Smoky air, Dusty air and Feelings are installed
 disabled until their lamp checks or replays, `install::PRODUCT_SKILLS_OFF`;
 Desk tutor and its marks wait for a Live session to take their functions, and the
 other installable skills and the parked Laugh glance are left out,
@@ -1143,6 +1146,7 @@ and version and held to the add-on limits, for a judge. Without
 | Light out when you leave (#1677) | core | The owner's: the light going out when nobody is there is something every lamp does. It does nothing without the eyes' `room/presence` (`LAMP_PRESENCE=on`), and until its lamp check it is installed disabled (`install::PRODUCT_SKILLS_OFF`), so turning presence on for Messages (#1673) does not turn it on too ([presence.md](presence.md)) |
 | Not feeling well (#1681) | core | A failed part shown as a creature a little unwell: on `lamp/health`'s `error` for 30 s, or its `quiet_ms` past 5 minutes (a part that came up well and stopped), one sleepy droop and a pale, slow breath until it ends. In the product's install since its lamp check: row 8 on lamp-52e6 with the lead, 20 Oct 11:35 (`install::PRODUCT_SKILLS`) |
 | Smoky air, Dusty air (#1684) | core | **Held until measured.** The air at the desk suddenly smoky (PM2.5 up 100 µg/m³ within 3 minutes, to 150 or more, held 30 s): one exact line, a small lift and an amber breath, once a spell, at any hour; and very dusty for an hour (125 or more): one exact line, at most once a day, in the daytime, with someone at the desk. Neither is a smoke alarm, which only the docs say (here and [air.md](air.md)): their lines, their `SKILL.md` descriptions and what the model is told to answer never say fire, alarm or smoke alarm; Smoky air's line begins "The air reads like smoke". Neither declares a `[stop]`, so a passing "stop" cannot snooze the smoke line (#1837's P3). Installed disabled (`install::PRODUCT_SKILLS_OFF`) until the four real traces (kettle steam, toast, a candle blown out, a match) are recorded on a lamp with an air sensor and their numbers are decided from the replays; their cases are written by a script, and those four are placeholders, to be replaced by the real recording (#1684). Their thresholds are provisional until then. For a trial, see [air.md](air.md), "Smoky air and Dusty air on a trial lamp" |
+| Feelings (#3691) | core | What the lamp felt, shown as a creature would: Mood's `felt` on `mood/state` (glad, lively, low; [mood.md](mood.md)) as a small head move of its own and a step of light from the person's, never brighter. Installed disabled (`install::PRODUCT_SKILLS_OFF`) until its lamp check, and it does nothing without Mood (`LAMP_MOOD=on`), which stays trial-only with Tone |
 | Light scenes, Point the light, Light show | core | Asked for by a person, never on their own (#1679): a scene's light, kept, with the head over the desk for reading and focus; the head over the desk and turned toward what the model's look saw there ("light my book"); a show of slow-changing colours under a minute. Installed disabled (`PRODUCT_SKILLS_OFF`): not yet tried on a lamp, and enabled, their three functions would put a product session past its 32 without `LAMP_USE_SKILL=on` |
 | Look for things | installable | "Where are my keys?" (#1685): the owner's call, 19 Oct: an installable skill, and the whole search is fine since a person asked. The desk first, then two places either side, five looks at most, the head down over the desk throughout; the model's look finds the thing, since the eyes find faces only. Not in the product's install: not yet tried on a lamp, and a session past its 32 functions without `LAMP_USE_SKILL=on` |
 | Guard mode (#1685) | installable | Turned on by voice while the person is out; texts them about visits to the desk ([guard-mode.md](guard-mode.md)). Not in the product's install until it has been tried on a lamp (`NOT_PRODUCT_SKILLS`), and its texts reach the phone only with `LAMP_MESSAGES=on` in `lamp-cloud` ([messages.md](messages.md), "Unasked texts") |
@@ -1158,7 +1162,7 @@ list in [v1-verdicts.md](v1-verdicts.md), "The owner's scope decisions,
 2026-10-19".
 
 A core skill comes with the lamp: `lamp-update install` writes it (on
-the product, ten folders with Bedtime and Morning disabled and the other nine enabled, and the eight of `PRODUCT_SKILLS_OFF` disabled), and a core
+the product, eighteen folders with Bedtime and Morning disabled and the other seventeen enabled, and the seven of `PRODUCT_SKILLS_OFF` disabled), and a core
 skill's file taken away or changed by hand is written again at the next
 install and the next update round: a core skill's files are the build's,
 not the person's (#1722; [updates.md](updates.md), "The product's
@@ -2136,6 +2140,7 @@ in [Bedtime and Morning](bedtime-morning.md).
 | A comfort break (#3504, installable) | Stand up's sitting held 120 minutes, 09:00 to 20:00, with nobody else in view for a minute, while the voice rests | Turns to them and says one short line that it's a good moment for a short break, naming no place or reason; held while anyone else is in view, for up to 30 minutes; once a sitting, twice a day | New |
 | Stand up (#1685, installable) | Stretch break's sitting held 100 minutes, 08:00 to 20:00, while the voice rests | Turns to them with a small `curious` tilt; once a sitting, twice a day; never a word about posture | New |
 | Wind down (#1685, installable) | Someone at the desk 20 minutes in the hour before bedtime (its `[active]`, 22:00 to 23:00 as it comes), while the voice rests | One `sleepy` droop and a shade of dim until they leave (`until = "ends"`); once an evening, never from bedtime on, so the night is Bedtime and Morning's (#1732) if that is on the lamp | New |
+| Feelings (#3691) | `mood/state`'s `felt.kind`, three named triggers, `glad`, `lively` and `low`, each once a feeling (`rearm = "ends"`, `wait` 1 minute); only while the voice has rested 5 s and not spoken for 30 s, the person is not head down (`unknown = "holds"`), Mood is not `asleep` (a state run out holds nothing), no hand is on the head, and a face has been in view 10 s | Glad: `glad-lift` (the body's `look_up`, 50 counts, 3.2 s) and `relative = { warmer = 1, dimmer = 1 }` with a 6 s breath for 12 s, at the person's level and never above it. Lively: `perk`, the same lift in 120 ms steps (about 2 s), a 4 s breath for 8 s. Low: `low-droop` (40 counts of pitch, 4.8 s, less than Stuffy air's `sleepy`) and a steady light warmer and a level dimmer for 20 s. Glad once in 20 minutes, Lively and Low once in 30, two an hour between them (`[budget] group = "feelings"`), six a day, rests after 3 nobody noticed; never from 21:00 to 08:00. No skill can read whether the lamp stands (the body says it only in `diagnostics`' list), so the face 10 s in view stands in for it: the body rises for a face of about 1.5 s in its 6 s, and a feeling never stands a folded lamp up. Its light goes to the ring with `LAMP_LIGHT_REQUESTS=on`, under the night's caps (`ring_caps`' `a_glad_breath_at_the_persons_brightest_draws_nothing_over_a_cap`) | New: the replay's relative light now names its `for` and `breathe_ms`. Installed disabled; its cases are written by a script. It has not run on a lamp |
 
 The first three prove that built-in behaviour moves onto the framework; the
 last two that a new skill needs no new code.

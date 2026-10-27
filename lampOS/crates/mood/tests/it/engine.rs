@@ -1523,7 +1523,11 @@ fn each_evidence_says_what_the_lamp_felt() {
     use lamp_mood::engine::{FELT_HOLD_US, QUIET_US, ToneKind};
     use lamp_msgs::FeltKind::{Glad, Lively, Low};
     use lamp_msgs::SeemsKind::{Negative, Positive};
-    assert_eq!(FELT_HOLD_US, 20 * SECOND_US);
+    assert_eq!(
+        FELT_HOLD_US,
+        90 * SECOND_US,
+        "past the feelings skill's minute after a talk"
+    );
 
     // A smile: on its second positive read, not its first.
     let mut mood = engine(DAY);

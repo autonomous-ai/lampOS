@@ -1,0 +1,15 @@
+# Low at 42 s while the lamp speaks (40 s to 50 s): nothing then; the droop once it
+# has not spoken for 30 s, at 80 s, within the minute it waits.
+clock = "10:00"
+
+[[expect]]
+at = "80s"
+within = "1s"
+call = "body.move"
+args = { move = "low-droop" }
+
+[[expect]]
+at = "80s"
+within = "1s"
+call = "light"
+args = { relative = { warmer = 1, dimmer = 1 }, for = "20s" }
