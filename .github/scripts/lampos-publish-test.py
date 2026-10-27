@@ -4,10 +4,12 @@
 import base64
 import hashlib
 import importlib.util
+import io
 import json
 from pathlib import Path
 import tempfile
 import unittest
+from unittest import mock
 
 SPEC = importlib.util.spec_from_file_location("publisher", Path(__file__).with_name("lampos-publish.py"))
 P = importlib.util.module_from_spec(SPEC)
@@ -265,6 +267,136 @@ class FakeCommands:
                 data = data[:-1] + bytes([data[-1] ^ 1])
             self.add(release, file.name, data)
         return b"uploaded\n"
+
+
+class CommandsTests(unittest.TestCase):
+    def failure(self, stderr, environ=None, words=None):
+        words = words or ["gh", "api", "argv-must-not-appear"]
+        result = P.subprocess.CompletedProcess(words, 17, b"stdout-must-not-appear", stderr)
+        logged = io.StringIO()
+        with mock.patch.object(P.subprocess, "run", return_value=result) as run, mock.patch.object(P.sys, "stderr", logged):
+            with self.assertRaises(P.Refused) as caught:
+                P.Commands(environ or {}).run(words)
+        run.assert_called_once()
+        message = str(caught.exception)
+        self.assertEqual(logged.getvalue(), message + "\n")
+        self.assertNotIn("stdout-must-not-appear", message)
+        self.assertNotIn("argv-must-not-appear", message)
+        return message
+
+    def test_gh_failures_use_fixed_labels_without_echoing_argv(self):
+        for prefix, label in ((["gh", "api"], "gh api"), (["/mock/gh", "release", "create"], "gh release create"), (["gh", "release", "upload"], "gh release upload"), (["gh", "argv-must-not-appear"], "gh")):
+            with self.subTest(label=label):
+                words = prefix + ["argv-must-not-appear", "--title", "private-title", "private-local-file"]
+                message = self.failure(b"HTTP 403: denied\nsecond-line-secret", words=words)
+                self.assertEqual(message, label + " failed (exit 17): HTTP 403: denied")
+                for value in ("private-title", "private-local-file", "second-line-secret"):
+                    self.assertNotIn(value, message)
+
+    def test_configured_secrets_and_split_private_key_are_redacted(self):
+        environ = {"GH_TOKEN": "q7!", P.SECRET: "-----BEGIN PRIVATE KEY-----\nshort-pem-body\n-----END PRIVATE KEY-----", "SERVICE_PASSWORD": "password-demo", "OTHER_CREDENTIAL_VALUE": "credential-demo"}
+        for value in (environ["GH_TOKEN"], *environ[P.SECRET].splitlines(), environ["SERVICE_PASSWORD"], environ["OTHER_CREDENTIAL_VALUE"]):
+            with self.subTest(value=value):
+                self.assertEqual(self.failure(("denied " + value + " end").encode(), environ), "gh api failed (exit 17): denied <redacted> end")
+
+    def test_redaction_happens_before_diagnostic_truncation(self):
+        secret = "short-secret-crossing-boundary"
+        prefix = "note " * 62 + "x "
+        message = self.failure((prefix + secret + " tail").encode(), {"GH_TOKEN": secret})
+        detail = message.split(": ", 1)[1]
+        self.assertEqual(detail, (prefix + "<redacted> tail")[:320])
+        self.assertEqual(len(detail), 320)
+        self.assertNotIn("short-secret", message)
+
+    def test_short_tokens_with_empty_jose_components_are_redacted(self):
+        # An unsecured JWT has an empty signature; direct JWE has no wrapped key.
+        for token in ("eyJhbGciOiJub25lIn0.eyJzdWIiOiJzIn0.", "eyJhbGciOiJkaXIifQ..a.b.c"):
+            with self.subTest(token=token):
+                self.assertEqual(self.failure(("denied " + token + " end").encode()), "gh api failed (exit 17): denied <redacted> end")
+
+    def test_credential_shapes_and_assignments_are_redacted(self):
+        for secret in ("ghp_demo", "gho_demo", "ghu_demo", "ghs_demo", "ghr_demo", "github_pat_demo", "sk-abcdefghijklmnop", "pk_abcdefghijklmnop", "rk-abcdefghijklmnop", "Ab9_" * 10, "eyJheader.payload.signature", "eyJheader.key.iv.cipher.tag"):
+            with self.subTest(secret=secret):
+                self.assertEqual(self.failure(("denied " + secret + " end").encode()), "gh api failed (exit 17): denied <redacted> end")
+        for field in ("token=small", "access_token: small", "API-key='two words'", 'password="two words"', "secret: small", "key=small"):
+            with self.subTest(field=field):
+                message = self.failure(("denied " + field).encode())
+                self.assertIn("<redacted>", message)
+                self.assertNotIn("small", message)
+                self.assertNotIn("two words", message)
+
+    def test_authorization_schemes_and_standalone_bearer_are_redacted(self):
+        for field in ("Authorization: Bearer small", "authorization=Basic tiny extra-credential", "Authorization: unfamiliar tiny extra-credential", "Bearer small"):
+            with self.subTest(field=field):
+                message = self.failure(("denied " + field).encode())
+                self.assertIn("<redacted>", message)
+                for value in ("small", "tiny", "extra-credential"):
+                    self.assertNotIn(value, message)
+
+    def test_url_credentials_and_query_values_are_redacted(self):
+        message = self.failure(b"GET https://user:pass@example.invalid/a?token=small&api_key=tiny&ok=yes")
+        self.assertEqual(message, "gh api failed (exit 17): GET https://<redacted>@example.invalid/a?<redacted>")
+        self.assertNotIn("unknown-value", self.failure(b"GET https://example.invalid/a?unknown-field=unknown-value"))
+
+    def test_ansi_controls_and_invalid_utf8_do_not_escape_first_line(self):
+        message = self.failure(b"\x1b[31mHTTP\x1b[0m\x00\t 403 \xff denied\nsecond-line-secret")
+        self.assertEqual(message, "gh api failed (exit 17): HTTP 403 \ufffd denied")
+        self.assertTrue(all(char.isprintable() for char in message))
+        self.assertEqual(self.failure(b"HTTP\x1b]0;private-title\x07 denied"), "gh api failed (exit 17): HTTP denied")
+
+    def test_missing_and_empty_first_stderr_lines_are_safe(self):
+        for stderr, expected in ((None, "no stderr"), (b"", "no stderr"), (b"\nsecond-line-secret", "empty stderr line"), (b"\x00\t", "empty stderr line")):
+            with self.subTest(stderr=stderr):
+                self.assertEqual(self.failure(stderr), "gh api failed (exit 17): " + expected)
+
+    def test_success_preserves_stdout_and_child_environment(self):
+        environ = {P.SECRET: "private-key-fixture", "GH_TOKEN": "auth-fixture", "PATH": "/mock"}
+        original = environ.copy()
+        words = ["gh", "api", "private-argv"]
+        result = P.subprocess.CompletedProcess(words, 0, b"successful output", b"ignored private stderr")
+        logged = io.StringIO()
+        with mock.patch.object(P.subprocess, "run", return_value=result) as run, mock.patch.object(P.sys, "stderr", logged):
+            self.assertEqual(P.Commands(environ).run(words), b"successful output")
+        run.assert_called_once_with(words, env={"GH_TOKEN": "auth-fixture", "PATH": "/mock"}, stdin=P.subprocess.DEVNULL, stdout=P.subprocess.PIPE, stderr=P.subprocess.PIPE, timeout=600, check=False)
+        self.assertEqual(environ, original)
+        self.assertEqual(logged.getvalue(), "")
+
+    def test_output_file_is_forwarded_without_echoing_output(self):
+        output = io.BytesIO()
+        def completed(words, **kwargs):
+            self.assertIs(kwargs["stdout"], output)
+            output.write(b"downloaded bytes")
+            return P.subprocess.CompletedProcess(words, 0, None, b"ignored private stderr")
+        logged = io.StringIO()
+        with mock.patch.object(P.subprocess, "run", side_effect=completed) as run, mock.patch.object(P.sys, "stderr", logged):
+            self.assertEqual(P.Commands({}).run(["gh", "api", "download"], output), b"")
+        run.assert_called_once()
+        self.assertEqual(output.getvalue(), b"downloaded bytes")
+        self.assertEqual(logged.getvalue(), "")
+
+    def test_non_gh_failures_remain_generic_and_silent(self):
+        for program in ("git", "/mock/lamp-update"):
+            with self.subTest(program=program):
+                result = P.subprocess.CompletedProcess([], 9, b"private stdout", b"private stderr")
+                logged = io.StringIO()
+                with mock.patch.object(P.subprocess, "run", return_value=result) as run, mock.patch.object(P.sys, "stderr", logged):
+                    with self.assertRaises(P.Refused) as caught:
+                        P.Commands({}).run([program, "private argv"])
+                run.assert_called_once()
+                self.assertEqual(str(caught.exception), Path(program).name + " failed (exit 9)")
+                self.assertEqual(logged.getvalue(), "")
+
+    def test_spawn_and_timeout_failures_do_not_echo_exception_details(self):
+        words = ["gh", "api", "private argv"]
+        for failure in (OSError("private spawn detail"), P.subprocess.TimeoutExpired(words, 600, output=b"private stdout", stderr=b"private stderr")):
+            with self.subTest(failure=type(failure).__name__):
+                logged = io.StringIO()
+                with mock.patch.object(P.subprocess, "run", side_effect=failure) as run, mock.patch.object(P.sys, "stderr", logged):
+                    with self.assertRaises(P.Refused) as caught:
+                        P.Commands({}).run(words)
+                run.assert_called_once()
+                self.assertEqual(str(caught.exception), "gh api did not complete")
+                self.assertEqual(logged.getvalue(), "")
 
 
 class PublicationTests(unittest.TestCase):
@@ -547,6 +679,23 @@ class PublicationTests(unittest.TestCase):
         commands = P.Commands(self.env)
         self.assertNotIn(P.SECRET, commands.environ)
         self.assertEqual(commands.environ["GITHUB_REPOSITORY"], P.REPO)
+
+    def test_promotion_wrapper_keeps_immediate_safe_gh_diagnostic_visible(self):
+        original = self.fake.run
+        failed = False
+        def simulated(words, output=None):
+            nonlocal failed
+            if not failed and tuple(words[:2]) == ("gh", "api") and "PATCH" in words:
+                failed = True
+                return P.Commands({"GH_TOKEN": "auth-fixture"}).run(words, output)
+            return original(words, output)
+        result = P.subprocess.CompletedProcess([], 22, b"private stdout", b"HTTP 403: auth-fixture denied\nprivate second line")
+        logged = io.StringIO()
+        with mock.patch.object(self.fake, "run", side_effect=simulated), mock.patch.object(P.subprocess, "run", return_value=result) as run, mock.patch.object(P.sys, "stderr", logged):
+            self.refused_unchanged("previous canonical envelope restored")
+        run.assert_called_once()
+        self.assertTrue(failed)
+        self.assertEqual(logged.getvalue(), "gh api failed (exit 22): HTTP 403: <redacted> denied\n")
 
 
 if __name__ == "__main__":
