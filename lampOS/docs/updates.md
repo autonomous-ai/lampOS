@@ -33,6 +33,11 @@ files remain separate. The lamp trials below do not enable them elsewhere.
 
 ## What exists and what we take
 
+The unwired [setting-file observer](writer-file-observation.md), a #3689
+prerequisite, provides bounded read-only descriptor observations for a
+future independent writer guard. It grants no path authority and performs
+no settings write, helper refresh or restoration.
+
 ### V1's OTA, in the form of the V1 verdicts
 
 Read for this task: `docs/bootstrap-ota.md` (sections 1, 2, 4 and 5) and
@@ -2366,3 +2371,15 @@ output, not on parsing, preexisting text or a complete authenticated plan.
 Ordinary callers retain their formatter, read order, diagnostics and bytes.
 The new path is unwired and introduces no storage, path authority, writer grant,
 helper refresh or restoration. Native/device acceptance remains separate.
+
+### Raw ownership capture for a future writer guard
+
+The unwired `writer_settings` adapter now associates each ordinary setting
+with bounded descriptor-observed bytes and the shared existing ownership
+decision, including omitted no-ops. It adds no live apply path, helper,
+allowlist entry or grant. Its read-only revalidation checks the same bytes,
+selected metadata, ancestor identities and explicit absences without
+re-planning or enlarging the original byte budget. No mutation boundary is
+wired. The [capture contract](writer-settings-capture.md)
+separates this raw input from authentication, head-touch projection, effect
+admission and independent recovery.
