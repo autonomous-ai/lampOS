@@ -1,10 +1,16 @@
-## 2026-10-28 01:26 — digest repair verified; state-type loss confirmed on current cleanup head
+## 2026-10-28 01:27 — current collector source and twenty-one local controls read
+
+READ-OK #3892 9e7d5d45b in the [source and focused collector scope](verification/head-capture-read-3892-20261028/current-9e-local.json). Production head_touch.rs/capture.rs remain exact to the earlier read. The primitive fixture now uses a deterministic size witness; a separate complete-collector fixture requires rejection of equal-length changed contents with modeled equal metadata. All other nineteen collector test bodies remain exact. All six owned blobs and modes match corrected95c. This correction neither guesses nor explains the unknown old6523 failed subcase.
+
+Fresh offline pinned Update library test compilation, current-executable discovery and one single-threaded collector module run pass:21 unique PASS, zero failed/ignored/unrun/retry. All1909 relevant source/build/manifest/lock guards, helpers/tools and actual/saved executable hashes close; three native groups exit0 and are absent. Root independently verifies all21 raw PASS rows, six output stream hashes and six owned blobs/modes. No full52/fullcrate, fresh fmt/Clippy or Mac physical bad-byte-filename coverage; Linux-only subsection stays outside this host result. Current original Linux is green, ARM is pending; draft/current-train qualification remains with the author. No activation, filesystem authority, atomic snapshot, hardware deadline or device acceptance is granted.
+
+## 2026-10-28 01:19 — digest repair verified; state-type loss confirmed on current cleanup head
 
 HOLD #3889 93f0584c2 after [five exact temporary-filesystem controls and four syntax checks](verification/played-cleanup-read-3889-20261028/repair-93f-HOLD.json). Digest failure with differing and matching copies, find failure and sort failure each return one from the generated restore and keep the intact backup: four fail-closed controls pass. The outer exit-eight handling is source-reviewed, not executed. This closes the narrow digest/enumeration fault on this source.
 
 The separate dangling tasks-told control still saves absence and then returns zero while deleting the live link and backup. Save line126 uses -e; restore line115 deletes live state and line121 deletes its apparently matching backup. Unsupported state kinds need preservation or refusal before mutation. Fourteen named child groups close, with numeric PIDs not retained; source/helper/tool guards close, no blocked real-tool calls. No full suite, actual data, SSH, sound, nested-link, concurrent-writer or lamp acceptance. Jarvis owns the remaining repair; old source faults/timeouts stay separately bound.
 
-## 2026-10-28 01:20 — state-type preservation added to cleanup read
+## 2026-10-28 01:17 — state-type preservation added to cleanup read
 
 A separate [exact save/generated-restore temporary-filesystem control](verification/played-cleanup-read-3889-20261028/dangling-state-1c-HOLD.json) on #3889 1c4d27e02 silently loses a pre-existing dangling tasks-told link: save returns zero and records absence, restore returns zero and removes the live link and backup. An unrelated regular owner file remains exact. No customer state, SSH, audio, actual remote command, nested-link or concurrent-writer test. Both bounded child groups close. This is a P2 preservation fault: unsupported types must be kept or rejected before mutation. New93f0584c2 digest repair is under reread; this old-source receipt grants no new-head conclusion. The earlier digest failure and old timeout records stay intact.
 

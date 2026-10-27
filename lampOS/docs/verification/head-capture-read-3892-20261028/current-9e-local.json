@@ -1,0 +1,413 @@
+{
+  "additional_limits": [
+    "No fmt or clippy rerun in this approved narrow runtime gate",
+    "No seam/foundation/receipt52 expansion or full Update/Voice/Memory tests",
+    "Original6523 native failure remains historical and unwaived by this current test-fixture correction",
+    "Linux physical raw-name block atcapture/tests.rs560 unexecuted on Mac; portable closed replay fixture only",
+    "No branch edits, public posts, CI reruns, network, or devices"
+  ],
+  "artifact": {
+    "emitted_path": "<worktrees>/third-store-target/debug/deps/lamp_update-cebdb705cde8ec81",
+    "features": [],
+    "fresh": false,
+    "retained_copy": "retained-lamp-update-current-host",
+    "sha256": "6e423f749b553b140d3e860f7e1f80213c34ce3a7c42981b044fed078801f77b"
+  },
+  "bank_released": true,
+  "compiler_artifact": {
+    "executable": "<target>/debug/deps/lamp_update-cebdb705cde8ec81",
+    "features": [],
+    "filenames": [
+      "<target>/debug/deps/lamp_update-cebdb705cde8ec81"
+    ],
+    "fresh": false,
+    "manifest_path": "<worktree>/lampOS/crates/update/Cargo.toml",
+    "package_id": "path+file://<worktree>/lampOS/crates/update#lamp-update@0.1.0",
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 0,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "reason": "compiler-artifact",
+    "target": {
+      "crate_types": [
+        "lib"
+      ],
+      "doc": true,
+      "doctest": true,
+      "edition": "2024",
+      "kind": [
+        "lib"
+      ],
+      "name": "lamp_update",
+      "src_path": "<worktree>/lampOS/crates/update/src/lib.rs",
+      "test": true
+    }
+  },
+  "counts": {
+    "fail": 0,
+    "ignored": 0,
+    "pass": 21,
+    "retries": 0,
+    "selected": 21,
+    "unrun": 0
+  },
+  "disposition": "SCOPED_READ_OK_CURRENT_SOURCE_AND_COLLECTOR21_LOCAL",
+  "evidence_hashes": {
+    "compile.stderr": "6ab7b6cd4bb71566ea90b9c73384898f4f4120c1f0b80c2958274f42fbc1c718",
+    "compile.stdout": "c448d64f82ff6afc766d8d876534d5a784e8640fa3a500d99ad5d6ccd97fb0cc",
+    "current-artifact.json": "868893a7e9468603347b9dc186727a8c1d933b9c1213ab3a51401ba53a8ebe3f",
+    "discovery.stdout": "70ef1c50bf5dcff4d1d1314ea97a50501a7804f44217aec9976505f0f404508d",
+    "qualified-local.json": "a6bf02bf3caf48fda0673a8e724aa9a9ed5cd59f8c2962959d65398094a8a627",
+    "retained-lamp-update-current-host": "6e423f749b553b140d3e860f7e1f80213c34ce3a7c42981b044fed078801f77b",
+    "runtime.stderr": "41fc9211f8b5d5e40b9af5d878d8e89917d2a5094e65bbc52891cb09e0ef9297",
+    "runtime.stdout": "01b6881abf710cb9c0b9cc0de48d9d20eeba169397b8817f255d9834cc871e05",
+    "source-scope-binding.json": "2582a9766c1a11ef427793ac440cca6d8997f14175586977c57c32ee1a079868"
+  },
+  "exact_environment": {
+    "CARGO_BUILD_JOBS": "1",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_TARGET_DIR": "<worktrees>/third-store-target",
+    "CARGO_TERM_COLOR": "never",
+    "RUST_TEST_THREADS": "1"
+  },
+  "head": "9e7d5d45b57fb5ff6534da92e080feb490ab529d",
+  "helper_sha256": {
+    "proposal.json": "2f1837133b20f7066679d98d3c030d310c13ee3be52e6608be6e2e1e086f1ff8",
+    "root-approval.json": "20779ffcb6f41c3045d88ef9cc12bb7b1e05e30f9fab61182d9ca515e8d6591a",
+    "run-gate.py": "dbdc6edd3da277d61261df470dc8e452934d7b5f5566baa3dd8d3bd1bd8870ae"
+  },
+  "limits": [
+    "Only collector21; no optional52 expansion proposed",
+    "Mac physical invalid-UTF8 name subsection cfgLinux unexecuted; portable private replay fixture only",
+    "No full crate/Voice/Memory runtime or source semantic review",
+    "Old6523proposal neverapproved/notrun; old nativefailure retained separately"
+  ],
+  "no_nextest": "Absent; Cargo single-thread module run once",
+  "owned_blobs": {
+    "crates/update/src/head_touch.rs": {
+      "mode_blob": "100644 blob f0f048d74a3010d0dd917b08b8eca0d31b239ad9\tlampOS/crates/update/src/head_touch.rs",
+      "sha256": "2e9bcd134f16744e622f813cc3f5e71fe55c1b2a7bb64a5bd14d63d157b3638c"
+    },
+    "crates/update/src/head_touch/capture.rs": {
+      "mode_blob": "100644 blob f25375f99386c7c78efc1b5ce9a172b7ac09248d\tlampOS/crates/update/src/head_touch/capture.rs",
+      "sha256": "4137a729709ccfb1ad5a9653fd570daa38a46d2c2988cbd767595bddac7bdf59"
+    },
+    "crates/update/src/head_touch/capture/tests.rs": {
+      "mode_blob": "100644 blob 442d2cb4598035b0974c5f3d7a39e7edd89f3b76\tlampOS/crates/update/src/head_touch/capture/tests.rs",
+      "sha256": "ae5af4ed21941b278391c7412706b36f352c28fb20453426df55ff59e65b7855"
+    },
+    "docs/head-touch-capture.md": {
+      "mode_blob": "100644 blob 5aaff01db09dd8d1432dc226f002745ff9f9ff4a\tlampOS/docs/head-touch-capture.md",
+      "sha256": "295e987588d23a25eac0fb8155dd65fef718195e536760a08e1bff8058442bde"
+    },
+    "docs/reuse-decisions.md": {
+      "mode_blob": "100644 blob b8c5d3768ae6d1035561e2827428ee14b19af2d5\tlampOS/docs/reuse-decisions.md",
+      "sha256": "a996f87675004d9330f3e8d3d45b76969cdc31cfafaff45cd23f66774848a40b"
+    },
+    "docs/updates.md": {
+      "mode_blob": "100644 blob b129d724563f8296257db43d90c031d8af15d2f8\tlampOS/docs/updates.md",
+      "sha256": "521890f7bc9a773d32efb465790eb95d3a632044093f193bf783eb55e6aa3cff"
+    }
+  },
+  "parent": "40923624247a893a19e1d980a328424eedffa308",
+  "source_before_after_sha256": {
+    "after": "474de4d5ebc1836099339717727ec9265ec019575d4dd7f0abaca35cbc1bccec",
+    "before": "474de4d5ebc1836099339717727ec9265ec019575d4dd7f0abaca35cbc1bccec"
+  },
+  "source_case_binding": {
+    "current_test_sha256": "ae5af4ed21941b278391c7412706b36f352c28fb20453426df55ff59e65b7855",
+    "linux_physical_block_cfg_lines": [
+      560
+    ],
+    "no_transfer": "Old6523 native failure stays historical/unwaived; current fixture repair source and current host runtime bound separately",
+    "production_sha_equality_to_old6523": {
+      "lampOS/crates/update/src/head_touch.rs": {
+        "current_sha256": "2e9bcd134f16744e622f813cc3f5e71fe55c1b2a7bb64a5bd14d63d157b3638c",
+        "old6523_sha256": "2e9bcd134f16744e622f813cc3f5e71fe55c1b2a7bb64a5bd14d63d157b3638c"
+      },
+      "lampOS/crates/update/src/head_touch/capture.rs": {
+        "current_sha256": "4137a729709ccfb1ad5a9653fd570daa38a46d2c2988cbd767595bddac7bdf59",
+        "old6523_sha256": "4137a729709ccfb1ad5a9653fd570daa38a46d2c2988cbd767595bddac7bdf59"
+      }
+    },
+    "selected21_source_names": [
+      {
+        "line": 123,
+        "name": "head_touch::capture::tests::actual_projection_and_verification_replay_after_the_filesystem_is_gone",
+        "path": "crates/update/src/head_touch/capture/tests.rs"
+      },
+      {
+        "line": 183,
+        "name": "head_touch::capture::tests::custom_pins_and_settings_off_do_not_invent_product_or_body_dependencies",
+        "path": "crates/update/src/head_touch/capture/tests.rs"
+      },
+      {
+        "line": 219,
+        "name": "head_touch::capture::tests::absence_empty_regular_and_null_are_distinct_and_unknown_keys_are_errors",
+        "path": "crates/update/src/head_touch/capture/tests.rs"
+      },
+      {
+        "line": 253,
+        "name": "head_touch::capture::tests::a_fixture_null_spelling_is_regular_text_and_a_real_null_mask_is_metadata_only",
+        "path": "crates/update/src/head_touch/capture/tests.rs"
+      },
+      {
+        "line": 281,
+        "name": "head_touch::capture::tests::relative_directory_and_regular_links_and_contained_absolute_links_recheck",
+        "path": "crates/update/src/head_touch/capture/tests.rs"
+      },
+      {
+        "line": 310,
+        "name": "head_touch::capture::tests::cache_keys_and_link_targets_keep_directory_requiring_spellings_distinct",
+        "path": "crates/update/src/head_touch/capture/tests.rs"
+      },
+      {
+        "line": 343,
+        "name": "head_touch::capture::tests::escapes_and_link_loops_refuse_without_an_ordinary_reader_fallback",
+        "path": "crates/update/src/head_touch/capture/tests.rs"
+      },
+      {
+        "line": 361,
+        "name": "head_touch::capture::tests::dangling_link_appearance_and_missing_ancestor_creation_invalidate",
+        "path": "crates/update/src/head_touch/capture/tests.rs"
+      },
+      {
+        "line": 378,
+        "name": "head_touch::capture::tests::directory_membership_including_ignored_names_and_absence_is_rechecked",
+        "path": "crates/update/src/head_touch/capture/tests.rs"
+      },
+      {
+        "line": 397,
+        "name": "head_touch::capture::tests::removal_from_a_captured_directory_invalidates_without_a_text_dependency",
+        "path": "crates/update/src/head_touch/capture/tests.rs"
+      },
+      {
+        "line": 415,
+        "name": "head_touch::capture::tests::file_mutation_and_ancestor_replacement_refuse_before_freeze",
+        "path": "crates/update/src/head_touch/capture/tests.rs"
+      },
+      {
+        "line": 452,
+        "name": "head_touch::capture::tests::same_descriptor_checks_reject_preopen_swap_and_postread_mutation",
+        "path": "crates/update/src/head_touch/capture/tests.rs"
+      },
+      {
+        "line": 484,
+        "name": "head_touch::capture::tests::metadata_only_null_classification_refuses_zero_fifo_and_socket",
+        "path": "crates/update/src/head_touch/capture/tests.rs"
+      },
+      {
+        "line": 499,
+        "name": "head_touch::capture::tests::raw_non_utf8_names_are_preserved_but_non_utf8_text_is_refused",
+        "path": "crates/update/src/head_touch/capture/tests.rs"
+      },
+      {
+        "line": 590,
+        "name": "head_touch::capture::tests::regular_hard_links_retain_link_count_and_content_dependencies",
+        "path": "crates/update/src/head_touch/capture/tests.rs"
+      },
+      {
+        "line": 601,
+        "name": "head_touch::capture::tests::root_substitution_and_an_unrelated_root_refuse_revalidation",
+        "path": "crates/update/src/head_touch/capture/tests.rs"
+      },
+      {
+        "line": 614,
+        "name": "head_touch::capture::tests::any_caught_provider_error_poisoned_collection_and_policy_errors_are_redacted",
+        "path": "crates/update/src/head_touch/capture/tests.rs"
+      },
+      {
+        "line": 630,
+        "name": "head_touch::capture::tests::file_aggregate_directory_name_key_and_work_limits_return_no_partial_success",
+        "path": "crates/update/src/head_touch/capture/tests.rs"
+      },
+      {
+        "line": 676,
+        "name": "head_touch::capture::tests::actual_default_file_and_ignored_name_bounds_are_enforced_and_poisoned",
+        "path": "crates/update/src/head_touch/capture/tests.rs"
+      },
+      {
+        "line": 703,
+        "name": "head_touch::capture::tests::path_component_link_and_repeated_resolution_work_are_bounded",
+        "path": "crates/update/src/head_touch/capture/tests.rs"
+      },
+      {
+        "line": 758,
+        "name": "head_touch::capture::tests::a_body_calibration_change_after_capture_refuses_even_with_carried_base_units",
+        "path": "crates/update/src/head_touch/capture/tests.rs"
+      }
+    ]
+  },
+  "source_guard_count": 1909,
+  "source_guard_sha256": "474de4d5ebc1836099339717727ec9265ec019575d4dd7f0abaca35cbc1bccec",
+  "source_helpers_tools_unchanged": true,
+  "stages": [
+    {
+      "argv": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-update",
+        "--lib",
+        "--no-run",
+        "--message-format=json"
+      ],
+      "cleanup": [],
+      "elapsed_seconds": 100.6859,
+      "exit": 0,
+      "group": "absent",
+      "pgid": 9368,
+      "pid": 9368,
+      "stage": "compile",
+      "stderr_sha256": "6ab7b6cd4bb71566ea90b9c73384898f4f4120c1f0b80c2958274f42fbc1c718",
+      "stdout_sha256": "c448d64f82ff6afc766d8d876534d5a784e8640fa3a500d99ad5d6ccd97fb0cc",
+      "timed_out": false
+    },
+    {
+      "argv": [
+        "<target>/debug/deps/lamp_update-cebdb705cde8ec81",
+        "--list",
+        "--format",
+        "terse"
+      ],
+      "cleanup": [],
+      "elapsed_seconds": 0.8818,
+      "exit": 0,
+      "group": "absent",
+      "pgid": 11098,
+      "pid": 11098,
+      "stage": "discovery",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "70ef1c50bf5dcff4d1d1314ea97a50501a7804f44217aec9976505f0f404508d",
+      "timed_out": false
+    },
+    {
+      "argv": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-update",
+        "--lib",
+        "--message-format=json",
+        "head_touch::capture::tests::",
+        "--",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "cleanup": [],
+      "elapsed_seconds": 0.4646,
+      "exit": 0,
+      "group": "absent",
+      "pgid": 11099,
+      "pid": 11099,
+      "stage": "runtime",
+      "stderr_sha256": "41fc9211f8b5d5e40b9af5d878d8e89917d2a5094e65bbc52891cb09e0ef9297",
+      "stdout_sha256": "01b6881abf710cb9c0b9cc0de48d9d20eeba169397b8817f255d9834cc871e05",
+      "timed_out": false
+    }
+  ],
+  "status": "PASS",
+  "target_release": "Exclusive flock released after source/helper/tool/executable checks; independent3913 helper notified; no bank reads afterrelease",
+  "terminals": [
+    [
+      "head_touch::capture::tests::a_body_calibration_change_after_capture_refuses_even_with_carried_base_units",
+      "ok"
+    ],
+    [
+      "head_touch::capture::tests::a_fixture_null_spelling_is_regular_text_and_a_real_null_mask_is_metadata_only",
+      "ok"
+    ],
+    [
+      "head_touch::capture::tests::absence_empty_regular_and_null_are_distinct_and_unknown_keys_are_errors",
+      "ok"
+    ],
+    [
+      "head_touch::capture::tests::actual_default_file_and_ignored_name_bounds_are_enforced_and_poisoned",
+      "ok"
+    ],
+    [
+      "head_touch::capture::tests::actual_projection_and_verification_replay_after_the_filesystem_is_gone",
+      "ok"
+    ],
+    [
+      "head_touch::capture::tests::any_caught_provider_error_poisoned_collection_and_policy_errors_are_redacted",
+      "ok"
+    ],
+    [
+      "head_touch::capture::tests::cache_keys_and_link_targets_keep_directory_requiring_spellings_distinct",
+      "ok"
+    ],
+    [
+      "head_touch::capture::tests::custom_pins_and_settings_off_do_not_invent_product_or_body_dependencies",
+      "ok"
+    ],
+    [
+      "head_touch::capture::tests::dangling_link_appearance_and_missing_ancestor_creation_invalidate",
+      "ok"
+    ],
+    [
+      "head_touch::capture::tests::directory_membership_including_ignored_names_and_absence_is_rechecked",
+      "ok"
+    ],
+    [
+      "head_touch::capture::tests::escapes_and_link_loops_refuse_without_an_ordinary_reader_fallback",
+      "ok"
+    ],
+    [
+      "head_touch::capture::tests::file_aggregate_directory_name_key_and_work_limits_return_no_partial_success",
+      "ok"
+    ],
+    [
+      "head_touch::capture::tests::file_mutation_and_ancestor_replacement_refuse_before_freeze",
+      "ok"
+    ],
+    [
+      "head_touch::capture::tests::metadata_only_null_classification_refuses_zero_fifo_and_socket",
+      "ok"
+    ],
+    [
+      "head_touch::capture::tests::path_component_link_and_repeated_resolution_work_are_bounded",
+      "ok"
+    ],
+    [
+      "head_touch::capture::tests::raw_non_utf8_names_are_preserved_but_non_utf8_text_is_refused",
+      "ok"
+    ],
+    [
+      "head_touch::capture::tests::regular_hard_links_retain_link_count_and_content_dependencies",
+      "ok"
+    ],
+    [
+      "head_touch::capture::tests::relative_directory_and_regular_links_and_contained_absolute_links_recheck",
+      "ok"
+    ],
+    [
+      "head_touch::capture::tests::removal_from_a_captured_directory_invalidates_without_a_text_dependency",
+      "ok"
+    ],
+    [
+      "head_touch::capture::tests::root_substitution_and_an_unrelated_root_refuse_revalidation",
+      "ok"
+    ],
+    [
+      "head_touch::capture::tests::same_descriptor_checks_reject_preopen_swap_and_postread_mutation",
+      "ok"
+    ]
+  ],
+  "tool_sha256": {
+    "cargo": "425e08ffa69bcf047b2a82b08b42d1d26ba8488f774bade1c14a62623fc18bad",
+    "rustc": "6859de89ddecec2ebaaec50d25c9c471d47f33677a96f7c81666247be062d499"
+  },
+  "tree": "6923ca059163953e0fa2560b9499a3f5a09126ed"
+}
