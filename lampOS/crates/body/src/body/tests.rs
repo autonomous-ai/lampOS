@@ -5357,6 +5357,20 @@ fn a_head_held_off_its_goal_by_a_hand_at_a_low_load_is_in_the_hand() {
     );
 }
 
+/// lamp-52e6, 27 Oct, 01:26:22: the base's goal jumped to 2,061 from 2,025
+/// where it last tracked; 2,037 four steps on, at a load of 104, it was
+/// closing on it, not held. A hand holding it, or pushing it away, is not.
+#[test]
+fn a_joint_closing_on_its_goal_is_following_not_pushed() {
+    assert!(closing_on(2_061, 2_037, 2_025));
+    assert!(closing_on(1_700, 1_741, 1_768));
+    // Held where it last tracked, or pushed away from its goal: a hand.
+    assert!(!closing_on(2_061, 2_025, 2_025));
+    assert!(!closing_on(2_061, 2_020, 2_025));
+    // Lamp-52e6's base turned 38 counts off its goal by a hand.
+    assert!(!closing_on(2_015, 2_053, 2_015));
+}
+
 /// lamp-06c1, 23 Oct: a head pitch that reads 124 to 136 at its own rest,
 /// over `STALL_LOAD`, with nothing on it and its position unmoving all
 /// night. Given way to a short push, it is let go after its ease and is
