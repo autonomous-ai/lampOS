@@ -1503,7 +1503,19 @@ impl Run<'_, '_> {
         companions: &BTreeMap<String, String>,
     ) -> Result<BTreeMap<String, String>, Outcome> {
         let mut carried = BTreeMap::new();
-        for unit in &manifest.units {
+        // Read host entries first so compatibility, not manifest order, decides
+        // whether a linked product template is still needed.
+        for unit in manifest
+            .units
+            .iter()
+            .filter(|unit| unit.lamp != manifest::PRODUCT_LAMP)
+            .chain(
+                manifest
+                    .units
+                    .iter()
+                    .filter(|unit| unit.lamp == manifest::PRODUCT_LAMP),
+            )
+        {
             // A template is named without its `@` in a manifest.
             let name = unit.on_lamp();
             if companion::kind(&name).is_some() {
@@ -1536,21 +1548,29 @@ impl Run<'_, '_> {
             };
             let product = unit.lamp == manifest::PRODUCT_LAMP;
             if product {
-                // A lamp-specific template always wins, regardless of order.
+                // A carried host template wins; plan still validates it.
                 // Pinned installations never acquire a product current link.
-                if !part.program.linked
-                    || manifest.units.iter().any(|other| {
-                        other.unit == unit.unit
-                            && other.lamp == self.config.lamp
-                            && other.lamp != manifest::PRODUCT_LAMP
-                    })
-                {
+                if !part.program.linked || carried.contains_key(&unit.unit) {
                     continue;
                 }
             } else if unit.lamp != self.config.lamp {
                 continue;
             }
             let text = self.fetch_unit(manifest, unit)?;
+            if !product
+                && part.program.linked
+                && unit::program(&text).is_some()
+                && manifest
+                    .units
+                    .iter()
+                    .any(|other| other.lamp == manifest::PRODUCT_LAMP && other.unit == unit.unit)
+            {
+                self.say(&format!(
+                    "skipping pinned {} for {}: the installed part uses {}current",
+                    unit.unit, unit.lamp, part.program.builds
+                ));
+                continue;
+            }
             if product
                 && unit::linked(&text)
                     != Some((part.program.builds.clone(), part.program.binary.clone()))
