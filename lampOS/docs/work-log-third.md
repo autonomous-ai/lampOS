@@ -1,3 +1,11 @@
+## 2026-10-27 23:53 — yawn fix original native slice verified
+
+#3887 7e92d6272 [original native receipt](verification/yawn-read-3887-20261027/native.json): ARM40541552504/job122320975884 and Linux40541552486/job122320975637 both succeed on attempt one. Both complete logs name843075e3c; API/Git ordered parents0d1d/7e92 and tree976bdd70e exactly equal authored. The one owned yawn blob/mode and all three selected source files are bound to that preview. Pinned workspace formatting and strict all-target Linux Clippy steps complete successfully.
+
+All thirteen selected yawn controls pass once: ten module, two Activity and one Blendshapes, zero selected bad/skip/unrun/retry observations. Root independently verifies all thirty-four evidence hashes and thirteen raw named PASS rows. No full native census, whole Eyes semantic coverage, author's353 transfer or new local Rust/Cargo execution. Original local std-only10/0 and parent negative control remain separate. All watcher/collector/auditor groups close without workflow action; no artifact, camera accuracy, latency or physical claim.
+
+Own #3646's next local clean carry is4d786be86 on frozen0d1d; completedf43 source/native receipts and artifacts remain preserved. All seven range rows equal and raw authors/messages/payloads are preserved; only Voiceunit/switch docs integrate Main. Source/closure audit has passed, fresh bounded gate proposal is being reviewed before compiler/runtime. Broker and old failure holds remain.
+
 ## 2026-10-27 23:42 — own-key original ARM64 and Linux gates qualified
 
 #3646 f43b55043: [original native receipt](verification/ownkeys-third-carry-20261027/original-native-f43.json) records ARM40539307194/job122313021846 and Linux40539307052/job122313022409, both workflow aggregates and required jobs SUCCESS on attempt one. Both complete logs name actual dd29c4743; API/Git ordered parents are197f21533/f43, tree22b45b4aa. No parent/tree log provenance is invented. Preview differs from authored f43 in twenty-five paths; no whole-tree or authored-host execution equivalence is claimed.

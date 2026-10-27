@@ -1,0 +1,611 @@
+{
+  "Root_check": "All34 evidence hashes independently match. Original complete ARM log has13 matching named yawn PASS rows, agreeing with the bound selected census; no full native count inferred.",
+  "raw_private_sha256": "a7a2048413ba439788082e3dd40d58cae6b8b5811ee0c3b12d52b8f9f1259000",
+  "receipt": {
+    "Linux_strict": {
+      "logged_commands": [
+        {
+          "line": 440,
+          "text": "\ufeff2026-10-27T16:31:05.3429643Z ##[group]Run cargo +1.96.0 fmt --all --check"
+        },
+        {
+          "line": 578,
+          "text": "\ufeff2026-10-27T16:33:50.1000325Z ##[group]Run cargo clippy --locked --workspace --all-targets -- -D warnings"
+        }
+      ],
+      "relevant_completed_steps": [
+        {
+          "completed_at": "2026-10-27T16:31:15Z",
+          "conclusion": "success",
+          "name": "formatting (whole workspace, pinned Rust)",
+          "number": 6,
+          "started_at": "2026-10-27T16:31:05Z",
+          "status": "completed"
+        },
+        {
+          "completed_at": "2026-10-27T16:34:56Z",
+          "conclusion": "success",
+          "name": "clippy (every crate and target, warnings as errors)",
+          "number": 9,
+          "started_at": "2026-10-27T16:33:50Z",
+          "status": "completed"
+        }
+      ],
+      "scope": "Job metadata and completed relevant formatting/strict Clippy steps; no native runtime census or product artifact/signature claim."
+    },
+    "Root_local_proof": {
+      "relative_receipt": "../qualified-local.json",
+      "scope": "Root std-only10PASS once plus old-parent-production/current-regression expected assertion failure2vs1; separately qualified before native. No repetition or transfer of author353/0.",
+      "sha256": "8be2370ca4393ea3cf0f22995e1ba246ce29ff1e0ad5e3ebf1c63400c8038ade"
+    },
+    "actual_preview": "843075e3c5de38c3ef1dc6dc2186cda42c188d29",
+    "actual_preview_tree_equals_authored": true,
+    "actual_source_overlay_paths": [],
+    "actual_tree": "976bdd70e08b4a5b5e45b5fe0290964daa2f045e",
+    "authored_base": "0d1d1f2b944581169c9f96adba9f40ab88adba92",
+    "authored_tree": "976bdd70e08b4a5b5e45b5fe0290964daa2f045e",
+    "closed_handles": [
+      {
+        "exit": 0,
+        "scope": "bounded original ARM watch",
+        "session": 94785
+      },
+      {
+        "exit": 0,
+        "scope": "completed Linux text/source read",
+        "session": 52312
+      },
+      {
+        "exit": 0,
+        "scope": "ARM final metadata/log collection",
+        "session": 47574
+      },
+      {
+        "exit": 0,
+        "scope": "logged preview source binding",
+        "session": 49089
+      }
+    ],
+    "commands": {
+      "original_ARM_log": [
+        "gh",
+        "run",
+        "view",
+        "40541552504",
+        "--repo",
+        "autonomous-ai/lampOS",
+        "--job",
+        "122320975884",
+        "--log"
+      ],
+      "original_Linux_log": [
+        "gh",
+        "run",
+        "view",
+        "40541552486",
+        "--repo",
+        "autonomous-ai/lampOS",
+        "--job",
+        "122320975637",
+        "--log"
+      ],
+      "watch": [
+        "gh",
+        "run",
+        "watch",
+        "40541552504",
+        "--repo",
+        "autonomous-ai/lampOS",
+        "--interval",
+        "30",
+        "--exit-status"
+      ]
+    },
+    "evidence_sha256": {
+      "activity-authored-source.rs": "feb668b6eae248b265e878ed96e2aefc5f7a66cb51a509949b7128ac25a352d6",
+      "arm-job-final.json": "d38f650970d9c02bd891217a88c303050e16704d04a0bd239978821ce799f5f3",
+      "arm-job-final.transport.json": "432ef2659f0f65aecacf871fb1f516f88f28f4043eebd0c5bb90d0d22b607160",
+      "arm-job-initial.json": "e2b27e1084fed1ada1b448daa555893a6fd3768216822a5b73e29a6631f2e22b",
+      "arm-job-initial.transport.json": "898055faab3ef1cbc246bd8ad4ddb6dd25073bcb1c00b95e4a253ebd120a75c9",
+      "arm-original-log.transport.json": "3bd6455c2707eb599a750d1e99d2e10cdb2c603ae7bdb73bd0f635028cdf503a",
+      "arm-original.log": "5793a27586973120bd075dd28e4f98c4f1a9c1d01419b87db3da743f4c32f1fa",
+      "arm-run-final.json": "e1fef27c7ed46fdeeebf3c0fc9447ff74acd69ba5826fd7cef6bd3ed947467c9",
+      "arm-run-final.transport.json": "d780a0cbac171e915b2fd95546cd15b4639379f195b0fb3f427161ab6ed23d51",
+      "arm-run-initial.json": "bba9b1aeec6ce03c50ce2c2a1e1d2677591cff82164b5639723bad31f885ccec",
+      "arm-run-initial.transport.json": "b576a4fe3d44253f15a3fa6c8912303f91e3be6d1365af35a72f3056503f5547",
+      "arm-watch-plan.json": "f0f445195856ff35a208db403517c1bb0689018cfbea0eed1b3fcd2935e4db3f",
+      "arm-watch-started.json": "681ff33d278ad33071ac7501f4cafaa887298d41b95eb6cb10bbade3c657b0fe",
+      "arm-watch-terminal.json": "da715f0a8711d499768f3207f638985f4781053f950233d8db72ef2ee21f28a4",
+      "arm-watch.log": "51e7b60c4c425e1d84b779c7226648e235a38ac664d110945647d359ea3d12d1",
+      "arm-yawn-status-lines.json": "79fb43d433757b9129aed7224faee513ea3614ba01628d0acb7f3aa41862a190",
+      "audit-input-guards-after.json": "0a2e2a7d8c92db0b90dfbf2268a8cafc05fc99350e08205d6efa8588a82014e8",
+      "audit-input-guards-before.json": "0a2e2a7d8c92db0b90dfbf2268a8cafc05fc99350e08205d6efa8588a82014e8",
+      "audit-native.py": "999f8f28269ccca306f639ac5966885fb2eeb390b9e2a0905a7745ee908e4fd5",
+      "authored-selected-source-census.json": "29fd8e54c4a4df71f6e88f9c55f2219c3eb688fbb5f3fc4c3dc1d3e46f126400",
+      "authored-test-cfg-context.json": "f7ae514c7a4767fb729e0b4c1f21edc85702846b87d72f6b85b8a9005244a11f",
+      "blendshapes-authored-source.rs": "89a47e6fc656682e300ea6c962b3821e10467986d0913a288d51160c8ca08f61",
+      "fetch-preview.transport.json": "2c8f94dba6b16365b4b6550672dd7cb791c1282f4f6009ac8a46a5b442612147",
+      "linux-job-initial.json": "a551b0777911d25d68980772096734e7ef5cf106578b633d30f972985fdeeff1",
+      "linux-job-initial.transport.json": "16d064ead79d323ff1ac260d54e5a7595316aa61b6f20c58f1a41a7972f46faf",
+      "linux-original-log.transport.json": "0da59ec2191401b08ed1de7652879b85df47f043a328fbc93244f3d79d361b11",
+      "linux-original.log": "534f811d8dd9eae3cbe7b6bc9a866dfd673f78f2b4c6785f3c1769cfa65e89f8",
+      "linux-run-initial.json": "597463b3d01afc3d4b8fcfb3f295ba425d52a4a4b55e831704ef80f98319a3f7",
+      "linux-run-initial.transport.json": "3fd3f75f17113745ad67f0af00120e477ced1fedd9cf5f2c2e2eb77f106499c1",
+      "root-local-proof-binding.json": "bd3cb82fe5d8a562f4f06eaeb5af502ba8f4a32a657ec5c5724c30bbdeaf0fd2",
+      "source-binding.json": "218cc15fe782956cc687edf1c065897b666b562af509853f6bd31ca883a45f91",
+      "source-yawn-census.txt": "9bf0cb1e200a869b11d09234117809d8747c7e812a84be90afbd55ea56ba1dd6",
+      "watch-arm.py": "a39c1e92820c4c9e4d8d46c055871bd44c3767638162170583eada5554dec75d",
+      "yawn-authored-source.rs": "2aaac24f9ccde37aaa3fae6c3face30c8f328f8a164363ab70b6f12bed76c249"
+    },
+    "head": "7e92d6272b710ef5d4b4fdeb213db689c51a2c6a",
+    "holds": [],
+    "limits": [
+      "Only13 named yawn terminals inventoried/source-bound; no full native test census, generic CI coverage, or full Eyes semantic review.",
+      "Original attempt1 statuses and selected no-retry observations only; any future failure or retry remains distinct and unwaived.",
+      "Exact original preview tree only; no equivalent-source or runtime-credit claim for future Main overlays/carries.",
+      "No transfer of author353/0; Root local std-only proof remains separate from this original ARM/Linux evidence.",
+      "No acoustic/camera/device behavior, signing, release, deploy or artifact executable qualification."
+    ],
+    "native_command_log_observations": [
+      {
+        "line": 826,
+        "text": "cargo nextest run --locked --release --workspace \\"
+      }
+    ],
+    "native_metadata": {
+      "arm": {
+        "head": "7e92d6272b710ef5d4b4fdeb213db689c51a2c6a",
+        "job_conclusion": "success",
+        "job_id": 122320975884,
+        "job_status": "completed",
+        "run_attempt": 1,
+        "run_conclusion": "success",
+        "run_id": 40541552504,
+        "run_status": "completed",
+        "scope": "Original run/job status; no artifact, device or signature qualification.",
+        "terminal_snapshot": "final"
+      },
+      "linux": {
+        "head": "7e92d6272b710ef5d4b4fdeb213db689c51a2c6a",
+        "job_conclusion": "success",
+        "job_id": 122320975637,
+        "job_status": "completed",
+        "run_attempt": 1,
+        "run_conclusion": "success",
+        "run_id": 40541552486,
+        "run_status": "completed",
+        "scope": "Original run/job status; no artifact, device or signature qualification.",
+        "terminal_snapshot": "initial"
+      }
+    },
+    "no_public_posts_source_edits_local_Rust_Cargo_device_workflow_rerun_cancel_or_artifact_execution": true,
+    "ordered_parents": [
+      "0d1d1f2b944581169c9f96adba9f40ab88adba92",
+      "7e92d6272b710ef5d4b4fdeb213db689c51a2c6a"
+    ],
+    "other_bad_status_name_hash_observations": [],
+    "owned_blob_mode": "100644 blob e2c1051cb77b0ca0a2dd5a0b0e06d9c046f7cb15\tlampOS/crates/eyes/src/yawn.rs",
+    "owned_path": "lampOS/crates/eyes/src/yawn.rs",
+    "selected_source_blobs_modes": [
+      "100644 blob 71b91e832e8d2e988a676ceb5e4297b84afdab89\tlampOS/crates/eyes/src/activity.rs",
+      "100644 blob 87e35c8f39ef4a0f3f667f9aa2d42883f0280f2c\tlampOS/crates/eyes/src/blendshapes.rs",
+      "100644 blob bfc3db51ba01c2d609f1713f0de10581c31fe364\tlampOS/crates/eyes/src/lib.rs",
+      "100644 blob e2c1051cb77b0ca0a2dd5a0b0e06d9c046f7cb15\tlampOS/crates/eyes/src/yawn.rs"
+    ],
+    "selected_source_bound_terminals": [
+      {
+        "actual": [
+          {
+            "binary_id": "lamp-eyes",
+            "duration": "   0.004s",
+            "line": 1426,
+            "line_sha256": "a76d4a796b1021c11bb361cb616a88a1c478c8bec9bfd580dbee01479ef46609",
+            "name": "yawn::tests::a_mouth_held_wide_for_the_hold_is_one_yawn",
+            "retry_marker": null,
+            "status": "PASS"
+          }
+        ],
+        "source": {
+          "binary": "lamp_eyes",
+          "file_sha256": "2aaac24f9ccde37aaa3fae6c3face30c8f328f8a164363ab70b6f12bed76c249",
+          "function_line": 174,
+          "function_line_sha256": "99412ba5e5c42153a447d5f314fe7f5dd86877d69017a656d521bbc88824ac15",
+          "name": "yawn::tests::a_mouth_held_wide_for_the_hold_is_one_yawn",
+          "package": "lamp-eyes",
+          "path": "lampOS/crates/eyes/src/yawn.rs",
+          "preceding_cfg_and_attributes": [
+            "        all",
+            "    }",
+            "",
+            "    #[test]"
+          ],
+          "target_kind": "lib"
+        }
+      },
+      {
+        "actual": [
+          {
+            "binary_id": "lamp-eyes",
+            "duration": "   0.004s",
+            "line": 1428,
+            "line_sha256": "52a68468851cc2bd54c7ed2b842d1c568040d2f6bb362e5cc1d17da4c692dd4b",
+            "name": "yawn::tests::a_short_gape_is_no_yawn",
+            "retry_marker": null,
+            "status": "PASS"
+          }
+        ],
+        "source": {
+          "binary": "lamp_eyes",
+          "file_sha256": "2aaac24f9ccde37aaa3fae6c3face30c8f328f8a164363ab70b6f12bed76c249",
+          "function_line": 184,
+          "function_line_sha256": "a398ea1eecf1fcc35623b24b51b33a11ae77babe54c843cd77fe4797e8812f5f",
+          "name": "yawn::tests::a_short_gape_is_no_yawn",
+          "package": "lamp-eyes",
+          "path": "lampOS/crates/eyes/src/yawn.rs",
+          "preceding_cfg_and_attributes": [
+            "        assert_eq!(counted(&mut yawns, &held(yawn(0.15), 17), 0), 1);",
+            "    }",
+            "",
+            "    #[test]"
+          ],
+          "target_kind": "lib"
+        }
+      },
+      {
+        "actual": [
+          {
+            "binary_id": "lamp-eyes",
+            "duration": "   0.004s",
+            "line": 1432,
+            "line_sha256": "7655303bf7303384c9a5754c5083abb52631058af7a43ee15d12369e20012c4f",
+            "name": "yawn::tests::two_yawns_with_the_mouth_closed_between_are_two",
+            "retry_marker": null,
+            "status": "PASS"
+          }
+        ],
+        "source": {
+          "binary": "lamp_eyes",
+          "file_sha256": "2aaac24f9ccde37aaa3fae6c3face30c8f328f8a164363ab70b6f12bed76c249",
+          "function_line": 190,
+          "function_line_sha256": "5120bfadbcdefad162b4f898ae058ae84a16ebbf7cf74f6c790b126eba3bdd4a",
+          "name": "yawn::tests::two_yawns_with_the_mouth_closed_between_are_two",
+          "package": "lamp-eyes",
+          "path": "lampOS/crates/eyes/src/yawn.rs",
+          "preceding_cfg_and_attributes": [
+            "        assert_eq!(counted(&mut yawns, &held(yawn(0.15), 6), 0), 0);",
+            "    }",
+            "",
+            "    #[test]"
+          ],
+          "target_kind": "lib"
+        }
+      },
+      {
+        "actual": [
+          {
+            "binary_id": "lamp-eyes",
+            "duration": "   0.004s",
+            "line": 1427,
+            "line_sha256": "b2b5451e30501d9bf5b0802068f5b945650dba439aca8d8dfb7007607ca2ba8c",
+            "name": "yawn::tests::a_mouth_that_only_half_closes_is_still_the_same_yawn",
+            "retry_marker": null,
+            "status": "PASS"
+          }
+        ],
+        "source": {
+          "binary": "lamp_eyes",
+          "file_sha256": "2aaac24f9ccde37aaa3fae6c3face30c8f328f8a164363ab70b6f12bed76c249",
+          "function_line": 198,
+          "function_line_sha256": "93bb70ce9a086c3611529b332c652a063d4fe07a5056fe631252dd620816519d",
+          "name": "yawn::tests::a_mouth_that_only_half_closes_is_still_the_same_yawn",
+          "package": "lamp-eyes",
+          "path": "lampOS/crates/eyes/src/yawn.rs",
+          "preceding_cfg_and_attributes": [
+            "        assert_eq!(counted(&mut yawns, &looks, 0), 2);",
+            "    }",
+            "",
+            "    #[test]"
+          ],
+          "target_kind": "lib"
+        }
+      },
+      {
+        "actual": [
+          {
+            "binary_id": "lamp-eyes",
+            "duration": "   0.004s",
+            "line": 1429,
+            "line_sha256": "0efbe9ca30064a5039cf12caf5c06ef423a25336cfedeea7ddacadabed8bc114",
+            "name": "yawn::tests::one_misread_look_is_forgiven_and_two_end_the_hold",
+            "retry_marker": null,
+            "status": "PASS"
+          }
+        ],
+        "source": {
+          "binary": "lamp_eyes",
+          "file_sha256": "2aaac24f9ccde37aaa3fae6c3face30c8f328f8a164363ab70b6f12bed76c249",
+          "function_line": 208,
+          "function_line_sha256": "81369a08bfeae5ef87e8e4dc1a609788f33e75f2cfcba11ca497776c35979a6b",
+          "name": "yawn::tests::one_misread_look_is_forgiven_and_two_end_the_hold",
+          "package": "lamp-eyes",
+          "path": "lampOS/crates/eyes/src/yawn.rs",
+          "preceding_cfg_and_attributes": [
+            "        assert_eq!(counted(&mut yawns, &looks, 0), 1);",
+            "    }",
+            "",
+            "    #[test]"
+          ],
+          "target_kind": "lib"
+        }
+      },
+      {
+        "actual": [
+          {
+            "binary_id": "lamp-eyes",
+            "duration": "   0.004s",
+            "line": 1425,
+            "line_sha256": "2ad621c479e65c70b04dc7507821b56af935f6229bd4b9e878bf1d7b6a39099b",
+            "name": "yawn::tests::a_held_smile_or_surprise_is_no_yawn",
+            "retry_marker": null,
+            "status": "PASS"
+          }
+        ],
+        "source": {
+          "binary": "lamp_eyes",
+          "file_sha256": "2aaac24f9ccde37aaa3fae6c3face30c8f328f8a164363ab70b6f12bed76c249",
+          "function_line": 220,
+          "function_line_sha256": "48665a8c469827285c46318efe53a48d036f7a81a3b1f6d7bc8854cd0cde9a5e",
+          "name": "yawn::tests::a_held_smile_or_surprise_is_no_yawn",
+          "package": "lamp-eyes",
+          "path": "lampOS/crates/eyes/src/yawn.rs",
+          "preceding_cfg_and_attributes": [
+            "        assert_eq!(counted(&mut Yawns::default(), &looks, 0), 0);",
+            "    }",
+            "",
+            "    #[test]"
+          ],
+          "target_kind": "lib"
+        }
+      },
+      {
+        "actual": [
+          {
+            "binary_id": "lamp-eyes",
+            "duration": "   0.004s",
+            "line": 1433,
+            "line_sha256": "c8fe18b645bae826a308d5952df2ebcd43f760ebc1972bae58a01a3c8e618b47",
+            "name": "yawn::tests::talk_is_no_yawn",
+            "retry_marker": null,
+            "status": "PASS"
+          }
+        ],
+        "source": {
+          "binary": "lamp_eyes",
+          "file_sha256": "2aaac24f9ccde37aaa3fae6c3face30c8f328f8a164363ab70b6f12bed76c249",
+          "function_line": 244,
+          "function_line_sha256": "cd21633f06f9d47e999427c1b4a21a6a8ca6ec2409857e908b2489760fb345c7",
+          "name": "yawn::tests::talk_is_no_yawn",
+          "package": "lamp-eyes",
+          "path": "lampOS/crates/eyes/src/yawn.rs",
+          "preceding_cfg_and_attributes": [
+            "",
+            "    /// Talk opens the mouth past the line now and then, never for long:",
+            "    /// the screen man's talk clip, 4 looks a second, its smiles as read.",
+            "    #[test]"
+          ],
+          "target_kind": "lib"
+        }
+      },
+      {
+        "actual": [
+          {
+            "binary_id": "lamp-eyes",
+            "duration": "   0.004s",
+            "line": 1430,
+            "line_sha256": "b84cdf9b5bb09f8fed65e5695a48c6d485838950758ef87d98ca951b7921b96d",
+            "name": "yawn::tests::looks_far_apart_are_not_one_hold",
+            "retry_marker": null,
+            "status": "PASS"
+          }
+        ],
+        "source": {
+          "binary": "lamp_eyes",
+          "file_sha256": "2aaac24f9ccde37aaa3fae6c3face30c8f328f8a164363ab70b6f12bed76c249",
+          "function_line": 264,
+          "function_line_sha256": "5e6e56b3ac9ce1ff77cc56f9de98450851755ce89eaf8ffadb95daa15bd3b958",
+          "name": "yawn::tests::looks_far_apart_are_not_one_hold",
+          "package": "lamp-eyes",
+          "path": "lampOS/crates/eyes/src/yawn.rs",
+          "preceding_cfg_and_attributes": [
+            "        assert_eq!(counted(&mut Yawns::default(), &looks, 0), 0);",
+            "    }",
+            "",
+            "    #[test]"
+          ],
+          "target_kind": "lib"
+        }
+      },
+      {
+        "actual": [
+          {
+            "binary_id": "lamp-eyes",
+            "duration": "   0.004s",
+            "line": 1424,
+            "line_sha256": "738b01607073cd2b796c45907ba68459b1ef96ed4443e4183b275c45b121832b",
+            "name": "yawn::tests::a_face_gone_with_its_mouth_open_does_not_block_the_next_yawn",
+            "retry_marker": null,
+            "status": "PASS"
+          }
+        ],
+        "source": {
+          "binary": "lamp_eyes",
+          "file_sha256": "2aaac24f9ccde37aaa3fae6c3face30c8f328f8a164363ab70b6f12bed76c249",
+          "function_line": 274,
+          "function_line_sha256": "b6c93ac5574570fb4d3672956952dba430cea872da4327522fb290e7be99975b",
+          "name": "yawn::tests::a_face_gone_with_its_mouth_open_does_not_block_the_next_yawn",
+          "package": "lamp-eyes",
+          "path": "lampOS/crates/eyes/src/yawn.rs",
+          "preceding_cfg_and_attributes": [
+            "",
+            "    /// The face leaves with its mouth open: the next yawn still counts.",
+            "    /// One missed mesh in a long yawn is not a face gone: still one.",
+            "    #[test]"
+          ],
+          "target_kind": "lib"
+        }
+      },
+      {
+        "actual": [
+          {
+            "binary_id": "lamp-eyes",
+            "duration": "   0.004s",
+            "line": 1431,
+            "line_sha256": "07533c6d4c7f416e6ba08d5f0bd3c5cae4cd7c2c8737f07decb54554c11e9746",
+            "name": "yawn::tests::scores_are_wanted_only_for_an_open_mouth",
+            "retry_marker": null,
+            "status": "PASS"
+          }
+        ],
+        "source": {
+          "binary": "lamp_eyes",
+          "file_sha256": "2aaac24f9ccde37aaa3fae6c3face30c8f328f8a164363ab70b6f12bed76c249",
+          "function_line": 300,
+          "function_line_sha256": "10e94ac461f785e231587df5fc6be0ea452964bd98d20cd73ef9966c270b26c5",
+          "name": "yawn::tests::scores_are_wanted_only_for_an_open_mouth",
+          "package": "lamp-eyes",
+          "path": "lampOS/crates/eyes/src/yawn.rs",
+          "preceding_cfg_and_attributes": [
+            "        }",
+            "    }",
+            "",
+            "    #[test]"
+          ],
+          "target_kind": "lib"
+        }
+      },
+      {
+        "actual": [
+          {
+            "binary_id": "lamp-eyes",
+            "duration": "   0.004s",
+            "line": 1109,
+            "line_sha256": "c52ca8fc042268d17bea85989350c46c5cac054c4bb31eb30f770179306529e9",
+            "name": "activity::tests::yawns_are_the_sittings_and_go_with_it",
+            "retry_marker": null,
+            "status": "PASS"
+          }
+        ],
+        "source": {
+          "binary": "lamp_eyes",
+          "file_sha256": "feb668b6eae248b265e878ed96e2aefc5f7a66cb51a509949b7128ac25a352d6",
+          "function_line": 642,
+          "function_line_sha256": "d581b878cb47b6038c5185853e8c0935ccd98d6b62c0cdcb82cc6f09f2992012",
+          "name": "activity::tests::yawns_are_the_sittings_and_go_with_it",
+          "package": "lamp-eyes",
+          "path": "lampOS/crates/eyes/src/activity.rs",
+          "preceding_cfg_and_attributes": [
+            "",
+            "    /// A sitting's yawns (#3709): counted while someone sits, none while",
+            "    /// away, and a new sitting begins at none.",
+            "    #[test]"
+          ],
+          "target_kind": "lib"
+        }
+      },
+      {
+        "actual": [
+          {
+            "binary_id": "lamp-eyes",
+            "duration": "   0.004s",
+            "line": 1110,
+            "line_sha256": "504b664bb761b3a1cde61f58b1f3a84d62b1c29c7be543581748fbe5438fe13f",
+            "name": "activity::tests::yawns_go_with_the_yes_and_with_the_camera",
+            "retry_marker": null,
+            "status": "PASS"
+          }
+        ],
+        "source": {
+          "binary": "lamp_eyes",
+          "file_sha256": "feb668b6eae248b265e878ed96e2aefc5f7a66cb51a509949b7128ac25a352d6",
+          "function_line": 668,
+          "function_line_sha256": "3e7fe9fc6c8c68dace96c6343ce7c41d971c3a7295bfaed53650ad362d1a5e46",
+          "name": "activity::tests::yawns_go_with_the_yes_and_with_the_camera",
+          "package": "lamp-eyes",
+          "path": "lampOS/crates/eyes/src/activity.rs",
+          "preceding_cfg_and_attributes": [
+            "    /// The face-expressions yes withdrawn mid-sitting: the count is 0 at",
+            "    /// once, a yawn then counts nothing, and with the yes back they count",
+            "    /// again from 0. A camera close forgets it too (#3842).",
+            "    #[test]"
+          ],
+          "target_kind": "lib"
+        }
+      },
+      {
+        "actual": [
+          {
+            "binary_id": "lamp-eyes",
+            "duration": "   0.004s",
+            "line": 1133,
+            "line_sha256": "1e30a65bd6e9ae781b29aa3249a9a5dfd557b8ca46f5f59fc7e2108e510e74a6",
+            "name": "blendshapes::tests::a_yawn_reads_the_smiles_mean_and_the_inner_brows",
+            "retry_marker": null,
+            "status": "PASS"
+          }
+        ],
+        "source": {
+          "binary": "lamp_eyes",
+          "file_sha256": "89a47e6fc656682e300ea6c962b3821e10467986d0913a288d51160c8ca08f61",
+          "function_line": 229,
+          "function_line_sha256": "9594d690ea9f54fd4234c3b8d97bbe597cc2432823a172bd4f68be6381fe36ec",
+          "name": "blendshapes::tests::a_yawn_reads_the_smiles_mean_and_the_inner_brows",
+          "package": "lamp-eyes",
+          "path": "lampOS/crates/eyes/src/blendshapes.rs",
+          "preceding_cfg_and_attributes": [
+            "    }",
+            "",
+            "    /// A yawn's two scores: the smiles' mean and the inner brows (#3709).",
+            "    #[test]"
+          ],
+          "target_kind": "lib"
+        }
+      }
+    ],
+    "selected_yawn_counts": {
+      "PASS": 13,
+      "bad": 0,
+      "other_yawn": 3,
+      "retry_observations": 0,
+      "selected_unrun": 0,
+      "skipped": 0,
+      "unique": 13,
+      "yawn_module": 10
+    },
+    "source_evidence_helper_hash_guards_unchanged": true,
+    "status": "ORIGINAL_NATIVE_YAWN13_AND_LINUX_STRICT_VERIFIED",
+    "utc": "2026-10-27T16:51:45.934426+00:00",
+    "watch": {
+      "argv": [
+        "gh",
+        "run",
+        "watch",
+        "40541552504",
+        "--repo",
+        "autonomous-ai/lampOS",
+        "--interval",
+        "30",
+        "--exit-status"
+      ],
+      "cleanup": [],
+      "elapsed_seconds": 69.27200692400001,
+      "error": null,
+      "helper_sha256": "a39c1e92820c4c9e4d8d46c055871bd44c3767638162170583eada5554dec75d",
+      "log_sha256": "51e7b60c4c425e1d84b779c7226648e235a38ac664d110945647d359ea3d12d1",
+      "process_group": "absent",
+      "reaped": true,
+      "returncode": 0,
+      "timed_out": false,
+      "utc": "2026-10-27T16:47:03.868915+00:00"
+    }
+  }
+}
