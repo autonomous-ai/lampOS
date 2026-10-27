@@ -1,0 +1,298 @@
+{
+  "PR": {
+    "current_head_still_matches": true,
+    "draft": true,
+    "gate_metadata_only": [
+      {
+        "conclusion": "",
+        "name": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+        "status": "IN_PROGRESS",
+        "url": "https://github.com/autonomous-ai/lampOS/actions/runs/40598812252/job/122521475255"
+      },
+      {
+        "conclusion": "SUCCESS",
+        "name": "lampOS \u2014 clippy, every crate and target (x86 Linux)",
+        "status": "COMPLETED",
+        "url": "https://github.com/autonomous-ai/lampOS/actions/runs/40598812095/job/122521474352"
+      },
+      {
+        "conclusion": "SKIPPED",
+        "name": "lampOS \u2014 promote a tested release to the stable feed",
+        "status": "COMPLETED",
+        "url": "https://github.com/autonomous-ai/lampOS/actions/runs/40598812252/job/122521476819"
+      }
+    ],
+    "new_review_comments_read": [
+      "6455721575",
+      "6455775153"
+    ],
+    "number": 3949,
+    "other_reader_disposition": "No source P1/P2 in final six paths; HOLD on current gates/draft/prerequisites/latest-base conditions, not waived by our local10.",
+    "state": "OPEN"
+  },
+  "counts": {
+    "FAIL": 0,
+    "PASS": 10,
+    "ignored": 0,
+    "retries": 0,
+    "selected": 10,
+    "unrun": 0
+  },
+  "current_driver": {
+    "depinfo_sha256": "125b67037f4fb478e0087785c7a4e235c1a00ddb68adaaef02c12a8a880d3b5e",
+    "executable": "[workspace]/.claude/worktrees/third-store-target/debug/deps/lamp_update-cebdb705cde8ec81",
+    "features": [],
+    "fresh": false,
+    "manifest": "[workspace]/.claude/worktrees/third-head-coherence-read-3949/lampOS/crates/update/Cargo.toml",
+    "normal_children_admitted": 0,
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 0,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "resolved_current_depinfo_sources": 171,
+    "retained_copy": "retained-current-update-lib-test",
+    "saved_snapshot": {
+      "ctime_ns": 1793142644378585696,
+      "device": 16777222,
+      "inode": 329290121,
+      "links": 1,
+      "mode": 493,
+      "mtime_ns": 1793142644262568000,
+      "sha256": "c81988d503245806a1f93968c19ded3c2046388ee3d4ae387d535a0edaf85014",
+      "size": 14917708
+    },
+    "sha256": "c81988d503245806a1f93968c19ded3c2046388ee3d4ae387d535a0edaf85014",
+    "target": {
+      "crate_types": [
+        "lib"
+      ],
+      "doc": true,
+      "doctest": true,
+      "edition": "2024",
+      "kind": [
+        "lib"
+      ],
+      "name": "lamp_update",
+      "src_path": "[workspace]/.claude/worktrees/third-head-coherence-read-3949/lampOS/crates/update/src/lib.rs",
+      "test": true
+    }
+  },
+  "guards": {
+    "all_four_groups_awaited_absent": true,
+    "all_source_index_mode_tools_helpers_current_saved_depinfo_guards_equal": true,
+    "bank_state": "RELEASED_ALL_GUARDS_CLOSED",
+    "index_bookends": {
+      "after": "a5aa8cef325eb508e2189efaf07f677cea876ddcc660d4952c43e7c11bd6e449",
+      "before": "a5aa8cef325eb508e2189efaf07f677cea876ddcc660d4952c43e7c11bd6e449"
+    },
+    "prior_saved_count": 194,
+    "retained_new_driver_count": 1,
+    "saved_bookends": {
+      "after": "0e31aec7a821346285ab06df3c5c78aecf8c5a2079a58892e8520e712d9db890",
+      "before": "0e31aec7a821346285ab06df3c5c78aecf8c5a2079a58892e8520e712d9db890"
+    },
+    "source_bookends": {
+      "after": "755937ea98d853860e474d0dec00795db27a89b145ee9e6c1328082ee666b7d3",
+      "before": "755937ea98d853860e474d0dec00795db27a89b145ee9e6c1328082ee666b7d3"
+    },
+    "tools": {
+      "cargo": "425e08ffa69bcf047b2a82b08b42d1d26ba8488f774bade1c14a62623fc18bad",
+      "rustc": "6859de89ddecec2ebaaec50d25c9c471d47f33677a96f7c81666247be062d499"
+    },
+    "total_saved_after_release": 195,
+    "tracked_source_count": 10934
+  },
+  "hashes": {
+    "audit-admission.py": "f4b77a3d56abcf7b5f669d8c749134faa1697a1197e13a8bf13fe292899d725c",
+    "coherence10-artifact.json": "15f9e16b49e766be92892fb1657b7cba267142ae074da3e7a20ffdb171de67fe",
+    "coherence10-compile.stderr": "d7bfdad85c25f33f1685e07d272f6d4ad46a00b7976ac38e0db3bf31d45777c3",
+    "coherence10-compile.stdout": "ef946af8a825c36dbe5fa5bc04249dca65f760d5b36b5bd3d367562bf55cf3ea",
+    "coherence10-discovery.stdout": "8602decb0edf6e51c324d6897fececdf3804063f8bdb70bfa43a44acd94fc279",
+    "coherence10-runtime.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "coherence10-runtime.stdout": "6d4401e4f5bd29f49d1f8d7dba4f141d236acf2feb06ed470495a4f5ef17a8d2",
+    "independent-admission-receipt.json": "16883970c0589f729cfdcb48ed6c5734e4371cadb4c19c7202b2d55627314a9f",
+    "prior-saved194.json": "59d83a3f1ebf7335c0b126d83112184d68cb109985cc6880b04ae9218959d437",
+    "qualified-coherence-ten.json": "436ebf6189b0e3c1f8bc03ca3b32f980ed14a87bacc7bab619c02568148fb2e7",
+    "run-focused-ten.py": "cb3be7470ed20e8a169d13907d3f7b60cb5bb756378063784a7cc3ba79451bce",
+    "saved194-after.json": "0e31aec7a821346285ab06df3c5c78aecf8c5a2079a58892e8520e712d9db890"
+  },
+  "head": "a7966359645966908b78220752fbeb7f01b6c457",
+  "independent_admission": {
+    "actual_current_manifest_and_lib_source": true,
+    "committed_source_names_equal_plan_and_actual_discovery": true,
+    "count": 10,
+    "depinfo_all_resolved_inside_exact_worktree_and_match_precompile_source": true,
+    "depinfo_sha256": "125b67037f4fb478e0087785c7a4e235c1a00ddb68adaaef02c12a8a880d3b5e",
+    "depinfo_sources": 171,
+    "driver_sha256": "c81988d503245806a1f93968c19ded3c2046388ee3d4ae387d535a0edaf85014",
+    "features": [],
+    "fresh": false,
+    "head": "a7966359645966908b78220752fbeb7f01b6c457",
+    "helper_sha256": "f4b77a3d56abcf7b5f669d8c749134faa1697a1197e13a8bf13fe292899d725c",
+    "no_old_alias_or_normal_child_admission": true,
+    "profile_test": true,
+    "retained_copy_sha256": "c81988d503245806a1f93968c19ded3c2046388ee3d4ae387d535a0edaf85014",
+    "runtime_not_started": true,
+    "status": "PASS_CURRENT_ADMISSION_CONTROL_AUDIT"
+  },
+  "limits": [
+    "Private read-only coherence only; no new runtime wiring/authentication/effects/live revalidation, authority or device claim.",
+    "No prerequisite replay/admission waiver; author owns latest-base/original native gates.",
+    "No producer600/121 or historical native count transferred.",
+    "Formatting/Clippy, predecessor121/full600 and broad package/runtime are not repeated by this reader.",
+    "Current CI statuses above are metadata-only, not our native checkout/count audit; ARM remains in progress at this snapshot.",
+    "Raw3858 and preimages3907 dependencies, draft, current-base/read/native requirements remain independent holds.",
+    "No runtime child, actual service/device/network/credential action, GitHub post, code edit, commit or push by this helper."
+  ],
+  "parent": "60c183d7ae189eacafe8e52304a562a3550053db",
+  "sideeffects": {
+    "count_basis": "nine controls use one root each; typed-absence control uses four (A has four components)",
+    "fixture_read_helpers": "writer_settings::capture -> writer_files::observe; Bundle::from_capture/decode; collect -> encode/decode; no Bundle publish/storage helper call.",
+    "metadata_exception": "Existing collector null-mask branch statat(SYMLINK_NOFOLLOW) of /dev/null at capture.rs:348-357; no device open/read/write.",
+    "mode": "0700",
+    "mutations": "Only private fixture create/write/mkdir/chmod/symlink/delete through TempDir; fixture changes are intentional.",
+    "processes": "No explicit child, self-exec, normal product binary, socket/service/network/worker thread spawned by these10 controls or called helpers. Standard libtest harness threads are not a zero-OS-thread claim.",
+    "temporary_roots": 13
+  },
+  "source": {
+    "final_commit_paths": 6,
+    "method": "Private borrowed immutable check; no live I/O, serialization, runtime caller or authority/effect addition. Existing ordinary production outside codec module declaration unchanged from immediate parent.",
+    "remaining_PR_stack_paths": 17,
+    "selected_source_sha256": "3934f0ea0db6094b95a9e1fa31c126a996cf2f6f7755d9ddcf01b3daf917639d",
+    "source_bindings_sha256": "f0e121988b9feb6f73954e365166a709ca25d56df0f5f4a76bfd7d887cc3bd76",
+    "source_findings_P1": [],
+    "source_findings_P2": [],
+    "source_packet_sha256": "b7124bb8b6504a435b38e0690be5e2a54f7b41d2309b63373881d31e77fe13e1"
+  },
+  "stages": [
+    {
+      "argv": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-update",
+        "--lib",
+        "--no-run",
+        "--jobs",
+        "1",
+        "--message-format=json"
+      ],
+      "bound_seconds": 1200,
+      "cleanup": [],
+      "elapsed_seconds": 101.6994,
+      "exit": 0,
+      "group": "absent",
+      "pgid": 79624,
+      "pid": 79624,
+      "stage": "coherence10-compile",
+      "stderr_sha256": "d7bfdad85c25f33f1685e07d272f6d4ad46a00b7976ac38e0db3bf31d45777c3",
+      "stdout_sha256": "ef946af8a825c36dbe5fa5bc04249dca65f760d5b36b5bd3d367562bf55cf3ea",
+      "timed_out": false
+    },
+    {
+      "argv": [
+        "[workspace]/.claude/worktrees/third-store-target/debug/deps/lamp_update-cebdb705cde8ec81",
+        "--list",
+        "--format",
+        "terse"
+      ],
+      "bound_seconds": 60,
+      "cleanup": [],
+      "elapsed_seconds": 0.8143,
+      "exit": 0,
+      "group": "absent",
+      "pgid": 82350,
+      "pid": 82350,
+      "stage": "coherence10-discovery",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "8602decb0edf6e51c324d6897fececdf3804063f8bdb70bfa43a44acd94fc279",
+      "timed_out": false
+    },
+    {
+      "argv": [
+        "/Library/Frameworks/Python.framework/Versions/3.9/bin/python3",
+        "[workspace]/.claude/worktrees/third-head-coherence-read-3949-evidence/audit-admission.py"
+      ],
+      "bound_seconds": 60,
+      "cleanup": [],
+      "elapsed_seconds": 0.1939,
+      "exit": 0,
+      "group": "absent",
+      "pgid": 82352,
+      "pid": 82352,
+      "stage": "coherence10-admission",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "2dc8544ea9c36c882939fe236fd73045554578d1e9302bb5638662517c5c8a2d",
+      "timed_out": false
+    },
+    {
+      "argv": [
+        "[workspace]/.claude/worktrees/third-store-target/debug/deps/lamp_update-cebdb705cde8ec81",
+        "head_touch::capture::codec::coherence::tests::",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "bound_seconds": 120,
+      "cleanup": [],
+      "elapsed_seconds": 0.0587,
+      "exit": 0,
+      "group": "absent",
+      "pgid": 82359,
+      "pid": 82359,
+      "stage": "coherence10-runtime",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "6d4401e4f5bd29f49d1f8d7dba4f141d236acf2feb06ed470495a4f5ef17a8d2",
+      "timed_out": false
+    }
+  ],
+  "status": "SCOPED_FINAL_SIX_SOURCE_AND_LOCAL10_QUALIFIED_FOR_ROOT_REVIEW",
+  "terminals": [
+    [
+      "head_touch::capture::codec::coherence::tests::both_typed_absences_agree_at_each_first_missing_component",
+      "ok"
+    ],
+    [
+      "head_touch::capture::codec::coherence::tests::common_leaf_fields_and_exact_binary_bytes_cannot_be_substituted",
+      "ok"
+    ],
+    [
+      "head_touch::capture::codec::coherence::tests::decoded_regular_empty_and_unmatched_binary_preserve_artifacts_without_live_io",
+      "ok"
+    ],
+    [
+      "head_touch::capture::codec::coherence::tests::directory_facts_check_types_membership_absence_and_extra_link_bypass",
+      "ok"
+    ],
+    [
+      "head_touch::capture::codec::coherence::tests::every_raw_entry_checks_common_ancestors_even_without_a_matching_head_leaf",
+      "ok"
+    ],
+    [
+      "head_touch::capture::codec::coherence::tests::exact_root_spelling_and_nonempty_raw_root_evidence_are_required",
+      "ok"
+    ],
+    [
+      "head_touch::capture::codec::coherence::tests::negative_kind_suffix_and_no_link_chain_shape_match_the_requested_key",
+      "ok"
+    ],
+    [
+      "head_touch::capture::codec::coherence::tests::signed_device_conversion_refuses_negative_instead_of_reinterpreting_bits",
+      "ok"
+    ],
+    [
+      "head_touch::capture::codec::coherence::tests::unchanged_bytes_with_real_permission_changes_fail_without_snapshot_or_auth_claims",
+      "ok"
+    ],
+    [
+      "head_touch::capture::codec::coherence::tests::unrelated_head_links_and_null_masks_are_valid_but_raw_overlap_refuses",
+      "ok"
+    ]
+  ],
+  "tree": "a960785006fb44d7c22975d8f236b3e63c7317ea"
+}
