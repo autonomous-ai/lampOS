@@ -135,6 +135,18 @@ fn shipped_definition_matches_the_original_order_words_and_reoffers_byte_for_byt
         definition.words.sentence_failed.as_bytes(),
         SENTENCE_FAILED.as_bytes()
     );
+    assert_eq!(
+        definition.words.touch_done.as_bytes(),
+        TOUCH_DONE.as_bytes()
+    );
+    assert_eq!(
+        definition.words.touch_failed.as_bytes(),
+        TOUCH_FAILED.as_bytes()
+    );
+    assert_eq!(
+        definition.words.give_again.as_bytes(),
+        GIVE_AGAIN.as_bytes()
+    );
     assert_eq!(definition.words.give_done.as_bytes(), GIVE_DONE.as_bytes());
     assert_eq!(
         definition.words.give_failed.as_bytes(),

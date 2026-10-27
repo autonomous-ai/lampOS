@@ -1,5 +1,5 @@
 //! The giving-way step (#1800), with a fake body on a scripted Unix clock.
-use super::giving_way::{Felt, GIVE_ASK, GIVE_DONE, GIVE_FAILED};
+use super::giving_way::{Felt, GIVE_AGAIN, GIVE_ASK, GIVE_DONE, GIVE_FAILED};
 use super::*;
 use std::cell::Cell;
 use std::sync::{
@@ -129,7 +129,13 @@ fn offer(walk: &mut Onboarding, now: u64) -> u64 {
 /// The invitation is offered, taken, bound and played whole.
 fn play(walk: &mut Onboarding, now: u64, turn: u64) -> Played {
     let token = offer(walk, now);
-    assert_eq!(walk.take_invitation(token, now).unwrap(), GIVE_ASK);
+    // A second try says what didn't work (#3769).
+    let asked = if walk.desired.giving_way_tries > 1 {
+        GIVE_AGAIN
+    } else {
+        GIVE_ASK
+    };
+    assert_eq!(walk.take_invitation(token, now).unwrap(), asked);
     let boot = BootId::new([4; 16]).unwrap();
     assert!(walk.bind_invitation(token, boot, turn));
     let ended_ms = 1_760_000_000_000 + now / 1_000;

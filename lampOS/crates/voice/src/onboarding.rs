@@ -1968,10 +1968,13 @@ impl Onboarding {
         }
         if step == Step::Touch {
             // Done only by a touch Controls felt; one reminder, then failed.
+            // Either end is said before the next step is asked (#3769).
             if touched || led.touched {
                 self.finish(step, Outcome::Done, None, now_us);
+                self.owed = Some(self.definition.words.touch_done.clone());
             } else if now_us.saturating_sub(asked_us) >= TOUCH_GIVE_UP_US {
                 self.finish(step, Outcome::Failed, None, now_us);
+                self.owed = Some(self.definition.words.touch_failed.clone());
             } else if can_speak && quiet_us >= GUIDE_EVERY_US && led.guided_us == Some(asked_us) {
                 led.guided_us = Some(now_us);
                 self.records
@@ -3912,6 +3915,11 @@ mod tests {
         assert_eq!(room.outcome(Step::Touch), Some(Outcome::Done));
         // Spoken, never a nod (the owner's #841 decision).
         assert_eq!(room.walk.take_gesture(), None);
+        // That it worked is said before the next step is asked (#3769).
+        assert_eq!(
+            room.wait(8 * S, Some(NEAR_MIDDLE)),
+            [TOUCH_DONE, PREFERENCES_NOTE]
+        );
         // Only the outcome is kept.
         assert_eq!(room.walk.kept().steps["touch"].framing, None);
         std::fs::remove_dir_all(root).unwrap();
@@ -4008,7 +4016,7 @@ mod tests {
         let (mut room, _says, root) = at_touch("untouched");
         assert_eq!(
             room.wait(61 * S, Some(NEAR_MIDDLE)),
-            [TOUCH_REMIND, PREFERENCES_NOTE]
+            [TOUCH_REMIND, TOUCH_FAILED, PREFERENCES_NOTE]
         );
         assert_eq!(room.outcome(Step::Touch), Some(Outcome::Failed));
         assert_eq!(room.walk.take_gesture(), None);

@@ -45,16 +45,16 @@ first = "(Nobody has spoken. Tell them in a few words that you would like to lea
 reoffer = "(Nobody has spoken. Tell them in a few words that you would like to learn how they call you from where they usually sit. Ask them to stay in their seat and call your name once, the way they would to get your attention, and then stay quiet yourself. Do not say your own name, and do not claim anything was measured.)"
 
 [onboarding.steps.touch]
-first = "(Nobody has spoken. Ask them, in a few words, to touch the top of your head gently, then stay quiet.)"
-reoffer = "(Nobody has spoken. Tell them in a few words that there is one more thing you can do now: feel a touch on the top of your head. Ask them to touch it gently, then stay quiet.)"
+first = "(Say only this, nothing before or after it: \"Tap the top of my head once, then let go.\")"
+reoffer = "(Say only this, nothing before or after it: \"One more thing: tap the top of my head once, then let go.\")"
 
 [onboarding.steps.privacy]
 first = "(Say only this one short sentence, nothing before or after it: \"Try my privacy switch {location}: close it, then open it again.\" Do not explain it, claim success or ask a tool to mark privacy done.)"
 reoffer = "(Say only this one short sentence, nothing before or after it: \"Try my privacy switch {location}: close it, then open it again.\" Do not explain it, claim success or ask a tool to mark privacy done.)"
 
 [onboarding.steps.giving_way]
-first = "(Nobody has spoken. Tell them in a few words that your head gives way to a hand: ask them to take it gently and move it a little, then let go. Do not claim anything has been felt yet.)"
-reoffer = "(Nobody has spoken. Tell them in a few words that your head gives way to a hand: ask them to take it gently and move it a little, then let go. Do not claim anything has been felt yet.)"
+first = "(Say only this, nothing before or after it: \"My head gives way to your hand. Take it gently, move it a little, then let go.\")"
+reoffer = "(Say only this, nothing before or after it: \"My head gives way to your hand. Take it gently, move it a little, then let go.\")"
 
 [onboarding.steps.room_sounds]
 first = "(Nobody has spoken. Ask them once, in a few words, whether you may notice music and laughter in the room, and say just this about it: the lamp notices music and laughter, nothing is recorded. Then call setup_step with step \"room_sounds\": done only after a clear yes, skipped if they say no or are unsure. Nothing more.)"
@@ -78,7 +78,9 @@ sit_turn = "(You can see them, but at the edge of what you see. Ask them in a fe
 sit_done = "(Now you can see them well where they sit. Tell them so in a few words.)"
 sit_failed = "(You still cannot see them well where they sit. Tell them in a few light words that it is fine: they can turn you toward their seat later, or ask you to redo the setup.)"
 who_again = "(That was not their name. Ask them once more, in a few words, what you should call them.)"
-touch_remind = "(You have not felt a touch yet. Ask them once more, in a few words, to touch the top of your head gently, then stay quiet.)"
+touch_remind = "(Say only this, nothing before or after it: \"I didn't feel that. Tap a little firmer, right on top of my head.\")"
+touch_done = "(Say only this, nothing before or after it: \"Got it, I felt that.\")"
+touch_failed = "(Say only this, nothing before or after it: \"I didn't feel a tap this time. That's fine, you can redo the setup later.\")"
 privacy_done = "(Their physical switch closed the microphones, and they opened it again. Briefly confirm that the switch works. Nothing more.)"
 privacy_done_camera = "(Their physical switch closed the microphones and the camera, and they opened it again. Briefly confirm that the switch works. Nothing more.)"
 privacy_failed = "(The privacy-switch check was not completed. Briefly say they can try it again later by redoing setup. Do not claim the switch was tested.)"
@@ -91,6 +93,7 @@ sentence_closer = "(Ask them in a few words to come a little closer and say anot
 sentence_again = "(Ask them in a few words to say another sentence from their seat, and then stay quiet yourself.)"
 sentence_done = "(You heard them well from where they sit. Tell them so in a few words. Nothing more.)"
 sentence_failed = "(You could not hear them well enough from where they sit this time. Tell them in a few light words: I'll get used to your voice as we talk. Do not claim anything was measured.)"
-give_done = "(You felt their hand move your head, gave way, and they let go. Tell them so in a few warm words. Nothing more.)"
-give_failed = "(You did not feel your head moved by a hand this time. Tell them in a few light words that it is fine and that they can redo the setup later. Do not claim anything was felt.)"
+give_again = "(Say only this, nothing before or after it: \"I didn't feel my head move. Take it gently, move it a little, then let go.\")"
+give_done = "(Say only this, nothing before or after it: \"Got it, my head moved with your hand.\")"
+give_failed = "(Say only this, nothing before or after it: \"I didn't feel my head move this time. That's fine, you can redo the setup later.\")"
 who_confirm = "(If you asked whether you may remember their face and they have not answered yet, wait for their answer. Otherwise ask them, in a few words: \"Did I get that right, {name}?\" Nothing more.)"
