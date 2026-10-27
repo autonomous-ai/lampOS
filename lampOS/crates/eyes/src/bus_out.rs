@@ -324,7 +324,8 @@ pub struct BusOut {
     /// With `lamp-eyes --seems`: how the person at the lamp seems from
     /// their face (#1671).
     seems: Option<Publisher>,
-    /// With `LAMP_ACTIVITY=on`: what the person at the desk is doing.
+    /// With `LAMP_ACTIVITY=on` or `place` (the product's): what the person
+    /// at the desk is doing.
     activity: Option<ActivityOut>,
 }
 
