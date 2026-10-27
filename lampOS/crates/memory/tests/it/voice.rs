@@ -612,11 +612,14 @@ fn forget_that_after(events: bool, asked: bool, journalled: bool) -> (Fixture, V
     drop(db);
     if journalled {
         // The end-of-talk pass is given what the conversation still has:
-        // the store no longer has the exchanges it names, so nothing.
+        // the store no longer has the exchanges it names, so nothing: it
+        // closes with nothing to observe, not refused (N12).
         assert!(client.end_conversation());
         let (end, answer) = fixture.next("conversation_end");
         assert_eq!(end["source_ids"].as_array().map(Vec::len), Some(2), "{end}");
         assert!(answer.get("input").is_none(), "{answer}");
+        assert_eq!(answer["ok"], true, "{answer}");
+        assert_eq!(answer["reason"], "forgotten", "{answer}");
     }
     (fixture, left, rid)
 }
