@@ -1,0 +1,261 @@
+{
+  "base": "992303fc8d72322bab46cdb18801c853ea43bb81",
+  "case_groups": {
+    "foundation18": [
+      "writer_refresh::tests::no_apply_does_not_qualify_but_one_exact_apply_can_enter_without_an_ordinary_round",
+      "writer_refresh::tests::a_restart_at_every_unqualified_prefix_requires_recovery_and_never_reissues_the_grant",
+      "writer_refresh::tests::qualified_writer_and_preimages_survive_a_restart_until_the_product_journal_closes",
+      "writer_refresh::tests::identity_substitution_never_changes_or_admits_the_saved_transaction",
+      "writer_refresh::tests::a_stale_or_modified_first_apply_cannot_consume_the_single_grant",
+      "writer_refresh::tests::unsupported_or_malformed_journals_are_retained_and_block_every_admission",
+      "writer_refresh::tests::missing_and_nonregular_records_do_not_turn_into_a_fresh_transaction",
+      "writer_refresh::tests::future_nonsemantic_metadata_is_preserved_without_becoming_admission_authority",
+      "writer_refresh::tests::write_bound_and_invalid_identities_leave_no_journal_or_partial_acceptance",
+      "writer_refresh::tests::diagnostics_hide_unknown_values_and_known_duplicate_or_shadowed_fields_are_refused",
+      "writer_refresh::tests::guard_lock_is_exclusive_and_independent_of_the_product_lock",
+      "writer_refresh::tests::failed_persist_after_publication_poisons_the_live_session_until_actual_disk_state_is_recovered",
+      "writer_refresh::tests::first_apply_binds_its_own_later_envelope_and_sequence_without_replacing_the_refresh_identity",
+      "writer_refresh::tests::restoring_an_apply_requires_its_original_grant_and_preimage_identity",
+      "writer_refresh::tests::reloaded_inputs_keep_the_exact_origin_and_distinguish_writer_from_apply_restoration",
+      "writer_refresh::tests::qualified_and_closed_inputs_keep_the_compatible_writer_and_bound_product_receipts",
+      "writer_refresh::tests::live_or_poisoned_sessions_cannot_expose_stale_recovery_inputs",
+      "writer_refresh::tests::recovery_views_retain_later_metadata_in_the_bound_inputs_without_reparsing"
+    ],
+    "mask1": [
+      "head_touch::tests::null_masks_do_not_admit_other_character_devices"
+    ],
+    "new4": [
+      "head_touch::input_tests::projection_and_verification_replay_closed_inputs_without_filesystem_fallback",
+      "head_touch::input_tests::an_uncaptured_key_never_becomes_a_captured_absence",
+      "head_touch::input_tests::rejecting_an_early_override_does_not_consume_a_later_directory_error",
+      "head_touch::input_tests::ordinary_inputs_keep_regular_links_null_masks_and_directory_aliases"
+    ]
+  },
+  "cases": {
+    "head_touch::input_tests::an_uncaptured_key_never_becomes_a_captured_absence": [
+      {
+        "line": 267,
+        "outcome": "ok"
+      }
+    ],
+    "head_touch::input_tests::ordinary_inputs_keep_regular_links_null_masks_and_directory_aliases": [
+      {
+        "line": 268,
+        "outcome": "ok"
+      }
+    ],
+    "head_touch::input_tests::projection_and_verification_replay_closed_inputs_without_filesystem_fallback": [
+      {
+        "line": 269,
+        "outcome": "ok"
+      }
+    ],
+    "head_touch::input_tests::rejecting_an_early_override_does_not_consume_a_later_directory_error": [
+      {
+        "line": 270,
+        "outcome": "ok"
+      }
+    ],
+    "head_touch::tests::null_masks_do_not_admit_other_character_devices": [
+      {
+        "line": 271,
+        "outcome": "ok"
+      }
+    ],
+    "writer_refresh::tests::a_restart_at_every_unqualified_prefix_requires_recovery_and_never_reissues_the_grant": [
+      {
+        "line": 272,
+        "outcome": "ok"
+      }
+    ],
+    "writer_refresh::tests::a_stale_or_modified_first_apply_cannot_consume_the_single_grant": [
+      {
+        "line": 273,
+        "outcome": "ok"
+      }
+    ],
+    "writer_refresh::tests::diagnostics_hide_unknown_values_and_known_duplicate_or_shadowed_fields_are_refused": [
+      {
+        "line": 274,
+        "outcome": "ok"
+      }
+    ],
+    "writer_refresh::tests::failed_persist_after_publication_poisons_the_live_session_until_actual_disk_state_is_recovered": [
+      {
+        "line": 275,
+        "outcome": "ok"
+      }
+    ],
+    "writer_refresh::tests::first_apply_binds_its_own_later_envelope_and_sequence_without_replacing_the_refresh_identity": [
+      {
+        "line": 276,
+        "outcome": "ok"
+      }
+    ],
+    "writer_refresh::tests::future_nonsemantic_metadata_is_preserved_without_becoming_admission_authority": [
+      {
+        "line": 277,
+        "outcome": "ok"
+      }
+    ],
+    "writer_refresh::tests::guard_lock_is_exclusive_and_independent_of_the_product_lock": [
+      {
+        "line": 278,
+        "outcome": "ok"
+      }
+    ],
+    "writer_refresh::tests::identity_substitution_never_changes_or_admits_the_saved_transaction": [
+      {
+        "line": 279,
+        "outcome": "ok"
+      }
+    ],
+    "writer_refresh::tests::live_or_poisoned_sessions_cannot_expose_stale_recovery_inputs": [
+      {
+        "line": 280,
+        "outcome": "ok"
+      }
+    ],
+    "writer_refresh::tests::missing_and_nonregular_records_do_not_turn_into_a_fresh_transaction": [
+      {
+        "line": 281,
+        "outcome": "ok"
+      }
+    ],
+    "writer_refresh::tests::no_apply_does_not_qualify_but_one_exact_apply_can_enter_without_an_ordinary_round": [
+      {
+        "line": 282,
+        "outcome": "ok"
+      }
+    ],
+    "writer_refresh::tests::qualified_and_closed_inputs_keep_the_compatible_writer_and_bound_product_receipts": [
+      {
+        "line": 283,
+        "outcome": "ok"
+      }
+    ],
+    "writer_refresh::tests::qualified_writer_and_preimages_survive_a_restart_until_the_product_journal_closes": [
+      {
+        "line": 284,
+        "outcome": "ok"
+      }
+    ],
+    "writer_refresh::tests::recovery_views_retain_later_metadata_in_the_bound_inputs_without_reparsing": [
+      {
+        "line": 285,
+        "outcome": "ok"
+      }
+    ],
+    "writer_refresh::tests::reloaded_inputs_keep_the_exact_origin_and_distinguish_writer_from_apply_restoration": [
+      {
+        "line": 286,
+        "outcome": "ok"
+      }
+    ],
+    "writer_refresh::tests::restoring_an_apply_requires_its_original_grant_and_preimage_identity": [
+      {
+        "line": 287,
+        "outcome": "ok"
+      }
+    ],
+    "writer_refresh::tests::unsupported_or_malformed_journals_are_retained_and_block_every_admission": [
+      {
+        "line": 288,
+        "outcome": "ok"
+      }
+    ],
+    "writer_refresh::tests::write_bound_and_invalid_identities_leave_no_journal_or_partial_acceptance": [
+      {
+        "line": 289,
+        "outcome": "ok"
+      }
+    ]
+  },
+  "counts": [
+    {
+      "failed": 0,
+      "ignored": 0,
+      "passed": 23,
+      "status": "ok"
+    }
+  ],
+  "current_test_artifact": {
+    "compiler_fresh": false,
+    "features": [],
+    "path": "<WORKSPACE>/.claude/worktrees/third-store-target/debug/deps/lamp_update-cebdb705cde8ec81",
+    "post_execution_sha256": "57887cb5bc60e5ff8b3397504ea0d6bda2384cba58f1f28dd25ace67c0f279de",
+    "scope": "Standard current Cargo compile+execution; hash measured afterward, no pre-execution binary preimage claim."
+  },
+  "hashes": {
+    "audit-gates.py": "a242027905b1850e5fc91b6f4e8c401650a65a85dc93879bb7bdd7efebc7d409",
+    "clippy.log": "d5b1c9c605e4c880c46025da44f304d56c29f6e38f9f26ab4dba8558b9a1032f",
+    "diff-check.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "diff.txt": "174981a71ffb326f5aeeac105e1d7dd535595a9ef086e5060bbd159bffd4b2e0",
+    "docs-diff.txt": "d1c92360c24718000e1a89b50a792f25531ce5f135dab814ed9ddc7503c9115d",
+    "fmt.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "gate-plan.json": "e2f2959da5b757c1e31e81361d69c4812c1c39e6913a93a9cecae4874fe5a56d",
+    "gate.terminal.json": "3a6b01692cdf675942fe55abc9be45a38647fde20bf738575c1d8f320c291c89",
+    "run-gates.py": "7603afbdef54b3ae83bf5632d6ba00d3fbae6e7f48afcd5b7d1711604a074527",
+    "selected23.log": "8c40c3e3aa052e8ba3ebd820914df37fc4d10e6ccfe5dc69c1dd563e5ca8ac64",
+    "source-after.json": "8de2dd3394007efd738434bdde3dd5da11937ca8ab988f0b837ad1b2cd4f75c4",
+    "source-before.json": "8de2dd3394007efd738434bdde3dd5da11937ca8ab988f0b837ad1b2cd4f75c4",
+    "source-plan.json": "3951317946c48972518ea7952fe7713e0e9cbb167f97e776dc81421998002232",
+    "target-reservation.json": "f14e083a743f1db476a59834e19199232d5040a2b4ecde7e3347f28cb1ab12a3"
+  },
+  "head": "5d866fd9c7fcb55720db478058f5e930b6a63e6e",
+  "holds": [],
+  "limits": [
+    "Local fmt/strict Update alltargets and exactly23 library controls only. No full507 package run, generic59 head_touch rerun or native CI audit/watch.",
+    "Test replay is not a runtime collector, authentication/freshness proof, snapshot authority, exclusion/write grant or release/device qualification.",
+    "Artifact SHA measured after standard current Cargo compile+execution; no pre-execution hash claim."
+  ],
+  "no_product_edits_Memory_semantic_device_or_CI_actions": true,
+  "scoped_source_hash_count": 7413,
+  "source_lock_helpers_unchanged": true,
+  "source_review": {
+    "authority_added": false,
+    "carried_body_calibration_and_active_pins_wrappers_preserved": true,
+    "lazy_directory_order_errors_preserved": true,
+    "limits": "Recording/replay interface seam only; no collector, snapshot authenticity/freshness, exclusion, FD/latency measurement, release or device qualification.",
+    "ordinary_read_unchanged": true
+  },
+  "stages": [
+    {
+      "cleanup": [],
+      "error": null,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "ok": true,
+      "process_group": "absent",
+      "reaped": true,
+      "returncode": 0,
+      "stage": "fmt",
+      "timed_out": false
+    },
+    {
+      "cleanup": [],
+      "error": null,
+      "log_sha256": "d5b1c9c605e4c880c46025da44f304d56c29f6e38f9f26ab4dba8558b9a1032f",
+      "ok": true,
+      "process_group": "absent",
+      "reaped": true,
+      "returncode": 0,
+      "stage": "clippy",
+      "timed_out": false
+    },
+    {
+      "cleanup": [],
+      "error": null,
+      "log_sha256": "8c40c3e3aa052e8ba3ebd820914df37fc4d10e6ccfe5dc69c1dd563e5ca8ac64",
+      "ok": true,
+      "process_group": "absent",
+      "reaped": true,
+      "returncode": 0,
+      "stage": "selected23",
+      "timed_out": false
+    }
+  ],
+  "status": "SOURCE_AND_LOCAL_23_VERIFIED",
+  "tree": "e8bdde3d851caf502490eb0580ce8806da0d697b",
+  "original_private_receipt_sha256": "db0c2c27d418717e17f83485415720ebd94fe0b0d2f253248928183fab3ac326",
+  "public_copy_note": "Absolute workspace/home paths normalized; original receipt digest retained separately."
+}
