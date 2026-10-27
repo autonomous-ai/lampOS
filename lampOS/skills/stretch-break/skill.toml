@@ -26,6 +26,10 @@ near = 0.14               # at the desk, not across the room: a face at least th
 for = "50m"
 gap = "2m"                # looking away or leaning out of view does not end the sitting
 rearm = "leaves"          # once per sitting; again only after they have left
+# A yawn seen in this sitting brings the stretch forward, to 30 minutes, as
+# V1's yawn rule did (#3709): still once a sitting. Only with
+# LAMP_YAWN_SOONER=on and the eyes counting yawns (LAMP_EYES_YAWN=on).
+sooner = { topic = "room/activity", field = "yawns", above = 0, for = "30m" }
 cooldown = "90m"
 wait = "10m"              # talking when the 50 minutes come: it stretches once the talk ends, within ten minutes (#1021)
 

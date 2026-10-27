@@ -891,6 +891,19 @@ fn serve(
         );
         engine = engine.resting_through_sounds();
     }
+    // A trigger's sooner brings it forward, only with LAMP_YAWN_SOONER=on
+    // (#3709: a yawn in the sitting, Stretch break at 30 minutes, not 50).
+    if watch::switched_on(
+        std::env::var(lamp_skills::SOONER_ENVIRONMENT)
+            .ok()
+            .as_deref(),
+    ) {
+        eprintln!(
+            "lamp-skills: a trigger's sooner shortens its for ({})",
+            lamp_skills::SOONER_ENVIRONMENT
+        );
+        engine = engine.sooner();
+    }
     // Who was here's mark of someone the lamp knows, never a name, only
     // with LAMP_WHO_WAS_HERE_KNOWN=on and the eyes' known file (#1685).
     if lamp_skills::known::marking() {
