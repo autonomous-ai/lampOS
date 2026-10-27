@@ -1,3 +1,39 @@
+Ready for lamp-voice: no (#3631 current carry, #3644 added-test native); #3689 taken
+
+## Current checkpoint: 2026-10-27 14:48 +07, transport restored and writer-first work taken
+
+Git/public API transport works again. Second read all Queue comments since the
+saved cursor through 6436400596 and own-PR feedback, reloaded the builder
+protocol and fast-forwarded its clean local branch to fetched a9d3a8274.
+#3466 is delivered by train213/f9a9404de. #3689 is taken and labelled:
+settings-writer refresh first (30 October), new parts/activation units after
+(3 November). Store #3692 and Harness #3693 remain separate lanes. Source
+inspection establishes that actual7071 already runs the updater as root with
+systemd-unit write authority, but its fixed apply helper cannot write its
+own path or undo a partly written newly allowlisted setting. The proposed
+independent frozen guard must restore partial settings before the old writer
+and arm boot/failure admission before replacing it. This is design work,
+with no new compiler, device, key, signing or promotion claim.
+
+[Reset original887 native evidence](verification/reset-query-bounds-20261026/native-887-e8e7/README.md)
+is now retained in Git: attempt1 ARM40443537543 and Linux40443537415 pass;
+**1,452 unique PASS / 0 bad / 9 skipped / 0 selected unrun** over the actual
+four-package selection, eight controls once. [Cloud originaldcd proof](verification/cloud-query-bounds-20261027/native-dcd-e8e7/README.md)
+likewise retains attempt1 ARM40443284601/Linux40443284626, **11,459 unique
+PASS / 0 bad / 106 skipped / 0 selected unrun**, eight controls once and
+separate Surround/provenance2/0/0 each. Authored/preview trees and ordered
+parents are bound. These are their exact old heads, not fresh execution of
+the maintenance carries. The earlier553 Voice LEAK and ff03/737 wake
+failure remain separately recorded without cause or waiver.
+
+Reviewer-two closed Reset's cleanup P2 on887 in6436352941. Maintenance
+continues with clean current carries and fresh scoped host gates. Cloud
+also adopts two offered endless-writer tests as a distinct new patch; those
+new cases require their own native qualification. No merge or readiness is
+claimed here.
+
+---
+
 Ready for lamp-voice: no (#3631 and #3644 current e8e7 native pending); updater already delivered
 
 ## Current checkpoint: 2026-10-27 10:26 +07, current heads and exact leak accounting

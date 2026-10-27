@@ -1,0 +1,495 @@
+{
+  "counts": {
+    "CANCEL": 0,
+    "EXECFAIL": 0,
+    "FAIL": 0,
+    "LEAK": 0,
+    "PASS": 1452,
+    "TIMEOUT": 0,
+    "XFAIL": 0,
+    "XPASS": 0
+  },
+  "echo_keys": [],
+  "failures": [],
+  "full_terminal_census_sha256": "644bd6d9048a7c3049a615557f60b3c571ed4b018e60479703c46aa1e2cbf706",
+  "identical_echo_rows_excluded": 0,
+  "missing_controls": [],
+  "picked_filter": "PICKED: package(=lamp-cloud) | package(=lamp-setup) | package(=lamp-update) | package(=lamp-voice-eval)",
+  "raw_logs": {
+    "arm64": {
+      "bytes": 323156,
+      "sha256": "b5d424268ab061194e6fdfc3ed65fc010ebbf585f4b0566d34eb3391b4fb4e55"
+    },
+    "clippy": {
+      "bytes": 44862,
+      "sha256": "9b92df6ac6ef447f63223d48457f881aaf981a12be2daa33454a120b93b362ad"
+    }
+  },
+  "relay_signals": {
+    "success_rows": [
+      "relay_signals: ok"
+    ]
+  },
+  "required_controls": [
+    {
+      "binary": "lamp-setup",
+      "name": "reset::query::tests::query_accepts_64_kib_and_refuses_more",
+      "ordinal": 202,
+      "status": "PASS",
+      "total": 1452
+    },
+    {
+      "binary": "lamp-setup",
+      "name": "reset::query::tests::query_reads_output_with_closed_stdin_and_discarded_stderr",
+      "ordinal": 204,
+      "status": "PASS",
+      "total": 1452
+    },
+    {
+      "binary": "lamp-setup",
+      "name": "reset::query::tests::query_refuses_nonzero_exit_and_spawn_failure",
+      "ordinal": 205,
+      "status": "PASS",
+      "total": 1452
+    },
+    {
+      "binary": "lamp-setup",
+      "name": "reset::query::tests::real_query_error_keeps_reset_data_and_journal_and_reboots",
+      "ordinal": 207,
+      "status": "PASS",
+      "total": 1452
+    },
+    {
+      "binary": "lamp-setup",
+      "name": "reset::query::tests::system_read_enforces_the_query_output_bound",
+      "ordinal": 208,
+      "status": "PASS",
+      "total": 1452
+    },
+    {
+      "binary": "lamp-setup",
+      "name": "reset::query::tests::a_failed_query_cleans_its_same_group_child_even_after_output_closes",
+      "ordinal": 210,
+      "status": "PASS",
+      "total": 1452
+    },
+    {
+      "binary": "lamp-setup",
+      "name": "reset::query::tests::query_deadline_also_applies_after_stdout_closes",
+      "ordinal": 263,
+      "status": "PASS",
+      "total": 1452
+    },
+    {
+      "binary": "lamp-setup",
+      "name": "reset::query::tests::query_timeout_cleans_the_exited_leaders_pipe_holding_descendant",
+      "ordinal": 354,
+      "status": "PASS",
+      "total": 1452
+    }
+  ],
+  "selected_unrun": 0,
+  "selection": {
+    "binaries": 20,
+    "selected": 1452,
+    "skipped_binaries": 165,
+    "skipped_tests": 9
+  },
+  "selection_scope": "PR dependency-selected nextest, not automatically full workspace",
+  "separate_process": {
+    "pass_rows": [
+      "test an_idle_worker_stays_ready_across_a_long_quiet ... ok (2008 ms)",
+      "test a_worker_reporting_another_model_is_refused_before_any_request ... ok (2 ms)",
+      "test no_outcome_is_delivered_after_close_even_for_an_answer_on_its_way ... ok (4 ms)",
+      "test verdict_carries_identity_and_one_request_at_a_time ... ok (56 ms)",
+      "test missing_model_is_final_and_never_restarted ... ok (162 ms)",
+      "test missing_executable_fails_at_once ... ok (2 ms)",
+      "test spawn_returns_while_worker_startup_is_held ... ok (6 ms)",
+      "test startup_failures_are_final ... ok (409 ms)",
+      "test serving_failures_are_replaced_within_budget ... ok (514 ms)",
+      "test protocol_violations_are_replaced ... ok (177 ms)",
+      "test cancelled_answers_are_never_delivered ... ok (155 ms)",
+      "test close_during_inference_never_waits ... ok (233 ms)",
+      "test sustained_requests_stay_bounded ... ok (691 ms)"
+    ],
+    "passed": 13
+  },
+  "stable_promotion_helper": {
+    "failed": 0,
+    "headers": [
+      "Running unittests src/lib.rs",
+      "Running unittests src/main.rs",
+      "Running tests/promotion.rs",
+      "Running tests/workflow.rs",
+      "Doc-tests lampos_promote"
+    ],
+    "ordered_summaries": [
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 2,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 22,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 1,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      }
+    ],
+    "passed": 25
+  },
+  "summary": [
+    "Summary [  42.229s] 1452 tests run: 1452 passed, 9 skipped"
+  ],
+  "unique_terminal_rows": 1452,
+  "workspace_doctests": {
+    "failed": 0,
+    "headers": [
+      "lamp_actions",
+      "lamp_addons",
+      "lamp_air",
+      "lamp_audio",
+      "lamp_body",
+      "lamp_bus",
+      "lamp_camera",
+      "lamp_cloud",
+      "lamp_controls",
+      "lamp_ears",
+      "lamp_environment",
+      "lamp_expression",
+      "lamp_eyes",
+      "lamp_gemini",
+      "lamp_health",
+      "lamp_ipc",
+      "lamp_keeper",
+      "lamp_lean",
+      "lamp_local_time",
+      "lamp_memory",
+      "lamp_mood",
+      "lamp_msgs",
+      "lamp_name",
+      "lamp_near_call",
+      "lamp_observer",
+      "lamp_peek",
+      "lamp_policy",
+      "lamp_records",
+      "lamp_ring",
+      "lamp_same_voice",
+      "lamp_schedule",
+      "lamp_selftest",
+      "lamp_settings",
+      "lamp_setup",
+      "lamp_skills",
+      "lamp_sound_fixtures",
+      "lamp_station",
+      "lamp_surround",
+      "lamp_tasks",
+      "lamp_turn_end",
+      "lamp_turn_end_wire",
+      "lamp_turn_owner",
+      "lamp_update",
+      "lamp_voice",
+      "lamp_voice_eval",
+      "lamp_voice_processes"
+    ],
+    "note": "Interleaved stdout/stderr: no fabricated per-crate summary association.",
+    "ordered_summaries": [
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 2,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 1,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 1,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      }
+    ],
+    "passed": 4
+  }
+}

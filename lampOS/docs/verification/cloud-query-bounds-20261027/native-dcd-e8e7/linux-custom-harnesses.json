@@ -1,0 +1,19 @@
+{
+  "note": "Already included in nextest total, not added again.",
+  "rows": [
+    {
+      "binary": "lamp-update::self-cli-exec",
+      "name": "actual_cli_exec_confirms_before_the_next_round",
+      "ordinal": 6681,
+      "status": "PASS",
+      "total": 11459
+    },
+    {
+      "binary": "lamp-update::self-process-cuts",
+      "name": "persisted_self_switches_survive_sigkill",
+      "ordinal": 7089,
+      "status": "PASS",
+      "total": 11459
+    }
+  ]
+}
