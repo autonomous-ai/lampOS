@@ -1,0 +1,45 @@
+{
+  "new_head": "a47fe22e56d181f6d7946bc5b98d90dd9560293e",
+  "tree": "cd040a50001a660b402e886d791643d7db91bcb1",
+  "base": "4084e4e1dde24ea17d6c88d944256f78904579c0",
+  "original": "2cc71e720b72d4f2d9b4aa2303219d846d2e67de",
+  "one_increment": true,
+  "original_author_committer_message_exact": true,
+  "source_index_modes_and_all_mtimes_unchanged": true,
+  "both_original_file_change_payloads_exact": true,
+  "entire_Rust_test_file_exact_original": true,
+  "range_diff": "! only current Main markdown context; original payload exact",
+  "old_metadata_wrapper_exit": 125,
+  "old_wrapper_actual_chunk": "7de34c",
+  "old_wrapper_no_source_or_ref_mutation": true,
+  "runtime_input_full_bytes_equal": true,
+  "post_doc_metadata_differences": [
+    {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/brave-fjord/lampOS/target/debug/build/lamp-camera-3b932f7397b2694a/build-script-build",
+      "runtime_metadata": {
+        "device": 16777222,
+        "inode": 489209918,
+        "mtime_ns": 1793097012444345309,
+        "ctime_ns": 1793121868298361819,
+        "size": 549320,
+        "mode": 493,
+        "nlink": 1,
+        "no_symlink": true
+      },
+      "post_doctest_metadata": {
+        "device": 16777222,
+        "inode": 489214726,
+        "mtime_ns": 1793097012444345309,
+        "ctime_ns": 1793121916210293919,
+        "size": 549320,
+        "mode": 493,
+        "nlink": 1,
+        "no_symlink": true
+      },
+      "bytes_equal": true
+    }
+  ],
+  "range_diff_sha256": "407c57371a333c20cc58f5389466809d2af7bd32c128705d46c93bd54c4413a2",
+  "push_performed": false,
+  "ready": false
+}

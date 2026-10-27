@@ -1,5 +1,7 @@
 # Original CI audit for #3472 at c0cf52f96
 
+Accounting correction, 28 October: use [the corrected JSON](receipt.corrected.json). The original JSON mistakenly recorded 11,760 executed / 0 unrun by reading the denominator of `9068/11760`. The raw events, summary numerator and unrun warning establish **9,068 executed / 2,692 unrun**, as this prose already stated. [Offline correction](offline-parser-correction.json); the original JSON and failed run remain preserved, with no replay or gate change.
+
 Ready: no. ARM64 failed; Linux Clippy passed. No test or workflow was rerun.
 
 Both runs checked out merge `0f4ba582efc0f17954536bf3a69e8fd90e605aad`, tree `0f1556bbf4d0488503c99df754758197b142d7cd`, with parents `0d1d1f2b944581169c9f96adba9f40ab88adba92` and the published head `c0cf52f9690d178f81d105e31e22c7694cc5738f`. This is not the current working tree. All six required-control source files match the published head; 13 of 15 relevant files match. The two upstream differences are the product Voice journal-resume setting and switches documentation; enrollment settings are unchanged.

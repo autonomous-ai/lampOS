@@ -1,0 +1,13 @@
+[
+  {
+    "binary": "lamp-voice::it",
+    "test": "diagnostics::dsp_reset_preserves_capture_sequence_and_cannot_cover_a_gap",
+    "event": "ok",
+    "line_one_based": 144,
+    "terminal_ordinal_one_based": 71,
+    "body_sha256": "7459f198ab04aaf7fc4d544bd4757040fda815dab39b9878874608ff524904ee",
+    "source_assertion_macros": 19,
+    "sequence_rows_within_one_identity": 3,
+    "Queued_submissions": 4
+  }
+]

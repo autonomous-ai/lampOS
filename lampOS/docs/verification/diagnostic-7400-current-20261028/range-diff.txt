@@ -1,0 +1,10 @@
+1:  2cc71e720b ! 1:  a47fe22e56 lampOS: require diagnostic sequence acknowledgements in tests
+    @@ lampOS/docs/voice-test-fixtures.md: fixture helpers are compiled only under `cfg
+     +failed observation; this fixture budget neither proves its cause nor guarantees
+     +completion under arbitrary OS or filesystem delays.
+     +
+    - ## Histories on a freshly booted host
+    + ## Kept privacy lease resynchronization
+      
+    - The #1569 Voice fixtures that place events before the present choose a
+    + The kept-value resync fixture deliberately receives no datagrams. Its local

@@ -1,3 +1,22 @@
+## 2026-10-27 17:34 UTC — Diagnostic increment passes and native accounting is corrected
+
+Ready for lamp-voice: no
+
+#3577 is pushed as `a47fe22e5` on passing parent `4084e4e1d`. [Fresh child proof](verification/diagnostic-7400-current-20261028/README.md):
+compiler 78777/0 and runtime 38429/0; all 275 Voice integration cases pass once,
+including 18 diagnostics and the one required sequence identity; four docs
+pass separately. Actual normal Voice companion and selected driver are bound.
+The parent 4,163 observations are not added. Context-only range change and
+original failed metadata wrapper 125 are explicitly retained; source stays exact.
+
+[Offline correction](verification/onboarding-c0cf-native-failure-20261027/offline-parser-correction.json)
+fixes the old c0cf JSON's two derived counters: 9,068 executed/2,692 unrun,
+not 11,760/0. Its prose and original 9,067 PASS / 1 FAIL were already correct.
+The original erroneous JSON and raw failed evidence remain preserved; no
+runtime was repeated. Ten's actual-hold change 4f9d23ccb clears the old #3898
+counter finding; Common's original-authority/unknown-frame contract stays a
+separate integration obligation, with independent reader runtime next.
+
 ## 2026-10-27 17:20 UTC — Current hand fixture passes and is pushed
 
 Ready for lamp-voice: no

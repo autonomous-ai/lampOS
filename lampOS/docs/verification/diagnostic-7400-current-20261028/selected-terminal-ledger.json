@@ -1,0 +1,1927 @@
+[
+  {
+    "binary": "lamp-voice::it",
+    "test": "admission::a_capture_gap_invalidates_pending_audio_and_makes_late_acceptance_inert",
+    "event": "ok",
+    "line_one_based": 4,
+    "terminal_ordinal_one_based": 1
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "admission::a_newer_owner_cannot_be_cancelled_by_an_older_candidate_decision",
+    "event": "ok",
+    "line_one_based": 6,
+    "terminal_ordinal_one_based": 2
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "admission::absent_owner_or_wrong_completion_receipt_cannot_imply_natural_completion",
+    "event": "ok",
+    "line_one_based": 8,
+    "terminal_ordinal_one_based": 3
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "admission::acceptance_drains_exact_original_prefix_and_held_pcm_once",
+    "event": "ok",
+    "line_one_based": 10,
+    "terminal_ordinal_one_based": 4
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "admission::closed_privacy_and_expired_authority_reject_pending_input",
+    "event": "ok",
+    "line_one_based": 12,
+    "terminal_ordinal_one_based": 5
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "admission::controller_restart_rejects_but_camera_or_heartbeat_updates_do_not",
+    "event": "ok",
+    "line_one_based": 14,
+    "terminal_ordinal_one_based": 6
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "admission::detector_failure_or_clock_regression_cannot_leave_acceptable_pending_audio",
+    "event": "ok",
+    "line_one_based": 16,
+    "terminal_ordinal_one_based": 7
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "admission::early_endpoint_is_retained_and_delivered_once_even_after_quiet_ticks",
+    "event": "ok",
+    "line_one_based": 18,
+    "terminal_ordinal_one_based": 8
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "admission::expired_ended_candidate_and_a_new_start_are_both_reported",
+    "event": "ok",
+    "line_one_based": 20,
+    "terminal_ordinal_one_based": 9
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "admission::explicit_natural_completion_allows_a_new_turn_without_rewriting_candidate_history",
+    "event": "ok",
+    "line_one_based": 22,
+    "terminal_ordinal_one_based": 10
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "admission::fixed_deadline_is_anchored_to_capture_not_receipt_or_new_evidence",
+    "event": "ok",
+    "line_one_based": 24,
+    "terminal_ordinal_one_based": 11
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "admission::full_prefix_plus_twenty_held_blocks_is_the_fifty_block_limit",
+    "event": "ok",
+    "line_one_based": 26,
+    "terminal_ordinal_one_based": 12
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "admission::malformed_prefixes_never_grant_a_candidate_or_affect_old_output",
+    "event": "ok",
+    "line_one_based": 28,
+    "terminal_ordinal_one_based": 13
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "admission::pending_and_policy_rejection_do_not_cancel_real_speech_or_light",
+    "event": "ok",
+    "line_one_based": 30,
+    "terminal_ordinal_one_based": 14
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "admission::pending_capture_and_privacy_incarnations_cannot_be_relabelled",
+    "event": "ok",
+    "line_one_based": 32,
+    "terminal_ordinal_one_based": 15
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "admission::planned_dsp_advance_preserves_stream_but_cannot_rewind_it",
+    "event": "ok",
+    "line_one_based": 34,
+    "terminal_ordinal_one_based": 16
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "admission::rejection_drains_the_same_burst_until_its_endpoint_before_rearming",
+    "event": "ok",
+    "line_one_based": 36,
+    "terminal_ordinal_one_based": 17
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "admission::reset_never_reuses_candidate_identity_or_accepts_old_evidence",
+    "event": "ok",
+    "line_one_based": 38,
+    "terminal_ordinal_one_based": 18
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "admission::short_prefix_cannot_borrow_unused_prefix_capacity_to_wait_longer",
+    "event": "ok",
+    "line_one_based": 40,
+    "terminal_ordinal_one_based": 19
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "admission::streaming_requires_contiguous_fresh_audio_and_fixed_capture_privacy",
+    "event": "ok",
+    "line_one_based": 42,
+    "terminal_ordinal_one_based": 20
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "admission::uncorrelated_future_stale_and_pretrigger_evidence_are_inert",
+    "event": "ok",
+    "line_one_based": 44,
+    "terminal_ordinal_one_based": 21
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "call_wait::a_call_wait_must_be_longer_than_the_window_and_at_most_three_seconds",
+    "event": "ok",
+    "line_one_based": 46,
+    "terminal_ordinal_one_based": 22
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "call_wait::a_first_sign_while_the_name_is_said_still_waits",
+    "event": "ok",
+    "line_one_based": 48,
+    "terminal_ordinal_one_based": 23
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "call_wait::only_the_name_waits_for_the_rest_and_says_so_when_the_wait_runs_out",
+    "event": "ok",
+    "line_one_based": 50,
+    "terminal_ordinal_one_based": 24
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "call_wait::speech_that_goes_on_past_a_call_is_not_one",
+    "event": "ok",
+    "line_one_based": 52,
+    "terminal_ordinal_one_based": 25
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "call_wait::the_rest_of_the_call_is_the_same_utterance_and_ends_as_any_other",
+    "event": "ok",
+    "line_one_based": 54,
+    "terminal_ordinal_one_based": 26
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "camera_config::exact_configuration_digest_is_checked_again_before_child_start",
+    "event": "ok",
+    "line_one_based": 56,
+    "terminal_ordinal_one_based": 27
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "camera_config::finite_duration_is_validated_before_any_worker_or_device",
+    "event": "ok",
+    "line_one_based": 58,
+    "terminal_ordinal_one_based": 28
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "camera_config::identity_path_format_and_size_have_no_defaults_or_fallbacks",
+    "event": "ok",
+    "line_one_based": 60,
+    "terminal_ordinal_one_based": 29
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "camera_config::private_regular_bounded_single_link_file_required",
+    "event": "ok",
+    "line_one_based": 62,
+    "terminal_ordinal_one_based": 30
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "camera_runtime::an_opening_deadline_cannot_be_extended_by_progress_and_stop_is_not_success",
+    "event": "ok",
+    "line_one_based": 64,
+    "terminal_ordinal_one_based": 31
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "camera_runtime::camera_role_channels_are_separate_and_unknown_roles_still_rejected",
+    "event": "ok",
+    "line_one_based": 66,
+    "terminal_ordinal_one_based": 32
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "camera_runtime::closed_and_permitted_but_not_started_never_open_or_claim_a_frame",
+    "event": "ok",
+    "line_one_based": 68,
+    "terminal_ordinal_one_based": 33
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "camera_runtime::control_full_at_final_handoff_retains_only_original_token",
+    "event": "ok",
+    "line_one_based": 70,
+    "terminal_ordinal_one_based": 34
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "camera_runtime::driver_teardown_after_prompt_revoke_has_its_own_bound",
+    "event": "ok",
+    "line_one_based": 72,
+    "terminal_ordinal_one_based": 35
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "camera_runtime::frame_link::a_worker_fault_closes_consumers",
+    "event": "ok",
+    "line_one_based": 74,
+    "terminal_ordinal_one_based": 36
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "camera_runtime::frame_link::consumer_flags_are_strict",
+    "event": "ok",
+    "line_one_based": 76,
+    "terminal_ordinal_one_based": 37
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "camera_runtime::frame_link::frames_leave_the_library_only_for_a_waiting_consumer",
+    "event": "ok",
+    "line_one_based": 78,
+    "terminal_ordinal_one_based": 38
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "camera_runtime::frame_link::privacy_revoke_closes_the_frame_link_before_the_camera_stops",
+    "event": "ok",
+    "line_one_based": 80,
+    "terminal_ordinal_one_based": 39
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "camera_runtime::full_control_slice_defers_port_work_and_then_keeps_latest_delivery_bounded",
+    "event": "ok",
+    "line_one_based": 82,
+    "terminal_ordinal_one_based": 40
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "camera_runtime::full_metadata_channel_closes_once_and_never_retries_frame",
+    "event": "ok",
+    "line_one_based": 84,
+    "terminal_ordinal_one_based": 41
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "camera_runtime::late_control_cannot_revive_expired_capture",
+    "event": "ok",
+    "line_one_based": 86,
+    "terminal_ordinal_one_based": 42
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "camera_runtime::no_first_frame_with_continuous_authority_is_explicit_failure",
+    "event": "ok",
+    "line_one_based": 88,
+    "terminal_ordinal_one_based": 43
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "camera_runtime::no_permission_or_unknown_permission_cannot_open_camera",
+    "event": "ok",
+    "line_one_based": 90,
+    "terminal_ordinal_one_based": 44
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "camera_runtime::original_grant_unknown_timestamp_and_metadata_only_survive_delivery",
+    "event": "ok",
+    "line_one_based": 92,
+    "terminal_ordinal_one_based": 45
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "camera_runtime::parent_has_no_ready_frame_on_start_and_reports_bounded_samples_only",
+    "event": "ok",
+    "line_one_based": 94,
+    "terminal_ordinal_one_based": 46
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "camera_runtime::parent_rechecks_original_grant_and_cannot_relabel_after_reopen",
+    "event": "ok",
+    "line_one_based": 96,
+    "terminal_ordinal_one_based": 47
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "camera_runtime::parent_rejects_late_wrong_source_repeated_and_old_epoch_metadata",
+    "event": "ok",
+    "line_one_based": 98,
+    "terminal_ordinal_one_based": 48
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "camera_runtime::queued_old_progress_cannot_hide_a_current_worker_stall",
+    "event": "ok",
+    "line_one_based": 102,
+    "terminal_ordinal_one_based": 50
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "camera_runtime::read_and_start_overruns_stop_without_a_current_frame",
+    "event": "ok",
+    "line_one_based": 100,
+    "terminal_ordinal_one_based": 49
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "camera_runtime::read_failure_is_reported_before_driver_teardown_and_stays_failed",
+    "event": "ok",
+    "line_one_based": 104,
+    "terminal_ordinal_one_based": 51
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "camera_runtime::reported_stop_time_follows_cleanup_and_duplicate_start_is_failure",
+    "event": "ok",
+    "line_one_based": 106,
+    "terminal_ordinal_one_based": 52
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "camera_runtime::revoke_after_post_read_drain_is_seen_at_final_handoff_drain",
+    "event": "ok",
+    "line_one_based": 108,
+    "terminal_ordinal_one_based": 53
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "camera_runtime::revoke_during_dequeue_discards_original_frame_before_handoff",
+    "event": "ok",
+    "line_one_based": 110,
+    "terminal_ordinal_one_based": 54
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "camera_runtime::revoke_during_start_suppresses_started_readiness_and_stops_once",
+    "event": "ok",
+    "line_one_based": 112,
+    "terminal_ordinal_one_based": 55
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "camera_runtime::stale_duplicate_authority_does_not_close_newer_capture",
+    "event": "ok",
+    "line_one_based": 114,
+    "terminal_ordinal_one_based": 56
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "camera_runtime::startup_discard_keeps_camera_loop_live_until_a_fresh_original_grant_frame",
+    "event": "ok",
+    "line_one_based": 116,
+    "terminal_ordinal_one_based": 57
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "camera_runtime::startup_discard_summary_reaches_progress_without_claiming_a_frame",
+    "event": "ok",
+    "line_one_based": 118,
+    "terminal_ordinal_one_based": 58
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "camera_runtime::startup_draining_serves_privacy_and_stop_before_any_export_or_next_read",
+    "event": "ok",
+    "line_one_based": 120,
+    "terminal_ordinal_one_based": 59
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "camera_runtime::startup_forever_old_frames_finish_as_unavailable_with_first_latest_age_evidence",
+    "event": "ok",
+    "line_one_based": 122,
+    "terminal_ordinal_one_based": 60
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "camera_runtime::stop_after_dequeue_and_before_delivery_wins",
+    "event": "ok",
+    "line_one_based": 124,
+    "terminal_ordinal_one_based": 61
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "camera_runtime::teardown_overrun_keeps_prompt_revocation_but_never_reports_success",
+    "event": "ok",
+    "line_one_based": 126,
+    "terminal_ordinal_one_based": 62
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "camera_runtime::timestamp_fault_receipt_retains_exact_comparison_without_frame_bytes",
+    "event": "ok",
+    "line_one_based": 128,
+    "terminal_ordinal_one_based": 63
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "diagnostics::accepted_speech_gap_zeros_are_explicit_and_do_not_replace_neighboring_pcm",
+    "event": "ok",
+    "line_one_based": 130,
+    "terminal_ordinal_one_based": 64
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "diagnostics::audio_fault_end_is_incomplete_even_with_good_written_pcm",
+    "event": "ok",
+    "line_one_based": 132,
+    "terminal_ordinal_one_based": 65
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "diagnostics::capture_files_preserve_pcm_offsets_hashes_and_full_acknowledgement",
+    "event": "ok",
+    "line_one_based": 136,
+    "terminal_ordinal_one_based": 67
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "diagnostics::capture_processing_cannot_be_mislabelled_as_render_processing",
+    "event": "ok",
+    "line_one_based": 134,
+    "terminal_ordinal_one_based": 66
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "diagnostics::capture_sequence_gap_and_unannounced_epoch_change_fail",
+    "event": "ok",
+    "line_one_based": 140,
+    "terminal_ordinal_one_based": 69
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "diagnostics::closed_privacy_cannot_be_overridden_by_pcm_metadata",
+    "event": "ok",
+    "line_one_based": 138,
+    "terminal_ordinal_one_based": 68
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "diagnostics::dsp_reset_preserves_capture_sequence_and_cannot_cover_a_gap",
+    "event": "ok",
+    "line_one_based": 144,
+    "terminal_ordinal_one_based": 71
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "diagnostics::duration_and_frame_shape_limits_disable_evidence_without_blocking",
+    "event": "ok",
+    "line_one_based": 142,
+    "terminal_ordinal_one_based": 70
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "diagnostics::explicit_reset_and_privacy_boundaries_are_retained_and_split_epochs",
+    "event": "ok",
+    "line_one_based": 148,
+    "terminal_ordinal_one_based": 73
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "diagnostics::no_overwrite_private_parent_and_symlink_rejection",
+    "event": "ok",
+    "line_one_based": 146,
+    "terminal_ordinal_one_based": 72
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "diagnostics::omitted_open_privacy_and_missing_opening_frames_are_invalid",
+    "event": "ok",
+    "line_one_based": 150,
+    "terminal_ordinal_one_based": 74
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "diagnostics::playback_reset_requires_matching_old_discard_and_advancing_epoch",
+    "event": "ok",
+    "line_one_based": 152,
+    "terminal_ordinal_one_based": 75
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "diagnostics::processing_provenance_matches_pending_result_and_acknowledged_summary",
+    "event": "ok",
+    "line_one_based": 158,
+    "terminal_ordinal_one_based": 78
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "diagnostics::render_cursor_gap_does_not_insert_silence",
+    "event": "ok",
+    "line_one_based": 154,
+    "terminal_ordinal_one_based": 76
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "diagnostics::render_records_only_accepted_prefix_and_typed_priming_silence",
+    "event": "ok",
+    "line_one_based": 156,
+    "terminal_ordinal_one_based": 77
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "diagnostics::repeated_privacy_observation_does_not_reset_the_render_cursor",
+    "event": "ok",
+    "line_one_based": 160,
+    "terminal_ordinal_one_based": 79
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "diagnostics::replaced_artifact_never_receives_original_pcm_or_valid_marker",
+    "event": "ok",
+    "line_one_based": 162,
+    "terminal_ordinal_one_based": 80
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "diagnostics::replacement_directory_and_existing_final_marker_cannot_be_certified",
+    "event": "ok",
+    "line_one_based": 178,
+    "terminal_ordinal_one_based": 88
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "end_silence::a_pause_shorter_than_the_wait_does_not_end_the_utterance",
+    "event": "ok",
+    "line_one_based": 164,
+    "terminal_ordinal_one_based": 81
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "end_silence::a_wait_outside_300_to_2000_ms_is_refused",
+    "event": "ok",
+    "line_one_based": 166,
+    "terminal_ordinal_one_based": 82
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "end_silence::an_utterance_ends_after_exactly_the_wait_that_was_asked_for",
+    "event": "ok",
+    "line_one_based": 168,
+    "terminal_ordinal_one_based": 83
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "end_silence::each_policy_keeps_its_own_wait_when_none_is_asked_for",
+    "event": "ok",
+    "line_one_based": 170,
+    "terminal_ordinal_one_based": 84
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "endpoint_confirmation::a_few_words_are_not_sent_to_the_model_and_end_on_the_silence_window",
+    "event": "ok",
+    "line_one_based": 172,
+    "terminal_ordinal_one_based": 85
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "endpoint_confirmation::a_late_name_sign_in_the_pause_still_holds_the_name_alone_with_a_lower_floor",
+    "event": "ok",
+    "line_one_based": 174,
+    "terminal_ordinal_one_based": 86
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "endpoint_confirmation::a_lower_floor_ends_a_short_finished_line_at_the_commit",
+    "event": "ok",
+    "line_one_based": 176,
+    "terminal_ordinal_one_based": 87
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "endpoint_confirmation::an_uncertain_verdict_asked_again_ends_the_line_only_on_a_complete_second",
+    "event": "ok",
+    "line_one_based": 180,
+    "terminal_ordinal_one_based": 89
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "endpoint_confirmation::any_speech_scored_block_restarts_the_pause_like_the_baseline",
+    "event": "ok",
+    "line_one_based": 182,
+    "terminal_ordinal_one_based": 90
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "endpoint_confirmation::busy_classifier_is_retried_with_the_same_trailing_context",
+    "event": "ok",
+    "line_one_based": 184,
+    "terminal_ordinal_one_based": 91
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "endpoint_confirmation::cancellation_and_reset_invalidate_pending_verdicts",
+    "event": "ok",
+    "line_one_based": 186,
+    "terminal_ordinal_one_based": 92
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "endpoint_confirmation::capture_discontinuity_faults_and_drops_the_pending_verdict",
+    "event": "ok",
+    "line_one_based": 188,
+    "terminal_ordinal_one_based": 93
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "endpoint_confirmation::complete_verdict_ends_at_the_commit_pause",
+    "event": "ok",
+    "line_one_based": 190,
+    "terminal_ordinal_one_based": 94
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "endpoint_confirmation::confirmation_never_runs_before_the_check_window",
+    "event": "ok",
+    "line_one_based": 192,
+    "terminal_ordinal_one_based": 95
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "endpoint_confirmation::default_profile_bands_end_complete_uncertain_and_incomplete_pauses",
+    "event": "ok",
+    "line_one_based": 194,
+    "terminal_ordinal_one_based": 96
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "endpoint_confirmation::default_profile_holds_unfinished_speech_but_resumes_on_speech",
+    "event": "ok",
+    "line_one_based": 196,
+    "terminal_ordinal_one_based": 97
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "endpoint_confirmation::failed_inference_falls_back_without_a_verdict",
+    "event": "ok",
+    "line_one_based": 198,
+    "terminal_ordinal_one_based": 98
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "endpoint_confirmation::fallback_ends_every_turn_exactly_where_the_baseline_does",
+    "event": "ok",
+    "line_one_based": 248,
+    "terminal_ordinal_one_based": 123
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "endpoint_confirmation::incomplete_verdict_holds_until_the_incomplete_window",
+    "event": "ok",
+    "line_one_based": 200,
+    "terminal_ordinal_one_based": 99
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "endpoint_confirmation::invalid_policies_are_rejected",
+    "event": "ok",
+    "line_one_based": 202,
+    "terminal_ordinal_one_based": 100
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "endpoint_confirmation::late_result_never_closes_a_later_utterance",
+    "event": "ok",
+    "line_one_based": 204,
+    "terminal_ordinal_one_based": 101
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "endpoint_confirmation::mechanics_threshold_treats_a_moderate_verdict_as_incomplete",
+    "event": "ok",
+    "line_one_based": 206,
+    "terminal_ordinal_one_based": 102
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "endpoint_confirmation::responsive_profile_is_explicit_and_commits_at_400_ms",
+    "event": "ok",
+    "line_one_based": 208,
+    "terminal_ordinal_one_based": 103
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "endpoint_confirmation::resumed_speech_discards_a_pending_complete_verdict",
+    "event": "ok",
+    "line_one_based": 210,
+    "terminal_ordinal_one_based": 104
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "endpoint_confirmation::retained_snapshot_is_the_latest_model_window",
+    "event": "ok",
+    "line_one_based": 212,
+    "terminal_ordinal_one_based": 105
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "endpoint_confirmation::slow_result_times_out_and_is_ignored_afterwards",
+    "event": "ok",
+    "line_one_based": 214,
+    "terminal_ordinal_one_based": 106
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "endpoint_confirmation::snapshot_holds_preroll_opening_and_resumed_speech_in_order",
+    "event": "ok",
+    "line_one_based": 216,
+    "terminal_ordinal_one_based": 107
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "endpoint_confirmation::the_name_alone_still_waits_for_the_rest_with_a_lower_floor",
+    "event": "ok",
+    "line_one_based": 218,
+    "terminal_ordinal_one_based": 108
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "endpoint_confirmation::the_start_counts_toward_the_floor_only_with_the_switch",
+    "event": "ok",
+    "line_one_based": 220,
+    "terminal_ordinal_one_based": 109
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "endpoint_confirmation::unavailable_model_falls_back_to_the_baseline_window",
+    "event": "ok",
+    "line_one_based": 222,
+    "terminal_ordinal_one_based": 110
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "endpoint_confirmation::verdict_after_the_commit_pause_ends_on_arrival",
+    "event": "ok",
+    "line_one_based": 224,
+    "terminal_ordinal_one_based": 111
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "endpoint_confirmation::with_short_verdicts_an_unfinished_short_line_waits_and_a_finished_one_ends_as_before",
+    "event": "ok",
+    "line_one_based": 226,
+    "terminal_ordinal_one_based": 112
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "endpoint_confirmation::with_the_nights_switches_an_unfinished_verdict_holds_and_a_confident_one_ends_as_before",
+    "event": "ok",
+    "line_one_based": 228,
+    "terminal_ordinal_one_based": 113
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "endpoint_confirmation::without_confirmation_the_baseline_records_its_silence_endpoint",
+    "event": "ok",
+    "line_one_based": 230,
+    "terminal_ordinal_one_based": 114
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "expression_out::said_ahead_the_lamps_sound_reaches_the_planner_in_time",
+    "event": "ok",
+    "line_one_based": 232,
+    "terminal_ordinal_one_based": 115
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "expression_out::the_held_turn_pair_is_taken_whole_by_the_rest_catalogue",
+    "event": "ok",
+    "line_one_based": 234,
+    "terminal_ordinal_one_based": 116
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "expression_out::the_planner_takes_everything_the_voice_says_and_plans_what_it_was_written_for",
+    "event": "ok",
+    "line_one_based": 236,
+    "terminal_ordinal_one_based": 117
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "first_control_message::a_first_control_message_may_wait_for_the_receiver_and_nothing_after_it",
+    "event": "ok",
+    "line_one_based": 238,
+    "terminal_ordinal_one_based": 118
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "first_words::a_yields_start_reaches_back_to_the_first_words_only_with_them_kept",
+    "event": "ok",
+    "line_one_based": 240,
+    "terminal_ordinal_one_based": 119
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "first_words::first_words_are_reached_only_within_the_last_one_point_six_seconds",
+    "event": "ok",
+    "line_one_based": 242,
+    "terminal_ordinal_one_based": 120
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "fixture_provider::bad_audio_order_privacy_shape_and_time_fail_closed",
+    "event": "ok",
+    "line_one_based": 244,
+    "terminal_ordinal_one_based": 121
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "fixture_provider::blocked_output_is_retained_then_discarded_on_new_owner_without_replay",
+    "event": "ok",
+    "line_one_based": 246,
+    "terminal_ordinal_one_based": 122
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "fixture_provider::cancellation_overtaking_end_drops_queued_pcm",
+    "event": "ok",
+    "line_one_based": 250,
+    "terminal_ordinal_one_based": 124
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "fixture_provider::cancellation_overtaking_start_reserves_original_owner_and_never_relabels_reply",
+    "event": "ok",
+    "line_one_based": 252,
+    "terminal_ordinal_one_based": 125
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "fixture_provider::conversation_cues_preserve_turns_endpoints_and_cancellation_reasons",
+    "event": "ok",
+    "line_one_based": 254,
+    "terminal_ordinal_one_based": 126
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "fixture_provider::cue_backpressure_is_bounded_and_latches_without_affecting_authority",
+    "event": "ok",
+    "line_one_based": 256,
+    "terminal_ordinal_one_based": 127
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "fixture_provider::cue_endpoint_must_be_private_same_user_socket_not_symlink_or_file",
+    "event": "ok",
+    "line_one_based": 258,
+    "terminal_ordinal_one_based": 128
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "fixture_provider::cue_event_to_peer_receipt_latency_is_reported_with_a_bounded_send_path",
+    "event": "ok",
+    "line_one_based": 260,
+    "terminal_ordinal_one_based": 129
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "fixture_provider::cues_are_bounded_ordered_fresh_and_keep_owner_epoch_context",
+    "event": "ok",
+    "line_one_based": 262,
+    "terminal_ordinal_one_based": 130
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "fixture_provider::deferred_input_keeps_original_age_and_cannot_wait_indefinitely_on_control",
+    "event": "ok",
+    "line_one_based": 264,
+    "terminal_ordinal_one_based": 131
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "fixture_provider::delayed_fresh_authority_cannot_revive_an_expired_original_lease",
+    "event": "ok",
+    "line_one_based": 266,
+    "terminal_ordinal_one_based": 132
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "fixture_provider::empty_second_drain_does_not_retry_an_input_without_matching_authority",
+    "event": "ok",
+    "line_one_based": 268,
+    "terminal_ordinal_one_based": 133
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "fixture_provider::expired_lease_and_regressing_clock_latch_failure_before_output",
+    "event": "ok",
+    "line_one_based": 270,
+    "terminal_ordinal_one_based": 134
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "fixture_provider::fixture_cli_requires_explicit_retention_and_no_unknown_or_duplicate_flags",
+    "event": "ok",
+    "line_one_based": 272,
+    "terminal_ordinal_one_based": 135
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "fixture_provider::fixture_rejects_a_start_bound_to_another_session",
+    "event": "ok",
+    "line_one_based": 274,
+    "terminal_ordinal_one_based": 136
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "fixture_provider::full_second_control_slice_retains_only_original_input_and_suppresses_output",
+    "event": "ok",
+    "line_one_based": 276,
+    "terminal_ordinal_one_based": 137
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "fixture_provider::invalid_occurrence_or_completion_metadata_latches_observation_failure",
+    "event": "ok",
+    "line_one_based": 278,
+    "terminal_ordinal_one_based": 138
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "fixture_provider::loader_keeps_exact_pcm_and_hash_and_rejects_mismatch_format_size_and_symlink",
+    "event": "ok",
+    "line_one_based": 288,
+    "terminal_ordinal_one_based": 143
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "fixture_provider::maximal_cue_fields_fit_the_fixed_datagram_without_truncation",
+    "event": "ok",
+    "line_one_based": 280,
+    "terminal_ordinal_one_based": 139
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "fixture_provider::multiple_playback_occurrences_remain_one_turn_until_completion",
+    "event": "ok",
+    "line_one_based": 282,
+    "terminal_ordinal_one_based": 140
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "fixture_provider::no_audio_before_real_endpoint_or_without_admitted_authority",
+    "event": "ok",
+    "line_one_based": 284,
+    "terminal_ordinal_one_based": 141
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "fixture_provider::one_admitted_completed_input_gets_exact_reply_and_no_repeat",
+    "event": "ok",
+    "line_one_based": 286,
+    "terminal_ordinal_one_based": 142
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "fixture_provider::privacy_close_and_coalesced_close_reopen_stop_without_revival",
+    "event": "ok",
+    "line_one_based": 290,
+    "terminal_ordinal_one_based": 144
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "fixture_provider::real_fixture_worker_exchanges_exact_pcm_and_stops_without_devices_or_cloud",
+    "event": "ok",
+    "line_one_based": 300,
+    "terminal_ordinal_one_based": 149
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "fixture_provider::separate_sockets_new_authority_in_empty_drain_gap_precedes_input_submission",
+    "event": "ok",
+    "line_one_based": 292,
+    "terminal_ordinal_one_based": 145
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "fixture_provider::separate_sockets_stop_or_privacy_in_empty_drain_gap_prevents_input_and_reply",
+    "event": "ok",
+    "line_one_based": 294,
+    "terminal_ordinal_one_based": 146
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "fixture_provider::stale_cue_and_peer_loss_latch_invalid_without_blocking_or_retrying",
+    "event": "ok",
+    "line_one_based": 296,
+    "terminal_ordinal_one_based": 147
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "light_call::twenty_light_calls_are_each_answered_once_the_ring_says_it_shows_them",
+    "event": "ok",
+    "line_one_based": 298,
+    "terminal_ordinal_one_based": 148
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "music_turns::made_up_music_opens_turns_and_speech_still_does",
+    "event": "ok",
+    "line_one_based": 378,
+    "terminal_ordinal_one_based": 188
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "news_told::news_heard_while_the_tasks_part_is_down_is_told_once_it_is_back",
+    "event": "ok",
+    "line_one_based": 302,
+    "terminal_ordinal_one_based": 150
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "news_told::news_heard_whole_closes_the_harness_it_was_of",
+    "event": "ok",
+    "line_one_based": 304,
+    "terminal_ordinal_one_based": 151
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "privacy_controls::a_fence_never_reads_the_other_kind_of_state",
+    "event": "ok",
+    "line_one_based": 306,
+    "terminal_ordinal_one_based": 152
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "privacy_controls::low_retires_capture_lease_even_after_slow_drain_with_old_allowed_controller",
+    "event": "ok",
+    "line_one_based": 308,
+    "terminal_ordinal_one_based": 153
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "privacy_controls::malformed_foreign_missing_future_stale_and_discontinuous_messages_are_rejected",
+    "event": "ok",
+    "line_one_based": 310,
+    "terminal_ordinal_one_based": 154
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "privacy_controls::no_slide_selects_the_route_and_reaches_the_worker_only_as_an_argument",
+    "event": "ok",
+    "line_one_based": 312,
+    "terminal_ordinal_one_based": 155
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "privacy_controls::no_slide_without_the_persisted_mute_refuses_to_start",
+    "event": "ok",
+    "line_one_based": 314,
+    "terminal_ordinal_one_based": 156
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "privacy_controls::off_selects_original_worker_and_touches_no_path",
+    "event": "ok",
+    "line_one_based": 316,
+    "terminal_ordinal_one_based": 157
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "privacy_controls::only_an_enabled_controls_conversation_passes_the_worker_its_gap_ride",
+    "event": "ok",
+    "line_one_based": 318,
+    "terminal_ordinal_one_based": 158
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "privacy_controls::publisher_and_reader_restart_cannot_rebind_an_active_worker",
+    "event": "ok",
+    "line_one_based": 320,
+    "terminal_ordinal_one_based": 159
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "privacy_controls::rapid_low_high_must_complete_new_stable_open_interval",
+    "event": "ok",
+    "line_one_based": 322,
+    "terminal_ordinal_one_based": 160
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "privacy_controls::repeated_publication_does_not_refresh_or_rename_acquisition",
+    "event": "ok",
+    "line_one_based": 324,
+    "terminal_ordinal_one_based": 161
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "privacy_controls::startup_low_and_faulted_hand_source_are_independent",
+    "event": "ok",
+    "line_one_based": 326,
+    "terminal_ordinal_one_based": 162
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "privacy_controls::up_to_the_first_datagram_a_fence_resyncs_and_after_it_a_gap_fails_closed",
+    "event": "ok",
+    "line_one_based": 328,
+    "terminal_ordinal_one_based": 163
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "privacy_controls::with_no_slide_a_fresh_marker_permits_only_with_an_allowed_controller",
+    "event": "ok",
+    "line_one_based": 330,
+    "terminal_ordinal_one_based": 164
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "privacy_controls::with_no_slide_stale_restarted_or_unmarked_states_are_refused",
+    "event": "ok",
+    "line_one_based": 332,
+    "terminal_ordinal_one_based": 165
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "privacy_pipeline::a_different_controller_cannot_replace_the_workers_private_authority",
+    "event": "ok",
+    "line_one_based": 334,
+    "terminal_ordinal_one_based": 166
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "privacy_pipeline::controls_stopping_with_the_slide_open_closes_both_microphones_within_50_ms",
+    "event": "ok",
+    "line_one_based": 336,
+    "terminal_ordinal_one_based": 167
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "privacy_pipeline::low_then_high_needs_a_fresh_worker_and_restored_controller_generation",
+    "event": "ok",
+    "line_one_based": 338,
+    "terminal_ordinal_one_based": 168
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "privacy_pipeline::missing_controls_or_a_publisher_restart_cannot_renew_an_open_capture",
+    "event": "ok",
+    "line_one_based": 340,
+    "terminal_ordinal_one_based": 169
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "privacy_pipeline::repeated_publication_preserves_original_acquisition_and_cannot_extend_capture",
+    "event": "ok",
+    "line_one_based": 342,
+    "terminal_ordinal_one_based": 170
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "privacy_pipeline::stable_high_never_grants_a_software_denied_controller",
+    "event": "ok",
+    "line_one_based": 344,
+    "terminal_ordinal_one_based": 171
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "privacy_pipeline::stable_high_opens_then_low_discards_pcm_and_drops_the_actual_handle",
+    "event": "ok",
+    "line_one_based": 346,
+    "terminal_ordinal_one_based": 172
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "privacy_pipeline::unavailable_startup_has_no_capture_and_does_not_claim_a_deliberate_mute",
+    "event": "ok",
+    "line_one_based": 348,
+    "terminal_ordinal_one_based": 173
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "privacy_pipeline::with_no_slide_capture_ends_fifty_ms_after_the_last_marker",
+    "event": "ok",
+    "line_one_based": 350,
+    "terminal_ordinal_one_based": 174
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "privacy_pipeline::with_no_slide_missing_restarted_or_unmarked_controls_never_keep_capture",
+    "event": "ok",
+    "line_one_based": 352,
+    "terminal_ordinal_one_based": 175
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "privacy_pipeline::with_no_slide_steady_markers_open_capture_and_the_software_mute_closes_it",
+    "event": "ok",
+    "line_one_based": 354,
+    "terminal_ordinal_one_based": 176
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "privacy_state::an_observation_gap_restarts_unmute_stability",
+    "event": "ok",
+    "line_one_based": 356,
+    "terminal_ordinal_one_based": 177
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "privacy_state::invalid_reads_and_explicit_close_cannot_be_reported_as_user_mute",
+    "event": "ok",
+    "line_one_based": 358,
+    "terminal_ordinal_one_based": 178
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "privacy_state::only_a_fresh_ordered_switch_read_is_an_explicit_mute",
+    "event": "ok",
+    "line_one_based": 360,
+    "terminal_ordinal_one_based": 179
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "privacy_state::unmute_stabilizes_without_conflating_it_with_mute_or_a_fault",
+    "event": "ok",
+    "line_one_based": 362,
+    "terminal_ordinal_one_based": 180
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "process::a_worker_role_not_on_the_voices_list_is_never_started",
+    "event": "ok",
+    "line_one_based": 364,
+    "terminal_ordinal_one_based": 181
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "process::every_command_the_voice_dispatches_is_on_its_list_and_no_other_runs",
+    "event": "ok",
+    "line_one_based": 366,
+    "terminal_ordinal_one_based": 182
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "process::real_worker_handshake_control_and_finite_shutdown",
+    "event": "ok",
+    "line_one_based": 368,
+    "terminal_ordinal_one_based": 183
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "process::the_voices_listed_helpers_are_the_ones_it_starts",
+    "event": "ok",
+    "line_one_based": 370,
+    "terminal_ordinal_one_based": 184
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "progress_news::a_change_then_a_say_now_from_the_acting_policy_then_one_note_to_tell",
+    "event": "ok",
+    "line_one_based": 372,
+    "terminal_ordinal_one_based": 185
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "progress_news::a_task_that_finished_before_its_words_came_is_not_told_as_working",
+    "event": "ok",
+    "line_one_based": 374,
+    "terminal_ordinal_one_based": 186
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "progress_news::after_a_restart_another_line_at_the_same_count_is_fetched_and_offered",
+    "event": "ok",
+    "line_one_based": 376,
+    "terminal_ordinal_one_based": 187
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "progress_news::queued_progress_is_withdrawn_when_its_task_goes_finishes_or_moves_on",
+    "event": "ok",
+    "line_one_based": 380,
+    "terminal_ordinal_one_based": 189
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "progress_news::stale_shadow_other_store_and_older_change_decisions_are_let_go",
+    "event": "ok",
+    "line_one_based": 382,
+    "terminal_ordinal_one_based": 190
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "progress_news::the_minute_counts_from_the_decision_not_from_the_fetching",
+    "event": "ok",
+    "line_one_based": 384,
+    "terminal_ordinal_one_based": 191
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "progress_news::without_the_switch_no_progress_is_listened_for_asked_or_kept",
+    "event": "ok",
+    "line_one_based": 386,
+    "terminal_ordinal_one_based": 192
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "progress_news::words_of_an_older_change_are_not_told_under_a_newer_decision",
+    "event": "ok",
+    "line_one_based": 388,
+    "terminal_ordinal_one_based": 193
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "progress_news::work_that_finished_while_the_lamp_waited_for_its_moment_is_not_told",
+    "event": "ok",
+    "line_one_based": 426,
+    "terminal_ordinal_one_based": 212
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "provider_config::a_field_from_a_newer_build_is_read_past_and_named",
+    "event": "ok",
+    "line_one_based": 390,
+    "terminal_ordinal_one_based": 194
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "provider_config::a_key_pasted_into_an_enum_field_is_never_quoted",
+    "event": "ok",
+    "line_one_based": 392,
+    "terminal_ordinal_one_based": 195
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "provider_config::a_key_written_in_the_provider_file_is_refused",
+    "event": "ok",
+    "line_one_based": 394,
+    "terminal_ordinal_one_based": 196
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "provider_config::camera_instruction_is_explicit_without_changing_model_voice_or_turn_policy",
+    "event": "ok",
+    "line_one_based": 396,
+    "terminal_ordinal_one_based": 197
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "provider_config::configuration_must_be_private_bounded_regular_and_not_a_symlink",
+    "event": "ok",
+    "line_one_based": 398,
+    "terminal_ordinal_one_based": 198
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "provider_config::credential_file_guards_and_redacted_failures_are_preserved",
+    "event": "ok",
+    "line_one_based": 400,
+    "terminal_ordinal_one_based": 199
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "provider_config::omitted_or_null_options_preserve_existing_setup_and_authentication_choices",
+    "event": "ok",
+    "line_one_based": 402,
+    "terminal_ordinal_one_based": 200
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "provider_config::private_file_to_setup_preserves_explicit_model_thinking_and_language",
+    "event": "ok",
+    "line_one_based": 404,
+    "terminal_ordinal_one_based": 201
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "provider_config::session_conversion_rejects_known_unsupported_combinations_and_invalid_tags",
+    "event": "ok",
+    "line_one_based": 406,
+    "terminal_ordinal_one_based": 202
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "provider_config::typed_load_rejects_malformed_levels_and_language_types",
+    "event": "ok",
+    "line_one_based": 408,
+    "terminal_ordinal_one_based": 203
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "reference_link::direct_control_remains_usable_when_actual_render_socket_is_full",
+    "event": "ok",
+    "line_one_based": 410,
+    "terminal_ordinal_one_based": 204
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "reference_link::terminal_notice_never_connects_an_unconnected_control_socket",
+    "event": "ok",
+    "line_one_based": 412,
+    "terminal_ordinal_one_based": 205
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "reference_link::terminal_notice_reaches_capture_when_speaker_closes_first",
+    "event": "ok",
+    "line_one_based": 414,
+    "terminal_ordinal_one_based": 206
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "reference_link::terminal_notice_survives_capture_closing_first_without_relaxing_live_sends",
+    "event": "ok",
+    "line_one_based": 416,
+    "terminal_ordinal_one_based": 207
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "reference_link::terminal_notice_uses_an_existing_control_connection_without_connecting_data",
+    "event": "ok",
+    "line_one_based": 418,
+    "terminal_ordinal_one_based": 208
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "reference_link::trusted_reference_peer_boot_cannot_be_learned_from_incoming_messages",
+    "event": "ok",
+    "line_one_based": 420,
+    "terminal_ordinal_one_based": 209
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "reference_prime::buffered_ack_cannot_claim_analysed_or_extra_held_samples",
+    "event": "ok",
+    "line_one_based": 422,
+    "terminal_ordinal_one_based": 210
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "reference_prime::capture_clock_prime_handshake_and_reset_keep_analysis_truthful",
+    "event": "ok",
+    "line_one_based": 424,
+    "terminal_ordinal_one_based": 211
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "reference_prime::changed_hardware_cursor_privacy_deadline_and_reset_reject_ack",
+    "event": "ok",
+    "line_one_based": 430,
+    "terminal_ordinal_one_based": 214
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "reference_prime::duplicate_prime_or_bad_ack_does_not_refresh_original_deadline",
+    "event": "ok",
+    "line_one_based": 428,
+    "terminal_ordinal_one_based": 213
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "reference_prime::fixed_prime_handshake_and_reset_keep_analysis_truthful",
+    "event": "ok",
+    "line_one_based": 434,
+    "terminal_ordinal_one_based": 216
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "reference_prime::malformed_and_legacy_wire_ack_are_not_implicitly_upgraded",
+    "event": "ok",
+    "line_one_based": 432,
+    "terminal_ordinal_one_based": 215
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "reference_prime::malformed_or_wrong_owner_ack_cannot_consume_pending_prime",
+    "event": "ok",
+    "line_one_based": 436,
+    "terminal_ordinal_one_based": 217
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "reference_prime::reset_requires_discard_evidence_and_old_ack_never_starts_new_epoch",
+    "event": "ok",
+    "line_one_based": 438,
+    "terminal_ordinal_one_based": 218
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "review_2026_10_14::review_a_plain_hearing_just_before_a_request_is_not_lost_to_a_fainter_one_after_it",
+    "event": "ok",
+    "line_one_based": 440,
+    "terminal_ordinal_one_based": 219
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "review_2026_10_14::review_sound_a_name_heard_counts_for_its_own_request_only",
+    "event": "ok",
+    "line_one_based": 442,
+    "terminal_ordinal_one_based": 220
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "review_2026_10_14::review_sound_a_second_look_is_owed_once_and_its_own_turn_owes_nothing",
+    "event": "ok",
+    "line_one_based": 444,
+    "terminal_ordinal_one_based": 221
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "review_2026_10_14::review_sound_the_note_is_offered_once_for_the_request_the_name_began",
+    "event": "ok",
+    "line_one_based": 446,
+    "terminal_ordinal_one_based": 222
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "review_2026_10_14::review_the_lamps_own_second_look_does_not_use_up_a_new_sessions_held_requests",
+    "event": "ok",
+    "line_one_based": 448,
+    "terminal_ordinal_one_based": 223
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "ring_worker::a_flood_of_head_requests_never_holds_back_revocation_or_expiry",
+    "event": "ok",
+    "line_one_based": 458,
+    "terminal_ordinal_one_based": 228
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "ring_worker::a_late_run_past_two_seconds_faults_and_a_ring_started_again_writes_black_then_the_light",
+    "event": "ok",
+    "line_one_based": 450,
+    "terminal_ordinal_one_based": 224
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "ring_worker::an_sd_mmc_retune_of_late_writes_is_kept_and_the_ring_goes_on",
+    "event": "ok",
+    "line_one_based": 452,
+    "terminal_ordinal_one_based": 225
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "ring_worker::cancellation_arriving_after_real_data_receive_prevents_any_color",
+    "event": "ok",
+    "line_one_based": 454,
+    "terminal_ordinal_one_based": 226
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "ring_worker::every_eye_mode_writes_and_says_the_shutdown_black_at_a_service_stop",
+    "event": "ok",
+    "line_one_based": 456,
+    "terminal_ordinal_one_based": 227
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "ring_worker::exhausted_shared_control_budget_defers_pending_frame_until_revocation",
+    "event": "ok",
+    "line_one_based": 460,
+    "terminal_ordinal_one_based": 229
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "ring_worker::future_data_snapshot_never_installs_or_renews_authority",
+    "event": "ok",
+    "line_one_based": 472,
+    "terminal_ordinal_one_based": 235
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "ring_worker::genuinely_older_expired_control_cannot_clear_a_newer_valid_cue",
+    "event": "ok",
+    "line_one_based": 462,
+    "terminal_ordinal_one_based": 230
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "ring_worker::heartbeat_overtaking_data_keeps_original_request_and_permit",
+    "event": "ok",
+    "line_one_based": 464,
+    "terminal_ordinal_one_based": 231
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "ring_worker::invalid_control_kind_or_malformed_frame_blanks_and_exits",
+    "event": "ok",
+    "line_one_based": 466,
+    "terminal_ordinal_one_based": 232
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "ring_worker::invalid_frame_bounds_reject_without_a_write_and_speaking_requires_playback",
+    "event": "ok",
+    "line_one_based": 468,
+    "terminal_ordinal_one_based": 233
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "ring_worker::late_authorities_blank_once_and_a_fresh_one_brings_the_light_back",
+    "event": "ok",
+    "line_one_based": 470,
+    "terminal_ordinal_one_based": 234
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "ring_worker::late_startup_black_write_is_reported_once_on_stderr",
+    "event": "ok",
+    "line_one_based": 474,
+    "terminal_ordinal_one_based": 236
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "ring_worker::local_socket_request_to_fake_sink_latency_is_measured_without_physical_claim",
+    "event": "ok",
+    "line_one_based": 480,
+    "terminal_ordinal_one_based": 239
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "ring_worker::malformed_control_blanks_and_reports_cleanup_failure_without_retry",
+    "event": "ok",
+    "line_one_based": 476,
+    "terminal_ordinal_one_based": 237
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "ring_worker::newer_expired_privacy_revocation_blanks_before_old_allowed_lease_expires",
+    "event": "ok",
+    "line_one_based": 478,
+    "terminal_ordinal_one_based": 238
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "ring_worker::output_caps_clamp_resting_frames_and_preserve_the_persons_light_off_setting",
+    "event": "ok",
+    "line_one_based": 490,
+    "terminal_ordinal_one_based": 244
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "ring_worker::output_caps_clamp_turn_frames_and_tightening_blanks_latched_pixels_without_a_new_frame",
+    "event": "ok",
+    "line_one_based": 482,
+    "terminal_ordinal_one_based": 240
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "ring_worker::output_caps_start_dark_before_any_snapshot_even_with_a_valid_turn",
+    "event": "ok",
+    "line_one_based": 484,
+    "terminal_ordinal_one_based": 241
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "ring_worker::permit_expires_without_another_frame_then_stop_remains_available",
+    "event": "ok",
+    "line_one_based": 486,
+    "terminal_ordinal_one_based": 242
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "ring_worker::primary_and_cleanup_write_errors_are_both_reported_once",
+    "event": "ok",
+    "line_one_based": 488,
+    "terminal_ordinal_one_based": 243
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "ring_worker::repeated_stale_control_does_not_renew_authority_and_a_ring_run_out_waits_for_a_fresh_one",
+    "event": "ok",
+    "line_one_based": 522,
+    "terminal_ordinal_one_based": 260
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "ring_worker::ring_wire_rejects_unknown_commands_and_unknown_nested_fields",
+    "event": "ok",
+    "line_one_based": 492,
+    "terminal_ordinal_one_based": 245
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "ring_worker::stale_owner_or_phase_cannot_blank_a_newer_valid_cue",
+    "event": "ok",
+    "line_one_based": 494,
+    "terminal_ordinal_one_based": 246
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "ring_worker::startup_failure_never_reports_ready_and_stop_failure_is_visible",
+    "event": "ok",
+    "line_one_based": 496,
+    "terminal_ordinal_one_based": 247
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "ring_worker::startup_stop_and_no_turn_never_invent_readiness_color",
+    "event": "ok",
+    "line_one_based": 498,
+    "terminal_ordinal_one_based": 248
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "soft_start::a_soft_start_keeps_300_ms_more_only_with_the_switch_and_first_words",
+    "event": "ok",
+    "line_one_based": 500,
+    "terminal_ordinal_one_based": 249
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "soft_start::a_soft_start_keeps_the_same_300_ms_after_any_quiet",
+    "event": "ok",
+    "line_one_based": 502,
+    "terminal_ordinal_one_based": 250
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "soft_start::a_soft_start_never_reaches_into_the_lamps_own_sound",
+    "event": "ok",
+    "line_one_based": 504,
+    "terminal_ordinal_one_based": 251
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "soft_start::a_start_heard_all_with_the_lamp_sounding_begins_as_usual",
+    "event": "ok",
+    "line_one_based": 506,
+    "terminal_ordinal_one_based": 252
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "soft_start::a_yields_start_is_not_a_soft_start",
+    "event": "ok",
+    "line_one_based": 508,
+    "terminal_ordinal_one_based": 253
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "typed_memory::a_text_keeps_and_reads_the_rooms_memory_not_the_person_at_the_lamp",
+    "event": "ok",
+    "line_one_based": 510,
+    "terminal_ordinal_one_based": 254
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "unfinished_wait::a_finished_question_does_not_wait",
+    "event": "ok",
+    "line_one_based": 512,
+    "terminal_ordinal_one_based": 255
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "unfinished_wait::a_lines_holds_add_up_to_the_bound",
+    "event": "ok",
+    "line_one_based": 514,
+    "terminal_ordinal_one_based": 256
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "unfinished_wait::a_person_who_stopped_after_um_is_answered_at_the_bound",
+    "event": "ok",
+    "line_one_based": 516,
+    "terminal_ordinal_one_based": 257
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "unfinished_wait::finished_words_told_in_the_wait_end_the_line_at_once",
+    "event": "ok",
+    "line_one_based": 518,
+    "terminal_ordinal_one_based": 258
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "unfinished_wait::speech_in_the_wait_goes_on_with_the_same_line",
+    "event": "ok",
+    "line_one_based": 520,
+    "terminal_ordinal_one_based": 259
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "unfinished_wait::unfinished_words_wait_and_end_within_the_bound",
+    "event": "ok",
+    "line_one_based": 524,
+    "terminal_ordinal_one_based": 261
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "unfinished_wait::with_smart_turn_a_stop_after_um_is_answered_within_the_bound",
+    "event": "ok",
+    "line_one_based": 526,
+    "terminal_ordinal_one_based": 262
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "unfinished_wait::without_words_told_the_line_ends_as_before",
+    "event": "ok",
+    "line_one_based": 528,
+    "terminal_ordinal_one_based": 263
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "visual_options::camera_is_opt_in_and_cannot_leak_into_fixture_or_positional_arguments",
+    "event": "ok",
+    "line_one_based": 530,
+    "terminal_ordinal_one_based": 264
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "visual_options::explicit_small_native_mode_and_buffer_bound_reach_child_without_resizing_or_identity_guess",
+    "event": "ok",
+    "line_one_based": 532,
+    "terminal_ordinal_one_based": 265
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "voice_core::baseline_does_not_claim_to_recover_an_arbitrarily_quiet_onset",
+    "event": "ok",
+    "line_one_based": 534,
+    "terminal_ordinal_one_based": 266
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "voice_core::baseline_keeps_a_mid_question_low_score_pause_in_one_input",
+    "event": "ok",
+    "line_one_based": 536,
+    "terminal_ordinal_one_based": 267
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "voice_core::baseline_short_reply_has_a_finite_endpoint_and_reset_keeps_policy",
+    "event": "ok",
+    "line_one_based": 538,
+    "terminal_ordinal_one_based": 268
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "voice_core::dsp_boundary_discards_inactive_prefix_but_preserves_active_words_and_order",
+    "event": "ok",
+    "line_one_based": 540,
+    "terminal_ordinal_one_based": 269
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "voice_core::empty_control_commands_keep_wire_compatibility_but_reject_unknown_fields",
+    "event": "ok",
+    "line_one_based": 542,
+    "terminal_ordinal_one_based": 270
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "voice_core::ipc_replay_or_other_worker_cannot_replace_fresh_observation",
+    "event": "ok",
+    "line_one_based": 544,
+    "terminal_ordinal_one_based": 271
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "voice_core::missing_audio_or_invalid_probability_is_failure_not_a_silent_endpoint",
+    "event": "ok",
+    "line_one_based": 546,
+    "terminal_ordinal_one_based": 272
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "voice_core::mute_is_immediate_reopening_stable_and_missing_samples_close",
+    "event": "ok",
+    "line_one_based": 548,
+    "terminal_ordinal_one_based": 273
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "voice_core::privacy_reorder_future_and_stale_fail_closed_without_rolling_back_highwater",
+    "event": "ok",
+    "line_one_based": 550,
+    "terminal_ordinal_one_based": 274
+  },
+  {
+    "binary": "lamp-voice::it",
+    "test": "voice_core::retained_prefix_and_endpoint_include_every_active_frame_once",
+    "event": "ok",
+    "line_one_based": 551,
+    "terminal_ordinal_one_based": 275
+  }
+]

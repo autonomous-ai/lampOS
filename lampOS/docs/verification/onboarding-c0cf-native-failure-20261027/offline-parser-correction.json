@@ -1,0 +1,39 @@
+{
+  "kind": "OFFLINE_PARSER_CORRECTION_NOT_RUNTIME",
+  "run": 40541161543,
+  "published_head": "c0cf52f9690d178f81d105e31e22c7694cc5738f",
+  "actual_checkout": "0f4ba582efc0f17954536bf3a69e8fd90e605aad",
+  "actual_tree": "0f1556bbf4d0488503c99df754758197b142d7cd",
+  "original_failed_result_unchanged": true,
+  "pass": 9067,
+  "fail": 1,
+  "unique_terminal_identities": 9068,
+  "executed": 9068,
+  "selected": 11760,
+  "selected_unrun": 2692,
+  "summary_skips": 106,
+  "summary_row": {
+    "line": 9994,
+    "text": "     Summary [ 210.367s] 9068/11760 tests run: 9067 passed, 1 failed, 106 skipped"
+  },
+  "raw_warning_confirms_selected_unrun": true,
+  "original_incorrect_numeric_fields": {
+    "native-runtime-accounting.json": {
+      "reported_executed": 11760,
+      "selected_unrun": 0
+    },
+    "receipt.json": {
+      "executed": 11760,
+      "unrun": 0
+    }
+  },
+  "cause": "Parser matched the denominator in a partial N/M tests-run summary. The numerator is the executed count. The prior prose already reported 9068 executed and 2692 unrun.",
+  "source_sha256": {
+    "receipt.json": "d72e71910feccb65f21d0cd4af97ee94f19f0e0776b22f962e8893c432b5106d",
+    "native-runtime-accounting.json": "7acab0ceffd76dbf586ac73b1e0dcb80191046c5ea7c6c539676fe8d4684677b",
+    "native-terminal-ledger.json": "ae029d68050be0c56d5ce8b21cf43eb027365b83ecccbad2d6f703c46b3f1faf",
+    "40541161543-member-1.log": "580f8eb6ed174dc5c6f82f34bc40d0240980f4ae87533583b7ba02d911ff74fa"
+  },
+  "old_files_untouched": true,
+  "no_tests_rerun": true
+}
