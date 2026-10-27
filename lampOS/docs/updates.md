@@ -1556,7 +1556,11 @@ On the development Mac (Intel, macOS 26.6, Rust 1.96.0), not on a lamp:
   when systemd itself cannot be asked; the journal line picked from
   `journalctl -o json` (the unit's own last, others' and the old main
   process's skipped, cleaned and cut); a command bounded in time and read
-  whole however much it prints.
+  whole however much it prints; the units' state query (`systemctl show`)
+  bounded too, within 5 s (`JOURNAL_WITHIN`, both pipes read): one that
+  stalls, or ends while a child it left holds its pipes, is an error
+  ("systemd cannot be asked"), so the watch never waits past its own
+  deadline on systemd, and a failed query still says its trimmed stderr.
 - With product parts (task #811, `cargo test -p lamp-update --test round`,
   19 rounds): a lamp with both kinds switched in one round, the voice by its
   unit and the eyes by their link, the eyes' unit byte for byte the same; a
