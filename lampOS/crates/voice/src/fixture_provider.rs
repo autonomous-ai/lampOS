@@ -445,6 +445,10 @@ impl FixtureProvider {
                 request,
                 privacy_generation,
             }
+            | ProviderInput::StepCall {
+                request,
+                privacy_generation,
+            }
             | ProviderInput::Written {
                 request,
                 privacy_generation,
@@ -544,7 +548,8 @@ impl FixtureProvider {
             // A note beside the request: the fixture has no model to tell.
             ProviderInput::Called { .. }
             | ProviderInput::Paused { .. }
-            | ProviderInput::CountOnly { .. } => {}
+            | ProviderInput::CountOnly { .. }
+            | ProviderInput::StepCall { .. } => {}
             ProviderInput::End { .. } => {
                 let input = self
                     .input
