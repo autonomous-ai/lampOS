@@ -1714,6 +1714,15 @@ On the development Mac (Intel, macOS 26.6, Rust 1.96.0), not on a lamp:
   later-version/additive-field acceptance. These local results do not cover
   the whole round suite, Linux/ARM64, a device, helper authentication or the
   frozen writer guard.
+  A later Mac gate on base `1fb93206e` adds two controls that wrap the actual
+  applier: a wrong Apply receipt still restores overwritten, removed and new
+  settings, modes and records through real Back; a wrong Back receipt keeps
+  the incomplete journal until a later idempotent Back is acknowledged,
+  without applying the refused build again. Full library **155 / 0 / 2
+  ignored** and the prior 65 plus those two round tests **67 / 0**, with 134
+  filtered out, pass with fmt and strict Update all-target Clippy. These are
+  filesystem/FakeSystemd fixtures, not a root one-shot, reboot or lamp trial;
+  their results are separate from the earlier `e362659ce` qualification.
 - Models in the manifest (#1680, `tests/round.rs`, `LAMP_UPDATE_MODELS`
   on unless said): a changed eyes model is fetched once, checked, and its
   path linked into the store with the eyes switched, install's file kept
