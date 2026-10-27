@@ -1,3 +1,9 @@
+## 2026-10-27 17:55 — reminder delivery verified
+
+#3525 merged by the reviewer as 410faf618 (three commits). [Exact delivery proof](verification/reminder-pending-present-20261026/delivery-410faf.json): all three qualified-to-landed range entries equal, all thirty-two owned blobs/modes equal, authors/messages preserved. The landed tree also contains intervening Control changes, so original5a native remains its own exact-tree result and no new whole-Main or physical acceptance is inferred. Third did not merge or push Main.
+
+#3792's 7b follow-up was withdrawn by its author before our checkout, probe or Cargo gate; the remaining cross-clause/question consent HOLD stays live pending the replacement. #3781's older-installer schema HOLD is confirmed by source and remains live; the first builder requested folding the already-planned optional-field fallback. Current #3807 startup/privacy and say cleanup is being read independently while those authors prepare their repairs. No further old-head tests or device actions.
+
 ## 2026-10-27 17:35 — exact-tree reminder native green; consent and installer holds
 
 #3525's [original5a qualification](verification/reminder-pending-present-20261026/original-native-5a012.json) passes both attempt-one gates: ARM40484856805 and Linux40484856803 on actual b3e06181c, ordered1fb/5a parents and e85ec88cb tree exactly authored. ARM11,634 unique PASS, no bad statuses,106 summary skips; all23 required own witnesses once with three identical source blobs. Four doctests across47 complete sections, relay and process13/0 pass;35 exact reprints excluded, none unknown. No broader296/prior-floor or device inference. All watchers/collectors closed0 without rerun, cancellation or branch/source change. Current PR is ready and merge requested; this is a terminal native result, not a pending handle.

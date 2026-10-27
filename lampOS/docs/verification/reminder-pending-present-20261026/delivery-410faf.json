@@ -1,0 +1,64 @@
+{
+  "delivered_pr": 3525,
+  "qualified_head": "5a01229e704dc40d278c887c722eb8bac775102b",
+  "landed_head": "410faf6180d4dfeacb9021d1e272020c6037d18d",
+  "commits": [
+    [
+      "00035b18a4162ba764ef7537013b72a032b9c1a7",
+      "8fd37c381700da16bb5cb37b328fe006a3a691d2"
+    ],
+    [
+      "75d3df50ca0cc61dac0b76ace1e5316baad65ef9",
+      "5a764fb294e7c67c16cac00afdac6137e9257567"
+    ],
+    [
+      "5a01229e704dc40d278c887c722eb8bac775102b",
+      "410faf6180d4dfeacb9021d1e272020c6037d18d"
+    ]
+  ],
+  "range_diff": "1:  00035b18a = 1:  8fd37c381 lampOS: rearm reminder chances on changed work\n2:  75d3df50c = 2:  5a764fb29 lampOS: keep face-count guards with changed-work triggers\n3:  5a01229e7 = 3:  410faf618 lampOS: redact a local path from reminder evidence",
+  "all32_owned_blobs_and_modes_equal": true,
+  "preserved_author_and_message": true,
+  "owned_blobs": {
+    "lampOS/crates/skills/src/lib.rs": "100644 blob 9b2116d7246f4e7c66c57afa4195c445fa3c099f",
+    "lampOS/crates/skills/tests/it/skills.rs": "100644 blob 98bdb879e4a261eb03bc607631c19a95f20eb926",
+    "lampOS/docs/reuse-decisions.md": "100644 blob 0b9833ffda7f271f84e2bac742f783f775127700",
+    "lampOS/docs/schedule.md": "100644 blob 08426b1fa12a7c313df5f4e5b3740a0f0d77376a",
+    "lampOS/docs/skills.md": "100644 blob b0cde0a2d9498c7aa68bd251a35542f1c2e6b574",
+    "lampOS/docs/verification/reminder-pending-present-20261026/README.md": "100644 blob 1d01a46901acf1a261566213fd3a6a3f549d587c",
+    "lampOS/docs/verification/reminder-pending-present-20261026/carry-1c884.json": "100644 blob 532ce6a4ffa9892df1d162f8c0c14ad10af546d7",
+    "lampOS/docs/verification/reminder-pending-present-20261026/changes-final-0c1.json": "100644 blob a6add879f12e455a7fa449dd12b09eb052e854ba",
+    "lampOS/docs/verification/reminder-pending-present-20261026/changes-initial.json": "100644 blob 0a0763b29abe27732fe03bc9063e1744a5fa9d71",
+    "lampOS/docs/verification/reminder-pending-present-20261026/compatibility-cli.json": "100644 blob 408902e9f5fa7b4e9988acef8b46c52aabed2683",
+    "lampOS/docs/verification/reminder-pending-present-20261026/current-1c884-intermediate.json": "100644 blob baa86e429ecc91c9ac3325d0a5a52a91b0e56bf7",
+    "lampOS/docs/verification/reminder-pending-present-20261026/final-1c884.json": "100644 blob 2458f66f2d3ae8f0fa4d2db7f50b39d2c74ae343",
+    "lampOS/docs/verification/reminder-pending-present-20261026/final-doc-clarification.json": "100644 blob a571a17f0e4e02a32268d09058017bd6e2436584",
+    "lampOS/docs/verification/reminder-pending-present-20261026/final-product-manifest.json": "100644 blob 76af84203389fd4974734590badd4678862167d4",
+    "lampOS/docs/verification/reminder-pending-present-20261026/fixed.json": "100644 blob 37e4db989268f2694582bf2389811f7b92f52d89",
+    "lampOS/docs/verification/reminder-pending-present-20261026/held-negative.json": "100644 blob 7b2fce7aa64b522a36ba52c7948031f262b647be",
+    "lampOS/docs/verification/reminder-pending-present-20261026/negative.json": "100644 blob cfd7e55041b3bee06822d976605de48703c41004",
+    "lampOS/docs/verification/reminder-pending-present-20261026/negative.patch": "100644 blob 0d165933aef609b25f137bbc4e5409acfaa163b2",
+    "lampOS/docs/verification/reminder-pending-present-20261026/old-daemon-reload.json": "100644 blob a8e40d0510b419d67d76609db466455824fd4f6f",
+    "lampOS/docs/verification/reminder-pending-present-20261026/old-parser.json": "100644 blob 018b1a718cd8dc4ccf56677bb46d71ded009dede",
+    "lampOS/docs/verification/reminder-pending-present-20261026/review-fixture.json": "100644 blob 1930a43a05638649da1c3c4345014ce9058eb40d",
+    "lampOS/docs/verification/reminder-pending-present-20261026/scalar-negative.json": "100644 blob 45e50a8cdb9ef83d5fac7235bb6bce0ab34db1d9",
+    "lampOS/docs/verification/reminder-pending-present-20261026/selected-negative-initial.json": "100644 blob 60943fa3edeb66f060a66af9f13b85dd0cbbd01c",
+    "lampOS/docs/verification/reminder-pending-present-20261026/selected-negative.json": "100644 blob b68d06b6557d5c8421a68c5a60a8cd1d6f4e4049",
+    "lampOS/docs/verification/reminder-pending-present-20261026/update-crossings.json": "100644 blob bd8b64e855197dc99b0c8ba270012ca7c3996bd5",
+    "lampOS/docs/verification/reminder-pending-present-20261026/while-negative.json": "100644 blob 3641a943096f334f19d6bbc22c649fa7ac0775b4",
+    "lampOS/skills/reminders/SKILL.md": "100644 blob eabccd3f0bd113d05f76a13966b2bd3d1c97df9e",
+    "lampOS/skills/reminders/skill.toml": "100644 blob e12cf462adfbd827bdcc23cf51e523d59ec49f7f",
+    "lampOS/skills/reminders/tests/due-during-a-talk-said-when-it-ends/expect.toml": "100644 blob bd5271514cbecff1fdc53f159cf9b531b87dc629",
+    "lampOS/skills/reminders/tests/due-while-they-are-at-the-desk/expect.toml": "100644 blob a3d9fae3e4def30b811dec0358e4d7e7d998d486",
+    "lampOS/skills/reminders/tests/each-reminder-once/expect.toml": "100644 blob 493a0a2b73d899fa18017c506b3c1b0f4f80b050",
+    "lampOS/skills/reminders/tests/quiet-while-schedule-cannot-serve-it/expect.toml": "100644 blob 9f6ae02eef1e677e1cee16658b1747b66f260040"
+  },
+  "qualified_tree": "e85ec88cba03ace20ca1b7df9099af6cbb38ee1f",
+  "landed_tree": "51085b7335c2644022a2a6bdb416ed45c0ec81d8",
+  "limits": [
+    "Own32source paths and authored patch equality only; the whole landed tree includes intervening Main changes.",
+    "Original5a native proof remains the authored-tree qualification, not a new whole-Main or physical/device result.",
+    "Merged by reviewer; Third did not push or merge Main."
+  ],
+  "private_receipt_sha256": "0e6aa47cae95c6a2636d6fced289eacff436edb179af458ba5d9a1fd3c644b09"
+}
