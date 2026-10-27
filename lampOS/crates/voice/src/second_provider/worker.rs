@@ -3175,22 +3175,6 @@ pub fn serve(
                 }),
             );
         }
-        // Right after a start, the ears' quiet room shows the room quiet for
-        // the name's join, never just unknown (`LAMP_FIRST_SECONDS_QUIET`,
-        // #3711).
-        if std::env::var(crate::second_provider::FIRST_SECONDS_QUIET_ENVIRONMENT)
-            .is_ok_and(|value| value == "on")
-        {
-            eprintln!(
-                "lamp-voice second: right after a start, a line in a room not yet known is kept as said in a quiet room for a join when the ears' stream stayed near its own quiet outside the lines and no talk was left alone and no other voice heard since (LAMP_FIRST_SECONDS_QUIET)"
-            );
-            if let Ok(mut heeding) = heeding.lock() {
-                heeding.showing_the_first_seconds_quiet();
-                if let Some(root) = files.bus_root.as_deref() {
-                    heeding.hear_levels(root, false);
-                }
-            }
-        }
         // The rule keeps the route's one reader of the Policy's decisions,
         // which a line going on reads too (`LAMP_GOING_ON_ASKS`, below).
         if let Some(verdicts) = verdicts {
@@ -3237,6 +3221,23 @@ pub fn serve(
             && let (Ok(mut heeding), Some(root)) = (heeding.lock(), files.bus_root.as_deref())
         {
             heeding.hear_levels(root, true);
+        }
+        // Right after a start, the ears' quiet room shows the room quiet for
+        // the name's join, never just unknown (`LAMP_FIRST_SECONDS_QUIET`,
+        // #3711). After `--addressed`'s looks are set up, so the levels'
+        // thread reads the eyes beside them (the reviewer-lead's P3 on #3801).
+        if std::env::var(crate::second_provider::FIRST_SECONDS_QUIET_ENVIRONMENT)
+            .is_ok_and(|value| value == "on")
+        {
+            eprintln!(
+                "lamp-voice second: right after a start, a line in a room not yet known is kept as said in a quiet room for a join when the ears' stream stayed near its own quiet outside the lines, no talk was left alone, no line was held and no other voice heard since (LAMP_FIRST_SECONDS_QUIET)"
+            );
+            if let Ok(mut heeding) = heeding.lock() {
+                heeding.showing_the_first_seconds_quiet();
+                if let Some(root) = files.bus_root.as_deref() {
+                    heeding.hear_levels(root, false);
+                }
+            }
         }
         // A line's first word, set off and sounding like the lamp's name, is
         // the name when lamp-name heard it near at the line's start
@@ -4230,6 +4231,11 @@ pub(crate) struct Heeding {
     /// (`--attention-near`), as on the Live route: with `--addressed` alone
     /// it is sampled for that judgement only.
     near_sign: bool,
+    /// Where the levels' thread finds `--addressed`'s looks to sample beside
+    /// them, whichever was set up first: started before them
+    /// (`LAMP_FIRST_SECONDS_QUIET`), it still reads the eyes once they are
+    /// (the reviewer-lead's P3 on #3801).
+    levels_looks: Arc<std::sync::OnceLock<std::sync::Weak<Mutex<crate::addressed::Looks>>>>,
     /// With `--addressed`: the eyes' looks, sampled beside the levels, and
     /// where each request's judgement is published, if the bus can be used.
     addressed: Option<(Looked, Option<crate::addressed::AddressedOut>)>,
@@ -4404,6 +4410,10 @@ pub(crate) struct Heeding {
     /// since the start: never cleared, unlike [`Self::another_person`].
     first_seconds_quiet: bool,
     another_since_start: bool,
+    /// With it, whether the rule held a line judged since the start: talk
+    /// the lamp left alone, which the room told counts as no talk when held
+    /// (`RoomTold::held`), never cleared.
+    held_since_start: bool,
     /// With it, each of the last lines kept and when it was said, so the
     /// ears' stream is read outside them ([`Self::ears_show_quiet`]).
     said: std::collections::VecDeque<(u64, (u64, u64))>,
@@ -5068,6 +5078,7 @@ impl Heeding {
             bus,
             thread,
             levels: None,
+            levels_looks: Arc::default(),
             near_sign: false,
             addressed: None,
             judged: None,
@@ -5126,6 +5137,7 @@ impl Heeding {
             another_person: None,
             first_seconds_quiet: false,
             another_since_start: false,
+            held_since_start: false,
             said: std::collections::VecDeque::new(),
         }
     }
@@ -5144,8 +5156,13 @@ impl Heeding {
     /// only for want of history right after a start
     /// ([`crate::room_told::RoomTold::unknown_for_want_of_history`]), is kept
     /// as said in a quiet room when the ears' own stream shows one
-    /// ([`Self::ears_show_quiet`]) and no other person was heard or seen
-    /// speaking in any line since the start. On lamp-4ace on 26 Oct, a bare
+    /// ([`Self::ears_show_quiet`]), no other person was heard or seen
+    /// speaking in any line since the start, and the rule held no line since
+    /// the start. With no voice check (`LAMP_SAME_VOICE_MODEL` unset) a
+    /// line in another voice with no face seen speaking it shows no other
+    /// person; held as said to nobody, it is no talk left alone for the room
+    /// told either (`RoomTold::held`), so the hold itself keeps the join off
+    /// (#3801's P3). On lamp-4ace on 26 Oct, a bare
     /// "Lamp.", a pause, then the request, the first line after a start
     /// with nobody in view, was held and had to be said twice: no eyes and
     /// an unknown room never joined. Only the join reads it: the rule's
@@ -5513,13 +5530,14 @@ impl Heeding {
             && self.keeps_room
             && room == crate::room_told::Room::Unknown
             && !self.another_since_start
+            && !self.held_since_start
             && crate::room_told::room()
                 .lock()
                 .is_ok_and(|mut told| told.unknown_for_want_of_history(monotonic_us()))
             && let Some((floor, most)) = self.ears_show_quiet(request)
         {
             eprintln!(
-                "lamp-voice second: request {request}: the room is not known yet after the start, and the ears' stream stayed within {most:.1} dB of its quiet of {floor:.1} dBFS outside the lines, with no talk left alone and no other voice since: kept as said in a quiet room for a join (LAMP_FIRST_SECONDS_QUIET)"
+                "lamp-voice second: request {request}: the room is not known yet after the start, and the ears' stream stayed within {most:.1} dB of its quiet of {floor:.1} dBFS outside the lines, with no talk left alone, no line held and no other voice since: kept as said in a quiet room for a join (LAMP_FIRST_SECONDS_QUIET)"
             );
             crate::room_told::Room::Quiet
         } else {
@@ -6452,7 +6470,9 @@ impl Heeding {
                 );
             })
             .ok();
-        self.addressed = Some((Looked::default(), out));
+        let looks = Looked::default();
+        let _ = self.levels_looks.set(Arc::downgrade(&looks));
+        self.addressed = Some((looks, out));
         self.hear_levels(root, false);
     }
 
@@ -6471,11 +6491,8 @@ impl Heeding {
         // Weak: the thread ends once this `Heeding` is gone (Second on #1028).
         let kept = Arc::downgrade(&levels);
         // The eyes' looks, read beside the levels as the Live worker reads
-        // them, with `--addressed` only.
-        let looked = self
-            .addressed
-            .as_ref()
-            .map(|(looks, _)| Arc::downgrade(looks));
+        // them, with `--addressed` only, set up before this or after.
+        let looked = self.levels_looks.clone();
         let started = std::thread::Builder::new()
             .name("second-levels".into())
             .spawn(move || {
@@ -6493,7 +6510,7 @@ impl Heeding {
                         .and_then(|message| message.parse::<lamp_msgs::RoomSound>().ok())
                         .filter(|level| !level.own_voice)
                         .and_then(|level| Some(level.level_db - level.floor_db?));
-                    if let Some(looks) = looked.as_ref().and_then(std::sync::Weak::upgrade)
+                    if let Some(looks) = looked.get().and_then(std::sync::Weak::upgrade)
                         && let Ok(Some(message)) = bus.latest(lamp_msgs::Faces::TOPIC)
                         && let Ok(mut looks) = looks.lock()
                     {
@@ -6552,6 +6569,14 @@ impl Heeding {
         self.keep_the_name_in_its_line(request, said, &mut signs);
         self.silence_turned(request, said, &mut signs);
         let verdict = self.judge(request, said, heard, signs.clone());
+        // `LAMP_FIRST_SECONDS_QUIET`: a line held since the start keeps the
+        // first seconds' join off. A wait for the Policy is no hold; a bare
+        // name waiting for its request is never judged here.
+        if self.first_seconds_quiet
+            && verdict.is_some_and(|why| why != crate::second_provider::WAITS_FOR_POLICY)
+        {
+            self.held_since_start = true;
+        }
         if self.said_lately.len() == SAID_KEPT {
             self.said_lately.pop_front();
         }
@@ -18265,6 +18290,63 @@ mod tests {
         );
     }
 
+    /// The reviewer-lead's P3 on #3801: with `--addressed` and
+    /// `LAMP_FIRST_SECONDS_QUIET` both on, the levels' thread reads the eyes
+    /// beside the levels, whichever started it first: the first seconds'
+    /// levels started before `--addressed`'s looks, as `serve` once did,
+    /// still fill them. With `--addressed` off, no looks.
+    #[test]
+    fn the_levels_thread_reads_the_eyes_for_addressed_started_before_it() {
+        use lamp_msgs::{Face, Faces};
+        let root = std::path::PathBuf::from(format!("/tmp/lle-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        let bus = lamp_bus::Bus::new(&root).unwrap();
+        let mut eyes = bus
+            .publisher_declared(Faces::TOPIC, &Faces::declaration(), "eyes")
+            .unwrap();
+        let mut looked = |levels_first: bool| {
+            let mut heeding = Heeding::new(true, true, Some(&root), None);
+            heeding.showing_the_first_seconds_quiet();
+            if levels_first {
+                heeding.hear_levels(&root, false);
+            }
+            heeding.judging_addressed(&root);
+            heeding.hear_levels(&root, false);
+            let began = monotonic_us();
+            for _ in 0..6 {
+                eyes.publish_json(
+                    monotonic_us(),
+                    &Faces {
+                        faces: vec![Face {
+                            id: "f0".into(),
+                            xmin: 0.4,
+                            ymin: 0.2,
+                            xmax: 0.6,
+                            ymax: 0.7,
+                            confidence: 1.0,
+                            yaw: Some(0.1),
+                            facing: Some(true),
+                            speaking: None,
+                        }],
+                    },
+                )
+                .unwrap();
+                std::thread::sleep(LEVEL_EVERY);
+            }
+            std::thread::sleep(LEVEL_EVERY * 2);
+            let (looks, _) = heeding.addressed.as_ref().unwrap();
+            looks.lock().unwrap().between(began, monotonic_us()).looks
+        };
+        assert!(looked(true) > 0, "the levels started first");
+        assert!(looked(false) > 0, "--addressed set up first");
+        let mut off = Heeding::new(true, true, Some(&root), None);
+        off.showing_the_first_seconds_quiet();
+        off.hear_levels(&root, false);
+        assert!(off.levels_looks.get().is_none() && off.addressed.is_none());
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
     /// Sixth's P3 on c0890e8db: with `--addressed` set up first, as `serve`
     /// does, `LAMP_NAME_NEAR` keeps its looks, one reader of the eyes for
     /// both; without it, its own.
@@ -18601,12 +18683,16 @@ mod tests {
     /// had to be said twice. With the switch, the ears' own stream shows the
     /// room quiet for the join: outside the lines said, the room microphone
     /// stayed within a few dB of its own quiet, that quiet under a loud
-    /// room's, and no talk was left alone and no other voice heard since the
-    /// start. lamp-c0a4 on 27 Oct (7071), a quiet room read at a quiet of
+    /// room's, and no talk was left alone, no line held and no other voice
+    /// heard since the start. lamp-c0a4 on 27 Oct (7071), a quiet room read at a quiet of
     /// -45 dBFS and levels of -43 to -46, joins; the person's own lines rise
     /// as they will. Talk or a television between the lines, a loud room's
     /// quiet, no levels, another voice since the start, talk left alone,
-    /// two faces in view, or the switch off: held, as before.
+    /// a line held since the start, two faces in view, or the switch off:
+    /// held, as before. The held line is another person's, with no voice
+    /// check and no face seen speaking it: held as said to nobody, the room
+    /// told counts it as no talk, and nothing else shows the other voice
+    /// (reviewer-three's P3 on #3801, lamp-c0a4's run 2).
     #[test]
     fn right_after_a_start_the_ears_quiet_room_lets_a_bare_name_join_its_request() {
         use crate::room_told::Room;
@@ -18626,6 +18712,9 @@ mod tests {
             /// A line in another voice since the start, its conversation
             /// over before the name.
             other_voice: bool,
+            /// A line since the start that the rule held, said to nobody
+            /// with nobody in view, before the name.
+            held: bool,
             on: bool,
         }
         let quiet = Start {
@@ -18634,6 +18723,7 @@ mod tests {
             in_view: 0,
             talk: false,
             other_voice: false,
+            held: false,
             on: true,
         };
         let run = |name: &str, start: Start| {
@@ -18669,16 +18759,32 @@ mod tests {
                 heeding.keep_line_room(98, Room::Unknown, true, true);
                 heeding.keep_line_room(99, Room::Unknown, false, false);
             }
+            if start.held {
+                // From 11.5 s to 10 s ago, before the name: no name, nobody
+                // in view, no conversation going on.
+                assert!(
+                    heeding
+                        .heed(
+                            97,
+                            (now - 11_500_000, now - 10_000_000),
+                            "Did you see the match last night?",
+                            None
+                        )
+                        .is_some()
+                );
+            }
             // "Lamp." from 5 s to 4.4 s ago, a pause, the request from 3 s
             // to 0.2 s ago; the ears read every 100 ms over the last 8 s,
-            // the person's own lines 20 dB over the quiet.
+            // or 12 s with the held line, the person's own lines 20 dB over
+            // the quiet.
             let windows = [
                 (now - 5_000_000, now - 4_400_000),
                 (now - 3_000_000, now - 200_000),
             ];
             if let Some(rises) = start.room {
                 let levels: Levels = Arc::default();
-                for (n, at) in (now - 8_000_000..=now).step_by(100_000).enumerate() {
+                let from = now - if start.held { 12_000_000 } else { 8_000_000 };
+                for (n, at) in (from..=now).step_by(100_000).enumerate() {
                     let said = windows
                         .iter()
                         .any(|(began, ended)| (*began..=*ended).contains(&at));
@@ -18783,6 +18889,16 @@ mod tests {
                 }
             )),
             "talk left alone since the start"
+        );
+        assert!(
+            held(run(
+                "d2",
+                Start {
+                    held: true,
+                    ..quiet
+                }
+            )),
+            "a line held since the start"
         );
         assert!(
             held(run(
