@@ -5591,6 +5591,9 @@ fn conversation_with_gate_inner(
         })
     });
     let mut onboarding_invitation_turn: Option<(BootId, u64)> = None;
+    // Whether any of the bound invitation's audio played, kept past its
+    // reply: a turn that ends unsettled with none is no ask (#3754).
+    let mut onboarding_invitation_audio = false;
     // The near-call step's evidence (#1803): `name/heard`, `ears/level` and
     // `voice/state`, drained without waiting. Without the bus the step is
     // unavailable.
@@ -9893,12 +9896,15 @@ fn conversation_with_gate_inner(
             current.answer_say(&speaker_pending, snapshot);
             if onboarding_invitation_turn == Some((current.owner.boot(), turn)) {
                 if let Some(walk) = onboarding.as_mut() {
-                    walk.invitation_finished(
-                        current.owner.boot(),
-                        turn,
-                        current.heard_whole(&speaker_pending, snapshot),
-                        monotonic_us(),
-                    );
+                    // Nothing of it played is no ask at all (#3754).
+                    let delivery = if current.heard_whole(&speaker_pending, snapshot) {
+                        crate::onboarding::Delivery::Whole
+                    } else if !current.had_audio {
+                        crate::onboarding::Delivery::Unsaid
+                    } else {
+                        crate::onboarding::Delivery::Cut
+                    };
+                    walk.invitation_finished(current.owner.boot(), turn, delivery, monotonic_us());
                 }
                 onboarding_invitation_turn = None;
             }
@@ -10922,13 +10928,21 @@ fn conversation_with_gate_inner(
             if let Some(polls) = trace.onboarding_test_polls.as_ref() {
                 polls.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
             }
+            if let Some(current) = reply.as_ref()
+                && onboarding_invitation_turn == Some((current.owner.boot(), current.owner.turn()))
+            {
+                onboarding_invitation_audio |= current.had_audio;
+            }
             if let Some((boot, turn)) = walk.invitation_binding()
                 && reply
                     .as_ref()
                     .map(|current| (current.owner.boot(), current.owner.turn()))
                     != Some((boot, turn))
             {
-                walk.invitation_finished(boot, turn, false, monotonic_us());
+                // Gone unsettled (the route failed, the service stopped,
+                // a privacy gap): with none of it played, it was never said.
+                let delivery = crate::onboarding::Delivery::unsettled(onboarding_invitation_audio);
+                walk.invitation_finished(boot, turn, delivery, monotonic_us());
                 onboarding_invitation_turn = None;
             }
             let can_speak = reply.is_none()
@@ -10987,6 +11001,7 @@ fn conversation_with_gate_inner(
                         let bound = (current.owner.boot(), current.owner.turn());
                         if walk.bind_invitation(offer.invitation, bound.0, bound.1) {
                             onboarding_invitation_turn = Some(bound);
+                            onboarding_invitation_audio = false;
                         }
                     }
                     begun_for(Some(ticket), reply);
