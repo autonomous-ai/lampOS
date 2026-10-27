@@ -52,10 +52,9 @@ breaks, a part that says whether the lamp is online, show it) come after it.
   `--failure-notice-dir`): played only for a turn whose request failed. Four
   are recorded in the second route's voice (#1844, 20 Oct):
   `provider_unavailable`, `back_online`, `voice_service_unreachable` and the
-  Wi-Fi helper's `wifi_lost`; and since #3697 the shutdown's `going_to_sleep`.
-  `lamp-update install` places them, with their
+  Wi-Fi helper's `wifi_lost`. `lamp-update install` places them, with their
   manifest, in `/opt/lampOS/voice/notices` from the `notices-2026-10-20`
-  and `notices-2026-10-27` releases (`deploy/product/models.json`), and the product unit passes that
+  release (`deploy/product/models.json`), and the product unit passes that
   folder. Before, it passed `/etc/lampOS/voice/notices`, which nothing
   filled, so every line was silent (lamp-06c1, 20 Oct). The way to say "I can't reach
   the internet" with no internet: a recording on the lamp.

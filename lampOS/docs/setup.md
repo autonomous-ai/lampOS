@@ -699,9 +699,8 @@ for it. It is recorded once at build time in the lamp's own voice and played
 by the voice:
 
 - **Asked** as `{"skill":"wifi","recording":"wifi_lost","priority":7,"expires_in_ms":60000}`.
-  The say service takes only the names it knows (`wifi_lost`, and the
-  shutdown's `going_to_sleep`, shutdown.md), and only from root's helpers
-  (the Wi-Fi helper, the shutdown): the socket's peer must be root (`SO_PEERCRED`, read on
+  The say service takes only the names it knows (`wifi_lost`), and only from
+  the Wi-Fi helper: the socket's peer must be root (`SO_PEERCRED`, read on
   Linux), so a skill, under any name, is refused ("recording is asked by the
   Wi-Fi helper only") and cannot say there is no Wi-Fi while the lamp is
   online (`say::Caller`). Its samples are
