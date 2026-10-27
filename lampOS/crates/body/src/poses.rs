@@ -13,11 +13,13 @@
 //! - `--pitch-window`: the default (lamp-4ace's), checked to lie inside the
 //!   pitch servo's own stored limits; `--home`'s pitch is brought inside the
 //!   body's home range (`Limits::FOLDED.pitch_home`) when it rests within
-//!   [`HOME_PITCH_TOLERANCE`] of it, and refused farther out;
+//!   [`HOME_PITCH_TOLERANCE`] of it, or over it within the body's
+//!   [`WAKE_REACH`] (a head moved off home by a hand, #3504), and refused
+//!   farther out;
 //! - `--gaze`: not here. It is measured with a face and the camera
 //!   (body.md), so the file says it is not measured and the body runs
 //!   without it.
-use crate::body::Limits;
+use crate::body::{Limits, WAKE_REACH};
 use crate::inspection::{InspectionReport, Readback, Stage};
 use std::fmt::Write as _;
 
@@ -38,7 +40,9 @@ pub const PITCH_WINDOW: (u16, u16) = (1740, 2030);
 /// How far outside the body's home range a rest pitch may read and still be
 /// a head resting on its stop (#2396: lamp-0c89 rests at 1755, five under
 /// 1760): it is brought to the nearest edge. Farther out, the head is off
-/// its stop and the read is refused.
+/// its stop and the read is refused, unless it is over the range (the side
+/// the head falls with its weight) within [`WAKE_REACH`]: a head moved off
+/// home by a hand, which the body wakes home (#3504).
 pub const HOME_PITCH_TOLERANCE: u16 = 20;
 /// How far the shoulder and the elbow may each stand from folded
 /// (`body.rs`'s `TRAVEL_CAP`).
@@ -125,8 +129,8 @@ pub fn rest_read(report: &InspectionReport) -> Result<RestRead, String> {
 /// `lamp.env`'s text for this lamp, from its rest read: the poses as the
 /// body takes them (`BODY_POSES`), and comments saying where each came
 /// from. Refused, with why, where the body itself would refuse them: a rest
-/// pitch more than [`HOME_PITCH_TOLERANCE`] outside the body's home range
-/// (within it, brought to its edge and said), a window outside the
+/// pitch more than [`HOME_PITCH_TOLERANCE`] under the body's home range or
+/// more than [`WAKE_REACH`] over it (nearer, brought to its edge and said), a window outside the
 /// pitch servo's limits, a stand farther from folded than the body allows,
 /// or a position past 4095.
 pub fn lamp_env(unit_id: &str, read: &RestRead, measured_at: &str) -> Result<String, String> {
@@ -205,8 +209,12 @@ fn head_checked(read: &RestRead) -> Result<(Span, Span, u16, Option<String>), St
 /// (`Limits::FOLDED.pitch_home`, where the body must find the head to
 /// start, which lies inside `--pitch-window` and over the head's floor). A
 /// rest pitch within [`HOME_PITCH_TOLERANCE`] outside it is the head on its
-/// stop: brought to the nearest edge, with the line saying so. Farther out
-/// it is refused.
+/// stop: brought to the nearest edge, with the line saying so. Over it (the
+/// side the head falls with its weight) by more, but within [`WAKE_REACH`],
+/// is a head moved off home by a hand (#3504: lamp-52e6 at 2213, lamp-3e83
+/// at 2102 after handling, each staying where a hand left it): the high
+/// edge is kept, and the body, waking, brings the head home from there.
+/// Farther over, or under by more than the tolerance, it is refused.
 fn home_pitch(pitch: u16) -> Result<(u16, Option<String>), String> {
     let (low, high) = Limits::FOLDED.pitch_home;
     let (edge, side, off) = if pitch < low {
@@ -216,17 +224,23 @@ fn home_pitch(pitch: u16) -> Result<(u16, Option<String>), String> {
     } else {
         return Ok((pitch, None));
     };
-    if off > HOME_PITCH_TOLERANCE {
+    let line = if off <= HOME_PITCH_TOLERANCE {
+        format!("home pitch {pitch} is {side} the body's home range {low}..{high}: {edge} kept")
+    } else if pitch > high && off <= WAKE_REACH {
+        format!(
+            "home pitch {pitch} is {off} over the body's home range {low}..{high}: a head moved off home by a hand; {edge} kept, and the body wakes it home (within {WAKE_REACH})"
+        )
+    } else {
+        let most = if pitch > high {
+            WAKE_REACH
+        } else {
+            HOME_PITCH_TOLERANCE
+        };
         return Err(format!(
-            "home pitch {pitch} is {off} {side} the body's home range {low}..{high}, more than {HOME_PITCH_TOLERANCE}: a head off its stop, not a rest reading. Fold the head down onto its stop and measure again; a head that still rests there is outside where this body starts (body.md)"
+            "home pitch {pitch} is {off} {side} the body's home range {low}..{high}, more than {most}: a head off its stop, not a rest reading. Fold the head down onto its stop and measure again; a head that still rests there is outside where this body starts (body.md)"
         ));
-    }
-    Ok((
-        edge,
-        Some(format!(
-            "home pitch {pitch} is {side} the body's home range {low}..{high}: {edge} kept"
-        )),
-    ))
+    };
+    Ok((edge, Some(line)))
 }
 
 /// A seated `lamp.env` for this lamp, from its rest read (#2163): `--home`,
@@ -667,17 +681,54 @@ mod tests {
         assert!(error.contains("home pitch 1739 is 21 under"), "{error}");
         assert!(error.contains("a head off its stop, not a rest reading"));
         assert!(error.contains("measure again"), "{error}");
+        let reach = 2020 + WAKE_REACH;
+        let error = seated_lamp_env(
+            "x",
+            &RestRead {
+                pitch: reach + 1,
+                ..read
+            },
+            "t",
+        )
+        .unwrap_err();
+        assert!(error.contains("401 over"), "{error}");
         assert!(
-            seated_lamp_env(
-                "x",
-                &RestRead {
-                    pitch: 2041,
-                    ..read
-                },
-                "t"
-            )
-            .is_err()
+            error.contains("more than 400: a head off its stop"),
+            "{error}"
         );
+    }
+
+    /// #3504: a head a hand moved off home, over the range (the side it falls
+    /// with its weight) within the body's wake reach, keeps the high edge,
+    /// which the body wakes it to; lamp-52e6 read 2213 after an SD card swap.
+    #[test]
+    fn a_home_pitch_moved_by_hand_within_the_wake_reach_keeps_the_edge() {
+        let read = rest_read(&inspection(LAMP_06C1, None)).unwrap();
+        let text = lamp_env(
+            "x",
+            &RestRead {
+                pitch: 2213,
+                ..read
+            },
+            "t",
+        )
+        .unwrap();
+        assert!(text.contains(
+            "# home pitch 2213 is 193 over the body's home range 1760..2020: a head moved off home by a hand; 2020 kept, and the body wakes it home (within 400)"
+        ));
+        assert!(text.contains("--home 2020,2057,2034 "));
+        let reach = 2020 + WAKE_REACH;
+        let seated = seated_lamp_env(
+            "x",
+            &RestRead {
+                pitch: reach,
+                ..read
+            },
+            "t",
+        )
+        .unwrap();
+        assert!(seated.contains("--home 2020,2057,2034 "), "{seated}");
+        assert!(seated.contains("400 over"), "{seated}");
     }
 
     /// A rest pitch inside the range, its edges too, is kept as read.

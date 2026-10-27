@@ -641,8 +641,10 @@ units stopped:
    with this lamp's roll and yaw, the default `--pitch-window` checked to
    lie inside the pitch servo's own limits, and `--torque on`. A rest pitch
    a little outside the body's home range is a head on its stop: `--home`
-   takes the nearest edge and the file says so; one farther out is refused,
-   a head off its stop (the range and how far, as the code reads them:
+   takes the nearest edge and the file says so; one over it farther, within
+   the body's wake reach, is a head moved off home by a hand, and `--home`
+   keeps the high edge, said too; one farther out is refused, a head off its
+   stop (the range and how far, as the code reads them:
    [body.md](body.md), on `lamp-body-measure`). The body starts from such a
    head by waking it home, as it does unless given `--wake off`. It refuses, with why, where the body would refuse the
    poses, and when any joint has torque on (the lamp is then held, not at

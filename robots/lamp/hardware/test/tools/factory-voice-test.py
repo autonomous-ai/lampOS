@@ -65,7 +65,7 @@ def setup(tmp, aplay_fails=False, voice_on=False):
                 read -r -p "factory: $1 Ready? [y/N] " a; [[ $a == y || $a == Y ]] || {{ echo "factory: FAILED: not ready for: $1" >&2; return 1; }}; }}
         case "$*" in
           *head-off*)
-            echo "lamp-body-measure: home pitch 2105 is 85 over the body's home range 1760..2020, more than 20: a head off its stop, not a rest reading."
+            echo "lamp-body-measure: home pitch 2505 is 485 over the body's home range 1760..2020, more than 400: a head off its stop, not a rest reading."
             echo "factory: FAILED: lamp-body-measure refused or could not read the body (its reason is above)" >&2; exit 1 ;;
           *--to\\ 3*)
             echo "factory: step 1 of 4, the body's poses"
