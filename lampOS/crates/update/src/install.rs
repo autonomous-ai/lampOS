@@ -22,6 +22,7 @@ use crate::{
     records::{Build, Records, State, replace_link, sync_parent, write_whole},
     round::{Hashing, file_sha256, filling},
     unit,
+    world::{JOURNAL_WITHIN, RESTART_WITHIN, query},
 };
 use ring::digest;
 use std::{
@@ -30,6 +31,7 @@ use std::{
     os::unix::fs::{DirBuilderExt, OpenOptionsExt, PermissionsExt},
     path::{Path, PathBuf},
     process::Command,
+    time::{Duration, Instant},
 };
 
 /// Every unit of the product, by name, as `deploy/product/` has it at the
@@ -911,7 +913,10 @@ impl Host for System {
     }
 
     fn tmpfiles(&mut self, path: &str) -> Result<(), String> {
-        run(Command::new("systemd-tmpfiles").args(["--create", path]))
+        run_within(
+            Command::new("systemd-tmpfiles").args(["--create", path]),
+            JOURNAL_WITHIN,
+        )
     }
 
     fn harness_at_boot(&mut self, user: &str, home: &str) -> Result<(), String> {
@@ -927,8 +932,9 @@ impl Host for System {
     }
 
     fn harness_version(&mut self, user: &str, home: &str) -> Result<String, String> {
-        let uid = uid_of(&mut output_of, user)?;
-        output_of(&harness_argv(user, home, &uid, &["version"]))
+        let mut quick = |argv: &[String]| output_of_within(argv, JOURNAL_WITHIN);
+        let uid = uid_of(&mut quick, user)?;
+        quick(&harness_argv(user, home, &uid, &["version"]))
     }
 
     fn restart(&mut self, unit: &str) -> Result<(), String> {
@@ -936,12 +942,17 @@ impl Host for System {
     }
 
     fn utc_offset_minutes(&mut self, zone: &str) -> Result<i32, String> {
-        let output = Command::new("date")
-            .arg("+%z")
-            .env("TZ", zone)
-            .output()
-            .map_err(|error| format!("date: {error}"))?;
-        offset_minutes(String::from_utf8_lossy(&output.stdout).trim())
+        // A failed `date` prints no offset, as before; only one that cannot
+        // start, or runs past the bound, says so.
+        let stdout = match query::output_within(
+            Command::new("date").arg("+%z").env("TZ", zone),
+            Instant::now() + JOURNAL_WITHIN,
+        ) {
+            Ok(stdout) => stdout,
+            Err(error) if error.kind() == io::ErrorKind::Other => Vec::new(),
+            Err(error) => return Err(shown_error("date +%z", JOURNAL_WITHIN, &error)),
+        };
+        offset_minutes(String::from_utf8_lossy(&stdout).trim())
             .ok_or_else(|| format!("date gave no offset for {zone}"))
     }
 }
@@ -975,17 +986,47 @@ fn uid_of(run: &mut Runner, user: &str) -> Result<String, String> {
 /// and fails on demand.
 pub type Runner<'a> = dyn FnMut(&[String]) -> Result<String, String> + 'a;
 
+/// The longest Harness's installer (`curl … | sh`) may take: it fetches over
+/// the lamp's own network, which can be slow.
+pub const INSTALLER_WITHIN: Duration = Duration::from_secs(15 * 60);
+
+/// Every step through it gets [`RESTART_WITHIN`], but Harness's installer,
+/// which fetches, gets [`INSTALLER_WITHIN`].
 fn output_of(argv: &[String]) -> Result<String, String> {
+    let fetches = argv
+        .last()
+        .is_some_and(|last| last.contains(HARNESS_INSTALLER));
+    output_of_within(
+        argv,
+        if fetches {
+            INSTALLER_WITHIN
+        } else {
+            RESTART_WITHIN
+        },
+    )
+}
+
+fn output_of_within(argv: &[String], within: Duration) -> Result<String, String> {
     let shown = argv.join(" ");
-    match Command::new(&argv[0]).args(&argv[1..]).output() {
-        Ok(output) if output.status.success() => {
-            Ok(String::from_utf8_lossy(&output.stdout).into_owned())
-        }
-        Ok(output) => Err(format!(
-            "{shown}: {}",
-            String::from_utf8_lossy(&output.stderr).trim()
-        )),
-        Err(error) => Err(format!("{shown}: {error}")),
+    query::output_and_stderr_within(
+        Command::new(&argv[0]).args(&argv[1..]),
+        Instant::now() + within,
+    )
+    .map(|stdout| String::from_utf8_lossy(&stdout).into_owned())
+    .map_err(|error| shown_error(&shown, within, &error))
+}
+
+/// A bounded command's error as `"{shown}: …"`: its own trimmed stderr (or
+/// exit status) when it failed, that it ran past `within` (its group then
+/// killed), or why it could not run.
+fn shown_error(shown: &str, within: Duration, error: &io::Error) -> String {
+    if error.kind() == io::ErrorKind::TimedOut {
+        format!(
+            "{shown}: did not end within {} s: it ran on, or a child it left held its output",
+            within.as_secs()
+        )
+    } else {
+        format!("{shown}: {error}")
     }
 }
 
@@ -1135,16 +1176,17 @@ pub fn service_left(json: &str) -> Vec<String> {
     )]
 }
 
+/// `command` run to its end within [`RESTART_WITHIN`]: `systemctl`
+/// restarts, reloads and enables, and `useradd`.
 fn run(command: &mut Command) -> Result<(), String> {
+    run_within(command, RESTART_WITHIN)
+}
+
+fn run_within(command: &mut Command, within: Duration) -> Result<(), String> {
     let shown = format!("{command:?}");
-    match command.output() {
-        Ok(output) if output.status.success() => Ok(()),
-        Ok(output) => Err(format!(
-            "{shown}: {}",
-            String::from_utf8_lossy(&output.stderr).trim()
-        )),
-        Err(error) => Err(format!("{shown}: {error}")),
-    }
+    query::output_and_stderr_within(command, Instant::now() + within)
+        .map(drop)
+        .map_err(|error| shown_error(&shown, within, &error))
 }
 
 /// `+0700` or `-0330` as minutes.
@@ -2923,5 +2965,57 @@ mod tests {
         assert_eq!(offset_minutes("+0000"), Some(0));
         assert_eq!(offset_minutes("0700"), None);
         assert_eq!(offset_minutes("+07"), None);
+    }
+
+    fn sh(script: &str) -> Vec<String> {
+        ["sh", "-c", script].map(str::to_owned).into()
+    }
+
+    /// Install's own commands are bounded: one that stalls, or ends while a
+    /// child it left holds its pipes, is an error within the bound naming
+    /// the command, never a hang.
+    #[test]
+    fn install_commands_never_wait_past_their_bound() {
+        let second = Duration::from_secs(1);
+        for script in ["sleep 30", "sleep 30 & echo ok"] {
+            let started = Instant::now();
+            let why = output_of_within(&sh(script), second).unwrap_err();
+            assert!(started.elapsed() < Duration::from_secs(3), "{script}");
+            assert_eq!(
+                why,
+                format!(
+                    "sh -c {script}: did not end within 1 s: it ran on, or a child it left held its output"
+                )
+            );
+            let started = Instant::now();
+            let why = run_within(Command::new("sh").args(["-c", script]), second).unwrap_err();
+            assert!(started.elapsed() < Duration::from_secs(3), "{script}");
+            assert!(why.contains("did not end within 1 s"), "{why}");
+            assert!(why.starts_with("\"sh\" \"-c\""), "{why}");
+        }
+    }
+
+    #[test]
+    fn install_commands_say_their_stderr_or_give_their_stdout() {
+        assert_eq!(
+            output_of_within(&sh("echo '  no such unit  ' >&2; exit 1"), JOURNAL_WITHIN),
+            Err("sh -c echo '  no such unit  ' >&2; exit 1: no such unit".to_owned())
+        );
+        let failing = run_within(
+            Command::new("sh").args(["-c", "echo ' bad ' >&2; exit 1"]),
+            JOURNAL_WITHIN,
+        );
+        assert_eq!(
+            failing,
+            Err("\"sh\" \"-c\" \"echo ' bad ' >&2; exit 1\": bad".to_owned())
+        );
+        assert_eq!(
+            output_of_within(&sh("echo ok"), JOURNAL_WITHIN),
+            Ok("ok\n".to_owned())
+        );
+        assert_eq!(
+            run_within(Command::new("sh").args(["-c", "echo ok"]), JOURNAL_WITHIN),
+            Ok(())
+        );
     }
 }
