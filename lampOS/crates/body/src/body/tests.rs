@@ -7080,6 +7080,34 @@ fn a_hand_lets_go_of_the_head_and_base_only_and_a_standing_lamp_stays_up() {
     assert!(after.iter().all(|g| g.stand > 0.9), "{report:?}");
 }
 
+/// #3702 review: during a hand's rest the arm is still held, and keeps the
+/// overload rule. A person pressing the limp head down into a standing lamp
+/// strains the shoulder (700, over the 480 cut-off) from 3.5 s to 7.5 s,
+/// inside the hand's rest (from about 2.5 s): it trips as an overload, all
+/// five are let go, and the arm's peak load is in the report.
+#[test]
+fn a_strained_arm_during_a_hands_rest_lets_go_of_all_five_as_an_overload() {
+    let (lamp, report, _) = let_go_standing(true, false, Some((3.5, 7.5)));
+    assert_eq!(report.released.len(), 2, "{report:?}");
+    assert_eq!(
+        report.released[1].joint,
+        Joint::BasePitch.name(),
+        "{report:?}"
+    );
+    assert!(report.released[1].load >= 480, "{report:?}");
+    assert!(report.released[1].seconds < 7.5, "{report:?}");
+    let off: Vec<u8> = lamp
+        .registers
+        .iter()
+        .filter(|(_, address, data)| *address == 40 && data == &vec![0])
+        .map(|(id, _, _)| *id)
+        .collect();
+    for joint in Joint::ALL {
+        assert!(off.contains(&joint.id()), "{joint}: {off:?}");
+    }
+    assert!(report.arm_peak_load[0] >= 700, "{report:?}");
+}
+
 /// A shoulder left up by a power cut that does not come down when it is
 /// lowered: the run ends there, held where it is, and the whole lamp is
 /// let go, as any surprise.
