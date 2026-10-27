@@ -2304,3 +2304,37 @@ order; a test-only closed reader proves replay without filesystem fallback.
 The [read-boundary contract](head-touch-inputs.md) records why drop-in absence,
 membership, custom pins and conditional calibration remain dependencies. It
 adds no actual collector, authentication, snapshot freshness or writer guard.
+
+### Read-only bounded capture for head-pair policy (#3689)
+
+A separate, unwired collector now supplies that policy with descriptor-anchored,
+bounded text and directory observations. It retains regular bytes/metadata,
+explicit missing-leaf/ancestor facts, bounded link chains, actual null-mask
+metadata and complete directory membership. Evaluator output is returned only
+after a fresh comparison; provider errors poison collection even if caught.
+Closed replay has no filesystem fallback and offers explicit read-only
+revalidation for a future immediately-before-write boundary. Ordinary wrappers,
+policy and call order remain unchanged.
+
+Stable trusted root ancestry/ownership, excluded writers, complete evaluation
+and candidate/output binding remain caller responsibilities. No file writes,
+authentication, admission, helper execution, bootstrap or restoration are added;
+this is neither an atomic snapshot nor a whole-round/systemd configuration proof.
+The [capture contract](head-touch-capture.md) records compatibility, conservative
+collector-only bounds and unverified deployment coverage. The original
+`5d866fd9c/992303fc8` full Mac attempt remains failed at **520/8/6 ignored**;
+six fixture permission errors and two unchanged World failures are retained,
+with the latter causes unestablished. The subsequent explicit-permission source
+on `3c9838fea6` remains **530/1/6 ignored**: this Mac filesystem returned `EILSEQ`
+while creating a raw-name fixture before the collector ran. The current
+`1d97a2c6d0` source keeps portable exact-byte closed replay and real invalid-UTF8
+content refusal everywhere, with physical raw-name capture/revalidation in an
+explicit Linux subsection that native ARM64 CI must execute before Ready.
+No whole test is ignored and production behavior is unchanged. The first
+fixture-corrected full Mac gate on `0d1d1f2b94` passed **531/0/6 ignored**, all
+52 required controls once, with formatting, strict Update Clippy, source/config
+guards and actual/preserved executable hashes closed. The validation prose was
+finalized afterward without changing Rust/test bytes; it adds no runtime credit.
+Neither failed result is waived or diagnosed by the pass. Mac physical raw-name
+capture remains unverified, native ARM64 must run the Linux subsection, and no
+device/bootstrap/restore acceptance is claimed here.
