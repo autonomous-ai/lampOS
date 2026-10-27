@@ -41,3 +41,15 @@ cho biết lamp đã xem ghi chú, không cho biết lamp đã dùng nó, nên c
 như «tránh món đó» có thể còn lại. `forget_all` và `forget_person` vẫn xóa
 toàn bộ phạm vi được yêu cầu; mọi lệnh quên vẫn vô hiệu hóa ghi chú phiên và
 lượt ghi đang chờ.
+
+## Nhật ký dừng sau một lệnh quên, rồi chạy lại
+
+Một lệnh quên đã xác nhận dừng việc ghi nhật ký của voice. Đây là chốt chặn
+riêng tư có chủ đích: lời và id của điều bị quên có thể vẫn nằm trong ngữ cảnh
+của provider, nên không lượt nào ghi sau đó được liên kết tới chúng. Nhưng không
+có nhật ký thì không có `conversation_end` và không có lượt quan sát, nên khi
+không bật `LAMP_MEMORY_JOURNAL_RESUMES`, một lệnh quên làm lượt quan sát ngừng
+cho tới khi voice khởi động lại (lamp-06c1, 27/10, N13 của Friday, #3504). Unit
+sản phẩm nay bật công tắc này cạnh `LAMP_MEMORY_OBSERVE`: phiên kế tiếp được mở
+mới, không tiếp nối phiên cũ, ghi nhật ký trở lại, và cuộc trò chuyện kế tiếp có
+lượt quan sát của nó. Vẫn còn nợ một lần kiểm tra trên lamp.
