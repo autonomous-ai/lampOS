@@ -1,5 +1,14 @@
 # Tests work log
 
+## 2026-10-27 21:33 — current updater native proof passes; acceptance remains with holder
+
+Ready for lamp-voice: no (#3843 current reads and device acceptance pending).
+
+[Current updater native proof](verification/tests-3843-current-native-20261027/) records ARM40517327034 and Linux40517326953 success on bd0e0371e: **7,779 unique PASS, zero bad/selected-unrun,53 aggregate skips**. Current Round is215 passes; all fourteen authored regressions pass once. Actual8146824a7 preview [992303fc8,bd0e0371e] exactly matches the authored tree and all three full blobs. The verified checksum manifest reports updater30b5d00c… instead of refusedb35b4c9b…; no ARM binary member was read or executed on the Mac.
+
+#3845 remains ready at536fc9c3e; reviewer-lead found no issue and Reviewer-two is reading. #3843 stays draft pending current reads and #3796 holder acceptance. Queue reports stable7632/bf6, not a successful Main992 publication or a verified52e6 update. No device outcome has been reported to Tests. The Reader fixture gates and Fourth's requested kept-resync disposition are next; Blue owns the Policy whole-line repair, so it is not duplicated.
+
+
 ## 2026-10-27 21:22 — Body current native gates pass; ready for readers
 
 Ready for lamp-voice: yes (#3845,536fc9c3e; current reader marks pending).
