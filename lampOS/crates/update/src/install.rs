@@ -15,7 +15,9 @@
 //! reserved `exit-note.conf` is always install's. Store's `store.conf` is
 //! installed as a setting and keeps a lamp's edits. A product setting
 //! changed on the lamp since an install wrote it is the lamp's own too, and
-//! is kept ([`settings`]).
+//! is kept ([`settings`]). A kept drop-in or setting that turns a product
+//! switch off (`LAMP_CLOUD=off`) is kept as well, and named
+//! ([`switches_off`]).
 use crate::{
     fetch::{Channel, Fetch},
     manifest::{self, Manifest},
@@ -1438,6 +1440,11 @@ pub fn install(
         &mut |state| save(&records, state),
     )?;
     own_pins_follow_build(config, &defaults, &mut changed, say)?;
+    // The units and settings are written; what is kept beside them may
+    // still turn a product switch off. Said, never changed.
+    for line in switches_off(config, &defaults) {
+        say(&line);
+    }
     reset_plan(
         config,
         manifest.sequence,
@@ -1622,6 +1629,65 @@ fn save(records: &Records, state: &State) -> Result<(), String> {
     records
         .save_state(state)
         .map_err(|error| format!("the state cannot be written: {error}"))
+}
+
+/// Every kept drop-in of a product unit (all but the reserved
+/// `exit-note.conf`), and every environment file the unit and those
+/// drop-ins name, that turns one of the unit's switches off
+/// (crate::switches): said by install, and left as it is. A lamp from its
+/// builder days with `Environment=LAMP_CLOUD=off` in a drop-in would
+/// otherwise come up off the cloud after an install to stable with nothing
+/// said. A file of `defaults` is said as a setting, edited when it is not
+/// the default's bytes. A file that cannot be read is passed over.
+pub fn switches_off(config: &Install, defaults: &[(&str, &str)]) -> Vec<String> {
+    use crate::switches::{environment, environment_file, environment_files, said, turned_off};
+    let mut lines = Vec::new();
+    for (name, text) in PRODUCT {
+        let switches = crate::switches::switches(text);
+        if switches.is_empty() {
+            continue;
+        }
+        let folder = format!("{UNITS}{name}.d/");
+        let mut drop_ins: Vec<String> = fs::read_dir(config.on(&folder))
+            .into_iter()
+            .flatten()
+            .filter_map(|entry| entry.ok()?.file_name().into_string().ok())
+            .filter(|file| file.ends_with(".conf") && file != "exit-note.conf")
+            .collect();
+        drop_ins.sort();
+        // The unit's environment files, then each drop-in's, in the order
+        // systemd reads them; an empty `EnvironmentFile=` clears the list.
+        let (_, mut files) = environment_files(text);
+        for file in drop_ins {
+            let path = format!("{folder}{file}");
+            let Ok(kept) = fs::read_to_string(config.on(&path)) else {
+                continue;
+            };
+            for how in turned_off(&switches, &environment(&kept)) {
+                lines.push(said(&format!("kept drop-in {path}"), &how));
+            }
+            let (cleared, named) = environment_files(&kept);
+            if cleared {
+                files.clear();
+            }
+            files.extend(named);
+        }
+        for path in files {
+            let Ok(kept) = fs::read_to_string(config.on(&path)) else {
+                continue;
+            };
+            let what = match defaults.iter().find(|(setting, _)| *setting == path) {
+                Some((_, default)) if *default != kept => "edited setting",
+                Some(_) => "setting",
+                None => "environment file",
+            };
+            for how in turned_off(&switches, &environment_file(&kept)) {
+                lines.push(said(&format!("{what} {path}, read by {name},"), &how));
+            }
+        }
+    }
+    lines.dedup();
+    lines
 }
 
 /// The product's settings, from `defaults` (path, bytes): each written

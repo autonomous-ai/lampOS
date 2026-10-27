@@ -890,6 +890,25 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
    install's only by such a record is recorded as install's before the next
    run's own intent takes the record's place, so two failed runs in a row
    lose nothing either (the reviewer on #815, 21:42).
+   With the units and settings written, install names every kept file that
+   turns a product switch off, and changes none of them. A product switch
+   is a variable a product unit sets `on` in its `[Service]`
+   (`Environment=LAMP_CLOUD=on` in `lamp-cloud.service`), read from the units
+   themselves, so a new switch is covered with no list to keep. It reads each
+   product unit's kept drop-ins (`/etc/systemd/system/UNIT.d/*.conf`, all but
+   `exit-note.conf`), with several assignments on one line, quotes and an
+   empty `Environment=` (which clears the unit's own lines) read as systemd
+   reads them, and every `EnvironmentFile=` the unit and its drop-ins name
+   (store's `store.env` is lamp-cloud's), which systemd reads over
+   `Environment=`. A value other than `on` is said, at every run, so a lamp
+   from its builder days that moves to stable never comes up quietly off the
+   cloud:
+   `kept drop-in /etc/systemd/system/lamp-cloud.service.d/old.conf turns LAMP_CLOUD off ("off"); the product sets it on`,
+   `edited setting /etc/lampOS/skills/store.env, read by lamp-cloud.service, turns LAMP_CLOUD off ("off"); the product sets it on`
+   (a file that is not a setting is said as `environment file PATH`). A
+   drop-in that sets the switch `on`, or sets other variables, is not said;
+   a clean install says none. A path with a `%` specifier is not read.
+   Remove the file, or set the switch back `on`, to take it back.
 6. Writes `/etc/lampOS/zone.env` from the system's zone if it is not there,
    and again when it names another zone than the one the lamp was set up in
    (`/etc/timezone`): a lamp set up before setup wrote it kept the image's
@@ -1191,7 +1210,12 @@ lamp-update check-units --cat units.txt --image robots/lamp --variant pro
   the product's.
 - **Every drop-in** (a file under a `.d/` folder) is said with its text: on a
   product lamp each one is a finding. After the office extras go back, the
-  check must name `office.conf` and nothing else.
+  check must name `office.conf` and nothing else. A drop-in of a product unit
+  (or of a template's instance) that turns one of the unit's `on` switches
+  off says so after its text, as install does:
+  `drop-in /etc/systemd/system/lamp-cloud.service.d/old.conf turns LAMP_CLOUD off ("off"); the product sets it on`.
+  `systemctl cat` prints no `EnvironmentFile=`'s contents, so an edited
+  `store.env` is named only by install.
 - **Every lamp unit the product has no file for** is said (`not in the
   product`), and a product unit read from anywhere but
   `/etc/systemd/system/` (`not where install puts it`).

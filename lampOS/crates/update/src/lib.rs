@@ -9,7 +9,8 @@
 //! [`round`] is one round of an update, with all of them; and [`own`] is
 //! lamp-update switching itself, and putting itself back; [`models`] the
 //! models a build carries; [`apply`] the settings and tmpfiles it carries,
-//! written by `lamp-update-apply`.
+//! written by `lamp-update-apply`; [`switches`] the product's switches,
+//! and a kept file that turns one off.
 pub mod apply;
 pub mod check_units;
 pub mod fetch;
@@ -27,6 +28,7 @@ pub mod records;
 pub mod round;
 mod setup_lifecycle;
 pub mod status;
+pub mod switches;
 pub mod unit;
 pub mod world;
 
