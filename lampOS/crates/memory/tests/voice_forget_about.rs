@@ -9,6 +9,8 @@ use lamp_memory::{
     days_protocol,
     protocol::Answer,
     server::{Memory, Stopper},
+    store::Person,
+    tidy::{Category, Output, Proposal},
 };
 use lamp_voice::remember::{DaysClient, FORGET, RECALL, REMEMBER, switch_forget_about};
 use serde_json::{Value, json};
@@ -41,6 +43,10 @@ struct Fixture {
 
 impl Fixture {
     fn new(name: &str) -> Self {
+        Self::new_with(name, |_, _| {})
+    }
+
+    fn new_with(name: &str, seed: impl FnOnce(&mut Days, u64)) -> Self {
         let root = std::env::temp_dir().join(format!("lamp-mfa-{}-{name}", std::process::id()));
         let _ = fs::remove_dir_all(&root);
         DirBuilder::new().mode(0o700).create(&root).unwrap();
@@ -48,7 +54,7 @@ impl Fixture {
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_millis() as u64;
-        let store = Days::open(
+        let mut store = Days::open(
             Options {
                 dir: root.join("store"),
                 keep_days: 30,
@@ -57,6 +63,7 @@ impl Fixture {
             now,
         )
         .unwrap();
+        seed(&mut store, now);
         let socket = root.join("m.sock");
         let server = Server::bind(&socket).unwrap();
         let stop = server.stopper();
@@ -72,6 +79,67 @@ impl Fixture {
             worker: Some(worker),
         }
     }
+}
+
+/// An unknown guest can remove a personal fact that an older observation
+/// pass saved under the room's scope. The room session must have seen that
+/// observation; an unrelated room fact survives.
+#[test]
+fn an_unknown_guests_room_observation_is_forgettable() {
+    assert!(switch_forget_about(true));
+    let fixture = Fixture::new_with("guest-observation", |store, now| {
+        let room = Person::everyone();
+        let evidence = store
+            .append(&room, now - 1, "I'm allergic to nuts", "I see", &[])
+            .unwrap();
+        let job = store
+            .conversation_end(&room, &format!("c{now}"), &[evidence])
+            .unwrap();
+        store
+            .tidy_apply(
+                &room,
+                &job.job,
+                &Output {
+                    observations: vec![Proposal {
+                        text: "Allergic to nuts".into(),
+                        category: Category::Preference,
+                        source_ids: vec![evidence],
+                        supersedes: None,
+                        on: None,
+                    }],
+                },
+            )
+            .unwrap();
+        store
+            .remember(&room, now, "The plant needs water on Fridays")
+            .unwrap();
+    });
+    let client = DaysClient::new(fixture.socket.clone()).unwrap();
+    let note = client.told_for_session_within(1, None, false, BUDGET);
+    assert!(note.contains("Allergic to nuts"), "{note}");
+    let (told, ok) = client.run_for(&call(FORGET, json!({"about":"allergy"})), BUDGET, None);
+    assert!(
+        ok && told["forgotten"] == true && told["count"] == 1,
+        "{told}"
+    );
+    let db = rusqlite::Connection::open_with_flags(
+        fixture.root.join("store").join(lamp_memory::days::DATABASE),
+        rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
+    )
+    .unwrap();
+    let allergy_rows: u64 = db
+        .query_row(
+            "SELECT count(*) FROM entries WHERE person='everyone' AND (text LIKE '%Allerg%' OR heard LIKE '%allerg%')",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert_eq!(allergy_rows, 0);
+    drop(db);
+    assert_eq!(
+        kept(&client, None, "plant"),
+        ["The plant needs water on Fridays"]
+    );
 }
 
 impl Drop for Fixture {

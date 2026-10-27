@@ -1549,16 +1549,21 @@ fn run_call_with_scope(
                 heard_kept,
                 lease,
                 || match lease {
-                    // A keep in a line admitted as the room's before the
-                    // eyes named anyone goes to the keeper recorded at the
-                    // line's end: the known face named by then plus 300 ms,
-                    // none other seen speaking it (#2807); the room's else.
-                    Some(lease) if model.name == crate::remember::REMEMBER => {
+                    // A keep or single-item forget admitted as the room's
+                    // waits for the eyes' bounded late identity. A person
+                    // named by the line's end plus 300 ms gets their own
+                    // scope; otherwise the room's scope is used (#2807).
+                    Some(lease)
+                        if matches!(
+                            model.name.as_str(),
+                            crate::remember::REMEMBER | crate::remember::FORGET
+                        ) =>
+                    {
                         let started = std::time::Instant::now();
                         match lease.keeper_within(crate::memory_scope::KEEPER_WAIT) {
                             Some(person) => {
                                 eprintln!(
-                                    "lamp-voice: request {request}: a keep in a line admitted as the room's goes to the known face the eyes named by its end ({} ms)",
+                                    "lamp-voice: request {request}: a memory write in a line admitted as the room's goes to the known face the eyes named by its end ({} ms)",
                                     started.elapsed().as_millis()
                                 );
                                 crate::remember::run_scoped_for(
@@ -4841,5 +4846,77 @@ mod tests {
         let asked = kept_by_late_look("nobody", cache, || {});
         assert!(asked.get("person").is_none(), "{asked}");
         assert!(started.elapsed() < Duration::from_millis(1_200), "bounded");
+    }
+
+    /// The same late identity rule is used for a single-item forget. If
+    /// the eyes name a person during the 300 ms wait, the room is untouched;
+    /// otherwise the request goes to the room and is not silently refused.
+    #[test]
+    fn a_single_item_forget_waits_for_the_eyes_before_choosing_the_room() {
+        let forget = |name: &str,
+                      cache: std::sync::Arc<crate::memory_scope::FaceCache>,
+                      fill: Box<dyn FnOnce() + Send>| {
+            let socket = std::env::temp_dir()
+                .join(format!("forget-late-{name}-{}.sock", std::process::id()));
+            let _ = std::fs::remove_file(&socket);
+            let listener = UnixListener::bind(&socket).unwrap();
+            let served = std::thread::spawn(move || {
+                let (mut stream, _) = listener.accept().unwrap();
+                let mut line = String::new();
+                BufReader::new(stream.try_clone().unwrap())
+                    .read_line(&mut line)
+                    .unwrap();
+                stream.write_all(b"{\"ok\":true,\"removed\":1}\n").unwrap();
+                serde_json::from_str::<Value>(&line).unwrap()
+            });
+            let request = 2_808;
+            let owner = crate::memory_scope::RequestScope::looking_later(
+                crate::memory_scope::RequestKey {
+                    worker: lamp_turn_owner::BootId::new([0x29; 16]).unwrap(),
+                    session: 1,
+                    request,
+                },
+                cache.snapshot(std::time::Instant::now()),
+                cache,
+            );
+            fill();
+            let lease = owner.lease();
+            lease.record_keeper(lease.face_at_end(std::time::Instant::now()));
+            let settings = Settings {
+                memory: Some(socket.clone()),
+                ..Default::default()
+            };
+            let call = ToolCall {
+                id: "f1".into(),
+                name: crate::remember::FORGET.into(),
+                args: json!({}),
+            };
+            let told = answer_scoped(&settings, &call, request, false, &lease);
+            assert_eq!(told["forgotten"], true, "{told}");
+            let asked = served.join().unwrap();
+            std::fs::remove_file(socket).unwrap();
+            asked
+        };
+        let ann = crate::remember::person_id("Ann");
+        let cache = std::sync::Arc::new(crate::memory_scope::FaceCache::default());
+        let filled = cache.clone();
+        let face = std::env::temp_dir().join(format!("forget-late-face-{}", std::process::id()));
+        std::fs::write(&face, "Ann").unwrap();
+        let seen = crate::known_faces::FaceObservation::read(&face);
+        std::fs::remove_file(face).unwrap();
+        let asked = forget(
+            "known",
+            cache,
+            Box::new(move || {
+                std::thread::spawn(move || {
+                    std::thread::sleep(Duration::from_millis(80));
+                    filled.replace(filled.begin_refresh(), seen);
+                });
+            }),
+        );
+        assert_eq!(asked["person"], ann, "{asked}");
+        let cache = std::sync::Arc::new(crate::memory_scope::FaceCache::default());
+        let asked = forget("unknown", cache, Box::new(|| {}));
+        assert!(asked.get("person").is_none(), "{asked}");
     }
 }
