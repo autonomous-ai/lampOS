@@ -1,0 +1,42 @@
+[
+  {
+    "logical_evidence": "second-3907-830d-arm-final-run-20261028.json",
+    "raw_bytes": 12701,
+    "raw_sha256": "6ce061643b6bad97df89af30fe80c075fa93d47f3fc0d13b38a96fe34f26cc62"
+  },
+  {
+    "logical_evidence": "second-3907-830d-arm-final-jobs-20261028.json",
+    "raw_bytes": 8152,
+    "raw_sha256": "7f8e07727d2a0568354e70c094495d9750c4c4eb0ba3debff4d922e3b21c710b"
+  },
+  {
+    "logical_evidence": "second-3907-830d-arm-complete-20261028.log",
+    "raw_bytes": 1951741,
+    "raw_sha256": "8a20afa062f1459f9b16ea0940e9d6081006934ae0f0041fa4dc5ec870315a3e"
+  },
+  {
+    "logical_evidence": "second-3907-830d-arm-watch-20261028.log",
+    "raw_bytes": 47494,
+    "raw_sha256": "e818cf790b8e4cb9463c6fdf4ad53eca6b8cdbd20d5ceda5f532316b978c9cca"
+  },
+  {
+    "logical_evidence": "second-3907-830d-linux-final-run-20261028.json",
+    "raw_bytes": 12700,
+    "raw_sha256": "8eb216b071c94fcf830cf523a7dc8da86432eea1747e9df5bb4dba80c426484e"
+  },
+  {
+    "logical_evidence": "second-3907-830d-linux-final-jobs-20261028.json",
+    "raw_bytes": 3007,
+    "raw_sha256": "7dd161ee6d72ebb00c2ee8c9739b8aa96869253399c86253fc0d3f03f8f65331"
+  },
+  {
+    "logical_evidence": "second-3907-830d-linux-complete-20261028.log",
+    "raw_bytes": 98177,
+    "raw_sha256": "1b357569abe35a39d2d8f58b062a9b1af5317a6198696865bdcb27feececf482"
+  },
+  {
+    "logical_evidence": "second-3907-830d-linux-watch-20261028.log",
+    "raw_bytes": 6242,
+    "raw_sha256": "83304b8d4755b747a1ca2e3701524847f36be7f9438f529bc96df413429c2eb3"
+  }
+]

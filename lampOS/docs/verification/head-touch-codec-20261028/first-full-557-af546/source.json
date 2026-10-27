@@ -1,0 +1,65 @@
+{
+  "actual_Main": "af546143a9d30f3b3062bb7a6efbc215e3bfcef3",
+  "actual_tested_wip_parent": "42daccad67ada45d3ac65f0480c60609e38d9dea",
+  "all6_committed_bytes_modes_equal_actual557": true,
+  "combined_paths": [
+    "lampOS/crates/update/src/head_touch.rs",
+    "lampOS/crates/update/src/head_touch/capture.rs",
+    "lampOS/crates/update/src/head_touch/capture/codec.rs",
+    "lampOS/crates/update/src/head_touch/capture/codec/tests.rs",
+    "lampOS/crates/update/src/head_touch/capture/tests.rs",
+    "lampOS/docs/head-touch-capture.md",
+    "lampOS/docs/head-touch-codec.md",
+    "lampOS/docs/reuse-decisions.md",
+    "lampOS/docs/updates.md"
+  ],
+  "committed_exact_source": "749c74033c4d46b55ecf0a613e125c3478ee8d44",
+  "dependent_commits": [
+    "42daccad67ada45d3ac65f0480c60609e38d9dea",
+    "749c74033c4d46b55ecf0a613e125c3478ee8d44"
+  ],
+  "files": {
+    "lampOS/crates/update/src/head_touch/capture.rs": {
+      "bytes": 23567,
+      "mode": 420,
+      "sha256": "f177737a21e11401998617cb4baa65343f02d226bb4c84dcc1ca25c0cfb21140"
+    },
+    "lampOS/crates/update/src/head_touch/capture/codec.rs": {
+      "bytes": 69742,
+      "mode": 420,
+      "sha256": "38e5a525a710fa48c141d45a11f445b0a55f9867e1574e4679be4de500d3e4c3"
+    },
+    "lampOS/crates/update/src/head_touch/capture/codec/tests.rs": {
+      "bytes": 42099,
+      "mode": 420,
+      "sha256": "730c8b9b330d4386a810cc7a6e848a80d5aba490d34dce41c5b2ccc29f5a7d43"
+    },
+    "lampOS/docs/head-touch-codec.md": {
+      "bytes": 6615,
+      "mode": 420,
+      "sha256": "eb4dbb1d3e99c823c2518ef37b896f851746cc93d6083e0e8aab4a2fcd9fe6c0"
+    },
+    "lampOS/docs/reuse-decisions.md": {
+      "bytes": 152042,
+      "mode": 420,
+      "sha256": "427d4eca95fcabd8a09e986aa3eb3c693588d919b3e3f2790080c32d6ab6dc5e"
+    },
+    "lampOS/docs/updates.md": {
+      "bytes": 175594,
+      "mode": 420,
+      "sha256": "008c25ed4e4d36affbdfb4796a762aceabfa0c8392e329dfbfdeb33683a8a23e"
+    }
+  },
+  "final_source_snapshot_sha256": "8879000c054e8daa06f2115c52fe59387a3387997b7e8b55ec03a10a1419bf66",
+  "later_dadacc_carry_not_runtime_qualified": true,
+  "six_codec_paths": [
+    "lampOS/crates/update/src/head_touch/capture.rs",
+    "lampOS/crates/update/src/head_touch/capture/codec.rs",
+    "lampOS/crates/update/src/head_touch/capture/codec/tests.rs",
+    "lampOS/docs/head-touch-codec.md",
+    "lampOS/docs/updates.md",
+    "lampOS/docs/reuse-decisions.md"
+  ],
+  "source_count": 7506,
+  "source_snapshot_sha256": "8879000c054e8daa06f2115c52fe59387a3387997b7e8b55ec03a10a1419bf66"
+}

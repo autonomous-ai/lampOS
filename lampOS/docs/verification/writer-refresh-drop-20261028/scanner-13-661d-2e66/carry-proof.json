@@ -1,0 +1,23 @@
+{
+  "all_three_complete_blobs_modes_equal": true,
+  "backup_ref": "refs/heads/second/pid-qualified-f0f65-20261028",
+  "files": {
+    "lampOS/crates/update/src/writer_refresh.rs": "100644 blob 2dc0a4d026be3190755fc8b66793960648a381f1\tlampOS/crates/update/src/writer_refresh.rs",
+    "lampOS/crates/update/src/writer_refresh/tests.rs": "100644 blob c25d33e511f161f638595bccc36886f0f4a81698\tlampOS/crates/update/src/writer_refresh/tests.rs",
+    "lampOS/docs/settings-writer-refresh.md": "100644 blob 3932a4fa5195a15d94d4ee23d93122b566f2000c\tlampOS/docs/settings-writer-refresh.md"
+  },
+  "full_blobs_modes_equal": [
+    "lampOS/crates/update/src/writer_refresh.rs",
+    "lampOS/crates/update/src/writer_refresh/tests.rs",
+    "lampOS/docs/settings-writer-refresh.md"
+  ],
+  "gate": "UNRUN current 2e66; actual f0f65 qualification remains separate",
+  "inherited_upstream_changed_full_blobs": [],
+  "new_base": "2e66c1aded556f5f688dab729331eacb045eeffc",
+  "new_head": "661d566959f4326827e243ec8e010c7c3429431a",
+  "new_tree": "53f3962f2da9e512471ca09a8ec14a4456982366",
+  "old_base": "f0f65dc995e493c0c7fe13e47a84aba21d0381b2",
+  "old_head": "649a5f213b5559dc33282be844e5fc1ee007e918",
+  "ordered_authored_patch_id_equal": true,
+  "range_diff": "1:  649a5f213b = 1:  661d566959 lampOS: release writer leases when their acquiring owner drops"
+}

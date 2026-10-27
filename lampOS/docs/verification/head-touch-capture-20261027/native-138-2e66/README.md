@@ -1,0 +1,9 @@
+# Collector original native qualification on 13887/2e66
+
+PR #3892, offered13887cac6c4b8d636aeb0511749cd391bcb9ec28, authored base2e66c1aded556f5f688dab729331eacb045eeffc. Original attempt1 ARM40571406631/job122426271546 and Linux40571406638/job122426270725 succeed. Both actual checkouts a491dd55e75a8d02ae85c713723296978a515636 have ordered [2e66,13887] parents and complete tree0280b967fa672cc0fd2f351eda27ff5beea419a7 equal to the offered source.
+
+The dependency-selected native suite has7,820 unique PASS, zero bad/selected unrun and53 summary skips,70 selected binaries and120 excluded. All52 required controls pass once, including Linux physical raw names and both corrected same-descriptor/full-content functions.34 identical final echoes are excluded. Separate docs4, process13, relay1, promotion-helper25 and Python49/12/7 are not added. Pinned Linux formatting and strict workspace/all-target Clippy completed with an actual Update compiler marker; cache-save was skipped.
+
+Artifact12766157094 binds48 current production binaries and2 selected examples with complete SHA256SUMS inventory and AArch64 ELF checks. ZIP SHA256 dd25245429fa48f2031e6c49cc4d1b46fcf1485945d040edac8514c5a3d99edc matches API and upload log. No artifact binary was executed. Individual Nextest executable bytes are not uploaded; no such byte hashes are fabricated. Runtime binds exact checkout and case/package identities; production artifact provenance is separate.
+
+This packet qualifies only13887/2e66. Later collector carries and the separate codec do not inherit these runtime counts. Earlier failed6523 native/shared-assertion subcase and cause remain unestablished; earlier host failures remain unwaived. Mac physical raw-name filesystem support is unverified. No authenticated plan, authority/admission, writer effects, restoration, device or power-cut acceptance is claimed. New current-head external reader dispositions remain separate from internal source checks.

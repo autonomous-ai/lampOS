@@ -1,0 +1,120 @@
+{
+  "run": {
+    "id": 40569191455,
+    "run_attempt": 1,
+    "head_sha": "830d8a69534b454f26da9c0d16d9c8e90e8494d1",
+    "status": "completed",
+    "conclusion": "success",
+    "html_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40569191455",
+    "event": "pull_request"
+  },
+  "jobs": [
+    {
+      "id": 122418508466,
+      "name": "lampOS \u2014 clippy, every crate and target (x86 Linux)",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-27T19:26:57Z",
+      "completed_at": "2026-10-27T19:32:24Z",
+      "html_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40569191455/job/122418508466",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-10-27T19:26:57Z",
+          "completed_at": "2026-10-27T19:26:58Z"
+        },
+        {
+          "name": "system packages",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-10-27T19:26:58Z",
+          "completed_at": "2026-10-27T19:27:09Z"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-10-27T19:27:09Z",
+          "completed_at": "2026-10-27T19:27:19Z"
+        },
+        {
+          "name": "Rust 1.96.0",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-10-27T19:27:19Z",
+          "completed_at": "2026-10-27T19:27:26Z"
+        },
+        {
+          "name": "stable promotion formatting and strict Clippy",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-10-27T19:27:26Z",
+          "completed_at": "2026-10-27T19:27:36Z"
+        },
+        {
+          "name": "formatting (whole workspace, pinned Rust)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-10-27T19:27:36Z",
+          "completed_at": "2026-10-27T19:27:43Z"
+        },
+        {
+          "name": "restore the cache",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-10-27T19:27:43Z",
+          "completed_at": "2026-10-27T19:31:08Z"
+        },
+        {
+          "name": "unchanged source files get the cached build's times back",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8,
+          "started_at": "2026-10-27T19:31:08Z",
+          "completed_at": "2026-10-27T19:31:10Z"
+        },
+        {
+          "name": "clippy (every crate and target, warnings as errors)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9,
+          "started_at": "2026-10-27T19:31:10Z",
+          "completed_at": "2026-10-27T19:32:21Z"
+        },
+        {
+          "name": "save the cache",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 10,
+          "started_at": "2026-10-27T19:32:21Z",
+          "completed_at": "2026-10-27T19:32:21Z"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 20,
+          "started_at": "2026-10-27T19:32:21Z",
+          "completed_at": "2026-10-27T19:32:22Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 21,
+          "started_at": "2026-10-27T19:32:22Z",
+          "completed_at": "2026-10-27T19:32:22Z"
+        }
+      ]
+    }
+  ]
+}

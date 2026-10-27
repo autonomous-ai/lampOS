@@ -1,0 +1,38 @@
+{
+  "actual_compiler_evidence": [
+    {
+      "actual_gate": "second-recheck-scoped-nextest-f0f65-gate-20261028",
+      "compiler_artifact_count": 229,
+      "compiler_census_sha256": "bf2d8dcae58c8cbc039b503361195d3a5b8c77e6f0f95e8734a7bbc288f349c5",
+      "memory_or_independent_target_artifacts": 0
+    },
+    {
+      "actual_gate": "second-pid-scoped-f0f65-gate-20261028",
+      "compiler_artifact_count": 229,
+      "compiler_census_sha256": "eea92c3bf60836bbcfdd37c4c13f0508d85ff88101d963c4b5565371f2f74081",
+      "memory_or_independent_target_artifacts": 0
+    }
+  ],
+  "affected_repository_test_suite": "lamp-update::it full13 projected until actual list",
+  "changed_paths": [
+    "M\tlampOS/crates/memory/tests/voice_link_used.rs",
+    "M\tlampOS/crates/memory/tests/voice_observe_room.rs",
+    "M\tlampOS/docs/control.md"
+  ],
+  "fresh_target_outputs": "Reconcile each actual emitted Cargo JSON output plus explicitly retained donor outputs; do not label all ten freshly produced or current-source.",
+  "new_base": "2e66c1aded556f5f688dab729331eacb045eeffc",
+  "no219_or203_runtime_transfer": true,
+  "no_direct_Update_include_or_reference_to_changed_Memory_targets": true,
+  "normal_Rust_production_or_Update_compile_input_changed": false,
+  "old_base": "f0f65dc995e493c0c7fe13e47a84aba21d0381b2",
+  "ordinary_Update_or_unit_skill_install_model_manifest_config_changes": false,
+  "owned_path_overlap": false,
+  "required_gate": [
+    "fmt",
+    "strict all-target Update Clippy",
+    "JSON compile --test it",
+    "fresh discovery and exact it13 runtime once",
+    "complete source/tool/config/current-retained artifact guards"
+  ],
+  "source_scan_not_runtime_execution": "Update tests/it/scratch_paths.rs:138 reads src/tests of each crate; ci_paths.rs:88 reads crate Rust strings. Both changed Memory test files are new repository-reader inputs."
+}

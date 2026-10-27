@@ -1,0 +1,11 @@
+# Raw observation original ARM64 qualification
+
+PR #3858 head `d06614fbc1a2eb706f848f2a9515719a23cfbccb`, authored base `2e66c1aded556f5f688dab729331eacb045eeffc`. Original attempt-1 run [40571659698](https://github.com/autonomous-ai/lampOS/actions/runs/40571659698/attempts/1), job 122427168031, succeeded. Actual checkout `a58248d4ed4bbaeecd6515473e60046c5e28483e`, ordered parents `['2e66c1aded556f5f688dab729331eacb045eeffc', 'd06614fbc1a2eb706f848f2a9515719a23cfbccb']`, preview tree `7c7ab0224b46877dc550bea717dfdebb510f3516`. Complete authored/preview tree equality: `True`. No rerun, local compilation or device action was requested for this audit.
+
+Actual dependency-selected runtime: **7817 unique PASS / 0 FAIL, LEAK, TIMEOUT or selected unrun / 53 skipped**, across 70 binaries; 120 binaries skipped. 34 identical terminal echoes excluded. All 49 committed-source controls (raw observation, adapter, foundation, Head seam/mask and bound apply/Round receipts) passed once as subsets. The PICKED packages and exact actual scope are recorded in census.json. Whole-workspace production build is a separate stage.
+
+Separate scopes: workspace doctests 4 passed / 0 failed across 47 summaries; process 13 passes; relay 1 successes; promotion helper 25 passed / 0 failed; Python regression scopes [49, 12, 7], each with its own OK. These are not added to nextest. Selected custom-driver outcomes are already nextest subsets.
+
+Committed-source modes/blobs/SHA-256 and original metadata/log hashes accompany this packet. The log does not upload or hash individual nextest executable bytes; exact checkout and package/case identities bind that executed scope. Production artifact provenance is separate. Earlier local controller/parser and normal-libtest failures retain their original source and disposition; no waiver, root cause or runtime replay is inferred. Raw observation and its adapter remain unwired; this audit claims no complete HeadInputs collector, authenticated/projected executable plan, freshness/exclusion proof, writer activation, key/signing/promotion, device or power-cut acceptance. Skipped publication jobs remain skipped.
+
+No production archive has been downloaded or verified by this audit. Any later artifact verification is a separate addendum, not test-executable provenance. This is no release or deployment handoff.

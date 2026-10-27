@@ -1,0 +1,9 @@
+{
+  "head": "830d8a69534b454f26da9c0d16d9c8e90e8494d1",
+  "base": "f0f65dc995e493c0c7fe13e47a84aba21d0381b2",
+  "original_run": 40569191542,
+  "requested": false,
+  "artifact_payload_verified": false,
+  "binary_digest_inventory_or_test_driver_equivalence_claimed": false,
+  "reason": "Root explicitly kept optional archive reads separate from completed source/case admission; no download was requested for this head"
+}

@@ -1,0 +1,14 @@
+{
+  "all_complete_owned_blobs_modes_equal": true,
+  "base": "2e66c1aded556f5f688dab729331eacb045eeffc",
+  "dirty_paths": [],
+  "docs_and_custom": "UNRUN unchanged scopes; earlier exact-source qualifications separate",
+  "earlier_CI_runner": "0.9.149",
+  "head": "d06614fbc1a2eb706f848f2a9515719a23cfbccb",
+  "nextest_version": "0.9.150",
+  "old_negative_driver_sha256": "dda9c34c9552474010a0a1e6e904f1b8d91607b79552d9ab81afc6ef89dda8a9",
+  "scope": "Current raw 2e66 it13 only; previous f0f full affected scope remains separate; no full current package runtime transfer",
+  "source_count": 7506,
+  "tree": "7c7ab0224b46877dc550bea717dfdebb510f3516",
+  "working_patch_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+}

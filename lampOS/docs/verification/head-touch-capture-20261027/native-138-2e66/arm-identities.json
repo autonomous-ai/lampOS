@@ -1,0 +1,161 @@
+{
+  "authored_base": "2e66c1aded556f5f688dab729331eacb045eeffc",
+  "authored_preview_complete_tree_equal": true,
+  "authored_tree": "0280b967fa672cc0fd2f351eda27ff5beea419a7",
+  "head": "13887cac6c4b8d636aeb0511749cd391bcb9ec28",
+  "job": {
+    "completed_at": "2026-10-27T19:56:25Z",
+    "conclusion": "success",
+    "id": 122426271546,
+    "name": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+    "started_at": "2026-10-27T19:41:47Z",
+    "status": "completed"
+  },
+  "ordered_preview_parents": [
+    "2e66c1aded556f5f688dab729331eacb045eeffc",
+    "13887cac6c4b8d636aeb0511749cd391bcb9ec28"
+  ],
+  "pr": 3892,
+  "preview": "a491dd55e75a8d02ae85c713723296978a515636",
+  "preview_tree": "0280b967fa672cc0fd2f351eda27ff5beea419a7",
+  "raw_api_sha256": {
+    "arm-job-final.json": "018d774a20a7641b1866c0d87d486ef6dd2c69f6fc2dcbb632cdfbe4b856a695",
+    "arm-run-final.json": "a90c716ee9d9ebb3dd2bd0cbe0e5573f188bcac5777a09364dc1c8edcccf8070",
+    "authored-commit.json": "27131bc4600671594de715a872e7c6926d276f3cd1041bc965b3fe26fcdee745",
+    "preview-commit.json": "ed799127dc8d8a69eb3d9dba5bbb91e58e1489335ad6ee61f2a738864b4ebe3f"
+  },
+  "raw_log_sha256": "5bc9bb0079f493ba4350a8dd2db8eb5132be4c5cf289796962f2dca63cc3fbee",
+  "run": {
+    "conclusion": "success",
+    "created_at": "2026-10-27T19:41:41Z",
+    "event": "pull_request",
+    "head_sha": "13887cac6c4b8d636aeb0511749cd391bcb9ec28",
+    "html_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40571406631",
+    "id": 40571406631,
+    "run_attempt": 1,
+    "status": "completed",
+    "updated_at": "2026-10-27T19:56:26Z"
+  },
+  "steps": [
+    {
+      "conclusion": "success",
+      "name": "Set up job",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "system packages",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "Run actions/checkout@v4",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "publication failure tests (offline, no signing secret)",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "Rust 1.96.0",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "artifact provenance regression (offline, disposable Cargo workspace)",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "stable promotion tests (offline, disposable test key)",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "restore the cache",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "unchanged source files get the cached build's times back",
+      "status": "completed"
+    },
+    {
+      "conclusion": "skipped",
+      "name": "record fresh source times for a cold publication build",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "Run taiki-e/install-action@v2",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "build (release, the lamps' binaries)",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "every built lamp-* binary is classified for the lamp-os package",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "build the two selected artifact examples without filename collisions",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "publication CLI rehearsal (local test key and simulated GitHub only)",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "which crates a pull request tests",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "test (full run, every test one at a time; otherwise without the realtime group, in parallel)",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "doc tests and the own-harness tests (nextest runs neither)",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "export only current Cargo targets and their SHA-256",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "Run actions/upload-artifact@v4",
+      "status": "completed"
+    },
+    {
+      "conclusion": "skipped",
+      "name": "discard the isolated example target before saving the cache",
+      "status": "completed"
+    },
+    {
+      "conclusion": "skipped",
+      "name": "save the cache",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "Post Run actions/checkout@v4",
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "name": "Complete job",
+      "status": "completed"
+    }
+  ]
+}

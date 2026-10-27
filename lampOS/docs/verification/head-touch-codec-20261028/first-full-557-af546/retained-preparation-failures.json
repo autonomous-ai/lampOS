@@ -1,0 +1,28 @@
+{
+  "correction": "Only owned formatting, one narrowly reasoned non-test staged-method annotation and three equivalent idioms; no API/bounds/test weakening. Failures remain failures, not runtime passes.",
+  "first_2e66_preflight": {
+    "Cargo_stages": 0,
+    "live_Main_advanced_to": "af546143a9d30f3b3062bb7a6efbc215e3bfcef3",
+    "native_exit": 1,
+    "runtime": "UNRUN"
+  },
+  "first_af546_formatted": {
+    "fmt": 0,
+    "metadata": 0,
+    "owned_diagnostics": [
+      "as_bytes dead_code",
+      "collapsible_if",
+      "manual_is_multiple_of",
+      "manual_contains"
+    ],
+    "runtime": "UNRUN",
+    "source_guards": true,
+    "strict_Clippy": 101
+  },
+  "first_af546_unformatted": {
+    "fmt_check": 1,
+    "metadata": 0,
+    "source_guards": true,
+    "strict_Clippy_compile_list_runtime": "UNRUN"
+  }
+}

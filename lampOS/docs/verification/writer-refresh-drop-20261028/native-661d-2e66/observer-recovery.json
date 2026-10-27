@@ -1,0 +1,20 @@
+{
+  "original_run_id": 40571931208,
+  "attempt": 1,
+  "authored_head": "661d566959f4326827e243ec8e010c7c3429431a",
+  "original_observer_exit": 1,
+  "original_observer_failure": "GitHub API read timed out; follow-up API snapshot remained in_progress. No CI result was inferred.",
+  "original_aggregate_controller_exit": 0,
+  "aggregate_exit_was_not_CI_completion": true,
+  "recovery_observer_exit": 0,
+  "same_original_run_and_attempt": true,
+  "no_workflow_rerun_or_test_retry_requested": true,
+  "private_receipt_sha256": {
+    "first_watch": "0a93b8a287640dec90520f51c181ade5c7b235f89c840b883a523b54496caa86",
+    "first_watch_log": "214a2bf50e0e214705da7accae92c11f38df1277231db243acffbbd45af439da",
+    "nonterminal_API": "db88c11da19e4a8e3a3a6b6c4dce4f84a9602f45d78fffea56ff8716289af250",
+    "recovery_watch": "cc4c439b121f42c5d9fab822976c732bd42ca53349308a76879633f845d7479f",
+    "recovery_watch_log": "7f24bde0ee282ac2c131eeb7ed3b4e975d9276756e87a8e23a38fa9644dd6263",
+    "terminal_API": "4f3e44d0fed6daf09a1bd0dd16de5cf3aad82f36a91ba7ee14d283aa54455146"
+  }
+}
