@@ -1,0 +1,22 @@
+{
+  "head": "79a41b5c8190dda1e4a7c56f072cde315b97315d",
+  "base": "82a62867cc1bcbbc4b0848519c6757f623d112ce",
+  "tree": "5a83820414ebc325a070a44254ba63c04c4c00ed",
+  "equal_original_passed_preview": "0587aef11765096d809f7e7f69bd0d46c262cb87",
+  "full_tree_equal": true,
+  "five_owned_files_blobs_modes_equal_old40ad": true,
+  "five_files": [
+    ".github/scripts/lampos-publish-cli-test.py",
+    ".github/scripts/lampos-publish-test.py",
+    ".github/scripts/lampos-publish.py",
+    ".github/workflows/lampos-arm64.yml",
+    "lampOS/docs/updates.md"
+  ],
+  "range_diff": "1:  40ad5f445 = 1:  79a41b5c8 lampOS: require protected release authorization for tested commits",
+  "local_code_unchanged": "Prior51/7 local results remain40ad-bound; current complete tree equals actually passed82/40ad original preview. No local runtime replay.",
+  "native": "Original40579301593 remains40ad-bound; new current original required and pending",
+  "limits": [
+    "No credential provisioning/value access or live release",
+    "No workflow rerun, device action or Mac ARM64 link"
+  ]
+}
