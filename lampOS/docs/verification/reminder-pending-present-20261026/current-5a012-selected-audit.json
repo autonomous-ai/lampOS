@@ -1,0 +1,294 @@
+{
+  "all32_integrated_owned_blobs_equal": true,
+  "authors_messages_preserved": true,
+  "base": "1fb93206e4a6c26d35c801b3472a5af179231881",
+  "counts": {
+    "failed": 0,
+    "ignored": 0,
+    "passed": 23
+  },
+  "hashes": {
+    "after-source.json": "1a8ec022ffad01a3d0a7df0e72e9b772480fa3234f0a71081235cd2873292cd3",
+    "audit-final.py": "2b61e2a03189d01d7ec8f292bd1d9d2629174ea28e0fb4a902d69dc7e63f37f2",
+    "before-source.json": "2f3efc5ad56d6e2c32b67689194cdff19dba2d89b2340aa8c9c7d47e0b0c0379",
+    "final-plan.json": "6a9e672e7d48df4dbc8805968069d07fe1c53b4764a48cf4dfec9b2f481bf4cb",
+    "final.terminal.json": "cbbe6e9a22a12774247dbcafa6a0396e1fd0788c1077c9fe110986ea59de8c59",
+    "range-diff.txt": "6a8d210a305642fe6d10c959332bf1f6d80fe401bd60f817d166dea02f331002",
+    "run-final.py": "d7ff20890e4a793f8ec6564fc8df37b192b8d7ddc29c94af45946c0fbb6c04f2",
+    "selected-dependency-feature-review.json": "273d8a30ef6b64390dedaec547658d8eab0bfaea30372c57d0bba744d834e7a4",
+    "selected-emitted-features-review.json": "1b71af7c8903a72b33d4438183674d50fbc9d03f118043979633548ec93b2432",
+    "source-after-gate.json": "16806b6e63ac2069802ba66d2d50dcdea49340fdd841465d60dc8cd613a5f6a9",
+    "source-before-gate.json": "16806b6e63ac2069802ba66d2d50dcdea49340fdd841465d60dc8cd613a5f6a9"
+  },
+  "head": "5a01229e704dc40d278c887c722eb8bac775102b",
+  "holds": [],
+  "limits": [
+    "Current fmt/strict13Clippy + two exact Cargo selections totaling23 cases only.",
+    "a3/e362 small23 and older6bb/4fcd native qualifications remain historical and separate;296 never executed.",
+    "No current native/device/physical-latency acceptance; Root owns publishing and x86 native CI gate."
+  ],
+  "no_workspace_build_full13_no_run_or_broad296": true,
+  "post_execution_artifacts": [
+    {
+      "compiler_features": [],
+      "compiler_fresh": false,
+      "path": "<WORKSPACE>/.claude/worktrees/third-reminder-dedicated-target/debug/deps/lamp_skills-c6f44302f3b2c78f",
+      "post_execution_sha256": "14510956c5ec5caea6e49095bc730ca71c5fb2f42940896916f73c27af6f048b",
+      "scope": "Cargo compiler record and standard Cargo execution; hash observed after execution only, no pre-execution preimage claim.",
+      "stage": "test-lib",
+      "target": "lamp_skills"
+    },
+    {
+      "compiler_features": [],
+      "compiler_fresh": false,
+      "path": "<WORKSPACE>/.claude/worktrees/third-reminder-dedicated-target/debug/deps/it-46363ab9699809b5",
+      "post_execution_sha256": "a0fc3daece0725ff9e278c63f475e3b8fd44e404e8ab2f448f49f1707065bc86",
+      "scope": "Cargo compiler record and standard Cargo execution; hash observed after execution only, no pre-execution preimage claim.",
+      "stage": "test-it",
+      "target": "it"
+    }
+  ],
+  "range_diff": "1:  eafd736f9 = 1:  00035b18a lampOS: rearm reminder chances on changed work\n2:  4937cc3e2 = 2:  75d3df50c lampOS: keep face-count guards with changed-work triggers\n3:  a3e5f16a8 = 3:  5a01229e7 lampOS: redact a local path from reminder evidence\n",
+  "required_witnesses": {
+    "skills::every_skill_folder_passes_its_own_recorded_tests": true,
+    "skills::reminder_pending::a_changes_trigger_keeps_face_count_as_a_fresh_eligibility_guard": true,
+    "skills::reminder_pending::a_changes_trigger_keeps_independent_while_paths": true,
+    "skills::reminder_pending::a_changes_trigger_reads_a_bounded_tuple_on_another_topic": true,
+    "skills::reminder_pending::a_changes_trigger_refuses_selected_while_path_overlap": true,
+    "skills::reminder_pending::a_schedule_ask_only_moves_when_voice_begins_it": true,
+    "skills::reminder_pending::a_talk_rearms_even_while_a_selected_trigger_value_is_invalid": true,
+    "skills::reminder_pending::a_valid_empty_schedule_rearms_after_an_invalid_selected_trigger_value": true,
+    "skills::reminder_pending::core_reminders_can_request_again_after_talk_with_pending_still_positive": true,
+    "skills::reminder_pending::core_reminders_coalesce_queue_changes_and_ignore_renewal_metadata": true,
+    "skills::reminder_pending::core_reminders_keep_readiness_and_enablement_gates_on_repeated_chances": true,
+    "skills::reminder_pending::core_reminders_keep_the_change_snapshot_across_unchanged_reload": true,
+    "skills::reminder_pending::core_reminders_notice_a_brief_talk_between_schedule_heartbeats": true,
+    "skills::reminder_pending::core_reminders_rearm_after_source_or_condition_expiry": true,
+    "skills::reminder_pending::existing_trigger_modes_keep_their_heartbeat_behavior": true,
+    "skills::reminder_pending::invalid_selected_choice_values_do_not_rearm_a_changes_snapshot": true,
+    "skills::reminder_pending::invalid_selected_trigger_values_do_not_rearm_a_reminder_snapshot": true,
+    "skills::reminder_pending::invalid_selected_values_do_not_replace_or_rearm_a_reminder_snapshot": true,
+    "skills::reminder_pending::repeated_schedule_chances_keep_one_waiting_runner_and_no_look": true,
+    "skills::reminder_pending::unchanged_held_reminder_has_one_chance_across_sixty_heartbeats": true,
+    "store::a_builds_key_in_the_skills_folder_wins_and_rotates_and_a_damaged_one_refuses": true,
+    "tests::a_change_trigger_requires_a_scalar_comparison": true,
+    "tests::a_change_trigger_requires_bounded_paths_and_compatible_options": true
+  },
+  "selected_emitted_feature_review": {
+    "after_package_ids": 299,
+    "before_package_ids": 299,
+    "emitted_feature_changes": [],
+    "method": "Actual13-selected-package all-target Clippy compiler-artifact feature vectors by exact package ID; separate from whole-workspace metadata union.",
+    "no_source_equivalence_claim": true
+  },
+  "source_unchanged": true,
+  "stages": [
+    {
+      "cleanup": [],
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "process_group": "absent",
+      "reaped": true,
+      "returncode": 0,
+      "stage": "fmt",
+      "timed_out": false
+    },
+    {
+      "cleanup": [],
+      "log_sha256": "6abe4dde8359f898c759a8d6466aee3b79bec5598925899eca751f42de2956b9",
+      "process_group": "absent",
+      "reaped": true,
+      "returncode": 0,
+      "stage": "clippy",
+      "timed_out": false
+    },
+    {
+      "cleanup": [],
+      "log_sha256": "f495459d8c4ee784fa5eced3f3a1363ffa789d5fc33c65688ed48ff6ff99f38c",
+      "process_group": "absent",
+      "reaped": true,
+      "returncode": 0,
+      "stage": "test-lib",
+      "timed_out": false
+    },
+    {
+      "cleanup": [],
+      "log_sha256": "472eb1f6ca66d092ff315cf8d281a79706aceb7fba33010a2828541011560bb5",
+      "process_group": "absent",
+      "reaped": true,
+      "returncode": 0,
+      "stage": "test-it",
+      "timed_out": false
+    }
+  ],
+  "status": "VERIFIED_FINAL_CLEAN_REMINDER_CARRY23",
+  "test_results": [
+    {
+      "cases": {
+        "tests::a_change_trigger_requires_a_scalar_comparison": [
+          {
+            "line": 262,
+            "outcome": "ok"
+          }
+        ],
+        "tests::a_change_trigger_requires_bounded_paths_and_compatible_options": [
+          {
+            "line": 263,
+            "outcome": "ok"
+          }
+        ]
+      },
+      "log_sha256": "f495459d8c4ee784fa5eced3f3a1363ffa789d5fc33c65688ed48ff6ff99f38c",
+      "stage": "test-lib",
+      "summaries": [
+        {
+          "failed": 0,
+          "ignored": 0,
+          "passed": 2,
+          "status": "ok"
+        }
+      ]
+    },
+    {
+      "cases": {
+        "skills::every_skill_folder_passes_its_own_recorded_tests": [
+          {
+            "line": 244,
+            "outcome": "ok"
+          }
+        ],
+        "skills::reminder_pending::a_changes_trigger_keeps_face_count_as_a_fresh_eligibility_guard": [
+          {
+            "line": 245,
+            "outcome": "ok"
+          }
+        ],
+        "skills::reminder_pending::a_changes_trigger_keeps_independent_while_paths": [
+          {
+            "line": 246,
+            "outcome": "ok"
+          }
+        ],
+        "skills::reminder_pending::a_changes_trigger_reads_a_bounded_tuple_on_another_topic": [
+          {
+            "line": 247,
+            "outcome": "ok"
+          }
+        ],
+        "skills::reminder_pending::a_changes_trigger_refuses_selected_while_path_overlap": [
+          {
+            "line": 248,
+            "outcome": "ok"
+          }
+        ],
+        "skills::reminder_pending::a_schedule_ask_only_moves_when_voice_begins_it": [
+          {
+            "line": 249,
+            "outcome": "ok"
+          }
+        ],
+        "skills::reminder_pending::a_talk_rearms_even_while_a_selected_trigger_value_is_invalid": [
+          {
+            "line": 264,
+            "outcome": "ok"
+          }
+        ],
+        "skills::reminder_pending::a_valid_empty_schedule_rearms_after_an_invalid_selected_trigger_value": [
+          {
+            "line": 265,
+            "outcome": "ok"
+          }
+        ],
+        "skills::reminder_pending::core_reminders_can_request_again_after_talk_with_pending_still_positive": [
+          {
+            "line": 266,
+            "outcome": "ok"
+          }
+        ],
+        "skills::reminder_pending::core_reminders_coalesce_queue_changes_and_ignore_renewal_metadata": [
+          {
+            "line": 267,
+            "outcome": "ok"
+          }
+        ],
+        "skills::reminder_pending::core_reminders_keep_readiness_and_enablement_gates_on_repeated_chances": [
+          {
+            "line": 268,
+            "outcome": "ok"
+          }
+        ],
+        "skills::reminder_pending::core_reminders_keep_the_change_snapshot_across_unchanged_reload": [
+          {
+            "line": 269,
+            "outcome": "ok"
+          }
+        ],
+        "skills::reminder_pending::core_reminders_notice_a_brief_talk_between_schedule_heartbeats": [
+          {
+            "line": 270,
+            "outcome": "ok"
+          }
+        ],
+        "skills::reminder_pending::core_reminders_rearm_after_source_or_condition_expiry": [
+          {
+            "line": 271,
+            "outcome": "ok"
+          }
+        ],
+        "skills::reminder_pending::existing_trigger_modes_keep_their_heartbeat_behavior": [
+          {
+            "line": 272,
+            "outcome": "ok"
+          }
+        ],
+        "skills::reminder_pending::invalid_selected_choice_values_do_not_rearm_a_changes_snapshot": [
+          {
+            "line": 273,
+            "outcome": "ok"
+          }
+        ],
+        "skills::reminder_pending::invalid_selected_trigger_values_do_not_rearm_a_reminder_snapshot": [
+          {
+            "line": 274,
+            "outcome": "ok"
+          }
+        ],
+        "skills::reminder_pending::invalid_selected_values_do_not_replace_or_rearm_a_reminder_snapshot": [
+          {
+            "line": 275,
+            "outcome": "ok"
+          }
+        ],
+        "skills::reminder_pending::repeated_schedule_chances_keep_one_waiting_runner_and_no_look": [
+          {
+            "line": 276,
+            "outcome": "ok"
+          }
+        ],
+        "skills::reminder_pending::unchanged_held_reminder_has_one_chance_across_sixty_heartbeats": [
+          {
+            "line": 292,
+            "outcome": "ok"
+          }
+        ],
+        "store::a_builds_key_in_the_skills_folder_wins_and_rotates_and_a_damaged_one_refuses": [
+          {
+            "line": 293,
+            "outcome": "ok"
+          }
+        ]
+      },
+      "log_sha256": "472eb1f6ca66d092ff315cf8d281a79706aceb7fba33010a2828541011560bb5",
+      "stage": "test-it",
+      "summaries": [
+        {
+          "failed": 0,
+          "ignored": 0,
+          "passed": 21,
+          "status": "ok"
+        }
+      ]
+    }
+  ],
+  "tree": "e85ec88cba03ace20ca1b7df9099af6cbb38ee1f",
+  "private_receipt_sha256": "d5610fb1792f1d259c153482db6200cfc5d26ba0e58992e8c48339c2983d47a8"
+}

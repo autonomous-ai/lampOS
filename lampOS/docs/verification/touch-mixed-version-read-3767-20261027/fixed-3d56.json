@@ -1,0 +1,166 @@
+{
+  "head": "3d56da1852b17b97f857a6e55d493d7cf8fa6960",
+  "old_validator_head": "74f563606186fd48f3a062976fc6178fc68148d3",
+  "status": "BOUNDED_READ_OK_REVERSE_STROKE_HOLD_CLOSED",
+  "gates": {
+    "fmt": 0,
+    "strict_four_crate_all_target_clippy": 0
+  },
+  "actual_test_counts": {
+    "controls-touch": [
+      50,
+      0,
+      0
+    ],
+    "msgs-touch": [
+      19,
+      0,
+      0
+    ],
+    "expression-wake": [
+      1,
+      0,
+      0
+    ],
+    "voice-wake": [
+      5,
+      0,
+      0
+    ]
+  },
+  "commands": {
+    "fmt": [
+      "cargo",
+      "+1.96.0",
+      "fmt",
+      "--all",
+      "--check"
+    ],
+    "clippy": [
+      "cargo",
+      "+1.96.0",
+      "clippy",
+      "-q",
+      "--offline",
+      "--locked",
+      "-p",
+      "lamp-controls",
+      "-p",
+      "lamp-msgs",
+      "-p",
+      "lamp-expression",
+      "-p",
+      "lamp-voice",
+      "--all-targets",
+      "--message-format=short",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "controls-touch": [
+      "cargo",
+      "+1.96.0",
+      "test",
+      "-q",
+      "--offline",
+      "--locked",
+      "-p",
+      "lamp-controls",
+      "--test",
+      "it",
+      "--",
+      "touch::",
+      "--test-threads=1"
+    ],
+    "msgs-touch": [
+      "cargo",
+      "+1.96.0",
+      "test",
+      "-q",
+      "--offline",
+      "--locked",
+      "-p",
+      "lamp-msgs",
+      "--test",
+      "it",
+      "--",
+      "touch::",
+      "--test-threads=1"
+    ],
+    "expression-wake": [
+      "cargo",
+      "+1.96.0",
+      "test",
+      "-q",
+      "--offline",
+      "--locked",
+      "-p",
+      "lamp-expression",
+      "--lib",
+      "--",
+      "--exact",
+      "alive::routine_tests::a_hand_kept_on_the_head_wakes_a_sleeping_lamp",
+      "--test-threads=1"
+    ],
+    "voice-wake": [
+      "cargo",
+      "+1.96.0",
+      "test",
+      "-q",
+      "--offline",
+      "--locked",
+      "-p",
+      "lamp-voice",
+      "--lib",
+      "--",
+      "--exact",
+      "hand_controls::tests::a_hold_while_onboarding_is_under_way_asks_no_sleep",
+      "hand_controls::tests::a_hand_kept_on_a_sleeping_lamp_wakes_it_at_the_stroke_once_saved",
+      "hand_controls::tests::a_hand_kept_a_second_wakes_a_mute_left_by_the_restart_guard_but_never_a_persons",
+      "coordinator::tests::hand_controls::a_hold_while_onboarding_is_under_way_gets_no_breath_and_never_sleeps",
+      "onboarding::tests::the_walk_is_under_way_from_its_start_to_its_end_gaps_and_all",
+      "--test-threads=1"
+    ]
+  },
+  "all_sessions_terminal_source_unchanged_groups_absent": true,
+  "source_files_hashed": 7277,
+  "wire_probe": {
+    "exit": 0,
+    "observations": [
+      "EMITTED Stroke None: old and new readers accept; awake Stroke preserved",
+      "Intermediate Stroke Wake: still accepted by new reader; current writer no longer emits it",
+      "900 ms Tap Wake: old rejects, new accepts",
+      "400 ms Tap Wake: both accept (positive control)"
+    ],
+    "hashes": {
+      "old_controls.rs": "33ce8ce455a7dfeac9cc5050951146ff16e409d202c6c78452b6634d95f96a62",
+      "new_controls.rs": "08447f956d242ec8f3c80a349285f5d32236186268802e445a15370aade9687e",
+      "main.rs": "ba2f0024c2241dd32d3d14a119936c2de7cfa88ee537704ff6307e255d2555c6",
+      "run.log": "08f3ab1fcf6142cfc5c0d39cdb01b54b7ac63c7bc9c237e66cedec6c0bdce7e8"
+    }
+  },
+  "baseline_long_tap": {
+    "old_touch_source_sha256": "3985d9655fa6374d06fcbf1eacf55ae04be48ffc09dcdcb77219ff4e7dd44cb4",
+    "finding": "Old writer tap window stops below500ms and Stroke begins at1s;900msrelease had no Tap or Stroke. Old-reader rejection of the new long tap is unsupported new behavior, not loss of an existing event. Source proof only for that baseline."
+  },
+  "source_review": [
+    "Current writer emits Stroke/None again, accepted by both exact validators; existing awake Stroke preserved.",
+    "New Voice owns wake on accepted Head Stroke, with Receiver::request_wake requiring sleep or established restart-guard mute and fresh contact after the clear fence. Own privacy mute remains closed.",
+    "5current Voice cases cover onboarding inhibition, stroke wake once saved, no resleep from same contact, fault guard vs own mute and walk gaps."
+  ],
+  "audit_preparation": "An initial expected Controls count199 came from a broader peer selector; actual exact touch:: module is50. Count audit corrected before publication, with no test rerun.",
+  "logs_sha256": {
+    "fmt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "clippy": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "controls-touch": "6db1f7f3b8b3473585359a5e038c9edc78745058bd50abd34e7ab2219d7cfc9a",
+    "msgs-touch": "7e024868ca1459496cc06fee86a05479aecd16662d55bd72fa4877667816b440",
+    "expression-wake": "c614016ce6b7b0e18e16ba4ae12ff1971939a6794276f27a4de9be06d41efc32",
+    "voice-wake": "fc991dbcb8347b6783b049fa2ad0e9c7c8516d3c0e87a31b236412d923a116cc"
+  },
+  "limits": [
+    "75selectedcases only; no full Controls/Msgs/Expression/Voice packages.",
+    "No live Bus, device, played hm, acoustic latency, physical sleep/wake or motor acceptance.",
+    "Old af49 HOLD and observations retained separately; no prior gate relabeled current."
+  ],
+  "private_receipt_sha256": "0e8abc2a32a741ba9055b0d202cf08edd22fd75b22f9ed59ebb31312ea53c7de"
+}

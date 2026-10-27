@@ -1,0 +1,166 @@
+{
+  "all_jobs_terminal_exit0_groups_absent": true,
+  "commands": {
+    "exact-controls": [
+      "cargo",
+      "+1.96.0",
+      "test",
+      "-q",
+      "--offline",
+      "--locked",
+      "-p",
+      "lamp-voice",
+      "--lib",
+      "--",
+      "--exact",
+      "second_provider::tests::a_later_wait_sound_preserves_the_answer_window",
+      "second_provider::tests::a_later_wait_sound_does_not_delay_cancellation",
+      "second_provider::tests::a_slow_first_round_makes_one_soft_sound_and_waits_longer",
+      "second_provider::tests::the_wait_sound_comes_when_it_is_told",
+      "second_provider::tests::the_wait_sounds_time_is_milliseconds_in_its_bounds",
+      "second_provider::tests::the_wait_sounds_take_turns",
+      "second_provider::tests::a_slow_second_speech_piece_keeps_order_until_release_or_retirement",
+      "second_provider::tests::a_spoken_turn_is_heard_then_said_sentence_by_sentence_in_order",
+      "second_provider::tests::a_turn_spoken_over_stops_its_chat_and_speech_and_sends_nothing_more",
+      "second_provider::tests::a_line_begun_over_only_the_wait_sound_is_begun_in_the_clear",
+      "second_provider::tests::a_chat_not_begun_within_three_seconds_ends_the_turn_unanswered",
+      "second_provider::tests::a_round_after_a_tool_ran_is_not_given_up",
+      "second_provider::worker::tests::a_camera_close_and_a_mute_are_told_as_a_privacy_change",
+      "second_provider::worker::tests::a_new_owner_retires_the_old_turn_and_its_late_input",
+      "--nocapture",
+      "--test-threads=1"
+    ],
+    "fmt": [
+      "cargo",
+      "+1.96.0",
+      "fmt",
+      "--all",
+      "--check"
+    ],
+    "helper-lock": [
+      "cargo",
+      "+1.96.0",
+      "generate-lockfile",
+      "--offline"
+    ],
+    "helper-tests": [
+      "cargo",
+      "+1.96.0",
+      "test",
+      "-q",
+      "--offline",
+      "--locked",
+      "--",
+      "--nocapture",
+      "--test-threads=1"
+    ],
+    "voice-clippy": [
+      "cargo",
+      "+1.96.0",
+      "clippy",
+      "-q",
+      "--offline",
+      "--locked",
+      "-p",
+      "lamp-voice",
+      "--all-targets",
+      "--message-format=short",
+      "--",
+      "-D",
+      "warnings"
+    ]
+  },
+  "composition": {
+    "authored_head_is_pre3771_single_clip": true,
+    "diff_does_not_change_DownLine_body": true,
+    "required": "Compose additive startup/Start calls with the current repaired3771cache; do not replace itsmissing-onlyretry/fallback renderer. No composed-head runtime or repaired-aee execution is claimed by this standalone61scope."
+  },
+  "final_pr_head": "61a1f4c802df38a66f539ca09442f8473af14566",
+  "final_pr_state": "OPEN",
+  "findings": {
+    "P1": [],
+    "P2": [],
+    "knownLeadP3": {
+      "finding": "Existing startup test configures neither cues nor downline; actual configured worker prefetch remains unexecuted. Private helper probe does not close that full-worker gap.",
+      "location": "lampOS/crates/voice/tests/second_route.rs:5159"
+    }
+  },
+  "gates": {
+    "fmt": 0,
+    "no_warning_allowances": true,
+    "strict_pinned196_voice_all_targets_clippy": 0
+  },
+  "hashes": {
+    "exact-controls.exit": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+    "exact-controls.log": "081d463568b82c083e99f79b07ae7dfbf14b392faec9324220ec3e5f93f77690",
+    "exact-controls.started.json": "e3c24f31bd9309af3cbdfcd691248cd387a3423cf54e7bb9e619a0d49b394f60",
+    "exact-controls.terminal.json": "53427ab2a73701b9e0c769c1a82a6364eb5de1663a4cb06ec3eb1e56e06f675b",
+    "fmt.exit": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+    "fmt.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "fmt.started.json": "7a51e869b655ce43cccea3d5e076ad72e464350943764d9ed16497fb151feb4c",
+    "fmt.terminal.json": "438852de8f2eb26c94f70db8832c104b41832f6088b418573a12246e33a1b879",
+    "helper-extraction.json": "7683357466fa37863f8cdef5af033cce0aa1f589bb94d852f182c9c585543038",
+    "helper-lock.exit": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+    "helper-lock.log": "9f7121abafdbb4d6d7e9a18ed194c75128e4d1d0a0c56c20595ee42ea0020376",
+    "helper-lock.started.json": "f8deda07eb766347f528200b814b10c76406e6695ef4180cec304f58f136f681",
+    "helper-lock.terminal.json": "95053b49d49a1b977ece797715cb2f4f0af99575f0e4d6bd0ae27ff09a2cca1a",
+    "helper-probe/Cargo.lock": "87ccbc9721bfec87d00188e40949c22bd0c3279fa4015efc9eaa9a1e01c0ec6b",
+    "helper-probe/Cargo.toml": "c5a47a5a6bb90da06f2e557d7078720a19dbe957bc747dfb3c6d83809140e73c",
+    "helper-probe/src/caches.rs": "be089a6b0a230d08f18139aac46f281ef986596daecbc7e3334951fd85a85578",
+    "helper-probe/src/cue_after.rs": "bc4802afaad5788fd98ddd29a4ebc153dcebbbf8d4d9a35ce0b56fd98e63f7cc",
+    "helper-probe/src/lib.rs": "b8b47ba827c1c1c1f801502b5eb8f4e54033c97ecd9cbc93eeba12922ae71465",
+    "helper-probe/src/render_method.rs": "63270455c964098b452108e10a9c5fd8335241d3b80f79eab884b5c5a1f65ec8",
+    "helper-tests.exit": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+    "helper-tests.log": "cf864b09d5004d3cd87917572088efdee0844189322961f0197431cc22975428",
+    "helper-tests.started.json": "66e58f2b44f6170c0985706ebb9e15c642af96d4e9604a09a2ade48d0a053576",
+    "helper-tests.terminal.json": "6cd93a9d99243d7bcf01505ca8d7ff6548780459cbab5666d2a41387d3b77178",
+    "pr-after-tests.json": "078d1ff054e1ad675028e3a38f5f9aa6231a5edcb5371bd6cec33e9f1548704c",
+    "pr-before-tests.json": "078d1ff054e1ad675028e3a38f5f9aa6231a5edcb5371bd6cec33e9f1548704c",
+    "prepare.py": "6d142fd33cef1f2e5e00e79e0b59d05a0a3c867f4052129671402b9dcf659310",
+    "run-supervised.py": "ce965c9f9328f7f3aa786a422452d7756f164e51052230f0d1089f8b2c1adbdf",
+    "scope.json": "c82020042a96d7e0720c9c1dab51081123d7d43e241ca43a316531717aad718b",
+    "source-before.json": "9990f1c1212482eab7c1bd77a69e6e5c7642a2e5d2e525219160d4c451187405",
+    "voice-clippy.exit": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+    "voice-clippy.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "voice-clippy.started.json": "b2d5c7b19488835c5feb1a9bb8a47819d97414c7a23f915e25e6df4c65d06d92",
+    "voice-clippy.terminal.json": "ad03c9ffc24e60db369910742e9f53182d66ab58bbfceb61b5e376479e488d2e"
+  },
+  "head": "61a1f4c802df38a66f539ca09442f8473af14566",
+  "limits": [
+    "Private probe uses exact unmodified helperbytes but minimalEngine/Shared/speak-only shells, not actualEngine construction orworker::run.",
+    "Sample length/count limits checked, not allocatorpeak or endtoendmemory/network latency profiling.",
+    "No broadfullVoice, realTTS/provider, device/acousticlatency or signed-release acceptance.",
+    "Warmtarget, no cold-buildclaim; no sourceedits/posts/staging/commit/push."
+  ],
+  "sessions": {
+    "exact_controls": 21688,
+    "fmt": 75048,
+    "helper_lock": 76069,
+    "helper_tests": 15336,
+    "voice_clippy": 61236
+  },
+  "source_files_hashed": 7284,
+  "source_unchanged": true,
+  "status": "BOUNDED_READ_COMPLETE_NO_P1_P2_DEMONSTRATED",
+  "tests": {
+    "private_exact_helper": {
+      "failed": 0,
+      "ignored": 0,
+      "passed": 4
+    },
+    "real_voice_exact14": {
+      "failed": 0,
+      "filtered": 3833,
+      "ignored": 0,
+      "passed": 14
+    }
+  },
+  "verified": [
+    "Changed test includes cold chat firstevent4s with no clip and checks equal cue_after+3s bound with/without clip. Ordinary no-cue3s and later-tool-round controls pass.",
+    "Option parser accepts500..4000ms, rejects invalid/overflow strings; worker uses default1500ms on error, so configured extended bound is3.5..7s.",
+    "Exact-helper probe: OFFzeroTTS; render method returns before TTS task poll; held sources and20repeatcalls yield at mostoneinflighttask percache/two total; completecache3cues+1down; all-failed resets/retries; kept sample lengths capped.",
+    "Actual worker source configures flags before run, sendsReady then callsrender_lines with noawait; request ownership/privacy/cancellation/pacing exactcontrols pass."
+  ],
+  "worktree_clean": true,
+  "private_receipt_sha256": "93ee246fd40e311da245adcbf982602a14c8b9b8427a20456c6b58ef200377a7"
+}
