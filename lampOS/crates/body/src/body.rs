@@ -38,6 +38,7 @@ use crate::{
     idle,
     inspection::{Interest, PortIo, Runtime},
     protocol::{ReadOnlyRequest, ReadWindow, StatusFlags, StatusParser},
+    units::ENCODER_MAX,
 };
 use serde::Serialize;
 use std::{io, time::Duration};
@@ -3828,9 +3829,13 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
         }
     };
     // A lamp's own window for the head is one the servo can reach.
+    // Read once here and reused by the own ranges below.
+    let mut pitch_limits = None;
     if limits.pitch_window != Limits::FOLDED.pitch_window {
         let (low, high) = limits.pitch_window;
-        match bus.position_limits(Joint::WristPitch) {
+        let read = bus.position_limits(Joint::WristPitch);
+        pitch_limits = read.as_ref().ok().copied();
+        match read {
             Ok((min, max)) if min <= low && high <= max => {}
             Ok((min, max)) => {
                 report.stop = refused(format!(
@@ -3849,7 +3854,24 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
     if limits.own_ranges {
         let mut ranges = [(0, 4_095); 5];
         for joint in Joint::ALL {
-            match bus.position_limits(joint) {
+            let read = match pitch_limits {
+                Some(range) if joint == Joint::WristPitch => Ok(range),
+                _ => bus.position_limits(joint),
+            };
+            // A stored range past the encoder or upside down is not one to
+            // bound the lamp by: refused, never clamped wider later. Only
+            // here, so a lamp without the switch starts as before.
+            let read = read.and_then(|(min, max)| {
+                if max > ENCODER_MAX || min > max {
+                    Err(format!(
+                        "{} stores position limits {min}..={max}, not a range in 0..={ENCODER_MAX}",
+                        joint.name()
+                    ))
+                } else {
+                    Ok((min, max))
+                }
+            });
+            match read {
                 Ok(range) => ranges[joint.index()] = range,
                 Err(detail) => {
                     report.stop = refused(format!("first read: {detail}"));
