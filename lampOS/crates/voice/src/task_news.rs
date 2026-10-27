@@ -1512,6 +1512,10 @@ fn made_note(
     if crate::made_skill::repair_of(&keeping.directory, key)
         && !crate::made_skill::repair_not_sent(&keeping.directory, key)
     {
+        // The app's ask follows it, if the voice stopped before it did.
+        if let Some(to) = crate::made_skill::repair_task(&keeping.directory, key) {
+            crate::app_make::repaired(&keeping.directory, key, &to);
+        }
         return Some(None);
     }
     let made = crate::made_skill::keep(answer, data["truncated"] == json!(true), key, keeping);
@@ -1541,7 +1545,12 @@ fn made_note(
                 "voice-repair",
                 REPAIR_WAIT,
             );
-            if let Err(error) = crate::made_skill::repaired(&keeping.directory, key, handed.is_ok())
+            let to = handed
+                .as_ref()
+                .ok()
+                .map(|(store, id)| format!("{store}:{id}"));
+            if let Err(error) =
+                crate::made_skill::repaired_to(&keeping.directory, key, to.as_deref())
             {
                 eprintln!("lamp-voice: a made skill's repair was not remembered: {error}");
             }
@@ -3233,7 +3242,7 @@ mod tests {
         );
         assert!(crate::made_skill::repair_of(&root, "s1:1:1"));
         assert!(!crate::made_skill::repair_not_sent(&root, "s1:1:1"));
-        crate::made_skill::repaired(&root, "s1:1:1", false).unwrap();
+        crate::made_skill::repaired_to(&root, "s1:1:1", None).unwrap();
         assert!(crate::made_skill::repair_not_sent(&root, "s1:1:1"));
         assert!(
             !crate::made_skill::claim_repair(&root, "s1:1:1"),
@@ -3243,6 +3252,31 @@ mod tests {
             crate::made_skill::claim_repair(&root, "s1:12:1"),
             "another answer is its own"
         );
+        // A claim left with no outcome (the voice stopped between it and
+        // the hand-over's end) is not sent once it is older than any
+        // hand-over takes: the answer is told not kept once (the
+        // reviewer-lead's P3 on #3662).
+        let now = crate::app_make::now_unix_ms();
+        assert!(!crate::made_skill::repair_not_sent_at(
+            &root, "s1:12:1", now
+        ));
+        assert!(crate::made_skill::repair_not_sent_at(
+            &root,
+            "s1:12:1",
+            now + crate::made_skill::CLAIM_STALE_MS + 1
+        ));
+        // A repair sent keeps its task, so the app's ask can follow it on a
+        // later read (Fourteen's P3 on #3662).
+        crate::made_skill::repaired_to(&root, "s1:12:1", Some("s1:13")).unwrap();
+        assert_eq!(
+            crate::made_skill::repair_task(&root, "s1:12:1").as_deref(),
+            Some("s1:13")
+        );
+        assert!(!crate::made_skill::repair_not_sent_at(
+            &root,
+            "s1:12:1",
+            now + crate::made_skill::CLAIM_STALE_MS + 1
+        ));
         let _ = std::fs::remove_dir_all(&root);
     }
 

@@ -1723,9 +1723,13 @@ happens:
        is claimed there under a lock before it is handed over
        (`made_skill::claim_repair`), so of the two readers of the same
        answers, the coordinator's and the texts worker's, only one sends it
-       (the reviewer-lead's P2 on #3662). A voice stopped between the claim
-       and the hand-over leaves that answer untold rather than sent twice.
-       Claims are kept 24 h, longer than an answer is read for.
+       (the reviewer-lead's P2 on #3662). A claim left with no outcome (the
+       voice stopped between it and the hand-over's end) is taken as not
+       sent after 2 minutes (`CLAIM_STALE_MS`), so the answer is told not
+       kept once, never sent twice. A repair sent keeps its task there, and
+       a later read moves an app's ask onto it, should the voice have
+       stopped before it did. Claims are kept 24 h, longer than an answer
+       is read for.
      - Only a refusal by the check is repaired. A wrong format or a skill
        asking for more than the light and the head is told not kept at
        once, as is a repair whose hand-over fails.
