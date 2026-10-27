@@ -270,3 +270,41 @@ both hand-control switches absent, finite directed/fixture behavior and audio
 policies are unchanged. An explicitly enabled software mute ends a finite
 directed run; only `serve` supervises another cycle. Fixtures reject hand-control
 flags rather than claiming to exercise their hardware lifecycle.
+
+## Child-exit fixture observations
+
+The test-only `a_privacy_worker_ended` helper records its command, callsite,
+child PID, setup/wait times, poll count and observed exit code/signal. A failed
+OS exit query is reported immediately, separately from a child still running.
+Its real five-second exit-observation bound and two-millisecond poll stay the
+same. The command fixture's `R` marker proves its first shell started; it does
+not prove the inner command completed. Only the observed exit status does.
+
+Only the deliberately crashing stand-in runs
+`ulimit -c 0 && kill -SEGV $$`. The checked limit avoids unnecessary regular
+core files, and exact SIGSEGV and exit-101 assertions prevent a shell error
+from satisfying the intended crash/nonzero cases. Linux may ignore RLIMIT_CORE
+for a piped core collector ([core(5)](https://man7.org/linux/man-pages/man5/core.5.html));
+a collector can delay reaping ([kernel core_pipe_limit](https://www.kernel.org/doc/html/latest/admin-guide/sysctl/kernel.html#core-pipe-limit)).
+This is fixture hygiene and observability, not proof that the original #3544
+timeout involved core writing or a particular command. Its failed native result
+remains failed; no current pass substitutes for its missing process timeline.
+Production freshness, unreadable-switch retries, cleanup and failure policy are
+unchanged.
+
+On 28 October 2026, the macOS x86_64 gate on the fixture change based on
+`fc9c781af` passed formatting and strict Voice all-target Clippy. A freshly
+compiled Voice library test executable then ran these exact cases once each,
+with one test thread and no retries:
+
+- `service_privacy_controls::tests::only_a_privacy_worker_that_ended_cleanly_at_its_start_is_an_unreadable_switch`
+- `coordinator::service::tests::a_conversations_privacy_worker_ended_at_its_start_goes_back_to_the_wait`
+- `service_privacy_controls::tests::an_unreadable_switch_is_read_again_and_never_ends_the_service`
+
+All three passed. The first two supplied ten real child start/status pairs;
+every observed child PID was absent after its case. The compile, discovery and
+runtime process groups were absent at closure, source and executable guards
+matched, and all 192 previously retained drivers remained unchanged. These
+are selected host fixture results, not a full-suite, Linux, device or original
+failure-clearance result. This result paragraph was added after execution and
+is not a compiled or runtime input to these cases.
