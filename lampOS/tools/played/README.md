@@ -68,11 +68,16 @@ These you can run on their own:
   `calendar.sh` has, so nothing real starts: a voice asks the lamp for a
   small skill and says yes to the hand-over; the stand-in answers with a
   fixed skill, and once the lamp asks "Shall I put it on the lamp?", the
-  voice answers "Yes, put it on." (made, asked, that SHA-256 installed only
+  voice answers "Yes, go ahead." (made, asked, that SHA-256 installed only
   after the yes, enabled, loaded, removed) or "No, not now." (nothing
   installed). `LAMP_MAKE_SKILL=on` rides on the stand-in's `/run` drop-ins,
-  removed on exit with any skill it put on. Its stand-in test is
-  `make-skill-test.sh`.
+  removed on exit with any skill it put on. The voice's made skills and told
+  news are saved in `/usr/local/lib/played-make-skill-saved` and put back on
+  exit, checked by SHA-256; a put-back that fails exits 8 and keeps that copy
+  (`sudo sh /usr/local/lib/played-make-skill-saved/restore` puts it back), the
+  lamp's guard runs the same put-back first, and a copy left over, or either
+  path as anything but a regular file or a folder of them (a link, dangling
+  or not), stops the next run before any change. Its stand-in test is `make-skill-test.sh`.
 
 - `cut-in-keeps.sh LABEL [ROUNDS]`, about 15 minutes for 3 rounds each way
   (#2739, `LAMP_CUT_IN_KEEPS_LISTENING`): "Hey Lamp, tell me a long story
