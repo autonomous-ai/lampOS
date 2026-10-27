@@ -55,6 +55,7 @@ use std::{
 use unicode_normalization::UnicodeNormalization;
 
 pub mod asked;
+pub mod doubted;
 pub mod heard;
 pub mod needs_face;
 pub mod noted;
@@ -1435,15 +1436,21 @@ fn replaces_described(mut tools: Vec<Tool>) -> Vec<Tool> {
 
 /// [`tools_with`] with each forgetting switch on or off. With
 /// `forget_about` off, every function is exactly what it was before #2176.
+/// The `remember` function's description. When unsure of a key word, ask
+/// first (#3504 finding N5, lamp-06c1 P5: "the two" kept for "tulip", then
+/// doubted aloud).
+pub const REMEMBER_DESCRIBED: &str = "Call this when someone asks you to remember something or keep it in mind for later. \
+                          Give what to keep as one short sentence that will still make sense weeks from now, \
+                          with their own words for names and numbers. If you are not sure you heard a key word \
+                          right (a name, a number, or the thing itself), do not call this yet: ask them, in a few \
+                          words, and call it once they say it again; never keep a word you doubt. Then say back \
+                          in a few words what you kept, so they can put you right if you misheard.";
+
 fn tools_for(rules: bool, forget_all: bool, forget_about: bool) -> Vec<Tool> {
     let mut tools = vec![
         Tool {
             name: REMEMBER.into(),
-            description: "Call this when someone asks you to remember something or keep it in mind for later. \
-                          Give what to keep as one short sentence that will still make sense weeks from now, \
-                          with their own words for names and numbers. Then say back in a few words what you kept, \
-                          so they can put you right if you misheard."
-                .into(),
+            description: REMEMBER_DESCRIBED.into(),
             parameters: Some(json!({
                 "type": "object",
                 "properties": {"text": {"type": "string", "description": "What to keep, in one short sentence."}},

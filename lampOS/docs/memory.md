@@ -627,6 +627,24 @@ passed. Tests: the notes' exact texts in `remember::tests`.
   journal says so, and the model is told nothing was forgotten and how to
   ask, never that the person didn't ask. Not on the Live route, whose tool
   runner has neither gate; lamps run the second route.
+- **A word it doubts is asked about before it is kept** (#3504 finding
+  N5; every lamp, no switch). On lamp-06c1 on 27 Oct (P5) "tulip" was
+  heard as "the two", kept, and then said back as "Kept: … "the two." I
+  may have misheard that". The `remember` description
+  (`remember::REMEMBER_DESCRIBED`) now says: when unsure of a key word (a
+  name, a number, the thing itself), don't call it yet; ask, and call it
+  once they say it again. On the second route, a `remember` called in a
+  chat round whose own words doubt what was heard ("misheard", "didn't
+  catch", "did you say", "say that again", "nghe nhầm", "nói lại" …;
+  `remember::doubted::doubts_what_was_heard`) is not run that round. The
+  model is told `{"remembered": false, "note": "Not kept: in this same
+  reply you doubted what you heard. …"}` and the journal says "a remember
+  was not run: its own round's words doubt what was heard". A round with
+  no words beside the call, as P5's was (its doubt came in the round after
+  the keep), is left to the description. The check is one search of the
+  round's words, so a normal turn's time is unchanged. Tests:
+  `remember::doubted::tests`,
+  `second_provider::tests::a_keep_its_own_round_doubts_is_not_run`.
 - **Asking it to keep or forget something is not itself kept.** The
   exchange in which `remember` or `forget` was called stays out of the
   journal: the kept list is the record of that.
