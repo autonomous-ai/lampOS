@@ -356,24 +356,6 @@ impl Recovering {
     }
 }
 
-/// Phones on the hotspot, from `iw dev IF station dump`: None when it can't
-/// be read, which the policy counts as some.
-fn phones(interface: &str) -> Option<u16> {
-    let output = std::process::Command::new("iw")
-        .args(["dev", interface, "station", "dump"])
-        .output()
-        .ok()
-        .filter(|output| output.status.success())?;
-    Some(
-        String::from_utf8_lossy(&output.stdout)
-            .lines()
-            .filter(|line| line.starts_with("Station "))
-            .count()
-            .try_into()
-            .unwrap_or(u16::MAX),
-    )
-}
-
 /// `recover` (#3020): a set-up lamp whose saved network is gone opens
 /// setup's hotspot after 90 s, only with its switch on. One look every 5 s.
 fn recover(config: lamp_setup::serve::Config) -> Result<bool, Box<dyn std::error::Error>> {
@@ -442,7 +424,7 @@ fn recover(config: lamp_setup::serve::Config) -> Result<bool, Box<dyn std::error
                     .previous
                     .exists(),
             phones: if open.is_some() {
-                phones(&config.interface)
+                lamp_setup::serve::phones(&config.interface)
             } else {
                 Some(0)
             },
