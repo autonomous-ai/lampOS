@@ -260,6 +260,42 @@ pub fn not_kept(directory: &Path, key: &str, why: &str) {
     }
 }
 
+/// Whether the app's ask whose task gave the answer `key`
+/// (`store:id:observation`), if one did, is still being made: only then is
+/// a refused skill repaired (#2813 piece 2). A skill asked for by voice has
+/// no ask here, and is.
+pub fn still_making(directory: &Path, key: &str, now_unix_ms: u64) -> bool {
+    asks(directory)
+        .iter()
+        .find(|entry| {
+            entry["task"]
+                .as_str()
+                .is_some_and(|task| key.starts_with(&format!("{task}:")))
+        })
+        .is_none_or(|entry| state(directory, entry, now_unix_ms) == "making")
+}
+
+/// The app's ask whose task gave the answer `key` follows its repair, the
+/// task `to` (`store:id`): what becomes of the repair is the ask's.
+pub fn repaired(directory: &Path, key: &str, to: &str) {
+    let changed = transact(directory, false, |entries| {
+        let mut found = false;
+        for entry in entries.iter_mut() {
+            if entry["task"]
+                .as_str()
+                .is_some_and(|task| key.starts_with(&format!("{task}:")))
+            {
+                entry["task"] = json!(to);
+                found = true;
+            }
+        }
+        (found, ())
+    });
+    if let Err(error) = changed {
+        eprintln!("lamp-voice: an app's skill: its repair not kept: {error}");
+    }
+}
+
 /// The made skill the app's ask `entry` became, if it is kept: the newest
 /// from its task.
 fn made_of(directory: &Path, entry: &Value) -> Option<Value> {
