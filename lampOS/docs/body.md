@@ -1999,8 +1999,17 @@ must find the head to start (`Limits::FOLDED.pitch_home`, 1760..2020 as the
 code reads it): a rest pitch within `poses::HOME_PITCH_TOLERANCE` (20) counts
 outside it is the head resting on its stop and takes the nearest edge, said
 in a comment line of the file (lamp-0c89, #2396, rests at 1755 and gets the
-low edge). Farther out it is refused, a head off its stop, and the refusal
-says to fold the head onto its stop and measure again. The body's own start
+low edge). Over the range (the side the head falls with its weight) by more,
+but within `WAKE_REACH` (400), is a head moved off home by a hand (#3504:
+lamp-52e6 read 2213 after an SD card swap, lamp-3e83 2102 after handling,
+each head staying where a hand left it): `--home` keeps the high edge, 2020,
+and the comment line says so ("home pitch 2213 is 193 over the body's home
+range 1760..2020: a head moved off home by a hand; 2020 kept, and the body
+wakes it home (within 400)"). Farther over than that, or under by more than
+the 20 (a head tipped up against its weight), it is refused, a head off its
+stop, and the refusal says to fold the head onto its stop and measure again
+(`a_home_pitch_moved_by_hand_within_the_wake_reach_keeps_the_edge`,
+`a_home_pitch_far_outside_the_body_s_range_is_refused`). The body's own start
 check is unchanged: it also reads the live pitch, which lies outside the
 range, and lets it through only to wake it home, so the clamp helps a body
 that wakes. `lamp-body` wakes unless given `--wake off`, so the product unit,
