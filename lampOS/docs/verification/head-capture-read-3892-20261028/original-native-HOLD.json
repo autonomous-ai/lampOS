@@ -1,0 +1,217 @@
+{
+  "Root_checks": "Root independently read all688 collector implementation lines, exact failed-test loop and read_regular hooks. Original panic line/hash verified directly; no branch/result/Stat values were logged, so cause/subcase remain unknown. Native failure is not waived by prior Mac passes. No new local Cargo/test run or semantic Memory review.",
+  "raw_private_sha256": "e29b0aa195b49851a0c0fd8d837772387cbd9b884a8cd8f85e024ee04f992419",
+  "receipt": {
+    "authored_base": "0d1d1f2b944581169c9f96adba9f40ab88adba92",
+    "closed_handles": [
+      {
+        "exit": 0,
+        "scope": "original metadata/frozen source acquisition",
+        "session": 29316
+      },
+      {
+        "exit": 0,
+        "scope": "one original fulltext collection perselectedjob",
+        "session": 16782
+      }
+    ],
+    "evidence_sha256": {
+      "arm-job-original.json": "e40d0fe64988b77c314ca6f7ed60ea267a4e367aa858efb8f32c934aa51237b8",
+      "arm-original.log": "27c3a184bebb91f5520ddb7b090226c8a42ab961094eb98224f1759cb719cd19",
+      "arm-run-original.json": "5dce71127bbb0e6067409a40b6c9314f8d98108f7e4ab4a5f4ef6687b0a03a25",
+      "linux-job-original.json": "f0a38795b7520220fdc2ad3c8861058ab61548e8138afe474ccf8d13d75fad6a",
+      "linux-original.log": "2048c2d46264733afec3689ca7160b75101b87e74b3208cf4daa3088cf5bdc42",
+      "linux-run-original.json": "4198f938bd7eb9dfe49174298881e17cfe498311e8c7d772f2b0dcb29af56b51",
+      "original-failfast-boundary.json": "c4ebe02203ad1b471ee4360a9c967913b7066167374b319c67c1c0d296150a3a",
+      "original-required52-terminals.json": "408eceb4971f6d77ba84fcb3401cca19e76759f12906957a981ba34a5fe2bf6c",
+      "original-source-binding.json": "1922f2a5c11c6e2f0377c39178f282ab24c8d19688922728057d103685473636",
+      "owned-failure-original-context.json": "27265671bd4c13cb19d57f1ba37e410d0c0be6b39fce90fdb94ff3b26a1faf50",
+      "required52-source-census.json": "b96d986c01f6a7bee43fc32671ca5f5b47ac09d702fca00bed834d2ecd95de9c"
+    },
+    "head": "6523fa886bf5aa5f6304732cdd23b58f4be3cbe9",
+    "no_Cargo_local_tests_new_reproducer_artifacts_workflow_reruns_cancel_source_edits_public_posts_or_devices": true,
+    "original_failfast_boundary": [
+      {
+        "line": 3392,
+        "sha256": "aca7f62474466259cee6a1ad4ade2df26886251755d8b369052b58e84d5011b7",
+        "text": "2026-10-27T17:02:34.4217123Z   Cancelling due to test failure: 3 tests still running"
+      },
+      {
+        "line": 3397,
+        "sha256": "31fbe817edb44bd07a2f54c1818f4a8a47b271de098953e46b151319a2c60c6b",
+        "text": "2026-10-27T17:02:35.3445145Z      Summary [  71.004s] 2509/7803 tests run: 2508 passed, 1 failed, 53 skipped"
+      },
+      {
+        "line": 3706,
+        "sha256": "a96f59daaeb5bbbd121b5b18e962f20a081ba8264661180be20f96e214fae8b2",
+        "text": "2026-10-27T17:02:35.3549957Z warning: 5294/7803 tests were not run due to test failure (run with --no-fail-fast to run all tests, or run with --max-fail)"
+      },
+      {
+        "line": 3708,
+        "sha256": "17ae6cac107f560785de27327860042322b84ca1d9131ddeac9d408094dd3b2a",
+        "text": "2026-10-27T17:02:35.3563252Z ##[error]Process completed with exit code 100."
+      }
+    ],
+    "original_metadata": {
+      "arm": {
+        "attempt": 1,
+        "head": "6523fa886bf5aa5f6304732cdd23b58f4be3cbe9",
+        "job": 122329568735,
+        "job_conclusion": "failure",
+        "run": 40543995512,
+        "run_conclusion": "failure"
+      },
+      "linux": {
+        "attempt": 1,
+        "head": "6523fa886bf5aa5f6304732cdd23b58f4be3cbe9",
+        "job": 122329571280,
+        "job_conclusion": "success",
+        "run": 40543995574,
+        "run_conclusion": "success"
+      }
+    },
+    "owned_failure": {
+      "Result_payload_printed": false,
+      "Stat_values_printed": false,
+      "actual_branch_flag_printed": false,
+      "assertion": "assertion failed: outcome.is_err()",
+      "cause": "UNKNOWN",
+      "name": "head_touch::capture::tests::same_descriptor_checks_reject_preopen_swap_and_postread_mutation",
+      "observed_predicate_only": "outcome.is_err() was false; no concrete Ok value or before flag was logged.",
+      "original_execution_log_line": 3373,
+      "overall_HOLD": true,
+      "panic_location": "crates/update/src/head_touch/capture/tests.rs:456:9",
+      "retry_observation": "One original execution FAIL plus final-summary reprint with identical name/counter/duration. No selected TRY marker.",
+      "source_loop": "before in [true,false] with pre-open replacement and post-read mutation hooks",
+      "stderr_lines": [
+        3388,
+        3389
+      ],
+      "subcase": "UNKNOWN",
+      "summary_reprint_log_line": 3705
+    },
+    "physical_Linux_rawname": {
+      "Linux_cfg_line": 537,
+      "Mac_physical_non_UTF8_filename_capture": "UNVERIFIED",
+      "guard_and_assertions_sha256_no_final_newline": "23885fb3fe51cbb6187f63291a4501af579459f42a370720fc987344db6b0b67",
+      "physical_subsection_executed_scope": "PASS in actual original aarch64-unknown-linux-gnu binary; cfgLinux block is not caught/ignored or bypassed by early return. Create/capture/rawnames/text/revalidate/mutate/refusal assertions retained.",
+      "source_path": "lampOS/crates/update/src/head_touch/capture/tests.rs",
+      "source_tests_sha256": "e11b05b3206e9da3e4506a2b8c9da3dc24a9ed4a7c2defcd3a63392f48137e8d",
+      "terminal": [
+        {
+          "binary": "lamp-update",
+          "counter": "2501/7803",
+          "duration": "   0.006s",
+          "line": 3368,
+          "line_sha256": "7eb95e111d00263c10c2f3eb76789bdc46c1c0b2ecc0836a7392b651dd3ef0c1",
+          "name": "head_touch::capture::tests::raw_non_utf8_names_are_preserved_but_non_utf8_text_is_refused",
+          "retry_marker": null,
+          "status": "PASS"
+        }
+      ],
+      "test": "head_touch::capture::tests::raw_non_utf8_names_are_preserved_but_non_utf8_text_is_refused",
+      "unconditional_Linux_subsection_assertions_present": true
+    },
+    "required52_original_coverage": {
+      "by_group": {
+        "collector21": {
+          "FAIL": 1,
+          "PASS": 20
+        },
+        "foundation18": {
+          "UNRUN_AFTER_FAILFAST": 18
+        },
+        "mask1": {
+          "UNRUN_AFTER_FAILFAST": 1
+        },
+        "receipt3": {
+          "UNRUN_AFTER_FAILFAST": 3
+        },
+        "receipt5": {
+          "PASS": 5
+        },
+        "seam4": {
+          "UNRUN_AFTER_FAILFAST": 4
+        }
+      },
+      "counts": {
+        "FAIL": 1,
+        "PASS": 25,
+        "UNRUN_AFTER_FAILFAST": 26
+      },
+      "selected_retry_observations": [],
+      "unrun_scope": "Eligible source cases absent before documented fail-fast completion; no execution/pass credit."
+    },
+    "retained_old_results": [
+      "Mac520/8/6 failed source remains unwaived; two old World causes unestablished.",
+      "Mac530/1/6 EILSEQ fixture failure remains retained; Macphysicalrawname remains unverified.",
+      "AuthorMac531/0/6 is separate and does not waive or replace this Linux owned failure."
+    ],
+    "source_binding": {
+      "ARM_job_runner_labels": [
+        "ubuntu-22.04-arm"
+      ],
+      "ARM_native_host_evidence": [
+        {
+          "line": 627,
+          "line_sha256": "c72702cb5775bfae9ff966ffc513b16d00d71be073a0f79620b9471fb47c5b37",
+          "text": "2026-10-27T16:46:52.4297470Z host: aarch64-unknown-linux-gnu"
+        }
+      ],
+      "actual_preview": "44e46f97868fecba769d09052902301a826d4cb8",
+      "actual_source_overlay_paths": [],
+      "actual_tree": "78cde1e924170b46b968138d3a56e0c242a0150d",
+      "actual_tree_equal_authored": true,
+      "authored_base": "0d1d1f2b944581169c9f96adba9f40ab88adba92",
+      "authored_tree": "78cde1e924170b46b968138d3a56e0c242a0150d",
+      "head": "6523fa886bf5aa5f6304732cdd23b58f4be3cbe9",
+      "logged_checkouts": {
+        "arm": [
+          {
+            "line": 270,
+            "line_sha256": "4fdf22678786588adebf16d9b74d601978378b03ed92eccbf2f3fc0511ccfa7b",
+            "text": "2026-10-27T16:46:05.1666744Z HEAD is now at 44e46f9 Merge 6523fa886bf5aa5f6304732cdd23b58f4be3cbe9 into 0d1d1f2b944581169c9f96adba9f40ab88adba92"
+          },
+          {
+            "line": 273,
+            "line_sha256": "c20ca8aa554933448ce495280b4501d88a735aca5f85ebfc0fe645dbc80a0900",
+            "text": "2026-10-27T16:46:05.2308072Z 44e46f97868fecba769d09052902301a826d4cb8"
+          }
+        ],
+        "linux": [
+          {
+            "line": 346,
+            "line_sha256": "928d425918662cbfbcca293231bf9219afb130cfa23c265e4bc393110f8e359f",
+            "text": "2026-10-27T16:45:57.0831326Z HEAD is now at 44e46f9 Merge 6523fa886bf5aa5f6304732cdd23b58f4be3cbe9 into 0d1d1f2b944581169c9f96adba9f40ab88adba92"
+          },
+          {
+            "line": 349,
+            "line_sha256": "610434c899cd6b7d0b4163cc63b14c0df764d48e6f258a06fbdf968e5749854c",
+            "text": "2026-10-27T16:45:57.1881061Z 44e46f97868fecba769d09052902301a826d4cb8"
+          }
+        ]
+      },
+      "ordered_parents": [
+        "0d1d1f2b944581169c9f96adba9f40ab88adba92",
+        "6523fa886bf5aa5f6304732cdd23b58f4be3cbe9"
+      ],
+      "owned_six_paths_blobs_modes": [
+        "100644 blob f0f048d74a3010d0dd917b08b8eca0d31b239ad9\tlampOS/crates/update/src/head_touch.rs",
+        "100644 blob f25375f99386c7c78efc1b5ce9a172b7ac09248d\tlampOS/crates/update/src/head_touch/capture.rs",
+        "100644 blob b227829af605ead004b4ff244ea604f282764b8d\tlampOS/crates/update/src/head_touch/capture/tests.rs",
+        "100644 blob 6e18a508a2a6f0cdda01bc0e5f40c380f837da64\tlampOS/docs/head-touch-capture.md",
+        "100644 blob b8c5d3768ae6d1035561e2827428ee14b19af2d5\tlampOS/docs/reuse-decisions.md",
+        "100644 blob b129d724563f8296257db43d90c031d8af15d2f8\tlampOS/docs/updates.md"
+      ]
+    },
+    "source_preflight": {
+      "collector_sha256": "4137a729709ccfb1ad5a9653fd570daa38a46d2c2988cbd767595bddac7bdf59",
+      "collector_tests_sha256": "e11b05b3206e9da3e4506a2b8c9da3dc24a9ed4a7c2defcd3a63392f48137e8d",
+      "parent_head_touch_sha256": "0703bf2d4ddbba946b365240f44bcb79b5edcfc28fd2c31c34e92d8e82d41334",
+      "production_head_touch_outside_four_line_wiring_exact": true,
+      "scope": "Read-only unwired collector; no new source P1/P2 identified apart from the material failing original owned control. Full local gate remains unapproved."
+    },
+    "status": "HOLD_OWNED_ORIGINAL_ARM_FAILURE",
+    "utc": "2026-10-27T17:19:11.950408+00:00"
+  }
+}
