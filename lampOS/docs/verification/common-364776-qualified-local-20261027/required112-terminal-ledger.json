@@ -1,0 +1,786 @@
+[
+  {
+    "binary": "lamp-eyes",
+    "test": "permit::tests::an_aged_received_permission_is_not_restamped_when_the_lock_becomes_free",
+    "event": "ok",
+    "line_one_based": 372,
+    "terminal_ordinal_one_based": 184
+  },
+  {
+    "binary": "lamp-eyes",
+    "test": "permit::tests::expired_and_regranted_hold_discards_delayed_identity_until_a_fresh_frame",
+    "event": "ok",
+    "line_one_based": 376,
+    "terminal_ordinal_one_based": 186
+  },
+  {
+    "binary": "lamp-eyes",
+    "test": "permit::tests::mesh_finished_after_permission_loss_cannot_publish_a_second_observation",
+    "event": "ok",
+    "line_one_based": 378,
+    "terminal_ordinal_one_based": 187
+  },
+  {
+    "binary": "lamp-eyes",
+    "test": "permit::tests::permission_deadline_keeps_receipt_age_and_refuses_equality_and_overflow",
+    "event": "ok",
+    "line_one_based": 380,
+    "terminal_ordinal_one_based": 188
+  },
+  {
+    "binary": "lamp-eyes",
+    "test": "permit::tests::renewal_keeps_the_capture_hold_and_queued_old_frames_never_gain_a_new_one",
+    "event": "ok",
+    "line_one_based": 382,
+    "terminal_ordinal_one_based": 189
+  },
+  {
+    "binary": "lamp-eyes",
+    "test": "who::tests::a_continuous_visible_identity_keeps_the_existing_recognition_cadence",
+    "event": "ok",
+    "line_one_based": 598,
+    "terminal_ordinal_one_based": 297
+  },
+  {
+    "binary": "lamp-eyes",
+    "test": "who::tests::a_short_raw_empty_look_withdraws_identity_before_a_same_id_return",
+    "event": "ok",
+    "line_one_based": 646,
+    "terminal_ordinal_one_based": 321
+  },
+  {
+    "binary": "lamp-eyes",
+    "test": "who::tests::failed_authority_refresh_disables_without_borrowing_through_write",
+    "event": "ok",
+    "line_one_based": 660,
+    "terminal_ordinal_one_based": 328
+  },
+  {
+    "binary": "lamp-eyes",
+    "test": "who::tests::fresh_empty_and_checking_captures_keep_original_age_and_epoch",
+    "event": "ok",
+    "line_one_based": 670,
+    "terminal_ordinal_one_based": 333
+  },
+  {
+    "binary": "lamp-eyes",
+    "test": "who::tests::raw_look_permission_refresh_keeps_identity_age_and_never_revives_expiry",
+    "event": "ok",
+    "line_one_based": 696,
+    "terminal_ordinal_one_based": 346
+  },
+  {
+    "binary": "lamp-eyes",
+    "test": "who::tests::skipped_failed_filtered_and_closed_looks_are_not_benign_absence",
+    "event": "ok",
+    "line_one_based": 732,
+    "terminal_ordinal_one_based": 364
+  },
+  {
+    "binary": "lamp-eyes",
+    "test": "who::tests::slow_recognition_keeps_capture_age_even_while_permission_is_renewed",
+    "event": "ok",
+    "line_one_based": 730,
+    "terminal_ordinal_one_based": 363
+  },
+  {
+    "binary": "lamp-eyes",
+    "test": "who::tests::stale_empty_and_checking_captures_revoke_before_publication",
+    "event": "ok",
+    "line_one_based": 738,
+    "terminal_ordinal_one_based": 367
+  },
+  {
+    "binary": "lamp-skills",
+    "test": "routine::tests::a_host_stall_expires_the_request_header_without_changing_the_manager_deadline",
+    "event": "ok",
+    "line_one_based": 1724,
+    "terminal_ordinal_one_based": 831
+  },
+  {
+    "binary": "lamp-skills::it",
+    "test": "skills::a_repeat_call_with_only_made_steps_is_refused_while_its_run_is_under_way",
+    "event": "ok",
+    "line_one_based": 2229,
+    "terminal_ordinal_one_based": 1083
+  },
+  {
+    "binary": "lamp-skills::it",
+    "test": "skills::the_one_action_reply_joins_on_unwind_before_connect_and_during_a_partial_request",
+    "event": "ok",
+    "line_one_based": 2473,
+    "terminal_ordinal_one_based": 1205
+  },
+  {
+    "binary": "lamp-skills::it",
+    "test": "skills::the_one_action_reply_reports_an_ack_write_error",
+    "event": "ok",
+    "line_one_based": 2471,
+    "terminal_ordinal_one_based": 1204
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::services::tests::declaration_barrier_rechecks_permission_before_each_http_attempt",
+    "event": "ok",
+    "line_one_based": 8589,
+    "terminal_ordinal_one_based": 4251
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::services::tests::pending_after_declaration_keeps_one_prepared_http_request",
+    "event": "ok",
+    "line_one_based": 8607,
+    "terminal_ordinal_one_based": 4260
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::name_carries::a_calls_words_back_after_the_next_line_began_still_carry",
+    "event": "ok",
+    "line_one_based": 8993,
+    "terminal_ordinal_one_based": 4453
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::name_carries::a_line_after_the_lamps_name_alone_is_said_by_it",
+    "event": "ok",
+    "line_one_based": 8995,
+    "terminal_ordinal_one_based": 4454
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::name_carries::a_line_past_the_wait_is_not_said_by_the_name",
+    "event": "ok",
+    "line_one_based": 8997,
+    "terminal_ordinal_one_based": 4455
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::name_carries::a_line_said_by_the_name_never_goes_on_from_talk_before_the_name",
+    "event": "ok",
+    "line_one_based": 8999,
+    "terminal_ordinal_one_based": 4456
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::name_carries::a_name_carries_only_on_a_sign_of_one_speaker",
+    "event": "ok",
+    "line_one_based": 9001,
+    "terminal_ordinal_one_based": 4457
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::name_carries::a_name_is_never_carried_across_sessions_or_a_stop",
+    "event": "ok",
+    "line_one_based": 9003,
+    "terminal_ordinal_one_based": 4458
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::name_carries::a_refused_names_words_are_never_joined_to_the_line",
+    "event": "ok",
+    "line_one_based": 9005,
+    "terminal_ordinal_one_based": 4459
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::name_carries::a_request_in_pieces_after_the_name_is_asked_as_one_named_line",
+    "event": "ok",
+    "line_one_based": 9007,
+    "terminal_ordinal_one_based": 4460
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::name_carries::a_short_line_begun_with_the_name_carries_it_too",
+    "event": "ok",
+    "line_one_based": 9009,
+    "terminal_ordinal_one_based": 4461
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::name_carries::a_short_line_begun_with_the_name_is_told_apart",
+    "event": "ok",
+    "line_one_based": 9011,
+    "terminal_ordinal_one_based": 4462
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::name_carries::a_short_sound_that_is_no_name_is_still_held",
+    "event": "ok",
+    "line_one_based": 9013,
+    "terminal_ordinal_one_based": 4463
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::name_carries::a_whole_short_command_is_answered_at_once",
+    "event": "ok",
+    "line_one_based": 9015,
+    "terminal_ordinal_one_based": 4464
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::name_carries::only_the_name_is_the_name_alone",
+    "event": "ok",
+    "line_one_based": 9017,
+    "terminal_ordinal_one_based": 4465
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::name_carries::the_lamps_name_alone_is_answered_as_a_call_after_the_wait",
+    "event": "ok",
+    "line_one_based": 9019,
+    "terminal_ordinal_one_based": 4466
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::name_carries::with_the_switch_off_nothing_changes",
+    "event": "ok",
+    "line_one_based": 9021,
+    "terminal_ordinal_one_based": 4467
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::face_forget::fixed_face_outcomes_keep_consent_and_partial_failure_without_raw_values",
+    "event": "ok",
+    "line_one_based": 9127,
+    "terminal_ordinal_one_based": 4520
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::face_forget::fixed_face_receipt_never_mints_from_prior_loss_or_outlives_its_owner",
+    "event": "ok",
+    "line_one_based": 9129,
+    "terminal_ordinal_one_based": 4521
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::face_forget::observed_disclosure_loss_wins_the_atomic_fixed_receipt_claim",
+    "event": "ok",
+    "line_one_based": 9131,
+    "terminal_ordinal_one_based": 4522
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::face_forget::proved_face_tools_retire_private_work_before_actual_scoped_mutation",
+    "event": "ok",
+    "line_one_based": 9133,
+    "terminal_ordinal_one_based": 4523
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::face_forget::queued_fixed_face_receipt_keeps_the_original_audio_expiry",
+    "event": "ok",
+    "line_one_based": 9175,
+    "terminal_ordinal_one_based": 4544
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::lost_private_authority_cannot_resume_on_a_later_positive_read",
+    "event": "ok",
+    "line_one_based": 9137,
+    "terminal_ordinal_one_based": 4525
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::private_output_rechecks_authority_after_queue_backpressure",
+    "event": "ok",
+    "line_one_based": 9151,
+    "terminal_ordinal_one_based": 4532
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::private_pending_before_and_after_note_ready_keeps_the_original_response_ceiling",
+    "event": "ok",
+    "line_one_based": 9153,
+    "terminal_ordinal_one_based": 4533
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::returned_private_event_pending_obeys_the_original_response_ceiling",
+    "event": "ok",
+    "line_one_based": 9169,
+    "terminal_ordinal_one_based": 4541
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::kept_name_callback::new_request_already_waiting_retries_after_the_old_reader_actually_denies",
+    "event": "ok",
+    "line_one_based": 9363,
+    "terminal_ordinal_one_based": 4638
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::lookaway_authority_tests::checking_return_holds_real_credited_ipc_until_completed_recognition",
+    "event": "ok",
+    "line_one_based": 9409,
+    "terminal_ordinal_one_based": 4661
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::lookaway_authority_tests::checking_return_never_arms_and_only_same_subject_can_finish_the_wait",
+    "event": "ok",
+    "line_one_based": 9407,
+    "terminal_ordinal_one_based": 4660
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::lookaway_authority_tests::checking_wait_never_hides_terminal_source_or_identity_loss",
+    "event": "ok",
+    "line_one_based": 9411,
+    "terminal_ordinal_one_based": 4662
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::lookaway_authority_tests::explicit_absence_is_request_owned_and_never_grants_an_inherited_private_scope",
+    "event": "ok",
+    "line_one_based": 9415,
+    "terminal_ordinal_one_based": 4664
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::lookaway_authority_tests::permission_expiry_blocks_first_private_grant_at_the_final_boundary",
+    "event": "ok",
+    "line_one_based": 9423,
+    "terminal_ordinal_one_based": 4668
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::lookaway_authority_tests::permission_reader_checks_completion_and_all_nonterminal_states",
+    "event": "ok",
+    "line_one_based": 9425,
+    "terminal_ordinal_one_based": 4669
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::lookaway_authority_tests::renewed_permission_cannot_refresh_an_old_absent_or_checking_observation",
+    "event": "ok",
+    "line_one_based": 9427,
+    "terminal_ordinal_one_based": 4670
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::lookaway_authority_tests::returning_track_changed_epoch_checking_and_unmatched_cancel_only_the_old_proved_request",
+    "event": "ok",
+    "line_one_based": 9431,
+    "terminal_ordinal_one_based": 4672
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::lookaway_authority_tests::returning_track_checking_envelope_has_no_identity_and_cannot_arm_continuation",
+    "event": "ok",
+    "line_one_based": 9433,
+    "terminal_ordinal_one_based": 4673
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::lookaway_authority_tests::returning_track_completed_recognition_keeps_original_grant_at_actual_http_fallback",
+    "event": "ok",
+    "line_one_based": 9435,
+    "terminal_ordinal_one_based": 4674
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::lookaway_authority_tests::returning_track_same_name_never_erases_changed_stable_identity",
+    "event": "ok",
+    "line_one_based": 9441,
+    "terminal_ordinal_one_based": 4677
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::memory_note_retries::a_held_line_and_a_revoked_scope_never_get_another_scopes_note",
+    "event": "ok",
+    "line_one_based": 9449,
+    "terminal_ordinal_one_based": 4681
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::memory_note_retries::authority_lost_during_a_note_read_discards_the_whole_context",
+    "event": "ok",
+    "line_one_based": 9477,
+    "terminal_ordinal_one_based": 4695
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::pending_context::permission_expiry_after_composition_sends_no_private_chat",
+    "event": "ok",
+    "line_one_based": 9517,
+    "terminal_ordinal_one_based": 4715
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::private_output_tests::private_output_credit_stall_rechecks_proof_without_changing_microphone_owner",
+    "event": "ok",
+    "line_one_based": 9519,
+    "terminal_ordinal_one_based": 4716
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::with_no_sign_of_a_second_person_a_line_let_out_joins_the_one_it_cut_short",
+    "event": "ok",
+    "line_one_based": 9889,
+    "terminal_ordinal_one_based": 4901
+  },
+  {
+    "binary": "lamp-ipc::camera_authority",
+    "test": "one_revocation_closes_two_independently_transferred_observers",
+    "event": "ok",
+    "line_one_based": 835,
+    "terminal_ordinal_one_based": 410
+  },
+  {
+    "binary": "lamp-ipc::camera_authority",
+    "test": "dropping_one_client_does_not_shutdown_the_shared_endpoint",
+    "event": "ok",
+    "line_one_based": 823,
+    "terminal_ordinal_one_based": 404
+  },
+  {
+    "binary": "lamp-ipc::camera_authority",
+    "test": "old_ticket_never_revives_with_a_new_hold",
+    "event": "ok",
+    "line_one_based": 833,
+    "terminal_ordinal_one_based": 409
+  },
+  {
+    "binary": "lamp-ipc::camera_authority",
+    "test": "revoke_before_grant_refuses_and_pinned_arc_does_not_delay_explicit_revoke",
+    "event": "ok",
+    "line_one_based": 839,
+    "terminal_ordinal_one_based": 412
+  },
+  {
+    "binary": "lamp-ipc::camera_authority",
+    "test": "revoke_during_prepared_grant_transfers_only_a_terminal_observer",
+    "event": "ok",
+    "line_one_based": 841,
+    "terminal_ordinal_one_based": 413
+  },
+  {
+    "binary": "lamp-ipc::camera_authority",
+    "test": "witness_drop_revokes_even_when_a_prepared_grant_keeps_an_observer",
+    "event": "ok",
+    "line_one_based": 847,
+    "terminal_ordinal_one_based": 416
+  },
+  {
+    "binary": "lamp-ipc::camera_authority",
+    "test": "incremental_frame_retains_fd_until_exact_frame_and_control_eof",
+    "event": "ok",
+    "line_one_based": 827,
+    "terminal_ordinal_one_based": 406
+  },
+  {
+    "binary": "lamp-ipc::camera_authority",
+    "test": "wrong_binding_magic_reserved_size_and_trailing_bytes_refuse_and_close_rights",
+    "event": "ok",
+    "line_one_based": 851,
+    "terminal_ordinal_one_based": 418
+  },
+  {
+    "binary": "lamp-ipc::camera_authority",
+    "test": "missing_extra_and_truncated_rights_refuse_without_leaking_descriptors",
+    "event": "ok",
+    "line_one_based": 829,
+    "terminal_ordinal_one_based": 407
+  },
+  {
+    "binary": "lamp-ipc::camera_authority",
+    "test": "wrong_fd_kinds_and_unconnected_stream_refuse",
+    "event": "ok",
+    "line_one_based": 854,
+    "terminal_ordinal_one_based": 419
+  },
+  {
+    "binary": "lamp-ipc::camera_authority",
+    "test": "cancellation_drops_a_retained_partial_frame_fd",
+    "event": "ok",
+    "line_one_based": 817,
+    "terminal_ordinal_one_based": 401
+  },
+  {
+    "binary": "lamp-ipc::camera_authority",
+    "test": "deadline_does_not_renew_while_waiting_for_reply",
+    "event": "ok",
+    "line_one_based": 821,
+    "terminal_ordinal_one_based": 403
+  },
+  {
+    "binary": "lamp-ipc::camera_authority",
+    "test": "unexpected_data_never_disappears_between_observers",
+    "event": "ok",
+    "line_one_based": 845,
+    "terminal_ordinal_one_based": 415
+  },
+  {
+    "binary": "lamp-ipc::camera_authority",
+    "test": "token_refuses_empty_incarnation_zero_hold_and_wraparound",
+    "event": "ok",
+    "line_one_based": 843,
+    "terminal_ordinal_one_based": 414
+  },
+  {
+    "binary": "lamp-ipc::camera_authority",
+    "test": "completed_frame_with_closed_or_nonsilent_observer_never_exposes_ready",
+    "event": "ok",
+    "line_one_based": 819,
+    "terminal_ordinal_one_based": 402
+  },
+  {
+    "binary": "lamp-ipc::camera_authority",
+    "test": "full_control_socket_keeps_grant_pending_until_its_original_deadline",
+    "event": "ok",
+    "line_one_based": 837,
+    "terminal_ordinal_one_based": 411
+  },
+  {
+    "binary": "lamp-ipc::camera_authority",
+    "test": "partial_receive_deadline_immediately_closes_retained_rights",
+    "event": "ok",
+    "line_one_based": 849,
+    "terminal_ordinal_one_based": 417
+  },
+  {
+    "binary": "lamp-ipc::camera_authority",
+    "test": "full_control_recovers_one_grant_after_exact_drain_without_renewing_deadline",
+    "event": "ok",
+    "line_one_based": 825,
+    "terminal_ordinal_one_based": 405
+  },
+  {
+    "binary": "lamp-eyes",
+    "test": "camera_authority::tests::delayed_record_of_real_success_does_not_poison_a_concurrent_close",
+    "event": "ok",
+    "line_one_based": 146,
+    "terminal_ordinal_one_based": 71
+  },
+  {
+    "binary": "lamp-eyes",
+    "test": "camera_authority::tests::retired_equal_hold_requests_rollover_and_genuinely_larger_hold_recovers",
+    "event": "ok",
+    "line_one_based": 148,
+    "terminal_ordinal_one_based": 72
+  },
+  {
+    "binary": "lamp-eyes",
+    "test": "camera_authority::tests::delayed_old_completion_cannot_retire_a_new_pair",
+    "event": "ok",
+    "line_one_based": 144,
+    "terminal_ordinal_one_based": 70
+  },
+  {
+    "binary": "lamp-eyes",
+    "test": "permit::camera_authority_tests::fixture_process",
+    "event": "ok",
+    "line_one_based": 342,
+    "terminal_ordinal_one_based": 169
+  },
+  {
+    "binary": "lamp-eyes",
+    "test": "permit::camera_authority_tests::explicit_close_revokes_two_exec_consumers_while_publication_lock_is_held",
+    "event": "ok",
+    "line_one_based": 340,
+    "terminal_ordinal_one_based": 168
+  },
+  {
+    "binary": "lamp-eyes",
+    "test": "permit::camera_authority_tests::reopen_changes_hold_and_old_observer_never_revives",
+    "event": "ok",
+    "line_one_based": 350,
+    "terminal_ordinal_one_based": 173
+  },
+  {
+    "binary": "lamp-eyes",
+    "test": "permit::camera_authority_tests::v3_runtime_source_requires_ready_capture_binding_and_keeps_recognition_generation_separate",
+    "event": "ok",
+    "line_one_based": 356,
+    "terminal_ordinal_one_based": 176
+  },
+  {
+    "binary": "lamp-eyes",
+    "test": "permit::camera_authority_tests::expired_source_is_not_renewed_by_an_open_descriptor",
+    "event": "ok",
+    "line_one_based": 338,
+    "terminal_ordinal_one_based": 167
+  },
+  {
+    "binary": "lamp-eyes",
+    "test": "permit::camera_authority_tests::unsafe_path_and_partial_peer_cleanup_are_bounded",
+    "event": "ok",
+    "line_one_based": 354,
+    "terminal_ordinal_one_based": 175
+  },
+  {
+    "binary": "lamp-eyes",
+    "test": "permit::camera_authority_tests::old_or_wrong_incarnation_requests_never_get_a_fresh_hold_ticket",
+    "event": "ok",
+    "line_one_based": 344,
+    "terminal_ordinal_one_based": 170
+  },
+  {
+    "binary": "lamp-eyes",
+    "test": "permit::camera_authority_tests::renewals_never_retag_old_observations_under_a_new_camera_hold",
+    "event": "ok",
+    "line_one_based": 348,
+    "terminal_ordinal_one_based": 172
+  },
+  {
+    "binary": "lamp-eyes",
+    "test": "permit::camera_authority_tests::private_layout_keeps_non_utf8_and_never_unlinks_existing_or_replaced_sockets",
+    "event": "ok",
+    "line_one_based": 346,
+    "terminal_ordinal_one_based": 171
+  },
+  {
+    "binary": "lamp-eyes",
+    "test": "permit::camera_authority_tests::retirement_between_at_renewal_and_private_handoff_rolls_capture_without_restamping_lease",
+    "event": "ok",
+    "line_one_based": 352,
+    "terminal_ordinal_one_based": 174
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "camera_authority::tests::v3_source_rejects_old_mixed_expired_and_pre_hold_observations",
+    "event": "ok",
+    "line_one_based": 3195,
+    "terminal_ordinal_one_based": 1554
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "camera_authority::tests::real_grant_is_request_owned_and_close_loses_every_consumer_without_source_rewrite",
+    "event": "ok",
+    "line_one_based": 3191,
+    "terminal_ordinal_one_based": 1552
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "camera_authority::tests::changed_hold_never_retargets_an_existing_request_and_open_ticket_cannot_extend_source_age",
+    "event": "ok",
+    "line_one_based": 3179,
+    "terminal_ordinal_one_based": 1546
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "camera_authority::tests::missing_peer_finishes_original_job_and_never_restarts_its_deadline",
+    "event": "ok",
+    "line_one_based": 3185,
+    "terminal_ordinal_one_based": 1549
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "camera_authority::tests::configured_path_refuses_foreign_mode_symlink_and_oversize_without_touching_them",
+    "event": "ok",
+    "line_one_based": 3181,
+    "terminal_ordinal_one_based": 1547
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "camera_authority::tests::stop_during_partial_grant_closes_retained_or_queued_rights",
+    "event": "ok",
+    "line_one_based": 3193,
+    "terminal_ordinal_one_based": 1553
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "camera_authority::tests::cached_evidence_keeps_its_original_capture_age_deadline",
+    "event": "ok",
+    "line_one_based": 3189,
+    "terminal_ordinal_one_based": 1551
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "camera_authority::tests::new_request_recovers_failed_acquisition_without_reviving_the_old_request",
+    "event": "ok",
+    "line_one_based": 3187,
+    "terminal_ordinal_one_based": 1550
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "camera_authority::tests::connected_kernel_peer_credentials_must_match_before_any_grant_bytes",
+    "event": "ok",
+    "line_one_based": 3183,
+    "terminal_ordinal_one_based": 1548
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::camera_ticket_exec_tests::fixture_producer",
+    "event": "ok",
+    "line_one_based": 9323,
+    "terminal_ordinal_one_based": 4618
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::camera_ticket_exec_tests::fixture_consumer",
+    "event": "ok",
+    "line_one_based": 9321,
+    "terminal_ordinal_one_based": 4617
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::camera_ticket_exec_tests::actual_eyes_close_with_publication_held_stops_two_exec_voice_consumers",
+    "event": "ok",
+    "line_one_based": 9329,
+    "terminal_ordinal_one_based": 4621
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::camera_ticket_exec_tests::ordinary_engine_scope_factory_carries_ticket_without_arming_scoped_context",
+    "event": "ok",
+    "line_one_based": 9325,
+    "terminal_ordinal_one_based": 4619
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::services::tts_authority_tests::real_tts_http_fallback_and_retry_recheck_kernel_authority_inside_one_poll",
+    "event": "ok",
+    "line_one_based": 8647,
+    "terminal_ordinal_one_based": 4280
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::services::tts_authority_tests::default_guarded_speech_keeps_synchronous_construction_but_never_polls_pending_child",
+    "event": "ok",
+    "line_one_based": 8633,
+    "terminal_ordinal_one_based": 4273
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::services::tts_authority_tests::completed_real_tts_response_waits_once_for_checking_then_resumes_or_drops",
+    "event": "ok",
+    "line_one_based": 8631,
+    "terminal_ordinal_one_based": 4272
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::services::tts_authority_tests::gemini_tts_text_post_requires_the_same_live_kernel_authority",
+    "event": "ok",
+    "line_one_based": 8635,
+    "terminal_ordinal_one_based": 4274
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::net::tts::authority_tests::real_socket_failure_and_each_later_tts_send_recheck_the_kernel_ticket",
+    "event": "ok",
+    "line_one_based": 8299,
+    "terminal_ordinal_one_based": 4106
+  },
+  {
+    "binary": "lamp-eyes",
+    "test": "camera_authority::tests::stale_expected_close_cannot_roll_capture_before_real_shutdown_completes",
+    "event": "ok",
+    "line_one_based": 150,
+    "terminal_ordinal_one_based": 73
+  },
+  {
+    "binary": "lamp-ipc::camera_authority",
+    "test": "named_control_eof_after_both_write_halves_close_delivers_live_observers",
+    "event": "ok",
+    "line_one_based": 831,
+    "terminal_ordinal_one_based": 408
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::private_speaker_expiry_tests::expired_v3_speaker_latches_loss_without_renewing_the_request",
+    "event": "ok",
+    "line_one_based": 9549,
+    "terminal_ordinal_one_based": 4731
+  }
+]

@@ -1,0 +1,217 @@
+{
+  "status": "CURRENT_SOURCE_LOCAL_QUALIFIED_READY_NO",
+  "ready_for_lamp_voice": false,
+  "source": {
+    "tested_head": "314a0f6bcb4061e360b85b8e0c9f0a9048cba8cd",
+    "published_folded_head": "28af4573a66c2844cdd0a91936d2eca8c566fd5b",
+    "full_tree": "364776260748a4c355cf625768c2065a32f510d0",
+    "frozen_Main": "36a42f30a756b6fd6f31c9b6102cb66e5008416c",
+    "source_and_all_mtimes_identical_across_metadata_fold": true,
+    "source_tracked_files": 10822,
+    "authored_paths": 61,
+    "Common_only_paths": 56
+  },
+  "actual_local_gate": {
+    "native_session": 60954,
+    "actual_exit": 0,
+    "actual_completion_observed": true,
+    "stages": [
+      "fmt",
+      "metadata",
+      "clippy",
+      "workspace-build",
+      "integration-list",
+      "integration-run",
+      "workspace-doctests",
+      "own-relay-signals",
+      "own-turn-end-process"
+    ],
+    "stage_exits": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "host": "macOS x86_64",
+    "compiler_normal_profiles": true,
+    "test_DEBUG0_only": true,
+    "test_optimization_assertions_overflow_checks_unchanged": true,
+    "build_jobs": 1,
+    "incremental": false,
+    "runtime_profile": "pr",
+    "runtime_slots": 2,
+    "runtime_retries": 0,
+    "scope": "Eyes, Voice, Memory, Skills and IPC camera-authority union"
+  },
+  "runtime": {
+    "unique_clean_passed": 5595,
+    "failed": 0,
+    "leaks": 0,
+    "timeouts": 0,
+    "all_selected_terminal": true,
+    "required112_passed": 112,
+    "current525_passed_separate": 525,
+    "overlap_not_added": 25,
+    "listed_cases": 5638,
+    "natural_ignored": 43,
+    "ignored_JSON_terminals": 27,
+    "natural_start_only_not_executed": 16,
+    "natural_unobserved": 0,
+    "suite_rows_not_extra_cases": 94,
+    "full_discovery_and_raw_ordinal_checks": true
+  },
+  "separate_results": {
+    "workspace_doctests": {
+      "passed": 4,
+      "failed": 0,
+      "ignored": 0,
+      "target_summary_rows": 47
+    },
+    "relay_signals": {
+      "passed": 1,
+      "failed": 0
+    },
+    "turn_end_process": {
+      "passed": 13,
+      "failed": 0
+    },
+    "not_added_to_runtime_unique_count": true
+  },
+  "runtime_input_proof": {
+    "captured_inputs": 46,
+    "exact_bytes_and_metadata_before_and_after_runtime": true,
+    "proof": "Pinned successful runner requires both immediate runtime input guards; no later target stability is inferred."
+  },
+  "retention_and_closure": {
+    "old_private_protected_files_full_initial_final": 7890,
+    "separate_old_durability_archive_files_full_initial_final": 46,
+    "archive_adds_qualification": false,
+    "archive_increases_old7890_count": false,
+    "archive_original_native_session": 84403,
+    "archive_original_actual_exit": 0,
+    "all_owned_sessions_closed": true
+  },
+  "metadata_fold": {
+    "actual_native_session": 93257,
+    "actual_exit": 0,
+    "full_tree_and_mtime_bridge": true,
+    "fixture_range_rows": [
+      "=",
+      "! doc context only"
+    ],
+    "fixture_runtime_test_payloads_exact": true,
+    "original_author_committer_messages_preserved_without_identity_publication": true,
+    "fixture_commits": [
+      "2f3556912260a7b4b15c56d6b6ca95a4ef3f133e",
+      "c757f6d85bb89f29753bb3abd8059bea18205d9a"
+    ],
+    "three_commits_on_base": true
+  },
+  "English_only_own_docs": {
+    "only_own_new_VI_page_removed": "lampOS/docs/vi/memory-speaking-frames_vi.md",
+    "single_English_cross_link_removed": true,
+    "legacy_Main_translation_subtree_unchanged": true,
+    "unchanged_legacy_translation_tree": "87289692caf0093ddf728882ef37b29be16806fb",
+    "new_own_VI_pages": 0
+  },
+  "historical_source_credit_not_transferred": {
+    "local35048": {
+      "passed": 5590,
+      "published_head": "314a0f6bcb4061e360b85b8e0c9f0a9048cba8cd",
+      "tree": "8d93ad178efd868fbf728d4d49bd81b48c28e2ed",
+      "proof": "../common-8d93-qualified-local-20261027/receipt.json"
+    },
+    "native314": {
+      "passed": 11905,
+      "published_head": "314a0f6bcb4061e360b85b8e0c9f0a9048cba8cd",
+      "actual_checkout": "433935815339d6d773d44e2107635db7d73b7a0c",
+      "actual_tree": "fd5a3439849af70dd65fc06927163cc6cbb23d78",
+      "ARM_run": 40504365418,
+      "proof": "../common-314-native-20261027/receipt.json"
+    },
+    "old_failures": [
+      {
+        "native_session": 13286,
+        "actual_exit": 125,
+        "stage": "metadata",
+        "stage_exit": 101,
+        "commands": 2,
+        "test_bodies": 0,
+        "original_failure_preserved": true,
+        "receipt_sha256": "4b46000841c0018449e8867babfb4fa596b2af962bc421b7c6debc4018c60a0a"
+      },
+      {
+        "native_session": 43280,
+        "actual_exit": 125,
+        "stage": "clippy",
+        "stage_exit": 101,
+        "commands": 2,
+        "test_bodies": 0,
+        "original_failure_preserved": true,
+        "receipt_sha256": "2476b76656271281b158532e2992834c7af1bd2e9b06cd7678e46505dcdff05a"
+      },
+      {
+        "native_session": 10427,
+        "actual_exit": 125,
+        "stage": "pre-fmt disk reserve",
+        "stage_exit": null,
+        "commands": 0,
+        "test_bodies": 0,
+        "original_failure_preserved": true,
+        "receipt_sha256": "69cc7c3fd706446009c16d920510e5fcddcff19e4b8d30c0416f394115405aef"
+      }
+    ],
+    "older_artifact_and_ARM_failures_remain_failed": [
+      "../common-8cf-runtime-artifact-loss-20261027/receipt.json",
+      "../common-3e9-native-failure-20261027/receipt.json"
+    ]
+  },
+  "fresh_native_runs": {
+    "ARM64": {
+      "id": 40513174138,
+      "url": "https://github.com/autonomous-ai/lampOS/actions/runs/40513174138"
+    },
+    "Linux_Clippy": {
+      "id": 40513174060,
+      "url": "https://github.com/autonomous-ai/lampOS/actions/runs/40513174060"
+    },
+    "state_at_preparation": "PENDING_SEPARATE_RESULT_AND_CHECKOUT_REVIEW",
+    "current_native_credit_claimed": false
+  },
+  "independent_holds": [
+    "Fresh exact-source ARM64/Linux results and checkout audit",
+    "Required current readers",
+    "Independent privacy acceptance",
+    "Installed binary/source pins",
+    "Mixed-version fail-closed checks",
+    "Lamp/device and physical trials including latency"
+  ],
+  "raw_user_words_logs_binaries_authors_private_paths_or_human_handles_published": false,
+  "evidence_sha256": {
+    "actual-current-gate-release": "231678c3a3cdd5c7604d7a3528fa183b8c89a3a4653f5fa763f876f9ccac835c",
+    "raw-runtime-JSON": "f5338d87efb652ccdc1adb0420b5ff76cc13ea5b904d797407ebc5d56543fa77",
+    "raw-runtime-human": "43eb0a309c72533346a217542f2380fb775af5fee3d5ba420087ca31c022e9a3",
+    "runtime-counts": "a69cfb80a1d66022d77ca854fa30711868b3b675fdbc421cff26765c19dc130b",
+    "runtime-input-manifest": "7c8387ef96f700d33266f88c0f7db0a13be12137d5212d6858709e0ada551110",
+    "all-selected-private-ledger": "fd19f41a4663d6bbbd812faef81382fceb480b24250c26ccf4b947f1be85fea0",
+    "source-freeze": "238b85f666345229c9c7cb1a4d3fc5a5e1a1cb03753661d974a53268947ecdcf",
+    "source-mtimes": "ca66b84c9d8b4485f01d0ecc884ff9ea949ab17ca57f5e07aa3248ffc5e7c2f1",
+    "source-binding": "8dd9cbd7e0ce6a1517ee5bbd601cc86810d711d1144b6edc78ef2e1d8cc434a7",
+    "protected-final-full-bytes": "9a79d69dded4e4d63509b54b7846496452f7e4df8d253cdbb57943a9fd2b42f0",
+    "archive-initial-full-bytes": "b8aaea866d9af5ba46ed8547405c8ee251c6c2a6c561aa9fae2d14d3b1a8d0bd",
+    "archive-final-full-bytes": "5b54d5ef9aa88dd3793e7a8d32524a39ca215a7c94fbbf042777ffbdf35c7d90",
+    "metadata-actual-completion": "9dbf2e0b9d7ebeccc9e11b93022be371c939a1d230a15592950485e446a397e0",
+    "metadata-result": "66db0ab03ca62875a3d1b028e4b44baec6d44006e1993970f812a42f872b261a",
+    "fixture-actual-range-diff": "ab597ecbc51264c9e2db2a16ad11cf174670a38d6aa887b4eb3b5543cb2e677a"
+  },
+  "public_files_sha256": {
+    "required112-terminal-ledger.json": "a4a58cfe9aa4c57a70b116286950224009d90e70f5c08847b07442242220189a",
+    "current525-terminal-ledger.json": "c9992a229f112673c940928a4de298067b99c5227c3cd725f093e07c1987cb90",
+    "map-revisions.json": "f45426f8c66af52e3420c00caf734d4c14ca9ec345b3e6e515c9fe591b4f5b0e"
+  }
+}

@@ -1,3 +1,17 @@
+## 2026-10-27 13:44 UTC — Common 364776 local gates and metadata fold complete
+
+Ready for lamp-voice: no
+
+[Current receipt](verification/common-364776-qualified-local-20261027/receipt.json):
+60954/0 completes all nine fresh gates with 5,595 unique runtime passes, all
+112 / current 525 once and 25 overlaps not added. Ignores split 27 JSON /
+16 start-only; separate docs 4/0, relay 1/0 and process 13/0 remain separate.
+Metadata 93257/0 folds to `28af4573a6` with identical full tree/mtimes on Main 36a42f;
+fixture `=` then `!` is doc context only, 61/56 paths, English-only own docs and
+legacy translations unchanged. All 7,890 old files plus the separate 46 archive
+hold. Prior local/native results and failures stay on their sources. New native
+runs await review; privacy, readers, installed/mixed and physical holds remain.
+
 ## 2026-10-27 13:15 UTC — Common 314 artifact digests independently verified
 
 Ready for lamp-voice: no

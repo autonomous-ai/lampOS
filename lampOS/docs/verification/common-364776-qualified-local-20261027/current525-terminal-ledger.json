@@ -1,0 +1,3677 @@
+[
+  {
+    "binary": "lamp-voice",
+    "test": "memory_scope::tests::original_admission_distinguishes_room_from_narrowed_private_and_revocation",
+    "event": "ok",
+    "line_one_based": 5347,
+    "terminal_ordinal_one_based": 2630
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "memory_scope::tests::cache_uses_latest_face_never_sticky_session_owner_and_expires",
+    "event": "ok",
+    "line_one_based": 5327,
+    "terminal_ordinal_one_based": 2620
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "memory_scope::tests::refreshed_observation_is_hashed_off_path_and_uses_its_original_expiry",
+    "event": "ok",
+    "line_one_based": 5355,
+    "terminal_ordinal_one_based": 2634
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "memory_scope::tests::contention_is_unknown_instead_of_waiting_or_reusing_an_old_person",
+    "event": "ok",
+    "line_one_based": 5333,
+    "terminal_ordinal_one_based": 2623
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "memory_scope::tests::invalidation_never_waits_for_a_refresh_lock_and_retires_inflight_reads",
+    "event": "ok",
+    "line_one_based": 5339,
+    "terminal_ordinal_one_based": 2626
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "memory_scope::tests::a_narrowed_lease_reads_the_room_at_every_later_boundary",
+    "event": "ok",
+    "line_one_based": 5321,
+    "terminal_ordinal_one_based": 2617
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "memory_scope::tests::owner_drop_revokes_every_task_lease_without_revoking_a_new_request",
+    "event": "ok",
+    "line_one_based": 5349,
+    "terminal_ordinal_one_based": 2631
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "memory_scope::tests::revocation_after_borrow_requires_a_fresh_boundary_check",
+    "event": "ok",
+    "line_one_based": 5357,
+    "terminal_ordinal_one_based": 2635
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "memory_scope::tests::looking_later_keeps_one_recorder_and_never_upgrades_room_disclosure",
+    "event": "ok",
+    "line_one_based": 5345,
+    "terminal_ordinal_one_based": 2629
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "memory_scope::tests::speaker_recorder_is_issued_once_and_seals_only_its_request",
+    "event": "ok",
+    "line_one_based": 5367,
+    "terminal_ordinal_one_based": 2640
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "memory_scope::tests::speaker_proof_rejects_wrong_worker_session_and_request_without_transfer",
+    "event": "ok",
+    "line_one_based": 5363,
+    "terminal_ordinal_one_based": 2638
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "memory_scope::tests::speaker_proof_requires_exactly_one_well_formed_boot_qualified_face",
+    "event": "ok",
+    "line_one_based": 5365,
+    "terminal_ordinal_one_based": 2639
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "memory_scope::tests::room_speaker_proof_keeps_old_and_new_boots_distinct_for_pending_photos",
+    "event": "ok",
+    "line_one_based": 5359,
+    "terminal_ordinal_one_based": 2636
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "memory_scope::tests::speaker_expiry_stays_anchored_to_audio_end_and_has_strict_bounds",
+    "event": "ok",
+    "line_one_based": 5361,
+    "terminal_ordinal_one_based": 2637
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "memory_scope::tests::held_narrowed_and_revoked_requests_never_expose_speaker_proof",
+    "event": "ok",
+    "line_one_based": 5337,
+    "terminal_ordinal_one_based": 2625
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "memory_scope::tests::dropping_the_request_owner_revokes_unsealed_and_sealed_speaker_proofs",
+    "event": "ok",
+    "line_one_based": 5335,
+    "terminal_ordinal_one_based": 2624
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "memory_scope::tests::a_known_face_lost_with_no_face_in_view_keeps_its_scope_through_the_gap",
+    "event": "ok",
+    "line_one_based": 5315,
+    "terminal_ordinal_one_based": 2614
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "memory_scope::tests::lamp_c0a4s_timeline_a_line_decided_4_to_6_s_after_the_answer_is_held",
+    "event": "ok",
+    "line_one_based": 5343,
+    "terminal_ordinal_one_based": 2628
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "memory_scope::tests::lamp_c0a4s_question_9_s_after_the_answer_is_held_past_a_sound_of_no_words",
+    "event": "ok",
+    "line_one_based": 5341,
+    "terminal_ordinal_one_based": 2627
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "memory_scope::tests::a_face_in_view_or_no_look_or_the_switch_off_holds_nothing",
+    "event": "ok",
+    "line_one_based": 5307,
+    "terminal_ordinal_one_based": 2610
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "memory_scope::tests::a_gap_is_held_only_for_someone_the_lamp_was_just_talking_with",
+    "event": "ok",
+    "line_one_based": 5309,
+    "terminal_ordinal_one_based": 2611
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "memory_scope::tests::an_unproved_private_read_check_does_not_poison_a_later_actual_proof",
+    "event": "ok",
+    "line_one_based": 5325,
+    "terminal_ordinal_one_based": 2619
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "memory_scope::tests::private_read_loss_is_shared_by_clones_and_cannot_be_reproved",
+    "event": "ok",
+    "line_one_based": 5353,
+    "terminal_ordinal_one_based": 2633
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "memory_scope::tests::a_new_request_has_fresh_private_read_state_after_the_previous_lost_it",
+    "event": "ok",
+    "line_one_based": 5323,
+    "terminal_ordinal_one_based": 2618
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "memory_scope::tests::private_read_loss_does_not_revoke_narrow_or_destroy_the_original_speaker",
+    "event": "ok",
+    "line_one_based": 5351,
+    "terminal_ordinal_one_based": 2632
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "memory_scope::tests::concurrent_true_and_false_after_private_proof_always_finish_lost",
+    "event": "ok",
+    "line_one_based": 5331,
+    "terminal_ordinal_one_based": 2622
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "memory_scope::tests::checking_can_only_pause_a_pinned_grant_and_never_wins_over_loss",
+    "event": "ok",
+    "line_one_based": 5329,
+    "terminal_ordinal_one_based": 2621
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "memory_scope::tests::a_keep_in_a_line_admitted_before_the_eyes_answered_goes_to_their_face",
+    "event": "ok",
+    "line_one_based": 5311,
+    "terminal_ordinal_one_based": 2612
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "memory_scope::tests::a_face_first_named_after_the_lines_end_and_the_wait_is_not_the_keeper",
+    "event": "ok",
+    "line_one_based": 5305,
+    "terminal_ordinal_one_based": 2609
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "memory_scope::tests::a_keep_looks_again_only_for_a_room_line_admitted_with_nobody_known_yet",
+    "event": "ok",
+    "line_one_based": 5313,
+    "terminal_ordinal_one_based": 2613
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "memory_scope::tests::a_late_look_is_armed_only_while_the_cache_is_cold",
+    "event": "ok",
+    "line_one_based": 5317,
+    "terminal_ordinal_one_based": 2615
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "memory_scope::tests::a_cache_gone_cold_during_the_line_arms_its_late_look_at_the_end",
+    "event": "ok",
+    "line_one_based": 5319,
+    "terminal_ordinal_one_based": 2616
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "memory_scope::tests::a_line_begun_cold_keeps_only_for_a_face_seen_or_named_at_its_start",
+    "event": "ok",
+    "line_one_based": 5381,
+    "terminal_ordinal_one_based": 2647
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "memory_scope::tests::a_change_in_the_eyes_known_file_makes_the_cache_cold",
+    "event": "ok",
+    "line_one_based": 5303,
+    "terminal_ordinal_one_based": 2608
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::reviewer_second_owner_name_does_not_follow_sticky_person_to_unknown_face",
+    "event": "ok",
+    "line_one_based": 9727,
+    "terminal_ordinal_one_based": 4820
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::an_empty_rooms_turn_then_an_unknown_faces_carry_no_typed_name",
+    "event": "ok",
+    "line_one_based": 9673,
+    "terminal_ordinal_one_based": 4793
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_skills_look_needs_the_switch_on_and_a_full_look",
+    "event": "ok",
+    "line_one_based": 9639,
+    "terminal_ordinal_one_based": 4776
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_airs_note_is_given_once_when_due",
+    "event": "ok",
+    "line_one_based": 9741,
+    "terminal_ordinal_one_based": 4827
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_line_heard_as_nothing_the_conversation_means_is_held_as_unclear",
+    "event": "ok",
+    "line_one_based": 9587,
+    "terminal_ordinal_one_based": 4750
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_routes_lines_are_one_sessions_and_eight_held_renew_it",
+    "event": "ok",
+    "line_one_based": 9801,
+    "terminal_ordinal_one_based": 4857
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_busy_room_asks_more_of_a_line_going_on_or_a_turned_face",
+    "event": "ok",
+    "line_one_based": 9525,
+    "terminal_ordinal_one_based": 4719
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_busy_room_never_holds_a_line_that_calls_the_lamp",
+    "event": "ok",
+    "line_one_based": 9527,
+    "terminal_ordinal_one_based": 4720
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_busy_rooms_fifteen_seconds_count_from_the_end_of_the_lamps_words",
+    "event": "ok",
+    "line_one_based": 9531,
+    "terminal_ordinal_one_based": 4722
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_line_just_after_a_long_answer_is_in_a_conversation_going_on",
+    "event": "ok",
+    "line_one_based": 9593,
+    "terminal_ordinal_one_based": 4753
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_busy_rooms_conversation_goes_on_fifteen_seconds",
+    "event": "ok",
+    "line_one_based": 9529,
+    "terminal_ordinal_one_based": 4721
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_journal_names_the_sign_that_let_a_line_out",
+    "event": "ok",
+    "line_one_based": 9765,
+    "terminal_ordinal_one_based": 4839
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::with_name_or_follow_up_a_face_alone_lets_no_line_out_in_a_busy_room_on_this_route",
+    "event": "ok",
+    "line_one_based": 9859,
+    "terminal_ordinal_one_based": 4886
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::with_name_or_follow_up_two_peoples_held_lines_make_a_quiet_room_busy",
+    "event": "ok",
+    "line_one_based": 9869,
+    "terminal_ordinal_one_based": 4891
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::with_name_or_follow_up_a_follow_up_begun_while_the_answer_plays_goes_on",
+    "event": "ok",
+    "line_one_based": 9861,
+    "terminal_ordinal_one_based": 4887
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::with_name_or_follow_up_another_voice_makes_the_room_busy_before_its_own_verdict",
+    "event": "ok",
+    "line_one_based": 9865,
+    "terminal_ordinal_one_based": 4889
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::with_name_or_follow_up_a_colleague_off_camera_is_answered_while_the_person_faces_the_lamp",
+    "event": "ok",
+    "line_one_based": 9857,
+    "terminal_ordinal_one_based": 4885
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::with_name_or_follow_up_two_faces_in_view_make_the_room_busy",
+    "event": "ok",
+    "line_one_based": 9867,
+    "terminal_ordinal_one_based": 4890
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::with_two_faces_held_two_faces_must_stay",
+    "event": "ok",
+    "line_one_based": 9893,
+    "terminal_ordinal_one_based": 4903
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::with_two_faces_held_privacy_late_looks_and_clock_steps_leave_no_busy_room",
+    "event": "ok",
+    "line_one_based": 9891,
+    "terminal_ordinal_one_based": 4902
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::with_two_faces_held_looks_between_lines_make_the_first_line_busy",
+    "event": "ok",
+    "line_one_based": 10017,
+    "terminal_ordinal_one_based": 4965
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::with_name_or_follow_up_a_follow_up_goes_on_only_eight_seconds",
+    "event": "ok",
+    "line_one_based": 9863,
+    "terminal_ordinal_one_based": 4888
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::another_voice_going_on_is_held_and_the_conversations_own_goes_on",
+    "event": "ok",
+    "line_one_based": 9679,
+    "terminal_ordinal_one_based": 4796
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_line_4_s_after_an_answer_is_held_by_another_voice_or_goes_on_judged_without_it",
+    "event": "ok",
+    "line_one_based": 9581,
+    "terminal_ordinal_one_based": 4747
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_held_colleague_extends_the_carry_window_but_not_past_its_cap",
+    "event": "ok",
+    "line_one_based": 9569,
+    "terminal_ordinal_one_based": 4741
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_extended_carry_still_needs_the_owner_and_ends_on_stop_privacy_or_forget",
+    "event": "ok",
+    "line_one_based": 9755,
+    "terminal_ordinal_one_based": 4834
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_fresh_call_and_actual_answer_after_forget_start_a_new_bounded_window",
+    "event": "ok",
+    "line_one_based": 9561,
+    "terminal_ordinal_one_based": 4737
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_colleague_print_first_known_at_the_extended_verdict_keeps_the_owner",
+    "event": "ok",
+    "line_one_based": 9553,
+    "terminal_ordinal_one_based": 4733
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_late_window_keeps_the_same_voice_sign_for_going_on_same_one",
+    "event": "ok",
+    "line_one_based": 9579,
+    "terminal_ordinal_one_based": 4746
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_late_colleague_print_cannot_revive_a_closed_or_disabled_carry",
+    "event": "ok",
+    "line_one_based": 9573,
+    "terminal_ordinal_one_based": 4743
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_same_speaker_goes_on_five_turns_in_a_busy_room_only_with_the_switch",
+    "event": "ok",
+    "line_one_based": 9807,
+    "terminal_ordinal_one_based": 4860
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_colleagues_line_is_held_and_two_in_a_row_end_the_carry",
+    "event": "ok",
+    "line_one_based": 9559,
+    "terminal_ordinal_one_based": 4736
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_owners_five_turns_go_on_past_one_colleague_line",
+    "event": "ok",
+    "line_one_based": 9787,
+    "terminal_ordinal_one_based": 4850
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_late_sure_other_voice_is_one_colleague_line",
+    "event": "ok",
+    "line_one_based": 9575,
+    "terminal_ordinal_one_based": 4744
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::after_a_held_colleague_the_owners_voice_alone_must_be_nearer_theirs",
+    "event": "ok",
+    "line_one_based": 9665,
+    "terminal_ordinal_one_based": 4789
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::two_held_colleagues_keep_the_older_voice_constraint",
+    "event": "ok",
+    "line_one_based": 9833,
+    "terminal_ordinal_one_based": 4873
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::held_voice_constraints_close_with_the_carry_and_reject_old_callbacks",
+    "event": "ok",
+    "line_one_based": 9705,
+    "terminal_ordinal_one_based": 4809
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_full_held_voice_bound_keeps_the_owner_by_face_until_a_fresh_call",
+    "event": "ok",
+    "line_one_based": 9565,
+    "terminal_ordinal_one_based": 4739
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_recent_call_can_resume_after_forget_without_a_stale_closed_scope",
+    "event": "ok",
+    "line_one_based": 9625,
+    "terminal_ordinal_one_based": 4769
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_fresh_call_clears_the_previous_callers_held_voice_constraints",
+    "event": "ok",
+    "line_one_based": 9563,
+    "terminal_ordinal_one_based": 4738
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_colleague_calling_the_lamp_becomes_the_caller",
+    "event": "ok",
+    "line_one_based": 9551,
+    "terminal_ordinal_one_based": 4732
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_line_with_no_sure_sign_is_held_and_ends_no_carry",
+    "event": "ok",
+    "line_one_based": 9601,
+    "terminal_ordinal_one_based": 4757
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_owner_turned_to_a_colleague_is_held_and_ends_the_carry",
+    "event": "ok",
+    "line_one_based": 9785,
+    "terminal_ordinal_one_based": 4849
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_colleagues_face_is_held_in_a_room_not_busy",
+    "event": "ok",
+    "line_one_based": 9557,
+    "terminal_ordinal_one_based": 4735
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_carry_ends_twenty_seconds_after_the_lamps_words_by_the_lines_start",
+    "event": "ok",
+    "line_one_based": 9753,
+    "terminal_ordinal_one_based": 4833
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_stop_a_privacy_change_or_a_forgetting_ends_the_carry",
+    "event": "ok",
+    "line_one_based": 9645,
+    "terminal_ordinal_one_based": 4779
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_late_unsure_print_of_a_carried_line_ends_nothing",
+    "event": "ok",
+    "line_one_based": 9577,
+    "terminal_ordinal_one_based": 4745
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_owners_line_seven_seconds_after_an_answer_with_a_short_print_is_carried",
+    "event": "ok",
+    "line_one_based": 9789,
+    "terminal_ordinal_one_based": 4851
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_colleague_within_the_eight_seconds_is_held_and_two_end_the_carry",
+    "event": "ok",
+    "line_one_based": 9555,
+    "terminal_ordinal_one_based": 4734
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::an_unsure_print_with_no_face_decides_nothing_whenever_it_comes",
+    "event": "ok",
+    "line_one_based": 9677,
+    "terminal_ordinal_one_based": 4795
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::an_unknown_voice_let_out_in_the_eight_seconds_is_no_identity_past_them",
+    "event": "ok",
+    "line_one_based": 9675,
+    "terminal_ordinal_one_based": 4794
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_sure_other_voice_within_the_eight_seconds_is_held",
+    "event": "ok",
+    "line_one_based": 9647,
+    "terminal_ordinal_one_based": 4780
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_low_print_without_spoken_to_keeps_the_conversation_going",
+    "event": "ok",
+    "line_one_based": 9603,
+    "terminal_ordinal_one_based": 4758
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_trusted_session_does_not_carry_to_another_voice",
+    "event": "ok",
+    "line_one_based": 9651,
+    "terminal_ordinal_one_based": 4782
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::going_on_holds_only_for_the_one_the_lamp_answered",
+    "event": "ok",
+    "line_one_based": 9699,
+    "terminal_ordinal_one_based": 4806
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::same_voice_starts_for_the_rules_that_read_it",
+    "event": "ok",
+    "line_one_based": 9731,
+    "terminal_ordinal_one_based": 4822
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::going_on_same_one_holds_without_spoken_to",
+    "event": "ok",
+    "line_one_based": 9701,
+    "terminal_ordinal_one_based": 4807
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::going_on_same_one_plays_the_conversations_voice_and_holds_another",
+    "event": "ok",
+    "line_one_based": 9703,
+    "terminal_ordinal_one_based": 4808
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_caller_let_in_by_a_turned_face_takes_the_conversations_voice",
+    "event": "ok",
+    "line_one_based": 9541,
+    "terminal_ordinal_one_based": 4727
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_call_unanswered_carries_the_next_lines_for_fifteen_seconds",
+    "event": "ok",
+    "line_one_based": 9539,
+    "terminal_ordinal_one_based": 4726
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_lamps_own_answers_to_talk_keep_no_conversation_going",
+    "event": "ok",
+    "line_one_based": 9775,
+    "terminal_ordinal_one_based": 4844
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::someone_else_by_voice_only_under_0_30",
+    "event": "ok",
+    "line_one_based": 9733,
+    "terminal_ordinal_one_based": 4823
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_call_let_out_carries_the_next_line_though_the_lamp_said_nothing",
+    "event": "ok",
+    "line_one_based": 9535,
+    "terminal_ordinal_one_based": 4724
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_lamp_just_asked_only_with_its_question_in_a_conversation",
+    "event": "ok",
+    "line_one_based": 9771,
+    "terminal_ordinal_one_based": 4842
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_facts_are_the_live_routes_own",
+    "event": "ok",
+    "line_one_based": 9757,
+    "terminal_ordinal_one_based": 4835
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::quiet_going_on_holds_nothing_without_a_sign_of_someone_else",
+    "event": "ok",
+    "line_one_based": 9713,
+    "terminal_ordinal_one_based": 4813
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::quiet_going_on_holds_the_talk_without_spoken_to",
+    "event": "ok",
+    "line_one_based": 9715,
+    "terminal_ordinal_one_based": 4814
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::quiet_going_on_plays_the_callers_speaking_face",
+    "event": "ok",
+    "line_one_based": 9717,
+    "terminal_ordinal_one_based": 4815
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::quiet_going_on_takes_a_face_turned_to_the_lamp_for_the_callers",
+    "event": "ok",
+    "line_one_based": 9721,
+    "terminal_ordinal_one_based": 4817
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_callers_face_goes_with_privacy_the_window_and_the_eyes_boot",
+    "event": "ok",
+    "line_one_based": 9751,
+    "terminal_ordinal_one_based": 4832
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::quiet_going_on_without_voice_or_face_plays_one_persons_follow_ups",
+    "event": "ok",
+    "line_one_based": 9723,
+    "terminal_ordinal_one_based": 4818
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::quiet_going_on_plays_the_callers_voice",
+    "event": "ok",
+    "line_one_based": 9719,
+    "terminal_ordinal_one_based": 4816
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_request_going_on_keeps_only_the_one_just_before_it",
+    "event": "ok",
+    "line_one_based": 9633,
+    "terminal_ordinal_one_based": 4773
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_carried_over_call_keeps_the_space_between_its_halves",
+    "event": "ok",
+    "line_one_based": 9545,
+    "terminal_ordinal_one_based": 4729
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_rule_holds_office_talk_and_lets_a_call_or_a_follow_up_through",
+    "event": "ok",
+    "line_one_based": 9803,
+    "terminal_ordinal_one_based": 4858
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::an_answer_ends_when_its_sound_has_all_been_played",
+    "event": "ok",
+    "line_one_based": 9671,
+    "terminal_ordinal_one_based": 4792
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_spoken_turn_is_given_its_few_functions_and_the_rest_behind_one",
+    "event": "ok",
+    "line_one_based": 9641,
+    "terminal_ordinal_one_based": 4777
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_call_for_the_rest_is_answered_by_the_route",
+    "event": "ok",
+    "line_one_based": 9749,
+    "terminal_ordinal_one_based": 4831
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_production_audio_runner_keeps_skills_identity_and_private_offers",
+    "event": "ok",
+    "line_one_based": 9795,
+    "terminal_ordinal_one_based": 4854
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_audio_runner_keeps_more_and_the_requests_early_search",
+    "event": "ok",
+    "line_one_based": 9743,
+    "terminal_ordinal_one_based": 4828
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_audio_runner_refuses_a_changed_or_retired_capability_before_dispatch",
+    "event": "ok",
+    "line_one_based": 9745,
+    "terminal_ordinal_one_based": 4829
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::stop_during_music_rpc_revokes_scope_and_finishes_without_waiting_for_the_reply",
+    "event": "ok",
+    "line_one_based": 9739,
+    "terminal_ordinal_one_based": 4826
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::stop_during_music_rpc_and_warm_stt_opening_finishes_without_waiting",
+    "event": "ok",
+    "line_one_based": 9737,
+    "terminal_ordinal_one_based": 4825
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::authority_that_lapsed_in_the_queue_during_a_stall_is_skipped",
+    "event": "ok",
+    "line_one_based": 9695,
+    "terminal_ordinal_one_based": 4804
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_camera_close_and_a_mute_are_told_as_a_privacy_change",
+    "event": "ok",
+    "line_one_based": 9543,
+    "terminal_ordinal_one_based": 4728
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::requested_audio_pending_without_ipc_credit_rechecks_camera_scope_and_expiry",
+    "event": "ok",
+    "line_one_based": 9725,
+    "terminal_ordinal_one_based": 4819
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_new_owner_retires_the_old_turn_and_its_late_input",
+    "event": "ok",
+    "line_one_based": 9615,
+    "terminal_ordinal_one_based": 4764
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_turns_end_holds_its_hand_on_to_memory_with_the_switch",
+    "event": "ok",
+    "line_one_based": 9659,
+    "terminal_ordinal_one_based": 4786
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_second_worker_sends_a_sign_ins_words_as_one_line",
+    "event": "ok",
+    "line_one_based": 9813,
+    "terminal_ordinal_one_based": 4863
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_written_request_goes_to_the_chat_as_a_note_and_silence_as_nothing",
+    "event": "ok",
+    "line_one_based": 9663,
+    "terminal_ordinal_one_based": 4788
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_quoted_line_is_never_kept_for_a_later_turn",
+    "event": "ok",
+    "line_one_based": 9623,
+    "terminal_ordinal_one_based": 4768
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_second_worker_reads_who_work_can_go_to_as_live_does",
+    "event": "ok",
+    "line_one_based": 9811,
+    "terminal_ordinal_one_based": 4862
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_second_worker_takes_the_task_switches_as_live_does",
+    "event": "ok",
+    "line_one_based": 9817,
+    "terminal_ordinal_one_based": 4865
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::with_memory_days_the_note_is_asked_once_a_session_and_kept_for_its_turns",
+    "event": "ok",
+    "line_one_based": 9853,
+    "terminal_ordinal_one_based": 4883
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_note_asked_as_the_turn_is_told_is_waited_for_longer_than_one_asked_ahead",
+    "event": "ok",
+    "line_one_based": 9617,
+    "terminal_ordinal_one_based": 4765
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::after_ten_quiet_minutes_the_same_persons_next_turn_asks_the_note_again",
+    "event": "ok",
+    "line_one_based": 9669,
+    "terminal_ordinal_one_based": 4791
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::as_the_only_voice_the_room_goes_to_its_file_and_the_next_worker_starts_from_it",
+    "event": "ok",
+    "line_one_based": 9691,
+    "terminal_ordinal_one_based": 4802
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::with_attention_near_the_rooms_rise_on_the_bus_makes_a_line_near",
+    "event": "ok",
+    "line_one_based": 9855,
+    "terminal_ordinal_one_based": 4884
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::with_addressed_a_line_said_close_and_facing_is_let_out_in_a_busy_room",
+    "event": "ok",
+    "line_one_based": 9847,
+    "terminal_ordinal_one_based": 4880
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::with_the_name_signal_a_spoken_turn_is_offered_heard_my_name_and_its_call_does_nothing",
+    "event": "ok",
+    "line_one_based": 9877,
+    "terminal_ordinal_one_based": 4895
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_health_fact_is_empty_with_the_switch_off_and_when_nothing_is_known",
+    "event": "ok",
+    "line_one_based": 9759,
+    "terminal_ordinal_one_based": 4836
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_second_worker_takes_the_live_workers_flags_but_keep_link",
+    "event": "ok",
+    "line_one_based": 9815,
+    "terminal_ordinal_one_based": 4864
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_turn_of_the_known_persons_own_is_told_their_name",
+    "event": "ok",
+    "line_one_based": 9655,
+    "terminal_ordinal_one_based": 4784
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_turn_is_kept_and_told_to_the_next",
+    "event": "ok",
+    "line_one_based": 9653,
+    "terminal_ordinal_one_based": 4783
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_narrowed_lines_exchange_is_the_rooms_not_the_known_persons",
+    "event": "ok",
+    "line_one_based": 9611,
+    "terminal_ordinal_one_based": 4762
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_sentence_is_kept_nowhere_and_the_next_line_carries_none_of_it",
+    "event": "ok",
+    "line_one_based": 9819,
+    "terminal_ordinal_one_based": 4866
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_texts_system_message_never_has_the_rooms_spoken_conversation",
+    "event": "ok",
+    "line_one_based": 9649,
+    "terminal_ordinal_one_based": 4781
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_worker_answers_a_text_without_the_rooms_spoken_conversation",
+    "event": "ok",
+    "line_one_based": 9829,
+    "terminal_ordinal_one_based": 4871
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_known_person_long_after_another_has_their_own_turns_at_once",
+    "event": "ok",
+    "line_one_based": 9571,
+    "terminal_ordinal_one_based": 4742
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_persons_first_turn_is_matched_against_their_own_kept_things",
+    "event": "ok",
+    "line_one_based": 9619,
+    "terminal_ordinal_one_based": 4766
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_line_is_the_callers_alone_only_with_their_one_face_speaking",
+    "event": "ok",
+    "line_one_based": 9589,
+    "terminal_ordinal_one_based": 4751
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_turns_hits_are_asked_in_its_leases_scope",
+    "event": "ok",
+    "line_one_based": 9661,
+    "terminal_ordinal_one_based": 4787
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::as_the_only_voice_the_rule_judges_in_the_room_the_route_keeps",
+    "event": "ok",
+    "line_one_based": 9693,
+    "terminal_ordinal_one_based": 4803
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::as_the_only_voice_the_day_and_the_night_bars_are_read_as_on_live",
+    "event": "ok",
+    "line_one_based": 9687,
+    "terminal_ordinal_one_based": 4800
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::with_a_second_sign_asked_a_name_heard_only_in_the_rooms_sound_opens_nothing",
+    "event": "ok",
+    "line_one_based": 9837,
+    "terminal_ordinal_one_based": 4875
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::with_a_second_sign_asked_a_name_heard_in_the_rooms_sound_counts_with_one",
+    "event": "ok",
+    "line_one_based": 9835,
+    "terminal_ordinal_one_based": 4874
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_name_the_second_sign_drops_earns_no_name_note",
+    "event": "ok",
+    "line_one_based": 9609,
+    "terminal_ordinal_one_based": 4761
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_name_heard_in_the_line_before_does_not_play_the_next",
+    "event": "ok",
+    "line_one_based": 9605,
+    "terminal_ordinal_one_based": 4759
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_hearing_come_two_lines_late_stays_with_its_line",
+    "event": "ok",
+    "line_one_based": 9567,
+    "terminal_ordinal_one_based": 4740
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_call_at_a_lines_start_goes_on_and_a_kept_hearing_is_used_up",
+    "event": "ok",
+    "line_one_based": 9533,
+    "terminal_ordinal_one_based": 4723
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::with_a_second_sign_asked_the_name_at_a_lines_start_counts",
+    "event": "ok",
+    "line_one_based": 9843,
+    "terminal_ordinal_one_based": 4878
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::with_a_second_sign_asked_the_lamp_named_in_passing_stays_dropped",
+    "event": "ok",
+    "line_one_based": 9841,
+    "terminal_ordinal_one_based": 4877
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::with_a_second_sign_asked_a_name_said_late_is_dated_from_when_it_began",
+    "event": "ok",
+    "line_one_based": 9839,
+    "terminal_ordinal_one_based": 4876
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::with_named_always_a_line_begun_with_the_name_to_a_face_is_answered_in_a_busy_room",
+    "event": "ok",
+    "line_one_based": 9871,
+    "terminal_ordinal_one_based": 4892
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::with_named_always_office_talk_that_opens_like_the_name_is_not_named",
+    "event": "ok",
+    "line_one_based": 9875,
+    "terminal_ordinal_one_based": 4894
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::with_named_always_an_unclear_line_named_to_a_face_stays_held",
+    "event": "ok",
+    "line_one_based": 9873,
+    "terminal_ordinal_one_based": 4893
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::with_busy_called_strict_office_lines_are_no_call_in_a_busy_room",
+    "event": "ok",
+    "line_one_based": 9851,
+    "terminal_ordinal_one_based": 4882
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::with_busy_called_strict_a_call_set_off_or_backed_still_counts",
+    "event": "ok",
+    "line_one_based": 9849,
+    "terminal_ordinal_one_based": 4881
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_rule_s_switches_each_turn_on_only_their_own_part",
+    "event": "ok",
+    "line_one_based": 9805,
+    "terminal_ordinal_one_based": 4859
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::with_turned_speaking_a_silent_face_turned_to_the_lamp_is_nobody_turned_to_it",
+    "event": "ok",
+    "line_one_based": 9887,
+    "terminal_ordinal_one_based": 4900
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::with_turned_face_speaks_a_turned_face_lets_out_only_a_line_it_is_seen_speaking",
+    "event": "ok",
+    "line_one_based": 9879,
+    "terminal_ordinal_one_based": 4896
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::with_turned_face_speaks_desk_talk_past_a_still_face_is_held_and_makes_the_room_busy",
+    "event": "ok",
+    "line_one_based": 9881,
+    "terminal_ordinal_one_based": 4897
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::with_turned_face_speaks_the_conversations_voice_still_counts_with_a_still_face",
+    "event": "ok",
+    "line_one_based": 9883,
+    "terminal_ordinal_one_based": 4898
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::with_turned_face_speaks_the_same_speaker_still_goes_on_five_turns",
+    "event": "ok",
+    "line_one_based": 9885,
+    "terminal_ordinal_one_based": 4899
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::one_person_said_both_lines_by_voice_or_by_one_face",
+    "event": "ok",
+    "line_one_based": 9709,
+    "terminal_ordinal_one_based": 4811
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::with_no_sign_of_a_second_person_a_line_let_out_joins_the_one_it_cut_short",
+    "event": "ok",
+    "line_one_based": 9889,
+    "terminal_ordinal_one_based": 4901
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_chain_with_two_faces_seen_speaking_in_it_breaks_before_the_second",
+    "event": "ok",
+    "line_one_based": 9547,
+    "terminal_ordinal_one_based": 4730
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_turned_face_counts_for_a_first_word_only_when_it_speaks_the_line",
+    "event": "ok",
+    "line_one_based": 9657,
+    "terminal_ordinal_one_based": 4785
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_near_check_reads_the_eyes_through_addressed_when_it_runs",
+    "event": "ok",
+    "line_one_based": 9783,
+    "terminal_ordinal_one_based": 4848
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_close_face_turned_over_the_line_counts_for_a_first_word_through_the_eyes",
+    "event": "ok",
+    "line_one_based": 9629,
+    "terminal_ordinal_one_based": 4771
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_near_hearing_counts_only_around_the_lines_start",
+    "event": "ok",
+    "line_one_based": 9613,
+    "terminal_ordinal_one_based": 4763
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_lamps_name_carries_only_on_a_sign_of_one_speaker",
+    "event": "ok",
+    "line_one_based": 9845,
+    "terminal_ordinal_one_based": 4879
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_line_kept_unjudged_is_read_for_one_speaker_as_a_judged_one",
+    "event": "ok",
+    "line_one_based": 9595,
+    "terminal_ordinal_one_based": 4754
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_request_with_a_pause_and_one_face_in_view_is_asked_whole",
+    "event": "ok",
+    "line_one_based": 9767,
+    "terminal_ordinal_one_based": 4840
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_line_begins_with_the_name_only_when_it_is_set_off_as_a_call",
+    "event": "ok",
+    "line_one_based": 9583,
+    "terminal_ordinal_one_based": 4748
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_name_heard_as_a_line_began_earns_the_live_routes_note",
+    "event": "ok",
+    "line_one_based": 9781,
+    "terminal_ordinal_one_based": 4847
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_call_the_live_route_would_hold_is_said_as_run_for_the_battery",
+    "event": "ok",
+    "line_one_based": 9537,
+    "terminal_ordinal_one_based": 4725
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_lamps_actions_and_a_line_going_on_read_one_reader_of_the_policy",
+    "event": "ok",
+    "line_one_based": 9769,
+    "terminal_ordinal_one_based": 4841
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_policy_holds_this_routes_actions_only_with_the_bus_and_the_rule",
+    "event": "ok",
+    "line_one_based": 9791,
+    "terminal_ordinal_one_based": 4852
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_policy_is_told_the_name_a_line_left_unanswered_and_the_lamp_speaking_lately",
+    "event": "ok",
+    "line_one_based": 9793,
+    "terminal_ordinal_one_based": 4853
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::as_the_only_voice_a_remark_to_the_room_is_held_with_the_switch",
+    "event": "ok",
+    "line_one_based": 9681,
+    "terminal_ordinal_one_based": 4797
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::as_the_only_voice_lines_said_over_the_lamp_are_not_talk_with_the_switch",
+    "event": "ok",
+    "line_one_based": 9685,
+    "terminal_ordinal_one_based": 4799
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::as_the_only_voice_an_answer_ends_a_busy_room_a_minute_later_with_the_switch",
+    "event": "ok",
+    "line_one_based": 9683,
+    "terminal_ordinal_one_based": 4798
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::as_the_only_voice_the_days_bars_hold_a_name_heard_close_by_day",
+    "event": "ok",
+    "line_one_based": 9689,
+    "terminal_ordinal_one_based": 4801
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::in_a_busy_room_a_line_going_on_waits_for_the_policy_and_goes_as_it_says",
+    "event": "ok",
+    "line_one_based": 9707,
+    "terminal_ordinal_one_based": 4810
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_line_judged_in_a_busy_room_is_known_as_judged_busy",
+    "event": "ok",
+    "line_one_based": 9591,
+    "terminal_ordinal_one_based": 4752
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::after_a_tool_turn_or_the_lamps_news_a_line_105_s_later_is_judged_as_live_judges_it",
+    "event": "ok",
+    "line_one_based": 9667,
+    "terminal_ordinal_one_based": 4790
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_line_let_out_only_as_the_conversation_going_on_earns_the_note",
+    "event": "ok",
+    "line_one_based": 9597,
+    "terminal_ordinal_one_based": 4755
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_line_begun_over_the_lamps_answer_is_not_told_it_may_be_peoples_talk",
+    "event": "ok",
+    "line_one_based": 9585,
+    "terminal_ordinal_one_based": 4749
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_reply_to_nothing_the_lamp_asked_said_over_its_answer_is_someone_elses",
+    "event": "ok",
+    "line_one_based": 9631,
+    "terminal_ordinal_one_based": 4772
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_hearing_hook_is_installed_with_the_switch_alone",
+    "event": "ok",
+    "line_one_based": 9761,
+    "terminal_ordinal_one_based": 4837
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::spoken_turns_are_told_to_answer_the_likeliest_meaning",
+    "event": "ok",
+    "line_one_based": 9735,
+    "terminal_ordinal_one_based": 4824
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_plain_ask_for_something_new_is_searched_from_its_words",
+    "event": "ok",
+    "line_one_based": 9621,
+    "terminal_ordinal_one_based": 4767
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_search_begun_early_is_taken_once_by_its_request",
+    "event": "ok",
+    "line_one_based": 9809,
+    "terminal_ordinal_one_based": 4861
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_models_query_adding_a_place_is_not_answered_by_the_early_search",
+    "event": "ok",
+    "line_one_based": 9779,
+    "terminal_ordinal_one_based": 4846
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_requests_first_search_takes_the_one_begun_early",
+    "event": "ok",
+    "line_one_based": 9637,
+    "terminal_ordinal_one_based": 4775
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_routes_bound_is_past_lives_and_within_the_chat_models_own",
+    "event": "ok",
+    "line_one_based": 9799,
+    "terminal_ordinal_one_based": 4856
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_spoken_turns_look_is_never_the_one_the_bound_cuts",
+    "event": "ok",
+    "line_one_based": 9643,
+    "terminal_ordinal_one_based": 4778
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_lamps_name_heard_as_lynn_is_its_call_not_someone_elses",
+    "event": "ok",
+    "line_one_based": 9773,
+    "terminal_ordinal_one_based": 4843
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_line_said_by_name_is_told_to_answer_and_a_face_only_line_may_decline",
+    "event": "ok",
+    "line_one_based": 9599,
+    "terminal_ordinal_one_based": 4756
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_name_hearing_counts_from_its_time_and_score",
+    "event": "ok",
+    "line_one_based": 9607,
+    "terminal_ordinal_one_based": 4760
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_weather_is_fetched_only_when_a_call_asks",
+    "event": "ok",
+    "line_one_based": 9825,
+    "terminal_ordinal_one_based": 4869
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_weather_switch_off_declares_and_fetches_nothing",
+    "event": "ok",
+    "line_one_based": 9827,
+    "terminal_ordinal_one_based": 4870
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_weather_is_cut_after_the_skills_and_before_the_search",
+    "event": "ok",
+    "line_one_based": 9823,
+    "terminal_ordinal_one_based": 4868
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_lamps_place_follows_its_time",
+    "event": "ok",
+    "line_one_based": 9777,
+    "terminal_ordinal_one_based": 4845
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_room_the_route_keeps_is_told_on_the_bus",
+    "event": "ok",
+    "line_one_based": 9797,
+    "terminal_ordinal_one_based": 4855
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::gemini_is_called_with_the_units_key_or_the_live_routes_google_key_never_a_relays",
+    "event": "ok",
+    "line_one_based": 9697,
+    "terminal_ordinal_one_based": 4805
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_hosted_chats_and_searches_take_the_units_credentials",
+    "event": "ok",
+    "line_one_based": 9763,
+    "terminal_ordinal_one_based": 4838
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::through_the_relay_deepseek_takes_the_relay_key_and_needs_no_deepseek_key",
+    "event": "ok",
+    "line_one_based": 9831,
+    "terminal_ordinal_one_based": 4872
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_refused_own_key_sends_that_request_through_the_relay",
+    "event": "ok",
+    "line_one_based": 9627,
+    "terminal_ordinal_one_based": 4770
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::a_removed_own_key_leaves_voice_keys_reporting",
+    "event": "ok",
+    "line_one_based": 9635,
+    "terminal_ordinal_one_based": 4774
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::own_keys_turned_off_or_the_worker_dropped_says_voice_keys_is_stopping",
+    "event": "ok",
+    "line_one_based": 9711,
+    "terminal_ordinal_one_based": 4812
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_bound_cuts_the_fetch_then_the_time_and_never_a_core_skill",
+    "event": "ok",
+    "line_one_based": 9747,
+    "terminal_ordinal_one_based": 4830
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::the_time_is_given_only_for_another_places_time",
+    "event": "ok",
+    "line_one_based": 9821,
+    "terminal_ordinal_one_based": 4867
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::memory_switches::with_the_memorys_switches_the_second_route_forgets_tells_a_thread_and_lists_rules",
+    "event": "ok",
+    "line_one_based": 9511,
+    "terminal_ordinal_one_based": 4712
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::memory_observer::a_pass_asks_deepseek_without_thinking_and_reads_its_streamed_json",
+    "event": "ok",
+    "line_one_based": 9505,
+    "terminal_ordinal_one_based": 4709
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::memory_observer::a_named_ask_makes_the_first_round_call_start_agent_task_and_nothing_else_changes",
+    "event": "ok",
+    "line_one_based": 9501,
+    "terminal_ordinal_one_based": 4707
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::memory_observer::an_ask_to_remember_a_face_with_a_name_makes_the_first_round_call_remember_my_face",
+    "event": "ok",
+    "line_one_based": 9507,
+    "terminal_ordinal_one_based": 4710
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::memory_observer::the_first_force_that_names_a_function_is_the_one_kept",
+    "event": "ok",
+    "line_one_based": 9509,
+    "terminal_ordinal_one_based": 4711
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::memory_observer::a_named_ask_tells_the_forced_round_only_the_agent_its_words_name",
+    "event": "ok",
+    "line_one_based": 9503,
+    "terminal_ordinal_one_based": 4708
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_slow_second_speech_piece_keeps_order_until_release_or_retirement",
+    "event": "ok",
+    "line_one_based": 8829,
+    "terminal_ordinal_one_based": 4371
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_spoken_turn_is_heard_then_said_sentence_by_sentence_in_order",
+    "event": "ok",
+    "line_one_based": 8837,
+    "terminal_ordinal_one_based": 4375
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_written_turn_is_answered_without_listening",
+    "event": "ok",
+    "line_one_based": 8859,
+    "terminal_ordinal_one_based": 4386
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_tool_call_is_run_and_its_result_answered",
+    "event": "ok",
+    "line_one_based": 8845,
+    "terminal_ordinal_one_based": 4379
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_forget_nobody_asked_for_is_not_run",
+    "event": "ok",
+    "line_one_based": 8683,
+    "terminal_ordinal_one_based": 4298
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_yes_alone_forgets_nothing_and_one_that_says_it_does",
+    "event": "ok",
+    "line_one_based": 8865,
+    "terminal_ordinal_one_based": 4389
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::only_words_that_ask_to_forget_let_a_forget_run",
+    "event": "ok",
+    "line_one_based": 9061,
+    "terminal_ordinal_one_based": 4487
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_hand_over_asked_by_voice_reaches_the_tasks_part_through_this_route",
+    "event": "ok",
+    "line_one_based": 8687,
+    "terminal_ordinal_one_based": 4300
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::news_asked_about_rides_on_its_turn_and_its_key_is_never_the_models",
+    "event": "ok",
+    "line_one_based": 9031,
+    "terminal_ordinal_one_based": 4472
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::news_asked_by_voice_through_this_route_is_put_on_the_turn",
+    "event": "ok",
+    "line_one_based": 9035,
+    "terminal_ordinal_one_based": 4474
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::words_said_before_a_call_are_told_to_the_next_round_with_the_switch",
+    "event": "ok",
+    "line_one_based": 9315,
+    "terminal_ordinal_one_based": 4614
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::not_for_me_ends_the_turn_in_silence",
+    "event": "ok",
+    "line_one_based": 9037,
+    "terminal_ordinal_one_based": 4475
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_decline_of_a_line_named_to_a_face_is_not_taken_once",
+    "event": "ok",
+    "line_one_based": 8679,
+    "terminal_ordinal_one_based": 4296
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_holding_only_answer_is_told_so_the_route_is_asked_to_go_on",
+    "event": "ok",
+    "line_one_based": 8703,
+    "terminal_ordinal_one_based": 4308
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_line_lost_on_the_network_is_asked_once_more_when_the_link_is_back",
+    "event": "ok",
+    "line_one_based": 8747,
+    "terminal_ordinal_one_based": 4330
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_line_is_not_asked_again_after_words_a_call_a_refusal_or_a_newer_line",
+    "event": "ok",
+    "line_one_based": 8741,
+    "terminal_ordinal_one_based": 4327
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::words_the_heed_holds_end_the_turn_unanswered",
+    "event": "ok",
+    "line_one_based": 9317,
+    "terminal_ordinal_one_based": 4615
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_turn_the_heed_holds_is_told_held_back",
+    "event": "ok",
+    "line_one_based": 8847,
+    "terminal_ordinal_one_based": 4380
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_line_the_model_declines_is_told_held_back",
+    "event": "ok",
+    "line_one_based": 8757,
+    "terminal_ordinal_one_based": 4335
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_line_declined_after_a_tool_ran_is_not_told_held_back",
+    "event": "ok",
+    "line_one_based": 8729,
+    "terminal_ordinal_one_based": 4321
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_held_verdict_is_told_before_its_words_are_taken",
+    "event": "ok",
+    "line_one_based": 8701,
+    "terminal_ordinal_one_based": 4307
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_turn_the_heed_lets_out_is_told_answered_and_one_not_judged_is_not_told",
+    "event": "ok",
+    "line_one_based": 8851,
+    "terminal_ordinal_one_based": 4382
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_line_held_as_unclear_is_told_and_a_misheard_cut_in_is_noted_next",
+    "event": "ok",
+    "line_one_based": 8737,
+    "terminal_ordinal_one_based": 4325
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_later_decline_keeps_an_executed_scoped_requested_audio_call",
+    "event": "ok",
+    "line_one_based": 8711,
+    "terminal_ordinal_one_based": 4312
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::an_unacted_mixed_requested_audio_and_decline_is_held_back",
+    "event": "ok",
+    "line_one_based": 8873,
+    "terminal_ordinal_one_based": 4393
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_chat_not_begun_within_three_seconds_ends_the_turn_unanswered",
+    "event": "ok",
+    "line_one_based": 8665,
+    "terminal_ordinal_one_based": 4289
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::lines_the_route_gave_up_are_no_talk_past_the_lamp",
+    "event": "ok",
+    "line_one_based": 8957,
+    "terminal_ordinal_one_based": 4435
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::the_owners_ten_lines_are_let_out_though_each_answer_was_cut_by_the_next",
+    "event": "ok",
+    "line_one_based": 9259,
+    "terminal_ordinal_one_based": 4586
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_chat_begun_on_the_early_words_is_kept_when_they_are_the_lines",
+    "event": "ok",
+    "line_one_based": 8663,
+    "terminal_ordinal_one_based": 4288
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_turns_tools_are_journalled_by_name_and_count_never_words",
+    "event": "ok",
+    "line_one_based": 8853,
+    "terminal_ordinal_one_based": 4383
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_resumed_turn_drops_the_chat_begun_on_its_early_words",
+    "event": "ok",
+    "line_one_based": 8809,
+    "terminal_ordinal_one_based": 4361
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::memory_told_on_the_early_words_keeps_the_prepared_round",
+    "event": "ok",
+    "line_one_based": 8961,
+    "terminal_ordinal_one_based": 4437
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::the_first_piece_waits_for_four_words_with_the_configured_voice",
+    "event": "ok",
+    "line_one_based": 9233,
+    "terminal_ordinal_one_based": 4573
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::early_words_stand_only_for_the_same_line_asked_the_same_way",
+    "event": "ok",
+    "line_one_based": 8897,
+    "terminal_ordinal_one_based": 4405
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_round_after_a_tool_ran_is_not_given_up",
+    "event": "ok",
+    "line_one_based": 8811,
+    "terminal_ordinal_one_based": 4362
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_pause_asks_the_lines_listener_for_its_words_so_far",
+    "event": "ok",
+    "line_one_based": 8783,
+    "terminal_ordinal_one_based": 4348
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_slow_first_round_makes_one_soft_sound_and_waits_longer",
+    "event": "ok",
+    "line_one_based": 8827,
+    "terminal_ordinal_one_based": 4370
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_line_begun_over_only_the_wait_sound_is_begun_in_the_clear",
+    "event": "ok",
+    "line_one_based": 8721,
+    "terminal_ordinal_one_based": 4317
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::each_request_sends_its_times_before_its_end",
+    "event": "ok",
+    "line_one_based": 8893,
+    "terminal_ordinal_one_based": 4403
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::the_wait_sound_comes_when_it_is_told",
+    "event": "ok",
+    "line_one_based": 9269,
+    "terminal_ordinal_one_based": 4591
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_later_wait_sound_preserves_the_answer_window",
+    "event": "ok",
+    "line_one_based": 8715,
+    "terminal_ordinal_one_based": 4314
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_later_wait_sound_does_not_delay_cancellation",
+    "event": "ok",
+    "line_one_based": 8713,
+    "terminal_ordinal_one_based": 4313
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::the_wait_sounds_time_is_milliseconds_in_its_bounds",
+    "event": "ok",
+    "line_one_based": 9273,
+    "terminal_ordinal_one_based": 4593
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::the_wait_sounds_take_turns",
+    "event": "ok",
+    "line_one_based": 9271,
+    "terminal_ordinal_one_based": 4592
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::not_for_me_written_as_words_ends_the_turn_in_silence",
+    "event": "ok",
+    "line_one_based": 9049,
+    "terminal_ordinal_one_based": 4481
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_look_without_a_picture_tells_the_model_it_saw_nothing",
+    "event": "ok",
+    "line_one_based": 8771,
+    "terminal_ordinal_one_based": 4342
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_look_sends_the_eyes_picture_or_says_there_is_none",
+    "event": "ok",
+    "line_one_based": 8767,
+    "terminal_ordinal_one_based": 4340
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_look_s_picture_goes_once_and_never_otherwise",
+    "event": "ok",
+    "line_one_based": 8765,
+    "terminal_ordinal_one_based": 4339
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::nothing_heard_is_a_quiet_complete_turn",
+    "event": "ok",
+    "line_one_based": 9053,
+    "terminal_ordinal_one_based": 4483
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::the_announcement_is_said_once_per_quiet_spell",
+    "event": "ok",
+    "line_one_based": 9219,
+    "terminal_ordinal_one_based": 4566
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::the_lamps_words_end_with_a_finished_piece_as_the_live_routes_do",
+    "event": "ok",
+    "line_one_based": 9243,
+    "terminal_ordinal_one_based": 4578
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::the_only_voice_never_says_it_sounds_different",
+    "event": "ok",
+    "line_one_based": 9255,
+    "terminal_ordinal_one_based": 4584
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::bedtime_words_use_the_second_routes_written_path_independently_of_reminders",
+    "event": "ok",
+    "line_one_based": 8877,
+    "terminal_ordinal_one_based": 4395
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_turn_spoken_over_stops_its_chat_and_speech_and_sends_nothing_more",
+    "event": "ok",
+    "line_one_based": 8849,
+    "terminal_ordinal_one_based": 4381
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::each_failing_service_fails_the_turn_at_its_stage",
+    "event": "ok",
+    "line_one_based": 8891,
+    "terminal_ordinal_one_based": 4402
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_speech_to_text_stream_lost_mid_line_fails_that_turn_and_the_next_is_answered",
+    "event": "ok",
+    "line_one_based": 8831,
+    "terminal_ordinal_one_based": 4372
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_reminder_is_deferred_as_the_fixture_does",
+    "event": "ok",
+    "line_one_based": 8797,
+    "terminal_ordinal_one_based": 4355
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::every_turn_begun_settles_the_routes_once",
+    "event": "ok",
+    "line_one_based": 8901,
+    "terminal_ordinal_one_based": 4407
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::the_only_voice_says_a_due_reminder_with_the_live_routes_note_and_no_tools",
+    "event": "ok",
+    "line_one_based": 9257,
+    "terminal_ordinal_one_based": 4585
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::the_chat_is_given_the_exchanges_it_is_told_between_the_system_and_the_question",
+    "event": "ok",
+    "line_one_based": 9223,
+    "terminal_ordinal_one_based": 4568
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::what_changes_is_told_after_the_exchanges_and_before_the_notes_and_words",
+    "event": "ok",
+    "line_one_based": 9303,
+    "terminal_ordinal_one_based": 4608
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_tool_call_is_heard_only_in_a_spoken_turn",
+    "event": "ok",
+    "line_one_based": 8843,
+    "terminal_ordinal_one_based": 4378
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_short_sound_not_heard_as_a_short_word_is_held_when_sounds_are_checked",
+    "event": "ok",
+    "line_one_based": 8817,
+    "terminal_ordinal_one_based": 4365
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_checked_sound_with_a_word_right_after_the_lamps_question_is_answered",
+    "event": "ok",
+    "line_one_based": 8671,
+    "terminal_ordinal_one_based": 4292
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::with_its_switch_a_written_turn_waits_seven_seconds_to_begin",
+    "event": "ok",
+    "line_one_based": 9305,
+    "terminal_ordinal_one_based": 4609
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_look_waits_five_seconds_and_then_says_it_could_not_look",
+    "event": "ok",
+    "line_one_based": 8769,
+    "terminal_ordinal_one_based": 4341
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_full_look_without_its_still_still_says_it_could_not_look",
+    "event": "ok",
+    "line_one_based": 8685,
+    "terminal_ordinal_one_based": 4299
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::the_sentence_is_heard_for_its_count_and_never_asked_of_the_model",
+    "event": "ok",
+    "line_one_based": 9261,
+    "terminal_ordinal_one_based": 4587
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::the_sentences_sound_is_not_carried_into_the_next_line",
+    "event": "ok",
+    "line_one_based": 9263,
+    "terminal_ordinal_one_based": 4588
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_request_going_on_from_one_given_up_begins_with_its_words",
+    "event": "ok",
+    "line_one_based": 8801,
+    "terminal_ordinal_one_based": 4357
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_request_going_on_takes_only_the_words_of_the_one_just_before_it_in_its_session",
+    "event": "ok",
+    "line_one_based": 8803,
+    "terminal_ordinal_one_based": 4358
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::the_first_request_after_a_stop_is_told_of_it_beside_its_words",
+    "event": "ok",
+    "line_one_based": 9235,
+    "terminal_ordinal_one_based": 4574
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_stop_whose_request_is_never_asked_is_told_with_the_next_one",
+    "event": "ok",
+    "line_one_based": 8841,
+    "terminal_ordinal_one_based": 4377
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_stop_goes_with_a_request_going_on_and_never_past_two_minutes",
+    "event": "ok",
+    "line_one_based": 8839,
+    "terminal_ordinal_one_based": 4376
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_chat_that_never_begins_says_a_slow_moment_then_a_shorter_one_never_the_same_twice",
+    "event": "ok",
+    "line_one_based": 8669,
+    "terminal_ordinal_one_based": 4291
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_chat_refused_before_any_word_says_the_down_line_then_the_shorter_one",
+    "event": "ok",
+    "line_one_based": 8667,
+    "terminal_ordinal_one_based": 4290
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::the_first_turn_after_a_start_says_the_down_line",
+    "event": "ok",
+    "line_one_based": 9237,
+    "terminal_ordinal_one_based": 4575
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_request_going_on_names_the_one_begun_before_it_in_its_session",
+    "event": "ok",
+    "line_one_based": 8805,
+    "terminal_ordinal_one_based": 4359
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::lines_left_unanswered_make_the_routes_room_busy_and_an_answer_is_speaking",
+    "event": "ok",
+    "line_one_based": 8955,
+    "terminal_ordinal_one_based": 4434
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_line_the_name_began_is_asked_with_the_name_note",
+    "event": "ok",
+    "line_one_based": 8759,
+    "terminal_ordinal_one_based": 4336
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_yes_after_a_hand_over_on_this_route_starts_it",
+    "event": "ok",
+    "line_one_based": 8863,
+    "terminal_ordinal_one_based": 4388
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_spoken_request_is_told_the_air_and_a_written_turn_is_not",
+    "event": "ok",
+    "line_one_based": 8833,
+    "terminal_ordinal_one_based": 4373
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_known_person_speaking_is_told_how_they_seem_and_no_one_else_is",
+    "event": "ok",
+    "line_one_based": 8709,
+    "terminal_ordinal_one_based": 4311
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::the_lamps_work_and_its_own_turns_are_told_to_the_rule",
+    "event": "ok",
+    "line_one_based": 9245,
+    "terminal_ordinal_one_based": 4579
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::the_first_line_after_a_stop_tells_the_rule_of_it",
+    "event": "ok",
+    "line_one_based": 9231,
+    "terminal_ordinal_one_based": 4572
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::the_end_of_the_lamps_words_is_told_as_they_are_sent",
+    "event": "ok",
+    "line_one_based": 9225,
+    "terminal_ordinal_one_based": 4569
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_line_let_out_only_as_the_conversation_is_asked_with_its_note",
+    "event": "ok",
+    "line_one_based": 8743,
+    "terminal_ordinal_one_based": 4328
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::the_voice_makes_ready_as_a_line_begins",
+    "event": "ok",
+    "line_one_based": 9265,
+    "terminal_ordinal_one_based": 4589
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_held_call_is_not_run_and_the_model_is_told_so",
+    "event": "ok",
+    "line_one_based": 8691,
+    "terminal_ordinal_one_based": 4302
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::the_first_words_are_said_before_the_first_sentence_ends",
+    "event": "ok",
+    "line_one_based": 9239,
+    "terminal_ordinal_one_based": 4576
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::the_words_heard_are_told_before_the_chat_begins",
+    "event": "ok",
+    "line_one_based": 9277,
+    "terminal_ordinal_one_based": 4595
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_look_asked_by_its_call_goes_to_the_coordinator_and_ends_the_turn",
+    "event": "ok",
+    "line_one_based": 8763,
+    "terminal_ordinal_one_based": 4338
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_skill_answer_with_a_look_asks_the_coordinator_for_the_turns_look",
+    "event": "ok",
+    "line_one_based": 8819,
+    "terminal_ordinal_one_based": 4366
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_skills_note_for_its_picture_goes_once_with_its_look_turn",
+    "event": "ok",
+    "line_one_based": 8823,
+    "terminal_ordinal_one_based": 4368
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_skills_note_for_its_picture_is_read_from_its_answer",
+    "event": "ok",
+    "line_one_based": 8825,
+    "terminal_ordinal_one_based": 4369
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_skills_look_dropped_in_a_written_turn_goes_on_to_the_next_round",
+    "event": "ok",
+    "line_one_based": 8821,
+    "terminal_ordinal_one_based": 4367
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::only_a_turn_the_lamp_answered_aloud_marks_whom_it_was_talking_with",
+    "event": "ok",
+    "line_one_based": 9051,
+    "terminal_ordinal_one_based": 4482
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_request_of_no_words_neither_starts_nor_uses_up_a_held_gap",
+    "event": "ok",
+    "line_one_based": 8807,
+    "terminal_ordinal_one_based": 4360
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_line_held_only_by_a_gap_is_told_no_memory_reads_or_hits",
+    "event": "ok",
+    "line_one_based": 8739,
+    "terminal_ordinal_one_based": 4326
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_dated_follow_up_s_line_goes_last_in_its_turn_s_notes",
+    "event": "ok",
+    "line_one_based": 8677,
+    "terminal_ordinal_one_based": 4295
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_cold_first_greeting_gets_the_dated_follow_up_s_line",
+    "event": "ok",
+    "line_one_based": 8675,
+    "terminal_ordinal_one_based": 4294
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_cold_first_request_tells_the_model_nothing_of_the_event",
+    "event": "ok",
+    "line_one_based": 8673,
+    "terminal_ordinal_one_based": 4293
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_one_word_first_request_then_a_greeting_tells_nothing_of_the_event",
+    "event": "ok",
+    "line_one_based": 8781,
+    "terminal_ordinal_one_based": 4347
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_dated_follow_up_s_line_comes_after_the_note_read_at_the_turn_or_ahead",
+    "event": "ok",
+    "line_one_based": 8681,
+    "terminal_ordinal_one_based": 4297
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_note_read_ahead_withholds_its_dated_follow_up_after_a_first_request",
+    "event": "ok",
+    "line_one_based": 8779,
+    "terminal_ordinal_one_based": 4346
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_gap_held_greeting_is_not_asked_for_a_dated_follow_up_s_line",
+    "event": "ok",
+    "line_one_based": 8689,
+    "terminal_ordinal_one_based": 4301
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_memory_call_on_a_gap_held_line_runs_for_no_one",
+    "event": "ok",
+    "line_one_based": 8775,
+    "terminal_ordinal_one_based": 4344
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_held_lines_yes_runs_for_no_one_though_the_face_is_back_before_the_call",
+    "event": "ok",
+    "line_one_based": 8697,
+    "terminal_ordinal_one_based": 4305
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_bare_yes_or_no_after_the_photo_question_is_its_answer_in_a_busy_room",
+    "event": "ok",
+    "line_one_based": 8655,
+    "terminal_ordinal_one_based": 4284
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::every_function_that_grants_or_keeps_for_someone_is_withheld_from_a_held_line",
+    "event": "ok",
+    "line_one_based": 8899,
+    "terminal_ordinal_one_based": 4406
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::memory_scope_is_bound_before_answer_and_revoked_with_the_turn",
+    "event": "ok",
+    "line_one_based": 8959,
+    "terminal_ordinal_one_based": 4436
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::dropping_engine_revokes_memory_scope_even_when_task_holds_a_lease",
+    "event": "ok",
+    "line_one_based": 8887,
+    "terminal_ordinal_one_based": 4400
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::revoked_tool_result_is_not_sent_to_another_chat_round",
+    "event": "ok",
+    "line_one_based": 9199,
+    "terminal_ordinal_one_based": 4556
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::words_cut_short_by_a_held_line_are_answered_in_its_place",
+    "event": "ok",
+    "line_one_based": 9311,
+    "terminal_ordinal_one_based": 4612
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::words_cut_short_by_a_line_let_out_are_let_go",
+    "event": "ok",
+    "line_one_based": 9313,
+    "terminal_ordinal_one_based": 4613
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_request_broken_into_four_pieces_is_asked_as_one_line",
+    "event": "ok",
+    "line_one_based": 8799,
+    "terminal_ordinal_one_based": 4356
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_piece_cut_before_it_was_asked_stays_in_the_chain",
+    "event": "ok",
+    "line_one_based": 8785,
+    "terminal_ordinal_one_based": 4349
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_line_already_answered_is_never_chained_into_the_next",
+    "event": "ok",
+    "line_one_based": 8717,
+    "terminal_ordinal_one_based": 4315
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_piece_cut_while_its_verdict_waits_is_chained_only_in_a_room_not_busy",
+    "event": "ok",
+    "line_one_based": 8787,
+    "terminal_ordinal_one_based": 4350
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_stop_cut_while_its_verdict_waits_clears_the_chain_in_any_room",
+    "event": "ok",
+    "line_one_based": 8835,
+    "terminal_ordinal_one_based": 4374
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_piece_folded_into_the_next_by_its_sound_keeps_the_chain",
+    "event": "ok",
+    "line_one_based": 8791,
+    "terminal_ordinal_one_based": 4352
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::stopped_words_are_never_joined_nor_answered_in_a_later_lines_place",
+    "event": "ok",
+    "line_one_based": 9221,
+    "terminal_ordinal_one_based": 4567
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_line_cut_short_by_the_same_person_is_asked_with_the_line_that_cut_it",
+    "event": "ok",
+    "line_one_based": 8727,
+    "terminal_ordinal_one_based": 4320
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_line_let_out_with_no_sign_of_a_second_person_is_asked_with_the_words_it_cut_short",
+    "event": "ok",
+    "line_one_based": 8745,
+    "terminal_ordinal_one_based": 4329
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_held_second_half_of_the_same_persons_request_is_answered_with_the_first",
+    "event": "ok",
+    "line_one_based": 8699,
+    "terminal_ordinal_one_based": 4306
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::words_carried_through_a_held_line_are_never_joined",
+    "event": "ok",
+    "line_one_based": 9307,
+    "terminal_ordinal_one_based": 4610
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_print_still_to_come_is_waited_for_before_the_lines_are_joined",
+    "event": "ok",
+    "line_one_based": 8795,
+    "terminal_ordinal_one_based": 4354
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_line_begun_while_a_join_waits_for_a_print_still_carries_the_words",
+    "event": "ok",
+    "line_one_based": 8725,
+    "terminal_ordinal_one_based": 4319
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_line_going_on_from_one_unanswered_hears_its_sound_first",
+    "event": "ok",
+    "line_one_based": 8735,
+    "terminal_ordinal_one_based": 4324
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::each_spoken_line_is_asked_with_its_call_note",
+    "event": "ok",
+    "line_one_based": 8895,
+    "terminal_ordinal_one_based": 4404
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::only_a_wordless_piece_carries_and_only_its_last_moments",
+    "event": "ok",
+    "line_one_based": 9055,
+    "terminal_ordinal_one_based": 4484
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::the_name_cut_off_by_a_pause_begins_the_next_line_with_the_listener_kept_ready",
+    "event": "ok",
+    "line_one_based": 9249,
+    "terminal_ordinal_one_based": 4581
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_wordless_piece_with_the_name_heard_lends_its_time_not_its_sound",
+    "event": "ok",
+    "line_one_based": 8857,
+    "terminal_ordinal_one_based": 4385
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::scoped_system_is_built_for_the_admitted_scope_not_the_face_in_view",
+    "event": "ok",
+    "line_one_based": 9201,
+    "terminal_ordinal_one_based": 4557
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_line_begun_over_the_lamps_answer_is_told_it_cut_in",
+    "event": "ok",
+    "line_one_based": 8723,
+    "terminal_ordinal_one_based": 4318
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_line_soon_after_the_lamp_spoke_is_told_it_may_follow_on",
+    "event": "ok",
+    "line_one_based": 8749,
+    "terminal_ordinal_one_based": 4331
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::only_the_lamps_name_is_told_so_and_asked_as_the_name_with_no_words",
+    "event": "ok",
+    "line_one_based": 9057,
+    "terminal_ordinal_one_based": 4485
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_called_line_with_more_words_than_the_name_is_not_told_it_was_only_the_name",
+    "event": "ok",
+    "line_one_based": 8659,
+    "terminal_ordinal_one_based": 4286
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_chat_begun_on_a_cut_ins_early_words_carries_its_note",
+    "event": "ok",
+    "line_one_based": 8661,
+    "terminal_ordinal_one_based": 4287
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::b_first_line_after_a_reaches_the_memory_as_bs",
+    "event": "ok",
+    "line_one_based": 8875,
+    "terminal_ordinal_one_based": 4394
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_line_another_face_spoke_is_the_rooms_and_the_known_faces_stays_theirs",
+    "event": "ok",
+    "line_one_based": 8719,
+    "terminal_ordinal_one_based": 4316
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::without_the_switch_a_line_another_face_spoke_stays_the_known_persons",
+    "event": "ok",
+    "line_one_based": 9309,
+    "terminal_ordinal_one_based": 4611
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::seeing_who_speaks_needs_the_scoped_context",
+    "event": "ok",
+    "line_one_based": 9203,
+    "terminal_ordinal_one_based": 4558
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_line_that_waits_for_the_policy_goes_as_it_decides",
+    "event": "ok",
+    "line_one_based": 8755,
+    "terminal_ordinal_one_based": 4334
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::the_next_lines_listener_is_kept_ready_and_one_closed_since_is_not_used",
+    "event": "ok",
+    "line_one_based": 9253,
+    "terminal_ordinal_one_based": 4583
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_kept_listener_goes_after_its_time_or_when_listening_stops",
+    "event": "ok",
+    "line_one_based": 8707,
+    "terminal_ordinal_one_based": 4310
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::the_first_line_after_a_start_goes_to_a_socket_opened_before_it",
+    "event": "ok",
+    "line_one_based": 9229,
+    "terminal_ordinal_one_based": 4571
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::no_listener_is_opened_before_a_line_outside_a_runtime",
+    "event": "ok",
+    "line_one_based": 9033,
+    "terminal_ordinal_one_based": 4473
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_line_ending_before_its_name_waits_for_it",
+    "event": "ok",
+    "line_one_based": 8731,
+    "terminal_ordinal_one_based": 4322
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_lines_words_are_counted_against_the_line_before_and_the_lamps_answer",
+    "event": "ok",
+    "line_one_based": 8761,
+    "terminal_ordinal_one_based": 4337
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::the_whose_words_line_says_its_counts_in_its_own_words",
+    "event": "ok",
+    "line_one_based": 9275,
+    "terminal_ordinal_one_based": 4594
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::the_latest_answers_words_are_kept_for_the_count",
+    "event": "ok",
+    "line_one_based": 9247,
+    "terminal_ordinal_one_based": 4580
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_line_that_cuts_the_story_is_asked_with_the_story_as_heard",
+    "event": "ok",
+    "line_one_based": 8753,
+    "terminal_ordinal_one_based": 4333
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_call_written_in_the_answer_is_left_out_of_what_was_heard",
+    "event": "ok",
+    "line_one_based": 8657,
+    "terminal_ordinal_one_based": 4285
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::each_answer_asks_for_its_speech_socket_as_it_begins",
+    "event": "ok",
+    "line_one_based": 8889,
+    "terminal_ordinal_one_based": 4401
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_written_turn_waits_longer_only_with_its_switch",
+    "event": "ok",
+    "line_one_based": 8861,
+    "terminal_ordinal_one_based": 4387
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_named_asks_call_goes_to_the_agent_its_words_name",
+    "event": "ok",
+    "line_one_based": 8777,
+    "terminal_ordinal_one_based": 4345
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::the_named_asks_journal_line_says_what_became_of_it_and_no_words",
+    "event": "ok",
+    "line_one_based": 9251,
+    "terminal_ordinal_one_based": 4582
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_line_that_asks_two_of_the_staff_gives_each_task_to_its_own",
+    "event": "ok",
+    "line_one_based": 8751,
+    "terminal_ordinal_one_based": 4332
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_held_lines_named_ask_is_said_in_the_journal",
+    "event": "ok",
+    "line_one_based": 8695,
+    "terminal_ordinal_one_based": 4304
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_searchs_own_written_turn_takes_the_skills_next_look",
+    "event": "ok",
+    "line_one_based": 8813,
+    "terminal_ordinal_one_based": 4363
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_push_mid_search_holds_its_looks_until_the_person_asks_again",
+    "event": "ok",
+    "line_one_based": 8793,
+    "terminal_ordinal_one_based": 4353
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_walked_search_past_two_minutes_since_its_own_look_still_takes_a_push",
+    "event": "ok",
+    "line_one_based": 8855,
+    "terminal_ordinal_one_based": 4384
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_looks_answer_with_no_call_is_told_to_the_coordinator",
+    "event": "ok",
+    "line_one_based": 8773,
+    "terminal_ordinal_one_based": 4343
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::an_add_ons_quoted_line_is_asked_with_no_functions_and_runs_no_call",
+    "event": "ok",
+    "line_one_based": 8867,
+    "terminal_ordinal_one_based": 4390
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::called_fallback_does_not_supply_words_for_a_music_identity",
+    "event": "ok",
+    "line_one_based": 8879,
+    "terminal_ordinal_one_based": 4396
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::requested_music_through_the_installed_runner_keeps_its_offer_private",
+    "event": "ok",
+    "line_one_based": 9197,
+    "terminal_ordinal_one_based": 4555
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::requested_audio_runner_preserves_news_until_engine_takes_out_its_key",
+    "event": "ok",
+    "line_one_based": 9195,
+    "terminal_ordinal_one_based": 4554
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::prepared_music_calls_wait_for_final_admission_and_survive_only_matching_words",
+    "event": "ok",
+    "line_one_based": 9101,
+    "terminal_ordinal_one_based": 4507
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::carried_words_answered_for_a_held_request_have_no_new_music_identity",
+    "event": "ok",
+    "line_one_based": 8885,
+    "terminal_ordinal_one_based": 4399
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::carried_sound_alone_does_not_authorize_music_for_the_successor",
+    "event": "ok",
+    "line_one_based": 8883,
+    "terminal_ordinal_one_based": 4398
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::more_then_decline_remains_unanswered_with_requested_audio_off_or_on",
+    "event": "ok",
+    "line_one_based": 8965,
+    "terminal_ordinal_one_based": 4439
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::skipped_music_confirmation_has_no_audio_but_a_later_sentence_can_still_speak",
+    "event": "ok",
+    "line_one_based": 9215,
+    "terminal_ordinal_one_based": 4564
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::warm_listeners_keep_exact_words_and_distinct_music_request_identities",
+    "event": "ok",
+    "line_one_based": 9297,
+    "terminal_ordinal_one_based": 4605
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::replaced_warm_listeners_hear_current_words_and_current_music_identity",
+    "event": "ok",
+    "line_one_based": 9193,
+    "terminal_ordinal_one_based": 4553
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::written_and_say_turns_neither_open_nor_consume_a_warm_music_listener",
+    "event": "ok",
+    "line_one_based": 9319,
+    "terminal_ordinal_one_based": 4616
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::warm_prepared_music_waits_for_final_raw_words_and_admission",
+    "event": "ok",
+    "line_one_based": 9299,
+    "terminal_ordinal_one_based": 4606
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::prepared_music_held_as_unclear_cannot_offer_and_written_sorry_has_no_grant",
+    "event": "ok",
+    "line_one_based": 9103,
+    "terminal_ordinal_one_based": 4508
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::misheard_hum_note_replaces_same_words_prepared_music_with_fresh_context",
+    "event": "ok",
+    "line_one_based": 8963,
+    "terminal_ordinal_one_based": 4438
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::carried_music_after_unclear_handoff_cancels_pending_call_without_another_unclear",
+    "event": "ok",
+    "line_one_based": 8881,
+    "terminal_ordinal_one_based": 4397
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::speech_tags_reach_only_the_voice_and_only_with_the_switch",
+    "event": "ok",
+    "line_one_based": 9217,
+    "terminal_ordinal_one_based": 4565
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::the_lamps_own_words_heard_back_are_held_or_taken_out_only_with_the_switch",
+    "event": "ok",
+    "line_one_based": 9241,
+    "terminal_ordinal_one_based": 4577
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::the_words_so_far_are_told_only_with_the_switch",
+    "event": "ok",
+    "line_one_based": 9279,
+    "terminal_ordinal_one_based": 4596
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_line_ending_on_a_filler_is_told_and_the_filler_never_reaches_the_model",
+    "event": "ok",
+    "line_one_based": 8733,
+    "terminal_ordinal_one_based": 4323
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::the_first_line_after_a_restart_keeps_for_the_face_the_eyes_name_later",
+    "event": "ok",
+    "line_one_based": 9227,
+    "terminal_ordinal_one_based": 4570
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::a_late_looks_keeper_is_the_face_seen_speaking_by_the_lines_end",
+    "event": "ok",
+    "line_one_based": 8789,
+    "terminal_ordinal_one_based": 4351
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::expired_private_system_never_calls_chat_or_speech",
+    "event": "ok",
+    "line_one_based": 9125,
+    "terminal_ordinal_one_based": 4519
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::private_hits_are_guarded_even_with_neutral_system",
+    "event": "ok",
+    "line_one_based": 9149,
+    "terminal_ordinal_one_based": 4531
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::private_held_forget_policy_expiry_sends_no_chat_or_tool",
+    "event": "ok",
+    "line_one_based": 9145,
+    "terminal_ordinal_one_based": 4529
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::private_tool_completion_expiry_cannot_start_another_round",
+    "event": "ok",
+    "line_one_based": 9161,
+    "terminal_ordinal_one_based": 4537
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::expired_prepared_private_events_never_reach_speech",
+    "event": "ok",
+    "line_one_based": 9123,
+    "terminal_ordinal_one_based": 4518
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::positive_private_and_public_room_contexts_still_dispatch",
+    "event": "ok",
+    "line_one_based": 9141,
+    "terminal_ordinal_one_based": 4527
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::empty_packets_preserve_legacy_current_and_carried_read_bounds",
+    "event": "ok",
+    "line_one_based": 9119,
+    "terminal_ordinal_one_based": 4516
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::authority_lost_while_chat_waits_sends_no_private_speech",
+    "event": "ok",
+    "line_one_based": 9105,
+    "terminal_ordinal_one_based": 4509
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::private_authority_loss_completes_the_live_engine_turn_once",
+    "event": "ok",
+    "line_one_based": 9143,
+    "terminal_ordinal_one_based": 4528
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::lost_private_authority_cannot_complete_a_revoked_or_different_request",
+    "event": "ok",
+    "line_one_based": 9135,
+    "terminal_ordinal_one_based": 4524
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::cached_private_hit_cannot_be_downgraded_by_neutral_final_system",
+    "event": "ok",
+    "line_one_based": 9111,
+    "terminal_ordinal_one_based": 4512
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::private_output_rechecks_authority_after_queue_backpressure",
+    "event": "ok",
+    "line_one_based": 9151,
+    "terminal_ordinal_one_based": 4532
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::private_held_forget_tool_completion_expiry_sends_no_first_chat",
+    "event": "ok",
+    "line_one_based": 9147,
+    "terminal_ordinal_one_based": 4530
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::lost_private_authority_cannot_resume_on_a_later_positive_read",
+    "event": "ok",
+    "line_one_based": 9137,
+    "terminal_ordinal_one_based": 4525
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::buffered_private_output_expires_at_both_receiver_boundaries_without_blocking_public_output",
+    "event": "ok",
+    "line_one_based": 9107,
+    "terminal_ordinal_one_based": 4510
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::private_words_waiting_for_announcement_capacity_are_never_retained_or_sent_to_tts",
+    "event": "ok",
+    "line_one_based": 9165,
+    "terminal_ordinal_one_based": 4539
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::private_speech_rechecks_before_first_poll_with_positive_room_and_public_controls",
+    "event": "ok",
+    "line_one_based": 9159,
+    "terminal_ordinal_one_based": 4536
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::private_speech_packet_returning_after_expiry_is_not_enqueued",
+    "event": "ok",
+    "line_one_based": 9155,
+    "terminal_ordinal_one_based": 4534
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::private_speech_piece_initialisation_preserves_queue_call_order",
+    "event": "ok",
+    "line_one_based": 9157,
+    "terminal_ordinal_one_based": 4535
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::private_words_expiring_between_announcement_check_and_retained_words_lock_are_not_kept",
+    "event": "ok",
+    "line_one_based": 9163,
+    "terminal_ordinal_one_based": 4538
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::event_note_private_provenance_survives_neutral_told_and_async_expiry",
+    "event": "ok",
+    "line_one_based": 9121,
+    "terminal_ordinal_one_based": 4517
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::queued_private_event_callback_rechecks_proof_before_read",
+    "event": "ok",
+    "line_one_based": 9167,
+    "terminal_ordinal_one_based": 4540
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::lost_request_before_told_keeps_public_completion_without_private_services",
+    "event": "ok",
+    "line_one_based": 9139,
+    "terminal_ordinal_one_based": 4526
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::short_done_after_a_private_tool_keeps_fresh_speaker_permission",
+    "event": "ok",
+    "line_one_based": 9173,
+    "terminal_ordinal_one_based": 4543
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::returned_private_event_waits_without_rereading_then_resumes_or_ends",
+    "event": "ok",
+    "line_one_based": 9171,
+    "terminal_ordinal_one_based": 4542
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::days_event_lock_pending_is_retried_without_replaying_its_decision",
+    "event": "ok",
+    "line_one_based": 9117,
+    "terminal_ordinal_one_based": 4515
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::returned_private_event_pending_obeys_the_original_response_ceiling",
+    "event": "ok",
+    "line_one_based": 9169,
+    "terminal_ordinal_one_based": 4541
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::private_pending_before_and_after_note_ready_keeps_the_original_response_ceiling",
+    "event": "ok",
+    "line_one_based": 9153,
+    "terminal_ordinal_one_based": 4533
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::carried_speaker::carried_old_speech_requires_positive_evidence_on_the_actual_current_piece",
+    "event": "ok",
+    "line_one_based": 9115,
+    "terminal_ordinal_one_based": 4514
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::carried_speaker::enrollment_and_private_disclosure_keep_independent_current_line_proofs",
+    "event": "ok",
+    "line_one_based": 9113,
+    "terminal_ordinal_one_based": 4513
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::face_forget::proved_face_tools_retire_private_work_before_actual_scoped_mutation",
+    "event": "ok",
+    "line_one_based": 9133,
+    "terminal_ordinal_one_based": 4523
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::face_forget::fixed_face_outcomes_keep_consent_and_partial_failure_without_raw_values",
+    "event": "ok",
+    "line_one_based": 9127,
+    "terminal_ordinal_one_based": 4520
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::face_forget::fixed_face_receipt_never_mints_from_prior_loss_or_outlives_its_owner",
+    "event": "ok",
+    "line_one_based": 9129,
+    "terminal_ordinal_one_based": 4521
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::face_forget::observed_disclosure_loss_wins_the_atomic_fixed_receipt_claim",
+    "event": "ok",
+    "line_one_based": 9131,
+    "terminal_ordinal_one_based": 4522
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::face_forget::queued_fixed_face_receipt_keeps_the_original_audio_expiry",
+    "event": "ok",
+    "line_one_based": 9175,
+    "terminal_ordinal_one_based": 4544
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::tests::private_context::short_line::a_short_current_piece_requires_two_unambiguous_positive_frames",
+    "event": "ok",
+    "line_one_based": 9179,
+    "terminal_ordinal_one_based": 4546
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::kept_name_callback::review_note_ahead_abandoned_refresh_keeps_the_confirmed_fact",
+    "event": "ok",
+    "line_one_based": 9399,
+    "terminal_ordinal_one_based": 4656
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::kept_name_callback::a_refresh_read_on_past_its_cancelled_line_is_the_next_lines",
+    "event": "ok",
+    "line_one_based": 9355,
+    "terminal_ordinal_one_based": 4634
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::kept_name_callback::a_refresh_let_go_untold_gives_the_keep_back",
+    "event": "ok",
+    "line_one_based": 9351,
+    "terminal_ordinal_one_based": 4632
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::kept_name_callback::review_keep_survives_privacy_void_while_the_refresh_is_reading",
+    "event": "ok",
+    "line_one_based": 9397,
+    "terminal_ordinal_one_based": 4655
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::kept_name_callback::review_an_invalid_resume_read_never_returns_the_forgotten_cached_note",
+    "event": "ok",
+    "line_one_based": 9395,
+    "terminal_ordinal_one_based": 4654
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::kept_name_callback::a_confirmed_keep_reaches_the_next_context_and_outlives_both_histories",
+    "event": "ok",
+    "line_one_based": 9349,
+    "terminal_ordinal_one_based": 4631
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::kept_name_callback::a_room_keep_reaches_the_next_context_without_a_person_change",
+    "event": "ok",
+    "line_one_based": 9353,
+    "terminal_ordinal_one_based": 4633
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::kept_name_callback::legacy_keeps_update_the_callback_without_a_days_marker",
+    "event": "ok",
+    "line_one_based": 9359,
+    "terminal_ordinal_one_based": 4636
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::kept_name_callback::private_note_start_waits_for_sealed_proof_and_room_is_distinct_from_held",
+    "event": "ok",
+    "line_one_based": 9393,
+    "terminal_ordinal_one_based": 4653
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::kept_name_callback::private_note_queued_reader_checks_real_permission_before_any_socket",
+    "event": "ok",
+    "line_one_based": 9385,
+    "terminal_ordinal_one_based": 4649
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::kept_name_callback::private_note_slow_real_read_cannot_spend_offer_or_disclose_after_proof_loss",
+    "event": "ok",
+    "line_one_based": 9391,
+    "terminal_ordinal_one_based": 4652
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::kept_name_callback::private_note_blocking_follow_up_rechecks_after_queue_and_consumes_once",
+    "event": "ok",
+    "line_one_based": 9383,
+    "terminal_ordinal_one_based": 4648
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::kept_name_callback::private_note_session_lock_wait_rechecks_proof_before_read_entry",
+    "event": "ok",
+    "line_one_based": 9389,
+    "terminal_ordinal_one_based": 4651
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::kept_name_callback::staged_private_note_cannot_cross_person_or_reused_face_from_another_boot",
+    "event": "ok",
+    "line_one_based": 9401,
+    "terminal_ordinal_one_based": 4657
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::kept_name_callback::private_note_same_request_cannot_revive_after_ready_observed_proof_loss",
+    "event": "ok",
+    "line_one_based": 9387,
+    "terminal_ordinal_one_based": 4650
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::kept_name_callback::lost_private_read_permission_does_not_revoke_an_ordinary_remember_write",
+    "event": "ok",
+    "line_one_based": 9361,
+    "terminal_ordinal_one_based": 4637
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::kept_name_callback::completed_private_read_needs_new_request_proof_after_ready_observed_loss",
+    "event": "ok",
+    "line_one_based": 9357,
+    "terminal_ordinal_one_based": 4635
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::kept_name_callback::new_request_already_waiting_retries_after_the_old_reader_actually_denies",
+    "event": "ok",
+    "line_one_based": 9363,
+    "terminal_ordinal_one_based": 4638
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::kept_name_callback::privacy::prepared_private_context_is_neutral_and_final_proof_discloses_both_layouts",
+    "event": "ok",
+    "line_one_based": 9375,
+    "terminal_ordinal_one_based": 4644
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::kept_name_callback::privacy::unproved_mismatched_expired_and_legacy_private_requests_never_read_memory_or_history",
+    "event": "ok",
+    "line_one_based": 9381,
+    "terminal_ordinal_one_based": 4647
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::kept_name_callback::privacy::genuine_room_context_keeps_room_notes_and_history_without_speaker_proof",
+    "event": "ok",
+    "line_one_based": 9369,
+    "terminal_ordinal_one_based": 4641
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::kept_name_callback::privacy::slow_note_read_rechecks_revocation_expiry_and_fresh_known_identity",
+    "event": "ok",
+    "line_one_based": 9377,
+    "terminal_ordinal_one_based": 4645
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::kept_name_callback::privacy::actual_hits_rpc_requires_positive_current_matching_proof_and_rechecks_its_reply",
+    "event": "ok",
+    "line_one_based": 9367,
+    "terminal_ordinal_one_based": 4640
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::kept_name_callback::privacy::identity_changed_during_history_composition_discards_the_private_told",
+    "event": "ok",
+    "line_one_based": 9371,
+    "terminal_ordinal_one_based": 4642
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::kept_name_callback::privacy::by_presence_context_never_adopts_a_different_sticky_person",
+    "event": "ok",
+    "line_one_based": 9365,
+    "terminal_ordinal_one_based": 4639
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::kept_name_callback::privacy::typed_setup_name_uses_final_speaker_proof_and_marks_disclosure",
+    "event": "ok",
+    "line_one_based": 9379,
+    "terminal_ordinal_one_based": 4646
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::kept_name_callback::privacy::missing_private_source_is_reported_once_without_granting_context",
+    "event": "ok",
+    "line_one_based": 9373,
+    "terminal_ordinal_one_based": 4643
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::lookaway_authority_tests::explicit_absence_is_request_owned_and_never_grants_an_inherited_private_scope",
+    "event": "ok",
+    "line_one_based": 9415,
+    "terminal_ordinal_one_based": 4664
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::lookaway_authority_tests::explicit_absence_never_heals_loss_or_downgrades_errors_and_legacy_sources",
+    "event": "ok",
+    "line_one_based": 9417,
+    "terminal_ordinal_one_based": 4665
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::lookaway_authority_tests::repeated_explicit_absence_does_not_extend_the_original_audio_deadline",
+    "event": "ok",
+    "line_one_based": 9429,
+    "terminal_ordinal_one_based": 4671
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::lookaway_authority_tests::actual_engine_sealed_microphone_request_finishes_through_explicit_lookaway",
+    "event": "ok",
+    "line_one_based": 9403,
+    "terminal_ordinal_one_based": 4658
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::lookaway_authority_tests::actual_http_fallback_retains_only_explicit_same_epoch_lookaway",
+    "event": "ok",
+    "line_one_based": 9405,
+    "terminal_ordinal_one_based": 4659
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::lookaway_authority_tests::explicit_lookaway_retains_credited_output_only_for_same_request_epoch",
+    "event": "ok",
+    "line_one_based": 9419,
+    "terminal_ordinal_one_based": 4666
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::lookaway_authority_tests::explicit_source_envelopes_reject_malformed_or_mixed_continuation_tokens",
+    "event": "ok",
+    "line_one_based": 9421,
+    "terminal_ordinal_one_based": 4667
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::lookaway_authority_tests::returning_track_changed_epoch_checking_and_unmatched_cancel_only_the_old_proved_request",
+    "event": "ok",
+    "line_one_based": 9431,
+    "terminal_ordinal_one_based": 4672
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::lookaway_authority_tests::returning_track_same_name_never_erases_changed_stable_identity",
+    "event": "ok",
+    "line_one_based": 9441,
+    "terminal_ordinal_one_based": 4677
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::lookaway_authority_tests::returning_track_completed_recognition_keeps_original_grant_at_actual_http_fallback",
+    "event": "ok",
+    "line_one_based": 9435,
+    "terminal_ordinal_one_based": 4674
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::lookaway_authority_tests::returning_track_completed_recognition_keeps_original_grant_at_credited_ipc",
+    "event": "ok",
+    "line_one_based": 9437,
+    "terminal_ordinal_one_based": 4675
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::lookaway_authority_tests::returning_track_unbound_and_legacy_requests_still_need_the_original_audio_face",
+    "event": "ok",
+    "line_one_based": 9443,
+    "terminal_ordinal_one_based": 4678
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::lookaway_authority_tests::returning_track_checking_envelope_has_no_identity_and_cannot_arm_continuation",
+    "event": "ok",
+    "line_one_based": 9433,
+    "terminal_ordinal_one_based": 4673
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::lookaway_authority_tests::returning_track_completed_recognition_never_extends_original_audio_deadline",
+    "event": "ok",
+    "line_one_based": 9455,
+    "terminal_ordinal_one_based": 4684
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::lookaway_authority_tests::checking_return_never_arms_and_only_same_subject_can_finish_the_wait",
+    "event": "ok",
+    "line_one_based": 9407,
+    "terminal_ordinal_one_based": 4660
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::lookaway_authority_tests::checking_wait_never_hides_terminal_source_or_identity_loss",
+    "event": "ok",
+    "line_one_based": 9411,
+    "terminal_ordinal_one_based": 4662
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::lookaway_authority_tests::checking_wait_ends_at_the_original_audio_deadline",
+    "event": "ok",
+    "line_one_based": 9439,
+    "terminal_ordinal_one_based": 4676
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::lookaway_authority_tests::checking_return_holds_real_credited_ipc_until_completed_recognition",
+    "event": "ok",
+    "line_one_based": 9409,
+    "terminal_ordinal_one_based": 4661
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::lookaway_authority_tests::event_selection_keeps_checking_distinct_from_room_and_lost",
+    "event": "ok",
+    "line_one_based": 9413,
+    "terminal_ordinal_one_based": 4663
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::lookaway_authority_tests::permission_expiry_blocks_first_private_grant_at_the_final_boundary",
+    "event": "ok",
+    "line_one_based": 9423,
+    "terminal_ordinal_one_based": 4668
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::lookaway_authority_tests::permission_reader_checks_completion_and_all_nonterminal_states",
+    "event": "ok",
+    "line_one_based": 9425,
+    "terminal_ordinal_one_based": 4669
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::lookaway_authority_tests::renewed_permission_cannot_refresh_an_old_absent_or_checking_observation",
+    "event": "ok",
+    "line_one_based": 9427,
+    "terminal_ordinal_one_based": 4670
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::memory_note_retries::the_incomplete_line_names_a_timeout",
+    "event": "ok",
+    "line_one_based": 9493,
+    "terminal_ordinal_one_based": 4703
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::memory_note_retries::the_incomplete_line_names_a_refusal",
+    "event": "ok",
+    "line_one_based": 9491,
+    "terminal_ordinal_one_based": 4702
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::memory_note_retries::the_incomplete_line_names_an_invalid_snapshot",
+    "event": "ok",
+    "line_one_based": 9495,
+    "terminal_ordinal_one_based": 4704
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::memory_note_retries::the_incomplete_line_names_a_missing_own_snapshot",
+    "event": "ok",
+    "line_one_based": 9487,
+    "terminal_ordinal_one_based": 4700
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::memory_note_retries::the_incomplete_line_names_a_busy_client",
+    "event": "ok",
+    "line_one_based": 9489,
+    "terminal_ordinal_one_based": 4701
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::memory_note_retries::the_incomplete_line_names_no_client",
+    "event": "ok",
+    "line_one_based": 9497,
+    "terminal_ordinal_one_based": 4705
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::memory_note_retries::an_incomplete_note_retries_on_the_next_turn_and_then_stays_cached",
+    "event": "ok",
+    "line_one_based": 9473,
+    "terminal_ordinal_one_based": 4693
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::memory_note_retries::repeated_failures_after_the_next_turn_get_one_attempt_per_interval",
+    "event": "ok",
+    "line_one_based": 9483,
+    "terminal_ordinal_one_based": 4698
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::memory_note_retries::a_valid_empty_note_is_cached_without_retries",
+    "event": "ok",
+    "line_one_based": 9465,
+    "terminal_ordinal_one_based": 4689
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::memory_note_retries::an_explicit_refresh_does_not_wait_for_failed_read_backoff",
+    "event": "ok",
+    "line_one_based": 9471,
+    "terminal_ordinal_one_based": 4692
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::memory_note_retries::a_held_person_change_cannot_leave_the_previous_persons_note_cached",
+    "event": "ok",
+    "line_one_based": 9451,
+    "terminal_ordinal_one_based": 4682
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::memory_note_retries::authority_lost_during_a_note_read_discards_the_whole_context",
+    "event": "ok",
+    "line_one_based": 9477,
+    "terminal_ordinal_one_based": 4695
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::memory_note_retries::unchanged_authority_keeps_the_note_and_unleased_behavior",
+    "event": "ok",
+    "line_one_based": 9499,
+    "terminal_ordinal_one_based": 4706
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::memory_note_retries::authority_is_checked_after_waiting_for_an_older_context",
+    "event": "ok",
+    "line_one_based": 9475,
+    "terminal_ordinal_one_based": 4694
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::memory_note_retries::a_kept_name_recovers_after_a_failed_refresh_without_another_keep",
+    "event": "ok",
+    "line_one_based": 9453,
+    "terminal_ordinal_one_based": 4683
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::memory_note_retries::a_timed_out_note_retries_and_recovers_without_a_keep",
+    "event": "ok",
+    "line_one_based": 9463,
+    "terminal_ordinal_one_based": 4688
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::memory_note_retries::a_non_held_person_change_bypasses_the_failed_persons_backoff",
+    "event": "ok",
+    "line_one_based": 9457,
+    "terminal_ordinal_one_based": 4685
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::memory_note_retries::an_eligible_retry_shares_one_budget_between_room_and_person",
+    "event": "ok",
+    "line_one_based": 9469,
+    "terminal_ordinal_one_based": 4691
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::memory_note_retries::a_note_asked_as_the_line_begins_is_in_by_its_end_and_the_loop_never_waits",
+    "event": "ok",
+    "line_one_based": 9459,
+    "terminal_ordinal_one_based": 4686
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::memory_note_retries::lines_never_answered_open_and_close_no_session_and_spend_no_follow_up",
+    "event": "ok",
+    "line_one_based": 9479,
+    "terminal_ordinal_one_based": 4696
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::memory_note_retries::a_follow_up_is_read_only_once_its_turn_is_answered",
+    "event": "ok",
+    "line_one_based": 9447,
+    "terminal_ordinal_one_based": 4680
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::memory_note_retries::a_late_note_is_the_next_turns_and_a_failed_one_is_asked_again_on_the_next_turn",
+    "event": "ok",
+    "line_one_based": 9467,
+    "terminal_ordinal_one_based": 4690
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::memory_note_retries::a_person_change_during_the_line_asks_again_for_whoever_it_is_at_its_end",
+    "event": "ok",
+    "line_one_based": 9461,
+    "terminal_ordinal_one_based": 4687
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::memory_note_retries::a_voided_read_is_never_told_and_holds_the_next_until_it_ends",
+    "event": "ok",
+    "line_one_based": 9485,
+    "terminal_ordinal_one_based": 4699
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::memory_note_retries::a_held_line_and_a_revoked_scope_never_get_another_scopes_note",
+    "event": "ok",
+    "line_one_based": 9449,
+    "terminal_ordinal_one_based": 4681
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::memory_note_retries::pending_note_adoption_preserves_the_completed_read_and_original_ask",
+    "event": "ok",
+    "line_one_based": 9481,
+    "terminal_ordinal_one_based": 4697
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::memory_note_retries::a_completed_old_note_reads_its_follow_up_once_after_recognition_is_ready",
+    "event": "ok",
+    "line_one_based": 9445,
+    "terminal_ordinal_one_based": 4679
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::pending_context::pending_composition_rebuilds_cached_note_history_and_name_before_one_final_chat",
+    "event": "ok",
+    "line_one_based": 9515,
+    "terminal_ordinal_one_based": 4714
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::pending_context::pending_prepared_composition_never_freezes_reduced_messages",
+    "event": "ok",
+    "line_one_based": 9513,
+    "terminal_ordinal_one_based": 4713
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::pending_context::permission_expiry_after_composition_sends_no_private_chat",
+    "event": "ok",
+    "line_one_based": 9517,
+    "terminal_ordinal_one_based": 4715
+  }
+]
