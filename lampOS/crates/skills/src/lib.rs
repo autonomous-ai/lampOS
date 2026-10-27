@@ -349,10 +349,18 @@ pub const OFF_FILE: &str = "off";
 /// shipped off that the person turned on (#2585, `lamp-update`'s
 /// `product_skills::ON`): one name a line, kept on through a round.
 pub const ON_FILE: &str = "on";
+/// The file in `--state-dir` beside [`OFF_FILE`] that keeps the owner's yes
+/// to a skill seeing the camera's picture (#3504, the look/camera split's
+/// piece C): one name a line, written only by the manage helper
+/// ([`package::camera`]). A skill that is not core sees the picture only
+/// while its name is here ([`Engine::picture_refused`]), and the Store
+/// installs a package that asks it only once it is.
+pub const CAMERA_FILE: &str = "camera";
 
-/// The names kept in `file` ([`OFF_FILE`] or [`ON_FILE`]), one a line; a
-/// line that is not a skill's name is passed over, and no file is none.
-/// The one reader of both, for the running program and the manage helper.
+/// The names kept in `file` ([`OFF_FILE`], [`ON_FILE`] or [`CAMERA_FILE`]),
+/// one a line; a line that is not a skill's name is passed over, and no
+/// file is none. The one reader of each, for the running program and the
+/// manage helper.
 /// Never read through a link (`O_NOFOLLOW`: one is refused).
 pub fn read_names(file: &Path) -> std::io::Result<BTreeSet<String>> {
     use std::{io::Read, os::unix::fs::OpenOptionsExt};
@@ -381,8 +389,9 @@ pub fn read_names(file: &Path) -> std::io::Result<BTreeSet<String>> {
 /// then moved over it, and the folder synced, so a power cut leaves the
 /// old file or the new one whole, never an empty one, and the move itself
 /// holds (the reviewer's P3 on #1837, as #1732's daily journal does). The
-/// one writer of [`OFF_FILE`] and [`ON_FILE`]: a `[stop]`'s off and on,
-/// and the app's ([`package::turn`]). Root's helper writes it in a folder
+/// one writer of [`OFF_FILE`], [`ON_FILE`] and [`CAMERA_FILE`]: a
+/// `[stop]`'s off and on, and the app's ([`package::turn`],
+/// [`package::camera`]). Root's helper writes it in a folder
 /// another user owns (the reviewer's P2 on #2878), so the file beside is
 /// only ever made new (`O_CREAT | O_EXCL`, which never follows a link): a
 /// file left there by a cut-off run is removed first, and a link there is
@@ -5735,6 +5744,35 @@ impl Engine {
 
     pub fn skills(&self) -> &[Skill] {
         &self.skills
+    }
+
+    /// Why `skill` may not see the camera's picture at this call, beyond
+    /// its `[permissions]`, or nothing. A core skill comes with the lamp;
+    /// any other sees it only while the owner's yes is kept for it in
+    /// [`CAMERA_FILE`], beside the off file ([`Engine::keep_off_in`]), read
+    /// now: a yes taken back holds from the next call, nothing restarted.
+    /// With no state folder no yes is kept, so none is given.
+    pub fn picture_refused(&self, skill: &str) -> Option<String> {
+        if self
+            .skills
+            .iter()
+            .any(|loaded| loaded.name == skill && loaded.kind == SkillKind::Core)
+        {
+            return None;
+        }
+        let not_yet = || "the owner hasn't said yes to its camera".to_owned();
+        let Some(file) = self
+            .off_file
+            .as_ref()
+            .map(|off| off.with_file_name(CAMERA_FILE))
+        else {
+            return Some(not_yet());
+        };
+        match read_names(&file) {
+            Ok(yes) if yes.contains(skill) => None,
+            Ok(_) => Some(not_yet()),
+            Err(error) => Some(format!("{}: {error}", file.display())),
+        }
     }
 
     /// The skill whose tool `name` is and what the model is told of a call
