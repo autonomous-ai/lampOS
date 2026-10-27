@@ -1,0 +1,1409 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/autonomous-ai/lampOS/blob/lamp-voice/lampOS/docs/control.schema.json",
+  "title": "lampOS control protocol, v1",
+  "description": "Every frame on wss://<lamp>.local:7731/v1, one JSON object per text frame: a request from the client, a reply or an event from the lamp. docs/control.md says what each means; this file is what the SDKs generate from. Not served yet: lamp-control is a design (#3504).",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/request"
+    },
+    {
+      "$ref": "#/$defs/reply"
+    },
+    {
+      "$ref": "#/$defs/event"
+    }
+  ],
+  "$defs": {
+    "id": {
+      "description": "The client's number for a request, echoed as `re` in its reply.",
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "time": {
+      "description": "The lamp's local time with its offset (RFC 3339).",
+      "type": "string",
+      "format": "date-time"
+    },
+    "grant": {
+      "description": "What a paired client may do. body: gestures, moves, look, joints; light; speak: say and sound; look: presence events; hear: registered phrases; sound: sound classes.",
+      "enum": [
+        "body",
+        "light",
+        "speak",
+        "look",
+        "hear",
+        "sound"
+      ]
+    },
+    "part": {
+      "description": "What a lease holds: voice is say and sound.",
+      "enum": [
+        "body",
+        "light",
+        "voice"
+      ]
+    },
+    "event_name": {
+      "enum": [
+        "person.arrived",
+        "person.left",
+        "person.stood_up",
+        "person.facing",
+        "phrase.heard",
+        "name.heard",
+        "sound.heard",
+        "touch",
+        "button",
+        "time",
+        "lamp.changed"
+      ]
+    },
+    "state_name": {
+      "enum": [
+        "presence",
+        "light",
+        "mood",
+        "lamp"
+      ]
+    },
+    "colour": {
+      "description": "lamp_msgs::Light::COLOURS.",
+      "enum": [
+        "yellow",
+        "red",
+        "green",
+        "blue",
+        "cyan",
+        "purple",
+        "orange",
+        "pink",
+        "white",
+        "warm"
+      ]
+    },
+    "pattern": {
+      "description": "lamp_msgs::PatternKind: a breath, a candle's wander, one soft pulse around. Never a blink or a flash.",
+      "enum": [
+        "breathe",
+        "candle",
+        "pulse"
+      ]
+    },
+    "gesture": {
+      "description": "The body's built-in clips (crates/body/src/clips/data.rs) a client may ask for. Not `idle`, which is the lamp's own, or `scanning`, which reads as a machine (rule 8).",
+      "enum": [
+        "nod",
+        "headshake",
+        "greeting",
+        "laugh",
+        "shy",
+        "stretching",
+        "acknowledge",
+        "curious",
+        "happy",
+        "caring",
+        "surprised",
+        "confused",
+        "sleepy",
+        "excited",
+        "dance_chill",
+        "dance_groove",
+        "dance_hype",
+        "dance_waltz",
+        "dance_jazz"
+      ]
+    },
+    "joint": {
+      "description": "A joint's target in degrees from its pose.",
+      "type": "number",
+      "minimum": -180,
+      "maximum": 180
+    },
+    "frame": {
+      "description": "One step of a move: head pitch, head roll, base yaw, shoulder, elbow, in counts from the pose (4,096 a turn), as moves/*.json.",
+      "type": "array",
+      "items": {
+        "type": "integer",
+        "minimum": -350,
+        "maximum": 350
+      },
+      "minItems": 5,
+      "maxItems": 5
+    },
+    "request": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/pair"
+        },
+        {
+          "$ref": "#/$defs/hello"
+        },
+        {
+          "$ref": "#/$defs/subscribe"
+        },
+        {
+          "$ref": "#/$defs/unsubscribe"
+        },
+        {
+          "$ref": "#/$defs/get"
+        },
+        {
+          "$ref": "#/$defs/lease.take"
+        },
+        {
+          "$ref": "#/$defs/lease.renew"
+        },
+        {
+          "$ref": "#/$defs/lease.release"
+        },
+        {
+          "$ref": "#/$defs/express"
+        },
+        {
+          "$ref": "#/$defs/gesture.op"
+        },
+        {
+          "$ref": "#/$defs/look"
+        },
+        {
+          "$ref": "#/$defs/move"
+        },
+        {
+          "$ref": "#/$defs/play"
+        },
+        {
+          "$ref": "#/$defs/joints"
+        },
+        {
+          "$ref": "#/$defs/light"
+        },
+        {
+          "$ref": "#/$defs/say"
+        },
+        {
+          "$ref": "#/$defs/sound"
+        },
+        {
+          "$ref": "#/$defs/stop"
+        }
+      ]
+    },
+    "pair": {
+      "description": "Once per computer, with the one-time code the owner's app shows (or the lamp says after a 3 s hold of its button).",
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "op": {
+          "const": "pair"
+        },
+        "name": {
+          "description": "The computer's name, shown in the app.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "key": {
+          "description": "The client's Ed25519 public key, base64 (32 bytes).",
+          "type": "string",
+          "pattern": "^[A-Za-z0-9+/]{43}=$"
+        },
+        "proof": {
+          "description": "HMAC-SHA256 keyed with the code's 8 ASCII digits, over \"lampos/v1/pair\" and a zero byte, the 32 key bytes, then the welcome's 32 nonce bytes; base64.",
+          "type": "string",
+          "pattern": "^[A-Za-z0-9+/]{43}=$"
+        }
+      },
+      "required": [
+        "id",
+        "op",
+        "name",
+        "key",
+        "proof"
+      ],
+      "additionalProperties": false
+    },
+    "hello": {
+      "description": "First on every connection of a paired client.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "op": {
+          "const": "hello"
+        },
+        "client": {
+          "type": "string",
+          "pattern": "^c_[0-9a-f]{1,32}$"
+        },
+        "sig": {
+          "description": "The client key's Ed25519 signature over \"lampos/v1/hello\" and a zero byte, then the welcome's 32 nonce bytes; base64 (64 bytes).",
+          "type": "string",
+          "pattern": "^[A-Za-z0-9+/]{86}==$"
+        }
+      },
+      "required": [
+        "id",
+        "op",
+        "client",
+        "sig"
+      ],
+      "additionalProperties": false
+    },
+    "subscribe": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "op": {
+          "const": "subscribe"
+        },
+        "events": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/event_name"
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "phrases": {
+          "description": "For phrase.heard: matched on the lamp; the client is told only which matched, never what was said.",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "pattern": "^[^\\u0000-\\u001f\\u007f]+$"
+          },
+          "maxItems": 16,
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "id",
+        "op",
+        "events"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "description": "phrase.heard needs the phrases to listen for.",
+          "if": {
+            "properties": {
+              "events": {
+                "contains": {
+                  "const": "phrase.heard"
+                }
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "phrases"
+            ],
+            "properties": {
+              "phrases": {
+                "minItems": 1
+              }
+            }
+          }
+        },
+        {
+          "description": "Phrases go only with phrase.heard.",
+          "if": {
+            "required": [
+              "phrases"
+            ]
+          },
+          "then": {
+            "properties": {
+              "events": {
+                "contains": {
+                  "const": "phrase.heard"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "unsubscribe": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "op": {
+          "const": "unsubscribe"
+        },
+        "events": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/event_name"
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "id",
+        "op",
+        "events"
+      ],
+      "additionalProperties": false
+    },
+    "get": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "op": {
+          "const": "get"
+        },
+        "state": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/state_name"
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "id",
+        "op",
+        "state"
+      ],
+      "additionalProperties": false
+    },
+    "lease.take": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "op": {
+          "const": "lease.take"
+        },
+        "parts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/part"
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "for_ms": {
+          "description": "At most 30 s; renew to keep it, up to 10 min a take.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 30000
+        },
+        "why": {
+          "description": "Journaled and shown in the app.",
+          "type": "string",
+          "maxLength": 200
+        }
+      },
+      "required": [
+        "id",
+        "op",
+        "parts",
+        "for_ms"
+      ],
+      "additionalProperties": false
+    },
+    "lease.renew": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "op": {
+          "const": "lease.renew"
+        },
+        "lease": {
+          "$ref": "#/$defs/lease_id"
+        },
+        "for_ms": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 30000
+        }
+      },
+      "required": [
+        "id",
+        "op",
+        "lease",
+        "for_ms"
+      ],
+      "additionalProperties": false
+    },
+    "lease.release": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "op": {
+          "const": "lease.release"
+        },
+        "lease": {
+          "$ref": "#/$defs/lease_id"
+        }
+      },
+      "required": [
+        "id",
+        "op",
+        "lease"
+      ],
+      "additionalProperties": false
+    },
+    "lease_id": {
+      "type": "string",
+      "pattern": "^l_[0-9]{1,20}$"
+    },
+    "express": {
+      "description": "A feeling in body and light, as the lamp shows its own (the feelings skill, #3691). Its names are that skill's; until it lands, the lamp answers bad_request for any.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "op": {
+          "const": "express"
+        },
+        "feeling": {
+          "type": "string",
+          "pattern": "^[a-z][a-z_]{1,23}$"
+        },
+        "strength": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 0.5
+        }
+      },
+      "required": [
+        "id",
+        "op",
+        "feeling"
+      ],
+      "additionalProperties": false
+    },
+    "gesture.op": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "op": {
+          "const": "gesture"
+        },
+        "name": {
+          "$ref": "#/$defs/gesture"
+        }
+      },
+      "required": [
+        "id",
+        "op",
+        "name"
+      ],
+      "additionalProperties": false
+    },
+    "look": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "op": {
+          "const": "look"
+        },
+        "at": {
+          "oneOf": [
+            {
+              "description": "At the face it sees (needs look), the person who called its name, or straight ahead.",
+              "enum": [
+                "face",
+                "name",
+                "ahead"
+              ]
+            },
+            {
+              "description": "Degrees from straight ahead: yaw right positive, pitch up positive; the body keeps it within its gaze reach.",
+              "type": "object",
+              "properties": {
+                "yaw": {
+                  "type": "number",
+                  "minimum": -180,
+                  "maximum": 180
+                },
+                "pitch": {
+                  "type": "number",
+                  "minimum": -90,
+                  "maximum": 90
+                }
+              },
+              "required": [
+                "yaw",
+                "pitch"
+              ],
+              "additionalProperties": false
+            }
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "op",
+        "at"
+      ],
+      "additionalProperties": false,
+      "description": "Needs a body lease held by this connection."
+    },
+    "move": {
+      "description": "A move of the client's own, needs a body lease held by this connection. Its first and last frames are all 0; the body's move check (moves.rs) judges the rest: 1.5 to 10 s, each joint's farthest and fastest. The last frame is all 0 too, which the crate checks; the schema can say only the first.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "op": {
+          "const": "move"
+        },
+        "step_ms": {
+          "type": "integer",
+          "minimum": 20,
+          "maximum": 1000
+        },
+        "frames": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/frame"
+          },
+          "minItems": 2,
+          "maxItems": 500,
+          "prefixItems": [
+            {
+              "description": "The first frame is the pose: all 0.",
+              "const": [
+                0,
+                0,
+                0,
+                0,
+                0
+              ]
+            }
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "op",
+        "step_ms",
+        "frames"
+      ],
+      "additionalProperties": false
+    },
+    "play": {
+      "description": "A recorded move from the client's installed package; needs a body lease held by this connection.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "op": {
+          "const": "play"
+        },
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_-]{0,39}$"
+        }
+      },
+      "required": [
+        "id",
+        "op",
+        "name"
+      ],
+      "additionalProperties": false
+    },
+    "joints": {
+      "description": "Joint targets, at most 20 a second, each step through the body's caps.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "op": {
+          "const": "joints"
+        },
+        "lease": {
+          "$ref": "#/$defs/lease_id"
+        },
+        "targets": {
+          "type": "object",
+          "properties": {
+            "pitch": {
+              "$ref": "#/$defs/joint"
+            },
+            "roll": {
+              "$ref": "#/$defs/joint"
+            },
+            "yaw": {
+              "$ref": "#/$defs/joint"
+            },
+            "shoulder": {
+              "$ref": "#/$defs/joint"
+            },
+            "elbow": {
+              "$ref": "#/$defs/joint"
+            }
+          },
+          "minProperties": 1,
+          "additionalProperties": false
+        },
+        "within_ms": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5000
+        }
+      },
+      "required": [
+        "id",
+        "op",
+        "lease",
+        "targets",
+        "within_ms"
+      ],
+      "additionalProperties": false
+    },
+    "light": {
+      "description": "A light for a while, below the person and the conversation, at the ring's default period for its pattern.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "op": {
+          "const": "light"
+        },
+        "colour": {
+          "$ref": "#/$defs/colour"
+        },
+        "level": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5
+        },
+        "pattern": {
+          "$ref": "#/$defs/pattern"
+        },
+        "for_ms": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 30000
+        }
+      },
+      "required": [
+        "id",
+        "op",
+        "colour",
+        "level",
+        "for_ms"
+      ],
+      "additionalProperties": false
+    },
+    "say": {
+      "description": "A line in the lamp's own voice, through its quiet, privacy and busy gates.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "op": {
+          "const": "say"
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 300,
+          "pattern": "^[^\\u0000-\\u0009\\u000b-\\u001f\\u007f]+$"
+        }
+      },
+      "required": [
+        "id",
+        "op",
+        "text"
+      ],
+      "additionalProperties": false
+    },
+    "sound": {
+      "description": "A clip of 3 s or less from the client's installed package.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "op": {
+          "const": "sound"
+        },
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_-]{0,39}$"
+        }
+      },
+      "required": [
+        "id",
+        "op",
+        "name"
+      ],
+      "additionalProperties": false
+    },
+    "stop": {
+      "description": "Ends the client's own actions now. Needs no grant and no lease.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "op": {
+          "const": "stop"
+        }
+      },
+      "required": [
+        "id",
+        "op"
+      ],
+      "additionalProperties": false
+    },
+    "reply": {
+      "oneOf": [
+        {
+          "description": "Taken. A pair reply carries client and grants; hello carries lamp, grants and limits; lease.take and lease.renew carry lease and until; get carries the states asked for.",
+          "type": "object",
+          "properties": {
+            "re": {
+              "description": "The request's id, or null when it couldn't be read.",
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/id"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "ok": {
+              "const": true
+            },
+            "client": {
+              "type": "string"
+            },
+            "grants": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/grant"
+              },
+              "uniqueItems": true
+            },
+            "lamp": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "v": {
+                  "const": 1
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "v"
+              ]
+            },
+            "limits": {
+              "$ref": "#/$defs/limits"
+            },
+            "lease": {
+              "$ref": "#/$defs/lease_id"
+            },
+            "until": {
+              "$ref": "#/$defs/time"
+            },
+            "presence": {
+              "$ref": "#/$defs/presence"
+            },
+            "light": {
+              "type": "object"
+            },
+            "mood": {
+              "type": "object"
+            },
+            "lamp_state": {
+              "$ref": "#/$defs/lamp_state"
+            }
+          },
+          "required": [
+            "re",
+            "ok"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "re": {
+              "description": "The request's id, or null when it couldn't be read.",
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/id"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "ok": {
+              "const": false
+            },
+            "error": {
+              "$ref": "#/$defs/error"
+            }
+          },
+          "required": [
+            "re",
+            "ok",
+            "error"
+          ]
+        }
+      ]
+    },
+    "error": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "enum": [
+            "unpaired",
+            "no_hello",
+            "no_grant",
+            "no_lease",
+            "lease_lost",
+            "busy",
+            "refused",
+            "quiet_hours",
+            "private",
+            "paused",
+            "asleep",
+            "rate",
+            "bad_request",
+            "off"
+          ]
+        },
+        "why": {
+          "type": "string"
+        },
+        "retry_ms": {
+          "description": "With rate: when the oldest counted action leaves its window.",
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "code",
+        "why"
+      ],
+      "description": "A refusal. New fields may come; a client ignores what it doesn't know."
+    },
+    "limits": {
+      "description": "hello's limits, as lamp-control's session::limits() says them: each rate class's windows (at most `most` in any `within_ms`), and the lease and say bounds.",
+      "type": "object",
+      "properties": {
+        "joints": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "most": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "within_ms": {
+                "type": "integer",
+                "minimum": 1
+              }
+            },
+            "required": [
+              "most",
+              "within_ms"
+            ]
+          }
+        },
+        "motion": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "most": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "within_ms": {
+                "type": "integer",
+                "minimum": 1
+              }
+            },
+            "required": [
+              "most",
+              "within_ms"
+            ]
+          }
+        },
+        "light": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "most": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "within_ms": {
+                "type": "integer",
+                "minimum": 1
+              }
+            },
+            "required": [
+              "most",
+              "within_ms"
+            ]
+          }
+        },
+        "say": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "most": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "within_ms": {
+                "type": "integer",
+                "minimum": 1
+              }
+            },
+            "required": [
+              "most",
+              "within_ms"
+            ]
+          }
+        },
+        "express": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "most": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "within_ms": {
+                "type": "integer",
+                "minimum": 1
+              }
+            },
+            "required": [
+              "most",
+              "within_ms"
+            ]
+          }
+        },
+        "hold_max_ms": {
+          "type": "integer"
+        },
+        "take_max_ms": {
+          "type": "integer"
+        },
+        "say_max_chars": {
+          "type": "integer"
+        }
+      }
+    },
+    "presence": {
+      "description": "How many people, how near, whether one faces the lamp. Never who.",
+      "type": "object",
+      "properties": {
+        "count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "near": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "facing": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "count"
+      ]
+    },
+    "lamp_state": {
+      "type": "object",
+      "properties": {
+        "talking": {
+          "type": "boolean"
+        },
+        "paused": {
+          "type": "boolean"
+        },
+        "private": {
+          "type": "boolean"
+        },
+        "asleep": {
+          "type": "boolean"
+        },
+        "quiet_hours": {
+          "type": "boolean"
+        },
+        "lease": {
+          "description": "Who holds a lease now, by client name, if anyone.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "event": {
+      "type": "object",
+      "properties": {
+        "ev": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/event_name"
+            },
+            {
+              "enum": [
+                "welcome",
+                "lease",
+                "done"
+              ]
+            }
+          ]
+        },
+        "at": {
+          "$ref": "#/$defs/time",
+          "description": "The lamp's local time, on the events about the room. welcome, lease and done may not carry it."
+        }
+      },
+      "required": [
+        "ev"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "ev": {
+                "const": "welcome"
+              }
+            }
+          },
+          "then": {
+            "description": "The lamp's first frame on every connection: the nonce pair's proof and hello's signature cover.",
+            "properties": {
+              "nonce": {
+                "description": "32 random bytes, base64, new for each connection.",
+                "type": "string",
+                "pattern": "^[A-Za-z0-9+/]{43}=$"
+              },
+              "lamp": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "v": {
+                    "const": 1
+                  }
+                },
+                "required": [
+                  "id",
+                  "name",
+                  "v"
+                ]
+              }
+            },
+            "required": [
+              "nonce",
+              "lamp"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "ev": {
+                "enum": [
+                  "person.arrived",
+                  "person.left"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "near": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "count": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "required": [
+              "count"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "ev": {
+                "const": "person.stood_up"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "side": {
+                "enum": [
+                  "left",
+                  "right",
+                  "ahead"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "ev": {
+                "const": "person.facing"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "facing": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "facing"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "ev": {
+                "const": "phrase.heard"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "phrase": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "phrase"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "ev": {
+                "const": "sound.heard"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "class": {
+                "type": "string"
+              },
+              "score": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              }
+            },
+            "required": [
+              "class"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "ev": {
+                "const": "touch"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "kind": {
+                "enum": [
+                  "tap",
+                  "pet",
+                  "hold"
+                ]
+              },
+              "where": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "ev": {
+                "const": "button"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "press": {
+                "enum": [
+                  "press",
+                  "long_press"
+                ]
+              }
+            },
+            "required": [
+              "press"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "ev": {
+                "const": "lamp.changed"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "lamp_state": {
+                "$ref": "#/$defs/lamp_state"
+              }
+            },
+            "required": [
+              "lamp_state"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "ev": {
+                "const": "lease"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "lease": {
+                "$ref": "#/$defs/lease_id"
+              },
+              "state": {
+                "enum": [
+                  "held",
+                  "suspended",
+                  "lost"
+                ]
+              },
+              "why": {
+                "enum": [
+                  "conversation",
+                  "hand",
+                  "stop_heard",
+                  "private",
+                  "paused",
+                  "asleep",
+                  "expired",
+                  "taken_by_owner_app",
+                  "revoked",
+                  "released"
+                ]
+              }
+            },
+            "required": [
+              "lease",
+              "state"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "ev": {
+                "const": "done"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "re": {
+                "$ref": "#/$defs/id"
+              },
+              "how": {
+                "enum": [
+                  "finished",
+                  "cut_short",
+                  "dropped"
+                ]
+              },
+              "why": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "re",
+              "how"
+            ]
+          }
+        }
+      ]
+    }
+  }
+}
