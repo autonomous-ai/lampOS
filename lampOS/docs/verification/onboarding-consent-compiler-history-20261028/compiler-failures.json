@@ -1,0 +1,814 @@
+{
+  "scope": "FULL_COMPILER_RUNTIME_UNRUN",
+  "environment": {
+    "jobs": 1,
+    "incremental": 0,
+    "offline": true,
+    "profiles": "normal"
+  },
+  "epochs": [
+    {
+      "epoch": "R1",
+      "head": "f903659bba298cdee290ee4285038a8f46af930b",
+      "tree": "9ad3276e27dfe3a5658e16eaee54eb8fc828d692",
+      "actual_native_session": 76111,
+      "actual_native_exit": 101,
+      "actual_native_chunk": "e6d757",
+      "stages": [
+        {
+          "label": "fmt",
+          "command": [
+            "cargo",
+            "+1.96.0",
+            "fmt",
+            "--all",
+            "--",
+            "--check"
+          ],
+          "exit": 0
+        },
+        {
+          "label": "metadata",
+          "command": [
+            "cargo",
+            "+1.96.0",
+            "metadata",
+            "--offline",
+            "--locked",
+            "--format-version=1"
+          ],
+          "exit": 0
+        },
+        {
+          "label": "clippy",
+          "command": [
+            "cargo",
+            "+1.96.0",
+            "clippy",
+            "--offline",
+            "--locked",
+            "--jobs",
+            "1",
+            "--workspace",
+            "--all-targets",
+            "--message-format=json",
+            "--",
+            "-D",
+            "warnings"
+          ],
+          "exit": 101
+        },
+        {
+          "label": "workspace-build",
+          "command": [
+            "cargo",
+            "+1.96.0",
+            "build",
+            "--offline",
+            "--locked",
+            "--jobs",
+            "1",
+            "--workspace",
+            "--message-format=json"
+          ],
+          "status": "UNRUN"
+        }
+      ],
+      "test_bodies_executed": 0,
+      "runtime_discovery_docs": "UNRUN",
+      "source_stable": true,
+      "retained_witnesses_preserved": true,
+      "owned_groups_closed": true,
+      "release_receipt_sha256": "4a27eabf46b2256c7c744b8117b61e7fb270f6282b4cf84ed615645e5465b2fe",
+      "clippy_stdout_sha256": "d5a8102caab7abddb0e09d6a14bdf99af6f8459265ec0f9ccc9ea2af19ad1e35"
+    },
+    {
+      "epoch": "R2",
+      "head": "f903659bba298cdee290ee4285038a8f46af930b",
+      "tree": "5da1fbca532e5594cfdf608c9f3a295f1873e064",
+      "actual_native_session": 82193,
+      "actual_native_exit": 101,
+      "actual_native_chunk": "e5b50e",
+      "stages": [
+        {
+          "label": "fmt",
+          "command": [
+            "cargo",
+            "+1.96.0",
+            "fmt",
+            "--all",
+            "--",
+            "--check"
+          ],
+          "exit": 0
+        },
+        {
+          "label": "metadata",
+          "command": [
+            "cargo",
+            "+1.96.0",
+            "metadata",
+            "--offline",
+            "--locked",
+            "--format-version=1"
+          ],
+          "exit": 0
+        },
+        {
+          "label": "clippy",
+          "command": [
+            "cargo",
+            "+1.96.0",
+            "clippy",
+            "--offline",
+            "--locked",
+            "--jobs",
+            "1",
+            "--workspace",
+            "--all-targets",
+            "--message-format=json",
+            "--",
+            "-D",
+            "warnings"
+          ],
+          "exit": 101
+        },
+        {
+          "label": "workspace-build",
+          "command": [
+            "cargo",
+            "+1.96.0",
+            "build",
+            "--offline",
+            "--locked",
+            "--jobs",
+            "1",
+            "--workspace",
+            "--message-format=json"
+          ],
+          "status": "UNRUN"
+        }
+      ],
+      "test_bodies_executed": 0,
+      "runtime_discovery_docs": "UNRUN",
+      "source_stable": true,
+      "retained_witnesses_preserved": true,
+      "owned_groups_closed": true,
+      "release_receipt_sha256": "b4189111609dcfe4c37b21e1bc0230f62e263d8ed12f161fc15da9d5055e7207",
+      "clippy_stdout_sha256": "6b8eee98e0ebc3c3622ed523cdf50e7535757434f962e0a4db8bd1edd8149fe0"
+    },
+    {
+      "epoch": "R3",
+      "head": "f903659bba298cdee290ee4285038a8f46af930b",
+      "tree": "0c7f5e858710631bc6e7b15f7513099b746dddcc",
+      "actual_native_session": 9586,
+      "actual_native_exit": 101,
+      "actual_native_chunk": "e8671d",
+      "stages": [
+        {
+          "label": "fmt",
+          "command": [
+            "cargo",
+            "+1.96.0",
+            "fmt",
+            "--all",
+            "--",
+            "--check"
+          ],
+          "exit": 0
+        },
+        {
+          "label": "metadata",
+          "command": [
+            "cargo",
+            "+1.96.0",
+            "metadata",
+            "--offline",
+            "--locked",
+            "--format-version=1"
+          ],
+          "exit": 0
+        },
+        {
+          "label": "clippy",
+          "command": [
+            "cargo",
+            "+1.96.0",
+            "clippy",
+            "--offline",
+            "--locked",
+            "--jobs",
+            "1",
+            "--workspace",
+            "--all-targets",
+            "--message-format=json",
+            "--",
+            "-D",
+            "warnings"
+          ],
+          "exit": 101
+        },
+        {
+          "label": "workspace-build",
+          "command": [
+            "cargo",
+            "+1.96.0",
+            "build",
+            "--offline",
+            "--locked",
+            "--jobs",
+            "1",
+            "--workspace",
+            "--message-format=json"
+          ],
+          "status": "UNRUN"
+        }
+      ],
+      "test_bodies_executed": 0,
+      "runtime_discovery_docs": "UNRUN",
+      "source_stable": true,
+      "retained_witnesses_preserved": true,
+      "owned_groups_closed": true,
+      "release_receipt_sha256": "4c17c3dff388a4f69a7c9ec407a9691bea2158fbf38dacc76fd39f03014d5a2b",
+      "clippy_stdout_sha256": "55e8e1ef90d744aac1b1788b07e8f6594f7db080e701d09ee8978a7923ac47ab"
+    }
+  ],
+  "diagnostics": [
+    {
+      "epoch": "R1",
+      "code": "E0308",
+      "message": "mismatched types",
+      "primary_spans": [
+        {
+          "file": "lampOS/crates/voice/src/coordinator.rs",
+          "line": 14524
+        }
+      ]
+    },
+    {
+      "epoch": "R2",
+      "code": "clippy::nonminimal_bool",
+      "message": "this boolean expression can be simplified",
+      "primary_spans": [
+        {
+          "file": "lampOS/crates/voice/src/remember_speaker/consent.rs",
+          "line": 332
+        }
+      ]
+    },
+    {
+      "epoch": "R3",
+      "code": "E0432",
+      "message": "unresolved import `lamp_audio::playback`",
+      "primary_spans": [
+        {
+          "file": "lampOS/crates/voice/src/coordinator/face_consent.rs",
+          "line": 63
+        }
+      ]
+    },
+    {
+      "epoch": "R3",
+      "code": "E0004",
+      "message": "non-exhaustive patterns: `provider_worker::ProviderInput::FaceQuestion { .. }` and `provider_worker::ProviderInput::FaceConsentDelivery { .. }` not covered",
+      "primary_spans": [
+        {
+          "file": "lampOS/crates/voice/src/coordinator/tests/endpoint_session.rs",
+          "line": 650
+        }
+      ]
+    },
+    {
+      "epoch": "R3",
+      "code": "unused_mut",
+      "message": "variable does not need to be mutable",
+      "primary_spans": [
+        {
+          "file": "lampOS/crates/voice/src/coordinator/tests/endpoint_session.rs",
+          "line": 552
+        }
+      ]
+    },
+    {
+      "epoch": "R3",
+      "code": "unused_mut",
+      "message": "variable does not need to be mutable",
+      "primary_spans": [
+        {
+          "file": "lampOS/crates/voice/src/coordinator/tests/endpoint_session.rs",
+          "line": 561
+        }
+      ]
+    },
+    {
+      "epoch": "R3",
+      "code": "unused_mut",
+      "message": "variable does not need to be mutable",
+      "primary_spans": [
+        {
+          "file": "lampOS/crates/voice/src/coordinator/tests/endpoint_session.rs",
+          "line": 565
+        }
+      ]
+    },
+    {
+      "epoch": "R3",
+      "code": "unused_mut",
+      "message": "variable does not need to be mutable",
+      "primary_spans": [
+        {
+          "file": "lampOS/crates/voice/src/coordinator/tests/endpoint_session.rs",
+          "line": 568
+        }
+      ]
+    },
+    {
+      "epoch": "R3",
+      "code": "unused_mut",
+      "message": "variable does not need to be mutable",
+      "primary_spans": [
+        {
+          "file": "lampOS/crates/voice/src/coordinator/tests/endpoint_session.rs",
+          "line": 570
+        }
+      ]
+    },
+    {
+      "epoch": "R3",
+      "code": "unused_mut",
+      "message": "variable does not need to be mutable",
+      "primary_spans": [
+        {
+          "file": "lampOS/crates/voice/src/coordinator/tests/endpoint_session.rs",
+          "line": 570
+        }
+      ]
+    },
+    {
+      "epoch": "R3",
+      "code": "unused_mut",
+      "message": "variable does not need to be mutable",
+      "primary_spans": [
+        {
+          "file": "lampOS/crates/voice/src/coordinator/tests/endpoint_session.rs",
+          "line": 571
+        }
+      ]
+    },
+    {
+      "epoch": "R3",
+      "code": "unused_mut",
+      "message": "variable does not need to be mutable",
+      "primary_spans": [
+        {
+          "file": "lampOS/crates/voice/src/coordinator/tests/endpoint_session.rs",
+          "line": 572
+        }
+      ]
+    },
+    {
+      "epoch": "R3",
+      "code": "unused_mut",
+      "message": "variable does not need to be mutable",
+      "primary_spans": [
+        {
+          "file": "lampOS/crates/voice/src/coordinator/tests/endpoint_session.rs",
+          "line": 573
+        }
+      ]
+    },
+    {
+      "epoch": "R3",
+      "code": "unused_variables",
+      "message": "unused variable: `channels`",
+      "primary_spans": [
+        {
+          "file": "lampOS/crates/voice/src/coordinator/tests/endpoint_session.rs",
+          "line": 552
+        }
+      ]
+    },
+    {
+      "epoch": "R3",
+      "code": "unused_variables",
+      "message": "unused variable: `seen`",
+      "primary_spans": [
+        {
+          "file": "lampOS/crates/voice/src/coordinator/tests/endpoint_session.rs",
+          "line": 553
+        }
+      ]
+    },
+    {
+      "epoch": "R3",
+      "code": "unused_variables",
+      "message": "unused variable: `ready_after`",
+      "primary_spans": [
+        {
+          "file": "lampOS/crates/voice/src/coordinator/tests/endpoint_session.rs",
+          "line": 555
+        }
+      ]
+    },
+    {
+      "epoch": "R3",
+      "code": "unused_variables",
+      "message": "unused variable: `shape`",
+      "primary_spans": [
+        {
+          "file": "lampOS/crates/voice/src/coordinator/tests/endpoint_session.rs",
+          "line": 557
+        }
+      ]
+    },
+    {
+      "epoch": "R3",
+      "code": "unused_variables",
+      "message": "unused variable: `ready`",
+      "primary_spans": [
+        {
+          "file": "lampOS/crates/voice/src/coordinator/tests/endpoint_session.rs",
+          "line": 561
+        }
+      ]
+    },
+    {
+      "epoch": "R3",
+      "code": "unused_variables",
+      "message": "unused variable: `refused_at`",
+      "primary_spans": [
+        {
+          "file": "lampOS/crates/voice/src/coordinator/tests/endpoint_session.rs",
+          "line": 565
+        }
+      ]
+    },
+    {
+      "epoch": "R3",
+      "code": "unused_variables",
+      "message": "unused variable: `first_step_us`",
+      "primary_spans": [
+        {
+          "file": "lampOS/crates/voice/src/coordinator/tests/endpoint_session.rs",
+          "line": 568
+        }
+      ]
+    },
+    {
+      "epoch": "R3",
+      "code": "unused_variables",
+      "message": "unused variable: `granted`",
+      "primary_spans": [
+        {
+          "file": "lampOS/crates/voice/src/coordinator/tests/endpoint_session.rs",
+          "line": 570
+        }
+      ]
+    },
+    {
+      "epoch": "R3",
+      "code": "unused_variables",
+      "message": "unused variable: `sent`",
+      "primary_spans": [
+        {
+          "file": "lampOS/crates/voice/src/coordinator/tests/endpoint_session.rs",
+          "line": 570
+        }
+      ]
+    },
+    {
+      "epoch": "R3",
+      "code": "unused_variables",
+      "message": "unused variable: `outbox`",
+      "primary_spans": [
+        {
+          "file": "lampOS/crates/voice/src/coordinator/tests/endpoint_session.rs",
+          "line": 571
+        }
+      ]
+    },
+    {
+      "epoch": "R3",
+      "code": "unused_variables",
+      "message": "unused variable: `due`",
+      "primary_spans": [
+        {
+          "file": "lampOS/crates/voice/src/coordinator/tests/endpoint_session.rs",
+          "line": 572
+        }
+      ]
+    },
+    {
+      "epoch": "R3",
+      "code": "unused_variables",
+      "message": "unused variable: `sequence`",
+      "primary_spans": [
+        {
+          "file": "lampOS/crates/voice/src/coordinator/tests/endpoint_session.rs",
+          "line": 573
+        }
+      ]
+    },
+    {
+      "epoch": "R3",
+      "code": "E0004",
+      "message": "non-exhaustive patterns: `Ok(Some(provider_worker::ProviderInput::FaceQuestion { .. }))` and `Ok(Some(provider_worker::ProviderInput::FaceConsentDelivery { .. }))` not covered",
+      "primary_spans": [
+        {
+          "file": "lampOS/crates/voice/src/coordinator/tests/pilot_faults.rs",
+          "line": 997
+        }
+      ]
+    },
+    {
+      "epoch": "R3",
+      "code": "E0004",
+      "message": "non-exhaustive patterns: `Some(provider_worker::ProviderInput::FaceQuestion { .. })` and `Some(provider_worker::ProviderInput::FaceConsentDelivery { .. })` not covered",
+      "primary_spans": [
+        {
+          "file": "lampOS/crates/voice/src/coordinator/tests/provider_terminal.rs",
+          "line": 566
+        }
+      ]
+    },
+    {
+      "epoch": "R3",
+      "code": "unused_mut",
+      "message": "variable does not need to be mutable",
+      "primary_spans": [
+        {
+          "file": "lampOS/crates/voice/src/coordinator/tests/provider_terminal.rs",
+          "line": 257
+        }
+      ]
+    },
+    {
+      "epoch": "R3",
+      "code": "unused_mut",
+      "message": "variable does not need to be mutable",
+      "primary_spans": [
+        {
+          "file": "lampOS/crates/voice/src/coordinator/tests/provider_terminal.rs",
+          "line": 324
+        }
+      ]
+    },
+    {
+      "epoch": "R3",
+      "code": "unused_mut",
+      "message": "variable does not need to be mutable",
+      "primary_spans": [
+        {
+          "file": "lampOS/crates/voice/src/coordinator/tests/provider_terminal.rs",
+          "line": 325
+        }
+      ]
+    },
+    {
+      "epoch": "R3",
+      "code": "unused_mut",
+      "message": "variable does not need to be mutable",
+      "primary_spans": [
+        {
+          "file": "lampOS/crates/voice/src/coordinator/tests/provider_terminal.rs",
+          "line": 326
+        }
+      ]
+    },
+    {
+      "epoch": "R3",
+      "code": "unused_mut",
+      "message": "variable does not need to be mutable",
+      "primary_spans": [
+        {
+          "file": "lampOS/crates/voice/src/coordinator/tests/provider_terminal.rs",
+          "line": 327
+        }
+      ]
+    },
+    {
+      "epoch": "R3",
+      "code": "unused_mut",
+      "message": "variable does not need to be mutable",
+      "primary_spans": [
+        {
+          "file": "lampOS/crates/voice/src/coordinator/tests/provider_terminal.rs",
+          "line": 328
+        }
+      ]
+    },
+    {
+      "epoch": "R3",
+      "code": "unused_mut",
+      "message": "variable does not need to be mutable",
+      "primary_spans": [
+        {
+          "file": "lampOS/crates/voice/src/coordinator/tests/provider_terminal.rs",
+          "line": 329
+        }
+      ]
+    },
+    {
+      "epoch": "R3",
+      "code": "unused_mut",
+      "message": "variable does not need to be mutable",
+      "primary_spans": [
+        {
+          "file": "lampOS/crates/voice/src/coordinator/tests/provider_terminal.rs",
+          "line": 330
+        }
+      ]
+    },
+    {
+      "epoch": "R3",
+      "code": "unused_mut",
+      "message": "variable does not need to be mutable",
+      "primary_spans": [
+        {
+          "file": "lampOS/crates/voice/src/coordinator/tests/provider_terminal.rs",
+          "line": 331
+        }
+      ]
+    },
+    {
+      "epoch": "R3",
+      "code": "unused_mut",
+      "message": "variable does not need to be mutable",
+      "primary_spans": [
+        {
+          "file": "lampOS/crates/voice/src/coordinator/tests/provider_terminal.rs",
+          "line": 332
+        }
+      ]
+    },
+    {
+      "epoch": "R3",
+      "code": "unused_mut",
+      "message": "variable does not need to be mutable",
+      "primary_spans": [
+        {
+          "file": "lampOS/crates/voice/src/coordinator/tests/provider_terminal.rs",
+          "line": 333
+        }
+      ]
+    },
+    {
+      "epoch": "R3",
+      "code": "unused_variables",
+      "message": "unused variable: `maximum_played`",
+      "primary_spans": [
+        {
+          "file": "lampOS/crates/voice/src/coordinator/tests/provider_terminal.rs",
+          "line": 121
+        }
+      ]
+    },
+    {
+      "epoch": "R3",
+      "code": "unused_variables",
+      "message": "unused variable: `shared`",
+      "primary_spans": [
+        {
+          "file": "lampOS/crates/voice/src/coordinator/tests/provider_terminal.rs",
+          "line": 256
+        }
+      ]
+    },
+    {
+      "epoch": "R3",
+      "code": "unused_variables",
+      "message": "unused variable: `output`",
+      "primary_spans": [
+        {
+          "file": "lampOS/crates/voice/src/coordinator/tests/provider_terminal.rs",
+          "line": 257
+        }
+      ]
+    },
+    {
+      "epoch": "R3",
+      "code": "unused_variables",
+      "message": "unused variable: `guard_sent`",
+      "primary_spans": [
+        {
+          "file": "lampOS/crates/voice/src/coordinator/tests/provider_terminal.rs",
+          "line": 324
+        }
+      ]
+    },
+    {
+      "epoch": "R3",
+      "code": "unused_variables",
+      "message": "unused variable: `terminal_sent`",
+      "primary_spans": [
+        {
+          "file": "lampOS/crates/voice/src/coordinator/tests/provider_terminal.rs",
+          "line": 325
+        }
+      ]
+    },
+    {
+      "epoch": "R3",
+      "code": "unused_variables",
+      "message": "unused variable: `capture_started`",
+      "primary_spans": [
+        {
+          "file": "lampOS/crates/voice/src/coordinator/tests/provider_terminal.rs",
+          "line": 326
+        }
+      ]
+    },
+    {
+      "epoch": "R3",
+      "code": "unused_variables",
+      "message": "unused variable: `capture_epoch`",
+      "primary_spans": [
+        {
+          "file": "lampOS/crates/voice/src/coordinator/tests/provider_terminal.rs",
+          "line": 327
+        }
+      ]
+    },
+    {
+      "epoch": "R3",
+      "code": "unused_variables",
+      "message": "unused variable: `capture_sequence`",
+      "primary_spans": [
+        {
+          "file": "lampOS/crates/voice/src/coordinator/tests/provider_terminal.rs",
+          "line": 328
+        }
+      ]
+    },
+    {
+      "epoch": "R3",
+      "code": "unused_variables",
+      "message": "unused variable: `next_capture`",
+      "primary_spans": [
+        {
+          "file": "lampOS/crates/voice/src/coordinator/tests/provider_terminal.rs",
+          "line": 329
+        }
+      ]
+    },
+    {
+      "epoch": "R3",
+      "code": "unused_variables",
+      "message": "unused variable: `next_privacy`",
+      "primary_spans": [
+        {
+          "file": "lampOS/crates/voice/src/coordinator/tests/provider_terminal.rs",
+          "line": 330
+        }
+      ]
+    },
+    {
+      "epoch": "R3",
+      "code": "unused_variables",
+      "message": "unused variable: `cursor`",
+      "primary_spans": [
+        {
+          "file": "lampOS/crates/voice/src/coordinator/tests/provider_terminal.rs",
+          "line": 331
+        }
+      ]
+    },
+    {
+      "epoch": "R3",
+      "code": "unused_variables",
+      "message": "unused variable: `held_retirement`",
+      "primary_spans": [
+        {
+          "file": "lampOS/crates/voice/src/coordinator/tests/provider_terminal.rs",
+          "line": 332
+        }
+      ]
+    },
+    {
+      "epoch": "R3",
+      "code": "unused_variables",
+      "message": "unused variable: `privacy_closed`",
+      "primary_spans": [
+        {
+          "file": "lampOS/crates/voice/src/coordinator/tests/provider_terminal.rs",
+          "line": 333
+        }
+      ]
+    },
+    {
+      "epoch": "R3",
+      "code": "E0004",
+      "message": "non-exhaustive patterns: `&provider_worker::ProviderInput::FaceQuestion { .. }` and `&provider_worker::ProviderInput::FaceConsentDelivery { .. }` not covered",
+      "primary_spans": [
+        {
+          "file": "lampOS/crates/voice/src/coordinator/tests/second_route.rs",
+          "line": 430
+        }
+      ]
+    }
+  ],
+  "no_failure_relabelled_as_pass": true,
+  "current_corrected_source": "PENDING_COMPILER_QUALIFICATION",
+  "Voice_runtime": "UNRUN",
+  "readiness": false
+}

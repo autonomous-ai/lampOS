@@ -1,3 +1,20 @@
+## 2026-10-28 02:32 ICT — Consent test compilation fixes continue; diagnostic native failure retained
+
+Ready for lamp-voice: no.
+
+[Consent component and compiler history](verification/onboarding-consent-compiler-history-20261028/README.md):
+Eyes-only integration passed 11 tests on its own source tree. Three later full-source
+compiler attempts failed before runtime; their errors and zero-test counts remain
+recorded. The five R3 test import/exhaustiveness fixes are being folded into a fresh
+source gate. No full Voice consent or physical acceptance is claimed.
+
+[Original diagnostic ARM failure](verification/diagnostic-a47-native-failure-20261028/README.md):
+#3577 a47fe22e5 recorded 5,097 passed, 1 failed and 2,698 selected unrun;
+all 18 owned diagnostics were unrun after the old N13 ordering failure. Linux
+Clippy passed. The failed run produced no downloadable executable. The next carry
+uses the delivered #3891 repair and requires fresh gates; no historical failure
+is waived. #3544 remains behind Main despite its green original source/native gates.
+
 ## 2026-10-27 17:58 UTC — Current hand native gate and source carry are green
 
 Native and source gates passed for #3544 `4084e4e1d`; ready transition follows.

@@ -1,0 +1,46 @@
+{
+  "status": "ORIGINAL_ARM_FAILURE_PRESERVED_CLIPPY_PASS",
+  "published_head": "a47fe22e56d181f6d7946bc5b98d90dd9560293e",
+  "ARM_run": 40551384357,
+  "Clippy_run": 40551384353,
+  "attempt": 1,
+  "actual_checkout": "1fd8aacaa31bdd2486fbcc3d4810c64c7b90c6b7",
+  "actual_tree": "a88b383c84d92beb258df392237899830eae2cba",
+  "parents": [
+    "3aa752f73914d0f29fc90edb010a3a7fa1cf526b",
+    "a47fe22e56d181f6d7946bc5b98d90dd9560293e"
+  ],
+  "unique_pass": 5097,
+  "fail": 1,
+  "bad_case": {
+    "event": "FAIL",
+    "duration": "0.011s",
+    "binary": "lamp-voice",
+    "test": "remember::tests::after_a_forget_the_next_conversation_is_journalled_and_ended",
+    "raw_line": 5930
+  },
+  "selected": 7796,
+  "executed": 5098,
+  "selected_unrun": 2698,
+  "summary_skips": 53,
+  "duplicate_terminals": 0,
+  "diagnostics_terminals": [],
+  "diagnostics_absence_no_runtime_credit": true,
+  "artifact_api_total": 0,
+  "failed_driver_unavailable_no_artifact": true,
+  "source_test_body_not_independently_requalified": true,
+  "no_whole_authored_tree_or_current_base_equivalence_assumed": true,
+  "no_runtime_replay_or_local_source_target_mutation": true,
+  "readiness": false,
+  "private_original_receipt_sha256": "3a40f04510bd8d28eedd1acea6fe4550471b020f3f3fe42a5a846db9171301f1",
+  "original_evidence_sha256": {
+    "40551384357-original-logs.zip": "322bde9adb65eaefc992f7ff53807eec1d1e0374f3522872f2283dcf9097d95b",
+    "40551384353-original-logs.zip": "dcee980c27de4a5b9b352c3457d98cf629c66993466197a5407a483be3f49087",
+    "unique-terminal-ledger.json": "e7ee4db1a3fcedf9651f0d8f80c1fc312bf583cb4cfc5df835810222bf34d6f5",
+    "failure-original-excerpt.log": "1c76a540f124b7d008a2b97ed6cbfec9cfac49fe9f20d8fd05f3c062a4d027ab",
+    "actual-checkout.json": "f7bb285d15c266ef114f5d94824cbaffc8372b5450a5eeb1403b1677222fb229"
+  },
+  "ARM_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40551384357",
+  "Clippy_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40551384353",
+  "historical_failure_preserved": true
+}

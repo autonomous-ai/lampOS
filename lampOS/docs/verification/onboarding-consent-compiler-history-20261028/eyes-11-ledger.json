@@ -1,0 +1,57 @@
+[
+  {
+    "test": "a_short_line_between_recognition_ticks_has_no_anchor_and_never_falls_back",
+    "event": "ok",
+    "line_one_based": 187
+  },
+  {
+    "test": "a_speaker_bound_enrollment_request_is_understood",
+    "event": "ok",
+    "line_one_based": 188
+  },
+  {
+    "test": "five_fresh_prints_of_the_requesting_speaker_reach_the_final_fence",
+    "event": "ok",
+    "line_one_based": 189
+  },
+  {
+    "test": "guarded_proof_cannot_be_mixed_with_a_legacy_operation_or_unknown_fields",
+    "event": "ok",
+    "line_one_based": 190
+  },
+  {
+    "test": "missing_or_ambiguous_frames_end_a_capture_and_a_return_cannot_rescue_it",
+    "event": "ok",
+    "line_one_based": 191
+  },
+  {
+    "test": "obsolete_or_unconsented_live_socket_requests_never_start_a_capture",
+    "event": "ok",
+    "line_one_based": 192
+  },
+  {
+    "test": "the_consented_socket_route_reaches_the_real_collector_and_people_store",
+    "event": "ok",
+    "line_one_based": 193
+  },
+  {
+    "test": "the_legacy_capture_contract_stays_available_when_not_guarded",
+    "event": "ok",
+    "line_one_based": 194
+  },
+  {
+    "test": "the_live_dispatcher_requires_the_consented_operation_only_when_guarded",
+    "event": "ok",
+    "line_one_based": 195
+  },
+  {
+    "test": "the_new_operation_is_unknown_to_the_frozen_pre_consent_parser_schema",
+    "event": "ok",
+    "line_one_based": 196
+  },
+  {
+    "test": "the_real_capture_collector_never_mixes_in_a_replacement_under_the_same_id",
+    "event": "ok",
+    "line_one_based": 197
+  }
+]

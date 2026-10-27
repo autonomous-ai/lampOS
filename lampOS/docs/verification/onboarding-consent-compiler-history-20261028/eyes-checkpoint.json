@@ -1,0 +1,88 @@
+{
+  "scope": "PARTIAL_EYES_ONLY_NOT_FEATURE_QUALIFICATION",
+  "head": "f903659bba298cdee290ee4285038a8f46af930b",
+  "tree": "b95ddc557662b48e5c5d75b53ce444e168e0593b",
+  "actual_native_exit": 0,
+  "actual_native_session": 99292,
+  "actual_native_chunk": "6706be",
+  "stages": [
+    {
+      "label": "fmt",
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "exit": 0
+    },
+    {
+      "label": "eyes-clippy",
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "clippy",
+        "--offline",
+        "--locked",
+        "--jobs",
+        "1",
+        "-p",
+        "lamp-eyes",
+        "--all-targets",
+        "--message-format=json",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit": 0
+    },
+    {
+      "label": "remember-speaker",
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--offline",
+        "--locked",
+        "--jobs",
+        "1",
+        "-p",
+        "lamp-eyes",
+        "--test",
+        "remember_speaker",
+        "--message-format=json",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit": 0
+    }
+  ],
+  "environment": {
+    "CARGO_BUILD_JOBS": "1",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_NET_OFFLINE": "true",
+    "compiler_profiles": "normal",
+    "remember_speaker_test_only": {
+      "CARGO_PROFILE_TEST_DEBUG": "0",
+      "test_threads": 1
+    }
+  },
+  "counts": {
+    "scope": "PARTIAL_EYES_ONLY",
+    "unique_pass": 11,
+    "failed": 0,
+    "ignored": 0,
+    "new_controls_once": 4,
+    "existing_controls_once": 7,
+    "Voice_consent_pending": true,
+    "old_275_or_4163_credit": false
+  },
+  "source_guard": true,
+  "retained_evidence_preserved": true,
+  "owned_groups_closed": true,
+  "no_current_full_source_runtime_credit": true,
+  "receipt_sha256": "bbf2e9408017ac138a8ddd8d3c6d3a803e8f47af5b20b22dca7fbb6cda0a6966",
+  "stdout_sha256": "3a19c246ca5037f65418fad3f315b5dec002db1be639ab66d1eb7940f793f746"
+}

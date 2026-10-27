@@ -1,0 +1,13 @@
+[
+  {
+    "binary": "lamp-voice",
+    "test": "remember::tests::after_a_forget_the_next_conversation_is_journalled_and_ended",
+    "event": "FAIL",
+    "reported_duration": "0.011s",
+    "outer_occurrences": 1,
+    "stage": "ARM nextest test step",
+    "failure_kind": "journal close/open order assertion",
+    "actual_checkout": "1fd8aacaa31bdd2486fbcc3d4810c64c7b90c6b7",
+    "later_delivered_repair_is_not_old_run_credit": true
+  }
+]
