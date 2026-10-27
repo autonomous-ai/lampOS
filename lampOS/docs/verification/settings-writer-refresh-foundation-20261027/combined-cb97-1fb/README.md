@@ -1,0 +1,9 @@
+# Combined writer foundation: complete current-base Update gate
+
+Exact committed source cb97e867da906a00df517b41c027dedfbf953bdf on public Main 1fb93206e4a6c26d35c801b3472a5af179231881, tree d7240bc1ec79ed8361c8c26dee358f91260ea7ce. Formatting, strict Update all-target Clippy, no-run compiler JSON and complete Update pass: **492 passed / 0 failed / 6 ignored**. All eighteen writer-refresh controls have one PASS row each, included in that total. This first runtime on this source uses normal bounded libtest concurrency, four test threads; no deadline or assertion changed, no failing runtime was replayed. Nextest was unavailable; Cargo is the actual runner.
+
+All 7341 source/workflow files and clean committed head/status close unchanged. All nine actual Cargo Running paths occur in the matching compile-stage JSON, and all ten compile-produced executable rows have matching actual/preserved post-run hashes and sizes. Separate doctest summary has no fabricated passes. Source manifests, raw logs, full compiler JSON and binaries remain private with hashes; this packet contains text only.
+
+The initial same-source gate passed fmt but could not resolve Main's newly declared rcgen from the offline registry cache before Rust compilation. Its compile/runtime stages were unrun and its failed boundary remains retained. Normal locked registry resolution then passed Clippy/compile and this first runtime. This is a dependency-cache recovery, not a source fix, retry-to-green runtime or waiver. Earlier foundation failures and 16f native results retain their own exact sources.
+
+This is only an unwired record/admission and validated recovery-input API. It does not copy a helper, authenticate artifact bytes, restore a setting, create a unit, prove physical power loss or exercise a 7071 GOOD/BAD. Original current-head ARM/Linux are separate.

@@ -1,3 +1,46 @@
+Ready for lamp-voice: no (#3775 combined original checks/read pending); Cloud train disposition pending
+
+## Current checkpoint: 2026-10-27 17:16 +07, complete combined foundation pushed
+
+#3775 is pushed as **3c3ef1a2a / c28789eeb**, with the validated accessor
+folded into its same unwired foundation. [Complete Update gate](verification/settings-writer-refresh-foundation-20261027/combined-cb97-1fb/README.md)
+on actual cb97/1fb passes fmt, strict Update all-target Clippy, compiler JSON
+and **492/0/6**, all eighteen controls once, normal four-thread libtest
+concurrency, no changed deadline/assertion. The initial offline attempt
+stopped before Rust compilation on Main's missing rcgen index entry;
+locked normal registry resolution then passed, and its first runtime passed.
+All 7341 source/workflow hashes and actual/preserved executable bindings close.
+
+[Current carry gate](verification/settings-writer-refresh-foundation-20261027/combined-3c3-c287/README.md)
+on 3c3/c287 passes current fmt/strict Clippy/compilation and full Update
+library plus function readers **173/0/2**, eighteen controls included.
+All six authored full blobs/modes and zero-context diff equal the full-gated
+source. Main's four Control-only changed files are unconsumed by actual
+Update compiler inputs; the full 492 result remains its own execution.
+New original ARM 40485795636/Linux 40485795797 are watched without reruns.
+Old 16f ARM 7,644/0/53 and its production-only artifact proof stay separate;
+no per-nextest executable hashes or new-accessor execution is inferred there.
+
+Receipt hardening remains separate: exact old e362 probes reproduced two
+wrong-identity library mutations and one incorrectly switched round; failure
+drivers/source retained. Production fix rejects op/sequence mismatch before
+record mutation and uses the waiting parent's own expected identity. A new
+actual-applier test restores written/removed/new-path files and modes after
+bad ApplyDone; another retains the journal on bad BackDone, then settles
+idempotently with no second Apply. Source on 1fb passes library 155/0/2 and
+selected 67/0; current carry/qualification/publication follows separately.
+Bug disposition: fixed and gated locally, not reported as a lamp trial.
+
+#3631 remains delivered, never reapplied over Sixth's query reuse. #3644
+405/e362 remains exact-read/current-x86-qualified; train 224's source carry
+was reported patch-identical, but no delivery is assumed without its merge
+record. No helper copy, setting restore, root one-shot, signing, promotion
+or physical-lamp acceptance was performed by this builder. Next foundation
+work observes bounded regular setting files through anchored descriptors;
+its source is being written unwired, with no compiler overlap.
+
+---
+
 Ready for lamp-voice: Reset delivered; Cloud current-ready; combined #3775 current gate active
 
 ## Current checkpoint: 2026-10-27 16:54 +07, recovery API and receipt bug disposition

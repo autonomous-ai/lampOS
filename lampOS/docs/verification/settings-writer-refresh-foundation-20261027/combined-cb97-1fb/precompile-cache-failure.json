@@ -1,0 +1,18 @@
+{
+  "head": "cb97e867da906a00df517b41c027dedfbf953bdf",
+  "fmt_exit": 0,
+  "clippy_driver_exit": 101,
+  "diagnostic": "no matching package rcgen in offline index, required by new Main lamp-control",
+  "rust_compilation_ran": false,
+  "tests_ran": false,
+  "raw_clippy_stderr_sha256": "6dbab71466f6176722924295234037866a96414e63361caad7e607d70168ec0e",
+  "source_closure": {
+    "head_unchanged": true,
+    "status_clean": true,
+    "source_unchanged": true,
+    "source_count": 7341,
+    "stages_completed": 2,
+    "all_stages_passed": false
+  },
+  "failure_retained": true
+}

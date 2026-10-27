@@ -1,0 +1,24 @@
+{
+  "qualified_head": "cb97e867da906a00df517b41c027dedfbf953bdf",
+  "qualified_base": "1fb93206e4a6c26d35c801b3472a5af179231881",
+  "head": "3c3ef1a2a97ca821b031b99245147254d7aaa47a",
+  "base": "c28789eeb03bf5d441927a7e991b949a2689b557",
+  "owned_modes_blobs": {
+    "lampOS/crates/update/src/lib.rs": "100644 blob 77d5807ac882409e634840bbfda142623797a31d\tlampOS/crates/update/src/lib.rs",
+    "lampOS/crates/update/src/writer_refresh.rs": "100644 blob 77ad2e38e7a3135fe56723cde18a822df5da8680\tlampOS/crates/update/src/writer_refresh.rs",
+    "lampOS/crates/update/src/writer_refresh/tests.rs": "100644 blob a9bb99c4ace0198232f37c658984f7d2a8ec79ae\tlampOS/crates/update/src/writer_refresh/tests.rs",
+    "lampOS/docs/reuse-decisions.md": "100644 blob a1f6ed3dae788bdc4206d1e4027428aa1c20c06e\tlampOS/docs/reuse-decisions.md",
+    "lampOS/docs/settings-writer-refresh.md": "100644 blob 4d595ce730e3569b98f1ca8c3bad22833a91181e\tlampOS/docs/settings-writer-refresh.md",
+    "lampOS/docs/updates.md": "100644 blob bc096ebcafb0c9d0e22f3e1606f3930b50f7ee08\tlampOS/docs/updates.md"
+  },
+  "all_owned_blobs_modes_equal": true,
+  "authored_zero_context_diff_equal": true,
+  "intervening_paths": [
+    "lampOS/crates/control/src/rate.rs",
+    "lampOS/crates/control/src/server.rs",
+    "lampOS/crates/control/src/session.rs",
+    "lampOS/crates/control/tests/door.rs",
+    "lampOS/docs/control.md"
+  ],
+  "control_package_absent_from_actual_update_compiler_artifacts": true
+}
