@@ -1,0 +1,140 @@
+{
+  "status": "SOURCE_CARRIES_ONLY_NOT_GATE_PASS",
+  "pinned_base": "99b5161531791de7ed57ce57f6cacf988d509f25",
+  "audited_at_utc": "2026-10-27T01:16:28.064352+00:00",
+  "entries": [
+    {
+      "PR": 3623,
+      "old_head": "0bd3f854c03806b69c4a8d17b89c29a775db350e",
+      "old_base": "4bff5f2c517bf64d4a32c31a90e0b24dc1a4810a",
+      "new_head": "a364a97dc1dd6c0a711d0bb81d3a4f4e04da9500",
+      "new_base": "99b5161531791de7ed57ce57f6cacf988d509f25",
+      "branch": "tests/1806-sleep-mood-clock",
+      "status": "clean",
+      "source_file_count": 10677,
+      "range_diff": "1:  0bd3f854c0 = 1:  a364a97dc1 lampOS: align the held Mood fixture with its sample clock",
+      "authored_blobs": [
+        {
+          "path": "lampOS/crates/expression/tests/runtime.rs",
+          "old_blob": "3e2917fc1719d9ecd385fc237c14c53f894a7993",
+          "new_blob": "3e2917fc1719d9ecd385fc237c14c53f894a7993",
+          "current_sha256": "e6d2dd7aeb19addfc1b83faf2049da5b0d38d73945a6b16b17166748abbcb4ce",
+          "bytes": 53210,
+          "whole_blob_equal": true
+        },
+        {
+          "path": "lampOS/docs/expression.md",
+          "old_blob": "45c62eb8b678e522dd6c92e23e7940832ba31b05",
+          "new_blob": "45c62eb8b678e522dd6c92e23e7940832ba31b05",
+          "current_sha256": "3d893182d80d5481be63798fd4449c75b3098699e6185d48da62f13b95b9dd4c",
+          "bytes": 81109,
+          "whole_blob_equal": true
+        }
+      ],
+      "commit_message_one_line": true,
+      "new_runtime_result_claim": false,
+      "new_native_result_claim": false
+    },
+    {
+      "PR": 3543,
+      "old_head": "59a2f5f0045647714dc4d9704ffcdc3b0df43980",
+      "old_base": "4bff5f2c517bf64d4a32c31a90e0b24dc1a4810a",
+      "new_head": "a59decc5687f71889e2403f4ec6e2d7f5f216e79",
+      "new_base": "99b5161531791de7ed57ce57f6cacf988d509f25",
+      "branch": "tests/1806-reader-sentinel-root",
+      "status": "clean",
+      "source_file_count": 10677,
+      "range_diff": "1:  59a2f5f004 = 1:  a59decc568 lampOS: isolate the reader sentinel fixture from host ancestry",
+      "authored_blobs": [
+        {
+          "path": "lampOS/crates/voice/src/session_reader/tests.rs",
+          "old_blob": "08f2fd1ca4c18ed01c5b3577d51248ed0e30e588",
+          "new_blob": "08f2fd1ca4c18ed01c5b3577d51248ed0e30e588",
+          "current_sha256": "5f47477a111d7f82da5fdeb3b3893718099eb67a0fe93b76b4f24ddc32adce73",
+          "bytes": 36597,
+          "whole_blob_equal": true
+        },
+        {
+          "path": "lampOS/docs/realtime-tests.md",
+          "old_blob": "80ae29b16b4d298a263ad333ec9672b4eeafadd0",
+          "new_blob": "80ae29b16b4d298a263ad333ec9672b4eeafadd0",
+          "current_sha256": "4b5481d7574ff3445db3d64fb502f4f3788e482fa2a560600fba31c57e53e1ca",
+          "bytes": 115505,
+          "whole_blob_equal": true
+        }
+      ],
+      "commit_message_one_line": true,
+      "new_runtime_result_claim": false,
+      "new_native_result_claim": false
+    },
+    {
+      "PR": 3572,
+      "old_head": "48518f84ced29ac0a70a8ab84236b3bc0459ff66",
+      "old_base": "4bff5f2c517bf64d4a32c31a90e0b24dc1a4810a",
+      "new_head": "a209424d3c5f07ca3423447bc2bb8bcb6d0a18e0",
+      "new_base": "99b5161531791de7ed57ce57f6cacf988d509f25",
+      "branch": "tests/1569-same-voice-restart-exit",
+      "status": "clean",
+      "source_file_count": 10677,
+      "range_diff": "1:  48518f84ce = 1:  a209424d3c lampOS: join the same-voice restart fixture worker",
+      "authored_blobs": [
+        {
+          "path": "lampOS/crates/voice/src/same_voice.rs",
+          "old_blob": "84d681f66371c607157ab4c1840b5e2d5f70c13b",
+          "new_blob": "84d681f66371c607157ab4c1840b5e2d5f70c13b",
+          "current_sha256": "151acd1d793723ba2ed1ac78ed9ca9517e376f52cf9119839de990107394ec72",
+          "bytes": 78068,
+          "whole_blob_equal": true
+        },
+        {
+          "path": "lampOS/docs/same-voice.md",
+          "old_blob": "8923730e5353e76be0ffeee0f395ff57327a53e0",
+          "new_blob": "8923730e5353e76be0ffeee0f395ff57327a53e0",
+          "current_sha256": "774451da969bbd1271f6ad143def758b0b1bb6acf0bd74e36ca3db104c1a5b0d",
+          "bytes": 40112,
+          "whole_blob_equal": true
+        }
+      ],
+      "commit_message_one_line": true,
+      "new_runtime_result_claim": false,
+      "new_native_result_claim": false
+    },
+    {
+      "PR": 3545,
+      "old_head": "3ec9834b94e2410aa18a9102ea3cfcbf94295c79",
+      "old_base": "4bff5f2c517bf64d4a32c31a90e0b24dc1a4810a",
+      "new_head": "53bda7362a882972710f127e27ac007f416b2b57",
+      "new_base": "99b5161531791de7ed57ce57f6cacf988d509f25",
+      "branch": "tests/1806-addon-journal-e1",
+      "status": "clean",
+      "source_file_count": 10677,
+      "range_diff": "1:  3ec9834b9 = 1:  53bda7362 lampOS: count completed addon judgements from new journal bytes",
+      "authored_blobs": [
+        {
+          "path": "lampOS/crates/skills/tests/it/addon.rs",
+          "old_blob": "41a8e546e85ee4d435b003d6eb13e240e9584082",
+          "new_blob": "41a8e546e85ee4d435b003d6eb13e240e9584082",
+          "current_sha256": "15db11e18468504635db4019862d1d5c4d35ecdacb60529c204aa28233b819c9",
+          "bytes": 31131,
+          "whole_blob_equal": true
+        },
+        {
+          "path": "lampOS/docs/skills.md",
+          "old_blob": "c71d8608866bcab461c072c88a8c8dfd6c48cf4d",
+          "new_blob": "c71d8608866bcab461c072c88a8c8dfd6c48cf4d",
+          "current_sha256": "627892816c1381c43e7e8fc49db846619fefbfc113e39b7d0f2993e41d1be5f3",
+          "bytes": 202319,
+          "whole_blob_equal": true
+        }
+      ],
+      "commit_message_one_line": true,
+      "new_runtime_result_claim": false,
+      "new_native_result_claim": false
+    }
+  ],
+  "limits": [
+    "Immutable object and current two-file source/branch/index-clean verification; no compiler/runtime/CI/device execution in this audit.",
+    "Old source-specific gate counts are not current99b results.",
+    "Each new head still needs its declared current gates, native checks and independent source reads before readiness."
+  ]
+}

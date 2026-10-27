@@ -1,0 +1,7 @@
+# Four Tests source carries onto 99b
+
+The clean local Mood #3623, Sentinel #3543, Restart #3572 and Skills #3545 branches are carried from pinned 4bff onto `99b5161531791de7ed57ce57f6cacf988d509f25`. Each range-diff contains one equal patch. Both entire authored blobs per PR match the preceding head and current checked-out bytes. Each head has exactly the new base as its parent, 10,677 tracked files, a clean status and a single-line commit message. Exact immutable IDs, branch names and byte/blob digests are in [audit.json](audit.json).
+
+Main added camera-authority IPC source/tests and enabled rustix filesystem APIs. That changes an input inside Expression’s declared dependency closure. Mood therefore runs a fresh full 340-case suite; its earlier zero-runtime/original-f441 reuse result remains scoped to the earlier carry. Restart’s completed 485/4bff run is 21/0/0 with 241 witnesses and controller zero; that result is not transferred to the new a209/99b head. Its fresh current module gate is separate. Sentinel and Skills current gates follow their own source and dependency bindings.
+
+This is source-carry evidence only. The new heads were not pushed by this read-only audit; each push follows its own gates. No current runtime/native/ready or device claim is made here, and no original failed result is overwritten. The active Carrier 4fd/4bff runtime retains its fixed source and is excluded from these source changes.

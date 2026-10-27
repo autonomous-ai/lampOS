@@ -1,5 +1,13 @@
 # Tests work log
 
+## 2026-10-27 08:16 — New IPC base carries and fresh gates
+
+Ready for lamp-voice: no (current 99b gates and reads pending)
+
+[Four clean source carries](verification/tests-four-carries-99b-20261027/) verify one equal patch, both whole authored blobs and current bytes, clean status and 10,677 tracked files for Mood `a364a97dc`, Sentinel `a59decc56`, Restart `a209424d3` and Skills `53bda7362`, each directly on pinned `99b516153`. Main’s IPC/rustix-fs input change prevents blind Expression runtime reuse. Root starts a fresh full Mood 340+docs0 and full Restart 21 concurrently on separate targets, jobs 1 each; they retain distinct source and guard scopes and make no idle-host/performance claim. New efficient guards hash full source/all frozen inputs at initial/final, enforce exact file-set/stat/owner/frozen metadata and actual executable hashes at other boundaries, and hash consumed executable bytes adjacent to direct calls.
+
+Carrier direct runtime stays fixed on `4fd/4bff`, with fresh actual 303 Update identities and 25 promoter cases scheduled. The two changed-input source readers are excluded from its explicit 139PASS/6IGNORE prior carry. That historical/current composition is never described as a fresh full Cargo run. No device action.
+
 ## 2026-10-27 07:52 — Sentinel current native checks pass; Carrier runtime starts
 
 Ready for lamp-voice: no (#3543 second current peer clearance pending)
