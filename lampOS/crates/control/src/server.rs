@@ -166,6 +166,16 @@ impl Shared {
             }
         }
     }
+
+    /// Closes every connection of `client` at once, a listener's included:
+    /// dropping its outbox ends the connection once what's queued (its
+    /// leases' `lost`) is sent (harness-reviewer's P2 on #3778).
+    fn close_client(&self, client: &str) {
+        self.open
+            .lock()
+            .expect("open")
+            .retain(|_, (of, _)| of.as_deref() != Some(client));
+    }
 }
 
 /// The TLS side of the door, from its certificate.
@@ -369,13 +379,16 @@ fn admin_answer(shared: &Shared, line: &str) -> Value {
     }
     if let Some(Value::String(client)) = asked.get("revoke") {
         let revoked = shared.door.lock().expect("door").revoke(client, now);
-        return match revoked {
+        let answer = match revoked {
             Ok((was, changes)) => {
                 shared.tell(changes);
                 json!({"revoked": was})
             }
             Err(error) => json!({"error": format!("could not keep the revoke: {error}")}),
         };
+        // Refused in memory either way, so its connections go now.
+        shared.close_client(client);
+        return answer;
     }
     if asked.get("clients").is_some() {
         let door = shared.door.lock().expect("door");
