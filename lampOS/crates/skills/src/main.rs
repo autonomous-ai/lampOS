@@ -4423,6 +4423,24 @@ mod tests {
     /// The known file and the daily journal come by their flag, or else by
     /// the unit's `Environment=` line, which an older binary ignores where
     /// it would end on an unknown flag (#2157); the flag wins.
+    /// Phase 0 of the lamp programming protocol (Nine's design on #3504,
+    /// 27 Oct, §4): the product's lamp-skills stamps every gesture and move
+    /// it sends as the skill's (`source = "skill:<name>"`, `priority =
+    /// "skill"`), which the product's body weighs (`--arbitration on`,
+    /// pinned in lamp-body's tests). Read from the unit file.
+    #[test]
+    fn the_product_unit_stamps_who_asks_for_a_gesture() {
+        const UNIT: &str = include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../deploy/product/lamp-skills.service"
+        ));
+        assert!(
+            UNIT.lines()
+                .any(|line| line == format!("Environment={BODY_REQUESTS_ENVIRONMENT}=on")),
+            "{UNIT}"
+        );
+    }
+
     #[test]
     fn a_path_comes_by_its_flag_or_else_the_environment() {
         let flag = Some(PathBuf::from("/run/lampos-eyes/known"));

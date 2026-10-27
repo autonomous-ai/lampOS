@@ -32,6 +32,9 @@ Environment=LAMP_EXPRESSION_BODY=on
 # body folds now, whoever is in front of it (#1362).
 Environment=LAMP_HEAD_TOUCH=on
 EnvironmentFile=/etc/lampOS/body/lamp.env
+# --arbitration on (#940): a gesture or move says who asks, and one asked higher ends the one playing, eased out, so a
+# skill's or an outside controller's gives way to the conversation's and a person's (docs/body.md, "Who may ask over
+# whom"); lamp-skills stamps its own (LAMP_BODY_REQUESTS). The lamp programming protocol's phase 0 (#3504, 27 Oct).
 # --speed 300, Tuning::SPEED_CAP (24 Oct): Expression's offsets, the mood poses and gaze moves reach the head at this
 # rate, with the software acceleration six times it (720 -> 1800 counts/s^2); leans keep their 1.5 s and the arm's stand
 # and fold follow --stand-seconds. Measured on lamp-4ace through one spoken answer each, body/joint_states read 10 times
@@ -40,7 +43,7 @@ EnvironmentFile=/etc/lampOS/body/lamp.env
 # arm 376,488/396,488; the strain bounds (pitch/roll/yaw 240/150/220 for six 20 ms steps in a row, arm 560 under
 # --force-limit 600) eased and retreated nothing at 300. The factory's first stand (deploy/factory/steps.sh) stays at
 # 120.
-ExecStart=/opt/lampOS/body/current/lamp-body --device /dev/ttyACM0 --unit-id %H --lock-directory /run/lampos-locks/motor --mood-socket /run/lampos-body/mood.sock --gaze-socket /run/lampos-body/gaze.sock --reach 150,15,1,250 --speed 300 --servo-speed 1000 --servo-acceleration 60 --gaze-reach 480,120 --stand-share 100 --stand-seconds 6 --awake-seconds 90 --idle on --force-limit 600 --wake on --rest-glance on --look-at-name on $BODY_POSES
+ExecStart=/opt/lampOS/body/current/lamp-body --device /dev/ttyACM0 --unit-id %H --lock-directory /run/lampos-locks/motor --mood-socket /run/lampos-body/mood.sock --gaze-socket /run/lampos-body/gaze.sock --reach 150,15,1,250 --speed 300 --servo-speed 1000 --servo-acceleration 60 --gaze-reach 480,120 --stand-share 100 --stand-seconds 6 --awake-seconds 90 --idle on --force-limit 600 --wake on --rest-glance on --look-at-name on --arbitration on $BODY_POSES
 Restart=on-failure
 RestartSec=15s
 KillMode=mixed
