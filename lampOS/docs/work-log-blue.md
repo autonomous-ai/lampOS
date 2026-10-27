@@ -612,3 +612,4 @@ Ready for lamp-voice: yes (#2553), once its ARM64 run is green
 - 18:59: NEXT TRAIN #3823 f4c6de577 (Third + harness-reviewer READ-OK, SDK jobs green). #3759 ARM64 green on 0679b5254; Reviewer-two re-read still open. #3799/#3817 waiting for a train.
 - 19:04: the reviewer-lead listed #3799, #3759 and #3817 as ready for back-to-back trains; I noted #3759 still has Reviewer-two's HOLD open (re-read in progress) and added #3823.
 - 19:11: Reviewer-two closed the #3759 repair read (P1/P2 none, 960 regex checks), with only the latest-base HOLD left; carried onto 3f4b87969 as e8a3d1b0b (range-diff =), gates green (doc 2/0, ci_paths 2/0, drift 1/0 x2, fmt, copies equal, SDKs 24/25). CI running.
+- 19:14: no findings. Checked Nine's part 6 (new lease why "slumped"): both SDKs pass the why through as given, so nothing to change. #3759 e8a3d1b0b CI running; #3799/#3817/#3823 wait for trains.
