@@ -99,6 +99,9 @@ struct Lamp {
     /// whatever its goal: from, until, servo, position. Its load is a
     /// strain of the same time.
     hand: Option<(Duration, Duration, usize, f32)>,
+    /// More hands, one after another, each a quick turn of 1,000 counts a
+    /// second: from, until, servo, position.
+    hands: Vec<(Duration, Duration, usize, f32)>,
     /// Positions read that are not where a servo is: from this time, its
     /// next reads give this, this many times. From, servo, reading, reads.
     misreads: Vec<(Duration, usize, u16, u8)>,
@@ -177,6 +180,7 @@ fn folded(cancel_at: Duration) -> (Lamp, Clock) {
             drops_goal: None,
             deaf: None,
             hand: None,
+            hands: Vec::new(),
             misreads: Vec::new(),
             read_times: Vec::new(),
         },
@@ -252,6 +256,12 @@ impl Lamp {
                 && (from..until).contains(&now)
             {
                 servo.position += (to - servo.position).clamp(-100.0 * step, 100.0 * step);
+                continue;
+            }
+            if let Some(&(_, _, _, to)) = self.hands.iter().find(|(from, until, handled, _)| {
+                *handled == index && (*from..*until).contains(&now)
+            }) {
+                servo.position += (to - servo.position).clamp(-1_000.0 * step, 1_000.0 * step);
                 continue;
             }
             if servo.torque != 1 || ((index == 1 || index == 2) && !self.arm_moves) {
@@ -14063,4 +14073,77 @@ fn own_ranges_check_every_pose_and_leave_a_full_turn_alone() {
         outside_own_ranges(&full, Some([0, 4_095, 0]), (0, 4_095), Some(far)),
         None
     );
+}
+
+/// A hand that turns the base 33 counts at a time, quickly, `turns` times:
+/// each turn presses past the base's bound until it gives way where the hand
+/// has it, and the hand then holds it there at 130, under the bound, over a
+/// rest of 100. A turn every 2.6 s, each after the last hold has eased.
+fn turned_in_steps(turns: u16, limp: bool) -> (BodyReport, Vec<Glimpse>) {
+    let ms = Duration::from_millis;
+    let (mut lamp, mut clock) = folded(Duration::from_secs(12));
+    let home = f32::from(HOME[2]);
+    lamp.servos[YAW].load = 100;
+    lamp.hands = (1..=turns)
+        .map(|k| {
+            let from = ms(1_000 + 2_600 * u64::from(k - 1));
+            (from, from + ms(2_600), YAW, home - 33.0 * f32::from(k))
+        })
+        .collect();
+    let gone = ms(1_000 + 2_600 * u64::from(turns));
+    lamp.strains = lamp
+        .hands
+        .iter()
+        .map(|(from, _, _, _)| (*from, *from + ms(120), YAW, 300))
+        .chain([(ms(1_000), gone, YAW, 130)])
+        .collect();
+    let mut seen = Vec::new();
+    let report = run(
+        &mut lamp,
+        &mut clock,
+        Limits {
+            limp,
+            ..giving_way(GiveWay::Return)
+        },
+        Some(HOME),
+        || Some((Mood::Listening, 100)),
+        |glimpse| seen.push(*glimpse),
+    );
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    assert_eq!(report.eased[2], turns, "{report:?}");
+    (report, seen)
+}
+
+/// lamp-52e6, 27 Oct, onboarding's "giving way": a hand turned the base
+/// about 30 counts at a time, each turn a stop-pushing of its own, at loads
+/// of 104 to 160 under the base's bound of 220, and `body/hand` never said
+/// a push. Moved past `HAND_MOVED` from where it first gave, over two holds
+/// of the same push, it is a hand, and released once the hand has gone.
+#[test]
+fn a_base_turned_by_hand_in_small_steps_under_its_bound_says_a_hand() {
+    let ms = Duration::from_millis;
+    for limp in [false, true] {
+        let (report, seen) = turned_in_steps(2, limp);
+        assert!(
+            seen.iter()
+                .any(|g| g.hand && (ms(3_600)..ms(6_200)).contains(&clock_of(g))),
+            "limp {limp}: never a hand in the second hold; {report:?}"
+        );
+        assert!(
+            seen.iter()
+                .filter(|g| clock_of(g) > ms(10_000))
+                .all(|g| !g.hand),
+            "limp {limp}: still a hand after it let go"
+        );
+    }
+}
+
+/// One such turn, held still where it gave and pressed under its bound, is
+/// not a hand: it never moved `HAND_MOVED` from where it gave.
+#[test]
+fn a_base_given_way_and_held_still_under_its_bound_is_not_a_hand() {
+    for limp in [false, true] {
+        let (report, seen) = turned_in_steps(1, limp);
+        assert!(seen.iter().all(|g| !g.hand), "limp {limp}: {report:?}");
+    }
 }
