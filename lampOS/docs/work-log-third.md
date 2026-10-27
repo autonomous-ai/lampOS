@@ -1,3 +1,11 @@
+## 2026-10-28 04:57 — collector and codec source reads carried without runtime transfer
+
+READ-OK #3892 d4e7e75ae in [the collector/caller source carry](verification/head-capture-read-3892-20261028/current-d4e-source.json), no new P1/P2. Root independently compares the entire Update package against old9e: no delta. Five of six full authored blobs match; updates.md alone inherits nine publisher-diagnostic lines, with own payload/preimages/range exact. Lock adds Control's LocalTime edge; older dependency filenames/consumer changes stay classified without Memory implementation review or old binary admission. Prior9e21 local cases stay9e-only; producer current14/broad/native counts remain separate.
+
+READ-OK #3937 2fa602a0a in [the codec/closed-replay source carry](verification/head-codec-read-3937-20261028/current-2fa-source.json), no new P1/P2. Root independently compares the entire Update package and capture/codec subtree against8fd: exact. Nine combined whole blobs/modes/preimages and both literal patches match; complete tree changes only install.md's inherited root-refusal clarification. Collector prerequisite equals standalone d4e's tree, avoiding double apply. Old8fd26 stays8fd-only; no new local runtime, fresh14/249/557/native, latest-train, authority, restoration or deadline claim. The bounded-allocation wording P3 and its producer correction remain source-bound.
+
+The original db59 ARM observer's transport timeout is retained separately from CI status. Fresh snapshots were in-progress; same-run continuation subsequently closes0 within the original deadline and actual terminal collection/audit is underway. No confirmed test failure was posted and no rerun/cancel/dispatch happened. New bounded-projection #3946 source review is explicitly Third's second reader slot alongside R2's first, with exact six-case proposal pending source/sideeffect review and no Cargo. Own-code drafts remain on current native/read/external credential/broker conditions; work continues through those waits.
+
 ## 2026-10-28 04:48 — current maintenance pushed; control-unit reset read qualified
 
 Ready for lamp-voice: no (#3646 remains draft for broker/current original ARM/read requirements; #3934 for protected release authorization/current requirements).

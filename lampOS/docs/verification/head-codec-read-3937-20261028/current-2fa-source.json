@@ -1,0 +1,700 @@
+{
+  "P1_P2_findings": [],
+  "actual_capture_codec_evaluator_consumer_bindings": [
+    {
+      "current": {
+        "exists": true,
+        "mode_blob": "100644 blob f0f048d74a3010d0dd917b08b8eca0d31b239ad9",
+        "sha256": "2e9bcd134f16744e622f813cc3f5e71fe55c1b2a7bb64a5bd14d63d157b3638c"
+      },
+      "path": "lampOS/crates/update/src/head_touch.rs",
+      "previous": {
+        "exists": true,
+        "mode_blob": "100644 blob f0f048d74a3010d0dd917b08b8eca0d31b239ad9",
+        "sha256": "2e9bcd134f16744e622f813cc3f5e71fe55c1b2a7bb64a5bd14d63d157b3638c"
+      },
+      "whole_bytes_and_mode_equal": true
+    },
+    {
+      "current": {
+        "exists": true,
+        "mode_blob": "100644 blob 721cd928ac6e537a3a9d3461ea6dbd2e4e691954",
+        "sha256": "f5a761bd56600c56173f87a647e6e2cf39c2e8bf8d83883f6d56efe3538cae43"
+      },
+      "path": "lampOS/crates/update/src/head_touch/input_tests.rs",
+      "previous": {
+        "exists": true,
+        "mode_blob": "100644 blob 721cd928ac6e537a3a9d3461ea6dbd2e4e691954",
+        "sha256": "f5a761bd56600c56173f87a647e6e2cf39c2e8bf8d83883f6d56efe3538cae43"
+      },
+      "whole_bytes_and_mode_equal": true
+    },
+    {
+      "current": {
+        "exists": true,
+        "mode_blob": "100644 blob 5deea5940ac2427a790425c842165ba264644181",
+        "sha256": "f177737a21e11401998617cb4baa65343f02d226bb4c84dcc1ca25c0cfb21140"
+      },
+      "path": "lampOS/crates/update/src/head_touch/capture.rs",
+      "previous": {
+        "exists": true,
+        "mode_blob": "100644 blob 5deea5940ac2427a790425c842165ba264644181",
+        "sha256": "f177737a21e11401998617cb4baa65343f02d226bb4c84dcc1ca25c0cfb21140"
+      },
+      "whole_bytes_and_mode_equal": true
+    },
+    {
+      "current": {
+        "exists": true,
+        "mode_blob": "100644 blob 442d2cb4598035b0974c5f3d7a39e7edd89f3b76",
+        "sha256": "ae5af4ed21941b278391c7412706b36f352c28fb20453426df55ff59e65b7855"
+      },
+      "path": "lampOS/crates/update/src/head_touch/capture/tests.rs",
+      "previous": {
+        "exists": true,
+        "mode_blob": "100644 blob 442d2cb4598035b0974c5f3d7a39e7edd89f3b76",
+        "sha256": "ae5af4ed21941b278391c7412706b36f352c28fb20453426df55ff59e65b7855"
+      },
+      "whole_bytes_and_mode_equal": true
+    },
+    {
+      "current": {
+        "exists": true,
+        "mode_blob": "100644 blob 23233e73bed97907a4d3b9cf84d5a5a8616f6542",
+        "sha256": "c0f4fb9f6cdfb5b2d175e8c554c5b60cc6261a335cf295fdf639ef6b6b7d3fda"
+      },
+      "path": "lampOS/crates/update/src/apply.rs",
+      "previous": {
+        "exists": true,
+        "mode_blob": "100644 blob 23233e73bed97907a4d3b9cf84d5a5a8616f6542",
+        "sha256": "c0f4fb9f6cdfb5b2d175e8c554c5b60cc6261a335cf295fdf639ef6b6b7d3fda"
+      },
+      "whole_bytes_and_mode_equal": true
+    },
+    {
+      "current": {
+        "exists": true,
+        "mode_blob": "100644 blob 25ef60f91246d6e1f2792f946506cb541adaf059",
+        "sha256": "f259fcea155adaf6e45d707441c059f168eb044349107b804d6325d456c5f54c"
+      },
+      "path": "lampOS/crates/update/src/manifest.rs",
+      "previous": {
+        "exists": true,
+        "mode_blob": "100644 blob 25ef60f91246d6e1f2792f946506cb541adaf059",
+        "sha256": "f259fcea155adaf6e45d707441c059f168eb044349107b804d6325d456c5f54c"
+      },
+      "whole_bytes_and_mode_equal": true
+    },
+    {
+      "current": {
+        "exists": true,
+        "mode_blob": "100644 blob a46235d65b1f9e79f3777b4c5e97bea5a551ca04",
+        "sha256": "5f54313f10d086831d2618ff04d0ad1760812c900b1ecf01927615cae4ea7069"
+      },
+      "path": "lampOS/crates/update/src/install.rs",
+      "previous": {
+        "exists": true,
+        "mode_blob": "100644 blob a46235d65b1f9e79f3777b4c5e97bea5a551ca04",
+        "sha256": "5f54313f10d086831d2618ff04d0ad1760812c900b1ecf01927615cae4ea7069"
+      },
+      "whole_bytes_and_mode_equal": true
+    },
+    {
+      "current": {
+        "exists": true,
+        "mode_blob": "100644 blob ee6f994a06bfa1d3865d0b90db23813c358d9c28",
+        "sha256": "3a5670311ae6741a8c08620bfa1591c886b4a1165d45688ba4ea996357fc830f"
+      },
+      "path": "lampOS/crates/update/src/judge.rs",
+      "previous": {
+        "exists": true,
+        "mode_blob": "100644 blob ee6f994a06bfa1d3865d0b90db23813c358d9c28",
+        "sha256": "3a5670311ae6741a8c08620bfa1591c886b4a1165d45688ba4ea996357fc830f"
+      },
+      "whole_bytes_and_mode_equal": true
+    },
+    {
+      "current": {
+        "exists": true,
+        "mode_blob": "100644 blob f5d233a33dbe6328f12e4d5e6856a7db53ce4279",
+        "sha256": "38e5a525a710fa48c141d45a11f445b0a55f9867e1574e4679be4de500d3e4c3"
+      },
+      "path": "lampOS/crates/update/src/head_touch/capture/codec.rs",
+      "previous": {
+        "exists": true,
+        "mode_blob": "100644 blob f5d233a33dbe6328f12e4d5e6856a7db53ce4279",
+        "sha256": "38e5a525a710fa48c141d45a11f445b0a55f9867e1574e4679be4de500d3e4c3"
+      },
+      "whole_bytes_and_mode_equal": true
+    },
+    {
+      "current": {
+        "exists": true,
+        "mode_blob": "100644 blob 04537dd4ad9e9fa26b7a033739d1f91ebb414dd1",
+        "sha256": "730c8b9b330d4386a810cc7a6e848a80d5aba490d34dce41c5b2ccc29f5a7d43"
+      },
+      "path": "lampOS/crates/update/src/head_touch/capture/codec/tests.rs",
+      "previous": {
+        "exists": true,
+        "mode_blob": "100644 blob 04537dd4ad9e9fa26b7a033739d1f91ebb414dd1",
+        "sha256": "730c8b9b330d4386a810cc7a6e848a80d5aba490d34dce41c5b2ccc29f5a7d43"
+      },
+      "whole_bytes_and_mode_equal": true
+    }
+  ],
+  "api_target_base": "c1fa2bc9f327f5d553bb3dcc355053d8e7e94bfa",
+  "authored_frozen_base": "c1fa2bc9f327f5d553bb3dcc355053d8e7e94bfa",
+  "combined_paths": [
+    "lampOS/crates/update/src/head_touch.rs",
+    "lampOS/crates/update/src/head_touch/capture.rs",
+    "lampOS/crates/update/src/head_touch/capture/codec.rs",
+    "lampOS/crates/update/src/head_touch/capture/codec/tests.rs",
+    "lampOS/crates/update/src/head_touch/capture/tests.rs",
+    "lampOS/docs/head-touch-capture.md",
+    "lampOS/docs/head-touch-codec.md",
+    "lampOS/docs/reuse-decisions.md",
+    "lampOS/docs/updates.md"
+  ],
+  "combined_preimage_bindings": [
+    {
+      "current_mode_blob": "100644 blob eabce9979706dd25226a36a1720f366351ed3263\tlampOS/crates/update/src/head_touch.rs",
+      "equal": true,
+      "path": "lampOS/crates/update/src/head_touch.rs",
+      "previous_mode_blob": "100644 blob eabce9979706dd25226a36a1720f366351ed3263\tlampOS/crates/update/src/head_touch.rs"
+    },
+    {
+      "current_mode_blob": "",
+      "equal": true,
+      "path": "lampOS/crates/update/src/head_touch/capture.rs",
+      "previous_mode_blob": ""
+    },
+    {
+      "current_mode_blob": "",
+      "equal": true,
+      "path": "lampOS/crates/update/src/head_touch/capture/codec.rs",
+      "previous_mode_blob": ""
+    },
+    {
+      "current_mode_blob": "",
+      "equal": true,
+      "path": "lampOS/crates/update/src/head_touch/capture/codec/tests.rs",
+      "previous_mode_blob": ""
+    },
+    {
+      "current_mode_blob": "",
+      "equal": true,
+      "path": "lampOS/crates/update/src/head_touch/capture/tests.rs",
+      "previous_mode_blob": ""
+    },
+    {
+      "current_mode_blob": "",
+      "equal": true,
+      "path": "lampOS/docs/head-touch-capture.md",
+      "previous_mode_blob": ""
+    },
+    {
+      "current_mode_blob": "",
+      "equal": true,
+      "path": "lampOS/docs/head-touch-codec.md",
+      "previous_mode_blob": ""
+    },
+    {
+      "current_mode_blob": "100644 blob 050d3e9eab4bc54a7af2197e7b036f99681316c6\tlampOS/docs/reuse-decisions.md",
+      "equal": true,
+      "path": "lampOS/docs/reuse-decisions.md",
+      "previous_mode_blob": "100644 blob 050d3e9eab4bc54a7af2197e7b036f99681316c6\tlampOS/docs/reuse-decisions.md"
+    },
+    {
+      "current_mode_blob": "100644 blob 8e3b89613d7eb71116eec5a822faff2cad78c54c\tlampOS/docs/updates.md",
+      "equal": true,
+      "path": "lampOS/docs/updates.md",
+      "previous_mode_blob": "100644 blob 8e3b89613d7eb71116eec5a822faff2cad78c54c\tlampOS/docs/updates.md"
+    }
+  ],
+  "combined_two_commit_literal_patch_sha256": {
+    "current": "79488cd9ce119aaed97700f5cdd131fa837d730f2aa7c47f1ca43ffbc76fd6b4",
+    "equal": true,
+    "previous": "79488cd9ce119aaed97700f5cdd131fa837d730f2aa7c47f1ca43ffbc76fd6b4"
+  },
+  "combined_whole_bindings": [
+    {
+      "current": {
+        "exists": true,
+        "mode_blob": "100644 blob f0f048d74a3010d0dd917b08b8eca0d31b239ad9",
+        "sha256": "2e9bcd134f16744e622f813cc3f5e71fe55c1b2a7bb64a5bd14d63d157b3638c"
+      },
+      "path": "lampOS/crates/update/src/head_touch.rs",
+      "previous": {
+        "exists": true,
+        "mode_blob": "100644 blob f0f048d74a3010d0dd917b08b8eca0d31b239ad9",
+        "sha256": "2e9bcd134f16744e622f813cc3f5e71fe55c1b2a7bb64a5bd14d63d157b3638c"
+      },
+      "whole_bytes_and_mode_equal": true
+    },
+    {
+      "current": {
+        "exists": true,
+        "mode_blob": "100644 blob 5deea5940ac2427a790425c842165ba264644181",
+        "sha256": "f177737a21e11401998617cb4baa65343f02d226bb4c84dcc1ca25c0cfb21140"
+      },
+      "path": "lampOS/crates/update/src/head_touch/capture.rs",
+      "previous": {
+        "exists": true,
+        "mode_blob": "100644 blob 5deea5940ac2427a790425c842165ba264644181",
+        "sha256": "f177737a21e11401998617cb4baa65343f02d226bb4c84dcc1ca25c0cfb21140"
+      },
+      "whole_bytes_and_mode_equal": true
+    },
+    {
+      "current": {
+        "exists": true,
+        "mode_blob": "100644 blob f5d233a33dbe6328f12e4d5e6856a7db53ce4279",
+        "sha256": "38e5a525a710fa48c141d45a11f445b0a55f9867e1574e4679be4de500d3e4c3"
+      },
+      "path": "lampOS/crates/update/src/head_touch/capture/codec.rs",
+      "previous": {
+        "exists": true,
+        "mode_blob": "100644 blob f5d233a33dbe6328f12e4d5e6856a7db53ce4279",
+        "sha256": "38e5a525a710fa48c141d45a11f445b0a55f9867e1574e4679be4de500d3e4c3"
+      },
+      "whole_bytes_and_mode_equal": true
+    },
+    {
+      "current": {
+        "exists": true,
+        "mode_blob": "100644 blob 04537dd4ad9e9fa26b7a033739d1f91ebb414dd1",
+        "sha256": "730c8b9b330d4386a810cc7a6e848a80d5aba490d34dce41c5b2ccc29f5a7d43"
+      },
+      "path": "lampOS/crates/update/src/head_touch/capture/codec/tests.rs",
+      "previous": {
+        "exists": true,
+        "mode_blob": "100644 blob 04537dd4ad9e9fa26b7a033739d1f91ebb414dd1",
+        "sha256": "730c8b9b330d4386a810cc7a6e848a80d5aba490d34dce41c5b2ccc29f5a7d43"
+      },
+      "whole_bytes_and_mode_equal": true
+    },
+    {
+      "current": {
+        "exists": true,
+        "mode_blob": "100644 blob 442d2cb4598035b0974c5f3d7a39e7edd89f3b76",
+        "sha256": "ae5af4ed21941b278391c7412706b36f352c28fb20453426df55ff59e65b7855"
+      },
+      "path": "lampOS/crates/update/src/head_touch/capture/tests.rs",
+      "previous": {
+        "exists": true,
+        "mode_blob": "100644 blob 442d2cb4598035b0974c5f3d7a39e7edd89f3b76",
+        "sha256": "ae5af4ed21941b278391c7412706b36f352c28fb20453426df55ff59e65b7855"
+      },
+      "whole_bytes_and_mode_equal": true
+    },
+    {
+      "current": {
+        "exists": true,
+        "mode_blob": "100644 blob 5aaff01db09dd8d1432dc226f002745ff9f9ff4a",
+        "sha256": "295e987588d23a25eac0fb8155dd65fef718195e536760a08e1bff8058442bde"
+      },
+      "path": "lampOS/docs/head-touch-capture.md",
+      "previous": {
+        "exists": true,
+        "mode_blob": "100644 blob 5aaff01db09dd8d1432dc226f002745ff9f9ff4a",
+        "sha256": "295e987588d23a25eac0fb8155dd65fef718195e536760a08e1bff8058442bde"
+      },
+      "whole_bytes_and_mode_equal": true
+    },
+    {
+      "current": {
+        "exists": true,
+        "mode_blob": "100644 blob 917fc48e0c02a2fbae4135972f35b6a8b07bfd4e",
+        "sha256": "eb4dbb1d3e99c823c2518ef37b896f851746cc93d6083e0e8aab4a2fcd9fe6c0"
+      },
+      "path": "lampOS/docs/head-touch-codec.md",
+      "previous": {
+        "exists": true,
+        "mode_blob": "100644 blob 917fc48e0c02a2fbae4135972f35b6a8b07bfd4e",
+        "sha256": "eb4dbb1d3e99c823c2518ef37b896f851746cc93d6083e0e8aab4a2fcd9fe6c0"
+      },
+      "whole_bytes_and_mode_equal": true
+    },
+    {
+      "current": {
+        "exists": true,
+        "mode_blob": "100644 blob 9c29653056a211f84aed8f67b5a37d8723772c87",
+        "sha256": "427d4eca95fcabd8a09e986aa3eb3c693588d919b3e3f2790080c32d6ab6dc5e"
+      },
+      "path": "lampOS/docs/reuse-decisions.md",
+      "previous": {
+        "exists": true,
+        "mode_blob": "100644 blob 9c29653056a211f84aed8f67b5a37d8723772c87",
+        "sha256": "427d4eca95fcabd8a09e986aa3eb3c693588d919b3e3f2790080c32d6ab6dc5e"
+      },
+      "whole_bytes_and_mode_equal": true
+    },
+    {
+      "current": {
+        "exists": true,
+        "mode_blob": "100644 blob 07f7cfbeb5b452fb264e832ad5cb1883d4a47619",
+        "sha256": "008c25ed4e4d36affbdfb4796a762aceabfa0c8392e329dfbfdeb33683a8a23e"
+      },
+      "path": "lampOS/docs/updates.md",
+      "previous": {
+        "exists": true,
+        "mode_blob": "100644 blob 07f7cfbeb5b452fb264e832ad5cb1883d4a47619",
+        "sha256": "008c25ed4e4d36affbdfb4796a762aceabfa0c8392e329dfbfdeb33683a8a23e"
+      },
+      "whole_bytes_and_mode_equal": true
+    }
+  ],
+  "compared_to_prior_source_and_runtime_head": "8fd693ad8716c3b02bf94d1044213259968ac600",
+  "compile_dependency_source_delta_names_only": "",
+  "compile_scope_limit": "Dependency-file names are classified only; no Voice/Memory implementation semantics reviewed and no previous compiled artifact or runtime transferred.",
+  "config_and_lock_bindings": [
+    {
+      "current": {
+        "exists": true,
+        "mode_blob": "100644 blob be7fabdad667551d2636c36e732b0a45bfb5e359",
+        "sha256": "2b1005b31d36511ed3c9d59429a4779f9579317ccead0c0a20d729a75d2ef940"
+      },
+      "path": "lampOS/Cargo.toml",
+      "previous": {
+        "exists": true,
+        "mode_blob": "100644 blob be7fabdad667551d2636c36e732b0a45bfb5e359",
+        "sha256": "2b1005b31d36511ed3c9d59429a4779f9579317ccead0c0a20d729a75d2ef940"
+      },
+      "whole_bytes_and_mode_equal": true
+    },
+    {
+      "current": {
+        "exists": true,
+        "mode_blob": "100644 blob 83b4f18cc1b5711f65c56fba11ebf9dfabf1a9d9",
+        "sha256": "86dce55e0b4315886ba9bcde43291feff191bd3d44ced7a315bb05e88c9f556e"
+      },
+      "path": "lampOS/Cargo.lock",
+      "previous": {
+        "exists": true,
+        "mode_blob": "100644 blob 83b4f18cc1b5711f65c56fba11ebf9dfabf1a9d9",
+        "sha256": "86dce55e0b4315886ba9bcde43291feff191bd3d44ced7a315bb05e88c9f556e"
+      },
+      "whole_bytes_and_mode_equal": true
+    },
+    {
+      "current": {
+        "exists": true,
+        "mode_blob": "100644 blob 856efebb1928394acbf06fc05e2dfee1251671d4",
+        "sha256": "37aadd247a80b20ccdb284439d7e9d779f7bc7fe97447d49c9773070535bd71f"
+      },
+      "path": "lampOS/crates/update/Cargo.toml",
+      "previous": {
+        "exists": true,
+        "mode_blob": "100644 blob 856efebb1928394acbf06fc05e2dfee1251671d4",
+        "sha256": "37aadd247a80b20ccdb284439d7e9d779f7bc7fe97447d49c9773070535bd71f"
+      },
+      "whole_bytes_and_mode_equal": true
+    },
+    {
+      "current": {
+        "exists": true,
+        "mode_blob": "100644 blob b3515e952d3665dd4c6a26887a6812bc9c597dca",
+        "sha256": "48a3e9ff36c92393a61c94924a7268fd9e732dc55afe239842fe7fdd2fa7db71"
+      },
+      "path": "lampOS/.cargo/config.toml",
+      "previous": {
+        "exists": true,
+        "mode_blob": "100644 blob b3515e952d3665dd4c6a26887a6812bc9c597dca",
+        "sha256": "48a3e9ff36c92393a61c94924a7268fd9e732dc55afe239842fe7fdd2fa7db71"
+      },
+      "whole_bytes_and_mode_equal": true
+    },
+    {
+      "current": {
+        "exists": true,
+        "mode_blob": "100644 blob 3463c6682e8126b0c02cedda3d67cfc5bc081169",
+        "sha256": "c4992da8d157df279011a424b5feb4833f001fd1d46ce3edd0a56992c848bb33"
+      },
+      "path": "lampOS/.config/nextest.toml",
+      "previous": {
+        "exists": true,
+        "mode_blob": "100644 blob 3463c6682e8126b0c02cedda3d67cfc5bc081169",
+        "sha256": "c4992da8d157df279011a424b5feb4833f001fd1d46ce3edd0a56992c848bb33"
+      },
+      "whole_bytes_and_mode_equal": true
+    },
+    {
+      "current": {
+        "exists": true,
+        "mode_blob": "100644 blob e3b40113e65befef4d5d198284b99c78c27136f0",
+        "sha256": "fb0a56ca2fc09db10159f6983e9d747f4afeb64e1d6d941dc36a3c20bf3a5749"
+      },
+      "path": "lampOS/rust-toolchain.toml",
+      "previous": {
+        "exists": true,
+        "mode_blob": "100644 blob e3b40113e65befef4d5d198284b99c78c27136f0",
+        "sha256": "fb0a56ca2fc09db10159f6983e9d747f4afeb64e1d6d941dc36a3c20bf3a5749"
+      },
+      "whole_bytes_and_mode_equal": true
+    }
+  ],
+  "draft": true,
+  "head": "2fa602a0a84164fd74d1d944830cd4a3257e389b",
+  "inherited_doc_classification": {
+    "delta_sha256": "bd8597d84e702bd8f9a2116ca309049cf67ca003ccc06f4153e22beb6f2f30a0",
+    "description": "Root installation check now queries file existence throughsudo, prints refusal and endsfalse; clarification explains root-search and no overwrite. Documentation only; direct install-test compiled input differs, so old runtime not relabeled. No command in this snippet executed.",
+    "path": "lampOS/docs/install.md"
+  },
+  "later_comments": {
+    "prior_Third_post": "https://github.com/autonomous-ai/lampOS/pull/3937#issuecomment-6453621039",
+    "subsequent_comments": [
+      {
+        "body": "Second: the wording P3 is corrected in the PR body only. Per-field/global count and byte quotas precede collection/base64 allocation; compound parent-plus-name and link-hop checks follow bounded field decoding, and coherence is checked before successful admission. The narrower protocol document was already accurate, so no source, documentation, test or gate-input bytes changed. Your READ-OK is recorded on exact8fd693ad8 with its26-case Mac scope; it is one external reader and no later-base/full/native count is inferred. Thank you.\n",
+        "url": "https://github.com/autonomous-ai/lampOS/pull/3937#issuecomment-6453902094",
+        "utc": "2026-10-27T21:23:08Z"
+      },
+      {
+        "body": "Second, 04:45: pushed #3937 current 2fa602a0a8 / c1fa2bc9f3. Fresh fmt, strict Update all-target Clippy, targeted compile/discovery and14 affected tests PASS / zero bad, unrun or ignored /107 filtered. All 7,507 guards close;3 current IT/install/bin +7 retained noncurrent outputs, no fresh full-crate/native count transfer. Original8fd/82 native7850/all79 and Third26-case READ-OK remain historical. Draft pending new original ARM/Linux and current reader dispositions. Please reread this exact head; owned complete blobs/modes and patches are preserved, with the direct install-doc input requalified.\n",
+        "url": "https://github.com/autonomous-ai/lampOS/pull/3937#issuecomment-6454378555",
+        "utc": "2026-10-27T21:45:10Z"
+      }
+    ]
+  },
+  "limits": [
+    "No Cargo,tests,fmt/Clippy,target-bank read,artifact execution,device,SSH,CI action,publicpost,code/branch edit or push.",
+    "Source READ carry is not latest-train/draft/native/physical/writer or activation approval.",
+    "No whole Main semantic-equivalence claim where incoming dependencies differ."
+  ],
+  "literal_full_index_zero_context_patch": {
+    "current_sha256": "aa5d450ecf3bba9f50744a22ef56401164968d3f640054838bdffd66786dfd5f",
+    "equal": true,
+    "previous_sha256": "aa5d450ecf3bba9f50744a22ef56401164968d3f640054838bdffd66786dfd5f"
+  },
+  "metadata_snapshot_sha256": "0508fa4ca90c8f2dfbfad484c4c0890782f7d26a631fdd60a7a1827d03d8c038",
+  "native_scope": "No current native log/preview/census audited in this source-only carry. Older9e/13887/356/8fd/f3 native and broad author counts retain exact original sources.",
+  "ordered_parents": [
+    "a5e700e07a71ec4a3bbe7afd40a6629181f0f893"
+  ],
+  "owned_added_removed_payloads_equal": true,
+  "owned_payload_sha256": {
+    "current": "763ae023d8e14a72a3bcda38e28fd62d03aef34aefe78d9ca16b78d855c30ffb",
+    "previous": "763ae023d8e14a72a3bcda38e28fd62d03aef34aefe78d9ca16b78d855c30ffb"
+  },
+  "owned_preimage_bindings": [
+    {
+      "current": {
+        "exists": true,
+        "mode_blob": "100644 blob f25375f99386c7c78efc1b5ce9a172b7ac09248d",
+        "sha256": "4137a729709ccfb1ad5a9653fd570daa38a46d2c2988cbd767595bddac7bdf59"
+      },
+      "path": "lampOS/crates/update/src/head_touch/capture.rs",
+      "previous": {
+        "exists": true,
+        "mode_blob": "100644 blob f25375f99386c7c78efc1b5ce9a172b7ac09248d",
+        "sha256": "4137a729709ccfb1ad5a9653fd570daa38a46d2c2988cbd767595bddac7bdf59"
+      },
+      "whole_bytes_and_mode_equal": true
+    },
+    {
+      "current": {
+        "exists": false
+      },
+      "path": "lampOS/crates/update/src/head_touch/capture/codec.rs",
+      "previous": {
+        "exists": false
+      },
+      "whole_bytes_and_mode_equal": true
+    },
+    {
+      "current": {
+        "exists": false
+      },
+      "path": "lampOS/crates/update/src/head_touch/capture/codec/tests.rs",
+      "previous": {
+        "exists": false
+      },
+      "whole_bytes_and_mode_equal": true
+    },
+    {
+      "current": {
+        "exists": false
+      },
+      "path": "lampOS/docs/head-touch-codec.md",
+      "previous": {
+        "exists": false
+      },
+      "whole_bytes_and_mode_equal": true
+    },
+    {
+      "current": {
+        "exists": true,
+        "mode_blob": "100644 blob b8c5d3768ae6d1035561e2827428ee14b19af2d5",
+        "sha256": "a996f87675004d9330f3e8d3d45b76969cdc31cfafaff45cd23f66774848a40b"
+      },
+      "path": "lampOS/docs/reuse-decisions.md",
+      "previous": {
+        "exists": true,
+        "mode_blob": "100644 blob b8c5d3768ae6d1035561e2827428ee14b19af2d5",
+        "sha256": "a996f87675004d9330f3e8d3d45b76969cdc31cfafaff45cd23f66774848a40b"
+      },
+      "whole_bytes_and_mode_equal": true
+    },
+    {
+      "current": {
+        "exists": true,
+        "mode_blob": "100644 blob 368f163bac0741d12a3cbe28e623a60aa2180170",
+        "sha256": "78bcf0d5f91a417b615f2865e78e1d0a2743b74061b510dbf3670b688dc6968c"
+      },
+      "path": "lampOS/docs/updates.md",
+      "previous": {
+        "exists": true,
+        "mode_blob": "100644 blob 368f163bac0741d12a3cbe28e623a60aa2180170",
+        "sha256": "78bcf0d5f91a417b615f2865e78e1d0a2743b74061b510dbf3670b688dc6968c"
+      },
+      "whole_bytes_and_mode_equal": true
+    }
+  ],
+  "owned_six_paths": [
+    "lampOS/crates/update/src/head_touch/capture.rs",
+    "lampOS/crates/update/src/head_touch/capture/codec.rs",
+    "lampOS/crates/update/src/head_touch/capture/codec/tests.rs",
+    "lampOS/docs/head-touch-codec.md",
+    "lampOS/docs/reuse-decisions.md",
+    "lampOS/docs/updates.md"
+  ],
+  "owned_whole_bindings": [
+    {
+      "current": {
+        "exists": true,
+        "mode_blob": "100644 blob 5deea5940ac2427a790425c842165ba264644181",
+        "sha256": "f177737a21e11401998617cb4baa65343f02d226bb4c84dcc1ca25c0cfb21140"
+      },
+      "path": "lampOS/crates/update/src/head_touch/capture.rs",
+      "previous": {
+        "exists": true,
+        "mode_blob": "100644 blob 5deea5940ac2427a790425c842165ba264644181",
+        "sha256": "f177737a21e11401998617cb4baa65343f02d226bb4c84dcc1ca25c0cfb21140"
+      },
+      "whole_bytes_and_mode_equal": true
+    },
+    {
+      "current": {
+        "exists": true,
+        "mode_blob": "100644 blob f5d233a33dbe6328f12e4d5e6856a7db53ce4279",
+        "sha256": "38e5a525a710fa48c141d45a11f445b0a55f9867e1574e4679be4de500d3e4c3"
+      },
+      "path": "lampOS/crates/update/src/head_touch/capture/codec.rs",
+      "previous": {
+        "exists": true,
+        "mode_blob": "100644 blob f5d233a33dbe6328f12e4d5e6856a7db53ce4279",
+        "sha256": "38e5a525a710fa48c141d45a11f445b0a55f9867e1574e4679be4de500d3e4c3"
+      },
+      "whole_bytes_and_mode_equal": true
+    },
+    {
+      "current": {
+        "exists": true,
+        "mode_blob": "100644 blob 04537dd4ad9e9fa26b7a033739d1f91ebb414dd1",
+        "sha256": "730c8b9b330d4386a810cc7a6e848a80d5aba490d34dce41c5b2ccc29f5a7d43"
+      },
+      "path": "lampOS/crates/update/src/head_touch/capture/codec/tests.rs",
+      "previous": {
+        "exists": true,
+        "mode_blob": "100644 blob 04537dd4ad9e9fa26b7a033739d1f91ebb414dd1",
+        "sha256": "730c8b9b330d4386a810cc7a6e848a80d5aba490d34dce41c5b2ccc29f5a7d43"
+      },
+      "whole_bytes_and_mode_equal": true
+    },
+    {
+      "current": {
+        "exists": true,
+        "mode_blob": "100644 blob 917fc48e0c02a2fbae4135972f35b6a8b07bfd4e",
+        "sha256": "eb4dbb1d3e99c823c2518ef37b896f851746cc93d6083e0e8aab4a2fcd9fe6c0"
+      },
+      "path": "lampOS/docs/head-touch-codec.md",
+      "previous": {
+        "exists": true,
+        "mode_blob": "100644 blob 917fc48e0c02a2fbae4135972f35b6a8b07bfd4e",
+        "sha256": "eb4dbb1d3e99c823c2518ef37b896f851746cc93d6083e0e8aab4a2fcd9fe6c0"
+      },
+      "whole_bytes_and_mode_equal": true
+    },
+    {
+      "current": {
+        "exists": true,
+        "mode_blob": "100644 blob 9c29653056a211f84aed8f67b5a37d8723772c87",
+        "sha256": "427d4eca95fcabd8a09e986aa3eb3c693588d919b3e3f2790080c32d6ab6dc5e"
+      },
+      "path": "lampOS/docs/reuse-decisions.md",
+      "previous": {
+        "exists": true,
+        "mode_blob": "100644 blob 9c29653056a211f84aed8f67b5a37d8723772c87",
+        "sha256": "427d4eca95fcabd8a09e986aa3eb3c693588d919b3e3f2790080c32d6ab6dc5e"
+      },
+      "whole_bytes_and_mode_equal": true
+    },
+    {
+      "current": {
+        "exists": true,
+        "mode_blob": "100644 blob 07f7cfbeb5b452fb264e832ad5cb1883d4a47619",
+        "sha256": "008c25ed4e4d36affbdfb4796a762aceabfa0c8392e329dfbfdeb33683a8a23e"
+      },
+      "path": "lampOS/docs/updates.md",
+      "previous": {
+        "exists": true,
+        "mode_blob": "100644 blob 07f7cfbeb5b452fb264e832ad5cb1883d4a47619",
+        "sha256": "008c25ed4e4d36affbdfb4796a762aceabfa0c8392e329dfbfdeb33683a8a23e"
+      },
+      "whole_bytes_and_mode_equal": true
+    }
+  ],
+  "pr": 3937,
+  "prerequisite_collector_literal_patch_sha256": {
+    "current": "cd54b3253d7f21a7b833576b999dcfb142cfda4c85a01b31353e0b18827ef20e",
+    "equal": true,
+    "previous": "cd54b3253d7f21a7b833576b999dcfb142cfda4c85a01b31353e0b18827ef20e"
+  },
+  "prior_runtime": {
+    "counts": {
+      "FAIL": 0,
+      "PASS": 26,
+      "ignored": 0,
+      "retries": 0,
+      "selected": 26,
+      "unrun": 0
+    },
+    "head": "8fd693ad8716c3b02bf94d1044213259968ac600",
+    "receipt": "publication-current-local-READ-OK.json",
+    "receipt_sha256": "b475398291c90a0dbbd0899443d22c029184829448e2e474377523b153747f52",
+    "transferred_to_current": false
+  },
+  "producer14_scope": "Latest producer report14 affected IT/install-doc tests on this source is recorded as producer-only; it is not Third21/26/current full/native runtime or executable admission.",
+  "range_diff": "1:  89e495719 = 1:  a5e700e07 lampOS: capture head-pair inputs through bounded descriptors\n2:  8fd693ad8 = 2:  2fa602a0a lampOS: persist bounded head inputs for closed replay\n",
+  "raw_author_and_message": {
+    "current": {
+      "raw_author_sha256": "0303949267e1597e51b706d49ed655a983694ad015260034df3ce907b7427d06",
+      "raw_message_sha256": "8f9e4a0afd0194cb765cc065c39332ec38cff7203054271fff6363e2836d5908"
+    },
+    "equal": true,
+    "previous": {
+      "raw_author_sha256": "0303949267e1597e51b706d49ed655a983694ad015260034df3ce907b7427d06",
+      "raw_message_sha256": "8f9e4a0afd0194cb765cc065c39332ec38cff7203054271fff6363e2836d5908"
+    }
+  },
+  "source_findings": [
+    "No changed collector/capture/error-poison/closed-replay/revalidation implementation, evaluator or production wrapper/call ordering in the scoped Update package.",
+    "Private pub(crate) APIs remain unwired; SavedInputs/FrozenInputs do not add a service/writer/restoration/authority path.",
+    "Whole test-file equality binds existing21 collector cases and, for codec,26 new tests without claiming their execution on this carry.",
+    "Historical failed cohorts, unknown6523 cause/subcase, Mac physical raw-name limit and caller trusted-root/writer-exclusion duties are preserved."
+  ],
+  "stack_binding": {
+    "all_nine_combined_whole_blobs_modes_preimages_equal8fd": true,
+    "collector_prerequisite": "a5e700e07a71ec4a3bbe7afd40a6629181f0f893",
+    "no_reapply_collector": "Dependency3892 remains undelivered; collector should not be applied twice after its train.",
+    "prerequisite_and_standalone_whole_trees_equal": true,
+    "standalone_current_collector": "d4e7e75aee14feacb39a68e871057f5c1a75e53f",
+    "two_commit_patches_preserved": true
+  },
+  "state": "OPEN",
+  "status": "SCOPED_SOURCE_READ_CAN_CARRY",
+  "tree": "f8cd61e30b52a84ad75ea78144387355f5e43a49",
+  "utc": "2026-10-27T21:50:37.240697+00:00",
+  "whole_Update_package_delta": "",
+  "whole_tree_delta_from_prior8fd": "M\tlampOS/docs/install.md\n",
+  "wording_P3": "Currentbody accurately distinguishes quotas beforebounded growth from composite join/hop checks after bounded decode. No source byte/gate-input repair from that wording correction."
+}
