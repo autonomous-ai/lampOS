@@ -179,11 +179,14 @@ pub fn apply(change: &Change, config: &Config) -> io::Result<Done> {
     }
 }
 
+/// The refusal of every request without `--enable`.
+pub const OFF: &str = "changes after setup are off";
+
 /// The helper's reply line to one request: `{"done": data}` or
 /// `{"refused": why}`. A refusal never holds what was asked.
 pub fn answer(line: &str, config: &Config, enabled: bool) -> (Value, Option<Done>) {
     if !enabled {
-        return (json!({"refused": "changes after setup are off"}), None);
+        return (json!({ "refused": OFF }), None);
     }
     let change = match parse(line.trim_end_matches(['\n', '\r']), config) {
         Ok(change) => change,
@@ -195,6 +198,54 @@ pub fn answer(line: &str, config: &Config, enabled: bool) -> (Value, Option<Done
             json!({"refused": format!("the change could not be saved: {}", error.kind())}),
             None,
         ),
+    }
+}
+
+/// The app's restart and shutdown (`system.reboot`, `system.shutdown`;
+/// #2193, #3697): `lamp_keeper::restart`'s requests, answers and update
+/// lock, the keeper's own.
+pub use lamp_keeper::restart::Power;
+
+/// How long a restart from the app waits for the voice to rest between
+/// turns before it restarts all the same: the keeper's own bound.
+pub const REST_MOST: Duration = QUIET;
+
+/// The reply to a restart or shutdown that `line` asks, read against
+/// lamp-update's lock in `records`, and the lock to hold while acting when
+/// it is to act; `None` when `line` asks neither. Off (no `--enable`),
+/// refused as every change is.
+pub fn power(
+    line: &str,
+    enabled: bool,
+    records: &lamp_update::records::Records,
+) -> Option<(Power, Value, Option<lamp_update::records::Lock>)> {
+    let power = Power::of(line)?;
+    if !enabled {
+        return Some((power, json!({ "refused": OFF }), None));
+    }
+    let lock = lamp_keeper::restart::update_lock(records);
+    let (reply, go) = power.reply(lock.as_ref().map(|_| ()).map_err(Clone::clone));
+    Some((power, reply, lock.ok().filter(|_| go)))
+}
+
+/// A restart from the app, once answered: wait for the voice to rest
+/// between turns (5 s resting, nobody heard, nothing said), at most
+/// [`REST_MOST`], then `restart`, all the same if it never rested, as the
+/// keeper's restart does. What happened, for the journal.
+pub fn restart_when_rested(
+    ears: &mut impl Ears,
+    restart: impl FnOnce() -> Result<(), String>,
+) -> String {
+    let waited = match wait_for_rest(ears, lamp_update::quiet::BETWEEN_TURNS, REST_MOST) {
+        Ok(()) => "the voice rested".to_owned(),
+        Err(why) => format!(
+            "the voice did not rest within {} s ({why})",
+            REST_MOST.as_secs()
+        ),
+    };
+    match restart() {
+        Ok(()) => format!("{waited}; lampos.target restarted"),
+        Err(why) => format!("{waited}; lampos.target could not be restarted: {why}"),
     }
 }
 
@@ -210,16 +261,22 @@ pub trait Ears {
 /// the voice (`lamp_update::quiet`): the voice resting, nobody heard and
 /// nothing said for 45 s. At most `most`; why not, when it never was.
 pub fn wait_for_quiet(ears: &mut impl Ears, most: Duration) -> Result<(), String> {
+    wait_for_rest(ears, QUIET, most)
+}
+
+/// Wait until the voice has rested, nobody heard and nothing said, for
+/// `long`. At most `most`; why not, when it never did.
+pub fn wait_for_rest(ears: &mut impl Ears, long: Duration, most: Duration) -> Result<(), String> {
     let started = ears.now_ms();
     let mut quiet = Quiet::new(started);
     loop {
         let now = ears.now_ms();
-        if quiet.for_at_least(QUIET, now).is_ok() {
+        if quiet.for_at_least(long, now).is_ok() {
             return Ok(());
         }
         if now.saturating_sub(started) >= most.as_millis() as u64 {
             return Err(quiet
-                .for_at_least(QUIET, now)
+                .for_at_least(long, now)
                 .err()
                 .unwrap_or_else(|| "never quiet".into()));
         }

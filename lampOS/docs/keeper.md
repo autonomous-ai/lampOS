@@ -223,9 +223,15 @@ With nothing said on `lamp/pause` both do exactly what they did before.
 
 ## A restart asked from the app (#2193)
 
-The app's `system.reboot` reaches the keeper through `lamp-cloud`
-([cloud.md](cloud.md), "A restart from the app"), which runs as `lampos`
-with no capabilities and so cannot restart anything itself.
+`lamp-cloud` no longer asks here: a product lamp has no keeper, so the
+app's `system.reboot` and `system.shutdown` go to setup's change helper
+([cloud.md](cloud.md), "A restart from the app"; setup.md, "Changed after
+setup"), which answers with this helper's code (`lamp_keeper::restart`:
+the requests, the answers and the update lock, one copy). This helper is
+kept for a lamp that runs the keeper and asks it by hand.
+
+It was reached through `lamp-cloud`, which runs as `lampos` with no
+capabilities and so cannot restart anything itself.
 `lamp-keeper-restart.socket` (root's, group `lampos`, mode 0660, one
 connection at a time) starts `lamp-keeper restart-asked` as root for each
 connection (`lamp-keeper-restart@.service`), with the connection as its

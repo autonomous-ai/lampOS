@@ -2250,6 +2250,7 @@ dependencies = [
  "axum",
  "lamp-bus",
  "lamp-ipc",
+ "lamp-keeper",
  "lamp-local-time",
  "lamp-msgs",
  "lamp-ring",

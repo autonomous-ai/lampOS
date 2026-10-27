@@ -561,6 +561,22 @@ refusal never holds the value asked, and the
 journal says what changed, never a name ("the person's name was changed (8
 characters)"); a zone is said.
 
+**The app's restart and shutdown** (#2193, #3697) are asked on the same
+helper, as the lines `{"restart":"lamp"}` and `{"shutdown":"lamp"}`
+(`lamp_keeper::restart`'s requests, answers and update lock, one copy with
+the keeper's own helper). Each takes lamp-update's lock
+(`/var/lib/lampos-update/lock`, writable in the unit) without waiting: held
+by an update, `{"refused":"an update is being installed: try again once it is
+done"}`; one it cannot check is refused too, with why. Otherwise it answers
+first, `{"done":{"restarting":true}}` or `{"done":{"shutting_down":true}}`,
+and then acts: the restart holds the lock, waits for the voice to rest
+between turns (5 s resting, nobody heard, nothing said; at most 45 s, then
+all the same) and runs `systemctl restart lampos.target`, never the machine
+(this connection's instance is not part of the target, so the restart does
+not stop it); the shutdown lets the lock go and starts `lamp-setup shutdown`
+(shutdown.md), which takes it again. Which of them `lamp-cloud` asks is its
+own switches' (`LAMP_APP_RESTART`, `LAMP_SHUTDOWN`; cloud.md).
+
 | Change | Checked | Written | Who follows, and how |
 |---|---|---|---|
 | The person's name | trimmed, at most 64 characters, no control character, line or paragraph separator or direction mark (the voice's own rule); `""` removes it | `/etc/lampOS/person/name`, 600 root, as setup writes it; removed for `""` | the voice reads it again at each hello and each new session: nothing restarts. A session already open keeps the old name until it ends |

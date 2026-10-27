@@ -93,9 +93,13 @@ pub struct Real {
     /// The lamp's software update for the app, with `LAMP_APP_UPDATE=on`
     /// (#2194, `crate::update`).
     pub update_page: bool,
-    /// The keeper's restart socket, with `LAMP_APP_RESTART=on` (#2193,
+    /// Setup's change helper's socket ([`crate::settings::SOCKET`]), asked
+    /// to restart the lamp, with `LAMP_APP_RESTART=on` (#2193,
     /// `system.reboot`).
     pub restart: Option<PathBuf>,
+    /// Setup's change helper asked to turn the lamp off, with
+    /// `LAMP_SHUTDOWN=on` (#3697, `system.shutdown`).
+    pub shutdown: Option<Shutdown>,
     /// lamp-skills' call socket, for guard mode from the owner's app, with
     /// `LAMP_GUARD_FROM_APP=on` (#2562, `crate::guard`).
     pub guard: Option<PathBuf>,
@@ -108,7 +112,37 @@ pub struct Real {
 /// `on` takes the app's `system.reboot` (#2193), with `LAMP_CLOUD=on`.
 pub const RESTART_ENVIRONMENT: &str = "LAMP_APP_RESTART";
 
-/// The keeper reads one line and checks one lock before it answers: bounded
+/// The app's `system.shutdown` (#3697): setup's change helper's socket, and
+/// its yes once given, so an app that asks again is answered the same and
+/// the helper is asked once.
+#[derive(Debug, Default)]
+pub struct Shutdown {
+    pub socket: PathBuf,
+    pub accepted: Option<Value>,
+}
+
+/// `on` takes the app's `system.shutdown` (#3697): `lamp_setup::shutdown::SWITCH`,
+/// named here as lamp-cloud doesn't build `lamp-setup`.
+pub const SHUTDOWN_ENVIRONMENT: &str = "LAMP_SHUTDOWN";
+
+impl Shutdown {
+    /// Asked on setup's change helper's socket, with `LAMP_SHUTDOWN=on`.
+    pub fn from_environment() -> Option<Self> {
+        let value = std::env::var(SHUTDOWN_ENVIRONMENT).ok();
+        crate::reports::switched_on(value.as_deref()).then(|| Self {
+            socket: crate::settings::SOCKET.into(),
+            accepted: None,
+        })
+    }
+}
+
+/// One restart or shutdown request to setup's change helper, in its line
+/// protocol (`lamp_keeper::restart`'s requests).
+fn ask_power(socket: &std::path::Path, request: &str) -> Result<Value, String> {
+    crate::settings::ask(socket, request, RESTART_WAIT).map(Option::unwrap_or_default)
+}
+
+/// The helper reads one line and checks one lock before it answers: bounded
 /// short, as the broker's loop waits on it (`crate::photos::DEADLINE`).
 pub const RESTART_WAIT: Duration = Duration::from_secs(2);
 
@@ -642,6 +676,10 @@ impl Lamp for Real {
         self.restart.is_some()
     }
 
+    fn shuts_down(&self) -> bool {
+        self.shutdown.is_some()
+    }
+
     fn guard(&self) -> Option<PathBuf> {
         self.guard.clone()
     }
@@ -659,13 +697,20 @@ impl Lamp for Real {
             .restart
             .as_deref()
             .ok_or_else(|| crate::wire::not_here("system.reboot"))?;
-        // The settings helper's line protocol, the keeper's words.
-        crate::settings::ask(socket, lamp_keeper::restart::REQUEST, RESTART_WAIT)
-            .map_err(|why| {
-                why.replace("the lamp's settings are", "the lamp's keeper is")
-                    .replace("the lamp's settings", "the lamp's keeper")
-            })
-            .map(Option::unwrap_or_default)
+        ask_power(socket, lamp_keeper::restart::REQUEST)
+    }
+
+    fn shut_down(&mut self) -> Result<Value, String> {
+        let shutdown = self
+            .shutdown
+            .as_mut()
+            .ok_or_else(|| crate::wire::not_here("system.shutdown"))?;
+        if let Some(accepted) = &shutdown.accepted {
+            return Ok(accepted.clone());
+        }
+        let accepted = ask_power(&shutdown.socket, lamp_keeper::restart::SHUTDOWN_REQUEST)?;
+        shutdown.accepted = Some(accepted.clone());
+        Ok(accepted)
     }
 
     fn new_run(&mut self, now_ms: u64) -> String {
@@ -851,6 +896,7 @@ mod tests {
             restart: None,
             guard: None,
             make_skill: None,
+            shutdown: None,
         };
         assert!(!lamp.recovery());
         let on = places.run.join("lampos-setup-recover/on");
@@ -859,6 +905,7 @@ mod tests {
         assert!(lamp.recovery());
         let _ = std::fs::remove_dir_all(root);
         assert_eq!(RECOVERY_ON, lamp_setup::recover::ON_FILE);
+        assert_eq!(SHUTDOWN_ENVIRONMENT, lamp_setup::shutdown::SWITCH);
     }
 
     /// #2937: the reset the app is told, from the controls' pins: `hold`
@@ -926,6 +973,7 @@ mod tests {
             restart: None,
             guard: None,
             make_skill: None,
+            shutdown: None,
         };
         let level = Volume {
             volume: 35,
@@ -1055,6 +1103,7 @@ mod tests {
             restart: None,
             guard: None,
             make_skill: None,
+            shutdown: None,
         };
         let blue = Light::new(true, "blue", 3).unwrap();
         // No ring yet.
