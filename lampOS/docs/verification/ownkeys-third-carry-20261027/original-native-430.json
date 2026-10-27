@@ -1,0 +1,147 @@
+{
+  "IPC_authority_once_PASS": 18,
+  "actual_checkout": "34580a31059315006508ad37b65f7144e73bb97a",
+  "actual_preview_tree": "7689adc42cfaba03e134e23fbe977a9120abfdea",
+  "all38_authored_owned_paths_equal_preview": true,
+  "authored_base": "db3d44d7303a1c026c4c0f1dcf995adf40b0605d",
+  "authored_tree": "7d11c7f286b6ea835e624900b2a92a36fa9a82e1",
+  "custom_harness": {
+    "process13_0": true,
+    "relay_signals_ok": true
+  },
+  "docs": {
+    "failed": 0,
+    "headings": 47,
+    "ignored": 0,
+    "incomplete_group": null,
+    "interleaved_groups": [],
+    "passed": 4,
+    "step_conclusion": "success",
+    "summaries": 47
+  },
+  "hashes": {
+    "arm-receipt.json": "f4f85d13423c96f6cb6b01ee4204b0249f1fd5700dbfa6b91377bd0795bb4948",
+    "arm-source-profiles.json": "0d90f1fb4120768e274bb8d722a37ab06ec6f078135e5fdbb7bee5556be9c50a",
+    "audit-arm.py": "8b009b0e929125e24bc9f236fa503e5e55c745170058c1518534faf6ad698ba3",
+    "audit-linux.py": "0e5605cb24cb4256f496bc3b03bd072bd47506942bae6ebfc4231973134ced72",
+    "authored-census.json": "040fa6d81785848319bcefaeb27f1d46b7cc4b48c9140bbed123e9d79dad615b",
+    "bind-preview.py": "c57dd770f4734f9fb9e9c3c8087c0fad38a17b12050d29d0fd029ff34396f828",
+    "collect-original.py": "6ea2dee2b8f4d3c19ec8324bbb88a749f827bb4b14c2766d6774e34515503a8e",
+    "linux-receipt.json": "b1a572b7ecc5320b60ee8532f5c3eaac6941d1d84da484685ec7b6bab1db504f",
+    "linux-source-profiles.json": "0d90f1fb4120768e274bb8d722a37ab06ec6f078135e5fdbb7bee5556be9c50a",
+    "prepare-census.py": "a04e557629088c4b34cfc14742923a6f1973084fe0536276d19072866607e619",
+    "terminal-handles.json": "3cd65456235574246777400701980c56149effb83db9e4203c5dd143d6182fcd",
+    "watch-original.py": "45944a6ba537bcc45bbf2254b3c58e6d08ecbb5d1eb47c05bd84e88d0a1ce930"
+  },
+  "head": "430a76dca4c0c92fe6a1fab0185bdd927ffa3202",
+  "limits": [
+    "Native observations bind the actual241f51500/430 integration preview, not authored430 whole tree.",
+    "Summary skips have no named PASS credit; inherited ignored source case remains outside active277.",
+    "Broker prerequisite keeps PR3646 DRAFT; original539 ARM failure remains preserved, with no inferred cause/repair or history waiver.",
+    "No new build, binary artifact execution/download, workflow rerun/cancel, device action, Memory semantic/PR review, branch mutation or public post."
+  ],
+  "nextest": {
+    "selected_unrun": 0,
+    "status_counts": {
+      "PASS": 11712
+    },
+    "summary": {
+      "executed": 11712,
+      "failed": 0,
+      "line": 12549,
+      "passed": 11712,
+      "raw_suffix": "11712 passed, 106 skipped",
+      "selected": 11712,
+      "skipped": 106
+    },
+    "unique_executed": 11712,
+    "verified_post_summary_reprints": 35
+  },
+  "old_Reader_case_current_observation": {
+    "rows": [
+      {
+        "binary": "lamp-voice",
+        "duration": "0.009s",
+        "line": 11232,
+        "name": "session_reader::tests::linux::shared_session_writer_projects_every_segment_without_private_values",
+        "ordinal": 10397,
+        "status": "PASS",
+        "total": 11712
+      }
+    ],
+    "scope": "Current original430 observation only; no cause, repair, or waiver inferred for original539 failure."
+  },
+  "ordered_parents": [
+    "241f51500f258ea06594f9edf3928a702d6a2038",
+    "430a76dca4c0c92fe6a1fab0185bdd927ffa3202"
+  ],
+  "overlay_path_count": 15,
+  "required_coverage": {
+    "Linux_once_PASS": 6,
+    "Linux_required": 6,
+    "active_required": 277,
+    "host_once_PASS": 271,
+    "host_required": 271,
+    "once_PASS": 277,
+    "own_once_PASS": 71,
+    "own_required": 71
+  },
+  "runs": {
+    "arm": {
+      "attempt": 1,
+      "conclusion": "success",
+      "id": 40503574815,
+      "job": 122187097668
+    },
+    "linux": {
+      "attempt": 1,
+      "conclusion": "success",
+      "id": 40503574892,
+      "job": 122187098302
+    }
+  },
+  "source_changed_profiles": [
+    "lampOS/crates/body/src/bin/lamp-body.rs",
+    "lampOS/crates/body/src/lease.rs",
+    "lampOS/crates/voice/src/coordinator/tests/second_route.rs"
+  ],
+  "source_profile_count": 51,
+  "status": "ORIGINAL_430_ARM_LINUX_PASSED_INTEGRATION_PREVIEW",
+  "terminal_handles": {
+    "all_handles_closed": true,
+    "all_native_watcher_groups_absent": true,
+    "arm_source_binder": {
+      "exit_code": 0,
+      "session": 8678
+    },
+    "arm_text_collector": {
+      "exit_code": 0,
+      "session": 79332
+    },
+    "binary_or_device_actions": false,
+    "functions_cells": [
+      {
+        "cell_id": "362",
+        "closed": true
+      },
+      {
+        "cell_id": "363",
+        "closed": true
+      }
+    ],
+    "linux_source_binder": {
+      "exit_code": 0,
+      "session": 88224
+    },
+    "linux_text_collector": {
+      "exit_code": 0,
+      "session": 92656
+    },
+    "native_watcher": {
+      "exit_code": 0,
+      "session": 96025
+    },
+    "rerun_or_cancel": false
+  },
+  "whole_authored_tree_qualification": false
+}

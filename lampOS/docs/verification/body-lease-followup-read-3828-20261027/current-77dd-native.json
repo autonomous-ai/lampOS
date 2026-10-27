@@ -1,0 +1,380 @@
+{
+  "all_handles_closed": true,
+  "file_hashes": {
+    "arm-watch.log": "fedacb589820fb8dc7813108ad448e13468b0e3f8e1fc4d018187e39680f4703",
+    "arm.json": "cc776f02fe453e717387e71cdea5e7dfc4cc34f95aa5953752bcdd084e7a818a",
+    "arm.log": "f10f709a0ecd098780f9e8da2794318d9d169dcb6e3055c71e7b76c7d87cf5b4",
+    "host-receipt.json": "9953cabde6f5b85aa0ac1e9a482b1b86af9fcbe4f967efa9ee70ab0682d13c37",
+    "linux-watch.log": "2f02ab513c947709b3ab62aa574155733299eb2ff83ed04e58a3219de102a775",
+    "linux.json": "0191e1430b442ecf635f4bc000483662e35d056a84e60a3eb4d1896644b97835",
+    "linux.log": "2bd858a3c3dd2d1a841502bcffbd3944b376c49cc25cbaef81ac9783015fe57c",
+    "native-test-audit.json": "54031c1e17ec0526adcf41a54d9352d517e5725fcab462276a7e79fee014abdd",
+    "pr-final.json": "e3b9ee1cf744d3669b5602aa92db3541e6eb9a82ce32832a9c1d58c722ce2261",
+    "source-bindings.json": "9764f6c5deb27fc240b5c104f4e5faf35c6584c039aaa3e81a89a94e25081b9c",
+    "source-review.json": "b780bcdd35655bb32b119a6f66d57e93602b9d1c94475bd255ab5eabc667bc57"
+  },
+  "handles_terminal0": {
+    "ARMwatch": 33056,
+    "Linuxwatch": "Already completed; initial command returned0 without session",
+    "collectors": [
+      26533,
+      79249,
+      82697,
+      14198,
+      97147
+    ],
+    "host": [
+      17347,
+      87132,
+      50004
+    ],
+    "source_fetch_checkout": [
+      97652,
+      70121
+    ]
+  },
+  "head": "77dd78bd4a5c8480c31f93f527de54eb87d3f1da",
+  "host_receipt_sha256": "9953cabde6f5b85aa0ac1e9a482b1b86af9fcbe4f967efa9ee70ab0682d13c37",
+  "limits": [
+    "No Mac execution of Linux-only binary tests; their native PASS entries come from ARM Linux job.",
+    "PRprofile12of47crates,53tests/118binaries skipped; no full/realtime suite, whole authored-tree or latestMain-composition native inference.",
+    "4docs,relayharness and13process cases separate from7752nextest total. Publication/provenance checks not added to runtime total.",
+    "Root exact helper probe and suspended-case execution remain separate; no duplicate helper or private fullbody harness here.",
+    "No Memoryimplementation/PRreads, device, public action, roothelper or physical overload/safety proof."
+  ],
+  "local_source_hashes_unchanged": 7373,
+  "local_worktree_clean": true,
+  "no_binary_artifact_download": true,
+  "no_test_rerun_or_cancel": true,
+  "pr_final": {
+    "authored_still_current": true,
+    "head": "77dd78bd4a5c8480c31f93f527de54eb87d3f1da",
+    "state": "OPEN"
+  },
+  "result": "Original77dd native runs succeed attempt1 on tested preview42593f2. All3changed blobs match authored77dd, but complete trees differ; preview-only native qualification. Host source/gates are in separate fixed receipt.",
+  "runs": {
+    "arm": {
+      "attempt": 1,
+      "conclusion": "success",
+      "id": 40503971219,
+      "jobs": [
+        {
+          "conclusion": "success",
+          "id": 122188441925,
+          "name": "lampOS \u2014 build and test on Linux ARM64 (1/1)"
+        },
+        {
+          "conclusion": "skipped",
+          "id": 122188443844,
+          "name": "lampOS \u2014 promote a tested release to the stable feed"
+        },
+        {
+          "conclusion": "skipped",
+          "id": 122195097438,
+          "name": "lampOS \u2014 sign and publish the tested lamp-voice artifact"
+        },
+        {
+          "conclusion": "skipped",
+          "id": 122195097625,
+          "name": "report-full-run-failure"
+        }
+      ],
+      "status": "completed"
+    },
+    "linux": {
+      "attempt": 1,
+      "conclusion": "success",
+      "id": 40503971271,
+      "jobs": [
+        {
+          "conclusion": "success",
+          "id": 122188442067,
+          "name": "lampOS \u2014 clippy, every crate and target (x86 Linux)"
+        }
+      ],
+      "status": "completed"
+    }
+  },
+  "source_binding": {
+    "all3changed_blobs_equal": true,
+    "authored": "77dd78bd4a5c8480c31f93f527de54eb87d3f1da",
+    "authored_tree": "d265fef57a619b4ccfebb0b188bc647141ce96e0",
+    "changed_files": {
+      "lampOS/crates/body/src/bin/lamp-body.rs": {
+        "42593f2a918abd496b69e8bed574826cf0b667ae": {
+          "blob": "1098918521fda300031a6f968900ebcee786ff1b",
+          "sha256": "32a68ba44babb5ebd73efd7a840e83b3d9fd32187d16db18c77d39c2973c0073"
+        },
+        "77dd78bd4a5c8480c31f93f527de54eb87d3f1da": {
+          "blob": "1098918521fda300031a6f968900ebcee786ff1b",
+          "sha256": "32a68ba44babb5ebd73efd7a840e83b3d9fd32187d16db18c77d39c2973c0073"
+        }
+      },
+      "lampOS/crates/body/src/lease.rs": {
+        "42593f2a918abd496b69e8bed574826cf0b667ae": {
+          "blob": "319758ae683af511710a31436a17c26f66c3e674",
+          "sha256": "21c72412b2f0a682cdc6eec5253c1d8cdffe6e05e7c3b63a9db2d4f234520300"
+        },
+        "77dd78bd4a5c8480c31f93f527de54eb87d3f1da": {
+          "blob": "319758ae683af511710a31436a17c26f66c3e674",
+          "sha256": "21c72412b2f0a682cdc6eec5253c1d8cdffe6e05e7c3b63a9db2d4f234520300"
+        }
+      },
+      "lampOS/docs/body.md": {
+        "42593f2a918abd496b69e8bed574826cf0b667ae": {
+          "blob": "b3456966f5d4e8fe1066c061d184bc21071b920e",
+          "sha256": "64e2f22039bef407e9ebecf49052a01c6d66bb913f58428114aa7d7367cbff68"
+        },
+        "77dd78bd4a5c8480c31f93f527de54eb87d3f1da": {
+          "blob": "b3456966f5d4e8fe1066c061d184bc21071b920e",
+          "sha256": "64e2f22039bef407e9ebecf49052a01c6d66bb913f58428114aa7d7367cbff68"
+        }
+      }
+    },
+    "parents": [
+      "241f51500f258ea06594f9edf3928a702d6a2038",
+      "77dd78bd4a5c8480c31f93f527de54eb87d3f1da"
+    ],
+    "preview": "42593f2a918abd496b69e8bed574826cf0b667ae",
+    "preview_tree": "1d454959670cc625a3cbeb51f041968a625cb5cd",
+    "preview_vs_authored_different_files": 10,
+    "scope": "Both original ARM and Linux logs check out this preview. All3changed blobs bind exactly to authored77dd; whole trees differ, so no whole-authored-tree or latestMain transfer.",
+    "whole_trees_equal": false
+  },
+  "target_free": "third-reminder-carry-target",
+  "test_audit": {
+    "bad_terminal_statuses": [],
+    "binaries_run": 70,
+    "custom_harness": {
+      "process13passed0failed": true,
+      "relay_signals_ok": true
+    },
+    "docs": {
+      "crate_summaries": 47,
+      "failed": 0,
+      "ignored": 0,
+      "passed": 4
+    },
+    "duplicate_detail_keys": [
+      {
+        "binary": "lamp-skills::it",
+        "occurrences": 2,
+        "test": "skills::a_reading_pose_is_held_on_the_mood_socket_for_its_for_and_then_let_go"
+      },
+      {
+        "binary": "lamp-skills::it",
+        "occurrences": 2,
+        "test": "skills::asking_the_policy_a_hello_made_and_not_noticed_rests"
+      },
+      {
+        "binary": "lamp-skills::it",
+        "occurrences": 2,
+        "test": "skills::asking_the_policy_on_the_hosts_clock_gives_up_after_its_wait"
+      },
+      {
+        "binary": "lamp-skills::it",
+        "occurrences": 2,
+        "test": "skills::the_program_forgets_a_snooze_at_a_restart"
+      },
+      {
+        "binary": "lamp-skills::it",
+        "occurrences": 2,
+        "test": "skills::the_program_keeps_a_skill_off_across_a_restart"
+      },
+      {
+        "binary": "lamp-voice",
+        "occurrences": 2,
+        "test": "coordinator::tests::endpoint_session::endpoint_fixture_reaps_on_panic_before_and_after_handoff"
+      },
+      {
+        "binary": "lamp-voice",
+        "occurrences": 2,
+        "test": "hand_controls::tests::with_the_wait_an_idle_pump_wakes_five_times_a_second_and_stops_at_once"
+      },
+      {
+        "binary": "lamp-voice",
+        "occurrences": 2,
+        "test": "hand_controls::tests::with_the_wait_an_owner_polling_every_2_ms_does_not_wake_the_pump"
+      },
+      {
+        "binary": "lamp-voice::it",
+        "occurrences": 2,
+        "test": "capture_hold_worker::a_microphone_busy_for_a_moment_at_start_is_opened_once_it_is_free"
+      },
+      {
+        "binary": "lamp-voice::it",
+        "occurrences": 2,
+        "test": "capture_hold_worker::a_microphone_gone_for_a_moment_at_start_is_opened_once_it_is_back"
+      },
+      {
+        "binary": "lamp-voice::it",
+        "occurrences": 2,
+        "test": "capture_hold_worker::a_mute_while_a_busy_microphone_is_waited_for_opens_nothing"
+      },
+      {
+        "binary": "lamp-voice::it",
+        "occurrences": 2,
+        "test": "capture_hold_worker::a_mute_while_the_microphone_is_waited_for_opens_nothing"
+      },
+      {
+        "binary": "lamp-voice::it",
+        "occurrences": 2,
+        "test": "capture_hold_worker::a_speaker_held_up_ends_the_capture_worker_unless_recovery_is_bounded"
+      },
+      {
+        "binary": "lamp-voice::it",
+        "occurrences": 2,
+        "test": "capture_hold_worker::a_stop_is_read_though_the_worker_has_gone_when_authority_falls_due"
+      },
+      {
+        "binary": "lamp-voice::it",
+        "occurrences": 2,
+        "test": "capture_hold_worker::another_microphone_is_handed_on_at_once_and_its_early_sound_is_not_accounted_for"
+      },
+      {
+        "binary": "lamp-voice::it",
+        "occurrences": 2,
+        "test": "capture_hold_worker::mic1_frames_wait_four_blocks_with_their_own_times_and_a_stop_drops_what_is_held"
+      },
+      {
+        "binary": "lamp-voice::it",
+        "occurrences": 2,
+        "test": "capture_hold_worker::mic1_muted_while_frames_are_held_hands_none_of_them_on"
+      },
+      {
+        "binary": "lamp-voice::it",
+        "occurrences": 2,
+        "test": "capture_hold_worker::mic1_with_a_recording_keeps_the_held_steps_before_the_first_block"
+      },
+      {
+        "binary": "lamp-voice::it",
+        "occurrences": 2,
+        "test": "capture_hold_worker::stalls_in_a_row_each_reopen_the_microphone_while_the_reference_goes_on"
+      },
+      {
+        "binary": "lamp-voice::it",
+        "occurrences": 2,
+        "test": "capture_hold_worker::stop_words_blocks_carry_what_was_asked_only_when_asked"
+      },
+      {
+        "binary": "lamp-voice::it",
+        "occurrences": 2,
+        "test": "capture_hold_worker::the_loop_waits_on_the_microphone_only_with_the_switch"
+      },
+      {
+        "binary": "lamp-voice::it",
+        "occurrences": 2,
+        "test": "capture_hold_worker::with_the_render_5_ms_after_each_block_all_but_a_few_blocks_are_read_within_a_ms"
+      },
+      {
+        "binary": "lamp-voice::it",
+        "occurrences": 2,
+        "test": "privacy_worker::a_producer_kept_up_only_if_its_samples_span_the_scenario"
+      },
+      {
+        "binary": "lamp-voice::it",
+        "occurrences": 2,
+        "test": "privacy_worker::after_its_first_datagram_a_gap_ends_the_worker_as_discontinuous"
+      },
+      {
+        "binary": "lamp-voice::it",
+        "occurrences": 2,
+        "test": "privacy_worker::allowed_authority_without_a_first_observation_cannot_start_a_gap_ride"
+      },
+      {
+        "binary": "lamp-voice::it",
+        "occurrences": 2,
+        "test": "privacy_worker::a_gap_ride_survives_controls_late_and_restabilizes_before_reopening"
+      },
+      {
+        "binary": "lamp-voice::it",
+        "occurrences": 2,
+        "test": "privacy_worker::before_any_datagram_the_worker_reads_the_kept_value_past_gaps_until_controls_is_late"
+      },
+      {
+        "binary": "lamp-voice::it",
+        "occurrences": 2,
+        "test": "privacy_worker::expiry_without_the_opt_in_or_allowed_authority_still_ends_the_worker"
+      },
+      {
+        "binary": "lamp-voice::it",
+        "occurrences": 2,
+        "test": "privacy_worker::a_gap_ride_recovers_short_repeated_publication_gaps_in_the_same_worker"
+      },
+      {
+        "binary": "lamp-voice::it",
+        "occurrences": 2,
+        "test": "privacy_worker::fresh_low_during_a_gap_ride_never_grants_the_same_worker_again"
+      },
+      {
+        "binary": "lamp-voice::it",
+        "occurrences": 2,
+        "test": "privacy_worker::losing_controls_ends_the_real_worker_cleanly_and_expires_its_lease"
+      },
+      {
+        "binary": "lamp-voice::it",
+        "occurrences": 2,
+        "test": "privacy_worker::the_real_worker_with_no_slide_grants_from_its_controller_alone"
+      },
+      {
+        "binary": "lamp-voice::it",
+        "occurrences": 2,
+        "test": "privacy_worker::selected_worker_requires_authority_latches_low_and_recovers_only_after_verified_stop"
+      },
+      {
+        "binary": "lamp-voice::it",
+        "occurrences": 2,
+        "test": "privacy_worker::an_isolated_fresh_high_does_not_extend_the_real_workers_gap_ride"
+      }
+    ],
+    "portable_lease_cases": [
+      {
+        "binary": "lamp-body",
+        "occurrences": 1,
+        "test": "lease::tests::a_hold_is_held_renewed_and_let_go"
+      },
+      {
+        "binary": "lamp-body",
+        "occurrences": 1,
+        "test": "lease::tests::a_hold_not_renewed_lapses_by_itself"
+      },
+      {
+        "binary": "lamp-body",
+        "occurrences": 1,
+        "test": "lease::tests::a_conversation_suspends_it_and_its_end_gives_it_back"
+      },
+      {
+        "binary": "lamp-body",
+        "occurrences": 1,
+        "test": "lease::tests::a_hand_privacy_a_pause_or_a_sleep_ends_it"
+      },
+      {
+        "binary": "lamp-body",
+        "occurrences": 1,
+        "test": "lease::tests::anything_else_is_refused_with_why"
+      }
+    ],
+    "preview": "42593f2a918abd496b69e8bed574826cf0b667ae",
+    "qualifications": "PRprofile12of47crates. Doctests/custom harnesses separate fromnextest. Both2Linuxbin cases+5portablelease cases PASSonce; the terminal test includes changed hand-loss/let-go subcases. Root separate suspended-helper proof not repeated or inferred.",
+    "raw_PASS_lines": 7786,
+    "required_linux_binary_cases": [
+      {
+        "binary": "lamp-body::bin/lamp-body",
+        "occurrences": 1,
+        "test": "tests::a_let_go_or_waiting_body_is_slumped_for_its_lease"
+      },
+      {
+        "binary": "lamp-body::bin/lamp-body",
+        "occurrences": 1,
+        "test": "tests::a_run_that_ends_tells_its_holder_why"
+      }
+    ],
+    "selection": "Changed: lamp-body. With the crates that depend on them and the three that read other crates' files (lamp-cloud, lamp-voice-eval, lamp-update): 12 of 47 crates.",
+    "skipped_binaries": 118,
+    "skipped_tests": 53,
+    "summary": [
+      "Summary [ 170.202s] 7752 tests run: 7752 passed, 53 skipped"
+    ],
+    "unique_passes": 7752
+  }
+}
