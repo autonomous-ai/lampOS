@@ -1,0 +1,453 @@
+{
+  "all_14_child_groups_reaped_absent": true,
+  "cases": [
+    {
+      "after_restore_told_lexists": true,
+      "after_save": {
+        "saved_done": true,
+        "saved_restore": true,
+        "saved_told_lexists": true
+      },
+      "backup_retained": true,
+      "case": "digest-fails-copy-differs",
+      "generated_restore_sha256": "9f9b8ac20699251004919bb5d9f028f65fa2724e4bbee7065fcc82196423ca20",
+      "initial_told": {
+        "exists_following": true,
+        "is_symlink": false,
+        "lexists": true
+      },
+      "injected_tools_sha256": {
+        "cp": "febc82c135390e5b1b0c6f77ce1b4fe358e9bc057dd4e86969b32b13576a8c8c",
+        "sha256sum": "00586759062d7c4300717af573b0c855cbf7898e8e9817c70e671580e14f1e5d",
+        "shasum": "00586759062d7c4300717af573b0c855cbf7898e8e9817c70e671580e14f1e5d"
+      },
+      "live_owner_matches": false,
+      "restore_exit": 1,
+      "save_exit": 0,
+      "saved_owner_intact": true,
+      "status": "FAIL_CLOSED_BACKUP_RETAINED"
+    },
+    {
+      "after_restore_told_lexists": true,
+      "after_save": {
+        "saved_done": true,
+        "saved_restore": true,
+        "saved_told_lexists": true
+      },
+      "backup_retained": true,
+      "case": "digest-fails-copy-matches",
+      "generated_restore_sha256": "9c98ed5f7a0f4999fc5ab16101411612b5a9be3b911688948fdb71d4dff0d541",
+      "initial_told": {
+        "exists_following": true,
+        "is_symlink": false,
+        "lexists": true
+      },
+      "injected_tools_sha256": {
+        "sha256sum": "00586759062d7c4300717af573b0c855cbf7898e8e9817c70e671580e14f1e5d",
+        "shasum": "00586759062d7c4300717af573b0c855cbf7898e8e9817c70e671580e14f1e5d"
+      },
+      "live_owner_matches": true,
+      "restore_exit": 1,
+      "save_exit": 0,
+      "saved_owner_intact": true,
+      "status": "FAIL_CLOSED_BACKUP_RETAINED"
+    },
+    {
+      "after_restore_told_lexists": true,
+      "after_save": {
+        "saved_done": true,
+        "saved_restore": true,
+        "saved_told_lexists": true
+      },
+      "backup_retained": true,
+      "case": "find-fails",
+      "generated_restore_sha256": "622306bae0d318c1cc6b02723a83ec2f20458a2367cb4d878969d4751880d726",
+      "initial_told": {
+        "exists_following": true,
+        "is_symlink": false,
+        "lexists": true
+      },
+      "injected_tools_sha256": {
+        "find": "88623ee8f34be3a852b2a5493976d293c9dd4705954e965ca26d74885d2e23c1"
+      },
+      "live_owner_matches": true,
+      "restore_exit": 1,
+      "save_exit": 0,
+      "saved_owner_intact": true,
+      "status": "FAIL_CLOSED_BACKUP_RETAINED"
+    },
+    {
+      "after_restore_told_lexists": true,
+      "after_save": {
+        "saved_done": true,
+        "saved_restore": true,
+        "saved_told_lexists": true
+      },
+      "backup_retained": true,
+      "case": "sort-fails",
+      "generated_restore_sha256": "0faf051efbd9ea48f75d47999f17b49d1d54770d70cc1d7a42c55a61ee6ab8e7",
+      "initial_told": {
+        "exists_following": true,
+        "is_symlink": false,
+        "lexists": true
+      },
+      "injected_tools_sha256": {
+        "sort": "88623ee8f34be3a852b2a5493976d293c9dd4705954e965ca26d74885d2e23c1"
+      },
+      "live_owner_matches": true,
+      "restore_exit": 1,
+      "save_exit": 0,
+      "saved_owner_intact": true,
+      "status": "FAIL_CLOSED_BACKUP_RETAINED"
+    },
+    {
+      "after_restore_told_lexists": false,
+      "after_save": {
+        "saved_done": true,
+        "saved_restore": true,
+        "saved_told_lexists": false
+      },
+      "backup_retained": false,
+      "case": "dangling-tasks-told",
+      "generated_restore_sha256": "ea8fdebc6ed9540e4820ed44b0561e9d186425f836b92e620ed9f5f1e9ff829c",
+      "initial_told": {
+        "exists_following": false,
+        "is_symlink": true,
+        "lexists": true
+      },
+      "injected_tools_sha256": {},
+      "live_owner_matches": true,
+      "restore_exit": 0,
+      "save_exit": 0,
+      "saved_owner_intact": false,
+      "status": "CONFIRMED_SILENT_DANGLING_LINK_LOSS"
+    }
+  ],
+  "commands": [
+    "python3 <evidence>/probe.py",
+    "/bin/bash -n <worktree>/lampOS/tools/played/make-skill.sh",
+    "/bin/bash -n <worktree>/lampOS/tools/played/make-skill-test.sh",
+    "/bin/sh -n <worktree>/lampOS/tools/played/stand-in.sh",
+    "/bin/sh -n <worktree>/lampOS/tools/played/stand-in-test.sh",
+    "Exact extracted restore_script and voice_state functions, temp-only SAVED/VOICE_DIR, local sudo-prefix-stripping command stub"
+  ],
+  "dangling_link_loss_confirmed": true,
+  "disposition": "HOLD for unchanged dangling-state-link loss; focused digest-error repair verified",
+  "exact_controller_sha256": "53cf1525f4570be2575488b32b77dbc5e56671874eef82ec1ff35971cad12e08",
+  "focused_failclosed_controls_pass": 4,
+  "guard_hashes": {
+    "helpers": {
+      "blocked-tools/afplay": "177f1ecdde05e0ae8b652249075afcd0ff736f684d46b357cf7978b09ac6fb6f",
+      "blocked-tools/say": "177f1ecdde05e0ae8b652249075afcd0ff736f684d46b357cf7978b09ac6fb6f",
+      "blocked-tools/scp": "177f1ecdde05e0ae8b652249075afcd0ff736f684d46b357cf7978b09ac6fb6f",
+      "blocked-tools/sftp": "177f1ecdde05e0ae8b652249075afcd0ff736f684d46b357cf7978b09ac6fb6f",
+      "blocked-tools/ssh": "177f1ecdde05e0ae8b652249075afcd0ff736f684d46b357cf7978b09ac6fb6f",
+      "blocked-tools/sshpass": "177f1ecdde05e0ae8b652249075afcd0ff736f684d46b357cf7978b09ac6fb6f",
+      "blocked-tools/sudo": "177f1ecdde05e0ae8b652249075afcd0ff736f684d46b357cf7978b09ac6fb6f",
+      "blocked-tools/systemctl": "177f1ecdde05e0ae8b652249075afcd0ff736f684d46b357cf7978b09ac6fb6f",
+      "blocked-tools/systemd-run": "177f1ecdde05e0ae8b652249075afcd0ff736f684d46b357cf7978b09ac6fb6f",
+      "local-command": "49e9010d482ac175c7717078b71873c138167af0e97c8ab2e342ec26eaca50a3",
+      "probe.py": "53cf1525f4570be2575488b32b77dbc5e56671874eef82ec1ff35971cad12e08"
+    },
+    "tools": {
+      "bash": "16303dedab719ddb63efd9dd68092a0da37b397bfd4fcb856d5f1c86c5ee414b",
+      "cp": "f0629f462c6535f7b1a19f559b7093638e714961bea9228cfb2ae7896f8557f4",
+      "find": "9cd3b4bbb80ac290fd188172e5fcbc48a6fe10ff3374313e4f01efea0101be1b",
+      "sed": "6ac57d91d32dda62f954dbcfe29e43dd55e69946821092b542dbbbe7dca86997",
+      "sh": "c0eaf44f9242d5bbc2e14f4e8b7dccc1eff7f2976d64dc18914d5ef9f373e100",
+      "sha256sum": "0e948a75f5773aebdfc38e28b289a27e04627eb933cf884d72788d5e5d9ccb67",
+      "shasum": "7b4a2ceaa5ba5d712b056b6415ca641f5516e58116eafd33b4467768fbf1b4b0",
+      "sort": "54c29f342722dffb3413a3a628f9bb37efccf4b26dd1ea5598e10edb82b4c33d"
+    }
+  },
+  "guards": {
+    "blocked_real_tool_attempts": 0,
+    "helper": true,
+    "source": true,
+    "source_count": 5,
+    "tool_count": 8,
+    "tools": true
+  },
+  "head": "93f0584c2677242919937c118cd6d9051e216909",
+  "limits": [
+    "Four exact generated-restore fault controls and one exact save/restore type probe, once per case",
+    "Restore exit1 tested directly; make-skill outer exit8 is source-reviewed, not executed",
+    "No full make-skill or stand-in suite; prior results separate",
+    "No SSH, sudo, audio, system units, device, network from probes, Cargo, or source changes",
+    "Initial dangling tasks-told only; no nested-link or empty-directory coverage"
+  ],
+  "parents": [
+    "e43fd36f6aee55e4fe9a2ee73acc2e261765fa5f"
+  ],
+  "platform": "macOS-26.6.2-x86_64-i386-64bit",
+  "prior_evidence": "Earlier1c digest failure and dangling-link receipts preserved; prior full-suite timeouts and author suites remain separate",
+  "private_focused_receipt_sha256": "53597a54918eb528bb19edf4416582b159d588a4f4b28976732516ccc025fdd7",
+  "process_group_evidence_limit": "For each of these14 uniquely named invocations, probe.py awaited the Popen process and asserted os.killpg(p.pid,0) raised ProcessLookupError. Numeric PIDs/PGIDs were not retained, so no retrospective numeric identity claim; no retries or repeated process probes.",
+  "python": "3.9.1",
+  "receipt_status": "SANITIZED_PUBLICATION_PACKET; no absolute home paths; raw outputs normalized to <evidence>",
+  "restore_function_sha256": "22aab9debe4b4920c40fdd045c84c402805603f860fe5c9650723fb392f289eb",
+  "source_line_anchors": {
+    "backup_delete": 121,
+    "copy_before_verification": 115,
+    "digest_status": 84,
+    "find_status": 97,
+    "outer_exit8": 237,
+    "save_e_checks": 126,
+    "saved_manifest_status": 117
+  },
+  "source_review": "sha captures digest status and requires 64 lowercase hex; sums checks find/sort and per-file digest status; both manifest generations must succeed before equality authorizes backup deletion. Save still treats dangling state links as absent with -e; restore removes live state before copying/verifying.",
+  "source_sha256": {
+    "lampOS/tools/played/README.md": "68a57ca3182c5748bbfb61459a4f20ee6e1827782b29bdac7a8803c0c9a87830",
+    "lampOS/tools/played/make-skill-test.sh": "b2dc71cf0b18aeb29627f728c5134bf8515a3d422baccbfdeb9f5a94152c6c6f",
+    "lampOS/tools/played/make-skill.sh": "3e444bc241a213a735619b43255da7bd9b4636e64059938bd9f2d5e5df86168d",
+    "lampOS/tools/played/stand-in-test.sh": "c18ec34dff356029cfbf74529f66c22df365e495cd3ca3c42f4e8dc61d30ad5d",
+    "lampOS/tools/played/stand-in.sh": "4be23b62b781d2a64e98392593c8af1394e0e6f3b87b518e39a3e68747fd0c02"
+  },
+  "source_snippets": [
+    {
+      "line": 115,
+      "path": "lampOS/tools/played/make-skill.sh",
+      "text": "  rm -rf \"$V/$x\" && { [ ! -e \"$S/$x\" ] || cp -a \"$S/$x\" \"$V/\"; } || { echo \"restore: $x could not be put back from $S\" >&2; exit 1; }"
+    },
+    {
+      "line": 117,
+      "path": "lampOS/tools/played/make-skill.sh",
+      "text": "saved=$(sums \"$S\" $names) || { echo \"restore: the saved copy in $S could not be read whole; it is kept\" >&2; exit 1; }"
+    },
+    {
+      "line": 118,
+      "path": "lampOS/tools/played/make-skill.sh",
+      "text": "now=$(sums \"$V\" $names) || { echo \"restore: $V could not be read whole; the copy in $S is kept\" >&2; exit 1; }"
+    },
+    {
+      "line": 119,
+      "path": "lampOS/tools/played/make-skill.sh",
+      "text": "case $saved in *\"files \"[0-9]*) ;; *) echo \"restore: no whole manifest of $S; it is kept\" >&2; exit 1 ;; esac"
+    },
+    {
+      "line": 120,
+      "path": "lampOS/tools/played/make-skill.sh",
+      "text": "[ \"${saved##*files }\" = \"${now##*files }\" ] && [ \"$saved\" = \"$now\" ] || { echo \"restore: $V is not as saved in $S\" >&2; exit 1; }"
+    },
+    {
+      "line": 121,
+      "path": "lampOS/tools/played/make-skill.sh",
+      "text": "[ \"${1:-all}\" = reset ] || rm -rf \"$S\""
+    },
+    {
+      "line": 124,
+      "path": "lampOS/tools/played/make-skill.sh",
+      "text": "voice_state() {  # save | reset | restore: the voice's made skills and told news, saved; made skills back as saved; both"
+    },
+    {
+      "line": 125,
+      "path": "lampOS/tools/played/make-skill.sh",
+      "text": "  case $1 in"
+    },
+    {
+      "line": 126,
+      "path": "lampOS/tools/played/make-skill.sh",
+      "text": "    save) restore_script | \"$LAMP_SSH\" \"sudo -n sh -c 'mkdir -m 0700 $SAVED && cat > $SAVED/restore && { [ ! -e $VOICE_DIR/made-skills ] || cp -a $VOICE_DIR/made-skills $SAVED/; } && { [ ! -e $VOICE_DIR/tasks-told ] || cp -a $VOICE_DIR/tasks-told $SAVED/; } && touch $SAVED/done'\" ;;"
+    },
+    {
+      "line": 127,
+      "path": "lampOS/tools/played/make-skill.sh",
+      "text": "    reset) lamp \"sudo -n sh $SAVED/restore reset\" ;;"
+    },
+    {
+      "line": 128,
+      "path": "lampOS/tools/played/make-skill.sh",
+      "text": "    restore) lamp \"sudo -n sh $SAVED/restore\" ;;"
+    },
+    {
+      "line": 237,
+      "path": "lampOS/tools/played/make-skill.sh",
+      "text": "    rc=8"
+    }
+  ],
+  "stage_identities_and_terminals": [
+    {
+      "argv": [
+        "/bin/bash",
+        "-n",
+        "<worktree>/lampOS/tools/played/make-skill.sh"
+      ],
+      "elapsed_seconds": 0.0066,
+      "exit": 0,
+      "group": "absent",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stage": "syntax-make-skill.sh"
+    },
+    {
+      "argv": [
+        "/bin/bash",
+        "-n",
+        "<worktree>/lampOS/tools/played/make-skill-test.sh"
+      ],
+      "elapsed_seconds": 0.0055,
+      "exit": 0,
+      "group": "absent",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stage": "syntax-make-skill-test.sh"
+    },
+    {
+      "argv": [
+        "/bin/sh",
+        "-n",
+        "<worktree>/lampOS/tools/played/stand-in.sh"
+      ],
+      "elapsed_seconds": 0.0109,
+      "exit": 0,
+      "group": "absent",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stage": "syntax-stand-in.sh"
+    },
+    {
+      "argv": [
+        "/bin/sh",
+        "-n",
+        "<worktree>/lampOS/tools/played/stand-in-test.sh"
+      ],
+      "elapsed_seconds": 0.0116,
+      "exit": 0,
+      "group": "absent",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stage": "syntax-stand-in-test.sh"
+    },
+    {
+      "argv": [
+        "/bin/bash",
+        "<evidence>/digest-fails-copy-differs-qy1t2ud9/exact-save.sh"
+      ],
+      "elapsed_seconds": 0.7528,
+      "exit": 0,
+      "group": "absent",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stage": "digest-fails-copy-differs-save"
+    },
+    {
+      "argv": [
+        "/bin/sh",
+        "<evidence>/digest-fails-copy-differs-qy1t2ud9/saved/restore"
+      ],
+      "elapsed_seconds": 1.1087,
+      "exit": 1,
+      "group": "absent",
+      "log_sha256": "264e169303f3ef695695636daa32cd28774ca6714c9ee6154e8714ad8f3f8397",
+      "stage": "digest-fails-copy-differs-restore"
+    },
+    {
+      "argv": [
+        "/bin/bash",
+        "<evidence>/digest-fails-copy-matches-egyavght/exact-save.sh"
+      ],
+      "elapsed_seconds": 0.0367,
+      "exit": 0,
+      "group": "absent",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stage": "digest-fails-copy-matches-save"
+    },
+    {
+      "argv": [
+        "/bin/sh",
+        "<evidence>/digest-fails-copy-matches-egyavght/saved/restore"
+      ],
+      "elapsed_seconds": 0.3592,
+      "exit": 1,
+      "group": "absent",
+      "log_sha256": "bb261562b22207e8f41fb62fc67919bb1994b310aad1fde6c9961620777ea7b2",
+      "stage": "digest-fails-copy-matches-restore"
+    },
+    {
+      "argv": [
+        "/bin/bash",
+        "<evidence>/find-fails-mc8_pv8h/exact-save.sh"
+      ],
+      "elapsed_seconds": 0.0398,
+      "exit": 0,
+      "group": "absent",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stage": "find-fails-save"
+    },
+    {
+      "argv": [
+        "/bin/sh",
+        "<evidence>/find-fails-mc8_pv8h/saved/restore"
+      ],
+      "elapsed_seconds": 0.6086,
+      "exit": 1,
+      "group": "absent",
+      "log_sha256": "0f85ae532310671b05127859a84345121de1d61b472d917859fa5eccee300829",
+      "stage": "find-fails-restore"
+    },
+    {
+      "argv": [
+        "/bin/bash",
+        "<evidence>/sort-fails-cuy7mhiv/exact-save.sh"
+      ],
+      "elapsed_seconds": 0.0384,
+      "exit": 0,
+      "group": "absent",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stage": "sort-fails-save"
+    },
+    {
+      "argv": [
+        "/bin/sh",
+        "<evidence>/sort-fails-cuy7mhiv/saved/restore"
+      ],
+      "elapsed_seconds": 0.3559,
+      "exit": 1,
+      "group": "absent",
+      "log_sha256": "487e1a72f2d3441ddcae6d9bc78850f1715ff139eda7592cd7bfa9c2150b521e",
+      "stage": "sort-fails-restore"
+    },
+    {
+      "argv": [
+        "/bin/bash",
+        "<evidence>/dangling-tasks-told-y9lkn6if/exact-save.sh"
+      ],
+      "elapsed_seconds": 0.0425,
+      "exit": 0,
+      "group": "absent",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stage": "dangling-tasks-told-save"
+    },
+    {
+      "argv": [
+        "/bin/sh",
+        "<evidence>/dangling-tasks-told-y9lkn6if/saved/restore"
+      ],
+      "elapsed_seconds": 0.0833,
+      "exit": 0,
+      "group": "absent",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stage": "dangling-tasks-told-restore"
+    }
+  ],
+  "syntax_pass": 4,
+  "tree": "6175af5a4ee435c526ba720b7d79d5b301110ccc",
+  "verified_raw_fault_outputs": [
+    {
+      "case": "digest-fails-copy-differs",
+      "raw_log_sha256": "264e169303f3ef695695636daa32cd28774ca6714c9ee6154e8714ad8f3f8397",
+      "sanitized_raw_output": "injected-digest-failure\nrestore: the saved copy in <evidence>/digest-fails-copy-differs-qy1t2ud9/saved could not be read whole; it is kept\n"
+    },
+    {
+      "case": "digest-fails-copy-matches",
+      "raw_log_sha256": "bb261562b22207e8f41fb62fc67919bb1994b310aad1fde6c9961620777ea7b2",
+      "sanitized_raw_output": "injected-digest-failure\nrestore: the saved copy in <evidence>/digest-fails-copy-matches-egyavght/saved could not be read whole; it is kept\n"
+    },
+    {
+      "case": "find-fails",
+      "raw_log_sha256": "0f85ae532310671b05127859a84345121de1d61b472d917859fa5eccee300829",
+      "sanitized_raw_output": "injected-enumeration-failure\nrestore: the saved copy in <evidence>/find-fails-mc8_pv8h/saved could not be read whole; it is kept\n"
+    },
+    {
+      "case": "sort-fails",
+      "raw_log_sha256": "487e1a72f2d3441ddcae6d9bc78850f1715ff139eda7592cd7bfa9c2150b521e",
+      "sanitized_raw_output": "injected-enumeration-failure\nrestore: the saved copy in <evidence>/sort-fails-cuy7mhiv/saved could not be read whole; it is kept\n"
+    }
+  ],
+  "voice_state_function_sha256": "ca9c493008689100512750e46f4e4b68684e3a46fe07630aee321388865569a1"
+}
