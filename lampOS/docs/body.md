@@ -231,9 +231,11 @@ which V1's calibration wrote on its lamps), says them in its report
 - a `--home`, a pitch window or a `--stand` pitch, roll or yaw outside that
   same window, or a `--folded-arm` or `--stand` shoulder or elbow outside
   the servo's own range, is refused at start, writing nothing (a folded arm
-  may rest on its stop: lamp-52e6's shoulder folds at 2,050, its limit
-  2,047, so the arm is checked against the range itself and its goals keep
-  their own window);
+  rests on its mechanical stop, which may lie past the servo's stored
+  limit: lamp-52e6's factory fold put the shoulder at 2,038, under its limit
+  2,047, so a folded arm may be up to `Standing::FOUND_SLACK` (80) outside
+  the range, a standing arm is checked against the range itself, and the
+  arm's goals keep their own window);
 - a joint that stores the whole turn, 0 to 4,095 (lamp-52e6's elbow), was
   never calibrated by V1 and keeps today's guard.
 

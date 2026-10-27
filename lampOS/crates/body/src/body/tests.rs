@@ -14025,10 +14025,26 @@ fn own_ranges_check_every_pose_and_leave_a_full_turn_alone() {
         outside_own_ranges(&LAMP_52E6_RANGES, Some(HOME), window, Some(up)),
         None
     );
+    // A fold rests on its stop, which may lie past the stored limit: up to
+    // `Standing::FOUND_SLACK` (80) under it is taken, as lamp-52e6's factory
+    // fold at 2038 under its 2047 (#3504); one count more is refused.
     let mut ranges = LAMP_52E6_RANGES;
-    ranges[Joint::BasePitch.index()] = (2_100, 3_799);
+    ranges[Joint::BasePitch.index()] = (2_130, 3_799);
+    assert_eq!(
+        outside_own_ranges(&ranges, Some(HOME), window, Some(up)),
+        None
+    );
+    ranges[Joint::BasePitch.index()] = (2_131, 3_799);
     let why = outside_own_ranges(&ranges, Some(HOME), window, Some(up)).unwrap();
     assert!(why.starts_with("folded arm base_pitch 2050"), "{why}");
+    let factory = Standing {
+        folded: [2_038, 2_101],
+        ..up
+    };
+    assert_eq!(
+        outside_own_ranges(&LAMP_52E6_RANGES, Some(HOME), window, Some(factory)),
+        None
+    );
     let mut ranges = LAMP_52E6_RANGES;
     ranges[Joint::WristRoll.index()] = (1_065, 2_050);
     let why = outside_own_ranges(&ranges, None, window, Some(up)).unwrap();
