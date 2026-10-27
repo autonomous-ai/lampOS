@@ -20,6 +20,7 @@ use crate::pairing::{self, Clients, Codes, PairRefused};
 use crate::protocol::{
     self, Error, ErrorCode, EventKind, Grant, LeaseWhy, Op, Part, StateKind, VERSION,
 };
+use crate::push::{self, Ask, Pushes, Step};
 use crate::rate::{Class, Rates};
 
 /// What the lamp's parts do for the door: each action, each piece of state,
@@ -101,6 +102,9 @@ impl Session {
 pub struct Outcome {
     pub send: Vec<Value>,
     pub close: bool,
+    /// A request for the manage helper (a pushed skill installed, listed or
+    /// removed), asked off the door's lock; its answer goes to the client.
+    pub ask: Option<Ask>,
 }
 
 /// The door: pairing, the paired clients, the leases and the rates, shared
@@ -128,7 +132,28 @@ pub struct Door {
     pin: [u8; 32],
     /// The quiet hours, once wired: the lamp's local time, if known.
     quiet: Option<Quiet>,
+    /// Where a pushed skill's package is kept for the manage helper: none,
+    /// and skill push is off on this lamp.
+    push_folder: Option<PathBuf>,
+    pushes: Pushes,
+    /// Each computer's pairing generation, raised at its every pair,
+    /// re-pair and revoke from one counter, so an install asked under one
+    /// pairing knows when it's no longer the same (the same key gets the
+    /// same id back: Fourteen's and Reviewer-two's P2 on #3910).
+    revs: BTreeMap<String, u64>,
+    last_rev: u64,
+    /// Computers with a `skill.list` or `skill.remove` still with the
+    /// helper: one each, and [`ASKING_MOST`] in all.
+    asking: BTreeSet<String>,
+    /// What the helper must be told of pairings, in order: drained by the
+    /// server into one queue, so a later change is never served first.
+    helper_changes: Vec<Value>,
 }
+
+/// The most `skill.list` and `skill.remove` with the helper at once, all
+/// computers together (Reviewer-two's P2 on #3910: each is a connection
+/// to root's helper).
+pub const ASKING_MOST: usize = 4;
 
 /// The lamp's quiet hours on the door: `say` and `sound` refused from
 /// 22:00 to 07:00 local (`lamp_local_time::quiet_hours`, one definition
@@ -206,6 +231,12 @@ impl Door {
             unsaved_revokes: BTreeSet::new(),
             pin,
             quiet: None,
+            push_folder: None,
+            pushes: Pushes::default(),
+            revs: BTreeMap::new(),
+            last_rev: 0,
+            asking: BTreeSet::new(),
+            helper_changes: Vec::new(),
         }
     }
 
@@ -214,6 +245,65 @@ impl Door {
     pub fn with_quiet_hours(mut self, quiet: Quiet) -> Self {
         self.quiet = Some(quiet);
         self
+    }
+
+    /// Skill push on, its packages kept in `folder` for the manage helper.
+    pub fn with_push_folder(mut self, folder: PathBuf) -> Self {
+        self.push_folder = Some(folder);
+        self
+    }
+
+    /// The manage helper has answered `client`'s install, asked under
+    /// pairing generation `rev` (or failed to): another may begin. If the
+    /// pairing changed while the install was with the helper (a revoke, a
+    /// re-pair, the same key paired again with other grants), the helper
+    /// is told again what the computer may have now, after the install,
+    /// whatever order it serves requests in (Fourteen's P2 on #3910).
+    pub fn push_installed(&mut self, client: &str, rev: u64) {
+        self.pushes.installed(self.push_folder.as_deref());
+        if self.rev_of(client) == rev {
+            return;
+        }
+        match self.clients.get(client).map(|paired| paired.grants.clone()) {
+            Some(grants) => self.tell_helper_grants(client, &grants),
+            None => self.tell_helper_off(client),
+        }
+    }
+
+    /// The helper has answered `client`'s `skill.list` or `skill.remove`.
+    pub fn helper_answered(&mut self, client: &str) {
+        self.asking.remove(client);
+    }
+
+    /// What the helper must be told of pairings since the last call, in
+    /// order.
+    pub fn take_helper_changes(&mut self) -> Vec<Value> {
+        std::mem::take(&mut self.helper_changes)
+    }
+
+    fn rev_of(&self, client: &str) -> u64 {
+        self.revs.get(client).copied().unwrap_or(0)
+    }
+
+    fn new_rev(&mut self, client: &str) {
+        self.last_rev += 1;
+        self.revs.insert(client.to_owned(), self.last_rev);
+    }
+
+    /// `client`'s pushed skills off (not deleted), with skill push on.
+    fn tell_helper_off(&mut self, client: &str) {
+        if self.push_folder.is_some() {
+            self.helper_changes.push(json!({ "off_pushed_by": client }));
+        }
+    }
+
+    /// `client`'s pushed skills held to `grants`: one asking a grant
+    /// outside them is turned off (Eighth's `grants_pushed_by`).
+    fn tell_helper_grants(&mut self, client: &str, grants: &BTreeSet<Grant>) {
+        if self.push_folder.is_some() {
+            self.helper_changes
+                .push(json!({ "grants_pushed_by": { "client": client, "grants": grants } }));
+        }
     }
 
     /// A new connection, and the `welcome` to send it first.
@@ -252,8 +342,14 @@ impl Door {
         let mut changes = Vec::new();
         if was {
             self.rates.forget(client);
+            self.pushes.forget(client);
             changes = self.leases.client_gone(client, LeaseWhy::Revoked, now_us);
             self.unsaved_revokes.insert(client.to_owned());
+            self.new_rev(client);
+        }
+        // Its pushed skills off (not deleted), whether or not it had any.
+        if was || waiting {
+            self.tell_helper_off(client);
         }
         // To the file: now, or with the next save that succeeds (a retry,
         // a pairing), so a restart can't bring the key back once the disk
@@ -453,6 +549,98 @@ impl Door {
                 parts.stop(&client, now_us);
                 return ok(re, Value::Null);
             }
+            Op::SkillPush { .. } | Op::SkillList {} | Op::SkillRemove { .. }
+                if self.push_folder.is_none() =>
+            {
+                return refuse(ErrorCode::Refused, PUSH_OFF.to_owned());
+            }
+            Op::SkillPush {
+                name,
+                sha256,
+                size,
+                part,
+                parts: count,
+                data,
+            } => {
+                // A push counts once, at its first part, whatever its parts.
+                if *part == 0 {
+                    if let Err(retry_ms) = self.rates.check(&client, Class::Push, now_us) {
+                        let mut error = Error::new(ErrorCode::Rate, Class::Push.says());
+                        error.retry_ms = Some(retry_ms);
+                        return reply_refused(Some(re), error);
+                    }
+                    self.rates.count(&client, Class::Push, now_us);
+                }
+                // What the helper holds the skill to: this computer, and its
+                // grants as they are now; the helper takes it only within
+                // 60 s of `at_unix_ms` on its own clock (Eighth on #3504).
+                let at_unix_ms = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map(|since| since.as_millis())
+                    .unwrap_or_default();
+                let about = json!({
+                    "client": client,
+                    "client_name": self.clients.get(&client).map(|paired| paired.name.clone()),
+                    "grants": grants,
+                    "at_unix_ms": at_unix_ms,
+                });
+                let folder = self.push_folder.clone().expect("push on");
+                let part = push::Part {
+                    name,
+                    sha256,
+                    size: *size,
+                    part: *part,
+                    parts: *count,
+                    data,
+                };
+                return match self
+                    .pushes
+                    .part(&client, &part, now_us, Some((&folder, &about)))
+                {
+                    Ok(Step::Got(got)) => ok(re, json!({"got": got})),
+                    Ok(Step::Whole { sha256 }) => Outcome {
+                        ask: Some(Ask {
+                            rev: self.rev_of(&client),
+                            ..Ask::install(re, &client, &sha256)
+                        }),
+                        ..Outcome::default()
+                    },
+                    Err(error) => reply_refused(Some(re), error),
+                };
+            }
+            Op::SkillList {} | Op::SkillRemove { .. } => {
+                // Bounded before the helper is asked: one at a time for each
+                // computer, a few for the lamp, and a rate (Reviewer-two's
+                // and Fourteen's P2 on #3910).
+                if self.asking.contains(&client) {
+                    return refuse(
+                        ErrorCode::Busy,
+                        "this computer's last skill request is still with the lamp's skill helper"
+                            .to_owned(),
+                    );
+                }
+                if self.asking.len() >= ASKING_MOST {
+                    return refuse(
+                        ErrorCode::Busy,
+                        "the lamp's skill helper is busy: try again".to_owned(),
+                    );
+                }
+                if let Err(retry_ms) = self.rates.check(&client, Class::Manage, now_us) {
+                    let mut error = Error::new(ErrorCode::Rate, Class::Manage.says());
+                    error.retry_ms = Some(retry_ms);
+                    return reply_refused(Some(re), error);
+                }
+                self.rates.count(&client, Class::Manage, now_us);
+                self.asking.insert(client.clone());
+                let ask = match &op {
+                    Op::SkillRemove { name } => Ask::remove(re, &client, name),
+                    _ => Ask::list(re, &client),
+                };
+                return Outcome {
+                    ask: Some(ask),
+                    ..Outcome::default()
+                };
+            }
             _ => {}
         }
         // A body lease where the op needs one: `joints` names its lease; a
@@ -578,6 +766,15 @@ impl Door {
                 ),
             );
         }
+        // A new pairing generation; and a key paired before, now with
+        // other grants, has its pushed skills held to the new ones.
+        self.new_rev(&id);
+        if before
+            .as_ref()
+            .is_some_and(|before| before.grants != grants)
+        {
+            self.tell_helper_grants(&id, &grants);
+        }
         ok(re, json!({"client": id, "grants": grants}))
     }
 
@@ -625,6 +822,9 @@ impl Door {
     }
 }
 
+/// Why a skill op is refused on a lamp where skill push is off.
+pub const PUSH_OFF: &str = "skill push is not on this lamp";
+
 /// The rates and caps `hello` tells, so a client keeps inside them.
 pub fn limits() -> Value {
     let class = |class: Class| -> Value {
@@ -642,6 +842,8 @@ pub fn limits() -> Value {
         "express": class(Class::Express),
         "refused": class(Class::Refused),
         "phrases": class(Class::Phrases),
+        "push": class(Class::Push),
+        "manage": class(Class::Manage),
         "hold_max_ms": protocol::HOLD_MAX_MS,
         "take_max_ms": crate::lease::TAKE_MAX_US / 1_000,
         "say_max_chars": protocol::SAY_MAX_CHARS,
@@ -656,14 +858,14 @@ pub fn event_of(change: &Change) -> Value {
 fn ok(re: u64, with: Value) -> Outcome {
     Outcome {
         send: vec![protocol::ok(re, with)],
-        close: false,
+        ..Outcome::default()
     }
 }
 
 fn reply_refused(re: Option<u64>, error: Error) -> Outcome {
     Outcome {
         send: vec![protocol::refused(re, &error)],
-        close: false,
+        ..Outcome::default()
     }
 }
 

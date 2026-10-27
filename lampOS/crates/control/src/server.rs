@@ -16,6 +16,7 @@
 
 use std::collections::BTreeSet;
 use std::collections::HashMap;
+use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
@@ -122,6 +123,14 @@ pub struct Shared {
     limits: Mutex<Limits>,
     /// Open connections by address, handshakes included.
     peers: Mutex<HashMap<std::net::IpAddr, usize>>,
+    /// The manage helper's socket, root's, which installs, lists and
+    /// removes pushed skills (`crate::push`).
+    manage: Mutex<Option<PathBuf>>,
+    /// What the helper is told of pairings, one at a time in the door's
+    /// order, by one thread started at the first (Reviewer-two on #3504: a
+    /// late wider grant change must never be served after a newer narrower
+    /// one).
+    changes: Mutex<Option<std::sync::mpsc::Sender<Value>>>,
 }
 
 impl Shared {
@@ -135,7 +144,76 @@ impl Shared {
             pin,
             limits: Mutex::new(Limits::default()),
             peers: Mutex::new(HashMap::new()),
+            manage: Mutex::new(None),
+            changes: Mutex::new(None),
         })
+    }
+
+    /// The manage helper at `socket` for pushed skills.
+    pub fn set_manage_socket(&self, socket: PathBuf) {
+        *self.manage.lock().expect("manage") = Some(socket);
+    }
+
+    /// `ask` of the manage helper off the door's lock and the runtime's
+    /// thread; its answer goes to `outbox`, the asking connection's.
+    fn ask_helper(
+        self: &Arc<Self>,
+        ask: crate::push::Ask,
+        outbox: mpsc::WeakUnboundedSender<Value>,
+    ) {
+        let shared = self.clone();
+        tokio::task::spawn_blocking(move || {
+            let socket = shared.manage.lock().expect("manage").clone();
+            let answer = match socket {
+                Some(socket) => crate::push::ask_helper(&socket, &ask.request, ask.wait()),
+                None => Err("no manage socket given".to_owned()),
+            };
+            // A pairing changed while the install was with the helper: its
+            // change may have been served first, so the door tells it
+            // again now, after the install (Fourteen's P2 on #3910).
+            {
+                let mut door = shared.door.lock().expect("door");
+                match ask.kind {
+                    crate::push::AskKind::Install => door.push_installed(&ask.client, ask.rev),
+                    _ => door.helper_answered(&ask.client),
+                }
+            }
+            shared.tell_helper();
+            if let Some(outbox) = outbox.upgrade() {
+                let _ = outbox.send(ask.answer(answer));
+            }
+        });
+    }
+
+    /// The door's pairing changes for the manage helper (a computer's
+    /// pushed skills off, or held to new grants), sent in order by one
+    /// thread; each answer said in the journal, as nobody waits for it.
+    fn tell_helper(&self) {
+        let changes = self.door.lock().expect("door").take_helper_changes();
+        if changes.is_empty() {
+            return;
+        }
+        let Some(socket) = self.manage.lock().expect("manage").clone() else {
+            return;
+        };
+        let mut queue = self.changes.lock().expect("changes");
+        let sender = queue.get_or_insert_with(|| {
+            let (sender, received) = std::sync::mpsc::channel::<Value>();
+            std::thread::spawn(move || {
+                for request in received {
+                    match crate::push::ask_helper(&socket, &request, crate::push::ASK_WAIT) {
+                        Ok(answer) => {
+                            eprintln!("lamp-control: told the helper {request}: {answer}")
+                        }
+                        Err(error) => eprintln!("lamp-control: told the helper {request}: {error}"),
+                    }
+                }
+            });
+            sender
+        });
+        for change in changes {
+            let _ = sender.send(change);
+        }
     }
 
     /// Other bounds on connections, for tests.
@@ -183,6 +261,8 @@ impl Shared {
                 pin,
                 limits: Mutex::new(Limits::default()),
                 peers: Mutex::new(HashMap::new()),
+                manage: Mutex::new(None),
+                changes: Mutex::new(None),
             }
         })
     }
@@ -385,6 +465,8 @@ where
 {
     let id = shared.next.fetch_add(1, Ordering::Relaxed);
     let (outbox, mut inbox) = mpsc::unbounded_channel::<Value>();
+    // Weak, so a revoke that drops the connection's outbox still closes it.
+    let answers = outbox.downgrade();
     let (mut session, welcome) = shared.door.lock().expect("door").open();
     shared.open.lock().expect("open").insert(
         id,
@@ -433,7 +515,7 @@ where
                         .duration_since(std::time::UNIX_EPOCH)
                         .map(|since| since.as_secs())
                         .unwrap_or_default();
-                    let outcome = {
+                    let mut outcome = {
                         let mut door = shared.door.lock().expect("door");
                         let mut parts = shared.parts.lock().expect("parts");
                         door.handle(&mut session, text.as_str(), parts.as_mut(), now, wall)
@@ -454,6 +536,11 @@ where
                             entry.grants = grants;
                         }
                     }
+                    if let Some(ask) = outcome.ask.take() {
+                        shared.ask_helper(ask, answers.clone());
+                    }
+                    // A pairing that changed a computer's grants.
+                    shared.tell_helper();
                     let mut gone = false;
                     for reply in outcome.send {
                         gone |= socket.send(Message::text(reply.to_string())).await.is_err();
@@ -497,7 +584,8 @@ where
 }
 
 /// The owner's side, one JSON object a line on a Unix socket:
-/// - `{"code": {"grants": ["body", "light"]}}` → `{"code": "12345678", "pin": "<sha256>"}`;
+/// - `{"code": {"grants": ["body", "light"]}}` → `{"code": "12345678", "pin": "<sha256>",
+///   "shown": [...]}`, `shown` the pairing screen's words for each grant;
 /// - `{"revoke": "c_…"}` → `{"revoked": true, "saved": true}`, or `"saved":
 ///   false` with an `error` when the file couldn't take it yet;
 /// - `{"clients": true}` → `{"clients": [{id, name, grants, paired_at}]}`.
@@ -534,8 +622,10 @@ fn admin_answer(shared: &Shared, line: &str) -> Value {
             serde_json::from_value(code.get("grants").cloned().unwrap_or(json!([])));
         return match grants {
             Ok(grants) => {
+                // The pairing screen's words for what is granted.
+                let shown: Vec<&str> = grants.iter().map(|grant| grant.shown()).collect();
                 let code = shared.door.lock().expect("door").issue_code(grants, now);
-                json!({"code": code, "pin": shared.pin})
+                json!({"code": code, "pin": shared.pin, "shown": shown})
             }
             Err(error) => json!({"error": format!("grants: {error}")}),
         };
@@ -543,6 +633,8 @@ fn admin_answer(shared: &Shared, line: &str) -> Value {
     if let Some(Value::String(client)) = asked.get("revoke") {
         let revoked = shared.door.lock().expect("door").revoke(client, now);
         shared.tell(revoked.changes);
+        // Its pushed skills off (not deleted), whether or not it had any.
+        shared.tell_helper();
         // What it asked for that still goes stops, as its `stop` would.
         if revoked.was {
             shared.parts.lock().expect("parts").stop(client, now);

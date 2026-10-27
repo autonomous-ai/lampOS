@@ -25,6 +25,12 @@ pub enum Class {
     /// program can't swap word lists to probe the room's speech
     /// (Fourteen's P2 on #3868).
     Phrases,
+    /// A `skill.push`, counted once at its first part: one each 10 s and
+    /// 20 an hour.
+    Push,
+    /// A `skill.list` or `skill.remove`, each a request to root's manage
+    /// helper: 6 a minute (Reviewer-two's P2 on #3910).
+    Manage,
     /// Actions a part refused: 20 a second, then the connection closes
     /// (Fourteen's P3 on #3798: a refusal is a round trip to a part, so
     /// spinning refused actions must cost something).
@@ -56,6 +62,8 @@ impl Class {
             Self::Say => &[(6, 60 * S), (60, 3_600 * S)],
             Self::Express => &[(1, 60 * S)],
             Self::Phrases => &[(6, 60 * S)],
+            Self::Push => &[(1, 10 * S), (20, 3_600 * S)],
+            Self::Manage => &[(6, 60 * S)],
             Self::Refused => &[(20, S)],
         }
     }
@@ -69,6 +77,8 @@ impl Class {
             Self::Say => "say: 6 a minute and 60 an hour",
             Self::Express => "express: 1 a minute",
             Self::Phrases => "phrases: 6 changes a minute",
+            Self::Push => "skill.push: 1 each 10 s and 20 an hour",
+            Self::Manage => "skill.list and skill.remove: 6 a minute",
             Self::Refused => "refused actions: 20 a second",
         }
     }
