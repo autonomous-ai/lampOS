@@ -663,3 +663,4 @@ Ready for lamp-voice: yes (#2553), once its ARM64 run is green
 - 23:05: #3840 merged (197f21533). Opened its P3 follow-up (blue/skill-check-p3 b76c3912a; first name line, dir move, warning wording, CI skill copy required; 59 passed on 3.12/3.10). Told Ten #3878 must copy the skill schema to the SDK (it changes the doc only).
 - 23:10: #3880 reviewer-lead no finding (P3s: dot-named moves, a stale comment) folded as ad095ae61, 60 passed. Ten carried the SDK skill-schema copy into #3878 (3da79e1a8); reviewer-lead no finding there.
 - 23:14: quiet tick for my PRs.
+- 23:21: took Ten's/reviewer-lead's #3878 P3 (format 2 in lamp skill check); written locally on blue/skill-check-format2 (sees_picture rule, look step needs it, format 3 refused, CLI names the format; 64 passed on 3.12/3.10 with #3878's schema; all 33 #3878 skills ok). Opens after #3878 and #3880 land.
