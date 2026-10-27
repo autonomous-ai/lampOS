@@ -616,6 +616,9 @@ struct TestFile {
     above: Option<f64>,
     below: Option<f64>,
     present: Option<bool>,
+    /// On `humans/faces/tracked` alone: at most this many faces in view
+    /// (#3504: a comfort break is said with nobody else there).
+    faces_at_most: Option<u32>,
     /// It has held this long.
     #[serde(rename = "for")]
     lasting: Option<String>,
@@ -1858,6 +1861,9 @@ enum Test {
     /// the picture's height.
     Faces(f32),
     NoFaces,
+    /// At most this many faces in `humans/faces/tracked`, by a list the
+    /// eyes said whole (#3504).
+    FacesAtMost(usize),
     Equals(String, Value),
     NotEquals(String, Value),
     Above(String, f64),
@@ -1871,6 +1877,8 @@ impl Test {
         match self {
             Self::NoFaces => serde_json::from_value::<Faces>(value.clone())
                 .is_ok_and(|faces| faces.check().is_ok() && faces.faces.is_empty()),
+            Self::FacesAtMost(most) => serde_json::from_value::<Faces>(value.clone())
+                .is_ok_and(|faces| faces.check().is_ok() && faces.faces.len() <= *most),
             Self::Faces(near) => value["faces"].as_array().is_some_and(|faces| {
                 faces.iter().any(|face| {
                     face["ymax"].as_f64().unwrap_or(0.0) - face["ymin"].as_f64().unwrap_or(0.0)
@@ -1898,6 +1906,7 @@ impl Test {
         match self {
             Self::NoFaces => "present no longer false".into(),
             Self::Faces(_) => "present no longer true".into(),
+            Self::FacesAtMost(most) => format!("more than {most} faces in view"),
             Self::Equals(field, wanted) => format!("{field} no longer {}", shown(wanted)),
             Self::NotEquals(field, unwanted) => format!("{field} now {}", shown(unwanted)),
             Self::Above(field, line) => format!("{field} no longer above {line}"),
@@ -1916,6 +1925,7 @@ impl Test {
         match self {
             Self::NoFaces => "no face".into(),
             Self::Faces(_) => "a face".into(),
+            Self::FacesAtMost(most) => format!("at most {most} faces"),
             Self::Equals(field, wanted) => format!("{field} {}", shown(wanted)),
             Self::NotEquals(field, unwanted) => format!("{field} not {}", shown(unwanted)),
             Self::Above(field, line) => format!("{field} above {line}"),
@@ -3032,7 +3042,23 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
     };
     let mut conditions = Vec::new();
     for condition in file.conditions {
+        let alone = condition.topic == Faces::TOPIC
+            && condition.field.is_none()
+            && condition.equals.is_none()
+            && condition.not_equals.is_none()
+            && condition.above.is_none()
+            && condition.below.is_none()
+            && condition.present.is_none();
         let test = match (condition.present, condition.not_equals) {
+            _ if condition.faces_at_most.is_some() => match condition.faces_at_most {
+                Some(most @ 1..=8) if alone => Test::FacesAtMost(most as usize),
+                _ => {
+                    return Err(format!(
+                        "faces_at_most, 1 to 8, is known only on {}, alone",
+                        Faces::TOPIC
+                    ));
+                }
+            },
             (None, Some(unwanted)) => match (
                 condition.field,
                 condition.equals,
@@ -5555,7 +5581,7 @@ impl Engine {
         };
         let topic = &condition.topic;
         let (field, value) = match &condition.test {
-            Test::Faces(_) | Test::NoFaces => ("faces", None),
+            Test::Faces(_) | Test::NoFaces | Test::FacesAtMost(_) => ("faces", None),
             Test::Equals(field, _)
             | Test::NotEquals(field, _)
             | Test::Above(field, _)
