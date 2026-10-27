@@ -2389,3 +2389,14 @@ re-planning or enlarging the original byte budget. No mutation boundary is
 wired. The [capture contract](writer-settings-capture.md)
 separates this raw input from authentication, head-touch projection, effect
 admission and independent recovery.
+
+### Read-only agreement of saved Head and ordinary file observations (#3689)
+
+The private [coherence check](head-preimage-coherence.md) compares exact logical
+root spelling, each ordinary root identity, represented lexical directory
+prefixes, overlapping regular bytes and typed absences. Captured directory
+membership is checked where it represents the next ordinary component. Link
+resolution and null/device overlap remain conservatively unsupported; unrelated
+closed Head facts retain their semantics. No encoding, runtime caller, live
+read, admission, writer grant or restoration effect is added. This agreement
+is not authentication, freshness, exclusion or an atomic filesystem snapshot.

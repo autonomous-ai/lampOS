@@ -284,6 +284,8 @@ pub(crate) struct SavedInputs {
     facts: Portable,
     encoded: Box<[u8]>,
 }
+
+mod coherence;
 impl fmt::Debug for SavedInputs {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("SavedInputs")
