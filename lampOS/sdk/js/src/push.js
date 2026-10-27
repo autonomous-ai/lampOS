@@ -156,6 +156,51 @@ export function openPackage(data) {
   return { name, version, author, files };
 }
 
+// At most `cap` bytes from a web stream, refused at the first byte past it:
+// reading stops there rather than after the whole download.
+export async function readCapped(body, cap = PACKAGE_MAX) {
+  const chunks = [];
+  let size = 0;
+  const reader = body.getReader();
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) return Buffer.concat(chunks);
+    size += value.length;
+    if (size > cap) {
+      await reader.cancel();
+      throw new LampError(`more than ${cap} bytes: a shared skill is 1 MiB at most`, { code: 'bad_request' });
+    }
+    chunks.push(Buffer.from(value));
+  }
+}
+
+// A shared package from an https URL, on this computer; the lamp never goes
+// to a URL for it. https only, no redirect to another scheme, and at most
+// 1 MiB read (Fourteen's point 4 on #3504). Nothing in it is run or unpacked
+// here: `openPackage` checks it in memory.
+export async function fetchPackage(url, { redirects = 5 } = {}) {
+  let at = new URL(url);
+  for (let hop = 0; ; hop += 1) {
+    if (at.protocol !== 'https:') {
+      const why = hop ? 'a redirect away from https is refused' : 'a shared skill is fetched over https only';
+      throw new LampError(`${at}: ${why}`, { code: 'bad_request' });
+    }
+    let response;
+    try {
+      response = await fetch(at, { redirect: 'manual', signal: AbortSignal.timeout(30_000) });
+    } catch (error) {
+      throw new LampError(`${at}: ${error.message}`, { code: 'bad_request' });
+    }
+    const next = response.headers.get('location');
+    if (response.status >= 300 && response.status < 400 && next && hop < redirects) {
+      at = new URL(next, at);
+      continue;
+    }
+    if (!response.ok) throw new LampError(`${at}: ${response.status}`, { code: 'bad_request' });
+    return readCapped(response.body);
+  }
+}
+
 // A top-level string key of skill.toml (before its first table), basic or
 // literal (`"1.0.0"` or `'1.0.0'`), or undefined.
 function topLevel(toml, key) {

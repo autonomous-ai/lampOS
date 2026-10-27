@@ -577,6 +577,32 @@ test('lamp skill keygen, pack --sign and check run as the Python CLI\'s do', asy
   assert.deepEqual(await lamp('skill', 'check', join(out, 'desk-wave-0.1.0.tar')), { code: 0, said: `desk-wave: package ok, signed by key ${fpr}, not the Store` });
 });
 
+test('a shared package is fetched over https only, and reading stops at 1 MiB', async () => {
+  // Fourteen's point 4 on #3504: https only, no redirect to another scheme,
+  // and reading stops at the cap, not after the whole download.
+  const { PACKAGE_MAX, fetchPackage, readCapped } = await import('../src/push.js');
+  for (const url of ['http://example.com/a.tar', 'file:///etc/passwd', 'ftp://example.com/a.tar']) {
+    await assert.rejects(fetchPackage(url), (error) => /https only/.test(error.why));
+  }
+  const stream = (total, chunk = 64 * 1024) => {
+    let sent = 0;
+    return new ReadableStream({
+      pull(controller) {
+        if (sent >= total) return controller.close();
+        const size = Math.min(chunk, total - sent);
+        sent += size;
+        controller.enqueue(new Uint8Array(size));
+      },
+    });
+  };
+  assert.equal((await readCapped(stream(PACKAGE_MAX))).length, PACKAGE_MAX);
+  let pulled = 0;
+  const endless = new ReadableStream({ pull(controller) { pulled += 1; controller.enqueue(new Uint8Array(64 * 1024)); } });
+  await assert.rejects(readCapped(endless), (error) => /1 MiB at most/.test(error.why));
+  // 16 chunks fill the MiB; the 17th goes past it, and nothing more is read.
+  assert.ok(pulled <= 18, `pulled ${pulled}`);
+});
+
 test('a push without the skills grant, or of a core skill, sends nothing', async () => {
   await withLamp({ grants: ['light'] }, async (lamp, fake) => {
     await assert.rejects(lamp.pushSkill(skillFolder('lit')), byCode.no_grant);
