@@ -1,0 +1,148 @@
+{
+  "source": {
+    "authored_base": "39b4f6adcf3f38b5e3f8efbad4a4f31f094745da",
+    "authored_head": "1931bf2fec147afef2944f00136cec4e8882fb95",
+    "executed_preview": "cfe2f54eeb38f37a59945e0c6b4a68c6e1f0c5fe",
+    "full_tree_equal": true,
+    "local_643d": "643d60aa7e66569f01ff4eb98660fd470892fd7b",
+    "local_base": "3d5ea2dd792d42fd52f26b978daf5ddbe9c68487",
+    "local_tree": "ad99a8ad76c6df5a6c135db8567018af657b5bd0",
+    "ordered_parents": [
+      "3d5ea2dd792d42fd52f26b978daf5ddbe9c68487",
+      "1931bf2fec147afef2944f00136cec4e8882fb95"
+    ],
+    "overlay_delta_from_authored": [
+      "lampOS/crates/camera/src/linux.rs",
+      "lampOS/crates/camera/src/linux/find.rs",
+      "lampOS/crates/eyes/src/bus_out.rs",
+      "lampOS/crates/eyes/src/camera_helper.rs",
+      "lampOS/crates/eyes/src/main.rs",
+      "lampOS/crates/update/src/install.rs",
+      "lampOS/docs/eyes.md",
+      "lampOS/docs/install.md",
+      "lampOS/tools/played/stand-in-test.sh",
+      "lampOS/tools/played/stand-in.sh"
+    ],
+    "preview_tree": "ad99a8ad76c6df5a6c135db8567018af657b5bd0"
+  },
+  "runs": {
+    "arm": {
+      "attempt": 1,
+      "checkout": "cfe2f54eeb38f37a59945e0c6b4a68c6e1f0c5fe",
+      "conclusion": "success",
+      "event": "pull_request",
+      "head": "1931bf2fec147afef2944f00136cec4e8882fb95",
+      "job": 122013527985,
+      "run": 40451027014
+    },
+    "linux": {
+      "attempt": 1,
+      "checkout": "cfe2f54eeb38f37a59945e0c6b4a68c6e1f0c5fe",
+      "conclusion": "success",
+      "event": "pull_request",
+      "head": "1931bf2fec147afef2944f00136cec4e8882fb95",
+      "job": 122013528037,
+      "run": 40451027063
+    }
+  },
+  "controls": {
+    "missing_or_nonpass": [],
+    "mock3_already_in32": true,
+    "once_pass": 32,
+    "required": 32
+  },
+  "nextest": {
+    "failed": 0,
+    "ipc_camera_authority_pass": 18,
+    "leak": 0,
+    "per_package_pass": {
+      "lamp-actions": 123,
+      "lamp-addons": 50,
+      "lamp-air": 27,
+      "lamp-audio": 193,
+      "lamp-body": 624,
+      "lamp-bus": 107,
+      "lamp-camera": 90,
+      "lamp-cloud": 196,
+      "lamp-controls": 516,
+      "lamp-ears": 76,
+      "lamp-environment": 12,
+      "lamp-expression": 340,
+      "lamp-eyes": 340,
+      "lamp-gemini": 285,
+      "lamp-health": 91,
+      "lamp-ipc": 45,
+      "lamp-keeper": 42,
+      "lamp-lean": 61,
+      "lamp-local-time": 11,
+      "lamp-memory": 336,
+      "lamp-mood": 118,
+      "lamp-msgs": 172,
+      "lamp-name": 44,
+      "lamp-near-call": 8,
+      "lamp-observer": 46,
+      "lamp-peek": 26,
+      "lamp-policy": 284,
+      "lamp-records": 193,
+      "lamp-ring": 53,
+      "lamp-same-voice": 5,
+      "lamp-schedule": 215,
+      "lamp-selftest": 84,
+      "lamp-settings": 49,
+      "lamp-setup": 186,
+      "lamp-skills": 551,
+      "lamp-sound-fixtures": 15,
+      "lamp-station": 69,
+      "lamp-surround": 268,
+      "lamp-tasks": 220,
+      "lamp-turn-end": 32,
+      "lamp-turn-end-wire": 5,
+      "lamp-turn-owner": 37,
+      "lamp-update": 443,
+      "lamp-voice": 4167,
+      "lamp-voice-eval": 623,
+      "lamp-voice-processes": 2
+    },
+    "skip_names_available": false,
+    "skipped_summary": 106,
+    "timeout": 0,
+    "unique_pass": 11480,
+    "verified_exact_post_summary_reprints": 35,
+    "voice_library_pass": 3849,
+    "whole_workspace_selector": true
+  },
+  "raw_hashes": {
+    "arm-job.log": "1024bee97bff7d5440334683fc1e32110dfa7d8df4a266560340c82e8e1c3a49",
+    "arm-jobs.json": "47ca931fedee92df1517fdd6ea36fcb462e505f383e73ba3cd4f007b4967631c",
+    "arm-run.json": "14bd32a84526e11684960c63f557bbdad934814e9e36aa0e84d07745390974ec",
+    "commit-cfe2f54eeb38f37a59945e0c6b4a68c6e1f0c5fe.json": "06d685e93b79756b2e4db82345f8bf556184f3f19aad3bead1161f6646f2df99",
+    "linux-job.log": "1eb33fbca06794c6dde375b5072bdc753a5ae16d6daa5a3d85c0a37d7ff3442d",
+    "linux-jobs.json": "0d5c84fd727da317540c39ace451e07643e25a054d4d9d699604f2b7514534c2",
+    "linux-run.json": "263fed6128bec9cfcccd9f707f10b266b07e512dd483cb5526d1235c75a27797",
+    "nextest-unique-cases.json": "592140109303a90026abf2db8bd030623a02b50fb6dfcec9532296e3fc84ea1b",
+    "required32-cases.json": "70197315cf2243d358fa1157ca2c21179a2d4fb195047f48d618907800d830b8"
+  },
+  "limits": [
+    "Original193 preview has3d5/193 parents and exact local643d/3d5 tree; not authored193/39b.",
+    "Successful Reader/privacy observations on this source do not establish cause or waive original fixture642 Reader failure; no retry requested.",
+    "106summary skips have no per-case names in this log; no inferred waiver.",
+    "No signed-release/device/latency acceptance; artifact export/upload is separate.",
+    "No binary downloaded or executed and no workflow action."
+  ],
+  "status": "ORIGINAL_NATIVE_GREEN_EXACT_643D_TREE",
+  "full_private_receipt_sha256": "c745abcea164426e4ca34cc219067b12415a017a456dcff905d34fcbe6ffb6ea",
+  "separate_docs": {
+    "failed": 0,
+    "ignored": 0,
+    "passed": 4,
+    "sections": 47
+  },
+  "current_controls40": {
+    "required": 40,
+    "once_pass": 40,
+    "source_bindings_verified": true,
+    "census_sha256": "01bb7c486011f84432022cc55367a48001f98bb76cd59f054a928ba639a81e85",
+    "limits": "Original193 preview has exact643d/3d5 tree. Native observations only; host runtime is separate. No historical failure is waived.",
+    "full_private_addendum_sha256": "fef046d2c36a00e3748b1cf134356512c595b303e2da39ce2da0568b51d0846c"
+  }
+}

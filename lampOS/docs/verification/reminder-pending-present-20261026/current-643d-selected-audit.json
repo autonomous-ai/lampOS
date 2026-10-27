@@ -1,0 +1,348 @@
+{
+  "head": "643d60aa7e66569f01ff4eb98660fd470892fd7b",
+  "base": "3d5ea2dd792d42fd52f26b978daf5ddbe9c68487",
+  "tree": "ad99a8ad76c6df5a6c135db8567018af657b5bd0",
+  "status": "VERIFIED_SELECTED_REMINDER_SCOPE",
+  "holds": [],
+  "limits": [
+    "Selected Skills/Update plus three exact install policy cases, seven switch and one Welcome cases, and twelve-package docs; not current full twelve-package runtime. Eight comfort corpus inputs are source-bound, not eight independently observed passes. Current clean two-commit source tree is bound; prior staged execution keeps its original identity.",
+    "Historical b490 full-suite privacy failure remains failed and separate.",
+    "No native, device or latency qualification."
+  ],
+  "selected_direct_counts": {
+    "failed": 0,
+    "ignored": 11,
+    "passed": 709
+  },
+  "integrity": {
+    "actual_and_saved_paths_rehashed": 133,
+    "raw_entries": 8762,
+    "source_files": 7291
+  },
+  "metadata": {
+    "after": [],
+    "before": [],
+    "current": []
+  },
+  "controller_sha256": "a637df782d7c8e655022f2f564ada831a94a6f3091877dda6f50bbca20a8ad25",
+  "helper_sha256": "947b19a7bbdeea1a707374236d91541f00d5116ca2c384a9b978219d55fdaedb",
+  "doc_headings": [
+    "lamp_body",
+    "lamp_cloud",
+    "lamp_expression",
+    "lamp_keeper",
+    "lamp_lean",
+    "lamp_memory",
+    "lamp_peek",
+    "lamp_setup",
+    "lamp_skills",
+    "lamp_update",
+    "lamp_voice",
+    "lamp_voice_eval"
+  ],
+  "full_private_receipt_sha256": "eaa68741b78dd73656b910d63b0e5e42cf19122582d439606c5bf741e84b4f4c",
+  "required_host_witnesses": 40,
+  "panic_hooks": {
+    "expected_occurrences": 2,
+    "unknown": 0
+  },
+  "commands": [
+    {
+      "label": "skills-lib",
+      "package": "lamp-skills",
+      "target": "lamp_skills",
+      "returncode": 0,
+      "log_sha256": "4c33e2db2c8763b6d72182164de08601f1d629702508711093874289dec41a5b",
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "line": 429,
+          "measured": 0,
+          "passed": 160,
+          "status": "ok"
+        }
+      ]
+    },
+    {
+      "label": "skills-bin",
+      "package": "lamp-skills",
+      "target": "lamp-skills",
+      "returncode": 0,
+      "log_sha256": "3e1eb82dd4319beccd0b23abd107c0f338e98a17ef28a51b53dd566b6d505f5c",
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "line": 63,
+          "measured": 0,
+          "passed": 20,
+          "status": "ok"
+        }
+      ]
+    },
+    {
+      "label": "skills-it",
+      "package": "lamp-skills",
+      "target": "it",
+      "returncode": 0,
+      "log_sha256": "77c29e8428825c6c38e139a38ad93d24b38ad0f36b0cf7e4f57a82ac6cb43448",
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 1,
+          "line": 1060,
+          "measured": 0,
+          "passed": 335,
+          "status": "ok"
+        }
+      ]
+    },
+    {
+      "label": "skills-release-pair",
+      "package": "lamp-skills",
+      "target": "release_pair",
+      "returncode": 0,
+      "log_sha256": "07d11427ce6d6ea9cb2620f2654f9804e5707a8307ce1751107040d647c1d0e8",
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 8,
+          "line": 14,
+          "measured": 0,
+          "passed": 2,
+          "status": "ok"
+        }
+      ]
+    },
+    {
+      "label": "skills-requested-audio",
+      "package": "lamp-skills",
+      "target": "requested_audio",
+      "returncode": 0,
+      "log_sha256": "2dbe5659bd12dbdf027b02ab9b8dd9f798cee53d322d06ede95323adaa27d8d0",
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "line": 38,
+          "measured": 0,
+          "passed": 31,
+          "status": "ok"
+        }
+      ]
+    },
+    {
+      "label": "update-lib",
+      "package": "lamp-update",
+      "target": "lamp_update",
+      "returncode": 0,
+      "log_sha256": "d6323e4abff676e78ac7acaa663320fe8a8f4c80d376dfe8117fcfab46699801",
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 2,
+          "line": 143,
+          "measured": 0,
+          "passed": 137,
+          "status": "ok"
+        }
+      ]
+    },
+    {
+      "label": "update-it",
+      "package": "lamp-update",
+      "target": "it",
+      "returncode": 0,
+      "log_sha256": "97ba13671e4a29d90291630e1028fb1e031d92533f48ccd0d2658aef6610c1fa",
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "line": 19,
+          "measured": 0,
+          "passed": 13,
+          "status": "ok"
+        }
+      ]
+    },
+    {
+      "label": "voice-switch-census",
+      "package": "lamp-voice",
+      "target": "lamp_voice",
+      "returncode": 0,
+      "log_sha256": "6fe2094e114df7228149c208143c34828a45a7a3eff9b9bc29b99ef683053116",
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered": 3825,
+          "ignored": 0,
+          "line": 11,
+          "measured": 0,
+          "passed": 7,
+          "status": "ok"
+        }
+      ]
+    },
+    {
+      "label": "voice-welcome-source",
+      "package": "lamp-voice",
+      "target": "lamp_voice",
+      "returncode": 0,
+      "log_sha256": "d204ad7c3b78f24dc76e2dcee4583d8cafb4c569f3732f7da116cec32872a89e",
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered": 3831,
+          "ignored": 0,
+          "line": 5,
+          "measured": 0,
+          "passed": 1,
+          "status": "ok"
+        }
+      ]
+    },
+    {
+      "label": "update-install-product-policy",
+      "package": "lamp-update",
+      "target": "install",
+      "returncode": 0,
+      "log_sha256": "fe41afd78fe638a76117ff9ca40148f2e4944f97a9fe493f398f6bf55d978b51",
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered": 99,
+          "ignored": 0,
+          "line": 7,
+          "measured": 0,
+          "passed": 3,
+          "status": "ok"
+        }
+      ]
+    },
+    {
+      "label": "doctests-12",
+      "package": null,
+      "target": null,
+      "returncode": 0,
+      "log_sha256": "755efc18727e2ac8a67dd3adb33b28026379ba4c2e2ca9e268094b851f384363",
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "line": 6,
+          "measured": 0,
+          "passed": 0,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "line": 12,
+          "measured": 0,
+          "passed": 0,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "line": 18,
+          "measured": 0,
+          "passed": 0,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "line": 24,
+          "measured": 0,
+          "passed": 0,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "line": 30,
+          "measured": 0,
+          "passed": 0,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "line": 36,
+          "measured": 0,
+          "passed": 0,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "line": 42,
+          "measured": 0,
+          "passed": 0,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "line": 48,
+          "measured": 0,
+          "passed": 0,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "line": 54,
+          "measured": 0,
+          "passed": 0,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "line": 60,
+          "measured": 0,
+          "passed": 0,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "line": 66,
+          "measured": 0,
+          "passed": 0,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "line": 72,
+          "measured": 0,
+          "passed": 0,
+          "status": "ok"
+        }
+      ]
+    }
+  ]
+}
