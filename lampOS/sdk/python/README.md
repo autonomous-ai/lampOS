@@ -57,13 +57,16 @@ from lampos import Lamp
 
 async def main():
     async with await Lamp.connect() as lamp:
-        lamp.on("person.arrived", lambda event: lamp.gesture("greeting"))
+        await lamp.on("person.arrived", lambda event: lamp.gesture("greeting"))
         await lamp.wait_closed()
 
 asyncio.run(main())
 ```
 
-- **Events:** `lamp.on(name, handler)` (a handler may be a coroutine),
+- **Events:** `await lamp.on(name, handler)` (a handler may be a
+  coroutine) subscribes, and raises the lamp's refusal, `NoGrantError`
+  without the event's grant: `person.*` needs `look`, `phrase.heard` needs
+  `hear`. Not awaited, the refusal comes out of `wait_closed()` instead.
   `lamp.off(name, handler)`. Each needs its grant:
 
   | event | fields | grant |
@@ -92,6 +95,10 @@ asyncio.run(main())
   lamp: `emit(event, **fields)`, `refuse_next(op, code, why)`,
   `done(re)`, `lease_event(lease, state, why)`, and `requests` /
   `received` for what it took.
+
+**When the lamp restarts** (every update), the connection closes and
+`wait_closed()` returns: a long-running program connects again, for example
+in a loop with a few seconds' pause.
 
 **Dependencies** (`websockets`, `cryptography`; `zeroconf` to find lamps)
 have lower bounds only, as a library's should: the application that uses

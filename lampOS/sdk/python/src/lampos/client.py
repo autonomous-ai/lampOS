@@ -20,6 +20,7 @@ from collections import defaultdict
 from typing import Any, Callable
 
 from websockets.asyncio.client import ClientConnection, connect as ws_connect
+from websockets.exceptions import ConnectionClosed
 
 from . import schema
 from .errors import LampError, NotPaired, WrongLamp, from_reply
@@ -88,6 +89,22 @@ def _check(op: str, fields: dict) -> None:
     for value in fields.get("parts", ()):
         if value not in schema.parts():
             raise LampError(f"no part {value!r}", code="bad_request")
+
+
+class Subscription:
+    """What `Lamp.on` returns. Awaited, it raises the lamp's refusal; one
+    nobody awaits is raised by `Lamp.wait_closed` instead, never lost."""
+
+    def __init__(self, task: asyncio.Future):
+        self.task = task
+        self.awaited = False
+
+    def __await__(self):
+        self.awaited = True
+        return self.task.__await__()
+
+    def done(self) -> bool:
+        return self.task.done()
 
 
 class Lease:
@@ -170,6 +187,10 @@ class Lamp:
         self._phrases: list[str] = []
         self._leases: dict[str, Lease] = {}
         self._tasks: set[asyncio.Task] = set()
+        # The first refusal of a subscription nobody awaited: `wait_closed`
+        # raises it, so a listener the lamp refused never waits in silence
+        # (harness-reviewer's P2 on #3760).
+        self._refused: asyncio.Future = asyncio.get_running_loop().create_future()
         self._reader = asyncio.create_task(self._read())
 
     # Pairing and connecting.
@@ -265,8 +286,16 @@ class Lamp:
         self._reader.cancel()
 
     async def wait_closed(self) -> None:
-        """Until the lamp closes the connection."""
-        await self._ws.wait_closed()
+        """Until the lamp closes the connection, or raises the refusal of a
+        subscription `on` asked for and nobody awaited (a missing grant,
+        say)."""
+        closed = asyncio.ensure_future(self._ws.wait_closed())
+        try:
+            done, _ = await asyncio.wait({closed, self._refused}, return_when=asyncio.FIRST_COMPLETED)
+        finally:
+            closed.cancel()
+        if self._refused in done:
+            raise self._refused.result()
 
     # Requests.
 
@@ -290,12 +319,25 @@ class Lamp:
         done = asyncio.get_running_loop().create_future() if wait else None
         if done is not None:
             self._done[id_] = done
-        reply = await self.request(op, **{k: v for k, v in fields.items() if v is not None})
+        try:
+            reply = await self.request(op, **{k: v for k, v in fields.items() if v is not None})
+        except BaseException:
+            if done is not None:
+                self._done.pop(id_, None)
+            raise
         return await done if done is not None else reply
 
     # The reader.
 
     async def _read(self) -> None:
+        try:
+            await self._frames()
+        except ConnectionClosed:
+            # The lamp went away without a close (a restart, its Wi-Fi):
+            # `wait_closed` returns, and the waiting requests fail below.
+            pass
+
+    async def _frames(self) -> None:
         try:
             async for text in self._ws:
                 frame = json.loads(text)
@@ -329,18 +371,48 @@ class Lamp:
 
     # Events and state.
 
-    def on(self, event: str, handler: Handler, *, phrases: list[str] | None = None) -> None:
+    def on(self, event: str, handler: Handler, *, phrases: list[str] | None = None) -> "Subscription":
         """Call `handler(event)` for each `event` the lamp says. A handler may
-        be a coroutine. Subscribes at once (in the background)."""
+        be a coroutine. Subscribes at once, and returns that subscription:
+        `await lamp.on(...)` raises the lamp's refusal (`NoGrantError` without
+        the event's grant). Not awaited, a refusal is raised by
+        `wait_closed` instead, never lost."""
         if event not in schema.events() and event not in ("lease", "done"):
             raise LampError(f"no event {event!r}", code="bad_request")
         self._handlers[event].append(handler)
         if phrases:
             self._phrases = sorted(set(self._phrases) | set(phrases))
-        if event in schema.events():
-            task = asyncio.ensure_future(self.subscribe([event]))
-            self._tasks.add(task)
-            task.add_done_callback(self._tasks.discard)
+        if event not in schema.events():
+            done = asyncio.get_running_loop().create_future()
+            done.set_result({})
+            return Subscription(done)
+        task = asyncio.ensure_future(self.subscribe([event]))
+        self._tasks.add(task)
+        task.add_done_callback(self._tasks.discard)
+        subscription = Subscription(task)
+        task.add_done_callback(lambda task: self._subscribed(subscription, event, handler))
+        return subscription
+
+    def _subscribed(self, subscription: "Subscription", event: str, handler: Handler) -> None:
+        task = subscription.task
+        if task.cancelled():
+            return
+        error = task.exception()
+        if error is None:
+            return
+        # A refused subscription takes its handler back off, so a later `on()`
+        # for the event, once granted, doesn't call both.
+        handlers = self._handlers.get(event, [])
+        if handler in handlers:
+            handlers.remove(handler)
+        if not handlers:
+            self._handlers.pop(event, None)
+        # Only a refusal nobody awaited goes to `wait_closed`; a closed
+        # connection is `wait_closed` returning, not a refusal.
+        if subscription.awaited or getattr(error, "code", None) == "closed":
+            return
+        if not self._refused.done():
+            self._refused.set_result(error)
 
     def off(self, event: str, handler: Handler) -> None:
         """Stop calling `handler` for `event`. With no handler left for an

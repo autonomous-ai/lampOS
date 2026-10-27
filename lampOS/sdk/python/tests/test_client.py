@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pytest
 
-from lampos import Keyring, Lamp, LampError, NotPaired, WrongLamp, errors, schema
+from lampos import Keyring, Lamp, LampError, NotPaired, Subscription, WrongLamp, errors, schema
 from lampos.testing import FakeLamp
 
 REPO_SCHEMA = Path(__file__).resolve().parents[3] / "docs" / "control.schema.json"
@@ -122,7 +122,7 @@ def test_hello_with_another_computers_key_is_unpaired(tmp_path):
 
 def test_greet_a_person_who_arrives(tmp_path):
     async def go():
-        async with FakeLamp() as fake:
+        async with FakeLamp(grants=("body", "look")) as fake:
             ring = await paired(fake, tmp_path)
             async with await Lamp.connect(keyring=ring) as lamp:
                 greeted = asyncio.Event()
@@ -391,5 +391,83 @@ def test_a_connection_that_only_listens_pings_so_the_lamp_keeps_it_open(tmp_path
                 # The latency is measured from a ping's pong: 0 until one came back.
                 while lamp._ws.latency == 0:
                     await asyncio.sleep(0.02)
+
+    run(go())
+
+
+def test_a_refused_subscription_is_raised_never_lost(tmp_path):
+    async def go():
+        async with FakeLamp(grants=("body",)) as fake:
+            ring = await paired(fake, tmp_path)
+            async with await Lamp.connect(keyring=ring) as lamp:
+                # Awaited: the lamp's refusal, typed.
+                with pytest.raises(errors.BY_CODE["no_grant"]):
+                    await lamp.on("person.arrived", lambda event: None)
+                assert "person.arrived" not in lamp._handlers, "a refused on() keeps no handler"
+            async with await Lamp.connect(keyring=ring) as lamp:
+                # Not awaited, as a plain listener writes it: wait_closed
+                # raises it rather than waiting forever.
+                lamp.on("person.arrived", lambda event: None)
+                with pytest.raises(errors.BY_CODE["no_grant"]):
+                    await asyncio.wait_for(lamp.wait_closed(), timeout=5)
+
+    run(go())
+
+
+def test_an_awaited_refusal_handled_by_the_caller_is_not_raised_again(tmp_path):
+    async def go():
+        async with FakeLamp(grants=("body",)) as fake:
+            ring = await paired(fake, tmp_path)
+            async with await Lamp.connect(keyring=ring) as lamp:
+                try:
+                    await lamp.on("person.arrived", lambda event: None)
+                except errors.BY_CODE["no_grant"]:
+                    await lamp.on("touch", lambda event: None)
+                # Still listening: wait_closed waits for the close.
+                with pytest.raises(asyncio.TimeoutError):
+                    await asyncio.wait_for(lamp.wait_closed(), timeout=0.5)
+
+    run(go())
+
+
+def test_a_subscription_cut_by_a_closed_connection_is_no_refusal(tmp_path):
+    async def go():
+        async with FakeLamp() as fake:
+            ring = await paired(fake, tmp_path)
+            async with await Lamp.connect(keyring=ring) as lamp:
+                cut = asyncio.get_running_loop().create_future()
+                cut.set_exception(LampError("the connection to the lamp closed", code="closed"))
+                lamp._subscribed(Subscription(cut), "touch", lambda event: None)
+                assert not lamp._refused.done()
+
+    run(go())
+
+
+def test_a_refused_waiting_action_leaves_nothing_behind(tmp_path):
+    async def go():
+        async with FakeLamp(grants=("light",)) as fake:
+            ring = await paired(fake, tmp_path)
+            async with await Lamp.connect(keyring=ring) as lamp:
+                with pytest.raises(errors.BY_CODE["no_grant"]):
+                    await lamp.gesture("nod", wait=True)
+                assert lamp._done == {}
+
+    run(go())
+
+
+def test_a_cancelled_wait_closed_leaves_no_wait_running(tmp_path):
+    async def go():
+        async with FakeLamp() as fake:
+            ring = await paired(fake, tmp_path)
+            async with await Lamp.connect(keyring=ring) as lamp:
+                before = len(asyncio.all_tasks())
+                for _ in range(8):
+                    waiting = asyncio.ensure_future(lamp.wait_closed())
+                    await asyncio.sleep(0.01)
+                    waiting.cancel()
+                    with pytest.raises(asyncio.CancelledError):
+                        await waiting
+                await asyncio.sleep(0)
+                assert len(asyncio.all_tasks()) == before
 
     run(go())
