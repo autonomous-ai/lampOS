@@ -113,6 +113,28 @@ pub enum Familiarity {
     Unknown,
 }
 
+/// The longest a feeling holds after the state's stamp: someone low's
+/// two-minute spell (#3691). Glad and lively hold less.
+pub const MOOD_FELT_MOST_US: u64 = 120_000_000;
+
+/// What the lamp felt (#3691): glad at a smile, a glad line or a kindly
+/// touch, lively at a surely lively voice, low beside someone low. Never a
+/// bang or the air: those move energy only.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum FeltKind {
+    Glad,
+    Lively,
+    Low,
+}
+
+/// A feeling and until when it holds, on the stamp's monotonic clock.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Felt {
+    pub kind: FeltKind,
+    pub until_us: u64,
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct MoodState {
     pub stamp: ClockStamp,
@@ -134,6 +156,10 @@ pub struct MoodState {
     /// nothing about the breath.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub breath: Option<MoodBreath>,
+    /// What the lamp felt, while it holds (#3691). Optional: a state
+    /// without it felt nothing to name, and an older reader ignores it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub felt: Option<Felt>,
 }
 
 impl MoodState {
@@ -185,6 +211,14 @@ impl MoodState {
         {
             return Err(Invalid(
                 "mood breath needs a phase from 0 to 1 and a pace in its bounds".into(),
+            ));
+        }
+        if let Some(felt) = self.felt
+            && (felt.until_us <= self.stamp.at_us
+                || felt.until_us - self.stamp.at_us > MOOD_FELT_MOST_US)
+        {
+            return Err(Invalid(
+                "mood felt must hold past its stamp, for two minutes at most".into(),
             ));
         }
         Ok(())
@@ -306,5 +340,112 @@ mod taken_tests {
         taken.gone();
         assert!(!taken.due(0.70, 59_000_000));
         assert!(taken.due(0.70, 60_000_000));
+    }
+}
+
+#[cfg(test)]
+mod felt_tests {
+    use super::*;
+
+    fn state(felt: Option<Felt>) -> MoodState {
+        MoodState {
+            stamp: ClockStamp {
+                clock_id: "boot".into(),
+                at_us: 10_000_000,
+                sequence: 1,
+            },
+            session_id: "s".into(),
+            awake: 0.7,
+            energy: 0.4,
+            warmth: 0.63,
+            asleep: false,
+            attention: None,
+            familiarity: Familiarity::Unknown,
+            familiar: None,
+            breath: None,
+            felt,
+        }
+    }
+
+    /// With a feeling: said as `{kind, until_us}` in snake_case, and read
+    /// back the same.
+    #[test]
+    fn a_felt_feeling_goes_and_comes_back_whole() {
+        for (kind, name) in [
+            (FeltKind::Glad, "glad"),
+            (FeltKind::Lively, "lively"),
+            (FeltKind::Low, "low"),
+        ] {
+            let sent = state(Some(Felt {
+                kind,
+                until_us: 30_000_000,
+            }));
+            let json = serde_json::to_value(&sent).unwrap();
+            assert_eq!(
+                json["felt"],
+                serde_json::json!({"kind": name, "until_us": 30_000_000u64})
+            );
+            let back: MoodState = serde_json::from_value(json).unwrap();
+            assert_eq!(back, sent);
+            assert!(back.check().is_ok());
+        }
+    }
+
+    /// Without one: no `felt` key, and a state written before `felt` reads
+    /// as none felt.
+    #[test]
+    fn no_feeling_is_left_out_and_an_older_state_reads_as_none() {
+        let sent = state(None);
+        let json = serde_json::to_value(&sent).unwrap();
+        assert!(json.get("felt").is_none(), "{json}");
+        let back: MoodState = serde_json::from_value(json).unwrap();
+        assert_eq!(back.felt, None);
+        assert_eq!(back, sent);
+    }
+
+    /// An older reader, with no `felt` of its own, still reads a state that
+    /// has one.
+    #[test]
+    fn an_older_reader_ignores_the_feeling() {
+        #[derive(Deserialize)]
+        #[allow(dead_code)]
+        struct Older {
+            stamp: ClockStamp,
+            session_id: String,
+            awake: f32,
+            energy: f32,
+            warmth: f32,
+            asleep: bool,
+            familiarity: Familiarity,
+        }
+        let json = serde_json::to_string(&state(Some(Felt {
+            kind: FeltKind::Glad,
+            until_us: 30_000_000,
+        })))
+        .unwrap();
+        let older: Older = serde_json::from_str(&json).unwrap();
+        assert_eq!(older.energy, 0.4);
+    }
+
+    /// A feeling must hold past the stamp, and for no longer than
+    /// [`MOOD_FELT_MOST_US`] after it.
+    #[test]
+    fn a_feeling_holds_past_its_stamp_and_within_its_bound() {
+        let at = 10_000_000;
+        for (until_us, ok) in [
+            (at + 1, true),
+            (at + MOOD_FELT_MOST_US, true),
+            (at, false),
+            (at - 1, false),
+            (at + MOOD_FELT_MOST_US + 1, false),
+            (u64::MAX, false),
+        ] {
+            let value = state(Some(Felt {
+                kind: FeltKind::Low,
+                until_us,
+            }));
+            assert_eq!(value.check().is_ok(), ok, "until {until_us}");
+        }
+        assert_eq!(MOOD_FELT_MOST_US, 120_000_000, "the two-minute low spell");
     }
 }
