@@ -3074,7 +3074,7 @@ mod tests {
                 if revoke {
                     unavailable()
                 } else {
-                    json!({"remembered":true})
+                    json!({"remembered":true,"kept_for":crate::remember::KEPT_FOR_THEM})
                 }
             );
             assert!(answer.requested_audio.is_none());
