@@ -1,0 +1,80 @@
+{
+  "head": "190b3e9215c002c75ea4f6645c2f0ac63b00c7ac",
+  "tree": "9d07ce6cb58eaee8d3236e9c9e5f22be97b8c158",
+  "source_before": {
+    "lampOS/crates/body/src/bin/lamp-body-measure.rs": "59e973e1b97bd7e4de45cc7f283d4d2c0021c279c6533f76d9a770e980fa05ac",
+    "lampOS/crates/body/src/linux.rs": "eb92adb4e8f3fe371140b6a44641e9ac3ef3f70ee6627cdc43f078c0b234e531",
+    "lampOS/crates/body/src/poses.rs": "3a67b66938c452b0260036cae94f6741073ae3175bb2369c0c1efd8909a0deb3",
+    "lampOS/docs/body.md": "ede43860b10a8bd2d23b8e9c1ace98b8b1ff8534299553120d589833f23676be",
+    "lampOS/docs/install.md": "2e9a567a74946ce2032e4aa6b6ce5c43cc7e4339d517533813ea6c791b281660"
+  },
+  "source_after": {
+    "lampOS/crates/body/src/bin/lamp-body-measure.rs": "59e973e1b97bd7e4de45cc7f283d4d2c0021c279c6533f76d9a770e980fa05ac",
+    "lampOS/crates/body/src/linux.rs": "eb92adb4e8f3fe371140b6a44641e9ac3ef3f70ee6627cdc43f078c0b234e531",
+    "lampOS/crates/body/src/poses.rs": "3a67b66938c452b0260036cae94f6741073ae3175bb2369c0c1efd8909a0deb3",
+    "lampOS/docs/body.md": "ede43860b10a8bd2d23b8e9c1ace98b8b1ff8534299553120d589833f23676be",
+    "lampOS/docs/install.md": "2e9a567a74946ce2032e4aa6b6ce5c43cc7e4339d517533813ea6c791b281660"
+  },
+  "clean_after": true,
+  "commands": [
+    {
+      "command": [
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit": 0,
+      "timeout": false,
+      "seconds": 12.433,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "clippy",
+        "-q",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-body",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit": 0,
+      "timeout": false,
+      "seconds": 38.506,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "test",
+        "-q",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-body",
+        "--",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "timeout": false,
+      "seconds": 83.762,
+      "log_sha256": "b373c12176c390bf6c4060088ef7575d4e80ca579bf3d39761013de45b3f4fb5"
+    }
+  ],
+  "scope": "Exact 190b3e921 host formatting, strict Body Clippy and all Body host tests. Linux-only sweep and tty path source-reviewed only; no Linux compilation, device or physical range measurement by Third.",
+  "host_test_totals": {
+    "passed": 630,
+    "failed": 0,
+    "ignored": 0
+  },
+  "read_findings": {
+    "p1_p2": [],
+    "p3": "Existing sampling/outlier limitation confirmed with exact ArcTracker source: a slow positive 0 to 2500 sweep reports 0-2500, sparse steps report 2400-0 span1696. Nothing consumes this comment as a bound; require rejected-read/large-step diagnostics and measured read rate before accepting per-unit limits.",
+    "read_only": "Added Linux loop reuses the fixed inspection request plan and one prepared Owner; each accepted report goes through rest_read torque refusal, and Owner::finish runs after success/failure. No servo register write is added.",
+    "write": "Appends one comment to an existing file, refuses a second prefix, retains BODY_POSES; no current reader of the comment."
+  },
+  "sampling_probe_sha256": "f49dc5c99d3aefba62ba6271f57e448c05ea87326a7e54c571b89d385ea2b180",
+  "full_private_receipt_sha256": "19f714db59d0b059c324bacb7589ba77cdea3bfea327986d66484713ec708f7d"
+}
