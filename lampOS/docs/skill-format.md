@@ -253,6 +253,12 @@ for the first builder on #3504, 27 Oct, from Ten's proposal there):
   sees when the skill runs (a `look = true` step). It is its own grant.
   - The app and the Store show it apart, with a strong warning.
   - It is never given by default, and the owner can take it back.
+  - On the lamp, the owner's yes is kept by name in `lamp-skills`'
+    state folder (`/var/lib/lampos-skills-state/camera`, written by the
+    manage helper at the app's `skills.camera`; #3504's piece C,
+    [skills.md](skills.md), "The manage helper"). A skill that is not core
+    gets the picture only while its name is there, read at each call, and
+    the Store installs a package that asks `camera` only once it is.
   - lamp-control has no such grant: a client never gets a frame.
 - **Format 1 keeps working.** A skill written before `camera` that says
   `look = true` for the picture still loads and runs. Its `look` is read

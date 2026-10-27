@@ -1047,7 +1047,7 @@ pub fn install(skills: &Path, from: &Path) -> Result<String, String> {
         let files = std::mem::take(&mut package.files);
         (package.manifest.name.clone(), files, Some(package))
     };
-    put_in(skills, &swept, &name, &files, package.as_ref())
+    put_in(skills, &swept, &name, &files, package.as_ref(), None)
 }
 
 /// A skill made on this lamp by voice (`lamp_voice::made_skill`, #1685),
@@ -1172,7 +1172,7 @@ pub fn install_made_at(
     let files = std::mem::take(&mut package.files);
     // What binds these bytes is the person's yes, by their SHA-256, not a
     // signature (the reviewer's P3 on #2414).
-    put_in(skills, &swept, &name, &files, Some(&package)).map(|said| {
+    put_in(skills, &swept, &name, &files, Some(&package), None).map(|said| {
         said.replace(
             NO_SIGNATURE,
             &format!(
@@ -1194,13 +1194,15 @@ fn made_here(card: &str) -> bool {
 
 /// The skill `name` of these `files` put together beside the live skills,
 /// loaded and moved in ([`moved_in`]), with the skills folder [`locked`] by
-/// the caller and what a killed run left `swept`.
+/// the caller and what a killed run left `swept`. `store_state`, for a
+/// Store install only, is where the owner's yes to the camera is kept.
 fn put_in(
     skills: &Path,
     swept: &[String],
     name: &str,
     files: &Files,
     package: Option<&Package>,
+    store_state: Option<&Path>,
 ) -> Result<String, String> {
     let name = name.to_owned();
     if !skill_name_ok(&name) {
@@ -1234,7 +1236,7 @@ fn put_in(
             fs::write(folder.join(INSTALLED_FROM), json).map_err(failed)?;
         }
         open_to_parts(&folder).map_err(failed)?;
-        moved_in(skills, &name, &folder, files.len(), package)
+        moved_in(skills, &name, &folder, files.len(), package, store_state)
     })();
     let _ = fs::remove_dir_all(&staged);
     if swept.is_empty() {
@@ -1257,6 +1259,7 @@ fn moved_in(
     folder: &Path,
     count: usize,
     package: Option<&Package>,
+    store_state: Option<&Path>,
 ) -> Result<String, String> {
     let skill =
         load(folder).map_err(|why| format!("not installed: {name} does not load: {why}"))?;
@@ -1313,6 +1316,22 @@ fn moved_in(
              a function the model calls is one skill's",
             kind.name()
         ));
+    }
+    // From the Store, a package that asks the camera's picture goes on
+    // only once the owner's yes to it is kept (#3504's piece C). One put
+    // on by hand or made here is not held here: its picture still waits
+    // for the yes at each call (`Engine::picture_refused`).
+    if let Some(state) = store_state
+        && skill.permissions.sees_picture()
+    {
+        let file = state.join(super::CAMERA_FILE);
+        let yes = super::read_names(&file)
+            .map_err(|error| format!("not installed: {}: {error}", file.display()))?;
+        if !yes.contains(name) {
+            return Err(format!(
+                "not installed: {name}: it asks the camera, and the owner hasn't said yes"
+            ));
+        }
     }
     let failed = |error: io::Error| format!("not installed: {}: {error}", target.display());
     match &replaced {
@@ -1377,8 +1396,48 @@ fn removed_said(name: &str) -> String {
 
 /// The running program's state folder on a product lamp (its unit's
 /// `--state-dir`), where the skills turned off and the core skills turned
-/// on are kept ([`super::OFF_FILE`], [`super::ON_FILE`]).
+/// on are kept ([`super::OFF_FILE`], [`super::ON_FILE`]), and the owner's
+/// yes to a skill's camera ([`super::CAMERA_FILE`]).
 pub const STATE_DIR: &str = "/var/lib/lampos-skills-state";
+
+/// The owner's yes to the skill `name` seeing the camera's picture kept,
+/// or with `allow` false taken back, in `state`'s [`super::CAMERA_FILE`]
+/// (#3504's piece C), written whole by [`super::keep_names`] under the
+/// skills folder's lock (waited for at most `wait`), as [`turn`] keeps off
+/// and on. The skill need not be on the lamp yet: the Store installs a
+/// package that asks the camera only once its yes is kept here
+/// ([`install_from_url`]). The running program reads the file at each
+/// call that would give the picture ([`super::Engine::picture_refused`]).
+pub fn camera(
+    skills: &Path,
+    state: &Path,
+    name: &str,
+    allow: bool,
+    wait: Duration,
+) -> Result<String, String> {
+    if !skill_name_ok(name) {
+        return Err(format!(
+            "{name:?} is not a skill's name: 1 to 64 lowercase letters, digits and hyphens"
+        ));
+    }
+    let _held = locked_within(skills, wait)?;
+    let file = state.join(super::CAMERA_FILE);
+    let failed = |error: io::Error| format!("{}: {error}", file.display());
+    let mut yes = super::read_names(&file).map_err(failed)?;
+    let changed = if allow {
+        yes.insert(name.to_owned())
+    } else {
+        yes.remove(name)
+    };
+    if changed {
+        super::keep_names(&file, &yes).map_err(failed)?;
+    }
+    Ok(if allow {
+        format!("{name} may see the camera's picture")
+    } else {
+        format!("{name} may not see the camera's picture")
+    })
+}
 
 /// Why the skill `name`, granted `permissions`, can't be turned off, or
 /// nothing: one granted a core operation ([`super::CORE_GRANTS`]: night
@@ -1700,9 +1759,12 @@ pub fn store_key(key_file: &Path) -> Result<[u8; 32], String> {
 /// with nothing written): put
 /// together where the running program does not look, loaded with every
 /// check a load makes, refused when it is core, when a core skill has its
-/// name or another skill its function, and only then renamed into place.
+/// name or another skill its function, or when it asks the camera's
+/// picture and the owner's yes to it is not kept in `state`'s
+/// [`super::CAMERA_FILE`] ([`camera`]), and only then renamed into place.
 pub fn install_from_url(
     skills: &Path,
+    state: &Path,
     asked: &Asked<'_>,
     key_file: &Path,
     channel: &mut dyn Channel,
@@ -1754,7 +1816,7 @@ pub fn install_from_url(
     let swept = swept(skills);
     let files = std::mem::take(&mut package.files);
     let name = package.manifest.name.clone();
-    put_in(skills, &swept, &name, &files, Some(&package))
+    put_in(skills, &swept, &name, &files, Some(&package), Some(state))
 }
 
 /// The Skills Store's side of the manage helper: where its key is, and how
@@ -1844,7 +1906,7 @@ pub const ASKED_MOST: u64 = 4_096;
 /// What the manage helper says of a line that is no request.
 pub const NOT_A_REQUEST: &str = "a request is one line, {\"remove\": NAME}, \
     {\"install\": {\"url\": URL, \"sha256\": HASH, \"name\": NAME, \"version\": VERSION}}, all but url optional, \
-    {\"install_made\": SHA256}, {\"off\": NAME} or {\"on\": NAME}";
+    {\"install_made\": SHA256}, {\"off\": NAME}, {\"on\": NAME}, {\"camera\": NAME} or {\"camera_off\": NAME}";
 
 /// One request to the manage helper, read from `input`, done in `skills`,
 /// and answered on `output` in one line: `{"done": WHAT}` or
@@ -1866,7 +1928,11 @@ pub const NOT_A_REQUEST: &str = "a request is one line, {\"remove\": NAME}, \
 ///   ([`install_made`]);
 /// - `{"off": NAME}` or `{"on": NAME}`, the app's off and on (#2815), kept
 ///   in `state` (the running program's `--state-dir`) by [`turn`]: a skill
-///   that is part of the lamp itself is refused with why.
+///   that is part of the lamp itself is refused with why;
+/// - `{"camera": NAME}` or `{"camera_off": NAME}`, the owner's yes to the
+///   skill seeing the camera's picture given or taken back in the app
+///   (#3504's piece C), kept in `state` by [`camera`]; the Store installs
+///   a package that asks the camera only once it is given.
 ///
 /// Each waits at most `lock_wait` ([`ASKED_LOCK_WAIT`] on the lamp,
 /// shorter only in a test) for the folder, then refuses with [`BUSY`]
@@ -1909,6 +1975,18 @@ pub fn asked(
             }
             _ => Err(NOT_A_REQUEST.to_owned()),
         },
+        // The owner's yes to the camera's picture, given or taken back.
+        _ if only("camera").or(only("camera_off")).is_some() => {
+            match (only("camera"), only("camera_off")) {
+                (Some(serde_json::Value::String(name)), None) => {
+                    camera(skills, state, name, true, lock_wait)
+                }
+                (None, Some(serde_json::Value::String(name))) => {
+                    camera(skills, state, name, false, lock_wait)
+                }
+                _ => Err(NOT_A_REQUEST.to_owned()),
+            }
+        }
         // Renamed aside is removed: where it was set aside, and why it
         // was not then deleted, go to the journal alone.
         (Some(serde_json::Value::String(name)), _) => {
@@ -1920,9 +1998,14 @@ pub fn asked(
             })
         }
         (_, Some(asked)) => match store {
-            Some(store) => {
-                install_from_url(skills, &asked, &store.key_file, store.channel, lock_wait)
-            }
+            Some(store) => install_from_url(
+                skills,
+                state,
+                &asked,
+                &store.key_file,
+                store.channel,
+                lock_wait,
+            ),
             None => Err(STORE_OFF.to_owned()),
         },
         _ => Err(NOT_A_REQUEST.to_owned()),
