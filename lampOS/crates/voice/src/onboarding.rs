@@ -2306,7 +2306,10 @@ fn hello_yes(words: &[String]) -> bool {
 }
 
 /// An answer about the hours to keep quiet: a time, a part of the day, or none.
+/// A part of the day right after "good" is a greeting, not an hour: "Good
+/// evening, Lamp." answers nothing (Fourteen's P2 on #3673).
 fn quiet_hours(words: &[String]) -> bool {
+    const GREETS: [&str; 4] = ["morning", "afternoon", "evening", "night"];
     const WHEN: [&str; 14] = [
         "quiet",
         "night",
@@ -2323,10 +2326,12 @@ fn quiet_hours(words: &[String]) -> bool {
         "after",
         "before",
     ];
-    words.iter().any(|word| {
-        WHEN.contains(&word.as_str())
-            || NO.contains(&word.as_str())
-            || word.chars().any(|c| c.is_ascii_digit())
+    words.iter().enumerate().any(|(at, word)| {
+        let greeting = at > 0 && words[at - 1] == "good" && GREETS.contains(&word.as_str());
+        !greeting
+            && (WHEN.contains(&word.as_str())
+                || NO.contains(&word.as_str())
+                || word.chars().any(|c| c.is_ascii_digit()))
     })
 }
 
@@ -3614,6 +3619,55 @@ mod tests {
                 room.outcome(Step::Preferences),
                 Some(Outcome::Done),
                 "{answer}"
+            );
+        }
+    }
+
+    /// "Good evening, Lamp." before the quiet hours is a greeting: the step
+    /// still owes them after a hello answer (Fourteen's probe on #3673).
+    #[test]
+    fn a_good_evening_is_not_the_quiet_hours() {
+        for (n, opener) in [
+            "Good evening, Lamp.",
+            "Good morning!",
+            "Good afternoon.",
+            "Good night, Lamp.",
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let mut room = Room::new(&format!("good-evening-{n}"));
+            assert_eq!(room.wait(7 * S, Some(NEAR_MIDDLE)), [SIT_NOTE, SIT_DONE]);
+            assert_eq!(room.wait(20 * S, Some(NEAR_MIDDLE)), [WHO_NOTE]);
+            report(&room.walk, "who_you_are", "done");
+            assert_eq!(room.wait(5 * S, Some(NEAR_MIDDLE)), [PREFERENCES_NOTE]);
+            room.walk.heard(opener, room.at);
+            room.walk.heard("Yes, you can say hello.", room.at);
+            room.wait(S, Some(NEAR_MIDDLE));
+            assert_eq!(
+                room.outcome(Step::Preferences),
+                None,
+                "{opener}: quiet hours still owed"
+            );
+        }
+        // A part of the day as an hour still answers.
+        for (n, hours) in ["Quiet in the evening.", "After ten at night."]
+            .into_iter()
+            .enumerate()
+        {
+            let mut room = Room::new(&format!("evening-hours-{n}"));
+            assert_eq!(room.wait(7 * S, Some(NEAR_MIDDLE)), [SIT_NOTE, SIT_DONE]);
+            assert_eq!(room.wait(20 * S, Some(NEAR_MIDDLE)), [WHO_NOTE]);
+            report(&room.walk, "who_you_are", "done");
+            assert_eq!(room.wait(5 * S, Some(NEAR_MIDDLE)), [PREFERENCES_NOTE]);
+            room.walk.heard("Good evening, Lamp.", room.at);
+            room.walk.heard(hours, room.at);
+            room.walk.heard("Yes, you can say hello.", room.at);
+            room.wait(S, Some(NEAR_MIDDLE));
+            assert_eq!(
+                room.outcome(Step::Preferences),
+                Some(Outcome::Done),
+                "{hours}"
             );
         }
     }
