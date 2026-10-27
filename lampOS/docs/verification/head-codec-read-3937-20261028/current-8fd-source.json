@@ -1,0 +1,121 @@
+{
+  "actual_evaluator_consumers_equal": [
+    {
+      "equal_f3": true,
+      "path": "lampOS/crates/update/src/head_touch.rs",
+      "sha256": "2e9bcd134f16744e622f813cc3f5e71fe55c1b2a7bb64a5bd14d63d157b3638c"
+    },
+    {
+      "equal_f3": true,
+      "path": "lampOS/crates/update/src/apply.rs",
+      "sha256": "c0f4fb9f6cdfb5b2d175e8c554c5b60cc6261a335cf295fdf639ef6b6b7d3fda"
+    },
+    {
+      "equal_f3": true,
+      "path": "lampOS/crates/update/src/manifest.rs",
+      "sha256": "f259fcea155adaf6e45d707441c059f168eb044349107b804d6325d456c5f54c"
+    }
+  ],
+  "base": "82a62867cc1bcbbc4b0848519c6757f623d112ce",
+  "changed_relevant_package_paths": [
+    "lampOS/crates/skills/src/package.rs"
+  ],
+  "codec_callsite_census": [
+    "8fd693ad8716c3b02bf94d1044213259968ac600:lampOS/crates/update/src/head_touch/capture/codec.rs",
+    "8fd693ad8716c3b02bf94d1044213259968ac600:lampOS/crates/update/src/head_touch/capture/codec/tests.rs"
+  ],
+  "configs_equal": [
+    {
+      "mode_blob": "100644 blob 83b4f18cc1b5711f65c56fba11ebf9dfabf1a9d9\tlampOS/Cargo.lock",
+      "path": "lampOS/Cargo.lock",
+      "same_mode_blob": true,
+      "sha256": "86dce55e0b4315886ba9bcde43291feff191bd3d44ced7a315bb05e88c9f556e"
+    },
+    {
+      "mode_blob": "100644 blob be7fabdad667551d2636c36e732b0a45bfb5e359\tlampOS/Cargo.toml",
+      "path": "lampOS/Cargo.toml",
+      "same_mode_blob": true,
+      "sha256": "2b1005b31d36511ed3c9d59429a4779f9579317ccead0c0a20d729a75d2ef940"
+    },
+    {
+      "mode_blob": "100644 blob 856efebb1928394acbf06fc05e2dfee1251671d4\tlampOS/crates/update/Cargo.toml",
+      "path": "lampOS/crates/update/Cargo.toml",
+      "same_mode_blob": true,
+      "sha256": "37aadd247a80b20ccdb284439d7e9d779f7bc7fe97447d49c9773070535bd71f"
+    },
+    {
+      "mode_blob": "100644 blob e3b40113e65befef4d5d198284b99c78c27136f0\tlampOS/rust-toolchain.toml",
+      "path": "lampOS/rust-toolchain.toml",
+      "same_mode_blob": true,
+      "sha256": "fb0a56ca2fc09db10159f6983e9d747f4afeb64e1d6d941dc36a3c20bf3a5749"
+    },
+    {
+      "mode_blob": "100644 blob b3515e952d3665dd4c6a26887a6812bc9c597dca\tlampOS/.cargo/config.toml",
+      "path": "lampOS/.cargo/config.toml",
+      "same_mode_blob": true,
+      "sha256": "48a3e9ff36c92393a61c94924a7268fd9e732dc55afe239842fe7fdd2fa7db71"
+    }
+  ],
+  "consumer_note": "Only codec and its tests mention the new API; no production activation. Skills package.rs changed in Main, but codec module/evaluator has no Skills calls; fresh current compilation is required, with no old runtime/binary equivalence assumed.",
+  "current_runtime_status": "UNRUN by Third. Producer8fd249/all78+install-doc1, prior f3 native7850/all78 and old557 are separate reports, not transferred.",
+  "head": "8fd693ad8716c3b02bf94d1044213259968ac600",
+  "nine_combined_whole_files_modes_equal_f3": [
+    {
+      "mode_blob_both": "100644 blob f0f048d74a3010d0dd917b08b8eca0d31b239ad9\tlampOS/crates/update/src/head_touch.rs",
+      "path": "lampOS/crates/update/src/head_touch.rs",
+      "sha256": "2e9bcd134f16744e622f813cc3f5e71fe55c1b2a7bb64a5bd14d63d157b3638c"
+    },
+    {
+      "mode_blob_both": "100644 blob 5deea5940ac2427a790425c842165ba264644181\tlampOS/crates/update/src/head_touch/capture.rs",
+      "path": "lampOS/crates/update/src/head_touch/capture.rs",
+      "sha256": "f177737a21e11401998617cb4baa65343f02d226bb4c84dcc1ca25c0cfb21140"
+    },
+    {
+      "mode_blob_both": "100644 blob f5d233a33dbe6328f12e4d5e6856a7db53ce4279\tlampOS/crates/update/src/head_touch/capture/codec.rs",
+      "path": "lampOS/crates/update/src/head_touch/capture/codec.rs",
+      "sha256": "38e5a525a710fa48c141d45a11f445b0a55f9867e1574e4679be4de500d3e4c3"
+    },
+    {
+      "mode_blob_both": "100644 blob 04537dd4ad9e9fa26b7a033739d1f91ebb414dd1\tlampOS/crates/update/src/head_touch/capture/codec/tests.rs",
+      "path": "lampOS/crates/update/src/head_touch/capture/codec/tests.rs",
+      "sha256": "730c8b9b330d4386a810cc7a6e848a80d5aba490d34dce41c5b2ccc29f5a7d43"
+    },
+    {
+      "mode_blob_both": "100644 blob 442d2cb4598035b0974c5f3d7a39e7edd89f3b76\tlampOS/crates/update/src/head_touch/capture/tests.rs",
+      "path": "lampOS/crates/update/src/head_touch/capture/tests.rs",
+      "sha256": "ae5af4ed21941b278391c7412706b36f352c28fb20453426df55ff59e65b7855"
+    },
+    {
+      "mode_blob_both": "100644 blob 5aaff01db09dd8d1432dc226f002745ff9f9ff4a\tlampOS/docs/head-touch-capture.md",
+      "path": "lampOS/docs/head-touch-capture.md",
+      "sha256": "295e987588d23a25eac0fb8155dd65fef718195e536760a08e1bff8058442bde"
+    },
+    {
+      "mode_blob_both": "100644 blob 917fc48e0c02a2fbae4135972f35b6a8b07bfd4e\tlampOS/docs/head-touch-codec.md",
+      "path": "lampOS/docs/head-touch-codec.md",
+      "sha256": "eb4dbb1d3e99c823c2518ef37b896f851746cc93d6083e0e8aab4a2fcd9fe6c0"
+    },
+    {
+      "mode_blob_both": "100644 blob 9c29653056a211f84aed8f67b5a37d8723772c87\tlampOS/docs/reuse-decisions.md",
+      "path": "lampOS/docs/reuse-decisions.md",
+      "sha256": "427d4eca95fcabd8a09e986aa3eb3c693588d919b3e3f2790080c32d6ab6dc5e"
+    },
+    {
+      "mode_blob_both": "100644 blob 07f7cfbeb5b452fb264e832ad5cb1883d4a47619\tlampOS/docs/updates.md",
+      "path": "lampOS/docs/updates.md",
+      "sha256": "008c25ed4e4d36affbdfb4796a762aceabfa0c8392e329dfbfdeb33683a8a23e"
+    }
+  ],
+  "parent_collector": "89e495719cec090e1bfafe07405a6cb48edabaf4",
+  "six_codec_owned_paths": [
+    "lampOS/crates/update/src/head_touch/capture.rs",
+    "lampOS/crates/update/src/head_touch/capture/codec.rs",
+    "lampOS/crates/update/src/head_touch/capture/codec/tests.rs",
+    "lampOS/docs/head-touch-codec.md",
+    "lampOS/docs/reuse-decisions.md",
+    "lampOS/docs/updates.md"
+  ],
+  "source_read_disposition": "F3 source read carries to current8fd; no new P1/P2.",
+  "tree": "ddd599765f9d7e7e583913ba9f8ca507f8b4ade9",
+  "two_commit_range_diff": "1:  05713ea4f = 1:  89e495719 lampOS: capture head-pair inputs through bounded descriptors\n2:  f3c768e6b = 2:  8fd693ad8 lampOS: persist bounded head inputs for closed replay\n"
+}

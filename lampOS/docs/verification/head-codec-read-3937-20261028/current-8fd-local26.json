@@ -1,0 +1,636 @@
+{
+  "base": "82a62867cc1bcbbc4b0848519c6757f623d112ce",
+  "bounds_seconds": {
+    "compile": 1200,
+    "discovery": 60,
+    "one_module_runtime": 1200
+  },
+  "current_emission": {
+    "executable": "T/debug/deps/lamp_update-cebdb705cde8ec81",
+    "features": [],
+    "filenames": [
+      "T/debug/deps/lamp_update-cebdb705cde8ec81"
+    ],
+    "fresh": false,
+    "manifest_path": "W/lampOS/crates/update/Cargo.toml",
+    "package_id": "path+file://W/lampOS/crates/update#lamp-update@0.1.0",
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 0,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "reason": "compiler-artifact",
+    "target": {
+      "crate_types": [
+        "lib"
+      ],
+      "doc": true,
+      "doctest": true,
+      "edition": "2024",
+      "kind": [
+        "lib"
+      ],
+      "name": "lamp_update",
+      "src_path": "W/lampOS/crates/update/src/lib.rs",
+      "test": true
+    }
+  },
+  "discovery_proven_names": [
+    "head_touch::capture::codec::tests::closed_restart_keeps_regular_empty_null_and_both_absences_distinct",
+    "head_touch::capture::codec::tests::relative_aliases_absolute_contained_links_and_raw_unresolved_suffix_replay",
+    "head_touch::capture::codec::tests::portable_raw_names_and_link_bytes_are_exact_without_a_physical_mac_claim",
+    "head_touch::capture::codec::tests::every_native_equality_field_is_selected_and_atime_is_excluded",
+    "head_touch::capture::codec::tests::signed_timestamps_and_portable_widths_refuse_unsupported_values",
+    "head_touch::capture::codec::tests::exact_external_hash_and_size_are_checked_and_do_not_authenticate_origin",
+    "head_touch::capture::codec::tests::future_nonsemantic_bytes_and_escape_spellings_are_retained_exactly",
+    "head_touch::capture::codec::tests::semantic_versions_ops_kinds_duplicates_and_nullable_shadowing_refuse",
+    "head_touch::capture::codec::tests::malformed_strings_truncations_and_non_utf8_regular_bytes_never_yield_partial_saved",
+    "head_touch::capture::codec::tests::joined_name_matches_the_native_exact_limit_and_refuses_one_over",
+    "head_touch::capture::codec::tests::same_absent_key_is_coherent_across_both_apis_and_conflicts_refuse",
+    "head_touch::capture::codec::tests::sorted_unique_rooted_keys_and_root_witness_agreement_are_required",
+    "head_touch::capture::codec::tests::quota_refusal_happens_before_a_base64_allocation_is_invoked",
+    "head_touch::capture::codec::tests::fact_and_witness_quotas_refuse_before_deserializing_the_next_collection",
+    "head_touch::capture::codec::tests::root_slash_retains_the_producers_conservative_extra_separator_cap",
+    "head_touch::capture::codec::tests::root_is_not_a_text_or_missing_directory_and_has_one_exact_witness",
+    "head_touch::capture::codec::tests::known_variant_payloads_directory_shapes_and_component_bytes_are_strict",
+    "head_touch::capture::codec::tests::lexical_and_encoded_bounds_refuse_before_the_json_parser_can_allocate",
+    "head_touch::capture::codec::tests::actual_evaluator_replays_closed_after_restart_for_conditional_carried_and_omitted_inputs",
+    "head_touch::capture::codec::tests::hard_link_aliases_keep_two_lexical_keys_and_revalidate_full_content",
+    "head_touch::capture::codec::tests::revalidation_checks_negative_membership_link_and_root_facts_without_mutating_saved_bytes",
+    "head_touch::capture::codec::tests::revalidation_compares_membership_as_a_set_and_replay_keeps_encoded_order",
+    "head_touch::capture::codec::tests::combined_fact_and_witness_aggregate_limits_are_enforced_across_rows",
+    "head_touch::capture::codec::tests::aggregate_names_raw_link_bytes_and_regular_text_refuse_below_the_encoded_cap",
+    "head_touch::capture::codec::tests::encoder_preflight_refuses_combined_fact_and_text_budgets_without_changing_inputs",
+    "head_touch::capture::codec::tests::lookup_parse_and_debug_diagnostics_redact_paths_contents_and_unknown_semantics"
+  ],
+  "disposition": "SCOPED_SOURCE_AND_LOCAL_READ_OK",
+  "env_overrides": {
+    "CARGO_BUILD_JOBS": "1",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_TARGET_DIR": "T",
+    "CARGO_TERM_COLOR": "never",
+    "RUST_TEST_THREADS": "1"
+  },
+  "head": "8fd693ad8716c3b02bf94d1044213259968ac600",
+  "immutable_evidence_sha256": {
+    "bank-release.json": "1765184160ea1ddd0041408fbe1e14ae1bee55ed39b9c8d388a5a9b8dbb87f08",
+    "current-8fd-proposal26.json": "aae528649e0175220a7af9d6eebba49d97430005cf9841fe13bba499285b899d",
+    "current-artifact.json": "1fd68bedcc6725c4d6c5ec6d5c0625fdf99f49e54e93abdbdabc95d1c26d89b1",
+    "current-codec26-runtime.started.json": "8d9d0d2db36d901b8d3e319d30348f84571a1f77b6fff204fc4bfea80cab6855",
+    "current-codec26-runtime.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "current-codec26-runtime.stdout": "7c20dc58662e255c8e0601ea91cf88e78e52faf8a2bbb80d4e4a1acb862c67fc",
+    "current-codec26-runtime.terminal.json": "1e78ef4266a13c3f2d568113e6ddd9d6e41ec3fb9a37db238acbaf8ee4a47d72",
+    "current-compile.started.json": "1d4e0a1455c83eab257a29a71444c675111140fcd056f2bf7fd43d4f46e29033",
+    "current-compile.stderr": "c2eaee9ae9b861e653256c6cce58d2715744052024211a005dcfaa9621a808e6",
+    "current-compile.stdout": "c950c7d15d4a4fde7547ac189d8264b9401c5e1b312c2c5c97ecef99303104fb",
+    "current-compile.terminal.json": "e0beb9e7b73bc18de750a15fd5e25cd23a39aec564e83f99156dcf0bf5b5506a",
+    "current-discovery.started.json": "84cc4c0034012bc9d70a6acff0f2b9e9f18a136be1b440ef9eee97297854cc84",
+    "current-discovery.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "current-discovery.stdout": "19249f460cb1c58c074c2e5dced874446de34189250e1fce7cdae3e10af5ac58",
+    "current-discovery.terminal.json": "b76f9daa3bd46bc810f3fe8f778ed4fe70a636b20140f0044a79252b49f22d7c",
+    "current-index-after.bin": "e286fc6a018fbeead59d6f5e7c52ab7de2e0e16fcb1fcc8f3400625e0308c2ae",
+    "current-index-before.bin": "e286fc6a018fbeead59d6f5e7c52ab7de2e0e16fcb1fcc8f3400625e0308c2ae",
+    "current-source-after.json": "e2f5231c64f91750233c9d1a34a4edbf7824abffd76b941e0c9c7f099b07e45d",
+    "current-source-before.json": "e2f5231c64f91750233c9d1a34a4edbf7824abffd76b941e0c9c7f099b07e45d",
+    "prior-copies-after.json": "98b6771b7ae0f8b5b556752d59ef711721ee02c5f43a77772751d5b6feeb2afe",
+    "prior-copies-before.json": "98b6771b7ae0f8b5b556752d59ef711721ee02c5f43a77772751d5b6feeb2afe",
+    "prior-saved-copies.json": "b2929821ccf07b047aceca26ff78e910efe18be56ec816efff9f0c39469e5632",
+    "qualified-current-local.json": "23141d7fafd266223d24b640a6370aeaebf2f1343cc922d4ece76697c1630521",
+    "root-approval.json": "d5537a3af2e5c1ac9111d8043f1731c85265359474044a63c3d296b63c78d01c",
+    "run-current-gate.py": "982756d0aedc1c045b2f416e04b11a0d70455390adab767e543deb2a8207f8f1",
+    "source-carry-8fd.json": "2cb66a0c06bd46a0544bf5404c071c2da300900cea1353fe41ffb80cb2592383",
+    "source-f3-review.json": "5c4e9ec768e79deb8536911ae2c8e96ca7b1743a17b8b65500227d87d92dde4c"
+  },
+  "limits": [
+    "This gate is authored current8fd only; live Main a808 is outside its source/runtime claim.",
+    "No local fmt/clippy, collector52, full Update/workspace, native CI, physical Mac raw-name or device verification was run.",
+    "The new codec remains private/default-off and unwired; no authority, authentication, atomic snapshot, restoration or bootstrap claim.",
+    "Author f3/current8fd scopes and original native reports remain separate; no historical failures or flakes are waived."
+  ],
+  "native_handle": {
+    "all_groups_absent": true,
+    "session_id": 98801,
+    "terminal_exit": 0
+  },
+  "parent": "89e495719cec090e1bfafe07405a6cb48edabaf4",
+  "path_legend": {
+    "E": "private immutable review evidence",
+    "REPO": "repository root",
+    "T": "exclusive released test target",
+    "W": "exact8fd detached review checkout"
+  },
+  "platform": {
+    "machine": "x86_64",
+    "release": "25.6.0",
+    "system": "Darwin",
+    "tool_versions": {
+      "cargo": "cargo 1.96.0 (30a34c682 2026-05-25)",
+      "rustc": "rustc 1.96.0 (ac68faa20 2026-05-25)"
+    }
+  },
+  "publication_actions": "No GitHub comments, branch changes, code edits, commits or push.",
+  "retained_driver": {
+    "evidence_relative_path": "retained-current-update-lib-test",
+    "sha256": "c2d91477b613b1e168ff37c6d2477f3e50deee0fdff1e89cfecdd14d82a7b370",
+    "size": 13926492
+  },
+  "runtime": {
+    "P3_wording": "Composite join/hop checks may follow already-bounded field decode; not an unbounded-growth finding or authority guarantee.",
+    "artifact": {
+      "emitted_path": "T/debug/deps/lamp_update-cebdb705cde8ec81",
+      "features": [],
+      "fresh": false,
+      "profile_test": true,
+      "retained_copy": "retained-current-update-lib-test",
+      "sha256": "c2d91477b613b1e168ff37c6d2477f3e50deee0fdff1e89cfecdd14d82a7b370"
+    },
+    "bank_released": true,
+    "base": "82a62867cc1bcbbc4b0848519c6757f623d112ce",
+    "child_scope": "One admitted current Update lib driver process with codec prefix, one thread, no child/provider/service executable.",
+    "counts": {
+      "FAIL": 0,
+      "PASS": 26,
+      "ignored": 0,
+      "retries": 0,
+      "selected": 26,
+      "unrun": 0
+    },
+    "head": "8fd693ad8716c3b02bf94d1044213259968ac600",
+    "helper_sha256": {
+      "bank-release.json": "1765184160ea1ddd0041408fbe1e14ae1bee55ed39b9c8d388a5a9b8dbb87f08",
+      "current-8fd-proposal26.json": "aae528649e0175220a7af9d6eebba49d97430005cf9841fe13bba499285b899d",
+      "prior-saved-copies.json": "b2929821ccf07b047aceca26ff78e910efe18be56ec816efff9f0c39469e5632",
+      "root-approval.json": "d5537a3af2e5c1ac9111d8043f1731c85265359474044a63c3d296b63c78d01c",
+      "run-current-gate.py": "982756d0aedc1c045b2f416e04b11a0d70455390adab767e543deb2a8207f8f1"
+    },
+    "index_before_after_sha256": {
+      "after": "e286fc6a018fbeead59d6f5e7c52ab7de2e0e16fcb1fcc8f3400625e0308c2ae",
+      "before": "e286fc6a018fbeead59d6f5e7c52ab7de2e0e16fcb1fcc8f3400625e0308c2ae"
+    },
+    "limits": [
+      "No collector52, foundation, functions/IT/Round/fullpackage/workspace runtime repetition or fmt/clippy expansion.",
+      "No normal child, provider, real network/device/SSH or artifact download/CI rerun.",
+      "All26 are distinct new committed controls; internal loops are not additional unique tests.",
+      "Mac synthetic raw name coverage only; Linux physical subsection remains native-owned.",
+      "No author248/249/78/557 or prior native runtime transfer, no authenticated authority/atomic snapshot/restoration or kernel deadline claim."
+    ],
+    "parent": "89e495719cec090e1bfafe07405a6cb48edabaf4",
+    "prior_all_bound_fields_unchanged": true,
+    "prior_bookend_sha256": {
+      "after": "98b6771b7ae0f8b5b556752d59ef711721ee02c5f43a77772751d5b6feeb2afe",
+      "before": "98b6771b7ae0f8b5b556752d59ef711721ee02c5f43a77772751d5b6feeb2afe"
+    },
+    "prior_saved_copy_count": 184,
+    "source_before_after_manifest_sha256": {
+      "after": "e2f5231c64f91750233c9d1a34a4edbf7824abffd76b941e0c9c7f099b07e45d",
+      "before": "e2f5231c64f91750233c9d1a34a4edbf7824abffd76b941e0c9c7f099b07e45d"
+    },
+    "source_guard_count": 7477,
+    "source_index_mode_tool_helper_current_saved_guards_unchanged": true,
+    "stages": [
+      {
+        "argv": [
+          "cargo",
+          "+1.96.0",
+          "test",
+          "--offline",
+          "--locked",
+          "-p",
+          "lamp-update",
+          "--lib",
+          "--no-run",
+          "--message-format=json"
+        ],
+        "cleanup": [],
+        "elapsed_seconds": 101.6219,
+        "exit": 0,
+        "group": "absent",
+        "pgid": 14879,
+        "pid": 14879,
+        "stage": "current-compile",
+        "stderr_sha256": "c2eaee9ae9b861e653256c6cce58d2715744052024211a005dcfaa9621a808e6",
+        "stdout_sha256": "c950c7d15d4a4fde7547ac189d8264b9401c5e1b312c2c5c97ecef99303104fb",
+        "timed_out": false
+      },
+      {
+        "argv": [
+          "T/debug/deps/lamp_update-cebdb705cde8ec81",
+          "--list",
+          "--format",
+          "terse"
+        ],
+        "cleanup": [],
+        "elapsed_seconds": 0.7512,
+        "exit": 0,
+        "group": "absent",
+        "pgid": 17684,
+        "pid": 17684,
+        "stage": "current-discovery",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stdout_sha256": "19249f460cb1c58c074c2e5dced874446de34189250e1fce7cdae3e10af5ac58",
+        "timed_out": false
+      },
+      {
+        "argv": [
+          "T/debug/deps/lamp_update-cebdb705cde8ec81",
+          "head_touch::capture::codec::tests::",
+          "--nocapture",
+          "--test-threads=1"
+        ],
+        "cleanup": [],
+        "elapsed_seconds": 2.1661,
+        "exit": 0,
+        "group": "absent",
+        "pgid": 17689,
+        "pid": 17689,
+        "stage": "current-codec26-runtime",
+        "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stdout_sha256": "7c20dc58662e255c8e0601ea91cf88e78e52faf8a2bbb80d4e4a1acb862c67fc",
+        "timed_out": false
+      }
+    ],
+    "status": "PASS",
+    "terminals": [
+      [
+        "head_touch::capture::codec::tests::actual_evaluator_replays_closed_after_restart_for_conditional_carried_and_omitted_inputs",
+        "ok"
+      ],
+      [
+        "head_touch::capture::codec::tests::aggregate_names_raw_link_bytes_and_regular_text_refuse_below_the_encoded_cap",
+        "ok"
+      ],
+      [
+        "head_touch::capture::codec::tests::closed_restart_keeps_regular_empty_null_and_both_absences_distinct",
+        "ok"
+      ],
+      [
+        "head_touch::capture::codec::tests::combined_fact_and_witness_aggregate_limits_are_enforced_across_rows",
+        "ok"
+      ],
+      [
+        "head_touch::capture::codec::tests::encoder_preflight_refuses_combined_fact_and_text_budgets_without_changing_inputs",
+        "ok"
+      ],
+      [
+        "head_touch::capture::codec::tests::every_native_equality_field_is_selected_and_atime_is_excluded",
+        "ok"
+      ],
+      [
+        "head_touch::capture::codec::tests::exact_external_hash_and_size_are_checked_and_do_not_authenticate_origin",
+        "ok"
+      ],
+      [
+        "head_touch::capture::codec::tests::fact_and_witness_quotas_refuse_before_deserializing_the_next_collection",
+        "ok"
+      ],
+      [
+        "head_touch::capture::codec::tests::future_nonsemantic_bytes_and_escape_spellings_are_retained_exactly",
+        "ok"
+      ],
+      [
+        "head_touch::capture::codec::tests::hard_link_aliases_keep_two_lexical_keys_and_revalidate_full_content",
+        "ok"
+      ],
+      [
+        "head_touch::capture::codec::tests::joined_name_matches_the_native_exact_limit_and_refuses_one_over",
+        "ok"
+      ],
+      [
+        "head_touch::capture::codec::tests::known_variant_payloads_directory_shapes_and_component_bytes_are_strict",
+        "ok"
+      ],
+      [
+        "head_touch::capture::codec::tests::lexical_and_encoded_bounds_refuse_before_the_json_parser_can_allocate",
+        "ok"
+      ],
+      [
+        "head_touch::capture::codec::tests::lookup_parse_and_debug_diagnostics_redact_paths_contents_and_unknown_semantics",
+        "ok"
+      ],
+      [
+        "head_touch::capture::codec::tests::malformed_strings_truncations_and_non_utf8_regular_bytes_never_yield_partial_saved",
+        "ok"
+      ],
+      [
+        "head_touch::capture::codec::tests::portable_raw_names_and_link_bytes_are_exact_without_a_physical_mac_claim",
+        "ok"
+      ],
+      [
+        "head_touch::capture::codec::tests::quota_refusal_happens_before_a_base64_allocation_is_invoked",
+        "ok"
+      ],
+      [
+        "head_touch::capture::codec::tests::relative_aliases_absolute_contained_links_and_raw_unresolved_suffix_replay",
+        "ok"
+      ],
+      [
+        "head_touch::capture::codec::tests::revalidation_checks_negative_membership_link_and_root_facts_without_mutating_saved_bytes",
+        "ok"
+      ],
+      [
+        "head_touch::capture::codec::tests::revalidation_compares_membership_as_a_set_and_replay_keeps_encoded_order",
+        "ok"
+      ],
+      [
+        "head_touch::capture::codec::tests::root_is_not_a_text_or_missing_directory_and_has_one_exact_witness",
+        "ok"
+      ],
+      [
+        "head_touch::capture::codec::tests::root_slash_retains_the_producers_conservative_extra_separator_cap",
+        "ok"
+      ],
+      [
+        "head_touch::capture::codec::tests::same_absent_key_is_coherent_across_both_apis_and_conflicts_refuse",
+        "ok"
+      ],
+      [
+        "head_touch::capture::codec::tests::semantic_versions_ops_kinds_duplicates_and_nullable_shadowing_refuse",
+        "ok"
+      ],
+      [
+        "head_touch::capture::codec::tests::signed_timestamps_and_portable_widths_refuse_unsupported_values",
+        "ok"
+      ],
+      [
+        "head_touch::capture::codec::tests::sorted_unique_rooted_keys_and_root_witness_agreement_are_required",
+        "ok"
+      ]
+    ],
+    "tool_sha256": {
+      "cargo": "425e08ffa69bcf047b2a82b08b42d1d26ba8488f774bade1c14a62623fc18bad",
+      "rustc": "6859de89ddecec2ebaaec50d25c9c471d47f33677a96f7c81666247be062d499"
+    },
+    "tree": "ddd599765f9d7e7e583913ba9f8ca507f8b4ade9"
+  },
+  "source_review": {
+    "P1_P2_findings": [],
+    "P3_wording_precision": "Composite joined length is checked after bounded names/path decoding and link-hop count after bounded witness decode. This does not permit unbounded growth: per-field/global caps already apply. It is a wording/ordering precision note, not a P1/P2 or general zero-allocation-before-any-semantic-refusal guarantee.",
+    "line_bindings": [
+      {
+        "label": "wire_caps",
+        "line": 21,
+        "path": "lampOS/crates/update/src/head_touch/capture/codec.rs",
+        "text": "const ENCODED: usize = 16 * 1024 * 1024;"
+      },
+      {
+        "label": "checked_budget",
+        "line": 49,
+        "path": "lampOS/crates/update/src/head_touch/capture/codec.rs",
+        "text": "fn add(value: &mut usize, amount: usize, cap: usize) -> Result<()> {"
+      },
+      {
+        "label": "encode_preflight",
+        "line": 512,
+        "path": "lampOS/crates/update/src/head_touch/capture/codec.rs",
+        "text": "fn check_frozen(inputs: &FrozenInputs) -> Result<()> {"
+      },
+      {
+        "label": "bounded_writer",
+        "line": 381,
+        "path": "lampOS/crates/update/src/head_touch/capture/codec.rs",
+        "text": "struct BoundedWriter(Vec<u8>);"
+      },
+      {
+        "label": "lexical_preflight",
+        "line": 677,
+        "path": "lampOS/crates/update/src/head_touch/capture/codec.rs",
+        "text": "fn lexical_bounds(bytes: &[u8]) -> Result<()> {"
+      },
+      {
+        "label": "raw_budget_before_allocation",
+        "line": 881,
+        "path": "lampOS/crates/update/src/head_touch/capture/codec.rs",
+        "text": "    budget.decoded(length, kind, limits)?;"
+      },
+      {
+        "label": "raw_output_allocation",
+        "line": 882,
+        "path": "lampOS/crates/update/src/head_touch/capture/codec.rs",
+        "text": "    let mut output = allocate(capacity)?;"
+      },
+      {
+        "label": "header_streaming",
+        "line": 942,
+        "path": "lampOS/crates/update/src/head_touch/capture/codec.rs",
+        "text": "struct HeaderSeed;"
+      },
+      {
+        "label": "witness_charge_before_map",
+        "line": 1026,
+        "path": "lampOS/crates/update/src/head_touch/capture/codec.rs",
+        "text": "        self.budget"
+      },
+      {
+        "label": "fact_seed",
+        "line": 1319,
+        "path": "lampOS/crates/update/src/head_touch/capture/codec.rs",
+        "text": "struct TextRowSeed<'a> {"
+      },
+      {
+        "label": "name_seed",
+        "line": 1408,
+        "path": "lampOS/crates/update/src/head_touch/capture/codec.rs",
+        "text": "struct NamesSeed<'a> {"
+      },
+      {
+        "label": "composite_join",
+        "line": 1629,
+        "path": "lampOS/crates/update/src/head_touch/capture/codec.rs",
+        "text": "                        joined_name(path.0.len(), name.0.len(), limits.path)"
+      },
+      {
+        "label": "cross_list_coherence",
+        "line": 1777,
+        "path": "lampOS/crates/update/src/head_touch/capture/codec.rs",
+        "text": "fn cross_list_coherence(texts: &[TextRow], directories: &[DirectoryRow]) -> Result<()> {"
+      },
+      {
+        "label": "decode_hash_size",
+        "line": 1810,
+        "path": "lampOS/crates/update/src/head_touch/capture/codec.rs",
+        "text": "pub(crate) fn decode("
+      },
+      {
+        "label": "closed_text_lookup",
+        "line": 310,
+        "path": "lampOS/crates/update/src/head_touch/capture/codec.rs",
+        "text": "    fn text(&mut self, path: &Path) -> Result<Option<String>> {"
+      },
+      {
+        "label": "exact_bytes",
+        "line": 305,
+        "path": "lampOS/crates/update/src/head_touch/capture/codec.rs",
+        "text": "    pub(crate) fn as_bytes(&self) -> &[u8] {"
+      },
+      {
+        "label": "explicit_fresh_revalidate",
+        "line": 1889,
+        "path": "lampOS/crates/update/src/head_touch/capture/codec.rs",
+        "text": "    pub(crate) fn revalidate(&self, root: &Path) -> Result<()> {"
+      }
+    ],
+    "owned_source_bindings": {
+      "lampOS/crates/update/src/head_touch/capture.rs": {
+        "mode_blob": "100644 blob 5deea5940ac2427a790425c842165ba264644181\tlampOS/crates/update/src/head_touch/capture.rs",
+        "sha256": "f177737a21e11401998617cb4baa65343f02d226bb4c84dcc1ca25c0cfb21140"
+      },
+      "lampOS/crates/update/src/head_touch/capture/codec.rs": {
+        "mode_blob": "100644 blob f5d233a33dbe6328f12e4d5e6856a7db53ce4279\tlampOS/crates/update/src/head_touch/capture/codec.rs",
+        "sha256": "38e5a525a710fa48c141d45a11f445b0a55f9867e1574e4679be4de500d3e4c3"
+      },
+      "lampOS/crates/update/src/head_touch/capture/codec/tests.rs": {
+        "mode_blob": "100644 blob 04537dd4ad9e9fa26b7a033739d1f91ebb414dd1\tlampOS/crates/update/src/head_touch/capture/codec/tests.rs",
+        "sha256": "730c8b9b330d4386a810cc7a6e848a80d5aba490d34dce41c5b2ccc29f5a7d43"
+      },
+      "lampOS/docs/head-touch-codec.md": {
+        "mode_blob": "100644 blob 917fc48e0c02a2fbae4135972f35b6a8b07bfd4e\tlampOS/docs/head-touch-codec.md",
+        "sha256": "eb4dbb1d3e99c823c2518ef37b896f851746cc93d6083e0e8aab4a2fcd9fe6c0"
+      },
+      "lampOS/docs/reuse-decisions.md": {
+        "mode_blob": "100644 blob 9c29653056a211f84aed8f67b5a37d8723772c87\tlampOS/docs/reuse-decisions.md",
+        "sha256": "427d4eca95fcabd8a09e986aa3eb3c693588d919b3e3f2790080c32d6ab6dc5e"
+      },
+      "lampOS/docs/updates.md": {
+        "mode_blob": "100644 blob 07f7cfbeb5b452fb264e832ad5cb1883d4a47619\tlampOS/docs/updates.md",
+        "sha256": "008c25ed4e4d36affbdfb4796a762aceabfa0c8392e329dfbfdeb33683a8a23e"
+      }
+    },
+    "physical_raw_name_limit": "Test line208 Linux subsection must run in original native CI; Mac wire fixture supplies no physical invalid-UTF8 filesystem claim.",
+    "review_findings": [
+      "No unbounded allocation path found under the declared schema ceilings. Successful lexical scan allocates no input-sized data and caps encoded length, nesting, string contents, primitive length and counted starts before Serde.",
+      "Header pass validates schema/op/root/stamp/width limits before fact trees. Known duplicate fields are rejected through bitsets or derived structs; skipped additive fields use IgnoredAny instead of Value/Content trees. Whole encoded UTF8 and parser.end are checked.",
+      "Fact/witness/name/decoded-byte quotas are charged before corresponding collection/base64 growth. Raw output computes decoded length including padding before allocation. Encoder validates all facts before cloning/base64/output and uses a capped writer.",
+      "Exact accepted input bytes, including future nonsemantic fields and whitespace, are copied only after semantic decode/coherence and retained without a SavedInputs mutation/reencode API. External hash/size provide integrity only.",
+      "Strict raw key validation rejects empty/dot/dotdot components and NUL; component-aware root containment, raw path sort/uniqueness, first root stamp agreement, directory/member join bounds and cross-API missing-fact coherence are checked.",
+      "Closed replay only returns stored facts and refuses uncaptured keys. Fresh revalidate is explicit and uses current bounded collector observations plus root bookends; directory membership compares as sets while saved replay order remains exact.",
+      "Portable stamps preserve native selected equality fields including rdev/signed timestamps, never reconstruct Stat. Null/missing/empty facts and raw names/link/suffixes remain distinct. Debug/errors redact paths and contents.",
+      "No production caller, storage, actor, helper execution or write/restore wiring was found. Caller still owns trusted ancestry, excluded writers, complete callback evaluation and authenticated intent/input/output binding."
+    ],
+    "source_carry": {
+      "actual_evaluator_consumers_equal": [
+        {
+          "equal_f3": true,
+          "path": "lampOS/crates/update/src/head_touch.rs",
+          "sha256": "2e9bcd134f16744e622f813cc3f5e71fe55c1b2a7bb64a5bd14d63d157b3638c"
+        },
+        {
+          "equal_f3": true,
+          "path": "lampOS/crates/update/src/apply.rs",
+          "sha256": "c0f4fb9f6cdfb5b2d175e8c554c5b60cc6261a335cf295fdf639ef6b6b7d3fda"
+        },
+        {
+          "equal_f3": true,
+          "path": "lampOS/crates/update/src/manifest.rs",
+          "sha256": "f259fcea155adaf6e45d707441c059f168eb044349107b804d6325d456c5f54c"
+        }
+      ],
+      "base": "82a62867cc1bcbbc4b0848519c6757f623d112ce",
+      "changed_relevant_package_paths": [
+        "lampOS/crates/skills/src/package.rs"
+      ],
+      "codec_callsite_census": [
+        "8fd693ad8716c3b02bf94d1044213259968ac600:lampOS/crates/update/src/head_touch/capture/codec.rs",
+        "8fd693ad8716c3b02bf94d1044213259968ac600:lampOS/crates/update/src/head_touch/capture/codec/tests.rs"
+      ],
+      "configs_equal": [
+        {
+          "mode_blob": "100644 blob 83b4f18cc1b5711f65c56fba11ebf9dfabf1a9d9\tlampOS/Cargo.lock",
+          "path": "lampOS/Cargo.lock",
+          "same_mode_blob": true,
+          "sha256": "86dce55e0b4315886ba9bcde43291feff191bd3d44ced7a315bb05e88c9f556e"
+        },
+        {
+          "mode_blob": "100644 blob be7fabdad667551d2636c36e732b0a45bfb5e359\tlampOS/Cargo.toml",
+          "path": "lampOS/Cargo.toml",
+          "same_mode_blob": true,
+          "sha256": "2b1005b31d36511ed3c9d59429a4779f9579317ccead0c0a20d729a75d2ef940"
+        },
+        {
+          "mode_blob": "100644 blob 856efebb1928394acbf06fc05e2dfee1251671d4\tlampOS/crates/update/Cargo.toml",
+          "path": "lampOS/crates/update/Cargo.toml",
+          "same_mode_blob": true,
+          "sha256": "37aadd247a80b20ccdb284439d7e9d779f7bc7fe97447d49c9773070535bd71f"
+        },
+        {
+          "mode_blob": "100644 blob e3b40113e65befef4d5d198284b99c78c27136f0\tlampOS/rust-toolchain.toml",
+          "path": "lampOS/rust-toolchain.toml",
+          "same_mode_blob": true,
+          "sha256": "fb0a56ca2fc09db10159f6983e9d747f4afeb64e1d6d941dc36a3c20bf3a5749"
+        },
+        {
+          "mode_blob": "100644 blob b3515e952d3665dd4c6a26887a6812bc9c597dca\tlampOS/.cargo/config.toml",
+          "path": "lampOS/.cargo/config.toml",
+          "same_mode_blob": true,
+          "sha256": "48a3e9ff36c92393a61c94924a7268fd9e732dc55afe239842fe7fdd2fa7db71"
+        }
+      ],
+      "consumer_note": "Only codec and its tests mention the new API; no production activation. Skills package.rs changed in Main, but codec module/evaluator has no Skills calls; fresh current compilation is required, with no old runtime/binary equivalence assumed.",
+      "head": "8fd693ad8716c3b02bf94d1044213259968ac600",
+      "nine_combined_whole_files_modes_equal_f3": [
+        {
+          "mode_blob_both": "100644 blob f0f048d74a3010d0dd917b08b8eca0d31b239ad9\tlampOS/crates/update/src/head_touch.rs",
+          "path": "lampOS/crates/update/src/head_touch.rs",
+          "sha256": "2e9bcd134f16744e622f813cc3f5e71fe55c1b2a7bb64a5bd14d63d157b3638c"
+        },
+        {
+          "mode_blob_both": "100644 blob 5deea5940ac2427a790425c842165ba264644181\tlampOS/crates/update/src/head_touch/capture.rs",
+          "path": "lampOS/crates/update/src/head_touch/capture.rs",
+          "sha256": "f177737a21e11401998617cb4baa65343f02d226bb4c84dcc1ca25c0cfb21140"
+        },
+        {
+          "mode_blob_both": "100644 blob f5d233a33dbe6328f12e4d5e6856a7db53ce4279\tlampOS/crates/update/src/head_touch/capture/codec.rs",
+          "path": "lampOS/crates/update/src/head_touch/capture/codec.rs",
+          "sha256": "38e5a525a710fa48c141d45a11f445b0a55f9867e1574e4679be4de500d3e4c3"
+        },
+        {
+          "mode_blob_both": "100644 blob 04537dd4ad9e9fa26b7a033739d1f91ebb414dd1\tlampOS/crates/update/src/head_touch/capture/codec/tests.rs",
+          "path": "lampOS/crates/update/src/head_touch/capture/codec/tests.rs",
+          "sha256": "730c8b9b330d4386a810cc7a6e848a80d5aba490d34dce41c5b2ccc29f5a7d43"
+        },
+        {
+          "mode_blob_both": "100644 blob 442d2cb4598035b0974c5f3d7a39e7edd89f3b76\tlampOS/crates/update/src/head_touch/capture/tests.rs",
+          "path": "lampOS/crates/update/src/head_touch/capture/tests.rs",
+          "sha256": "ae5af4ed21941b278391c7412706b36f352c28fb20453426df55ff59e65b7855"
+        },
+        {
+          "mode_blob_both": "100644 blob 5aaff01db09dd8d1432dc226f002745ff9f9ff4a\tlampOS/docs/head-touch-capture.md",
+          "path": "lampOS/docs/head-touch-capture.md",
+          "sha256": "295e987588d23a25eac0fb8155dd65fef718195e536760a08e1bff8058442bde"
+        },
+        {
+          "mode_blob_both": "100644 blob 917fc48e0c02a2fbae4135972f35b6a8b07bfd4e\tlampOS/docs/head-touch-codec.md",
+          "path": "lampOS/docs/head-touch-codec.md",
+          "sha256": "eb4dbb1d3e99c823c2518ef37b896f851746cc93d6083e0e8aab4a2fcd9fe6c0"
+        },
+        {
+          "mode_blob_both": "100644 blob 9c29653056a211f84aed8f67b5a37d8723772c87\tlampOS/docs/reuse-decisions.md",
+          "path": "lampOS/docs/reuse-decisions.md",
+          "sha256": "427d4eca95fcabd8a09e986aa3eb3c693588d919b3e3f2790080c32d6ab6dc5e"
+        },
+        {
+          "mode_blob_both": "100644 blob 07f7cfbeb5b452fb264e832ad5cb1883d4a47619\tlampOS/docs/updates.md",
+          "path": "lampOS/docs/updates.md",
+          "sha256": "008c25ed4e4d36affbdfb4796a762aceabfa0c8392e329dfbfdeb33683a8a23e"
+        }
+      ],
+      "parent_collector": "89e495719cec090e1bfafe07405a6cb48edabaf4",
+      "six_codec_owned_paths": [
+        "lampOS/crates/update/src/head_touch/capture.rs",
+        "lampOS/crates/update/src/head_touch/capture/codec.rs",
+        "lampOS/crates/update/src/head_touch/capture/codec/tests.rs",
+        "lampOS/docs/head-touch-codec.md",
+        "lampOS/docs/reuse-decisions.md",
+        "lampOS/docs/updates.md"
+      ],
+      "source_read_disposition": "F3 source read carries to current8fd; no new P1/P2.",
+      "tree": "ddd599765f9d7e7e583913ba9f8ca507f8b4ade9",
+      "two_commit_range_diff": "1:  05713ea4f = 1:  89e495719 lampOS: capture head-pair inputs through bounded descriptors\n2:  f3c768e6b = 2:  8fd693ad8 lampOS: persist bounded head inputs for closed replay\n"
+    }
+  },
+  "terminal_summary": "26 passed; 0 failed; 0 ignored; 0 measured; 203 filtered out; one invocation, zero retries.",
+  "tree": "ddd599765f9d7e7e583913ba9f8ca507f8b4ade9"
+}
