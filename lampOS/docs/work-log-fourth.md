@@ -1,3 +1,19 @@
+## 2026-10-27 17:58 UTC — Current hand native gate and source carry are green
+
+Native and source gates passed for #3544 `4084e4e1d`; ready transition follows.
+
+[Original native proof](verification/hand-4084-native-20261028/README.md):
+ARM 40549421469 and Linux 40549421398 passed, 7,791 unique native PASS with
+zero bad/unrun, all 23 hand controls once. Nine Voice privacy cases passed;
+seven Bus/Msgs cases were excluded by the logged 12/47 crate selection and
+receive no credit. Separate doctests 4/47 targets, process 13 and relay 1.
+Actual merge 312cca200 / tree fb089fd4 has parents 28e7/4084; all three owned
+files are exact. Artifact metadata only; no new binary pins asserted.
+Reviewer-two's current source carry 6448935739 clears the exact narrow
+kept-resync fixture prerequisite; prior failed cohorts remain unchanged.
+#3577 `a47fe22e5` is pushed with 275 fresh integration passes; its original
+ARM continues. The new #3472 runtime-consent P2 has the implementation lane.
+
 ## 2026-10-27 17:34 UTC — Diagnostic increment passes and native accounting is corrected
 
 Ready for lamp-voice: no

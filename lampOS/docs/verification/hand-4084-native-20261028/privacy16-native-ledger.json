@@ -1,0 +1,234 @@
+[
+  {
+    "binary": "lamp-bus::it",
+    "test": "bus::a_subscriber_is_told_once_that_the_source_has_gone_and_once_that_it_is_back",
+    "source_path": "lampOS/crates/bus/tests/it/bus.rs",
+    "body_sha256": "89edc0de92d0b338d3e8e40544e11f5de13c27751f5a9f150235ca395ccffa5e",
+    "terminals": [],
+    "one_clean_native_pass": false,
+    "package_selected": false,
+    "not_observed_reason": "package excluded by actual logged PICKED filter"
+  },
+  {
+    "binary": "lamp-bus::it",
+    "test": "bus::a_topic_that_promised_a_period_is_late_after_twice_that_and_on_time_with_the_next",
+    "source_path": "lampOS/crates/bus/tests/it/bus.rs",
+    "body_sha256": "dd5de5e0af7e9be8443cf4d49b1185bade7f4b388f75d67e593aef0f1e1d0117",
+    "terminals": [],
+    "one_clean_native_pass": false,
+    "package_selected": false,
+    "not_observed_reason": "package excluded by actual logged PICKED filter"
+  },
+  {
+    "binary": "lamp-msgs::it",
+    "test": "privacy::a_lamp_with_no_slide_permits_only_with_its_marker_and_a_fresh_observation",
+    "source_path": "lampOS/crates/msgs/tests/it/privacy.rs",
+    "body_sha256": "ff17ba2d06b24fad65cd019224b385e0339c538d9a916d1f93c1ee6f3a073e94",
+    "terminals": [],
+    "one_clean_native_pass": false,
+    "package_selected": false,
+    "not_observed_reason": "package excluded by actual logged PICKED filter"
+  },
+  {
+    "binary": "lamp-msgs::it",
+    "test": "privacy::envelope_must_name_voice_and_match_payload_clock_time_session_and_sequence",
+    "source_path": "lampOS/crates/msgs/tests/it/privacy.rs",
+    "body_sha256": "c59f67776d357dbcf82f128e958fab4694b62121778af59c2c7b9a26baac4417",
+    "terminals": [],
+    "one_clean_native_pass": false,
+    "package_selected": false,
+    "not_observed_reason": "package excluded by actual logged PICKED filter"
+  },
+  {
+    "binary": "lamp-msgs::it",
+    "test": "privacy::freshness_is_original_acquisition_bounded_and_boot_scoped",
+    "source_path": "lampOS/crates/msgs/tests/it/privacy.rs",
+    "body_sha256": "97d62cea7602ac76aca56567b67acddd4981fca86d831136c6037a7d936fa18a",
+    "terminals": [],
+    "one_clean_native_pass": false,
+    "package_selected": false,
+    "not_observed_reason": "package excluded by actual logged PICKED filter"
+  },
+  {
+    "binary": "lamp-msgs::it",
+    "test": "privacy::permission_requires_known_open_switch_and_bounded_valid_lineage",
+    "source_path": "lampOS/crates/msgs/tests/it/privacy.rs",
+    "body_sha256": "bcbe66ad91a7d14b51837fc6b09eca5ce553e7038a027cd1a9b3e10bebbf6055",
+    "terminals": [],
+    "one_clean_native_pass": false,
+    "package_selected": false,
+    "not_observed_reason": "package excluded by actual logged PICKED filter"
+  },
+  {
+    "binary": "lamp-msgs::it",
+    "test": "privacy::topic_is_additive_and_json_roundtrips",
+    "source_path": "lampOS/crates/msgs/tests/it/privacy.rs",
+    "body_sha256": "97883fcb31ed1c8040010b8d01336b8cb085652c90e35024be43860128df6eee",
+    "terminals": [],
+    "one_clean_native_pass": false,
+    "package_selected": false,
+    "not_observed_reason": "package excluded by actual logged PICKED filter"
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "privacy_bus::tests::a_receipt_comes_only_with_a_slides_reading",
+    "source_path": "lampOS/crates/voice/src/privacy_bus.rs",
+    "body_sha256": "9ad4be77bacbdc11127a7ccf3337264e52dbfc86a2da0cd71d1f87efe2d8401f",
+    "terminals": [
+      {
+        "event": "PASS",
+        "duration": "0.007s",
+        "binary": "lamp-voice",
+        "test": "privacy_bus::tests::a_receipt_comes_only_with_a_slides_reading",
+        "raw_line": 5385
+      }
+    ],
+    "one_clean_native_pass": true,
+    "package_selected": true,
+    "not_observed_reason": null
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "privacy_bus::tests::after_a_datagram_a_gap_ends_the_lease_reader_inside_its_first_second",
+    "source_path": "lampOS/crates/voice/src/privacy_bus.rs",
+    "body_sha256": "7c9399ca4a9d9b1115c36b709976d2900a870e1bc6707df28c261be2d05cd6e7",
+    "terminals": [
+      {
+        "event": "PASS",
+        "duration": "0.010s",
+        "binary": "lamp-voice",
+        "test": "privacy_bus::tests::after_a_datagram_a_gap_ends_the_lease_reader_inside_its_first_second",
+        "raw_line": 5387
+      }
+    ],
+    "one_clean_native_pass": true,
+    "package_selected": true,
+    "not_observed_reason": null
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "privacy_bus::tests::only_recovery_finishes_the_source_episode_and_allows_a_new_one",
+    "source_path": "lampOS/crates/voice/src/privacy_bus.rs",
+    "body_sha256": "607589d9cbeafdaefda0edf42231be3837d70981d5669fa387e038b01a71dd6b",
+    "terminals": [
+      {
+        "event": "PASS",
+        "duration": "0.007s",
+        "binary": "lamp-voice",
+        "test": "privacy_bus::tests::only_recovery_finishes_the_source_episode_and_allows_a_new_one",
+        "raw_line": 5386
+      }
+    ],
+    "one_clean_native_pass": true,
+    "package_selected": true,
+    "not_observed_reason": null
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "privacy_bus::tests::recovery_queued_after_a_source_stall_reports_the_old_expiry_first",
+    "source_path": "lampOS/crates/voice/src/privacy_bus.rs",
+    "body_sha256": "fe17c83da97b309442c7109a4beabced378584fdcfa2bd440ece0c6f07d028ad",
+    "terminals": [
+      {
+        "event": "PASS",
+        "duration": "0.007s",
+        "binary": "lamp-voice",
+        "test": "privacy_bus::tests::recovery_queued_after_a_source_stall_reports_the_old_expiry_first",
+        "raw_line": 5388
+      }
+    ],
+    "one_clean_native_pass": true,
+    "package_selected": true,
+    "not_observed_reason": null
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "privacy_bus::tests::selected_endpoints_bind_and_read_a_real_bus",
+    "source_path": "lampOS/crates/voice/src/privacy_bus.rs",
+    "body_sha256": "1a24bf9adc9393a83fa11c1270549fb4bf2afd2c9b5ac7ef6fae2abb421815e8",
+    "terminals": [
+      {
+        "event": "PASS",
+        "duration": "0.007s",
+        "binary": "lamp-voice",
+        "test": "privacy_bus::tests::selected_endpoints_bind_and_read_a_real_bus",
+        "raw_line": 5389
+      }
+    ],
+    "one_clean_native_pass": true,
+    "package_selected": true,
+    "not_observed_reason": null
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "privacy_bus::tests::source_expiry_is_ridden_only_when_enabled_after_permission",
+    "source_path": "lampOS/crates/voice/src/privacy_bus.rs",
+    "body_sha256": "a0a906100b5dc487098054d4ac0fea6899be72a5e6f6b2f9075a92b1e09cce7c",
+    "terminals": [
+      {
+        "event": "PASS",
+        "duration": "0.007s",
+        "binary": "lamp-voice",
+        "test": "privacy_bus::tests::source_expiry_is_ridden_only_when_enabled_after_permission",
+        "raw_line": 5390
+      }
+    ],
+    "one_clean_native_pass": true,
+    "package_selected": true,
+    "not_observed_reason": null
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "privacy_bus::tests::the_lease_reader_resyncs_on_kept_leases_only_before_its_first_datagram_in_its_first_second",
+    "source_path": "lampOS/crates/voice/src/privacy_bus.rs",
+    "body_sha256": "f34687d997f096135af9cd394cc42e5eee32f7e578291b091f6d134e41fd2ca1",
+    "terminals": [
+      {
+        "event": "PASS",
+        "duration": "0.024s",
+        "binary": "lamp-voice",
+        "test": "privacy_bus::tests::the_lease_reader_resyncs_on_kept_leases_only_before_its_first_datagram_in_its_first_second",
+        "raw_line": 5391
+      }
+    ],
+    "one_clean_native_pass": true,
+    "package_selected": true,
+    "not_observed_reason": null
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "privacy_bus::tests::the_lease_watch_answers_at_once_through_refused_input_and_lets_a_lease_expire",
+    "source_path": "lampOS/crates/voice/src/privacy_bus.rs",
+    "body_sha256": "4d1292faf0ea9a38213d757fe83383dfac8a4e1779a4ba3c111c96a032bcbbdf",
+    "terminals": [
+      {
+        "event": "PASS",
+        "duration": "0.244s",
+        "binary": "lamp-voice",
+        "test": "privacy_bus::tests::the_lease_watch_answers_at_once_through_refused_input_and_lets_a_lease_expire",
+        "raw_line": 5412
+      }
+    ],
+    "one_clean_native_pass": true,
+    "package_selected": true,
+    "not_observed_reason": null
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "privacy_bus::tests::the_order_begins_again_only_before_the_first_datagram_in_the_first_second",
+    "source_path": "lampOS/crates/voice/src/privacy_bus.rs",
+    "body_sha256": "772e499262122852fa487a000c8a7f5292319c5f2236fabca5126163f51ba7de",
+    "terminals": [
+      {
+        "event": "PASS",
+        "duration": "0.007s",
+        "binary": "lamp-voice",
+        "test": "privacy_bus::tests::the_order_begins_again_only_before_the_first_datagram_in_the_first_second",
+        "raw_line": 5392
+      }
+    ],
+    "one_clean_native_pass": true,
+    "package_selected": true,
+    "not_observed_reason": null
+  }
+]
