@@ -1,3 +1,25 @@
+## 2026-10-27 07:39 UTC — Completed Common host gate failed; evidence retained
+
+Ready for lamp-voice: no
+
+[Common 218c host receipt](verification/common-218c-host-failure-20261027/receipt.json):
+normal formatting, metadata, strict workspace/all-target Clippy and build pass.
+The complete four-crate plus IPC camera union gives 5,435 passes / 86 failures,
+all 5,521 selected cases terminal; all 110 controls give 79 passes / 31 failures.
+There are zero leaks, timeouts or retries. The 43 natural ignores split into
+27 JSON terminals and 16 start-only entries with human SKIP, not executions.
+Actual controller125 and nextest100 remain failed. It was not cancelled and
+no manual signal was sent; docs/custom stages are unrun.
+
+Both failed drivers are independently retained. Actual dsymutil and independent
+Mach-O inspections find zero backing inputs for each; preservation exits 0
+with stable source and fresh owned-process closure before target release.
+The three explicitly approved archived source worktrees are removed after
+full backup/restore checks, with all branches, backups, targets and failure
+evidence kept. Pending transport, fixture and diagnostic repairs and latest-Main
+carry need fresh gates. Earlier results remain source-scoped; no native,
+physical or latency acceptance is claimed.
+
 ## 2026-10-27 04:42 UTC — Superseded Common runtime failed and cancelled
 
 Ready for lamp-voice: no

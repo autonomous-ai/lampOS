@@ -1,0 +1,127 @@
+{
+  "status": "FAILED_COMPLETE_LOCAL_SCOPE_NOT_READY",
+  "source": {
+    "head": "ed9aff39b609676535343f8979631c909e2a430a",
+    "tree": "218c1d5f25e1bee8b8a1d706bdf0e9247ea7efd8",
+    "pinned_main": "3d5ea2dd792d42fd52f26b978daf5ddbe9c68487",
+    "tracked_files": 10726
+  },
+  "scope": {
+    "host": "macOS",
+    "full_test_packages": [
+      "lamp-eyes",
+      "lamp-voice",
+      "lamp-memory",
+      "lamp-skills"
+    ],
+    "additional_binary": "lamp-ipc::camera_authority",
+    "host_test_debug": "0",
+    "full_workspace_runtime": false,
+    "all_transitive_dependency_runtime": false,
+    "native_or_device_acceptance": false
+  },
+  "normal_compiler": {
+    "actual_native_exit": 0,
+    "native_session": 44053,
+    "native_chunk": "8e205f",
+    "commands": [
+      {
+        "command": "cargo +1.96.0 fmt --all --check",
+        "exit": 0
+      },
+      {
+        "command": "cargo +1.96.0 metadata --offline --locked --format-version=1",
+        "exit": 0
+      },
+      {
+        "command": "cargo +1.96.0 clippy --offline --locked --jobs 1 --workspace --all-targets --message-format=json -- -D warnings",
+        "exit": 0
+      },
+      {
+        "command": "cargo +1.96.0 build --offline --locked --jobs 1 --workspace --message-format=json",
+        "exit": 0
+      }
+    ],
+    "all_local_packages_freshly_rebuilt_claimed": false
+  },
+  "discovery": {
+    "listed_identities": 5564,
+    "listed_binaries": 39,
+    "unlisted_binaries": 7,
+    "eligible_nonignored_identities": 5521,
+    "required_controls_eligible": 110,
+    "preserved_contracts_eligible_separate": 525,
+    "overlap_not_added": 25,
+    "runtime_credit_from_discovery": 0
+  },
+  "runtime": {
+    "actual_native_exit": 125,
+    "native_session": 95854,
+    "native_chunk": "283378",
+    "actual_nextest_exit": 100,
+    "selected_unique": 5521,
+    "clean_passed": 5435,
+    "failed": 86,
+    "all_selected_terminal": true,
+    "leaks": 0,
+    "timeouts": 0,
+    "retries": 0,
+    "deliberately_cancelled": false,
+    "manual_signal_sent": false,
+    "required_controls": {
+      "total": 110,
+      "passed": 79,
+      "failed": 31
+    },
+    "natural_ignores": {
+      "identities": 43,
+      "json_terminals": 27,
+      "start_only_with_human_SKIP": 16,
+      "not_executions": true
+    },
+    "test_slots": 2,
+    "fail_fast": false,
+    "docs_custom_stages": "UNRUN_AFTER_RUNTIME_FAILURE",
+    "preserved525_not_a_separate_runtime_count": true
+  },
+  "failed_driver_retention": {
+    "actual_native_exit": 0,
+    "native_session": 10213,
+    "native_chunk": "77088c",
+    "failed_drivers": 2,
+    "actual_dsymutil_and_independent_MachO_inspections": 2,
+    "actual_backing_files": 0,
+    "zero_backings_observed_not_assumed": true,
+    "source_stable": true,
+    "owned_sessions_groups_closed": true,
+    "target_release_permitted": true,
+    "original_125_and_100_remain_failed": true
+  },
+  "approved_archived_source_cleanup": {
+    "explicit_owner_approval": true,
+    "directories_removed": 3,
+    "branches_preserved": 3,
+    "logical_tracked_bytes_restore_verified": 815503724,
+    "distinct_source_index_states_backed_up": true,
+    "backups_targets_and_failure_evidence_untouched": true,
+    "observed_shared_volume_free_delta_bytes": 1764061184,
+    "shared_volume_delta_exclusively_attributed_to_removal": false
+  },
+  "evidence_sha256": {
+    "normal-compiler-actual-native-terminal": "8cc36f4748b9745759b61e0977e93ea5aea6b2d1b50b809ac2b0f81fbf512d16",
+    "normal-compiler-operations": "b75d1b4c52c00630f32b1a355e92fa1e150669663d57ab1bbca706fe5dc29d75",
+    "discovery-census": "8332eecd4efd63a271a7b612f26d7f9c1a0edcfebacb08253d8939ce5f41446d",
+    "runtime-actual-native-terminal": "82517f3e37df5969e90d2717c3a294bfe7fa4308420d9b78418f6d3c8cab52a8",
+    "runtime-counts": "690dbe288635dffe8b02dc89eba004fcc7491e42f31e1f24a62f7318ff72a2bc",
+    "all-selected-and-required-terminal-audit": "c1fea845c1085ead8e04f6bbaf9acf514494bc4555c68020d88e0d341b769bd6",
+    "failed-driver-actual-native-release": "61f998a9cd84ef1c6477be41a8910d5a15f0382eea2ba822a88656cb4d611041",
+    "archived-source-current-backup-proof": "2af844de001c23beafa23da90da77a466227e8e2f5cb5af69c409b3e7f69c563",
+    "archived-source-actual-approved-removal": "cdfd35097d577ed65a8de389fc07afa5f1e88ac2d08d35e160c918f20ffad6fa"
+  },
+  "limitations": [
+    "Only this source epoch is covered; earlier failures and later candidate repairs retain their own outcomes.",
+    "No claim that the pending transport repair explains every failure.",
+    "No ARM64, Linux, device, acoustic latency, recognition or motor acceptance.",
+    "No gate credit transfers to latest-Main carry or pending source changes."
+  ]
+}
