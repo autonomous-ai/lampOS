@@ -359,7 +359,7 @@ jobs:
     runs-on: ubuntu-22.04-arm
     timeout-minutes: 30
     permissions:
-      contents: write
+      contents: read
     concurrency:
       group: lampos-publish-lamp-voice
       cancel-in-progress: false
@@ -374,7 +374,11 @@ jobs:
           path: build
       - name: verify, sign, upload, then promote the channel
         env:
-          GH_TOKEN: ${{ github.token }}
+          # The built-in token is sometimes refused (403) creating the release,
+          # cause not established (#3906); it can never have Workflows write.
+          # This repository-limited token has Contents and Workflows write and
+          # lives only in the protected environment.
+          GH_TOKEN: ${{ secrets.LAMPOS_RELEASE_TOKEN }}
           LAMPOS_UPDATE_PUBLISH: ${{ vars.LAMPOS_UPDATE_PUBLISH }}
           LAMPOS_UPDATE_BOOTSTRAP: ${{ vars.LAMPOS_UPDATE_BOOTSTRAP }}
           # Use the branch-restricted environment secret, with no repository or

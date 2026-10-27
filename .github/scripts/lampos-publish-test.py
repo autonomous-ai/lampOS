@@ -270,6 +270,35 @@ class FakeCommands:
 
 
 class CommandsTests(unittest.TestCase):
+    def test_release_authorization_is_scoped_to_each_gh_child_without_mutating_context(self):
+        environ = {
+            P.SECRET: "signing-key-fixture", "GH_TOKEN": "release-authorization-fixture",
+            "GITHUB_TOKEN": "builtin-authorization-fixture",
+            "GH_ENTERPRISE_TOKEN": "enterprise-authorization-fixture",
+            "GITHUB_ENTERPRISE_TOKEN": "enterprise-builtin-fixture",
+            "PATH": "/mock", "GITHUB_REPOSITORY": P.REPO, "GITHUB_SHA": SHA,
+        }
+        original = environ.copy()
+        context = {key: original[key] for key in ("PATH", "GITHUB_REPOSITORY", "GITHUB_SHA")}
+        commands = P.Commands(environ)
+        children = []
+        def completed(words, **kwargs):
+            children.append(kwargs["env"].copy())
+            return P.subprocess.CompletedProcess(words, 0, b"simulated output", b"")
+        words = (["gh", "api", "simulated"], ["git", "rev-parse", "HEAD"],
+                 ["/mock/lamp-update", "check"], ["/mock/gh", "release", "upload", "simulated"])
+        with mock.patch.object(P.subprocess, "run", side_effect=completed) as run:
+            for command in words:
+                self.assertEqual(commands.run(command), b"simulated output")
+        self.assertEqual(run.call_count, 4)
+        for index, child in enumerate(children):
+            with self.subTest(child=index):
+                expected = {**context, "GH_TOKEN": original["GH_TOKEN"]} if index in (0, 3) else context
+                self.assertEqual(child, expected)
+        self.assertEqual(commands.environ, context)
+        self.assertEqual(environ, original)
+        self.assertTrue({original[key] for key in (P.SECRET, "GH_TOKEN", "GITHUB_TOKEN", "GH_ENTERPRISE_TOKEN", "GITHUB_ENTERPRISE_TOKEN")} <= set(commands.redactions))
+
     def failure(self, stderr, environ=None, words=None):
         words = words or ["gh", "api", "argv-must-not-appear"]
         result = P.subprocess.CompletedProcess(words, 17, b"stdout-must-not-appear", stderr)
@@ -413,7 +442,7 @@ class PublicationTests(unittest.TestCase):
         self.classification = self.root / "lampOS/deploy/package-binaries.json"
         self.classification.parent.mkdir(parents=True)
         self.classification.write_text(json.dumps(fixture_classification()))
-        self.env = {P.ENABLE: "on", P.BOOTSTRAP: "off", P.SECRET: "not-a-real-key", "GITHUB_ACTIONS": "true", "GITHUB_REPOSITORY": P.REPO, "GITHUB_EVENT_NAME": "push", "GITHUB_REF": "refs/heads/lamp-voice", "GITHUB_SHA": SHA, "GITHUB_RUN_NUMBER": "10", "GITHUB_RUN_ID": "1234", "GITHUB_RUN_ATTEMPT": "1"}
+        self.env = {P.ENABLE: "on", P.BOOTSTRAP: "off", P.SECRET: "not-a-real-key", "GH_TOKEN": "release-authorization-fixture", "GITHUB_ACTIONS": "true", "GITHUB_REPOSITORY": P.REPO, "GITHUB_EVENT_NAME": "push", "GITHUB_REF": "refs/heads/lamp-voice", "GITHUB_SHA": SHA, "GITHUB_RUN_NUMBER": "10", "GITHUB_RUN_ID": "1234", "GITHUB_RUN_ATTEMPT": "1"}
         self.fake = FakeCommands()
 
     def checksums(self):
@@ -431,6 +460,22 @@ class PublicationTests(unittest.TestCase):
         if canonical:
             self.assertEqual(self.fake.before, self.fake.canonical())
         self.assertTrue(all(not path.exists() for path in self.fake.key_paths))
+
+    def test_missing_release_authorization_refuses_before_commands_or_signing(self):
+        for credential in (None, "", " \t\r\n"):
+            with self.subTest(credential=credential):
+                self.fake = FakeCommands()
+                self.env["GITHUB_TOKEN"] = "ambient-builtin-authorization-fixture"
+                if credential is None:
+                    self.env.pop("GH_TOKEN", None)
+                else:
+                    self.env["GH_TOKEN"] = credential
+                original = self.env.copy()
+                self.refused_unchanged("^LAMPOS_RELEASE_TOKEN is absent from the protected publication environment$")
+                self.assertEqual(self.fake.calls, [])
+                self.assertEqual(self.fake.updater_calls, [])
+                self.assertEqual(self.fake.key_paths, [])
+                self.assertEqual(self.env, original)
 
     def test_existing_channel_advances_only_after_verified_build_and_stage(self):
         original = P.tree_info(self.artifact)

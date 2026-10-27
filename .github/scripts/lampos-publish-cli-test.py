@@ -11,6 +11,7 @@ from pathlib import Path
 import shutil
 import tempfile
 import unittest
+from unittest import mock
 
 SPEC = importlib.util.spec_from_file_location("offline_tests", Path(__file__).with_name("lampos-publish-test.py"))
 T = importlib.util.module_from_spec(SPEC)
@@ -27,12 +28,21 @@ class LocalCommands(T.FakeCommands):
         for switch in ("LAMP_UPDATE_SELF", "LAMP_UPDATE_MODELS", "LAMP_UPDATE_APPLY", "LAMP_UPDATE_IMAGE"):
             env[switch] = "off"
         self.local = P.Commands(env)
+        self.updater_results = []
 
     def updater(self, words):
         self.updater_calls.append(words)
         if words[1] == "check":
             self.assert_check(dict(zip(words[2::2], words[3::2])))
-        return self.local.run(words)
+        run = P.subprocess.run
+
+        def observed_run(*args, **kwargs):
+            result = run(*args, **kwargs)
+            self.updater_results.append((words[1], result.returncode, result.stdout.decode("utf-8", errors="replace")))
+            return result
+
+        with mock.patch.object(P.subprocess, "run", side_effect=observed_run):
+            return self.local.run(words)
 
 
 class CliTests(unittest.TestCase):
@@ -64,7 +74,7 @@ class CliTests(unittest.TestCase):
         for name in sorted((T.RETAINED | T.EXCLUDED) - {"lamp-update"}):
             (self.artifact / name).write_bytes(b"test-only payload, never executed\n")
         (self.artifact / "SHA256SUMS").write_text("".join(f"{P.digest(path)}  {path.name}\n" for path in sorted(self.artifact.iterdir())))
-        self.env = {P.ENABLE: "on", P.BOOTSTRAP: "on", P.SECRET: self.private.read_text(), "GITHUB_ACTIONS": "true", "GITHUB_REPOSITORY": P.REPO, "GITHUB_EVENT_NAME": "push", "GITHUB_REF": "refs/heads/lamp-voice", "GITHUB_SHA": T.SHA, "GITHUB_RUN_NUMBER": "10", "GITHUB_RUN_ID": "1234", "GITHUB_RUN_ATTEMPT": "1"}
+        self.env = {P.ENABLE: "on", P.BOOTSTRAP: "on", P.SECRET: self.private.read_text(), "GH_TOKEN": "simulated-release-authorization", "GITHUB_ACTIONS": "true", "GITHUB_REPOSITORY": P.REPO, "GITHUB_EVENT_NAME": "push", "GITHUB_REF": "refs/heads/lamp-voice", "GITHUB_SHA": T.SHA, "GITHUB_RUN_NUMBER": "10", "GITHUB_RUN_ID": "1234", "GITHUB_RUN_ATTEMPT": "1"}
         self.fake = LocalCommands()
 
     def publish(self):
@@ -92,11 +102,16 @@ class CliTests(unittest.TestCase):
         self.fake.before = raw
         self.env[P.BOOTSTRAP] = "off"
 
-    def refused_head(self, raw):
+    def refused_head(self, raw, reason):
         original = P.tree_info(self.artifact)
         self.install_head(raw)
-        with self.assertRaises(P.Refused):
+        with self.assertRaisesRegex(P.Refused, r"lamp-update failed \(exit 1\)"):
             self.publish()
+        checks = [(code, stdout) for command, code, stdout in self.fake.updater_results if command == "check"]
+        # The new candidate verifies first; the existing head must then reach
+        # its own verifier and refuse for this fixture's intended reason.
+        self.assertEqual([code for code, _ in checks], [0, 1])
+        self.assertIn(reason, checks[-1][1])
         self.assertEqual(self.fake.canonical(), raw)
         self.assertEqual(self.fake.head_mutations, [])
         self.assertNotIn(f"{P.HEAD}-10", self.fake.release_map)
@@ -141,16 +156,16 @@ class CliTests(unittest.TestCase):
         signature = bytearray(base64.b64decode(envelope["signature"]))
         signature[0] ^= 1
         envelope["signature"] = base64.b64encode(signature).decode()
-        self.refused_head(json.dumps(envelope).encode())
+        self.refused_head(json.dumps(envelope).encode(), "the signature does not match the manifest")
 
     def test_real_signed_foreign_channel_refuses_before_immutable_upload(self):
-        self.refused_head(self.signed_head({"channel": "foreign-channel"}))
+        self.refused_head(self.signed_head({"channel": "foreign-channel"}), "the build is of channel foreign-channel, and this lamp follows lamp-voice")
 
     def test_real_signed_newer_schema_refuses_before_immutable_upload(self):
-        self.refused_head(self.signed_head({"schema": 999}, unchecked=True))
+        self.refused_head(self.signed_head({"schema": 999}, unchecked=True), "the manifest is schema 999")
 
     def test_real_signed_newer_updater_floor_refuses_before_immutable_upload(self):
-        self.refused_head(self.signed_head({"min_updater": 999}))
+        self.refused_head(self.signed_head({"min_updater": 999}), "needs updater 999 or newer")
 
 
 if __name__ == "__main__":
