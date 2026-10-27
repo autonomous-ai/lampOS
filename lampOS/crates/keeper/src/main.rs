@@ -66,7 +66,8 @@ restart-asked reads one request on standard input (lamp-cloud's, on
 lamp-keeper-restart.socket) and answers on standard output: refused while
 lamp-update holds its lock (an update installs); else answered, and then,
 holding that lock, lampos.target is restarted as stop lamp stops it.
-Never the machine.
+Never the machine. A shutdown request (lamp-cloud's system.shutdown) is
+answered the same way and then runs lamp-setup shutdown.
 With --setup-marker, a lamp whose marker does not exist yet (not set up for
 a home) starts only lamp-setup.service, not lampos.target, and is not ready;
 serve starts lampos.target once the marker appears. Installed by the
@@ -196,24 +197,44 @@ const QUIET: Duration = Duration::from_secs(45);
 /// paused: lamp-cloud's reply to the app leaves before it is stopped.
 const ANSWERED: Duration = Duration::from_secs(3);
 
-/// `lamp-keeper restart-asked` (#2193): one request from lamp-cloud on
-/// standard input, the answer on standard output, then the restart. The
-/// update's lock is held to the end, so no update starts under it.
+/// `lamp-keeper restart-asked` (#2193, #3697): one request from lamp-cloud
+/// on standard input, the answer on standard output, then the restart or
+/// the shutdown. A restart holds the update's lock to the end, so no update
+/// starts under it; a shutdown holds it until it hands over to `lamp-setup
+/// shutdown`, whose runner takes the lock itself.
 fn restart_asked() -> ExitCode {
+    use lamp_keeper::restart::{Asked, SHUTDOWN};
     use std::io::{BufRead, Read, Write};
     let mut line = String::new();
     let _ = std::io::BufReader::new(std::io::stdin().take(4_096)).read_line(&mut line);
     let records = lamp_update::records::Records::new(PathBuf::from(lamp_update::install::RECORDS));
-    // The lock is held to the end, so no update starts under the restart.
-    let (reply, lock) = lamp_keeper::restart::asked(&line, &records);
+    let (reply, asked) = lamp_keeper::restart::asked(&line, &records);
     let mut out = std::io::stdout();
     let _ = writeln!(out, "{reply}").and_then(|()| out.flush());
     eprintln!("lamp-keeper: restart asked: {reply}");
-    let Some(_lock) = lock else {
+    let Some((asked, lock)) = asked else {
         return ExitCode::SUCCESS;
     };
     thread::sleep(ANSWERED);
-    quietly("restart")
+    if asked == Asked::Restart {
+        let stopped = quietly("restart");
+        drop(lock);
+        return stopped;
+    }
+    // The runner takes the lock itself, so it is let go here a moment
+    // before: an update that starts in between makes the runner refuse,
+    // said in its journal (lamp-setup-shutdown), not to the app.
+    drop(lock);
+    match std::process::Command::new(SHUTDOWN[0])
+        .args(&SHUTDOWN[1..])
+        .status()
+    {
+        Ok(status) if status.success() => ExitCode::SUCCESS,
+        ended => {
+            eprintln!("lamp-keeper: {}: {ended:?}", SHUTDOWN.join(" "));
+            ExitCode::FAILURE
+        }
+    }
 }
 
 /// Pause, wait for the voice to rest, stop or restart the lamp, clear the

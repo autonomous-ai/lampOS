@@ -246,7 +246,16 @@ Never the machine: the keeper does not reboot (above, "Not taken"). The
 socket is wanted by `lampos.target` but not part of it, as the keeper's own
 unit, so the restart it starts does not stop it.
 
-**Who may ask:** the switch, `LAMP_APP_RESTART=on`, is `lamp-cloud`'s;
+The same helper takes one other line, `{"shutdown":"lamp"}`, the app's
+`system.shutdown` (#3697, [shutdown.md](shutdown.md)): refused as above
+while an update installs; else `{"done":{"shutting_down":true}}`, 3 s, and
+then, the update's lock let go, `/opt/lampOS/setup/current/lamp-setup
+shutdown`, which hands the runner to its own unit (`lamp-setup-shutdown`)
+and returns. The runner takes the lock itself and refuses, in its journal,
+an update that started in the moment between. Any other line is refused
+with `not a restart or shutdown request`.
+
+**Who may ask:** the switches, `LAMP_APP_RESTART=on` and `LAMP_SHUTDOWN=on`, are `lamp-cloud`'s;
 the helper reads none. The socket trusts the `lampos` group, the same
 trust as `lamp-setup-change.socket`, and doesn't check which part asks:
 once the units are installed, any part running as `lampos` can ask for a

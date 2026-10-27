@@ -56,13 +56,24 @@ go and lit, and stays so. `lamp-keeper start lamp` brings it back.
 ## The switch
 
 `LAMP_SHUTDOWN` (`on` exactly; off unless set; `switches.md`) is for the ways
-a person asks, which the later changes add. The runner itself is not behind it:
-it is only ever started by one of those, or by hand.
+a person asks: `lamp-cloud` reads it for the app (below); the others come with
+later changes. The runner itself is not behind it: it is only ever started by
+one of those, or by hand.
 
-## What later changes add
+## The ways a person asks
 
-1. The app's `system.shutdown` through `lamp-cloud`, on a root socket as the
-   app's restart is asked (`lamp-keeper restart-asked`, keeper.md).
+1. **The app** (Mobile's off button, #3698): `system.shutdown` to
+   `lamp-cloud`, which sends `{"shutdown":"lamp"}` on the keeper's restart
+   socket (`/run/lampos-keeper-restart/restart.sock`). Root's helper
+   (`lamp-keeper restart-asked`) refuses while an update installs, else
+   answers `{"done":{"shutting_down":true}}`, so the app hears `success`
+   before the lamp goes down, and 3 s later runs
+   `/opt/lampOS/setup/current/lamp-setup shutdown`. An app that asks again is
+   answered the same, and the lamp is turned off once (cloud.md, "The lamp
+   turned off from the app"; keeper.md, "A restart asked from the app").
+
+Still to come:
+
 2. The button held, acting on release by hold time (HAL-5.7), with warning
    lights while it is held.
 3. Voice: "Lamp, turn off", only with a spoken yes, never on a guess; the lamp
@@ -73,7 +84,9 @@ Each starts `lamp-setup shutdown` and is behind `LAMP_SHUTDOWN`.
 ## Not yet seen on a lamp
 
 Host tests only (`lamp-setup`'s `shutdown`, `lamp-body`'s let-go against
-simulated servos). On a lamp still to see: the rest proof on a standing lamp;
+simulated servos, `lamp-cloud`'s `system.shutdown` against a stand-in keeper
+answering with the keeper's own code). On a lamp still to see: the app's
+`success` before the lamp goes down; the rest proof on a standing lamp;
 the let-go's per-joint read-back; whether the ring keeps its frame after the
 poweroff (it does only while the LEDs keep power); whether the servos keep
 power after the board's poweroff; and a clean boot with no filesystem repair.

@@ -173,6 +173,19 @@ pub trait Lamp {
     fn restarts(&self) -> bool {
         false
     }
+
+    /// Asks the keeper to turn the lamp off (`system.shutdown`, #3697): its
+    /// answer, given before the lamp goes down, or why not. Only with
+    /// `LAMP_SHUTDOWN=on`.
+    fn shut_down(&mut self) -> Result<Value, String> {
+        Err(not_here("system.shutdown"))
+    }
+
+    /// Whether `system.shutdown` is answered (`LAMP_SHUTDOWN=on`), asked of
+    /// nobody.
+    fn shuts_down(&self) -> bool {
+        false
+    }
 }
 
 /// Whether a kind is answered on `lamp` now: its switch, read without
@@ -183,7 +196,7 @@ const ALWAYS: Switch = |_| true;
 
 /// Every kind the app may ask that this lamp can answer, with its switch,
 /// in the order `system.info`'s `can` lists them (#2864).
-pub const KINDS: [(&str, Switch); 35] = [
+pub const KINDS: [(&str, Switch); 36] = [
     ("system.info", ALWAYS),
     ("system.version", ALWAYS),
     ("system.network", ALWAYS),
@@ -221,6 +234,7 @@ pub const KINDS: [(&str, Switch); 35] = [
     ("skills.made", |lamp| lamp.make_skill().is_some()),
     ("update.status", |lamp| lamp.update_page()),
     ("system.reboot", |lamp| lamp.restarts()),
+    ("system.shutdown", |lamp| lamp.shuts_down()),
 ];
 
 const WIFI: Switch = |lamp| lamp.changes().is_some_and(|c| c.wifi_on());
@@ -446,6 +460,9 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
         // A restart from the app (#2193): asked of the keeper, never done
         // here; the keeper answers first and refuses under an update.
         "system.reboot" if on(lamp, kind) => lamp.restart().map(Some),
+        // The lamp turned off from the app (#3697): asked of the keeper,
+        // which answers first and runs `lamp-setup shutdown`; never here.
+        "system.shutdown" if on(lamp, kind) => lamp.shut_down().map(Some),
         "" => Err("no kind".to_owned()),
         // `device.soft_reset` too: a destructive act from anywhere is the
         // owner's call (the first builder on #1396, 21:52).
@@ -494,6 +511,7 @@ pub mod tests {
         pub make_skill: Option<std::path::PathBuf>,
         pub update_page: bool,
         pub restart: bool,
+        pub shutdown: bool,
         /// What `recovery` says (#3020).
         pub recovery: bool,
         /// What `reset` says (#2937).
@@ -587,6 +605,9 @@ pub mod tests {
         }
         fn restarts(&self) -> bool {
             self.restart
+        }
+        fn shuts_down(&self) -> bool {
+            self.shutdown
         }
         fn send_text(&mut self, text: &lamp_msgs::ChatIn, _now_ms: u64) -> Result<(), String> {
             self.texts.push(text.clone());
@@ -903,6 +924,7 @@ pub mod tests {
             "face.enroll",
             "led.state.set",
             "system.reboot",
+            "system.shutdown",
             // Without LAMP_GUARD_FROM_APP=on (#2562).
             "guard.on",
             "guard.off",
@@ -1017,6 +1039,7 @@ pub mod tests {
             ),
             ("update page", |f| f.update_page = true, &["update.status"]),
             ("restart", |f| f.restart = true, &["system.reboot"]),
+            ("shutdown", |f| f.shutdown = true, &["system.shutdown"]),
         ];
         let always = [
             "system.info",

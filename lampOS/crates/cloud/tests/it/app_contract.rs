@@ -7,7 +7,7 @@
 //! through JSON as the broker carries it.
 use lamp_bus::Bus;
 use lamp_cloud::answer::answer;
-use lamp_cloud::lamp::{Places, Real, Ring, Texts, Wifi};
+use lamp_cloud::lamp::{Places, Real, Ring, Shutdown, Texts, Wifi};
 use lamp_cloud::wire::Identity;
 use lamp_msgs::{Light, LightRequest};
 use serde_json::{Value, json};
@@ -171,6 +171,7 @@ fn each_field_the_apps_page_reads_is_there_with_the_type_it_takes() {
         restart: None,
         guard: None,
         make_skill: None,
+        shutdown: None,
     };
     let me = Identity {
         device: "lamp".into(),
@@ -276,6 +277,7 @@ fn the_faces_page_reads_names_and_removes_one() {
         restart: None,
         guard: None,
         make_skill: None,
+        shutdown: None,
     };
     let me = Identity {
         device: "lamp".into(),
@@ -427,6 +429,7 @@ fn schedule_list_and_cancel_answer_with_the_switch_and_are_not_here_without() {
         restart: None,
         guard: None,
         make_skill: None,
+        shutdown: None,
     };
     let me = Identity {
         device: "lamp".into(),
@@ -517,6 +520,7 @@ fn the_software_update_is_answered_from_lamp_updates_status() {
         restart: None,
         guard: None,
         make_skill: None,
+        shutdown: None,
     };
     let me = Identity {
         device: "lamp".into(),
@@ -644,6 +648,7 @@ fn a_restart_from_the_app_is_the_keepers_answered_first_and_refused_under_an_upd
         restart: Some(socket),
         guard: None,
         make_skill: None,
+        shutdown: None,
     };
     let me = Identity {
         device: "lamp".into(),
@@ -678,6 +683,80 @@ fn a_restart_from_the_app_is_the_keepers_answered_first_and_refused_under_an_upd
         reply
             .to_string()
             .contains("not on this lamp: system.reboot")
+    );
+    let _ = std::fs::remove_dir_all(root);
+}
+
+/// `system.shutdown` (#3697, Mobile's off button on #3698): off, a kind
+/// this lamp lacks and no keeper asked; on, the keeper's answer, refused
+/// under an update; once taken, asked again (any data) it is answered the
+/// same and the keeper is asked no more, so the lamp is turned off once.
+#[test]
+fn a_shutdown_from_the_app_is_the_keepers_answered_once_and_refused_under_an_update() {
+    let root = PathBuf::from(format!("/tmp/lcr-shutdown-{}", std::process::id()));
+    let places = lamp(&root);
+    let socket = root.join("restart.sock");
+    let serving = keeper(&socket, vec![true, false]);
+    let mut real = Real {
+        places,
+        bus: None,
+        device_id: "d-42".into(),
+        build: "812+460a1a1aa2b3".into(),
+        wifi: Wifi::default(),
+        ring: Ring::default(),
+        texts: Texts::default(),
+        reports: None,
+        skills: None,
+        changes: None,
+        photos: None,
+        faces: None,
+        schedule: None,
+        update_page: false,
+        restart: None,
+        guard: None,
+        make_skill: None,
+        shutdown: None,
+    };
+    let me = Identity {
+        device: "lamp".into(),
+        id: "d-42".into(),
+        ..Identity::default()
+    };
+    let said = |real: &mut Real, data: &Value| {
+        let result = answer(real, "system.shutdown", data);
+        let sent = me
+            .data("2026-10-27T10:00:00Z", "system.shutdown", &result)
+            .to_string();
+        serde_json::from_str::<Value>(&sent).unwrap()
+    };
+    // Off: not here, and no keeper asked.
+    let reply = said(&mut real, &Value::Null);
+    assert_eq!(reply["status"], "failure", "{reply}");
+    assert!(
+        reply
+            .to_string()
+            .contains("not on this lamp: system.shutdown"),
+        "{reply}"
+    );
+    real.shutdown = Some(Shutdown {
+        socket,
+        accepted: None,
+    });
+    let reply = said(&mut real, &Value::Null);
+    assert_eq!(reply["status"], "failure", "{reply}");
+    assert!(
+        reply.to_string().contains(lamp_keeper::restart::INSTALLING),
+        "{reply}"
+    );
+    let reply = said(&mut real, &Value::Null);
+    assert_eq!(reply["status"], "success", "{reply}");
+    assert_eq!(reply["data"]["shutting_down"], true, "{reply}");
+    for data in [Value::Null, json!({"now": "please"}), json!("junk")] {
+        assert_eq!(said(&mut real, &data)["data"], reply["data"], "{data}");
+    }
+    assert_eq!(
+        serving.join().unwrap(),
+        [lamp_keeper::restart::SHUTDOWN_REQUEST; 2]
     );
     let _ = std::fs::remove_dir_all(root);
 }

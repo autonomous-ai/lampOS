@@ -2,7 +2,9 @@
 # one request from lamp-cloud on lamp-keeper-restart.socket, as standard input and output.
 # Refused while lamp-update holds its lock (an update installs); else answered, and 3 s later,
 # with that lock held, the lamp paused, the voice's quiet waited for (45 s at most) and
-# lampos.target restarted. Never the machine.
+# lampos.target restarted. Never the machine. A shutdown request (#3697, docs/shutdown.md):
+# refused the same way; else answered, and 3 s later /opt/lampOS/setup/current/lamp-setup shutdown
+# hands the runner to its own unit (lamp-setup-shutdown) through systemd-run and returns.
 [Unit]
 Description=lampOS restart from the app: one request
 CollectMode=inactive-or-failed

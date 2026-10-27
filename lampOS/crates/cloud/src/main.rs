@@ -201,6 +201,8 @@ fn main() -> ExitCode {
             .as_deref()
             == Some("on"))
         .then(|| lamp_keeper::restart::SOCKET.into()),
+        // The lamp turned off from the app, asked of the keeper (#3697): only with LAMP_SHUTDOWN=on.
+        shutdown: lamp_cloud::lamp::Shutdown::from_environment(),
         // Guard mode on and off from the owner's app (#2562): only with LAMP_GUARD_FROM_APP=on.
         guard: lamp_cloud::guard::from_environment(),
         // A skill typed in the app (#2813): only with LAMP_APP_MAKE_SKILL=on and the skills page.
@@ -238,6 +240,7 @@ fn main() -> ExitCode {
         restart: None,
         guard: None,
         make_skill: None,
+        shutdown: None,
     };
     runtime.block_on(async move {
         let looks = async move {

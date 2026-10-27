@@ -1,7 +1,8 @@
 # lampOS restart from the app (#2193, lampOS/docs/keeper.md, "A restart asked from the app"):
-# the socket lamp-cloud asks the keeper on for the app's system.reboot. Wanted by the target but
+# the socket lamp-cloud asks the keeper on for the app's system.reboot, and system.shutdown
+# (#3697, lampOS/docs/shutdown.md). Wanted by the target but
 # not PartOf it, as the keeper's own unit: the restart it starts must not stop it. One at a time.
-# LAMP_APP_RESTART=on is lamp-cloud's switch, not this socket's: the socket trusts the lampos
+# LAMP_APP_RESTART=on and LAMP_SHUTDOWN=on are lamp-cloud's switches, not this socket's: the socket trusts the lampos
 # group, the same trust as lamp-setup-change.socket, and doesn't check which part asks.
 [Unit]
 Description=lampOS restart from the app: the socket lamp-cloud asks the keeper on
