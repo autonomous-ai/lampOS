@@ -606,9 +606,15 @@ units stopped:
    install -d -m 0700 ~/measure-lock
    lamp-body-measure --device /dev/ttyACM0 --unit-id <this lamp> \
      --lock-directory ~/measure-lock --write ~/lamp.env
-   # then root installs the file it wrote
-   sudo install -o root -g root -m 0644 ~/lamp.env /etc/lampOS/body/lamp.env
+   # then root installs the file it wrote, never over one already there
+   test ! -e /etc/lampOS/body/lamp.env &&
+     sudo install -o root -g root -m 0644 ~/lamp.env /etc/lampOS/body/lamp.env
    ```
+
+   The root step refuses if `/etc/lampOS/body/lamp.env` is there, as the
+   tool does for its own file: a lamp with poses set by hand keeps them
+   (Fourteen's P3 on #3919). To replace them, move the old file aside
+   first.
 
    `lamp-body-measure` runs **unprivileged**. As root it refuses by design:
    a process with `CAP_SYS_ADMIN` could bypass the servo port's exclusive
