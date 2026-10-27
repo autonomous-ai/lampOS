@@ -2123,6 +2123,14 @@ then use that person's scope:
     Test: `it::days::an_observation_never_rests_only_on_the_lamps_own_words`.
   - **The observation pass** (`LAMP_MEMORY_OBSERVE`) drops the proposals
     the detector marks before `tidy_apply`; the rest go as before.
+  - **The observation pass never keeps a question as a fact** (finding
+    N10 on #3504): `OBSERVE_STATED`, told after `OBSERVE_PROMPT`, says to
+    keep what the person stated, never their questions or "Asked ...";
+    the store leaves out a proposal starting "Asked what/whether/about …"
+    or resting only on heard lines that ask, while "I love tea, you know?",
+    "Do you know I like tea?" and "Asked the lamp to remind them …" are kept
+    (`tidy::only_asked`, [memory-days.md](memory-days.md)). Test:
+    `it::days::a_question_is_never_kept_as_a_fact`.
   - **The journal** says, with no words: "a remember about a person was not
     kept: speaker unknown (skipped=1)", or "observation pass: dropped N
     about a person: speaker unknown".

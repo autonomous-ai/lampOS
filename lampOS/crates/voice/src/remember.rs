@@ -1222,16 +1222,22 @@ pub const OBSERVE_PROMPT: &str = "You keep a household lamp's memory tidy. The u
 /// when the job carries the conversation's day (`"today"`).
 const OBSERVE_EVENTS: &str = " \"today\" is the day of these exchanges. A thread or promise about an event on a day the cited words make clear (\"on Saturday\", \"tomorrow\", \"on 24 October\") also has \"on\":\"YYYY-MM-DD\", that day worked out from \"today\". \"on\" is only for an event still to come, \"today\" or later: one already past (\"my exam was yesterday\") has none. When the day is not clear, leave \"on\" out, and never guess it.";
 
-/// The observation pass's prompt: [`OBSERVE_PROMPT`] as it is, and with
-/// `events` (a job carrying `"today"`, [`observe_input`]) the sentence
-/// asking for an event's day after it.
+/// The observation pass's prompt: [`OBSERVE_PROMPT`] and [`OBSERVE_STATED`],
+/// and with `events` (a job carrying `"today"`, [`observe_input`]) the
+/// sentence asking for an event's day after them.
 pub fn observe_prompt(events: bool) -> std::borrow::Cow<'static, str> {
     if events {
-        format!("{OBSERVE_PROMPT}{OBSERVE_EVENTS}").into()
+        format!("{OBSERVE_PROMPT}{OBSERVE_STATED}{OBSERVE_EVENTS}").into()
     } else {
-        OBSERVE_PROMPT.into()
+        format!("{OBSERVE_PROMPT}{OBSERVE_STATED}").into()
     }
 }
+
+/// What [`OBSERVE_PROMPT`] is always told after it (finding N10 on #3504:
+/// a misheard "What is my favorite dream?" was kept as "Asked what their
+/// favorite dream is."). The memory leaves such a proposal out as well
+/// (`tidy::only_asked`).
+pub const OBSERVE_STATED: &str = " Keep only what the person stated, never their questions or requests for an answer: a question such as \"What is my favorite drink?\" is not a fact about them, so never propose \"Asked ...\" or \"Wants to know ...\". A statement ending in a tag (\"I love tea, you know?\") is still what they stated.";
 
 /// The job the model is given: the memory's frozen job as it is, and with
 /// `events` its day as `"today"`, `"<Weekday> YYYY-MM-DD"`, the local day
@@ -11056,9 +11062,15 @@ mod tests {
             "Tuesday 2026-10-13"
         );
 
-        assert_eq!(observe_prompt(false), OBSERVE_PROMPT);
+        assert_eq!(
+            observe_prompt(false),
+            format!("{OBSERVE_PROMPT}{OBSERVE_STATED}")
+        );
         let asked = observe_prompt(true);
-        assert!(asked.starts_with(OBSERVE_PROMPT), "{asked}");
+        assert!(
+            asked.starts_with(&format!("{OBSERVE_PROMPT}{OBSERVE_STATED}")),
+            "{asked}"
+        );
         assert!(
             asked.ends_with(OBSERVE_EVENTS)
                 && asked.contains(r#""on":"YYYY-MM-DD""#)
@@ -11068,6 +11080,11 @@ mod tests {
             "{asked}"
         );
         assert!(!OBSERVE_PROMPT.contains("today"));
+        // Finding N10 on #3504: what they stated, never their questions.
+        assert!(!OBSERVE_STATED.contains("today"));
+        for words in ["never their questions", "\"Asked ...\"", "you know?"] {
+            assert!(observe_prompt(false).contains(words), "{words}");
+        }
     }
 
     /// #1693, `LAMP_MEMORY_EVENTS`: what the model proposes reaches the

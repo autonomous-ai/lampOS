@@ -1423,7 +1423,7 @@ fn protocol_round_trip_records_links_prepares_and_applies_a_job_then_verifies_fo
     let first = raw["id"].as_u64().unwrap();
     let (linked, _) = request(
         &mut store,
-        json!({"op":"append_linked","at_unix_ms":NOW,"heard":"Coffee?","said":"Black","source_ids":[first]}),
+        json!({"op":"append_linked","at_unix_ms":NOW,"heard":"Coffee black.","said":"Black","source_ids":[first]}),
         NOW,
     );
     let linked = linked["id"].as_u64().unwrap();
@@ -3450,4 +3450,40 @@ fn a_newer_category_shows_in_a_session_note_as_a_plain_fact() {
     };
     assert_eq!(kind(kept), "preference", "a kept fact's plain label");
     assert_eq!(kind(later), kind(kept), "{facts}");
+}
+
+/// Finding N10 on #3504 (lamp-06c1, 27 Oct): a misheard "What is my
+/// favorite dream?" was kept as "Asked what their favorite dream is.". A
+/// proposal resting only on a question, or saying "Asked", keeps nothing;
+/// a statement with a question tag is kept.
+#[test]
+fn a_question_is_never_kept_as_a_fact() {
+    let scratch = Scratch::new("only-asked");
+    let mut store = scratch.open(30, NOW);
+    let room = Person::everyone();
+    for (conversation, heard, proposed, kept_count) in [
+        (
+            "question",
+            "What is my favorite dream?",
+            "Favorite dream is a question about dreams",
+            0,
+        ),
+        (
+            "asked",
+            "Hey, mom. My favorite dream is flying.",
+            "Asked what their favorite dream is.",
+            0,
+        ),
+        ("tag", "I love tea, you know?", "Loves tea", 1),
+    ] {
+        let line = store.append(&room, NOW, heard, "Mm", &[]).unwrap();
+        let job = store
+            .conversation_end(&room, conversation, &[line])
+            .unwrap();
+        let kept = store
+            .tidy_apply(&room, &job.job, &output(proposed, &[line], None))
+            .unwrap();
+        assert_eq!(kept.len(), kept_count, "{heard} / {proposed}");
+    }
+    assert!(found(&mut store, &room, "asked").is_empty());
 }
