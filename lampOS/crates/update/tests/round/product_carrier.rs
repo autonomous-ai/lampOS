@@ -533,3 +533,440 @@ fn a_same_binary_product_unit_records_good_only_after_climb_and_confirmation() {
     assert_eq!(lamp.own_build(), sha(updater));
     assert!(lamp.pending().is_none());
 }
+
+// A signed fleet build can carry current-linked product units beside the
+// older pinned units kept for development lamps. Layout precedes specificity.
+fn product_first(lamp: &mut Lamp, reverse: bool) {
+    if !reverse {
+        return;
+    }
+    let envelope = &lamp.channel.files[&format!("{CHANNEL}{}", manifest::ENVELOPE)];
+    let bytes = manifest::signed(envelope, &lamp.config.key).unwrap();
+    let mut build = manifest::parse(&bytes).unwrap();
+    build.units.reverse();
+    lamp.channel.files.insert(
+        format!("{CHANNEL}{}", manifest::ENVELOPE),
+        manifest::seal(&serde_json::to_vec(&build).unwrap(), &lamp.key).unwrap(),
+    );
+}
+
+fn pinned_eyes_unit() -> String {
+    eyes_unit().replace("/current/", &format!("/{}/", sha("eyes 1")))
+}
+
+fn linked_product_beside_pinned_template(reverse: bool) {
+    let mut lamp = Lamp::new().with_linked_eyes("eyes 1");
+    let product = new_eyes_unit();
+    carried(
+        &mut lamp,
+        &product,
+        "eyes 2",
+        Some(&pinned_eyes_unit()),
+        Vec::new(),
+    );
+    product_first(&mut lamp, reverse);
+    let outcome = lamp.round();
+    assert_eq!(
+        outcome,
+        Outcome::Switched(2),
+        "reverse={reverse}: {:?}",
+        lamp.said
+    );
+    assert_eq!(lamp.read("/etc/systemd/system/lamp-eyes.service"), product);
+    assert_eq!(lamp.eyes_link(), sha("eyes 2"));
+    assert_eq!(lamp.calls(), ["reload", "restart lamp-eyes.service"]);
+    assert_eq!(lamp.state()["installed"]["sequence"], 2);
+}
+
+#[test]
+fn a_linked_part_uses_product_before_its_pinned_lamp_template() {
+    linked_product_beside_pinned_template(true);
+}
+
+#[test]
+fn a_linked_part_uses_product_after_its_pinned_lamp_template() {
+    linked_product_beside_pinned_template(false);
+}
+
+#[test]
+fn a_compatible_linked_lamp_template_still_wins_in_either_manifest_order() {
+    for reverse in [false, true] {
+        let mut lamp = Lamp::new().with_linked_eyes("eyes 1");
+        let specific = format!("{}Environment=LAMP_BUS_ROOT=/run/this-lamp\n", eyes_unit());
+        carried(
+            &mut lamp,
+            &new_eyes_unit(),
+            "eyes 2",
+            Some(&specific),
+            Vec::new(),
+        );
+        product_first(&mut lamp, reverse);
+        assert_eq!(
+            lamp.round(),
+            Outcome::Switched(2),
+            "reverse={reverse}: {:?}",
+            lamp.said
+        );
+        assert_eq!(lamp.read("/etc/systemd/system/lamp-eyes.service"), specific);
+        assert_eq!(lamp.eyes_link(), sha("eyes 2"));
+    }
+}
+
+#[test]
+fn a_pinned_part_keeps_its_pinned_lamp_template_beside_product_in_either_order() {
+    for reverse in [false, true] {
+        let mut lamp = Lamp::new().with_linked_eyes("eyes 1");
+        let pinned = pinned_eyes_unit();
+        fs::write(
+            lamp.root.join("etc/systemd/system/lamp-eyes.service"),
+            &pinned,
+        )
+        .unwrap();
+        carried(
+            &mut lamp,
+            &new_eyes_unit(),
+            "eyes 2",
+            Some(&pinned),
+            Vec::new(),
+        );
+        product_first(&mut lamp, reverse);
+        assert_eq!(
+            lamp.round(),
+            Outcome::Switched(2),
+            "reverse={reverse}: {:?}",
+            lamp.said
+        );
+        assert_eq!(
+            lamp.read("/etc/systemd/system/lamp-eyes.service"),
+            pinned.replace(&sha("eyes 1"), &sha("eyes 2"))
+        );
+        // The old current link is irrelevant to this pinned installation.
+        assert_eq!(lamp.eyes_link(), sha("eyes 1"));
+        assert!(
+            !lamp
+                .channel
+                .fetched
+                .iter()
+                .any(|url| url.ends_with("product.lamp-eyes.service"))
+        );
+    }
+}
+
+fn climbed_updater_confirms_mixed_layout(reverse: bool) {
+    let mut lamp = settings_lamp(false, true);
+    lamp.config.updater = manifest::PRODUCT_UNITS_UPDATER - 1;
+    lamp.systemd.self_recovery = Ok(());
+    let recovery = lamp.root.join(own::BACK.trim_start_matches('/'));
+    fs::create_dir_all(recovery.parent().unwrap()).unwrap();
+    fs::write(&recovery, "the independently installed recovery executable").unwrap();
+    fs::set_permissions(&recovery, fs::Permissions::from_mode(0o755)).unwrap();
+    let before = eyes_unit();
+    let product = new_eyes_unit();
+    carried(
+        &mut lamp,
+        &product,
+        "eyes 2",
+        Some(&pinned_eyes_unit()),
+        Vec::new(),
+    );
+    let envelope = &lamp.channel.files[&format!("{CHANNEL}{}", manifest::ENVELOPE)];
+    let bytes = manifest::signed(envelope, &lamp.config.key).unwrap();
+    let mut build = manifest::parse(&bytes).unwrap();
+    let updater = "update 2";
+    build.files.push(File {
+        name: "lamp-update".into(),
+        sha256: sha(updater),
+        size: updater.len() as u64,
+    });
+    lamp.channel.files.insert(
+        format!("{}lamp-update", build.files_url),
+        updater.as_bytes().to_vec(),
+    );
+    lamp.channel.files.insert(
+        format!("{CHANNEL}{}", manifest::ENVELOPE),
+        manifest::seal(&serde_json::to_vec(&build).unwrap(), &lamp.key).unwrap(),
+    );
+    product_first(&mut lamp, reverse);
+    assert_eq!(
+        lamp.round(),
+        Outcome::Climbs {
+            sequence: 2,
+            needed: manifest::PRODUCT_UNITS_UPDATER,
+            from: sha("update 1"),
+            to: sha(updater),
+        },
+        "reverse={reverse}: {:?}",
+        lamp.said
+    );
+    assert_eq!(lamp.state()["installed"]["sequence"], 1);
+    assert_eq!(lamp.read("/etc/systemd/system/lamp-eyes.service"), before);
+    assert_eq!(lamp.eyes_link(), sha("eyes 1"));
+    assert!(lamp.pending().is_some());
+    lamp.config.updater = manifest::UPDATER;
+    assert_eq!(
+        lamp.confirm(&sha(updater)),
+        own::Confirm::Confirmed,
+        "reverse={reverse}: {:?}",
+        lamp.said
+    );
+    assert!(lamp.pending().is_none());
+    assert_eq!(lamp.state()["installed"]["sequence"], 1);
+    assert_eq!(lamp.read("/etc/systemd/system/lamp-eyes.service"), before);
+    assert_eq!(lamp.eyes_link(), sha("eyes 1"));
+    assert_eq!(
+        lamp.round(),
+        Outcome::Switched(2),
+        "reverse={reverse}: {:?}",
+        lamp.said
+    );
+    assert_eq!(lamp.read("/etc/systemd/system/lamp-eyes.service"), product);
+    assert_eq!(lamp.eyes_link(), sha("eyes 2"));
+    assert_eq!(lamp.own_build(), sha(updater));
+    assert_eq!(lamp.state()["installed"]["sequence"], 2);
+}
+
+#[test]
+fn a_climbed_updater_confirms_product_before_its_pinned_lamp_template() {
+    climbed_updater_confirms_mixed_layout(true);
+}
+
+#[test]
+fn a_climbed_updater_confirms_product_after_its_pinned_lamp_template() {
+    climbed_updater_confirms_mixed_layout(false);
+}
+
+#[test]
+fn skipping_a_pinned_host_logs_only_its_unit_host_and_installed_link() {
+    let mut lamp = Lamp::new().with_linked_eyes("eyes 1");
+    let sentinel = "private-unit-environment-must-not-be-journaled";
+    let pinned = format!(
+        "{}Environment=LAMP_CARRIER_TEST_SECRET={sentinel}\n",
+        pinned_eyes_unit()
+    );
+    let product = new_eyes_unit();
+    carried(&mut lamp, &product, "eyes 2", Some(&pinned), Vec::new());
+    assert_eq!(lamp.round(), Outcome::Switched(2), "{:?}", lamp.said);
+    let expected = format!(
+        "skipping pinned lamp-eyes.service for {}: the installed part uses /opt/lampOS/eyes/current",
+        lamp.config.lamp
+    );
+    assert_eq!(
+        lamp.said.iter().filter(|line| **line == expected).count(),
+        1
+    );
+    assert!(!lamp.said.iter().any(|line| line.contains(sentinel)));
+    assert!(
+        !lamp
+            .said
+            .iter()
+            .any(|line| line.contains("LAMP_CARRIER_TEST_SECRET"))
+    );
+    assert_eq!(lamp.read("/etc/systemd/system/lamp-eyes.service"), product);
+}
+
+#[test]
+fn an_invalid_linked_host_is_refused_instead_of_falling_back_to_product() {
+    for specific in [
+        eyes_unit().replace("eyes/current/lamp-eyes", "other/current/lamp-eyes"),
+        eyes_unit().replace("eyes/current/lamp-eyes", "eyes/current/lamp-voice"),
+        "[Service]\nExecStart=/usr/bin/false\n".to_owned(),
+    ] {
+        let mut lamp = Lamp::new().with_linked_eyes("eyes 1");
+        let before = lamp.lamp_files();
+        carried(
+            &mut lamp,
+            &new_eyes_unit(),
+            "eyes 2",
+            Some(&specific),
+            Vec::new(),
+        );
+        let outcome = lamp.round();
+        assert!(matches!(outcome, Outcome::Refused(_)), "{outcome:?}");
+        assert_eq!(lamp.lamp_files(), before);
+        assert!(lamp.calls().is_empty());
+        assert!(
+            !lamp
+                .said
+                .iter()
+                .any(|line| line.starts_with("skipping pinned "))
+        );
+        assert!(
+            !lamp
+                .channel
+                .fetched
+                .iter()
+                .any(|url| url.ends_with("product.lamp-eyes.service"))
+        );
+    }
+}
+
+#[test]
+fn a_pinned_host_without_a_product_candidate_keeps_the_existing_refusal() {
+    let mut lamp = Lamp::new().with_linked_eyes("eyes 1");
+    let before = lamp.lamp_files();
+    carried(
+        &mut lamp,
+        &new_eyes_unit(),
+        "eyes 2",
+        Some(&pinned_eyes_unit()),
+        Vec::new(),
+    );
+    let envelope = &lamp.channel.files[&format!("{CHANNEL}{}", manifest::ENVELOPE)];
+    let bytes = manifest::signed(envelope, &lamp.config.key).unwrap();
+    let mut build = manifest::parse(&bytes).unwrap();
+    build
+        .units
+        .retain(|unit| unit.lamp != manifest::PRODUCT_LAMP);
+    lamp.channel.files.insert(
+        format!("{CHANNEL}{}", manifest::ENVELOPE),
+        manifest::seal(&serde_json::to_vec(&build).unwrap(), &lamp.key).unwrap(),
+    );
+    let outcome = lamp.round();
+    assert!(
+        matches!(outcome, Outcome::Refused(ref why) if why == "the build's lamp-eyes.service does not start /opt/lampOS/eyes/ through its current link"),
+        "{outcome:?}"
+    );
+    assert_eq!(lamp.lamp_files(), before);
+    assert!(lamp.calls().is_empty());
+    assert!(
+        !lamp
+            .said
+            .iter()
+            .any(|line| line.starts_with("skipping pinned "))
+    );
+    assert!(
+        !lamp
+            .channel
+            .fetched
+            .iter()
+            .any(|url| url.ends_with("product.lamp-eyes.service"))
+    );
+}
+
+fn assert_mixed_template_fetch_failure(host: bool, unreachable: bool) {
+    let mut lamp = Lamp::new().with_linked_eyes("eyes 1");
+    let before = lamp.lamp_files();
+    carried(
+        &mut lamp,
+        &new_eyes_unit(),
+        "eyes 2",
+        Some(&pinned_eyes_unit()),
+        Vec::new(),
+    );
+    let asset = if host {
+        format!("{}.lamp-eyes.service", lamp.config.lamp)
+    } else {
+        "product.lamp-eyes.service".to_owned()
+    };
+    let url = format!("https://channel.test/build-2/{asset}");
+    if unreachable {
+        // The signed envelope remains reachable: only this exact unit fetch fails.
+        lamp.channel.unreachable_under = Some(url.clone());
+    } else {
+        lamp.channel
+            .files
+            .insert(url.clone(), b"changed after signing".to_vec());
+    }
+    let outcome = lamp.round();
+    if unreachable {
+        assert!(matches!(outcome, Outcome::Unreachable(_)), "{outcome:?}");
+    } else {
+        assert!(
+            matches!(outcome, Outcome::Refused(ref why) if why == &format!("{asset} does not match its SHA-256")),
+            "{outcome:?}"
+        );
+    }
+    assert!(lamp.channel.fetched.contains(&url));
+    assert_eq!(lamp.lamp_files(), before);
+    assert!(lamp.calls().is_empty());
+    if host {
+        assert!(
+            !lamp
+                .said
+                .iter()
+                .any(|line| line.starts_with("skipping pinned "))
+        );
+        assert!(
+            !lamp
+                .channel
+                .fetched
+                .iter()
+                .any(|url| url.ends_with("product.lamp-eyes.service"))
+        );
+    } else {
+        assert!(
+            lamp.said
+                .iter()
+                .any(|line| line.starts_with("skipping pinned lamp-eyes.service for "))
+        );
+    }
+}
+
+#[test]
+fn the_product_fallback_still_rejects_corrupt_signed_unit_bytes() {
+    assert_mixed_template_fetch_failure(false, false);
+}
+
+#[test]
+fn an_unreachable_product_fallback_does_not_switch_any_part() {
+    assert_mixed_template_fetch_failure(false, true);
+}
+
+#[test]
+fn a_corrupt_pinned_host_is_not_silently_skipped_for_product() {
+    assert_mixed_template_fetch_failure(true, false);
+}
+
+#[test]
+fn an_unreachable_pinned_host_is_not_silently_skipped_for_product() {
+    assert_mixed_template_fetch_failure(true, true);
+}
+
+#[test]
+fn a_product_voice_ignores_its_legacy_pinned_releases_template() {
+    // Model the real historical Voice folder difference with Voice itself,
+    // not an Eyes unit that starts another binary.
+    let mut lamp = Lamp::installed();
+    let product = lamp.read("/etc/systemd/system/lamp-voice.service");
+    let legacy = voice_unit(&sha("lamp-voice 1"));
+    assert_eq!(
+        unit::linked(&product),
+        Some(("/opt/lampOS/voice/".into(), "lamp-voice".into()))
+    );
+    let pinned = unit::program(&legacy).unwrap();
+    assert_eq!(
+        (pinned.builds.as_str(), pinned.binary.as_str()),
+        ("/opt/lampOS/releases/", "lamp-voice")
+    );
+    let mut build = product_build(&mut lamp, 2);
+    for (host, text) in [
+        (lamp.config.lamp.clone(), legacy),
+        (manifest::PRODUCT_LAMP.into(), product.clone()),
+    ] {
+        let unit = Unit {
+            lamp: host,
+            unit: "lamp-voice.service".into(),
+            sha256: sha(&text),
+            size: text.len() as u64,
+        };
+        lamp.channel.files.insert(
+            format!("{}{}", build.files_url, unit.file_name()),
+            text.into_bytes(),
+        );
+        build.units.push(unit);
+    }
+    build.min_updater = Some(manifest::PRODUCT_UNITS_UPDATER);
+    lamp.channel.files.insert(
+        format!("{CHANNEL}{}", manifest::ENVELOPE),
+        manifest::seal(&serde_json::to_vec(&build).unwrap(), &lamp.key).unwrap(),
+    );
+    assert_eq!(lamp.round(), Outcome::Switched(2), "{:?}", lamp.said);
+    assert_eq!(lamp.read("/etc/systemd/system/lamp-voice.service"), product);
+    assert_eq!(
+        fs::read_link(lamp.root.join("opt/lampOS/voice/current"))
+            .unwrap()
+            .to_str(),
+        Some(sha("lamp-voice 2").as_str())
+    );
+    assert!(lamp.said.iter().any(|line| line == &format!("skipping pinned lamp-voice.service for {}: the installed part uses /opt/lampOS/voice/current", lamp.config.lamp)));
+}
