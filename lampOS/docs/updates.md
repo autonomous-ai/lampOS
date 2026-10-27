@@ -599,7 +599,10 @@ workflow change.
    (`NRestarts`) or change process (`MainPID`). At the end it must be
    running, and if it was in `lamp/health` before the switch it must be
    there again, not stale, and not in error unless it was before. A part
-   that never reported is judged by systemd alone.
+   that never reported is judged by systemd alone. A state query that fails
+   (`systemctl show`, at most 5 s) is not known yet and is asked again until
+   the watch's end; only one still failing then puts the build back
+   ("systemd cannot be asked").
 10. **Back.** A part not well: the journal's validated old startup order is
     used without rereading the installed dependency graph. Later changes or
     read failures in that graph cannot veto the saved restart order. Every
@@ -1557,10 +1560,12 @@ On the development Mac (Intel, macOS 26.6, Rust 1.96.0), not on a lamp:
   `journalctl -o json` (the unit's own last, others' and the old main
   process's skipped, cleaned and cut); a command bounded in time and read
   whole however much it prints; the units' state query (`systemctl show`)
-  bounded too, within 5 s (`JOURNAL_WITHIN`, both pipes read): one that
-  stalls, or ends while a child it left holds its pipes, is an error
-  ("systemd cannot be asked"), so the watch never waits past its own
-  deadline on systemd, and a failed query still says its trimmed stderr.
+  bounded too, within 5 s (`JOURNAL_WITHIN`), group-safe and capped as the
+  other queries (1 MiB stdout; stderr drained, 64 KiB kept): one that
+  stalls, or ends while a child it left holds its pipes, is an error and
+  that child is killed with its group; a failed query says its trimmed
+  stderr. In the watch a failed query is asked again until the watch's
+  deadline, putting back only if systemd still cannot be asked at the end.
 - With product parts (task #811, `cargo test -p lamp-update --test round`,
   19 rounds): a lamp with both kinds switched in one round, the voice by its
   unit and the eyes by their link, the eyes' unit byte for byte the same; a
