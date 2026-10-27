@@ -35,8 +35,11 @@ base64 = "=0.22.1"
 # and its answer, without lamp-update (the library only).
 lamp-keeper = { path = "../keeper", default-features = false }
 toml = { version = "1", default-features = false, features = ["parse", "serde", "std"] }
+# Own the query's process group and drain stdout without a waiting reader thread.
+rustix = { version = "=1.1.5", features = ["fs", "process"] }
 
 [dev-dependencies]
+tempfile = "3"
 # The Skills Store's tests (src/skills.rs): a package signed with a key of
 # their own, fetched from a local server through lamp-update's HTTP code.
 lamp-update = { path = "../update" }
