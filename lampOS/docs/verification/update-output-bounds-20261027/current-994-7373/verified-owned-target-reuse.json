@@ -1,0 +1,19 @@
+{
+  "actual_and_preserved_outputs_depfiles_verified_before_compiler": true,
+  "actual_executables_verified_before_compiler": true,
+  "changed_source_entries": [
+    "lampOS/crates/memory/src/days.rs",
+    "lampOS/crates/memory/src/tidy.rs",
+    "lampOS/crates/memory/tests/it/days.rs",
+    "lampOS/crates/memory/tests/it/voice_submit.rs",
+    "lampOS/crates/memory/tests/voice_link_used.rs",
+    "lampOS/crates/voice/src/remember.rs",
+    "lampOS/docs/memory-days.md",
+    "lampOS/docs/memory.md"
+  ],
+  "note": "Same owned worktree/target; old full Update runtime remains bound to431/4bff. Current runtime is lib plus one exact round reader only.",
+  "previous_closure_sha256": "4f5f79d682ef7b390692c6e39a9ba842ae30bf5a5208df3941e7aa055b0d8b03",
+  "previous_complete_sha256": "94a527fb35ec8e4ee6b37d8daa0307283938e336a35a151a099c00776b3117e8",
+  "previous_head": "ced61575eabfd290188d5ba2626b1f43506398fc",
+  "previous_source_inventory_sha256": "1b43fa6f94a2dd2fe9c4fea87f115912dff55b34c1c4d1128e3d56fe960449b7"
+}

@@ -1,0 +1,5 @@
+{
+  "absent_before_creation": true,
+  "empty_immediately_before_compile": true,
+  "target": "<target>"
+}

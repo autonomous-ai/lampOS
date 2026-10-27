@@ -1,0 +1,124 @@
+{
+  "closure": {
+    "actual_and_preserved_outputs_unchanged": true,
+    "depfile_count": 445,
+    "executable_count": 10,
+    "exit_code": 101,
+    "local_output_count": 63,
+    "source_unchanged": true
+  },
+  "complete_marker_absent": true,
+  "receipts": {
+    "clippy": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "clippy",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-setup",
+        "-p",
+        "lamp-cloud",
+        "--all-targets",
+        "--message-format=short",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "disk_free_before": 59033051136,
+      "elapsed_seconds": 19.436,
+      "error": null,
+      "exit_code": 0,
+      "log_sha256": "c36ba8e50f20fcbe43a27b495cca1a052995c0ea052a4db311fd88591b345ce0",
+      "source_entries": 7242,
+      "source_unchanged": true
+    },
+    "compile": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-setup",
+        "-p",
+        "lamp-cloud",
+        "--no-run",
+        "--message-format=json"
+      ],
+      "disk_free_before": 59032936448,
+      "elapsed_seconds": 56.528,
+      "error": null,
+      "exit_code": 0,
+      "log_sha256": "d3d5f7bbd4728f07d466391aa2806c9a0985727789eccd514c832846a117aace",
+      "source_entries": 7242,
+      "source_unchanged": true
+    },
+    "fmt": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "disk_free_before": 59033194496,
+      "elapsed_seconds": 7.055,
+      "error": null,
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source_entries": 7242,
+      "source_unchanged": true
+    },
+    "metadata": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "metadata",
+        "--locked",
+        "--offline",
+        "--format-version",
+        "1",
+        "--filter-platform",
+        "aarch64-apple-darwin"
+      ],
+      "disk_free_before": 59035172864,
+      "elapsed_seconds": 1.044,
+      "error": null,
+      "exit_code": 0,
+      "log_sha256": "77727db02e4ae1d3aec8ed05f0877754509621838d2000665aefc273913fd145",
+      "source_entries": 7242,
+      "source_unchanged": true
+    },
+    "runtime": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-setup",
+        "-p",
+        "lamp-cloud",
+        "--no-fail-fast",
+        "--",
+        "--test-threads=16"
+      ],
+      "disk_free_before": 58805538816,
+      "elapsed_seconds": 21.939,
+      "error": null,
+      "exit_code": 101,
+      "log_sha256": "288f34e861a04783c621c701ee0081eb1b563ace8fee50e61db7ac97887446b1",
+      "source_entries": 7242,
+      "source_unchanged": true
+    }
+  },
+  "retry": false,
+  "runtime_exit_code": 101,
+  "source_inventory_sha256": "789256a7b80a846ea8c9d5627ca045394f5afe32d121284a07dab3cd05166a91",
+  "status": "FAILED",
+  "supervisor_exit_code": 1
+}

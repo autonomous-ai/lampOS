@@ -1,0 +1,27 @@
+{
+  "cases": [
+    [
+      "a_waking_face_that_never_answers_cannot_keep_the_privacy_ring_dark",
+      "ok"
+    ]
+  ],
+  "note": "Literal summaries preserve nested child outputs separately; audit before aggregate counts.",
+  "runtime_bindings": [
+    {
+      "header": "Running tests/wake.rs (<target>/debug/deps/wake-a7cd8f8c806435b2)",
+      "sha256": "f0693ac4a0c69194485f07f696ad1475baad395c49026b6cc59a4743b68a4b3d"
+    }
+  ],
+  "scope": "baseline-wake",
+  "summaries": [
+    {
+      "failed": 0,
+      "filtered": 5,
+      "header": "Running tests/wake.rs (<target>/debug/deps/wake-a7cd8f8c806435b2)",
+      "ignored": 0,
+      "literal": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.20s",
+      "passed": 1,
+      "status": "ok"
+    }
+  ]
+}

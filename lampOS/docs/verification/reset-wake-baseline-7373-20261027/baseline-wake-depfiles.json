@@ -1,0 +1,707 @@
+[
+  {
+    "path": "<target>/debug/deps/shlex-810ce013610456de.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-0-shlex-810ce013610456de.d",
+    "sha256": "f9bfde303c9714eec81484ad87f29a1a5711229ca669c5fd61b8b0d091eabcc9"
+  },
+  {
+    "path": "<target>/debug/deps/writeable-e37ac8ac1d3d4e22.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-1-writeable-e37ac8ac1d3d4e22.d",
+    "sha256": "3110e8f0f2c3e6524afcaf46a390651343304cff854d42e817afbd08eebbfcfe"
+  },
+  {
+    "path": "<target>/debug/deps/http_body_util-fe4681a1ab507873.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-2-http_body_util-fe4681a1ab507873.d",
+    "sha256": "2cf89a1b21ab46b312f760742618381d35043b643005fc6d12a1144ad5f4316a"
+  },
+  {
+    "path": "<target>/debug/deps/signal_hook_registry-bc3cf9462af0f145.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-3-signal_hook_registry-bc3cf9462af0f145.d",
+    "sha256": "5a7f055dcd413d6e1f5ba47b188027e23e1726fcba18323e548de896802cb58f"
+  },
+  {
+    "path": "<target>/debug/deps/stable_deref_trait-a051d0e58713ce59.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-4-stable_deref_trait-a051d0e58713ce59.d",
+    "sha256": "dd9eac712e921d114db345e216809c9c32c229ce3e92de148755238368c59a1a"
+  },
+  {
+    "path": "<target>/debug/deps/zerovec_derive-cc3387ab266e5203.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-5-zerovec_derive-cc3387ab266e5203.d",
+    "sha256": "5e5f16a8512f7fa6a3d8e1480e3c6795bb6a21f8d2e23b21a89ab85d03a34a7a"
+  },
+  {
+    "path": "<target>/debug/deps/lamp_ipc-feeaa577d12c7675.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-6-lamp_ipc-feeaa577d12c7675.d",
+    "sha256": "1addeb5c75f4f5f4d06477022f40032da4f73256c2b64237ecab268c08425613"
+  },
+  {
+    "path": "<target>/debug/deps/icu_locale_core-db1477cb95c66ea5.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-7-icu_locale_core-db1477cb95c66ea5.d",
+    "sha256": "c37d7909df53c31d93ad460163847c33d4d3d593c4163585e5202f5c84c7cf06"
+  },
+  {
+    "path": "<target>/debug/deps/core_foundation-e92fd04dccd3be92.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-8-core_foundation-e92fd04dccd3be92.d",
+    "sha256": "617ec654d80f586972a447275a1f83481e593db05cda00ba1889b72fbc109c4a"
+  },
+  {
+    "path": "<target>/debug/deps/tokio_rustls-55be87c7a6160084.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-9-tokio_rustls-55be87c7a6160084.d",
+    "sha256": "ff5369576560079e784617e99d7667608474c69f9f93cb0858f811b48dde158a"
+  },
+  {
+    "path": "<target>/debug/deps/find_msvc_tools-ec76d30d248b94d8.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-10-find_msvc_tools-ec76d30d248b94d8.d",
+    "sha256": "423da0441f7199f234199a3ba0191aac582617b6a1664285ecee8c3e91095921"
+  },
+  {
+    "path": "<target>/debug/deps/jiff_core-aa4d9fe2653f588e.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-11-jiff_core-aa4d9fe2653f588e.d",
+    "sha256": "b4d7af2099c5c8a343a398f0c3f29326e184b776a81cfdc66056072185ccf570"
+  },
+  {
+    "path": "<target>/debug/deps/serde-ed3f9f3797e73776.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-12-serde-ed3f9f3797e73776.d",
+    "sha256": "e7b55ff27b427bb6a34c693143edd9de3412d445cc79fc19c080a3f78728fe0a"
+  },
+  {
+    "path": "<target>/debug/deps/subtle-2010eb206496eb2d.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-13-subtle-2010eb206496eb2d.d",
+    "sha256": "b9efc2fa82fa2fa627ceb0e7d287f2c91ddcbe9e9e0c51ec440725ee2d488ede"
+  },
+  {
+    "path": "<target>/debug/deps/itoa-f1ae332e353f4621.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-14-itoa-f1ae332e353f4621.d",
+    "sha256": "2187ee248e556a63c5656925339c554bdc3ebe99db4dc4125512af858dfbaa57"
+  },
+  {
+    "path": "<target>/debug/deps/memchr-e5948309a90d7cec.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-15-memchr-e5948309a90d7cec.d",
+    "sha256": "7c8e44dcf207175854889a854d406fe5c64f68ffa1252f8cba481b0347bc3067"
+  },
+  {
+    "path": "<target>/debug/deps/zerotrie-2a084c30758e2fbc.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-16-zerotrie-2a084c30758e2fbc.d",
+    "sha256": "03796ae2f18554ff3f4b22dac9ebbfa89dc3ff7ce7bfc9c38c11c6f7b792a538"
+  },
+  {
+    "path": "<target>/debug/deps/atomic_waker-ba15cf2d59c16d35.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-17-atomic_waker-ba15cf2d59c16d35.d",
+    "sha256": "7aebefb616666ad7c4fc1fb87f5bc7bd2c4baf69b8707c864a542862a64bbd43"
+  },
+  {
+    "path": "<target>/debug/deps/webpki_roots-a2c404b71ef32bb0.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-18-webpki_roots-a2c404b71ef32bb0.d",
+    "sha256": "23ad545a00de6e4f00a925b90446828fd9cf30922887473752d1106da8257f12"
+  },
+  {
+    "path": "<target>/debug/deps/cfg_if-aea3b32455814e1e.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-19-cfg_if-aea3b32455814e1e.d",
+    "sha256": "b03932963834dd078e8c84aab5f9a26ad65478f8bc6c232d77e1b395b0ddc21a"
+  },
+  {
+    "path": "<target>/debug/deps/zerofrom-29bb373eedff65d8.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-20-zerofrom-29bb373eedff65d8.d",
+    "sha256": "33a09a89a5aaa389e960c21196b93a3013e60442d4a4a35405fabbc0f4c7cbab"
+  },
+  {
+    "path": "<target>/debug/deps/libc-85a38dd20af127ff.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-21-libc-85a38dd20af127ff.d",
+    "sha256": "be11e39f00e10348d268ccee24634d3ecdfd93855efb4e141e0ca2cdb3d1c792"
+  },
+  {
+    "path": "<target>/debug/deps/icu_properties-e04dbca651bedca0.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-22-icu_properties-e04dbca651bedca0.d",
+    "sha256": "d124eaf3b4ac535b3d6304a1d078f673dbd5825688597701d24d4d6faffad31b"
+  },
+  {
+    "path": "<target>/debug/deps/tracing_core-d051435005d57955.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-23-tracing_core-d051435005d57955.d",
+    "sha256": "c28934a4abb319e3884cfa99e96bc7e8f52d6c26eb8dd53972c56d27f7e146b6"
+  },
+  {
+    "path": "<target>/debug/deps/lamp_update-4df08f734ae64b65.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-24-lamp_update-4df08f734ae64b65.d",
+    "sha256": "f1dfb6ff49a37eeb833558732e4afeefa4bbe95348435bfac9550b838e063b19"
+  },
+  {
+    "path": "<target>/debug/deps/security_framework_sys-3d7fb8270a011e05.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-25-security_framework_sys-3d7fb8270a011e05.d",
+    "sha256": "8b407c20c8ae9a8e57948f976df55be8263c0ece084148a331d60e5ee8066c87"
+  },
+  {
+    "path": "<target>/debug/deps/proc_macro2-b91b520b24078ecc.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-26-proc_macro2-b91b520b24078ecc.d",
+    "sha256": "0ffafafdfc31baea21af55ae07a605655e5a2b802ff78503fe1f5a38b6891da9"
+  },
+  {
+    "path": "<target>/debug/deps/percent_encoding-8e52cae6bfe32ebb.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-27-percent_encoding-8e52cae6bfe32ebb.d",
+    "sha256": "9793436606fe332fcbe93989dde5195ac5950f362604d0904ebbbc4aaeaabe6f"
+  },
+  {
+    "path": "<target>/debug/deps/matchit-8abeab9edb8cadb2.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-28-matchit-8abeab9edb8cadb2.d",
+    "sha256": "4e560877c0664a1fd4dda35d6bb00d5a74e2b2d4d46b42dffdf957951f2004dd"
+  },
+  {
+    "path": "<target>/debug/deps/getrandom-9ffbdcc0f8358ca9.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-29-getrandom-9ffbdcc0f8358ca9.d",
+    "sha256": "e48281993ee844c04bcaf1ed4e4f9389be120ccaac5883cc07c353c7a639b6c3"
+  },
+  {
+    "path": "<target>/debug/deps/hyper_rustls-b14d77cb971b0104.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-30-hyper_rustls-b14d77cb971b0104.d",
+    "sha256": "27055b4522abad368c292dda94d1bc6842927c2dd5b278c6ab6a844f32f1cea8"
+  },
+  {
+    "path": "<target>/debug/deps/base64-e4532c73ad546e3b.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-31-base64-e4532c73ad546e3b.d",
+    "sha256": "6b5c08ac31fb1ab500603451ed999e88aec363d34b5a886ac4b2607887dbe2e7"
+  },
+  {
+    "path": "<target>/debug/deps/idna-f33c318a3f530246.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-32-idna-f33c318a3f530246.d",
+    "sha256": "d8c0e082b692438829ead4406ca0adb0eb3278f0a7381a8bcd01f4288167d9f2"
+  },
+  {
+    "path": "<target>/debug/deps/futures_task-fcd66e2ddd6da447.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-33-futures_task-fcd66e2ddd6da447.d",
+    "sha256": "d24f0a0db06a0137dc482f5802c4e3abe540fc80ca893f9595757139282dbbeb"
+  },
+  {
+    "path": "<target>/debug/deps/ring-392dc5f20020f616.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-34-ring-392dc5f20020f616.d",
+    "sha256": "06a6cfc55d49cc82cbb8bf0ab58f560696b8c788bfffb447d9c8137cd2259391"
+  },
+  {
+    "path": "<target>/debug/deps/tower-653c91ff5b1268fc.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-35-tower-653c91ff5b1268fc.d",
+    "sha256": "3d4b2873d066b16e91c14272e73a925aa413ab291d68a89bc322404929411147"
+  },
+  {
+    "path": "<target>/debug/deps/jiff-4c66188c4e672f5b.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-36-jiff-4c66188c4e672f5b.d",
+    "sha256": "5e200f8674f6598c2f542c3ed0791a052a5b717b0972354eec172ff94dd6ec26"
+  },
+  {
+    "path": "<target>/debug/deps/generic_array-b27f9771441c5b2c.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-37-generic_array-b27f9771441c5b2c.d",
+    "sha256": "efa48fec01504b4aeb50bce5bde4d68810f8b3b205e2e7721c2798111b42ab08"
+  },
+  {
+    "path": "<target>/debug/deps/tower_service-7d1e427dd5efc55f.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-38-tower_service-7d1e427dd5efc55f.d",
+    "sha256": "afa13340f6cc4c2533c1fbb79a4d54aa681c000aeb7a7c21aefdfc54929b419c"
+  },
+  {
+    "path": "<target>/debug/deps/crypto_common-224d67bb5cccecd7.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-39-crypto_common-224d67bb5cccecd7.d",
+    "sha256": "dd1b54760443c7bc92660945f1fac9761d98dbb7dc82fbd5cf4b994ce6bd415e"
+  },
+  {
+    "path": "<target>/debug/deps/smallvec-616ad84ff6504894.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-40-smallvec-616ad84ff6504894.d",
+    "sha256": "015686274816c2909fd04e6a23fbc53bfa3cc44edb7afcc2168c43f3ee85c69e"
+  },
+  {
+    "path": "<target>/debug/deps/errno-0edd3f258837f26d.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-41-errno-0edd3f258837f26d.d",
+    "sha256": "d5dcc5669283f006bd33980e041ef78134d7eac3a68a23f01d08a7e97577338b"
+  },
+  {
+    "path": "<target>/debug/deps/cpufeatures-a7b4e341690debe6.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-42-cpufeatures-a7b4e341690debe6.d",
+    "sha256": "72ab457062da5638f052ca62a124f56951ca14ec5ac272538537a13258bb0075"
+  },
+  {
+    "path": "<target>/debug/deps/tokio-4c63f02b5e50fcb4.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-43-tokio-4c63f02b5e50fcb4.d",
+    "sha256": "85bb11d4875dbc6dc828926229877b292ccb2a67780b013dcc024469b1b02124"
+  },
+  {
+    "path": "<target>/debug/deps/webpki-8e7934dc5d8b47e6.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-44-webpki-8e7934dc5d8b47e6.d",
+    "sha256": "c779a7f187c6924c077e352d828daa1fee9ca41c73cd86eab7c5f7a3b99ee856"
+  },
+  {
+    "path": "<target>/debug/deps/log-f20ef5828b69282f.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-45-log-f20ef5828b69282f.d",
+    "sha256": "cacf057fbc33cc1096b9a99667fee2a6456843424d50cf1f93c13acd9f38b639"
+  },
+  {
+    "path": "<target>/debug/deps/core_foundation_sys-1f28ea5fcd4b9523.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-46-core_foundation_sys-1f28ea5fcd4b9523.d",
+    "sha256": "50f36c1a48f83432715cf57e88b3113ee2e4ea796f5a0be6b85032e883db3440"
+  },
+  {
+    "path": "<target>/debug/deps/jiff_tzdb-f212f0ea8d4e24c9.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-47-jiff_tzdb-f212f0ea8d4e24c9.d",
+    "sha256": "bd059e37845b714f33606249de89a1de88216f0228d4e499ea648f689c7f6db5"
+  },
+  {
+    "path": "<target>/debug/deps/bitflags-328bd2bbd71e721b.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-48-bitflags-328bd2bbd71e721b.d",
+    "sha256": "8178a09c57cc9263dc18bfa774959e3fb4cfa61fa19884881b01aa3f8f8836ec"
+  },
+  {
+    "path": "<target>/debug/deps/cc-2bdcf85fb37d213c.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-49-cc-2bdcf85fb37d213c.d",
+    "sha256": "6915c62fec57e62e2dc35abf1c01e7d2aa5acc80bd3ce17be3d378d0a6c6957c"
+  },
+  {
+    "path": "<target>/debug/deps/unicode_ident-3095d304d2a539cb.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-50-unicode_ident-3095d304d2a539cb.d",
+    "sha256": "fc044afec7bfe9641c93c723af3dd8c1442bc8ada4f58999e4a055c36a60619e"
+  },
+  {
+    "path": "<target>/debug/deps/yoke_derive-a01adca3513af5ce.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-51-yoke_derive-a01adca3513af5ce.d",
+    "sha256": "f58453a270cd21e9fbfe491d21cd10d190ba1d3690437a01eb0a671b4319bc1f"
+  },
+  {
+    "path": "<target>/debug/deps/serde_core-655f4ad2a9bea0d9.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-52-serde_core-655f4ad2a9bea0d9.d",
+    "sha256": "9a148f546279e52ef53738cfd403ffc02b2bb3660a6a3bdfedca53851820f643"
+  },
+  {
+    "path": "<target>/debug/deps/icu_collections-fbe3a32d2e15bd2f.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-53-icu_collections-fbe3a32d2e15bd2f.d",
+    "sha256": "f7cb4d4c693745070384095305de1006ed55d136ff460378b0eb22fa3d4a9f3d"
+  },
+  {
+    "path": "<target>/debug/deps/once_cell-75475f2cdf70add4.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-54-once_cell-75475f2cdf70add4.d",
+    "sha256": "560ef42245b9a8533f7b45b197815d60b564cc12332d9f6f2a98aa2eacc6df66"
+  },
+  {
+    "path": "<target>/debug/deps/mime-c48578701d24727e.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-55-mime-c48578701d24727e.d",
+    "sha256": "f18fba9ae223d263d1e8637b06935d2ded13b8b6873c1793d5846f047d5f3001"
+  },
+  {
+    "path": "<target>/debug/deps/rustls-c818709ac0d7813d.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-56-rustls-c818709ac0d7813d.d",
+    "sha256": "c1121360326acb4c58db687fc028c90e0c19dba09392cb737ac8696581eac287"
+  },
+  {
+    "path": "<target>/debug/deps/hyper_util-b072734cd21811da.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-57-hyper_util-b072734cd21811da.d",
+    "sha256": "3346fc67a6c06352705baa8e0a9058ded37943e073167cfd9583a1bfb195bfb0"
+  },
+  {
+    "path": "<target>/debug/deps/tinystr-9413d3d769229cba.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-58-tinystr-9413d3d769229cba.d",
+    "sha256": "2525f1bb9a4ed78098771729922b86a23f5cbef346dda797913a60e5c92bcb84"
+  },
+  {
+    "path": "<target>/debug/deps/lamp_bus-8ed4963f3a74bcdb.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-59-lamp_bus-8ed4963f3a74bcdb.d",
+    "sha256": "d425ee5176b97ccbfe5a043134525b8cc940fde4bbc59dbb2d123eae09ff1655"
+  },
+  {
+    "path": "<target>/debug/deps/ipnet-209428de8abac0fa.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-60-ipnet-209428de8abac0fa.d",
+    "sha256": "9e6ec64512e4ea56361dabc07c32f56dfe588dceeb01731d252c207dc87059fc"
+  },
+  {
+    "path": "<target>/debug/deps/icu_normalizer-33dfabd32ebc49b2.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-61-icu_normalizer-33dfabd32ebc49b2.d",
+    "sha256": "857c932f4e26fcd3e6b09fa7fa16d875b3219c655fd0b4c1f7ebd81a6c2b773d"
+  },
+  {
+    "path": "<target>/debug/deps/syn-e846372cdf139c81.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-62-syn-e846372cdf139c81.d",
+    "sha256": "6d342bfbbfd4186b7c3dc8e9cb9c589cab94ab09714df6eb67e56bfed1339123"
+  },
+  {
+    "path": "<target>/debug/deps/security_framework-aeec4fadd8b4240a.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-63-security_framework-aeec4fadd8b4240a.d",
+    "sha256": "364cdc46256182254f1889a3a59cc2c9d6d80b4c9db308f33cbe5ad20c7a3494"
+  },
+  {
+    "path": "<target>/debug/deps/form_urlencoded-2c812ef31be7e2c4.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-64-form_urlencoded-2c812ef31be7e2c4.d",
+    "sha256": "807dc906999f16d78199969ed4af8b67ee04c348d79342e00f6e3394a258a395"
+  },
+  {
+    "path": "<target>/debug/deps/zerofrom_derive-4141b9706c893020.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-65-zerofrom_derive-4141b9706c893020.d",
+    "sha256": "4985c59563c7fc120694bd16a9b33fb1fc19f58867d899c8d505cc198a4d69fa"
+  },
+  {
+    "path": "<target>/debug/deps/bytes-018747fc49d302d0.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-66-bytes-018747fc49d302d0.d",
+    "sha256": "7318b74d76a391fdd12b23920624dde9b5481699085346ef0bc55f03d3116a23"
+  },
+  {
+    "path": "<target>/debug/deps/try_lock-020a54ba9bc761bb.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-67-try_lock-020a54ba9bc761bb.d",
+    "sha256": "ebc98505abf655ca989e536eba4fdbcffabf19e08200d56aaaae3a69103f0050"
+  },
+  {
+    "path": "<target>/debug/deps/synstructure-44fe0d2d71046343.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-68-synstructure-44fe0d2d71046343.d",
+    "sha256": "640d69a80196c00508e6cd0f8b7a904fea111acf1277732d97e6c25b49e12068"
+  },
+  {
+    "path": "<target>/debug/deps/icu_properties_data-238be9ae1e96a480.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-69-icu_properties_data-238be9ae1e96a480.d",
+    "sha256": "bb6c9ce655afc6f03d878053af6df254692710ae2389a6c231404c0f348577e2"
+  },
+  {
+    "path": "<target>/debug/deps/potential_utf-f2f6312f5ce46c51.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-70-potential_utf-f2f6312f5ce46c51.d",
+    "sha256": "14066a82667c247e83cddcacbac48a6b871fa8f7ed7d86c23e1877d5d2bd36a1"
+  },
+  {
+    "path": "<target>/debug/deps/icu_provider-cc4e1c7be31d93bd.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-71-icu_provider-cc4e1c7be31d93bd.d",
+    "sha256": "a27c44c8fcba3c3ebd4f32e670f223961fbf8bfd10b4ef0b7f766cc93e1e87b3"
+  },
+  {
+    "path": "<target>/debug/deps/lamp_local_time-0ba1d770369ec162.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-72-lamp_local_time-0ba1d770369ec162.d",
+    "sha256": "9f1c36d84c4236e2de369400a51e305fc3b02746e21fcbedaccb7264a5b18966"
+  },
+  {
+    "path": "<target>/debug/deps/hyper-f60e2024cdc08d4e.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-73-hyper-f60e2024cdc08d4e.d",
+    "sha256": "6912aabec7811f9fd489add18efb430e597c51a7488b1ad69cb5f9121610f0c2"
+  },
+  {
+    "path": "<target>/debug/deps/displaydoc-5667de5e88bb8435.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-74-displaydoc-5667de5e88bb8435.d",
+    "sha256": "7e52f208dcdacd51511f3f90ae6f1927a38e6a72ef4da7edfbd40f5f14ea22da"
+  },
+  {
+    "path": "<target>/debug/deps/utf8_iter-bdd571bd57a28fa0.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-75-utf8_iter-bdd571bd57a28fa0.d",
+    "sha256": "a03d97956bd67c8747756f81177d14dace748d4a1a3a98a055b0ddac1fc66baf"
+  },
+  {
+    "path": "<target>/debug/deps/axum-d16b2ca775465951.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-76-axum-d16b2ca775465951.d",
+    "sha256": "48d0f5de499d343cff868479537dcc6c2d558eb04ed11224e54e91a6c7cd12c0"
+  },
+  {
+    "path": "<target>/debug/deps/pin_project_lite-2ef770aeba0ec911.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-77-pin_project_lite-2ef770aeba0ec911.d",
+    "sha256": "2fbbc568d9e9a9b006cf2368782a908ab0e953f52efb2c8a4ca72b70c9463b5a"
+  },
+  {
+    "path": "<target>/debug/deps/yoke-f2702c4534f31322.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-78-yoke-f2702c4534f31322.d",
+    "sha256": "2c67cceaff7d6a68e25e60221c0d68a6d1bf0dca8f9993e1ed392e4ad721df58"
+  },
+  {
+    "path": "<target>/debug/deps/url-31090d1bfd71292e.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-79-url-31090d1bfd71292e.d",
+    "sha256": "9170dad1fe8bb6f3f7bb3fdd39574a1ca9287cb208813511ce5f618ae6b35590"
+  },
+  {
+    "path": "<target>/debug/deps/lamp_ring-9eb9d0bfc1a93739.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-80-lamp_ring-9eb9d0bfc1a93739.d",
+    "sha256": "f8cbc6962c2b4a73c9f148ed0bbfd015f2911247a1bd5931b6b0a725c23deb63"
+  },
+  {
+    "path": "<target>/debug/deps/icu_normalizer_data-bc1ebe1bf6af2ef0.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-81-icu_normalizer_data-bc1ebe1bf6af2ef0.d",
+    "sha256": "a831913949a74b1e83996b99c9a984a8f1c2975fc7cadefc67a0ac3d5a06e29c"
+  },
+  {
+    "path": "<target>/debug/deps/futures_core-f0c8cfdc46ea73c3.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-82-futures_core-f0c8cfdc46ea73c3.d",
+    "sha256": "3b373dac2f678d48fd545769aee3949fa574603d14ef8a1a15c00621022c9832"
+  },
+  {
+    "path": "<target>/debug/deps/rustls_pki_types-f67f29d6f3aabcf7.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-83-rustls_pki_types-f67f29d6f3aabcf7.d",
+    "sha256": "7c783596e48525d79c918fc9c0c34f80a1aa7b2b010938279941c4e4fb70a3c9"
+  },
+  {
+    "path": "<target>/debug/deps/tower_http-2dbda0f83ff1131d.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-84-tower_http-2dbda0f83ff1131d.d",
+    "sha256": "bd3a16604cfa737cb49d07d2de0fe7729393a268e95621e3e34534f3cb8031a1"
+  },
+  {
+    "path": "<target>/debug/deps/litemap-c687ea3bb8111337.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-85-litemap-c687ea3bb8111337.d",
+    "sha256": "04777e0e92b9a49d9c95a96318c0badd4b5cd502353bc24fa78f845034e9d2a6"
+  },
+  {
+    "path": "<target>/debug/deps/quote-41d201e7894ed622.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-86-quote-41d201e7894ed622.d",
+    "sha256": "cd55bcdf1a5d1dd97a4485dfae7a2fd85dcce9d68211c147d5d36b7f9fd63610"
+  },
+  {
+    "path": "<target>/debug/deps/untrusted-f9ec1542f973a85b.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-87-untrusted-f9ec1542f973a85b.d",
+    "sha256": "16f2e917b0355e088d04fb1ce54f33dc341e2a1cc5d5e41c840286ed7a8ae6b6"
+  },
+  {
+    "path": "<target>/debug/deps/zeroize-1a2de6ae5244de58.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-88-zeroize-1a2de6ae5244de58.d",
+    "sha256": "0e06fd249fd76ae5472ecf146672e8d30a24f327d18e5938339a52b5d47198fd"
+  },
+  {
+    "path": "<target>/debug/deps/sha2-ec5ba5f778db9dd0.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-89-sha2-ec5ba5f778db9dd0.d",
+    "sha256": "1694dcb788a92370469903469a09abeccaa7f2bea34e175ebd387912fe2ce407"
+  },
+  {
+    "path": "<target>/debug/deps/slab-918a9aea68a0d2b9.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-90-slab-918a9aea68a0d2b9.d",
+    "sha256": "42dd53e07df416379abefc082ec2cdb84478c1f4088a69786e73b8058292459b"
+  },
+  {
+    "path": "<target>/debug/deps/mio-8757bfc577210939.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-91-mio-8757bfc577210939.d",
+    "sha256": "1cf1073172d8db559c3db01692c46c6aefcbe7d55c0b2268b477ff36fd38831d"
+  },
+  {
+    "path": "<target>/debug/deps/rustix-08f55ff272936cd0.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-92-rustix-08f55ff272936cd0.d",
+    "sha256": "be7a2366c23247e599e5e207196c10cb6b676cdf12dec55692ce2826b657147b"
+  },
+  {
+    "path": "<target>/debug/deps/base64-9be4bd84b89cee5c.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-93-base64-9be4bd84b89cee5c.d",
+    "sha256": "30347e40d30342bc4d5eb2026268cffd876d727b69824cba2a51325dbd87abe7"
+  },
+  {
+    "path": "<target>/debug/deps/tokio_macros-b42bbebe4bfffad6.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-94-tokio_macros-b42bbebe4bfffad6.d",
+    "sha256": "f6314f82a1d8ecf571d01aa2bc09c1657a3a4c128f9dbcb6d68081ac71f8b925"
+  },
+  {
+    "path": "<target>/debug/deps/httpdate-4777461e1fb0b36a.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-95-httpdate-4777461e1fb0b36a.d",
+    "sha256": "ec2604dd63e4b1f54c4aa7336f1ade6060266377bd5ef87d15459368986cfe86"
+  },
+  {
+    "path": "<target>/debug/deps/httparse-cd8f335e2faa6069.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-96-httparse-cd8f335e2faa6069.d",
+    "sha256": "ff35f2d7ce41d105b070778d812db748073788e78736cb2a74d1fb4e4fbecca4"
+  },
+  {
+    "path": "<target>/debug/deps/sync_wrapper-1add82f083852006.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-97-sync_wrapper-1add82f083852006.d",
+    "sha256": "bca0dc23cdbae4bfc89edb9bfb2a1590f6155bdb9ce84a3be98f0a1aac6fc2fc"
+  },
+  {
+    "path": "<target>/debug/deps/lamp_turn_owner-dd9e1e6bd8d30965.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-98-lamp_turn_owner-dd9e1e6bd8d30965.d",
+    "sha256": "09a96b54c73927e942b580bf94996e63b51788df786ffca6d3d6bb3791a986b3"
+  },
+  {
+    "path": "<target>/debug/deps/axum_core-5d42e5208a1ce8d9.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-99-axum_core-5d42e5208a1ce8d9.d",
+    "sha256": "c2312d55b456a6668501d68d3a2b904d7659f812310b7ee46bc762630a2edd40"
+  },
+  {
+    "path": "<target>/debug/deps/tower_layer-b5fda1e22bdbfc5a.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-100-tower_layer-b5fda1e22bdbfc5a.d",
+    "sha256": "e1ea41d33f0f08f1bc03773c31f35ad484b032864ee13dae5c6fb71f3f767d39"
+  },
+  {
+    "path": "<target>/debug/deps/version_check-6c0aa4b0cdb0ad74.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-101-version_check-6c0aa4b0cdb0ad74.d",
+    "sha256": "18d4e79b28801d827de32dbdcc79b77dfcad4e96edc7eb4c62eaa3e98bf061f0"
+  },
+  {
+    "path": "<target>/debug/deps/tracing-ff64a17a057c98cc.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-102-tracing-ff64a17a057c98cc.d",
+    "sha256": "7d070cd6c6c6890ede5a9d0acf3f8e320f77fd95eb2463a848c7808b6e80aefa"
+  },
+  {
+    "path": "<target>/debug/deps/wake-a7cd8f8c806435b2.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-103-wake-a7cd8f8c806435b2.d",
+    "sha256": "914fc269f5ca640bc60bb91bd2c540fb59623d82c33db8ebbffc1f985af7a37c"
+  },
+  {
+    "path": "<target>/debug/deps/zerovec-1d76d1572c131404.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-104-zerovec-1d76d1572c131404.d",
+    "sha256": "97fcf7a687778451bf9847ed23c7c0ce4f69d7913bf34d26e62b682fed4dd66a"
+  },
+  {
+    "path": "<target>/debug/deps/lamp_setup-eb2320864e7aa40b.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-105-lamp_setup-eb2320864e7aa40b.d",
+    "sha256": "af1e5e8372c9b0716f1724b187645efccd3fa1adc78b233e17075d04ed9cf4a3"
+  },
+  {
+    "path": "<target>/debug/deps/http-ce87732adbaa7b59.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-106-http-ce87732adbaa7b59.d",
+    "sha256": "1a668686f99695ffc611a65e9c6ed107816ecb6aa1c749ef11e7b425777bf089"
+  },
+  {
+    "path": "<target>/debug/deps/lamp_setup-d993343dd8e0603c.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-107-lamp_setup-d993343dd8e0603c.d",
+    "sha256": "d146eb74c821f18b466976378ddfb64487c1cc8687f65486fce6ddc530033f62"
+  },
+  {
+    "path": "<target>/debug/deps/rustls_platform_verifier-5cea3b9f655fb534.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-108-rustls_platform_verifier-5cea3b9f655fb534.d",
+    "sha256": "124c7e04163a9760540e07b156cc82ea3756501b70540199179d960e55f4636e"
+  },
+  {
+    "path": "<target>/debug/deps/serde_derive-cf2637191a8479a4.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-109-serde_derive-cf2637191a8479a4.d",
+    "sha256": "c42fc18d632b46a4ed706861a1576f9949a479a6f1a51f841add4c3c0fc5203a"
+  },
+  {
+    "path": "<target>/debug/deps/block_buffer-09633317d999e6bb.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-110-block_buffer-09633317d999e6bb.d",
+    "sha256": "a22c680512016491e56451fb91472827e684610a22bd64640a522636b9f1f837"
+  },
+  {
+    "path": "<target>/debug/deps/zmij-65e3fa454b76e94a.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-111-zmij-65e3fa454b76e94a.d",
+    "sha256": "287b79310aa529b59302c837e66c1a16db9bc46a0c7593382d1c20fc90b9efd4"
+  },
+  {
+    "path": "<target>/debug/deps/serde_json-87f550c2ac702a1c.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-112-serde_json-87f550c2ac702a1c.d",
+    "sha256": "a6dccdd1a719c876e05ac4973dc22f57b24a9a8a6caf25610e743504edfdd343"
+  },
+  {
+    "path": "<target>/debug/deps/reqwest-c70c4d60ff845a8d.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-113-reqwest-c70c4d60ff845a8d.d",
+    "sha256": "02bca2f77c8e75c56d5321bb8f13e72f913f033d30ff013af3dfb355b5ef819b"
+  },
+  {
+    "path": "<target>/debug/deps/cfg_aliases-115f2d682a4930be.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-114-cfg_aliases-115f2d682a4930be.d",
+    "sha256": "1408931b6ad902476d16ad130dea235e870c64f4205fe034297a0762ff1f371d"
+  },
+  {
+    "path": "<target>/debug/deps/digest-803286e0aebe47d2.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-115-digest-803286e0aebe47d2.d",
+    "sha256": "267266a1e38d20e193ea7af8555fea2cee6f5b2e4e25fd79568818bfe303538a"
+  },
+  {
+    "path": "<target>/debug/deps/nix-9fb76dc5e99fe15a.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-116-nix-9fb76dc5e99fe15a.d",
+    "sha256": "2e212773ad4db325f4b2fadf542795520027e07f27a114a7e54f98d62dc9846d"
+  },
+  {
+    "path": "<target>/debug/deps/want-5241625f5c0fc0f6.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-117-want-5241625f5c0fc0f6.d",
+    "sha256": "900b13d8574595aa98c0c5829e67150ac519ebd48feeaf68e2849f1f53ef2256"
+  },
+  {
+    "path": "<target>/debug/deps/idna_adapter-6f235eeee1c8206b.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-118-idna_adapter-6f235eeee1c8206b.d",
+    "sha256": "b874f1984889ddc6844ccb753f8662789a2de2191f5407e7ced6180cc18bc6a4"
+  },
+  {
+    "path": "<target>/debug/deps/http_body-a8a43cb0ce0e1f40.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-119-http_body-a8a43cb0ce0e1f40.d",
+    "sha256": "99da2e6af2bb7770edc57d37a56e25a59c3b9aca8116bc0abb38c6e2016034ae"
+  },
+  {
+    "path": "<target>/debug/deps/lamp_msgs-8dd6c9464b60fb71.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-120-lamp_msgs-8dd6c9464b60fb71.d",
+    "sha256": "7217cc89da6527ac342c9d93f5ff51017d0b1d1b30bc0e4a9b77042204b694a8"
+  },
+  {
+    "path": "<target>/debug/deps/futures_channel-db86729433ed68bc.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-121-futures_channel-db86729433ed68bc.d",
+    "sha256": "355475866700dce4f839c4dc5f23218140bf93a67151860c3e167683845fe888"
+  },
+  {
+    "path": "<target>/debug/deps/serde_path_to_error-cb289e678ebf6efb.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-122-serde_path_to_error-cb289e678ebf6efb.d",
+    "sha256": "1d1412d2d6ac1cf9716eb7e3c194ebefe913087b0844a4790908dd4f45faa696"
+  },
+  {
+    "path": "<target>/debug/deps/typenum-be5911685742ae6d.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-123-typenum-be5911685742ae6d.d",
+    "sha256": "8b50559f85980e6c4c81314955826a6abec932ffa735147cbb3f164f130c2b87"
+  },
+  {
+    "path": "<target>/debug/deps/socket2-63b0d54056edb894.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-124-socket2-63b0d54056edb894.d",
+    "sha256": "a627cef83384c2bd78984fb570a9821b654f7710816cade575c6bfaa1109e38a"
+  },
+  {
+    "path": "<target>/debug/deps/futures_util-d2de0fe295ae5254.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-125-futures_util-d2de0fe295ae5254.d",
+    "sha256": "f23b3c9cc689b2751b5ba85297368279e4eaee795111641e46a3b77580dd71b0"
+  },
+  {
+    "path": "<target>/debug/build/libc-48eb09ba54e497c2/build_script_build-48eb09ba54e497c2.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-126-build_script_build-48eb09ba54e497c2.d",
+    "sha256": "88adb5eac22867dd6f25267835bd4bb7d201f016d7c545622d3a09f795476904"
+  },
+  {
+    "path": "<target>/debug/build/icu_normalizer_data-07a433a86c8fa213/build_script_build-07a433a86c8fa213.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-127-build_script_build-07a433a86c8fa213.d",
+    "sha256": "8187c0de0d00045a8c778b4ccfa03d071181598ffef2612c32344435e333366d"
+  },
+  {
+    "path": "<target>/debug/build/serde-47ef4cc41f888599/build_script_build-47ef4cc41f888599.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-128-build_script_build-47ef4cc41f888599.d",
+    "sha256": "b4fb83aaaab34c0439edef3d42d412befee1f1963f8c6332eff15c88c4ac02d3"
+  },
+  {
+    "path": "<target>/debug/build/proc-macro2-4d5fb0f49d863bc8/build_script_build-4d5fb0f49d863bc8.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-129-build_script_build-4d5fb0f49d863bc8.d",
+    "sha256": "499b9be35e9ecb93c6458ed26e671ea7bd2c9f30dfde8f0efd84299f4b6d36a8"
+  },
+  {
+    "path": "<target>/debug/build/ring-71cdb71d832f5da7/build_script_build-71cdb71d832f5da7.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-130-build_script_build-71cdb71d832f5da7.d",
+    "sha256": "7d0e216a32071cbcd15f9877a5f53e639a1d5f0e46fa2dcc4cde30aab97b04d0"
+  },
+  {
+    "path": "<target>/debug/build/icu_properties_data-8cbab4427e5db3c6/build_script_build-8cbab4427e5db3c6.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-131-build_script_build-8cbab4427e5db3c6.d",
+    "sha256": "fd150be8c3cd381d276a8e77b4bd6511bcd9162fe5c4a7d21c0cff166f6d9f2b"
+  },
+  {
+    "path": "<target>/debug/build/generic-array-6a358fda44e9f72b/build_script_build-6a358fda44e9f72b.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-132-build_script_build-6a358fda44e9f72b.d",
+    "sha256": "65e275bd2874e390d3a4aaa76a9a90edba8e73873123e1d274c1c6f06760dc1b"
+  },
+  {
+    "path": "<target>/debug/build/rustls-f5002fddbd6ddaa0/build_script_build-f5002fddbd6ddaa0.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-133-build_script_build-f5002fddbd6ddaa0.d",
+    "sha256": "f12fb41bacf282aed0d672d23edd045787742700dda3f53ae4d87b6fb3c734d4"
+  },
+  {
+    "path": "<target>/debug/build/zmij-144e2544bcb6ac2b/build_script_build-144e2544bcb6ac2b.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-134-build_script_build-144e2544bcb6ac2b.d",
+    "sha256": "a992c546096e0d840daf9b4d484e51e1c8c2628fdcdf756b898ddf372e367311"
+  },
+  {
+    "path": "<target>/debug/build/rustix-03156996a9d48617/build_script_build-03156996a9d48617.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-135-build_script_build-03156996a9d48617.d",
+    "sha256": "8c5ab01fbe8f664ca064326d39d3d1ce4947d04cb7e1f0d1bdd8ae0d3adbe78e"
+  },
+  {
+    "path": "<target>/debug/build/httparse-c297094df7cd6919/build_script_build-c297094df7cd6919.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-136-build_script_build-c297094df7cd6919.d",
+    "sha256": "b1a900e978326518cd6431b184c1041c27f4264fbc6859c827cce24ae76b3ed0"
+  },
+  {
+    "path": "<target>/debug/build/nix-a7a8a785f4fef33a/build_script_build-a7a8a785f4fef33a.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-137-build_script_build-a7a8a785f4fef33a.d",
+    "sha256": "ed5cdd1e2edf0c3ad5bedf16eca8bc36ffcbdc6c9e27dba8a10ff52aabb629bf"
+  },
+  {
+    "path": "<target>/debug/build/serde_core-66d223ad0758f2d4/build_script_build-66d223ad0758f2d4.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-138-build_script_build-66d223ad0758f2d4.d",
+    "sha256": "b9c37cee9a76763e86736ba18cb6ce41240cf0e12adcedb9d6c78ec841ef516c"
+  },
+  {
+    "path": "<target>/debug/build/quote-9b70a444c953cb52/build_script_build-9b70a444c953cb52.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-139-build_script_build-9b70a444c953cb52.d",
+    "sha256": "e4ff71bdc2d4f597c1a555023d59296eabeb1b0742477bdf03612831b6950318"
+  },
+  {
+    "path": "<target>/debug/build/serde_json-9edfe3bde811f84e/build_script_build-9edfe3bde811f84e.d",
+    "preserved_path": "<gate>/baseline-wake/artifacts/dep-140-build_script_build-9edfe3bde811f84e.d",
+    "sha256": "204f1fd8679f13df6418e2f5265ad65c19ce250ddd54bc0d5f7e7f03a018f60b"
+  }
+]

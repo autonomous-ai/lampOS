@@ -1,0 +1,7 @@
+{
+  "lampOS/crates/ring/Cargo.toml": "100644 blob 048678f541ce44452f40b946511058f09c1fecfc\tlampOS/crates/ring/Cargo.toml",
+  "lampOS/crates/ring/src/waking.rs": "100644 blob b1c8ffd6e2e5946231382819c89050b5afbf438d\tlampOS/crates/ring/src/waking.rs",
+  "lampOS/crates/setup/Cargo.toml": "100644 blob 01096122b56f647d33470bb96f3e2210cc17d6df\tlampOS/crates/setup/Cargo.toml",
+  "lampOS/crates/setup/src/wake.rs": "100644 blob 3245af023f77d035c997a26d0898441f5781d64d\tlampOS/crates/setup/src/wake.rs",
+  "lampOS/crates/setup/tests/wake.rs": "100644 blob 142ecced64e81da56145e962bc1b29714e69c956\tlampOS/crates/setup/tests/wake.rs"
+}

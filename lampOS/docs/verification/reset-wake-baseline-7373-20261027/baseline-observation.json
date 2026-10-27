@@ -1,0 +1,13 @@
+{
+  "case": "a_waking_face_that_never_answers_cannot_keep_the_privacy_ring_dark",
+  "exact_public_base": "737331535d0cab813170d288110fc44ff5d41a68",
+  "limit": "One filtered case does not recreate full-suite contention; a pass does not waive the PR full-suite failure.",
+  "no_retry": true,
+  "rows": [
+    [
+      "a_waking_face_that_never_answers_cannot_keep_the_privacy_ring_dark",
+      "ok"
+    ]
+  ],
+  "thread_count_flag": 16
+}

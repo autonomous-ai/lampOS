@@ -1,5 +1,17 @@
 Ready for lamp-voice: no
 
+## Current checkpoint: 2026-10-27 08:32 +07, latest-base outcomes retained
+
+[Full ff03/7373 failure](verification/reset-query-bounds-20261026/failed-ff03-7373/README.md) records **388/1/5**, the unchanged wake/privacy timing assertion at 163.064 ms, all eight query controls passing, and source/actual-preserved artifacts stable. [Clean public-Main baseline](verification/reset-wake-baseline-7373-20261027/README.md) ran only that case once: **1/0/0**, five filtered. It did not reproduce the full-suite failure or establish inherited attribution. Tests has the finding on #3631 and Queue; no PR retry or threshold relaxation. This local carry remains unpushed and draft.
+
+[Current Update 994/7373 focused proof](verification/update-output-bounds-20261027/current-994-7373/README.md): fmt and strict all-target Clippy pass, library **131/0/2**, exact round **1/0/0**, 182 filtered, all nine controls once, source and actual/preserved output/depfile/executable guards closed per scope. The exact-lease push started original ARM40432733066/Linux40432732912. ARM attempt 1 failed before runtime in the separate promotion-helper dependency resolution on a crates.io HTTP/2 error: zero product cases run. Original failed evidence is retained. An explicitly requested failed-job retry on the same head is collecting; neither failure nor historical green is presented as current qualification.
+
+Cloud's private reader and eight direct controls are committed locally as 129774137f on 7373. Public wrapper/caller policies, two seconds and 256 KiB stay fixed. Host-filtered offline metadata resolves; the earlier unfiltered metadata lacked a foreign-platform cached derive crate before compilation. Cloud's scoped frozen-source host gate is next. No device, provider, key, signing or release action.
+
+---
+
+Ready for lamp-voice: no
+
 ## Current checkpoint: 2026-10-27 08:27 +07, carries and independent Mood read
 
 The two docs conflicts were resolved on 99b516153, preserving all incoming and authored sections. [Reset e8dd exact host proof](verification/reset-query-bounds-20261026/current-e8dd-99b5/README.md): fmt, strict Setup/Cloud Clippy, full **389/0/5**, eight controls once. [Update ced exact focused host proof](verification/update-output-bounds-20261027/current-ced-99b5/README.md): fmt, strict Update Clippy, full library **131/0/2**, exact round reader **1/0/0**, 182 filtered; all nine controls once. Full historical Update **433/0/4** and its two Mac-ignored Linux controls remain bound to 431/4bff. Source and actual/preserved artifacts were guarded at each closed scope; no full round or negative-control replay.

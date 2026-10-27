@@ -1,0 +1,42 @@
+{
+  "complete": {
+    "base": "737331535d0cab813170d288110fc44ff5d41a68",
+    "complete": true,
+    "head": "737331535d0cab813170d288110fc44ff5d41a68",
+    "note": "Each scope closed artifact guards before subsequent compilation; only last scope current actual paths claimed at final completion.",
+    "scopes": [
+      "baseline-wake"
+    ],
+    "source_entries": 7241,
+    "source_unchanged": true
+  },
+  "identity": {
+    "base": "737331535d0cab813170d288110fc44ff5d41a68",
+    "controller_sha256": "553743e248e8e4112012b89d4ae374b96b644ee098404b4b46e18a73d9ac1123",
+    "head": "737331535d0cab813170d288110fc44ff5d41a68",
+    "runner_sha256": "2e66404ac7e0a43bc84afc01b8ba599bd3c14724c3a29e9fce51c831eaf87183"
+  },
+  "receipts": {
+    "metadata": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "metadata",
+        "--locked",
+        "--offline",
+        "--format-version",
+        "1",
+        "--filter-platform",
+        "aarch64-apple-darwin"
+      ],
+      "disk_free_before": 57250570240,
+      "elapsed_seconds": 0.927,
+      "error": null,
+      "exit_code": 0,
+      "log_sha256": "9d1c2ec9113ed4c6203c323ec20f59dcae38fc9f1c089e4a256287e9ef4f5c49",
+      "source_entries": 7241,
+      "source_unchanged": true
+    }
+  },
+  "source_inventory_sha256": "faf0c2da5d04172796ff9ce542c2564c72d2f4b71d9f6338910cddbd539ab3c8"
+}

@@ -1,0 +1,82 @@
+{
+  "complete": {
+    "base": "737331535d0cab813170d288110fc44ff5d41a68",
+    "complete": true,
+    "head": "99422939fa848bd2b4bc7923ac610981df4adf57",
+    "note": "Each scope closed artifact guards before subsequent compilation; only last scope current actual paths claimed at final completion.",
+    "scopes": [
+      "update-lib",
+      "update-round-reader"
+    ],
+    "source_entries": 7243,
+    "source_unchanged": true
+  },
+  "identity": {
+    "base": "737331535d0cab813170d288110fc44ff5d41a68",
+    "controller_sha256": "03bd987145ec2c7080a249bd7c025895a6cc178396af4ae0d18a83efa16496bd",
+    "head": "99422939fa848bd2b4bc7923ac610981df4adf57",
+    "runner_sha256": "2e66404ac7e0a43bc84afc01b8ba599bd3c14724c3a29e9fce51c831eaf87183"
+  },
+  "receipts": {
+    "clippy": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "clippy",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-update",
+        "--all-targets",
+        "--message-format=short",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "disk_free_before": 58786369536,
+      "elapsed_seconds": 19.193,
+      "error": null,
+      "exit_code": 0,
+      "log_sha256": "45577e50b05aa40b4ade4b616338cc807a7ec51a744234abc18d9d2aacfe7051",
+      "source_entries": 7243,
+      "source_unchanged": true
+    },
+    "fmt": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "disk_free_before": 58786381824,
+      "elapsed_seconds": 7.082,
+      "error": null,
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source_entries": 7243,
+      "source_unchanged": true
+    },
+    "metadata": {
+      "command": [
+        "cargo",
+        "+1.96.0",
+        "metadata",
+        "--locked",
+        "--offline",
+        "--format-version",
+        "1",
+        "--filter-platform",
+        "aarch64-apple-darwin"
+      ],
+      "disk_free_before": 58788433920,
+      "elapsed_seconds": 1.024,
+      "error": null,
+      "exit_code": 0,
+      "log_sha256": "a14e4ff389d05de01e61e1823e1b7da29ebc6a978a17098d9371b70181f1d38a",
+      "source_entries": 7243,
+      "source_unchanged": true
+    }
+  },
+  "source_inventory_sha256": "321fba2bb3bef0110e125a254bbf17c8472109112f97995c58b1d4e92ad65184"
+}

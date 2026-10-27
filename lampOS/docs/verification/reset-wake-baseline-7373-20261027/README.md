@@ -1,0 +1,7 @@
+# Public 7373 isolated wake baseline observation
+
+Clean public baseline 737331535d0cab813170d288110fc44ff5d41a68, own branch second/reset-wake-baseline-7373. No query PR change was applied. Exactly one invocation compiled and ran `cargo +1.96.0 test --locked --offline -p lamp-setup --test wake a_waking_face_that_never_answers_cannot_keep_the_privacy_ring_dark`; compilation added --no-run --message-format=json, runtime added --no-fail-fast -- --exact --test-threads=16. Result **1 passed, 0 failed, 0 ignored, 5 filtered**, test duration 0.20s, command 1.673s. No retry.
+
+This isolated baseline did not reproduce the retained ff03 full Setup/Cloud failure (388/1/5; wake interval 163.063834ms versus required 100ms <= interval <150ms). It does not prove the PR caused the failure, nor that the failure is inherited: the exact filtered case does not recreate sibling-test/full-suite contention. The failed PR gate remains failed and must be reported separately; no source fix or waiver was made.
+
+A separate metadata target preceded atomically absent/empty exclusive compilation output. Source inventory 7241 remained unchanged. Guards retained 2 executables, 18 local outputs and 141 depfiles with actual/preserved hashes; runtime header binds to the test driver. Exact commands, literal summary, source inventory, configuration, local dependency inputs, raw log hashes and artifact manifests are retained. This is a baseline experiment, not a full gate or installed timing acceptance. No binaries or scripts are in this packet.
