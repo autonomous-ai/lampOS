@@ -682,3 +682,4 @@ Ready for lamp-voice: yes (#2553), once its ARM64 run is green
 - 00:29: quiet tick for my PRs; no SDK questions from harness-reviewer.
 - 00:34: quiet tick for my PRs. The 75c9 lamp-control install waits ~20 min for a build (lamp-voice ARM64 red on the N13 flake; Friday's #3891 fixes it).
 - 00:39: Reviewer-two reading #3903. Otherwise quiet.
+- 00:44: train 254 merged #3900 (part 6); checked parts.rs on f903659bb: look/joints/express/play/sound still waits_for the same words, so #3903's LAMP_CONTROL_REFUSES stays exact.
