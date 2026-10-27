@@ -1,5 +1,13 @@
 # Tests work log
 
+## 2026-10-27 14:56 — Carrier landed; current fixture carries and retained admission failure
+
+Ready for lamp-voice: #3466 landed through train #3744; remaining test PRs are drafts pending current gates.
+
+First reports Carrier merged by train into pinnedf9a9404de. Its original PR is closed without a merge commit because the train rebased the same six patches. Main ARM40467022152 is green; actual stable promotion and the requested one7071 production update acceptance remain separate from the completed [unit-only GOOD/BAD proof](verification/tests-carrier-7071-52e6-20261027/). The slot board has another holder through15:11; no new Tests lamp access or changes.
+
+Restart9dd/f9, Moodf284/f9, Skills0f059/f9 and Ready5ea/f9 each preserve an equal patch. Sentinel f0c/f9 retains the exact approved two-file P3 payload, not yet committed or qualified. [Restart admission proof](verification/tests-restart-f9-admission-20261027/) retains the fresh-target attempt's successful formatting/metadata/strict12, then resource admission FAIL/native1 before workspace or any test runtime. All338 witnesses/source/owner guards passed. Narrow old incremental-only cleanup preserved runtime binaries/source/logs/proof and observed about3.31GB more free. The unstarted workspace/test remainder is active on the same current target with unchanged capacity guards. No current fixture pass or readiness claim.
+
 ## 2026-10-27 12:25 — Carrier 7071 round complete and lamp restored
 
 Ready for lamp-voice: yes (#3466, dd5a88c61; First owns merge/promotion)
