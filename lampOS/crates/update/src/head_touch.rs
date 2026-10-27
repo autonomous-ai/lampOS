@@ -11,7 +11,7 @@ use std::{
     fs,
     io::{self, Read},
     os::unix::fs::{FileTypeExt, MetadataExt, OpenOptionsExt},
-    path::Path,
+    path::{Path, PathBuf},
 };
 
 pub(crate) const PINS: &str = "/etc/lampOS/controls/controls-pins.json";
@@ -20,6 +20,40 @@ const VOICE: &str = "lamp-voice.service";
 const EXPRESSION: &str = "lamp-expression.service";
 const BODY: &str = "lamp-body.service";
 const BODY_ENV: &str = "/etc/lampOS/body/lamp.env";
+
+/// Read dependencies of the existing head-pair policy. A closed implementation
+/// must distinguish a captured absence from an uncaptured key. This interface
+/// supplies no authentication, exclusion, freshness or write authority.
+pub(crate) trait HeadInputs {
+    fn text(&mut self, path: &Path) -> Result<Option<String>, String>;
+    fn entries(&mut self, directory: &Path) -> Result<Option<ConfEntries>, String>;
+}
+
+/// Owned and lazy: policy may reject an early file without consuming a later
+/// directory error. Entries include ignored names so a collector can bound all
+/// enumeration work before filtering. No iterator borrows its input provider.
+pub(crate) type ConfEntries = Box<dyn Iterator<Item = Result<PathBuf, String>>>;
+
+struct OrdinaryInputs;
+
+impl HeadInputs for OrdinaryInputs {
+    fn text(&mut self, path: &Path) -> Result<Option<String>, String> {
+        read(path)
+    }
+
+    fn entries(&mut self, directory: &Path) -> Result<Option<ConfEntries>, String> {
+        let entries = match fs::read_dir(directory) {
+            Ok(entries) => entries,
+            Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(None),
+            Err(error) => return Err(format!("head touch overrides cannot be read: {error}")),
+        };
+        Ok(Some(Box::new(entries.map(|entry| {
+            entry
+                .map(|entry| entry.path())
+                .map_err(|error| error.to_string())
+        }))))
+    }
+}
 
 fn read(path: &Path) -> Result<Option<String>, String> {
     let failed = |error: io::Error| format!("{}: {error}", path.display());
@@ -79,7 +113,7 @@ fn service(text: &str) -> String {
 
 // The product uses literal Environment and ExecStart settings. Do not guess
 // when a local override can change those: leave the installed lamp untouched.
-fn no_mode_overrides(root: &Path, name: &str) -> Result<(), String> {
+fn no_mode_overrides(inputs: &mut dyn HeadInputs, root: &Path, name: &str) -> Result<(), String> {
     for base in [
         "etc/systemd/system",
         "run/systemd/system",
@@ -92,17 +126,16 @@ fn no_mode_overrides(root: &Path, name: &str) -> Result<(), String> {
             "lamp-.service.d".to_owned(),
             format!("{name}.d"),
         ] {
-            let entries = match fs::read_dir(root.join(base).join(folder)) {
-                Ok(entries) => entries,
-                Err(error) if error.kind() == io::ErrorKind::NotFound => continue,
-                Err(error) => return Err(format!("head touch overrides cannot be read: {error}")),
+            let entries = match inputs.entries(&root.join(base).join(folder))? {
+                Some(entries) => entries,
+                None => continue,
             };
             for entry in entries {
-                let path = entry.map_err(|e| e.to_string())?.path();
+                let path = entry?;
                 if path.extension().is_none_or(|ext| ext != "conf") {
                     continue;
                 }
-                let text = read(&path)?.unwrap_or_default();
+                let text = inputs.text(&path)?.unwrap_or_default();
                 if service(&text).lines().any(|line| {
                     line.ends_with('\\')
                         || line.starts_with("ExecStart=")
@@ -138,15 +171,16 @@ fn flag(text: &str, flag: &str) -> bool {
 }
 
 fn reader(
+    inputs: &mut dyn HeadInputs,
     root: &Path,
     units: &Path,
     carried: &BTreeMap<String, String>,
     name: &str,
 ) -> Result<Option<String>, String> {
-    no_mode_overrides(root, name)?;
+    no_mode_overrides(inputs, root, name)?;
     let text = match carried.get(name) {
         Some(text) => text.clone(),
-        None => match read(&units.join(name))? {
+        None => match inputs.text(&units.join(name))? {
             Some(text) => text,
             None => return Ok(None),
         },
@@ -218,7 +252,16 @@ pub(crate) fn active_pins(
     units: &Path,
     carried: &BTreeMap<String, String>,
 ) -> Result<Option<String>, String> {
-    let Some(text) = reader(root, units, carried, CONTROLS)? else {
+    active_pins_with(&mut OrdinaryInputs, root, units, carried)
+}
+
+fn active_pins_with(
+    inputs: &mut dyn HeadInputs,
+    root: &Path,
+    units: &Path,
+    carried: &BTreeMap<String, String>,
+) -> Result<Option<String>, String> {
+    let Some(text) = reader(inputs, root, units, carried, CONTROLS)? else {
         return Ok(None);
     };
     let Some(path) = argument(&text, "--pins")? else {
@@ -252,13 +295,16 @@ fn bus_root(text: &str, flag: Option<&str>, empty_is_default: bool) -> Result<St
 // bytes rather than assuming it contains poses. These per-lamp calibration
 // paths are not allowed manifest settings; install and update preserve them.
 fn body_reader(
+    inputs: &mut dyn HeadInputs,
     root: &Path,
     units: &Path,
     carried: &BTreeMap<String, String>,
 ) -> Result<String, String> {
     let text = match carried.get(BODY) {
         Some(text) => text.clone(),
-        None => read(&units.join(BODY))?.ok_or("head touch needs installed lamp-body.service")?,
+        None => inputs
+            .text(&units.join(BODY))?
+            .ok_or("head touch needs installed lamp-body.service")?,
     };
     let mut normalized = Vec::new();
     let mut commands = 0;
@@ -268,7 +314,7 @@ fn body_reader(
             .map(|path| path.strip_prefix('-').unwrap_or(path))
             .filter(|path| matches!(*path, BODY_ENV | "/var/lib/lampos-body/measured.env"));
         if let Some(path) = calibration_path {
-            let calibration = read(&root.join(path.trim_start_matches('/')))?;
+            let calibration = inputs.text(&root.join(path.trim_start_matches('/')))?;
             // A new lamp may not have measured poses yet. The required file
             // then prevents Body from starting, as it did before this check.
             for line in calibration.as_deref().unwrap_or_default().lines() {
@@ -308,15 +354,20 @@ fn body_reader(
         BODY.to_owned(),
         format!("[Service]\n{}", normalized.join("\n")),
     )]);
-    reader(root, units, &normalized, BODY)?
+    reader(inputs, root, units, &normalized, BODY)?
         .ok_or("head touch needs installed lamp-body.service".into())
 }
 
-fn legacy(root: &Path, units: &Path, carried: &BTreeMap<String, String>) -> Result<bool, String> {
+fn legacy(
+    inputs: &mut dyn HeadInputs,
+    root: &Path,
+    units: &Path,
+    carried: &BTreeMap<String, String>,
+) -> Result<bool, String> {
     let mut texts = Vec::new();
     for name in [VOICE, EXPRESSION, CONTROLS] {
         texts.push(
-            reader(root, units, carried, name)?
+            reader(inputs, root, units, carried, name)?
                 .ok_or_else(|| format!("head touch needs installed {name}"))?,
         );
     }
@@ -341,7 +392,7 @@ fn legacy(root: &Path, units: &Path, carried: &BTreeMap<String, String>) -> Resu
         return Err("head touch needs its enabled readers and Controls on the same bus, including the enabled privacy reader".into());
     }
     if voice {
-        let body = body_reader(root, units, carried)?;
+        let body = body_reader(inputs, root, units, carried)?;
         if unit::environment(&body, "LAMP_HEAD_TOUCH").as_deref() != Some("on")
             || Path::new(&bus_root(&body, None, true)?) != Path::new(&controls)
         {
@@ -382,7 +433,7 @@ pub(crate) fn preflight_install(
         .iter()
         .map(|(name, text)| ((*name).to_owned(), (*text).to_owned()))
         .collect();
-    let wanted = legacy(root, units, &carried)?;
+    let wanted = legacy(&mut OrdinaryInputs, root, units, &carried)?;
     let configured = object
         .get("legacy_head")
         .and_then(|value| value.as_bool())
@@ -401,7 +452,18 @@ pub(crate) fn project(
     settings: &[Setting],
     steps: &mut Vec<Step>,
 ) -> Result<(), String> {
-    if active_pins(root, units, carried)?.as_deref() != Some(PINS) {
+    project_with(&mut OrdinaryInputs, root, units, carried, settings, steps)
+}
+
+pub(crate) fn project_with(
+    inputs: &mut dyn HeadInputs,
+    root: &Path,
+    units: &Path,
+    carried: &BTreeMap<String, String>,
+    settings: &[Setting],
+    steps: &mut Vec<Step>,
+) -> Result<(), String> {
+    if active_pins_with(inputs, root, units, carried)?.as_deref() != Some(PINS) {
         return Ok(());
     }
     let Some(setting) = settings
@@ -416,7 +478,7 @@ pub(crate) fn project(
     let Some(mut object) = pins(text)? else {
         return Ok(());
     };
-    let wanted = legacy(root, units, carried)?;
+    let wanted = legacy(inputs, root, units, carried)?;
     if object
         .get("legacy_head")
         .and_then(|value| value.as_bool())
@@ -430,7 +492,7 @@ pub(crate) fn project(
         Some(_) => return Ok(()),
         None => {
             // plan omits an already-recorded exact copy of the signed input.
-            let Some(current) = read(&root.join(PINS.trim_start_matches('/')))? else {
+            let Some(current) = inputs.text(&root.join(PINS.trim_start_matches('/')))? else {
                 return Ok(());
             };
             if Some(manifest::sha256_hex(current.as_bytes())) != setting.sha256 {
@@ -450,12 +512,15 @@ pub(crate) fn project(
     );
     steps[at].setting.text = Some(text.clone());
     steps[at].setting.sha256 = Some(manifest::sha256_hex(text.as_bytes()));
-    steps[at].act =
-        if read(&root.join(PINS.trim_start_matches('/')))?.as_deref() == Some(text.as_str()) {
-            Act::Record
-        } else {
-            Act::Write
-        };
+    steps[at].act = if inputs
+        .text(&root.join(PINS.trim_start_matches('/')))?
+        .as_deref()
+        == Some(text.as_str())
+    {
+        Act::Record
+    } else {
+        Act::Write
+    };
     Ok(())
 }
 
@@ -467,13 +532,23 @@ pub(crate) fn verify(
     carried: &BTreeMap<String, String>,
     steps: &[Step],
 ) -> Result<(), String> {
-    let Some(path) = active_pins(root, units, carried)? else {
+    verify_with(&mut OrdinaryInputs, root, units, carried, steps)
+}
+
+pub(crate) fn verify_with(
+    inputs: &mut dyn HeadInputs,
+    root: &Path,
+    units: &Path,
+    carried: &BTreeMap<String, String>,
+    steps: &[Step],
+) -> Result<(), String> {
+    let Some(path) = active_pins_with(inputs, root, units, carried)? else {
         return Ok(());
     };
     let text = match steps.iter().find(|step| step.setting.path == path) {
         Some(step) if step.act == Act::Write => step.setting.text.clone(),
         Some(step) if step.act == Act::Remove => None,
-        _ => read(&root.join(path.trim_start_matches('/')))?,
+        _ => inputs.text(&root.join(path.trim_start_matches('/')))?,
     };
     let Some(text) = text else {
         return Ok(());
@@ -481,7 +556,7 @@ pub(crate) fn verify(
     let Some(object) = pins(&text)? else {
         return Ok(());
     };
-    let wanted = legacy(root, units, carried)?;
+    let wanted = legacy(inputs, root, units, carried)?;
     if object
         .get("legacy_head")
         .and_then(|value| value.as_bool())
@@ -510,3 +585,6 @@ mod tests {
         assert!(!is_null_device(&zero));
     }
 }
+
+#[cfg(test)]
+mod input_tests;

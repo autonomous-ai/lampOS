@@ -2121,3 +2121,13 @@ introduced. Direct controls exercise Cloud's public wrapper and its own
 256 KiB boundary. Mac, original ARM64 and installed-lamp acceptance remain
 separate evidence; successful detached-descendant cleanup and hard kernel
 spawn/reap bounds are outside this contract.
+
+## Preserve head-pair policy behind a read boundary (#3689)
+
+Keep the existing literal unit/pins projection, conservative override refusal,
+regular symlink/null-mask handling and conditional Body calibration. Introduce
+only text and lazy-directory operations so a future guard can freeze the same
+policy inputs without copying its rules. Reuse the ordinary reader unchanged;
+a strict regular-file observer cannot silently replace compatible read-only
+links or masks. Test replay is not a collector, filesystem transaction,
+authentication or restoration. See [the boundary](head-touch-inputs.md).

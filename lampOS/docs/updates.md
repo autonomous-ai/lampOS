@@ -2283,3 +2283,12 @@ The linked qualification record retains the exact head, proof and limits.
 Different Cloud payloads contain the same provenance parser; this is not
 proof of distinct parser versions,
 Store signature trust or physical update durability.
+
+### Projection read inputs for a future frozen plan
+
+Head-touch projection now has an internal text/lazy-directory input boundary.
+Ordinary wrappers retain their existing filesystem behavior and evaluation
+order; a test-only closed reader proves replay without filesystem fallback.
+The [read-boundary contract](head-touch-inputs.md) records why drop-in absence,
+membership, custom pins and conditional calibration remain dependencies. It
+adds no actual collector, authentication, snapshot freshness or writer guard.
