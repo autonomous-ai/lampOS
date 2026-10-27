@@ -983,19 +983,49 @@ fn a_head_touch_stops_a_talking_lamp_and_only_a_short_tap_asks_it_to_listen_or_w
     assert!(second.contact_id > tap.contact_id);
 }
 
+/// #3747 (the lead's table): no length between a tap and a stroke asks
+/// nothing. A touch let go at 0.51 s or at 0.9 s is a tap, which listens and
+/// wakes a sleeping lamp; a lone 110 ms edge, under the shortest tap, never
+/// wakes it; and a 10 ms blip never qualified, so its letting go is nothing.
 #[test]
-fn a_touch_let_go_at_half_a_second_or_a_blip_is_no_tap() {
+fn a_touch_let_go_under_a_second_is_a_tap_and_a_blip_or_lone_edge_never_wakes() {
     let mut rig = Rig::new(head());
     rig.head_ready();
-    // Held to 0.51 s: too long to be a tap, too short for a stroke.
-    assert_eq!(rig.run(550_000, 1_060_000, 1).len(), 1);
-    assert!(rig.run(1_060_000, 1_400_000, 0).is_empty());
+    // Each let go, then at rest until the next, read every 10 ms.
+    for (began, held, next) in [
+        (550_000, 510_000, 2_000_000),
+        (2_000_000, 900_000, 4_000_000),
+    ] {
+        let mut events = rig.run(began, began + held, 1);
+        events.extend(rig.run(began + held, next, 0));
+        assert_eq!(
+            events.iter().map(|e| e.gesture).collect::<Vec<_>>(),
+            [TouchGesture::Touch, TouchGesture::Tap],
+            "let go at {held}"
+        );
+        let (touch, tap) = (&events[0], &events[1]);
+        assert_eq!(touch.intent(false, true), None, "its touch alone");
+        assert_eq!((tap.began_us, tap.released_us), (began, Some(began + held)));
+        assert_eq!(tap.intent(false, false), Some(TouchIntent::Attend));
+        assert_eq!(tap.intent(false, true), Some(TouchIntent::Wake));
+    }
+    // A lone 110 ms edge: a touch that may stop speech, and nothing asleep.
+    let mut events = rig.run(4_000_000, 4_110_000, 1);
+    events.extend(rig.run(4_110_000, 5_000_000, 0));
+    assert_eq!(
+        events.iter().map(|e| e.gesture).collect::<Vec<_>>(),
+        [TouchGesture::Touch]
+    );
+    assert!(events.iter().all(|e| e.intent(false, true).is_none()));
     // One 10 ms blip never qualified, so its letting go is nothing either.
-    rig.run(1_400_000, 2_000_000, 0);
-    assert!(rig.run(2_000_000, 2_010_000, 1).is_empty());
-    assert!(rig.run(2_010_000, 2_400_000, 0).is_empty());
+    assert!(rig.run(5_000_000, 5_010_000, 1).is_empty());
+    assert!(rig.run(5_010_000, 5_400_000, 0).is_empty());
 }
 
+/// A hand kept three seconds asks for sleep (#711; kept by the lead on
+/// #1711), and its letting go asks nothing. Asleep when it began, the lamp
+/// wakes at its stroke, a second in (#3747); its touch alone and its hold
+/// never wake it.
 #[test]
 fn a_hand_kept_three_seconds_asks_for_sleep_and_its_letting_go_asks_nothing() {
     let mut rig = Rig::new(head());
@@ -1015,12 +1045,34 @@ fn a_hand_kept_three_seconds_asks_for_sleep_and_its_letting_go_asks_nothing() {
     assert_eq!(sleep.intent(false, false), Some(TouchIntent::Sleep));
     assert_eq!(sleep.intent(true, false), Some(TouchIntent::Sleep));
     assert_eq!(sleep.intent(false, true), None);
+    assert_eq!(events[0].intent(false, true), None, "the touch alone");
+    assert_eq!(events[1].intent(false, false), Some(TouchIntent::Stroke));
+    // The stroke keeps its old form, asking nothing asleep (Third's P2 on
+    // #3767): its readers wake a sleeping lamp on it themselves.
+    assert_eq!(events[1].intent(false, true), None);
     // The countdown between: the hand's time, at every acquisition.
     assert_eq!(
         rig.engine.tick(3_550_000).state.sources[0].held_us,
         Some(3_000_000)
     );
     assert!(rig.run(3_560_000, 4_000_000, 0).is_empty());
+}
+
+/// A tap of a sleeping lamp wakes it at its letting go, once: its touch
+/// alone asks nothing asleep.
+#[test]
+fn a_tap_wakes_a_sleeping_lamp_once() {
+    let mut rig = Rig::new(head());
+    rig.head_ready();
+    let mut events = rig.run(550_000, 800_000, 1);
+    events.extend(rig.run(800_000, 1_400_000, 0));
+    assert_eq!(
+        events.iter().map(|e| e.gesture).collect::<Vec<_>>(),
+        [TouchGesture::Touch, TouchGesture::Tap]
+    );
+    assert_eq!(events[0].intent(false, true), None);
+    assert_eq!(events[1].intent(false, true), Some(TouchIntent::Wake));
+    assert_eq!(events[1].intent(false, false), Some(TouchIntent::Attend));
 }
 
 #[test]
@@ -1034,6 +1086,11 @@ fn a_lone_short_edge_can_stop_speech_but_never_asks_to_listen() {
     assert_eq!(
         events.iter().map(|e| e.gesture).collect::<Vec<_>>(),
         [TouchGesture::Touch]
+    );
+    assert_eq!(
+        events[0].intent(false, true),
+        None,
+        "never wakes it (#3747)"
     );
     assert!(rig.run(660_000, 1_000_000, 0).is_empty());
 }
@@ -1057,6 +1114,8 @@ fn the_head_timing_is_a_setting_with_bounds() {
         (Some(10), None, None),
         (Some(201), None, None),
         (Some(100), Some(90), None),
+        // The shortest tap keeps its range under half a second, although a
+        // tap is now let go under a second (#3747).
         (None, Some(500), None),
         (None, None, Some(501)),
     ] {

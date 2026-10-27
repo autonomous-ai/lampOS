@@ -1486,7 +1486,12 @@ mod head {
                     TouchIntent::Attend,
                     Some(TouchIntent::Wake),
                 ),
-                TouchGesture::Stroke => (TouchIntent::Stroke, TouchIntent::Stroke, None),
+                // Asleep, a hand kept a second wakes it (#3747).
+                TouchGesture::Stroke => (
+                    TouchIntent::Stroke,
+                    TouchIntent::Stroke,
+                    Some(TouchIntent::Wake),
+                ),
                 TouchGesture::Hold => (TouchIntent::Sleep, TouchIntent::Sleep, None),
                 _ => (TouchIntent::Stop, TouchIntent::Notice, None),
             };

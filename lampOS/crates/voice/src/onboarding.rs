@@ -1559,6 +1559,29 @@ impl Onboarding {
         self.owed.is_some() || self.led.as_ref().is_some_and(|led| led.asked_us.is_some())
     }
 
+    /// Whether the walk is under way (#3747, the lead on #1711: no sleep
+    /// from the head then): from its start, waiting for its first ask
+    /// included, until every step in the skill's order has its outcome,
+    /// the gaps between steps among it, not only while a step is led; and
+    /// while a step offered again after the walk is led. Read from the
+    /// runner's own progress, so a step asked and then stopped (nobody
+    /// there) and a restart mid-walk still count; `None` until that
+    /// progress is read, for the caller to keep what it last knew. Not a
+    /// walk whose storage failed: it leads nothing.
+    pub fn under_way(&self) -> Option<bool> {
+        if self.storage_failed {
+            return Some(false);
+        }
+        self.initialized.then(|| {
+            self.leading()
+                || self
+                    .definition
+                    .order
+                    .iter()
+                    .any(|step| !self.desired.steps.contains_key(step.name()))
+        })
+    }
+
     /// "Where you sit" is being led: the lamp looks at the person (the
     /// coordinator tells the body it listens, so its gaze turns the head to
     /// the face in small corrections) before it asks to be moved.
@@ -2895,6 +2918,50 @@ mod tests {
         };
         assert_eq!(again.walk.kept(), room.walk.kept());
         assert_eq!(again.wait(30 * S, Some(NEAR_MIDDLE)), NONE);
+    }
+
+    /// #3747 (the lead on #1711): the walk is under way from its start to
+    /// its end, waiting for its first ask and the gaps between steps too,
+    /// not only while a step is led; over once every step has ended; under
+    /// way again when it is redone.
+    #[test]
+    fn the_walk_is_under_way_from_its_start_to_its_end_gaps_and_all() {
+        let mut room = Room::new("under-way");
+        // Nobody there yet: nothing asked, and the walk is waiting to begin.
+        assert_eq!(room.wait(2 * S, None), NONE);
+        assert!(!room.walk.leading());
+        assert_eq!(room.walk.under_way(), Some(true));
+        assert_eq!(room.wait(4 * S, Some(SIDE)), [SIT_NOTE]);
+        assert!(room.walk.leading());
+        assert_eq!(room.walk.under_way(), Some(true));
+        report(&room.walk, "where_you_sit", "skipped");
+        // Between two steps: the first ended, the next not yet asked.
+        assert_eq!(room.wait(S, None), NONE);
+        assert_eq!(room.outcome(Step::WhereYouSit), Some(Outcome::Skipped));
+        assert!(!room.walk.leading());
+        assert_eq!(room.walk.under_way(), Some(true), "between steps");
+        assert_eq!(room.wait(4 * S, Some(SIDE)), [WHO_NOTE]);
+        report(&room.walk, "who_you_are", "skipped");
+        assert_eq!(room.wait(4 * S, Some(SIDE)), [PREFERENCES_NOTE]);
+        assert_eq!(room.walk.under_way(), Some(true));
+        report(&room.walk, "preferences", "skipped");
+        assert_eq!(room.wait(4 * S, Some(SIDE)), NONE);
+        assert_eq!(room.walk.kept().steps.len(), Step::IDS.len());
+        assert_eq!(room.walk.under_way(), Some(false), "every step ended");
+        // Kept across a restart: still over. Before a walk has read its
+        // progress, it doesn't say.
+        let again = Onboarding::at(room.walk.file.clone());
+        assert_eq!(again.under_way(), Some(false));
+        let unread = Onboarding::with_storage(room.walk.file.clone(), again.storage.clone());
+        assert_eq!(unread.under_way(), None);
+        let redo = ToolCall {
+            id: "c".into(),
+            name: REDO.into(),
+            args: json!({}),
+        };
+        assert!(run(&room.walk.file, &redo).1);
+        assert_eq!(room.wait(4 * S, Some(SIDE)), [SIT_NOTE]);
+        assert_eq!(room.walk.under_way(), Some(true), "redone");
     }
 
     #[test]
