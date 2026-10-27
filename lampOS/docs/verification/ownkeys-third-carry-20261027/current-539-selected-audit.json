@@ -1,0 +1,87 @@
+{
+  "head": "539ef86a20330c5724c01b60ff7f032ed6865a1c",
+  "base": "f7252d81dc2e72494afc6ea842bd8b0445f1991c",
+  "status": "VERIFIED_CURRENT_SELECTED_SCOPE",
+  "holds": [],
+  "counts": {
+    "current_selected_nonoverlap": {
+      "failed": 0,
+      "ignored": 10,
+      "passed": 1938
+    },
+    "nested_exclusions": [
+      {
+        "child_ok_line": 8,
+        "child_start_line": 5,
+        "excluded_child_summary": {
+          "failed": 0,
+          "filtered_out": 0,
+          "finished_in": "1.58s",
+          "ignored": 0,
+          "line": 10,
+          "measured": 0,
+          "passed": 1,
+          "status": "ok"
+        },
+        "log": "selected-08-lamp-memory-voice_observe_room.log",
+        "outer_ok_line": 12,
+        "outer_start_line": 3,
+        "retained_outer_summary": {
+          "failed": 0,
+          "filtered_out": 0,
+          "finished_in": "1.59s",
+          "ignored": 0,
+          "line": 14,
+          "measured": 0,
+          "passed": 1,
+          "status": "ok"
+        },
+        "source": "crates/memory/tests/voice_observe_room.rs",
+        "source_sha256": "85134b7d9406591625a17415d98a78ffffe3e09d50ee2a27e4efafbe03a8b6ab",
+        "test": "with_the_switch_a_room_conversation_is_not_observed_and_a_known_persons_is"
+      }
+    ],
+    "not_a_full14_count": true,
+    "raw_direct_summary_totals": {
+      "failed": 0,
+      "ignored": 10,
+      "passed": 1939
+    },
+    "separate_doc_cases": {
+      "failed": 0,
+      "ignored": 0,
+      "passed": 0
+    }
+  },
+  "scope": {
+    "all77_current_drivers_executed": false,
+    "commands_completed": 28,
+    "distinct_direct_driver_targets": 27,
+    "exact_group_invocations": 8,
+    "exact_primary_cases": 153,
+    "historical_counts_reused": false,
+    "planned_commands": 28,
+    "separate_doc_headings": 14,
+    "unique_required_host_witnesses": 207,
+    "whole_driver_invocations": 19
+  },
+  "limits": [
+    "Only this 539ef86a2/f725 selected scope; no newer Main, old count composition, all77 or full14 claim.",
+    "Known nested exclusion requires exact pinned source and two bounded successful child/outer summaries.",
+    "Unknown summaries, unrecognized completions, assertion failures and hooks remain holds; no old interleaving normalization.",
+    "Raw snapshots and captured executable guards are observations, not exhaustive syscall/host dependency tracing.",
+    "Temporary rustdoc executables are outside the77 captured-driver count. No ignored/native/provider/device case was forced.",
+    "Current native full Voice/Body/Camera/Eyes/affected packages and IPC18 remain required before Ready; physical2094 stays held."
+  ],
+  "full_private_audit_sha256": "5738fc8bb92ca3c0ddd58a26f67492584ad7c3248a8965607de365c57e2813fc",
+  "required_active_witnesses": 206,
+  "required_own_witnesses": 65,
+  "named_inherited_ignored": 1,
+  "expected_caught_hooks": 10,
+  "unknown_hooks": 0,
+  "artifact_pairs": 140,
+  "source_files": 7304,
+  "raw_entries": 8783,
+  "root_change_stream_comparison": "All 38 authored paths have identical added/removed line streams against their respective bases; two test insertion conflicts retained all original functions.",
+  "integrity": "All guards stable; metadata unchanged, groups absent, no timeout or cleanup."
+}
