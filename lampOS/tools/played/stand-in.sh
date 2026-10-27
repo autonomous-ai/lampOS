@@ -20,8 +20,9 @@
 # never touched.
 #   PLAYED_REMOTE     the stand-in's folder (default /usr/local/lib/played-stand-in; /run may be noexec)
 #   PLAYED_GUARD_S    how long the lamp's guard waits, whole seconds (default 3600)
-#   PLAYED_RESTORE    a script the guard runs first, as /bin/sh, when it is still there (make-skill.sh's saved copy
-#                     of the voice's state, kept outside PLAYED_REMOTE, which removes itself once put back and checked)
+#   PLAYED_RESTORE    a script the guard runs first, as /bin/sh, when it is still there, with lamp-voice stopped
+#                     (make-skill.sh's saved copy of the voice's state, kept outside PLAYED_REMOTE, which removes
+#                     itself once put back and checked)
 # and, for stand-in-test.sh, PLAYED_UNITS (where the drop-ins go, default /run/systemd/system), SYSTEMCTL and
 # SYSTEMD_RUN.
 # The lamp's guard: before the drop-ins are written, `in` arms a systemd-run timer (zz-played-stand-in-guard) that
@@ -29,7 +30,9 @@
 # and the next run's `in` replaces it. So a Mac that sleeps or drops off mid-run, and never runs `out`, leaves the
 # lamp changed for at most that long, not overnight (lamp-0c89, 22 Oct, with full-look-row.sh, #3195). A skill a
 # make-skill.sh run put on is not the guard's: that run removes it itself; the voice's state it saved is, through
-# PLAYED_RESTORE, put back before anything else (Third's P2 on #3889).
+# PLAYED_RESTORE, put back before anything else (Third's P2 on #3889), with lamp-voice stopped first so it writes
+# none of it meanwhile (a stop that fails, or a voice still active, puts nothing back and keeps the copy: Third's
+# HOLD on a8962558b), and started again straight after, the put-back passed or not (El's P3s on #3889 and #3936).
 REMOTE=${PLAYED_REMOTE:-/usr/local/lib/played-stand-in}
 UNITS=${PLAYED_UNITS:-/run/systemd/system}
 SYSTEMCTL=${SYSTEMCTL:-systemctl}
@@ -132,12 +135,15 @@ in)
   exec_line=$(printf '%s\n' "$exec_line" | sed -E "s#--harness [^ ]+#--harness $REMOTE/harness#") || fail "swapping --harness failed"
   case "$exec_line" in *--sign-in-by-code*) ;; *) exec_line="$exec_line --sign-in-by-code";; esac
   # The guard first (above), so nothing is written that it would not take out. Its command has no $, which systemd
-  # would expand in the unit's command line.
+  # would expand in the unit's command line. Its put-back runs only once lamp-voice's stop succeeded and `is-active`
+  # printed exactly inactive or failed; any other answer, or none, keeps the copy (Third's HOLD on b2d2dfb0b). Its
+  # last step, the copy gone, is its status: a copy still there (a put-back that failed or never ran) fails the
+  # guard, after its cleanup and restart.
   unguard
   restore=""
-  [ -z "${PLAYED_RESTORE:-}" ] || restore="[ ! -e $PLAYED_RESTORE ] || /bin/sh $PLAYED_RESTORE; "
+  [ -z "${PLAYED_RESTORE:-}" ] || restore="[ ! -e $PLAYED_RESTORE ] || { systemctl stop lamp-voice && systemctl is-active lamp-voice | grep -qx -e inactive -e failed && /bin/sh $PLAYED_RESTORE; systemctl start lamp-voice; }; "
   $SYSTEMD_RUN --unit=$GUARD --on-active="${GUARD_S}s" /bin/sh -c \
-    "${restore}rm -f $TASKS_DROP $VOICE_DROP; systemctl daemon-reload; systemctl restart lamp-tasks lamp-voice; rm -rf $REMOTE" \
+    "${restore}rm -f $TASKS_DROP $VOICE_DROP; systemctl daemon-reload; systemctl restart lamp-tasks lamp-voice; rm -rf $REMOTE${PLAYED_RESTORE:+; [ ! -e $PLAYED_RESTORE ]}" \
     >/dev/null || fail "arming the lamp's guard (systemd-run) failed"
   mkdir -p "$UNITS/lamp-tasks.service.d" "$UNITS/lamp-voice.service.d" || { unguard; fail "mkdir of the drop-in folders failed"; }
   { printf '[Unit]\nConditionPathExists=\n' &&
@@ -154,11 +160,13 @@ in)
   echo "stand-in in: lamp-tasks $tasks as $user:$group, its Harness $REMOTE/harness, its store $store"
   ;;
 out)
-  unguard
+  # The guard is stopped last: a session lost before then leaves it to restart both and remove the folder (El's P3
+  # on #3936), where stopping it first left nothing to.
   rm -f "$TASKS_DROP" "$VOICE_DROP"
   $SYSTEMCTL daemon-reload
   $SYSTEMCTL restart lamp-tasks lamp-voice
   rm -rf "$REMOTE"
+  unguard
   echo "put back: lamp-tasks $($SYSTEMCTL is-active lamp-tasks), lamp-voice $($SYSTEMCTL is-active lamp-voice)"
   ;;
 *) echo "usage: stand-in.sh in|out" >&2; exit 2 ;;

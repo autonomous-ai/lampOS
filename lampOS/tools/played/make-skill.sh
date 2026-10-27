@@ -10,9 +10,13 @@
 # The voice's made skills (/var/lib/lampOS/voice/made-skills) and its told news (tasks-told) are saved first, in
 # /usr/local/lib/played-make-skill-saved (outside the stand-in's folder, which `out` and the lamp's guard remove); each
 # arm starts from the saved made skills, so an ask left by one arm is never answered by the next, and both are put
-# back when it ends, checked file by file (SHA-256) against the saved copy, which only then is removed. A put-back
-# that fails or differs exits 8 and keeps the copy, printing its path; the lamp's guard (a Mac that never came back)
-# runs the same put-back first. A copy left by an earlier run stops the next one before any change (exit 3).
+# back when it ends, with lamp-voice stopped (so it writes neither while they are), checked entry by entry, each
+# folder and each file's SHA-256, against the saved copy, which only then is removed. A put-back that fails or
+# differs exits 8 and keeps the copy, printing its path; the lamp's guard (a Mac that never came back) runs the same
+# put-back first, with lamp-voice stopped too. Neither puts anything back unless the stop worked, and both start it
+# again straight after, the put-back passed or not. The copy is made in $SAVED.part and renamed into place only once
+# whole, so a save cut short is never taken for a copy. A copy left by an earlier run, or a save cut short, stops
+# the next one before any change (exit 3), saying how to recover.
 # Hand-overs fail while it runs.
 #
 #   LAMP_HOST=<lamp> lampOS/tools/played/make-skill.sh LABEL FIXTURE [yes|no|both]
@@ -68,13 +72,16 @@ if [ "$(date +%u)" -le 5 ] && [ "$(date +%H)" -ge 12 ] && [ "$(date +%H)" -lt 14
 fi
 lamp() { "$LAMP_SSH" "$@" </dev/null; }
 # The save and put-back, kept in the saved copy as $SAVED/restore and run on the lamp as root, by this script and by the
-# lamp's guard. `check`: each of the voice's two paths is a regular file, a folder of only folders and regular files,
-# or not there at all (neither -e nor -L); anything else (a symbolic link, dangling or not, a fifo, a device) stops
+# lamp's guard. The save writes into $S.part, beside it, and renames that to $S only once the copy is whole and
+# checked: a save cut short leaves only $S.part, and the voice was not changed before it (El's P3 on #3889).
+# `check`: each of the voice's two paths is a regular file, a folder of only folders and regular files, or not there
+# at all (neither -e nor -L); anything else (a symbolic link, dangling or not, a fifo, a device) stops
 # the run before any change, and no link is ever copied (Third's P2 on 93f0584c2). `save`: the same check, the
 # copies, and each path's kind recorded in `kinds`. `reset` puts the made skills back as saved; with no argument,
 # both. A put-back first checks every path it would replace: only a plain file or folder, or one recorded absent and
-# so this run's, is ever removed. Each is then checked against the copy, its kind and each file's SHA-256, and only a
-# put-back of both that matches removes the copy. Anything else exits 1 and leaves the copy where it is.
+# so this run's, is ever removed. Each is then checked against the copy, its kind, every folder in it and each file's
+# SHA-256, and only a put-back of both that matches removes the copy. Anything else exits 1 and leaves the copy where
+# it is. The caller stops lamp-voice first, so it writes neither path meanwhile (El's P3 on #3889).
 restore_script() {
   sed -e "s#@SAVED@#$SAVED#" -e "s#@VOICE@#$VOICE_DIR#" <<'EOF'
 #!/bin/sh
@@ -101,44 +108,50 @@ sha() {  # FILE: its SHA-256, 64 hex digits, or a failure
   [ ${#h} -eq 64 ] || return 1
   printf '%s\n' "$h"
 }
-sums() {  # DIR NAME...: each NAME's kind and its files' SHA-256, in order, then the count of files; or a failure
+# A folder's manifest names every folder in it as well as every file, so a copy that drops an empty folder differs
+# (Third's P3 on #3889); `kind` has already refused anything else inside.
+sums() {  # DIR NAME...: each NAME's kind, every folder and file in it (a file with its SHA-256), in order, then the
+          # count of entries; or a failure
   d=$1; shift
   cd "$d" || return 1
   n=0
   for x in "$@"; do
     if [ -d "$x" ]; then
       echo "dir $x"
-      found=$(find "$x" -type f) || return 1
-      files=$(printf '%s\n' "$found" | sort) || return 1
-      [ -n "$files" ] || continue
+      found=$(find "$x" \( -type f -o -type d \)) || return 1
+      entries=$(printf '%s\n' "$found" | sort) || return 1
       while IFS= read -r f; do
-        h=$(sha "$f") || return 1
-        echo "$f $h"; n=$((n + 1))
-      done <<FILES
-$files
-FILES
+        if [ -d "$f" ]; then echo "d $f"
+        elif [ -f "$f" ]; then h=$(sha "$f") || return 1; echo "f $f $h"
+        else return 1; fi
+        n=$((n + 1))
+      done <<ENTRIES
+$entries
+ENTRIES
     elif [ -e "$x" ]; then
       h=$(sha "$x") || return 1
       echo "file $x $h"; n=$((n + 1))
     else echo "none $x"; fi
   done
-  echo "files $n"
+  echo "entries $n"
 }
 case ${1:-all} in
   check) for x in $NAMES; do kind "$V/$x" >/dev/null || exit 1; done; exit 0 ;;
-  save)
-    [ ! -e "$S/done" ] && [ ! -e "$S/kinds" ] || { echo "save: $S holds a copy already" >&2; exit 1; }
+  save)  # into $S.part, renamed to $S once whole
+    P=$S.part
+    [ ! -e "$S" ] && [ ! -L "$S" ] || { echo "save: $S holds a copy already" >&2; exit 1; }
+    [ -d "$P" ] && [ ! -e "$P/done" ] && [ ! -e "$P/kinds" ] || { echo "save: $P is not a fresh folder" >&2; exit 1; }
     for x in $NAMES; do
       k=$(kind "$V/$x") || exit 1
       if [ "$k" != none ]; then
-        cp -a "$V/$x" "$S/" || { echo "save: $V/$x could not be copied" >&2; exit 1; }
-        c=$(kind "$S/$x") || exit 1
+        cp -a "$V/$x" "$P/" || { echo "save: $V/$x could not be copied" >&2; exit 1; }
+        c=$(kind "$P/$x") || exit 1
         [ "$c" = "$k" ] || { echo "save: the copy of $V/$x is a $c, not a $k" >&2; exit 1; }
       fi
-      echo "$x $k" >> "$S/kinds" || exit 1
+      echo "$x $k" >> "$P/kinds" || exit 1
     done
-    a=$(sums "$S" $NAMES) && b=$(sums "$V" $NAMES) && [ "$a" = "$b" ] || { echo "save: the copy in $S is not as $V" >&2; exit 1; }
-    touch "$S/done" || exit 1
+    a=$(sums "$P" $NAMES) && b=$(sums "$V" $NAMES) && [ "$a" = "$b" ] || { echo "save: the copy in $P is not as $V" >&2; exit 1; }
+    touch "$P/done" && mv "$P" "$S" || { echo "save: $P could not be put in place as $S" >&2; exit 1; }
     exit 0 ;;
   reset) names=made-skills ;;
   all) names=$NAMES ;;
@@ -158,16 +171,24 @@ for x in $names; do
 done
 saved=$(sums "$S" $names) || { echo "restore: the saved copy in $S could not be read whole; it is kept" >&2; exit 1; }
 now=$(sums "$V" $names) || { echo "restore: $V could not be read whole; the copy in $S is kept" >&2; exit 1; }
-case $saved in *"files "[0-9]*) ;; *) echo "restore: no whole manifest of $S; it is kept" >&2; exit 1 ;; esac
-[ "${saved##*files }" = "${now##*files }" ] && [ "$saved" = "$now" ] || { echo "restore: $V is not as saved in $S" >&2; exit 1; }
+case $saved in *"entries "[0-9]*) ;; *) echo "restore: no whole manifest of $S; it is kept" >&2; exit 1 ;; esac
+[ "${saved##*entries }" = "${now##*entries }" ] && [ "$saved" = "$now" ] || { echo "restore: $V is not as saved in $S" >&2; exit 1; }
 [ "${1:-all}" = reset ] || rm -rf "$S"
 EOF
 }
-voice_state() {  # save | reset | restore: the voice's made skills and told news, saved; made skills back as saved; both
+voice_state() {  # save | reset | restore: the voice's made skills and told news, saved; made skills back as saved;
+                 # both, with lamp-voice stopped first
   case $1 in
-    save) restore_script | "$LAMP_SSH" "sudo -n sh -c 'mkdir -m 0700 $SAVED && cat > $SAVED/restore && sh $SAVED/restore save'" ;;
+    save) restore_script | "$LAMP_SSH" "sudo -n sh -c 'mkdir -m 0700 $SAVED.part && cat > $SAVED.part/restore && sh $SAVED.part/restore save'" ;;
     reset) lamp "sudo -n sh $SAVED/restore reset" ;;
-    restore) lamp "sudo -n sh $SAVED/restore" ;;
+    # lamp-voice writes both: stopped, so none of its writes lands while they are put back and checked (a false
+    # differ, exit 8; El's P3 on #3889). Nothing needs it (no unit Requires or BindsTo it). The stop is required, and
+    # proved: a stop that succeeded and then `is-active` printing exactly inactive, or failed (no process left: a stop
+    # that timed out and killed it). A failed stop or any other answer (active, activating, deactivating, unknown,
+    # nothing, a query error) puts nothing back and keeps the copy, a failure (Third's HOLDs on a8962558b and
+    # b2d2dfb0b). Either way the same root shell on the lamp starts it again right after, and that shell ignores a
+    # hang-up and a closed pipe, so an ssh or a Mac lost meanwhile never leaves the voice stopped (El's P3 on #3936).
+    restore) lamp "sudo -n sh -c 'trap \"\" HUP PIPE; rc=1; if systemctl stop lamp-voice; then st=\$(systemctl is-active lamp-voice 2>/dev/null); else st=\"not stopped\"; fi; case \"\$st\" in inactive | failed) sh $SAVED/restore; rc=\$? ;; *) echo \"restore: lamp-voice could not be stopped, so nothing was put back (its state: \${st:-no answer}); the copy in $SAVED is kept\" >&2 ;; esac; systemctl start lamp-voice; exit \$rc'" ;;
   esac
 }
 
@@ -192,8 +213,14 @@ case $? in
 esac
 NUDGE=stand-up-nudge   # proved not on: this run's to remove
 # A copy an earlier run could not put back is the only one of the voice's own state: never saved over (Fourteen's P3).
-left=$(lamp "sudo -n sh -c 'if [ -e $SAVED ] || [ -L $SAVED ]; then echo left; else echo none; fi'")
-[ "$left" = none ] || { echo "make-skill.sh: an earlier run's saved copy of the voice's state is at $SAVED (${left:-no answer}); put it back with: sudo sh $SAVED/restore. Nothing changed" >&2; exit 3; }
+# A save cut short (the Mac gone before its rename) left only $SAVED.part: the voice was not changed before the save
+# was whole, so that folder is safe to remove (El's P3 on #3889).
+left=$(lamp "sudo -n sh -c 'if [ -e $SAVED ] || [ -L $SAVED ]; then echo left; elif [ -e $SAVED.part ] || [ -L $SAVED.part ]; then echo part; else echo none; fi'")
+case $left in
+  none) ;;
+  part) echo "make-skill.sh: an earlier run's save was cut short at $SAVED.part, before anything was changed, so the voice's state is as it was; remove it with: sudo rm -rf $SAVED.part. Nothing changed" >&2; exit 3 ;;
+  *) echo "make-skill.sh: an earlier run's saved copy of the voice's state is at $SAVED (${left:-no answer}); put it back with: sudo sh $SAVED/restore. Nothing changed" >&2; exit 3 ;;
+esac
 # The voice's two paths only as a regular file, a folder of plain files, or not there: a link (dangling or not), a fifo
 # or a device stops here, before any change (Third's P2 on 93f0584c2).
 restore_script | "$LAMP_SSH" "sudo -n sh -s -- check" || { echo "make-skill.sh: the voice's made skills or told news is not a plain file or folder (above); nothing changed" >&2; exit 3; }
@@ -262,7 +289,7 @@ if [ "$FROM" = app ]; then
   "$LAMP_SSH" "sudo -n tee $REMOTE/lamp-cloud >/dev/null && sudo -n chmod 0755 $REMOTE/lamp-cloud" < "$CLOUD" || exit 9
 fi
 voice_state save || {
-  lamp "sudo -n sh -c '[ -e $SAVED/done ] || rm -rf $SAVED'"   # a copy cut short is no copy, and nothing was changed
+  lamp "sudo -n rm -rf $SAVED.part"   # a copy cut short is no copy, and nothing was changed
   echo "make-skill.sh: the voice's made skills and told news could not be saved; nothing played" | tee -a "$OUT" >&2; exit 9; }
 
 # The stand-in in (stand-in.sh, on the lamp as root), and put back whatever happens, with stand-up-nudge (an arm

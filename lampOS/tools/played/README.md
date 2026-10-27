@@ -72,12 +72,18 @@ These you can run on their own:
   after the yes, enabled, loaded, removed) or "No, not now." (nothing
   installed). `LAMP_MAKE_SKILL=on` rides on the stand-in's `/run` drop-ins,
   removed on exit with any skill it put on. The voice's made skills and told
-  news are saved in `/usr/local/lib/played-make-skill-saved` and put back on
-  exit, checked by SHA-256; a put-back that fails exits 8 and keeps that copy
+  news are saved in `/usr/local/lib/played-make-skill-saved` (made as
+  `….part` and renamed once whole) and put back on exit with lamp-voice
+  stopped (nothing put back unless the stop worked and lamp-voice then
+  reads inactive or failed, and started again straight after either way;
+  the guard exits nonzero while the copy is still there), checked folder by folder and file by file
+  (SHA-256); a put-back that fails exits 8 and keeps that copy
   (`sudo sh /usr/local/lib/played-make-skill-saved/restore` puts it back), the
-  lamp's guard runs the same put-back first, and a copy left over, or either
-  path as anything but a regular file or a folder of them (a link, dangling
-  or not), stops the next run before any change. Its stand-in test is `make-skill-test.sh`.
+  lamp's guard runs the same put-back first, and a copy left over, a save cut
+  short (`sudo rm -rf /usr/local/lib/played-make-skill-saved.part` clears it;
+  nothing was changed before it), or either path as anything but a regular
+  file or a folder of them (a link, dangling or not), stops the next run
+  before any change. Its stand-in test is `make-skill-test.sh`.
 
 - `cut-in-keeps.sh LABEL [ROUNDS]`, about 15 minutes for 3 rounds each way
   (#2739, `LAMP_CUT_IN_KEEPS_LISTENING`): "Hey Lamp, tell me a long story
