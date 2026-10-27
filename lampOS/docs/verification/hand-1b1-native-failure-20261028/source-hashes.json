@@ -1,0 +1,36 @@
+{
+  "actual_checkout": "22cf6a6939ecd1968c756422a7ac029cf8759741",
+  "actual_tree": "79c7011a31fffb7614f7fe649914f744a9f8b12d",
+  "actual_Main_parent": "c1fa2bc9f327f5d553bb3dcc355053d8e7e94bfa",
+  "published_head": "1b1da9ae3fc6fbf1101cd1b88f10bcaa37fb55ad",
+  "files": [
+    {
+      "path": "lampOS/crates/voice/src/second_provider/worker.rs",
+      "actual_git_blob": "70dffd5ceffd3ff63953e4d9bd68b3db0f054250",
+      "published_git_blob": "70dffd5ceffd3ff63953e4d9bd68b3db0f054250",
+      "Main_parent_git_blob": "70dffd5ceffd3ff63953e4d9bd68b3db0f054250",
+      "whole_file_sha256": "3fd295e2842c895f0a69d18c231146769e398a89be8fff3843e69f29ef146101",
+      "actual_mode": "100644",
+      "exact_actual_published_Main_file": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/service_trace.rs",
+      "actual_git_blob": "a752cd988686fc724bca573f76f03edf90f24a82",
+      "published_git_blob": "a752cd988686fc724bca573f76f03edf90f24a82",
+      "Main_parent_git_blob": "a752cd988686fc724bca573f76f03edf90f24a82",
+      "whole_file_sha256": "593290a4d1e64c2283bd6ae7b481b39449353bc70fd53e4c67318323ae4adafe",
+      "actual_mode": "100644",
+      "exact_actual_published_Main_file": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/service_privacy_controls.rs",
+      "actual_git_blob": "06278b55bb0cdf160e32a29ec1fe3fa16fc169e1",
+      "published_git_blob": "06278b55bb0cdf160e32a29ec1fe3fa16fc169e1",
+      "Main_parent_git_blob": "06278b55bb0cdf160e32a29ec1fe3fa16fc169e1",
+      "whole_file_sha256": "20e1cfa06201d5263f55a5e8989a88dcba695dfbaee9959d2405106049d7487d",
+      "actual_mode": "100644",
+      "exact_actual_published_Main_file": true
+    }
+  ],
+  "cause_not_inferred_from_source_equality": true
+}

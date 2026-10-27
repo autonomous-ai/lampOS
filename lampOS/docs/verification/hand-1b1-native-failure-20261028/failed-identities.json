@@ -1,0 +1,41 @@
+[
+  {
+    "binary": "lamp-voice",
+    "test": "second_provider::worker::tests::with_two_faces_held_looks_between_lines_make_the_first_line_busy",
+    "event": "FAIL",
+    "elapsed": "7.721s",
+    "test_declaration_line": 10604,
+    "reported_failure_line": 10685,
+    "source_path": "lampOS/crates/voice/src/second_provider/worker.rs",
+    "assertion_summary": "Observed classification Unknown; assertion expected Busy. No cause inferred.",
+    "whole_source_sha256": "3fd295e2842c895f0a69d18c231146769e398a89be8fff3843e69f29ef146101",
+    "actual_git_blob": "70dffd5ceffd3ff63953e4d9bd68b3db0f054250",
+    "same_as_actual_Main_parent_and_published_head": true
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "service_trace::tests::private_and_failed_reader_traces_keep_the_original_records_and_finite_state",
+    "event": "FAIL",
+    "elapsed": "10.209s",
+    "test_declaration_line": 744,
+    "reported_failure_line": 393,
+    "source_path": "lampOS/crates/voice/src/service_trace.rs",
+    "assertion_summary": "Fixture writer completion wait returned Timeout.",
+    "whole_source_sha256": "593290a4d1e64c2283bd6ae7b481b39449353bc70fd53e4c67318323ae4adafe",
+    "actual_git_blob": "a752cd988686fc724bca573f76f03edf90f24a82",
+    "same_as_actual_Main_parent_and_published_head": true
+  },
+  {
+    "binary": "lamp-voice",
+    "test": "service_privacy_controls::tests::only_a_privacy_worker_that_ended_cleanly_at_its_start_is_an_unreadable_switch",
+    "event": "FAIL",
+    "elapsed": "10.942s",
+    "test_declaration_line": 639,
+    "reported_failure_line": 623,
+    "source_path": "lampOS/crates/voice/src/service_privacy_controls.rs",
+    "assertion_summary": "Fixture stand-in did not end within its bounded wait.",
+    "whole_source_sha256": "20e1cfa06201d5263f55a5e8989a88dcba695dfbaee9959d2405106049d7487d",
+    "actual_git_blob": "06278b55bb0cdf160e32a29ec1fe3fa16fc169e1",
+    "same_as_actual_Main_parent_and_published_head": true
+  }
+]

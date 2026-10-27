@@ -1,0 +1,84 @@
+{
+  "status": "ORIGINAL_ARM_FAILED_LINUX_CLIPPY_PASSED",
+  "PR": 3544,
+  "published_head": "1b1da9ae3fc6fbf1101cd1b88f10bcaa37fb55ad",
+  "published_tree": "5c1f55fda333a87b71de05b1e3faa859a2e10642",
+  "authored_base": "82a62867cc1bcbbc4b0848519c6757f623d112ce",
+  "actual_checkout": "22cf6a6939ecd1968c756422a7ac029cf8759741",
+  "actual_tree": "79c7011a31fffb7614f7fe649914f744a9f8b12d",
+  "actual_parents": [
+    "c1fa2bc9f327f5d553bb3dcc355053d8e7e94bfa",
+    "1b1da9ae3fc6fbf1101cd1b88f10bcaa37fb55ad"
+  ],
+  "ARM_run": 40588908587,
+  "ARM_job": 122487669919,
+  "Linux_Clippy_run": 40588908613,
+  "attempt": 1,
+  "native_completion": {
+    "ARM": {
+      "run": 40588908587,
+      "session": 46485,
+      "exit": 1,
+      "chunk": "93ddd1",
+      "step_exit": 100
+    },
+    "Linux_Clippy": {
+      "run": 40588908613,
+      "session": null,
+      "exit": 0,
+      "chunk": "0ceaa8"
+    },
+    "ARM_log_collection": {
+      "session": 88731,
+      "exit": 0,
+      "chunk": "83031b"
+    }
+  },
+  "selected": 7805,
+  "unique_terminal_identities": 6469,
+  "PASS": 6466,
+  "FAIL": 3,
+  "selected_unrun": 1336,
+  "aggregate_skips": 54,
+  "selected_binaries_reported": 70,
+  "skipped_binaries_reported": 120,
+  "duplicate_terminal_identities": 0,
+  "retries": 0,
+  "nextest_LEAK_or_TIMEOUT_terminals": 0,
+  "internal_fixture_timeouts_remain_failures": true,
+  "nextest_stopped_scheduling_after_failure": true,
+  "workflow_cancelled": false,
+  "required23": {
+    "once_PASS": 8,
+    "no_terminal": 15,
+    "Linux_only_case": "NO_TERMINAL_NO_NATIVE_CREDIT"
+  },
+  "privacy16": {
+    "once_PASS": 9,
+    "no_terminal": 7,
+    "absent_identity_selection_not_established": "Excluded binaries exist and complete JSON discovery was not retained; absent identities are not asserted selected-unrun."
+  },
+  "docs_relay_process_export": "UNRUN_AFTER_FAILED_STAGE",
+  "artifact_count": 0,
+  "failed_executable_retained": false,
+  "failed_executable_binding_claimed": false,
+  "artifact_download_performed": false,
+  "three_failed_source_files_exact_actual_Main_parent_and_published": true,
+  "actual_vs_authored_only_install_md_differs": true,
+  "all_three_authored_blobs_match": true,
+  "source_equality_does_not_establish_failure_cause": true,
+  "no_load_flakiness_or_unrelatedness_waiver": true,
+  "local4177_and_prior_native_results_not_transferred": true,
+  "no_rerun_dispatch_cancel_Cargo_target_source_ref_or_post_actions": true,
+  "raw_evidence_sha256": {
+    "40588908587-original-logs.zip": "900c97fbf6a3781e6422d27049814d69ab9b493878a7df6ac0fbc6e339b4e16f",
+    "40588908613-original-logs.zip": "a793cf292902fc8216968a7cce553ac74616e35043d913f03f7bddc5be65e6bb",
+    "native-terminal-ledger.json": "d8999e567d33112f4e2e03ef68794ba63409e2b22693fb7a29f69c196d2f1308",
+    "native-runtime-accounting.json": "338e1a53f2d3843376e66849fc1ffcad75ccf3bea99e4b8b7fc94de3f1526bb9",
+    "required23-native-ledger.json": "b5b752bcf61c03f219f563e3c1979dbb1b5f40ddd4121941f087b6c3cffa8684",
+    "privacy16-native-ledger.json": "38c3cd96fb38387c18cc810beb564f40b25ceb1e6aaac12de08d1d6eb07b1543",
+    "failed-identities-source-assertions.json": "0691f1c4b9908092446fe3a8a7ba37508a197f039aca24c306b1dc4254f39ca6",
+    "failed-source-Main-comparison.json": "41bd4b3c06502cab22ea12c3cdcd437509f52ab6a5c4e5eb39ee34258391d21d",
+    "artifacts-api.json": "244563f989470892c537c9a4622920af0d228ee4528f7d00c64a06d6cd95856c"
+  }
+}
