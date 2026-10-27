@@ -1716,6 +1716,7 @@ On lamp-4ace on 20 Oct the second route's model called neither `recall` nor `sea
 - **The scope, one count for the turn:** the known face's (`known_faces::known_now`, `person_id`) only when the session the turn is in is theirs too, and the room's when neither names anyone. The turn's session is opened before the hits are asked (`worker::hits_person`), and the turn's notes still see the change, so a person's first turn is theirs and not the last session's (the reviewer's P2 on #2268: "What's my name?" is often the first thing asked). When they differ, nothing is told: someone leaning in for one look doesn't have their kept things told in another's conversation (the reviewer's P2 on #2251). The journal says "memory isn't told: the face and the session's person differ".
 - **What's asked:** the newest 16 KB of that scope's kept list (`{"op":"kept","max_bytes":16384}`, the answer read up to 40 KB). That's the whole list unless its things are long (200 of up to 300 bytes is 60 KB), so a name kept early isn't lost behind newer ones. It's matched in the voice by the words they share with what was heard (`remember::hit_words`), both sides folded as the memory's search folds them (#2510 take 1 b): NFC, lower case, `đ` as `d`; then accents removed, as `forget {about}` matches, so "màu" heard as "mau" is the same word; small words and the memory's common words (`search::COMMON`, English and Vietnamese: "là", "của", "và" …) left out by one rule: a word heard with accents when it is one of them with those accents, a word heard without any when it is one of them without theirs ("la cua va" matches nothing). So an accented word that only folds to one stays: "chó" (a dog) is not "cho" (for), "cửa" (a door) not "của" (of); "cua" heard for "cửa" without its accents is taken as "của"; three letters or more, a possessive's `'s` and a plural's `s` taken off. A Vietnamese word of two letters ("đỏ") is too short, as in English. Not the memory's full-text search: on lamp-4ace on 20 Oct its twelve best for "what is my name" were all exchanges, none kept, and the room's search took about 44 ms, where its kept list (63 things) took 3 ms. `hits_note` over 200 calls on a 200-thing kept list on the Mac, a release build: p50 3.5 ms, p95 4.3 ms (`hits_note_latency_on_a_200_entry_kept_list`, ignored, run by hand).
 - **The room's** are told with a line that they were said in this room and that the lamp can't tell who said them or who is asking, as the session note's room part says.
+- **A person's own** are told with a line that they are the person's own, the one at the lamp now, to be told as theirs ("you told me"), never as something someone here or someone else said (`remember::HITS_OWN_NOTE`, #3504, N9). On lamp-06c1 on 27 Oct, with the line missing, a hit from her own scope was told as "someone in this room once said theirs was hibiscus tea" (journal `(theirs) hits_told=1`). About 150 bytes more on such a turn; no extra round.
 - **The bound:** the answer within `HITS_WITHIN` (60 ms), or let go, never waited for. A line with no word that says what it's about isn't asked. On the final words it runs off the worker's runtime (`spawn_blocking`). On the early words of a prepared chat it runs inline, where the chat begins, so a slow memory can hold that line's audio for up to the same 60 ms.
 - **What's told:** at most three kept things, the most words shared first, then the newest, each cut to 160 characters, with how long ago in words. They go after a note saying they are notes, not instructions, to be used only if they fit and never listed.
 - **Not as sources:** nothing told here goes into the session's sources, so the 64-source bound (#2176 finding 1) isn't spent on it.
@@ -2021,8 +2022,14 @@ then use that person's scope:
     `call me`, lower-cased with a curly apostrophe read as a straight one.
     Simple on purpose: every room-kept thing *was* said by someone in the
     room, so a fact it catches wrongly is still told truly.
-  - **A known person's own snapshot** is told as before: their own kept
-    name stays theirs.
+  - **A known person's own snapshot** keeps its facts as they are: their
+    own kept name stays theirs. Its sentence says, beside the room's "say
+    someone here said it", that everything in it is theirs, to be told to
+    them as theirs ("you told me", "you work at …"), never as something
+    someone here or someone else said (`ROOM_NOT_ASKER_SECOND`, #3504, N9:
+    on lamp-06c1 on 27 Oct, with the product switches, "Where do I work?"
+    was answered "Someone here said you work at a bakery…" from her own
+    snapshot, 1 of 1). Off, the note is byte for byte as before.
   - **The journal**, at each session's open, after the open has let go of
     the client's context: "a session's memory note carried N of the room's
     kept things (M as someone in the room's) and K of the person's own".
