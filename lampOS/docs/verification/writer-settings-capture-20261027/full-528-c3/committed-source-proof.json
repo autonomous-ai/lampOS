@@ -1,0 +1,14 @@
+{
+  "head": "09590e12e320a8fafd1d1c45ee6e42e126dcff5f",
+  "base": "c3eb20be307d06a6d6278254ec54654b68698b0e",
+  "tree": "0bfa847ddacaa1afbf56dac2d764e4887fc9172b",
+  "actual_gate_source": "d7ff625506106deb18b000292150c021a41a29ac plus two P3 doc WIP files",
+  "all_7498_source_hashes_equal_tested_snapshot": true,
+  "PASS": 528,
+  "bad_unrun": 0,
+  "ignored": 6,
+  "required": 49,
+  "commit_binding_only_no_new_execution": true,
+  "P3_ordinary_only_accessor_and_parent_churn_prose_included": true,
+  "P3_load_failure_OPEN": true
+}

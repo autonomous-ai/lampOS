@@ -1,0 +1,32 @@
+diff --git a/lampOS/crates/update/src/writer_settings.rs b/lampOS/crates/update/src/writer_settings.rs
+index 9c89793772..7afb9d0ddf 100644
+--- a/lampOS/crates/update/src/writer_settings.rs
++++ b/lampOS/crates/update/src/writer_settings.rs
+@@ -43,6 +43,8 @@ impl<'a> Captured<'a> {
+         &self.before
+     }
+ 
++    /// Ordinary ownership without an image-shipped before map. This decision
++    /// is not image-aware and is not an executable apply-plan admission.
+     pub fn act(&self) -> Option<&Act> {
+         self.act.as_ref()
+     }
+diff --git a/lampOS/docs/writer-file-observation.md b/lampOS/docs/writer-file-observation.md
+index 5b310eaeca..62a923dabe 100644
+--- a/lampOS/docs/writer-file-observation.md
++++ b/lampOS/docs/writer-file-observation.md
+@@ -59,6 +59,14 @@ race-free snapshot or eliminate replacement/device-open races when the
+ exclusion precondition fails. Regular-file kernel and storage operations
+ have no wall-clock deadline here. All descriptors close on return.
+ 
++Ancestor comparisons intentionally use the full selected identity, including
++directory length, link count, mtime and ctime. An unrelated entry change in
++`/`, `/etc` or another observed parent can therefore refuse the capture or
++recheck even when the selected leaf is unchanged. This conservative refusal
++does not establish that a live lamp can keep every parent stable. The future
++guard must qualify its writer coordination and refusal rate before wiring
++this API; private fixtures do not justify weakening those identity checks.
++
+ ## Verification and limits
+ 
+ Ten authored controls cover regular/binary/empty contents, missing suffix

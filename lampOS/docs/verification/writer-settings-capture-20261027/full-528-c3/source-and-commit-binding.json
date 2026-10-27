@@ -1,0 +1,37 @@
+{
+  "actual_gate_source": "d7ff625506106deb18b000292150c021a41a29ac plus two frozen P3 documentation WIP paths",
+  "dirty_files": [
+    "lampOS/crates/update/src/writer_settings.rs",
+    "lampOS/docs/writer-file-observation.md"
+  ],
+  "source_count": 7498,
+  "raw_source_before_sha256": "f0aa5e9d41c6b6dd5727ee1e523d11d7334d21a920d16e7d70d5f7bbec7df92a",
+  "raw_source_after_sha256": "f0aa5e9d41c6b6dd5727ee1e523d11d7334d21a920d16e7d70d5f7bbec7df92a",
+  "raw_source_snapshots_equal": true,
+  "raw_working_patch_sha256": "4e85f297935eb259f009746dd917cfb609a04b3c20178c1e4ca59222ce30d7cc",
+  "working_patch_matches_recorded_identity": false,
+  "commit_after_gate": "09590e12e320a8fafd1d1c45ee6e42e126dcff5f",
+  "commit_tree": "0bfa847ddacaa1afbf56dac2d764e4887fc9172b",
+  "all_committed_source_hashes_equal_tested_working_snapshot": true,
+  "local_execution_on_commit_09590_claimed": false,
+  "original_private_compiler_stdout_sha256": "9af71aaefeb450ad91bee9c60eb24f78df146fde34049d11b494a3f00698fbd7",
+  "original_nextest_stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "original_nextest_stderr_sha256": "623c9c1e091f3c892bac360a30a5a5f6f9beeeb9a65180043f7be1d073a70ef4",
+  "all_boundary_guards": {
+    "head_unchanged": true,
+    "status_unchanged": true,
+    "working_patch_unchanged": true,
+    "source_unchanged": true,
+    "source_count": 7498,
+    "configuration_unchanged": true,
+    "controller_unchanged": true,
+    "nextest_tool_unchanged": true,
+    "nextest_config_unchanged": true,
+    "retained_failed_driver_unchanged": true,
+    "receipt_selectors_unchanged": true,
+    "all_stages_passed": true,
+    "controller_error": null
+  },
+  "actual_and_preserved_hashes_at_completed_boundary": true,
+  "preserved_copies_remain_private_after_controlled_target_release": true
+}

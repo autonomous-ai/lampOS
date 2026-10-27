@@ -1,0 +1,102 @@
+{
+  "accounting": "Two custom macOS skip contracts each 0/0/1 overlap the six Nextest ignores; no extra passes. Doctests 0/0/0. Separate stages do not clear runtime exit100/controller1.",
+  "custom_contracts": [
+    {
+      "binary": "lamp-update::self-cli-exec",
+      "exit_code": 0,
+      "matched": true,
+      "name": "actual_cli_exec_confirms_before_the_next_round",
+      "overlap_existing_six_ignored": true
+    },
+    {
+      "binary": "lamp-update::self-process-cuts",
+      "exit_code": 0,
+      "matched": true,
+      "name": "persisted_self_switches_survive_sigkill",
+      "overlap_existing_six_ignored": true
+    }
+  ],
+  "doctests": {
+    "exit_code": 0,
+    "summaries": [
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0
+      }
+    ]
+  },
+  "runtime": [
+    {
+      "argv": [
+        "cargo",
+        "+1.96.0",
+        "nextest",
+        "run",
+        "--locked",
+        "-p",
+        "lamp-update",
+        "--profile",
+        "pr",
+        "-E",
+        "all()",
+        "--config-file",
+        "lampOS/.config/nextest.toml",
+        "--user-config-file",
+        "none",
+        "--test-threads",
+        "4",
+        "--retries",
+        "0",
+        "--no-fail-fast",
+        "--status-level",
+        "all",
+        "--final-status-level",
+        "none",
+        "--color",
+        "never"
+      ],
+      "elapsed_seconds": 430.128,
+      "exit_code": 100,
+      "stage": "nextest"
+    },
+    {
+      "argv": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--locked",
+        "-p",
+        "lamp-update",
+        "--doc",
+        "--",
+        "--test-threads=4"
+      ],
+      "elapsed_seconds": 0.354,
+      "exit_code": 0,
+      "stage": "doctests"
+    },
+    {
+      "argv": [
+        "target/debug/deps/self_cli_exec-25113342c679f525",
+        "--exact",
+        "actual_cli_exec_confirms_before_the_next_round",
+        "--test-threads=1"
+      ],
+      "elapsed_seconds": 0.003,
+      "exit_code": 0,
+      "stage": "custom-self-cli-exec"
+    },
+    {
+      "argv": [
+        "target/debug/deps/self_process_cuts-8ce1b6350e2ac329",
+        "--exact",
+        "persisted_self_switches_survive_sigkill",
+        "--test-threads=1"
+      ],
+      "elapsed_seconds": 0.003,
+      "exit_code": 0,
+      "stage": "custom-self-process-cuts"
+    }
+  ]
+}

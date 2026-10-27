@@ -1,0 +1,541 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.12s
+────────────
+ Nextest run ID d664de06-d099-4c23-9365-4c807489f23a with nextest profile: pr
+    Starting 528 tests across 9 binaries (6 tests skipped)
+        PASS [   0.080s] (  1/528) lamp-update apply::tests::a_done_for_another_operation_does_not_change_any_setting_record
+        PASS [   0.080s] (  2/528) lamp-update apply::tests::a_done_for_another_sequence_does_not_change_any_setting_record
+        PASS [   0.105s] (  3/528) lamp-update apply::tests::a_matching_done_keeps_the_permanent_forward_read_contract
+        PASS [   0.152s] (  4/528) lamp-update apply::tests::a_path_both_a_setting_and_an_image_file_is_refused_with_nothing_written
+        PASS [   0.257s] (  5/528) lamp-update apply::tests::a_new_skills_folder_is_removed_when_it_is_put_back_and_a_folder_in_use_stays
+        PASS [   0.013s] (  6/528) lamp-update apply::tests::a_request_with_a_field_it_does_not_know_is_read
+        PASS [   0.330s] (  7/528) lamp-update apply::tests::a_put_back_asked_again_after_being_cut_short_puts_every_record_back
+        PASS [   0.257s] (  8/528) lamp-update apply::tests::a_removed_setting_goes_only_where_it_is_still_the_builds
+        PASS [   0.373s] (  9/528) lamp-update apply::tests::a_setting_still_the_builds_is_written_and_one_the_lamp_changed_is_kept
+        PASS [   0.235s] ( 10/528) lamp-update apply::tests::a_setting_the_lamp_removed_stays_removed_and_one_never_there_is_written
+        PASS [   0.172s] ( 11/528) lamp-update apply::tests::a_signed_image_file_outside_the_list_is_refused_with_nothing_written
+        PASS [   0.615s] ( 12/528) lamp-update apply::tests::a_reload_that_fails_fails_the_apply_and_a_speaker_that_fails_is_said
+        PASS [   0.104s] ( 13/528) lamp-update apply::tests::an_explicit_expected_identity_does_not_follow_a_rewritten_staged_request
+        PASS [   0.153s] ( 14/528) lamp-update apply::tests::a_unit_systemd_cannot_load_writes_nothing
+        PASS [   0.147s] ( 15/528) lamp-update apply::tests::an_envelope_signed_with_another_key_or_of_another_build_writes_nothing
+        PASS [   0.078s] ( 16/528) lamp-update apply::tests::an_unknown_done_operation_is_refused_without_changing_any_setting_record
+        PASS [   0.340s] ( 17/528) lamp-update apply::tests::put_back_keeps_a_file_changed_since_and_a_stale_back_file_is_not_used
+        PASS [   0.023s] ( 18/528) lamp-update apply::tests::the_apply_unit_can_write_every_carried_path_and_never_names_journald
+        PASS [   0.429s] ( 19/528) lamp-update apply::tests::put_back_restores_each_file_byte_for_byte_and_its_mode
+        PASS [   0.583s] ( 20/528) lamp-update apply::tests::put_back_restores_the_images_files_and_reloads_again
+        PASS [   0.024s] ( 21/528) lamp-update apply::tests::the_tmpfiles_install_writes_is_one_it_shipped
+        PASS [   0.533s] ( 22/528) lamp-update apply::tests::the_images_files_are_written_where_the_lamp_has_one_the_image_shipped
+        PASS [   0.366s] ( 23/528) lamp-update apply::tests::the_variants_file_is_written_and_none_of_another
+        PASS [   0.028s] ( 24/528) lamp-update apply::tests::without_a_request_nothing_is_done
+        PASS [   0.598s] ( 25/528) lamp-update apply::tests::the_tmpfiles_are_created_only_when_they_are_there
+        PASS [   0.008s] ( 26/528) lamp-update check_units::tests::a_base_unit_of_19_oct_that_leaves_lamp_cloud_off_is_named
+        PASS [   1.042s] ( 27/528) lamp-update apply::tests::the_apply_path_never_restarts_or_signals_journald
+        PASS [   0.008s] ( 28/528) lamp-update check_units::tests::a_drop_in_that_turns_a_product_switch_off_says_so
+        PASS [   0.007s] ( 29/528) lamp-update check_units::tests::a_masked_unit_fails_an_implicit_slice_does_not_and_white_space_shows
+        PASS [   0.007s] ( 30/528) lamp-update check_units::tests::a_units_own_path_line_is_its_text_and_hides_nothing
+        PASS [   0.007s] ( 31/528) lamp-update check_units::tests::exactly_the_product_passes_and_a_unit_from_elsewhere_does_not
+        PASS [   0.007s] ( 32/528) lamp-update check_units::tests::same_changed_drop_in_extra_and_missing_are_each_said_and_fail_the_check
+        PASS [   0.007s] ( 33/528) lamp-update check_units::tests::systemctl_cat_is_read_file_by_file_and_a_comment_with_a_path_is_no_file
+        PASS [   0.007s] ( 34/528) lamp-update check_units::tests::the_images_unit_is_the_images_not_extra_and_compared_with_its_variant
+        PASS [   0.007s] ( 35/528) lamp-update fetch::tests::a_chunked_file_and_one_to_the_end
+        PASS [   0.015s] ( 36/528) lamp-update check_units::tests::the_product_as_install_writes_it_passes
+        PASS [   0.007s] ( 37/528) lamp-update fetch::tests::a_file_by_its_length_after_a_redirect
+        SKIP [         ] (───────) lamp-update fetch::tests::a_release_file_from_github
+        PASS [   0.009s] ( 38/528) lamp-update fetch::tests::a_folder_on_the_lamp
+        PASS [   0.083s] ( 39/528) lamp-update apply::tests::without_the_image_asked_or_from_an_older_copy_none_is_written
+        PASS [   0.008s] ( 40/528) lamp-update fetch::tests::missing_too_large_short_and_other_answers
+        PASS [   0.011s] ( 41/528) lamp-update fetch::tests::an_answered_lookup_is_counted_out_before_its_answer_arrives
+        PASS [   0.229s] ( 42/528) lamp-update apply::tests::unrecorded_tmpfiles_an_install_shipped_are_the_builds_and_others_the_lamps
+        PASS [   0.007s] ( 43/528) lamp-update fetch::tests::urls_and_redirects
+        PASS [   0.008s] ( 44/528) lamp-update fetch::tests::no_network_is_unreachable
+        PASS [   0.007s] ( 45/528) lamp-update head_touch::input_tests::an_uncaptured_key_never_becomes_a_captured_absence
+        PASS [   0.007s] ( 46/528) lamp-update head_touch::input_tests::rejecting_an_early_override_does_not_consume_a_later_directory_error
+        PASS [   0.008s] ( 47/528) lamp-update head_touch::input_tests::ordinary_inputs_keep_regular_links_null_masks_and_directory_aliases
+        PASS [   0.007s] ( 48/528) lamp-update head_touch::tests::null_masks_do_not_admit_other_character_devices
+        PASS [   0.007s] ( 49/528) lamp-update image::tests::a_file_not_listed_as_shipped_is_refused
+        PASS [   0.007s] ( 50/528) lamp-update image::tests::a_unit_reloads_systemd_a_rule_reloads_udev_and_asound_restarts_the_voice
+        PASS [   0.011s] ( 51/528) lamp-update image::tests::every_image_file_of_every_variant_is_listed_as_shipped
+        PASS [   0.007s] ( 52/528) lamp-update image::tests::journald_is_never_restarted_nor_signalled
+        PASS [   0.008s] ( 53/528) lamp-update image::tests::the_variant_is_the_images_and_none_is_standard
+        PASS [   0.008s] ( 54/528) lamp-update install::tests::a_timed_service_is_never_enabled_and_its_timer_is
+        PASS [   0.041s] ( 55/528) lamp-update head_touch::input_tests::projection_and_verification_replay_closed_inputs_without_filesystem_fallback
+        PASS [   0.007s] ( 56/528) lamp-update install::tests::a_unit_through_current_is_read
+        PASS [   0.007s] ( 57/528) lamp-update install::tests::every_deploy_product_unit_is_installed_or_named_left_out
+        PASS [   0.070s] ( 58/528) lamp-update fetch::tests::a_name_lookup_that_hangs_is_given_up_and_no_round_starts_another_until_it_ends
+        PASS [   0.008s] ( 59/528) lamp-update install::tests::every_tool_the_factory_steps_run_is_installed_where_they_look
+        PASS [   0.008s] ( 60/528) lamp-update install::tests::every_product_part_starts_through_its_current_link
+        PASS [   0.007s] ( 61/528) lamp-update install::tests::offsets_are_read
+        PASS [   0.009s] ( 62/528) lamp-update install::tests::no_product_unit_names_a_lamp
+        PASS [   0.007s] ( 63/528) lamp-update install::tests::the_cloud_is_enabled_with_the_lamp
+        PASS [   0.007s] ( 64/528) lamp-update install::tests::the_eyes_camera_helper_socket_is_enabled_and_names_the_eyes_camera
+        PASS [   0.007s] ( 65/528) lamp-update install::tests::the_skills_manage_socket_is_enabled_and_its_template_is_not
+        PASS [   0.007s] ( 66/528) lamp-update install::tests::the_wifi_helper_is_never_listed_without_its_restore_at_boot
+        PASS [   0.007s] ( 67/528) lamp-update judge::tests::a_part_that_stays_up_with_one_process_and_says_it_is_well_is_well
+        PASS [   0.007s] ( 68/528) lamp-update judge::tests::restarted_failed_or_another_process_is_not_well
+        PASS [   0.038s] ( 69/528) lamp-update install::tests::install_commands_say_their_stderr_or_give_their_stdout
+        PASS [   0.007s] ( 70/528) lamp-update judge::tests::the_part_s_own_word_counts_against_what_it_said_before
+        PASS [   0.010s] ( 71/528) lamp-update manifest::tests::a_build_for_a_newer_updater_is_refused_by_an_older_one_only
+        PASS [   0.008s] ( 72/528) lamp-update manifest::tests::a_key_made_by_openssl_signs_as_well
+        PASS [   0.007s] ( 73/528) lamp-update manifest::tests::a_manifest_without_min_updater_is_written_and_read_as_before
+        PASS [   0.008s] ( 74/528) lamp-update manifest::tests::a_newer_manifest_this_updater_cannot_read_is_refused_for_its_updater
+        PASS [   0.008s] ( 75/528) lamp-update manifest::tests::a_sealed_manifest_opens_with_its_key_and_gives_back_its_bytes
+        PASS [   0.008s] ( 76/528) lamp-update manifest::tests::a_setting_with_a_field_it_does_not_know_is_still_read
+        PASS [   0.007s] ( 77/528) lamp-update manifest::tests::an_image_file_outside_the_list_listed_twice_or_not_its_sha_is_refused
+        PASS [   0.008s] ( 78/528) lamp-update manifest::tests::min_updater_is_signed_with_the_rest
+        PASS [   0.009s] ( 79/528) lamp-update manifest::tests::another_key_a_changed_byte_or_a_changed_signature_is_refused
+        PASS [   0.009s] ( 80/528) lamp-update manifest::tests::min_updater_raised_under_the_same_signature_is_a_bad_signature
+        PASS [   0.007s] ( 81/528) lamp-update manifest::tests::names_are_plain
+        PASS [   0.008s] ( 82/528) lamp-update manifest::tests::models_are_read_only_with_the_updater_they_need_and_plain_paths
+        PASS [   0.008s] ( 83/528) lamp-update manifest::tests::nothing_but_a_plain_manifest_is_signed_or_taken
+        PASS [   0.008s] ( 84/528) lamp-update manifest::tests::settings_are_read_only_with_the_updater_they_need_and_their_own_paths
+        PASS [   0.009s] ( 85/528) lamp-update manifest::tests::product_units_require_the_signed_updater_level_before_older_readers_select_them
+        PASS [   0.009s] ( 86/528) lamp-update manifest::tests::the_reset_plan_is_read_only_with_its_updater_and_its_own_path
+        PASS [   0.007s] ( 87/528) lamp-update models::tests::a_link_into_the_store_is_relative_and_a_unit_reads_by_path_or_folder
+        PASS [   0.007s] ( 88/528) lamp-update product_skills::tests::only_plain_paths_in_the_skills_it_names_are_taken
+        PASS [   0.018s] ( 89/528) lamp-update product_skills::tests::a_link_in_place_of_a_core_file_is_put_back_and_never_read
+        PASS [   0.013s] ( 90/528) lamp-update product_skills::tests::each_file_is_one_of_three
+        PASS [   0.014s] ( 91/528) lamp-update product_skills::tests::the_bundle_of_the_repository_is_what_install_writes
+        PASS [   0.023s] ( 92/528) lamp-update product_skills::tests::the_stores_key_beside_the_skills_is_left_alone
+        PASS [   0.063s] ( 93/528) lamp-update product_skills::tests::what_is_written_is_put_back_and_a_file_changed_since_is_left
+        PASS [   0.039s] ( 94/528) lamp-update publish::tests::models_are_carried_with_the_updater_they_need
+        PASS [   0.073s] ( 95/528) lamp-update publish::tests::binaries_and_each_lamps_units_but_nothing_else
+        PASS [   0.022s] ( 96/528) lamp-update publish::tests::the_images_files_are_carried_with_the_updater_they_need
+        PASS [   0.024s] ( 97/528) lamp-update publish::tests::product_services_and_linked_lamp_overrides_are_carried_with_level_six
+        PASS [   0.007s] ( 98/528) lamp-update quiet::tests::a_stale_mute_or_one_in_a_turn_is_not_quiet
+        PASS [   0.017s] ( 99/528) lamp-update publish::tests::the_products_settings_are_carried_with_the_updater_they_need
+        PASS [   0.007s] (100/528) lamp-update quiet::tests::a_voice_asleep_or_muted_for_privacy_is_quiet_at_once
+        PASS [   0.016s] (101/528) lamp-update publish::tests::the_stores_key_is_carried_only_when_the_repository_has_it
+        PASS [   0.007s] (102/528) lamp-update quiet::tests::a_voice_that_says_nothing_is_never_quiet
+        PASS [   0.007s] (103/528) lamp-update quiet::tests::forty_five_seconds_of_nothing_after_the_last_word
+        PASS [   0.007s] (104/528) lamp-update quiet::tests::hearing_thinking_or_speaking_is_a_turn
+        PASS [   0.007s] (105/528) lamp-update quiet::tests::quiet_needs_as_long_a_watch
+        PASS [   0.007s] (106/528) lamp-update records::tests::a_state_from_before_the_settings_reads_and_writes_as_before
+        PASS [   0.024s] (107/528) lamp-update records::tests::a_link_left_beside_is_replaced_and_never_written_through
+        PASS [   0.014s] (108/528) lamp-update records::tests::a_state_that_cannot_be_read_is_kept_aside
+        PASS [   0.027s] (109/528) lamp-update records::tests::a_state_from_a_later_build_keeps_its_fields_across_a_save
+        SKIP [         ] (───────) lamp-update records::tests::write_records_fixtures
+        PASS [   0.007s] (110/528) lamp-update records::tests::one_at_a_time
+        PASS [   0.013s] (111/528) lamp-update records::tests::each_kept_state_and_journal_reads_as_saved
+        PASS [   0.007s] (112/528) lamp-update setup_lifecycle::tests::incomplete_duplicate_or_malformed_manager_records_are_unknown
+        PASS [   0.007s] (113/528) lamp-update setup_lifecycle::tests::manager_identity_requires_the_exact_loaded_product_with_known_dropins
+        PASS [   0.028s] (114/528) lamp-update status::tests::the_status_is_the_records_build_the_phase_and_the_last_end_without_its_reason
+        PASS [   0.063s] (115/528) lamp-update records::tests::state_journal_and_previous_units_are_kept
+        PASS [   0.007s] (116/528) lamp-update status::tests::the_value_lasts_three_periods_so_a_dead_updater_reads_stale
+        PASS [   0.007s] (117/528) lamp-update switches::tests::a_later_drop_in_or_file_that_sets_it_back_on_leaves_it_on
+        PASS [   0.006s] (118/528) lamp-update switches::tests::environment_files_and_their_lines
+        PASS [   0.006s] (119/528) lamp-update switches::tests::several_on_a_line_quoted_continued_and_cleared_are_read_as_systemd_does
+        PASS [   0.006s] (120/528) lamp-update switches::tests::the_product_switches_are_its_on_lines_and_lamp_cloud_is_one
+        PASS [   0.007s] (121/528) lamp-update unit::restart_order::tests::a_declared_socket_precedes_its_service
+        PASS [   0.006s] (122/528) lamp-update unit::restart_order::tests::a_path_through_an_unchanged_unit_still_orders_its_ends
+        PASS [   0.007s] (123/528) lamp-update unit::restart_order::tests::cycles_including_self_edges_are_refused
+        PASS [   0.007s] (124/528) lamp-update unit::restart_order::tests::repeated_and_folded_declarations_keep_each_edge
+        PASS [   0.007s] (125/528) lamp-update unit::restart_order::tests::requirements_and_directives_in_other_sections_do_not_order_units
+        PASS [   0.008s] (126/528) lamp-update unit::restart_order::tests::the_shipped_managed_services_have_a_valid_startup_graph
+        PASS [   0.007s] (127/528) lamp-update unit::restart_order::tests::the_voice_starts_after_controls_so_it_stops_first
+        PASS [   0.007s] (128/528) lamp-update unit::restart_order::tests::unsupported_ordering_cannot_silently_lose_a_dependency
+        PASS [   0.007s] (129/528) lamp-update unit::tests::a_new_build_is_written_everywhere_the_folder_is_named
+        PASS [   0.006s] (130/528) lamp-update unit::tests::comments_do_not_make_a_unit_another
+        PASS [   0.007s] (131/528) lamp-update unit::tests::lamp_4aces_own_units_are_read
+        PASS [   0.007s] (132/528) lamp-update unit::tests::only_a_part_installed_by_build_is_a_program
+        PASS [   0.007s] (133/528) lamp-update unit::tests::the_generic_package_sets_up_and_resets_as_the_product_does
+        PASS [   0.012s] (134/528) lamp-update unit::tests::the_generic_voice_answers_whom_the_product_does
+        PASS [   0.008s] (135/528) lamp-update unit::tests::the_generic_voice_has_the_product_clock_and_session_context
+        PASS [   0.007s] (136/528) lamp-update unit::tests::the_generic_voice_runs_the_ring_as_the_product_does
+        PASS [   0.007s] (137/528) lamp-update unit::tests::the_generic_voice_says_its_failures_as_the_product_does
+        PASS [   0.119s] (138/528) lamp-update world::query::tests::an_endless_writer_is_refused_at_the_cap_and_its_group_killed
+        PASS [   0.300s] (139/528) lamp-update status::tests::a_restart_keeps_the_last_result_each_end_is_said_and_it_is_said_again
+        PASS [   0.155s] (140/528) lamp-update world::query::tests::an_endless_writer_whose_child_holds_the_pipe_is_refused_and_both_killed
+        PASS [   0.210s] (141/528) lamp-update world::query::tests::public_output_accepts_one_mib_and_refuses_one_byte_more
+        PASS [   0.017s] (142/528) lamp-update world::query::tests::public_output_refuses_invalid_utf8_instead_of_a_partial_string
+        PASS [   1.556s] (143/528) lamp-update world::query::tests::a_failed_query_cleans_its_same_group_child_even_after_output_closes
+        PASS [   0.032s] (144/528) lamp-update world::query::tests::query_reads_output_with_closed_stdin_and_discarded_stderr
+        PASS [   0.021s] (145/528) lamp-update world::query::tests::query_refuses_nonzero_exit_and_spawn_failure
+        PASS [   1.558s] (146/528) lamp-update world::query::tests::invalid_utf8_cleans_closed_output_child
+        PASS [   2.011s] (147/528) lamp-update world::query::tests::query_deadline_applies_after_stdout_closes
+        PASS [   1.015s] (148/528) lamp-update world::tests::a_child_holding_the_pipe_is_an_error_within_the_bound
+        PASS [   0.073s] (149/528) lamp-update world::tests::a_failed_query_says_its_trimmed_stderr_and_a_good_one_its_stdout
+        PASS [   4.024s] (150/528) lamp-update install::tests::install_commands_never_wait_past_their_bound
+        PASS [   0.023s] (151/528) lamp-update world::tests::self_recovery_accepts_an_armed_timer_and_an_inactive_service
+        PASS [   0.019s] (152/528) lamp-update world::tests::self_recovery_refuses_a_timer_not_armed_persistently
+        PASS [   0.013s] (153/528) lamp-update world::tests::self_recovery_refuses_an_unloaded_masked_or_ephemeral_service
+        PASS [   0.010s] (154/528) lamp-update world::tests::self_recovery_refuses_malformed_or_unexpected_query_records
+        PASS [   0.009s] (155/528) lamp-update world::tests::self_recovery_requires_one_of_each_record_and_required_property
+        PASS [   0.008s] (156/528) lamp-update world::tests::systemctl_show_is_read_unit_by_unit
+        PASS [   1.011s] (157/528) lamp-update world::tests::a_stalled_systemctl_show_is_an_error_within_its_bound
+        PASS [   1.532s] (158/528) lamp-update world::tests::a_child_holding_the_pipe_is_killed_with_the_query
+        PASS [   0.007s] (159/528) lamp-update world::tests::the_real_disk_has_room
+        PASS [   0.010s] (160/528) lamp-update writer_files::tests::a_fifo_is_refused_without_waiting_for_a_writer_and_its_worker_is_always_joined
+        PASS [   0.008s] (161/528) lamp-update writer_files::tests::a_hard_link_is_not_accepted_as_a_setting_and_directories_are_not_read
+        PASS [   0.012s] (162/528) lamp-update writer_files::tests::descriptor_and_ancestor_metadata_changes_refuse_the_observation
+        PASS [   0.008s] (163/528) lamp-update writer_files::tests::errors_and_debug_do_not_expose_relative_names_or_file_contents
+        PASS [   0.009s] (164/528) lamp-update writer_files::tests::explicit_content_caps_and_the_hard_ceiling_are_enforced_without_truncating_success
+        PASS [   0.007s] (165/528) lamp-update writer_files::tests::invalid_or_unbounded_relative_names_are_refused_before_opening_the_root
+        PASS [   0.008s] (166/528) lamp-update writer_files::tests::missing_intermediate_and_leaf_are_distinct_and_keep_only_existing_ancestors
+        PASS [   0.009s] (167/528) lamp-update writer_files::tests::no_follow_rejects_leaf_ancestor_and_root_links_without_reading_the_outside_witness
+        PASS [   0.009s] (168/528) lamp-update writer_files::tests::pre_open_inode_or_metadata_substitution_and_disappearance_are_not_read_as_the_original_file
+        PASS [   0.008s] (169/528) lamp-update writer_files::tests::regular_bytes_and_all_existing_ancestor_identities_are_observed_without_changing_them
+        PASS [   0.365s] (170/528) lamp-update writer_refresh::tests::a_restart_at_every_unqualified_prefix_requires_recovery_and_never_reissues_the_grant
+        PASS [   0.067s] (171/528) lamp-update writer_refresh::tests::a_stale_or_modified_first_apply_cannot_consume_the_single_grant
+        PASS [   0.038s] (172/528) lamp-update writer_refresh::tests::diagnostics_hide_unknown_values_and_known_duplicate_or_shadowed_fields_are_refused
+        PASS [   0.827s] (173/528) lamp-update world::tests::the_bus_hears_the_voice_and_not_an_old_state
+        PASS [   0.108s] (174/528) lamp-update writer_refresh::tests::failed_persist_after_publication_poisons_the_live_session_until_actual_disk_state_is_recovered
+        PASS [   0.122s] (175/528) lamp-update writer_refresh::tests::first_apply_binds_its_own_later_envelope_and_sequence_without_replacing_the_refresh_identity
+        PASS [   0.030s] (176/528) lamp-update writer_refresh::tests::guard_lock_is_exclusive_and_independent_of_the_product_lock
+        PASS [   0.107s] (177/528) lamp-update writer_refresh::tests::future_nonsemantic_metadata_is_preserved_without_becoming_admission_authority
+        PASS [   0.024s] (178/528) lamp-update writer_refresh::tests::identity_substitution_never_changes_or_admits_the_saved_transaction
+        PASS [   0.016s] (179/528) lamp-update writer_refresh::tests::missing_and_nonregular_records_do_not_turn_into_a_fresh_transaction
+        PASS [   0.102s] (180/528) lamp-update writer_refresh::tests::live_or_poisoned_sessions_cannot_expose_stale_recovery_inputs
+        PASS [   0.141s] (181/528) lamp-update writer_refresh::tests::no_apply_does_not_qualify_but_one_exact_apply_can_enter_without_an_ordinary_round
+        PASS [   0.137s] (182/528) lamp-update writer_refresh::tests::qualified_and_closed_inputs_keep_the_compatible_writer_and_bound_product_receipts
+        PASS [   3.524s] (183/528) lamp-update world::query::tests::query_timeout_cleans_the_exited_leaders_pipe_holding_descendant
+        PASS [   0.134s] (184/528) lamp-update writer_refresh::tests::qualified_writer_and_preimages_survive_a_restart_until_the_product_journal_closes
+        PASS [   0.120s] (185/528) lamp-update writer_refresh::tests::recovery_views_retain_later_metadata_in_the_bound_inputs_without_reparsing
+        PASS [   0.265s] (186/528) lamp-update writer_refresh::tests::restoring_an_apply_requires_its_original_grant_and_preimage_identity
+        PASS [   0.017s] (187/528) lamp-update writer_refresh::tests::write_bound_and_invalid_identities_leave_no_journal_or_partial_acceptance
+        PASS [   0.263s] (188/528) lamp-update writer_refresh::tests::unsupported_or_malformed_journals_are_retained_and_block_every_admission
+        PASS [   0.049s] (189/528) lamp-update writer_settings::tests::captured_bytes_preserve_ordinary_ownership_and_keep_all_omitted_noops
+        PASS [   0.020s] (190/528) lamp-update writer_settings::tests::oversized_or_invalid_new_inputs_are_bounded_and_redacted_before_observation
+        PASS [   0.045s] (191/528) lamp-update writer_settings::tests::old_byte_limits_allow_exact_budget_then_empty_or_absent_but_never_a_prefix
+        PASS [   0.048s] (192/528) lamp-update writer_settings::tests::revalidation_refuses_new_negative_dependencies_and_replaced_ancestors
+        PASS [   1.837s] (193/528) lamp-update world::tests::the_bus_hears_a_muted_voice_and_not_a_mute_it_cannot_read
+        PASS [   0.011s] (194/528) lamp-update writer_settings::tests::selected_invalid_values_refuse_before_filesystem_access_and_unrelated_values_are_ignored
+        PASS [   0.076s] (195/528) lamp-update writer_settings::tests::revalidation_refuses_byte_mode_deletion_and_same_byte_inode_changes
+        PASS [   0.007s] (196/528) lamp-update writer_settings::tests::shared_classifier_keeps_tmpfiles_marker_and_image_shipped_precedence
+        PASS [   0.042s] (197/528) lamp-update writer_settings::tests::revalidation_refuses_replaced_roots_links_and_nonregular_leaves
+        PASS [   0.015s] (198/528) lamp-update::functions the_generic_voice_declares_the_clock_and_receives_time_and_session_context
+        PASS [   0.009s] (199/528) lamp-update::functions the_product_voice_s_functions_in_a_process_of_their_own
+        PASS [   0.543s] (200/528) lamp-update writer_refresh::tests::reloaded_inputs_keep_the_exact_origin_and_distinguish_writer_from_apply_restoration
+        PASS [   0.204s] (201/528) lamp-update::functions a_product_chat_request_offers_dance_at_the_bound
+        PASS [   0.160s] (202/528) lamp-update::functions with_reports_on_dance_stays_at_the_bound
+        PASS [   0.206s] (203/528) lamp-update::functions a_product_lamp_declares_every_function_it_has_within_the_bound
+        PASS [   0.057s] (204/528) lamp-update::install a_build_without_a_part_is_refused_before_anything_is_written
+        PASS [   6.802s] (205/528) lamp-update::install a_blank_lamp_gets_every_part_its_units_and_nothing_started
+        PASS [   6.691s] (206/528) lamp-update::install a_build_without_the_bodys_factory_tools_still_installs
+        PASS [   6.700s] (207/528) lamp-update::install a_blank_lamp_runs_every_product_skill_as_the_skill
+        PASS [   6.475s] (208/528) lamp-update::install a_closed_etc_lampos_is_said_and_left_as_it_is
+        PASS [   6.462s] (209/528) lamp-update::install a_default_found_closed_is_opened_and_a_lamps_own_found_closed_is_said
+        PASS [   6.464s] (210/528) lamp-update::install a_device_key_found_open_is_narrowed_and_never_said
+        PASS [  13.227s] (211/528) lamp-update::install a_clean_install_names_no_switch_off
+        PASS [   0.221s] (212/528) lamp-update::install a_file_left_beside_by_a_run_cut_off_does_not_lend_its_mode_to_the_key
+        PASS [   0.229s] (213/528) lamp-update::install a_file_that_does_not_match_installs_nothing_of_it
+        PASS [   6.637s] (214/528) lamp-update::install a_failed_exit_note_write_keeps_reload_debt_for_the_next_install
+        PASS [   6.676s] (215/528) lamp-update::install a_disabled_core_skill_turned_on_stays_on_through_an_install
+        PASS [   7.597s] (216/528) lamp-update::install a_kept_drop_in_that_turns_lamp_cloud_off_is_named_and_kept
+        PASS [   6.571s] (217/528) lamp-update::install a_key_a_reset_removed_is_never_put_back_from_v1s_config
+        PASS [   6.851s] (218/528) lamp-update::install a_lamp_set_up_before_setup_wrote_zone_env_gets_its_saved_zone_at_the_next_install
+        PASS [   7.469s] (219/528) lamp-update::install a_missing_store_drop_in_is_repaired_and_failed_reload_is_retried
+        PASS [   0.084s] (220/528) lamp-update::install a_moved_lamp_is_given_the_product_voices_five_lines
+        PASS [  14.629s] (221/528) lamp-update::install a_lamps_own_pins_gain_the_privacy_section_and_keep_the_rest
+        PASS [   0.289s] (222/528) lamp-update::install a_newer_default_replaces_only_a_setting_nobody_changed
+        PASS [   0.010s] (223/528) lamp-update::install a_product_lamp_without_a_link_says_so_once_and_never_drops_speech_in_silence
+        PASS [  13.962s] (224/528) lamp-update::install a_lamps_own_pins_on_the_old_guess_get_every_head_line
+        PASS [   7.980s] (225/528) lamp-update::install a_newer_build_moves_each_link_and_keeps_the_old_folders
+        PASS [   6.807s] (226/528) lamp-update::install a_refused_service_install_records_nothing_and_keeps_the_drop_in
+        PASS [   7.243s] (227/528) lamp-update::install a_reset_then_prepare_does_not_restore_the_old_key
+        PASS [   7.826s] (228/528) lamp-update::install a_set_aside_holds_for_keys_there_and_after_a_mark_that_was_not_saved
+        PASS [   7.009s] (229/528) lamp-update::install a_setting_changed_on_the_lamp_is_kept_when_install_runs_again
+        PASS [   0.115s] (230/528) lamp-update::install a_setting_written_but_not_yet_recorded_is_still_installs
+        PASS [  40.327s] (231/528) lamp-update::install a_failing_step_keeps_the_record_and_a_later_run_finishes
+        PASS [   6.477s] (232/528) lamp-update::install a_setting_in_the_way_stops_the_install_before_any_is_written
+        PASS [   6.828s] (233/528) lamp-update::install a_switch_set_back_on_later_is_not_named_and_a_file_named_twice_is_said_once
+        PASS [   6.762s] (234/528) lamp-update::install an_edited_setting_or_environment_file_that_turns_a_switch_off_is_named
+        PASS [   6.856s] (235/528) lamp-update::install an_install_over_19_octs_units_writes_each_as_the_build_has_it
+        PASS [   7.246s] (236/528) lamp-update::install an_install_puts_a_core_skills_changed_file_back_and_says_so
+        PASS [   7.014s] (237/528) lamp-update::install an_install_stopped_after_writing_its_units_enables_at_the_next_run
+        PASS [   0.023s] (238/528) lamp-update::install every_part_of_the_brain_has_a_product_unit
+        PASS [   0.015s] (239/528) lamp-update::install every_part_of_the_lamp_waits_for_setups_marker_itself
+        PASS [   0.011s] (240/528) lamp-update::install every_skill_folder_is_in_the_product_or_says_why_not
+        PASS [   8.612s] (241/528) lamp-update::install an_install_that_ends_before_its_units_says_so_and_keeps_the_old_ones
+        PASS [   6.764s] (242/528) lamp-update::install an_install_whose_enable_failed_enables_at_the_next_run_and_keeps_its_settings_record
+        PASS [   7.238s] (243/528) lamp-update::install harness_at_boot_gives_lamposs_manager_its_home_first
+        PASS [   7.580s] (244/528) lamp-update::install harness_off_after_a_first_install_leaves_no_linger
+        PASS [  14.769s] (245/528) lamp-update::install corrupt_records_are_set_aside_and_never_bring_back_a_key_a_reset_removed
+        PASS [   7.055s] (246/528) lamp-update::install harness_off_runs_uninstall_stop_status_then_the_linger_then_pgrep
+        PASS [   7.275s] (247/528) lamp-update::install harness_on_installs_with_harnesss_own_installer_then_sets_it_at_boot
+        PASS [   7.401s] (248/528) lamp-update::install harness_on_keeps_a_harness_already_there
+        PASS [   7.392s] (249/528) lamp-update::install harness_on_stops_at_a_failing_step_and_leaves_no_link
+        PASS [   0.032s] (250/528) lamp-update::install harness_versions_are_read_as_harness_prints_them
+        PASS [   0.018s] (251/528) lamp-update::install head_touch_comes_whole_and_never_beside_the_old_engines_head
+        PASS [  29.286s] (252/528) lamp-update::install harness_is_set_to_start_at_boot_once_when_it_is_there
+        PASS [   6.917s] (253/528) lamp-update::install head_touch_preflight_files::dangling_drop_in_keeps_missing_file_compatibility
+        PASS [   0.315s] (254/528) lamp-update::install head_touch_preflight_files::directory_drop_in_is_refused_before_mutation
+        PASS [   0.238s] (255/528) lamp-update::install head_touch_preflight_files::fifo_body_calibration_is_refused_before_mutation
+        PASS [   0.295s] (256/528) lamp-update::install head_touch_preflight_files::fifo_drop_in_is_refused_before_mutation
+        PASS [   0.289s] (257/528) lamp-update::install head_touch_preflight_files::fifo_without_a_writer_is_refused_before_mutation
+        PASS [  22.045s] (258/528) lamp-update::install harness_on_keeps_a_harness_whose_version_cannot_be_read_in_time
+        PASS [   6.492s] (259/528) lamp-update::install head_touch_preflight_files::dev_null_drop_in_mask_is_preserved
+        PASS [   7.267s] (260/528) lamp-update::install head_touch_preflight_files::missing_local_files_keep_install_compatibility
+        PASS [   7.101s] (261/528) lamp-update::install head_touch_preflight_files::regular_benign_drop_in_is_preserved
+        PASS [   0.132s] (262/528) lamp-update::install install_head_body_refuses_calibration_environment_overrides_before_mutation
+        PASS [   6.430s] (263/528) lamp-update::install head_touch_preflight_files::symlink_to_regular_drop_in_is_preserved
+        PASS [   0.014s] (264/528) lamp-update::install install_places_the_voices_recorded_lines_where_the_product_voice_reads_them
+        PASS [   6.199s] (265/528) lamp-update::install install_head_body_keeps_factory_calibration
+        PASS [  27.601s] (266/528) lamp-update::install harness_on_updates_its_own_older_harness_and_says_one_too_old
+        PASS [   8.266s] (267/528) lamp-update::install install_places_every_exit_note_hook_and_keeps_other_drop_ins
+        PASS [   8.577s] (268/528) lamp-update::install install_prepares_store_off_and_keeps_the_lamps_store_choice
+        PASS [   0.387s] (269/528) lamp-update::install install_review_head_pair_refuses_a_disabling_drop_in_before_mutation
+        PASS [   0.322s] (270/528) lamp-update::install install_review_head_pair_refuses_a_removed_mute_before_mutation
+        PASS [   2.407s] (271/528) lamp-update::install install_review_head_pair_refusal_precedes_state_and_host_mutation
+        PASS [  11.556s] (272/528) lamp-update::install install_records_the_tmpfiles_it_writes
+        PASS [   0.024s] (273/528) lamp-update::install lamp_update_back_waits_for_its_binary_rather_than_failing
+        PASS [  11.569s] (274/528) lamp-update::install install_review_head_pair_keeps_a_benign_drop_in
+        PASS [   8.887s] (275/528) lamp-update::install install_review_head_pair_retry_keeps_calibration_and_is_idempotent
+        PASS [   0.075s] (276/528) lamp-update::install prepare_places_the_recorded_lines_a_moved_lamps_voice_reads
+        PASS [   0.447s] (277/528) lamp-update::install prepare_sets_corrupt_records_aside_and_leaves_unreadable_ones_alone
+        PASS [   6.574s] (278/528) lamp-update::install music_sway_and_watch_you_leave_are_on_in_the_product
+        PASS [   6.855s] (279/528) lamp-update::install missing_models_are_fetched_checked_and_placed_and_a_lamps_own_is_kept
+        PASS [   0.030s] (280/528) lamp-update::install product_units_pass_only_options_an_older_binary_takes
+        PASS [  15.037s] (281/528) lamp-update::install install_setup_on_replaces_a_hand_placed_plan_and_keeps_the_old_in_the_records
+        PASS [   0.125s] (282/528) lamp-update::install second_review_body_head_off_refuses_before_bundle_mutation
+        PASS [   0.188s] (283/528) lamp-update::install settings_written_before_one_that_fails_are_still_installs
+        PASS [   7.096s] (284/528) lamp-update::install prepare_then_reset_then_install_does_not_restore_the_old_key
+        PASS [   6.862s] (285/528) lamp-update::install product_routine_state_is_private_persistent_and_keeps_new_switches_off
+        PASS [   0.160s] (286/528) lamp-update::install the_device_key_is_provisioned_private_and_only_where_missing
+        PASS [   0.025s] (287/528) lamp-update::install the_exit_note_allowlist_is_exactly_clouds_product_services
+        PASS [   6.930s] (288/528) lamp-update::install run_twice_it_changes_nothing
+        PASS [   0.019s] (289/528) lamp-update::install the_parts_that_keep_local_time_read_the_zone_setup_saves
+        PASS [   0.014s] (290/528) lamp-update::install the_pinned_models_are_the_ones_their_parts_check
+        PASS [   0.011s] (291/528) lamp-update::install the_plans_install_shipped_are_listed
+        PASS [   0.010s] (292/528) lamp-update::install the_product_full_look_is_on_in_both_units_with_one_file
+        PASS [   0.009s] (293/528) lamp-update::install the_product_keeps_nothing_personal_while_nobody_is_known
+        PASS [   0.008s] (294/528) lamp-update::install the_product_sees_who_speaks
+        PASS [   0.022s] (295/528) lamp-update::install the_product_skills_are_exactly_the_core_skills
+        PASS [   7.134s] (296/528) lamp-update::install the_builds_plan_already_there_is_no_change_and_no_backup
+        PASS [   0.033s] (297/528) lamp-update::install the_skills_tools_are_in_their_own_folder_which_the_voice_reads
+        PASS [   0.016s] (298/528) lamp-update::install the_tasks_part_closes_the_harness_a_told_task_started
+        PASS [   7.291s] (299/528) lamp-update::install the_installed_bedtime_skill_is_disabled_and_absent_from_live_catalogs
+        PASS [   7.176s] (300/528) lamp-update::install the_second_route_gets_its_services_on_the_voices_key_and_a_lamps_own_is_kept
+        PASS [   0.023s] (301/528) lamp-update::install time_of_day_parts_wait_for_the_kernel_to_say_the_clock_is_set
+        PASS [   0.015s] (302/528) lamp-update::install tmpfiles_make_lock_folders_the_parts_accept_and_the_voices_sessions_folder
+        PASS [   0.186s] (303/528) lamp-update::install two_failed_runs_in_a_row_keep_a_written_setting_as_installs
+        PASS [   6.579s] (304/528) lamp-update::install the_tasks_part_waits_for_harness_rather_than_failing
+        PASS [  13.793s] (305/528) lamp-update::install setup_settings_are_written_only_with_setup_on_and_kept_once_changed
+        PASS [   0.033s] (306/528) lamp-update::install what_harness_service_status_still_has_is_read_from_its_json
+        PASS [   0.669s] (307/528) lamp-update::install without_a_usable_key_nothing_is_written_and_the_key_is_never_said
+        PASS [   6.641s] (308/528) lamp-update::install unreadable_records_stop_install_rather_than_being_written_over
+        PASS [   0.433s] (309/528) lamp-update::it ci_paths::every_doc_a_crate_reads_is_named_back_in_the_workflows_pull_request_paths
+        PASS [   0.008s] (310/528) lamp-update::it ci_paths::the_scan_sees_paths_in_strings_and_not_in_comments_or_prose
+        PASS [   0.009s] (311/528) lamp-update::it image_journal::systemd_reads_it_last_beside_another_drop_in
+        PASS [   0.007s] (312/528) lamp-update::it image_journal::the_journal_is_kept_well_inside_the_ram_disk
+        PASS [   1.383s] (313/528) lamp-update::it image_ramlog::a_failed_move_keeps_the_kept_boots_and_says_so
+        PASS [   0.020s] (314/528) lamp-update::it image_ramlog::logrotate_runs_the_lamps_copy_back_in_place_of_the_bases
+        PASS [   0.019s] (315/528) lamp-update::it image_ramlog::ramlogs_copies_leave_the_journal_out
+        PASS [   0.010s] (316/528) lamp-update::it image_ramlog::ramlogs_stop_keeps_the_journal_before_its_own_stop
+        PASS [   0.288s] (317/528) lamp-update::it image_ramlog::the_copy_back_leaves_the_journal_alone
+        PASS [   0.021s] (318/528) lamp-update::it image_ramlog::the_defaults_keep_the_bases_settings
+        PASS [   1.559s] (319/528) lamp-update::it image_ramlog::the_last_two_boots_are_kept_at_shutdown_only
+        PASS [   0.138s] (320/528) lamp-update::it scratch_paths::no_two_files_of_a_test_binary_build_the_same_scratch_folder
+        SKIP [         ] (───────) lamp-update::release_pair release_6408_recovers_a_cut_written_by_release_6449
+        SKIP [         ] (───────) lamp-update::release_pair release_6449_recovers_a_cut_written_by_release_6408
+        PASS [   0.008s] (321/528) lamp-update::it scratch_paths::the_names_read_are_the_scratch_folders_only
+        PASS [   0.399s] (322/528) lamp-update::round a_bad_signature_or_a_bad_checksum_is_refused_with_nothing_installed
+        PASS [   0.560s] (323/528) lamp-update::round a_build_for_a_newer_updater_is_refused_and_taken_once_the_updater_can
+        PASS [   1.002s] (324/528) lamp-update::round a_build_of_only_new_product_skills_places_them_and_restarts_nothing
+        PASS [  13.369s] (325/528) lamp-update::install the_voice_gets_its_service_and_the_lamps_device_key_from_v1s_config
+        PASS [   0.785s] (326/528) lamp-update::round a_build_put_back_puts_its_settings_back_byte_for_byte
+        PASS [   1.148s] (327/528) lamp-update::round a_build_put_back_puts_the_images_files_back
+        PASS [   0.975s] (328/528) lamp-update::round a_build_put_back_puts_the_old_reset_plan_back
+        PASS [   0.494s] (329/528) lamp-update::round a_changed_model_is_fetched_checked_and_switched_with_its_part
+        PASS [  11.345s] (330/528) lamp-update::install what_harness_still_has_is_said_and_without_harness_the_record_is_kept
+        PASS [  10.671s] (331/528) lamp-update::install without_setup_on_a_plan_there_follows_the_build_and_none_is_never_added
+        PASS [   0.377s] (332/528) lamp-update::round a_command_is_read_within_its_bound_and_killed_after
+        PASS [   0.047s] (333/528) lamp-update::round a_disk_too_full_for_a_second_copy_is_refused_before_anything_is_written
+        PASS [   0.860s] (334/528) lamp-update::round a_folder_made_two_builds_ago_is_removed_and_one_never_made_is_kept
+        PASS [   1.317s] (335/528) lamp-update::round a_core_skill_turned_on_stays_on_through_a_round
+        PASS [   2.069s] (336/528) lamp-update::round a_build_put_back_puts_the_product_skills_back
+        PASS [   0.109s] (337/528) lamp-update::round a_lamp_short_of_room_for_the_models_refuses_before_fetching
+        PASS [   0.343s] (338/528) lamp-update::round a_hardware_profile_that_cannot_be_read_never_fails_the_round
+        PASS [   0.460s] (339/528) lamp-update::round a_lamp_update_back_from_before_the_plan_writes_the_rest_and_the_round_says_so
+        PASS [   0.659s] (340/528) lamp-update::round a_lamp_with_no_reset_plan_gets_none_from_a_round
+        PASS [   0.484s] (341/528) lamp-update::round a_lamp_without_lamp_update_apply_puts_the_build_back_with_nothing_written
+        PASS [   1.316s] (342/528) lamp-update::round a_lamp_with_an_old_reset_plan_updated_by_a_round_ends_with_the_builds_and_a_backup
+        PASS [   0.437s] (343/528) lamp-update::round a_link_switch_cut_short_is_put_back_at_the_next_start
+        PASS [   0.562s] (344/528) lamp-update::round a_lamps_own_asound_is_kept_and_the_voice_not_restarted_for_it
+        PASS [   0.308s] (345/528) lamp-update::round a_model_fetch_cut_by_the_network_is_unreachable_not_refused
+        PASS [   0.575s] (346/528) lamp-update::round a_linked_part_that_dies_is_put_back_by_its_link
+        PASS [   0.423s] (347/528) lamp-update::round a_model_only_switch_cut_short_restarts_the_part_that_reads_it
+        PASS [   0.806s] (348/528) lamp-update::round a_linked_part_keeps_its_build_and_the_one_before
+        PASS [   0.303s] (349/528) lamp-update::round a_model_switch_cut_short_is_put_back_at_the_next_start
+        PASS [   0.236s] (350/528) lamp-update::round a_model_that_cannot_be_put_back_leaves_the_others_put_back_and_the_journal_kept
+        PASS [   0.166s] (351/528) lamp-update::round a_model_that_does_not_match_its_sha_refuses_the_build_with_nothing_switched
+        PASS [   0.434s] (352/528) lamp-update::round a_model_switch_whose_part_dies_puts_the_model_back
+        PASS [   0.327s] (353/528) lamp-update::round a_new_build_is_installed_beside_the_old_and_switched
+        PASS [  10.121s] (354/528) lamp-update::round a_new_updater_not_confirmed_by_the_deadline_is_put_back
+        PASS [   9.999s] (355/528) lamp-update::round a_new_updater_that_confirms_keeps_its_switch
+        PASS [   0.233s] (356/528) lamp-update::round a_new_worker_beside_an_unchanged_voice_gets_a_folder_named_by_its_list
+        PASS [   0.464s] (357/528) lamp-update::round a_part_put_back_says_its_restarts_and_last_line_in_the_outcome_only
+        PASS [  11.111s] (358/528) lamp-update::round a_new_updater_that_exits_at_once_is_put_back
+        PASS [   0.724s] (359/528) lamp-update::round a_part_that_dies_is_put_back_and_its_build_refused
+        PASS [   0.546s] (360/528) lamp-update::round a_part_that_says_it_is_in_error_is_put_back_after_its_minute
+        PASS [   0.533s] (361/528) lamp-update::round a_part_whose_folder_is_gone_is_installed_afresh
+        PASS [   0.599s] (362/528) lamp-update::round a_product_lamp_without_a_tmpfiles_record_takes_the_builds_tmpfiles
+        PASS [   0.870s] (363/528) lamp-update::round a_rejected_apply_receipt_runs_real_back_and_restores_written_settings_modes_and_records
+        PASS [   1.016s] (364/528) lamp-update::round a_rejected_back_receipt_keeps_the_journal_until_real_back_is_acknowledged
+        PASS [   0.644s] (365/528) lamp-update::round a_reset_plan_changed_on_the_lamp_is_replaced_by_a_round_never_kept
+        PASS [  18.831s] (366/528) lamp-update::round a_cut_inside_the_put_back_of_an_unreadable_self_json_never_turns_it_around
+        PASS [   9.414s] (367/528) lamp-update::round a_new_updater_that_refuses_every_manifest_is_put_back
+        PASS [   1.471s] (368/528) lamp-update::round a_round_does_not_switch_lamp_skills_onto_checks_its_old_folders_fail
+        PASS [   9.573s] (369/528) lamp-update::round a_round_after_install_keeps_lamp_updates_own_folder
+        PASS [   0.310s] (370/528) lamp-update::round a_round_places_second_json_before_a_voice_unit_that_needs_it
+        PASS [   8.550s] (371/528) lamp-update::round a_round_by_hand_keeps_the_folder_it_runs_from
+        PASS [   0.105s] (372/528) lamp-update::round a_round_that_cannot_place_second_json_writes_no_unit
+        PASS [   1.260s] (373/528) lamp-update::round a_round_puts_a_core_skills_files_back_and_keeps_the_persons_own
+        PASS [   1.152s] (374/528) lamp-update::round a_round_that_sets_damaged_records_aside_keeps_the_keys_marked
+        PASS [   0.569s] (375/528) lamp-update::round a_round_with_nothing_to_change_only_checks
+        PASS [  13.639s] (376/528) lamp-update::round a_round_after_its_own_switch_keeps_the_old_binarys_folder
+        PASS [   1.625s] (377/528) lamp-update::round a_skill_the_build_removes_leaves_the_turned_on_record_with_one_line
+        PASS [   0.576s] (378/528) lamp-update::round a_state_query_failing_mid_watch_is_asked_again_and_puts_nothing_back
+        PASS [   0.682s] (379/528) lamp-update::round a_switch_cut_short_after_its_settings_puts_them_back_at_the_next_start
+        PASS [   9.402s] (380/528) lamp-update::round a_round_keeping_second_json_still_reaches_deepseek_through_the_relay
+        PASS [   0.262s] (381/528) lamp-update::round a_switch_cut_short_is_put_back_at_the_next_start
+        PASS [   0.331s] (382/528) lamp-update::round a_unit_the_build_carries_is_carried_with_the_build_written_in
+        PASS [   0.369s] (383/528) lamp-update::round a_voice_that_is_well_is_put_back_between_two_turns
+        PASS [   5.584s] (384/528) lamp-update::round a_self_json_the_disk_cannot_give_is_tried_again_next_round
+        PASS [   0.220s] (385/528) lamp-update::round an_older_build_is_not_taken
+        PASS [   0.390s] (386/528) lamp-update::round an_older_lamp_update_back_ignores_the_images_files_and_the_round_says_so
+        PASS [   0.299s] (387/528) lamp-update::round an_unchanged_model_is_not_fetched_and_its_file_stays
+        PASS [  10.181s] (388/528) lamp-update::round a_self_json_from_a_later_version_still_reads
+        PASS [   6.302s] (389/528) lamp-update::round an_unreadable_journal_is_set_aside_and_the_round_goes_on
+        PASS [  10.434s] (390/528) lamp-update::round an_old_updater_climbs_one_updater_a_round
+        PASS [  10.416s] (391/528) lamp-update::round an_unreadable_self_json_with_both_builds_known_is_put_back
+        PASS [   6.768s] (392/528) lamp-update::round an_updater_too_old_for_a_build_not_newer_than_installed_takes_nothing_it_carries
+        PASS [   0.884s] (393/528) lamp-update::round asleep_quiet::a_lamp_asleep_or_muted_for_privacy_is_switched_without_waiting
+        PASS [   0.357s] (394/528) lamp-update::round asleep_quiet::a_voice_that_says_nothing_is_still_waited_for
+        PASS [  10.598s] (395/528) lamp-update::round an_unreadable_self_json_with_the_builds_unknown_is_set_aside
+        PASS [   0.660s] (396/528) lamp-update::round both_kinds_of_part_switch_in_one_round_each_its_own_way
+        PASS [   0.767s] (397/528) lamp-update::round asound_waits_for_a_quiet_moment_within_the_bound_and_then_for_the_next_round
+        PASS [   6.068s] (398/528) lamp-update::round an_updater_too_old_for_a_build_without_an_updater_is_refused_with_nothing_written
+        PASS [  10.227s] (399/528) lamp-update::round an_updater_too_old_for_a_build_takes_only_the_updater_it_carries_then_the_rest
+        PASS [  13.129s] (400/528) lamp-update::round head_touch::body_head_calibration_cannot_override_the_sleep_reader
+        PASS [  13.799s] (401/528) lamp-update::round head_touch::body_head_mode_and_bus_dropins_are_refused_before_writes
+        PASS [   6.498s] (402/528) lamp-update::round head_touch::body_head_on_an_isolated_bus_is_refused_before_writes
+        PASS [  22.298s] (403/528) lamp-update::round head_touch::body_head_complete_bundle_preserves_literal_factory_calibration
+        PASS [   6.515s] (404/528) lamp-update::round head_touch::body_head_repeated_exec_start_is_refused_before_writes
+        PASS [  10.795s] (405/528) lamp-update::round head_touch::custom_head_wiring_is_kept_or_the_reader_transition_is_refused
+        PASS [  20.329s] (406/528) lamp-update::round head_touch::body_head_requires_an_enabled_carried_or_installed_sleep_reader
+        PASS [  40.532s] (407/528) lamp-update::round head_touch::absent_unused_product_pins_do_not_block_active_build_pins_updates
+        PASS [   6.994s] (408/528) lamp-update::round head_touch::cut_after_pins_apply_restarts_unchanged_controls_after_restoring_old_pins
+        PASS [  14.765s] (409/528) lamp-update::round head_touch::failed_head_reader_candidate_restores_exact_old_pins_and_units
+        PASS [  37.551s] (410/528) lamp-update::round head_touch::custom_active_pins_are_kept_and_checked_against_the_reader_pair
+        PASS [  22.360s] (411/528) lamp-update::round head_touch::environment_only_head_bus_mismatch_is_refused_before_any_write
+        PASS [   7.410s] (412/528) lamp-update::round head_touch::head_pins_cannot_change_without_restarting_their_controls_reader
+        PASS [  30.069s] (413/528) lamp-update::round head_touch::expression_or_controls_bus_mismatch_is_refused_before_any_write
+        PASS [   7.333s] (414/528) lamp-update::round head_touch::isolated_voice_controls_bus_is_refused_before_any_write
+        PASS [  21.790s] (415/528) lamp-update::round head_touch::head_bus_root_dropins_are_not_guessed_from_base_units
+        PASS [  20.948s] (416/528) lamp-update::round head_touch::invalid_mute_path_and_unknown_reader_are_refused
+        PASS [  14.246s] (417/528) lamp-update::round head_touch::malformed_environment_quotes_are_not_reader_evidence
+        PASS [  35.149s] (418/528) lamp-update::round head_touch::head_reader_mode_overrides_are_not_guessed_from_base_units
+        PASS [  22.133s] (419/528) lamp-update::round head_touch::matching_explicit_or_default_head_bus_roots_allow_the_paired_transition
+        PASS [  13.384s] (420/528) lamp-update::round head_touch::mixed_head_readers_are_refused_before_settings_or_units_are_written
+        PASS [  11.906s] (421/528) lamp-update::round head_touch::old_apply_helper_pins_mismatch_is_put_back_before_readers_restart
+        PASS [   6.606s] (422/528) lamp-update::round head_touch::paired_head_bus_cannot_diverge_from_voices_enabled_privacy_bus
+        PASS [   6.876s] (423/528) lamp-update::round head_touch::paired_head_readers_without_controls_mute_are_refused_before_writes
+        PASS [   9.491s] (424/528) lamp-update::round head_touch::paired_head_readers_disable_legacy_even_when_signed_pins_enable_it
+        PASS [  10.742s] (425/528) lamp-update::round head_touch::pr2948_settings_off_preserves_the_old_head_reader
+        PASS [  10.896s] (426/528) lamp-update::round head_touch::pr2948_settings_on_keeps_a_head_reader_available
+        PASS [  10.230s] (427/528) lamp-update::round head_touch::repeated_projected_pins_keep_their_actual_hash_without_restarting_controls
+        PASS [   6.623s] (428/528) lamp-update::round head_touch::settings_off_refuses_paired_head_readers_with_legacy_pins
+        PASS [   6.619s] (429/528) lamp-update::round head_touch::textually_equal_expanded_head_bus_roots_are_not_a_verified_pair
+        PASS [  10.298s] (430/528) lamp-update::round head_touch::third_review_binary_update_checks_active_build_local_head_pins
+        PASS [   6.918s] (431/528) lamp-update::round head_touch::third_review_paired_head_readers_on_different_buses_are_refused
+        PASS [  10.522s] (432/528) lamp-update::round lamp_update_back_puts_back_an_unreadable_self_json
+        PASS [  32.939s] (433/528) lamp-update::round head_touch::semantic_head_reader_paths_cannot_expand_invocation_variables
+        PASS [   0.494s] (434/528) lamp-update::round no_line_is_asked_when_systemd_itself_cannot_be_asked
+        PASS [   0.703s] (435/528) lamp-update::round no_line_is_asked_of_a_good_switch_and_none_is_said_when_there_is_none
+        PASS [   0.159s] (436/528) lamp-update::round no_network_changes_nothing_and_says_so
+        PASS [  13.263s] (437/528) lamp-update::round install_writes_the_fallback_and_no_round_touches_it
+        PASS [   0.129s] (438/528) lamp-update::round product_carrier::a_comment_only_product_unit_is_an_intended_noop
+        PASS [   0.064s] (439/528) lamp-update::round product_carrier::a_corrupt_product_unit_is_refused_before_any_write
+        PASS [   0.402s] (440/528) lamp-update::round product_carrier::a_managed_product_manifest_can_bootstrap_the_existing_settings_helper
+        PASS [   0.232s] (441/528) lamp-update::round product_carrier::a_product_template_cannot_change_a_parts_binary_or_build_folder
+        PASS [   0.518s] (442/528) lamp-update::round product_carrier::a_product_template_does_not_replace_a_pinned_lamps_unit
+        PASS [   1.954s] (443/528) lamp-update::round only_a_skill_that_would_stop_loading_holds_lamp_skills_back
+        PASS [   0.610s] (444/528) lamp-update::round product_carrier::a_product_unit_switches_with_its_link_and_leaves_local_dropins_alone
+        PASS [   1.148s] (445/528) lamp-update::round product_carrier::a_same_binary_product_unit_records_good_only_after_climb_and_confirmation
+        PASS [   0.600s] (446/528) lamp-update::round product_carrier::an_unhealthy_product_build_restores_the_exact_unit_and_link
+        PASS [   0.516s] (447/528) lamp-update::round product_carrier::automatic_settings_do_not_change_an_older_non_product_manifest
+        PASS [   2.444s] (448/528) lamp-update::round product_carrier::an_older_updater_climbs_before_the_product_switch_and_fallback
+        PASS [   0.487s] (449/528) lamp-update::round product_carrier::the_lamps_specific_unit_wins_over_the_product_unit
+        PASS [   0.762s] (450/528) lamp-update::round product_carrier::explicit_off_and_an_unmanaged_updater_do_not_bootstrap_settings
+        PASS [   0.192s] (451/528) lamp-update::round product_skills_go_only_into_installs_folder_and_only_when_it_can_be_written
+        PASS [   0.117s] (452/528) lamp-update::round product_skills_written_by_a_switch_cut_short_are_put_back_at_the_next_start
+        PASS [   0.546s] (453/528) lamp-update::round prune_keeps_what_a_model_path_links_to_when_the_state_was_set_aside
+        PASS [   0.633s] (454/528) lamp-update::round prune_keeps_the_models_of_the_kept_builds
+        PASS [   0.242s] (455/528) lamp-update::round restart_order::a_cycle_in_an_older_recovery_journal_is_retained_without_arbitrary_restarts
+        PASS [   0.447s] (456/528) lamp-update::round restart_order::a_cut_at_reload_saves_the_full_old_projection_before_recovery
+        PASS [   0.190s] (457/528) lamp-update::round restart_order::a_cycle_in_either_candidate_or_rollback_plan_refuses_before_mutation
+        PASS [   0.174s] (458/528) lamp-update::round restart_order::a_legacy_journal_uses_saved_declarations_and_unchanged_transitive_dependencies
+        PASS [   0.475s] (459/528) lamp-update::round restart_order::empty_saved_order_recovers_files_and_keeps_live_builds_when_inventory_is_unreadable
+        PASS [   0.638s] (460/528) lamp-update::round restart_order::after_and_before_order_the_forward_restarts_instead_of_unit_names
+        PASS [   0.444s] (461/528) lamp-update::round restart_order::interrupted_recovery_orders_saved_units_despite_a_shuffled_partial_journal
+        PASS [   0.536s] (462/528) lamp-update::round restart_order::ordering_does_not_start_inactive_or_restart_unchanged_dependencies
+        PASS [   0.257s] (463/528) lamp-update::round restart_order::rollback_uses_the_saved_old_dependencies_not_the_new_graph_or_its_reverse
+        PASS [   1.457s] (464/528) lamp-update::round restart_order::malformed_present_rollback_orders_retain_the_prefix_and_do_not_fetch
+        PASS [   0.400s] (465/528) lamp-update::round restart_order::saved_rollback_order_keeps_transitive_edges_after_an_unchanged_unit_drifts
+        PASS [   0.740s] (466/528) lamp-update::round restart_order::saved_rollback_order_survives_a_newly_unreadable_installed_unit
+        PASS [   0.872s] (467/528) lamp-update::round restart_order::saved_rollback_order_survives_an_interrupted_put_back_and_keeps_inactive_units_off
+        PASS [   0.788s] (468/528) lamp-update::round restart_quiet::continuous_speech_puts_prerequisites_back_without_restarting_voice
+        PASS [   1.108s] (469/528) lamp-update::round restart_order::the_product_voices_declared_managed_prerequisites_restart_before_it
+        PASS [   0.507s] (470/528) lamp-update::round restart_quiet::queued_speech_during_a_prerequisite_is_heard_before_restarting_voice
+        PASS [  11.553s] (471/528) lamp-update::round no_second_round_begins_while_lamp_updates_own_switch_waits
+        PASS [  11.265s] (472/528) lamp-update::round self_cuts::cut_after_candidate_is_synced_keeps_old_runnable_and_reuses_candidate
+        PASS [  10.825s] (473/528) lamp-update::round self_cuts::cut_after_confirmation_clears_pending_keeps_new_runnable_on_restart
+        SLOW [> 60.000s] (───────) lamp-update::round head_touch::stale_unused_product_pins_do_not_block_active_build_pins_updates
+        PASS [  10.778s] (474/528) lamp-update::round self_cuts::cut_after_pending_is_saved_keeps_old_runnable_and_recovers_before_next_round
+        PASS [  22.240s] (475/528) lamp-update::round self_cuts::cut_after_current_moves_keeps_new_runnable_and_can_confirm_or_put_back
+        PASS [   2.018s] (476/528) lamp-update::round self_cuts::runnable_events::controls::a_partial_first_output_also_starts_the_finish_watchdog
+        PASS [   0.009s] (477/528) lamp-update::round self_cuts::runnable_events::controls::a_read_error_restores_flags_and_leaves_the_direct_child_owned
+        PASS [   5.010s] (478/528) lamp-update::round self_cuts::runnable_events::controls::a_never_released_first_output_gate_hits_the_startup_watchdog
+        PASS [   2.018s] (479/528) lamp-update::round self_cuts::runnable_events::controls::an_exited_leader_does_not_make_a_held_output_descriptor_complete
+        PASS [  16.867s] (480/528) lamp-update::round self_cuts::interrupted_put_back_keeps_a_runnable_current_and_finishes_on_restart
+        PASS [  68.457s] (481/528) lamp-update::round head_touch::stale_unused_product_pins_do_not_block_active_build_pins_updates
+        PASS [   0.016s] (482/528) lamp-update::round self_cuts::runnable_events::controls::no_output_is_not_readiness
+        PASS [   0.016s] (483/528) lamp-update::round self_cuts::runnable_events::controls::output_beyond_the_previous_capture_limit_fails_explicitly
+        PASS [   0.050s] (484/528) lamp-update::round self_cuts::runnable_events::controls::wrong_payload_nonzero_status_and_non_utf8_cannot_satisfy_the_fixture
+        PASS [   2.231s] (485/528) lamp-update::round self_cuts::runnable_events::controls::first_output_can_follow_a_gate_longer_than_the_old_spawn_watchdog
+        PASS [   2.019s] (486/528) lamp-update::round self_cuts::runnable_events::controls::full_output_without_exit_hits_the_absolute_finish_watchdog
+        PASS [   2.018s] (487/528) lamp-update::round self_cuts::runnable_events::controls::later_bytes_do_not_renew_the_first_byte_finish_deadline
+        PASS [  10.631s] (488/528) lamp-update::round self_cuts::without_self_opt_in_parts_update_but_no_handover_prefix_is_written
+        PASS [  15.008s] (489/528) lamp-update::round self_recovery::missing_recovery_also_defers_an_updater_first_climb_without_touching_parts
+        PASS [   0.771s] (490/528) lamp-update::round setup_lifecycle::a_different_failed_part_still_rolls_back_without_restarting_completed_setup
+        PASS [   0.810s] (491/528) lamp-update::round setup_lifecycle::an_alias_outside_the_lamp_prefix_cannot_bypass_the_product_check
+        PASS [   1.158s] (492/528) lamp-update::round setup_lifecycle::chained_and_loaded_aliases_retain_normal_restart_even_without_alias_files
+        PASS [   0.411s] (493/528) lamp-update::round setup_lifecycle::completed_product_setup_keeps_serving_without_restart_or_false_rollback
+        PASS [   0.307s] (494/528) lamp-update::round setup_lifecycle::completion_after_the_activity_snapshot_is_rechecked_before_restart
+        PASS [   0.433s] (495/528) lamp-update::round setup_lifecycle::completion_removed_during_the_manager_query_is_not_used
+        PASS [   1.493s] (496/528) lamp-update::round setup_lifecycle::custom_base_units_and_candidate_changes_keep_normal_watch_rules
+        PASS [   0.979s] (497/528) lamp-update::round setup_lifecycle::incomplete_product_setup_still_restarts_and_is_watched
+        PASS [   0.704s] (498/528) lamp-update::round setup_lifecycle::recovery_keeps_the_true_active_journal_but_does_not_restart_completed_setup
+        PASS [   0.555s] (499/528) lamp-update::round setup_lifecycle::recovery_rechecks_effective_aliases_after_restoring_the_old_unit
+        PASS [   0.617s] (500/528) lamp-update::round setup_lifecycle::reset_removing_completion_before_recovery_restarts_the_old_setup
+        PASS [   0.681s] (501/528) lamp-update::round setup_lifecycle::reset_removing_completion_before_restart_retains_the_normal_watch
+        PASS [   0.574s] (502/528) lamp-update::round setup_lifecycle::the_exact_product_exit_note_and_merged_usr_layout_keep_the_exception
+        PASS [  18.945s] (503/528) lamp-update::round self_recovery::unavailable_recovery_keeps_the_parts_and_can_be_retried_when_armed
+        PASS [   3.685s] (504/528) lamp-update::round setup_lifecycle::uncertain_override_files_do_not_hang_or_grant_the_exception
+        PASS [   1.669s] (505/528) lamp-update::round setup_lifecycle::unknown_manager_identity_and_custom_loaded_paths_keep_normal_watch
+        PASS [   2.563s] (506/528) lamp-update::round setup_lifecycle::unknown_dropins_at_each_scope_keep_normal_watch_rules
+        PASS [   1.777s] (507/528) lamp-update::round the_apps_off_and_on_hold_through_a_round_and_a_restart
+        PASS [   1.406s] (508/528) lamp-update::round the_guard_still_refuses_a_persons_skill_the_new_lamp_skills_will_not_load
+        PASS [   0.009s] (509/528) lamp-update::round the_journal_line_is_the_units_own_last_cleaned_and_cut
+        PASS [   0.685s] (510/528) lamp-update::round the_old_build_not_well_either_says_the_first_unit_not_wells_line
+        PASS [   1.380s] (511/528) lamp-update::round the_round_rejects_a_done_matching_a_rewritten_request_instead_of_its_own_request
+        PASS [   0.574s] (512/528) lamp-update::round the_voice_is_not_switched_while_someone_talks_to_the_lamp
+        PASS [   0.331s] (513/528) lamp-update::round with_apply_off_a_builds_settings_are_not_written_and_that_is_said
+        PASS [   0.544s] (514/528) lamp-update::round with_apply_on_a_builds_settings_are_written_at_the_switch_and_the_part_reading_one_restarted
+        PASS [   0.079s] (515/528) lamp-update::round with_image_off_the_images_files_are_not_written_and_that_is_said
+        PASS [   0.239s] (516/528) lamp-update::round with_image_on_the_images_files_are_written_and_asound_restarts_the_voice_at_a_quiet_moment
+        PASS [  40.791s] (517/528) lamp-update::round self_recovery::an_absent_or_unrunnable_fallback_keeps_the_completed_parts_and_old_updater
+        PASS [   9.757s] (518/528) lamp-update::round the_fallback_reads_a_self_json_written_by_a_later_updater
+        PASS [   0.267s] (519/528) lamp-update::round with_the_switch_off_a_build_with_other_models_is_refused
+        PASS [  40.668s] (520/528) lamp-update::round self_recovery::an_unchanged_or_refused_updater_needs_no_recovery_query
+        PASS [   1.135s] (521/528) lamp-update::round with_the_switch_off_a_lamps_own_model_is_kept_as_with_it_on
+        SKIP [         ] (───────) lamp-update::self-cli-exec actual_cli_exec_confirms_before_the_next_round
+        SKIP [         ] (───────) lamp-update::self-process-cuts persisted_self_switches_survive_sigkill
+        PASS [   0.254s] (522/528) lamp-update::round without_apply_nothing_is_written_and_what_would_change_is_said
+        PASS [   0.792s] (523/528) lamp-update::bin/lamp-update product_settings_tests::an_unreadable_apply_value_is_present_and_never_enables_product_settings
+        PASS [   0.050s] (524/528) lamp-update::bin/lamp-update product_settings_tests::manifest_defaults_follow_the_product_tree_but_explicit_choices_win
+        PASS [   0.018s] (525/528) lamp-update::bin/lamp-update product_settings_tests::only_an_absent_apply_switch_and_self_switch_allow_the_product_default
+        PASS [   8.360s] (526/528) lamp-update::round with_models_off_a_new_updater_confirms_and_the_build_waits_for_models
+        PASS [   5.139s] (527/528) lamp-update::round with_the_switch_off_an_updater_too_old_for_a_build_takes_nothing_it_carries
+        PASS [   6.759s] (528/528) lamp-update::round with_the_switch_off_lamp_update_never_switches_itself
+────────────
+     Summary [ 449.375s] 528 tests run: 528 passed (1 slow), 6 skipped

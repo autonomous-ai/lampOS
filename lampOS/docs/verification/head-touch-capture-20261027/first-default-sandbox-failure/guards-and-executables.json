@@ -1,0 +1,194 @@
+{
+  "artifacts": [
+    {
+      "bytes": 23107368,
+      "kind": [
+        "test"
+      ],
+      "preserved_sha256": "9115003b17d3bfc19d944b3b62a4ea80335bbcd21db4add0ce93b62f64755b90",
+      "profile_test": true,
+      "recorded_post_list_sha256": "9115003b17d3bfc19d944b3b62a4ea80335bbcd21db4add0ce93b62f64755b90",
+      "recorded_post_runtime_sha256": "9115003b17d3bfc19d944b3b62a4ea80335bbcd21db4add0ce93b62f64755b90",
+      "sha256": "9115003b17d3bfc19d944b3b62a4ea80335bbcd21db4add0ce93b62f64755b90",
+      "target": "functions"
+    },
+    {
+      "bytes": 16832904,
+      "kind": [
+        "test"
+      ],
+      "preserved_sha256": "a70f4ecc264cea6434f127dfb0f1b7e734c812b52cd6e6f9c738d5de68679c8a",
+      "profile_test": true,
+      "recorded_post_list_sha256": "a70f4ecc264cea6434f127dfb0f1b7e734c812b52cd6e6f9c738d5de68679c8a",
+      "recorded_post_runtime_sha256": "a70f4ecc264cea6434f127dfb0f1b7e734c812b52cd6e6f9c738d5de68679c8a",
+      "sha256": "a70f4ecc264cea6434f127dfb0f1b7e734c812b52cd6e6f9c738d5de68679c8a",
+      "target": "install"
+    },
+    {
+      "bytes": 2008192,
+      "kind": [
+        "test"
+      ],
+      "preserved_sha256": "f6bbcc836a8d1ad67690ff494df684ba0690d69030ea87fb12a1a35cc0ed7c32",
+      "profile_test": true,
+      "recorded_post_list_sha256": "f6bbcc836a8d1ad67690ff494df684ba0690d69030ea87fb12a1a35cc0ed7c32",
+      "recorded_post_runtime_sha256": "f6bbcc836a8d1ad67690ff494df684ba0690d69030ea87fb12a1a35cc0ed7c32",
+      "sha256": "f6bbcc836a8d1ad67690ff494df684ba0690d69030ea87fb12a1a35cc0ed7c32",
+      "target": "it"
+    },
+    {
+      "bytes": 1283712,
+      "kind": [
+        "bin"
+      ],
+      "preserved_sha256": "751a6948f05378e7b9c227e0c1773431a090ddf0ca141486323c8da289615e30",
+      "profile_test": true,
+      "recorded_post_list_sha256": "751a6948f05378e7b9c227e0c1773431a090ddf0ca141486323c8da289615e30",
+      "recorded_post_runtime_sha256": "751a6948f05378e7b9c227e0c1773431a090ddf0ca141486323c8da289615e30",
+      "sha256": "751a6948f05378e7b9c227e0c1773431a090ddf0ca141486323c8da289615e30",
+      "target": "lamp-update"
+    },
+    {
+      "bytes": 16120352,
+      "kind": [
+        "lib"
+      ],
+      "preserved_sha256": "9b2b13d3ddadae5f01c25dd303fe71cb0aac210ff471d055886f61d029853d4f",
+      "profile_test": true,
+      "recorded_post_list_sha256": "9b2b13d3ddadae5f01c25dd303fe71cb0aac210ff471d055886f61d029853d4f",
+      "recorded_post_runtime_sha256": "9b2b13d3ddadae5f01c25dd303fe71cb0aac210ff471d055886f61d029853d4f",
+      "sha256": "9b2b13d3ddadae5f01c25dd303fe71cb0aac210ff471d055886f61d029853d4f",
+      "target": "lamp_update"
+    },
+    {
+      "bytes": 3348288,
+      "kind": [
+        "test"
+      ],
+      "preserved_sha256": "df0f72aa917d9f0d314e4b5e54203cd4c027f5c71607f95964472668ab261a1a",
+      "profile_test": true,
+      "recorded_post_list_sha256": "df0f72aa917d9f0d314e4b5e54203cd4c027f5c71607f95964472668ab261a1a",
+      "recorded_post_runtime_sha256": "df0f72aa917d9f0d314e4b5e54203cd4c027f5c71607f95964472668ab261a1a",
+      "sha256": "df0f72aa917d9f0d314e4b5e54203cd4c027f5c71607f95964472668ab261a1a",
+      "target": "release_pair"
+    },
+    {
+      "bytes": 20810232,
+      "kind": [
+        "test"
+      ],
+      "preserved_sha256": "e150ca2792d936ef50dcef0029909486ce763615974456a7fec92509dbc1d198",
+      "profile_test": true,
+      "recorded_post_list_sha256": "e150ca2792d936ef50dcef0029909486ce763615974456a7fec92509dbc1d198",
+      "recorded_post_runtime_sha256": "e150ca2792d936ef50dcef0029909486ce763615974456a7fec92509dbc1d198",
+      "sha256": "e150ca2792d936ef50dcef0029909486ce763615974456a7fec92509dbc1d198",
+      "target": "round"
+    },
+    {
+      "bytes": 565360,
+      "kind": [
+        "test"
+      ],
+      "preserved_sha256": "114e528d11f27d354fba902d79a66978c73e4986fcd3322880bd5488538e97ac",
+      "profile_test": true,
+      "recorded_post_list_sha256": "114e528d11f27d354fba902d79a66978c73e4986fcd3322880bd5488538e97ac",
+      "recorded_post_runtime_sha256": "114e528d11f27d354fba902d79a66978c73e4986fcd3322880bd5488538e97ac",
+      "sha256": "114e528d11f27d354fba902d79a66978c73e4986fcd3322880bd5488538e97ac",
+      "target": "self-cli-exec"
+    },
+    {
+      "bytes": 565920,
+      "kind": [
+        "test"
+      ],
+      "preserved_sha256": "6db321bc5df7bade77cca49f52f650d47ad897e5abe3830f8085db39d3afac11",
+      "profile_test": true,
+      "recorded_post_list_sha256": "6db321bc5df7bade77cca49f52f650d47ad897e5abe3830f8085db39d3afac11",
+      "recorded_post_runtime_sha256": "6db321bc5df7bade77cca49f52f650d47ad897e5abe3830f8085db39d3afac11",
+      "sha256": "6db321bc5df7bade77cca49f52f650d47ad897e5abe3830f8085db39d3afac11",
+      "target": "self-process-cuts"
+    },
+    {
+      "bytes": 13780736,
+      "kind": [
+        "bin"
+      ],
+      "preserved_sha256": "6b1a3d09e40315c9bdc7175a79e8150b88b42a5b27b5cfc6366f19ab138c486f",
+      "profile_test": false,
+      "recorded_post_list_sha256": "6b1a3d09e40315c9bdc7175a79e8150b88b42a5b27b5cfc6366f19ab138c486f",
+      "recorded_post_runtime_sha256": "6b1a3d09e40315c9bdc7175a79e8150b88b42a5b27b5cfc6366f19ab138c486f",
+      "sha256": "6b1a3d09e40315c9bdc7175a79e8150b88b42a5b27b5cfc6366f19ab138c486f",
+      "target": "lamp-update"
+    }
+  ],
+  "guard_count": 7401,
+  "immutable_drivers": [
+    {
+      "role": "runtime",
+      "sha256": "465c0b73d726012ed6420df96f9bdc4324b298e0da1dd90e79cfc54613a7e95d"
+    },
+    {
+      "role": "corrected-preparation",
+      "sha256": "2c861650038f5a46b7c380301877c3c926ba079c0e9d65eb465e599baaf82507"
+    },
+    {
+      "role": "first-failed-preparation",
+      "sha256": "7317e2cc157cced99d4e72ceb4f3ceca8a7fedbace7953b39c6adfc2a5e7d0a0"
+    }
+  ],
+  "limits": "Historical actual-executable closure was captured before target reuse. This audit verifies both retained private copies, not the now-reused active target. No clean rebuild, native ARM, device or installed-executable proof is inferred.",
+  "listed_binary_bindings": [
+    {
+      "binary": "lamp-update",
+      "sha256": "9b2b13d3ddadae5f01c25dd303fe71cb0aac210ff471d055886f61d029853d4f"
+    },
+    {
+      "binary": "lamp-update::bin/lamp-update",
+      "sha256": "751a6948f05378e7b9c227e0c1773431a090ddf0ca141486323c8da289615e30"
+    },
+    {
+      "binary": "lamp-update::functions",
+      "sha256": "9115003b17d3bfc19d944b3b62a4ea80335bbcd21db4add0ce93b62f64755b90"
+    },
+    {
+      "binary": "lamp-update::install",
+      "sha256": "a70f4ecc264cea6434f127dfb0f1b7e734c812b52cd6e6f9c738d5de68679c8a"
+    },
+    {
+      "binary": "lamp-update::it",
+      "sha256": "f6bbcc836a8d1ad67690ff494df684ba0690d69030ea87fb12a1a35cc0ed7c32"
+    },
+    {
+      "binary": "lamp-update::release_pair",
+      "sha256": "df0f72aa917d9f0d314e4b5e54203cd4c027f5c71607f95964472668ab261a1a"
+    },
+    {
+      "binary": "lamp-update::round",
+      "sha256": "e150ca2792d936ef50dcef0029909486ce763615974456a7fec92509dbc1d198"
+    },
+    {
+      "binary": "lamp-update::self-cli-exec",
+      "sha256": "114e528d11f27d354fba902d79a66978c73e4986fcd3322880bd5488538e97ac"
+    },
+    {
+      "binary": "lamp-update::self-process-cuts",
+      "sha256": "6db321bc5df7bade77cca49f52f650d47ad897e5abe3830f8085db39d3afac11"
+    }
+  ],
+  "prep_to_runtime_source_equal": true,
+  "runtime_closure": {
+    "actual_preserved_executables_closed": true,
+    "all_runtime_stages_passed": false,
+    "configuration_unchanged": true,
+    "controller_error": "actual runtime/census/stage failure; no retry",
+    "head_unchanged": true,
+    "nextest_config_unchanged": true,
+    "nextest_tool_unchanged": true,
+    "runtime_controller_unchanged": true,
+    "source_count": 7401,
+    "source_unchanged": true,
+    "status_unchanged": true,
+    "working_patch_unchanged": true
+  },
+  "source_before_after_equal": true
+}

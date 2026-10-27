@@ -1,0 +1,198 @@
+{
+  "corrected_preparation": {
+    "closure": {
+      "all_preparation_stages_passed": true,
+      "controller_error": null,
+      "controller_unchanged": true,
+      "head_unchanged": true,
+      "nextest_tool_unchanged": true,
+      "runtime_tests_run": 0,
+      "source_count": 7401,
+      "source_unchanged": true,
+      "status_unchanged": true
+    },
+    "completion_recovery": {
+      "cargo_children_synchronously_reaped": true,
+      "handle_loss": "The exec wrapper printed output without retaining the returned session ID; no functions store entry was created. No preparation rerun was performed for status.",
+      "no_rerun_for_status": true,
+      "process_absence_claim": false,
+      "targeted_process_probe_exit": 3
+    },
+    "completion_recovery_sha256": "6ca8e6cfaf4700065cfcac06c3811fed227a02733dee2c34269ad847d1833d6a",
+    "limits": "Final fmt/Clippy/compile/list child exits each0 and closure exists, but initial fmt-check 1 is retained and no overall corrected-prep native CLI exit 0 or global process-absence claim is made.",
+    "overall_native_cli_exit": "UNOBSERVED",
+    "overall_native_cli_exit_observed": false,
+    "stages": [
+      {
+        "argv": [
+          "cargo",
+          "+1.96.0",
+          "fmt",
+          "--all",
+          "--check"
+        ],
+        "elapsed_seconds": 5.747388124989811,
+        "exit_code": 1,
+        "stage": "fmt-first-check"
+      },
+      {
+        "argv": [
+          "cargo",
+          "+1.96.0",
+          "fmt",
+          "-p",
+          "lamp-update"
+        ],
+        "elapsed_seconds": 0.3586612079816405,
+        "exit_code": 0,
+        "stage": "fmt-owned"
+      },
+      {
+        "argv": [
+          "cargo",
+          "+1.96.0",
+          "fmt",
+          "--all",
+          "--check"
+        ],
+        "elapsed_seconds": 5.814763792004669,
+        "exit_code": 0,
+        "stage": "fmt"
+      },
+      {
+        "argv": [
+          "cargo",
+          "+1.96.0",
+          "clippy",
+          "--locked",
+          "-q",
+          "-p",
+          "lamp-update",
+          "--all-targets",
+          "--message-format=short",
+          "--",
+          "-D",
+          "warnings"
+        ],
+        "elapsed_seconds": 2.3900694589829072,
+        "exit_code": 0,
+        "stage": "clippy"
+      },
+      {
+        "argv": [
+          "cargo",
+          "+1.96.0",
+          "test",
+          "--locked",
+          "-p",
+          "lamp-update",
+          "--no-run",
+          "--message-format=json"
+        ],
+        "elapsed_seconds": 28.36447008297546,
+        "exit_code": 0,
+        "stage": "compile"
+      },
+      {
+        "argv": [
+          "cargo",
+          "+1.96.0",
+          "nextest",
+          "list",
+          "--locked",
+          "-p",
+          "lamp-update",
+          "--profile",
+          "pr",
+          "-E",
+          "all()",
+          "--config-file",
+          "lampOS/.config/nextest.toml",
+          "--user-config-file",
+          "none",
+          "--message-format",
+          "json"
+        ],
+        "elapsed_seconds": 6.993422750005266,
+        "exit_code": 0,
+        "stage": "list"
+      }
+    ]
+  },
+  "first_attempt": {
+    "cause": "FIFO fixture uses forbidden unsafe block and unresolved libc on this host; Clippy exits 101. No no-run test compile/list/runtime stage reached.",
+    "closure": {
+      "all_preparation_stages_passed": false,
+      "controller_error": "RuntimeError: clippy exited 101",
+      "controller_unchanged": true,
+      "head_unchanged": true,
+      "nextest_tool_unchanged": true,
+      "runtime_tests_run": 0,
+      "source_count": 7401,
+      "source_unchanged": true,
+      "status_unchanged": true
+    },
+    "failed_source_manifest_sha256": "e89d4d4959074279a0224d9a8d796fd7d83778c8113310dcef0d5d99a70ecbd4",
+    "failure_excerpt": "crates/update/src/head_touch/capture/tests.rs:435:16: error: usage of an `unsafe` block\ncrates/update/src/head_touch/capture/tests.rs:435:25: error[E0433]: cannot find module or crate `libc` in this scope: use of unresolved module or unlinked crate `libc`\nerror: could not compile `lamp-update` (lib test) due to 2 previous errors\n",
+    "failure_log_sha256": "68697cd9af4579cb3dea1dc01a3f4c35e1806bbe38f33e057ce0bfd4b8666c40",
+    "scope": "formatting and strict Clippy test compilation only; zero runtime bodies",
+    "session_handle": 66086,
+    "stages": [
+      {
+        "argv": [
+          "cargo",
+          "+1.96.0",
+          "fmt",
+          "--all",
+          "--check"
+        ],
+        "elapsed_seconds": 5.784634834009921,
+        "exit_code": 1,
+        "stage": "fmt-first-check"
+      },
+      {
+        "argv": [
+          "cargo",
+          "+1.96.0",
+          "fmt",
+          "-p",
+          "lamp-update"
+        ],
+        "elapsed_seconds": 0.3502447920036502,
+        "exit_code": 0,
+        "stage": "fmt-owned"
+      },
+      {
+        "argv": [
+          "cargo",
+          "+1.96.0",
+          "fmt",
+          "--all",
+          "--check"
+        ],
+        "elapsed_seconds": 5.794898375024786,
+        "exit_code": 0,
+        "stage": "fmt"
+      },
+      {
+        "argv": [
+          "cargo",
+          "+1.96.0",
+          "clippy",
+          "--locked",
+          "-q",
+          "-p",
+          "lamp-update",
+          "--all-targets",
+          "--message-format=short",
+          "--",
+          "-D",
+          "warnings"
+        ],
+        "elapsed_seconds": 19.640810167009477,
+        "exit_code": 101,
+        "stage": "clippy"
+      }
+    ]
+  }
+}

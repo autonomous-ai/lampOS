@@ -1,0 +1,38 @@
+{
+  "doctests": {
+    "exit_code": 0,
+    "summaries": [
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0
+      }
+    ],
+    "totals": {
+      "failed": 0,
+      "ignored": 0,
+      "passed": 0
+    }
+  },
+  "limits": "Both custom-driver cases are whole-binary excluded from scoped runtime and are separately checked Mac 0/0/1 contracts. They add no passes and are not part of the two current scoped ignored cases.",
+  "mac_custom_contracts": [
+    {
+      "binary": "lamp-update::self-cli-exec",
+      "excluded_from_scoped_runtime": true,
+      "exit_code": 0,
+      "full_discovery_policy_ignored": true,
+      "matched": true,
+      "name": "actual_cli_exec_confirms_before_the_next_round",
+      "not_added_to_selected_passes": true
+    },
+    {
+      "binary": "lamp-update::self-process-cuts",
+      "excluded_from_scoped_runtime": true,
+      "exit_code": 0,
+      "full_discovery_policy_ignored": true,
+      "matched": true,
+      "name": "persisted_self_switches_survive_sigkill",
+      "not_added_to_selected_passes": true
+    }
+  ]
+}

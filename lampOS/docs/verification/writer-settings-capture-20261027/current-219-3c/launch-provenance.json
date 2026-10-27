@@ -1,0 +1,8 @@
+{
+  "evidence_kind": "Exact request arguments and native results transcribed from this agent visible tool request/response; not a provider-signed independent attestation",
+  "sandbox_permissions": "require_escalated",
+  "session_id": 82254,
+  "observed_native_exit": 0,
+  "raw_private_request_receipt_sha256": "8f44baad6dd89d6af3cd43e63bfa55df3370ba98968b11bd39eb505a9a5fb53e",
+  "limits": "Only this current scoped invocation. The first collector default-permissions account remains self-reported without its original request; this does not repair or waive that failed execution."
+}

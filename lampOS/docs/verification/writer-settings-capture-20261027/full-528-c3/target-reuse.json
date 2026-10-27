@@ -1,0 +1,19 @@
+{
+  "donor_manifest": "<private-path>",
+  "manifest_sha256": "dd72821eaf499dfb99b44d0ea713791ac6c96b318f7051b48dce8d5097bb7416",
+  "closure_sha256": "fd7d2e2ff1f2df41075696eda17589e9ca6dff61351e6a4a381c09b65901a13d",
+  "donor_closure": {
+    "head_unchanged": true,
+    "status_unchanged": true,
+    "source_unchanged": true,
+    "source_count": 7420,
+    "runtime_controller_unchanged": true,
+    "preparation_controller_unchanged": true,
+    "nextest_tool_unchanged": true,
+    "controller_error": null,
+    "all_stages_passed": true
+  },
+  "actual_and_preserved_count": 10,
+  "artifact_boundary_only_no_runtime_equivalence": true,
+  "explicit_slot_release_required": true
+}

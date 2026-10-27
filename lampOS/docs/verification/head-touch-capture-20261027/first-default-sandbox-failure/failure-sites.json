@@ -1,0 +1,80 @@
+{
+  "all_eight_caused_by_sandbox": false,
+  "excerpts": [
+    {
+      "binary": "lamp-update",
+      "case": "fetch::tests::a_chunked_file_and_one_to_the_end",
+      "cause_disposition": "Observed EPERM at this setup site; no all-eight causal inference",
+      "operation": "local TcpListener::bind fixture setup before fetch operation",
+      "ordinal": 34,
+      "raw_panic_message": "called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: \"Operation not permitted\" }",
+      "source_location": "crates/update/src/fetch.rs:632:57"
+    },
+    {
+      "binary": "lamp-update",
+      "case": "fetch::tests::a_file_by_its_length_after_a_redirect",
+      "cause_disposition": "Observed EPERM at this setup site; no all-eight causal inference",
+      "operation": "local TcpListener::bind fixture setup before fetch operation",
+      "ordinal": 37,
+      "raw_panic_message": "called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: \"Operation not permitted\" }",
+      "source_location": "crates/update/src/fetch.rs:632:57"
+    },
+    {
+      "binary": "lamp-update",
+      "case": "fetch::tests::missing_too_large_short_and_other_answers",
+      "cause_disposition": "Observed EPERM at this setup site; no all-eight causal inference",
+      "operation": "local TcpListener::bind fixture setup before fetch operation",
+      "ordinal": 41,
+      "raw_panic_message": "called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: \"Operation not permitted\" }",
+      "source_location": "crates/update/src/fetch.rs:632:57"
+    },
+    {
+      "binary": "lamp-update",
+      "case": "fetch::tests::no_network_is_unreachable",
+      "cause_disposition": "Observed EPERM at this setup site; no all-eight causal inference",
+      "operation": "local TcpListener::bind fixture setup before fetch operation",
+      "ordinal": 42,
+      "raw_panic_message": "called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: \"Operation not permitted\" }",
+      "source_location": "crates/update/src/fetch.rs:752:61"
+    },
+    {
+      "binary": "lamp-update",
+      "case": "head_touch::capture::tests::metadata_only_null_classification_refuses_zero_fifo_and_socket",
+      "cause_disposition": "Observed EPERM at this setup site; no collector classification assertion reached",
+      "operation": "UnixListener::bind fixture setup before collector invocation",
+      "ordinal": 57,
+      "raw_panic_message": "called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: \"Operation not permitted\" }",
+      "source_location": "crates/update/src/head_touch/capture/tests.rs:465:49"
+    },
+    {
+      "binary": "lamp-update",
+      "case": "head_touch::capture::tests::raw_non_utf8_names_are_preserved_but_non_utf8_text_is_refused",
+      "cause_disposition": "Observed EPERM at this setup site; no collector text/name assertion reached",
+      "operation": "fs::write raw non-UTF-8 fixture filename before collector invocation",
+      "ordinal": 60,
+      "raw_panic_message": "called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: \"Operation not permitted\" }",
+      "source_location": "crates/update/src/head_touch/capture/tests.rs:481:32"
+    },
+    {
+      "binary": "lamp-update",
+      "case": "world::tests::the_bus_hears_the_voice_and_not_an_old_state",
+      "cause_disposition": "UNESTABLISHED: the log supplies no underlying errno or independently proved cause",
+      "operation": "empty listened-result assertion",
+      "ordinal": 183,
+      "raw_panic_message": "[]",
+      "source_location": "crates/update/src/world.rs:850:9"
+    },
+    {
+      "binary": "lamp-update",
+      "case": "world::tests::the_bus_hears_a_muted_voice_and_not_a_mute_it_cannot_read",
+      "cause_disposition": "UNESTABLISHED: the log supplies no underlying errno or independently proved cause",
+      "operation": "empty listened-result assertion",
+      "ordinal": 199,
+      "raw_panic_message": "[]",
+      "source_location": "crates/update/src/world.rs:892:9"
+    }
+  ],
+  "raw_log_sha256": "b29e2b7a37e100e416044745086f18dbf03e7fb965f56c849e166f1c671e418d",
+  "redaction": "Only unstable numeric thread identifiers are omitted; messages and relative source panic sites retained.",
+  "waived_failures": 0
+}

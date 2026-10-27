@@ -1,0 +1,13 @@
+{
+  "argv": [
+    "rg",
+    "-n",
+    "\\bwriter_files\\b|\\bwriter_settings\\b|\\bobserved_act\\b",
+    "lampOS/crates",
+    "--glob",
+    "*.rs"
+  ],
+  "exit_code": 0,
+  "stdout": "lampOS/crates/update/src/writer_settings.rs:11:    writer_files::{self, Entry, Observation},\nlampOS/crates/update/src/writer_settings.rs:95:            let current = writer_files::observe(root, relative, cap)?;\nlampOS/crates/update/src/writer_settings.rs:217:        let cap = writer_files::MOST_BYTES.min(MOST_OLD_BYTES - old_bytes);\nlampOS/crates/update/src/writer_settings.rs:218:        let before = writer_files::observe(root, relative, cap)?;\nlampOS/crates/update/src/writer_settings.rs:238:        let act = apply::observed_act(setting, now.as_deref(), recorded, writing, &shipped);\nlampOS/crates/update/src/apply.rs:198:pub(crate) fn observed_act(\nlampOS/crates/update/src/apply.rs:243:        let act = observed_act(setting, now.as_deref(), recorded, writing, shipped);\nlampOS/crates/update/src/lib.rs:34:pub mod writer_files;\nlampOS/crates/update/src/lib.rs:36:pub mod writer_settings;\nlampOS/crates/update/src/writer_settings/tests.rs:139:    let bytes = vec![42; writer_files::MOST_BYTES];\nlampOS/crates/update/src/writer_settings/tests.rs:165:        &vec![42; writer_files::MOST_BYTES + 1],\nlampOS/crates/update/src/writer_settings/tests.rs:235:        apply::observed_act(&setting, Some(old), &empty, &empty, &no_shipped),\nlampOS/crates/update/src/writer_settings/tests.rs:240:        apply::observed_act(&setting, Some(old), &recorded, &empty, &no_shipped),\nlampOS/crates/update/src/writer_settings/tests.rs:245:        apply::observed_act(&setting, Some(old), &recorded, &writing, &no_shipped),\nlampOS/crates/update/src/writer_settings/tests.rs:250:        apply::observed_act(&setting, Some(old), &recorded, &empty, &shipped),\nlampOS/crates/update/src/writer_settings/tests.rs:255:        apply::observed_act(&setting, desired, &recorded, &empty, &shipped),\nlampOS/crates/update/src/writer_settings/tests.rs:332:            let now = writer_files::observe(root.path(), &settings[0].path[1..], 3).unwrap();\n",
+  "stderr": ""
+}

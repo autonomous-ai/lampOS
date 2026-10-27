@@ -1,0 +1,75 @@
+{
+  "base": "992303fc8d72322bab46cdb18801c853ea43bb81",
+  "branch": "second/head-inputs-observe",
+  "followup": {
+    "current_c3_carry": "prepared and UNRUN at this task admission; no follow-up result credited here",
+    "environment": "Any later explicit require_escalated fixture execution on changed current source is a separate source/environment test, not an old-source replay or waiver."
+  },
+  "head": "5d866fd9c7fcb55720db478058f5e930b6a63e6e",
+  "nextest_child_exit": 100,
+  "outer_permissions": {
+    "evidence_class": "SELF-REPORTED launching-agent contemporaneous admission/session record",
+    "independent_machine_readable_outer_policy_receipt_available": false,
+    "limits": "Not inferred from EPERM, Cargo environment or config; no broad/private harness log search performed. Effective OS rule set was not independently captured.",
+    "original_structured_launch_request_retained": false,
+    "record_field": "first-failure-disposition.default_sandbox_launch=true",
+    "record_sha256": "8ef84ca2517afe9f416e82adff20557f3c0fd0b60a4bf713a310f5b16284c662",
+    "session_handle": 63660,
+    "value": "default sandbox"
+  },
+  "owned_source": [
+    {
+      "mode": 420,
+      "path": "lampOS/crates/update/src/head_touch/capture/tests.rs",
+      "sha256": "8329431d960bf336f5fc343ef3d145f0ad9a3498508b570db06551896327100e",
+      "type": 32768
+    },
+    {
+      "mode": 420,
+      "path": "lampOS/crates/update/src/head_touch/capture.rs",
+      "sha256": "4137a729709ccfb1ad5a9653fd570daa38a46d2c2988cbd767595bddac7bdf59",
+      "type": 32768
+    },
+    {
+      "mode": 420,
+      "path": "lampOS/crates/update/src/head_touch.rs",
+      "sha256": "2e9bcd134f16744e622f813cc3f5e71fe55c1b2a7bb64a5bd14d63d157b3638c",
+      "type": 32768
+    },
+    {
+      "mode": 420,
+      "path": "lampOS/docs/head-touch-capture.md",
+      "sha256": "ce3c1c4874c288e7e0cd8d0781cdf987731921e3b872694d8c25beaab4b9529d",
+      "type": 32768
+    },
+    {
+      "mode": 420,
+      "path": "lampOS/docs/reuse-decisions.md",
+      "sha256": "a996f87675004d9330f3e8d3d45b76969cdc31cfafaff45cd23f66774848a40b",
+      "type": 32768
+    },
+    {
+      "mode": 420,
+      "path": "lampOS/docs/updates.md",
+      "sha256": "5b6e44850ec0c55ac525fbb87be3a92bf4f663d8fd617c0c4849561fedbc018f",
+      "type": 32768
+    }
+  ],
+  "runner": {
+    "config_sha256": "c4992da8d157df279011a424b5feb4833f001fd1d46ce3edd0a56992c848bb33",
+    "filter": "all()",
+    "nextest": "0.9.150",
+    "no_fail_fast": true,
+    "processes": 4,
+    "profile": "pr",
+    "retries": 0,
+    "sha256": "aad9d409cd2f0a81fcaed49d7672a133254179458436c1e957505e4a11655329",
+    "user_config": "none"
+  },
+  "runtime_native_cli_exit": 1,
+  "source_after_sha256": "f80760b390b2026e48db4bc8c70e56064173d531afd81e992ac7fc7f2ea40f35",
+  "source_before_sha256": "f80760b390b2026e48db4bc8c70e56064173d531afd81e992ac7fc7f2ea40f35",
+  "source_count": 7401,
+  "source_shape": "5d/992 plus exactly six frozen WIP files, not a committed candidate",
+  "working_patch_sha256": "1971c8ce45a460ecccd6fa263546d42bf488462beed7d468c33d8e2c523de46a"
+}
