@@ -1,5 +1,19 @@
 Ready for lamp-voice: no
 
+## Current checkpoint: 2026-10-27 08:27 +07, carries and independent Mood read
+
+The two docs conflicts were resolved on 99b516153, preserving all incoming and authored sections. [Reset e8dd exact host proof](verification/reset-query-bounds-20261026/current-e8dd-99b5/README.md): fmt, strict Setup/Cloud Clippy, full **389/0/5**, eight controls once. [Update ced exact focused host proof](verification/update-output-bounds-20261027/current-ced-99b5/README.md): fmt, strict Update Clippy, full library **131/0/2**, exact round reader **1/0/0**, 182 filtered; all nine controls once. Full historical Update **433/0/4** and its two Mac-ignored Linux controls remain bound to 431/4bff. Source and actual/preserved artifacts were guarded at each closed scope; no full round or negative-control replay.
+
+Main then advanced to 737331535. All authored blobs and modes remain identical in clean local ff03ad11f and 99422939f. The new Reset full gate retained an unrelated wake/privacy timing failure, measured 163.063834 ms at unchanged wake.rs:279; **388/1/5**, runtime 101, source/artifact guards closed. It has not been retried, hidden or declared ready. Baseline attribution and the separate Update gate are proceeding.
+
+[Independent Mood #3623 proof](verification/mood-independent-0bd3-20261027/README.md) is a new exact 0bd3/4bff Mac run: fmt, strict Expression Clippy and **340/0/0**, both controls once, docs 0/0/0, all source and executable/output/depfile guards pass. Source review finds no P1/P2; current Main carry/native remain required. Review result posted as latest-base-only HOLD, not a relabelled latest-head execution.
+
+Sixth now owns the separate Systemctl::states gap. Second claimed Cloud's report-reader inherited-pipe/truncated-prefix gap on Queue #3504, with unchanged two-second/256 KiB contracts and existing caller failure policies. No device, key, provider, signing or release action.
+
+---
+
+Ready for lamp-voice: no
+
 ## Current checkpoint: 2026-10-27 07:50 +07, updater original native fully qualified
 
 #3635 **431b784c4/4bff5f2c5** has [original attempt-1 native proof](verification/update-output-bounds-20261027/native-431/README.md): ARM **40426895652** and Linux Clippy **40426895429** both pass. Actual checkout cffca1858 has ordered 4bff/431 parents and authored tree 135da998c equality. The Cargo.toml-change selection explicitly ran the whole-workspace PR profile: **11,424 unique passes / 0 failures, leaks, timeouts or selected unrun / 106 skipped**, with 35 identical echoes excluded. All nine required controls and both Linux custom self-cut/CLI-exec harnesses pass once; their passes are already subsets of nextest. Separate process 13, relay 1, docs 4 across 46 summaries and helper 25 are not added. Promotion/signing/publication are skipped. No CI rerun or local ARM build.

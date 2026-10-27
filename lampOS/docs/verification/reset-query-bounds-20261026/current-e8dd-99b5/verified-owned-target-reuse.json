@@ -1,0 +1,20 @@
+{
+  "actual_executables_reverified_before_any_compiler": true,
+  "actual_preserved_outputs_and_depfiles_reverified_before_any_compiler": true,
+  "changed_source_entries": [
+    "lampOS/crates/ipc/Cargo.toml",
+    "lampOS/crates/ipc/src/camera_authority.rs",
+    "lampOS/crates/ipc/src/lib.rs",
+    "lampOS/crates/ipc/tests/camera_authority.rs",
+    "lampOS/docs/architecture.md",
+    "lampOS/docs/reuse-decisions.md"
+  ],
+  "new_empty_target": false,
+  "note": "Same exclusively owned target and worktree; prior full closure retained. No cold-target claim.",
+  "previous_artifact_closure_sha256": "e26eda5df48e44800ec113f8915c78bd0fe3a80fcd70c41ca532471d09ca9cbd",
+  "previous_complete_sha256": "32c2f427ac11f4e309205b6699e9a4d067e3b86d4b1076021896a77339a2fdd0",
+  "previous_head": "e19e98a7fbd68ad4ea20c195e3b5fe79c644e9a6",
+  "previous_source_inventory_sha256": "d279df290677bfcfcf126fa2355678cca459c022936b5bc249aa8f58e37d72d8",
+  "source_worktree": "<source>",
+  "target": "<target>"
+}

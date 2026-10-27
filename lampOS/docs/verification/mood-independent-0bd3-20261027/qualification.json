@@ -1,0 +1,201 @@
+{
+  "closure": {
+    "actual_and_preserved_outputs_unchanged": true,
+    "depfile_count": 112,
+    "executable_count": 8,
+    "exit_code": 0,
+    "local_output_count": 26,
+    "source_unchanged": true
+  },
+  "complete": {
+    "base": "4bff5f2c517bf64d4a32c31a90e0b24dc1a4810a",
+    "complete": true,
+    "head": "0bd3f854c03806b69c4a8d17b89c29a775db350e",
+    "note": "One full Expression execution; nested journal child stdout is discarded, not added to outer libtest totals.",
+    "scopes": [
+      "expression"
+    ],
+    "source_entries": 7239,
+    "source_unchanged": true
+  },
+  "exclusive_target": {
+    "absent_before_creation": true,
+    "empty_immediately_before_clippy": true,
+    "target": "$TARGET"
+  },
+  "identity": {
+    "base": "4bff5f2c517bf64d4a32c31a90e0b24dc1a4810a",
+    "controller_sha256": "ff86d6f1dc3a459003dd6d86f19fb5a17826497800eabbb9aacee7653d13d838",
+    "head": "0bd3f854c03806b69c4a8d17b89c29a775db350e",
+    "runner_sha256": "2e66404ac7e0a43bc84afc01b8ba599bd3c14724c3a29e9fce51c831eaf87183"
+  },
+  "required_controls": {
+    "sleep_name::an_expired_sleeping_name_is_journaled_once_by_the_service": [
+      [
+        "sleep_name::an_expired_sleeping_name_is_journaled_once_by_the_service",
+        "ok"
+      ]
+    ],
+    "sleep_name::the_service_breathes_the_head_with_moods_breath_from_the_bus": [
+      [
+        "sleep_name::the_service_breathes_the_head_with_moods_breath_from_the_bus",
+        "ok"
+      ]
+    ]
+  },
+  "stages": {
+    "clippy": {
+      "command": [
+        "$CARGO_HOME/bin/cargo",
+        "+1.96.0",
+        "clippy",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-expression",
+        "--all-targets",
+        "--message-format=short",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "disk_free_before": 61190082560,
+      "elapsed_seconds": 22.683,
+      "error": null,
+      "exit_code": 0,
+      "log_sha256": "cf97abfb222fa5845f1aea1dfd4d5f2c5eb3f67cb70b9265a87d8fb341e6036c",
+      "source_entries": 7239,
+      "source_unchanged": true
+    },
+    "compile": {
+      "command": [
+        "$CARGO_HOME/bin/cargo",
+        "+1.96.0",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-expression",
+        "--no-run",
+        "--message-format=json"
+      ],
+      "disk_free_before": 61133611008,
+      "elapsed_seconds": 25.428,
+      "error": null,
+      "exit_code": 0,
+      "log_sha256": "3a503a73ba06497d3c6a0931a02ea2b13db062237dafc0b40bc230f9b152048f",
+      "source_entries": 7239,
+      "source_unchanged": true
+    },
+    "fmt": {
+      "command": [
+        "$CARGO_HOME/bin/cargo",
+        "+1.96.0",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "disk_free_before": 61190275072,
+      "elapsed_seconds": 6.35,
+      "error": null,
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source_entries": 7239,
+      "source_unchanged": true
+    },
+    "metadata": {
+      "command": [
+        "$CARGO_HOME/bin/cargo",
+        "+1.96.0",
+        "metadata",
+        "--locked",
+        "--offline",
+        "--format-version",
+        "1",
+        "--filter-platform",
+        "aarch64-apple-darwin"
+      ],
+      "disk_free_before": 61192097792,
+      "elapsed_seconds": 1.108,
+      "error": null,
+      "exit_code": 0,
+      "log_sha256": "09cbdead7bad3444ed8b03d5755b20bfb58001aad8b4bf934a54e0628d665c59",
+      "source_entries": 7239,
+      "source_unchanged": true
+    },
+    "runtime": {
+      "command": [
+        "$CARGO_HOME/bin/cargo",
+        "+1.96.0",
+        "test",
+        "--locked",
+        "--offline",
+        "-p",
+        "lamp-expression",
+        "--no-fail-fast",
+        "--",
+        "--test-threads=16"
+      ],
+      "disk_free_before": 60692914176,
+      "elapsed_seconds": 8.042,
+      "error": null,
+      "exit_code": 0,
+      "log_sha256": "00022ef806a7f941bf7bec08d5b993bd89ba13ae619015f538438b3031af1382",
+      "source_entries": 7239,
+      "source_unchanged": true
+    }
+  },
+  "summary": {
+    "docs_separate": "0/0/0",
+    "failed": 0,
+    "ignored": 0,
+    "literal_summaries": [
+      {
+        "failed": 0,
+        "filtered": 0,
+        "header": "Running unittests src/lib.rs ($TARGET/debug/deps/lamp_expression-76da23656c5dc461)",
+        "ignored": 0,
+        "literal": "test result: ok. 27 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.19s",
+        "passed": 27,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "filtered": 0,
+        "header": "Running unittests src/main.rs ($TARGET/debug/deps/lamp_expression-0ad4f336d0245487)",
+        "ignored": 0,
+        "literal": "test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s",
+        "passed": 4,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "filtered": 0,
+        "header": "Running tests/it/main.rs ($TARGET/debug/deps/it-a3132b514901b7e4)",
+        "ignored": 0,
+        "literal": "test result: ok. 281 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.22s",
+        "passed": 281,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "filtered": 0,
+        "header": "Running tests/runtime.rs ($TARGET/debug/deps/runtime-fc85dcb0aeaf3b5e)",
+        "ignored": 0,
+        "literal": "test result: ok. 28 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.36s",
+        "passed": 28,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "filtered": 0,
+        "header": "Doc-tests lamp_expression",
+        "ignored": 0,
+        "literal": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "passed": 0,
+        "status": "ok"
+      }
+    ],
+    "passed": 340
+  }
+}

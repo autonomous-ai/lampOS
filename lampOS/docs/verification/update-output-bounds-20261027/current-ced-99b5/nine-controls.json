@@ -1,0 +1,56 @@
+{
+  "a_command_is_read_within_its_bound_and_killed_after": [
+    [
+      "a_command_is_read_within_its_bound_and_killed_after",
+      "ok"
+    ]
+  ],
+  "world::query::tests::a_failed_query_cleans_its_same_group_child_even_after_output_closes": [
+    [
+      "world::query::tests::a_failed_query_cleans_its_same_group_child_even_after_output_closes",
+      "ok"
+    ]
+  ],
+  "world::query::tests::invalid_utf8_cleans_closed_output_child": [
+    [
+      "world::query::tests::invalid_utf8_cleans_closed_output_child",
+      "ok"
+    ]
+  ],
+  "world::query::tests::public_output_accepts_one_mib_and_refuses_one_byte_more": [
+    [
+      "world::query::tests::public_output_accepts_one_mib_and_refuses_one_byte_more",
+      "ok"
+    ]
+  ],
+  "world::query::tests::public_output_refuses_invalid_utf8_instead_of_a_partial_string": [
+    [
+      "world::query::tests::public_output_refuses_invalid_utf8_instead_of_a_partial_string",
+      "ok"
+    ]
+  ],
+  "world::query::tests::query_deadline_applies_after_stdout_closes": [
+    [
+      "world::query::tests::query_deadline_applies_after_stdout_closes",
+      "ok"
+    ]
+  ],
+  "world::query::tests::query_reads_output_with_closed_stdin_and_discarded_stderr": [
+    [
+      "world::query::tests::query_reads_output_with_closed_stdin_and_discarded_stderr",
+      "ok"
+    ]
+  ],
+  "world::query::tests::query_refuses_nonzero_exit_and_spawn_failure": [
+    [
+      "world::query::tests::query_refuses_nonzero_exit_and_spawn_failure",
+      "ok"
+    ]
+  ],
+  "world::query::tests::query_timeout_cleans_the_exited_leaders_pipe_holding_descendant": [
+    [
+      "world::query::tests::query_timeout_cleans_the_exited_leaders_pipe_holding_descendant",
+      "ok"
+    ]
+  ]
+}

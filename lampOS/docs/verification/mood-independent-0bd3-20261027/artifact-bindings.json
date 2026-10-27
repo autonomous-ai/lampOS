@@ -1,0 +1,936 @@
+{
+  "depfiles": [
+    {
+      "path": "$TARGET/debug/examples/replay_cost.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-0-replay_cost.d",
+      "sha256": "d002e0c1f3ecc074e809b093be9d26ac00c3b028b883a2e77b8a8affdb9b491d"
+    },
+    {
+      "path": "$TARGET/debug/examples/replay_cost-11ae6efa960c410d.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-1-replay_cost-11ae6efa960c410d.d",
+      "sha256": "b9cab30da7e87dc15936b8bc70e135bbdf85a51af028199a912c9799605eca98"
+    },
+    {
+      "path": "$TARGET/debug/examples/rest_cost-4fafed872a48cce1.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-2-rest_cost-4fafed872a48cce1.d",
+      "sha256": "a42aea5c49c7847af2603c9c2cd5902a71be0a8b470d8a0249ef8d11ed84ee7e"
+    },
+    {
+      "path": "$TARGET/debug/examples/recent_playout_cost.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-3-recent_playout_cost.d",
+      "sha256": "7982051e71335c8efffd02d86069356d7c60b5713573a1e5fb515432e112f1ed"
+    },
+    {
+      "path": "$TARGET/debug/examples/replay_cost-e879376b0eb098d6.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-4-replay_cost-e879376b0eb098d6.d",
+      "sha256": "6b213ab930fc2ce030f5dc47fabad7163bae027845664f121506023244459e01"
+    },
+    {
+      "path": "$TARGET/debug/examples/rest_cost-0f4ba9737a93c69b.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-5-rest_cost-0f4ba9737a93c69b.d",
+      "sha256": "93266fe4e14bee6bd958c42f6565d7c016c0cbbd6e2a34af050095656f5d5e4b"
+    },
+    {
+      "path": "$TARGET/debug/examples/recent_playout_cost-5c352da6ef084181.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-6-recent_playout_cost-5c352da6ef084181.d",
+      "sha256": "789501417371fdd75a3c41e2f47daa625847aa76c49b5b824c6f5a6184e63441"
+    },
+    {
+      "path": "$TARGET/debug/examples/rest_cost.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-7-rest_cost.d",
+      "sha256": "e6dc3aa05725d6d122f15a0883570139ffb72193f112698bb2e7216aa8ace68c"
+    },
+    {
+      "path": "$TARGET/debug/examples/recent_playout_cost-3f7004160bc77c8a.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-8-recent_playout_cost-3f7004160bc77c8a.d",
+      "sha256": "bcfff0168a4bb5ac434120b14b2d77294474501851ad9beb8da6c4430a0df579"
+    },
+    {
+      "path": "$TARGET/debug/deps/lamp_bus-a2cb36744562c523.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-9-lamp_bus-a2cb36744562c523.d",
+      "sha256": "b06b92ebf5e1453e17d05f35bd36cd62465fe43229181c57789cc632aa815a09"
+    },
+    {
+      "path": "$TARGET/debug/deps/toml_parser-1c703d5916edf516.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-10-toml_parser-1c703d5916edf516.d",
+      "sha256": "524634625bc741fa59f897f12e7169d641549e60671656b6950799b2a43194de"
+    },
+    {
+      "path": "$TARGET/debug/deps/lamp_expression-2fafa251f88138c1.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-11-lamp_expression-2fafa251f88138c1.d",
+      "sha256": "f2a4e61657616ddc840e7a432f63330f28abc89ae473afac23067654368f5116"
+    },
+    {
+      "path": "$TARGET/debug/deps/memchr-4d831e3f9de051c6.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-12-memchr-4d831e3f9de051c6.d",
+      "sha256": "cb0c66c417f94b586f4e3bd9be04f9ddbc7aaf318db9e1b963650b92a61bab39"
+    },
+    {
+      "path": "$TARGET/debug/deps/quote-0457a6caa2517783.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-13-quote-0457a6caa2517783.d",
+      "sha256": "fb619f35b379500d43d21faca59d43576872e9ec4789566e2807cddcbcfba4c6"
+    },
+    {
+      "path": "$TARGET/debug/deps/proc_macro2-47b6f782a04a17e6.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-14-proc_macro2-47b6f782a04a17e6.d",
+      "sha256": "5dced4bd7ce818a251911e88a3f9af0c40fb9acc5b2dfa43a9a4ebf0e1478b11"
+    },
+    {
+      "path": "$TARGET/debug/deps/lamp_turn_owner-83214e189ede5904.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-15-lamp_turn_owner-83214e189ede5904.d",
+      "sha256": "74f676ef2647f215fab0f9879fe2f40e8ac2b229bd4954f2ffb4aabe19c14ac2"
+    },
+    {
+      "path": "$TARGET/debug/deps/lamp_expression-76da23656c5dc461.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-16-lamp_expression-76da23656c5dc461.d",
+      "sha256": "fd56babba56c3915514eec6d36c35aa5a8ee04913014fe6c0af1e3730ec716d5"
+    },
+    {
+      "path": "$TARGET/debug/deps/runtime-fc85dcb0aeaf3b5e.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-17-runtime-fc85dcb0aeaf3b5e.d",
+      "sha256": "eccd16553942117246647d4a8d97b70f3bc50a42a9337eb16249f8947cc28e00"
+    },
+    {
+      "path": "$TARGET/debug/deps/jiff_core-aa4d9fe2653f588e.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-18-jiff_core-aa4d9fe2653f588e.d",
+      "sha256": "7efa30fc382b34a4f7a4029829c28cb46525b99eb82ba8174aa0b3449f8d9db7"
+    },
+    {
+      "path": "$TARGET/debug/deps/itoa-f1ae332e353f4621.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-19-itoa-f1ae332e353f4621.d",
+      "sha256": "f5a68f0fde540bff60049cb0fa1314a57364bb39d2b3dfdffba93dc21d00b9e8"
+    },
+    {
+      "path": "$TARGET/debug/deps/it-93e63a1a342de60d.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-20-it-93e63a1a342de60d.d",
+      "sha256": "943f9ab8c651a495750e2f0a8235219ced9b4d6cea51349729f5c9563c267688"
+    },
+    {
+      "path": "$TARGET/debug/deps/cfg_if-0013097605f77fca.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-21-cfg_if-0013097605f77fca.d",
+      "sha256": "b5c97ab435db74589934c247a8f04710d33aa161f0df41401294b6246d11a7b4"
+    },
+    {
+      "path": "$TARGET/debug/deps/cfg_if-aea3b32455814e1e.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-22-cfg_if-aea3b32455814e1e.d",
+      "sha256": "1b97b4a970a85b089795d8bb44a2e64705cc6372a68f45e7a172ee4a26b69d2d"
+    },
+    {
+      "path": "$TARGET/debug/deps/lamp_expression-c4fe34e31d7721d7.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-23-lamp_expression-c4fe34e31d7721d7.d",
+      "sha256": "62824693637b21c34c894be722e9cfec6420af26c757d9cd848904bd41e1600a"
+    },
+    {
+      "path": "$TARGET/debug/deps/libc-85a38dd20af127ff.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-24-libc-85a38dd20af127ff.d",
+      "sha256": "9496d8a6dacaae21d27b056ba02238bc648d7ef87a39f50d717e3a1c756ea9fb"
+    },
+    {
+      "path": "$TARGET/debug/deps/it-a3132b514901b7e4.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-25-it-a3132b514901b7e4.d",
+      "sha256": "7833a3e00d9abc89fa44577d74a04be9b3969bbabbad5fa4d64cb503c43f3bec"
+    },
+    {
+      "path": "$TARGET/debug/deps/serde-9afdeb93254069eb.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-26-serde-9afdeb93254069eb.d",
+      "sha256": "fb17365fb16ff2631f15b62417f223611c8b38b0b05c52644dbd2101f9b3e19c"
+    },
+    {
+      "path": "$TARGET/debug/deps/generic_array-86914deceb6a2a21.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-27-generic_array-86914deceb6a2a21.d",
+      "sha256": "7c0099357697b5fdb9ce16233f566bc607890ee59e5f449f8f854db4b4c15a82"
+    },
+    {
+      "path": "$TARGET/debug/deps/lamp_msgs-1c4816aae0bfe3e1.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-28-lamp_msgs-1c4816aae0bfe3e1.d",
+      "sha256": "ca90d71c16543df61d990d75bebb1c6b4d1b6b474940140c36b197703c77e14d"
+    },
+    {
+      "path": "$TARGET/debug/deps/jiff-f977e8011e07a15d.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-29-jiff-f977e8011e07a15d.d",
+      "sha256": "559747e70c739a659a57ce9af34f05cdab23c61eb863c91b49060040c4db7d75"
+    },
+    {
+      "path": "$TARGET/debug/deps/libc-f45966f9df35b4b9.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-30-libc-f45966f9df35b4b9.d",
+      "sha256": "687fb53997d52a968c4e3f91f4492da98c415f1b2b0186203f364783ad1ae8fb"
+    },
+    {
+      "path": "$TARGET/debug/deps/base64-e4532c73ad546e3b.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-31-base64-e4532c73ad546e3b.d",
+      "sha256": "d4be1015177c0e0887eef696f9abc47967d87ca546a53ad2d15be5d67fc40767"
+    },
+    {
+      "path": "$TARGET/debug/deps/toml_datetime-112f29c755dfa042.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-32-toml_datetime-112f29c755dfa042.d",
+      "sha256": "b86ff9ce92d9c48c4941765f96fd6903cab1b72fb18c2b75de55237a5a2939d9"
+    },
+    {
+      "path": "$TARGET/debug/deps/nix-c0b6e76fe1bb3b31.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-33-nix-c0b6e76fe1bb3b31.d",
+      "sha256": "1a60d5b86d8d1122a171c8f984235e2e1e0d0519a068034e4b2eb49cbb797ff7"
+    },
+    {
+      "path": "$TARGET/debug/deps/glam-98b88bb99a7a9fef.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-34-glam-98b88bb99a7a9fef.d",
+      "sha256": "48f6c307a4500a53e828c6badbf936c605443a5835a0a2e0f29a4d58d2616979"
+    },
+    {
+      "path": "$TARGET/debug/deps/lamp_body-baa4121d3e80e4db.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-35-lamp_body-baa4121d3e80e4db.d",
+      "sha256": "5c594fc868aed98dbc8e2e12c81dbbce9c4354b9f8f9d17d5312acb6053c2eec"
+    },
+    {
+      "path": "$TARGET/debug/deps/serde-0d1bff8e5940d7e2.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-36-serde-0d1bff8e5940d7e2.d",
+      "sha256": "5e258b909d7c4f282f2a0fe59f6408f159ff8cd5f5068c0c0a8561a9a23ddfee"
+    },
+    {
+      "path": "$TARGET/debug/deps/lamp_msgs-20585a2275004d6c.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-37-lamp_msgs-20585a2275004d6c.d",
+      "sha256": "f6910e7ebd2e28182c87572862c7e6221c2b704cb863a4b62712ecaf3c2a2d87"
+    },
+    {
+      "path": "$TARGET/debug/deps/rustix-95da5b42c1357046.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-38-rustix-95da5b42c1357046.d",
+      "sha256": "037e849c8d305a6e743afd4290e291a03d8e9df86493a89b569a4f98d8d66e72"
+    },
+    {
+      "path": "$TARGET/debug/deps/toml_datetime-f8d6ef647905e162.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-39-toml_datetime-f8d6ef647905e162.d",
+      "sha256": "80a9ee28cf54f4fb6d9f3a737fd98d49fe3cca828d7a3854d5a22a39ff7189c3"
+    },
+    {
+      "path": "$TARGET/debug/deps/jiff-4c66188c4e672f5b.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-40-jiff-4c66188c4e672f5b.d",
+      "sha256": "092966267a78a10f5da919aec9d766d0d312436192bdf3842208fe1b903cdbee"
+    },
+    {
+      "path": "$TARGET/debug/deps/generic_array-b27f9771441c5b2c.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-41-generic_array-b27f9771441c5b2c.d",
+      "sha256": "4883f3f21dfab6b56b723106a9aeb4c927e53253c4781b4c7e85db3e6b5efb85"
+    },
+    {
+      "path": "$TARGET/debug/deps/winnow-09ee9419aee7f50a.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-42-winnow-09ee9419aee7f50a.d",
+      "sha256": "51aeb105f77723ba8dcf929465a9ef32ee84854390a21d10f5d44c85b9fe8c44"
+    },
+    {
+      "path": "$TARGET/debug/deps/crypto_common-224d67bb5cccecd7.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-43-crypto_common-224d67bb5cccecd7.d",
+      "sha256": "ace91b0c632c34cb4dc331d8f2ff4fc89262d5dabc68519942dc1072fcb6f8a5"
+    },
+    {
+      "path": "$TARGET/debug/deps/cpufeatures-a7b4e341690debe6.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-44-cpufeatures-a7b4e341690debe6.d",
+      "sha256": "3c2f11cbdd3b012c010b808cf51d8158a173be95e0bedef38c36ef28a61747e0"
+    },
+    {
+      "path": "$TARGET/debug/deps/jiff_tzdb-f212f0ea8d4e24c9.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-45-jiff_tzdb-f212f0ea8d4e24c9.d",
+      "sha256": "0ced98b40b28cf99f62268fc688c1f65eb7524e636d7f4b76913f77337447393"
+    },
+    {
+      "path": "$TARGET/debug/deps/bitflags-328bd2bbd71e721b.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-46-bitflags-328bd2bbd71e721b.d",
+      "sha256": "6eec5eab6ae63076d1d7015cbb400823a81e483e20d836d86c92672b58b8a1eb"
+    },
+    {
+      "path": "$TARGET/debug/deps/lamp_expression-b337359d3d421032.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-47-lamp_expression-b337359d3d421032.d",
+      "sha256": "762b6e2aafc75f0fe53b149a29897665bf0332e11625ebb4f83abe298ab2248d"
+    },
+    {
+      "path": "$TARGET/debug/deps/unicode_ident-3095d304d2a539cb.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-48-unicode_ident-3095d304d2a539cb.d",
+      "sha256": "ee3125e79b0500e33145a48e1e68329b8bcaf08bf953d7bcf4fb19429ff4892e"
+    },
+    {
+      "path": "$TARGET/debug/deps/itoa-f429a71ebbde654f.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-49-itoa-f429a71ebbde654f.d",
+      "sha256": "4442de4f92282a04e85e1a1e05c493afa88efff3916edc019e8815833e56254a"
+    },
+    {
+      "path": "$TARGET/debug/deps/runtime-c0a25b033ad41069.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-50-runtime-c0a25b033ad41069.d",
+      "sha256": "4c1e3d8a2cf8d54de978631a6245d2f64d1bb6092f7b121d6a617db891bad87b"
+    },
+    {
+      "path": "$TARGET/debug/deps/base64-e25592333b0594e9.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-51-base64-e25592333b0594e9.d",
+      "sha256": "0ce80d5a46e13fc5bf48e103d80a8a670661f53b53c169e76ff3ffbde05aae97"
+    },
+    {
+      "path": "$TARGET/debug/deps/lamp_turn_owner-f93c0c30fdada0e3.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-52-lamp_turn_owner-f93c0c30fdada0e3.d",
+      "sha256": "ce61526e0499b79eb078af66a6304de575e18630513efe16ab96b28939e2ced7"
+    },
+    {
+      "path": "$TARGET/debug/deps/lamp_bus-1a5095346c8b36b8.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-53-lamp_bus-1a5095346c8b36b8.d",
+      "sha256": "9ec53646dcda85d743ed8517bf34ae86484569c303854797d7099651186af15f"
+    },
+    {
+      "path": "$TARGET/debug/deps/winnow-2ec06c17589837c1.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-54-winnow-2ec06c17589837c1.d",
+      "sha256": "53e32f29f774f50a584702207ad57c023ae03d730a57c5f48114e4c4b02be533"
+    },
+    {
+      "path": "$TARGET/debug/deps/toml_parser-234fee23ca26c1a4.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-55-toml_parser-234fee23ca26c1a4.d",
+      "sha256": "8d54c994573d15c2f8de566c2353fa649078621321cb9e54b240633713d9ed88"
+    },
+    {
+      "path": "$TARGET/debug/deps/typenum-ca5d632833ab6014.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-56-typenum-ca5d632833ab6014.d",
+      "sha256": "2b47aea7f52b2ff51a5e83433b5a8be007f0238eebd76d09bcbf6bcf08622f73"
+    },
+    {
+      "path": "$TARGET/debug/deps/block_buffer-2a3252ecf106f471.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-57-block_buffer-2a3252ecf106f471.d",
+      "sha256": "21f9bd3b61938ae0c9bb94d9c989afda7895554043f9ff42c8248bf6c9743b76"
+    },
+    {
+      "path": "$TARGET/debug/deps/lamp_ipc-c15907191feaf4a9.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-58-lamp_ipc-c15907191feaf4a9.d",
+      "sha256": "649276617f2c19c966043bcbea8fefe3bd649576a3395d6f8075256aa7d1e0d5"
+    },
+    {
+      "path": "$TARGET/debug/deps/jiff_tzdb-e89a2d20a5190bea.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-59-jiff_tzdb-e89a2d20a5190bea.d",
+      "sha256": "989a61b276301f45200f098bfa7dd3f591a94b93a74776f4fd709aa3483b7bab"
+    },
+    {
+      "path": "$TARGET/debug/deps/rustix-6bf171237027b01f.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-60-rustix-6bf171237027b01f.d",
+      "sha256": "38034586dad08b2d6d31ef335ece95ec8395a422d02313e079cc3691572db60f"
+    },
+    {
+      "path": "$TARGET/debug/deps/lamp_local_time-0ba1d770369ec162.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-61-lamp_local_time-0ba1d770369ec162.d",
+      "sha256": "e4ada292df962b999877a03e95ae6e8cf924951b53ebe7370836dde4eb97e838"
+    },
+    {
+      "path": "$TARGET/debug/deps/lamp_expression-e8d4483d9d8faa1c.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-62-lamp_expression-e8d4483d9d8faa1c.d",
+      "sha256": "796d2eada69a6a795bc014ca06d33690da21c82e281599780b17ecce302bac12"
+    },
+    {
+      "path": "$TARGET/debug/deps/errno-3d0e25b7e64b7a36.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-63-errno-3d0e25b7e64b7a36.d",
+      "sha256": "bca8381283b0c67787f336f423225bf96b94af23f14cb21afdf045189d484735"
+    },
+    {
+      "path": "$TARGET/debug/deps/lamp_expression-894630712bcf8381.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-64-lamp_expression-894630712bcf8381.d",
+      "sha256": "64ce895efa712a481a0ffa7bad84869a77b127681fa76bdd0d2a3ad4be56a4dd"
+    },
+    {
+      "path": "$TARGET/debug/deps/lamp_body-09fd2c6e5bbf59b8.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-65-lamp_body-09fd2c6e5bbf59b8.d",
+      "sha256": "03d80f370c53aeb1eb24004326520603452a7b762c771ec8faab6aa99a4d48a9"
+    },
+    {
+      "path": "$TARGET/debug/deps/serde_core-b986378d05bb7fd5.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-66-serde_core-b986378d05bb7fd5.d",
+      "sha256": "d3b50c97db8711db9fb1c37673ad571e97a1e1019fa28a4fa5844411fddd8728"
+    },
+    {
+      "path": "$TARGET/debug/deps/errno-40512cb2a8b26e0b.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-67-errno-40512cb2a8b26e0b.d",
+      "sha256": "f35f7d85d5e25e675b8568dc3f364a49e494be314d24d3113eef9d1315a3484e"
+    },
+    {
+      "path": "$TARGET/debug/deps/lamp_keeper-7195a445cea94377.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-68-lamp_keeper-7195a445cea94377.d",
+      "sha256": "534c76c3646291bc315b9fa2cf98a7922670b162ae6d19400f78c86d1265f514"
+    },
+    {
+      "path": "$TARGET/debug/deps/sha2-ec5ba5f778db9dd0.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-69-sha2-ec5ba5f778db9dd0.d",
+      "sha256": "4e36f3771bc16b0a544095b47f6d028273542cbd75e531a95e315cacc07044eb"
+    },
+    {
+      "path": "$TARGET/debug/deps/zmij-700d672369ba259b.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-70-zmij-700d672369ba259b.d",
+      "sha256": "0cc792b2edf0cd6363794bd86fae77aa3d481bd8a48a3bdd42a0449c4e9e21a3"
+    },
+    {
+      "path": "$TARGET/debug/deps/toml-8f637fa1738a0d6d.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-71-toml-8f637fa1738a0d6d.d",
+      "sha256": "3e7a3ee10b86c5064eb42e01330d6b29e6ff91223d454e97c2e452bb3b5d242e"
+    },
+    {
+      "path": "$TARGET/debug/deps/lamp_expression-0ad4f336d0245487.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-72-lamp_expression-0ad4f336d0245487.d",
+      "sha256": "21dc972c2f078314808ba159b54ba0249247e3ecb71bca3a99d77a5f74caec8f"
+    },
+    {
+      "path": "$TARGET/debug/deps/lamp_lean-c80f33e28a2ea0cc.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-73-lamp_lean-c80f33e28a2ea0cc.d",
+      "sha256": "2039ca88c7f74e295f1c901089b481105ea324f2b231587315425a297d21aee3"
+    },
+    {
+      "path": "$TARGET/debug/deps/serde_json-c3252370635687b6.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-74-serde_json-c3252370635687b6.d",
+      "sha256": "2df729b734d114dba914c3ac75d2577b324415f745250dae520b3a4587654f16"
+    },
+    {
+      "path": "$TARGET/debug/deps/serde_derive-3ac6bb147c7fd335.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-75-serde_derive-3ac6bb147c7fd335.d",
+      "sha256": "4ac2eb18fd089a66d4960f9d592be18e8986d75e379be35ebaa50c8ab43b4a9d"
+    },
+    {
+      "path": "$TARGET/debug/deps/serde_json-902041d2c0c7002c.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-76-serde_json-902041d2c0c7002c.d",
+      "sha256": "1ceb39adaca937fd541011077774ec1dfb757562e930da8b24963dd6848fd06c"
+    },
+    {
+      "path": "$TARGET/debug/deps/bitflags-da750522097629b0.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-77-bitflags-da750522097629b0.d",
+      "sha256": "dc20fc4eaff21d9b8594c693801be0c3500e12b0907f42e05f8cf024a917e11f"
+    },
+    {
+      "path": "$TARGET/debug/deps/version_check-6c0aa4b0cdb0ad74.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-78-version_check-6c0aa4b0cdb0ad74.d",
+      "sha256": "4eb1475ddc91475880a9ea44ad8517f5633f1111c26c4f80af14836c8fe398fd"
+    },
+    {
+      "path": "$TARGET/debug/deps/lamp_ipc-77bfd5f8f749224f.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-79-lamp_ipc-77bfd5f8f749224f.d",
+      "sha256": "d783c4ce996650ea3eabafe0ff5c9c21ae2bbf0bf25ccabf854022ed6801d4b9"
+    },
+    {
+      "path": "$TARGET/debug/deps/jiff_core-4a3e64c992c15cc1.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-80-jiff_core-4a3e64c992c15cc1.d",
+      "sha256": "e29f8be838eef2f3b3242b18c721b6d215aa425bb95516b099956e55015ab443"
+    },
+    {
+      "path": "$TARGET/debug/deps/crypto_common-f0d3cc75165dcb6b.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-81-crypto_common-f0d3cc75165dcb6b.d",
+      "sha256": "7948e374573d34f6c66d2726959a75e808350d4cf8cf66f9982705c7cf28018a"
+    },
+    {
+      "path": "$TARGET/debug/deps/serde_spanned-57a7be7f4c4d8541.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-82-serde_spanned-57a7be7f4c4d8541.d",
+      "sha256": "b2c3d456d91e3bb91d5fdfb1bab53372787d89f6b034dc95dfb43bafd6eda34f"
+    },
+    {
+      "path": "$TARGET/debug/deps/lamp_expression-b23bc08dd1990213.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-83-lamp_expression-b23bc08dd1990213.d",
+      "sha256": "b50412bd0fe87a9acd017ed1609a57b10b18673f83fefeb87fefe69965581e79"
+    },
+    {
+      "path": "$TARGET/debug/deps/sha2-3771aeeb13efb2ef.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-84-sha2-3771aeeb13efb2ef.d",
+      "sha256": "bcccf0d4b2927fccce0bb7cbafe72640e4cfe2be1e50d0242910fe28f4a074d4"
+    },
+    {
+      "path": "$TARGET/debug/deps/lamp_lean-36303e0233375072.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-85-lamp_lean-36303e0233375072.d",
+      "sha256": "d6d1b05a5c8dad78aafe251363deb288df6d5adfe386a27ac1d1381437f63aea"
+    },
+    {
+      "path": "$TARGET/debug/deps/syn-7749e9c0654a418d.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-86-syn-7749e9c0654a418d.d",
+      "sha256": "198685a44fd8de858c46237920c52ed7867a543ce96ccb5b75379bb45bf3422a"
+    },
+    {
+      "path": "$TARGET/debug/deps/memchr-01bf717062e1077c.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-87-memchr-01bf717062e1077c.d",
+      "sha256": "8d380986bc5185c8b6fb63f5e31dbfc149c09e88f5cc4c121179377879c88b66"
+    },
+    {
+      "path": "$TARGET/debug/deps/block_buffer-09633317d999e6bb.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-88-block_buffer-09633317d999e6bb.d",
+      "sha256": "7bcf5ca3dc3ec9c03b80664f1aa773b56b8cbb3ebc8bee573a78fcdccf9f39ce"
+    },
+    {
+      "path": "$TARGET/debug/deps/zmij-65e3fa454b76e94a.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-89-zmij-65e3fa454b76e94a.d",
+      "sha256": "22a096a49c73636605a46dedb0964e315f835353cb3347b5a6e447f6d27d3eb9"
+    },
+    {
+      "path": "$TARGET/debug/deps/cfg_aliases-115f2d682a4930be.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-90-cfg_aliases-115f2d682a4930be.d",
+      "sha256": "0c4f1ca852833dcff1ace2424935b4934da249282f13a8a6932ce1a42527bf81"
+    },
+    {
+      "path": "$TARGET/debug/deps/digest-803286e0aebe47d2.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-91-digest-803286e0aebe47d2.d",
+      "sha256": "a83f758a98f966c2409991f59f691037dd93a4c386758115e92b0c6666e26700"
+    },
+    {
+      "path": "$TARGET/debug/deps/glam-1c1f59715af2b5c3.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-92-glam-1c1f59715af2b5c3.d",
+      "sha256": "baf37956e69a1a18d4311d2f7c5fb32e126f721b5b0b0d1aaea39c1b53de06ca"
+    },
+    {
+      "path": "$TARGET/debug/deps/nix-9fb76dc5e99fe15a.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-93-nix-9fb76dc5e99fe15a.d",
+      "sha256": "652def712ab5f637c4b11c52149fbbecf515e65aaaffb6a77683f28819c5f177"
+    },
+    {
+      "path": "$TARGET/debug/deps/toml-c251dc38b9defe35.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-94-toml-c251dc38b9defe35.d",
+      "sha256": "aed048160733b184b2ba35d7475dd22b737f4f60eccedd84b064fbc231f3772b"
+    },
+    {
+      "path": "$TARGET/debug/deps/serde_core-dd538f5fa8f60920.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-95-serde_core-dd538f5fa8f60920.d",
+      "sha256": "5d304bebd5fb3585d7b2e35fbfcf07f570178b5d4223be198d62e10e6f51451d"
+    },
+    {
+      "path": "$TARGET/debug/deps/cpufeatures-2e2c9c8ef8b1e4af.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-96-cpufeatures-2e2c9c8ef8b1e4af.d",
+      "sha256": "735875d34618aed2b3315ccaeb1c287ea073ce244e320db1cb8f340ebcc14ae9"
+    },
+    {
+      "path": "$TARGET/debug/deps/digest-3fe84a0b67cfbfda.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-97-digest-3fe84a0b67cfbfda.d",
+      "sha256": "e937e33c6427bed0ddc832cc0e41c17b950006b9e781d924b90e4f60555e95c5"
+    },
+    {
+      "path": "$TARGET/debug/deps/serde_spanned-a9de3370ca7a07e8.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-98-serde_spanned-a9de3370ca7a07e8.d",
+      "sha256": "7d469fa5b941f9b5ec37dae620aad0accfb8bd2ce472f04a4d6be60a22522d85"
+    },
+    {
+      "path": "$TARGET/debug/deps/typenum-be5911685742ae6d.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-99-typenum-be5911685742ae6d.d",
+      "sha256": "942d4762eceebb0c3b47d894fd97ccbcebb2e473369b1e557a2804f1f0aaeef5"
+    },
+    {
+      "path": "$TARGET/debug/deps/lamp_local_time-44164ef078c34df5.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-100-lamp_local_time-44164ef078c34df5.d",
+      "sha256": "ca5e5b9dbd79241cf19a64b6b842c9d04f0f9e53e829d583b0532bd565dc9243"
+    },
+    {
+      "path": "$TARGET/debug/deps/lamp_keeper-18579e0836f10ce0.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-101-lamp_keeper-18579e0836f10ce0.d",
+      "sha256": "1d926fa1e4c52732a3e93d012924c7fbf07b46a4ea58ffee96b780f91e7e574e"
+    },
+    {
+      "path": "$TARGET/debug/build/libc-48eb09ba54e497c2/build_script_build-48eb09ba54e497c2.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-102-build_script_build-48eb09ba54e497c2.d",
+      "sha256": "491ce5aa047f0b400371cb2823fc3472183da11b6cba12945066553166ba780a"
+    },
+    {
+      "path": "$TARGET/debug/build/serde_json-eecfc5e1c909430e/build_script_build-eecfc5e1c909430e.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-103-build_script_build-eecfc5e1c909430e.d",
+      "sha256": "32bf781e9050a3e43a868a31bf8c05d55b1278e49c9d47351f3053ed254243a6"
+    },
+    {
+      "path": "$TARGET/debug/build/serde-47ef4cc41f888599/build_script_build-47ef4cc41f888599.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-104-build_script_build-47ef4cc41f888599.d",
+      "sha256": "f683b40ad8ee86c0ec97b60f4dc6815080c313b4d1459342ab87830f7cd52aea"
+    },
+    {
+      "path": "$TARGET/debug/build/generic-array-6a358fda44e9f72b/build_script_build-6a358fda44e9f72b.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-105-build_script_build-6a358fda44e9f72b.d",
+      "sha256": "63f611a73e48f92cdec0fa525e799b0a80bef37bc5dd752ac89dba17e9521693"
+    },
+    {
+      "path": "$TARGET/debug/build/quote-4697ce263dc13f0b/build_script_build-4697ce263dc13f0b.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-106-build_script_build-4697ce263dc13f0b.d",
+      "sha256": "0bcb1bac50eb9a8ae61f7d01e1a96c65fb3f2efc354ad08457cfd339739d0b3e"
+    },
+    {
+      "path": "$TARGET/debug/build/proc-macro2-36005514b6cc2296/build_script_build-36005514b6cc2296.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-107-build_script_build-36005514b6cc2296.d",
+      "sha256": "868cd6f776ee238cbfc1935a3fad9483fc8d6a041f007614e26a2fa76bd1076d"
+    },
+    {
+      "path": "$TARGET/debug/build/serde_core-815063bbc5969c4f/build_script_build-815063bbc5969c4f.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-108-build_script_build-815063bbc5969c4f.d",
+      "sha256": "5a42c319b7e33dd8faf6f262041a6ea888eb2ce1ba15b1d928e850832897ef0f"
+    },
+    {
+      "path": "$TARGET/debug/build/zmij-144e2544bcb6ac2b/build_script_build-144e2544bcb6ac2b.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-109-build_script_build-144e2544bcb6ac2b.d",
+      "sha256": "2b9e91acb2b211ee267e259c3b01525294e955d48ba582eb5723e325889c4297"
+    },
+    {
+      "path": "$TARGET/debug/build/nix-a7a8a785f4fef33a/build_script_build-a7a8a785f4fef33a.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-110-build_script_build-a7a8a785f4fef33a.d",
+      "sha256": "382d502a5f9b780f4fa5a5b8928b15ed323306ae1c8cfc7a15e8b6972993310a"
+    },
+    {
+      "path": "$TARGET/debug/build/rustix-91e7b8d271dd550f/build_script_build-91e7b8d271dd550f.d",
+      "preserved_path": "$EVIDENCE/expression/artifacts/dep-111-build_script_build-91e7b8d271dd550f.d",
+      "sha256": "f3b0c0956b9b7db6f6470e2249f8011963632c706f5fd2868f304a0f3539b164"
+    }
+  ],
+  "executables": [
+    {
+      "fresh": false,
+      "package_id": "path+file://$SOURCE/lampOS/crates/expression#lamp-expression@0.1.0",
+      "path": "$TARGET/debug/examples/recent_playout_cost",
+      "sha256": "75a6e93426f0d69d76265dc2e99fe573360e356932ac60aeb89326ae9013f371",
+      "target": {
+        "crate_types": [
+          "bin"
+        ],
+        "doc": false,
+        "doctest": false,
+        "edition": "2024",
+        "kind": [
+          "example"
+        ],
+        "name": "recent_playout_cost",
+        "src_path": "$SOURCE/lampOS/crates/expression/examples/recent_playout_cost.rs",
+        "test": false
+      }
+    },
+    {
+      "fresh": false,
+      "package_id": "path+file://$SOURCE/lampOS/crates/expression#lamp-expression@0.1.0",
+      "path": "$TARGET/debug/deps/it-a3132b514901b7e4",
+      "sha256": "c5ebf56e5cfa9bdcd0a226d799309508323f2e7232289369dbf6e18c89ac7ba2",
+      "target": {
+        "crate_types": [
+          "bin"
+        ],
+        "doc": false,
+        "doctest": false,
+        "edition": "2024",
+        "kind": [
+          "test"
+        ],
+        "name": "it",
+        "src_path": "$SOURCE/lampOS/crates/expression/tests/it/main.rs",
+        "test": true
+      }
+    },
+    {
+      "fresh": false,
+      "package_id": "path+file://$SOURCE/lampOS/crates/expression#lamp-expression@0.1.0",
+      "path": "$TARGET/debug/examples/replay_cost",
+      "sha256": "1c2a59ad89235eb058c2f2819b7f915fd672bf2442e3bbd0a28f36fc82edff2f",
+      "target": {
+        "crate_types": [
+          "bin"
+        ],
+        "doc": false,
+        "doctest": false,
+        "edition": "2024",
+        "kind": [
+          "example"
+        ],
+        "name": "replay_cost",
+        "src_path": "$SOURCE/lampOS/crates/expression/examples/replay_cost.rs",
+        "test": false
+      }
+    },
+    {
+      "fresh": false,
+      "package_id": "path+file://$SOURCE/lampOS/crates/expression#lamp-expression@0.1.0",
+      "path": "$TARGET/debug/examples/rest_cost",
+      "sha256": "d3c5e9bd5a827cba1e2d3be1a9e8f81bc8139d2fd2baf9b55c7c044502ada524",
+      "target": {
+        "crate_types": [
+          "bin"
+        ],
+        "doc": false,
+        "doctest": false,
+        "edition": "2024",
+        "kind": [
+          "example"
+        ],
+        "name": "rest_cost",
+        "src_path": "$SOURCE/lampOS/crates/expression/examples/rest_cost.rs",
+        "test": false
+      }
+    },
+    {
+      "fresh": false,
+      "package_id": "path+file://$SOURCE/lampOS/crates/expression#lamp-expression@0.1.0",
+      "path": "$TARGET/debug/lamp-expression",
+      "sha256": "462095793a43ba0287dc1181888f46262378cdbfebf5d4d08abee77f3685d0e1",
+      "target": {
+        "crate_types": [
+          "bin"
+        ],
+        "doc": true,
+        "doctest": false,
+        "edition": "2024",
+        "kind": [
+          "bin"
+        ],
+        "name": "lamp-expression",
+        "src_path": "$SOURCE/lampOS/crates/expression/src/main.rs",
+        "test": true
+      }
+    },
+    {
+      "fresh": false,
+      "package_id": "path+file://$SOURCE/lampOS/crates/expression#lamp-expression@0.1.0",
+      "path": "$TARGET/debug/deps/runtime-fc85dcb0aeaf3b5e",
+      "sha256": "2491e74b68e9130c3cabf76ede33c887fb35fe47b246b3970f5d04153ba9f614",
+      "target": {
+        "crate_types": [
+          "bin"
+        ],
+        "doc": false,
+        "doctest": false,
+        "edition": "2024",
+        "kind": [
+          "test"
+        ],
+        "name": "runtime",
+        "src_path": "$SOURCE/lampOS/crates/expression/tests/runtime.rs",
+        "test": true
+      }
+    },
+    {
+      "fresh": false,
+      "package_id": "path+file://$SOURCE/lampOS/crates/expression#lamp-expression@0.1.0",
+      "path": "$TARGET/debug/deps/lamp_expression-0ad4f336d0245487",
+      "sha256": "5f4ab4d088c25abc4d5f8fe2c625c2c5fc46a1d23896c9d89f8c04c6b7cdd290",
+      "target": {
+        "crate_types": [
+          "bin"
+        ],
+        "doc": true,
+        "doctest": false,
+        "edition": "2024",
+        "kind": [
+          "bin"
+        ],
+        "name": "lamp-expression",
+        "src_path": "$SOURCE/lampOS/crates/expression/src/main.rs",
+        "test": true
+      }
+    },
+    {
+      "fresh": false,
+      "package_id": "path+file://$SOURCE/lampOS/crates/expression#lamp-expression@0.1.0",
+      "path": "$TARGET/debug/deps/lamp_expression-76da23656c5dc461",
+      "sha256": "7933452a53d2086b661fe63d983190dc8a69efbe46cda9e64d567d8e4e787f4c",
+      "target": {
+        "crate_types": [
+          "lib"
+        ],
+        "doc": true,
+        "doctest": true,
+        "edition": "2024",
+        "kind": [
+          "lib"
+        ],
+        "name": "lamp_expression",
+        "src_path": "$SOURCE/lampOS/crates/expression/src/lib.rs",
+        "test": true
+      }
+    }
+  ],
+  "local_outputs": [
+    {
+      "fresh": false,
+      "package_id": "path+file://$SOURCE/lampOS/crates/bus#lamp-bus@0.1.0",
+      "path": "$TARGET/debug/deps/liblamp_bus-1a5095346c8b36b8.rlib",
+      "preserved_path": "$EVIDENCE/expression/artifacts/0-liblamp_bus-1a5095346c8b36b8.rlib",
+      "sha256": "2ef63db4fd817af1897ef97e027a23fff35850878d88d9e73ef22bd0a25ac5c5",
+      "target": "lamp_bus"
+    },
+    {
+      "fresh": false,
+      "package_id": "path+file://$SOURCE/lampOS/crates/bus#lamp-bus@0.1.0",
+      "path": "$TARGET/debug/deps/liblamp_bus-1a5095346c8b36b8.rmeta",
+      "preserved_path": "$EVIDENCE/expression/artifacts/1-liblamp_bus-1a5095346c8b36b8.rmeta",
+      "sha256": "8df98a40a2e878a9cc590cc92afbcde29341f694537b18be0d7c5e514f70de27",
+      "target": "lamp_bus"
+    },
+    {
+      "fresh": false,
+      "package_id": "path+file://$SOURCE/lampOS/crates/msgs#lamp-msgs@0.1.0",
+      "path": "$TARGET/debug/deps/liblamp_msgs-20585a2275004d6c.rlib",
+      "preserved_path": "$EVIDENCE/expression/artifacts/2-liblamp_msgs-20585a2275004d6c.rlib",
+      "sha256": "b7bbb72f7c67aaf207f4c2f6aec11a3f14e66a5a385797a960b33cc0a41a61bb",
+      "target": "lamp_msgs"
+    },
+    {
+      "fresh": false,
+      "package_id": "path+file://$SOURCE/lampOS/crates/msgs#lamp-msgs@0.1.0",
+      "path": "$TARGET/debug/deps/liblamp_msgs-20585a2275004d6c.rmeta",
+      "preserved_path": "$EVIDENCE/expression/artifacts/3-liblamp_msgs-20585a2275004d6c.rmeta",
+      "sha256": "5527583494d7f4053f257c6bc0bb3bfb82a29a2f56337a93fc353a71588ffe7e",
+      "target": "lamp_msgs"
+    },
+    {
+      "fresh": false,
+      "package_id": "path+file://$SOURCE/lampOS/crates/lean#lamp-lean@0.1.0",
+      "path": "$TARGET/debug/deps/liblamp_lean-c80f33e28a2ea0cc.rlib",
+      "preserved_path": "$EVIDENCE/expression/artifacts/4-liblamp_lean-c80f33e28a2ea0cc.rlib",
+      "sha256": "82af28be3325da940bc6c8151741dfaa431755057100f5841497309fdb8e99de",
+      "target": "lamp_lean"
+    },
+    {
+      "fresh": false,
+      "package_id": "path+file://$SOURCE/lampOS/crates/lean#lamp-lean@0.1.0",
+      "path": "$TARGET/debug/deps/liblamp_lean-c80f33e28a2ea0cc.rmeta",
+      "preserved_path": "$EVIDENCE/expression/artifacts/5-liblamp_lean-c80f33e28a2ea0cc.rmeta",
+      "sha256": "b863b91dcf73cd84244902c03a6348757efc551111c1424e410b018502af50b9",
+      "target": "lamp_lean"
+    },
+    {
+      "fresh": false,
+      "package_id": "path+file://$SOURCE/lampOS/crates/ipc#lamp-ipc@0.1.0",
+      "path": "$TARGET/debug/deps/liblamp_ipc-77bfd5f8f749224f.rlib",
+      "preserved_path": "$EVIDENCE/expression/artifacts/6-liblamp_ipc-77bfd5f8f749224f.rlib",
+      "sha256": "6d893a654a56c5db1fe9cf0174995282a7b23973e30056d9a9931211edbb254c",
+      "target": "lamp_ipc"
+    },
+    {
+      "fresh": false,
+      "package_id": "path+file://$SOURCE/lampOS/crates/ipc#lamp-ipc@0.1.0",
+      "path": "$TARGET/debug/deps/liblamp_ipc-77bfd5f8f749224f.rmeta",
+      "preserved_path": "$EVIDENCE/expression/artifacts/7-liblamp_ipc-77bfd5f8f749224f.rmeta",
+      "sha256": "51fde2831a8c4bc74cea5a57fa238f80871f631e832acc57ff62f2db9d2baccf",
+      "target": "lamp_ipc"
+    },
+    {
+      "fresh": false,
+      "package_id": "path+file://$SOURCE/lampOS/crates/keeper#lamp-keeper@0.1.0",
+      "path": "$TARGET/debug/deps/liblamp_keeper-18579e0836f10ce0.rlib",
+      "preserved_path": "$EVIDENCE/expression/artifacts/8-liblamp_keeper-18579e0836f10ce0.rlib",
+      "sha256": "0036804800ed2c3c5c11c2f149b8df0ecc6c597792fd5839c4408555ccffc4e9",
+      "target": "lamp_keeper"
+    },
+    {
+      "fresh": false,
+      "package_id": "path+file://$SOURCE/lampOS/crates/keeper#lamp-keeper@0.1.0",
+      "path": "$TARGET/debug/deps/liblamp_keeper-18579e0836f10ce0.rmeta",
+      "preserved_path": "$EVIDENCE/expression/artifacts/9-liblamp_keeper-18579e0836f10ce0.rmeta",
+      "sha256": "f1e6156bee117a6ef49db664357b15b05b801f9898c8019d29d6a4ca4d4c8bb9",
+      "target": "lamp_keeper"
+    },
+    {
+      "fresh": false,
+      "package_id": "path+file://$SOURCE/lampOS/crates/turn-owner#lamp-turn-owner@0.1.0",
+      "path": "$TARGET/debug/deps/liblamp_turn_owner-f93c0c30fdada0e3.rlib",
+      "preserved_path": "$EVIDENCE/expression/artifacts/10-liblamp_turn_owner-f93c0c30fdada0e3.rlib",
+      "sha256": "f594159e9d4b280ab678c7d4d303463a52f80adf4e996c1de8c73ad690cf399c",
+      "target": "lamp_turn_owner"
+    },
+    {
+      "fresh": false,
+      "package_id": "path+file://$SOURCE/lampOS/crates/turn-owner#lamp-turn-owner@0.1.0",
+      "path": "$TARGET/debug/deps/liblamp_turn_owner-f93c0c30fdada0e3.rmeta",
+      "preserved_path": "$EVIDENCE/expression/artifacts/11-liblamp_turn_owner-f93c0c30fdada0e3.rmeta",
+      "sha256": "20e6c071e11768802b4cb25f45705c353bbbdb3e2d4e05950299814728da7da9",
+      "target": "lamp_turn_owner"
+    },
+    {
+      "fresh": false,
+      "package_id": "path+file://$SOURCE/lampOS/crates/body#lamp-body@0.1.0",
+      "path": "$TARGET/debug/deps/liblamp_body-09fd2c6e5bbf59b8.rlib",
+      "preserved_path": "$EVIDENCE/expression/artifacts/12-liblamp_body-09fd2c6e5bbf59b8.rlib",
+      "sha256": "bc636cfc16668942b80d66fc75bfb06eaa1324044257ff69629219c7d0b29a1f",
+      "target": "lamp_body"
+    },
+    {
+      "fresh": false,
+      "package_id": "path+file://$SOURCE/lampOS/crates/body#lamp-body@0.1.0",
+      "path": "$TARGET/debug/deps/liblamp_body-09fd2c6e5bbf59b8.rmeta",
+      "preserved_path": "$EVIDENCE/expression/artifacts/13-liblamp_body-09fd2c6e5bbf59b8.rmeta",
+      "sha256": "4b58c1abdfff815fea59d6f83b166498dfa108c6c6bf5585a5da052d0a39fa45",
+      "target": "lamp_body"
+    },
+    {
+      "fresh": false,
+      "package_id": "path+file://$SOURCE/lampOS/crates/local-time#lamp-local-time@0.1.0",
+      "path": "$TARGET/debug/deps/liblamp_local_time-0ba1d770369ec162.rlib",
+      "preserved_path": "$EVIDENCE/expression/artifacts/14-liblamp_local_time-0ba1d770369ec162.rlib",
+      "sha256": "9947e7206ad655bc13ffb56903736a4c82e01531e8c8d5234caee91db0bda55a",
+      "target": "lamp_local_time"
+    },
+    {
+      "fresh": false,
+      "package_id": "path+file://$SOURCE/lampOS/crates/local-time#lamp-local-time@0.1.0",
+      "path": "$TARGET/debug/deps/liblamp_local_time-0ba1d770369ec162.rmeta",
+      "preserved_path": "$EVIDENCE/expression/artifacts/15-liblamp_local_time-0ba1d770369ec162.rmeta",
+      "sha256": "b138a167ed5700eedf8b9417ac3c6ca3a6e8d9c7a4161a7fc83d69ea43d619cc",
+      "target": "lamp_local_time"
+    },
+    {
+      "fresh": false,
+      "package_id": "path+file://$SOURCE/lampOS/crates/expression#lamp-expression@0.1.0",
+      "path": "$TARGET/debug/deps/liblamp_expression-b337359d3d421032.rlib",
+      "preserved_path": "$EVIDENCE/expression/artifacts/16-liblamp_expression-b337359d3d421032.rlib",
+      "sha256": "5addd682176ae65ffd69be1d2e546a95bc6ee267528ba95b0f418d60444844ac",
+      "target": "lamp_expression"
+    },
+    {
+      "fresh": false,
+      "package_id": "path+file://$SOURCE/lampOS/crates/expression#lamp-expression@0.1.0",
+      "path": "$TARGET/debug/deps/liblamp_expression-b337359d3d421032.rmeta",
+      "preserved_path": "$EVIDENCE/expression/artifacts/17-liblamp_expression-b337359d3d421032.rmeta",
+      "sha256": "49fcaf3b25df6de5f7d1511bc8412c585b525d9439a8e22e67ec667c09606ffb",
+      "target": "lamp_expression"
+    },
+    {
+      "fresh": false,
+      "package_id": "path+file://$SOURCE/lampOS/crates/expression#lamp-expression@0.1.0",
+      "path": "$TARGET/debug/examples/recent_playout_cost",
+      "preserved_path": "$EVIDENCE/expression/artifacts/18-recent_playout_cost",
+      "sha256": "75a6e93426f0d69d76265dc2e99fe573360e356932ac60aeb89326ae9013f371",
+      "target": "recent_playout_cost"
+    },
+    {
+      "fresh": false,
+      "package_id": "path+file://$SOURCE/lampOS/crates/expression#lamp-expression@0.1.0",
+      "path": "$TARGET/debug/deps/it-a3132b514901b7e4",
+      "preserved_path": "$EVIDENCE/expression/artifacts/19-it-a3132b514901b7e4",
+      "sha256": "c5ebf56e5cfa9bdcd0a226d799309508323f2e7232289369dbf6e18c89ac7ba2",
+      "target": "it"
+    },
+    {
+      "fresh": false,
+      "package_id": "path+file://$SOURCE/lampOS/crates/expression#lamp-expression@0.1.0",
+      "path": "$TARGET/debug/examples/replay_cost",
+      "preserved_path": "$EVIDENCE/expression/artifacts/20-replay_cost",
+      "sha256": "1c2a59ad89235eb058c2f2819b7f915fd672bf2442e3bbd0a28f36fc82edff2f",
+      "target": "replay_cost"
+    },
+    {
+      "fresh": false,
+      "package_id": "path+file://$SOURCE/lampOS/crates/expression#lamp-expression@0.1.0",
+      "path": "$TARGET/debug/examples/rest_cost",
+      "preserved_path": "$EVIDENCE/expression/artifacts/21-rest_cost",
+      "sha256": "d3c5e9bd5a827cba1e2d3be1a9e8f81bc8139d2fd2baf9b55c7c044502ada524",
+      "target": "rest_cost"
+    },
+    {
+      "fresh": false,
+      "package_id": "path+file://$SOURCE/lampOS/crates/expression#lamp-expression@0.1.0",
+      "path": "$TARGET/debug/lamp-expression",
+      "preserved_path": "$EVIDENCE/expression/artifacts/22-lamp-expression",
+      "sha256": "462095793a43ba0287dc1181888f46262378cdbfebf5d4d08abee77f3685d0e1",
+      "target": "lamp-expression"
+    },
+    {
+      "fresh": false,
+      "package_id": "path+file://$SOURCE/lampOS/crates/expression#lamp-expression@0.1.0",
+      "path": "$TARGET/debug/deps/runtime-fc85dcb0aeaf3b5e",
+      "preserved_path": "$EVIDENCE/expression/artifacts/23-runtime-fc85dcb0aeaf3b5e",
+      "sha256": "2491e74b68e9130c3cabf76ede33c887fb35fe47b246b3970f5d04153ba9f614",
+      "target": "runtime"
+    },
+    {
+      "fresh": false,
+      "package_id": "path+file://$SOURCE/lampOS/crates/expression#lamp-expression@0.1.0",
+      "path": "$TARGET/debug/deps/lamp_expression-0ad4f336d0245487",
+      "preserved_path": "$EVIDENCE/expression/artifacts/24-lamp_expression-0ad4f336d0245487",
+      "sha256": "5f4ab4d088c25abc4d5f8fe2c625c2c5fc46a1d23896c9d89f8c04c6b7cdd290",
+      "target": "lamp-expression"
+    },
+    {
+      "fresh": false,
+      "package_id": "path+file://$SOURCE/lampOS/crates/expression#lamp-expression@0.1.0",
+      "path": "$TARGET/debug/deps/lamp_expression-76da23656c5dc461",
+      "preserved_path": "$EVIDENCE/expression/artifacts/25-lamp_expression-76da23656c5dc461",
+      "sha256": "7933452a53d2086b661fe63d983190dc8a69efbe46cda9e64d567d8e4e787f4c",
+      "target": "lamp_expression"
+    }
+  ]
+}

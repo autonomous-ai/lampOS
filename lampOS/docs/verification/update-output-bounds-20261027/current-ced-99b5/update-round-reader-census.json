@@ -1,0 +1,27 @@
+{
+  "cases": [
+    [
+      "a_command_is_read_within_its_bound_and_killed_after",
+      "ok"
+    ]
+  ],
+  "note": "Literal summaries preserve nested child outputs separately; audit before aggregate counts.",
+  "runtime_bindings": [
+    {
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "sha256": "56b3b5b82633154e4e2ef73031324c00bee52a05570d4b2a5e1d096951a8d732"
+    }
+  ],
+  "scope": "update-round-reader",
+  "summaries": [
+    {
+      "failed": 0,
+      "filtered": 182,
+      "header": "Running tests/round.rs (<target>/debug/deps/round-42e77f9cbb014d5a)",
+      "ignored": 0,
+      "literal": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 182 filtered out; finished in 0.36s",
+      "passed": 1,
+      "status": "ok"
+    }
+  ]
+}

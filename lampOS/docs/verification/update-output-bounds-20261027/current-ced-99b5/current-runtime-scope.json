@@ -1,0 +1,9 @@
+{
+  "custom_harnesses": "not run in this focused carry",
+  "full_current_Update_runtime": false,
+  "historical_full_runtime": "431b784c4b9e911575f79e7ad3ce879e61c2b8b9",
+  "scopes": [
+    "update-lib",
+    "update-round-reader"
+  ]
+}

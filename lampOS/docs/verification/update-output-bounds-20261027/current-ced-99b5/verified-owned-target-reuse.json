@@ -1,0 +1,17 @@
+{
+  "actual_and_preserved_outputs_depfiles_verified_before_compiler": true,
+  "actual_executables_verified_before_compiler": true,
+  "changed_source_entries": [
+    "lampOS/crates/ipc/Cargo.toml",
+    "lampOS/crates/ipc/src/camera_authority.rs",
+    "lampOS/crates/ipc/src/lib.rs",
+    "lampOS/crates/ipc/tests/camera_authority.rs",
+    "lampOS/docs/architecture.md",
+    "lampOS/docs/reuse-decisions.md"
+  ],
+  "note": "Same owned worktree/target; old full Update runtime remains bound to431/4bff. Current runtime is lib plus one exact round reader only.",
+  "previous_closure_sha256": "afaada2e8285efcc25aa98b22656516ac377cf45a523d754f4e10f6bd01755ed",
+  "previous_complete_sha256": "102fdb24c92d5dfe8f9b2d112c4736fe2c7fc99f19b4154907b988b7c8553f5b",
+  "previous_head": "431b784c4b9e911575f79e7ad3ce879e61c2b8b9",
+  "previous_source_inventory_sha256": "376b1500a6e52e92a770b7d77c26d893e5e21943f3b33bed6d4d6bbefcce872c"
+}

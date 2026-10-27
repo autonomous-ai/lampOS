@@ -1,0 +1,46 @@
+{
+  "cargo-configuration.json": {
+    "bytes": 949,
+    "sha256": "1bf23a8f4e51ee36d171a2e5194513a64a36c2ef235eaa3e61deeeffce862ab2"
+  },
+  "clippy.log": {
+    "bytes": 2084,
+    "sha256": "cf97abfb222fa5845f1aea1dfd4d5f2c5eb3f67cb70b9265a87d8fb341e6036c"
+  },
+  "exclusive-target-created.json": {
+    "bytes": 153,
+    "sha256": "1d1345d9f612e945821ea115230654cae17ee504bdb1eaf1788668541acaa311"
+  },
+  "expression/census.json": {
+    "bytes": 39054,
+    "sha256": "9c272ea4516b6aa8b90d45484ec7eadf9efe99eb648f2b9ec791d942a16f35d9"
+  },
+  "expression/compile.log": {
+    "bytes": 56922,
+    "sha256": "3a503a73ba06497d3c6a0931a02ea2b13db062237dafc0b40bc230f9b152048f"
+  },
+  "expression/runtime.log": {
+    "bytes": 31175,
+    "sha256": "00022ef806a7f941bf7bec08d5b993bd89ba13ae619015f538438b3031af1382"
+  },
+  "fmt.log": {
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "local-inputs.json": {
+    "bytes": 90217,
+    "sha256": "8325adb73c5b1de65934de5beb4b6559b9cfded2113401311ac80b6cd67253f8"
+  },
+  "metadata.log": {
+    "bytes": 1865919,
+    "sha256": "09cbdead7bad3444ed8b03d5755b20bfb58001aad8b4bf934a54e0628d665c59"
+  },
+  "source-status.json": {
+    "bytes": 7856,
+    "sha256": "922ebcefca8390d96d082a10aaa1cdbe24aaa3dad1b3a3004244de8b2cf80eb1"
+  },
+  "source.json": {
+    "bytes": 1187683,
+    "sha256": "964e8e172490235e705d9336c7480c2da3c04dc34c56d342d3f14dd41aef40d9"
+  }
+}
