@@ -335,11 +335,39 @@ fn head_qualifies_actual_continuous_observations_only() {
     e.gesture = TouchGesture::Stroke;
     e.when_speaking = TouchIntent::Stroke;
     e.when_quiet = TouchIntent::Stroke;
-    e.when_asleep = None;
+    // #3747: asleep, a hand kept a second wakes it.
+    e.when_asleep = Some(TouchIntent::Wake);
     e.began_us = e.observed_us - 1_000_000;
     e.check().unwrap();
+    assert_eq!(e.intent(false, true), Some(TouchIntent::Wake));
     e.began_us += 1;
     assert!(e.check().is_err());
+}
+
+/// #3747 (the Reviewer-lead on #3767): for one release a head stroke is
+/// taken as an older Controls says it, asking nothing asleep, and as a
+/// newer one does, asking to wake; never asking anything else asleep.
+#[test]
+fn a_head_stroke_is_taken_from_an_older_controls_and_a_newer_one() {
+    let mut stroke = event();
+    stroke.gesture = TouchGesture::Stroke;
+    stroke.when_speaking = TouchIntent::Stroke;
+    stroke.when_quiet = TouchIntent::Stroke;
+    stroke.began_us = stroke.observed_us - 1_000_000;
+    stroke.when_asleep = None;
+    stroke.check().unwrap();
+    assert_eq!(stroke.intent(false, true), None, "older: asks nothing");
+    stroke.when_asleep = Some(TouchIntent::Wake);
+    stroke.check().unwrap();
+    assert_eq!(stroke.intent(false, true), Some(TouchIntent::Wake), "newer");
+    for other in [TouchIntent::Sleep, TouchIntent::Stop, TouchIntent::Stroke] {
+        stroke.when_asleep = Some(other);
+        assert!(stroke.check().is_err(), "{other:?}");
+    }
+    // Only the stroke: a touch that asks to wake is still refused.
+    let mut touch = event();
+    touch.when_asleep = Some(TouchIntent::Wake);
+    assert!(touch.check().is_err());
 }
 
 /// A head tap released `held` after it began, confirmed 150 ms later.
@@ -359,12 +387,13 @@ fn head_tap(held: u64) -> TouchEvent {
 }
 
 #[test]
-fn the_head_stops_at_a_touch_listens_at_a_short_tap_and_sleeps_at_three_seconds() {
-    // #711: only a short tap, let go, asks it to listen or wake.
-    for held in [20_000, 499_999] {
+fn the_head_stops_at_a_touch_listens_at_a_tap_under_a_second_and_sleeps_at_three_seconds() {
+    // #711: only a tap, let go, asks it to listen or wake; since #3747, any
+    // let go under the stroke's second.
+    for held in [20_000, 499_999, 500_000, 999_999] {
         head_tap(held).check().unwrap();
     }
-    for held in [19_999, 500_000] {
+    for held in [19_999, 1_000_000] {
         assert!(head_tap(held).check().is_err(), "{held}");
     }
     let mut held_tap = head_tap(300_000);
@@ -491,7 +520,7 @@ fn retained_events_cannot_change_session_time_or_overwrite_motion() {
     e.began_us = e.observed_us - 1_000_000;
     e.when_speaking = TouchIntent::Stroke;
     e.when_quiet = TouchIntent::Stroke;
-    e.when_asleep = None;
+    e.when_asleep = Some(TouchIntent::Wake);
     e.check().unwrap();
     assert!(s.check().is_err());
 }

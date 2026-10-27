@@ -273,8 +273,10 @@ Off unless `lamp-expression serve --head-touch`, and Controls runs with
   0.5 s, so a stopped Controls never leaves it leaning. Only awake, and only
   with the body free.
 - **A hand kept three seconds** (Hold) puts it to sleep at once, by day too,
-  as the night's own sleep does: the same bow and breath.
-- **A tap** wakes it when asleep. Awake, a tap is "are you there?" (First,
+  as the night's own sleep does: the same bow and breath. Never while
+  onboarding is under way (#3747): the voice declines that hold, and its
+  word that it is awake keeps Expression from folding.
+- **A tap**, or a hand kept a second, wakes it when asleep (#3747). Awake, a tap is "are you there?" (First,
   #711, 05:05). It looks up: the head lifts a little (`LOOK_UP`, pitch
   -0.035 rad), and toward a face the eyes saw in the last second, more for
   one high in the picture and less for one low (`LOOK_UP_TOWARD`, 0.025 rad
