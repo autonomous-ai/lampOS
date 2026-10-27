@@ -1,0 +1,82 @@
+{
+  "status": "ORIGINAL_NATIVE_PASSED",
+  "holds": [],
+  "source": {
+    "actual_preview": "2848d935d4192afddf19857b56a5c23a708969f6",
+    "event_head": "021f0089705df64ad10a02899c1575f5a3f3c98b",
+    "local_comparison_head": "021f0089705df64ad10a02899c1575f5a3f3c98b",
+    "local_tree": "1ac66a5837670eb166973a465f75acea1104e31b",
+    "ordered_parents": [
+      "e70da415d928d6b03664b90d3074c295609ae820",
+      "021f0089705df64ad10a02899c1575f5a3f3c98b"
+    ],
+    "preview_tree": "1ac66a5837670eb166973a465f75acea1104e31b",
+    "whole_tree_equal": true
+  },
+  "nextest": {
+    "ipc_camera_authority_pass": 0,
+    "per_package_pass": {
+      "lamp-body": 624,
+      "lamp-cloud": 196,
+      "lamp-expression": 340,
+      "lamp-keeper": 42,
+      "lamp-lean": 61,
+      "lamp-memory": 336,
+      "lamp-peek": 26,
+      "lamp-setup": 186,
+      "lamp-skills": 528,
+      "lamp-update": 443,
+      "lamp-voice": 4167,
+      "lamp-voice-eval": 623
+    },
+    "skip_names_available": false,
+    "status_counts": {
+      "PASS": 7572
+    },
+    "summary_skips": 53,
+    "unique_rows": 7572,
+    "verified_post_summary_reprints_excluded": 34,
+    "voice_library_pass": 3849
+  },
+  "controls": {
+    "linux_only_once_pass": 0,
+    "missing_or_nonpass": [],
+    "once_pass": 9,
+    "required": 9
+  },
+  "separate_docs": {
+    "failed": 0,
+    "ignored": 0,
+    "passed": 4,
+    "sections": 47
+  },
+  "separate_custom_harnesses": {
+    "relay_signals_ok": true,
+    "turn_end_process13_0": true
+  },
+  "limits": [
+    "Only this original event and executed preview; no newer Main or device acceptance.",
+    "Successful Reader observation does not establish cause or waive original642 Reader failure held by Tests under #3543.",
+    "No CI rerun, binary download/execution or device action.",
+    "Summary skips have no per-case names in log and are not waived."
+  ],
+  "runs": {
+    "arm": {
+      "actual_checkout": "2848d935d4192afddf19857b56a5c23a708969f6",
+      "attempt": 1,
+      "conclusion": "success",
+      "head": "021f0089705df64ad10a02899c1575f5a3f3c98b",
+      "job": 121996140916,
+      "run": 40445638182
+    },
+    "linux": {
+      "actual_checkout": "2848d935d4192afddf19857b56a5c23a708969f6",
+      "attempt": 1,
+      "conclusion": "success",
+      "head": "021f0089705df64ad10a02899c1575f5a3f3c98b",
+      "job": 121996140900,
+      "run": 40445638227
+    }
+  },
+  "full_private_receipt_sha256": "662a3e2490153f6032412a64e4fc86a656b3d1d48d452b6cea5a3b6e630ecf0f"
+}
