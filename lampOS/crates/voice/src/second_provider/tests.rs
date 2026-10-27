@@ -4479,6 +4479,44 @@ async fn the_sentence_is_heard_for_its_count_and_never_asked_of_the_model() {
     );
 }
 
+/// lamp-52e6, 27 October (#3504): while how_you_sound waits for a call
+/// (`StepCall`), a line that is only the lamp's name is the step's: the
+/// model is never asked and nothing is answered, so no answer cuts the
+/// walk's next prompt. "Lamp, what time is it?" in the same window is a
+/// turn and is answered.
+#[tokio::test]
+async fn only_the_name_while_the_step_waits_for_a_call_is_not_a_turn() {
+    for (heard, asked) in [
+        ("Lamp.", false),
+        ("Hey Lamp!", false),
+        ("Lamp, what time is it?", true),
+    ] {
+        let script = Arc::new(Script {
+            heard: Mutex::new([Ok(heard.to_owned())].into()),
+            chats: Mutex::new([vec![text("Ten past one."), Ok(ChatEvent::Done)]].into()),
+            ..Script::default()
+        });
+        let (mut engine, _, _) = scripted(script.clone());
+        engine.submit(start(1));
+        engine.submit(ProviderInput::StepCall {
+            request: 1,
+            privacy_generation: 1,
+        });
+        engine.submit(audio(1, 1));
+        engine.submit(end(1));
+        let said = turn(&mut engine).await;
+        assert_eq!(said.last().map(String::as_str), Some("complete"), "{heard}");
+        assert_eq!(
+            !script.asked.lock().unwrap().is_empty(),
+            asked,
+            "{heard}: {said:?}"
+        );
+        if !asked {
+            assert_eq!(said, ["started:1", "complete"], "{heard}");
+        }
+    }
+}
+
 /// The reviewer-lead on #2031: onboarding's sentence is not carried into
 /// the next line's speech to text by its sound either, whether that line
 /// begins within `CARRY_AFTER_END` of it or is marked continuing.

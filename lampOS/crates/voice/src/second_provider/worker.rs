@@ -186,6 +186,10 @@ impl Gate {
                 request,
                 privacy_generation,
             }
+            | ProviderInput::StepCall {
+                request,
+                privacy_generation,
+            }
             | ProviderInput::Written {
                 request,
                 privacy_generation,

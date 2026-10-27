@@ -772,6 +772,16 @@ pub enum ProviderInput {
         request: u64,
         privacy_generation: u64,
     },
+    /// The request in hand began while onboarding's `how_you_sound` waits
+    /// for a call (#3504), from its name prompt to the end of its try: a
+    /// line whose words are only the lamp's name is the step's call, never
+    /// asked of the model nor answered. Any other words go on as a turn.
+    /// The second route's; the Live worker takes nothing from it (the
+    /// coordinator holds a bare call's End there).
+    StepCall {
+        request: u64,
+        privacy_generation: u64,
+    },
     /// A whole request in writing, for a turn the lamp begins itself: it is
     /// a start and an end at once and carries no sound.
     Written {
@@ -818,6 +828,7 @@ impl ProviderInput {
             | Self::Called { request, .. }
             | Self::Paused { request, .. }
             | Self::CountOnly { request, .. }
+            | Self::StepCall { request, .. }
             | Self::Written { request, .. }
             | Self::Reminder { request, .. } => *request,
         }
@@ -840,6 +851,9 @@ impl ProviderInput {
                 privacy_generation, ..
             }
             | Self::CountOnly {
+                privacy_generation, ..
+            }
+            | Self::StepCall {
                 privacy_generation, ..
             }
             | Self::Written {
@@ -6181,6 +6195,9 @@ impl InputHandoff {
                 self.require_open(request)?;
                 crate::thread::count_only(Some(request.get()));
             }
+            // The second route's: on Live the coordinator holds a bare
+            // call's End in the step's window itself.
+            ProviderInput::StepCall { .. } => self.require_open(request)?,
             ProviderInput::End { sound, cut_in, .. } => {
                 self.require_open(request)?;
                 if self.called.take() == Some(request.get()) {

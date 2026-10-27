@@ -560,6 +560,41 @@ Stop, mute and physical privacy are not touched. Tests:
 `coordinator::tests::second_route::a_line_that_is_more_than_the_name_is_answered_in_the_near_call_window`,
 `onboarding::near_flow_tests::the_reply_is_held_only_in_the_try_window_and_the_held_call_counts`.
 
+**On the second route, only the name is never a turn** (#3504). On lamp-52e6
+on 27 October each "Lamp" the person called was also taken by the second
+route as a line of its own and answered, and the answer cut the walk's next
+prompt: three of six tries were "not played whole". So while the name part
+waits for a call, from its prompt handed to the model, through its playing,
+to its try's judgement (`NearFlow::waits_for_call`), every line admitted is
+told the second route as `ProviderInput::StepCall` right after its Start
+(`coordinator.rs`, `step_call`; record `onboarding_step_call`), whether or
+not lamp-name's hearing has come yet. When its words are only the lamp's
+name (`second_provider.rs`'s `name_alone`, the rule of
+`LAMP_SECOND_NAME_CARRIES`: "Lamp.", "Hey Lamp!"), or the name was heard and
+no words came back, the second route asks no chat, answers nothing, keeps it
+out of the thread and carries it to no later line ("only the lamp's name,
+while how_you_sound waits for a call: left to the step, not answered"). The
+try is measured from `name/heard` as before. Any other words ("Lamp, what
+time is it?") are a turn as now, and a prompt such a line cuts is offered
+again as any cut prompt. Outside the step nothing is told. The Live worker
+takes nothing from `StepCall`; there the coordinator's hold above stands.
+Only the invitation's own turn can mark a prompt played whole
+(`invitation_finished` is bound to it), so an answer never does. The places
+that decide whether a line heard during the walk becomes a turn are:
+`commit_admitted_input`'s `CountOnly` (the sentence), the `StepCall` after it
+(the call), `near_call_window` on a turn's blocks and at its End (the
+coordinator's hold), and the second route's turn task (`count_only` and
+`step_call` marks, before its name carry). `continue_after_early_end` tells
+no `StepCall`; it runs only with `--early-end-ms`, which the product unit
+does not pass. Tests:
+`second_provider::tests::only_the_name_while_the_step_waits_for_a_call_is_not_a_turn`,
+`coordinator::tests::second_route::a_line_begun_while_the_step_waits_for_a_call_is_told_the_second_route`.
+
+**Each prompt's end is one journal line**: `lamp-voice onboarding:
+how_you_sound prompt N played whole (call)`, or `cut`, or `(sentence)`, at the
+moment its playback is known whole or cut. A test driven from outside times
+its answer by it.
+
 **The name part's end.** At most five prompts, and the part stops asking
 once five can't reach three accepted (`asks_again`). Three accepted calls make
 the bar (`near_rise`: the quietest less 3 dB, held to 16–24 dB); the bar and

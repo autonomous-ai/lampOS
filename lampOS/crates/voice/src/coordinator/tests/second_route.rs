@@ -434,6 +434,7 @@ fn request_of(input: &ProviderInput) -> u64 {
         | ProviderInput::Called { request, .. }
         | ProviderInput::Paused { request, .. }
         | ProviderInput::CountOnly { request, .. }
+        | ProviderInput::StepCall { request, .. }
         | ProviderInput::Written { request, .. }
         | ProviderInput::Reminder { request, .. } => *request,
     }
@@ -5382,6 +5383,45 @@ fn a_line_that_is_more_than_the_name_is_answered_in_the_near_call_window() {
                     .is_none()
             );
         }
+    }
+}
+
+/// lamp-52e6, 27 October (#3504): a line begun while how_you_sound waits for
+/// a call is told the second route as `StepCall`, right after its Start,
+/// whether or not lamp-name's hearing has come yet (on 52e6 a bare "Lamp"
+/// went on as a turn and its answer cut the next prompt). Outside the step
+/// nothing is told.
+#[test]
+fn a_line_begun_while_the_step_waits_for_a_call_is_told_the_second_route() {
+    let _one = super::pilot_faults::one_session();
+    for window in [Some(0), None] {
+        let run = run(Script {
+            second: false,
+            only: true,
+            near_window_ms: window,
+            second_hears: Some("Lamp."),
+            ..Script::question(Live::Answer(12))
+        });
+        run.assert_clean();
+        let told: Vec<u64> = run
+            .seen
+            .second
+            .iter()
+            .filter_map(|input| match input {
+                ProviderInput::StepCall { request, .. } => Some(*request),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(
+            told,
+            if window.is_some() { vec![1] } else { vec![] },
+            "{window:?}: {}",
+            run.summary()
+        );
+        assert_eq!(
+            run.events("onboarding_step_call").len(),
+            usize::from(window.is_some())
+        );
     }
 }
 
