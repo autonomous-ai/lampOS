@@ -1,0 +1,163 @@
+{
+  "status": "ORIGINAL_ARM_AND_LINUX_CLIPPY_SUCCESS",
+  "PR": 3577,
+  "published_head": "4cd9d4995c482e0bc15f2ee537066205efd3d234",
+  "published_tree": "61b8507430ae3b4791cc7a441e18e58e4a0618e8",
+  "authored_parent": "1b1da9ae3fc6fbf1101cd1b88f10bcaa37fb55ad",
+  "actual_checkout": "f951521809844e3196490e98d872cc3aebeded1d",
+  "actual_tree": "a8f00d31ec80620a8411982e3e5ba5ee1b85d77f",
+  "actual_parents": [
+    "c1fa2bc9f327f5d553bb3dcc355053d8e7e94bfa",
+    "4cd9d4995c482e0bc15f2ee537066205efd3d234"
+  ],
+  "actual_entries": 10913,
+  "all_two_child_and_three_parent_owned_blobs_modes_exact": true,
+  "whole_actual_tree_equals_authored": false,
+  "actual_vs_authored_only_install_md_differs": true,
+  "ARM_run": 40590263211,
+  "ARM_job": 122492367892,
+  "ARM_native": {
+    "session": 12852,
+    "exit": 0,
+    "chunk": "6ffda5"
+  },
+  "Linux_Clippy_run": 40590263139,
+  "Linux_Clippy_job": 122492368631,
+  "Linux_Clippy_native": {
+    "session": 39561,
+    "exit": 0,
+    "chunk": "e05f31"
+  },
+  "attempt": 1,
+  "unique_outer_PASS": 7805,
+  "bad": 0,
+  "duplicates": 0,
+  "retries": 0,
+  "selected_unrun": 0,
+  "aggregate_skips": 54,
+  "skip_identities_not_invented": true,
+  "required_diagnostics_once_PASS": 18,
+  "sequence_once_PASS": 1,
+  "sequence_is_subset_not_added": true,
+  "separate_not_added_to_nextest": {
+    "doc_targets": 47,
+    "doc_PASS": 4,
+    "doc_failed": 0,
+    "relay_aggregate_PASS": 1,
+    "process_PASS": 13,
+    "process_failed": 0
+  },
+  "export_log": {
+    "binaries": 48,
+    "examples": 2,
+    "complete_SHA256SUMS_reported": true
+  },
+  "artifact_metadata_only": {
+    "id": 12773469736,
+    "compressed_bytes": 118781444,
+    "API_ZIP_digest": "sha256:d96eab2c13a589b9d60aeb626bd08f312bab67a1c43f2c4a5b8295db4b746337",
+    "upload_log_matches_API": true,
+    "downloaded": false,
+    "payload_or_ELF_verified": false,
+    "pins_derived": false
+  },
+  "parent_failed_cases_independent_child_observation": {
+    "run": 40590263211,
+    "actual_checkout": "f951521809844e3196490e98d872cc3aebeded1d",
+    "rows": [
+      {
+        "binary": "lamp-voice",
+        "test": "second_provider::worker::tests::with_two_faces_held_looks_between_lines_make_the_first_line_busy",
+        "same_source_blob_as_failed_parent": true,
+        "actual_blob": "70dffd5ceffd3ff63953e4d9bd68b3db0f054250",
+        "terminal": {
+          "event": "PASS",
+          "duration": "7.925s",
+          "binary": "lamp-voice",
+          "test": "second_provider::worker::tests::with_two_faces_held_looks_between_lines_make_the_first_line_busy",
+          "raw_line": 7612
+        }
+      },
+      {
+        "binary": "lamp-voice",
+        "test": "service_trace::tests::private_and_failed_reader_traces_keep_the_original_records_and_finite_state",
+        "same_source_blob_as_failed_parent": true,
+        "actual_blob": "a752cd988686fc724bca573f76f03edf90f24a82",
+        "terminal": {
+          "event": "PASS",
+          "duration": "0.008s",
+          "binary": "lamp-voice",
+          "test": "service_trace::tests::private_and_failed_reader_traces_keep_the_original_records_and_finite_state",
+          "raw_line": 7267
+        }
+      },
+      {
+        "binary": "lamp-voice",
+        "test": "service_privacy_controls::tests::only_a_privacy_worker_that_ended_cleanly_at_its_start_is_an_unreadable_switch",
+        "same_source_blob_as_failed_parent": true,
+        "actual_blob": "06278b55bb0cdf160e32a29ec1fe3fa16fc169e1",
+        "terminal": {
+          "event": "PASS",
+          "duration": "0.136s",
+          "binary": "lamp-voice",
+          "test": "service_privacy_controls::tests::only_a_privacy_worker_that_ended_cleanly_at_its_start_is_an_unreadable_switch",
+          "raw_line": 7262
+        }
+      }
+    ],
+    "independent_original_child_run": true,
+    "does_not_clear_or_reclassify_failed_parent_run": true,
+    "cause_not_inferred": true
+  },
+  "does_not_reclassify_parent_1b1_failure": true,
+  "old_a47_failed_ARM_remains_failed": true,
+  "local275_and_prior_native_counts_not_transferred": true,
+  "reader_parent_dependency_current_base_and_physical_conditions_separate": true,
+  "no_rerun_dispatch_cancel_source_target_ref_Cargo_post_actions": true,
+  "actual_collection_completions": [
+    {
+      "operation": "ARM logs",
+      "session": 83487,
+      "exit": 0,
+      "chunk": "f9a774"
+    },
+    {
+      "operation": "Clippy logs",
+      "session": 52722,
+      "exit": 0,
+      "chunk": "615c8b"
+    },
+    {
+      "operation": "actual source API",
+      "session": 68712,
+      "exit": 0,
+      "chunk": "7eac88"
+    }
+  ],
+  "evidence_sha256": {
+    "40590263211-original-logs.zip": "5682109fba60367ae4582b4f784961675ea13f569065d1bf47e8b67766c0a549",
+    "40590263139-original-logs.zip": "a7377bb14e08cc50af7704c79614923c4f245fb4427306f652b40fb2e226461d",
+    "native-terminal-ledger.json": "101f13a2c9759a93e20f87b29c9b5f0d2b043600dd9a5f886639f895d10055ae",
+    "native-runtime-accounting.json": "c80f2bbb345dcfcb2ffa4dda9477e766d51ffce64e32cd2e4fbb0ccbe2fb639c",
+    "required18-native-ledger.json": "c21fa21957b568ea60a5983388e196f3e6d964ec186faf6d2dbc1628680c6717",
+    "sequence-source-identity.json": "80f7b66f06ac8ef90de0d8df2c078d9d18b8e9812523720935452eb228744750",
+    "source-composition.json": "57743eca36b81a6907c7f1321796f589fe2e58e906b5b8d48dea686c4f173120",
+    "parent-failed-cases-child-observation.json": "ba88abb602185c9521b2ecf0f9b95b4fbbda60b93abbbbb6cae1ec4a43e368c3",
+    "f951521809844e3196490e98d872cc3aebeded1d-source-binding.json": "d6d4178d86d89dbde47edaaf2ac078743c4fe6b227ee8c4606274474c774b807"
+  },
+  "ready": false,
+  "historical_failed_runs": [
+    {
+      "PR": 3544,
+      "run": 40588908587,
+      "head": "1b1da9ae3fc6fbf1101cd1b88f10bcaa37fb55ad",
+      "status": "FAILED_UNCHANGED"
+    },
+    {
+      "PR": 3577,
+      "run": 40551384357,
+      "head": "a47fe22e56d181f6d7946bc5b98d90dd9560293e",
+      "status": "FAILED_UNCHANGED"
+    }
+  ]
+}

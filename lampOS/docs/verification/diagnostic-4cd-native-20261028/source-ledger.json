@@ -1,0 +1,75 @@
+{
+  "published_head": "4cd9d4995c482e0bc15f2ee537066205efd3d234",
+  "published_tree": "61b8507430ae3b4791cc7a441e18e58e4a0618e8",
+  "authored_parent": "1b1da9ae3fc6fbf1101cd1b88f10bcaa37fb55ad",
+  "actual_checkout": "f951521809844e3196490e98d872cc3aebeded1d",
+  "actual_tree": "a8f00d31ec80620a8411982e3e5ba5ee1b85d77f",
+  "actual_parents": [
+    "c1fa2bc9f327f5d553bb3dcc355053d8e7e94bfa",
+    "4cd9d4995c482e0bc15f2ee537066205efd3d234"
+  ],
+  "both_original_logs_independently_identify_checkout": true,
+  "all_five_parent_and_child_blobs_modes_match": true,
+  "bound_files": [
+    {
+      "path": "lampOS/crates/voice/src/hand_controls.rs",
+      "actual_blob": "233a2c6f0d5a01241020031c5ebb688ef2ceea72",
+      "actual_mode": "100644",
+      "published_blob": "233a2c6f0d5a01241020031c5ebb688ef2ceea72",
+      "published_mode": "100644",
+      "exact_published_blob_mode": true,
+      "same_published_and_local_tested": true
+    },
+    {
+      "path": "lampOS/crates/voice/src/hand_controls/tests.rs",
+      "actual_blob": "ed5029cc4dfd47eba12d017d7f6ea1687a83bd88",
+      "actual_mode": "100644",
+      "published_blob": "ed5029cc4dfd47eba12d017d7f6ea1687a83bd88",
+      "published_mode": "100644",
+      "exact_published_blob_mode": true,
+      "same_published_and_local_tested": true
+    },
+    {
+      "path": "lampOS/crates/voice/tests/it/diagnostics.rs",
+      "actual_blob": "a86c8e10871ac53cb79802addb177078ebc5e5be",
+      "actual_mode": "100644",
+      "published_blob": "a86c8e10871ac53cb79802addb177078ebc5e5be",
+      "published_mode": "100644",
+      "exact_published_blob_mode": true,
+      "same_published_and_local_tested": true
+    },
+    {
+      "path": "lampOS/docs/realtime-tests.md",
+      "actual_blob": "1d529515bacbf8ac6cc7df4e41ae0a9ce0f0f013",
+      "actual_mode": "100644",
+      "published_blob": "1d529515bacbf8ac6cc7df4e41ae0a9ce0f0f013",
+      "published_mode": "100644",
+      "exact_published_blob_mode": true,
+      "same_published_and_local_tested": true
+    },
+    {
+      "path": "lampOS/docs/voice-test-fixtures.md",
+      "actual_blob": "89924bf63ccd3230b8021cf9a189a30ab00dc1b2",
+      "actual_mode": "100644",
+      "published_blob": "89924bf63ccd3230b8021cf9a189a30ab00dc1b2",
+      "published_mode": "100644",
+      "exact_published_blob_mode": true,
+      "same_published_and_local_tested": true
+    }
+  ],
+  "full_tree_difference": [
+    {
+      "path": "lampOS/docs/install.md",
+      "authored": [
+        "100644",
+        "blob",
+        "157d7a44a37c1dd1a068a7d3c50592497e97f271"
+      ],
+      "actual": [
+        "100644",
+        "blob",
+        "1ded79654d818eb44a919571dcbf793aaa7c9e82"
+      ]
+    }
+  ]
+}

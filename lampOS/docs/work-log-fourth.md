@@ -1,3 +1,9 @@
+## 2026-10-28 05:14 ICT — Diagnostic original native gate passed
+
+[Original child native proof](verification/diagnostic-4cd-native-20261028/README.md): #3577 `4cd9d4995` passed original ARM 40590263211 and Linux Clippy 40590263139. The actual merge is `f95152180`, tree `a8f00d31e`, on Main `c1fa2bc9f` and this head. All five parent/child authored blobs and modes match; only install.md differs from the host-authored tree. There are 7,805 unique native passes, zero bad/duplicate/retry/selected-unrun outcomes, all 18 diagnostics once with the sequence included, and 54 separate aggregate skips. Four docs, one relay aggregate and 13 process cases are separate. No artifact payload or executable pins are claimed.
+
+The original parent and earlier child failures stay failed. The parent's three failed cases passed independently in this child run with identical source files; that is a comparison, not a cause or waiver. Source/native reader carry is being requested. Parent's current-base carry is being prepared without changing the active independent N3 review compiler source or target; strict Clippy is still running. Consent d4 Linux Clippy is green and its original ARM remains active. No device action.
+
 ## 2026-10-28 05:10 ICT — Consent is carried onto current Main with exact CI-tree equality
 
 [Carry and original proof](verification/onboarding-d4-current-carry-20261028/README.md): #3472 is pushed as `d4ce16238` on frozen Main `c1fa2bc9f`, one unchanged commit with an equal range-diff. The complete tree equals original green a616 CI tree `ebb7cb559`, all 10,920 entries, including the changed install guide. Original source qualification is 11,829 unique passes and all 56 controls; new-head ARM and Linux originals are active, not yet credited. Main then advanced to `ef90c8561` through #3947 while the frozen reader compiler was active; that incoming change is not assumed covered. The explicit physical activation hold and draft remain.

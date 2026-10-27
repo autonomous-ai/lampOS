@@ -1,0 +1,186 @@
+{
+  "count": 18,
+  "sequence_subset_count": 1,
+  "rows": [
+    {
+      "binary": "lamp-voice::it",
+      "test": "diagnostics::accepted_speech_gap_zeros_are_explicit_and_do_not_replace_neighboring_pcm",
+      "source_path": "lampOS/crates/voice/tests/it/diagnostics.rs",
+      "source_file_sha256": "b368573cd5894ccfada720835d9d098297e1250ea61477702c6169a99db8e8eb",
+      "event": "PASS",
+      "test_duration": "0.008s",
+      "once": true,
+      "sequence_subset": false
+    },
+    {
+      "binary": "lamp-voice::it",
+      "test": "diagnostics::audio_fault_end_is_incomplete_even_with_good_written_pcm",
+      "source_path": "lampOS/crates/voice/tests/it/diagnostics.rs",
+      "source_file_sha256": "b368573cd5894ccfada720835d9d098297e1250ea61477702c6169a99db8e8eb",
+      "event": "PASS",
+      "test_duration": "0.007s",
+      "once": true,
+      "sequence_subset": false
+    },
+    {
+      "binary": "lamp-voice::it",
+      "test": "diagnostics::capture_files_preserve_pcm_offsets_hashes_and_full_acknowledgement",
+      "source_path": "lampOS/crates/voice/tests/it/diagnostics.rs",
+      "source_file_sha256": "b368573cd5894ccfada720835d9d098297e1250ea61477702c6169a99db8e8eb",
+      "event": "PASS",
+      "test_duration": "0.007s",
+      "once": true,
+      "sequence_subset": false
+    },
+    {
+      "binary": "lamp-voice::it",
+      "test": "diagnostics::capture_processing_cannot_be_mislabelled_as_render_processing",
+      "source_path": "lampOS/crates/voice/tests/it/diagnostics.rs",
+      "source_file_sha256": "b368573cd5894ccfada720835d9d098297e1250ea61477702c6169a99db8e8eb",
+      "event": "PASS",
+      "test_duration": "0.005s",
+      "once": true,
+      "sequence_subset": false
+    },
+    {
+      "binary": "lamp-voice::it",
+      "test": "diagnostics::capture_sequence_gap_and_unannounced_epoch_change_fail",
+      "source_path": "lampOS/crates/voice/tests/it/diagnostics.rs",
+      "source_file_sha256": "b368573cd5894ccfada720835d9d098297e1250ea61477702c6169a99db8e8eb",
+      "event": "PASS",
+      "test_duration": "0.010s",
+      "once": true,
+      "sequence_subset": false
+    },
+    {
+      "binary": "lamp-voice::it",
+      "test": "diagnostics::closed_privacy_cannot_be_overridden_by_pcm_metadata",
+      "source_path": "lampOS/crates/voice/tests/it/diagnostics.rs",
+      "source_file_sha256": "b368573cd5894ccfada720835d9d098297e1250ea61477702c6169a99db8e8eb",
+      "event": "PASS",
+      "test_duration": "0.008s",
+      "once": true,
+      "sequence_subset": false
+    },
+    {
+      "binary": "lamp-voice::it",
+      "test": "diagnostics::dsp_reset_preserves_capture_sequence_and_cannot_cover_a_gap",
+      "source_path": "lampOS/crates/voice/tests/it/diagnostics.rs",
+      "source_file_sha256": "b368573cd5894ccfada720835d9d098297e1250ea61477702c6169a99db8e8eb",
+      "event": "PASS",
+      "test_duration": "0.022s",
+      "once": true,
+      "sequence_subset": true
+    },
+    {
+      "binary": "lamp-voice::it",
+      "test": "diagnostics::duration_and_frame_shape_limits_disable_evidence_without_blocking",
+      "source_path": "lampOS/crates/voice/tests/it/diagnostics.rs",
+      "source_file_sha256": "b368573cd5894ccfada720835d9d098297e1250ea61477702c6169a99db8e8eb",
+      "event": "PASS",
+      "test_duration": "0.010s",
+      "once": true,
+      "sequence_subset": false
+    },
+    {
+      "binary": "lamp-voice::it",
+      "test": "diagnostics::explicit_reset_and_privacy_boundaries_are_retained_and_split_epochs",
+      "source_path": "lampOS/crates/voice/tests/it/diagnostics.rs",
+      "source_file_sha256": "b368573cd5894ccfada720835d9d098297e1250ea61477702c6169a99db8e8eb",
+      "event": "PASS",
+      "test_duration": "0.009s",
+      "once": true,
+      "sequence_subset": false
+    },
+    {
+      "binary": "lamp-voice::it",
+      "test": "diagnostics::no_overwrite_private_parent_and_symlink_rejection",
+      "source_path": "lampOS/crates/voice/tests/it/diagnostics.rs",
+      "source_file_sha256": "b368573cd5894ccfada720835d9d098297e1250ea61477702c6169a99db8e8eb",
+      "event": "PASS",
+      "test_duration": "0.007s",
+      "once": true,
+      "sequence_subset": false
+    },
+    {
+      "binary": "lamp-voice::it",
+      "test": "diagnostics::omitted_open_privacy_and_missing_opening_frames_are_invalid",
+      "source_path": "lampOS/crates/voice/tests/it/diagnostics.rs",
+      "source_file_sha256": "b368573cd5894ccfada720835d9d098297e1250ea61477702c6169a99db8e8eb",
+      "event": "PASS",
+      "test_duration": "0.011s",
+      "once": true,
+      "sequence_subset": false
+    },
+    {
+      "binary": "lamp-voice::it",
+      "test": "diagnostics::playback_reset_requires_matching_old_discard_and_advancing_epoch",
+      "source_path": "lampOS/crates/voice/tests/it/diagnostics.rs",
+      "source_file_sha256": "b368573cd5894ccfada720835d9d098297e1250ea61477702c6169a99db8e8eb",
+      "event": "PASS",
+      "test_duration": "0.014s",
+      "once": true,
+      "sequence_subset": false
+    },
+    {
+      "binary": "lamp-voice::it",
+      "test": "diagnostics::processing_provenance_matches_pending_result_and_acknowledged_summary",
+      "source_path": "lampOS/crates/voice/tests/it/diagnostics.rs",
+      "source_file_sha256": "b368573cd5894ccfada720835d9d098297e1250ea61477702c6169a99db8e8eb",
+      "event": "PASS",
+      "test_duration": "0.016s",
+      "once": true,
+      "sequence_subset": false
+    },
+    {
+      "binary": "lamp-voice::it",
+      "test": "diagnostics::render_cursor_gap_does_not_insert_silence",
+      "source_path": "lampOS/crates/voice/tests/it/diagnostics.rs",
+      "source_file_sha256": "b368573cd5894ccfada720835d9d098297e1250ea61477702c6169a99db8e8eb",
+      "event": "PASS",
+      "test_duration": "0.008s",
+      "once": true,
+      "sequence_subset": false
+    },
+    {
+      "binary": "lamp-voice::it",
+      "test": "diagnostics::render_records_only_accepted_prefix_and_typed_priming_silence",
+      "source_path": "lampOS/crates/voice/tests/it/diagnostics.rs",
+      "source_file_sha256": "b368573cd5894ccfada720835d9d098297e1250ea61477702c6169a99db8e8eb",
+      "event": "PASS",
+      "test_duration": "0.006s",
+      "once": true,
+      "sequence_subset": false
+    },
+    {
+      "binary": "lamp-voice::it",
+      "test": "diagnostics::repeated_privacy_observation_does_not_reset_the_render_cursor",
+      "source_path": "lampOS/crates/voice/tests/it/diagnostics.rs",
+      "source_file_sha256": "b368573cd5894ccfada720835d9d098297e1250ea61477702c6169a99db8e8eb",
+      "event": "PASS",
+      "test_duration": "0.007s",
+      "once": true,
+      "sequence_subset": false
+    },
+    {
+      "binary": "lamp-voice::it",
+      "test": "diagnostics::replaced_artifact_never_receives_original_pcm_or_valid_marker",
+      "source_path": "lampOS/crates/voice/tests/it/diagnostics.rs",
+      "source_file_sha256": "b368573cd5894ccfada720835d9d098297e1250ea61477702c6169a99db8e8eb",
+      "event": "PASS",
+      "test_duration": "0.007s",
+      "once": true,
+      "sequence_subset": false
+    },
+    {
+      "binary": "lamp-voice::it",
+      "test": "diagnostics::replacement_directory_and_existing_final_marker_cannot_be_certified",
+      "source_path": "lampOS/crates/voice/tests/it/diagnostics.rs",
+      "source_file_sha256": "b368573cd5894ccfada720835d9d098297e1250ea61477702c6169a99db8e8eb",
+      "event": "PASS",
+      "test_duration": "0.010s",
+      "once": true,
+      "sequence_subset": false
+    }
+  ]
+}
