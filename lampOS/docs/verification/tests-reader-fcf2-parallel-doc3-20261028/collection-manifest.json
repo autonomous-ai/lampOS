@@ -1,0 +1,49 @@
+{
+  "files": {
+    "original-seven.json": {
+      "sha256": "1c0bc031e0ffb61130382c3b2ac290a7d248e42c1307d694c9292c13e05eed1e",
+      "bytes": 1117
+    },
+    "authored-range-diff.txt": {
+      "sha256": "0c87917ca7221291b191aac8521ab1c202a6b3a9c1d7d16079e32e027482c551",
+      "bytes": 94
+    },
+    "qualified-push-result.json": {
+      "sha256": "cbeb999628b237e13192d63547ae2bea4540950e6e10ed8a7d57cb23cff78ff0",
+      "bytes": 637
+    },
+    "doc3-terminal.json": {
+      "sha256": "db0992454831719589fa5154e4612522e7cc310e46241147bb179f8a6665bd5a",
+      "bytes": 823
+    },
+    "full-parallel.stdout.txt": {
+      "sha256": "8afaf3142f21ad05beaff34a59fdb76d3940274f73deb4d164d8b0faadbb20bb",
+      "bytes": 643603
+    },
+    "ci-paths-selected.stdout.txt": {
+      "sha256": "3ddd2ec6438118a11c43e82323269c8e74ad93990561acf00694bc17ed5c5f63",
+      "bytes": 292
+    },
+    "install-selected.stdout.txt": {
+      "sha256": "fef3515fde85c480e72f17b61ce5e3a6b237027986ba296ac686b05e0601a43b",
+      "bytes": 180
+    },
+    "README.md": {
+      "sha256": "597bee400294cc34873c0ff1877e6295353848dc272a2e02c7ed80b9b057a67d",
+      "bytes": 2155
+    },
+    "full-parallel-terminal.json": {
+      "sha256": "e784ced9fd8aceb33b7015ebb0ff193d1376ed0739376e4b749469c5aa728715",
+      "bytes": 10610
+    },
+    "x86-mac-architecture-proof.json": {
+      "sha256": "86387f9c739ebee597a916d544e60cb770ca0a8c92bbf682ec14563123b350b8",
+      "bytes": 1294
+    }
+  },
+  "private_source_roots": [
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/reader-current-full-parallel-after-doc3-20261028",
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/reader-current-doc-consumers-capacity-continuation-20261028"
+  ],
+  "captures_verbatim_except_authored_README": true
+}

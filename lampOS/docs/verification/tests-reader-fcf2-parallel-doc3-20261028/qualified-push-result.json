@@ -1,0 +1,13 @@
+{
+  "status": "PUSHED_EXACT_LEASE_OWN_READER",
+  "head": "fcf2c5c9193ddaf930adc04c834b91627bb97b77",
+  "base": "fc9c781afaed38dc976f650484c30f65bf5db57a",
+  "expected_old": "0288c0db50097f4560bf0d09157a137d6b66d7fc",
+  "remote_head_verified": "fcf2c5c9193ddaf930adc04c834b91627bb97b77",
+  "live_Main_at_push": "2b73dd03073947c62b3d10593f293aa9ab954410",
+  "Main_may_have_advanced_after_frozen_admission": true,
+  "both_actual_controllers_PASS_native0": true,
+  "source_metadata_full_snapshot_equal_before_after_push": true,
+  "no_mark_ready_GHcomment_or_log_worktree_write": true,
+  "completed_UTC": "2026-10-27T22:55:17.659022+00:00"
+}

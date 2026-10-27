@@ -1,5 +1,13 @@
 # Tests work log
 
+## 2026-10-28 05:58 — latest Reader full parallel gate and push
+
+Ready for lamp-voice: no (current source reads/base disposition and new original CI remain).
+
+[Reader fcf2 on fc9](verification/tests-reader-fcf2-parallel-doc3-20261028/) passed default-thread x86_64 Mac full Voice **3,885/0/15** once in 250.99 s, all 3,900 identities and original seven once. Reader four and Trace six are subsets. Formatting, strict twelve-package Clippy/workspace/current compilation/inventories and 558 witnesses/three executable guards passed; separate install one/ci_paths two and 561/three guards passed. Both controller native handles closed zero; exact-lease push from0288 closed zero. Main2b73 was recorded at push, not relabeled as the host source. Original ARM40598411153/Linux40598411121 are newly running and watched separately; no result claimed yet.
+
+[Additional released compiler objects](verification/tests-retired-additional-compiler-objects-20261028/) restored admission capacity without touching any current cache, protected path or evidence. Mood's unstarted test-compile/runtime continuation is next on frozen29f/2b73; its prior admission stop remains. No device action.
+
 ## 2026-10-28 05:51 — published Skills 527 host and original native qualifications
 
 Ready for lamp-voice: no (Reviewer-two's latest-base HOLD and current source reads remain; PR stays draft).

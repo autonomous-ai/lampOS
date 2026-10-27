@@ -1,0 +1,41 @@
+{
+  "head": "fcf2c5c9193ddaf930adc04c834b91627bb97b77",
+  "base": "fc9c781afaed38dc976f650484c30f65bf5db57a",
+  "scope": "Executed current native Mac default-parallel full VoiceLIB; no Linux x86 or ARM execution claim",
+  "Python_platform_machine": "x86_64",
+  "runtime_executable_header": {
+    "magic": "0xfeedfacf",
+    "CPU_type": "0x1000007",
+    "CPU_subtype": 3,
+    "filetype": 2,
+    "format": "Mach-O 64-bit",
+    "architecture": "x86_64"
+  },
+  "runtime_executable_SHA256": "e145dd810812b4b0f81f31cad3ffe6969aed4ae41a09ef4e8b6eba379195e070",
+  "bytes": 117369504,
+  "sealed_basename": "Voice-lib-e145dd810812b4b0-lamp_voice-6d619bbdd1df3a0d",
+  "actual_Cargo_profile": {
+    "opt_level": "0",
+    "debuginfo": 0,
+    "debug_assertions": true,
+    "overflow_checks": true,
+    "test": true
+  },
+  "actual_Cargo_features": [],
+  "actual_Cargo_target": {
+    "kind": [
+      "lib"
+    ],
+    "crate_types": [
+      "lib"
+    ],
+    "name": "lamp_voice",
+    "src_path": "/private/tmp/tests-ready-speaking-1c-20261026/lampOS/crates/voice/src/lib.rs",
+    "edition": "2024",
+    "doc": true,
+    "doctest": true,
+    "test": true
+  },
+  "raw_runtime_command_receipt_SHA256": "467826ff867b1329993a79bef4a642bb7f4f27f72157b392e835bec229c996de",
+  "no_cross_arch_build_or_execution": true
+}

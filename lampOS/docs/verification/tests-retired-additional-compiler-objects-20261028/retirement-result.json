@@ -1,0 +1,11 @@
+{
+  "status": "CLOSED_RECONSTRUCTIBLE_OLD_COMPILER_OBJECTS_ONLY",
+  "removed_files": 684,
+  "allocated_bytes_retired": 310669312,
+  "all_other_old_files_stat_verified": 9324,
+  "free_before": 3150213120,
+  "free_after": 3459833856,
+  "current_targets_and_all_guarded_files_untouched": true,
+  "Cargo_or_tests_run": false,
+  "utc": "2026-10-27T22:52:03.954981+00:00"
+}

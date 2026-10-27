@@ -1,0 +1,31 @@
+{
+  "status": "PASS",
+  "head": "fcf2c5c9193ddaf930adc04c834b91627bb97b77",
+  "base": "fc9c781afaed38dc976f650484c30f65bf5db57a",
+  "runtime_attempts": 2,
+  "scope": "Only exact actual install.md consumer plus complete ci_paths; no full Update/package or inherited Voice runtime claim",
+  "counts": {
+    "install": {
+      "ok": 1
+    },
+    "it": {
+      "ok": 2
+    }
+  },
+  "actual_doc_consumer_once": true,
+  "complete_ci_paths_once": true,
+  "no_broad_Update_runtime_credit": true,
+  "Voice_runtime_not_repeated": true,
+  "source_unchanged": true,
+  "official_owner_unchanged": true,
+  "sealed_and_actual_guards": true,
+  "protected_count": 561,
+  "actual_count": 3,
+  "full_hash_checkpoints": [
+    "initial",
+    "final"
+  ],
+  "owned_groups_closed": true,
+  "unresolved_owned_pids": [],
+  "lease_released": true
+}

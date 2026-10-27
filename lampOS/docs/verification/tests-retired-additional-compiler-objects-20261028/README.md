@@ -1,0 +1,3 @@
+# Released compiler-cache capacity recovery
+
+Retired only 684 nonexecutable rebuildable Rust libraries/static archives/Mach-O objects in the two already released October 24 qualification caches. The exact private predeletion hash/stat manifest and open-file audit were retained. All 9,324 other old-cache files retained their exact stats; all 760 known guarded paths/inodes and current build targets were excluded. Source, Git, raw evidence, test executables, dynamic libraries and protected historical debug2 were preserved. No Cargo or tests ran during cleanup. Available space rose from 3,150,213,120 to 3,459,833,856 bytes. Historical intact-cache claims describe their original captures, not a future replay guarantee.
