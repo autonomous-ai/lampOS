@@ -67,10 +67,10 @@ its test is `a_hearing_is_first_signed_as_it_begins_and_said_when_it_falls`.
 
 **Under its bars (#3923).** A line that starts with "Lamp" is sometimes
 heard as "Ma'am, …" or "Blake, …", and its run of scores reaches neither
-bar. Whatever the switches are, a run of scores from 0.05
-(`UNDER_BARS_LEAST`) whose best stayed under `--near` (under `--least`
+bar. Whatever the switches are, a run of scores from 0.2
+(`UNDER_BARS_LEAST`; a quiet room scores runs of 0.06 to 0.18) whose best stayed under `--near` (under `--least`
 without it) is one journal line when it is over, never published:
-`under its bars: best=0.310 began_ms_ago=240`, beside `near its name:
+`under its bars: best=0.310 began_ms_ago=160`, beside `near its name:
 score=… began_ms_ago=…` for a run that reached the near bar. So a missed
 call shows whether it scored about 0.3 or about 0. Runs are held off for
 1 s after each, as hearings are, which in a room that talks all day is
