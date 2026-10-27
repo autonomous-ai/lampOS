@@ -360,17 +360,18 @@ pub fn check_with_image(
         ..Report::default()
     };
     let mut seen: BTreeMap<&str, &Printed> = BTreeMap::new();
+    // Each product unit's drop-ins in the order printed (systemd's), read
+    // together: a switch a later drop-in sets back `on` is on.
+    let mut drop_ins_of: BTreeMap<&str, Vec<(String, crate::switches::Assignments)>> =
+        BTreeMap::new();
     for file in &parsed.files {
         let parent = file.path.rsplit('/').nth(1).unwrap_or_default();
         if let Some(unit) = parent.strip_suffix(".d") {
-            if let Some(text) = product_unit(product, unit) {
-                let switches = crate::switches::switches(text);
-                for how in crate::switches::turned_off(
-                    &switches,
-                    &crate::switches::environment(&file.text),
-                ) {
-                    report.switches_off.push((file.path.clone(), how));
-                }
+            if product_unit(product, unit).is_some() {
+                drop_ins_of
+                    .entry(unit)
+                    .or_default()
+                    .push((file.path.clone(), crate::switches::environment(&file.text)));
             }
             report.drop_ins.push(file.clone());
             continue;
@@ -413,6 +414,15 @@ pub fn check_with_image(
             }
         };
         report.units.insert(name.clone(), verdict);
+    }
+    for (unit, drop_ins) in drop_ins_of {
+        let Some(text) = product_unit(product, unit) else {
+            continue;
+        };
+        let switches = crate::switches::switches(text);
+        report
+            .switches_off
+            .extend(crate::switches::merged_off(&switches, &drop_ins));
     }
     report
 }
@@ -631,9 +641,10 @@ ExecStart=/opt/x
         assert_eq!(report.units.len(), units.len());
     }
     /// A drop-in that turns its unit's `on` switch off says so in its
-    /// finding, by name and value; one that sets the switch on, or another
-    /// variable, does not. The real product's lamp-cloud, and a template's
-    /// instance, too.
+    /// finding, by name and value; one that sets other variables does not,
+    /// and a later drop-in that sets the switch back on leaves it on, so
+    /// nothing is said (the Reviewer-lead's P3 on #3728). The real
+    /// product's lamp-cloud, and a template's instance, too.
     #[test]
     fn a_drop_in_that_turns_a_product_switch_off_says_so() {
         let units = product();
@@ -643,7 +654,7 @@ ExecStart=/opt/x
             .collect();
         printed.push_str(
             "# /etc/systemd/system/lamp-b.service.d/old.conf\n[Service]\nEnvironment=LAMP_OFFICE=on \"LAMP_X=off\"\n\n\
-             # /etc/systemd/system/lamp-b.service.d/on.conf\n[Service]\nEnvironment=LAMP_X=on LAMP_Y=off\n",
+             # /etc/systemd/system/lamp-b.service.d/other.conf\n[Service]\nEnvironment=LAMP_Z=on LAMP_Y=off\n",
         );
         let report = check(&units, &parse(&printed));
         assert_eq!(
@@ -662,6 +673,11 @@ ExecStart=/opt/x
         );
         assert_eq!(said.matches("the product sets it on").count(), 1, "{said}");
         assert!(!report.passes());
+        // A later drop-in sets it back on: on, and not said.
+        let back = format!(
+            "{printed}\n# /etc/systemd/system/lamp-b.service.d/zz-on.conf\n[Service]\nEnvironment=LAMP_X=on\n"
+        );
+        assert!(check(&units, &parse(&back)).switches_off.is_empty());
         // The office extras (PRINTED's office.conf) turn nothing off.
         assert!(check(&units, &parse(PRINTED)).switches_off.is_empty());
 

@@ -900,7 +900,10 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
    empty `Environment=` (which clears the unit's own lines) read as systemd
    reads them, and every `EnvironmentFile=` the unit and its drop-ins name
    (store's `store.env` is lamp-cloud's), which systemd reads over
-   `Environment=`. A value other than `on` is said, at every run, so a lamp
+   `Environment=`. They are read together as systemd merges them: the
+   drop-ins in name order, then the environment files (a file named twice
+   counts once, at its last place). Only a switch still not `on` at the end
+   is said, by the file that left it off, at every run, so a lamp
    from its builder days that moves to stable never comes up quietly off the
    cloud:
    `kept drop-in /etc/systemd/system/lamp-cloud.service.d/old.conf turns LAMP_CLOUD off ("off"); the product sets it on`,
@@ -1212,7 +1215,8 @@ lamp-update check-units --cat units.txt --image robots/lamp --variant pro
   product lamp each one is a finding. After the office extras go back, the
   check must name `office.conf` and nothing else. A drop-in of a product unit
   (or of a template's instance) that turns one of the unit's `on` switches
-  off says so after its text, as install does:
+  off, read with the unit's other drop-ins in the order printed, says so
+  after its text, as install does:
   `drop-in /etc/systemd/system/lamp-cloud.service.d/old.conf turns LAMP_CLOUD off ("off"); the product sets it on`.
   `systemctl cat` prints no `EnvironmentFile=`'s contents, so an edited
   `store.env` is named only by install.

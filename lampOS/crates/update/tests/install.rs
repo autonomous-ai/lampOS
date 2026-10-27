@@ -682,8 +682,8 @@ fn switches_said(lamp: &Lamp) -> Vec<&str> {
 
 /// A lamp from its builder days with an old `LAMP_CLOUD=off` drop-in: the
 /// install to stable keeps it, as it keeps every drop-in but its own, and
-/// names it, at every run. A drop-in that sets the switch on, or other
-/// variables, is not named.
+/// names it, at every run. A drop-in that sets other variables is not
+/// named (one that sets the switch back on: the test after this one).
 #[test]
 fn a_kept_drop_in_that_turns_lamp_cloud_off_is_named_and_kept() {
     let mut lamp = Lamp::new(188, &[]);
@@ -695,7 +695,7 @@ fn a_kept_drop_in_that_turns_lamp_cloud_off_is_named_and_kept() {
         ),
         (
             "/etc/systemd/system/lamp-cloud.service.d/on.conf",
-            "[Service]\nEnvironment=LAMP_CLOUD=on LAMP_OFFICE=off\n",
+            "[Service]\nEnvironment=LAMP_CLOUD_OFFLINE_WILL=on LAMP_OFFICE=off\n",
         ),
         (
             "/etc/systemd/system/lamp-voice.service.d/30-local.conf",
@@ -720,6 +720,62 @@ fn a_kept_drop_in_that_turns_lamp_cloud_off_is_named_and_kept() {
     lamp.said.clear();
     lamp.install().unwrap();
     assert!(switches_said(&lamp).is_empty(), "{:?}", lamp.said);
+}
+
+/// Read as systemd merges them (the Reviewer-lead's P3s on #3728): an old
+/// drop-in's `off` that a later drop-in, or an environment file, sets back
+/// `on` leaves the switch on, and nothing is said. An environment file named
+/// twice, with another between, is said once.
+#[test]
+fn a_switch_set_back_on_later_is_not_named_and_a_file_named_twice_is_said_once() {
+    let mut lamp = Lamp::new(188, &[]);
+    let folder = "/etc/systemd/system/lamp-cloud.service.d";
+    fs::create_dir_all(lamp.on(folder)).unwrap();
+    fs::write(
+        lamp.on(&format!("{folder}/10-old.conf")),
+        "[Service]\nEnvironment=LAMP_CLOUD=off\n",
+    )
+    .unwrap();
+    fs::write(
+        lamp.on(&format!("{folder}/20-fix.conf")),
+        "[Service]\nEnvironment=LAMP_CLOUD=on\n",
+    )
+    .unwrap();
+    lamp.install().unwrap();
+    assert!(switches_said(&lamp).is_empty(), "{:?}", lamp.said);
+
+    // Off in every drop-in, on in store.env, which wins over Environment=.
+    fs::write(
+        lamp.on(&format!("{folder}/20-fix.conf")),
+        "[Service]\nEnvironment=LAMP_CLOUD=off\n",
+    )
+    .unwrap();
+    let env = "/etc/lampOS/skills/store.env";
+    fs::write(lamp.on(env), "LAMP_CLOUD=on\n").unwrap();
+    lamp.said.clear();
+    lamp.install().unwrap();
+    assert!(switches_said(&lamp).is_empty(), "{:?}", lamp.said);
+
+    // store.env named again by a drop-in after another file: read last, said once.
+    fs::write(lamp.on(env), "LAMP_CLOUD=off\n").unwrap();
+    let other = "/etc/lampOS/cloud/other.env";
+    fs::create_dir_all(lamp.on(other).parent().unwrap()).unwrap();
+    fs::write(lamp.on(other), "LAMP_OFFICE=on\n").unwrap();
+    fs::write(
+        lamp.on(&format!("{folder}/30-files.conf")),
+        format!("[Service]\nEnvironmentFile=-{other}\nEnvironmentFile=-{env}\n"),
+    )
+    .unwrap();
+    lamp.said.clear();
+    lamp.install().unwrap();
+    assert_eq!(
+        switches_said(&lamp),
+        [format!(
+            "edited setting {env}, read by lamp-cloud.service, turns LAMP_CLOUD off (\"off\"); the product sets it on"
+        )],
+        "{:?}",
+        lamp.said
+    );
 }
 
 /// A clean install, and the next, name nothing: no product setting or
