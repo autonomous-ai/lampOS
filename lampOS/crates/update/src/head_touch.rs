@@ -14,6 +14,10 @@ use std::{
     path::{Path, PathBuf},
 };
 
+// Read-only prerequisite, deliberately unwired until the independent guard owns
+// admission, writer exclusion and the immediately-before-write recheck.
+pub(crate) mod capture;
+
 pub(crate) const PINS: &str = "/etc/lampOS/controls/controls-pins.json";
 const CONTROLS: &str = "lamp-controls.service";
 const VOICE: &str = "lamp-voice.service";
