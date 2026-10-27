@@ -1,0 +1,74 @@
+{
+  "cloud-provenance": {
+    "artifact_files_sha256": {
+      "execution-validation-exit.txt": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "native/tmp/pair-output/runtime-exit.txt": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "native/tmp/pair-output/test-exit.txt": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "native/tmp/pair-output/tests.txt": "1e45c0f10fd8a3a65da93f09071b53785b2114564aae626dcc47d1b27933eda3",
+      "run-provenance.txt": "b06ae03f963ce04436afc5db86ca74c90f0d30c79b85f916c8dc71578bd797de",
+      "selected-artifact.json": "e3595e93a6c729855292a825f13f337ca5fb5423e3c3a4239f59a60414cbe436",
+      "source-after.sha256": "80972a7d6531f1a240e9479d88198e92696f59566c4ea551684b5fbf62fe69fe",
+      "source-before.sha256": "80972a7d6531f1a240e9479d88198e92696f59566c4ea551684b5fbf62fe69fe",
+      "source-revision.txt": "ab72fdd9ac03313ca40fbd66e725bb946889ef597502ddc3558209008e10757c",
+      "test-binary.sha256": "4a2b199161004445464912ca475a6028e6a2a93294fb6a19a6799a09b07c1433",
+      "verified-payloads.txt": "ceb0039498c8f8ce96a84335d082fe6bac368b55616b48a47fd2e2dc4eea8bcb"
+    },
+    "artifact_zip_sha256": "1796f1f8e841fdc813a3355ae1a885a108ee31513fb7a9fedd6ffbb6b04f18d6",
+    "attempt": 1,
+    "case_names": [
+      "release_6408_cloud_reads_6498_packages_and_6498_reads_the_replacement",
+      "release_6498_cloud_reads_6408_packages_and_6408_reads_the_replacement"
+    ],
+    "failed": 0,
+    "head": "eee85fa51cff7a7d910158bba8c795b03cae8c76",
+    "ignored": 0,
+    "job_id": 121969834940,
+    "literal_summary": "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.39s",
+    "passed": 2,
+    "preview": "f821dff13c9e4bcb2b187a6d3ca6b1737317f15f",
+    "raw_job_log_sha256": "ba73e9358c918c7b648df804c7e9dee13d58d6a6c94379ba3bcfbc023dee63d2",
+    "run_id": 40437575139,
+    "scope": "Two isolated native ARM64 published-release reader directions, separate from nextest; standalone ok lines bind the two named sequential cases, not echoed workflow assertions.",
+    "source_unchanged": true,
+    "status": "success",
+    "tree": "d9fbc8c3b77f17d017cd1ac8a6c239adcb4d2ea7",
+    "url": "https://github.com/autonomous-ai/lampOS/actions/runs/40437575139",
+    "validation_exit": 0
+  },
+  "surround": {
+    "artifact_files_sha256": {
+      "execution-validation-exit.txt": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "native/tmp/pair-output/runtime-exit.txt": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "native/tmp/pair-output/test-exit.txt": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "native/tmp/pair-output/tests.txt": "d8a604f27746a283ac51b7c3b14f34565611a7aafdfd842d954e7d3be6e45a21",
+      "run-provenance.txt": "e8ef13189f43ae0216938fffaec7e2be77826d34ff420f0a02c17dc6a95ecb65",
+      "selected-artifact.json": "3e70c8546e18747a702e23dcb7bfac8b1c2b685883ce243c11ba01bc282259b9",
+      "source-after.sha256": "80972a7d6531f1a240e9479d88198e92696f59566c4ea551684b5fbf62fe69fe",
+      "source-before.sha256": "80972a7d6531f1a240e9479d88198e92696f59566c4ea551684b5fbf62fe69fe",
+      "source-revision.txt": "ab72fdd9ac03313ca40fbd66e725bb946889ef597502ddc3558209008e10757c",
+      "test-binary.sha256": "f41b2b5744845fcece54c7816bc2b7db8b850da0a4ac0a80e493ba7d1a63628f",
+      "verified-payloads.txt": "99c7b3b80fde7c2711ae8a584d1ce7bbd8eb0788d11589d7c674f360a3550f1b"
+    },
+    "artifact_zip_sha256": "924764e1b16d7e85c40de26ffea31e599d97c3ad475e42c4baeb6be65ca69326",
+    "attempt": 1,
+    "case_names": [
+      "release_6408_surround_candidates_cross_6498_and_return",
+      "release_6498_surround_candidates_cross_6408_and_return"
+    ],
+    "failed": 0,
+    "head": "eee85fa51cff7a7d910158bba8c795b03cae8c76",
+    "ignored": 0,
+    "job_id": 121969834425,
+    "literal_summary": "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 2.99s",
+    "passed": 2,
+    "preview": "f821dff13c9e4bcb2b187a6d3ca6b1737317f15f",
+    "raw_job_log_sha256": "6adbaa20bcede2a5d92533ebbb50f3fa971d7e0d3c51eb9bb49d5696e26d3c19",
+    "run_id": 40437575155,
+    "scope": "Two isolated native ARM64 published-release reader directions, separate from nextest; standalone ok lines bind the two named sequential cases, not echoed workflow assertions.",
+    "source_unchanged": true,
+    "status": "success",
+    "tree": "d9fbc8c3b77f17d017cd1ac8a6c239adcb4d2ea7",
+    "url": "https://github.com/autonomous-ai/lampOS/actions/runs/40437575155",
+    "validation_exit": 0
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "actual_executables_reverified_before_any_compiler": true,
+  "actual_preserved_outputs_and_depfiles_reverified_before_any_compiler": true,
+  "changed_source_entries": [
+    "lampOS/crates/update/Cargo.toml",
+    "lampOS/crates/update/src/round.rs",
+    "lampOS/crates/update/src/world.rs",
+    "lampOS/crates/update/src/world/query.rs",
+    "lampOS/crates/update/src/world/query_tests.rs",
+    "lampOS/crates/update/tests/round.rs",
+    "lampOS/docs/reuse-decisions.md",
+    "lampOS/docs/updates.md"
+  ],
+  "new_empty_target": false,
+  "note": "Same exclusively owned target and worktree. Latest bd40/33d5 full serial gate succeeded389/0/5; its actual and preserved source/artifact boundary is verified. Current new5982 composition uses one runtime thread. Old ff03/737 failure remains historical only, with no causal attribution or waiver. No cold-target or automatic retry claim.",
+  "previous_artifact_closure_sha256": "e26eda5df48e44800ec113f8915c78bd0fe3a80fcd70c41ca532471d09ca9cbd",
+  "previous_head": "bd40bc557766f1d7bafdf41d7dffdabfb7a0fffe",
+  "previous_runtime_exit_code": 0,
+  "previous_runtime_receipt_sha256": "fa9b9b574bfdfad54b3028732d2c800709e0889bcbfd6d0efd39875ac772d4ec",
+  "previous_source_inventory_sha256": "7fbadf171ce2b836b2b42ce65de7a965ca4a89adfabc3c207ca4365899752e3e",
+  "source_worktree": "<review-scratch>",
+  "target": "<review-scratch>"
+}

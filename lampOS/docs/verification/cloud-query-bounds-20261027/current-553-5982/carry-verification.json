@@ -1,0 +1,18 @@
+{
+  "authored_blob_modes_verified": [
+    "lampOS/Cargo.lock",
+    "lampOS/crates/cloud/Cargo.toml",
+    "lampOS/crates/cloud/src/reports.rs",
+    "lampOS/crates/cloud/src/reports/query.rs",
+    "lampOS/crates/cloud/src/reports/query_tests.rs",
+    "lampOS/docs/cloud.md"
+  ],
+  "authored_suffix_sha256": "5eacd6219b3b8172925cff91559b343b604fa9ae8f9b8ba6069a8074dabcd93a",
+  "base": "5982e4b7fa465177f55697ddb362d78b964809b7",
+  "head": "553e0d653eb9557a7b804e8fb6c469c102159808",
+  "prior_base": "33d5627cadad7184f9ea2dcdc5b858f3aa3de58d",
+  "prior_head": "eee85fa51cff7a7d910158bba8c795b03cae8c76",
+  "reuse_doc_exact_new_main_plus_old_suffix": true,
+  "root_proof_sha256": "d6017f0d1bd3bb077bab03716880b24860fe6bc9b5d6c21ab23105a6e7d871d9",
+  "source_clean": true
+}

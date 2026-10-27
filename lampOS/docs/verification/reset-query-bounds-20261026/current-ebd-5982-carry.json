@@ -1,0 +1,14 @@
+{
+  "oldbase": "33d5627cadad7184f9ea2dcdc5b858f3aa3de58d",
+  "newbase": "5982e4b7fa465177f55697ddb362d78b964809b7",
+  "oldhead": "bd40bc557766f1d7bafdf41d7dffdabfb7a0fffe",
+  "newhead": "ebd641e1fb4ccc0fbb250287c4428013389c61db",
+  "authored_non_doc_blobs_unchanged": {
+    "lampOS/crates/setup/src/reset.rs": "100644 blob 754a4b7dfa1c62bd01c07a0c5c1d35bb9514ade0\tlampOS/crates/setup/src/reset.rs",
+    "lampOS/crates/setup/src/reset/query.rs": "100644 blob 8684e05e8b92250225d794403fb60af1c25b1594\tlampOS/crates/setup/src/reset/query.rs",
+    "lampOS/docs/setup.md": "100644 blob 8001d51e6f8a1bff3332962987cb8c7889b41643\tlampOS/docs/setup.md"
+  },
+  "reuse_doc_current_main_preserved": true,
+  "reuse_doc_authored_suffix_sha256": "951ff4048a9f76a61cfb8c8b6af1bd150629dc742aa01c93b1a279e94084037a",
+  "note": "Only documentation context changes. New Main text plus exact prior authored suffix; all other authored blob/mode entries identical."
+}

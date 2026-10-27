@@ -1,0 +1,56 @@
+{
+  "arm64": {
+    "log_fetch": {
+      "exit_code": 0,
+      "stderr": ""
+    },
+    "log_fetch_receipt_sha256": "030fc3878daaa0471dd27944f0a46e1b1dfa4fcdbdf97fd885c66ce2cf574619",
+    "note": "Terminal status derives from attempt-specific final metadata and full retained job logs; watcher exit status is preserved separately.",
+    "watch": {
+      "command": [
+        "gh",
+        "run",
+        "watch",
+        "40437322889",
+        "--repo",
+        "autonomous-ai/lampOS",
+        "--interval",
+        "30",
+        "--exit-status",
+        "--compact"
+      ],
+      "deadline_seconds": 3600,
+      "elapsed_seconds": 899.129,
+      "exit_code": 0,
+      "interval_seconds": 30
+    },
+    "watch_log_sha256": "fd250436aecb349637b1597f9e3223b4df35b70834797a09b0ffd443f183e1c3"
+  },
+  "clippy": {
+    "log_fetch": {
+      "exit_code": 0,
+      "stderr": ""
+    },
+    "log_fetch_receipt_sha256": "030fc3878daaa0471dd27944f0a46e1b1dfa4fcdbdf97fd885c66ce2cf574619",
+    "note": "Terminal status derives from attempt-specific final metadata and full retained job logs; watcher exit status is preserved separately.",
+    "watch": {
+      "command": [
+        "gh",
+        "run",
+        "watch",
+        "40437322868",
+        "--repo",
+        "autonomous-ai/lampOS",
+        "--interval",
+        "30",
+        "--exit-status",
+        "--compact"
+      ],
+      "deadline_seconds": 3600,
+      "elapsed_seconds": 196.531,
+      "exit_code": 0,
+      "interval_seconds": 30
+    },
+    "watch_log_sha256": "0afbf95dea630b91ed4fa159dadb0f43116cbbfa320a41011b18738d65cb0644"
+  }
+}

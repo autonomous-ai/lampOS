@@ -1,0 +1,15 @@
+{
+  "authored_blob_modes_verified": [
+    "lampOS/crates/setup/src/reset.rs",
+    "lampOS/crates/setup/src/reset/query.rs",
+    "lampOS/docs/setup.md"
+  ],
+  "authored_suffix_sha256": "951ff4048a9f76a61cfb8c8b6af1bd150629dc742aa01c93b1a279e94084037a",
+  "base": "5982e4b7fa465177f55697ddb362d78b964809b7",
+  "head": "ebd641e1fb4ccc0fbb250287c4428013389c61db",
+  "prior_base": "33d5627cadad7184f9ea2dcdc5b858f3aa3de58d",
+  "prior_head": "bd40bc557766f1d7bafdf41d7dffdabfb7a0fffe",
+  "reuse_doc_exact_new_main_plus_old_suffix": true,
+  "root_proof_sha256": "f4ff370be20a6277910c8d9b3590c1fceb52c8219c725e5e115f8e0dd4509a62",
+  "source_clean": true
+}

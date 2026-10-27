@@ -1,0 +1,22 @@
+{
+  "original_head": "7dbc4b21eba41af69949fd95f98abd4fa4b774b3",
+  "incorporated_commit": "a4263dedb65a4c1535a0707a25073901bdd56bc1",
+  "original_and_incorporated_tree": "ee8f77744587f73b8a315e2864d4c12f0eafce05",
+  "full_tree_equal": true,
+  "incorporated_parent": "33d5627cadad7184f9ea2dcdc5b858f3aa3de58d",
+  "current_main": "5982e4b7fa465177f55697ddb362d78b964809b7",
+  "incorporated_is_ancestor_of_main": true,
+  "unchanged_original_controls_and_manifest": {
+    "lampOS/crates/update/src/world/query_tests.rs": {
+      "original": "100644 blob 3be364978da1514979976da700120291984e2041\tlampOS/crates/update/src/world/query_tests.rs",
+      "main": "100644 blob 3be364978da1514979976da700120291984e2041\tlampOS/crates/update/src/world/query_tests.rs"
+    },
+    "lampOS/crates/update/Cargo.toml": {
+      "original": "100644 blob 856efebb1928394acbf06fc05e2dfee1251671d4\tlampOS/crates/update/Cargo.toml",
+      "main": "100644 blob 856efebb1928394acbf06fc05e2dfee1251671d4\tlampOS/crates/update/Cargo.toml"
+    }
+  },
+  "train_pr": 3650,
+  "stacked_pr": 3641,
+  "note": "Second updater code was included as the dependency commit of the merged states-query train. Later changes are Sixth states-loop/watch improvements; original controls/manifest stay identical. PR3635 need not reapply the incorporated change."
+}

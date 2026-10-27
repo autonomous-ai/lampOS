@@ -1,3 +1,19 @@
+Ready for lamp-voice: yes (#3635 delivered through train 196); no (#3631 and #3644 current native pending)
+
+## Current checkpoint: 2026-10-27 09:53 +07, updater delivered and remaining carries current
+
+The updater fix is in Main through train 196 (#3650 / #3641). [Incorporation proof](verification/update-output-bounds-20261027/incorporated-main-5982.json) shows commit **a4263dedb** has the exact full tree of tested head **7dbc4b21e**, parent **33d5627ca**, and is an ancestor of Main **5982e4b7f**. Original controls and manifest remain identical after Sixth's states/watch improvements. Second closed duplicate #3635 with this explanation, retaining its branch and review history rather than reapplying it. [Original 7dbc native proof](verification/update-output-bounds-20261027/native-7dbc-33d5/README.md): ARM 40437322889 and Linux 40437322868 pass attempt 1; **11,446 unique passes / 0 bad / 106 skipped / 0 selected unrun**, all nine controls and both Linux custom cases once. Separate process 13, docs 4, helper 25 and relay pass. No promotion or publication claim.
+
+[Cloud eee/33d native proof](verification/cloud-query-bounds-20261027/native-eee-33d5/README.md) likewise has **11,446 unique passes / 0 bad / 106 skipped / 0 unrun**, all eight Cloud controls, Clippy and both extra reader workflows green. [Reset bd40/33d proof](verification/reset-query-bounds-20261026/native-bd40-33d5/README.md) has **1,439 unique passes / 0 bad / 9 skipped / 0 unrun**, all eight reset controls; actual Cloud/Setup/Update/Voice-eval selection, exact preview identity, and separate docs 4/process 13/helper 25/relay evidence. These successes retain their old source identities.
+
+Both remaining fixes are now pushed on actual Main 5982: **#3644 553e0d653**, [current host proof](verification/cloud-query-bounds-20261027/current-553-5982/README.txt), fmt/strict Clippy/full Cloud **204/0/4**, eight controls; **#3631 ebd641e1f**, [current serial proof](verification/reset-query-bounds-20261026/current-ebd-5982-serial/README.txt), fmt/strict Setup+Cloud Clippy/full **389/0/5**, eight controls and wake regression. Only reuse-doc context conflicts changed: exact new Main plus exact authored suffix, with all six/three other authored blobs and modes preserved. Fresh original Cloud ARM 40439732017/Linux 40439731939/Surround 40439731963/provenance 40439731949 and Reset ARM 40440039649/Linux 40440039673 collect. No negative replay or latency assertion change.
+
+Second also closed superseded own-keys PR #3510 in favor of Third's active #3646, with seven commits/authors preserved and all latest-base/native/read/#2094 activation holds retained. No duplicate carry, key or device work.
+
+The independent #3651 short-break skill read has full Skills **527/0/9**, Update installer **101/0/0**, and eight separately reported CLI scenes passing; reverse-reader gates continue. No P1/P2 found in the shipped configuration; played acceptance remains owed. The old reset ff03/737 failure remains separately preserved and unattributed. Main publication's infrastructure retry stays in First's publishing lane.
+
+---
+
 Ready for lamp-voice: no
 
 ## Current checkpoint: 2026-10-27 09:25 +07, reset carry gate passes without changing its assertion

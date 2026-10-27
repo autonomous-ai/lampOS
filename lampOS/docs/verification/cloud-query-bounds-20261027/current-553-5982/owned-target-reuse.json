@@ -1,0 +1,25 @@
+{
+  "actual_preserved_outputs_depfiles_executables_verified_before_compile": true,
+  "changed_source_entries": [
+    "lampOS/crates/update/Cargo.toml",
+    "lampOS/crates/update/src/round.rs",
+    "lampOS/crates/update/src/world.rs",
+    "lampOS/crates/update/src/world/query.rs",
+    "lampOS/crates/update/src/world/query_tests.rs",
+    "lampOS/crates/update/tests/round.rs",
+    "lampOS/docs/reuse-decisions.md",
+    "lampOS/docs/updates.md"
+  ],
+  "previous_head": "eee85fa51cff7a7d910158bba8c795b03cae8c76",
+  "prior_closure": {
+    "actual_and_preserved_outputs_unchanged": true,
+    "depfile_count": 439,
+    "executable_count": 5,
+    "exit_code": 0,
+    "local_output_count": 58,
+    "source_unchanged": true
+  },
+  "prior_closure_sha256": "1e7bea44b25595a86e4362d2a83330d330a4c2df443d5f52a07db29174f6d14d",
+  "prior_source_sha256": "390f5131eddd0504245d71ae787a4f1a091ca27953c831ebd2c33ad90328ca06",
+  "reason": "Carry onto5982 using latest33d5/eee successful completed boundary. Earlier sandbox-failed131/73/4 remains separate; its old actual paths are not reasserted after subsequent compilation."
+}
