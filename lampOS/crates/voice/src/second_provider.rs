@@ -240,10 +240,28 @@ pub fn first_words_for(value: Option<&str>, gemini_speech: bool) -> Option<usize
     }
 }
 /// With `LAMP_SECOND_DOWN_LINE=on`: what the lamp says when a turn's first
-/// round has not begun within its bound, rather than nothing, at most once
-/// in [`DOWN_LINE_EVERY`] (the first builder, 2026-10-17 02:48: the relay's
-/// chat stopped answering at 02:29 and the backup voice went silent).
-pub const DOWN_LINE: &str = "I can't think right now; give me a minute.";
+/// round has not begun within its bound, rather than nothing (the first
+/// builder, 2026-10-17 02:48: the relay's chat stopped answering at 02:29
+/// and the backup voice went silent). Said as a slow moment, never a fault:
+/// "I can't think right now" read as broken to the tester on a 7071 lamp
+/// (#3755, 27 Oct 13:53).
+pub const DOWN_LINE: &str = "Sorry, my thoughts are slow just now. Ask me again in a moment.";
+/// What it says instead when the last of these was [`DOWN_LINE`], less than
+/// [`DOWN_LINE_EVERY`] ago: shorter, and never the same line twice in a row
+/// (#3755). After this one, the next is [`DOWN_LINE`] again.
+pub const DOWN_LINE_AGAIN: &str = "Still slow, sorry.";
+/// What it says when the chat refuses before any word for a reason asking
+/// again won't mend (401, 402, 403, any other 4xx but 429: a wrong or
+/// expired key, no credit): no promise of a moment (the Reviewer-lead's P3
+/// on #3771). At most once in [`DOWN_LINE_EVERY`]; asking again changes
+/// nothing, so it isn't repeated.
+pub const DOWN_LINE_CANNOT: &str = "Sorry, I can't answer just now.";
+
+/// Whether a refusal before any word is passing (429, a 5xx), which the slow
+/// line suits, or one asking again won't mend.
+fn passing(status: u16) -> bool {
+    status == 429 || status >= 500
+}
 pub const DOWN_LINE_EVERY: Duration = Duration::from_secs(60);
 /// The kept line is at most 4 s of speech.
 const DOWN_LINE_MOST_SAMPLES: usize = 4 * 24_000;
@@ -1547,14 +1565,18 @@ impl Cues {
     }
 }
 
-/// [`DOWN_LINE`], rendered by [`Services::speak`] after a turn, while the
-/// relay answers, and kept in memory, so it can be said when the chat no
-/// longer does.
+/// [`DOWN_LINE`] and [`DOWN_LINE_AGAIN`], rendered by [`Services::speak`]
+/// after a turn, while the relay answers, and kept in memory, so they can be
+/// said when the chat no longer does.
 #[derive(Default)]
 struct DownLine {
     clip: Mutex<Option<Vec<i16>>>,
+    again: Mutex<Option<Vec<i16>>>,
+    cannot: Mutex<Option<Vec<i16>>>,
+    cannot_at: Mutex<Option<tokio::time::Instant>>,
     rendering: AtomicBool,
-    said_at: Mutex<Option<tokio::time::Instant>>,
+    /// When the last was said, and whether it was [`DOWN_LINE_AGAIN`].
+    said_at: Mutex<Option<(tokio::time::Instant, bool)>>,
 }
 
 impl DownLine {
@@ -1565,57 +1587,105 @@ impl DownLine {
         let line = self.clone();
         let services = services.clone();
         tokio::spawn(async move {
-            let mut clip = Vec::new();
-            let mut speech = services.speak(DOWN_LINE.to_owned());
-            while let Some(packet) = speech.next().await {
-                match packet {
-                    Ok(packet) => clip.extend(packet),
-                    Err(_) => {
-                        clip.clear();
-                        break;
-                    }
+            // Each clip rendered until it is kept: one that failed (the
+            // short one alone, say) is asked again after the next turn, and
+            // the ones kept are not rendered again (Third's P2 on #3771).
+            let missing =
+                |slot: &Mutex<Option<Vec<i16>>>| slot.lock().is_ok_and(|kept| kept.is_none());
+            for (slot, text) in [
+                (&line.clip, DOWN_LINE),
+                (&line.again, DOWN_LINE_AGAIN),
+                (&line.cannot, DOWN_LINE_CANNOT),
+            ] {
+                if !missing(slot) {
+                    continue;
                 }
-                if clip.len() >= DOWN_LINE_MOST_SAMPLES {
-                    clip.truncate(DOWN_LINE_MOST_SAMPLES);
-                    break;
+                let clip = render_line(&services, text).await;
+                if clip.is_empty() {
+                    continue;
                 }
-            }
-            match line.clip.lock() {
-                Ok(mut kept) if !clip.is_empty() => {
+                if text == DOWN_LINE {
                     // The real length, for whether the 4 s cap ever cuts it
                     // (the reviewer on #1195).
                     eprintln!(
                         "lamp-voice second: the down line is {} ms",
                         clip.len() as u64 * 1000 / 24_000
                     );
+                }
+                if let Ok(mut kept) = slot.lock() {
                     *kept = Some(clip);
                 }
-                _ => {
-                    eprintln!(
-                        "lamp-voice second: the down line could not be said; trying again after the next turn"
-                    );
-                    line.rendering.store(false, Ordering::Release);
-                }
+            }
+            if [&line.clip, &line.again, &line.cannot]
+                .into_iter()
+                .any(missing)
+            {
+                eprintln!(
+                    "lamp-voice second: a down line could not be said; trying again after the next turn"
+                );
+                line.rendering.store(false, Ordering::Release);
             }
         });
     }
 
-    /// The line, if rendered and not said in the last [`DOWN_LINE_EVERY`].
-    fn due(&self) -> Option<Vec<i16>> {
+    /// The line to say now, if rendered, and whether it is
+    /// [`DOWN_LINE_AGAIN`]: that one when [`DOWN_LINE`] was the last said,
+    /// less than [`DOWN_LINE_EVERY`] ago; otherwise [`DOWN_LINE`]. Never the
+    /// same line twice in a row within the minute (#3755).
+    fn due(&self) -> Option<(Vec<i16>, bool)> {
         let said_at = *self.said_at.lock().ok()?;
         let now = tokio::time::Instant::now();
-        if said_at.is_some_and(|at| now.duration_since(at) < DOWN_LINE_EVERY) {
+        let again = said_at
+            .is_some_and(|(at, was_again)| !was_again && now.duration_since(at) < DOWN_LINE_EVERY);
+        // The short line not rendered (yet): the long one rather than
+        // silence (Third's P2 on #3771).
+        let short = again.then(|| self.again.lock().ok()?.clone()).flatten();
+        match short {
+            Some(clip) => Some((clip, true)),
+            None => Some((self.clip.lock().ok()?.clone()?, false)),
+        }
+    }
+
+    /// [`DOWN_LINE_CANNOT`], if rendered and not said in the last
+    /// [`DOWN_LINE_EVERY`].
+    fn cannot_due(&self) -> Option<Vec<i16>> {
+        let at = *self.cannot_at.lock().ok()?;
+        if at.is_some_and(|at| tokio::time::Instant::now().duration_since(at) < DOWN_LINE_EVERY) {
             return None;
         }
-        self.clip.lock().ok()?.clone()
+        self.cannot.lock().ok()?.clone()
+    }
+
+    fn cannot_said(&self) {
+        if let Ok(mut at) = self.cannot_at.lock() {
+            *at = Some(tokio::time::Instant::now());
+        }
     }
 
     /// The line was played (Nine on #1195: a cue that failed keeps it due).
-    fn said(&self) {
+    fn said(&self, again: bool) {
         if let Ok(mut said_at) = self.said_at.lock() {
-            *said_at = Some(tokio::time::Instant::now());
+            *said_at = Some((tokio::time::Instant::now(), again));
         }
     }
+}
+
+/// `text` said by the route's voice into one clip, at most
+/// `DOWN_LINE_MOST_SAMPLES`; empty if the voice failed.
+async fn render_line(services: &Arc<dyn Services>, text: &str) -> Vec<i16> {
+    let mut clip = Vec::new();
+    let mut speech = services.speak(text.to_owned());
+    while let Some(packet) = speech.next().await {
+        match packet {
+            Ok(packet) => clip.extend(packet),
+            Err(_) => return Vec::new(),
+        }
+        if clip.len() >= DOWN_LINE_MOST_SAMPLES {
+            clip.truncate(DOWN_LINE_MOST_SAMPLES);
+            break;
+        }
+    }
+    clip
 }
 
 /// At most [`CUE_MOST_SAMPLES`], at half the reply's level (about -6 dB),
@@ -4180,8 +4250,8 @@ pub(crate) fn output_request(event: &ProviderOutput) -> Option<u64> {
 }
 
 /// The closest provider fault for a client error. No text is carried.
-/// The down line ("I can't think right now; give me a minute."), when it
-/// is switched on, due and kept: as audio only, so it is no answer in the
+/// The down line ([`DOWN_LINE`], or [`DOWN_LINE_AGAIN`] within the minute),
+/// when it is switched on and kept: as audio only, so it is no answer in the
 /// thread. Only to someone who spoke: a lamp's own turn (a hello, a skill's
 /// say) never says it (the reviewer on #1195).
 async fn say_down(shared: &Shared, request: u64, heard: bool) -> Result<(), Stop> {
@@ -4191,9 +4261,33 @@ async fn say_down(shared: &Shared, request: u64, heard: bool) -> Result<(), Stop
         .filter(|_| heard)
         .and_then(|down| Some((down, down.due()?)))
     {
+        let (clip, again) = clip;
         cue(shared, request, clip).await?;
-        down.said();
-        eprintln!("lamp-voice second: request {request} said it can't think right now");
+        down.said(again);
+        eprintln!(
+            "lamp-voice second: request {request} said its thoughts are slow{}",
+            if again {
+                " (again, the shorter line)"
+            } else {
+                ""
+            }
+        );
+    }
+    Ok(())
+}
+
+/// [`DOWN_LINE_CANNOT`], when switched on, kept and due, to someone who
+/// spoke only, as [`say_down`].
+async fn say_cannot(shared: &Shared, request: u64, heard: bool) -> Result<(), Stop> {
+    if let Some((down, clip)) = shared
+        .down
+        .as_ref()
+        .filter(|_| heard)
+        .and_then(|down| Some((down, down.cannot_due()?)))
+    {
+        cue(shared, request, clip).await?;
+        down.cannot_said();
+        eprintln!("lamp-voice second: request {request} said it can't answer just now");
     }
     Ok(())
 }
@@ -7743,10 +7837,20 @@ async fn answer(
                             }
                         }
                         // A chat that answers with a refusal before any word
-                        // (401, 429, a 5xx) is as down as one that never
-                        // begins: the line, not silence (#1844's B).
-                        if first && round == 1 && matches!(error, net::Error::Status(_)) {
-                            say_down(shared, request, heard).await?;
+                        // is as down as one that never begins: a line, not
+                        // silence (#1844's B). The slow line only for one
+                        // that passes (429, a 5xx); a key, credit or request
+                        // refused says it can't answer, with no promise
+                        // (the Reviewer-lead's P3 on #3771).
+                        if first
+                            && round == 1
+                            && let net::Error::Status(status) = error
+                        {
+                            if passing(status) {
+                                say_down(shared, request, heard).await?;
+                            } else {
+                                say_cannot(shared, request, heard).await?;
+                            }
                         }
                         return Err(Stop::Failed(fault(&error)));
                     }

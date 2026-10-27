@@ -412,12 +412,26 @@ A base URL on `campaign-api.autonomous.ai` ending in `/ai` is given `/v1`
   the one at 0.17 was held as another voice. Once an answer piece has
   sounded, a line over it is a cut-in as before.
   With `LAMP_SECOND_DOWN_LINE=on`, a spoken turn whose first round has not
-  begun within its bound, or whose chat refuses it before any word (a
-  status: 401, 402, 429, a 5xx; #1844's B, then the turn fails as before),
-  says "I can't think right now; give me a minute."
-  (`DOWN_LINE`) instead of nothing, at most once a minute
-  (`DOWN_LINE_EVERY`; the journal: `said it can't think right now`). The
-  line is said once by this route's own voice as the first spoken line
+  begun within its bound, or whose chat refuses it before any word with a
+  status that passes (429 or a 5xx; #1844's B, then the turn fails as
+  before), says "Sorry, my thoughts are slow just now. Ask me again in a
+  moment."
+  (`DOWN_LINE`) instead of nothing. Said again within a minute
+  (`DOWN_LINE_EVERY`) of that line, it says the shorter "Still slow,
+  sorry." (`DOWN_LINE_AGAIN`), and after that one `DOWN_LINE` again: never
+  the same line twice in a row (#3755: "I can't think right now" read as
+  broken to the tester on a 7071 lamp, 27 Oct 13:53, so a slow moment, not a
+  fault, and each person who asks is answered, where it used to fall silent
+  for the rest of the minute). Any other status before any word (401, 402,
+  403, 400, 404: a wrong or expired key, no credit, a request refused)
+  says "Sorry, I can't answer just now." (`DOWN_LINE_CANNOT`) instead, at
+  most once a minute, since asking again won't mend it and the slow line
+  would promise it would (the Reviewer-lead's P3 on #3771); its journal:
+  `said it can't answer just now`. The journal: `said its thoughts are slow`,
+  and `(again, the shorter line)` for the second. The three lines are
+  rendered together, each until it is kept: one whose render failed is asked
+  again after the next turn, and until the short one is kept the long one is
+  said in its place, never silence (Third's P2 on #3771). The line is said once by this route's own voice as the first spoken line
   begins (before its chat, #1195's run on lamp-52e6, 21 Oct: the first turn
   after a start was silent otherwise), or after a turn is out, while the
   relay answers. The first can overlap one turn once a start: a line said
