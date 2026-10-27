@@ -5,7 +5,7 @@ The Node client for the lamp's v1 control protocol
 messages in
 [control.schema.json](https://github.com/autonomous-ai/lampOS/blob/lamp-voice/lampOS/docs/control.schema.json)).
 Same names as the Python SDK, in camelCase, with promises. It runs on your
-computer, never on a lamp. Node 18 or later.
+computer, never on a lamp. Node 20.11 or later.
 
 **Not usable on a lamp yet:** the lamp's side, `lamp-control`, is being built
 (#3504). Until then, try it with the fake lamp below.

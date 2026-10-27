@@ -41,9 +41,15 @@ jobs:
           done
           exit $status
 
+  # Each SDK's floor (requires-python, engines) and a current one, so the
+  # floor the package promises stays tested (harness-reviewer's P3 on #3823).
   python:
-    name: lampOS SDK — Python (pytest)
+    name: lampOS SDK — Python ${{ matrix.python }} (pytest)
     runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ['3.10', '3.12']
     defaults:
       run:
         working-directory: lampOS/sdk/python
@@ -51,14 +57,18 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version: ${{ matrix.python }}
       - run: python -m pip install --upgrade pip
       - run: python -m pip install -e '.[test]'
       - run: python -m pytest -q tests
 
   js:
-    name: lampOS SDK — JavaScript (node --test)
+    name: lampOS SDK — JavaScript, Node ${{ matrix.node }} (node --test)
     runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ['20', '22']
     defaults:
       run:
         working-directory: lampOS/sdk/js
@@ -66,6 +76,6 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: ${{ matrix.node }}
       - run: npm install --no-audit --no-fund --omit=optional
       - run: npm test
