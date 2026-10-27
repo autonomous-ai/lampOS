@@ -1891,19 +1891,26 @@ impl Days {
             bad("the model result is empty, exceeds its limits, or has invalid provenance")
         })?;
         // Only what rests on the person's own words is kept, never what the
-        // lamp alone said (`tidy::said_by_the_person`, finding M on #3504).
+        // lamp said (`tidy::said_by_the_person`, finding M on #3504), and
+        // nothing the scope keeps already (`tidy::restates`).
+        let kept: Vec<String> = tx
+            .prepare("SELECT text FROM entries WHERE person=?1 AND active=1 AND kind IN ('kept','observation')")?
+            .query_map([person.as_str()], |r| r.get(0))?
+            .collect::<rusqlite::Result<_>>()?;
         let theirs = tidy::Output {
             observations: output
                 .observations
                 .iter()
-                .filter(|proposal| tidy::said_by_the_person(&input, proposal))
+                .filter(|proposal| {
+                    tidy::said_by_the_person(&input, proposal) && !tidy::restates(proposal, &kept)
+                })
                 .cloned()
                 .collect(),
         };
         let left_out = output.observations.len() - theirs.observations.len();
         if left_out > 0 {
             eprintln!(
-                "lamp-memory: tidy_apply left out {left_out} of {} observations resting only on the lamp's words",
+                "lamp-memory: tidy_apply left out {left_out} of {} observations resting on the lamp's words or kept already",
                 output.observations.len()
             );
         }

@@ -157,7 +157,7 @@ fn forgetting_an_observation_removes_its_cited_exchanges_and_linked_descendants_
         .append(&room, NOW, "Coffee is black", "Noted", &[])
         .unwrap();
     let linked = store
-        .append(&room, NOW, "Recall the coffee", "Black", &[first])
+        .append(&room, NOW, "Recall the black coffee", "Black", &[first])
         .unwrap();
     let fact = observe(
         &mut store,
@@ -168,7 +168,13 @@ fn forgetting_an_observation_removes_its_cited_exchanges_and_linked_descendants_
         None,
     );
     let later = store
-        .append(&room, NOW, "Coffee again", "Still black", &[fact])
+        .append(
+            &room,
+            NOW,
+            "Coffee again, still black",
+            "Still black",
+            &[fact],
+        )
         .unwrap();
     let descendant = observe(
         &mut store,
@@ -442,8 +448,11 @@ fn a_bad_second_proposal_leaves_the_whole_batch_unwritten_and_the_job_retryable(
 /// Finding M on #3504 (lamp-4ace and lamp-06c1, 27 Oct): what only the
 /// lamp said is never kept as theirs. "How do I take my coffee?" answered
 /// "Green tea's more my sort of thing" keeps no "prefers green tea"; the
-/// same proposal from their own "I like green tea" is kept; and in one
-/// batch only the one resting on their words is.
+/// same proposal from their own "I like green tea" is kept; in one batch
+/// only the one not from the lamp's words is; theirs in Vietnamese or in
+/// other words is kept (the reviewer-lead's P2 on #3634); a recall's echo
+/// with the lamp's distinctive word is not, nor a restatement of what is
+/// kept.
 #[test]
 fn an_observation_never_rests_only_on_the_lamps_own_words() {
     let scratch = Scratch::new("lamp-words");
@@ -506,6 +515,104 @@ fn an_observation_never_rests_only_on_the_lamps_own_words() {
             .iter()
             .all(|id| *id == both)
     );
+    // The reviewer-lead's P2 on #3634: their words in another language,
+    // or said otherwise, are still theirs.
+    for (conversation, heard, said, proposed) in [
+        (
+            "vietnamese",
+            "Tôi thích cà phê sữa",
+            "Ồ, hay quá",
+            "Likes milk coffee",
+        ),
+        (
+            "paraphrase",
+            "Remind me to call mom",
+            "Sure",
+            "Wants to phone their mother",
+        ),
+    ] {
+        let line = store.append(&room, NOW, heard, said, &[]).unwrap();
+        let job = store
+            .conversation_end(&room, conversation, &[line])
+            .unwrap();
+        let kept = store
+            .tidy_apply(&room, &job.job, &output(proposed, &[line], None))
+            .unwrap();
+        assert_eq!(kept.len(), 1, "{heard}");
+    }
+    // The reviewer-lead's HOLD on #3649: the lamp's words said otherwise,
+    // to an assent that says nothing itself, are not theirs; theirs in
+    // Vietnamese is (a scope of its own, so nothing restates it).
+    let vi = person("vi-speaker");
+    for (who, conversation, heard, said, proposed, kept_count) in [
+        (
+            &room,
+            "lamp-vi",
+            "ừ",
+            "Mình thì thích trà xanh hơn",
+            "Likes green tea",
+            0,
+        ),
+        (
+            &room,
+            "lamp-other-words",
+            "sure",
+            "Chamomile could help you sleep",
+            "Drinks herbal tea at night",
+            0,
+        ),
+        (
+            &vi,
+            "theirs-vi",
+            "Tôi thích trà xanh",
+            "Ồ, hay quá",
+            "Likes green tea",
+            1,
+        ),
+    ] {
+        let line = store.append(who, NOW, heard, said, &[]).unwrap();
+        let job = store.conversation_end(who, conversation, &[line]).unwrap();
+        let kept = store
+            .tidy_apply(who, &job.job, &output(proposed, &[line], None))
+            .unwrap();
+        assert_eq!(kept.len(), kept_count, "{heard} / {said}");
+    }
+    // lamp-06c1, 28 Oct: a recall's echo. Their question's generic words
+    // were heard, "hibiscus" only in the lamp's answer: nothing kept.
+    let echo = store
+        .append(
+            &room,
+            NOW,
+            "What is my favorite drink?",
+            "Hibiscus tea",
+            &[],
+        )
+        .unwrap();
+    let job = store.conversation_end(&room, "echo", &[echo]).unwrap();
+    let kept = store
+        .tidy_apply(
+            &room,
+            &job.job,
+            &output("Favorite drink is hibiscus tea", &[echo], None),
+        )
+        .unwrap();
+    assert!(kept.is_empty(), "{kept:?}");
+    // Their own words saying again what is kept: nothing new kept.
+    store
+        .remember(&room, NOW, "Favourite drink: hibiscus tea")
+        .unwrap();
+    let again = store
+        .append(&room, NOW, "I love hibiscus tea", "Me too", &[])
+        .unwrap();
+    let job = store.conversation_end(&room, "again", &[again]).unwrap();
+    let kept = store
+        .tidy_apply(
+            &room,
+            &job.job,
+            &output("Favorite drink is hibiscus tea", &[again], None),
+        )
+        .unwrap();
+    assert!(kept.is_empty(), "{kept:?}");
 }
 
 #[test]
@@ -573,7 +680,7 @@ fn observations_are_dated_by_their_own_cited_evidence_not_when_the_job_was_prepa
     let proposals = Output {
         observations: vec![
             proposal("An older coffee preference", &[older], None),
-            proposal("Coffee preference changed", &[older, newer], None),
+            proposal("Coffee preference now black", &[older, newer], None),
         ],
     };
     let ids = store.tidy_apply(&room, &job.job, &proposals).unwrap();
@@ -1236,7 +1343,7 @@ fn a_sqlite_delete_failure_rolls_back_entries_search_notes_and_pending_jobs() {
         .unwrap();
     let fact = observe(&mut store, &room, "coffee", &[source], "Coffee black", None);
     let linked = store
-        .append(&room, NOW, "Coffee again", "Black", &[fact])
+        .append(&room, NOW, "Coffee again, black", "Black", &[fact])
         .unwrap();
     let note = store.session_open(&room, "frozen", NOTE_BYTES).unwrap();
     let pending = store.conversation_end(&room, "pending", &[linked]).unwrap();

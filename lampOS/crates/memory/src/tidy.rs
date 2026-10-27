@@ -503,36 +503,132 @@ const PLAIN: &[&str] = &[
     "với",
     "được",
     "thích",
+    "favorite",
+    "favourite",
+    "favorites",
+    "favourites",
+    // Assent and small talk that carry nothing, the person's ("yes",
+    // "ừ", "vâng") or the lamp's ("nice", "noted", "ồ, hay quá").
+    "yes",
+    "yeah",
+    "yep",
+    "sure",
+    "okay",
+    "fine",
+    "right",
+    "nice",
+    "noted",
+    "great",
+    "cool",
+    "good",
+    "lovely",
+    "got",
+    "thanks",
+    "ừ",
+    "ừm",
+    "vâng",
+    "dạ",
+    "ồ",
+    "hay",
+    "quá",
+    "nhé",
+    "vậy",
+    "nhỉ",
 ];
 
-/// A text's words that say what it is about: [`crate::search::text`]'s
-/// form, three characters or more, none of [`PLAIN`], a final `s` off.
-fn about_words(text: &str) -> BTreeSet<String> {
+/// A text's distinctive words: [`crate::search::content_words`] (as a
+/// targeted forget picks a fact's words: three characters or more, no
+/// common word, a final `s` off, `đ` folded), without the generic ones of
+/// [`PLAIN`] ("likes", "prefers", "favourite"…), folded the same way.
+pub(crate) fn about_words(text: &str) -> BTreeSet<String> {
+    let plain: BTreeSet<String> = PLAIN
+        .iter()
+        .flat_map(|word| crate::search::content_words(word))
+        .collect();
+    crate::search::content_words(text)
+        .into_iter()
+        .filter(|word| !plain.contains(word))
+        .collect()
+}
+
+/// Whether `proposal` rests on the person's own words. Left out: one with
+/// a distinctive word ([`about_words`]) the lamp said in its cited
+/// exchanges and nobody heard (finding M on #3504: the lamp's own "green
+/// tea's more my sort of thing", and on lamp-06c1, 28 Oct, a recall's echo,
+/// "What is my favorite drink?" answered "Hibiscus tea", kept as "Favorite
+/// drink is hibiscus tea"). Kept: one sharing a word with what was heard;
+/// or, in other words or another language ("phone their mother" from "call
+/// mom", "likes green tea" from "tôi thích trà xanh"), one whose heard
+/// lines say something themselves (not only "yes", "ừ", "sure") while the
+/// lamp's lines say nothing of their own. Otherwise left out: "ừ" to the
+/// lamp's "Mình thì thích trà xanh hơn" proposed as "likes green tea", or
+/// "sure" to "chamomile could help you sleep" as "drinks herbal tea at
+/// night" (the reviewer-lead's HOLD on #3649). Other cited evidence than
+/// an exchange counts as heard.
+pub fn said_by_the_person(input: &Input, proposal: &Proposal) -> bool {
+    let about = about_words(&proposal.text);
+    let cited = || {
+        input
+            .records
+            .iter()
+            .filter(|record| proposal.source_ids.contains(&record.id))
+    };
+    let heard: BTreeSet<String> = cited()
+        .flat_map(|record| {
+            about_words(match record.kind.as_str() {
+                "exchange" => &record.heard,
+                _ => &record.text,
+            })
+        })
+        .collect();
+    let lamps: BTreeSet<String> = cited()
+        .filter(|record| record.kind == "exchange")
+        .flat_map(|record| about_words(&record.said))
+        .collect();
+    // A distinctive word only the lamp said: theirs it is not.
+    if about
+        .iter()
+        .any(|word| lamps.contains(word) && !heard.contains(word))
+    {
+        return false;
+    }
+    // In their own words, or in other words or another language from
+    // what they said, when the lamp said nothing of its own to take them
+    // from (the reviewer-lead's HOLD on #3649: "ừ" to the lamp's "Mình
+    // thì thích trà xanh hơn" is not "likes green tea"; "tôi thích trà
+    // xanh" is).
+    !heard.is_disjoint(&about) || (!heard.is_empty() && lamps.is_empty())
+}
+
+/// A text's words for [`restates`]: every word, short ones and numbers
+/// too, but for [`PLAIN`]'s and a few that only join ("is", "a", "my"…),
+/// a final `s` off: "Favorite drink is hibiscus tea" and "Favourite drink:
+/// hibiscus tea" are the same; "Orchid species 1" and "Orchid species 2"
+/// are not.
+fn restate_words(text: &str) -> BTreeSet<String> {
+    const JOINING: &[&str] = &[
+        "is", "a", "an", "to", "of", "my", "i", "me", "it", "in", "on", "at",
+    ];
+    let plain: BTreeSet<String> = PLAIN.iter().map(|word| crate::search::text(word)).collect();
     crate::search::text(text)
         .split(|character: char| !character.is_alphanumeric())
-        .filter(|word| word.chars().count() >= 3 && !PLAIN.contains(word))
+        .filter(|word| !word.is_empty() && !plain.contains(*word) && !JOINING.contains(word))
         .map(|word| word.strip_suffix('s').unwrap_or(word).to_owned())
         .collect()
 }
 
-/// Whether `proposal` rests on the person's own words: one of its words
-/// that say what it is about is in what was heard of a cited exchange, or
-/// in a cited kept thing (what they asked to keep), never only in what the
-/// lamp said (finding M on #3504: lamp-4ace and lamp-06c1, 27 Oct, the
-/// lamp's own "green tea's more my sort of thing" kept as a room fact and
-/// told back as the asker's). A proposal with no such word rests on
-/// nothing of theirs either.
-pub fn said_by_the_person(input: &Input, proposal: &Proposal) -> bool {
-    let about = about_words(&proposal.text);
-    input
-        .records
-        .iter()
-        .filter(|record| proposal.source_ids.contains(&record.id))
-        .map(|record| match record.kind.as_str() {
-            "exchange" => about_words(&record.heard),
-            _ => about_words(&record.text),
-        })
-        .any(|theirs| !theirs.is_disjoint(&about))
+/// Whether `proposal` says again what one of `kept` (the scope's current
+/// kept things and observations) says, in the same words but for joining
+/// and generic ones ([`restate_words`]): a recall's echo kept again as an
+/// observation (lamp-06c1, 28 Oct). A proposal that supersedes an
+/// observation is a change, and a dated one may carry its day anew: never
+/// a restatement.
+pub fn restates(proposal: &Proposal, kept: &[String]) -> bool {
+    let words = restate_words(&proposal.text);
+    proposal.supersedes.is_none()
+        && proposal.on.is_none()
+        && !words.is_empty()
+        && kept.iter().any(|text| restate_words(text) == words)
 }
 
 /// A nonblocking adapter, driven outside the memory server's socket loop.
