@@ -2549,7 +2549,30 @@ pub fn run(file: &Path, call: &ToolCall) -> (Value, bool) {
         }
         _ => return (crate::tools::unavailable(), false),
     };
-    let written = std::fs::OpenOptions::new()
+    match post(file, &line) {
+        Ok(()) => (json!({"ok": true}), true),
+        Err(_) => (
+            json!({"error": "I could not note that just now. Go on all the same."}),
+            false,
+        ),
+    }
+}
+
+/// A face `remember_my_face` saved (#3740): "who you are" is done, as the
+/// model's own `setup_step` would say. The runner takes it only while it
+/// leads that step, so a face saved at any other time changes nothing. On
+/// a tester's 7071 lamp on 27 Oct the chat saved the face twice and the
+/// step was never recorded.
+pub fn face_saved(file: &Path) {
+    let line = json!({"step": Step::WhoYouAre.name(), "outcome": "done"});
+    if let Err(error) = post(file, &line) {
+        eprintln!("lamp-voice: onboarding: a face saved, not noted for \"who you are\": {error}");
+    }
+}
+
+/// One line for the runner, appended to the mailbox, at most 16 KiB in all.
+fn post(file: &Path, line: &Value) -> io::Result<()> {
+    std::fs::OpenOptions::new()
         .append(true)
         .create(true)
         .open(mailbox_of(file))
@@ -2559,14 +2582,7 @@ pub fn run(file: &Path, call: &ToolCall) -> (Value, bool) {
                 return Err(io::Error::other("onboarding mailbox is full"));
             }
             mailbox.write_all(line.as_bytes())
-        });
-    match written {
-        Ok(()) => (json!({"ok": true}), true),
-        Err(_) => (
-            json!({"error": "I could not note that just now. Go on all the same."}),
-            false,
-        ),
-    }
+        })
 }
 
 #[cfg(test)]
@@ -3427,6 +3443,26 @@ mod tests {
         // ... and only then is the person asked to turn it.
         assert_eq!(room.wait(2 * S, Some(edge)), [SIT_TURN]);
         assert!(room.walk.looking());
+    }
+
+    /// A face `remember_my_face` saved while "who you are" is led ends it
+    /// (#3740, a tester's 7071 lamp); saved before the step is led, it
+    /// changes nothing.
+    #[test]
+    fn a_face_saved_ends_who_you_are_only_while_it_is_led() {
+        let mut room = Room::new("face-saved");
+        face_saved(&room.walk.file);
+        assert_eq!(room.wait(7 * S, Some(NEAR_MIDDLE)), [SIT_NOTE, SIT_DONE]);
+        assert_eq!(room.wait(20 * S, Some(NEAR_MIDDLE)), [WHO_NOTE]);
+        room.wait(S, Some(NEAR_MIDDLE));
+        assert_eq!(
+            room.outcome(Step::WhoYouAre),
+            None,
+            "saved before it was led"
+        );
+        face_saved(&room.walk.file);
+        room.wait(S, Some(NEAR_MIDDLE));
+        assert_eq!(room.outcome(Step::WhoYouAre), Some(Outcome::Done));
     }
 
     #[test]

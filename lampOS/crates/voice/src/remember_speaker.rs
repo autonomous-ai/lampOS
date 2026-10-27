@@ -497,7 +497,7 @@ mod tests {
         assert!(settings.remember_speaker && settings.names_checked);
         assert_eq!(rest, ["--session"]);
         assert!(matches!(tools::route(&settings, known_faces::REMEMBER),
-            tools::Route::Faces(_, chosen) if chosen.remember_speaker && chosen.checked));
+            tools::Route::Faces(_, chosen, _) if chosen.remember_speaker && chosen.checked));
         let declaration = known_faces::tools_checked(true)
             .into_iter()
             .find(|tool| tool.name == known_faces::REMEMBER)
