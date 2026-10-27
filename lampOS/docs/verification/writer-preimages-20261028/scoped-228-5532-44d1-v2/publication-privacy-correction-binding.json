@@ -1,0 +1,16 @@
+{
+  "protocol": "publication_privacy_correction/1",
+  "old_packet_manifest_SHA256": "a8e0c71c457d78c360a6e6f44ab724329cb7ca36e4a5135bf00ca9142b12fb77",
+  "changed_member": "publication-receipt.json",
+  "old_published_member_SHA256": "a41de54782a928d7895ed07ed73320e5067f6767d01c6bdc272b1f1705849b8d",
+  "new_published_member_SHA256": "cbbd772cbc51b650afbdaa28dc4d9a92859e9ae8977d40b82ac85533c51830a1",
+  "old_bytes": 815,
+  "new_bytes": 834,
+  "method": "Parse JSON, replace the typed builder/public-account string with a public-builder-account placeholder, then JSON-dump. No serialized JSON regex.",
+  "all_other_old_members_byte_identical_except_manifest": true,
+  "old_sanitization_record_retained_as_prior_epoch": true,
+  "this_binding_supersedes_prior_published_hash_for_changed_member_only": true,
+  "source_runtime_tests_counts_unchanged": true,
+  "old_packet_unchanged_unpublished": true,
+  "no_source_or_runtime_replay": true
+}

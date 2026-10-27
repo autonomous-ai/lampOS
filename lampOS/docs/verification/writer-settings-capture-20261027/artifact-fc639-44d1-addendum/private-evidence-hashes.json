@@ -1,0 +1,8 @@
+{
+  "artifact-audit.py": "c7eccf8115e8f79779a67927c8f0ad432af7c5186a71040be5d22a93e9864084",
+  "artifact-audit-recovered-local.py": "1dc7cf52c7c52a0f82e78103b20925f3e9fa09cae4b6f0694466c013cf638ecb",
+  "artifact-recovered-analysis.stdout": "6cd7f6b59ccd00fcfcbc73d3d4c9d48f82d29bf7bff807dec3468dbcf84764fa",
+  "artifact-recovered-analysis.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "original-artifact.zip": "e5d45abf7a2208511148fddaea7f0fe373807af9726b4bb9fb6c4913e85ee476",
+  "artifacts.json": "628230e489f75895f0a679ee4790748aeec4070d718a2e458b39d0365a131147"
+}

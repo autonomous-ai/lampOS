@@ -1,0 +1,172 @@
+[
+  {
+    "post_runtime_sha256": "b7e1a77f36b0f482a8f232d7a8405bf4131c3ade5e29592e60fa82e946f20c1f",
+    "preserved_sha256": "b7e1a77f36b0f482a8f232d7a8405bf4131c3ade5e29592e60fa82e946f20c1f",
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "sha256": "b7e1a77f36b0f482a8f232d7a8405bf4131c3ade5e29592e60fa82e946f20c1f",
+    "size": 17252568,
+    "target": "install",
+    "target_kinds": [
+      "test"
+    ]
+  },
+  {
+    "post_runtime_sha256": "8fbb6f4e1f59e8666bd83499dcd044707376dcd92083bc2176bd41c0187de5ac",
+    "preserved_sha256": "8fbb6f4e1f59e8666bd83499dcd044707376dcd92083bc2176bd41c0187de5ac",
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "sha256": "8fbb6f4e1f59e8666bd83499dcd044707376dcd92083bc2176bd41c0187de5ac",
+    "size": 550064,
+    "target": "self-cli-exec",
+    "target_kinds": [
+      "test"
+    ]
+  },
+  {
+    "post_runtime_sha256": "65970ff4f9068acaed344365738424a64a324fb37232a6940a339996917afde6",
+    "preserved_sha256": "65970ff4f9068acaed344365738424a64a324fb37232a6940a339996917afde6",
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "sha256": "65970ff4f9068acaed344365738424a64a324fb37232a6940a339996917afde6",
+    "size": 3295024,
+    "target": "release_pair",
+    "target_kinds": [
+      "test"
+    ]
+  },
+  {
+    "post_runtime_sha256": "1959f6adaba5a38237e0f85abecb36c524881c03a2152043e773b475763ac100",
+    "preserved_sha256": "1959f6adaba5a38237e0f85abecb36c524881c03a2152043e773b475763ac100",
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "sha256": "1959f6adaba5a38237e0f85abecb36c524881c03a2152043e773b475763ac100",
+    "size": 15267760,
+    "target": "lamp_update",
+    "target_kinds": [
+      "lib"
+    ]
+  },
+  {
+    "post_runtime_sha256": "c09bdee086b77d1ec716e58323978d84e350e0c5bc4cba2a981ed48a949d70bc",
+    "preserved_sha256": "c09bdee086b77d1ec716e58323978d84e350e0c5bc4cba2a981ed48a949d70bc",
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "sha256": "c09bdee086b77d1ec716e58323978d84e350e0c5bc4cba2a981ed48a949d70bc",
+    "size": 1976720,
+    "target": "it",
+    "target_kinds": [
+      "test"
+    ]
+  },
+  {
+    "post_runtime_sha256": "beba88302b0070a62eab8e48d42f34de2f77bc0ed16e762be443551b8a22fb34",
+    "preserved_sha256": "beba88302b0070a62eab8e48d42f34de2f77bc0ed16e762be443551b8a22fb34",
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "sha256": "beba88302b0070a62eab8e48d42f34de2f77bc0ed16e762be443551b8a22fb34",
+    "size": 550112,
+    "target": "self-process-cuts",
+    "target_kinds": [
+      "test"
+    ]
+  },
+  {
+    "post_runtime_sha256": "652e4af8aaebda2fc36208d98c85aa53fd66fc709a289c9abbc5b638b98af440",
+    "preserved_sha256": "652e4af8aaebda2fc36208d98c85aa53fd66fc709a289c9abbc5b638b98af440",
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "sha256": "652e4af8aaebda2fc36208d98c85aa53fd66fc709a289c9abbc5b638b98af440",
+    "size": 22852872,
+    "target": "functions",
+    "target_kinds": [
+      "test"
+    ]
+  },
+  {
+    "post_runtime_sha256": "fd6a5d7934bf41c333720b05a3ef5706970df39fb4d06f73e56a4a3288704094",
+    "preserved_sha256": "fd6a5d7934bf41c333720b05a3ef5706970df39fb4d06f73e56a4a3288704094",
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "sha256": "fd6a5d7934bf41c333720b05a3ef5706970df39fb4d06f73e56a4a3288704094",
+    "size": 1277536,
+    "target": "lamp-update",
+    "target_kinds": [
+      "bin"
+    ]
+  },
+  {
+    "post_runtime_sha256": "9f691cc27ae625b7a9d910620fa324256ae97626419af1ee554a43e43237cb31",
+    "preserved_sha256": "9f691cc27ae625b7a9d910620fa324256ae97626419af1ee554a43e43237cb31",
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": true
+    },
+    "sha256": "9f691cc27ae625b7a9d910620fa324256ae97626419af1ee554a43e43237cb31",
+    "size": 20987448,
+    "target": "round",
+    "target_kinds": [
+      "test"
+    ]
+  },
+  {
+    "post_runtime_sha256": "e984e358fbedcc09d52f3160e4228e8472b748ed74e19334a8b3c618e524739c",
+    "preserved_sha256": "e984e358fbedcc09d52f3160e4228e8472b748ed74e19334a8b3c618e524739c",
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": false
+    },
+    "sha256": "e984e358fbedcc09d52f3160e4228e8472b748ed74e19334a8b3c618e524739c",
+    "size": 13556960,
+    "target": "lamp-update",
+    "target_kinds": [
+      "bin"
+    ]
+  }
+]

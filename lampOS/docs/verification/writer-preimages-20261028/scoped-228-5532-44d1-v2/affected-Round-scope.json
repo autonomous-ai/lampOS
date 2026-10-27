@@ -1,0 +1,16 @@
+{
+  "source": "<private-path>",
+  "sha256": "306bbad1c093d1c1b4db6c9e7c626706f6d072c78fa12cab96d7249f47b96c2d",
+  "plan": {
+    "old_base": "a17ec9216e53f6a77931dd9686f83be8244d05a2",
+    "latest": "44d1ec5abe70723bc7e232552f05eb14f029c0d8",
+    "Raw_head": "fc6398c51b2e90a40841ec14c5f0288851d8d6fe",
+    "Voice_onboarding_production_consumed": true,
+    "reason": "yes-phrase parsing/logging and run-to-answer extraction outside cfgtest; normalVoice artifact profile false",
+    "other_scope": "doorControl not normalUpdate; no Update/unit/skill/model/lock/config or own10/3 path overlap",
+    "projection219_not_runtime": true,
+    "freshdiscovery_required": true,
+    "prior_a17_runtime": "UNRUN;5883preCargo guardstop"
+  },
+  "projection228_only_until_discovery": true
+}

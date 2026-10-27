@@ -1,0 +1,21 @@
+{
+  "files": {
+    "<private-key:f8fded37874dae0b>": null,
+    "<private-key:288e3cdaaf949e14>": {
+      "sha256": "48a3e9ff36c92393a61c94924a7268fd9e732dc55afe239842fe7fdd2fa7db71",
+      "bytes": 210
+    },
+    "<private-key:e0f925bde4557e41>": null,
+    "<private-key:d8d8a5ce8889026e>": null,
+    "<private-key:32fa1a9c8ca680e8>": null,
+    "<private-key:c9aa625b1619bc1f>": null,
+    "/private/.cargo/config": null,
+    "/private/.cargo/config.toml": null,
+    "/.cargo/config": null,
+    "/.cargo/config.toml": null,
+    "<private-key:dd3faa977b66f11f>": null,
+    "<private-key:4e810bb1bae4c081>": null
+  },
+  "inherited_compiler_variable_names": [],
+  "user_nextest_config": "none"
+}

@@ -1,0 +1,20 @@
+{
+  "base": "f0f65dc995e493c0c7fe13e47a84aba21d0381b2",
+  "baseline_198_pass_INCONCLUSIVE": true,
+  "config_sha256": "c4992da8d157df279011a424b5feb4833f001fd1d46ce3edd0a56992c848bb33",
+  "controller_sha256": "ae69dc32f4b4e8e1ffbcfbaed0a62b36e3a7c3e2aa1540e1ec41be6c31b14e67",
+  "dirty_files": [],
+  "earlier_CI_runner_version": "0.9.149",
+  "earlier_failure_unwaived": true,
+  "head": "c08ae7b8b144195606b5228ea0e7c3465103379e",
+  "merged_receipt_selector_sha256": "ecf2c70720c3f1c14b5ba960123cea0e3ae0764777f4906992a989c58ee80c23",
+  "nextest_tool_sha256": "aad9d409cd2f0a81fcaed49d7672a133254179458436c1e957505e4a11655329",
+  "nextest_version": "0.9.150",
+  "own_branch": "second/writer-observation-recheck",
+  "preferred_runner_scope": "CURRENT scoped LIB/functions/it plus3receiptRound cases;219isprojectionuntildiscovery; old528fullremainsc3; failedlibtestunwaived",
+  "source_count": 7506,
+  "tree": "78e894c68d8381d37a5f321da23e75de67240d83",
+  "uncommitted_source_gate": false,
+  "verified_tool_proof_sha256": "5563f2b54904be2611512496701b75cb5d11f8a60fe3e60773a1579b82286c1f",
+  "working_patch_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+}

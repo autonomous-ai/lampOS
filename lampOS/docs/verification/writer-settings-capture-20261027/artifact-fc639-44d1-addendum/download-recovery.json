@@ -1,0 +1,9 @@
+{
+  "artifact_id": 12761263846,
+  "sha256": "e5d45abf7a2208511148fddaea7f0fe373807af9726b4bb9fb6c4913e85ee476",
+  "bytes": 118476481,
+  "duration_seconds": 217.125,
+  "original_api_digest_equal": true,
+  "retry_only_read_download_no_CI_rerun": true,
+  "signed_download_url_not_published": true
+}

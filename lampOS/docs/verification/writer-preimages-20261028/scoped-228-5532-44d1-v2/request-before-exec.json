@@ -1,0 +1,19 @@
+{
+  "approved": true,
+  "head": "553216bf7062659b78bfa35c0ab9eed89851c76a",
+  "raw_parent": "fc6398c51b2e90a40841ec14c5f0288851d8d6fe",
+  "base": "44d1ec5abe70723bc7e232552f05eb14f029c0d8",
+  "scope": "current preimages fullLIB functions it plus3receipt",
+  "projection_only": 228,
+  "all_required": 58,
+  "donor": "<private-path>",
+  "donor_sha256": "6eee415e0cc6d1e165b5df10cf1d1c88c25064f73fe33d4c5b2dbeb15c67a095",
+  "donor_closure_sha256": "a82d1932fae9ace9054f996e49565d41950682ad302b9f0319a714a4d59824c2",
+  "donor_explicitly_released_by_Root": true,
+  "controller": "<gate-evidence>.py",
+  "controller_sha256": "2a18e4cbc51283cca6c2690c00f237147e967884f239c00b1d516d1f0fa0e511",
+  "runtime": "AUTHORIZED UNRUN beforeexecution; Root START afterPID86566 closed/released",
+  "old_f755_native40559893842_stays_exact_a17_source": true,
+  "old_f755_native_audit_preserved": "<private-path>",
+  "native_archive_audit": "stillowed aftersource/caseaudit preserved; noNativebinaryhashclaim"
+}

@@ -1,0 +1,43 @@
+[
+  {
+    "chunk_id": "4cfe0e",
+    "raw_private_sha256": "b7b00bae382f599cad840d7510937f10ab1aa17cdcb74e066a764d12210d3cee",
+    "receipt": "continuation-1.json",
+    "session_id": 74221,
+    "wall_time_seconds": 5.003241708
+  },
+  {
+    "chunk_id": "af72d3",
+    "raw_private_sha256": "b2d8cc7b73789c17a7b438ae3e992c172d34548825ffd7dc444a991ee8c8f959",
+    "receipt": "continuation-2.json",
+    "session_id": 74221,
+    "wall_time_seconds": 30.001549167
+  },
+  {
+    "chunk_id": "80af0d",
+    "raw_private_sha256": "1e180821949f855f1065b8e4994b350f7a5c953765dedf20d1376727a47796ba",
+    "receipt": "continuation-3.json",
+    "session_id": 74221,
+    "wall_time_seconds": 30.001158375
+  },
+  {
+    "chunk_id": "43d4ad",
+    "exit_code": 0,
+    "raw_private_sha256": "7c10659e027d1dffe79071d5cc453f2bfb80d751892a0e9e0b4a49c21a078a06",
+    "receipt": "continuation-4.json",
+    "wall_time_seconds": 3.958e-06
+  },
+  {
+    "chunk_id": "2b3edd",
+    "raw_private_sha256": "4ef42e4977a8449eedb3ee24bce41fd0727c28abb4c779fbf736a8455a420d39",
+    "receipt": "initial-result.json",
+    "session_id": 74221,
+    "wall_time_seconds": 1.001480167
+  },
+  {
+    "raw_private_sha256": "a050a63f1288119bc77752059b6b59039c7163975c5ebe76e1b5b0249ea10132",
+    "receipt": "request-before-exec.json",
+    "sandbox_permissions": "require_escalated",
+    "saved_before_exec": true
+  }
+]

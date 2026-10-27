@@ -1,0 +1,22 @@
+[
+  {
+    "chunk_id": "2c6f51",
+    "exit_code": 0,
+    "raw_private_sha256": "a96e308d6eb60f6821c31a2a8719e167fa973bbc15c0231b8268758b6e0f5002",
+    "receipt": "continuation-2.json",
+    "wall_time_seconds": 1.9667e-05
+  },
+  {
+    "chunk_id": "ac32ee",
+    "raw_private_sha256": "90fd26e0e53125285bd68b599eeb4c72a83a42aa53a146a05cf6044b88ceac6b",
+    "receipt": "initial-result.json",
+    "session_id": 59009,
+    "wall_time_seconds": 1.002940417
+  },
+  {
+    "raw_private_sha256": "0e24040e8fd7180bffa517894007da381a36872dbf54e6cae697ad6f0384edf9",
+    "receipt": "request.json",
+    "sandbox_permissions": "require_escalated",
+    "saved_before_exec": true
+  }
+]

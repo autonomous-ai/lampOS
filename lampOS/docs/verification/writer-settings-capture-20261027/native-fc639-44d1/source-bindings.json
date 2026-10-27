@@ -1,0 +1,65 @@
+{
+  "files": [
+    {
+      "blob": "2e5e541d8eb974694cf451f27eac1a57897c1b69",
+      "mode": "100644",
+      "path": "lampOS/crates/update/src/apply.rs",
+      "sha256": "db0720893ee7a085e2612000ca89a9a5066f1430d7ff96b6f6d2cb5489e52fb8"
+    },
+    {
+      "blob": "d10a9823678d0a044f126c120b394a11147cf25d",
+      "mode": "100644",
+      "path": "lampOS/crates/update/src/lib.rs",
+      "sha256": "d429a76236d320f916997619f4a1384705a8ee35c39f5c6d1333cec89a46ab47"
+    },
+    {
+      "blob": "79b0f419624e2ed1f8416673844afd7e988531e7",
+      "mode": "100644",
+      "path": "lampOS/crates/update/src/writer_files.rs",
+      "sha256": "13657a14e71d7dd07f0bffe176a09585ef270051ed90dfb756ff96d85267b55c"
+    },
+    {
+      "blob": "9dadf2e73c5db037d5126b95e78a7fcac768df1f",
+      "mode": "100644",
+      "path": "lampOS/crates/update/src/writer_files/tests.rs",
+      "sha256": "8165868d61749055d934b068abad50bc8b514f366b51b8e3973e9e8c937baf95"
+    },
+    {
+      "blob": "7afb9d0ddf4c2372dc95ece82f9bfa1ba42fc8c6",
+      "mode": "100644",
+      "path": "lampOS/crates/update/src/writer_settings.rs",
+      "sha256": "53080a07a94e76ecc47f83bf0316a203be43abdfc6af6156e99f2bd9859d7248"
+    },
+    {
+      "blob": "00aaca5cffce778e7787b98bb3a4c3f66d85baa3",
+      "mode": "100644",
+      "path": "lampOS/crates/update/src/writer_settings/tests.rs",
+      "sha256": "327273cc855dc85d5034b0dc511abd03477b710bf113f3fe6df3f61189161bad"
+    },
+    {
+      "blob": "a41755ffd97d653e52cda21a77e52f422dba661e",
+      "mode": "100644",
+      "path": "lampOS/docs/reuse-decisions.md",
+      "sha256": "eefc7fd76d2afb77c360d6895313ee35dacb98dd76fd5ea6a45a73692760d98b"
+    },
+    {
+      "blob": "a349db54517ccdf056a567d1ddcda12476fe8b73",
+      "mode": "100644",
+      "path": "lampOS/docs/updates.md",
+      "sha256": "9fd68ef6663534f868586faa69c98ab50c301becfd1e327eb68372154ea72c4e"
+    },
+    {
+      "blob": "62a923dabe6c1dd267742ddd5275c6e25f3dcbdc",
+      "mode": "100644",
+      "path": "lampOS/docs/writer-file-observation.md",
+      "sha256": "369d7ce1ac493f37ecc1a5cb414f3f5ba14b2796de33b89de7a2024725da109d"
+    },
+    {
+      "blob": "b9c8d7ba9bc37b7c26acc19d9723139a211b3f90",
+      "mode": "100644",
+      "path": "lampOS/docs/writer-settings-capture.md",
+      "sha256": "9766bdaed2e350b920f2ab09252e5f2435a11a1c8243feb8e25f5442af7ab149"
+    }
+  ],
+  "head": "fc6398c51b2e90a40841ec14c5f0288851d8d6fe"
+}

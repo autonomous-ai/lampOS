@@ -1,0 +1,246 @@
+{
+  "run": {
+    "id": 40559893842,
+    "run_attempt": 1,
+    "head_sha": "f75535e4356256b9749ddecf0099ba0675ff22b0",
+    "status": "completed",
+    "conclusion": "success",
+    "html_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40559893842",
+    "event": "pull_request"
+  },
+  "jobs": [
+    {
+      "id": 122385773111,
+      "name": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-27T18:25:53Z",
+      "completed_at": "2026-10-27T18:41:11Z",
+      "html_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40559893842/job/122385773111",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-10-27T18:25:54Z",
+          "completed_at": "2026-10-27T18:25:55Z"
+        },
+        {
+          "name": "system packages",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-10-27T18:25:55Z",
+          "completed_at": "2026-10-27T18:26:17Z"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-10-27T18:26:17Z",
+          "completed_at": "2026-10-27T18:26:23Z"
+        },
+        {
+          "name": "publication failure tests (offline, no signing secret)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-10-27T18:26:23Z",
+          "completed_at": "2026-10-27T18:26:24Z"
+        },
+        {
+          "name": "Rust 1.96.0",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-10-27T18:26:24Z",
+          "completed_at": "2026-10-27T18:26:29Z"
+        },
+        {
+          "name": "artifact provenance regression (offline, disposable Cargo workspace)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-10-27T18:26:29Z",
+          "completed_at": "2026-10-27T18:26:30Z"
+        },
+        {
+          "name": "stable promotion tests (offline, disposable test key)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-10-27T18:26:30Z",
+          "completed_at": "2026-10-27T18:26:50Z"
+        },
+        {
+          "name": "restore the cache",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8,
+          "started_at": "2026-10-27T18:26:50Z",
+          "completed_at": "2026-10-27T18:27:03Z"
+        },
+        {
+          "name": "unchanged source files get the cached build's times back",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9,
+          "started_at": "2026-10-27T18:27:03Z",
+          "completed_at": "2026-10-27T18:27:04Z"
+        },
+        {
+          "name": "record fresh source times for a cold publication build",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 10,
+          "started_at": "2026-10-27T18:27:04Z",
+          "completed_at": "2026-10-27T18:27:04Z"
+        },
+        {
+          "name": "Run taiki-e/install-action@v2",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11,
+          "started_at": "2026-10-27T18:27:04Z",
+          "completed_at": "2026-10-27T18:27:05Z"
+        },
+        {
+          "name": "build (release, the lamps' binaries)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12,
+          "started_at": "2026-10-27T18:27:05Z",
+          "completed_at": "2026-10-27T18:30:05Z"
+        },
+        {
+          "name": "every built lamp-* binary is classified for the lamp-os package",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13,
+          "started_at": "2026-10-27T18:30:05Z",
+          "completed_at": "2026-10-27T18:30:06Z"
+        },
+        {
+          "name": "build the two selected artifact examples without filename collisions",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 14,
+          "started_at": "2026-10-27T18:30:06Z",
+          "completed_at": "2026-10-27T18:31:29Z"
+        },
+        {
+          "name": "publication CLI rehearsal (local test key and simulated GitHub only)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 15,
+          "started_at": "2026-10-27T18:31:29Z",
+          "completed_at": "2026-10-27T18:31:29Z"
+        },
+        {
+          "name": "which crates a pull request tests",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 16,
+          "started_at": "2026-10-27T18:31:29Z",
+          "completed_at": "2026-10-27T18:31:29Z"
+        },
+        {
+          "name": "test (full run, every test one at a time; otherwise without the realtime group, in parallel)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 17,
+          "started_at": "2026-10-27T18:31:29Z",
+          "completed_at": "2026-10-27T18:40:47Z"
+        },
+        {
+          "name": "doc tests and the own-harness tests (nextest runs neither)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 18,
+          "started_at": "2026-10-27T18:40:47Z",
+          "completed_at": "2026-10-27T18:41:01Z"
+        },
+        {
+          "name": "export only current Cargo targets and their SHA-256",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 19,
+          "started_at": "2026-10-27T18:41:01Z",
+          "completed_at": "2026-10-27T18:41:02Z"
+        },
+        {
+          "name": "Run actions/upload-artifact@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 20,
+          "started_at": "2026-10-27T18:41:02Z",
+          "completed_at": "2026-10-27T18:41:09Z"
+        },
+        {
+          "name": "discard the isolated example target before saving the cache",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 21,
+          "started_at": "2026-10-27T18:41:09Z",
+          "completed_at": "2026-10-27T18:41:09Z"
+        },
+        {
+          "name": "save the cache",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 22,
+          "started_at": "2026-10-27T18:41:09Z",
+          "completed_at": "2026-10-27T18:41:09Z"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 44,
+          "started_at": "2026-10-27T18:41:09Z",
+          "completed_at": "2026-10-27T18:41:10Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 45,
+          "started_at": "2026-10-27T18:41:10Z",
+          "completed_at": "2026-10-27T18:41:10Z"
+        }
+      ]
+    },
+    {
+      "id": 122385775980,
+      "name": "lampOS \u2014 promote a tested release to the stable feed",
+      "status": "completed",
+      "conclusion": "skipped",
+      "started_at": "2026-10-27T18:25:49Z",
+      "completed_at": "2026-10-27T18:25:48Z",
+      "html_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40559893842/job/122385775980",
+      "steps": []
+    },
+    {
+      "id": 122394127339,
+      "name": "lampOS \u2014 sign and publish the tested lamp-voice artifact",
+      "status": "completed",
+      "conclusion": "skipped",
+      "started_at": "2026-10-27T18:41:11Z",
+      "completed_at": "2026-10-27T18:41:11Z",
+      "html_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40559893842/job/122394127339",
+      "steps": []
+    },
+    {
+      "id": 122394127551,
+      "name": "report-full-run-failure",
+      "status": "completed",
+      "conclusion": "skipped",
+      "started_at": "2026-10-27T18:41:11Z",
+      "completed_at": "2026-10-27T18:41:11Z",
+      "html_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40559893842/job/122394127551",
+      "steps": []
+    }
+  ]
+}

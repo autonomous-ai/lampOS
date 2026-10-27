@@ -1,0 +1,15 @@
+{
+  "all_three_complete_blobs_modes_equal": true,
+  "files": {
+    "lampOS/crates/update/src/writer_refresh.rs": "100644 blob 2dc0a4d026be3190755fc8b66793960648a381f1\tlampOS/crates/update/src/writer_refresh.rs",
+    "lampOS/crates/update/src/writer_refresh/tests.rs": "100644 blob c25d33e511f161f638595bccc36886f0f4a81698\tlampOS/crates/update/src/writer_refresh/tests.rs",
+    "lampOS/docs/settings-writer-refresh.md": "100644 blob 3932a4fa5195a15d94d4ee23d93122b566f2000c\tlampOS/docs/settings-writer-refresh.md"
+  },
+  "gate": "UNRUN beforefresh203/all33 fornormalVoiceproduction; earlier512f903/current13on409 separate",
+  "new_base": "44d1ec5abe70723bc7e232552f05eb14f029c0d8",
+  "new_head": "ee4ddf6f6d5b5856e9fc398860a6ab2984619bf9",
+  "new_tree": "694dc2a574b2d00e4af20f6b8a100ba6590be11e",
+  "old_base": "a17ec9216e53f6a77931dd9686f83be8244d05a2",
+  "old_head": "7d1a347d1060166c747fc614924b421fc00d4d4b",
+  "range_diff": "1:  7d1a347d10 = 1:  ee4ddf6f6d lampOS: release writer leases when their acquiring owner drops"
+}

@@ -1,0 +1,47 @@
+{
+  "source": {
+    "head": "f75535e4356256b9749ddecf0099ba0675ff22b0",
+    "base": "a17ec9216e53f6a77931dd9686f83be8244d05a2",
+    "actual_preview": "002d62c6c82b9d57e91b3098f8797d4e7ded8c3f",
+    "tree": "b9ded6928a754ae826b5890a035cd4630cf3e633",
+    "ordered_parents_verified": true,
+    "complete_authored_tree_equals_actual_preview": true
+  },
+  "ARM_original": {
+    "run": 40559893842,
+    "attempt": 1,
+    "required_job": 122385773111,
+    "actual_job_terminal": "completed/success",
+    "watch71336_exit": 0,
+    "log71171_exit": 0,
+    "unique_PASS": 7822,
+    "bad_or_selected_unrun": 0,
+    "reported_skips": 53,
+    "required_controls_once": 58,
+    "new_controls_once": 9
+  },
+  "Linux_original": {
+    "original_run": 40559893833,
+    "attempt": 1,
+    "head": "f75535e4356256b9749ddecf0099ba0675ff22b0",
+    "required_job": 122385774620,
+    "actual_job_terminal": "completed/success",
+    "actual_checkout": "002d62c6c82b9d57e91b3098f8797d4e7ded8c3f",
+    "ordered_preview_parents": [
+      "a17ec9216e53f6a77931dd9686f83be8244d05a2",
+      "f75535e4356256b9749ddecf0099ba0675ff22b0"
+    ],
+    "complete_preview_tree_equals_authored": "b9ded6928a754ae826b5890a035cd4630cf3e633",
+    "full_log_bytes": 95069,
+    "full_log_sha256": "197814656181f0727642904b0448a286c1a4c368145666bd6d358b634afa23db",
+    "watch_native72636_drained": 0,
+    "log_native94001_drained": 0,
+    "watch_exit_alone_not_used": true,
+    "no_rerun": true
+  },
+  "raw_ARM_log_SHA256": "18da1909e99857aaec7bdb022b48a73674f2229b3bcacef071a927c72499b8af",
+  "exact_terminal_rows_SHA256": "a143ec3221581bc08822133c2dd875d8354ca06af6070b6180e5a0aefab8312e",
+  "archive_download_hash_audit": "PENDING; not implied by job success",
+  "old_original_0f420_failure_unwaived": true,
+  "current_unpublished_5532_source_runtime": "UNRUN, not qualified by f755 result"
+}

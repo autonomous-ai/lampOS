@@ -1,0 +1,39 @@
+{
+  "Mac_custom_contracts": [
+    {
+      "binary": "lamp-update::self-cli-exec",
+      "excluded_from_scoped_runtime": true,
+      "exit_code": 0,
+      "full_discovery_policy_ignored": true,
+      "matched": true,
+      "name": "actual_cli_exec_confirms_before_the_next_round",
+      "not_added_to_selected_passes": true
+    },
+    {
+      "binary": "lamp-update::self-process-cuts",
+      "excluded_from_scoped_runtime": true,
+      "exit_code": 0,
+      "full_discovery_policy_ignored": true,
+      "matched": true,
+      "name": "persisted_self_switches_survive_sigkill",
+      "not_added_to_selected_passes": true
+    }
+  ],
+  "contracts_outside_two_scoped_ignores": true,
+  "doctests": {
+    "exit_code": 0,
+    "summaries": [
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0
+      }
+    ],
+    "totals": {
+      "failed": 0,
+      "ignored": 0,
+      "passed": 0
+    }
+  },
+  "no_added_passes": true
+}

@@ -1,0 +1,821 @@
+{
+  "counts": {
+    "CANCEL": 0,
+    "EXECFAIL": 0,
+    "FAIL": 0,
+    "LEAK": 0,
+    "PASS": 7815,
+    "TIMEOUT": 0,
+    "XFAIL": 0,
+    "XPASS": 0
+  },
+  "full_terminal_census_sha256": "380bb52b9342460e546f186caa88df71d10bea5cba412901b8843daa3d2dc73b",
+  "identical_echo_rows_excluded": 34,
+  "linux_custom_drivers": {
+    "note": "Subsets of nextest, not added passes.",
+    "rows": [
+      {
+        "binary": "lamp-update::self-cli-exec",
+        "name": "actual_cli_exec_confirms_before_the_next_round",
+        "ordinal": 2967,
+        "status": "PASS",
+        "total": 7815
+      },
+      {
+        "binary": "lamp-update::self-process-cuts",
+        "name": "persisted_self_switches_survive_sigkill",
+        "ordinal": 3433,
+        "status": "PASS",
+        "total": 7815
+      }
+    ]
+  },
+  "missing_controls": [],
+  "picked_filter": "package(=lamp-body) | package(=lamp-cloud) | package(=lamp-expression) | package(=lamp-keeper) | package(=lamp-lean) | package(=lamp-memory) | package(=lamp-peek) | package(=lamp-setup) | package(=lamp-skills) | package(=lamp-update) | package(=lamp-voice) | package(=lamp-voice-eval)",
+  "required_controls": [
+    {
+      "binary": "lamp-update",
+      "name": "apply::tests::a_done_for_another_operation_does_not_change_any_setting_record",
+      "ordinal": 2442,
+      "status": "PASS",
+      "total": 7815
+    },
+    {
+      "binary": "lamp-update",
+      "name": "apply::tests::a_done_for_another_sequence_does_not_change_any_setting_record",
+      "ordinal": 2443,
+      "status": "PASS",
+      "total": 7815
+    },
+    {
+      "binary": "lamp-update",
+      "name": "apply::tests::a_matching_done_keeps_the_permanent_forward_read_contract",
+      "ordinal": 2444,
+      "status": "PASS",
+      "total": 7815
+    },
+    {
+      "binary": "lamp-update",
+      "name": "apply::tests::an_explicit_expected_identity_does_not_follow_a_rewritten_staged_request",
+      "ordinal": 2456,
+      "status": "PASS",
+      "total": 7815
+    },
+    {
+      "binary": "lamp-update",
+      "name": "apply::tests::an_unknown_done_operation_is_refused_without_changing_any_setting_record",
+      "ordinal": 2457,
+      "status": "PASS",
+      "total": 7815
+    },
+    {
+      "binary": "lamp-update",
+      "name": "head_touch::input_tests::an_uncaptured_key_never_becomes_a_captured_absence",
+      "ordinal": 2487,
+      "status": "PASS",
+      "total": 7815
+    },
+    {
+      "binary": "lamp-update",
+      "name": "head_touch::input_tests::ordinary_inputs_keep_regular_links_null_masks_and_directory_aliases",
+      "ordinal": 2488,
+      "status": "PASS",
+      "total": 7815
+    },
+    {
+      "binary": "lamp-update",
+      "name": "head_touch::input_tests::projection_and_verification_replay_closed_inputs_without_filesystem_fallback",
+      "ordinal": 2489,
+      "status": "PASS",
+      "total": 7815
+    },
+    {
+      "binary": "lamp-update",
+      "name": "head_touch::input_tests::rejecting_an_early_override_does_not_consume_a_later_directory_error",
+      "ordinal": 2490,
+      "status": "PASS",
+      "total": 7815
+    },
+    {
+      "binary": "lamp-update",
+      "name": "head_touch::tests::null_masks_do_not_admit_other_character_devices",
+      "ordinal": 2491,
+      "status": "PASS",
+      "total": 7815
+    },
+    {
+      "binary": "lamp-update",
+      "name": "writer_files::tests::a_fifo_is_refused_without_waiting_for_a_writer_and_its_worker_is_always_joined",
+      "ordinal": 2604,
+      "status": "PASS",
+      "total": 7815
+    },
+    {
+      "binary": "lamp-update",
+      "name": "writer_files::tests::a_hard_link_is_not_accepted_as_a_setting_and_directories_are_not_read",
+      "ordinal": 2605,
+      "status": "PASS",
+      "total": 7815
+    },
+    {
+      "binary": "lamp-update",
+      "name": "writer_files::tests::descriptor_and_ancestor_metadata_changes_refuse_the_observation",
+      "ordinal": 2606,
+      "status": "PASS",
+      "total": 7815
+    },
+    {
+      "binary": "lamp-update",
+      "name": "writer_files::tests::errors_and_debug_do_not_expose_relative_names_or_file_contents",
+      "ordinal": 2607,
+      "status": "PASS",
+      "total": 7815
+    },
+    {
+      "binary": "lamp-update",
+      "name": "writer_files::tests::explicit_content_caps_and_the_hard_ceiling_are_enforced_without_truncating_success",
+      "ordinal": 2608,
+      "status": "PASS",
+      "total": 7815
+    },
+    {
+      "binary": "lamp-update",
+      "name": "writer_files::tests::invalid_or_unbounded_relative_names_are_refused_before_opening_the_root",
+      "ordinal": 2609,
+      "status": "PASS",
+      "total": 7815
+    },
+    {
+      "binary": "lamp-update",
+      "name": "writer_files::tests::missing_intermediate_and_leaf_are_distinct_and_keep_only_existing_ancestors",
+      "ordinal": 2610,
+      "status": "PASS",
+      "total": 7815
+    },
+    {
+      "binary": "lamp-update",
+      "name": "writer_files::tests::no_follow_rejects_leaf_ancestor_and_root_links_without_reading_the_outside_witness",
+      "ordinal": 2611,
+      "status": "PASS",
+      "total": 7815
+    },
+    {
+      "binary": "lamp-update",
+      "name": "writer_files::tests::pre_open_inode_or_metadata_substitution_and_disappearance_are_not_read_as_the_original_file",
+      "ordinal": 2612,
+      "status": "PASS",
+      "total": 7815
+    },
+    {
+      "binary": "lamp-update",
+      "name": "writer_files::tests::regular_bytes_and_all_existing_ancestor_identities_are_observed_without_changing_them",
+      "ordinal": 2613,
+      "status": "PASS",
+      "total": 7815
+    },
+    {
+      "binary": "lamp-update",
+      "name": "writer_refresh::tests::a_restart_at_every_unqualified_prefix_requires_recovery_and_never_reissues_the_grant",
+      "ordinal": 2614,
+      "status": "PASS",
+      "total": 7815
+    },
+    {
+      "binary": "lamp-update",
+      "name": "writer_refresh::tests::a_stale_or_modified_first_apply_cannot_consume_the_single_grant",
+      "ordinal": 2615,
+      "status": "PASS",
+      "total": 7815
+    },
+    {
+      "binary": "lamp-update",
+      "name": "writer_refresh::tests::diagnostics_hide_unknown_values_and_known_duplicate_or_shadowed_fields_are_refused",
+      "ordinal": 2616,
+      "status": "PASS",
+      "total": 7815
+    },
+    {
+      "binary": "lamp-update",
+      "name": "writer_refresh::tests::failed_persist_after_publication_poisons_the_live_session_until_actual_disk_state_is_recovered",
+      "ordinal": 2617,
+      "status": "PASS",
+      "total": 7815
+    },
+    {
+      "binary": "lamp-update",
+      "name": "writer_refresh::tests::first_apply_binds_its_own_later_envelope_and_sequence_without_replacing_the_refresh_identity",
+      "ordinal": 2618,
+      "status": "PASS",
+      "total": 7815
+    },
+    {
+      "binary": "lamp-update",
+      "name": "writer_refresh::tests::future_nonsemantic_metadata_is_preserved_without_becoming_admission_authority",
+      "ordinal": 2619,
+      "status": "PASS",
+      "total": 7815
+    },
+    {
+      "binary": "lamp-update",
+      "name": "writer_refresh::tests::guard_lock_is_exclusive_and_independent_of_the_product_lock",
+      "ordinal": 2620,
+      "status": "PASS",
+      "total": 7815
+    },
+    {
+      "binary": "lamp-update",
+      "name": "writer_refresh::tests::identity_substitution_never_changes_or_admits_the_saved_transaction",
+      "ordinal": 2621,
+      "status": "PASS",
+      "total": 7815
+    },
+    {
+      "binary": "lamp-update",
+      "name": "writer_refresh::tests::live_or_poisoned_sessions_cannot_expose_stale_recovery_inputs",
+      "ordinal": 2622,
+      "status": "PASS",
+      "total": 7815
+    },
+    {
+      "binary": "lamp-update",
+      "name": "writer_refresh::tests::missing_and_nonregular_records_do_not_turn_into_a_fresh_transaction",
+      "ordinal": 2623,
+      "status": "PASS",
+      "total": 7815
+    },
+    {
+      "binary": "lamp-update",
+      "name": "writer_refresh::tests::no_apply_does_not_qualify_but_one_exact_apply_can_enter_without_an_ordinary_round",
+      "ordinal": 2624,
+      "status": "PASS",
+      "total": 7815
+    },
+    {
+      "binary": "lamp-update",
+      "name": "writer_refresh::tests::qualified_and_closed_inputs_keep_the_compatible_writer_and_bound_product_receipts",
+      "ordinal": 2625,
+      "status": "PASS",
+      "total": 7815
+    },
+    {
+      "binary": "lamp-update",
+      "name": "writer_refresh::tests::qualified_writer_and_preimages_survive_a_restart_until_the_product_journal_closes",
+      "ordinal": 2626,
+      "status": "PASS",
+      "total": 7815
+    },
+    {
+      "binary": "lamp-update",
+      "name": "writer_refresh::tests::recovery_views_retain_later_metadata_in_the_bound_inputs_without_reparsing",
+      "ordinal": 2627,
+      "status": "PASS",
+      "total": 7815
+    },
+    {
+      "binary": "lamp-update",
+      "name": "writer_refresh::tests::reloaded_inputs_keep_the_exact_origin_and_distinguish_writer_from_apply_restoration",
+      "ordinal": 2628,
+      "status": "PASS",
+      "total": 7815
+    },
+    {
+      "binary": "lamp-update",
+      "name": "writer_refresh::tests::restoring_an_apply_requires_its_original_grant_and_preimage_identity",
+      "ordinal": 2629,
+      "status": "PASS",
+      "total": 7815
+    },
+    {
+      "binary": "lamp-update",
+      "name": "writer_refresh::tests::unsupported_or_malformed_journals_are_retained_and_block_every_admission",
+      "ordinal": 2630,
+      "status": "PASS",
+      "total": 7815
+    },
+    {
+      "binary": "lamp-update",
+      "name": "writer_refresh::tests::write_bound_and_invalid_identities_leave_no_journal_or_partial_acceptance",
+      "ordinal": 2631,
+      "status": "PASS",
+      "total": 7815
+    },
+    {
+      "binary": "lamp-update",
+      "name": "writer_settings::tests::captured_bytes_preserve_ordinary_ownership_and_keep_all_omitted_noops",
+      "ordinal": 2632,
+      "status": "PASS",
+      "total": 7815
+    },
+    {
+      "binary": "lamp-update",
+      "name": "writer_settings::tests::old_byte_limits_allow_exact_budget_then_empty_or_absent_but_never_a_prefix",
+      "ordinal": 2633,
+      "status": "PASS",
+      "total": 7815
+    },
+    {
+      "binary": "lamp-update",
+      "name": "writer_settings::tests::oversized_or_invalid_new_inputs_are_bounded_and_redacted_before_observation",
+      "ordinal": 2634,
+      "status": "PASS",
+      "total": 7815
+    },
+    {
+      "binary": "lamp-update",
+      "name": "writer_settings::tests::revalidation_refuses_byte_mode_deletion_and_same_byte_inode_changes",
+      "ordinal": 2635,
+      "status": "PASS",
+      "total": 7815
+    },
+    {
+      "binary": "lamp-update",
+      "name": "writer_settings::tests::revalidation_refuses_new_negative_dependencies_and_replaced_ancestors",
+      "ordinal": 2636,
+      "status": "PASS",
+      "total": 7815
+    },
+    {
+      "binary": "lamp-update",
+      "name": "writer_settings::tests::revalidation_refuses_replaced_roots_links_and_nonregular_leaves",
+      "ordinal": 2637,
+      "status": "PASS",
+      "total": 7815
+    },
+    {
+      "binary": "lamp-update",
+      "name": "writer_settings::tests::selected_invalid_values_refuse_before_filesystem_access_and_unrelated_values_are_ignored",
+      "ordinal": 2638,
+      "status": "PASS",
+      "total": 7815
+    },
+    {
+      "binary": "lamp-update",
+      "name": "writer_settings::tests::shared_classifier_keeps_tmpfiles_marker_and_image_shipped_precedence",
+      "ordinal": 2639,
+      "status": "PASS",
+      "total": 7815
+    },
+    {
+      "binary": "lamp-update::round",
+      "name": "a_rejected_apply_receipt_runs_real_back_and_restores_written_settings_modes_and_records",
+      "ordinal": 2807,
+      "status": "PASS",
+      "total": 7815
+    },
+    {
+      "binary": "lamp-update::round",
+      "name": "a_rejected_back_receipt_keeps_the_journal_until_real_back_is_acknowledged",
+      "ordinal": 2808,
+      "status": "PASS",
+      "total": 7815
+    },
+    {
+      "binary": "lamp-update::round",
+      "name": "the_round_rejects_a_done_matching_a_rewritten_request_instead_of_its_own_request",
+      "ordinal": 2955,
+      "status": "PASS",
+      "total": 7815
+    }
+  ],
+  "selected_packages": [
+    "lamp-body",
+    "lamp-cloud",
+    "lamp-expression",
+    "lamp-keeper",
+    "lamp-lean",
+    "lamp-memory",
+    "lamp-peek",
+    "lamp-setup",
+    "lamp-skills",
+    "lamp-update",
+    "lamp-voice",
+    "lamp-voice-eval"
+  ],
+  "selected_unrun": 0,
+  "selection": {
+    "binaries": 70,
+    "selected": 7815,
+    "skipped_binaries": 120,
+    "skipped_tests": 53
+  },
+  "selection_scope": "Actual dependency-selected PR suite, not full-workspace runtime.",
+  "separate_process": {
+    "pass_rows": [
+      "test an_idle_worker_stays_ready_across_a_long_quiet ... ok (2009 ms)",
+      "test a_worker_reporting_another_model_is_refused_before_any_request ... ok (2 ms)",
+      "test no_outcome_is_delivered_after_close_even_for_an_answer_on_its_way ... ok (4 ms)",
+      "test verdict_carries_identity_and_one_request_at_a_time ... ok (56 ms)",
+      "test missing_model_is_final_and_never_restarted ... ok (162 ms)",
+      "test missing_executable_fails_at_once ... ok (2 ms)",
+      "test spawn_returns_while_worker_startup_is_held ... ok (6 ms)",
+      "test startup_failures_are_final ... ok (409 ms)",
+      "test serving_failures_are_replaced_within_budget ... ok (514 ms)",
+      "test protocol_violations_are_replaced ... ok (177 ms)",
+      "test cancelled_answers_are_never_delivered ... ok (155 ms)",
+      "test close_during_inference_never_waits ... ok (233 ms)",
+      "test sustained_requests_stay_bounded ... ok (689 ms)"
+    ],
+    "passed": 13
+  },
+  "separate_promotion_helper": {
+    "failed": 0,
+    "ordered_summaries": [
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 2,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 22,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 1,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      }
+    ],
+    "passed": 25
+  },
+  "separate_python_regressions": [
+    {
+      "command": "python3 -I .github/scripts/lampos-publish-test.py",
+      "passed": 35,
+      "terminal": "OK"
+    },
+    {
+      "command": "python3 -B -I .github/scripts/lampos-publish-artifact-test.py",
+      "passed": 12,
+      "terminal": "OK"
+    },
+    {
+      "command": "python3 -I .github/scripts/lampos-publish-cli-test.py --updater lampOS/target/release/lamp-update",
+      "passed": 7,
+      "terminal": "OK"
+    }
+  ],
+  "separate_relay": {
+    "passed": 1,
+    "success_rows": [
+      "relay_signals: ok"
+    ]
+  },
+  "separate_workspace_doctests": {
+    "failed": 0,
+    "headers": [
+      "lamp_actions",
+      "lamp_addons",
+      "lamp_air",
+      "lamp_audio",
+      "lamp_body",
+      "lamp_bus",
+      "lamp_camera",
+      "lamp_cloud",
+      "lamp_control",
+      "lamp_controls",
+      "lamp_ears",
+      "lamp_environment",
+      "lamp_expression",
+      "lamp_eyes",
+      "lamp_gemini",
+      "lamp_health",
+      "lamp_ipc",
+      "lamp_keeper",
+      "lamp_lean",
+      "lamp_local_time",
+      "lamp_memory",
+      "lamp_mood",
+      "lamp_msgs",
+      "lamp_name",
+      "lamp_near_call",
+      "lamp_observer",
+      "lamp_peek",
+      "lamp_policy",
+      "lamp_records",
+      "lamp_ring",
+      "lamp_same_voice",
+      "lamp_schedule",
+      "lamp_selftest",
+      "lamp_settings",
+      "lamp_setup",
+      "lamp_skills",
+      "lamp_sound_fixtures",
+      "lamp_station",
+      "lamp_surround",
+      "lamp_tasks",
+      "lamp_turn_end",
+      "lamp_turn_end_wire",
+      "lamp_turn_owner",
+      "lamp_update",
+      "lamp_voice",
+      "lamp_voice_eval",
+      "lamp_voice_processes"
+    ],
+    "note": "Interleaved streams; no invented per-header mapping.",
+    "ordered_summaries": [
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 2,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 1,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 1,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      },
+      {
+        "failed": 0,
+        "ignored": 0,
+        "passed": 0,
+        "status": "ok"
+      }
+    ],
+    "passed": 4
+  },
+  "summary": [
+    "Summary [ 181.718s] 7815 tests run: 7815 passed, 53 skipped"
+  ],
+  "unique_terminal_rows": 7815
+}

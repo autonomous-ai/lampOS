@@ -1,0 +1,29 @@
+[
+  {
+    "chunk_id": "217244",
+    "raw_private_sha256": "11dd749038c84098baaef98a72bd19b40611a3f86d19e8e130be3eadaf6718a8",
+    "receipt": "continuation-1.json",
+    "session_id": 5991,
+    "wall_time_seconds": 30.0009845
+  },
+  {
+    "chunk_id": "143fc0",
+    "raw_private_sha256": "edc4f9c95b53adc5b96b9af281ada62d956f803fb23deb02697b69f6a3913df9",
+    "receipt": "initial-result.json",
+    "session_id": 5991,
+    "wall_time_seconds": 1.003663167
+  },
+  {
+    "raw_private_sha256": "f1db30e376fa8ce6b9e09135e871f0df08bc7ffce686709d9dc36aba8bfe3a6c",
+    "receipt": "request-before-exec.json",
+    "sandbox_permissions": "require_escalated",
+    "saved_before_exec": true
+  },
+  {
+    "chunk_id": "e25423",
+    "exit_code": 0,
+    "raw_private_sha256": "ae1c05500968b1a1a103ee91884e9b8d16a197b0d143a9e68ec70d1d824c2da2",
+    "receipt": "terminal-result.json",
+    "wall_time_seconds": 1.6875e-05
+  }
+]

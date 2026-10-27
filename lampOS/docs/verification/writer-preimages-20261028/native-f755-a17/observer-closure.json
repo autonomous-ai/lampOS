@@ -1,0 +1,12 @@
+{
+  "ARM_watch71336_exit": 0,
+  "ARM_log71171_exit": 0,
+  "Linux_watch72636_exit": 0,
+  "Linux_log94001_exit": 0,
+  "artifact_download85939_exit": 0,
+  "actual_required_job_metadata_checked": true,
+  "watch_exit_alone_never_success_proof": true,
+  "all_original_attempts": 1,
+  "workflow_reruns_or_cancellations": 0,
+  "earlier_premature_partial_artifact_read_retained": true
+}

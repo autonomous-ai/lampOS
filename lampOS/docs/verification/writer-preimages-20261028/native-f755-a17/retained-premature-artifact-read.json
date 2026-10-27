@@ -1,0 +1,11 @@
+{
+  "kind": "premature_artifact_read_not_completed_digest_failure",
+  "original_download_native_handle": 85939,
+  "prior_continuation_returned_running_session_id_not_exit_code": true,
+  "mistaken_early_SHA_assertion_exit": 1,
+  "mistaken_read_chunk_id": "ffc0e0",
+  "mistaken_output": "AssertionError before any success claim; partial SHA not retained/claimed",
+  "download_cancelled_or_retried": false,
+  "same_original_download_still_owned": true,
+  "next_action": "Drain original85939 to actual exit before final digest/ZIP/inventory checks; do not treat partial bytes as completed artifact"
+}

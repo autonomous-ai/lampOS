@@ -1,0 +1,22 @@
+{
+  "old_head": "c860efa352cdb6501d24a962b216fddf1987bec6",
+  "old_base": "a17ec9216e53f6a77931dd9686f83be8244d05a2",
+  "new_head": "fc6398c51b2e90a40841ec14c5f0288851d8d6fe",
+  "new_base": "44d1ec5abe70723bc7e232552f05eb14f029c0d8",
+  "new_tree": "30000dcd531cbd81b06660f4c2bb118fd40ab672",
+  "all_ten_complete_blobs_modes_equal": true,
+  "files": {
+    "lampOS/crates/update/src/apply.rs": "100644 blob 2e5e541d8eb974694cf451f27eac1a57897c1b69\tlampOS/crates/update/src/apply.rs",
+    "lampOS/crates/update/src/lib.rs": "100644 blob d10a9823678d0a044f126c120b394a11147cf25d\tlampOS/crates/update/src/lib.rs",
+    "lampOS/crates/update/src/writer_files.rs": "100644 blob 79b0f419624e2ed1f8416673844afd7e988531e7\tlampOS/crates/update/src/writer_files.rs",
+    "lampOS/crates/update/src/writer_files/tests.rs": "100644 blob 9dadf2e73c5db037d5126b95e78a7fcac768df1f\tlampOS/crates/update/src/writer_files/tests.rs",
+    "lampOS/crates/update/src/writer_settings.rs": "100644 blob 7afb9d0ddf4c2372dc95ece82f9bfa1ba42fc8c6\tlampOS/crates/update/src/writer_settings.rs",
+    "lampOS/crates/update/src/writer_settings/tests.rs": "100644 blob 00aaca5cffce778e7787b98bb3a4c3f66d85baa3\tlampOS/crates/update/src/writer_settings/tests.rs",
+    "lampOS/docs/reuse-decisions.md": "100644 blob a41755ffd97d653e52cda21a77e52f422dba661e\tlampOS/docs/reuse-decisions.md",
+    "lampOS/docs/updates.md": "100644 blob a349db54517ccdf056a567d1ddcda12476fe8b73\tlampOS/docs/updates.md",
+    "lampOS/docs/writer-file-observation.md": "100644 blob 62a923dabe6c1dd267742ddd5275c6e25f3dcbdc\tlampOS/docs/writer-file-observation.md",
+    "lampOS/docs/writer-settings-capture.md": "100644 blob b9c8d7ba9bc37b7c26acc19d9723139a211b3f90\tlampOS/docs/writer-settings-capture.md"
+  },
+  "range_diff": "1:  c860efa352 = 1:  fc6398c51b lampOS: capture and revalidate raw setting ownership",
+  "gate": "UNRUN before fresh219; a17stoppedpreCargo5883 no runtime replay"
+}
