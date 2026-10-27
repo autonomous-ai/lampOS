@@ -1,0 +1,33 @@
+{
+  "arm": {
+    "run": 40549421469,
+    "job": 122348798882,
+    "attempt": 1,
+    "status": "completed",
+    "conclusion": "success",
+    "watcher_terminal_exit": 0
+  },
+  "linux": {
+    "run": 40549421398,
+    "job": 122348797794,
+    "status": "completed",
+    "conclusion": "success",
+    "commands_verified": [
+      "cargo +1.96.0 fmt --all --check",
+      "cargo clippy --locked --workspace --all-targets -- -D warnings"
+    ]
+  },
+  "raw_logs_private": {
+    "arm": {
+      "sha256": "9c0a2868c5ccff2bf6b503ccbc5f6f9ae3d30e2986c0ca1f1b4a39f91c6254dc",
+      "lines": 9426
+    },
+    "linux": {
+      "sha256": "e4820153ae867718ee85d5c54ccd8b364fb7e3beadbaa3d64461fef23f29d3d7",
+      "lines": 648
+    }
+  },
+  "raw_per_test_executable_bytes_not_available": true,
+  "production_artifact_not_audited": true,
+  "new_local_cargo_or_tests": 0
+}

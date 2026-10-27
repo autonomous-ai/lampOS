@@ -1,0 +1,11 @@
+{
+  "all182SKIPpairs_exactly_match_fresh_discovery": true,
+  "filtered_other_cases": 180,
+  "full_discovered_cases": 517,
+  "full_discovery_not_runtime": true,
+  "full_ignored_flags": 6,
+  "ignored_flags_in_scoped_list": 2,
+  "other_cases_docs_custom_fmt_Clippy": "UNRUN; no release-gate claim",
+  "scoped_discovered_cases": 183,
+  "selected_runtime_cases": 1
+}

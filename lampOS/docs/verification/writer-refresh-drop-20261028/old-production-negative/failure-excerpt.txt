@@ -1,0 +1,6 @@
+Exact selected case: writer_refresh::tests::dropping_the_session_releases_its_lease_despite_a_retained_duplicate
+Actual outcome: FAIL (1/1); Nextest exit 100.
+Source: crates/update/src/writer_refresh/tests.rs:78:36
+called `Result::unwrap()` on an `Err` value: Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+Summary: 1 test run: 0 passed, 1 failed, 182 skipped.
+Original orchestration exit: 1, from the separately preserved analysis assertion.

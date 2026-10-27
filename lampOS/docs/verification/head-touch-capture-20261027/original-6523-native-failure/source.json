@@ -1,0 +1,51 @@
+{
+  "head": "6523fa886bf5aa5f6304732cdd23b58f4be3cbe9",
+  "base": "0d1d1f2b944581169c9f96adba9f40ab88adba92",
+  "preview": {
+    "parents": [
+      "0d1d1f2b944581169c9f96adba9f40ab88adba92",
+      "6523fa886bf5aa5f6304732cdd23b58f4be3cbe9"
+    ],
+    "sha": "44e46f97868fecba769d09052902301a826d4cb8",
+    "tree": "78cde1e924170b46b968138d3a56e0c242a0150d"
+  },
+  "files": {
+    "lampOS/crates/update/src/head_touch.rs": {
+      "git_mode": "100644",
+      "git_blob": "f0f048d74a3010d0dd917b08b8eca0d31b239ad9",
+      "sha256": "2e9bcd134f16744e622f813cc3f5e71fe55c1b2a7bb64a5bd14d63d157b3638c",
+      "actual_preview_equal_via_complete_tree": true
+    },
+    "lampOS/crates/update/src/head_touch/capture.rs": {
+      "git_mode": "100644",
+      "git_blob": "f25375f99386c7c78efc1b5ce9a172b7ac09248d",
+      "sha256": "4137a729709ccfb1ad5a9653fd570daa38a46d2c2988cbd767595bddac7bdf59",
+      "actual_preview_equal_via_complete_tree": true
+    },
+    "lampOS/crates/update/src/head_touch/capture/tests.rs": {
+      "git_mode": "100644",
+      "git_blob": "b227829af605ead004b4ff244ea604f282764b8d",
+      "sha256": "e11b05b3206e9da3e4506a2b8c9da3dc24a9ed4a7c2defcd3a63392f48137e8d",
+      "actual_preview_equal_via_complete_tree": true
+    },
+    "lampOS/docs/head-touch-capture.md": {
+      "git_mode": "100644",
+      "git_blob": "6e18a508a2a6f0cdda01bc0e5f40c380f837da64",
+      "sha256": "9598ec0320f98523bcf3a648388141cf0c1f14ab3f0b1928b6a94bb154365a3e",
+      "actual_preview_equal_via_complete_tree": true
+    },
+    "lampOS/docs/reuse-decisions.md": {
+      "git_mode": "100644",
+      "git_blob": "b8c5d3768ae6d1035561e2827428ee14b19af2d5",
+      "sha256": "a996f87675004d9330f3e8d3d45b76969cdc31cfafaff45cd23f66774848a40b",
+      "actual_preview_equal_via_complete_tree": true
+    },
+    "lampOS/docs/updates.md": {
+      "git_mode": "100644",
+      "git_blob": "b129d724563f8296257db43d90c031d8af15d2f8",
+      "sha256": "521890f7bc9a773d32efb465790eb95d3a632044093f193bf783eb55e6aa3cff",
+      "actual_preview_equal_via_complete_tree": true
+    }
+  },
+  "complete_preview_authored_tree_equal": true
+}

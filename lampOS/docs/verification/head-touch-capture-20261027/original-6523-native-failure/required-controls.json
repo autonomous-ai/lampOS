@@ -1,0 +1,324 @@
+{
+  "capture": [
+    {
+      "binary_id": "lamp-update",
+      "test": "head_touch::capture::tests::actual_projection_and_verification_replay_after_the_filesystem_is_gone",
+      "status": "PASS",
+      "ordinal": 2490
+    },
+    {
+      "binary_id": "lamp-update",
+      "test": "head_touch::capture::tests::custom_pins_and_settings_off_do_not_invent_product_or_body_dependencies",
+      "status": "PASS",
+      "ordinal": 2493
+    },
+    {
+      "binary_id": "lamp-update",
+      "test": "head_touch::capture::tests::absence_empty_regular_and_null_are_distinct_and_unknown_keys_are_errors",
+      "status": "PASS",
+      "ordinal": 2488
+    },
+    {
+      "binary_id": "lamp-update",
+      "test": "head_touch::capture::tests::a_fixture_null_spelling_is_regular_text_and_a_real_null_mask_is_metadata_only",
+      "status": "PASS",
+      "ordinal": 2487
+    },
+    {
+      "binary_id": "lamp-update",
+      "test": "head_touch::capture::tests::relative_directory_and_regular_links_and_contained_absolute_links_recheck",
+      "status": "PASS",
+      "ordinal": 2503
+    },
+    {
+      "binary_id": "lamp-update",
+      "test": "head_touch::capture::tests::cache_keys_and_link_targets_keep_directory_requiring_spellings_distinct",
+      "status": "PASS",
+      "ordinal": 2492
+    },
+    {
+      "binary_id": "lamp-update",
+      "test": "head_touch::capture::tests::escapes_and_link_loops_refuse_without_an_ordinary_reader_fallback",
+      "status": "PASS",
+      "ordinal": 2496
+    },
+    {
+      "binary_id": "lamp-update",
+      "test": "head_touch::capture::tests::dangling_link_appearance_and_missing_ancestor_creation_invalidate",
+      "status": "PASS",
+      "ordinal": 2494
+    },
+    {
+      "binary_id": "lamp-update",
+      "test": "head_touch::capture::tests::directory_membership_including_ignored_names_and_absence_is_rechecked",
+      "status": "PASS",
+      "ordinal": 2495
+    },
+    {
+      "binary_id": "lamp-update",
+      "test": "head_touch::capture::tests::removal_from_a_captured_directory_invalidates_without_a_text_dependency",
+      "status": "PASS",
+      "ordinal": 2504
+    },
+    {
+      "binary_id": "lamp-update",
+      "test": "head_touch::capture::tests::file_mutation_and_ancestor_replacement_refuse_before_freeze",
+      "status": "PASS",
+      "ordinal": 2498
+    },
+    {
+      "binary_id": "lamp-update",
+      "test": "head_touch::capture::tests::same_descriptor_checks_reject_preopen_swap_and_postread_mutation",
+      "status": "FAIL",
+      "ordinal": 2506
+    },
+    {
+      "binary_id": "lamp-update",
+      "test": "head_touch::capture::tests::metadata_only_null_classification_refuses_zero_fifo_and_socket",
+      "status": "PASS",
+      "ordinal": 2499
+    },
+    {
+      "binary_id": "lamp-update",
+      "test": "head_touch::capture::tests::raw_non_utf8_names_are_preserved_but_non_utf8_text_is_refused",
+      "status": "PASS",
+      "ordinal": 2501
+    },
+    {
+      "binary_id": "lamp-update",
+      "test": "head_touch::capture::tests::regular_hard_links_retain_link_count_and_content_dependencies",
+      "status": "PASS",
+      "ordinal": 2502
+    },
+    {
+      "binary_id": "lamp-update",
+      "test": "head_touch::capture::tests::root_substitution_and_an_unrelated_root_refuse_revalidation",
+      "status": "PASS",
+      "ordinal": 2505
+    },
+    {
+      "binary_id": "lamp-update",
+      "test": "head_touch::capture::tests::any_caught_provider_error_poisoned_collection_and_policy_errors_are_redacted",
+      "status": "PASS",
+      "ordinal": 2491
+    },
+    {
+      "binary_id": "lamp-update",
+      "test": "head_touch::capture::tests::file_aggregate_directory_name_key_and_work_limits_return_no_partial_success",
+      "status": "PASS",
+      "ordinal": 2497
+    },
+    {
+      "binary_id": "lamp-update",
+      "test": "head_touch::capture::tests::actual_default_file_and_ignored_name_bounds_are_enforced_and_poisoned",
+      "status": "PASS",
+      "ordinal": 2489
+    },
+    {
+      "binary_id": "lamp-update",
+      "test": "head_touch::capture::tests::path_component_link_and_repeated_resolution_work_are_bounded",
+      "status": "PASS",
+      "ordinal": 2500
+    },
+    {
+      "binary_id": "lamp-update",
+      "test": "head_touch::capture::tests::a_body_calibration_change_after_capture_refuses_even_with_carried_base_units",
+      "status": "PASS",
+      "ordinal": 2486
+    }
+  ],
+  "seam": [
+    {
+      "binary_id": "lamp-update",
+      "test": "head_touch::input_tests::projection_and_verification_replay_closed_inputs_without_filesystem_fallback",
+      "status": "UNRUN",
+      "ordinal": null
+    },
+    {
+      "binary_id": "lamp-update",
+      "test": "head_touch::input_tests::an_uncaptured_key_never_becomes_a_captured_absence",
+      "status": "UNRUN",
+      "ordinal": null
+    },
+    {
+      "binary_id": "lamp-update",
+      "test": "head_touch::input_tests::rejecting_an_early_override_does_not_consume_a_later_directory_error",
+      "status": "UNRUN",
+      "ordinal": null
+    },
+    {
+      "binary_id": "lamp-update",
+      "test": "head_touch::input_tests::ordinary_inputs_keep_regular_links_null_masks_and_directory_aliases",
+      "status": "UNRUN",
+      "ordinal": null
+    }
+  ],
+  "foundation": [
+    {
+      "binary_id": "lamp-update",
+      "test": "writer_refresh::tests::no_apply_does_not_qualify_but_one_exact_apply_can_enter_without_an_ordinary_round",
+      "status": "UNRUN",
+      "ordinal": null
+    },
+    {
+      "binary_id": "lamp-update",
+      "test": "writer_refresh::tests::a_restart_at_every_unqualified_prefix_requires_recovery_and_never_reissues_the_grant",
+      "status": "UNRUN",
+      "ordinal": null
+    },
+    {
+      "binary_id": "lamp-update",
+      "test": "writer_refresh::tests::qualified_writer_and_preimages_survive_a_restart_until_the_product_journal_closes",
+      "status": "UNRUN",
+      "ordinal": null
+    },
+    {
+      "binary_id": "lamp-update",
+      "test": "writer_refresh::tests::identity_substitution_never_changes_or_admits_the_saved_transaction",
+      "status": "UNRUN",
+      "ordinal": null
+    },
+    {
+      "binary_id": "lamp-update",
+      "test": "writer_refresh::tests::a_stale_or_modified_first_apply_cannot_consume_the_single_grant",
+      "status": "UNRUN",
+      "ordinal": null
+    },
+    {
+      "binary_id": "lamp-update",
+      "test": "writer_refresh::tests::unsupported_or_malformed_journals_are_retained_and_block_every_admission",
+      "status": "UNRUN",
+      "ordinal": null
+    },
+    {
+      "binary_id": "lamp-update",
+      "test": "writer_refresh::tests::missing_and_nonregular_records_do_not_turn_into_a_fresh_transaction",
+      "status": "UNRUN",
+      "ordinal": null
+    },
+    {
+      "binary_id": "lamp-update",
+      "test": "writer_refresh::tests::future_nonsemantic_metadata_is_preserved_without_becoming_admission_authority",
+      "status": "UNRUN",
+      "ordinal": null
+    },
+    {
+      "binary_id": "lamp-update",
+      "test": "writer_refresh::tests::write_bound_and_invalid_identities_leave_no_journal_or_partial_acceptance",
+      "status": "UNRUN",
+      "ordinal": null
+    },
+    {
+      "binary_id": "lamp-update",
+      "test": "writer_refresh::tests::diagnostics_hide_unknown_values_and_known_duplicate_or_shadowed_fields_are_refused",
+      "status": "UNRUN",
+      "ordinal": null
+    },
+    {
+      "binary_id": "lamp-update",
+      "test": "writer_refresh::tests::guard_lock_is_exclusive_and_independent_of_the_product_lock",
+      "status": "UNRUN",
+      "ordinal": null
+    },
+    {
+      "binary_id": "lamp-update",
+      "test": "writer_refresh::tests::failed_persist_after_publication_poisons_the_live_session_until_actual_disk_state_is_recovered",
+      "status": "UNRUN",
+      "ordinal": null
+    },
+    {
+      "binary_id": "lamp-update",
+      "test": "writer_refresh::tests::first_apply_binds_its_own_later_envelope_and_sequence_without_replacing_the_refresh_identity",
+      "status": "UNRUN",
+      "ordinal": null
+    },
+    {
+      "binary_id": "lamp-update",
+      "test": "writer_refresh::tests::restoring_an_apply_requires_its_original_grant_and_preimage_identity",
+      "status": "UNRUN",
+      "ordinal": null
+    },
+    {
+      "binary_id": "lamp-update",
+      "test": "writer_refresh::tests::reloaded_inputs_keep_the_exact_origin_and_distinguish_writer_from_apply_restoration",
+      "status": "UNRUN",
+      "ordinal": null
+    },
+    {
+      "binary_id": "lamp-update",
+      "test": "writer_refresh::tests::qualified_and_closed_inputs_keep_the_compatible_writer_and_bound_product_receipts",
+      "status": "UNRUN",
+      "ordinal": null
+    },
+    {
+      "binary_id": "lamp-update",
+      "test": "writer_refresh::tests::live_or_poisoned_sessions_cannot_expose_stale_recovery_inputs",
+      "status": "UNRUN",
+      "ordinal": null
+    },
+    {
+      "binary_id": "lamp-update",
+      "test": "writer_refresh::tests::recovery_views_retain_later_metadata_in_the_bound_inputs_without_reparsing",
+      "status": "UNRUN",
+      "ordinal": null
+    }
+  ],
+  "mask": [
+    {
+      "binary_id": "lamp-update",
+      "test": "head_touch::tests::null_masks_do_not_admit_other_character_devices",
+      "status": "UNRUN",
+      "ordinal": null
+    }
+  ],
+  "receipt": [
+    {
+      "binary_id": "lamp-update",
+      "test": "apply::tests::a_done_for_another_operation_does_not_change_any_setting_record",
+      "status": "PASS",
+      "ordinal": 2441
+    },
+    {
+      "binary_id": "lamp-update",
+      "test": "apply::tests::a_done_for_another_sequence_does_not_change_any_setting_record",
+      "status": "PASS",
+      "ordinal": 2442
+    },
+    {
+      "binary_id": "lamp-update",
+      "test": "apply::tests::an_explicit_expected_identity_does_not_follow_a_rewritten_staged_request",
+      "status": "PASS",
+      "ordinal": 2455
+    },
+    {
+      "binary_id": "lamp-update",
+      "test": "apply::tests::a_matching_done_keeps_the_permanent_forward_read_contract",
+      "status": "PASS",
+      "ordinal": 2443
+    },
+    {
+      "binary_id": "lamp-update",
+      "test": "apply::tests::an_unknown_done_operation_is_refused_without_changing_any_setting_record",
+      "status": "PASS",
+      "ordinal": 2456
+    },
+    {
+      "binary_id": "lamp-update::round",
+      "test": "a_rejected_apply_receipt_runs_real_back_and_restores_written_settings_modes_and_records",
+      "status": "UNRUN",
+      "ordinal": null
+    },
+    {
+      "binary_id": "lamp-update::round",
+      "test": "a_rejected_back_receipt_keeps_the_journal_until_real_back_is_acknowledged",
+      "status": "UNRUN",
+      "ordinal": null
+    },
+    {
+      "binary_id": "lamp-update::round",
+      "test": "the_round_rejects_a_done_matching_a_rewritten_request_instead_of_its_own_request",
+      "status": "UNRUN",
+      "ordinal": null
+    }
+  ]
+}

@@ -1,0 +1,62 @@
+[
+  {
+    "stage": "metadata",
+    "exit_code": 0,
+    "elapsed_seconds": 0.428,
+    "original_stage_record_sha256": "5a3296f35b18d7992eae616667aab8ca2eec2f5bbfd7250fc1c78bf873ebc75a"
+  },
+  {
+    "stage": "fmt",
+    "exit_code": 0,
+    "elapsed_seconds": 6.032,
+    "original_stage_record_sha256": "5a3296f35b18d7992eae616667aab8ca2eec2f5bbfd7250fc1c78bf873ebc75a"
+  },
+  {
+    "stage": "clippy",
+    "exit_code": 0,
+    "elapsed_seconds": 30.05,
+    "original_stage_record_sha256": "5a3296f35b18d7992eae616667aab8ca2eec2f5bbfd7250fc1c78bf873ebc75a"
+  },
+  {
+    "stage": "compile",
+    "exit_code": 0,
+    "elapsed_seconds": 76.526,
+    "original_stage_record_sha256": "5a3296f35b18d7992eae616667aab8ca2eec2f5bbfd7250fc1c78bf873ebc75a"
+  },
+  {
+    "stage": "full-list",
+    "exit_code": 0,
+    "elapsed_seconds": 7.311,
+    "original_stage_record_sha256": "5a3296f35b18d7992eae616667aab8ca2eec2f5bbfd7250fc1c78bf873ebc75a"
+  },
+  {
+    "stage": "scoped-list",
+    "exit_code": 0,
+    "elapsed_seconds": 0.374,
+    "original_stage_record_sha256": "5a3296f35b18d7992eae616667aab8ca2eec2f5bbfd7250fc1c78bf873ebc75a"
+  },
+  {
+    "stage": "nextest",
+    "exit_code": 0,
+    "elapsed_seconds": 9.555,
+    "original_stage_record_sha256": "5a3296f35b18d7992eae616667aab8ca2eec2f5bbfd7250fc1c78bf873ebc75a"
+  },
+  {
+    "stage": "doctests",
+    "exit_code": 0,
+    "elapsed_seconds": 0.499,
+    "original_stage_record_sha256": "5a3296f35b18d7992eae616667aab8ca2eec2f5bbfd7250fc1c78bf873ebc75a"
+  },
+  {
+    "stage": "mac-contract-self-cli-exec",
+    "exit_code": 0,
+    "elapsed_seconds": 0.003,
+    "original_stage_record_sha256": "5a3296f35b18d7992eae616667aab8ca2eec2f5bbfd7250fc1c78bf873ebc75a"
+  },
+  {
+    "stage": "mac-contract-self-process-cuts",
+    "exit_code": 0,
+    "elapsed_seconds": 0.003,
+    "original_stage_record_sha256": "5a3296f35b18d7992eae616667aab8ca2eec2f5bbfd7250fc1c78bf873ebc75a"
+  }
+]

@@ -1,0 +1,19 @@
+{
+  "case": [
+    "lamp-update",
+    "writer_refresh::tests::dropping_the_session_releases_its_lease_despite_a_retained_duplicate"
+  ],
+  "dirty_paths": [
+    "lampOS/crates/update/src/writer_refresh/tests.rs"
+  ],
+  "filter": "binary_id(=lamp-update) & test(=writer_refresh::tests::dropping_the_session_releases_its_lease_despite_a_retained_duplicate)",
+  "fmt_and_Clippy": "UNRUN for exact preserved diagnostic source; this is not a releasable candidate gate",
+  "head": "d8ca71f4dc6e65b00564afb1e67c1a33311aeab8",
+  "mode": "ONE expected-failing old-production duplicate-descriptor model, NOT candidate gate or prior failure cause proof",
+  "old_production_sha256": "f90f1851020a0a8fa443e30f5dd496f8a2d142b255a46f3490bb54414aa935ca",
+  "protected_new_control_sha256": "9c0088c82d41a6815799a1b02149fa1b3b2299f8617401f68d202db0e3b45215",
+  "runner": "Nextest0.9.150",
+  "source_count": 7496,
+  "tree": "ed4cb37e0d99976f62504f9e5abe28a0e23c9603",
+  "working_patch_sha256": "3a5ba8fce32776bcd75b4c48a6ada4d6eb04c35abe2788684d64720a8f5d59c7"
+}

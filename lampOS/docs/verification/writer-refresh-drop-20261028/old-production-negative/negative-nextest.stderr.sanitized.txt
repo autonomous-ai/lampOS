@@ -1,0 +1,208 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.12s
+────────────
+ Nextest run ID <RUN_ID> with nextest profile: pr
+    Starting 1 test across 1 binary (182 tests and 8 binaries skipped)
+        SKIP [         ] (───) lamp-update apply::tests::a_done_for_another_operation_does_not_change_any_setting_record
+        SKIP [         ] (───) lamp-update apply::tests::a_done_for_another_sequence_does_not_change_any_setting_record
+        SKIP [         ] (───) lamp-update apply::tests::a_matching_done_keeps_the_permanent_forward_read_contract
+        SKIP [         ] (───) lamp-update apply::tests::a_new_skills_folder_is_removed_when_it_is_put_back_and_a_folder_in_use_stays
+        SKIP [         ] (───) lamp-update apply::tests::a_path_both_a_setting_and_an_image_file_is_refused_with_nothing_written
+        SKIP [         ] (───) lamp-update apply::tests::a_put_back_asked_again_after_being_cut_short_puts_every_record_back
+        SKIP [         ] (───) lamp-update apply::tests::a_reload_that_fails_fails_the_apply_and_a_speaker_that_fails_is_said
+        SKIP [         ] (───) lamp-update apply::tests::a_removed_setting_goes_only_where_it_is_still_the_builds
+        SKIP [         ] (───) lamp-update apply::tests::a_request_with_a_field_it_does_not_know_is_read
+        SKIP [         ] (───) lamp-update apply::tests::a_setting_still_the_builds_is_written_and_one_the_lamp_changed_is_kept
+        SKIP [         ] (───) lamp-update apply::tests::a_setting_the_lamp_removed_stays_removed_and_one_never_there_is_written
+        SKIP [         ] (───) lamp-update apply::tests::a_signed_image_file_outside_the_list_is_refused_with_nothing_written
+        SKIP [         ] (───) lamp-update apply::tests::a_unit_systemd_cannot_load_writes_nothing
+        SKIP [         ] (───) lamp-update apply::tests::an_envelope_signed_with_another_key_or_of_another_build_writes_nothing
+        SKIP [         ] (───) lamp-update apply::tests::an_explicit_expected_identity_does_not_follow_a_rewritten_staged_request
+        SKIP [         ] (───) lamp-update apply::tests::an_unknown_done_operation_is_refused_without_changing_any_setting_record
+        SKIP [         ] (───) lamp-update apply::tests::put_back_keeps_a_file_changed_since_and_a_stale_back_file_is_not_used
+        SKIP [         ] (───) lamp-update apply::tests::put_back_restores_each_file_byte_for_byte_and_its_mode
+        SKIP [         ] (───) lamp-update apply::tests::put_back_restores_the_images_files_and_reloads_again
+        SKIP [         ] (───) lamp-update apply::tests::the_apply_path_never_restarts_or_signals_journald
+        SKIP [         ] (───) lamp-update apply::tests::the_apply_unit_can_write_every_carried_path_and_never_names_journald
+        SKIP [         ] (───) lamp-update apply::tests::the_images_files_are_written_where_the_lamp_has_one_the_image_shipped
+        SKIP [         ] (───) lamp-update apply::tests::the_tmpfiles_are_created_only_when_they_are_there
+        SKIP [         ] (───) lamp-update apply::tests::the_tmpfiles_install_writes_is_one_it_shipped
+        SKIP [         ] (───) lamp-update apply::tests::the_variants_file_is_written_and_none_of_another
+        SKIP [         ] (───) lamp-update apply::tests::unrecorded_tmpfiles_an_install_shipped_are_the_builds_and_others_the_lamps
+        SKIP [         ] (───) lamp-update apply::tests::without_a_request_nothing_is_done
+        SKIP [         ] (───) lamp-update apply::tests::without_the_image_asked_or_from_an_older_copy_none_is_written
+        SKIP [         ] (───) lamp-update check_units::tests::a_base_unit_of_19_oct_that_leaves_lamp_cloud_off_is_named
+        SKIP [         ] (───) lamp-update check_units::tests::a_drop_in_that_turns_a_product_switch_off_says_so
+        SKIP [         ] (───) lamp-update check_units::tests::a_masked_unit_fails_an_implicit_slice_does_not_and_white_space_shows
+        SKIP [         ] (───) lamp-update check_units::tests::a_units_own_path_line_is_its_text_and_hides_nothing
+        SKIP [         ] (───) lamp-update check_units::tests::exactly_the_product_passes_and_a_unit_from_elsewhere_does_not
+        SKIP [         ] (───) lamp-update check_units::tests::same_changed_drop_in_extra_and_missing_are_each_said_and_fail_the_check
+        SKIP [         ] (───) lamp-update check_units::tests::systemctl_cat_is_read_file_by_file_and_a_comment_with_a_path_is_no_file
+        SKIP [         ] (───) lamp-update check_units::tests::the_images_unit_is_the_images_not_extra_and_compared_with_its_variant
+        SKIP [         ] (───) lamp-update check_units::tests::the_product_as_install_writes_it_passes
+        SKIP [         ] (───) lamp-update fetch::tests::a_chunked_file_and_one_to_the_end
+        SKIP [         ] (───) lamp-update fetch::tests::a_file_by_its_length_after_a_redirect
+        SKIP [         ] (───) lamp-update fetch::tests::a_folder_on_the_lamp
+        SKIP [         ] (───) lamp-update fetch::tests::a_name_lookup_that_hangs_is_given_up_and_no_round_starts_another_until_it_ends
+        SKIP [         ] (───) lamp-update fetch::tests::a_release_file_from_github
+        SKIP [         ] (───) lamp-update fetch::tests::an_answered_lookup_is_counted_out_before_its_answer_arrives
+        SKIP [         ] (───) lamp-update fetch::tests::missing_too_large_short_and_other_answers
+        SKIP [         ] (───) lamp-update fetch::tests::no_network_is_unreachable
+        SKIP [         ] (───) lamp-update fetch::tests::urls_and_redirects
+        SKIP [         ] (───) lamp-update head_touch::input_tests::an_uncaptured_key_never_becomes_a_captured_absence
+        SKIP [         ] (───) lamp-update head_touch::input_tests::ordinary_inputs_keep_regular_links_null_masks_and_directory_aliases
+        SKIP [         ] (───) lamp-update head_touch::input_tests::projection_and_verification_replay_closed_inputs_without_filesystem_fallback
+        SKIP [         ] (───) lamp-update head_touch::input_tests::rejecting_an_early_override_does_not_consume_a_later_directory_error
+        SKIP [         ] (───) lamp-update head_touch::tests::null_masks_do_not_admit_other_character_devices
+        SKIP [         ] (───) lamp-update image::tests::a_file_not_listed_as_shipped_is_refused
+        SKIP [         ] (───) lamp-update image::tests::a_unit_reloads_systemd_a_rule_reloads_udev_and_asound_restarts_the_voice
+        SKIP [         ] (───) lamp-update image::tests::every_image_file_of_every_variant_is_listed_as_shipped
+        SKIP [         ] (───) lamp-update image::tests::journald_is_never_restarted_nor_signalled
+        SKIP [         ] (───) lamp-update image::tests::the_variant_is_the_images_and_none_is_standard
+        SKIP [         ] (───) lamp-update install::tests::a_timed_service_is_never_enabled_and_its_timer_is
+        SKIP [         ] (───) lamp-update install::tests::a_unit_through_current_is_read
+        SKIP [         ] (───) lamp-update install::tests::every_deploy_product_unit_is_installed_or_named_left_out
+        SKIP [         ] (───) lamp-update install::tests::every_product_part_starts_through_its_current_link
+        SKIP [         ] (───) lamp-update install::tests::every_tool_the_factory_steps_run_is_installed_where_they_look
+        SKIP [         ] (───) lamp-update install::tests::install_commands_never_wait_past_their_bound
+        SKIP [         ] (───) lamp-update install::tests::install_commands_say_their_stderr_or_give_their_stdout
+        SKIP [         ] (───) lamp-update install::tests::no_product_unit_names_a_lamp
+        SKIP [         ] (───) lamp-update install::tests::offsets_are_read
+        SKIP [         ] (───) lamp-update install::tests::the_cloud_is_enabled_with_the_lamp
+        SKIP [         ] (───) lamp-update install::tests::the_eyes_camera_helper_socket_is_enabled_and_names_the_eyes_camera
+        SKIP [         ] (───) lamp-update install::tests::the_skills_manage_socket_is_enabled_and_its_template_is_not
+        SKIP [         ] (───) lamp-update install::tests::the_wifi_helper_is_never_listed_without_its_restore_at_boot
+        SKIP [         ] (───) lamp-update judge::tests::a_part_that_stays_up_with_one_process_and_says_it_is_well_is_well
+        SKIP [         ] (───) lamp-update judge::tests::restarted_failed_or_another_process_is_not_well
+        SKIP [         ] (───) lamp-update judge::tests::the_part_s_own_word_counts_against_what_it_said_before
+        SKIP [         ] (───) lamp-update manifest::tests::a_build_for_a_newer_updater_is_refused_by_an_older_one_only
+        SKIP [         ] (───) lamp-update manifest::tests::a_key_made_by_openssl_signs_as_well
+        SKIP [         ] (───) lamp-update manifest::tests::a_manifest_without_min_updater_is_written_and_read_as_before
+        SKIP [         ] (───) lamp-update manifest::tests::a_newer_manifest_this_updater_cannot_read_is_refused_for_its_updater
+        SKIP [         ] (───) lamp-update manifest::tests::a_sealed_manifest_opens_with_its_key_and_gives_back_its_bytes
+        SKIP [         ] (───) lamp-update manifest::tests::a_setting_with_a_field_it_does_not_know_is_still_read
+        SKIP [         ] (───) lamp-update manifest::tests::an_image_file_outside_the_list_listed_twice_or_not_its_sha_is_refused
+        SKIP [         ] (───) lamp-update manifest::tests::another_key_a_changed_byte_or_a_changed_signature_is_refused
+        SKIP [         ] (───) lamp-update manifest::tests::min_updater_is_signed_with_the_rest
+        SKIP [         ] (───) lamp-update manifest::tests::min_updater_raised_under_the_same_signature_is_a_bad_signature
+        SKIP [         ] (───) lamp-update manifest::tests::models_are_read_only_with_the_updater_they_need_and_plain_paths
+        SKIP [         ] (───) lamp-update manifest::tests::names_are_plain
+        SKIP [         ] (───) lamp-update manifest::tests::nothing_but_a_plain_manifest_is_signed_or_taken
+        SKIP [         ] (───) lamp-update manifest::tests::product_units_require_the_signed_updater_level_before_older_readers_select_them
+        SKIP [         ] (───) lamp-update manifest::tests::settings_are_read_only_with_the_updater_they_need_and_their_own_paths
+        SKIP [         ] (───) lamp-update manifest::tests::the_reset_plan_is_read_only_with_its_updater_and_its_own_path
+        SKIP [         ] (───) lamp-update models::tests::a_link_into_the_store_is_relative_and_a_unit_reads_by_path_or_folder
+        SKIP [         ] (───) lamp-update product_skills::tests::a_link_in_place_of_a_core_file_is_put_back_and_never_read
+        SKIP [         ] (───) lamp-update product_skills::tests::each_file_is_one_of_three
+        SKIP [         ] (───) lamp-update product_skills::tests::only_plain_paths_in_the_skills_it_names_are_taken
+        SKIP [         ] (───) lamp-update product_skills::tests::the_bundle_of_the_repository_is_what_install_writes
+        SKIP [         ] (───) lamp-update product_skills::tests::the_stores_key_beside_the_skills_is_left_alone
+        SKIP [         ] (───) lamp-update product_skills::tests::what_is_written_is_put_back_and_a_file_changed_since_is_left
+        SKIP [         ] (───) lamp-update publish::tests::binaries_and_each_lamps_units_but_nothing_else
+        SKIP [         ] (───) lamp-update publish::tests::models_are_carried_with_the_updater_they_need
+        SKIP [         ] (───) lamp-update publish::tests::product_services_and_linked_lamp_overrides_are_carried_with_level_six
+        SKIP [         ] (───) lamp-update publish::tests::the_images_files_are_carried_with_the_updater_they_need
+        SKIP [         ] (───) lamp-update publish::tests::the_products_settings_are_carried_with_the_updater_they_need
+        SKIP [         ] (───) lamp-update publish::tests::the_stores_key_is_carried_only_when_the_repository_has_it
+        SKIP [         ] (───) lamp-update quiet::tests::a_stale_mute_or_one_in_a_turn_is_not_quiet
+        SKIP [         ] (───) lamp-update quiet::tests::a_voice_asleep_or_muted_for_privacy_is_quiet_at_once
+        SKIP [         ] (───) lamp-update quiet::tests::a_voice_that_says_nothing_is_never_quiet
+        SKIP [         ] (───) lamp-update quiet::tests::forty_five_seconds_of_nothing_after_the_last_word
+        SKIP [         ] (───) lamp-update quiet::tests::hearing_thinking_or_speaking_is_a_turn
+        SKIP [         ] (───) lamp-update quiet::tests::quiet_needs_as_long_a_watch
+        SKIP [         ] (───) lamp-update records::tests::a_link_left_beside_is_replaced_and_never_written_through
+        SKIP [         ] (───) lamp-update records::tests::a_state_from_a_later_build_keeps_its_fields_across_a_save
+        SKIP [         ] (───) lamp-update records::tests::a_state_from_before_the_settings_reads_and_writes_as_before
+        SKIP [         ] (───) lamp-update records::tests::a_state_that_cannot_be_read_is_kept_aside
+        SKIP [         ] (───) lamp-update records::tests::each_kept_state_and_journal_reads_as_saved
+        SKIP [         ] (───) lamp-update records::tests::one_at_a_time
+        SKIP [         ] (───) lamp-update records::tests::state_journal_and_previous_units_are_kept
+        SKIP [         ] (───) lamp-update records::tests::write_records_fixtures
+        SKIP [         ] (───) lamp-update setup_lifecycle::tests::incomplete_duplicate_or_malformed_manager_records_are_unknown
+        SKIP [         ] (───) lamp-update setup_lifecycle::tests::manager_identity_requires_the_exact_loaded_product_with_known_dropins
+        SKIP [         ] (───) lamp-update status::tests::a_restart_keeps_the_last_result_each_end_is_said_and_it_is_said_again
+        SKIP [         ] (───) lamp-update status::tests::the_status_is_the_records_build_the_phase_and_the_last_end_without_its_reason
+        SKIP [         ] (───) lamp-update status::tests::the_value_lasts_three_periods_so_a_dead_updater_reads_stale
+        SKIP [         ] (───) lamp-update switches::tests::a_later_drop_in_or_file_that_sets_it_back_on_leaves_it_on
+        SKIP [         ] (───) lamp-update switches::tests::environment_files_and_their_lines
+        SKIP [         ] (───) lamp-update switches::tests::several_on_a_line_quoted_continued_and_cleared_are_read_as_systemd_does
+        SKIP [         ] (───) lamp-update switches::tests::the_product_switches_are_its_on_lines_and_lamp_cloud_is_one
+        SKIP [         ] (───) lamp-update unit::restart_order::tests::a_declared_socket_precedes_its_service
+        SKIP [         ] (───) lamp-update unit::restart_order::tests::a_path_through_an_unchanged_unit_still_orders_its_ends
+        SKIP [         ] (───) lamp-update unit::restart_order::tests::cycles_including_self_edges_are_refused
+        SKIP [         ] (───) lamp-update unit::restart_order::tests::repeated_and_folded_declarations_keep_each_edge
+        SKIP [         ] (───) lamp-update unit::restart_order::tests::requirements_and_directives_in_other_sections_do_not_order_units
+        SKIP [         ] (───) lamp-update unit::restart_order::tests::the_shipped_managed_services_have_a_valid_startup_graph
+        SKIP [         ] (───) lamp-update unit::restart_order::tests::the_voice_starts_after_controls_so_it_stops_first
+        SKIP [         ] (───) lamp-update unit::restart_order::tests::unsupported_ordering_cannot_silently_lose_a_dependency
+        SKIP [         ] (───) lamp-update unit::tests::a_new_build_is_written_everywhere_the_folder_is_named
+        SKIP [         ] (───) lamp-update unit::tests::comments_do_not_make_a_unit_another
+        SKIP [         ] (───) lamp-update unit::tests::lamp_4aces_own_units_are_read
+        SKIP [         ] (───) lamp-update unit::tests::only_a_part_installed_by_build_is_a_program
+        SKIP [         ] (───) lamp-update unit::tests::the_generic_package_sets_up_and_resets_as_the_product_does
+        SKIP [         ] (───) lamp-update unit::tests::the_generic_voice_answers_whom_the_product_does
+        SKIP [         ] (───) lamp-update unit::tests::the_generic_voice_has_the_product_clock_and_session_context
+        SKIP [         ] (───) lamp-update unit::tests::the_generic_voice_runs_the_ring_as_the_product_does
+        SKIP [         ] (───) lamp-update unit::tests::the_generic_voice_says_its_failures_as_the_product_does
+        SKIP [         ] (───) lamp-update world::query::tests::a_failed_query_cleans_its_same_group_child_even_after_output_closes
+        SKIP [         ] (───) lamp-update world::query::tests::an_endless_writer_is_refused_at_the_cap_and_its_group_killed
+        SKIP [         ] (───) lamp-update world::query::tests::an_endless_writer_whose_child_holds_the_pipe_is_refused_and_both_killed
+        SKIP [         ] (───) lamp-update world::query::tests::invalid_utf8_cleans_closed_output_child
+        SKIP [         ] (───) lamp-update world::query::tests::public_output_accepts_one_mib_and_refuses_one_byte_more
+        SKIP [         ] (───) lamp-update world::query::tests::public_output_refuses_invalid_utf8_instead_of_a_partial_string
+        SKIP [         ] (───) lamp-update world::query::tests::query_deadline_applies_after_stdout_closes
+        SKIP [         ] (───) lamp-update world::query::tests::query_reads_output_with_closed_stdin_and_discarded_stderr
+        SKIP [         ] (───) lamp-update world::query::tests::query_refuses_nonzero_exit_and_spawn_failure
+        SKIP [         ] (───) lamp-update world::query::tests::query_timeout_cleans_the_exited_leaders_pipe_holding_descendant
+        SKIP [         ] (───) lamp-update world::tests::a_child_holding_the_pipe_is_an_error_within_the_bound
+        SKIP [         ] (───) lamp-update world::tests::a_child_holding_the_pipe_is_killed_with_the_query
+        SKIP [         ] (───) lamp-update world::tests::a_failed_query_says_its_trimmed_stderr_and_a_good_one_its_stdout
+        SKIP [         ] (───) lamp-update world::tests::a_stalled_systemctl_show_is_an_error_within_its_bound
+        SKIP [         ] (───) lamp-update world::tests::self_recovery_accepts_an_armed_timer_and_an_inactive_service
+        SKIP [         ] (───) lamp-update world::tests::self_recovery_refuses_a_timer_not_armed_persistently
+        SKIP [         ] (───) lamp-update world::tests::self_recovery_refuses_an_unloaded_masked_or_ephemeral_service
+        SKIP [         ] (───) lamp-update world::tests::self_recovery_refuses_malformed_or_unexpected_query_records
+        SKIP [         ] (───) lamp-update world::tests::self_recovery_requires_one_of_each_record_and_required_property
+        SKIP [         ] (───) lamp-update world::tests::systemctl_show_is_read_unit_by_unit
+        SKIP [         ] (───) lamp-update world::tests::the_bus_hears_a_muted_voice_and_not_a_mute_it_cannot_read
+        SKIP [         ] (───) lamp-update world::tests::the_bus_hears_the_voice_and_not_an_old_state
+        SKIP [         ] (───) lamp-update world::tests::the_real_disk_has_room
+        SKIP [         ] (───) lamp-update writer_refresh::tests::a_restart_at_every_unqualified_prefix_requires_recovery_and_never_reissues_the_grant
+        SKIP [         ] (───) lamp-update writer_refresh::tests::a_stale_or_modified_first_apply_cannot_consume_the_single_grant
+        SKIP [         ] (───) lamp-update writer_refresh::tests::diagnostics_hide_unknown_values_and_known_duplicate_or_shadowed_fields_are_refused
+        SKIP [         ] (───) lamp-update writer_refresh::tests::failed_persist_after_publication_poisons_the_live_session_until_actual_disk_state_is_recovered
+        SKIP [         ] (───) lamp-update writer_refresh::tests::first_apply_binds_its_own_later_envelope_and_sequence_without_replacing_the_refresh_identity
+        SKIP [         ] (───) lamp-update writer_refresh::tests::future_nonsemantic_metadata_is_preserved_without_becoming_admission_authority
+        SKIP [         ] (───) lamp-update writer_refresh::tests::guard_lock_is_exclusive_and_independent_of_the_product_lock
+        SKIP [         ] (───) lamp-update writer_refresh::tests::identity_substitution_never_changes_or_admits_the_saved_transaction
+        SKIP [         ] (───) lamp-update writer_refresh::tests::live_or_poisoned_sessions_cannot_expose_stale_recovery_inputs
+        SKIP [         ] (───) lamp-update writer_refresh::tests::missing_and_nonregular_records_do_not_turn_into_a_fresh_transaction
+        SKIP [         ] (───) lamp-update writer_refresh::tests::no_apply_does_not_qualify_but_one_exact_apply_can_enter_without_an_ordinary_round
+        SKIP [         ] (───) lamp-update writer_refresh::tests::qualified_and_closed_inputs_keep_the_compatible_writer_and_bound_product_receipts
+        SKIP [         ] (───) lamp-update writer_refresh::tests::qualified_writer_and_preimages_survive_a_restart_until_the_product_journal_closes
+        SKIP [         ] (───) lamp-update writer_refresh::tests::recovery_views_retain_later_metadata_in_the_bound_inputs_without_reparsing
+        SKIP [         ] (───) lamp-update writer_refresh::tests::reloaded_inputs_keep_the_exact_origin_and_distinguish_writer_from_apply_restoration
+        SKIP [         ] (───) lamp-update writer_refresh::tests::restoring_an_apply_requires_its_original_grant_and_preimage_identity
+        SKIP [         ] (───) lamp-update writer_refresh::tests::unsupported_or_malformed_journals_are_retained_and_block_every_admission
+        SKIP [         ] (───) lamp-update writer_refresh::tests::write_bound_and_invalid_identities_leave_no_journal_or_partial_acceptance
+        FAIL [   0.027s] (1/1) lamp-update writer_refresh::tests::dropping_the_session_releases_its_lease_despite_a_retained_duplicate
+  stdout ───
+
+    running 1 test
+    test writer_refresh::tests::dropping_the_session_releases_its_lease_despite_a_retained_duplicate ... FAILED
+
+    failures:
+
+    failures:
+        writer_refresh::tests::dropping_the_session_releases_its_lease_despite_a_retained_duplicate
+
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 182 filtered out; finished in 0.02s
+
+  stderr ───
+
+    thread 'writer_refresh::tests::dropping_the_session_releases_its_lease_despite_a_retained_duplicate' <THREAD_ID> panicked at crates/update/src/writer_refresh/tests.rs:78:36:
+    called `Result::unwrap()` on an `Err` value: Os { code: 35, kind: WouldBlock, message: "Resource temporarily unavailable" }
+    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+────────────
+     Summary [   0.028s] 1 test run: 0 passed, 1 failed, 182 skipped
+error: test run failed

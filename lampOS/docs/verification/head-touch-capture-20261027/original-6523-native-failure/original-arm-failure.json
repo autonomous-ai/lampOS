@@ -1,0 +1,122 @@
+{
+  "PR": 3892,
+  "head": "6523fa886bf5aa5f6304732cdd23b58f4be3cbe9",
+  "base": "0d1d1f2b944581169c9f96adba9f40ab88adba92",
+  "actual_checkout": "44e46f97868fecba769d09052902301a826d4cb8",
+  "ordered_parents": [
+    "0d1d1f2b944581169c9f96adba9f40ab88adba92",
+    "6523fa886bf5aa5f6304732cdd23b58f4be3cbe9"
+  ],
+  "full_tree": "78cde1e924170b46b968138d3a56e0c242a0150d",
+  "complete_tree_equals_authored_head": true,
+  "platform": "aarch64-unknown-linux-gnu",
+  "Rust": "1.96.0",
+  "Nextest": "0.9.149",
+  "run_id": 40543995512,
+  "job_id": 122329568735,
+  "attempt": 1,
+  "event": "pull_request",
+  "run_conclusion": "failure",
+  "job_conclusion": "failure",
+  "native_watch_exit": 1,
+  "Nextest_exit": 100,
+  "selection": {
+    "selected": 7803,
+    "selected_binaries": 70,
+    "summary_skips": 53,
+    "whole_binaries_skipped": 119,
+    "terminal": 2509,
+    "PASS": 2508,
+    "FAIL": 1,
+    "selected_unrun": 5294,
+    "partition": "hash:1/1",
+    "profile": "pr",
+    "parallel_cpus": 4,
+    "fail_fast": true
+  },
+  "failed_control": {
+    "status": "FAIL",
+    "ordinal": 2506,
+    "total": 7803,
+    "binary": "lamp-update",
+    "name": "head_touch::capture::tests::same_descriptor_checks_reject_preopen_swap_and_postread_mutation"
+  },
+  "failure_location": "crates/update/src/head_touch/capture/tests.rs:456:9",
+  "failed_predicate": "outcome.is_err()",
+  "failure_payload_and_original_metadata": "not recorded",
+  "failed_subcase_and_cause": "UNESTABLISHED",
+  "final_FAIL_echo": "one duplicate terminal reprint after summary; not a rerun",
+  "required_controls": {
+    "PASS": 25,
+    "FAIL": 1,
+    "UNRUN": 26,
+    "groups": {
+      "capture": {
+        "PASS": 20,
+        "FAIL": 1
+      },
+      "seam": {
+        "UNRUN": 4
+      },
+      "foundation": {
+        "UNRUN": 18
+      },
+      "mask": {
+        "UNRUN": 1
+      },
+      "receipt": {
+        "PASS": 5,
+        "UNRUN": 3
+      }
+    }
+  },
+  "physical_Linux_raw_name_control": {
+    "status": "PASS",
+    "ordinal": 2501,
+    "native_cfg_branch_source_present": true,
+    "skipped_or_caught_EILSEQ": false,
+    "not_whole_gate_acceptance": true
+  },
+  "stage_conclusions": {
+    "Set up job": "success",
+    "system packages": "success",
+    "Run actions/checkout@v4": "success",
+    "publication failure tests (offline, no signing secret)": "success",
+    "Rust 1.96.0": "success",
+    "artifact provenance regression (offline, disposable Cargo workspace)": "success",
+    "stable promotion tests (offline, disposable test key)": "success",
+    "restore the cache": "success",
+    "unchanged source files get the cached build's times back": "success",
+    "record fresh source times for a cold publication build": "skipped",
+    "Run taiki-e/install-action@v2": "success",
+    "build (release, the lamps' binaries)": "success",
+    "every built lamp-* binary is classified for the lamp-os package": "success",
+    "build the two selected artifact examples without filename collisions": "success",
+    "publication CLI rehearsal (local test key and simulated GitHub only)": "success",
+    "which crates a pull request tests": "success",
+    "test (full run, every test one at a time; otherwise without the realtime group, in parallel)": "failure",
+    "doc tests and the own-harness tests (nextest runs neither)": "skipped",
+    "export only current Cargo targets and their SHA-256": "skipped",
+    "Run actions/upload-artifact@v4": "skipped",
+    "discard the isolated example target before saving the cache": "skipped",
+    "save the cache": "skipped",
+    "Post Run actions/checkout@v4": "success",
+    "Complete job": "success"
+  },
+  "raw_private_evidence_sha256": {
+    "arm-job.log": "6ed799bb734a1860b21c263da67fa09a26feb810b4e8b9c5aed46d4b70a8d4dc",
+    "arm-run.json": "e62f7cb91f6009fe05094ec211d361e52ce1c37e8f0cd5cfb101667f8dc7ffa4",
+    "arm-job.json": "f56080640c1cdb9333f91d5eb9587b5ccf5b504800b94a3023266efdbb8b299c",
+    "linux-preview-source.json": "a17d017f800ba5cbd74e6395abab6bac0263b214827095d96a195d6d7fab1779"
+  },
+  "complete_log_lines": 3724,
+  "limits": [
+    "Only the original attempt was read; no rerun or cancel.",
+    "53 SKIPs are summary counts; this failed CI did not retain full JSON discovery or enumerate every selected-unrun name.",
+    "All 52 required controls are joined to source names, with UNRUN meaning absent from unique terminal rows.",
+    "Doc/custom/export/upload stages were skipped, so no artifact or executable hash or documentation success is claimed.",
+    "Cached source times and targets were reused; no clean-build claim.",
+    "Later corrected source and local Mac results are separate; old cause remains unestablished.",
+    "No installed-lamp, activation, performance, power-cut or restoration acceptance."
+  ]
+}

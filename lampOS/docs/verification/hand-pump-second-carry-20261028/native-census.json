@@ -1,0 +1,252 @@
+{
+  "unique_passes": 7791,
+  "bad_unrun_selected": 0,
+  "echoes_excluded": 34,
+  "required22": [
+    {
+      "status": "PASS",
+      "ordinal": 4129,
+      "total": 7791,
+      "binary": "lamp-voice",
+      "test": "hand_controls::tests::an_idle_pump_is_ready_only_after_its_first_subscribed_drain"
+    },
+    {
+      "status": "PASS",
+      "ordinal": 926,
+      "total": 7791,
+      "binary": "lamp-voice",
+      "test": "hand_controls::tests::with_the_wait_an_idle_pump_wakes_five_times_a_second_and_stops_at_once"
+    },
+    {
+      "status": "PASS",
+      "ordinal": 4165,
+      "total": 7791,
+      "binary": "lamp-voice",
+      "test": "hand_controls::tests::with_the_wait_a_head_touch_is_read_as_it_arrives"
+    },
+    {
+      "status": "PASS",
+      "ordinal": 4166,
+      "total": 7791,
+      "binary": "lamp-voice",
+      "test": "hand_controls::tests::with_the_wait_a_mute_taken_through_the_owners_poll_is_said_at_once"
+    },
+    {
+      "status": "PASS",
+      "ordinal": 4548,
+      "total": 7791,
+      "binary": "lamp-voice",
+      "test": "privacy_bus::tests::after_a_datagram_a_gap_ends_the_lease_reader_inside_its_first_second"
+    },
+    {
+      "status": "PASS",
+      "ordinal": 4550,
+      "total": 7791,
+      "binary": "lamp-voice",
+      "test": "privacy_bus::tests::selected_endpoints_bind_and_read_a_real_bus"
+    },
+    {
+      "status": "PASS",
+      "ordinal": 4552,
+      "total": 7791,
+      "binary": "lamp-voice",
+      "test": "privacy_bus::tests::the_lease_reader_resyncs_on_kept_leases_only_before_its_first_datagram_in_its_first_second"
+    },
+    {
+      "status": "PASS",
+      "ordinal": 4573,
+      "total": 7791,
+      "binary": "lamp-voice",
+      "test": "privacy_bus::tests::the_lease_watch_answers_at_once_through_refused_input_and_lets_a_lease_expire"
+    },
+    {
+      "status": "PASS",
+      "ordinal": 6766,
+      "total": 7791,
+      "binary": "lamp-voice",
+      "test": "transport::tests::initial_capture_prepared_survives_bounded_speaker_startup"
+    },
+    {
+      "status": "PASS",
+      "ordinal": 6763,
+      "total": 7791,
+      "binary": "lamp-voice",
+      "test": "transport::tests::initial_capture_prepared_still_requires_age_boot_order_and_nonfuture_time"
+    },
+    {
+      "status": "PASS",
+      "ordinal": 6769,
+      "total": 7791,
+      "binary": "lamp-voice",
+      "test": "transport::tests::reference_startup_allowance_does_not_cover_primes_data_or_capture_input"
+    },
+    {
+      "status": "PASS",
+      "ordinal": 6765,
+      "total": 7791,
+      "binary": "lamp-voice",
+      "test": "transport::tests::later_capture_prepared_keeps_the_existing_single_sender_stall_allowance"
+    },
+    {
+      "status": "PASS",
+      "ordinal": 6759,
+      "total": 7791,
+      "binary": "lamp-voice",
+      "test": "transport::tests::a_receiver_held_up_takes_what_queued_meanwhile_within_a_bound"
+    },
+    {
+      "status": "PASS",
+      "ordinal": 6764,
+      "total": 7791,
+      "binary": "lamp-voice",
+      "test": "transport::tests::a_stale_renewal_with_the_next_renewal_behind_it_is_passed_over"
+    },
+    {
+      "status": "PASS",
+      "ordinal": 6770,
+      "total": 7791,
+      "binary": "lamp-voice",
+      "test": "transport::tests::renewals_read_on_time_are_taken_one_by_one"
+    },
+    {
+      "status": "PASS",
+      "ordinal": 6767,
+      "total": 7791,
+      "binary": "lamp-voice",
+      "test": "transport::tests::only_the_next_message_in_order_may_come_late_from_a_held_up_sender"
+    },
+    {
+      "status": "PASS",
+      "ordinal": 6771,
+      "total": 7791,
+      "binary": "lamp-voice",
+      "test": "transport::tests::the_providers_input_takes_a_message_late_in_order_and_its_output_does_not"
+    },
+    {
+      "status": "PASS",
+      "ordinal": 6768,
+      "total": 7791,
+      "binary": "lamp-voice",
+      "test": "transport::tests::only_the_providers_input_takes_late_and_every_other_channel_keeps_its_bound"
+    },
+    {
+      "status": "PASS",
+      "ordinal": 6762,
+      "total": 7791,
+      "binary": "lamp-voice",
+      "test": "transport::tests::a_run_of_late_messages_is_said_however_it_ends"
+    },
+    {
+      "status": "PASS",
+      "ordinal": 6774,
+      "total": 7791,
+      "binary": "lamp-voice",
+      "test": "transport::tests::the_second_routes_input_takes_a_message_late_only_as_the_only_voice"
+    },
+    {
+      "status": "PASS",
+      "ordinal": 6772,
+      "total": 7791,
+      "binary": "lamp-voice",
+      "test": "transport::tests::the_providers_input_still_refuses_another_boot_or_another_order"
+    },
+    {
+      "status": "PASS",
+      "ordinal": 6761,
+      "total": 7791,
+      "binary": "lamp-voice",
+      "test": "transport::tests::a_send_to_a_peer_that_has_gone_is_refused_with_the_sockets_name"
+    }
+  ],
+  "accepted16_observed_subset": [
+    {
+      "status": "PASS",
+      "ordinal": 4546,
+      "total": 7791,
+      "binary": "lamp-voice",
+      "test": "privacy_bus::tests::a_receipt_comes_only_with_a_slides_reading"
+    },
+    {
+      "status": "PASS",
+      "ordinal": 4548,
+      "total": 7791,
+      "binary": "lamp-voice",
+      "test": "privacy_bus::tests::after_a_datagram_a_gap_ends_the_lease_reader_inside_its_first_second"
+    },
+    {
+      "status": "PASS",
+      "ordinal": 4547,
+      "total": 7791,
+      "binary": "lamp-voice",
+      "test": "privacy_bus::tests::only_recovery_finishes_the_source_episode_and_allows_a_new_one"
+    },
+    {
+      "status": "PASS",
+      "ordinal": 4549,
+      "total": 7791,
+      "binary": "lamp-voice",
+      "test": "privacy_bus::tests::recovery_queued_after_a_source_stall_reports_the_old_expiry_first"
+    },
+    {
+      "status": "PASS",
+      "ordinal": 4550,
+      "total": 7791,
+      "binary": "lamp-voice",
+      "test": "privacy_bus::tests::selected_endpoints_bind_and_read_a_real_bus"
+    },
+    {
+      "status": "PASS",
+      "ordinal": 4551,
+      "total": 7791,
+      "binary": "lamp-voice",
+      "test": "privacy_bus::tests::source_expiry_is_ridden_only_when_enabled_after_permission"
+    },
+    {
+      "status": "PASS",
+      "ordinal": 4552,
+      "total": 7791,
+      "binary": "lamp-voice",
+      "test": "privacy_bus::tests::the_lease_reader_resyncs_on_kept_leases_only_before_its_first_datagram_in_its_first_second"
+    },
+    {
+      "status": "PASS",
+      "ordinal": 4573,
+      "total": 7791,
+      "binary": "lamp-voice",
+      "test": "privacy_bus::tests::the_lease_watch_answers_at_once_through_refused_input_and_lets_a_lease_expire"
+    },
+    {
+      "status": "PASS",
+      "ordinal": 4553,
+      "total": 7791,
+      "binary": "lamp-voice",
+      "test": "privacy_bus::tests::the_order_begins_again_only_before_the_first_datagram_in_the_first_second"
+    }
+  ],
+  "accepted16_not_observed_in_current_native_selection": [
+    "bus::a_subscriber_is_told_once_that_the_source_has_gone_and_once_that_it_is_back",
+    "bus::a_topic_that_promised_a_period_is_late_after_twice_that_and_on_time_with_the_next",
+    "privacy::a_lamp_with_no_slide_permits_only_with_its_marker_and_a_fresh_observation",
+    "privacy::envelope_must_name_voice_and_match_payload_clock_time_session_and_sequence",
+    "privacy::freshness_is_original_acquisition_bounded_and_boot_scoped",
+    "privacy::permission_requires_known_open_switch_and_bounded_valid_lineage",
+    "privacy::topic_is_additive_and_json_roundtrips"
+  ],
+  "raw_log_sha256": "9c0a2868c5ccff2bf6b503ccbc5f6f9ae3d30e2986c0ca1f1b4a39f91c6254dc",
+  "prior_analysis_guard_rejected_all16_native_assumption": true,
+  "no_fresh_local_runtime": true,
+  "additional_new_join_and_linux_control": [
+    {
+      "test": "hand_controls::tests::the_head_touch_fixture_joins_its_worker_before_a_failed_check_returns",
+      "status": "PASS",
+      "terminal_reprints": 0,
+      "sanitized_terminal": "        PASS [   0.006s] (4155/7791) lamp-voice hand_controls::tests::the_head_touch_fixture_joins_its_worker_before_a_failed_check_returns"
+    },
+    {
+      "test": "transport::tests::a_refused_send_drops_what_the_gone_peer_had_sent",
+      "status": "PASS",
+      "terminal_reprints": 0,
+      "sanitized_terminal": "        PASS [   0.006s] (6760/7791) lamp-voice transport::tests::a_refused_send_drops_what_the_gone_peer_had_sent"
+    }
+  ]
+}

@@ -1,0 +1,35 @@
+/// A retained duplicate models a descriptor held between fork and exec. It
+/// does not reproduce an actual spawn or establish a reported failure's cause.
+#[test]
+fn dropping_the_session_releases_its_lease_despite_a_retained_duplicate() {
+    let (_folder, store) = fixture();
+    let binding = binding();
+    let session = store.prepare(binding.clone()).unwrap();
+    let retained = session._lock.try_clone().unwrap();
+    let before = bytes(&store);
+    assert_eq!(
+        store.inspect(&binding).unwrap_err().kind(),
+        io::ErrorKind::WouldBlock
+    );
+    drop(session);
+    let reopened = Store::open(store.folder.clone()).unwrap();
+    assert_eq!(
+        reopened.inspect(&binding).unwrap(),
+        Admission::RecoveryNeeded
+    );
+    let recovery = reopened.recover(&binding).unwrap();
+    // Closing the old description must not release the independently opened
+    // recovery session's lease.
+    drop(retained);
+    assert_eq!(
+        store.inspect(&binding).unwrap_err().kind(),
+        io::ErrorKind::WouldBlock
+    );
+    assert_eq!(bytes(&store), before);
+    drop(recovery);
+    assert_eq!(
+        store.inspect(&binding).unwrap(),
+        Admission::RecoveryNeeded
+    );
+}
+

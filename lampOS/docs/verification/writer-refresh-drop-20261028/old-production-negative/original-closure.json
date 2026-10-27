@@ -1,0 +1,16 @@
+{
+  "configuration_unchanged": true,
+  "controller_error": "AssertionError('preserve unexpected first result; no replay')",
+  "controller_unchanged": true,
+  "fmt_and_Clippy_unrun": true,
+  "head_unchanged": true,
+  "negative_runtime_executions": 1,
+  "negative_witness_as_expected": false,
+  "nextest_config_unchanged": true,
+  "nextest_tool_unchanged": true,
+  "no_current_candidate_gate_pass_claim": true,
+  "source_count": 7496,
+  "source_unchanged": true,
+  "status_unchanged": true,
+  "working_patch_unchanged": true
+}

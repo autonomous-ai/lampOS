@@ -1,0 +1,64 @@
+{
+  "head": "4084e4e1dde24ea17d6c88d944256f78904579c0",
+  "whole_files": [
+    {
+      "path": "lampOS/crates/voice/src/privacy_bus.rs",
+      "sha256": "0f376c76bc9409f9d41c07187d4a58de553bfb5b49a6d600342bcd90714a67df",
+      "matches_accepted_3637": true
+    },
+    {
+      "path": "lampOS/crates/msgs/src/privacy.rs",
+      "sha256": "32ec32a89137fc6e39e5fb9b66314f0349069d1321e63d7e0cd5fc2ce0b8e8a1",
+      "matches_accepted_3637": true
+    },
+    {
+      "path": "lampOS/crates/msgs/tests/it/privacy.rs",
+      "sha256": "49877816630df846011d0c3a9fe3239e4bbdac0cdfffa31478a38c159ca03356",
+      "matches_accepted_3637": true
+    },
+    {
+      "path": "lampOS/crates/bus/tests/it/bus.rs",
+      "sha256": "7040765d6d856c9e228a1211da736b8a891680a5bf90d4b0a3a6ced064a1f76a",
+      "matches_accepted_3637": true
+    },
+    {
+      "path": "lampOS/crates/bus/src/subscribe.rs",
+      "sha256": "0404a4e881ee06ba41c4f5874d31dcf773a9aba818d2b4df410e6a05bf396e28",
+      "matches_accepted_3637": true
+    },
+    {
+      "path": "lampOS/crates/bus/src/wire.rs",
+      "sha256": "2773cbc3f2dd0fe5accd28e1e940b57dc579dc48c922821e4b66e5b80abf6920",
+      "matches_accepted_3637": true
+    },
+    {
+      "path": "lampOS/crates/bus/src/publish.rs",
+      "sha256": "3b760ef2169d8561750c0bf28f8bea176f729c8ba18de45354067068814016c1",
+      "matches_accepted_3637": true
+    },
+    {
+      "path": "lampOS/crates/bus/src/live.rs",
+      "sha256": "b0a04b4b0a58ab8ca01a38de39931bf3657fc985187caee6db43499b2b6b6291",
+      "matches_accepted_3637": true
+    },
+    {
+      "path": "lampOS/crates/bus/src/declare.rs",
+      "sha256": "60183bfa717674edc75d709417c7cb4f8366900bb598a8db627240a2a96c5995",
+      "matches_accepted_3637": true
+    },
+    {
+      "path": "lampOS/crates/ipc/src/lib.rs",
+      "sha256": "f64aa5070b79991a58ed0fe772c6697c3d52f4c58b48e793046c753358703c44",
+      "matches_accepted_3637": true
+    },
+    {
+      "path": "lampOS/crates/controls/src/privacy.rs",
+      "sha256": "3a22d4b087a9f6cf68b3fbcc753bed367d53354d2660c6c1057b7bdb04a60a2d",
+      "matches_accepted_3637": true
+    }
+  ],
+  "source_proof_sha256": "03df7653078dabbda18cab6cb37a28532b6ec482d886b781b63d2299b0e117a7",
+  "accepted_comment": 6444805122,
+  "narrow_kept_resync_disposition_applies": true,
+  "other_3315_dispositions_or_runtime_claimed": false
+}

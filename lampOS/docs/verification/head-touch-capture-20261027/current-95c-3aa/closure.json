@@ -1,0 +1,23 @@
+{
+  "head_unchanged": true,
+  "status_unchanged": true,
+  "working_patch_unchanged": true,
+  "source_unchanged": true,
+  "source_count": 7502,
+  "configuration_unchanged": true,
+  "controller_unchanged": true,
+  "nextest_tool_unchanged": true,
+  "nextest_config_unchanged": true,
+  "retained_failed_driver_unchanged": true,
+  "receipt_selectors_unchanged": true,
+  "affected_scope_unchanged": true,
+  "all_stages_passed": true,
+  "controller_error": null,
+  "observed_native_exit": 0,
+  "final_native_result_sha256": "26a34713c0cca2a18e04bb3e9a9f2a4115eb67d1b4f8279481c1900d17d1b4dd",
+  "original_request_explicit_require_escalated": true,
+  "original_request_machine_receipt_sha256": "c3157779f5afefe1fd50387893b9810ca71c8e81e3bcbaf20e54da85f7ef8bf6",
+  "source_freeze_includes_all_untracked_owned_files": true,
+  "postrun_doc_delta_separately_bound": true,
+  "executable_manifest_sha256": "464b9aa6f0c5d0a4b04a5c195a1befa7bc827092fa36c9974625c24c6aa98b1c"
+}

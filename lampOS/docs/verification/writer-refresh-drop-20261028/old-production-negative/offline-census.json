@@ -1,0 +1,72 @@
+{
+  "actual_counts": {
+    "FAIL": 1,
+    "LEAK": 0,
+    "PASS": 0,
+    "TIMEOUT": 0,
+    "selected_unrun": 0
+  },
+  "actual_driver_sha256": "dda9c34c9552474010a0a1e6e904f1b8d91607b79552d9ab81afc6ef89dda8a9",
+  "actual_failure_location": "crates/update/src/writer_refresh/tests.rs:78:36",
+  "all_nonselected_skip_pairs_accounted": true,
+  "all_ten_actual_preserved_postruntime_hashes_closed": true,
+  "analysis_only_no_replay": true,
+  "case_binary_discovery_binding_exact": true,
+  "cause_of_prior_reported_failures": "UNESTABLISHED",
+  "driver_sha256": "dda9c34c9552474010a0a1e6e904f1b8d91607b79552d9ab81afc6ef89dda8a9",
+  "error_kind": "WouldBlock",
+  "error_message": "Resource temporarily unavailable",
+  "exact_discovery_sha256": "10aea7ca012643f959c2a8736369d0bc1274c4319b5eb30a9d57d00a6ac3caaa",
+  "expected_negative_witness": true,
+  "expected_old_production_negative_witness_verified_offline": true,
+  "fmt_Clippy_docs_custom": "UNRUN; diagnostic source is never offered or pushed",
+  "headers": [
+    "    Starting 1 test across 1 binary (182 tests and 8 binaries skipped)"
+  ],
+  "no_candidate_gate_pass_claim": true,
+  "no_compilation_or_runtime_replay": true,
+  "offline_analysis_controller_sha256": "c3829a44041680243d27ee4aab5070e9140754024a53f58174a74aa4bd7bc490",
+  "original_closure_sha256": "02e999e643fb8e9786cc2a973ef5436e69dc3792e6d21d6d4ca1d9b4b3bd8c55",
+  "original_controller_assertion_preserved": "AssertionError('preserve unexpected first result; no replay')",
+  "original_controller_sha256": "4fe8fce361c7acf6f7b246a7c8588847f7eba1b35be24a56cb907691f466ba69",
+  "original_manifest_sha256": "e12a5a66ee9a5617b2ac9dae98ed79afda70201bcc5c171cde845aaf373c99f1",
+  "original_native_exit_code": 1,
+  "original_nextest_exit_code": 100,
+  "parser_bookkeeping_causes": [
+    "SKIP placeholder was three dashes for one selected case; original parser required seven",
+    "Starting header used singular test/binary; original parser required plural tests"
+  ],
+  "raw_log_hashes_reverified": true,
+  "raw_os_code": 35,
+  "raw_stderr_sha256": "bc07d31721395dd0d8732d2dfc83c9a663f4408c18ebd744a59fbad36b77bd67",
+  "raw_stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "runtime_executions": 1,
+  "selected_case": [
+    "lamp-update",
+    "writer_refresh::tests::dropping_the_session_releases_its_lease_despite_a_retained_duplicate"
+  ],
+  "skip_census": {
+    "filtered": 180,
+    "ignored": 2,
+    "membership_matches_fresh_discovery": true,
+    "observed_widths": [
+      3
+    ]
+  },
+  "source_count": 7496,
+  "source_guard_keys_verified": [
+    "head_unchanged",
+    "status_unchanged",
+    "working_patch_unchanged",
+    "source_unchanged",
+    "configuration_unchanged",
+    "controller_unchanged",
+    "nextest_tool_unchanged",
+    "nextest_config_unchanged"
+  ],
+  "summaries": [
+    "     Summary [   0.028s] 1 test run: 0 passed, 1 failed, 182 skipped"
+  ],
+  "terminal_pair_membership_exact": true,
+  "unknown_or_duplicate_pairs": 0
+}

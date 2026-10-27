@@ -1,0 +1,13 @@
+{
+  "donor_kind": "expected-negative",
+  "manifest_sha256": "e12a5a66ee9a5617b2ac9dae98ed79afda70201bcc5c171cde845aaf373c99f1",
+  "original_closure_sha256": "02e999e643fb8e9786cc2a973ef5436e69dc3792e6d21d6d4ca1d9b4b3bd8c55",
+  "actual_and_preserved_count": 10,
+  "test_outcome_not_reclassified": true,
+  "original_negative_runtime_executions": 1,
+  "original_false_negative_witness_preserved": true,
+  "original_controller_error_preserved": true,
+  "separate_reconciliation_sha256": "4ddd96526b61429e995d63ab8c35121bd6f48faab2a4d1d760778e506c63867a",
+  "separate_analysis_sha256": "bfe280e139070fbd0b6dc684e447be2d0692ab3b5349dbd676b3a38f87a62e47",
+  "cache_boundary_only_no_runtime_equivalence": true
+}

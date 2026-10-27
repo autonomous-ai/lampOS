@@ -1,0 +1,45 @@
+{
+  "pr": 3892,
+  "head": "6523fa886bf5aa5f6304732cdd23b58f4be3cbe9",
+  "base": "0d1d1f2b944581169c9f96adba9f40ab88adba92",
+  "actual_checkout": "44e46f97868fecba769d09052902301a826d4cb8",
+  "ordered_parents": [
+    "0d1d1f2b944581169c9f96adba9f40ab88adba92",
+    "6523fa886bf5aa5f6304732cdd23b58f4be3cbe9"
+  ],
+  "full_tree": "78cde1e924170b46b968138d3a56e0c242a0150d",
+  "authored_preview_complete_tree_equal": true,
+  "run": {
+    "id": 40543995574,
+    "attempt": 1,
+    "event": "pull_request",
+    "status": "completed",
+    "conclusion": "success"
+  },
+  "job": {
+    "id": 122329571280,
+    "status": "completed",
+    "conclusion": "success"
+  },
+  "required_stage_conclusions": {
+    "Rust 1.96.0": "success",
+    "stable promotion formatting and strict Clippy": "success",
+    "formatting (whole workspace, pinned Rust)": "success",
+    "clippy (every crate and target, warnings as errors)": "success"
+  },
+  "actual_commands": [
+    "cargo fmt --manifest-path .github/tools/lampos-promote/Cargo.toml --check",
+    "cargo clippy --locked --manifest-path .github/tools/lampos-promote/Cargo.toml --all-targets -- -D warnings",
+    "cargo +1.96.0 fmt --all --check",
+    "cargo clippy --locked --workspace --all-targets -- -D warnings"
+  ],
+  "actual_checked_update": true,
+  "job_watch_native_exit": 0,
+  "platform": "x86_64 Linux",
+  "toolchain": "1.96.0",
+  "complete_job_log_lines": 701,
+  "raw_complete_job_log_sha256": "5815490b6fa9e327d375236facd12b20e1a1aa7dc4189004942b46a7835feb30",
+  "raw_run_api_sha256": "9d17ac89a14230e847a6b3d9cbfab880a3713e4b184925434986ba13cc517f67",
+  "raw_job_api_sha256": "cef837e60969e84aad6b2da98c347286551f60afc37db1798ef7231b49a9588a",
+  "limits": "Original attempt1 only; no rerun. Exact tested preview equals authored tree, not later d8 Main. Per-command numeric shell exits are not printed; step success, Bash -e and command completion markers establish success. Target/source-time cache reuse is recorded; no clean-rebuild claim. No runtime/device/ARM physical subsection credit from Clippy."
+}

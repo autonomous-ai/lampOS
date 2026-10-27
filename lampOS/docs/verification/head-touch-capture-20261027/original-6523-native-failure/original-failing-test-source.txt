@@ -1,0 +1,46 @@
+#[test]
+fn file_mutation_and_ancestor_replacement_refuse_before_freeze() {
+    for replace_parent in [false, true] {
+        let root = root();
+        let path = put(root.path(), "a/nested/value", b"first");
+        let mut collector = Collector::open(root.path(), Limits::default()).unwrap();
+        assert_eq!(collector.text(&path).unwrap().as_deref(), Some("first"));
+        if replace_parent {
+            fs::rename(root.path().join("a/nested"), root.path().join("a/old")).unwrap();
+            put(root.path(), "a/nested/value", b"first");
+        } else {
+            fs::write(&path, b"second").unwrap();
+        }
+        assert!(collector.finish().is_err());
+    }
+}
+
+#[test]
+fn same_descriptor_checks_reject_preopen_swap_and_postread_mutation() {
+    for before in [true, false] {
+        let root = root();
+        let path = put(root.path(), "value", b"first");
+        let directory = File::open(root.path()).unwrap();
+        let expected =
+            Identity(rustix::fs::statat(&directory, "value", AtFlags::SYMLINK_NOFOLLOW).unwrap());
+        let outcome = read_regular(
+            &directory,
+            OsStr::new("value"),
+            expected,
+            100,
+            || {
+                if before {
+                    fs::remove_file(&path).unwrap();
+                    symlink("/dev/zero", &path).unwrap();
+                }
+            },
+            || {
+                if !before {
+                    fs::write(&path, b"other").unwrap();
+                }
+            },
+        );
+        assert!(outcome.is_err());
+    }
+}
+
