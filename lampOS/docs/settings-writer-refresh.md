@@ -198,7 +198,7 @@ bytes, install a guard, copy a helper, execute restoration or activate a
 service. Its external-effect acknowledgments require verified caller
 results. An existing private stable store directory is a caller
 precondition; privileged ancestor/ownership confinement belongs to the
-later bootstrap. No CLI or round currently calls this module. Eighteen
+later bootstrap. No CLI or round currently calls this module. Eighteen existing
 focused tests cover admission, records and recovery inputs; broader gates and
 original native qualification are recorded separately on the PR.
 
@@ -270,3 +270,58 @@ test evidence. No privileged refresh, process-cut trial, root systemd run,
 new-path setting acceptance or lamp rehearsal has run for this extension.
 The cited source audit establishes the bootstrap route and the old-helper
 rollback gap; #3466's earlier ordinary-unit GOOD/BAD does not close them.
+
+
+### Owner-scoped guard lock release
+
+The unwired `Store` acquires a private `OwnedLockGuard` only after its
+nonblocking exclusive lock succeeds. `inspect`, `prepare`, `recover` and a
+live `Session` record the acquiring process ID and release that owner's
+lock explicitly before closing the file when dropped in that same process.
+An inherited guard dropped in another process only closes its descriptor;
+it must not explicitly unlock the parent's shared lock. A duplicate descriptor may otherwise keep the same open-file-description
+lock alive after the controller is dropped. The journal, recovery admission,
+timeouts and grant policy are unchanged. Unlock errors cannot be returned
+from `Drop`; closing the file remains the fallback.
+
+This is an owner-scoped lease, not ownership transferable across `fork`.
+The parent controls the lease; a child must not use an inherited live
+`Session` as an independent journal or grant owner. The PID check protects
+automatic child-side guard drop, not child-side journal operations or general
+fork safety. Explicit unlocking affects every
+duplicate reference to the original lock, including a child's, as the
+[Linux flock manual](https://man7.org/linux/man-pages/man2/flock.2.html) and
+[Apple flock manual](https://developer.apple.com/library/archive/documentation/System/Conceptual/ManPages_iPhoneOS/man2/flock.2.html)
+describe. A later session acquires an independent open description; closing
+a stale duplicate must not release that new session's lock.
+
+A deterministic control retains a duplicate descriptor across session drop
+and checks immediate recovery and the independent new lease. A second
+control supplies a private non-owner PID to model inherited-descriptor drop
+and verifies that the parent's lease stays held. These model descriptor
+retention and ownership; they do not run a real fork or spawn or establish
+the cause of any reported concurrent-test failure. The old production code
+plus this new control was preserved before the candidate change. The protected old-production control ran once: 0 PASS / 1 expected FAIL,
+with OS code 35 (`WouldBlock`) at the immediate inspection after session
+drop. Its original orchestration exit 1 is retained: a parser expected a
+plural header and seven SKIP dashes, while a one-case run used a singular
+header and three dashes. Separately hashed offline analysis accounts for
+that one failure and all 182 skipped pairs without a compiler or runtime
+replay. It does not establish the reported flakes' cause. Earlier baseline-20
+and instrumented-candidate-38 cohorts remain INCONCLUSIVE and unwaived.
+At this preparation freeze the PID-guard candidate and its two models are
+UNRUN; later qualification must retain its exact source and separate result.
+
+
+The eighteen existing record/admission controls plus the two lock-lifetime
+models make twenty focused module controls. On the frozen preparation at
+Main `f903659bb`, the first full candidate execution passed 512 cases with
+0 bad or selected unrun and 6 policy ignores; all 33 required controls
+(twenty module, eight bound-receipt and five Head-input/mask cases) passed
+once. Fresh fmt, strict all-target Update Clippy, compilation and discovery
+passed, and all 7,500 source/configuration/runner guards and ten preserved
+executable hashes closed. Doctests had no cases; the two Mac custom-driver
+contracts were already policy-ignored and added no passes. This paragraph
+is a later documentation-only qualification note; its Rust and test bytes
+are exact to that frozen execution. Later current-base/native evidence is
+separate, and no old reported failure is waived or explained by that pass.
