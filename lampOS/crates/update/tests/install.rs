@@ -3992,6 +3992,79 @@ fn harness_on_keeps_a_harness_already_there() {
     assert!(lamp.host.steps.is_empty());
 }
 
+/// A `harness version` that runs past its bound is not known, not missing:
+/// the Harness there, ours or not, is kept and never installed over, and
+/// one read in time after its installer ran is not said too old.
+#[test]
+fn harness_on_keeps_a_harness_whose_version_cannot_be_read_in_time() {
+    let late = || {
+        Err("runuser … harness version: did not end within 30 s: it ran on, or a child it left held its output".to_owned())
+    };
+    let ours = |lamp: &Lamp| {
+        let link = lamp.on(install::HARNESS);
+        fs::create_dir_all(link.parent().unwrap()).unwrap();
+        let _ = fs::remove_file(&link);
+        std::os::unix::fs::symlink(
+            format!("{}/.local/bin/harness", install::HARNESS_HOME),
+            &link,
+        )
+        .unwrap();
+    };
+    let installs = |lamp: &Lamp| lamp.called("harness-on lampos /var/lib/lampos-tasks");
+    // Ours, too slow to say: kept, nothing installed, nothing too old.
+    let mut lamp = Lamp::new(188, &[]);
+    lamp.install().unwrap();
+    ours(&lamp);
+    lamp.host.versions = [late()].into();
+    lamp.harness_on().unwrap();
+    assert_eq!(installs(&lamp), 0);
+    assert!(
+        lamp.said.iter().any(|line| line.starts_with(
+            "Harness at /usr/local/bin/harness is kept as it is: its version could not be read in time"
+        )),
+        "{:?}",
+        lamp.said
+    );
+    assert!(
+        !lamp
+            .said
+            .iter()
+            .any(|line| line.starts_with("harness_too_old:"))
+    );
+    // Not ours, too slow to say: kept, and not said too old.
+    let mut lamp = Lamp::with_harness();
+    lamp.install().unwrap();
+    lamp.host.versions = [late()].into();
+    lamp.harness_on().unwrap();
+    assert_eq!(installs(&lamp), 0);
+    assert!(
+        !lamp
+            .said
+            .iter()
+            .any(|line| line.starts_with("harness_too_old:"))
+    );
+    // Ours and old, its installer ran, then too slow to say: not too old.
+    let mut lamp = Lamp::new(188, &[]);
+    lamp.install().unwrap();
+    ours(&lamp);
+    lamp.host.versions = [Ok("0.4.19\n".into()), late()].into();
+    lamp.harness_on().unwrap();
+    assert_eq!(installs(&lamp), 1);
+    assert!(
+        lamp.said.iter().any(|line| line.starts_with(
+            "Harness's own installer ran, from 0.4.19; its version could not be read in time"
+        )),
+        "{:?}",
+        lamp.said
+    );
+    assert!(
+        !lamp
+            .said
+            .iter()
+            .any(|line| line.starts_with("harness_too_old:"))
+    );
+}
+
 /// #1676, the first builder at 09:46: a Harness `harness-on` put there (the
 /// link to the launcher in its HOME) older than 0.4.23 is brought up to the
 /// version Harness's own installer ships, with `harness version` read before
