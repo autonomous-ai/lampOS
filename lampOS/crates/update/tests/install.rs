@@ -580,13 +580,23 @@ fn install_prepares_store_off_and_keeps_the_lamps_store_choice() {
         "[Service]\nPrivateNetwork=yes\n"
     );
     assert!(!lamp.on(lamp_skills::package::STORE_KEY).exists());
-    // Store provision is installer-only until the OTA settings contract
-    // carries these paths. Its public key must never enter a build manifest.
+    // Store provision is installer-only: the settings writer takes none of
+    // these paths. The factory's key never enters a build manifest; a
+    // build ships the Store's key only in the skills folder, where
+    // lamp-skills reads it (#3692, `install::store_key_setting`).
     let carried = install::product_settings();
     assert!(
         carried.iter().all(|s| s.path != env
             && s.path != drop_in
             && s.path != lamp_skills::package::STORE_KEY)
+    );
+    assert_eq!(
+        install::STORE_KEY_SETTING,
+        format!(
+            "{}/{}",
+            lamp_update::product_skills::FOLDER,
+            lamp_skills::package::BUILD_STORE_KEY
+        )
     );
 }
 

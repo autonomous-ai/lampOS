@@ -70,14 +70,19 @@ pub fn store_gates(cloud: Option<&str>, page: Option<&str>, store: Option<&str>)
     gates(cloud, page) && lamp_skills::package::store_switched_on(store)
 }
 
-/// [`store_gates`] as the environment says, and the Store's own public key
-/// must be present and valid before the app is offered installs.
-pub fn store_on_from_environment() -> bool {
+/// [`store_gates`] as the environment says, and the Store's own public key,
+/// the build's in `folder` or else the factory's, as the manage helper
+/// reads it (`lamp_skills::package::store_keys`), must be present and valid
+/// before the app is offered installs. Read once, at the start: the helper
+/// reads the keys again for every install, so this is only whether the app
+/// is offered them.
+pub fn store_on_from_environment(folder: &Path) -> bool {
     store_gates(
         std::env::var("LAMP_CLOUD").ok().as_deref(),
         std::env::var(ENVIRONMENT).ok().as_deref(),
         std::env::var(STORE_ENVIRONMENT).ok().as_deref(),
-    ) && lamp_skills::package::store_key(Path::new(lamp_skills::package::STORE_KEY)).is_ok()
+    ) && lamp_skills::package::store_keys(folder, Path::new(lamp_skills::package::STORE_KEY))
+        .is_ok()
 }
 
 /// Whether the switch is on: both `LAMP_CLOUD` and `LAMP_SKILLS_PAGE` are `on`.
@@ -119,11 +124,12 @@ impl Places {
     /// The product's: the unit's `--dir`, and its `--state-dir`'s off file
     /// (`deploy/product/lamp-skills.service`, the folder #1732 shares).
     pub fn product() -> Self {
+        let folder = PathBuf::from("/var/lib/lampOS/skills");
         Self {
-            folder: "/var/lib/lampOS/skills".into(),
+            store: store_on_from_environment(&folder),
+            folder,
             off: "/var/lib/lampos-skills-state/off".into(),
             manage: lamp_skills::package::MANAGE_SOCKET.into(),
-            store: store_on_from_environment(),
             addons: std::env::var(lamp_skills::ADDONS_ENVIRONMENT).is_ok_and(|value| value == "on"),
         }
     }
