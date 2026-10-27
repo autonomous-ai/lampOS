@@ -366,7 +366,7 @@ fn a_skill_from_a_package_is_listed_with_its_sha256_and_version() {
 
     // Put on from its package, as the manage helper puts one on.
     let first = pack(&folder.join("desk-tutor"), &root.join("one")).unwrap();
-    install(&folder, &first).unwrap();
+    install(&folder, None, &first).unwrap();
     let row = tutor(&mut real);
     assert_eq!(
         (&row["version"], &row["sha256"]),
@@ -393,7 +393,7 @@ fn a_skill_from_a_package_is_listed_with_its_sha256_and_version() {
     )
     .unwrap();
     let next = pack(&source, &root.join("two")).unwrap();
-    install(&folder, &next).unwrap();
+    install(&folder, None, &next).unwrap();
     let row = tutor(&mut real);
     assert_eq!(
         (&row["version"], &row["sha256"]),
@@ -405,7 +405,7 @@ fn a_skill_from_a_package_is_listed_with_its_sha256_and_version() {
     );
 
     // Put on again from a folder: no package, so none.
-    install(&folder, &source).unwrap();
+    install(&folder, None, &source).unwrap();
     assert!(tutor(&mut real)["sha256"].is_null());
     let _ = fs::remove_dir_all(&root);
 }

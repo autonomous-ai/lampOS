@@ -801,7 +801,7 @@ fn disabled_media_reserves_its_tool_without_advertisement_or_authority() {
         "kind = \"installable\"\nversion = \"1.0.0\"\ntool = \"play_fixture\"\n[permissions]\nspeak = true\n[[do]]\nsay = \"Answer briefly.\"\n",
     )
     .unwrap();
-    let why = package::install(dir.path(), &collision).unwrap_err();
+    let why = package::install(dir.path(), None, &collision).unwrap_err();
     assert!(
         why.contains("the installable skill audio-fixture's"),
         "{why}"

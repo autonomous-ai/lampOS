@@ -219,7 +219,7 @@ fn a_package_installs_whole_its_files_checked_and_open_to_the_parts() {
     // Closed on the computer it came from: open on the lamp all the same.
     fs::set_permissions(source.join("SKILL.md"), fs::Permissions::from_mode(0o600)).unwrap();
     let path = package::pack(&source, dir.path()).unwrap();
-    let said = package::install(&skills, &path).unwrap();
+    let said = package::install(&skills, None, &path).unwrap();
     assert!(
         said.starts_with("installed desk-tutor 1.0.0 (installable) from its package"),
         "{said}"
@@ -453,14 +453,14 @@ fn a_package_changed_damaged_or_out_of_shape_installs_nothing() {
         ),
     ];
     for (case, path, why) in cases {
-        let error = package::install(&skills, &path).unwrap_err();
+        let error = package::install(&skills, None, &path).unwrap_err();
         assert!(error.contains(why), "{case}: {error}");
         assert!(error.starts_with("not installed"), "{case}: {error}");
         assert!(left(&skills).is_empty(), "{case}: {:?}", left(&skills));
     }
     // The same files and manifest, untouched, do install.
     let path = package_of(&dir.path().join("good"), good, &files, &[]);
-    package::install(&skills, &path).unwrap();
+    package::install(&skills, None, &path).unwrap();
     assert_eq!(left(&skills), ["desk-tutor"]);
 }
 
@@ -480,7 +480,7 @@ fn a_packages_signature_is_carried_and_not_checked() {
         read_package(&path).unwrap().signature.as_deref(),
         Some(&b"not a signature at all"[..])
     );
-    let said = package::install(&skills, &path).unwrap();
+    let said = package::install(&skills, None, &path).unwrap();
     assert!(
         said.contains("its signature not checked: a package installed by hand from a file"),
         "{said}"
@@ -493,13 +493,13 @@ fn an_installable_skill_is_replaced_by_its_next_version_and_removed_whole() {
     let skills = dir.path().join("skills");
     fs::create_dir(&skills).unwrap();
     let first = tutor(&dir.path().join("one"), "1.0.0");
-    let said = package::install(&skills, &first).unwrap();
+    let said = package::install(&skills, None, &first).unwrap();
     assert!(
         said.starts_with("installed desk-tutor 1.0.0 (installable) from its folder"),
         "{said}"
     );
     let next = package::pack(&tutor(&dir.path().join("two"), "1.1.0"), dir.path()).unwrap();
-    let said = package::install(&skills, &next).unwrap();
+    let said = package::install(&skills, None, &next).unwrap();
     assert!(
         said.starts_with("replaced desk-tutor 1.0.0 with 1.1.0 (installable)"),
         "{said}"
@@ -526,7 +526,7 @@ fn a_skill_put_on_from_a_package_keeps_its_sha256_and_manifest_and_one_from_a_fo
     let installed = skills.join("desk-tutor");
     // The catalogue's sha256 is the package's own bytes'.
     let first = package::pack(&tutor(&dir.path().join("one"), "1.0.0"), dir.path()).unwrap();
-    package::install(&skills, &first).unwrap();
+    package::install(&skills, None, &first).unwrap();
     let kept = package::installed_from(&installed).unwrap();
     assert_eq!(kept.sha256, sha256_hex(&fs::read(&first).unwrap()));
     assert_eq!(kept.manifest, read_package(&first).unwrap().manifest);
@@ -548,7 +548,7 @@ fn a_skill_put_on_from_a_package_keeps_its_sha256_and_manifest_and_one_from_a_fo
 
     // The next version replaces it, with the new package's.
     let next = package::pack(&tutor(&dir.path().join("two"), "1.1.0"), dir.path()).unwrap();
-    package::install(&skills, &next).unwrap();
+    package::install(&skills, None, &next).unwrap();
     let kept = package::installed_from(&installed).unwrap();
     assert_eq!(kept.sha256, sha256_hex(&fs::read(&next).unwrap()));
     assert_ne!(kept.sha256, sha256_hex(&fs::read(&first).unwrap()));
@@ -567,12 +567,12 @@ fn a_skill_put_on_from_a_package_keeps_its_sha256_and_manifest_and_one_from_a_fo
     let copy = dir.path().join("copy").join("desk-tutor");
     fs::create_dir_all(copy.parent().unwrap()).unwrap();
     fs::rename(&installed, &copy).unwrap();
-    package::install(&skills, &copy).unwrap();
+    package::install(&skills, None, &copy).unwrap();
     assert!(!installed.join(package::INSTALLED_FROM).exists());
     assert_eq!(package::installed_from(&installed), None);
 
     // Removed: gone with the skill.
-    package::install(&skills, &next).unwrap();
+    package::install(&skills, None, &next).unwrap();
     assert!(package::installed_from(&installed).is_some());
     package::remove(&skills, None, "desk-tutor").unwrap();
     assert!(left(&skills).is_empty());
@@ -587,7 +587,7 @@ fn a_skill_put_on_from_a_package_keeps_its_sha256_and_manifest_and_one_from_a_fo
         &forged,
         &[],
     );
-    let why = package::install(&skills, &path).unwrap_err();
+    let why = package::install(&skills, None, &path).unwrap_err();
     assert!(why.contains("none beginning with a dot"), "{why}");
 
     // A core skill, as it comes with the lamp, has none.
@@ -601,7 +601,7 @@ fn a_core_skill_is_never_installed_replaced_or_removed() {
     fs::create_dir(&skills).unwrap();
     // A core skill comes with the lamp, never from a folder or a package.
     let dance = copied(&dir.path().join("src"), "dance", "", "");
-    let why = package::install(&skills, &dance).unwrap_err();
+    let why = package::install(&skills, None, &dance).unwrap_err();
     assert!(why.contains("dance says kind = \"core\""), "{why}");
     assert!(left(&skills).is_empty());
     // As lamp-update install puts it.
@@ -616,7 +616,7 @@ fn a_core_skill_is_never_installed_replaced_or_removed() {
         "kind = \"core\"",
         "kind = \"installable\"",
     );
-    let why = package::install(&skills, &theirs).unwrap_err();
+    let why = package::install(&skills, None, &theirs).unwrap_err();
     assert!(
         why.contains("welcome-back is a core skill on this lamp"),
         "{why}"
@@ -643,7 +643,7 @@ fn a_disabled_core_stays_in_inventory_and_cannot_be_packaged_replaced_or_removed
             .contains("core skill")
     );
     assert!(
-        package::install(&skills, &core)
+        package::install(&skills, None, &core)
             .unwrap_err()
             .contains("says kind = \"core\"")
     );
@@ -670,7 +670,7 @@ fn a_disabled_core_stays_in_inventory_and_cannot_be_packaged_replaced_or_removed
         "kind = \"installable\"",
     );
     assert!(
-        package::install(&skills, &replacement)
+        package::install(&skills, None, &replacement)
             .unwrap_err()
             .contains("is a core skill on this lamp")
     );
@@ -718,7 +718,7 @@ fn a_disabled_installable_reserves_its_tool_but_adds_no_live_function() {
         "tool = \"check_my_work\"\n[permissions]\nspeak = true\n[[do]]\nsay = \"Ready.\"\n",
     )
     .unwrap();
-    let why = package::install(&skills, &duplicate).unwrap_err();
+    let why = package::install(&skills, None, &duplicate).unwrap_err();
     assert!(why.contains("the installable skill desk-tutor's"), "{why}");
 
     // Disabling does not hide validation failures, and an invalid installed
@@ -732,7 +732,7 @@ fn a_disabled_installable_reserves_its_tool_but_adds_no_live_function() {
     let listed = package::list(&skills).unwrap();
     assert!(listed.contains("not loaded: not permitted: look needs camera = true"));
     assert!(
-        package::install(&skills, &duplicate)
+        package::install(&skills, None, &duplicate)
             .unwrap_err()
             .contains("the installable skill desk-tutor's")
     );
@@ -767,14 +767,14 @@ fn a_skill_whose_tool_another_skill_has_is_not_installed() {
         .unwrap();
         skill
     };
-    let why = package::install(&skills, &skill_of("a-dance", "dance")).unwrap_err();
+    let why = package::install(&skills, None, &skill_of("a-dance", "dance")).unwrap_err();
     assert_eq!(
         why,
         "not installed: a-dance's tool \"dance\" is the core skill dance's on this lamp: \
          a function the model calls is one skill's"
     );
     assert_eq!(left(&skills), ["dance"]);
-    let said = package::install(&skills, &tutor(&dir.path().join("one"), "1.0.0")).unwrap();
+    let said = package::install(&skills, None, &tutor(&dir.path().join("one"), "1.0.0")).unwrap();
     assert!(
         said.ends_with(
             "The skills here give the model 2 functions (dance, check_my_work). A session takes 32, \
@@ -784,13 +784,13 @@ fn a_skill_whose_tool_another_skill_has_is_not_installed() {
         ),
         "{said}"
     );
-    let why = package::install(&skills, &skill_of("tutor-two", "check_my_work")).unwrap_err();
+    let why = package::install(&skills, None, &skill_of("tutor-two", "check_my_work")).unwrap_err();
     assert!(
         why.contains("tool \"check_my_work\" is the installable skill desk-tutor's on this lamp"),
         "{why}"
     );
     assert_eq!(left(&skills), ["dance", "desk-tutor"]);
-    let said = package::install(&skills, &tutor(&dir.path().join("two"), "1.1.0")).unwrap();
+    let said = package::install(&skills, None, &tutor(&dir.path().join("two"), "1.1.0")).unwrap();
     assert!(
         said.starts_with("replaced desk-tutor 1.0.0 with 1.1.0"),
         "{said}"
@@ -819,7 +819,7 @@ fn what_a_killed_install_or_remove_left_is_deleted_by_the_next_install() {
     for kept in [".install-notes", ".installer-x-1", ".install-z-1a"] {
         fs::create_dir(skills.join(kept)).unwrap();
     }
-    let said = package::install(&skills, &tutor(&dir.path().join("src"), "1.0.0")).unwrap();
+    let said = package::install(&skills, None, &tutor(&dir.path().join("src"), "1.0.0")).unwrap();
     assert!(
         said.ends_with(
             "Deleted what a killed install or remove left: .install-desk-tutor-99999, .removed-old-skill-12."
@@ -841,7 +841,7 @@ fn what_a_killed_install_or_remove_left_is_deleted_by_the_next_install() {
         b"not the skills'"
     );
     // Nothing left this time, and nothing said of it.
-    let said = package::install(&skills, &tutor(&dir.path().join("next"), "1.1.0")).unwrap();
+    let said = package::install(&skills, None, &tutor(&dir.path().join("next"), "1.1.0")).unwrap();
     assert!(!said.contains("Deleted"), "{said}");
 }
 
@@ -859,7 +859,7 @@ fn an_install_waits_while_another_run_holds_the_skills_folder() {
     let (done, finished) = std::sync::mpsc::channel();
     let installing = {
         let skills = skills.clone();
-        std::thread::spawn(move || done.send(package::install(&skills, &source)).unwrap())
+        std::thread::spawn(move || done.send(package::install(&skills, None, &source)).unwrap())
     };
     assert!(
         finished
@@ -883,12 +883,12 @@ fn a_folder_with_a_link_or_nowhere_to_go_is_not_installed() {
     fs::create_dir(&skills).unwrap();
     let source = tutor(&dir.path().join("src"), "1.0.0");
     std::os::unix::fs::symlink("/etc/passwd", source.join("lights.toml")).unwrap();
-    let why = package::install(&skills, &source).unwrap_err();
+    let why = package::install(&skills, None, &source).unwrap_err();
     assert!(why.contains("lights.toml: a link"), "{why}");
     fs::remove_file(source.join("lights.toml")).unwrap();
-    let why = package::install(&dir.path().join("none"), &source).unwrap_err();
+    let why = package::install(&dir.path().join("none"), None, &source).unwrap_err();
     assert!(why.starts_with("no skills folder at"), "{why}");
-    let why = package::install(&skills, &dir.path().join("gone")).unwrap_err();
+    let why = package::install(&skills, None, &dir.path().join("gone")).unwrap_err();
     assert!(why.contains("gone"), "{why}");
     assert!(left(&skills).is_empty());
 }
@@ -1434,6 +1434,39 @@ fn the_apps_off_and_on_are_kept_and_a_skill_of_the_lamp_itself_is_refused() {
     assert_eq!(answer["refused"], package::NOT_A_REQUEST);
 }
 
+/// #3504's piece C: the owner's yes to the camera is kept by name, so a
+/// package put in place by hand under a name that has it takes it away
+/// before it goes in: its picture is refused until the owner says yes to
+/// it. Another name's yes stays.
+#[test]
+fn a_hand_install_under_a_granted_name_takes_its_camera_yes_away() {
+    let dir = tempfile::tempdir().unwrap();
+    let skills = dir.path().join("skills");
+    let state = dir.path().join("state");
+    fs::create_dir_all(&skills).unwrap();
+    fs::create_dir_all(&state).unwrap();
+    let camera = state.join(lamp_skills::CAMERA_FILE);
+    lamp_skills::keep_names(
+        &camera,
+        &["desk-tutor".to_owned(), "other".to_owned()].into(),
+    )
+    .unwrap();
+    let packed = package::pack(
+        &tutor(&dir.path().join("src"), "1.0.0"),
+        &dir.path().join("out"),
+    )
+    .unwrap();
+    package::install(&skills, Some(&state), &packed).unwrap();
+    assert_eq!(fs::read_to_string(&camera).unwrap(), "other\n");
+    let (loaded, _) = lamp_skills::load_all(&skills);
+    let mut running = lamp_skills::Engine::new(loaded, true);
+    running.keep_off_in(&state).unwrap();
+    assert_eq!(
+        running.picture_refused("desk-tutor").as_deref(),
+        Some("the owner hasn't said yes to its camera")
+    );
+}
+
 /// #3504's piece C: the owner's yes to a skill's camera, asked of the
 /// manage helper, is kept in the state folder's `camera`, a name a line,
 /// and taken back. A running lamp-skills reads it at each call that would
@@ -1457,7 +1490,7 @@ fn the_owners_camera_yes_is_kept_read_at_each_call_and_taken_back() {
         &dir.path().join("out"),
     )
     .unwrap();
-    package::install(&skills, &packed).unwrap();
+    package::install(&skills, None, &packed).unwrap();
     let ask = |line: &str| {
         let mut answer = Vec::new();
         let ok = package::asked(
