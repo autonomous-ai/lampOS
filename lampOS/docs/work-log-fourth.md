@@ -1,3 +1,16 @@
+## 2026-10-27 15:07 UTC — Superseded onboarding scope interrupted and retained
+
+Ready for lamp-voice: no
+
+[Actual interrupted receipt](verification/onboarding-bf6f-interrupted-20261027/README.md):
+old 9ab/bf6 broad runtime ended controller125/nextest100 after an intentional
+scope correction: 745 clean PASS, two SIGINT/raw-failed, 4,874 selected unrun.
+Docs are unrun; both earlier zero-body125 stops remain. All115 input backings
+and the interrupted Round witness are retained independently; source/closure
+pass. No qualification or product-failure cause is inferred. Current c3eb
+onboarding composes the landed exact words and goes through focused host plus
+new native gates; no old case credit transfers.
+
 ## 2026-10-27 14:40 UTC — Independent kept-resync fixture disposition accepted
 
 Ready for lamp-voice: no

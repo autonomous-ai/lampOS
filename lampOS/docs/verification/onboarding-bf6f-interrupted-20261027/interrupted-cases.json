@@ -1,0 +1,16 @@
+[
+  {
+    "test": "lamp-update::round$head_touch::pr2948_settings_on_keeps_a_head_reader_available",
+    "raw_event": "failed",
+    "human_status": "SIGINT",
+    "seconds": 2.136899087,
+    "raw_line_one_based": 1537
+  },
+  {
+    "test": "lamp-update::round$head_touch::pr2948_settings_off_preserves_the_old_head_reader",
+    "raw_event": "failed",
+    "human_status": "SIGINT",
+    "seconds": 3.666368742,
+    "raw_line_one_based": 1538
+  }
+]

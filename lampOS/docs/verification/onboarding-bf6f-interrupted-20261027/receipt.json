@@ -1,0 +1,49 @@
+{
+  "actual_native_session_id": 85268,
+  "actual_native_exit": 125,
+  "actual_native_chunk": "8c2d92",
+  "actual_native_tool_completion_observed": true,
+  "head": "bf6f7bbdf5e936c2ef82621e1bb7592d511c1453",
+  "tree": "9ab408b27bf1471382b58e35cca2fb4967af0e10",
+  "source_stable": true,
+  "all_owned_sessions_groups_closed": true,
+  "target_release_permitted": true,
+  "qualification": false,
+  "scope_interruption_intentional": true,
+  "actual_nextest_exit": 100,
+  "controller_error_retained": "Missing/ambiguous raw nextest Summary",
+  "selected": 5621,
+  "clean_pass": 745,
+  "raw_failed": 2,
+  "human_SIGINT": 2,
+  "selected_unrun": 4874,
+  "JSON_ignored": 8,
+  "human_summary_skipped": 368,
+  "skip_identities_not_reclassified": true,
+  "discovery_or_compiler_replayed": false,
+  "docs": "UNRUN",
+  "archive_actual_native": 10777,
+  "archive_actual_exit": 0,
+  "archive_receipt_sha256": "e63c44e4c6196fd9b485e0518861b9291f796698298e77d96bac23f758b27d29",
+  "retention_complete": true,
+  "original_stops_preserved": [
+    2623,
+    27218
+  ],
+  "no_failure_cause_waiver": true,
+  "evidence_sha256": {
+    "integration-run.stdout": "c841f296547442aa132e028ad944be5ff760669446c6354b96f7a902969edf88",
+    "integration-run.stderr": "b7a47160be68ea3cca1ac8479a561694b82705c00815e54f893d0a5f494d71ec",
+    "terminal.json": "eb118f62bc584972cdbc78bfdd04a6f118dca53feee2cc1b94cd0e7fdcade78e",
+    "root-intentional-interruption.json": "3767611afc69501f0651ef7d2a2a4a98e138c1efd86990fed15342b0bc2a3446",
+    "actual-interrupted-release.json": "b34a9afecf4b0ba9f126f28d0f5e3477512173e91dab991452c3c7d85c8bb492"
+  },
+  "backings": {
+    "archive_files": 115,
+    "archive_bytes": 1528136591,
+    "archive_sha256": "e63c44e4c6196fd9b485e0518861b9291f796698298e77d96bac23f758b27d29",
+    "archive_native_exit": 0,
+    "interrupted_driver_sha256": "39e2d88d08ebd62ed7bf8d92c21944027f3ae1e64ca6674457ffd73b302c18a2",
+    "independent_0600": true
+  }
+}
