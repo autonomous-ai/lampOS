@@ -1,0 +1,59 @@
+# lampOS's programming door: paired computers on the lamp's network act through it, over WebSocket
+# and TLS on port 7731, with the lamp's own pinned certificate, held to the owner's grants, leases and
+# rates, each action routed to the part that already does it at skill priority (lampOS/docs/control.md,
+# #3504). Camera frames, sound and words never go through it.
+# The product unit (lampOS/docs/install.md), on every lamp and off (the helper's decision per Nine's
+# person, 27 Oct, #3504): nothing listens until the owner turns developer access on, which a drop-in
+# does,
+#   [Service]
+#   Environment=LAMP_CONTROL=on
+# and the owner pairs a computer through the admin socket (`lamp-control code --grants …`). Off, it
+# says so and exits 0 with nothing listening, and stays inactive.
+[Unit]
+Description=lampOS programming door (lamp-control)
+PartOf=lampos.target
+# Not before setup has finished (#806). The target's own condition holds back none of its parts.
+ConditionPathExists=/var/lib/lampos-setup/done
+After=local-fs.target lamp-voice.service lamp-body.service lamp-skills.service
+StartLimitIntervalSec=600
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=lampos
+Group=lampos
+Slice=lampos-parts.slice
+Nice=10
+# Its certificate, key and paired computers, the owner's alone (0700).
+StateDirectory=lampos-control
+StateDirectoryMode=0700
+# The owner's admin socket, 0600 in a 0700 folder.
+RuntimeDirectory=lampos-control
+RuntimeDirectoryMode=0700
+# Off in the product, said here so a drop-in's `on` is the one change.
+Environment=LAMP_CONTROL=off
+ExecStart=/opt/lampOS/control/current/lamp-control serve --state-dir /var/lib/lampos-control --listen 0.0.0.0:7731 --admin-socket /run/lampos-control/admin.sock --mood-socket /run/lampos-body/mood.sock --say-socket /run/lampos-say/say.sock --bus-root /run/lampos-bus
+Restart=on-failure
+RestartSec=10s
+StandardInput=null
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=lamp-control
+NoNewPrivileges=yes
+ProtectSystem=strict
+ReadWritePaths=/run/lampos-bus
+ProtectHome=yes
+PrivateTmp=yes
+# A network service that parses TLS and WebSocket from the LAN: nothing more
+# than it needs (Fourteen's P3 on #3876). Port 7731 needs no capability.
+CapabilityBoundingSet=
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+RestrictNamespaces=yes
+LockPersonality=yes
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=lampos.target

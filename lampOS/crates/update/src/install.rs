@@ -124,6 +124,11 @@ pub const PRODUCT: &[(&str, &str)] = &[
         "lamp-addons.service",
         include_str!("../../../deploy/product/lamp-addons.service"),
     ),
+    // The programming door (#3504); off unless `LAMP_CONTROL=on`.
+    (
+        "lamp-control.service",
+        include_str!("../../../deploy/product/lamp-control.service"),
+    ),
     // The lamp's inner state (#1670); off unless set.
     (
         "lamp-mood.service",
@@ -256,6 +261,7 @@ pub const EXIT_NOTE_UNITS: &[&str] = &[
     "lamp-air.service",
     "lamp-body.service",
     "lamp-cloud.service",
+    "lamp-control.service",
     "lamp-controls.service",
     "lamp-ears.service",
     "lamp-expression.service",
@@ -602,6 +608,7 @@ pub const RESET_PLAN: &str = include_str!("../../setup/fixtures/reset-plan-produ
 /// build's is written over it. Add the new one first whenever the fixture
 /// changes; never remove one.
 pub const RESET_PLAN_SHIPPED: &[&str] = &[
+    "0021544b0e2294d160b0ae4cc116b17a008760a4f308ab538bdb485b6e616422", // #3876, 27 Oct: lamp-control's paired computers wiped
     "f82d89481380f2a6851ebc09ffa400056494f55c2ff6552d8b58fed2742ebd6b", // #2948 carried onto lamp-voice 23 Oct: head touch on (#711)
     "ad3fd11185bdf206f8622fef2c6d9bafac4efb7742e65b1c7df11de383cc83e6", // combined people temporaries and face expressions, 23 Oct
     "52645fae3f61d823ae08b920f5af8efa179cc47a8dd3ba96af29910e42ab16d1", // #3072 (people temporaries), 22 Oct
