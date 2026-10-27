@@ -1,3 +1,9 @@
+## 2026-10-27 08:45 — qualified fixture draft pushed; newer base continues
+
+#3637 is pushed as da5ed5b30/99b after [focused current-source gate](verification/privacy-kept-resync-fixture-20261027/carry-99b-audit.json): 238/0/1 plus three doctests, all sixteen witnesses/two expected hooks, stable source/raw/65 artifact pairs and no forced cleanup. Four warm compiler stages pass. It remains draft. Main then advanced to 737; local equal-patch head 642f7974a awaits its own qualification and fresh original native full Voice. Earlier 4bff full host/native results and R3's57f read retain their sources.
+
+Reminder's latest prepared head is now 96506fb42/737, with all 32 authored blobs unchanged from0c. Its compiler gate runs; the99b Reminder preparation ran no compiler/tests. Ownkeys' separate75f/4bff remaining run continues on unchanged source. No current737 or readiness claim is made for the fixture draft.
+
 ## 2026-10-27 07:58 — privacy fixture original ARM and Linux green
 
 #3637 remains draft for two current reads. [Original native proof](verification/privacy-kept-resync-fixture-20261027/README.md): ARM40428072057 passes 7,551 unique nextest cases, zero bad, 53 summary skips; all nine Voice privacy controls pass once. Thirty-four post-summary PASS reprints are verified and excluded from the census. Linux40428072085 passes pinned workspace formatting and strict all-target Clippy. Both actual preview checkouts 06173069d have ordered 4bff/57f parents and authored-tree equality. No native binary download/link/execution on the Mac or device claim.

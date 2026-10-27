@@ -88,3 +88,18 @@ authored and locally tested tree fb7e47dc1. No native binary was downloaded,
 linked or executed on the Mac. No device result or historical-cause attribution
 is inferred. Two current independent reads and any later base carry remain
 separate readiness gates.
+
+## Qualified 99b draft carry
+
+PR #3637 was carried to da5ed5b30 on 99b516153 with an equal two-file
+patch. Four fresh compiler stages passed, with 65 paths captured.
+[Independent focused carry audit](carry-99b-audit.json): **238/0/1**, plus
+**3/0/0 doctests**; nine privacy cases, full Msgs lib/IT, full Bus lib and
+two exact Bus liveness cases. All 16 witnesses and two expected caught hooks
+pass, with no unknown hook or HOLD. Source/raw inputs and all 65 actual/saved
+artifacts remain unchanged in bytes and metadata; all groups close normally.
+
+This is the stated focused host scope on 99b, not a current full Voice host
+run. Main advanced again to 737331535; a clean equal-patch carry is locally
+642f7974a and remains unqualified until its own checks finish. Fresh original
+native full Voice and current independent reads remain required before readiness.
