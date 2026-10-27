@@ -1,0 +1,443 @@
+[
+  {
+    "binary": "lamp-body",
+    "observed_unique": 475,
+    "outcomes": {
+      "PASS": 475
+    }
+  },
+  {
+    "binary": "lamp-body::bin/lamp-body",
+    "observed_unique": 44,
+    "outcomes": {
+      "PASS": 44
+    }
+  },
+  {
+    "binary": "lamp-body::bin/lamp-body-inspect",
+    "observed_unique": 2,
+    "outcomes": {
+      "PASS": 2
+    }
+  },
+  {
+    "binary": "lamp-body::bin/lamp-body-measure",
+    "observed_unique": 8,
+    "outcomes": {
+      "PASS": 8
+    }
+  },
+  {
+    "binary": "lamp-body::bin/lamp-body-mood",
+    "observed_unique": 3,
+    "outcomes": {
+      "PASS": 3
+    }
+  },
+  {
+    "binary": "lamp-body::bin/lamp-body-worker",
+    "observed_unique": 1,
+    "outcomes": {
+      "PASS": 1
+    }
+  },
+  {
+    "binary": "lamp-body::it",
+    "observed_unique": 125,
+    "outcomes": {
+      "PASS": 125
+    }
+  },
+  {
+    "binary": "lamp-cloud",
+    "observed_unique": 177,
+    "outcomes": {
+      "PASS": 177
+    }
+  },
+  {
+    "binary": "lamp-cloud::it",
+    "observed_unique": 30,
+    "outcomes": {
+      "PASS": 30
+    }
+  },
+  {
+    "binary": "lamp-expression",
+    "observed_unique": 28,
+    "outcomes": {
+      "PASS": 28
+    }
+  },
+  {
+    "binary": "lamp-expression::bin/lamp-expression",
+    "observed_unique": 4,
+    "outcomes": {
+      "PASS": 4
+    }
+  },
+  {
+    "binary": "lamp-expression::it",
+    "observed_unique": 281,
+    "outcomes": {
+      "PASS": 281
+    }
+  },
+  {
+    "binary": "lamp-expression::runtime",
+    "observed_unique": 28,
+    "outcomes": {
+      "PASS": 28
+    }
+  },
+  {
+    "binary": "lamp-keeper",
+    "observed_unique": 40,
+    "outcomes": {
+      "PASS": 40
+    }
+  },
+  {
+    "binary": "lamp-keeper::bin/lamp-keeper",
+    "observed_unique": 2,
+    "outcomes": {
+      "PASS": 2
+    }
+  },
+  {
+    "binary": "lamp-lean",
+    "observed_unique": 10,
+    "outcomes": {
+      "PASS": 10
+    }
+  },
+  {
+    "binary": "lamp-lean::it",
+    "observed_unique": 51,
+    "outcomes": {
+      "PASS": 51
+    }
+  },
+  {
+    "binary": "lamp-memory",
+    "observed_unique": 105,
+    "outcomes": {
+      "PASS": 105
+    }
+  },
+  {
+    "binary": "lamp-memory::bin/lamp-memory",
+    "observed_unique": 8,
+    "outcomes": {
+      "PASS": 8
+    }
+  },
+  {
+    "binary": "lamp-memory::bin/lamp-memory-eval",
+    "observed_unique": 8,
+    "outcomes": {
+      "PASS": 8
+    }
+  },
+  {
+    "binary": "lamp-memory::forget_person",
+    "observed_unique": 3,
+    "outcomes": {
+      "PASS": 3
+    }
+  },
+  {
+    "binary": "lamp-memory::forget_shared_exchange",
+    "observed_unique": 4,
+    "outcomes": {
+      "PASS": 4
+    }
+  },
+  {
+    "binary": "lamp-memory::forgot",
+    "observed_unique": 1,
+    "outcomes": {
+      "PASS": 1
+    }
+  },
+  {
+    "binary": "lamp-memory::health_control",
+    "observed_unique": 23,
+    "outcomes": {
+      "PASS": 23
+    }
+  },
+  {
+    "binary": "lamp-memory::it",
+    "observed_unique": 169,
+    "outcomes": {
+      "PASS": 169
+    }
+  },
+  {
+    "binary": "lamp-memory::paraphrase_fixture",
+    "observed_unique": 1,
+    "outcomes": {
+      "PASS": 1
+    }
+  },
+  {
+    "binary": "lamp-memory::voice_early_words",
+    "observed_unique": 1,
+    "outcomes": {
+      "PASS": 1
+    }
+  },
+  {
+    "binary": "lamp-memory::voice_follows_face",
+    "observed_unique": 1,
+    "outcomes": {
+      "PASS": 1
+    }
+  },
+  {
+    "binary": "lamp-memory::voice_forget",
+    "observed_unique": 5,
+    "outcomes": {
+      "PASS": 5
+    }
+  },
+  {
+    "binary": "lamp-memory::voice_forget_about",
+    "observed_unique": 2,
+    "outcomes": {
+      "PASS": 2
+    }
+  },
+  {
+    "binary": "lamp-memory::voice_forget_named",
+    "observed_unique": 2,
+    "outcomes": {
+      "PASS": 2
+    }
+  },
+  {
+    "binary": "lamp-memory::voice_link_used",
+    "observed_unique": 2,
+    "outcomes": {
+      "PASS": 2
+    }
+  },
+  {
+    "binary": "lamp-memory::voice_observe",
+    "observed_unique": 1,
+    "outcomes": {
+      "PASS": 1
+    }
+  },
+  {
+    "binary": "lamp-memory::voice_observe_forget",
+    "observed_unique": 1,
+    "outcomes": {
+      "PASS": 1
+    }
+  },
+  {
+    "binary": "lamp-memory::voice_observe_named_forget",
+    "observed_unique": 1,
+    "outcomes": {
+      "PASS": 1
+    }
+  },
+  {
+    "binary": "lamp-memory::voice_observe_room",
+    "observed_unique": 1,
+    "outcomes": {
+      "PASS": 1
+    }
+  },
+  {
+    "binary": "lamp-memory::voice_since_until",
+    "observed_unique": 2,
+    "outcomes": {
+      "PASS": 2
+    }
+  },
+  {
+    "binary": "lamp-peek",
+    "observed_unique": 15,
+    "outcomes": {
+      "PASS": 15
+    }
+  },
+  {
+    "binary": "lamp-peek::peek",
+    "observed_unique": 11,
+    "outcomes": {
+      "PASS": 11
+    }
+  },
+  {
+    "binary": "lamp-setup",
+    "observed_unique": 26,
+    "outcomes": {
+      "PASS": 26
+    }
+  },
+  {
+    "binary": "lamp-setup::it",
+    "observed_unique": 165,
+    "outcomes": {
+      "PASS": 165
+    }
+  },
+  {
+    "binary": "lamp-setup::wake",
+    "observed_unique": 6,
+    "outcomes": {
+      "PASS": 6
+    }
+  },
+  {
+    "binary": "lamp-skills",
+    "observed_unique": 160,
+    "outcomes": {
+      "PASS": 160
+    }
+  },
+  {
+    "binary": "lamp-skills::bin/lamp-skills",
+    "observed_unique": 23,
+    "outcomes": {
+      "PASS": 23
+    }
+  },
+  {
+    "binary": "lamp-skills::it",
+    "observed_unique": 344,
+    "outcomes": {
+      "PASS": 344
+    }
+  },
+  {
+    "binary": "lamp-skills::release_pair",
+    "observed_unique": 2,
+    "outcomes": {
+      "PASS": 2
+    }
+  },
+  {
+    "binary": "lamp-skills::requested_audio",
+    "observed_unique": 31,
+    "outcomes": {
+      "PASS": 31
+    }
+  },
+  {
+    "binary": "lamp-update",
+    "observed_unique": 233,
+    "outcomes": {
+      "PASS": 233
+    }
+  },
+  {
+    "binary": "lamp-update::bin/lamp-update",
+    "observed_unique": 3,
+    "outcomes": {
+      "PASS": 3
+    }
+  },
+  {
+    "binary": "lamp-update::functions",
+    "observed_unique": 5,
+    "outcomes": {
+      "PASS": 5
+    }
+  },
+  {
+    "binary": "lamp-update::install",
+    "observed_unique": 108,
+    "outcomes": {
+      "PASS": 108
+    }
+  },
+  {
+    "binary": "lamp-update::it",
+    "observed_unique": 13,
+    "outcomes": {
+      "PASS": 13
+    }
+  },
+  {
+    "binary": "lamp-update::round",
+    "observed_unique": 201,
+    "outcomes": {
+      "PASS": 201
+    }
+  },
+  {
+    "binary": "lamp-update::self-cli-exec",
+    "observed_unique": 1,
+    "outcomes": {
+      "PASS": 1
+    }
+  },
+  {
+    "binary": "lamp-update::self-process-cuts",
+    "observed_unique": 1,
+    "outcomes": {
+      "PASS": 1
+    }
+  },
+  {
+    "binary": "lamp-voice",
+    "observed_unique": 3918,
+    "outcomes": {
+      "PASS": 3918
+    }
+  },
+  {
+    "binary": "lamp-voice-eval",
+    "observed_unique": 378,
+    "outcomes": {
+      "PASS": 378
+    }
+  },
+  {
+    "binary": "lamp-voice-eval::bin/lamp-voice-eval",
+    "observed_unique": 7,
+    "outcomes": {
+      "PASS": 7
+    }
+  },
+  {
+    "binary": "lamp-voice-eval::it",
+    "observed_unique": 238,
+    "outcomes": {
+      "PASS": 238
+    }
+  },
+  {
+    "binary": "lamp-voice::bin/lamp-voice",
+    "observed_unique": 1,
+    "outcomes": {
+      "PASS": 1
+    }
+  },
+  {
+    "binary": "lamp-voice::example/render_line_second",
+    "observed_unique": 4,
+    "outcomes": {
+      "PASS": 4
+    }
+  },
+  {
+    "binary": "lamp-voice::example/stop_words_stt_replay",
+    "observed_unique": 6,
+    "outcomes": {
+      "PASS": 6
+    }
+  },
+  {
+    "binary": "lamp-voice::it",
+    "observed_unique": 307,
+    "outcomes": {
+      "PASS": 307
+    }
+  }
+]

@@ -1,0 +1,119 @@
+{
+  "source": "original current ARM execution window; identities independently joined, not Mac outcome reuse",
+  "cases": [
+    {
+      "test": "provider_worker::tests::requested_audio_crosses_the_live_worker_only_after_its_tool_reply",
+      "records": [
+        {
+          "line": 5741,
+          "timestamp": "2026-10-27T23:09:39.2381470Z",
+          "status": "PASS",
+          "seconds": 0.056,
+          "ordinal": 4882,
+          "total": 7857,
+          "binary": "lamp-voice",
+          "test": "provider_worker::tests::requested_audio_crosses_the_live_worker_only_after_its_tool_reply"
+        }
+      ],
+      "PASS_once": true
+    },
+    {
+      "test": "provider_worker::tests::policy_holds::a_timer_in_a_turn_that_follows_the_lamp_is_set_though_the_policy_said_stay_quiet",
+      "records": [
+        {
+          "line": 5702,
+          "timestamp": "2026-10-27T23:09:38.0806176Z",
+          "status": "PASS",
+          "seconds": 0.014,
+          "ordinal": 4843,
+          "total": 7857,
+          "binary": "lamp-voice",
+          "test": "provider_worker::tests::policy_holds::a_timer_in_a_turn_that_follows_the_lamp_is_set_though_the_policy_said_stay_quiet"
+        }
+      ],
+      "PASS_once": true
+    },
+    {
+      "test": "provider_worker::tests::reminders::a_reminder_rung_into_a_busy_room_is_no_answer_to_end_it_by",
+      "records": [
+        {
+          "line": 5727,
+          "timestamp": "2026-10-27T23:09:38.8730197Z",
+          "status": "PASS",
+          "seconds": 0.007,
+          "ordinal": 4868,
+          "total": 7857,
+          "binary": "lamp-voice",
+          "test": "provider_worker::tests::reminders::a_reminder_rung_into_a_busy_room_is_no_answer_to_end_it_by"
+        }
+      ],
+      "PASS_once": true
+    },
+    {
+      "test": "remember::tests::the_oldest_of_a_long_kept_list_is_found_and_the_rooms_are_marked",
+      "records": [
+        {
+          "line": 6090,
+          "timestamp": "2026-10-27T23:09:44.2274750Z",
+          "status": "PASS",
+          "seconds": 0.008,
+          "ordinal": 5231,
+          "total": 7857,
+          "binary": "lamp-voice",
+          "test": "remember::tests::the_oldest_of_a_long_kept_list_is_found_and_the_rooms_are_marked"
+        }
+      ],
+      "PASS_once": true
+    },
+    {
+      "test": "second_provider::worker::tests::stop_during_music_rpc_revokes_scope_and_finishes_without_waiting_for_the_reply",
+      "records": [
+        {
+          "line": 7265,
+          "timestamp": "2026-10-27T23:09:58.7238448Z",
+          "status": "PASS",
+          "seconds": 0.011,
+          "ordinal": 6406,
+          "total": 7857,
+          "binary": "lamp-voice",
+          "test": "second_provider::worker::tests::stop_during_music_rpc_revokes_scope_and_finishes_without_waiting_for_the_reply"
+        }
+      ],
+      "PASS_once": true
+    },
+    {
+      "test": "second_provider::worker::tests::the_lamps_own_answers_to_talk_keep_no_conversation_going",
+      "records": [
+        {
+          "line": 7283,
+          "timestamp": "2026-10-27T23:10:00.0955521Z",
+          "status": "PASS",
+          "seconds": 0.007,
+          "ordinal": 6424,
+          "total": 7857,
+          "binary": "lamp-voice",
+          "test": "second_provider::worker::tests::the_lamps_own_answers_to_talk_keep_no_conversation_going"
+        }
+      ],
+      "PASS_once": true
+    },
+    {
+      "test": "coordinator::tests::requested_audio::cancelled_gapped_or_expired_music_never_acknowledges_its_confirmation_news",
+      "records": [
+        {
+          "line": 4756,
+          "timestamp": "2026-10-27T23:09:17.0100908Z",
+          "status": "PASS",
+          "seconds": 0.114,
+          "ordinal": 3897,
+          "total": 7857,
+          "binary": "lamp-voice",
+          "test": "coordinator::tests::requested_audio::cancelled_gapped_or_expired_music_never_acknowledges_its_confirmation_news"
+        }
+      ],
+      "PASS_once": true
+    }
+  ],
+  "all_PASS_once": true,
+  "already_in_global_counts": true
+}

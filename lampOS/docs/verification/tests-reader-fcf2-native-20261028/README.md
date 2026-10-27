@@ -1,0 +1,11 @@
+# Reader fcf2 original ARM64 and Linux checks
+
+Original attempt-one [ARM64 40598411153](https://github.com/autonomous-ai/lampOS/actions/runs/40598411153) and [Linux Clippy 40598411121](https://github.com/autonomous-ai/lampOS/actions/runs/40598411121) succeeded for authored `fcf2c5c9193ddaf930adc04c834b91627bb97b77` on `fc9c781afaed38dc976f650484c30f65bf5db57a`.
+
+The selected ARM execution contains **7,857 unique passes, zero failures/leaks/timeouts, zero selected unrun, and 54 aggregate skips**, across 70 binaries. The complete case census and unchanged selected-step bytes are published. All 15 ordinary Reader cases, seven Trace cases and the original seven Voice cases passed once within that total. Privileged DAC remains ignored/unrun. The 34 post-summary output records are configured final-output reprints, rather than extra executions; there were no execution duplicates or retries. This is the actual twelve-package selection, not every workspace/custom-harness test.
+
+The actual checkout is `b5c85b49a21f0ddbed59810413c3e19ba4acff76`, ordered parents `[2b73dd03073947c62b3d10593f293aa9ab954410, fcf2c5c9193ddaf930adc04c834b91627bb97b77]`, tree `4b5e0fb18ac4b29a18c6de138b366e7e06ff10b6`. Six additional Update plan-output/source/test/docs entries are explicit in the delta. Both Reader-owned files/modes, all ten fetched source/config inputs and all 94 CI/build-input records per context match authored input; whole trees are not equated. The raw checkout, rather than a mutable merge ref, is authority.
+
+Separate checks passed: promoter 25, workspace doctests 4 across 47 groups, process 13, relay OK and offline Python 49/12/7. They are not added to the nextest total. Artifact metadata matches the original upload ID/bytes/digest. No archive, checksum payload or ARM binary was downloaded, executed or independently rehashed.
+
+The private 89-entry collection manifest is sealed by SHA-256 `50b6d71e905739b302432bd9603b7ab3935aeb1c36a83dc9807252fbfc8a2d07`; every entry was reverified before this compact publication. Native Mac full parallel 3,885/0/15 and separate Doc3 retain their own source/profile/runtime scope. Original failed scopes, zero-work capacity/import stops, unknown causes and draft/latest-base holds remain unchanged. No historical failure waiver, current train qualification or device claim follows from these original passes.

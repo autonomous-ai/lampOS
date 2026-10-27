@@ -1,0 +1,7 @@
+
+running 2 tests
+test ci_paths::the_scan_sees_paths_in_strings_and_not_in_comments_or_prose ... ok
+test ci_paths::every_doc_a_crate_reads_is_named_back_in_the_workflows_pull_request_paths ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 11 filtered out; finished in 0.44s
+

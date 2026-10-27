@@ -1,0 +1,33 @@
+running 28 tests
+test a_closed_switch_reads_from_the_last_privacy_lease_said ... ok
+test a_full_output_record_stops_growing_and_counts_loss ... ok
+test a_note_about_one_turn_is_not_a_warning_and_a_fault_or_a_lacking_input_is ... ok
+test a_saved_light_setting_remains_valid_after_days_without_a_change ... ok
+test boot_identity_cannot_be_empty_or_a_path ... ok
+test enabled_output_uses_a_new_session_and_expires_after_input_loss ... ok
+test mood_in_reads_only_a_fresh_valid_state_from_mood ... ok
+test offline_face_reads_only_a_fresh_offline_from_lamp_online ... ok
+test older_topics_are_aged_by_wall_time_not_private_publisher_time ... ok
+test only_a_service_with_the_offline_face_draws_listening_unavailable_when_offline ... ok
+test paused_by_the_keeper_nothing_is_asked_of_the_body_or_the_light_until_resumed ... ok
+test shadow_mode_has_diagnostics_but_never_an_actuator_request ... ok
+test sleep_name::a_clock_found_not_set_forgets_the_time_of_day_it_had ... ok
+test sleep_name::a_clock_not_set_gives_no_night_and_a_set_one_does ... ok
+test sleep_name::a_privacy_read_error_refuses_a_tap_until_a_valid_open_lease ... ok
+test sleep_name::a_tap_while_the_privacy_switch_is_closed_gets_no_look_up ... ok
+test sleep_name::activity_adaptation_keeps_the_source_clock_and_owner ... ok
+test sleep_name::an_expired_sleeping_name_is_journaled_once_by_the_service ... ok
+test sleep_name::name_adaptation_keeps_publication_delay_and_ago_ms ... ok
+test sleep_name::sleeping_name_requires_validated_speech_through_the_local_bus ... ok
+test sleep_name::the_service_breathes_the_head_with_moods_breath_from_the_bus ... ok
+test sleep_name::the_switch_closed_mid_look_ends_it ... ok
+test slow_input_draining_does_not_make_old_joints_fresh ... ok
+test the_heads_topics_are_read_only_with_head_touch ... ok
+test the_liveliness_taken_is_said_and_nothing_with_mood_off ... ok
+test two_expression_processes_cannot_own_one_bus ... ok
+test typed_timing_keeps_its_shared_stamp_and_bad_inputs_are_counted ... ok
+test without_a_pause_said_expression_asks_exactly_as_before ... ok
+
+test result: ok. 28 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.58s
+
+

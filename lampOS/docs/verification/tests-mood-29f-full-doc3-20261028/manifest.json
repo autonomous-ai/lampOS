@@ -1,0 +1,65 @@
+{
+  "self_excluded": "manifest.json",
+  "files": [
+    {
+      "path": "README.md",
+      "sha256": "a943aee01af1850f0c74080bdc734eb8fd0b5c7f1eea0725d57462110f412f04",
+      "bytes": 3211
+    },
+    {
+      "path": "audit.json",
+      "sha256": "d79ce65a4e3c2503b42cea367af9750444ddecc8c6d0ebbad1f2c24b75e2cea4",
+      "bytes": 55537
+    },
+    {
+      "path": "bin.stdout.txt",
+      "sha256": "4cd48bab002413dca94bdf1078e50468e6d6ecd0160b8108139272c38e123da6",
+      "bytes": 389
+    },
+    {
+      "path": "doc-ci-paths.stdout.txt",
+      "sha256": "0831ae2f2c3bcc3d006038c7da7d986439ee8f3e14975929f89b16da2defa1b8",
+      "bytes": 292
+    },
+    {
+      "path": "doc-install.stdout.txt",
+      "sha256": "d505da6dbd471a889fc5c29626b3739d724d94ca6d25e744a7d80fb0a3eb82ed",
+      "bytes": 180
+    },
+    {
+      "path": "doc3-terminal.json",
+      "sha256": "cb16d5184f44343ce118867ddf35c51be9b3d201e56bb8b0da781d684672b013",
+      "bytes": 1166
+    },
+    {
+      "path": "docs.stdout.txt",
+      "sha256": "63e1375cb2e28cc11cb67575eb85fd42d1f6136e032cccd49051b1776a2d5c3d",
+      "bytes": 112
+    },
+    {
+      "path": "expression-terminal.json",
+      "sha256": "4fd3928b6340929303b30afd19a466b37d36cc364b006ba71ec5d7238908b500",
+      "bytes": 5746
+    },
+    {
+      "path": "it.stdout.txt",
+      "sha256": "ce6cfce7789d097e72bc10fdf4ee7fecbdedaad6040ae1cfdb03039ee1a6f9e5",
+      "bytes": 25293
+    },
+    {
+      "path": "lib.stdout.txt",
+      "sha256": "3c26a71fa8d41c2115198dcbc35049d62b8a305e814d04658d84e66aa95e4984",
+      "bytes": 2683
+    },
+    {
+      "path": "prefix-terminal.json",
+      "sha256": "f58cecce182aef1cfede740ac5f1d34d6e0d49b3f5e1238f34150aaa94bfd405",
+      "bytes": 2986
+    },
+    {
+      "path": "runtime.stdout.txt",
+      "sha256": "5a86206ac1ba1d38d1ebbada1d0b8f1c8ade4f880624909c371e789816b84d0a",
+      "bytes": 2153
+    }
+  ]
+}

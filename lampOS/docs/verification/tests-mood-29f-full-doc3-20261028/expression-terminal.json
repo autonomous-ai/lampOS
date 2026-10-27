@@ -1,0 +1,131 @@
+{
+  "original_receipt": {
+    "private_evidence_role": "mood-29f-unstarted-no-run-capacity-v3-20261028/terminal.json",
+    "sha256": "b486549d20afb57d450f450670dd778a5527c36082a7124f4166a5e50d0fa89f",
+    "bytes": 5372
+  },
+  "projection": {
+    "status": "PASS",
+    "head": "29f30f8dc444546b3915dd6cebd815f2ca67191a",
+    "base": "2b73dd03073947c62b3d10593f293aa9ab954410",
+    "branch": "tests/1806-sleep-mood-clock",
+    "authored_paths": [
+      "lampOS/crates/expression/tests/runtime.rs",
+      "lampOS/docs/expression.md"
+    ],
+    "uncommitted_paths": [],
+    "runtime_attempts": 1,
+    "runtime_reuse": false,
+    "current_test_execution_claim": true,
+    "scope": "Unstarted no-run/inventory/full Expression package once; same frozen29f/2b73, four closed compiler-prefix commands referenced and NEVER rerun; original resourceFAIL1 retained; no prior test runtime exists",
+    "controlled_overlay": false,
+    "native_claim": false,
+    "inherited_compiler_prefix": [
+      "fmt",
+      "metadata",
+      "strict",
+      "workspace"
+    ],
+    "new_command_start": "test-compile",
+    "original_prefix_native_exit": 1,
+    "original_resource_failure_retained": true,
+    "fmt": true,
+    "strict_packages": [
+      "lamp-body",
+      "lamp-cloud",
+      "lamp-expression",
+      "lamp-keeper",
+      "lamp-lean",
+      "lamp-memory",
+      "lamp-peek",
+      "lamp-setup",
+      "lamp-skills",
+      "lamp-update",
+      "lamp-voice",
+      "lamp-voice-eval"
+    ],
+    "Expression_artifact_freshness_observed_only": true,
+    "blanket_local_freshness_claim": false,
+    "workspace_build": true,
+    "counts": {
+      "passed": 341,
+      "failed": 0,
+      "ignored": 0
+    },
+    "doc_blocks": [
+      "\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n"
+    ],
+    "ordinary_filter_count": 0,
+    "runtime_command_exit": 0,
+    "runtime_command_completed": true,
+    "qualification_mode": "fresh_full_package_runtime",
+    "affected_case_passed_once": true,
+    "required_cases_passed_once": [
+      "sleep_name::the_service_breathes_the_head_with_moods_breath_from_the_bus",
+      "sleep_name::an_expired_sleeping_name_is_journaled_once_by_the_service"
+    ],
+    "qualified_committed_paths": {
+      "lampOS/crates/expression/tests/runtime.rs": {
+        "sha256": "34c0f7b294e1fa4011cdb0da02daba8035432cdcc28bbd57864cf06951e94752",
+        "bytes": 53262,
+        "mode": 420,
+        "kind": "file"
+      },
+      "lampOS/docs/expression.md": {
+        "sha256": "3d893182d80d5481be63798fd4449c75b3098699e6185d48da62f13b95b9dd4c",
+        "bytes": 81109,
+        "mode": 420,
+        "kind": "file"
+      }
+    },
+    "committed_head_matches_qualified_owner": "29f30f8dc444546b3915dd6cebd815f2ca67191a",
+    "unresolved_owned_pids": [],
+    "lease_released": true,
+    "permanent_owner_unchanged": true,
+    "source_unchanged": true,
+    "owned_groups_closed": true,
+    "sealed_witnesses_unchanged": true,
+    "sealed_final_count": 198,
+    "actual_executable_guards_passed": true,
+    "guard_policy": {
+      "full_SHA_points": [
+        "initial",
+        "final"
+      ],
+      "full_SHA_scope": "All tracked canonical/official source and inherited/new sealed witnesses; no filesystem-wide read-only claim.",
+      "other_boundaries": "Entire tracked file-set/stat6 plus both HEAD/branch/base/index/clean metadata; all sealed original metadata and every active actual executable SHA/stat.",
+      "consumption": "All post-no-run actual SHA/stat before every list and sole full Cargo runtime, corresponding independent witnesses guarded; raw and parsed Cargo census durable before postguards.",
+      "parent_handoff": "Future CLOSED current Skills full-package PASS and Root full-SHA/metadata release only; derive final sealed/actual counts and retired flat schema after close. No Skills/Mood runtime transfer.",
+      "alias_policy": "Prospective metadata-derived normal bin/example convenience alias inode-only at closed no-recompile full Cargo0/101; all other attrs/test/frozen inodes strict. Rust failures remain FAIL.",
+      "new_frozen_modes": "copy2 retains each emitted executable mode; no chmod/read-only-filesystem claim. All inherited modes remain strict.",
+      "compiler_prefix": "All four exact closed command/raw receipts remain prior executions; immutable source/owner physical bookends and protected maps must match new initial full guards. Current no-run/profile/depinfo/inventory and sole full runtime remain mandatory."
+    },
+    "convenience_alias_inode_events": [
+      {
+        "path": "TARGET/debug/lamp-expression",
+        "before_inode": 490389112,
+        "after_inode": 490389445,
+        "boundary": "closed no-recompile sole full Cargo Expression0/101 after no-run; Rust failure remains FAIL; all other attributes strict"
+      },
+      {
+        "path": "TARGET/debug/examples/recent_playout_cost",
+        "before_inode": 490389113,
+        "after_inode": 490389452,
+        "boundary": "closed no-recompile sole full Cargo Expression0/101 after no-run; Rust failure remains FAIL; all other attributes strict"
+      },
+      {
+        "path": "TARGET/debug/examples/replay_cost",
+        "before_inode": 490389143,
+        "after_inode": 490389450,
+        "boundary": "closed no-recompile sole full Cargo Expression0/101 after no-run; Rust failure remains FAIL; all other attributes strict"
+      },
+      {
+        "path": "TARGET/debug/examples/rest_cost",
+        "before_inode": 490389144,
+        "after_inode": 490389447,
+        "boundary": "closed no-recompile sole full Cargo Expression0/101 after no-run; Rust failure remains FAIL; all other attributes strict"
+      }
+    ]
+  },
+  "projection_not_original_file_SHA": true
+}

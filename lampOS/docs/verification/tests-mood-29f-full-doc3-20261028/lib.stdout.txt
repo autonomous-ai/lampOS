@@ -1,0 +1,34 @@
+
+running 28 tests
+test alive::routine_tests::a_hand_kept_on_the_head_wakes_a_sleeping_lamp ... ok
+test alive::routine_tests::a_manual_head_sleep_cannot_be_taken_or_released_by_the_routine ... ok
+test alive::routine_tests::a_new_routine_does_not_replace_feedback_to_a_hand ... ok
+test alive::routine_tests::an_uncorroborated_name_does_not_take_the_routine_but_confirmed_speech_does ... ok
+test alive::routine_tests::autonomous_night_and_morning_are_still_the_default ... ok
+test alive::routine_tests::changing_schedulers_releases_only_a_routines_rest ... ok
+test alive::routine_tests::name_touch_reminder_and_conversation_wakes_supersede_routine_ownership ... ok
+test alive::routine_tests::releasing_rest_or_a_stretch_is_continuous_and_never_runs_more_wake_frames ... ok
+test alive::routine_tests::renewing_rest_does_not_restart_it_and_wake_is_once ... ok
+test alive::routine_tests::routine_rest_and_wake_require_the_current_free_resting_context ... ok
+test alive::routine_tests::skill_scheduling_removes_both_automatic_decisions ... ok
+test alive::routine_tests::the_nights_sleep_begins_and_holds_as_the_built_in_one ... ok
+test alive::routine_tests::voice_sleep_takes_ownership_before_the_next_tick_and_keeps_it_after_staleness ... ok
+test engine::rest::tests::a_cancel_of_an_episode_a_sound_already_ended_is_a_no_op ... ok
+test engine::rest::tests::a_rest_transport_gap_spends_the_active_episode_before_a_renewal ... ok
+test runtime::unplug_tests::a_matching_skills_cancel_hands_the_body_back ... ok
+test runtime::unplug_tests::body_ready_from_the_real_publishers_is_acknowledged_asleep ... ok
+test runtime::unplug_tests::closed_privacy_and_failed_light_publication_never_acknowledge ... ok
+test runtime::unplug_tests::ready_presents_sleep_even_while_voice_speaks_then_acknowledges ... ok
+test runtime::unplug_tests::switch_off_shadow_failed_mismatch_and_stale_never_acknowledge ... ok
+test speaking::tests::a_long_answer_ends_with_a_settle_and_the_head_comes_back_level ... ok
+test speaking::tests::a_stressed_word_nods_the_head_and_a_steady_voice_does_not ... ok
+test speaking::tests::an_answer_that_ends_mid_sway_eases_the_base_back_to_centre_and_no_further_out ... ok
+test speaking::tests::held_or_cut_in_on_nothing_moves_and_nothing_is_owed ... ok
+test speaking::tests::nods_are_never_closer_than_four_seconds_and_not_all_alike ... ok
+test speaking::tests::one_sentence_nods_once_however_many_its_stressed_words ... ok
+test speaking::tests::rules_outside_the_limits_are_refused ... ok
+test speaking::tests::some_pauses_turn_the_base_out_to_either_side_and_back_to_centre ... ok
+
+test result: ok. 28 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.43s
+
+

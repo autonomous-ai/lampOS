@@ -1,0 +1,9 @@
+running 4 tests
+test tests::invalid_options_cannot_accidentally_enable_a_service ... ok
+test tests::outputs_require_the_explicit_enable_switch ... ok
+test tests::the_hour_and_the_time_of_day_are_asked_for_by_name ... ok
+test tests::the_start_line_names_the_zone_only_when_one_is_given ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+

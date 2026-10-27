@@ -1,0 +1,65 @@
+{
+  "original_receipt": {
+    "private_evidence_role": "mood-fresh-after-skills527-gates-20261028/terminal.json",
+    "sha256": "38cdc6ce1f8b8ebfc1ed37310505357800f94f51a9a99472db1c4c5a09a3f2db",
+    "bytes": 2593
+  },
+  "projection": {
+    "status": "FAIL",
+    "head": "29f30f8dc444546b3915dd6cebd815f2ca67191a",
+    "base": "2b73dd03073947c62b3d10593f293aa9ab954410",
+    "branch": "tests/1806-sleep-mood-clock",
+    "authored_paths": [
+      "lampOS/crates/expression/tests/runtime.rs",
+      "lampOS/docs/expression.md"
+    ],
+    "uncommitted_paths": [],
+    "runtime_attempts": 0,
+    "runtime_reuse": false,
+    "current_test_execution_claim": false,
+    "scope": "ONE fresh full unfiltered serial current Expression Cargo package, four actual drivers/docs and required2; accepted upstream deltas recorded, no runtime reuse/freshness forcing/clean/retry",
+    "controlled_overlay": false,
+    "native_claim": false,
+    "fmt": true,
+    "strict_packages": [
+      "lamp-body",
+      "lamp-cloud",
+      "lamp-expression",
+      "lamp-keeper",
+      "lamp-lean",
+      "lamp-memory",
+      "lamp-peek",
+      "lamp-setup",
+      "lamp-skills",
+      "lamp-update",
+      "lamp-voice",
+      "lamp-voice-eval"
+    ],
+    "Expression_artifact_freshness_observed_only": true,
+    "blanket_local_freshness_claim": false,
+    "workspace_build": true,
+    "error": "AssertionError('Insufficient disk before Cargo')",
+    "unresolved_owned_pids": [],
+    "lease_released": true,
+    "permanent_owner_unchanged": true,
+    "source_unchanged": true,
+    "owned_groups_closed": true,
+    "sealed_witnesses_unchanged": true,
+    "sealed_final_count": 190,
+    "actual_executable_guards_passed": false,
+    "guard_policy": {
+      "full_SHA_points": [
+        "initial",
+        "final"
+      ],
+      "full_SHA_scope": "All tracked canonical/official source and inherited/new sealed witnesses; no filesystem-wide read-only claim.",
+      "other_boundaries": "Entire tracked file-set/stat6 plus both HEAD/branch/base/index/clean metadata; all sealed original metadata and every active actual executable SHA/stat.",
+      "consumption": "All post-no-run actual SHA/stat before every list and sole full Cargo runtime, corresponding independent witnesses guarded; raw and parsed Cargo census durable before postguards.",
+      "parent_handoff": "Future CLOSED current Skills full-package PASS and Root full-SHA/metadata release only; derive final sealed/actual counts and retired flat schema after close. No Skills/Mood runtime transfer.",
+      "alias_policy": "Prospective metadata-derived normal bin/example convenience alias inode-only at closed no-recompile full Cargo0/101; all other attrs/test/frozen inodes strict. Rust failures remain FAIL.",
+      "new_frozen_modes": "copy2 retains each emitted executable mode; no chmod/read-only-filesystem claim. All inherited modes remain strict."
+    },
+    "convenience_alias_inode_events": []
+  },
+  "projection_not_original_file_SHA": true
+}

@@ -1,5 +1,15 @@
 # Tests work log
 
+## 2026-10-28 06:19 — Reader current native and Mood current host proof
+
+Ready for lamp-voice: no (current reads and latest-base/train-member disposition remain; both PRs stay draft).
+
+[Reader fcf2 original ARM/Linux](verification/tests-reader-fcf2-native-20261028/) both succeed, attempt one: **7,857 unique passes, zero bad or selected unrun, 54 aggregate skips**. Reader 15, Trace 7 and the original seven Voice cases pass once within the total. Actual b5c85b49a has ordered parents 2b73/fcf2 and six additional Update plan-output/source/test/docs entries; both owned files/modes, all ten fetched inputs and 94 CI/build-input records per context match, without whole-tree equality. The unchanged selected-step capture, full census, seven projection and compact manifest bind the private 89-entry seal. Thirty-four configured reprints and auxiliary promoter 25/docs 4/process 13/relay/Python 49,12,7 remain separate; no artifact payload.
+
+[Mood 29f on 2b73](verification/tests-mood-29f-full-doc3-20261028/) freshly passes **341/0/0 plus zero-case docs**, all four drivers and both Mood/Journal controls once. Four closed formatting/metadata/strict/workspace prefix commands are referenced, never repeated; their original resource-failed controller stays failed. The first package runtime and separate install one/ci_paths two pass, all source/owner/201 sealed/three latest actual guards and owned groups close, and the exact-lease push succeeds. Doc3's two runtime attempts mean two distinct commands, not retries. Exact stdout slices retain every byte and trailing newline. Retired old debug2/sleep non-executable archives restored capacity while preserving evidence, source, Git, current caches, executables and protected paths. Original ARM 40600407828 and Linux 40600407841 both have terminal metadata SUCCESS; their raw source/count audit remains separately owned and in progress, with no old native count transfer.
+
+Reviewer-two's latest comment permits an actual current train member to satisfy the base condition when exact carried source and original green run bind the current base. No hold is waived by these producer packets, no mark-ready transition occurs, and historical failed scopes/unknown causes remain unchanged. No device action or local build/test occurred in this publication.
+
 ## 2026-10-28 05:58 — latest Reader full parallel gate and push
 
 Ready for lamp-voice: no (current source reads/base disposition and new original CI remain).

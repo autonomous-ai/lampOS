@@ -1,0 +1,39 @@
+{
+  "original_receipt": {
+    "private_evidence_role": "mood-29f-capacity-v3-doc3-20261028/terminal.json",
+    "sha256": "28a8c09120349606087976912004cdb758104b20f7e436979165f547242f11e3",
+    "bytes": 833
+  },
+  "projection": {
+    "status": "PASS",
+    "head": "29f30f8dc444546b3915dd6cebd815f2ca67191a",
+    "base": "2b73dd03073947c62b3d10593f293aa9ab954410",
+    "runtime_attempts": 2,
+    "scope": "Only exact actual install.md consumer plus complete ci_paths; no full Update/package or inherited Expression runtime claim",
+    "counts": {
+      "install": {
+        "ok": 1
+      },
+      "it": {
+        "ok": 2
+      }
+    },
+    "actual_doc_consumer_once": true,
+    "complete_ci_paths_once": true,
+    "no_broad_Update_runtime_credit": true,
+    "Expression_runtime_not_repeated": true,
+    "source_unchanged": true,
+    "official_owner_unchanged": true,
+    "sealed_and_actual_guards": true,
+    "protected_count": 201,
+    "actual_count": 3,
+    "full_hash_checkpoints": [
+      "initial",
+      "final"
+    ],
+    "owned_groups_closed": true,
+    "unresolved_owned_pids": [],
+    "lease_released": true
+  },
+  "projection_not_original_file_SHA": true
+}

@@ -1,0 +1,40 @@
+{
+  "self_excluded": "manifest.json",
+  "files": [
+    {
+      "path": "README.md",
+      "sha256": "11fd9576d65f06ee29829e10f0fd3bd941db2f008a36a2057e522d50acb5f669",
+      "bytes": 2365
+    },
+    {
+      "path": "audit.json",
+      "sha256": "84466707dd144cd98b6bc1a4aaa0df4a02a40f26a4b7c525eb42e7ca2a7815d6",
+      "bytes": 19818
+    },
+    {
+      "path": "full-case-census.json",
+      "sha256": "119d9b46e67b33426607a870608704e37f067c144556e18df72111d319079266",
+      "bytes": 2241702
+    },
+    {
+      "path": "original-seven.json",
+      "sha256": "80444d537fff07fcaa51162234fcb1c47f028f3e5ab59b574a2f5510e16b38ca",
+      "bytes": 3985
+    },
+    {
+      "path": "per-binary-census.json",
+      "sha256": "5de0945895c708fbab5234beeada5659cdb43bb205f41d76ebcd0e925911b799",
+      "bytes": 7405
+    },
+    {
+      "path": "preview-input-delta.json",
+      "sha256": "686742bd50c9262557afa8c9f25a3880e061c6add943f7ad25180a3d9066aacd",
+      "bytes": 10598
+    },
+    {
+      "path": "selected-test-step.stdout.txt",
+      "sha256": "f4d07a7b774bf8f264eb060ca6ad5836d8314e2d60a3e3b0928c91f67f5d2ab2",
+      "bytes": 1299330
+    }
+  ]
+}
