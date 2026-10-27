@@ -1,0 +1,50 @@
+{
+  "host": {
+    "machine": "x86_64",
+    "release": "25.6.0",
+    "shell": "GNU bash, version 3.2.57(1)-release (x86_64-apple-darwin25)",
+    "system": "Darwin"
+  },
+  "raw_private_sha256": "c704b9f82bac5a3d2e21d9e6fe2a6f1a36f4f70f979d877ee4aa83587ec050b6",
+  "receipt": {
+    "actual_restored_value": "corrupted copy",
+    "backup_exists_after": false,
+    "digest_errors_observed": 4,
+    "driver_reaped": true,
+    "elapsed_seconds": 1.220635902,
+    "expected_value": "original made state",
+    "generated_script_sha256": "ab87128411dd6ba1a723ac7e193f1285765ffe16a57c054eac38de00da3a54f6",
+    "group_absent": true,
+    "head": "1c4d27e02f01fbe19050fe58533b2c9b2cc18e63",
+    "injected_faults": "cp copies then corrupts only temporary made-skills/value; sha256sum exits17 on every call without a digest. No source code, SSH or device action is modified/executed.",
+    "scope": "Exact generated restore function with private temporary paths and fault-injected executables; not a whole played-arm or mock-suite rerun.",
+    "source_function_sha256": "d7efb82f2a22ac8af71df707f6f80bfe73d17d26be86362c959cef8162e49e41",
+    "stdout_stderr": "injected digest failure\ninjected digest failure\ninjected digest failure\ninjected digest failure\n",
+    "subject_exit": 0
+  },
+  "scope": "Two faults injected into temporary-only tools: successful cp followed by intentional leaf corruption, and sha256sum failure17 on both sides. Demonstrates exact generated verifier fail-open, not an actual device or storage-failure diagnosis. Existing inventory-success/header fix is repaired in source; whole repair still HOLD. No whole played-arm or long-suite rerun.",
+  "source_findings": "Digest failure is lost through the cut pipeline, and sums hides digest/enumeration errors. Both empty digest manifests compare equal; removal runs without successful verification. Require successful enumeration/digests for both manifests before equality and retain the backup on every error.",
+  "source_lines": [
+    {
+      "line": 81,
+      "text": "sha() { if command -v sha256sum >/dev/null 2>&1; then sha256sum \"$1\"; else shasum -a 256 \"$1\"; fi | cut -d' ' -f1; }"
+    },
+    {
+      "line": 82,
+      "text": "sums() {  # DIR NAME...: each NAME's kind, and its files' SHA-256, in order"
+    },
+    {
+      "line": 86,
+      "text": "    if [ -d \"$x\" ]; then echo \"dir $x\"; find \"$x\" -type f | sort | while IFS= read -r f; do echo \"$f $(sha \"$f\")\"; done"
+    },
+    {
+      "line": 95,
+      "text": "[ \"$(sums \"$S\" $names)\" = \"$(sums \"$V\" $names)\" ] || { echo \"restore: $V is not as saved in $S\" >&2; exit 1; }"
+    },
+    {
+      "line": 96,
+      "text": "[ \"${1:-all}\" = reset ] || rm -rf \"$S\""
+    }
+  ],
+  "status": "HOLD_P2_RESTORE_DIGEST_ERRORS_CAN_DELETE_RECOVERY_COPY"
+}
