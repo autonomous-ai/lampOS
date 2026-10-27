@@ -1,0 +1,21 @@
+{
+  "status": "ROOT_VERIFIED_FULL_SKILLS_PASS",
+  "head": "6c931b8cd73019301f031b6596bb17a24d5cb6b2",
+  "base": "82a62867cc1bcbbc4b0848519c6757f623d112ce",
+  "counts": {
+    "passed": 557,
+    "failed": 0,
+    "ignored": 9
+  },
+  "required_cases_once": [
+    "addon::says_the_judge_dropped_do_not_spend_the_hour",
+    "routine::tests::a_delayed_sample_inside_the_window_keeps_its_original_deadline",
+    "routine::tests::a_host_stall_expires_the_request_header_without_changing_the_manager_deadline"
+  ],
+  "sealed": 164,
+  "actual": 7,
+  "commands_closed": 16,
+  "source_bookends_equal": true,
+  "native_exit": 0,
+  "no_runtime_reuse": true
+}

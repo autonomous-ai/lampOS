@@ -1,0 +1,205 @@
+{
+  "status": "ROOT_REVIEWED_FRESH_FULL_MAC_SKILLS_PASS",
+  "head": "6c931b8cd73019301f031b6596bb17a24d5cb6b2",
+  "base": "82a62867cc1bcbbc4b0848519c6757f623d112ce",
+  "platform": "x86_64-apple-darwin",
+  "profile": "dev/test debug0, debug_assertions and overflow_checks enabled, jobs1/incrementaloff/offlinelocked",
+  "package_counts": {
+    "passed": 557,
+    "failed": 0,
+    "ignored": 9
+  },
+  "drivers": [
+    {
+      "target_name": "lamp_skills",
+      "target_kind": [
+        "lib"
+      ],
+      "executable_SHA256": "d23b43ff8ca0df5025db168e61accb81c1509ff32aef736fd34b7cdeaba7c2ed",
+      "counts": {
+        "passed": 160,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 0
+      },
+      "compiled_cases": 160,
+      "compiled_ignored": 0,
+      "ordinary_filters": 0,
+      "raw_rows": 160,
+      "execution_rows": 160,
+      "identity_unique_within_target": true
+    },
+    {
+      "target_name": "lamp-skills",
+      "target_kind": [
+        "bin"
+      ],
+      "executable_SHA256": "c84cc0b40ce04e16f9d4d8903514f794ed84719c2b75f1b06425278be986e8d8",
+      "counts": {
+        "passed": 20,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 0
+      },
+      "compiled_cases": 20,
+      "compiled_ignored": 0,
+      "ordinary_filters": 0,
+      "raw_rows": 20,
+      "execution_rows": 20,
+      "identity_unique_within_target": true
+    },
+    {
+      "target_name": "it",
+      "target_kind": [
+        "test"
+      ],
+      "executable_SHA256": "a46e630f0141126cb7942287c320a239437e2603c6144307346ebd3d9b9fdb6b",
+      "counts": {
+        "passed": 344,
+        "failed": 0,
+        "ignored": 1,
+        "measured": 0,
+        "filtered_out": 0
+      },
+      "compiled_cases": 345,
+      "compiled_ignored": 1,
+      "ordinary_filters": 0,
+      "raw_rows": 345,
+      "execution_rows": 345,
+      "identity_unique_within_target": true
+    },
+    {
+      "target_name": "release_pair",
+      "target_kind": [
+        "test"
+      ],
+      "executable_SHA256": "8c202ad745f0ef4ac839eae486eedf71dfde70b566e5a57077915392c23822b9",
+      "counts": {
+        "passed": 2,
+        "failed": 0,
+        "ignored": 8,
+        "measured": 0,
+        "filtered_out": 0
+      },
+      "compiled_cases": 10,
+      "compiled_ignored": 8,
+      "ordinary_filters": 0,
+      "raw_rows": 10,
+      "execution_rows": 10,
+      "identity_unique_within_target": true
+    },
+    {
+      "target_name": "requested_audio",
+      "target_kind": [
+        "test"
+      ],
+      "executable_SHA256": "69187003f5a138d6c2bda17db87cf82f4e756d6d80f87dc1dd4d9d20b043eb07",
+      "counts": {
+        "passed": 31,
+        "failed": 0,
+        "ignored": 0,
+        "measured": 0,
+        "filtered_out": 0
+      },
+      "compiled_cases": 31,
+      "compiled_ignored": 0,
+      "ordinary_filters": 0,
+      "raw_rows": 31,
+      "execution_rows": 31,
+      "identity_unique_within_target": true
+    }
+  ],
+  "docs_passed": 0,
+  "docs_failed": 0,
+  "test_driver_count": 5,
+  "normal_helper_count": 2,
+  "compiled_identity_count": 566,
+  "runtime_attempts": 1,
+  "runtime_reuse": false,
+  "fullCargo_wall_seconds": 242.401722,
+  "Rust_exit": 0,
+  "native_controller_exit": 0,
+  "atomic_wrapper_exit": 0,
+  "commands_closed": 16,
+  "strict_packages": [
+    "lamp-body",
+    "lamp-cloud",
+    "lamp-expression",
+    "lamp-keeper",
+    "lamp-lean",
+    "lamp-memory",
+    "lamp-peek",
+    "lamp-setup",
+    "lamp-skills",
+    "lamp-update",
+    "lamp-voice",
+    "lamp-voice-eval"
+  ],
+  "required_cases_once": [
+    "addon::says_the_judge_dropped_do_not_spend_the_hour",
+    "routine::tests::a_delayed_sample_inside_the_window_keeps_its_original_deadline",
+    "routine::tests::a_host_stall_expires_the_request_header_without_changing_the_manager_deadline"
+  ],
+  "IT_counts": {
+    "passed": 344,
+    "failed": 0,
+    "ignored": 1,
+    "measured": 0,
+    "filtered_out": 0
+  },
+  "IT_fresh": false,
+  "IT_depinfo_includes_main_shared_addon": true,
+  "source_file_count": 10913,
+  "source_bookends": "projections/source-bookends.json",
+  "source_unchanged": true,
+  "official_owner_unchanged": true,
+  "witness_count": 164,
+  "actual_guard_count": 7,
+  "all_sealed_and_actual_guards": true,
+  "owned_groups_closed": true,
+  "unresolved_owned_pids": [],
+  "lease_released": true,
+  "normal_alias_inode_events": [
+    {
+      "path": "/private/tmp/tests-body-holder-cargo-20261027/debug/examples/render_relaxing_music",
+      "old_inode": 489869772,
+      "new_inode": 489870070,
+      "all_other_fields_SHA_equal": true
+    },
+    {
+      "path": "/private/tmp/tests-body-holder-cargo-20261027/debug/lamp-skills",
+      "old_inode": 489869803,
+      "new_inode": 489870071,
+      "all_other_fields_SHA_equal": true
+    }
+  ],
+  "guard_policy": {
+    "full_SHA": "All canonical/official tracked source and inherited/new sealed initial/final",
+    "other_boundaries": "Full tracked file-set/stat6/index/HEAD/branch/base/clean plus all sealed bound metadata and active actual SHA/stat",
+    "consumption": "Adjacent actual/copy SHA at each inventory and sole full Cargo",
+    "normal_alias_exception": "Only metadata-derived normal bin/examples inode-only after closed no-recompile Cargo0or101; all other attrs/hash and test/frozen inodes strict; Rust failure remains failure",
+    "modes": "preserved; no filesystem readonly claim"
+  },
+  "old_555_no_transfer": true,
+  "old_521_1_9_failure_retained": true,
+  "old_7929_native_scope": "projections/prior-7929-scope.json",
+  "current_native_ARM64": {
+    "run_id": 40581843149,
+    "status": "PENDING",
+    "url": "https://github.com/autonomous-ai/lampOS/actions/runs/40581843149"
+  },
+  "current_native_Linux_strict": {
+    "run_id": 40581843061,
+    "status": "PENDING",
+    "url": "https://github.com/autonomous-ai/lampOS/actions/runs/40581843061"
+  },
+  "scope_limits": [
+    "No full local reverse-dependent runtime claim",
+    "No current native/installed-device/latency or privileged result",
+    "Latest-base/current-read/native readiness remains separate"
+  ],
+  "raw_streams_preserved_byte_for_byte": true,
+  "producer_receipts_not_independent_binary_reexecution": true
+}

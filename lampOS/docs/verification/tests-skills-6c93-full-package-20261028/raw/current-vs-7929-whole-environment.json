@@ -1,0 +1,15 @@
+{
+  "whole_environment_equal": false,
+  "excluded_keys": [],
+  "changed_key_hashes": {
+    "CODEX_THREAD_ID": {
+      "before": "1f3880802d127d84b495722e397d10408929dade7650ac2ef27bb583d97f090f",
+      "after": "95ce03236990eb35c5682cac67b39af50b30961b719e96040911b9267826002e"
+    },
+    "CODEX_TOOL_CALL_ID": {
+      "before": "50e48778113bff9925cf529cce207ed2124b794d5a4c34c055c5badf05e1f352",
+      "after": "9aeef84f50e69740433f041496edcdd6d8d65f7d2e664b35878dd503dff0107a"
+    }
+  },
+  "no_automatic_context_exclusion_or_runtime_equivalence_claim": true
+}

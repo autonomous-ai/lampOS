@@ -1,0 +1,7 @@
+{
+  "status": "PROSPECTIVE_FULL_PACKAGE_RUNTIME_REQUIRED",
+  "new_source": "6c931b8cd73019301f031b6596bb17a24d5cb6b2",
+  "pinned_base": "82a62867cc1bcbbc4b0848519c6757f623d112ce",
+  "runtime_reuse": false,
+  "decision": "Newpackage/shared validation on82 plus previously unrunDad product/tests/lock inputs require ONE fresh full unfiltered currentSkills Cargo incldocs; required3 inside once; derive allcurrentcases."
+}

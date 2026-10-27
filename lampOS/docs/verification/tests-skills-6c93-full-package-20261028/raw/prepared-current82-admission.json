@@ -1,0 +1,45 @@
+{
+  "status": "CURRENT_FROZEN82_TYPED_SOURCE_AND_CACHE_ADMITTED",
+  "head": "6c931b8cd73019301f031b6596bb17a24d5cb6b2",
+  "base": "82a62867cc1bcbbc4b0848519c6757f623d112ce",
+  "origin_observed": "82a62867cc1bcbbc4b0848519c6757f623d112ce",
+  "controller_sha256": "4c04e7b052331bbc37ee0ba8e614f01ce77dc9f32fb8dd6ddbc984b900339bea",
+  "sealed_count": 157,
+  "retired_actual_count": 7,
+  "verified_bindings": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-82-body-after-7929-full-gates-20261028/prepared-verified-bindings.json",
+    "sha256": "4279bf492d1172d66af74ee2825357504a23a9aee18fa4ec376a9bd429776ef5",
+    "bytes": 74144
+  },
+  "pre_carry_full_SHA_stat157_7": true,
+  "final_metadata157_7": true,
+  "initial_lsof": {
+    "exit_code": 1,
+    "stdout": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-82-body-after-7929-full-gates-20261028/pre-admission-lsof.stdout",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "stderr": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-82-body-after-7929-full-gates-20261028/pre-admission-lsof.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    }
+  },
+  "final_lsof": {
+    "exit_code": 1,
+    "stdout": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-82-body-after-7929-full-gates-20261028/final-prelaunch-lsof.stdout",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "stderr": {
+      "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-82-body-after-7929-full-gates-20261028/final-prelaunch-lsof.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    }
+  },
+  "minimum_free_bytes": 6977703936,
+  "no_clean_touch_or_prior_compiler": true,
+  "all_sources_clean_equal_except_alias": true
+}

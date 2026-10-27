@@ -1,0 +1,27 @@
+{
+  "status": "ROOT_PROSPECTIVE82_CHECKED_ACTIVATION",
+  "controller_sha256": "4c04e7b052331bbc37ee0ba8e614f01ce77dc9f32fb8dd6ddbc984b900339bea",
+  "plan": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-82-body-after-7929-full-gates-20261028/plan.json",
+    "sha256": "4963fa5077a090ee48bdd06d7a5beec20ce88da262a43dea7bac3a9380b82f7f",
+    "bytes": 14939
+  },
+  "launch": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-82-body-after-7929-full-gates-20261028/launch.json",
+    "sha256": "8a7db606fdec632d02b7581939bc5c7dd296ec5983c1dbb5892c21a6128d7e5e",
+    "bytes": 1307
+  },
+  "source": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-82-body-after-7929-full-gates-20261028/prepared-canonical-source.json",
+    "sha256": "f66aab6d63df876eb92dcaafd43c888fd637374ba1b89303bb4163666dd90142",
+    "bytes": 2458076
+  },
+  "official": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-82-body-after-7929-full-gates-20261028/prepared-official-source.json",
+    "sha256": "634e28c1443f06165b118935ca905ce6455e4432c48017b68b9d5a3a7e7a664c",
+    "bytes": 2458063
+  },
+  "minimum_free_bytes": 6977527808,
+  "all_checks_passed": true,
+  "exact_controller_bytes_unchanged": true
+}

@@ -1,0 +1,28 @@
+{
+  "bookends": {
+    "source-before.json": {
+      "file": "raw/source-before.json",
+      "sha256": "f66aab6d63df876eb92dcaafd43c888fd637374ba1b89303bb4163666dd90142",
+      "bytes": 2458076
+    },
+    "source-after.json": {
+      "file": "raw/source-after.json",
+      "sha256": "f66aab6d63df876eb92dcaafd43c888fd637374ba1b89303bb4163666dd90142",
+      "bytes": 2458076
+    },
+    "official-source-before.json": {
+      "file": "raw/official-source-before.json",
+      "sha256": "634e28c1443f06165b118935ca905ce6455e4432c48017b68b9d5a3a7e7a664c",
+      "bytes": 2458063
+    },
+    "official-source-after.json": {
+      "file": "raw/official-source-after.json",
+      "sha256": "634e28c1443f06165b118935ca905ce6455e4432c48017b68b9d5a3a7e7a664c",
+      "bytes": 2458063
+    }
+  },
+  "canonical_equal": true,
+  "official_equal": true,
+  "file_count_each": 10913,
+  "canonical_official_equal_except_branch": true
+}

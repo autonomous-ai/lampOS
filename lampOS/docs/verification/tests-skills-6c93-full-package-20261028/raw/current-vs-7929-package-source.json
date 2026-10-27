@@ -1,0 +1,59 @@
+{
+  "old_head": "792937f432cd3bc88279f084b2ad2faba6df777b",
+  "current_head": "6c931b8cd73019301f031b6596bb17a24d5cb6b2",
+  "entire_package_equal": false,
+  "changed_entries": {
+    "lampOS/crates/skills/src/main.rs": {
+      "before": {
+        "sha256": "74d35938cf988f4c5e7dc4c1a620683bc84a58e1e1e8422dccc65d935fdadb97",
+        "bytes": 215965,
+        "mode": 420,
+        "kind": "file"
+      },
+      "after": {
+        "sha256": "489dd9545450890409a10f2473fc340a55368896fab9dffa5193da441b5cd6e0",
+        "bytes": 216548,
+        "mode": 420,
+        "kind": "file"
+      }
+    },
+    "lampOS/crates/skills/src/package.rs": {
+      "before": {
+        "sha256": "2ab4959691c7a6d5d1e3746b459f51bc7d0217457beb20d10b1db52db739405b",
+        "bytes": 84035,
+        "mode": 420,
+        "kind": "file"
+      },
+      "after": {
+        "sha256": "458969b0d032283e2dccc1a6455f4590d48aa6c048a84b38bb1538cd6f462aa4",
+        "bytes": 89836,
+        "mode": 420,
+        "kind": "file"
+      }
+    },
+    "lampOS/crates/skills/tests/it/main.rs": {
+      "before": {
+        "sha256": "fd47c1c3275639afcab9d3ffe1793c44544b24eef274d37929097665048828ac",
+        "bytes": 1492,
+        "mode": 420,
+        "kind": "file"
+      },
+      "after": {
+        "sha256": "e667da6f6199a72de54e9408f2eeaf86b6a829e67f6fb4b431ffb4f7df94b905",
+        "bytes": 1504,
+        "mode": 420,
+        "kind": "file"
+      }
+    },
+    "lampOS/crates/skills/tests/it/shared.rs": {
+      "before": null,
+      "after": {
+        "sha256": "de452b22905338bba8a591359f52094fdf965df15575a7601f8c08bab41fa574",
+        "bytes": 8034,
+        "mode": 420,
+        "kind": "file"
+      }
+    }
+  },
+  "no_old555_runtime_transfer": true
+}

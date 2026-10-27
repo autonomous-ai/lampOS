@@ -1,0 +1,8 @@
+    Checking lamp-memory v0.1.0 (/private/tmp/tests-skills-canonical-20261028/lampOS/crates/memory)
+    Checking lamp-skills v0.1.0 (/private/tmp/tests-skills-canonical-20261028/lampOS/crates/skills)
+    Checking lamp-voice-eval v0.1.0 (/private/tmp/tests-skills-canonical-20261028/lampOS/crates/voice-eval)
+    Checking lamp-cloud v0.1.0 (/private/tmp/tests-skills-canonical-20261028/lampOS/crates/cloud)
+    Checking lamp-voice v0.1.0 (/private/tmp/tests-skills-canonical-20261028/lampOS/crates/voice)
+    Checking lamp-update v0.1.0 (/private/tmp/tests-skills-canonical-20261028/lampOS/crates/update)
+    Checking lamp-body v0.1.0 (/private/tmp/tests-skills-canonical-20261028/lampOS/crates/body)
+    Finished `dev` profile [unoptimized] target(s) in 2m 18s

@@ -1,0 +1,2 @@
+   Compiling lamp-skills v0.1.0 (/private/tmp/tests-skills-canonical-20261028/lampOS/crates/skills)
+    Finished `test` profile [unoptimized] target(s) in 36.10s

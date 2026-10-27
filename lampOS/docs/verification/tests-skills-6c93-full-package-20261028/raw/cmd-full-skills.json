@@ -1,0 +1,62 @@
+{
+  "command": [
+    "/Users/autonomous/.cargo/bin/cargo",
+    "+1.96.0",
+    "test",
+    "--offline",
+    "--locked",
+    "--jobs",
+    "1",
+    "-p",
+    "lamp-skills",
+    "--no-fail-fast",
+    "--",
+    "--test-threads=1"
+  ],
+  "cwd": "/private/tmp/tests-skills-canonical-20261028/lampOS",
+  "started_at": "2026-10-27T20:45:03.720840+00:00",
+  "timeout_seconds": 3600,
+  "stdout": "cmd-full-skills.stdout.txt",
+  "stderr": "cmd-full-skills.stderr.txt",
+  "timeout_cleanup": [
+    {
+      "action": "leader exited unreaped; no other owned group members",
+      "members": [
+        {
+          "pid": 54586,
+          "state": "Z"
+        }
+      ]
+    }
+  ],
+  "timed_out": false,
+  "disk_reserve_breached": false,
+  "stop_reason": null,
+  "process_group_scope": "Owned group only; no detached-descendant cleanup claim.",
+  "group_closure_method": "WNOWAIT leader reservation and ps group inventory before reap",
+  "launch_state": "Popen_recorded",
+  "disk_reserve_bytes": 2214592512,
+  "disk_sample_interval_seconds": 1,
+  "disk_paths": [
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-82-body-after-7929-full-gates-20261028",
+    "/private/tmp/tests-body-holder-cargo-20261027"
+  ],
+  "disk_samples": 240,
+  "disk_last_available_bytes": 6062530560,
+  "disk_minimum_available_bytes": 6062530560,
+  "available_bytes_before_Cargo": 6559928320,
+  "owned_pid": 54586,
+  "owned_process_group": 54586,
+  "direct_wait_status": 0,
+  "exit_code": 0,
+  "owned_group_absent_after_cleanup": true,
+  "unexpected_owned_descendants": false,
+  "unresolved_owned_pids": [],
+  "compiler_lease_held": false,
+  "wall_seconds": 242.401722,
+  "finished_at": "2026-10-27T20:49:06.152427+00:00",
+  "stdout_sha256": "437778c69d9ab8b32a2cbcabeddd2db08ecfcd2c49d22f53173f64b4731034e5",
+  "stdout_bytes": 47773,
+  "stderr_sha256": "612bda643cdafa152feca823c8fc258c788137590bab59f518f358188b127504",
+  "stderr_bytes": 53863
+}

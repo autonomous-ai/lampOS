@@ -1,0 +1,12 @@
+{
+  "wrapper_exit": 0,
+  "runtime_wrapper_attempted_once": true,
+  "head": "6c931b8cd73019301f031b6596bb17a24d5cb6b2",
+  "base": "82a62867cc1bcbbc4b0848519c6757f623d112ce",
+  "controller_sha256": "4c04e7b052331bbc37ee0ba8e614f01ce77dc9f32fb8dd6ddbc984b900339bea",
+  "actual_native_result": {
+    "path": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-82-body-after-7929-full-gates-20261028/native-controller-result.json",
+    "sha256": "7823a0a8b585488a144384693525a6d2ff90511bc800944455a95114eb380394",
+    "bytes": 472
+  }
+}

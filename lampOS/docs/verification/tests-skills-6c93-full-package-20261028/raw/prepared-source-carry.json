@@ -1,0 +1,20 @@
+{
+  "status": "CLEAN_ATOMIC82_OWN_CARRY",
+  "old_head": "d277ad68abe1a4025ef4fc8f6c0feeee35ec5c4f",
+  "old_base": "61c2a7264744a851ba18334ff4bcffd4668310ed",
+  "head": "6c931b8cd73019301f031b6596bb17a24d5cb6b2",
+  "base": "82a62867cc1bcbbc4b0848519c6757f623d112ce",
+  "backup_ref": "tests/preserve-skills-d277-before-82-20261028",
+  "origin_observed_after_single_fetch": "82a62867cc1bcbbc4b0848519c6757f623d112ce",
+  "later_Main_does_not_abort_frozen82": false,
+  "new_delta_paths": [
+    "lampOS/crates/skills/src/package.rs",
+    "lampOS/crates/skills/tests/it/shared.rs",
+    "lampOS/docs/skills.md"
+  ],
+  "one_patch_equal": true,
+  "addon_fullblob_mode_equal": true,
+  "docs_new82_plus_owned_paragraph_exact": true,
+  "whole_doc_or_rawpatch_equality_not_claimed": true,
+  "range_diff": "1:  d277ad68a = 1:  6c931b8cd lampOS: count completed addon judgements from new journal bytes\n"
+}

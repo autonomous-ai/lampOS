@@ -1,0 +1,666 @@
+{
+  "artifacts": [
+    {
+      "target_identity": [
+        "it",
+        [
+          "test"
+        ],
+        true
+      ],
+      "old": {
+        "sha256": "96f7095a9ff7294f2bba7ae06fc156528e59d5b781b8e708ec5ac9cf7dba6ca9",
+        "bytes": 25955220,
+        "mode": 493,
+        "mtime_ns": 1793131100590411475,
+        "device": 16777222,
+        "inode": 489673238,
+        "kind": "file",
+        "artifact": {
+          "reason": "compiler-artifact",
+          "package_id": "path+file:///private/tmp/tests-skills-canonical-20261028/lampOS/crates/skills#lamp-skills@0.1.0",
+          "manifest_path": "/private/tmp/tests-skills-canonical-20261028/lampOS/crates/skills/Cargo.toml",
+          "target": {
+            "kind": [
+              "test"
+            ],
+            "crate_types": [
+              "bin"
+            ],
+            "name": "it",
+            "src_path": "/private/tmp/tests-skills-canonical-20261028/lampOS/crates/skills/tests/it/main.rs",
+            "edition": "2024",
+            "doc": false,
+            "doctest": false,
+            "test": true
+          },
+          "profile": {
+            "opt_level": "0",
+            "debuginfo": 0,
+            "debug_assertions": true,
+            "overflow_checks": true,
+            "test": true
+          },
+          "features": [],
+          "filenames": [
+            "/private/tmp/tests-body-holder-cargo-20261027/debug/deps/it-aabcadd0c6d2694b"
+          ],
+          "executable": "/private/tmp/tests-body-holder-cargo-20261027/debug/deps/it-aabcadd0c6d2694b",
+          "fresh": false
+        },
+        "sealed_copy": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-2e66-body-after-mood-full-gates-prep-20261028/frozen/1-it-aabcadd0c6d2694b"
+      },
+      "current": {
+        "sha256": "a46e630f0141126cb7942287c320a239437e2603c6144307346ebd3d9b9fdb6b",
+        "bytes": 26015612,
+        "mode": 493,
+        "mtime_ns": 1793133857789531135,
+        "device": 16777222,
+        "inode": 489869761,
+        "kind": "file",
+        "artifact": {
+          "reason": "compiler-artifact",
+          "package_id": "path+file:///private/tmp/tests-skills-canonical-20261028/lampOS/crates/skills#lamp-skills@0.1.0",
+          "manifest_path": "/private/tmp/tests-skills-canonical-20261028/lampOS/crates/skills/Cargo.toml",
+          "target": {
+            "kind": [
+              "test"
+            ],
+            "crate_types": [
+              "bin"
+            ],
+            "name": "it",
+            "src_path": "/private/tmp/tests-skills-canonical-20261028/lampOS/crates/skills/tests/it/main.rs",
+            "edition": "2024",
+            "doc": false,
+            "doctest": false,
+            "test": true
+          },
+          "profile": {
+            "opt_level": "0",
+            "debuginfo": 0,
+            "debug_assertions": true,
+            "overflow_checks": true,
+            "test": true
+          },
+          "features": [],
+          "filenames": [
+            "/private/tmp/tests-body-holder-cargo-20261027/debug/deps/it-aabcadd0c6d2694b"
+          ],
+          "executable": "/private/tmp/tests-body-holder-cargo-20261027/debug/deps/it-aabcadd0c6d2694b",
+          "fresh": false
+        },
+        "sealed_copy": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-82-body-after-7929-full-gates-20261028/frozen/1-it-aabcadd0c6d2694b"
+      },
+      "same_relevant_fields": false
+    },
+    {
+      "target_identity": [
+        "lamp-skills",
+        [
+          "bin"
+        ],
+        false
+      ],
+      "old": {
+        "sha256": "cfab66b6a87fddd43131f9f3d00a9db8bb0dc022295e97c6737a8229e31f3f82",
+        "bytes": 20472428,
+        "mode": 493,
+        "mtime_ns": 1793131104948368533,
+        "device": 16777222,
+        "inode": 489676980,
+        "kind": "file",
+        "artifact": {
+          "reason": "compiler-artifact",
+          "package_id": "path+file:///private/tmp/tests-skills-canonical-20261028/lampOS/crates/skills#lamp-skills@0.1.0",
+          "manifest_path": "/private/tmp/tests-skills-canonical-20261028/lampOS/crates/skills/Cargo.toml",
+          "target": {
+            "kind": [
+              "bin"
+            ],
+            "crate_types": [
+              "bin"
+            ],
+            "name": "lamp-skills",
+            "src_path": "/private/tmp/tests-skills-canonical-20261028/lampOS/crates/skills/src/main.rs",
+            "edition": "2024",
+            "doc": true,
+            "doctest": false,
+            "test": true
+          },
+          "profile": {
+            "opt_level": "0",
+            "debuginfo": 0,
+            "debug_assertions": true,
+            "overflow_checks": true,
+            "test": false
+          },
+          "features": [],
+          "filenames": [
+            "/private/tmp/tests-body-holder-cargo-20261027/debug/lamp-skills"
+          ],
+          "executable": "/private/tmp/tests-body-holder-cargo-20261027/debug/lamp-skills",
+          "fresh": false
+        },
+        "sealed_copy": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-2e66-body-after-mood-full-gates-prep-20261028/frozen/3-lamp-skills"
+      },
+      "current": {
+        "sha256": "8fb70d98e430012a147fccaa20ae25a2d8e5a86d26dfffb15b71057c7b9d9b0f",
+        "bytes": 20486828,
+        "mode": 493,
+        "mtime_ns": 1793133860462717775,
+        "device": 16777222,
+        "inode": 489869803,
+        "kind": "file",
+        "artifact": {
+          "reason": "compiler-artifact",
+          "package_id": "path+file:///private/tmp/tests-skills-canonical-20261028/lampOS/crates/skills#lamp-skills@0.1.0",
+          "manifest_path": "/private/tmp/tests-skills-canonical-20261028/lampOS/crates/skills/Cargo.toml",
+          "target": {
+            "kind": [
+              "bin"
+            ],
+            "crate_types": [
+              "bin"
+            ],
+            "name": "lamp-skills",
+            "src_path": "/private/tmp/tests-skills-canonical-20261028/lampOS/crates/skills/src/main.rs",
+            "edition": "2024",
+            "doc": true,
+            "doctest": false,
+            "test": true
+          },
+          "profile": {
+            "opt_level": "0",
+            "debuginfo": 0,
+            "debug_assertions": true,
+            "overflow_checks": true,
+            "test": false
+          },
+          "features": [],
+          "filenames": [
+            "/private/tmp/tests-body-holder-cargo-20261027/debug/lamp-skills"
+          ],
+          "executable": "/private/tmp/tests-body-holder-cargo-20261027/debug/lamp-skills",
+          "fresh": false
+        },
+        "sealed_copy": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-82-body-after-7929-full-gates-20261028/frozen/3-lamp-skills"
+      },
+      "same_relevant_fields": false
+    },
+    {
+      "target_identity": [
+        "lamp-skills",
+        [
+          "bin"
+        ],
+        true
+      ],
+      "old": {
+        "sha256": "2afeaa7df697b6593799ea621b655f0b4a1c20fa6328062b0eb90604e39b7dc1",
+        "bytes": 13449204,
+        "mode": 493,
+        "mtime_ns": 1793131107020555156,
+        "device": 16777222,
+        "inode": 489673465,
+        "kind": "file",
+        "artifact": {
+          "reason": "compiler-artifact",
+          "package_id": "path+file:///private/tmp/tests-skills-canonical-20261028/lampOS/crates/skills#lamp-skills@0.1.0",
+          "manifest_path": "/private/tmp/tests-skills-canonical-20261028/lampOS/crates/skills/Cargo.toml",
+          "target": {
+            "kind": [
+              "bin"
+            ],
+            "crate_types": [
+              "bin"
+            ],
+            "name": "lamp-skills",
+            "src_path": "/private/tmp/tests-skills-canonical-20261028/lampOS/crates/skills/src/main.rs",
+            "edition": "2024",
+            "doc": true,
+            "doctest": false,
+            "test": true
+          },
+          "profile": {
+            "opt_level": "0",
+            "debuginfo": 0,
+            "debug_assertions": true,
+            "overflow_checks": true,
+            "test": true
+          },
+          "features": [],
+          "filenames": [
+            "/private/tmp/tests-body-holder-cargo-20261027/debug/deps/lamp_skills-b6219d16028772de"
+          ],
+          "executable": "/private/tmp/tests-body-holder-cargo-20261027/debug/deps/lamp_skills-b6219d16028772de",
+          "fresh": false
+        },
+        "sealed_copy": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-2e66-body-after-mood-full-gates-prep-20261028/frozen/4-lamp_skills-b6219d16028772de"
+      },
+      "current": {
+        "sha256": "c84cc0b40ce04e16f9d4d8903514f794ed84719c2b75f1b06425278be986e8d8",
+        "bytes": 13446452,
+        "mode": 493,
+        "mtime_ns": 1793133849840247892,
+        "device": 16777222,
+        "inode": 489869720,
+        "kind": "file",
+        "artifact": {
+          "reason": "compiler-artifact",
+          "package_id": "path+file:///private/tmp/tests-skills-canonical-20261028/lampOS/crates/skills#lamp-skills@0.1.0",
+          "manifest_path": "/private/tmp/tests-skills-canonical-20261028/lampOS/crates/skills/Cargo.toml",
+          "target": {
+            "kind": [
+              "bin"
+            ],
+            "crate_types": [
+              "bin"
+            ],
+            "name": "lamp-skills",
+            "src_path": "/private/tmp/tests-skills-canonical-20261028/lampOS/crates/skills/src/main.rs",
+            "edition": "2024",
+            "doc": true,
+            "doctest": false,
+            "test": true
+          },
+          "profile": {
+            "opt_level": "0",
+            "debuginfo": 0,
+            "debug_assertions": true,
+            "overflow_checks": true,
+            "test": true
+          },
+          "features": [],
+          "filenames": [
+            "/private/tmp/tests-body-holder-cargo-20261027/debug/deps/lamp_skills-b6219d16028772de"
+          ],
+          "executable": "/private/tmp/tests-body-holder-cargo-20261027/debug/deps/lamp_skills-b6219d16028772de",
+          "fresh": false
+        },
+        "sealed_copy": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-82-body-after-7929-full-gates-20261028/frozen/0-lamp_skills-b6219d16028772de"
+      },
+      "same_relevant_fields": false
+    },
+    {
+      "target_identity": [
+        "lamp_skills",
+        [
+          "lib"
+        ],
+        true
+      ],
+      "old": {
+        "sha256": "82a1fe6e1560cac0478b4936c0fe1566ce09be76891e328373352dddc5386dee",
+        "bytes": 14333044,
+        "mode": 493,
+        "mtime_ns": 1793131118469244899,
+        "device": 16777222,
+        "inode": 489674086,
+        "kind": "file",
+        "artifact": {
+          "reason": "compiler-artifact",
+          "package_id": "path+file:///private/tmp/tests-skills-canonical-20261028/lampOS/crates/skills#lamp-skills@0.1.0",
+          "manifest_path": "/private/tmp/tests-skills-canonical-20261028/lampOS/crates/skills/Cargo.toml",
+          "target": {
+            "kind": [
+              "lib"
+            ],
+            "crate_types": [
+              "lib"
+            ],
+            "name": "lamp_skills",
+            "src_path": "/private/tmp/tests-skills-canonical-20261028/lampOS/crates/skills/src/lib.rs",
+            "edition": "2024",
+            "doc": true,
+            "doctest": true,
+            "test": true
+          },
+          "profile": {
+            "opt_level": "0",
+            "debuginfo": 0,
+            "debug_assertions": true,
+            "overflow_checks": true,
+            "test": true
+          },
+          "features": [],
+          "filenames": [
+            "/private/tmp/tests-body-holder-cargo-20261027/debug/deps/lamp_skills-8299c9194e44862b"
+          ],
+          "executable": "/private/tmp/tests-body-holder-cargo-20261027/debug/deps/lamp_skills-8299c9194e44862b",
+          "fresh": false
+        },
+        "sealed_copy": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-2e66-body-after-mood-full-gates-prep-20261028/frozen/6-lamp_skills-8299c9194e44862b"
+      },
+      "current": {
+        "sha256": "d23b43ff8ca0df5025db168e61accb81c1509ff32aef736fd34b7cdeaba7c2ed",
+        "bytes": 14333044,
+        "mode": 493,
+        "mtime_ns": 1793133873369989056,
+        "device": 16777222,
+        "inode": 489869893,
+        "kind": "file",
+        "artifact": {
+          "reason": "compiler-artifact",
+          "package_id": "path+file:///private/tmp/tests-skills-canonical-20261028/lampOS/crates/skills#lamp-skills@0.1.0",
+          "manifest_path": "/private/tmp/tests-skills-canonical-20261028/lampOS/crates/skills/Cargo.toml",
+          "target": {
+            "kind": [
+              "lib"
+            ],
+            "crate_types": [
+              "lib"
+            ],
+            "name": "lamp_skills",
+            "src_path": "/private/tmp/tests-skills-canonical-20261028/lampOS/crates/skills/src/lib.rs",
+            "edition": "2024",
+            "doc": true,
+            "doctest": true,
+            "test": true
+          },
+          "profile": {
+            "opt_level": "0",
+            "debuginfo": 0,
+            "debug_assertions": true,
+            "overflow_checks": true,
+            "test": true
+          },
+          "features": [],
+          "filenames": [
+            "/private/tmp/tests-body-holder-cargo-20261027/debug/deps/lamp_skills-8299c9194e44862b"
+          ],
+          "executable": "/private/tmp/tests-body-holder-cargo-20261027/debug/deps/lamp_skills-8299c9194e44862b",
+          "fresh": false
+        },
+        "sealed_copy": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-82-body-after-7929-full-gates-20261028/frozen/6-lamp_skills-8299c9194e44862b"
+      },
+      "same_relevant_fields": false
+    },
+    {
+      "target_identity": [
+        "release_pair",
+        [
+          "test"
+        ],
+        true
+      ],
+      "old": {
+        "sha256": "8c202ad745f0ef4ac839eae486eedf71dfde70b566e5a57077915392c23822b9",
+        "bytes": 3695280,
+        "mode": 493,
+        "mtime_ns": 1793131102342305583,
+        "device": 16777222,
+        "inode": 489673299,
+        "kind": "file",
+        "artifact": {
+          "reason": "compiler-artifact",
+          "package_id": "path+file:///private/tmp/tests-skills-canonical-20261028/lampOS/crates/skills#lamp-skills@0.1.0",
+          "manifest_path": "/private/tmp/tests-skills-canonical-20261028/lampOS/crates/skills/Cargo.toml",
+          "target": {
+            "kind": [
+              "test"
+            ],
+            "crate_types": [
+              "bin"
+            ],
+            "name": "release_pair",
+            "src_path": "/private/tmp/tests-skills-canonical-20261028/lampOS/crates/skills/tests/release_pair.rs",
+            "edition": "2024",
+            "doc": false,
+            "doctest": false,
+            "test": true
+          },
+          "profile": {
+            "opt_level": "0",
+            "debuginfo": 0,
+            "debug_assertions": true,
+            "overflow_checks": true,
+            "test": true
+          },
+          "features": [],
+          "filenames": [
+            "/private/tmp/tests-body-holder-cargo-20261027/debug/deps/release_pair-e9612804d54e7498"
+          ],
+          "executable": "/private/tmp/tests-body-holder-cargo-20261027/debug/deps/release_pair-e9612804d54e7498",
+          "fresh": false
+        },
+        "sealed_copy": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-2e66-body-after-mood-full-gates-prep-20261028/frozen/2-release_pair-e9612804d54e7498"
+      },
+      "current": {
+        "sha256": "8c202ad745f0ef4ac839eae486eedf71dfde70b566e5a57077915392c23822b9",
+        "bytes": 3695280,
+        "mode": 493,
+        "mtime_ns": 1793133863597625847,
+        "device": 16777222,
+        "inode": 489869845,
+        "kind": "file",
+        "artifact": {
+          "reason": "compiler-artifact",
+          "package_id": "path+file:///private/tmp/tests-skills-canonical-20261028/lampOS/crates/skills#lamp-skills@0.1.0",
+          "manifest_path": "/private/tmp/tests-skills-canonical-20261028/lampOS/crates/skills/Cargo.toml",
+          "target": {
+            "kind": [
+              "test"
+            ],
+            "crate_types": [
+              "bin"
+            ],
+            "name": "release_pair",
+            "src_path": "/private/tmp/tests-skills-canonical-20261028/lampOS/crates/skills/tests/release_pair.rs",
+            "edition": "2024",
+            "doc": false,
+            "doctest": false,
+            "test": true
+          },
+          "profile": {
+            "opt_level": "0",
+            "debuginfo": 0,
+            "debug_assertions": true,
+            "overflow_checks": true,
+            "test": true
+          },
+          "features": [],
+          "filenames": [
+            "/private/tmp/tests-body-holder-cargo-20261027/debug/deps/release_pair-e9612804d54e7498"
+          ],
+          "executable": "/private/tmp/tests-body-holder-cargo-20261027/debug/deps/release_pair-e9612804d54e7498",
+          "fresh": false
+        },
+        "sealed_copy": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-82-body-after-7929-full-gates-20261028/frozen/5-release_pair-e9612804d54e7498"
+      },
+      "same_relevant_fields": true
+    },
+    {
+      "target_identity": [
+        "render_relaxing_music",
+        [
+          "example"
+        ],
+        false
+      ],
+      "old": {
+        "sha256": "7e344928394f2657f58e7cbaec879eb452e96fac45857f3b945f345903c649be",
+        "bytes": 548512,
+        "mode": 493,
+        "mtime_ns": 1793131091393355682,
+        "device": 16777222,
+        "inode": 489676979,
+        "kind": "file",
+        "artifact": {
+          "reason": "compiler-artifact",
+          "package_id": "path+file:///private/tmp/tests-skills-canonical-20261028/lampOS/crates/skills#lamp-skills@0.1.0",
+          "manifest_path": "/private/tmp/tests-skills-canonical-20261028/lampOS/crates/skills/Cargo.toml",
+          "target": {
+            "kind": [
+              "example"
+            ],
+            "crate_types": [
+              "bin"
+            ],
+            "name": "render_relaxing_music",
+            "src_path": "/private/tmp/tests-skills-canonical-20261028/lampOS/crates/skills/examples/render_relaxing_music.rs",
+            "edition": "2024",
+            "doc": false,
+            "doctest": false,
+            "test": false
+          },
+          "profile": {
+            "opt_level": "0",
+            "debuginfo": 0,
+            "debug_assertions": true,
+            "overflow_checks": true,
+            "test": false
+          },
+          "features": [],
+          "filenames": [
+            "/private/tmp/tests-body-holder-cargo-20261027/debug/examples/render_relaxing_music"
+          ],
+          "executable": "/private/tmp/tests-body-holder-cargo-20261027/debug/examples/render_relaxing_music",
+          "fresh": false
+        },
+        "sealed_copy": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-2e66-body-after-mood-full-gates-prep-20261028/frozen/0-render_relaxing_music"
+      },
+      "current": {
+        "sha256": "7e344928394f2657f58e7cbaec879eb452e96fac45857f3b945f345903c649be",
+        "bytes": 548512,
+        "mode": 493,
+        "mtime_ns": 1793133858092352690,
+        "device": 16777222,
+        "inode": 489869772,
+        "kind": "file",
+        "artifact": {
+          "reason": "compiler-artifact",
+          "package_id": "path+file:///private/tmp/tests-skills-canonical-20261028/lampOS/crates/skills#lamp-skills@0.1.0",
+          "manifest_path": "/private/tmp/tests-skills-canonical-20261028/lampOS/crates/skills/Cargo.toml",
+          "target": {
+            "kind": [
+              "example"
+            ],
+            "crate_types": [
+              "bin"
+            ],
+            "name": "render_relaxing_music",
+            "src_path": "/private/tmp/tests-skills-canonical-20261028/lampOS/crates/skills/examples/render_relaxing_music.rs",
+            "edition": "2024",
+            "doc": false,
+            "doctest": false,
+            "test": false
+          },
+          "profile": {
+            "opt_level": "0",
+            "debuginfo": 0,
+            "debug_assertions": true,
+            "overflow_checks": true,
+            "test": false
+          },
+          "features": [],
+          "filenames": [
+            "/private/tmp/tests-body-holder-cargo-20261027/debug/examples/render_relaxing_music"
+          ],
+          "executable": "/private/tmp/tests-body-holder-cargo-20261027/debug/examples/render_relaxing_music",
+          "fresh": false
+        },
+        "sealed_copy": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-82-body-after-7929-full-gates-20261028/frozen/2-render_relaxing_music"
+      },
+      "same_relevant_fields": true
+    },
+    {
+      "target_identity": [
+        "requested_audio",
+        [
+          "test"
+        ],
+        true
+      ],
+      "old": {
+        "sha256": "a92c0aedfcb7abe40f9c6335d278b0544799383dc6ed7d94d99be64c2681a2fd",
+        "bytes": 13331268,
+        "mode": 493,
+        "mtime_ns": 1793131108520885525,
+        "device": 16777222,
+        "inode": 489673513,
+        "kind": "file",
+        "artifact": {
+          "reason": "compiler-artifact",
+          "package_id": "path+file:///private/tmp/tests-skills-canonical-20261028/lampOS/crates/skills#lamp-skills@0.1.0",
+          "manifest_path": "/private/tmp/tests-skills-canonical-20261028/lampOS/crates/skills/Cargo.toml",
+          "target": {
+            "kind": [
+              "test"
+            ],
+            "crate_types": [
+              "bin"
+            ],
+            "name": "requested_audio",
+            "src_path": "/private/tmp/tests-skills-canonical-20261028/lampOS/crates/skills/tests/requested_audio.rs",
+            "edition": "2024",
+            "doc": false,
+            "doctest": false,
+            "test": true
+          },
+          "profile": {
+            "opt_level": "0",
+            "debuginfo": 0,
+            "debug_assertions": true,
+            "overflow_checks": true,
+            "test": true
+          },
+          "features": [],
+          "filenames": [
+            "/private/tmp/tests-body-holder-cargo-20261027/debug/deps/requested_audio-deef722372f12c7e"
+          ],
+          "executable": "/private/tmp/tests-body-holder-cargo-20261027/debug/deps/requested_audio-deef722372f12c7e",
+          "fresh": false
+        },
+        "sealed_copy": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-2e66-body-after-mood-full-gates-prep-20261028/frozen/5-requested_audio-deef722372f12c7e"
+      },
+      "current": {
+        "sha256": "69187003f5a138d6c2bda17db87cf82f4e756d6d80f87dc1dd4d9d20b043eb07",
+        "bytes": 13355284,
+        "mode": 493,
+        "mtime_ns": 1793133861888720188,
+        "device": 16777222,
+        "inode": 489869818,
+        "kind": "file",
+        "artifact": {
+          "reason": "compiler-artifact",
+          "package_id": "path+file:///private/tmp/tests-skills-canonical-20261028/lampOS/crates/skills#lamp-skills@0.1.0",
+          "manifest_path": "/private/tmp/tests-skills-canonical-20261028/lampOS/crates/skills/Cargo.toml",
+          "target": {
+            "kind": [
+              "test"
+            ],
+            "crate_types": [
+              "bin"
+            ],
+            "name": "requested_audio",
+            "src_path": "/private/tmp/tests-skills-canonical-20261028/lampOS/crates/skills/tests/requested_audio.rs",
+            "edition": "2024",
+            "doc": false,
+            "doctest": false,
+            "test": true
+          },
+          "profile": {
+            "opt_level": "0",
+            "debuginfo": 0,
+            "debug_assertions": true,
+            "overflow_checks": true,
+            "test": true
+          },
+          "features": [],
+          "filenames": [
+            "/private/tmp/tests-body-holder-cargo-20261027/debug/deps/requested_audio-deef722372f12c7e"
+          ],
+          "executable": "/private/tmp/tests-body-holder-cargo-20261027/debug/deps/requested_audio-deef722372f12c7e",
+          "fresh": false
+        },
+        "sealed_copy": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-82-body-after-7929-full-gates-20261028/frozen/4-requested_audio-deef722372f12c7e"
+      },
+      "same_relevant_fields": false
+    }
+  ],
+  "same_identity_set": true,
+  "all_relevant_fields_equal": false,
+  "runtime_reuse_granted": false,
+  "fresh_full_runtime_chosen_prospectively": true
+}

@@ -1,0 +1,47 @@
+{
+  "identities": {
+    "addon::says_the_judge_dropped_do_not_spend_the_hour": [
+      {
+        "package": "lamp-skills",
+        "target_name": "it",
+        "target_kind": [
+          "test"
+        ],
+        "name": "addon::says_the_judge_dropped_do_not_spend_the_hour",
+        "outcome": "ok",
+        "raw_status": "ok"
+      }
+    ],
+    "routine::tests::a_delayed_sample_inside_the_window_keeps_its_original_deadline": [
+      {
+        "package": "lamp-skills",
+        "target_name": "lamp_skills",
+        "target_kind": [
+          "lib"
+        ],
+        "name": "routine::tests::a_delayed_sample_inside_the_window_keeps_its_original_deadline",
+        "outcome": "ok",
+        "raw_status": "ok"
+      }
+    ],
+    "routine::tests::a_host_stall_expires_the_request_header_without_changing_the_manager_deadline": [
+      {
+        "package": "lamp-skills",
+        "target_name": "lamp_skills",
+        "target_kind": [
+          "lib"
+        ],
+        "name": "routine::tests::a_host_stall_expires_the_request_header_without_changing_the_manager_deadline",
+        "outcome": "ok",
+        "raw_status": "ok"
+      }
+    ]
+  },
+  "single_addon_identity": true,
+  "internal_addon_variants": [
+    true,
+    false
+  ],
+  "internal_variants_not_extra_Rust_tests": true,
+  "all_required_once": true
+}

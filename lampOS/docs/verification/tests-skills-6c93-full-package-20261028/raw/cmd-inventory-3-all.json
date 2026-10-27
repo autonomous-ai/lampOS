@@ -1,0 +1,54 @@
+{
+  "command": [
+    "/private/tmp/tests-body-holder-cargo-20261027/debug/deps/release_pair-e9612804d54e7498",
+    "--list",
+    "--format",
+    "terse"
+  ],
+  "cwd": "/private/tmp/tests-skills-canonical-20261028/lampOS",
+  "started_at": "2026-10-27T20:44:52.850198+00:00",
+  "timeout_seconds": 300,
+  "stdout": "cmd-inventory-3-all.stdout.txt",
+  "stderr": "cmd-inventory-3-all.stderr.txt",
+  "timeout_cleanup": [
+    {
+      "action": "leader exited unreaped; no other owned group members",
+      "members": [
+        {
+          "pid": 54356,
+          "state": "Z"
+        }
+      ]
+    }
+  ],
+  "timed_out": false,
+  "disk_reserve_breached": false,
+  "stop_reason": null,
+  "process_group_scope": "Owned group only; no detached-descendant cleanup claim.",
+  "group_closure_method": "WNOWAIT leader reservation and ps group inventory before reap",
+  "launch_state": "Popen_recorded",
+  "disk_reserve_bytes": 2214592512,
+  "disk_sample_interval_seconds": 1,
+  "disk_paths": [
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/skills-82-body-after-7929-full-gates-20261028",
+    "/private/tmp/tests-body-holder-cargo-20261027"
+  ],
+  "disk_samples": 1,
+  "disk_last_available_bytes": 6560284672,
+  "disk_minimum_available_bytes": 6560284672,
+  "available_bytes_before_Cargo": 6560284672,
+  "owned_pid": 54356,
+  "owned_process_group": 54356,
+  "direct_wait_status": 0,
+  "exit_code": 0,
+  "owned_group_absent_after_cleanup": true,
+  "unexpected_owned_descendants": false,
+  "unresolved_owned_pids": [],
+  "compiler_lease_held": false,
+  "wall_seconds": 0.668012,
+  "finished_at": "2026-10-27T20:44:53.518329+00:00",
+  "stdout_sha256": "61c3d9ddd3a71efbb2a3ac1831a13905723c29b458077ce217e3b9206ffccc53",
+  "stdout_bytes": 698,
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stderr_bytes": 0
+}

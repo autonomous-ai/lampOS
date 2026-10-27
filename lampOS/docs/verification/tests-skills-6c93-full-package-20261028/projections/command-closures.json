@@ -1,0 +1,134 @@
+{
+  "commands": {
+    "cmd-fmt": {
+      "receipt": "raw/cmd-fmt.json",
+      "exit_code": 0,
+      "direct_wait_status": 0,
+      "owned_group_closed": true,
+      "timed_out": false,
+      "disk_reserve_breached": false
+    },
+    "cmd-full-skills": {
+      "receipt": "raw/cmd-full-skills.json",
+      "exit_code": 0,
+      "direct_wait_status": 0,
+      "owned_group_closed": true,
+      "timed_out": false,
+      "disk_reserve_breached": false
+    },
+    "cmd-inventory-0-all": {
+      "receipt": "raw/cmd-inventory-0-all.json",
+      "exit_code": 0,
+      "direct_wait_status": 0,
+      "owned_group_closed": true,
+      "timed_out": false,
+      "disk_reserve_breached": false
+    },
+    "cmd-inventory-0-ignored": {
+      "receipt": "raw/cmd-inventory-0-ignored.json",
+      "exit_code": 0,
+      "direct_wait_status": 0,
+      "owned_group_closed": true,
+      "timed_out": false,
+      "disk_reserve_breached": false
+    },
+    "cmd-inventory-1-all": {
+      "receipt": "raw/cmd-inventory-1-all.json",
+      "exit_code": 0,
+      "direct_wait_status": 0,
+      "owned_group_closed": true,
+      "timed_out": false,
+      "disk_reserve_breached": false
+    },
+    "cmd-inventory-1-ignored": {
+      "receipt": "raw/cmd-inventory-1-ignored.json",
+      "exit_code": 0,
+      "direct_wait_status": 0,
+      "owned_group_closed": true,
+      "timed_out": false,
+      "disk_reserve_breached": false
+    },
+    "cmd-inventory-2-all": {
+      "receipt": "raw/cmd-inventory-2-all.json",
+      "exit_code": 0,
+      "direct_wait_status": 0,
+      "owned_group_closed": true,
+      "timed_out": false,
+      "disk_reserve_breached": false
+    },
+    "cmd-inventory-2-ignored": {
+      "receipt": "raw/cmd-inventory-2-ignored.json",
+      "exit_code": 0,
+      "direct_wait_status": 0,
+      "owned_group_closed": true,
+      "timed_out": false,
+      "disk_reserve_breached": false
+    },
+    "cmd-inventory-3-all": {
+      "receipt": "raw/cmd-inventory-3-all.json",
+      "exit_code": 0,
+      "direct_wait_status": 0,
+      "owned_group_closed": true,
+      "timed_out": false,
+      "disk_reserve_breached": false
+    },
+    "cmd-inventory-3-ignored": {
+      "receipt": "raw/cmd-inventory-3-ignored.json",
+      "exit_code": 0,
+      "direct_wait_status": 0,
+      "owned_group_closed": true,
+      "timed_out": false,
+      "disk_reserve_breached": false
+    },
+    "cmd-inventory-4-all": {
+      "receipt": "raw/cmd-inventory-4-all.json",
+      "exit_code": 0,
+      "direct_wait_status": 0,
+      "owned_group_closed": true,
+      "timed_out": false,
+      "disk_reserve_breached": false
+    },
+    "cmd-inventory-4-ignored": {
+      "receipt": "raw/cmd-inventory-4-ignored.json",
+      "exit_code": 0,
+      "direct_wait_status": 0,
+      "owned_group_closed": true,
+      "timed_out": false,
+      "disk_reserve_breached": false
+    },
+    "cmd-metadata": {
+      "receipt": "raw/cmd-metadata.json",
+      "exit_code": 0,
+      "direct_wait_status": 0,
+      "owned_group_closed": true,
+      "timed_out": false,
+      "disk_reserve_breached": false
+    },
+    "cmd-strict": {
+      "receipt": "raw/cmd-strict.json",
+      "exit_code": 0,
+      "direct_wait_status": 0,
+      "owned_group_closed": true,
+      "timed_out": false,
+      "disk_reserve_breached": false
+    },
+    "cmd-test-compile": {
+      "receipt": "raw/cmd-test-compile.json",
+      "exit_code": 0,
+      "direct_wait_status": 0,
+      "owned_group_closed": true,
+      "timed_out": false,
+      "disk_reserve_breached": false
+    },
+    "cmd-workspace": {
+      "receipt": "raw/cmd-workspace.json",
+      "exit_code": 0,
+      "direct_wait_status": 0,
+      "owned_group_closed": true,
+      "timed_out": false,
+      "disk_reserve_breached": false
+    }
+  },
+  "count": 16,
+  "every_actual_exit_and_owned_group_closed": true
+}

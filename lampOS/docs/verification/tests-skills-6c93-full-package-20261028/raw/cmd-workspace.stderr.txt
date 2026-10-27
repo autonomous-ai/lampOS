@@ -1,0 +1,7 @@
+   Compiling lamp-memory v0.1.0 (/private/tmp/tests-skills-canonical-20261028/lampOS/crates/memory)
+   Compiling lamp-skills v0.1.0 (/private/tmp/tests-skills-canonical-20261028/lampOS/crates/skills)
+   Compiling lamp-control v0.1.0 (/private/tmp/tests-skills-canonical-20261028/lampOS/crates/control)
+   Compiling lamp-cloud v0.1.0 (/private/tmp/tests-skills-canonical-20261028/lampOS/crates/cloud)
+   Compiling lamp-voice-eval v0.1.0 (/private/tmp/tests-skills-canonical-20261028/lampOS/crates/voice-eval)
+   Compiling lamp-body v0.1.0 (/private/tmp/tests-skills-canonical-20261028/lampOS/crates/body)
+    Finished `dev` profile [unoptimized] target(s) in 43.62s
