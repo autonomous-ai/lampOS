@@ -68,6 +68,8 @@ pub struct Lamp {
     pub events: Events,
     /// Each client's light still asked for, to give back at its `stop`.
     lights: HashMap<String, (Light, u64)>,
+    /// What the bus says, for `get` (docs/control.md, "Events").
+    watch: Option<Arc<std::sync::Mutex<crate::watch::Watch>>>,
     datagram: Option<UnixDatagram>,
     /// The boot's monotonic clock (`CLOCK_MONOTONIC`), the one a claim's
     /// `until_us` is read against: not the door's own, which starts with
@@ -90,6 +92,7 @@ impl Lamp {
             clock_id,
             events,
             lights: HashMap::new(),
+            watch: None,
             // Never blocking under the door's lock: a full mood queue is
             // the body busy, said (the Reviewer-lead's P3 on #3805).
             datagram: UnixDatagram::unbound()
@@ -102,6 +105,12 @@ impl Lamp {
     /// Another clock for claims, for tests.
     pub fn with_clock(mut self, clock: fn() -> u64) -> Self {
         self.clock = clock;
+        self
+    }
+
+    /// Answers `get` from what `watch` keeps of the bus.
+    pub fn watching(mut self, watch: Arc<std::sync::Mutex<crate::watch::Watch>>) -> Self {
+        self.watch = Some(watch);
         self
     }
 
@@ -295,8 +304,11 @@ impl Parts for Lamp {
         }
     }
 
-    fn state(&self, _: StateKind) -> Value {
-        Value::Null
+    fn state(&self, kind: StateKind) -> Value {
+        self.watch
+            .as_ref()
+            .and_then(|watch| watch.lock().ok().map(|watch| watch.state(kind)))
+            .unwrap_or(Value::Null)
     }
 
     fn stop(&mut self, client: &str, _: u64) {

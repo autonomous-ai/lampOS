@@ -80,6 +80,11 @@ impl Session {
         self.client.as_deref()
     }
 
+    /// The events it subscribed to.
+    pub fn events(&self) -> &BTreeSet<EventKind> {
+        &self.events
+    }
+
     /// Whether it subscribed to `event`.
     pub fn wants(&self, event: EventKind) -> bool {
         self.events.contains(&event)
@@ -110,6 +115,10 @@ pub struct Door {
     leases: Leases,
     rates: Rates,
     open: BTreeMap<String, usize>,
+    /// The phrases each client's connections listen for, by connection, so
+    /// a client holds at most [`protocol::PHRASES_MAX`] across them all
+    /// (Fourteen's P2 on #3868).
+    phrases_held: BTreeMap<String, BTreeMap<[u8; 32], usize>>,
     random: SystemRandom,
     /// Revokes taken in memory but not yet in the file: written out by the
     /// next save that succeeds.
@@ -140,6 +149,7 @@ impl Door {
             leases: Leases::new(),
             rates: Rates::new(),
             open: BTreeMap::new(),
+            phrases_held: BTreeMap::new(),
             random: SystemRandom::new(),
             unsaved_revokes: BTreeSet::new(),
             pin,
@@ -206,6 +216,7 @@ impl Door {
         let Some(client) = &session.client else {
             return Vec::new();
         };
+        self.hold_phrases(client, session.nonce, 0);
         let left = self.open.get_mut(client).map(|count| {
             *count = count.saturating_sub(1);
             *count
@@ -215,6 +226,29 @@ impl Door {
             return self.leases.client_gone(client, LeaseWhy::Released, now_us);
         }
         Vec::new()
+    }
+
+    /// Records how many phrases one connection of `client` listens for.
+    fn hold_phrases(&mut self, client: &str, connection: [u8; 32], count: usize) {
+        let held = self.phrases_held.entry(client.to_owned()).or_default();
+        if count == 0 {
+            held.remove(&connection);
+        } else {
+            held.insert(connection, count);
+        }
+        if held.is_empty() {
+            self.phrases_held.remove(client);
+        }
+    }
+
+    /// The phrases `client`'s other connections listen for.
+    fn phrases_elsewhere(&self, client: &str, connection: [u8; 32]) -> usize {
+        self.phrases_held.get(client).map_or(0, |held| {
+            held.iter()
+                .filter(|(other, _)| **other != connection)
+                .map(|(_, count)| count)
+                .sum()
+        })
     }
 
     /// The paired computers.
@@ -284,10 +318,30 @@ impl Door {
         }
         match &op {
             Op::Subscribe { events, phrases } => {
-                session.events.extend(events.iter().copied());
-                if !phrases.is_empty() {
+                if !phrases.is_empty() && *phrases != session.phrases {
+                    // Across all its connections, and a change at most 6 a
+                    // minute (Fourteen's P2 on #3868).
+                    if self.phrases_elsewhere(&client, session.nonce) + phrases.len()
+                        > protocol::PHRASES_MAX
+                    {
+                        return refuse(
+                            ErrorCode::BadRequest,
+                            format!(
+                                "phrases: at most {} across this computer's connections",
+                                protocol::PHRASES_MAX
+                            ),
+                        );
+                    }
+                    if let Err(retry_ms) = self.rates.check(&client, Class::Phrases, now_us) {
+                        let mut error = Error::new(ErrorCode::Rate, Class::Phrases.says());
+                        error.retry_ms = Some(retry_ms);
+                        return reply_refused(Some(re), error);
+                    }
+                    self.rates.count(&client, Class::Phrases, now_us);
                     session.phrases = phrases.clone();
+                    self.hold_phrases(&client, session.nonce, phrases.len());
                 }
+                session.events.extend(events.iter().copied());
                 return ok(re, json!({"events": session.events}));
             }
             Op::Unsubscribe { events } => {
@@ -296,6 +350,7 @@ impl Door {
                 }
                 if !session.events.contains(&EventKind::PhraseHeard) {
                     session.phrases.clear();
+                    self.hold_phrases(&client, session.nonce, 0);
                 }
                 return ok(re, json!({"events": session.events}));
             }
@@ -517,6 +572,7 @@ pub fn limits() -> Value {
         "say": class(Class::Say),
         "express": class(Class::Express),
         "refused": class(Class::Refused),
+        "phrases": class(Class::Phrases),
         "hold_max_ms": protocol::HOLD_MAX_MS,
         "take_max_ms": crate::lease::TAKE_MAX_US / 1_000,
         "say_max_chars": protocol::SAY_MAX_CHARS,
@@ -663,6 +719,61 @@ mod tests {
         );
         assert_eq!(reply(&outcome)["ok"], true, "{outcome:?}");
         (door, session, fake)
+    }
+
+    /// Fourteen's P2 on #3868: a computer holds at most 16 phrases across
+    /// all its connections, and changes them at most 6 times a minute; the
+    /// same phrases again cost nothing.
+    #[test]
+    fn phrases_are_capped_across_connections_and_their_changes_are_rated() {
+        let computer = Computer::new(1);
+        let (mut door, mut first, mut fake) = paired(&computer, &[Grant::Hear]);
+        let subscribe = |n: std::ops::Range<usize>| {
+            let phrases: Vec<String> = n.map(|n| format!("\"phrase number {n}\"")).collect();
+            format!(
+                r#"{{"id":3,"op":"subscribe","events":["phrase.heard"],"phrases":[{}]}}"#,
+                phrases.join(",")
+            )
+        };
+        let ten = door.handle(&mut first, &subscribe(0..10), &mut fake, 2 * S, 1);
+        assert_eq!(reply(&ten)["ok"], true, "{ten:?}");
+        // The same ten again: no change, no rate.
+        for _ in 0..8 {
+            let again = door.handle(&mut first, &subscribe(0..10), &mut fake, 2 * S, 1);
+            assert_eq!(reply(&again)["ok"], true, "{again:?}");
+        }
+        // A second connection of the same computer: 10 + 7 is past 16.
+        let (mut second, welcome) = door.open();
+        let hello = door.handle(
+            &mut second,
+            &computer.hello_frame(&welcome),
+            &mut fake,
+            2 * S,
+            1,
+        );
+        assert_eq!(reply(&hello)["ok"], true, "{hello:?}");
+        let over = door.handle(&mut second, &subscribe(10..17), &mut fake, 2 * S, 1);
+        assert_eq!(code_of(&over), Some("bad_request"));
+        assert!(
+            reply(&over)["error"]["why"]
+                .as_str()
+                .unwrap()
+                .contains("across")
+        );
+        let six = door.handle(&mut second, &subscribe(10..16), &mut fake, 2 * S, 1);
+        assert_eq!(reply(&six)["ok"], true, "{six:?}");
+        // The first connection closing gives its ten back.
+        door.closed(&first, 3 * S);
+        let more = door.handle(&mut second, &subscribe(10..26), &mut fake, 3 * S, 1);
+        assert_eq!(reply(&more)["ok"], true, "{more:?}");
+        // Changes: 3 so far; 3 more fit the minute, the seventh is rated.
+        for n in 0..3 {
+            let change = door.handle(&mut second, &subscribe(n..n + 2), &mut fake, 4 * S, 1);
+            assert_eq!(reply(&change)["ok"], true, "{change:?}");
+        }
+        let rated = door.handle(&mut second, &subscribe(5..7), &mut fake, 4 * S, 1);
+        assert_eq!(code_of(&rated), Some("rate"));
+        assert_eq!(reply(&rated)["error"]["why"], "phrases: 6 changes a minute");
     }
 
     #[test]

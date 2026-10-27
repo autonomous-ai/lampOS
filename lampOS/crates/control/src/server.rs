@@ -30,8 +30,9 @@ use tokio_tungstenite::tungstenite::handshake::server::{ErrorResponse, Request, 
 use tokio_tungstenite::tungstenite::protocol::WebSocketConfig;
 
 use crate::cert::Identity;
-use crate::protocol::Grant;
+use crate::protocol::{EventKind, Grant};
 use crate::session::{Door, Parts, event_of};
+use crate::watch::{Out, Watch, phrases_in};
 
 /// The largest frame a client may send.
 pub const FRAME_MAX: usize = 64 * 1024;
@@ -99,7 +100,15 @@ impl Drop for Slot {
 pub const LEASE_TICK: Duration = Duration::from_millis(250);
 
 /// An open connection: its client, once hello'd, and its outbox.
-type Open = (Option<String>, mpsc::UnboundedSender<Value>);
+struct Open {
+    client: Option<String>,
+    outbox: mpsc::UnboundedSender<Value>,
+    /// What it subscribed to, and its phrases, as its session says.
+    events: BTreeSet<EventKind>,
+    phrases: Vec<String>,
+    /// Its client's grants, read at its hello.
+    grants: BTreeSet<Grant>,
+}
 
 /// What every connection shares.
 pub struct Shared {
@@ -180,15 +189,76 @@ impl Shared {
 
     /// Sends `event` to every connection of `client`.
     fn send_to(&self, client: &str, event: Value) {
-        for (of, outbox) in self.open.lock().expect("open").values() {
-            if of.as_deref() == Some(client) {
-                let _ = outbox.send(event.clone());
+        for open in self.open.lock().expect("open").values() {
+            if open.client.as_deref() == Some(client) {
+                let _ = open.outbox.send(event.clone());
             }
         }
     }
 
     fn now_us(&self) -> u64 {
         u64::try_from(self.started.elapsed().as_micros()).unwrap_or(u64::MAX)
+    }
+
+    /// What the bus said, handed on: each event to every connection that
+    /// subscribed to it and holds its grant; words heard only as the
+    /// phrases each connection listens for, never the words; the lamp's own
+    /// lease signals to the leases (docs/control.md, "Events").
+    pub fn deliver(&self, outs: Vec<Out>) {
+        let now = self.now_us();
+        let at = rfc3339_utc(std::time::SystemTime::now());
+        for out in outs {
+            match out {
+                Out::Event(kind, fields) => {
+                    let mut event = fields;
+                    event["ev"] = serde_json::to_value(kind).unwrap_or_default();
+                    event["at"] = Value::String(at.clone());
+                    for open in self.open.lock().expect("open").values() {
+                        let granted = kind
+                            .needs()
+                            .is_none_or(|grant| open.grants.contains(&grant));
+                        if open.client.is_some() && granted && open.events.contains(&kind) {
+                            let _ = open.outbox.send(event.clone());
+                        }
+                    }
+                }
+                Out::Heard(text) => {
+                    for open in self.open.lock().expect("open").values() {
+                        if open.client.is_none()
+                            || !open.grants.contains(&Grant::Hear)
+                            || !open.events.contains(&EventKind::PhraseHeard)
+                        {
+                            continue;
+                        }
+                        for phrase in phrases_in(&text, &open.phrases) {
+                            let _ = open.outbox.send(serde_json::json!({"ev": "phrase.heard", "at": at, "phrase": phrase}));
+                        }
+                    }
+                }
+                Out::Suspend(part, why) => {
+                    let changes = self
+                        .door
+                        .lock()
+                        .expect("door")
+                        .leases()
+                        .suspend(part, why, now);
+                    self.tell(changes);
+                }
+                Out::Resume => {
+                    let changes = self.door.lock().expect("door").leases().resume(now);
+                    self.tell(changes);
+                }
+                Out::Lose(part, why) => {
+                    let changes = self
+                        .door
+                        .lock()
+                        .expect("door")
+                        .leases()
+                        .lose(part, why, now);
+                    self.tell(changes);
+                }
+            }
+        }
     }
 
     /// Sends each lease change to every connection of its client.
@@ -198,9 +268,9 @@ impl Shared {
         }
         let open = self.open.lock().expect("open");
         for change in changes {
-            for (client, outbox) in open.values() {
-                if client.as_deref() == Some(change.client.as_str()) {
-                    let _ = outbox.send(event_of(&change));
+            for each in open.values() {
+                if each.client.as_deref() == Some(change.client.as_str()) {
+                    let _ = each.outbox.send(event_of(&change));
                 }
             }
         }
@@ -213,7 +283,7 @@ impl Shared {
         self.open
             .lock()
             .expect("open")
-            .retain(|_, (of, _)| of.as_deref() != Some(client));
+            .retain(|_, open| open.client.as_deref() != Some(client));
     }
 }
 
@@ -304,7 +374,16 @@ where
     let id = shared.next.fetch_add(1, Ordering::Relaxed);
     let (outbox, mut inbox) = mpsc::unbounded_channel::<Value>();
     let (mut session, welcome) = shared.door.lock().expect("door").open();
-    shared.open.lock().expect("open").insert(id, (None, outbox));
+    shared.open.lock().expect("open").insert(
+        id,
+        Open {
+            client: None,
+            outbox,
+            events: BTreeSet::new(),
+            phrases: Vec::new(),
+            grants: BTreeSet::new(),
+        },
+    );
     let (quiet, hello) = {
         let limits = shared.limits.lock().expect("limits");
         (limits.quiet, limits.hello)
@@ -347,10 +426,21 @@ where
                         let mut parts = shared.parts.lock().expect("parts");
                         door.handle(&mut session, text.as_str(), parts.as_mut(), now, wall)
                     };
-                    if let Some(client) = session.client()
-                        && let Some(entry) = shared.open.lock().expect("open").get_mut(&id)
-                    {
-                        entry.0 = Some(client.to_owned());
+                    if let Some(client) = session.client() {
+                        let grants = shared
+                            .door
+                            .lock()
+                            .expect("door")
+                            .clients()
+                            .get(client)
+                            .map(|paired| paired.grants.clone())
+                            .unwrap_or_default();
+                        if let Some(entry) = shared.open.lock().expect("open").get_mut(&id) {
+                            entry.client = Some(client.to_owned());
+                            entry.events = session.events().clone();
+                            entry.phrases = session.phrases().to_vec();
+                            entry.grants = grants;
+                        }
                     }
                     let mut gone = false;
                     for reply in outcome.send {
@@ -386,7 +476,7 @@ where
             .lock()
             .expect("open")
             .values()
-            .any(|open| open.0.as_deref() == Some(client));
+            .any(|open| open.client.as_deref() == Some(client));
         if !still_open {
             shared.parts.lock().expect("parts").stop(client, now);
         }
@@ -470,4 +560,103 @@ fn admin_answer(shared: &Shared, line: &str) -> Value {
         return json!({"clients": clients});
     }
     json!({"error": "ask for code, revoke or clients"})
+}
+
+/// The bus topics the door reads, each subscribed on its own thread, every
+/// message handed to `watch` and what it means delivered.
+pub const TOPICS: [&str; 14] = [
+    "humans/faces/tracked",
+    "room/stood_up",
+    "name/heard",
+    "voice/heard",
+    "ears/classes",
+    "controls/gesture",
+    "body/hand",
+    "voice/state",
+    "lamp/pause",
+    "voice/mute",
+    "voice/privacy",
+    "light/state",
+    "mood/state",
+    "controls/touch",
+];
+
+/// Subscribes to [`TOPICS`] on the bus at `bus`, and hands every message to
+/// `watch`, delivering what it means through `shared` on the runtime of
+/// the caller.
+pub fn watch_bus(
+    bus: &lamp_bus::Bus,
+    watch: Arc<Mutex<Watch>>,
+    shared: Arc<Shared>,
+) -> std::io::Result<()> {
+    let (sent, mut taken) = mpsc::unbounded_channel::<(String, Value)>();
+    for topic in TOPICS {
+        let mut subscriber = bus.subscribe(topic, "control")?;
+        let sent = sent.clone();
+        std::thread::spawn(move || {
+            loop {
+                match subscriber.recv(Duration::from_secs(1)) {
+                    Ok(Some(message)) => {
+                        if let Ok(payload) = message.json()
+                            && sent.send((topic.to_owned(), payload)).is_err()
+                        {
+                            return;
+                        }
+                    }
+                    Ok(None) => {}
+                    Err(_) => std::thread::sleep(Duration::from_millis(200)),
+                }
+            }
+        });
+    }
+    tokio::spawn(async move {
+        while let Some((topic, payload)) = taken.recv().await {
+            let now = shared.now_us();
+            let outs = watch.lock().expect("watch").take(&topic, &payload, now);
+            shared.deliver(outs);
+        }
+    });
+    Ok(())
+}
+
+/// `at` as RFC 3339 in UTC, to the second (`2026-10-27T08:30:01Z`).
+pub fn rfc3339_utc(at: std::time::SystemTime) -> String {
+    let seconds = at
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|since| since.as_secs())
+        .unwrap_or(0);
+    let days = seconds / 86_400;
+    let rest = seconds % 86_400;
+    // Days to a civil date (Howard Hinnant's algorithm).
+    let z = days as i64 + 719_468;
+    let era = z.div_euclid(146_097);
+    let doe = z - era * 146_097;
+    let yoe = (doe - doe / 1_460 + doe / 36_524 - doe / 146_096) / 365;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let day = doy - (153 * mp + 2) / 5 + 1;
+    let month = if mp < 10 { mp + 3 } else { mp - 9 };
+    let year = yoe + era * 400 + i64::from(month <= 2);
+    format!(
+        "{year:04}-{month:02}-{day:02}T{:02}:{:02}:{:02}Z",
+        rest / 3_600,
+        rest % 3_600 / 60,
+        rest % 60
+    )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn times_are_rfc3339_in_utc() {
+        let at = std::time::UNIX_EPOCH + Duration::from_secs(1_793_090_401);
+        assert_eq!(rfc3339_utc(at), "2026-10-27T08:40:01Z");
+        assert_eq!(rfc3339_utc(std::time::UNIX_EPOCH), "1970-01-01T00:00:00Z");
+        assert_eq!(
+            rfc3339_utc(std::time::UNIX_EPOCH + Duration::from_secs(951_782_400)),
+            "2000-02-29T00:00:00Z"
+        );
+    }
 }

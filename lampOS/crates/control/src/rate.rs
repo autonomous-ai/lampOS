@@ -21,6 +21,10 @@ pub enum Class {
     Say,
     /// `express`: one a minute.
     Express,
+    /// A change of the phrases a connection listens for: 6 a minute, so a
+    /// program can't swap word lists to probe the room's speech
+    /// (Fourteen's P2 on #3868).
+    Phrases,
     /// Actions a part refused: 20 a second, then the connection closes
     /// (Fourteen's P3 on #3798: a refusal is a round trip to a part, so
     /// spinning refused actions must cost something).
@@ -51,6 +55,7 @@ impl Class {
             Self::Light => &[(5, S)],
             Self::Say => &[(6, 60 * S), (60, 3_600 * S)],
             Self::Express => &[(1, 60 * S)],
+            Self::Phrases => &[(6, 60 * S)],
             Self::Refused => &[(20, S)],
         }
     }
@@ -63,6 +68,7 @@ impl Class {
             Self::Light => "light: 5 a second",
             Self::Say => "say: 6 a minute and 60 an hour",
             Self::Express => "express: 1 a minute",
+            Self::Phrases => "phrases: 6 changes a minute",
             Self::Refused => "refused actions: 20 a second",
         }
     }

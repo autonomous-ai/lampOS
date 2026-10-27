@@ -13,8 +13,9 @@ SDKs generate from.
 - **piece 2** (#3736): pairing and hello (`pairing.rs`), and each connection's session over grants, leases and rates (`session.rs`).
 - **piece 3**: the door on the network (`server.rs`, `cert.rs`, the `lamp-control` binary): WebSocket over TLS 1.3 at `/v1`, the lamp's own certificate, and the owner's admin socket. Its actions were refused until piece 4.
 - **piece 4**: the routing (`parts.rs`). `gesture` and `move` go to the body's mood socket, `light` is a `light/request` on the bus, and `say` goes to the voice's say socket with its outcome as a `done` event. Each is at `skill` priority as `lamp-control`, held to the part's own checks. `look` and `joints` (the body's lease socket), `express`, `play` and `sound` are refused with what they wait for. A computer's last connection closing, or a revoke, stops what it asked for, and actions a part refuses are bounded at 20 a second.
+- **piece 5**: the bus as events, lease signals and state (`watch.rs`, with `--bus-root`). Events go out by edge, never per message: someone arrived or left, turned to or from the lamp, or stood up; the lamp's name heard; a sound class past its bar (never `speech`); a touch or the button; the lamp talking, paused, private or asleep. Each goes only to a connection subscribed to it that holds its grant. Words heard are matched on the lamp against each connection's own phrases, and only the phrase leaves it. Talking suspends every lease and resting holds them again; a hand on the body, a stop, a pause, privacy or sleep loses them. `get` answers presence (counts, never who), the light, the inner state and the lamp's own.
 
-**No unit carries it yet**, so nothing listens on a lamp; discovery, and the bus's events and state, are the next pieces, off unless `LAMP_CONTROL=on`, and the owner turns developer
+**No unit carries it yet**, so nothing listens on a lamp; discovery is the next piece, off unless `LAMP_CONTROL=on`, and the owner turns developer
 access on in the app. This
 page is the contract it and the SDKs are built to. Its protocol types, lease
 rules and rates are `crates/control` (Nine, #3715), and the schema follows
@@ -236,7 +237,7 @@ so one made for pairing can never stand as a hello's, or the other way round
 listener's included, after its leases' `lost`, and its leases end; they also end when its last
 connection closes. `limits` says the rates below, so an
 SDK can keep under them: for each class (`joints`, `motion`, `light`, `say`,
-`express`, `refused`) a list of `{"most": N, "within_ms": M}`, and `hold_max_ms`,
+`express`, `refused`, `phrases`) a list of `{"most": N, "within_ms": M}`, and `hold_max_ms`,
 `take_max_ms` and `say_max_chars`.
 
 ### Subscribe and state
@@ -325,7 +326,7 @@ which back. An SDK's wait for them returns at the answer.
 |---|---|---|---|
 | `pair` | `name` (1–64 chars), `key` (Ed25519 public, base64), `proof` (base64) | — | — |
 | `hello` | `client` (`c_` + 1–32 lowercase hex), `sig` (base64) | — | — |
-| `subscribe` | `events` (at least one), `phrases` (≤ 16, ≤ 64 chars, only with `phrase.heard`, which needs them) | each event's grant | — |
+| `subscribe` | `events` (at least one), `phrases` (≤ 16 across the computer's connections, each ≤ 64 chars and two words or more or one of 8 letters, only with `phrase.heard`, which needs them) | each event's grant | — |
 | `unsubscribe` | `events` | — | — |
 | `get` | `state`: `presence` (`look`), `light`, `mood`, `lamp` | — | — |
 | `lease.take` | `parts` (`body`, `light`, `voice`), `for_ms` 1–30,000, `why` ≤ 200 chars | `body`, `light` or `speak` for each part | — |
@@ -385,7 +386,8 @@ Rates a client is held to:
 | `say`, `sound` | 6 a minute and 60 an hour |
 | `express` | 1 a minute |
 | actions a part refused | 20 a second, then the connection closes |
-| registered phrases | 16, of 64 characters at most |
+| registered phrases | 16 a computer, across all its connections; each of 64 characters at most, and two words or more or one word of 8 letters or more |
+| changing the phrases | 6 a minute; the same phrases again cost nothing |
 
 `gesture`, `move`, `play` and `look` share one class, `motion`. A refusal
 says `retry_ms`, the time until the oldest counted action leaves its window.
