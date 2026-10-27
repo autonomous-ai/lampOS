@@ -548,6 +548,20 @@ workflow change.
    3 s old), nothing was heard or said (`voice/heard`, `voice/said`) and the
    voice was in no other state for 45 s, and the program has watched that
    long. Listening means it hears someone, so only resting is quiet. A
+   lamp asleep or muted for privacy says no state, only its mute
+   (`voice/mute`, once a second, at most 3 s old, #3770): muted, with the
+   reason `sleep` or none, is quiet at once, since its microphones are
+   closed and no turn can be cut (not while a fresh `voice/state` says a
+   turn). The round plays no sound and shows nothing on the ring, so a
+   sleeping lamp is switched silently; the voice comes back asleep from its
+   saved mute record, and the watch (step 9) reads `lamp/health`, where
+   it says it is well with its microphones off, not `voice/state`. The
+   bus, not that record, is read: while an awake voice runs, its record
+   holds the restart guard's mute. A mute restored
+   by that guard after a fault reads on the bus as a mute with no reason
+   and counts too: its microphones are closed as well. Without
+   `LAMP_HEAD_TOUCH=on` and `--controls-mute` the voice says no
+   `voice/mute`, and a muted voice there still cannot be judged. A
    voice that says nothing on the bus cannot be judged and is not switched;
    a voice whose unit is not running hears nobody and is no reason to wait.
    No quiet moment within `--quiet-wait-s` (3600): the new folders stay

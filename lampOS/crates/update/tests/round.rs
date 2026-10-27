@@ -44,6 +44,9 @@ mod setup_lifecycle;
 #[path = "round/head_touch.rs"]
 mod head_touch;
 
+#[path = "round/asleep_quiet.rs"]
+mod asleep_quiet;
+
 #[path = "round/product_carrier.rs"]
 mod product_carrier;
 #[path = "round/restart_order.rs"]
