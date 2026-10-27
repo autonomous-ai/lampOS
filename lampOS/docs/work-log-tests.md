@@ -1,5 +1,13 @@
 # Tests work log
 
+## 2026-10-27 22:58 — Reader current full run fails cleanup; control next
+
+Ready for lamp-voice: no (#3543 current local gate failed; #3843 full gate active).
+
+[The fresh Reader-containing full Voice library](verification/tests-sentinel-3c-full-lib-failure-20261027/) on 3a554a97c / Main 3c9838fea ended **3867/1/15**, Rust 101 / native 1. The sole failure is a_push_mid_search_drops_its_looks_picture: scenario host watchdog and fixture-child exit-observation timeout. All 3883 identities bind to inventory; strict twelve-package Clippy, workspace build, compilation and all source/517 witness/three actual-executable guards passed. The failed runtime is retained; unchanged-Main attribution is pending a control. No deadline increase, assertion weakening or blind rerun.
+
+The updater is now local 192f0dfd4 on pinned Main 1d97a2c6d, with both Rust blobs unchanged from 8aa and Main's input-seam appendix retained. Its full affected-package gate runs in the separate released Body cache. The Ready fixture is carried locally to dc903a293, with its Mood dependency still explicit. No new device access.
+
 ## 2026-10-27 22:45 — current fixture carries; two gate lanes
 
 Ready for lamp-voice: no (fresh gates, native checks and current reads remain).

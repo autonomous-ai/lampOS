@@ -1,0 +1,25 @@
+{
+  "status": "FAIL",
+  "head": "3a554a97c60e8d4f27b0b6dae10f52f113697c04",
+  "base": "3c9838fea6591410cdf534d27088615021c8df30",
+  "runtime_attempts": 1,
+  "runtime_scope": "One full actual lamp-voice LIB executable, serial, no filter; actual full case census; required Reader platform subset reconciled from this same run, no second module execution",
+  "source_state": "clean committed HEAD",
+  "committed_head_alone_qualification_claim": true,
+  "Linux_reader_cases_run": false,
+  "old_mutable_bindings_retired_count": 3,
+  "no_clean": true,
+  "error": "AssertionError()",
+  "source_unchanged": true,
+  "official_owner_unchanged": true,
+  "sealed_and_actual_guards": true,
+  "protected_count": 517,
+  "actual_count": 3,
+  "full_hash_checkpoints": [
+    "initial",
+    "final"
+  ],
+  "owned_groups_closed": true,
+  "unresolved_owned_pids": [],
+  "lease_released": true
+}

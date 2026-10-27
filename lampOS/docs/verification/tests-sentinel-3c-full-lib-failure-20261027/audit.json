@@ -1,0 +1,55 @@
+{
+  "source_head": "3a554a97c60e8d4f27b0b6dae10f52f113697c04",
+  "base": "3c9838fea6591410cdf534d27088615021c8df30",
+  "status": "FAIL",
+  "counts": {
+    "ok": 3867,
+    "ignored": 15,
+    "FAILED": 1
+  },
+  "full_inventory_count": 3883,
+  "exact_case_and_ignored_inventory_binding": true,
+  "failed_cases": [
+    "coordinator::tests::second_route::a_push_mid_search_drops_its_looks_picture"
+  ],
+  "Rust_exit": 101,
+  "native_exit": 1,
+  "compile_stage_exits": {
+    "cmd-fmt": 0,
+    "cmd-metadata": 0,
+    "cmd-strict": 0,
+    "cmd-workspace": 0,
+    "cmd-Voice-lib-compile": 0
+  },
+  "copies": {
+    "terminal.json": {
+      "sha256": "e203a26a29fe09b2dfcdf0cad65d3d89f6d8488c206f9dda6f656477401d2656",
+      "bytes": 874
+    },
+    "native-controller-result.json": {
+      "sha256": "fea59a0390e03d17b1b2dc45063f22d993bd0b547f0464b2f17fe62ef687dd5a",
+      "bytes": 471
+    },
+    "observed-census.json": {
+      "sha256": "fffe9a82ec404939ba239e6ee28e9eb3be35be863a339cf3274a24d29d0ccaf8",
+      "bytes": 934583
+    },
+    "cmd-full-Voice-lib.json": {
+      "sha256": "c90fbf4877f7dc890eab21917ba0ab0e52b4921c58b025bed038386bfbd56e0c",
+      "bytes": 1907
+    },
+    "cmd-full-Voice-lib.stdout.txt": {
+      "sha256": "e4f5a179aa29eddd9fe37627968adf054b8380f53c9902d797e2b05d23dfaaab",
+      "bytes": 388617
+    },
+    "cmd-full-Voice-lib.stderr.txt": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "inventory.json": {
+      "sha256": "d324b3b8a760d1a39e1640b4202ed2192063915a23d77fef7f7f413d9a760472",
+      "bytes": 368292
+    }
+  },
+  "no_baseline_attribution_or_waiver": true
+}
