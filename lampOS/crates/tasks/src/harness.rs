@@ -104,6 +104,13 @@ pub enum EngineKind {
     Devin,
     #[serde(rename = "devin-cloud")]
     DevinCloud,
+    /// Hermes (Nous Research's agent), which Harness launches with its first
+    /// prompt as `hermes chat -q` and no permission modes (openharness
+    /// `cli/src/lib/engineLaunch.ts`). Harness's other agents (Cursor,
+    /// Copilot, Grok, Amp, Kilo …) take no first prompt there
+    /// (`FIRST_PROMPT_ARGS` null, `PROMPT_UNSUPPORTED`), so no work can be
+    /// handed to them and none is a target.
+    Hermes,
 }
 
 impl EngineKind {
@@ -114,6 +121,7 @@ impl EngineKind {
             Self::Opencode => "opencode",
             Self::Devin => "devin",
             Self::DevinCloud => "devin-cloud",
+            Self::Hermes => "hermes",
         }
     }
 
@@ -131,12 +139,12 @@ impl EngineKind {
         matches!(self, Self::DevinCloud)
     }
 
-    /// Whether the agent has Harness's permission modes. Devin has none:
-    /// Harness leaves the mode out for it and refuses one it is sent
-    /// (`INVALID_PERMISSION_MODE`; openharness `cli/src/lib/newCommand.ts`),
-    /// so it opens in its own default.
+    /// Whether the agent has Harness's permission modes. Devin and Hermes have
+    /// none: Harness leaves the mode out for them and refuses one they are
+    /// sent (`INVALID_PERMISSION_MODE`; openharness `cli/src/lib/newCommand.ts`,
+    /// `PERMISSION_MODES`), so they open in their own default.
     fn has_modes(self) -> bool {
-        !matches!(self, Self::Devin | Self::DevinCloud)
+        !matches!(self, Self::Devin | Self::DevinCloud | Self::Hermes)
     }
 }
 

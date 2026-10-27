@@ -260,8 +260,13 @@ and has to be made there first. Without it, and for every other failed
 `new`, the task stays `uncertain` with `new_failed`, and the lamp says the
 work may not have started.
 
-The engine allowlist is `codex`, `claude`, `opencode`, `devin` or
-`devin-cloud` (OpenCode since task 41: Harness 0.4.2's `harness new --help`
+The engine allowlist is `codex`, `claude`, `opencode`, `devin`,
+`devin-cloud` or `hermes` (Hermes since #3504, 27 Oct: Harness launches it
+with its first prompt as `hermes chat -q`, with no permission modes, so it
+is sent no `--mode`, as Devin is; Harness's other agents, Cursor, Copilot,
+Grok, Amp, Kilo and the rest, take no first prompt there, so none can be
+handed work; the store's `schema` is 4 only while it holds a Hermes task,
+by Devin's rule, so a build from before sets it aside; OpenCode since task 41: Harness 0.4.2's `harness new --help`
 names it, and its ask mode passes OpenCode no flag; see "Who gets the work";
 Devin since #1854, see "Devin" below; Devin Cloud, see "Devin Cloud"). A
 `devin-cloud` target's project is empty: it works in no folder. Otherwise a
