@@ -1,0 +1,482 @@
+{
+  "artifacts": {
+    "install": {
+      "actual_executable": "REPO/.claude/worktrees/third-store-target/debug/deps/install-56b9137cd677b603",
+      "features": [],
+      "fresh": false,
+      "manifest": "REPO/.claude/worktrees/third-ownkeys-fc9-prep/lampOS/crates/update/Cargo.toml",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 0,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": true
+      },
+      "retained_copy": "REPO/.claude/worktrees/third-latest-carry-fc9-prep-evidence/ownkeys-gate/retained-current-install",
+      "sha256": "77e00d83f7860c85790f801dc8b7eefb1279dc8989778cfe7f807d22695c93be",
+      "target": {
+        "crate_types": [
+          "bin"
+        ],
+        "doc": false,
+        "doctest": false,
+        "edition": "2024",
+        "kind": [
+          "test"
+        ],
+        "name": "install",
+        "src_path": "REPO/.claude/worktrees/third-ownkeys-fc9-prep/lampOS/crates/update/tests/install.rs",
+        "test": true
+      }
+    },
+    "it": {
+      "actual_executable": "REPO/.claude/worktrees/third-store-target/debug/deps/it-49911377a8fbd75d",
+      "features": [],
+      "fresh": false,
+      "manifest": "REPO/.claude/worktrees/third-ownkeys-fc9-prep/lampOS/crates/update/Cargo.toml",
+      "profile": {
+        "debug_assertions": true,
+        "debuginfo": 0,
+        "opt_level": "0",
+        "overflow_checks": true,
+        "test": true
+      },
+      "retained_copy": "REPO/.claude/worktrees/third-latest-carry-fc9-prep-evidence/ownkeys-gate/retained-current-it",
+      "sha256": "2697a74302e1f72b27660f60c20c2caa6fb0374eb29efc9e65ffc7777e6cdc66",
+      "target": {
+        "crate_types": [
+          "bin"
+        ],
+        "doc": false,
+        "doctest": false,
+        "edition": "2024",
+        "kind": [
+          "test"
+        ],
+        "name": "it",
+        "src_path": "REPO/.claude/worktrees/third-ownkeys-fc9-prep/lampOS/crates/update/tests/it/main.rs",
+        "test": true
+      }
+    }
+  },
+  "auth_separate": {
+    "counts": "51 unit + 7 old saved x86 updater compatibility tests, no current Rust claim",
+    "head": "5613b3420fd7a189f7f140035d38bd8821379ad4",
+    "packet": "auth-local-qualified-publication.json",
+    "sha256": "52ca7adfc43bf196aeb138010baa237587d10a791f1ff60684599e302f81f595"
+  },
+  "base": "fc9c781afaed38dc976f650484c30f65bf5db57a",
+  "counts": {
+    "FAIL": 0,
+    "PASS": 21,
+    "ignored": 0,
+    "retries": 0,
+    "selected": 21,
+    "unrun": 0
+  },
+  "evidence_sha256": {
+    "3646-range-diff.txt": "e1505371e7f242bd51e200d07402ab9f748c01ead4d35712f0dc5c518438ccc8",
+    "ownkeys-gate/current-artifacts.json": "0ea87cf8a08f2c5fbcedc2837995b23c722884ded98ddfa46f8e9bb5ede1933a",
+    "ownkeys-gate/immutable-saved190.json": "f4218cc9952353830fae922e12ca6bc8104eab314998d8e3dacee785d6e73548",
+    "ownkeys-gate/qualified.json": "adb670d5dd7a5fb90993ca7baa562a737a845c90df0788a278d87b8077b9d091",
+    "ownkeys-gate/saved190-after.json": "6db3a389d973ee8d7ba9a72de72685b5c88540587892f11ef894c4d64be5af93",
+    "ownkeys-proportionate-gate-proposal.json": "5eec18ffd00ccdfcdb512a865ce0f0f28e99e236e4f9c2d509d2f1e160efaddb"
+  },
+  "guards": {
+    "all_guards_equal": true,
+    "all_stage_groups_closed": true,
+    "bank_released": true,
+    "free_after": 6105575424,
+    "free_before": 6125244416,
+    "metadata_bookends_equal": true,
+    "metadata_sha256": "191a791998b0f52af5bb288bd5b4f4ef17a23409a91d58307371c874c2cf3723",
+    "prior_saved_count": 190,
+    "retained_new_drivers": 2,
+    "source_bookends": {
+      "after": "de2d1a20df744a1ed59e9680257434566f0c26daabef7329a28c58bf89d386f3",
+      "before": "de2d1a20df744a1ed59e9680257434566f0c26daabef7329a28c58bf89d386f3"
+    },
+    "source_count": 10941,
+    "tool_sha256": {
+      "cargo": "425e08ffa69bcf047b2a82b08b42d1d26ba8488f774bade1c14a62623fc18bad",
+      "clippy-driver": "6863d97a19fa9ec53da799f1b24fb80373a5a8ffac8bd31a46beb4503b301b80",
+      "rustc": "6859de89ddecec2ebaaec50d25c9c471d47f33677a96f7c81666247be062d499",
+      "rustfmt": "e0d4e3ba5e00cf354d17cc1e58973e8ead1b67dd5968254baabe950ecbf2461f"
+    },
+    "total_immutable_saved_count": 192
+  },
+  "head": "9f3876368ee2ee5d451349e95236397338fb8712",
+  "incoming_impact": {
+    "change": "Private read-only collector/codec wired as module only; no manifest/lock/toolchain/config change; Name journal independent",
+    "changed_paths": 11,
+    "path": "incoming-impact.json",
+    "sha256": "f910464269a74ba49083f6510f530b9f21252ca37108bc85ba20db39df0afc64"
+  },
+  "limits": [
+    "No full Update/Voice/old337 replay; no normal product binaries invoked.",
+    "Linux/native/device/runtime holds remain; original newhead ARM/Linux gates required after Root push.",
+    "Draft broker and original historical failure hold are not waived.",
+    "Two IT cases returned normally before platform-specific body checks; test harness terminals remain PASS, helper body coverage is unavailable.",
+    "Historical ARM Reader failure and broker/protected-credential draft holds remain unwaived.",
+    "No full native census inferred or fixed expected aggregate; newhead original ARM/Linux must be bound separately.",
+    "No public push, provider/device/credential action or release performed by helper."
+  ],
+  "optional_test_body_limits": [
+    "no systemd-analyze here: skipped",
+    "no GNU rsync here: skipped"
+  ],
+  "pr": 3646,
+  "public_expected_lease": "db59beb36e7907827b4a4e7406e34e4eaed5f37a",
+  "source_proof": {
+    "owned_complete_blobs_modes_equal": "38/38",
+    "path": "3646-source-carry.json",
+    "range_diff": "7 equal; no conflicts or substantive edits",
+    "raw_authors_messages_and_payloads_equal": "7/7",
+    "sha256": "43497e9114217d284fcd2a116498fc4047234b21af93a8d16e8c5a7f8e9eb37d"
+  },
+  "stages": [
+    {
+      "argv": [
+        "cargo",
+        "+1.96.0",
+        "metadata",
+        "--offline",
+        "--locked",
+        "--no-deps",
+        "--format-version",
+        "1"
+      ],
+      "bound": 60,
+      "cleanup": [],
+      "elapsed": 0.0833,
+      "exit": 0,
+      "group": "absent",
+      "pgid": 42942,
+      "pid": 42942,
+      "stage": "metadata-before",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "191a791998b0f52af5bb288bd5b4f4ef17a23409a91d58307371c874c2cf3723",
+      "timeout": false
+    },
+    {
+      "argv": [
+        "cargo",
+        "+1.96.0",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "bound": 120,
+      "cleanup": [],
+      "elapsed": 12.7075,
+      "exit": 0,
+      "group": "absent",
+      "pgid": 42943,
+      "pid": 42943,
+      "stage": "fmt",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "timeout": false
+    },
+    {
+      "argv": [
+        "cargo",
+        "+1.96.0",
+        "clippy",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-update",
+        "--all-targets",
+        "--jobs",
+        "1",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "bound": 1200,
+      "cleanup": [],
+      "elapsed": 61.272,
+      "exit": 0,
+      "group": "absent",
+      "pgid": 43085,
+      "pid": 43085,
+      "stage": "strict-update",
+      "stderr_sha256": "b4de8f6778ab288d17aad688311d2dd61a35ef0374eeb4f35e4154eb513d16fc",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "timeout": false
+    },
+    {
+      "argv": [
+        "cargo",
+        "+1.96.0",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "lamp-update",
+        "--test",
+        "install",
+        "--test",
+        "it",
+        "--no-run",
+        "--jobs",
+        "1",
+        "--message-format=json"
+      ],
+      "bound": 1200,
+      "cleanup": [],
+      "elapsed": 97.8104,
+      "exit": 0,
+      "group": "absent",
+      "pgid": 44311,
+      "pid": 44311,
+      "stage": "compile",
+      "stderr_sha256": "9fa711e9b86ff18dcd1bc6267b54387d917a91bea778c3de8e2ada59c48ec400",
+      "stdout_sha256": "75c6eb01fb6ece650d462ddb418b63759ab627d740208612f6046803960d252c",
+      "timeout": false
+    },
+    {
+      "argv": [
+        "REPO/.claude/worktrees/third-store-target/debug/deps/install-56b9137cd677b603",
+        "--list",
+        "--format",
+        "terse"
+      ],
+      "bound": 60,
+      "cleanup": [],
+      "elapsed": 0.8295,
+      "exit": 0,
+      "group": "absent",
+      "pgid": 46186,
+      "pid": 46186,
+      "stage": "discovery-install",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "62aedde518f5fa1889b2ab5ebb5cb00569f52aac8afc33c03c1098a9a81d59d9",
+      "timeout": false
+    },
+    {
+      "argv": [
+        "REPO/.claude/worktrees/third-store-target/debug/deps/it-49911377a8fbd75d",
+        "--list",
+        "--format",
+        "terse"
+      ],
+      "bound": 60,
+      "cleanup": [],
+      "elapsed": 0.7182,
+      "exit": 0,
+      "group": "absent",
+      "pgid": 46192,
+      "pid": 46192,
+      "stage": "discovery-it",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "baddc58d8487566c4ab3bb050066f6f2725ff6b2b1be4e9de23aba32cef9ada6",
+      "timeout": false
+    },
+    {
+      "argv": [
+        "REPO/.claude/worktrees/third-store-target/debug/deps/it-49911377a8fbd75d",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "bound": 120,
+      "cleanup": [],
+      "elapsed": 1.6642,
+      "exit": 0,
+      "group": "absent",
+      "pgid": 46198,
+      "pid": 46198,
+      "stage": "runtime-it13",
+      "stderr_sha256": "52ad85af9411eddb9ab5ed13bd374392c71f95059655ebff6d9c2c0653bb63d5",
+      "stdout_sha256": "bb54c3f57c1327dcfdbc51dbdfdc212e7be3573fe90d674941fe2598ff1abf4b",
+      "timeout": false
+    },
+    {
+      "argv": [
+        "REPO/.claude/worktrees/third-store-target/debug/deps/install-56b9137cd677b603",
+        "install_removes_the_voices_old_own_keys_drop_in_and_keeps_the_rest",
+        "--exact",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "bound": 30,
+      "cleanup": [],
+      "elapsed": 7.6253,
+      "exit": 0,
+      "group": "absent",
+      "pgid": 46496,
+      "pid": 46496,
+      "stage": "runtime-install-1",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "d9f992a3147d4d144df481c538da024fdbb7a70197dca63e0f990160884733a2",
+      "timeout": false
+    },
+    {
+      "argv": [
+        "REPO/.claude/worktrees/third-store-target/debug/deps/install-56b9137cd677b603",
+        "install_keeps_a_same_length_edited_own_keys_drop_in_without_reloading",
+        "--exact",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "bound": 30,
+      "cleanup": [],
+      "elapsed": 7.4544,
+      "exit": 0,
+      "group": "absent",
+      "pgid": 46591,
+      "pid": 46591,
+      "stage": "runtime-install-2",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "715177340be6cbd87764eb75aa929caa3b04607db314cd662eb929cf1c04c252",
+      "timeout": false
+    },
+    {
+      "argv": [
+        "REPO/.claude/worktrees/third-store-target/debug/deps/install-56b9137cd677b603",
+        "install_keeps_an_own_keys_off_drop_in_without_reloading",
+        "--exact",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "bound": 30,
+      "cleanup": [],
+      "elapsed": 7.5011,
+      "exit": 0,
+      "group": "absent",
+      "pgid": 46678,
+      "pid": 46678,
+      "stage": "runtime-install-3",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "f3c3f33ba3f4f7b7efbb34a713aa9eef17ed4262641a34ac27f1f4669c508b2a",
+      "timeout": false
+    },
+    {
+      "argv": [
+        "REPO/.claude/worktrees/third-store-target/debug/deps/install-56b9137cd677b603",
+        "install_keeps_an_own_keys_symlink_to_the_exact_template",
+        "--exact",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "bound": 30,
+      "cleanup": [],
+      "elapsed": 7.6118,
+      "exit": 0,
+      "group": "absent",
+      "pgid": 46740,
+      "pid": 46740,
+      "stage": "runtime-install-4",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "cd4e5bc8e85be397ecafcc0fad939b7a340243e6c10cefb2d50b68bd38ca4031",
+      "timeout": false
+    },
+    {
+      "argv": [
+        "REPO/.claude/worktrees/third-store-target/debug/deps/install-56b9137cd677b603",
+        "install_preflight_refuses_a_directory_at_the_retired_own_keys_path",
+        "--exact",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "bound": 30,
+      "cleanup": [],
+      "elapsed": 7.5189,
+      "exit": 0,
+      "group": "absent",
+      "pgid": 46918,
+      "pid": 46918,
+      "stage": "runtime-install-5",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "fde27318bb22567a0eb3776587af28d52fd9c055728c51902d79ee9fad9a2126",
+      "timeout": false
+    },
+    {
+      "argv": [
+        "REPO/.claude/worktrees/third-store-target/debug/deps/install-56b9137cd677b603",
+        "a_failed_reload_after_retiring_own_keys_is_retried_without_removing_again",
+        "--exact",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "bound": 30,
+      "cleanup": [],
+      "elapsed": 7.6336,
+      "exit": 0,
+      "group": "absent",
+      "pgid": 46979,
+      "pid": 46979,
+      "stage": "runtime-install-6",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "3f77032b7ea377047dfa2344f61360083b748a83d697283ec98a6b1f0f5124e2",
+      "timeout": false
+    },
+    {
+      "argv": [
+        "REPO/.claude/worktrees/third-store-target/debug/deps/install-56b9137cd677b603",
+        "the_product_takes_a_persons_own_keys",
+        "--exact",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "bound": 30,
+      "cleanup": [],
+      "elapsed": 0.0261,
+      "exit": 0,
+      "group": "absent",
+      "pgid": 47082,
+      "pid": 47082,
+      "stage": "runtime-install-7",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "e92e42c75cc4286b67e2a5edec4ee9411d99845004047e16e2a8fd9fb80f68c3",
+      "timeout": false
+    },
+    {
+      "argv": [
+        "REPO/.claude/worktrees/third-store-target/debug/deps/install-56b9137cd677b603",
+        "every_part_of_the_lamp_waits_for_setups_marker_itself",
+        "--exact",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "bound": 30,
+      "cleanup": [],
+      "elapsed": 0.0249,
+      "exit": 0,
+      "group": "absent",
+      "pgid": 47083,
+      "pid": 47083,
+      "stage": "runtime-install-8",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "1a145d452fae6210092076b3fc2e2addf9821fef723b8ded2e3afbed2c8ef30a",
+      "timeout": false
+    },
+    {
+      "argv": [
+        "cargo",
+        "+1.96.0",
+        "metadata",
+        "--offline",
+        "--locked",
+        "--no-deps",
+        "--format-version",
+        "1"
+      ],
+      "bound": 60,
+      "cleanup": [],
+      "elapsed": 0.0872,
+      "exit": 0,
+      "group": "absent",
+      "pgid": 47084,
+      "pid": 47084,
+      "stage": "metadata-after",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "191a791998b0f52af5bb288bd5b4f4ef17a23409a91d58307371c874c2cf3723",
+      "timeout": false
+    }
+  ],
+  "status": "QUALIFIED_LOCAL_CARRY_NO_PUBLIC_PUSH_BY_HELPER",
+  "tree": "bd9403825979b5ac6c3ac921b884ed407ccd7459"
+}
