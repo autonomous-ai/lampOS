@@ -66,8 +66,9 @@ const GAP: Duration = Duration::from_millis(500);
 /// The floor of a run of scores that stayed under both bars and is still
 /// worth a journal line (#3923): a "Lamp" misheard as "Ma'am" or "Blake"
 /// is lost under the near bar, and the line tells about 0.3 from about 0.
-/// Lower than this is any line with no name in it.
-const UNDER_BARS_LEAST: f32 = 0.05;
+/// A quiet room on lamp-c0a4 scored runs of 0.06 to 0.18 every 2 s with no
+/// one talking (#3923), so a line is only written from 0.2.
+const UNDER_BARS_LEAST: f32 = 0.2;
 /// At most this many "under its bars" lines a minute. `HOLD_OFF` alone
 /// lets one through about every 1.1 s, so a room that talks all day (a
 /// television) would write some 3,000 an hour; ten a minute still shows
@@ -1207,7 +1208,15 @@ mod tests {
             .zip(0..)
             .filter_map(|(score, step)| under.score(score, at(step)))
             .collect();
-        assert_eq!(lines, ["under its bars: best=0.310 began_ms_ago=240"]);
+        assert_eq!(lines, ["under its bars: best=0.310 began_ms_ago=160"]);
+        // A quiet room's runs, under the floor, are no line.
+        let mut under = UnderBars::new(DEFAULT_NEAR);
+        let lines: Vec<String> = [0.01, 0.12, 0.18, 0.15, 0.02]
+            .into_iter()
+            .zip(0..)
+            .filter_map(|(score, step)| under.score(score, at(step)))
+            .collect();
+        assert!(lines.is_empty(), "{lines:?}");
         let mut under = UnderBars::new(DEFAULT_NEAR);
         let lines: Vec<String> = [0.01, 0.2, 0.5, 0.3, 0.02]
             .into_iter()
