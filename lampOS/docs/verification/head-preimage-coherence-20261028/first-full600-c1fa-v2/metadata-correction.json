@@ -1,0 +1,9 @@
+{
+  "corrected_member": "README.md",
+  "old_manifest_sha256": "07b993639c52630738999d77602f8ed1d3394603302a6e6a12278872f7a1e1fe",
+  "old_member_sha256": "4ee942bf8ef26dbd9647f89d959627d79a60cbe54014d280baa31ffd5a21144e",
+  "new_member_sha256": "c188d0c7fc3118568a3229c12ddfbc36b52a5ea4a8ae43180e7fc76c4b9e6f88",
+  "reason": "Replace inaccurate simultaneous-running status wording with timeless workflow identities and explicitly separate CI qualification. Linux had completed before seal; no gate/source/runtime/count changed.",
+  "all_other_original_members_unchanged": true,
+  "old_packet_retained_immutable_private": true
+}

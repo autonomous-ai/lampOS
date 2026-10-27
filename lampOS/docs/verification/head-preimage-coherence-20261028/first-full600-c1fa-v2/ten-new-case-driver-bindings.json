@@ -1,0 +1,102 @@
+[
+  {
+    "binary_id": "lamp-update",
+    "case": "head_touch::capture::codec::coherence::tests::both_typed_absences_agree_at_each_first_missing_component",
+    "status": "PASS",
+    "actual_path": "<controlled-target>/debug/deps/lamp_update-e14d54c83f68ff7f",
+    "actual_sha256": "ee9c3c77417d5b27ba72c9f17b9aa96d1b2292cf80394dd166f5dc24a5c8f3f6",
+    "preserved_path": "<gate-evidence>/executables/2",
+    "preserved_sha256": "ee9c3c77417d5b27ba72c9f17b9aa96d1b2292cf80394dd166f5dc24a5c8f3f6",
+    "binding": "runtime binary ID joins exact discovery/compiled/preserved driver; skipped cases excluded"
+  },
+  {
+    "binary_id": "lamp-update",
+    "case": "head_touch::capture::codec::coherence::tests::common_leaf_fields_and_exact_binary_bytes_cannot_be_substituted",
+    "status": "PASS",
+    "actual_path": "<controlled-target>/debug/deps/lamp_update-e14d54c83f68ff7f",
+    "actual_sha256": "ee9c3c77417d5b27ba72c9f17b9aa96d1b2292cf80394dd166f5dc24a5c8f3f6",
+    "preserved_path": "<gate-evidence>/executables/2",
+    "preserved_sha256": "ee9c3c77417d5b27ba72c9f17b9aa96d1b2292cf80394dd166f5dc24a5c8f3f6",
+    "binding": "runtime binary ID joins exact discovery/compiled/preserved driver; skipped cases excluded"
+  },
+  {
+    "binary_id": "lamp-update",
+    "case": "head_touch::capture::codec::coherence::tests::decoded_regular_empty_and_unmatched_binary_preserve_artifacts_without_live_io",
+    "status": "PASS",
+    "actual_path": "<controlled-target>/debug/deps/lamp_update-e14d54c83f68ff7f",
+    "actual_sha256": "ee9c3c77417d5b27ba72c9f17b9aa96d1b2292cf80394dd166f5dc24a5c8f3f6",
+    "preserved_path": "<gate-evidence>/executables/2",
+    "preserved_sha256": "ee9c3c77417d5b27ba72c9f17b9aa96d1b2292cf80394dd166f5dc24a5c8f3f6",
+    "binding": "runtime binary ID joins exact discovery/compiled/preserved driver; skipped cases excluded"
+  },
+  {
+    "binary_id": "lamp-update",
+    "case": "head_touch::capture::codec::coherence::tests::exact_root_spelling_and_nonempty_raw_root_evidence_are_required",
+    "status": "PASS",
+    "actual_path": "<controlled-target>/debug/deps/lamp_update-e14d54c83f68ff7f",
+    "actual_sha256": "ee9c3c77417d5b27ba72c9f17b9aa96d1b2292cf80394dd166f5dc24a5c8f3f6",
+    "preserved_path": "<gate-evidence>/executables/2",
+    "preserved_sha256": "ee9c3c77417d5b27ba72c9f17b9aa96d1b2292cf80394dd166f5dc24a5c8f3f6",
+    "binding": "runtime binary ID joins exact discovery/compiled/preserved driver; skipped cases excluded"
+  },
+  {
+    "binary_id": "lamp-update",
+    "case": "head_touch::capture::codec::coherence::tests::every_raw_entry_checks_common_ancestors_even_without_a_matching_head_leaf",
+    "status": "PASS",
+    "actual_path": "<controlled-target>/debug/deps/lamp_update-e14d54c83f68ff7f",
+    "actual_sha256": "ee9c3c77417d5b27ba72c9f17b9aa96d1b2292cf80394dd166f5dc24a5c8f3f6",
+    "preserved_path": "<gate-evidence>/executables/2",
+    "preserved_sha256": "ee9c3c77417d5b27ba72c9f17b9aa96d1b2292cf80394dd166f5dc24a5c8f3f6",
+    "binding": "runtime binary ID joins exact discovery/compiled/preserved driver; skipped cases excluded"
+  },
+  {
+    "binary_id": "lamp-update",
+    "case": "head_touch::capture::codec::coherence::tests::directory_facts_check_types_membership_absence_and_extra_link_bypass",
+    "status": "PASS",
+    "actual_path": "<controlled-target>/debug/deps/lamp_update-e14d54c83f68ff7f",
+    "actual_sha256": "ee9c3c77417d5b27ba72c9f17b9aa96d1b2292cf80394dd166f5dc24a5c8f3f6",
+    "preserved_path": "<gate-evidence>/executables/2",
+    "preserved_sha256": "ee9c3c77417d5b27ba72c9f17b9aa96d1b2292cf80394dd166f5dc24a5c8f3f6",
+    "binding": "runtime binary ID joins exact discovery/compiled/preserved driver; skipped cases excluded"
+  },
+  {
+    "binary_id": "lamp-update",
+    "case": "head_touch::capture::codec::coherence::tests::negative_kind_suffix_and_no_link_chain_shape_match_the_requested_key",
+    "status": "PASS",
+    "actual_path": "<controlled-target>/debug/deps/lamp_update-e14d54c83f68ff7f",
+    "actual_sha256": "ee9c3c77417d5b27ba72c9f17b9aa96d1b2292cf80394dd166f5dc24a5c8f3f6",
+    "preserved_path": "<gate-evidence>/executables/2",
+    "preserved_sha256": "ee9c3c77417d5b27ba72c9f17b9aa96d1b2292cf80394dd166f5dc24a5c8f3f6",
+    "binding": "runtime binary ID joins exact discovery/compiled/preserved driver; skipped cases excluded"
+  },
+  {
+    "binary_id": "lamp-update",
+    "case": "head_touch::capture::codec::coherence::tests::signed_device_conversion_refuses_negative_instead_of_reinterpreting_bits",
+    "status": "PASS",
+    "actual_path": "<controlled-target>/debug/deps/lamp_update-e14d54c83f68ff7f",
+    "actual_sha256": "ee9c3c77417d5b27ba72c9f17b9aa96d1b2292cf80394dd166f5dc24a5c8f3f6",
+    "preserved_path": "<gate-evidence>/executables/2",
+    "preserved_sha256": "ee9c3c77417d5b27ba72c9f17b9aa96d1b2292cf80394dd166f5dc24a5c8f3f6",
+    "binding": "runtime binary ID joins exact discovery/compiled/preserved driver; skipped cases excluded"
+  },
+  {
+    "binary_id": "lamp-update",
+    "case": "head_touch::capture::codec::coherence::tests::unchanged_bytes_with_real_permission_changes_fail_without_snapshot_or_auth_claims",
+    "status": "PASS",
+    "actual_path": "<controlled-target>/debug/deps/lamp_update-e14d54c83f68ff7f",
+    "actual_sha256": "ee9c3c77417d5b27ba72c9f17b9aa96d1b2292cf80394dd166f5dc24a5c8f3f6",
+    "preserved_path": "<gate-evidence>/executables/2",
+    "preserved_sha256": "ee9c3c77417d5b27ba72c9f17b9aa96d1b2292cf80394dd166f5dc24a5c8f3f6",
+    "binding": "runtime binary ID joins exact discovery/compiled/preserved driver; skipped cases excluded"
+  },
+  {
+    "binary_id": "lamp-update",
+    "case": "head_touch::capture::codec::coherence::tests::unrelated_head_links_and_null_masks_are_valid_but_raw_overlap_refuses",
+    "status": "PASS",
+    "actual_path": "<controlled-target>/debug/deps/lamp_update-e14d54c83f68ff7f",
+    "actual_sha256": "ee9c3c77417d5b27ba72c9f17b9aa96d1b2292cf80394dd166f5dc24a5c8f3f6",
+    "preserved_path": "<gate-evidence>/executables/2",
+    "preserved_sha256": "ee9c3c77417d5b27ba72c9f17b9aa96d1b2292cf80394dd166f5dc24a5c8f3f6",
+    "binding": "runtime binary ID joins exact discovery/compiled/preserved driver; skipped cases excluded"
+  }
+]

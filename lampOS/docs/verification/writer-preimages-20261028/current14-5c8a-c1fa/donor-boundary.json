@@ -1,0 +1,7 @@
+{
+  "manifest_sha256": "b38d50bdfc164acadac69dc1c055062f119bd88e839a6c01e92d26d1f2e50bc9",
+  "closure_sha256": "2c62453d698bda1a663b7140cc7963f2c63a67a133277ee4320d33df58ffcf54",
+  "admission_sha256": "71d3cbd4534b05efc4c41f291051faf22030ca2f4b932f2e6236a951b2ae64f8",
+  "actual_preserved_outputs": 10,
+  "source_or_runtime_equivalence_claimed": false
+}

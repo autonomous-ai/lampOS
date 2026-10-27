@@ -1,0 +1,27 @@
+{
+  "head": "a15ef0e5c6a9997417a559ebebaaca18dd2ab8c9",
+  "base": "c1fa2bc9f327f5d553bb3dcc355053d8e7e94bfa",
+  "tree": "d8f5a509ebf01d5fd69f89c2fe9a39af89a12a86",
+  "own_branch": "second/head-preimage-coherence-v2",
+  "working_patch_sha256": "fe2cbf26454210cfc5ddb9d7fdbe722ca58c3c397421f6c8a3a81d48b48046d8",
+  "dirty_files": [
+    "lampOS/crates/update/src/head_touch/capture/codec.rs",
+    "lampOS/crates/update/src/head_touch/capture/codec/coherence.rs",
+    "lampOS/crates/update/src/head_touch/capture/codec/coherence/tests.rs",
+    "lampOS/docs/head-preimage-coherence.md",
+    "lampOS/docs/reuse-decisions.md",
+    "lampOS/docs/updates.md"
+  ],
+  "uncommitted_source_gate": true,
+  "source_count": 7522,
+  "controller_sha256": "0f27870037ed2141a529dbf0139d234b46d028982538afe0696e84232d5a495a",
+  "nextest_tool_sha256": "aad9d409cd2f0a81fcaed49d7672a133254179458436c1e957505e4a11655329",
+  "nextest_version": "0.9.150",
+  "earlier_CI_runner_version": "0.9.149",
+  "verified_tool_proof_sha256": "5563f2b54904be2611512496701b75cb5d11f8a60fe3e60773a1579b82286c1f",
+  "merged_receipt_selector_sha256": "ecf2c70720c3f1c14b5ba960123cea0e3ae0764777f4906992a989c58ee80c23",
+  "config_sha256": "c4992da8d157df279011a424b5feb4833f001fd1d46ce3edd0a56992c848bb33",
+  "preferred_runner_scope": "FIRST FULL head/preimage coherence lamp-update normal Nextest all(); actual count discovered,all new coherence and111 existing required; old failures separate",
+  "earlier_failure_unwaived": true,
+  "baseline_198_pass_INCONCLUSIVE": true
+}

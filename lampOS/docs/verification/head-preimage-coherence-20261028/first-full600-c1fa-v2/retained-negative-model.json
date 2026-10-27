@@ -1,0 +1,5 @@
+{
+  "preserved_sha256": "dda9c34c9552474010a0a1e6e904f1b8d91607b79552d9ab81afc6ef89dda8a9",
+  "old_actual_target_not_rehashed_after_authorized_reuse": true,
+  "actual_outcome": "oneFAIL/Nextest100; original parser exit1 preserved; offline correction only; no priorcauseclaim"
+}

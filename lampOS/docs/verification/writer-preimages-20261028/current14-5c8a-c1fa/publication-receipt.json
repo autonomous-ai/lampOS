@@ -1,0 +1,13 @@
+{
+  "head": "5c8a646878a2bd30c5ea62fb324e7a90f9110867",
+  "base": "c1fa2bc9f327f5d553bb3dcc355053d8e7e94bfa",
+  "exact_old_head": "67a8e9554f6fb9644e0b0ab72a2e3895141e26ed",
+  "tree": "5bec88e0a495eb2e4f7e51626662815a93d88ea8",
+  "gate_scope": "14 targeted checks only; previous229/native scopes remain separate",
+  "gate_closure_SHA256": "4cf34dddef6b4ae7453fff476cc23975ce47db50f594c1c9d79198ec28e9af83",
+  "actor": "<public-builder-account>",
+  "original67_native_audit_closed": true,
+  "exit_code": 0,
+  "stdout": "",
+  "stderr": "To https://github.com/autonomous-ai/lampOS.git\n + 67a8e9554f...5c8a646878 HEAD -> second/writer-preimages-latest (forced update)\n"
+}

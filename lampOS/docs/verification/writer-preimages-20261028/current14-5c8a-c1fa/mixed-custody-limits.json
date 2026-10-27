@@ -1,0 +1,9 @@
+{
+  "current_emitted": 3,
+  "retained_NONCURRENT_never_executed": 7,
+  "all_ten_preserved_hashes_reverified": true,
+  "postrelease_actual_target_rehash_claimed": false,
+  "named_post_list_fields_for_current_three": false,
+  "post_list_comparison": "Guarded by prior controller assertions; no fabricated manifest fields",
+  "prior229_or7830_runtime_equivalence_claimed": false
+}

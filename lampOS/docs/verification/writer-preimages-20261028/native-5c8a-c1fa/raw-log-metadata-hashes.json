@@ -1,0 +1,42 @@
+[
+  {
+    "logical_evidence": "ARM-run-final.json",
+    "raw_bytes": 14247,
+    "raw_sha256": "36badb99081497609eef3e89178a66072fe15c9a6f41831015e5face16368f9b"
+  },
+  {
+    "logical_evidence": "ARM-jobs-final.json",
+    "raw_bytes": 11179,
+    "raw_sha256": "505bfee639d848573d200474f3a7d2f4bb08e22df826d826dbfd4cae3fbcd595"
+  },
+  {
+    "logical_evidence": "ARM.log",
+    "raw_bytes": 1952019,
+    "raw_sha256": "2ac442703ddb4e85afdfcd7fa116b9c01dfa2a21a47b3bbc1930c7497fcd9c17"
+  },
+  {
+    "logical_evidence": "ARM-watch.stdout",
+    "raw_bytes": 40244,
+    "raw_sha256": "71981ad24e9e2836208eedecbb511e35e4090d67f6e6fb46f77929b3191dd9b8"
+  },
+  {
+    "logical_evidence": "Linux-run.json",
+    "raw_bytes": 14246,
+    "raw_sha256": "4bfa8f091e3b55ce155785a5b4f4606834c331ae4f96726a251d6bc1945da915"
+  },
+  {
+    "logical_evidence": "Linux-jobs.json",
+    "raw_bytes": 4318,
+    "raw_sha256": "ecd71750005df3a08236e02e9dcb2e6ec1418144ba2087aa0b1b315d84407bce"
+  },
+  {
+    "logical_evidence": "Linux.log",
+    "raw_bytes": 93034,
+    "raw_sha256": "faeb017ffe2e7d26990c5c45addfc2b691bdd8a88dfa32ac1bb9c28da8e8babb"
+  },
+  {
+    "logical_evidence": "Linux-watch.stdout",
+    "raw_bytes": 5585,
+    "raw_sha256": "22c9a6126dc6e53d17d74bbb12a96453400903002e449958c34d7d32bbe3fb04"
+  }
+]

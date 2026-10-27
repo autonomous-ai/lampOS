@@ -1,0 +1,33 @@
+{
+  "explicit_slot_released": true,
+  "donor_manifest": "<private-path>",
+  "donor_manifest_sha256": "b38d50bdfc164acadac69dc1c055062f119bd88e839a6c01e92d26d1f2e50bc9",
+  "donor_closure_sha256": "2c62453d698bda1a663b7140cc7963f2c63a67a133277ee4320d33df58ffcf54",
+  "required_true_closure_keys": [
+    "head_unchanged",
+    "status_unchanged",
+    "working_patch_unchanged",
+    "source_unchanged",
+    "configuration_unchanged",
+    "controller_unchanged",
+    "nextest_tool_unchanged",
+    "nextest_config_unchanged",
+    "old_failed_driver_preserved_unchanged",
+    "retained_failed_round_driver_unchanged",
+    "affected_scope_unchanged",
+    "mixed_current_vs_retained_provenance_explicit",
+    "all_stages_passed"
+  ],
+  "head": "5c8a646878a2bd30c5ea62fb324e7a90f9110867",
+  "base": "c1fa2bc9f327f5d553bb3dcc355053d8e7e94bfa",
+  "controller_sha256": "2caf32d081bf8ef593ae4ebd13847bb5cc44bbda25c897dc02ca450af2bb3959",
+  "current_outputs": 3,
+  "retained_noncurrent_outputs": 7,
+  "named_post_list_absent_for_current_outputs": [
+    "install",
+    "it",
+    "lamp-update"
+  ],
+  "post_list_current_claim": "flow-guarded by prior controller, not invented named fields",
+  "all10_actual_preserved_post_runtime_reverified": true
+}

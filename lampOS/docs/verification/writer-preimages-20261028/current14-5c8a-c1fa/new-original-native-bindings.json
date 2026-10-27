@@ -1,0 +1,12 @@
+{
+  "head": "5c8a646878a2bd30c5ea62fb324e7a90f9110867",
+  "base_at_push": "c1fa2bc9f327f5d553bb3dcc355053d8e7e94bfa",
+  "originals": {
+    "Linux": 40588955730,
+    "ARM": 40588955846
+  },
+  "attempt": 1,
+  "prior67_native_audit_closed_before_push": true,
+  "optional_archive_requested": false,
+  "no_rerun_or_cancellation": true
+}

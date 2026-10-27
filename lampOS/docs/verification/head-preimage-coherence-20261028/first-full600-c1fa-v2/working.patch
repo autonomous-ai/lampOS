@@ -1,0 +1,55 @@
+diff --git a/lampOS/crates/update/src/head_touch/capture/codec.rs b/lampOS/crates/update/src/head_touch/capture/codec.rs
+index f5d233a33d..665a7d9c74 100644
+--- a/lampOS/crates/update/src/head_touch/capture/codec.rs
++++ b/lampOS/crates/update/src/head_touch/capture/codec.rs
+@@ -284,6 +284,8 @@ pub(crate) struct SavedInputs {
+     facts: Portable,
+     encoded: Box<[u8]>,
+ }
++
++mod coherence;
+ impl fmt::Debug for SavedInputs {
+     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+         f.debug_struct("SavedInputs")
+diff --git a/lampOS/docs/reuse-decisions.md b/lampOS/docs/reuse-decisions.md
+index 093c464672..fb174d9eb4 100644
+--- a/lampOS/docs/reuse-decisions.md
++++ b/lampOS/docs/reuse-decisions.md
+@@ -1,5 +1,18 @@
+ # Reuse decisions: V1, ROS 2 and existing Rust systems
+ 
++## Compare existing saved observations before finite-plan derivation (2026-10-28)
++
++Reuse the validated bounded preimage bundle and saved Head codec rather than
++parsing their JSON again or constructing native Stat values. Compare only
++common selected fields with checked numeric conversions, canonical overlapping
++prefixes and exact regular bytes/typed absences. Directory membership adds
++negative evidence without implying file kind. Refuse unsupported link/null
++overlap instead of introducing another resolver. Both original encodings stay
++immutable; ordinary policy and wire readers remain unchanged. This supplies
++represented lexical agreement only, with authentication, protected root intent,
++writer exclusion, durable admission and independent restoration still separate.
++See [the coherence contract](head-preimage-coherence.md).
++
+ ## Cap only the future plan's derived head-pins output (2026-10-28)
+ 
+ Reuse the existing V2 head-pair evaluator, ordinary pretty-JSON bytes and
+diff --git a/lampOS/docs/updates.md b/lampOS/docs/updates.md
+index 42d65b877c..d6744a40d9 100644
+--- a/lampOS/docs/updates.md
++++ b/lampOS/docs/updates.md
+@@ -2389,3 +2389,14 @@ re-planning or enlarging the original byte budget. No mutation boundary is
+ wired. The [capture contract](writer-settings-capture.md)
+ separates this raw input from authentication, head-touch projection, effect
+ admission and independent recovery.
++
++### Read-only agreement of saved Head and ordinary file observations (#3689)
++
++The private [coherence check](head-preimage-coherence.md) compares exact logical
++root spelling, each ordinary root identity, represented lexical directory
++prefixes, overlapping regular bytes and typed absences. Captured directory
++membership is checked where it represents the next ordinary component. Link
++resolution and null/device overlap remain conservatively unsupported; unrelated
++closed Head facts retain their semantics. No encoding, runtime caller, live
++read, admission, writer grant or restoration effect is added. This agreement
++is not authentication, freshness, exclusion or an atomic filesystem snapshot.

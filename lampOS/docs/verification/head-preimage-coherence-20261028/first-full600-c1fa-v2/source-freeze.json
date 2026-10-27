@@ -1,0 +1,47 @@
+{
+  "head": "a15ef0e5c6a9997417a559ebebaaca18dd2ab8c9",
+  "base": "c1fa2bc9f327f5d553bb3dcc355053d8e7e94bfa",
+  "owned_paths": [
+    "lampOS/crates/update/src/head_touch/capture/codec.rs",
+    "lampOS/crates/update/src/head_touch/capture/codec/coherence.rs",
+    "lampOS/crates/update/src/head_touch/capture/codec/coherence/tests.rs",
+    "lampOS/docs/head-preimage-coherence.md",
+    "lampOS/docs/updates.md",
+    "lampOS/docs/reuse-decisions.md"
+  ],
+  "files": {
+    "lampOS/crates/update/src/head_touch/capture/codec.rs": {
+      "sha256": "dbfafc272c0e158f97764a6a6ababf589c4e7a833d669b79d5843480c5e8b6e3",
+      "mode": 420,
+      "bytes": 69758
+    },
+    "lampOS/crates/update/src/head_touch/capture/codec/coherence.rs": {
+      "sha256": "1d256ce1442eb85531c341246afae93bf855f8bc8b88be8c78304f7d5df50037",
+      "mode": 420,
+      "bytes": 8471
+    },
+    "lampOS/crates/update/src/head_touch/capture/codec/coherence/tests.rs": {
+      "sha256": "9ecbf08d95d0ba71808b79131c06f8456a228f4eadd14a46edecb253a5c259ea",
+      "mode": 420,
+      "bytes": 17219
+    },
+    "lampOS/docs/head-preimage-coherence.md": {
+      "sha256": "47299d4911fd639ec90e3cbbf979135b2918ee8ff4b6e72d4f96c0a0369b774c",
+      "mode": 420,
+      "bytes": 3364
+    },
+    "lampOS/docs/updates.md": {
+      "sha256": "d377d590388451b3c35972b5af17c5fdd12b6fbf4ec058830aeee8a10c063046",
+      "mode": 420,
+      "bytes": 178351
+    },
+    "lampOS/docs/reuse-decisions.md": {
+      "sha256": "fbc4a8c9294ceee0ec5a3141c2c6516f30e5b5de2ed0d9a853985afc78da8d41",
+      "mode": 420,
+      "bytes": 157014
+    }
+  },
+  "prerequisites": "exactcodefiles and fullshared-documentlines verified in separate v2receipts",
+  "internal_source_P2": "impossibleextraLink beyondlexicalleaf fixedbeforeCargo, decoderaccepted regression authored",
+  "runtime_unrun": true
+}

@@ -1,0 +1,16 @@
+{
+  "head": "5c8a646878a2bd30c5ea62fb324e7a90f9110867",
+  "base": "c1fa2bc9f327f5d553bb3dcc355053d8e7e94bfa",
+  "tree": "5bec88e0a495eb2e4f7e51626662815a93d88ea8",
+  "source_count": 7510,
+  "scope": "Current preimages c1fa targeted 14 only; previous a808 229/core58 plus doc and original native sources remain separate; no full current-source count transfer",
+  "nextest_version": "0.9.150",
+  "earlier_CI_runner": "0.9.149",
+  "Raw_parent": "a784962a461b140342eaf7622fdd68e0317b7014",
+  "five_nonshared_complete_blobs_modes_equal": true,
+  "shared_doc_authored_hunk_and_upstream_preserved": true,
+  "dirty_paths": [],
+  "working_patch_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "old_negative_driver_sha256": "dda9c34c9552474010a0a1e6e904f1b8d91607b79552d9ab81afc6ef89dda8a9",
+  "docs_and_custom": "UNRUN unchanged scopes; earlier exact-source qualifications separate"
+}

@@ -1,0 +1,414 @@
+[
+  {
+    "line": 288,
+    "text": "HEAD is now at f9f3423 Merge 5c8a646878a2bd30c5ea62fb324e7a90f9110867 into c1fa2bc9f327f5d553bb3dcc355053d8e7e94bfa"
+  },
+  {
+    "line": 290,
+    "text": "[command]/usr/bin/git log -1 --format=%H"
+  },
+  {
+    "line": 523,
+    "text": "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+  },
+  {
+    "line": 528,
+    "text": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+  },
+  {
+    "line": 556,
+    "text": "test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s"
+  },
+  {
+    "line": 563,
+    "text": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+  },
+  {
+    "line": 569,
+    "text": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+  },
+  {
+    "line": 654,
+    "text": "cargo-nextest 0.9.149 (3fe4ef319 2026-10-20)"
+  },
+  {
+    "line": 698,
+    "text": "Finished `release` profile [optimized] target(s) in 2m 50s"
+  },
+  {
+    "line": 766,
+    "text": "Finished `release` profile [optimized] target(s) in 52.59s"
+  },
+  {
+    "line": 787,
+    "text": "Finished `release` profile [optimized] target(s) in 28.01s"
+  },
+  {
+    "line": 821,
+    "text": "PICKED: package(=lamp-body) | package(=lamp-cloud) | package(=lamp-expression) | package(=lamp-keeper) | package(=lamp-lean) | package(=lamp-memory) | package(=lamp-peek) | package(=lamp-setup) | package(=lamp-skills) | package(=lamp-update) | package(=lamp-voice) | package(=lamp-voice-eval)"
+  },
+  {
+    "line": 856,
+    "text": "Finished `release` profile [optimized] target(s) in 6m 04s"
+  },
+  {
+    "line": 859,
+    "text": "Starting 7830 tests across 70 binaries (54 tests and 120 binaries skipped)"
+  },
+  {
+    "line": 8691,
+    "text": "Summary [ 173.250s] 7830 tests run: 7830 passed, 54 skipped"
+  },
+  {
+    "line": 8698,
+    "text": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 344 filtered out; finished in 3.62s"
+  },
+  {
+    "line": 8714,
+    "text": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 344 filtered out; finished in 1.15s"
+  },
+  {
+    "line": 8740,
+    "text": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 344 filtered out; finished in 4.52s"
+  },
+  {
+    "line": 8755,
+    "text": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 344 filtered out; finished in 0.92s"
+  },
+  {
+    "line": 8777,
+    "text": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 344 filtered out; finished in 1.74s"
+  },
+  {
+    "line": 8802,
+    "text": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3933 filtered out; finished in 3.02s"
+  },
+  {
+    "line": 8819,
+    "text": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3933 filtered out; finished in 2.73s"
+  },
+  {
+    "line": 8828,
+    "text": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3933 filtered out; finished in 1.30s"
+  },
+  {
+    "line": 8837,
+    "text": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 307 filtered out; finished in 0.96s"
+  },
+  {
+    "line": 8850,
+    "text": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 307 filtered out; finished in 1.56s"
+  },
+  {
+    "line": 8862,
+    "text": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 307 filtered out; finished in 0.87s"
+  },
+  {
+    "line": 8874,
+    "text": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 307 filtered out; finished in 1.01s"
+  },
+  {
+    "line": 8885,
+    "text": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 307 filtered out; finished in 2.25s"
+  },
+  {
+    "line": 8897,
+    "text": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 307 filtered out; finished in 0.80s"
+  },
+  {
+    "line": 8908,
+    "text": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 307 filtered out; finished in 2.80s"
+  },
+  {
+    "line": 8920,
+    "text": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 307 filtered out; finished in 2.80s"
+  },
+  {
+    "line": 8932,
+    "text": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 307 filtered out; finished in 1.30s"
+  },
+  {
+    "line": 8943,
+    "text": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 307 filtered out; finished in 2.31s"
+  },
+  {
+    "line": 8954,
+    "text": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 307 filtered out; finished in 3.50s"
+  },
+  {
+    "line": 8965,
+    "text": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 307 filtered out; finished in 7.91s"
+  },
+  {
+    "line": 8977,
+    "text": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 307 filtered out; finished in 1.59s"
+  },
+  {
+    "line": 8991,
+    "text": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 307 filtered out; finished in 2.51s"
+  },
+  {
+    "line": 9004,
+    "text": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 307 filtered out; finished in 0.00s"
+  },
+  {
+    "line": 9013,
+    "text": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 307 filtered out; finished in 0.07s"
+  },
+  {
+    "line": 9022,
+    "text": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 307 filtered out; finished in 0.05s"
+  },
+  {
+    "line": 9031,
+    "text": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 307 filtered out; finished in 0.40s"
+  },
+  {
+    "line": 9040,
+    "text": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 307 filtered out; finished in 0.21s"
+  },
+  {
+    "line": 9049,
+    "text": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 307 filtered out; finished in 0.20s"
+  },
+  {
+    "line": 9058,
+    "text": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 307 filtered out; finished in 0.66s"
+  },
+  {
+    "line": 9067,
+    "text": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 307 filtered out; finished in 0.24s"
+  },
+  {
+    "line": 9076,
+    "text": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 307 filtered out; finished in 0.12s"
+  },
+  {
+    "line": 9085,
+    "text": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 307 filtered out; finished in 0.11s"
+  },
+  {
+    "line": 9094,
+    "text": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 307 filtered out; finished in 0.33s"
+  },
+  {
+    "line": 9105,
+    "text": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 307 filtered out; finished in 1.13s"
+  },
+  {
+    "line": 9114,
+    "text": "Finished `release` profile [optimized] target(s) in 0.22s"
+  },
+  {
+    "line": 9119,
+    "text": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+  },
+  {
+    "line": 9125,
+    "text": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+  },
+  {
+    "line": 9131,
+    "text": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+  },
+  {
+    "line": 9137,
+    "text": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+  },
+  {
+    "line": 9143,
+    "text": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+  },
+  {
+    "line": 9151,
+    "text": "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+  },
+  {
+    "line": 9158,
+    "text": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+  },
+  {
+    "line": 9164,
+    "text": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+  },
+  {
+    "line": 9170,
+    "text": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+  },
+  {
+    "line": 9176,
+    "text": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+  },
+  {
+    "line": 9182,
+    "text": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+  },
+  {
+    "line": 9188,
+    "text": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+  },
+  {
+    "line": 9194,
+    "text": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+  },
+  {
+    "line": 9200,
+    "text": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+  },
+  {
+    "line": 9206,
+    "text": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+  },
+  {
+    "line": 9212,
+    "text": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+  },
+  {
+    "line": 9219,
+    "text": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+  },
+  {
+    "line": 9226,
+    "text": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+  },
+  {
+    "line": 9232,
+    "text": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+  },
+  {
+    "line": 9238,
+    "text": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+  },
+  {
+    "line": 9244,
+    "text": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+  },
+  {
+    "line": 9250,
+    "text": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+  },
+  {
+    "line": 9257,
+    "text": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+  },
+  {
+    "line": 9264,
+    "text": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+  },
+  {
+    "line": 9270,
+    "text": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+  },
+  {
+    "line": 9276,
+    "text": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+  },
+  {
+    "line": 9282,
+    "text": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+  },
+  {
+    "line": 9288,
+    "text": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+  },
+  {
+    "line": 9294,
+    "text": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+  },
+  {
+    "line": 9300,
+    "text": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+  },
+  {
+    "line": 9306,
+    "text": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+  },
+  {
+    "line": 9312,
+    "text": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+  },
+  {
+    "line": 9318,
+    "text": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+  },
+  {
+    "line": 9324,
+    "text": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+  },
+  {
+    "line": 9330,
+    "text": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+  },
+  {
+    "line": 9336,
+    "text": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+  },
+  {
+    "line": 9342,
+    "text": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+  },
+  {
+    "line": 9348,
+    "text": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+  },
+  {
+    "line": 9354,
+    "text": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+  },
+  {
+    "line": 9360,
+    "text": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+  },
+  {
+    "line": 9366,
+    "text": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+  },
+  {
+    "line": 9372,
+    "text": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+  },
+  {
+    "line": 9378,
+    "text": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+  },
+  {
+    "line": 9384,
+    "text": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+  },
+  {
+    "line": 9390,
+    "text": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+  },
+  {
+    "line": 9396,
+    "text": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+  },
+  {
+    "line": 9402,
+    "text": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+  },
+  {
+    "line": 9404,
+    "text": "Finished `release` profile [optimized] target(s) in 0.10s"
+  },
+  {
+    "line": 9406,
+    "text": "relay_signals: ok"
+  },
+  {
+    "line": 9407,
+    "text": "Finished `release` profile [optimized] target(s) in 0.10s"
+  },
+  {
+    "line": 9424,
+    "text": "test result: 13 passed; 0 failed"
+  },
+  {
+    "line": 9429,
+    "text": "Packaged 48 current workspace binaries and 2 selected examples with complete SHA256SUMS"
+  },
+  {
+    "line": 9467,
+    "text": "Artifact download URL: https://github.com/autonomous-ai/lampOS/actions/runs/40588955846/artifacts/12773173599"
+  }
+]

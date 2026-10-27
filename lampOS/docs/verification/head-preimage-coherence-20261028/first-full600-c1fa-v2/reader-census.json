@@ -1,0 +1,13 @@
+{
+  "argv": [
+    "rg",
+    "-n",
+    "\\bcheck_preimages\\b|head_touch::capture::codec::coherence",
+    "lampOS/crates",
+    "--glob",
+    "*.rs"
+  ],
+  "exit_code": 0,
+  "stdout": "lampOS/crates/update/src/head_touch/capture/codec/coherence/tests.rs:96:    saved.check_preimages(root, bundle).unwrap();\nlampOS/crates/update/src/head_touch/capture/codec/coherence/tests.rs:103:    let error = saved.check_preimages(root, bundle).unwrap_err();\nlampOS/crates/update/src/head_touch/capture/codec/coherence.rs:187:    pub(crate) fn check_preimages(&self, root: &Path, bundle: &Bundle) -> Result<()> {\n",
+  "stderr": ""
+}

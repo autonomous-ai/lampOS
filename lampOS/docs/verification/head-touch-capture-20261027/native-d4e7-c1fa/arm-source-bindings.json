@@ -1,0 +1,42 @@
+{
+  "base": "c1fa2bc9f327f5d553bb3dcc355053d8e7e94bfa",
+  "files": {
+    "lampOS/crates/update/src/head_touch.rs": {
+      "bytes": 22043,
+      "git_blob": "f0f048d74a3010d0dd917b08b8eca0d31b239ad9",
+      "git_mode": "100644",
+      "sha256": "2e9bcd134f16744e622f813cc3f5e71fe55c1b2a7bb64a5bd14d63d157b3638c"
+    },
+    "lampOS/crates/update/src/head_touch/capture.rs": {
+      "bytes": 23544,
+      "git_blob": "f25375f99386c7c78efc1b5ce9a172b7ac09248d",
+      "git_mode": "100644",
+      "sha256": "4137a729709ccfb1ad5a9653fd570daa38a46d2c2988cbd767595bddac7bdf59"
+    },
+    "lampOS/crates/update/src/head_touch/capture/tests.rs": {
+      "bytes": 27694,
+      "git_blob": "442d2cb4598035b0974c5f3d7a39e7edd89f3b76",
+      "git_mode": "100644",
+      "sha256": "ae5af4ed21941b278391c7412706b36f352c28fb20453426df55ff59e65b7855"
+    },
+    "lampOS/docs/head-touch-capture.md": {
+      "bytes": 12993,
+      "git_blob": "5aaff01db09dd8d1432dc226f002745ff9f9ff4a",
+      "git_mode": "100644",
+      "sha256": "295e987588d23a25eac0fb8155dd65fef718195e536760a08e1bff8058442bde"
+    },
+    "lampOS/docs/reuse-decisions.md": {
+      "bytes": 150690,
+      "git_blob": "b8c5d3768ae6d1035561e2827428ee14b19af2d5",
+      "git_mode": "100644",
+      "sha256": "a996f87675004d9330f3e8d3d45b76969cdc31cfafaff45cd23f66774848a40b"
+    },
+    "lampOS/docs/updates.md": {
+      "bytes": 174709,
+      "git_blob": "368f163bac0741d12a3cbe28e623a60aa2180170",
+      "git_mode": "100644",
+      "sha256": "78bcf0d5f91a417b615f2865e78e1d0a2743b74061b510dbf3670b688dc6968c"
+    }
+  },
+  "head": "d4e7e75aee14feacb39a68e871057f5c1a75e53f"
+}

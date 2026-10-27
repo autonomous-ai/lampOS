@@ -1,0 +1,106 @@
+[
+  {
+    "file": "census.json",
+    "raw_sha256": "d0d7566436bf097e91e231f4b8ac77c7ad486d7923e089a8d1a7cce1a6bf622a",
+    "published_sha256": "d0d7566436bf097e91e231f4b8ac77c7ad486d7923e089a8d1a7cce1a6bf622a",
+    "transformation": "JSON parse -> recursive string-value redaction -> JSON dump",
+    "raw_bytes": 23240,
+    "published_bytes": 23240
+  },
+  {
+    "file": "terminal-rows.json",
+    "raw_sha256": "97dd13979808c695ac0c0bf42006b87628dcd6293fb02eb0f0ba9641bdbf6c26",
+    "published_sha256": "97dd13979808c695ac0c0bf42006b87628dcd6293fb02eb0f0ba9641bdbf6c26",
+    "transformation": "JSON parse -> recursive string-value redaction -> JSON dump",
+    "raw_bytes": 1537044,
+    "published_bytes": 1537044
+  },
+  {
+    "file": "all58-required-controls.json",
+    "raw_sha256": "08b162e05737e77da4a9267374c036d8f0aa250b2cace0046a464feebefa7f98",
+    "published_sha256": "08b162e05737e77da4a9267374c036d8f0aa250b2cace0046a464feebefa7f98",
+    "transformation": "JSON parse -> recursive string-value redaction -> JSON dump",
+    "raw_bytes": 15581,
+    "published_bytes": 15581
+  },
+  {
+    "file": "source-closure.json",
+    "raw_sha256": "8170a3f7262f8b38655efe5da1718dac2f078c0f1b6dde1e93b4f5b526aeadb4",
+    "published_sha256": "8170a3f7262f8b38655efe5da1718dac2f078c0f1b6dde1e93b4f5b526aeadb4",
+    "transformation": "JSON parse -> recursive string-value redaction -> JSON dump",
+    "raw_bytes": 9068,
+    "published_bytes": 9068
+  },
+  {
+    "file": "optional-archive-boundary.json",
+    "raw_sha256": "19c9f92f206ee655009ade7278e4ad63d9b2c26cb1e7a4b80a8dbf21552fda4e",
+    "published_sha256": "19c9f92f206ee655009ade7278e4ad63d9b2c26cb1e7a4b80a8dbf21552fda4e",
+    "transformation": "JSON parse -> recursive string-value redaction -> JSON dump",
+    "raw_bytes": 225,
+    "published_bytes": 225
+  },
+  {
+    "file": "arm-terminal-jobs.json",
+    "raw_sha256": "503dcaaed065889132f5fa9d037758a8ba4e8ba36acd11a11acf6ee621c05f43",
+    "published_sha256": "503dcaaed065889132f5fa9d037758a8ba4e8ba36acd11a11acf6ee621c05f43",
+    "transformation": "JSON parse -> recursive string-value redaction -> JSON dump",
+    "raw_bytes": 8377,
+    "published_bytes": 8377
+  },
+  {
+    "file": "arm-scope-witnesses.json",
+    "raw_sha256": "819cca84d90e8912ebc04fc01d4c6936a1869d0244ee506a49454892d7e913d4",
+    "published_sha256": "819cca84d90e8912ebc04fc01d4c6936a1869d0244ee506a49454892d7e913d4",
+    "transformation": "JSON parse -> recursive string-value redaction -> JSON dump",
+    "raw_bytes": 13657,
+    "published_bytes": 13657
+  },
+  {
+    "file": "linux-terminal-jobs.json",
+    "raw_sha256": "0ba47fe683d3e8f9b0b4570e52e122d0abab13289f4c3b8a897858f462a9bce5",
+    "published_sha256": "0ba47fe683d3e8f9b0b4570e52e122d0abab13289f4c3b8a897858f462a9bce5",
+    "transformation": "JSON parse -> recursive string-value redaction -> JSON dump",
+    "raw_bytes": 3796,
+    "published_bytes": 3796
+  },
+  {
+    "file": "linux-scope-witnesses.json",
+    "raw_sha256": "128d842481adf8fccff32f9ad1dc855baa4d5e8f916d1fa94556dc9001783f66",
+    "published_sha256": "bd2493354d3a7fd3b167bdae0896f272360943f99f71d8af7cd7caab416c5bca",
+    "transformation": "JSON parse -> recursive string-value redaction -> JSON dump",
+    "raw_bytes": 698,
+    "published_bytes": 677
+  },
+  {
+    "file": "raw-log-metadata-hashes.json",
+    "raw_sha256": "7c367f5d0dbcbd4e0ef3c8201d10db6714353136248e1a25c204bb2996c548ba",
+    "published_sha256": "7c367f5d0dbcbd4e0ef3c8201d10db6714353136248e1a25c204bb2996c548ba",
+    "transformation": "JSON parse -> recursive string-value redaction -> JSON dump",
+    "raw_bytes": 1287,
+    "published_bytes": 1287
+  },
+  {
+    "file": "observer-closure.json",
+    "raw_sha256": "a05c8f7864fd9c80fabb1cf7feeccb2e8798b1573c9ac6bf24495036d64acbc5",
+    "published_sha256": "a05c8f7864fd9c80fabb1cf7feeccb2e8798b1573c9ac6bf24495036d64acbc5",
+    "transformation": "JSON parse -> recursive string-value redaction -> JSON dump",
+    "raw_bytes": 368,
+    "published_bytes": 368
+  },
+  {
+    "file": "README.md",
+    "raw_sha256": "3ebb5445288da50d7fca6e6c4d2a6de4215ae1698409bf94d014d78f3dd95537",
+    "published_sha256": "3ebb5445288da50d7fca6e6c4d2a6de4215ae1698409bf94d014d78f3dd95537",
+    "transformation": "text redaction + exactly one terminal LF; documented prose spacing only",
+    "raw_bytes": 3359,
+    "published_bytes": 3359
+  },
+  {
+    "file": "actual-preview-binding.json",
+    "raw_sha256": "fc2e36d9bc202b33678315b85645b86fcfb0ad21990caaad830ff6c62ea1305b",
+    "published_sha256": "fc2e36d9bc202b33678315b85645b86fcfb0ad21990caaad830ff6c62ea1305b",
+    "transformation": "JSON parse -> recursive string-value redaction -> JSON dump",
+    "raw_bytes": 369,
+    "published_bytes": 369
+  }
+]

@@ -1,0 +1,144 @@
+{
+  "actual_pass": 14,
+  "actual_bad": 0,
+  "selected_unrun": 0,
+  "ignored": 0,
+  "filtered_nonignored": 107,
+  "selected": 14,
+  "required_pairs": [
+    [
+      "lamp-update::install",
+      "every_part_of_the_lamp_waits_for_setups_marker_itself"
+    ],
+    [
+      "lamp-update::it",
+      "ci_paths::every_doc_a_crate_reads_is_named_back_in_the_workflows_pull_request_paths"
+    ],
+    [
+      "lamp-update::it",
+      "scratch_paths::no_two_files_of_a_test_binary_build_the_same_scratch_folder"
+    ]
+  ],
+  "cases": [
+    {
+      "binary": "lamp-update::it",
+      "case": "ci_paths::the_scan_sees_paths_in_strings_and_not_in_comments_or_prose",
+      "status": "PASS",
+      "ordinal": 1,
+      "total": 14,
+      "driver_sha256": "c5c1f08f194944764fc5510dded26a9e2fe4fb8a1c4c3cafc308beef9795cfeb"
+    },
+    {
+      "binary": "lamp-update::it",
+      "case": "image_journal::systemd_reads_it_last_beside_another_drop_in",
+      "status": "PASS",
+      "ordinal": 2,
+      "total": 14,
+      "driver_sha256": "c5c1f08f194944764fc5510dded26a9e2fe4fb8a1c4c3cafc308beef9795cfeb"
+    },
+    {
+      "binary": "lamp-update::install",
+      "case": "every_part_of_the_lamp_waits_for_setups_marker_itself",
+      "status": "PASS",
+      "ordinal": 3,
+      "total": 14,
+      "driver_sha256": "d7ba8772743677295823b6267291b73e90cc99ac94482bbc84e723940922e36e"
+    },
+    {
+      "binary": "lamp-update::it",
+      "case": "image_journal::the_journal_is_kept_well_inside_the_ram_disk",
+      "status": "PASS",
+      "ordinal": 4,
+      "total": 14,
+      "driver_sha256": "c5c1f08f194944764fc5510dded26a9e2fe4fb8a1c4c3cafc308beef9795cfeb"
+    },
+    {
+      "binary": "lamp-update::it",
+      "case": "image_ramlog::logrotate_runs_the_lamps_copy_back_in_place_of_the_bases",
+      "status": "PASS",
+      "ordinal": 5,
+      "total": 14,
+      "driver_sha256": "c5c1f08f194944764fc5510dded26a9e2fe4fb8a1c4c3cafc308beef9795cfeb"
+    },
+    {
+      "binary": "lamp-update::it",
+      "case": "image_ramlog::ramlogs_copies_leave_the_journal_out",
+      "status": "PASS",
+      "ordinal": 6,
+      "total": 14,
+      "driver_sha256": "c5c1f08f194944764fc5510dded26a9e2fe4fb8a1c4c3cafc308beef9795cfeb"
+    },
+    {
+      "binary": "lamp-update::it",
+      "case": "image_ramlog::ramlogs_stop_keeps_the_journal_before_its_own_stop",
+      "status": "PASS",
+      "ordinal": 7,
+      "total": 14,
+      "driver_sha256": "c5c1f08f194944764fc5510dded26a9e2fe4fb8a1c4c3cafc308beef9795cfeb"
+    },
+    {
+      "binary": "lamp-update::it",
+      "case": "image_ramlog::the_defaults_keep_the_bases_settings",
+      "status": "PASS",
+      "ordinal": 8,
+      "total": 14,
+      "driver_sha256": "c5c1f08f194944764fc5510dded26a9e2fe4fb8a1c4c3cafc308beef9795cfeb"
+    },
+    {
+      "binary": "lamp-update::it",
+      "case": "image_ramlog::the_copy_back_leaves_the_journal_alone",
+      "status": "PASS",
+      "ordinal": 9,
+      "total": 14,
+      "driver_sha256": "c5c1f08f194944764fc5510dded26a9e2fe4fb8a1c4c3cafc308beef9795cfeb"
+    },
+    {
+      "binary": "lamp-update::it",
+      "case": "scratch_paths::no_two_files_of_a_test_binary_build_the_same_scratch_folder",
+      "status": "PASS",
+      "ordinal": 10,
+      "total": 14,
+      "driver_sha256": "c5c1f08f194944764fc5510dded26a9e2fe4fb8a1c4c3cafc308beef9795cfeb"
+    },
+    {
+      "binary": "lamp-update::it",
+      "case": "scratch_paths::the_names_read_are_the_scratch_folders_only",
+      "status": "PASS",
+      "ordinal": 11,
+      "total": 14,
+      "driver_sha256": "c5c1f08f194944764fc5510dded26a9e2fe4fb8a1c4c3cafc308beef9795cfeb"
+    },
+    {
+      "binary": "lamp-update::it",
+      "case": "image_ramlog::the_last_two_boots_are_kept_at_shutdown_only",
+      "status": "PASS",
+      "ordinal": 12,
+      "total": 14,
+      "driver_sha256": "c5c1f08f194944764fc5510dded26a9e2fe4fb8a1c4c3cafc308beef9795cfeb"
+    },
+    {
+      "binary": "lamp-update::it",
+      "case": "ci_paths::every_doc_a_crate_reads_is_named_back_in_the_workflows_pull_request_paths",
+      "status": "PASS",
+      "ordinal": 13,
+      "total": 14,
+      "driver_sha256": "c5c1f08f194944764fc5510dded26a9e2fe4fb8a1c4c3cafc308beef9795cfeb"
+    },
+    {
+      "binary": "lamp-update::it",
+      "case": "image_ramlog::a_failed_move_keeps_the_kept_boots_and_says_so",
+      "status": "PASS",
+      "ordinal": 14,
+      "total": 14,
+      "driver_sha256": "c5c1f08f194944764fc5510dded26a9e2fe4fb8a1c4c3cafc308beef9795cfeb"
+    }
+  ],
+  "summary": [
+    "     Summary [   0.479s] 14 tests run: 14 passed, 107 skipped"
+  ],
+  "exit_code": 0,
+  "retries": 0,
+  "processes": 4,
+  "prior_required_control_scope_not_reexecuted": true,
+  "runtime_scope": "Full IT13 and one direct install-doc reader only; filtered install cases and retained outputs are not executed"
+}

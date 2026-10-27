@@ -1,0 +1,26 @@
+{
+  "old_base": "a808ef04b5885ccb35e8e7693eee16ae331e3a7f",
+  "new_base": "c1fa2bc9f327f5d553bb3dcc355053d8e7e94bfa",
+  "last_actual_broader_base": "82a62867cc1bcbbc4b0848519c6757f623d112ce",
+  "changed_paths": [
+    "lampOS/docs/install.md"
+  ],
+  "comparison_sha256": "2a16a8776f2569834c979c2c1c4a4737c52070154af70c6594a01bf24f348274",
+  "cumulative_since_actual82_only_install_manual": true,
+  "production_Rust_manifest_lock_unit_skills_changed": false,
+  "own_path_overlap": false,
+  "direct_compiled_reader": {
+    "binary": "lamp-update::install",
+    "test": "every_part_of_the_lamp_waits_for_setups_marker_itself",
+    "source": "lampOS/crates/update/tests/install.rs",
+    "include": "../../../docs/install.md"
+  },
+  "recommended_current_scope": "fresh fmt/strict all-target Clippy, targeted IT/install compile/discovery, full IT13 plus exact one install-doc reader; actual discovery authoritative",
+  "runtime_count_projection": 14,
+  "actual_a808_Raw_PID_Cargo_invocations": 0,
+  "last_actual_82_broad_counts": {
+    "Raw": 220,
+    "PID": 204
+  },
+  "no_runtime_count_transfer": true
+}

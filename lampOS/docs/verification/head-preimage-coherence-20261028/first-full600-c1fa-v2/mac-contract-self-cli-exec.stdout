@@ -1,0 +1,4 @@
+running 1 test
+test actual_cli_exec_confirms_before_the_next_round ... ignored, requires Linux ARM64/x86-64 ptrace
+
+test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out

@@ -1,0 +1,16 @@
+{
+  "head": "4c6ddfb625eb1f1d32a4f6a110f78d9923ebd6b3",
+  "own_six_committed_bytes_modes_match_gate": true,
+  "own_paths": [
+    "lampOS/crates/update/src/head_touch/capture/codec.rs",
+    "lampOS/crates/update/src/head_touch/capture/codec/coherence.rs",
+    "lampOS/crates/update/src/head_touch/capture/codec/coherence/tests.rs",
+    "lampOS/docs/head-preimage-coherence.md",
+    "lampOS/docs/reuse-decisions.md",
+    "lampOS/docs/updates.md"
+  ],
+  "base": "c1fa2bc9f327f5d553bb3dcc355053d8e7e94bfa",
+  "combined_commits": 6,
+  "combined_paths": 26,
+  "clean": true
+}

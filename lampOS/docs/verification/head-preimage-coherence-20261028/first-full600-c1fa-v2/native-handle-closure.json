@@ -1,0 +1,77 @@
+{
+  "native_handle": 35846,
+  "terminal_exit_code": 0,
+  "outer_records": [
+    {
+      "chunk_id": "8128dd",
+      "wall_time_seconds": 1.00316975,
+      "session_id": 35846,
+      "original_token_count": 0,
+      "output": ""
+    },
+    {
+      "chunk_id": "8734fd",
+      "wall_time_seconds": 5.00257325,
+      "session_id": 35846,
+      "original_token_count": 136,
+      "output": "{\"stage\": \"metadata\", \"argv\": [\"<cargo-home>/bin/cargo\", \"+1.96.0\", \"metadata\", \"--locked\", \"--format-version\", \"1\", \"--filter-platform\", \"aarch64-apple-darwin\"], \"exit_code\": 0, \"elapsed_seconds\": 0.172}\n{\"stage\": \"fmt\", \"argv\": [\"<cargo-home>/bin/cargo\", \"+1.96.0\", \"fmt\", \"--all\", \"--check\"], \"exit_code\": 0, \"elapsed_seconds\": 5.741}\n{\"stage\": \"clippy\", \"argv\": [\"<cargo-home>/bin/cargo\", \"+1.96.0\", \"clippy\", \"--locked\", \"-p\", \"lamp-update\", \"--all-targets\", \"--\", \"-D\", \"warnings\"], \"exit_code\": 0, \"elapsed_seconds\": 20.135}\n"
+    },
+    {
+      "chunk_id": "9448e8",
+      "wall_time_seconds": 5.000727833,
+      "session_id": 35846,
+      "original_token_count": 0,
+      "output": ""
+    },
+    {
+      "chunk_id": "514cb8",
+      "wall_time_seconds": 5.002592584,
+      "session_id": 35846,
+      "original_token_count": 268,
+      "output": "{\"stage\": \"compile\", \"argv\": [\"<cargo-home>/bin/cargo\", \"+1.96.0\", \"test\", \"--locked\", \"-p\", \"lamp-update\", \"--no-run\", \"--message-format=json\"], \"exit_code\": 0, \"elapsed_seconds\": 54.46}\n{\"stage\": \"full-list\", \"argv\": [\"<private-path>\", \"nextest\", \"list\", \"--locked\", \"-p\", \"lamp-update\", \"--profile\", \"pr\", \"-E\", \"all()\", \"--config-file\", \"<plan-output-tree>/lampOS/.config/nextest.toml\", \"--user-config-file\", \"none\", \"--message-format\", \"json\"], \"exit_code\": 0, \"elapsed_seconds\": 7.294}\n{\"stage\": \"scoped-list\", \"argv\": [\"<private-path>\", \"nextest\", \"list\", \"--locked\", \"-p\", \"lamp-update\", \"--profile\", \"pr\", \"-E\", \"all()\", \"--config-file\", \"<plan-output-tree>/lampOS/.config/nextest.toml\", \"--user-config-file\", \"none\", \"--message-format\", \"json\"], \"exit_code\": 0, \"elapsed_seconds\": 0.376}\nSCOPED_DISCOVERY {\"selected\": 600, \"policy_ignored\": 6, \"filtered_nonignored\": 0, \"excluded_binaries\": 0, \"required\": 121}\n"
+    },
+    {
+      "chunk_id": "0fd1dd",
+      "wall_time_seconds": 5.001307584,
+      "session_id": 35846,
+      "original_token_count": 0,
+      "output": ""
+    },
+    {
+      "chunk_id": "265f8a",
+      "wall_time_seconds": 5.001686208,
+      "session_id": 35846,
+      "original_token_count": 0,
+      "output": ""
+    },
+    {
+      "chunk_id": "e7c270",
+      "wall_time_seconds": 30.001427959,
+      "session_id": 35846,
+      "original_token_count": 0,
+      "output": ""
+    },
+    {
+      "chunk_id": "7104c7",
+      "wall_time_seconds": 30.002048208,
+      "session_id": 35846,
+      "original_token_count": 0,
+      "output": ""
+    },
+    {
+      "chunk_id": "5790ef",
+      "wall_time_seconds": 30.002566292,
+      "session_id": 35846,
+      "original_token_count": 0,
+      "output": ""
+    },
+    {
+      "chunk_id": "71e966",
+      "wall_time_seconds": 1.5375e-05,
+      "exit_code": 0,
+      "original_token_count": 474,
+      "output": "{\"stage\": \"nextest\", \"argv\": [\"<private-path>\", \"nextest\", \"run\", \"--locked\", \"-p\", \"lamp-update\", \"--profile\", \"pr\", \"-E\", \"all()\", \"--config-file\", \"<plan-output-tree>/lampOS/.config/nextest.toml\", \"--user-config-file\", \"none\", \"--test-threads\", \"4\", \"--retries\", \"0\", \"--no-fail-fast\", \"--status-level\", \"all\", \"--final-status-level\", \"none\", \"--color\", \"never\"], \"exit_code\": 0, \"elapsed_seconds\": 448.315}\n{\"counts\": {\"PASS\": 600, \"FAIL\": 0, \"LEAK\": 0, \"TIMEOUT\": 0, \"EXECFAIL\": 0, \"XPASS\": 0, \"XFAIL\": 0, \"CANCEL\": 0}, \"selected_unrun\": 0, \"ignored\": 6, \"required_controls\": 121, \"protocol_errors\": []}\n{\"stage\": \"doctests\", \"argv\": [\"<cargo-home>/bin/cargo\", \"+1.96.0\", \"test\", \"--locked\", \"-p\", \"lamp-update\", \"--doc\", \"--\", \"--test-threads=4\"], \"exit_code\": 0, \"elapsed_seconds\": 0.529}\n{\"stage\": \"mac-contract-self-cli-exec\", \"argv\": [\"<controlled-target>/debug/deps/self_cli_exec-7a8efcc313003c4d\", \"--exact\", \"actual_cli_exec_confirms_before_the_next_round\", \"--test-threads=1\"], \"exit_code\": 0, \"elapsed_seconds\": 0.003}\n{\"stage\": \"mac-contract-self-process-cuts\", \"argv\": [\"<controlled-target>/debug/deps/self_process_cuts-9807238ddc4f9970\", \"--exact\", \"persisted_self_switches_survive_sigkill\", \"--test-threads=1\"], \"exit_code\": 0, \"elapsed_seconds\": 0.003}\n{\"head_unchanged\": true, \"status_unchanged\": true, \"working_patch_unchanged\": true, \"source_unchanged\": true, \"source_count\": 7522, \"configuration_unchanged\": true, \"controller_unchanged\": true, \"nextest_tool_unchanged\": true, \"nextest_config_unchanged\": true, \"retained_failed_driver_unchanged\": true, \"receipt_selectors_unchanged\": true, \"affected_scope_unchanged\": true, \"retained_negative_model_driver_unchanged\": true, \"all_stages_passed\": true, \"controller_error\": null}\n"
+    }
+  ],
+  "output": "{\"stage\": \"metadata\", \"argv\": [\"<cargo-home>/bin/cargo\", \"+1.96.0\", \"metadata\", \"--locked\", \"--format-version\", \"1\", \"--filter-platform\", \"aarch64-apple-darwin\"], \"exit_code\": 0, \"elapsed_seconds\": 0.172}\n{\"stage\": \"fmt\", \"argv\": [\"<cargo-home>/bin/cargo\", \"+1.96.0\", \"fmt\", \"--all\", \"--check\"], \"exit_code\": 0, \"elapsed_seconds\": 5.741}\n{\"stage\": \"clippy\", \"argv\": [\"<cargo-home>/bin/cargo\", \"+1.96.0\", \"clippy\", \"--locked\", \"-p\", \"lamp-update\", \"--all-targets\", \"--\", \"-D\", \"warnings\"], \"exit_code\": 0, \"elapsed_seconds\": 20.135}\n{\"stage\": \"compile\", \"argv\": [\"<cargo-home>/bin/cargo\", \"+1.96.0\", \"test\", \"--locked\", \"-p\", \"lamp-update\", \"--no-run\", \"--message-format=json\"], \"exit_code\": 0, \"elapsed_seconds\": 54.46}\n{\"stage\": \"full-list\", \"argv\": [\"<private-path>\", \"nextest\", \"list\", \"--locked\", \"-p\", \"lamp-update\", \"--profile\", \"pr\", \"-E\", \"all()\", \"--config-file\", \"<plan-output-tree>/lampOS/.config/nextest.toml\", \"--user-config-file\", \"none\", \"--message-format\", \"json\"], \"exit_code\": 0, \"elapsed_seconds\": 7.294}\n{\"stage\": \"scoped-list\", \"argv\": [\"<private-path>\", \"nextest\", \"list\", \"--locked\", \"-p\", \"lamp-update\", \"--profile\", \"pr\", \"-E\", \"all()\", \"--config-file\", \"<plan-output-tree>/lampOS/.config/nextest.toml\", \"--user-config-file\", \"none\", \"--message-format\", \"json\"], \"exit_code\": 0, \"elapsed_seconds\": 0.376}\nSCOPED_DISCOVERY {\"selected\": 600, \"policy_ignored\": 6, \"filtered_nonignored\": 0, \"excluded_binaries\": 0, \"required\": 121}\n{\"stage\": \"nextest\", \"argv\": [\"<private-path>\", \"nextest\", \"run\", \"--locked\", \"-p\", \"lamp-update\", \"--profile\", \"pr\", \"-E\", \"all()\", \"--config-file\", \"<plan-output-tree>/lampOS/.config/nextest.toml\", \"--user-config-file\", \"none\", \"--test-threads\", \"4\", \"--retries\", \"0\", \"--no-fail-fast\", \"--status-level\", \"all\", \"--final-status-level\", \"none\", \"--color\", \"never\"], \"exit_code\": 0, \"elapsed_seconds\": 448.315}\n{\"counts\": {\"PASS\": 600, \"FAIL\": 0, \"LEAK\": 0, \"TIMEOUT\": 0, \"EXECFAIL\": 0, \"XPASS\": 0, \"XFAIL\": 0, \"CANCEL\": 0}, \"selected_unrun\": 0, \"ignored\": 6, \"required_controls\": 121, \"protocol_errors\": []}\n{\"stage\": \"doctests\", \"argv\": [\"<cargo-home>/bin/cargo\", \"+1.96.0\", \"test\", \"--locked\", \"-p\", \"lamp-update\", \"--doc\", \"--\", \"--test-threads=4\"], \"exit_code\": 0, \"elapsed_seconds\": 0.529}\n{\"stage\": \"mac-contract-self-cli-exec\", \"argv\": [\"<controlled-target>/debug/deps/self_cli_exec-7a8efcc313003c4d\", \"--exact\", \"actual_cli_exec_confirms_before_the_next_round\", \"--test-threads=1\"], \"exit_code\": 0, \"elapsed_seconds\": 0.003}\n{\"stage\": \"mac-contract-self-process-cuts\", \"argv\": [\"<controlled-target>/debug/deps/self_process_cuts-9807238ddc4f9970\", \"--exact\", \"persisted_self_switches_survive_sigkill\", \"--test-threads=1\"], \"exit_code\": 0, \"elapsed_seconds\": 0.003}\n{\"head_unchanged\": true, \"status_unchanged\": true, \"working_patch_unchanged\": true, \"source_unchanged\": true, \"source_count\": 7522, \"configuration_unchanged\": true, \"controller_unchanged\": true, \"nextest_tool_unchanged\": true, \"nextest_config_unchanged\": true, \"retained_failed_driver_unchanged\": true, \"receipt_selectors_unchanged\": true, \"affected_scope_unchanged\": true, \"retained_negative_model_driver_unchanged\": true, \"all_stages_passed\": true, \"controller_error\": null}\n"
+}

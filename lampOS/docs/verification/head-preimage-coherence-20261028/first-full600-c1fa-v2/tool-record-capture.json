@@ -1,0 +1,5 @@
+{
+  "CONTINUE1": "Reconstructed exact three tool-visible stage JSON rows plus original chunk fields; no new execution.",
+  "other_records": "Direct full tool-result saves.",
+  "all_native_rows": "Parsed and retained; final native exit zero verified."
+}
