@@ -1,0 +1,159 @@
+{
+  "all_handles_closed": true,
+  "coverage_gap": "No committed test binds an onboarding invitation and queues PCM followed by cancellation before speaker acceptance. Existing queue-cancel and Delivery helper cases each pass natively but do not cover the new branch together.",
+  "file_hashes": {
+    "arm.log": "e2769168eb190a2d4693f5b337e78b13adb933daed9c9e32a9c6450d2dc70c62",
+    "linux.log": "43bb1fd970e0fc3f599c7280d83696697fe67d268159d614a97c8446708a2d84",
+    "native-preliminary.json": "30a195d73e52156e511aad166ce0dd7f3f1126fa5d82f8b704aee6f5c9449d87",
+    "native-source-bindings.json": "2f1ec761c55687cac75441de2be8518fd970f18c73718026ec7d5afed415a95a",
+    "pr-at-hold.json": "8f4cf795814c9e13806d0b2cc290f65eca46d7d2510c0b8c71338449efd4ccda",
+    "source-hold.json": "140188980aebda86ca5d83398cef0b2847556d61e19b25687681874aee364ccc"
+  },
+  "handles_terminal0": [
+    64967,
+    1055,
+    92994,
+    20268,
+    88937,
+    79708,
+    64951,
+    27741
+  ],
+  "head": "a4e13942453e01eba673952afff41a49a0589bd4",
+  "host_gates": {
+    "fmt": {
+      "cleanup": [],
+      "controller_error": null,
+      "elapsed_seconds": 13.444674555999999,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "process_group": "absent",
+      "reaped": true,
+      "returncode": 0,
+      "source_unchanged": true,
+      "timed_out": false
+    },
+    "focused_tests": "Not started after Root stop",
+    "full149onboarding": "Not rerun; author149passed/1failedMacstorage cohort remains explicit;3alone reruns are not a waiver.",
+    "strictVoiceClippy": "Not started after Root stop"
+  },
+  "limits": [
+    "Green original CI does not settle the source-inferred P2 or waive failed author Mac cohort.",
+    "Native result qualifies actual preview with exact changed coordinator blob; full authored tree differs. No whole-authored/currentMain transfer.",
+    "No acoustic/device, Memory implementation/PR semantic read, public action, test rerun/cancellation or artifact binary download."
+  ],
+  "native_coverage": {
+    "bad_terminal_statuses": [],
+    "binaries_run": 70,
+    "custom_harness": {
+      "process13passed0failed": true,
+      "relay_signals_ok": true
+    },
+    "docs": {
+      "crate_summaries": 47,
+      "failed": 0,
+      "ignored": 0,
+      "passed": 4
+    },
+    "duplicate_detail_keys": 34,
+    "existing_witnesses": [
+      {
+        "PASS_occurrences": 1,
+        "binary": "lamp-voice",
+        "test": "coordinator::tests::interruption_after_provider_slice_revokes_old_pcm_before_speaker_dispatch"
+      },
+      {
+        "PASS_occurrences": 1,
+        "binary": "lamp-voice",
+        "test": "onboarding::tests::a_turn_gone_before_its_first_audio_is_no_ask_and_a_redo_forgets_the_count"
+      },
+      {
+        "PASS_occurrences": 1,
+        "binary": "lamp-voice",
+        "test": "onboarding::storage::tests::shutdown_drains_a_redo_barrier_behind_a_stalled_old_done_write"
+      }
+    ],
+    "gap": "No test binds onboarding invitation and drives new latch with queued-only Audio then interruption. Existing unit/helper witnesses do not execute that branch with a bound invitation.",
+    "head": "a4e13942453e01eba673952afff41a49a0589bd4",
+    "preview": "2d5f4ea187dafc2efddf1fb17ed055a614d318f5",
+    "qualification": "Green original CI is not a behavioral readiness waiver for the source-inferred P2; failed authorMac149/1cohort remains historical separate evidence.",
+    "rawPASS_lines": 7784,
+    "selection": "Changed: lamp-voice. With the crates that depend on them and the three that read other crates' files (lamp-cloud, lamp-voice-eval, lamp-update): 12 of 47 crates.",
+    "skipped_binaries": 118,
+    "skipped_tests": 53,
+    "summary": [
+      "Summary [ 170.342s] 7750 tests run: 7750 passed, 53 skipped"
+    ],
+    "unique_passes": 7750
+  },
+  "native_source_binding": {
+    "authored": "a4e13942453e01eba673952afff41a49a0589bd4",
+    "authored_tree": "4a0882d8f70cd16f11a657e81ff173db6dc415c6",
+    "changed_blob_equal": true,
+    "changed_file": {
+      "2d5f4ea187dafc2efddf1fb17ed055a614d318f5": {
+        "blob": "077d985a1c4acb0c3a50f9e53158c6a1f6cca933",
+        "sha256": "8274edcd252e82de719e729dac3a027940c84ffb6701b63bf7b59cff41d7e21d"
+      },
+      "a4e13942453e01eba673952afff41a49a0589bd4": {
+        "blob": "077d985a1c4acb0c3a50f9e53158c6a1f6cca933",
+        "sha256": "8274edcd252e82de719e729dac3a027940c84ffb6701b63bf7b59cff41d7e21d"
+      }
+    },
+    "parents": [
+      "241f51500f258ea06594f9edf3928a702d6a2038",
+      "a4e13942453e01eba673952afff41a49a0589bd4"
+    ],
+    "preview": "2d5f4ea187dafc2efddf1fb17ed055a614d318f5",
+    "preview_tree": "a8e2dc4dbd0190d4a0115c7c4c5153a08354db28",
+    "whole_trees_equal": false
+  },
+  "no_product_edit_or_private_harness": true,
+  "original_native_runs": {
+    "arm": {
+      "attempt": 1,
+      "conclusion": "success",
+      "id": 40504159564,
+      "jobs": [
+        {
+          "conclusion": "success",
+          "id": 122189087134,
+          "name": "lampOS \u2014 build and test on Linux ARM64 (1/1)"
+        },
+        {
+          "conclusion": "skipped",
+          "id": 122189088660,
+          "name": "lampOS \u2014 promote a tested release to the stable feed"
+        },
+        {
+          "conclusion": "skipped",
+          "id": 122195128709,
+          "name": "report-full-run-failure"
+        },
+        {
+          "conclusion": "skipped",
+          "id": 122195129024,
+          "name": "lampOS \u2014 sign and publish the tested lamp-voice artifact"
+        }
+      ],
+      "status": "completed"
+    },
+    "linux": {
+      "attempt": 1,
+      "conclusion": "success",
+      "id": 40504159322,
+      "jobs": [
+        {
+          "conclusion": "success",
+          "id": 122189085875,
+          "name": "lampOS \u2014 clippy, every crate and target (x86 Linux)"
+        }
+      ],
+      "status": "completed"
+    }
+  },
+  "result": "P2 HOLD: new provider-arrival latch can spend a try before any speaker acceptance. Source inference only, not executed bound-invitation reproduction.",
+  "source_guard_unchanged": 7373,
+  "source_hardware_boundary": "Provider PCM receipt/queue at7230-7256 differs from speaker accepted playback/sounded at3208-3210.",
+  "store_target_free": true,
+  "worktree_clean": true
+}

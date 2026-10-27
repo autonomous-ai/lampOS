@@ -1,0 +1,55 @@
+{
+  "head": "9276c872fa2923bf57b6a21e08d83809fc25231d",
+  "command": [
+    "npm",
+    "test"
+  ],
+  "node": "v26.7.0",
+  "ws": "8.22.0",
+  "returncode": 0,
+  "timed_out": false,
+  "reaped": true,
+  "process_group": "absent",
+  "cleanup": [],
+  "seconds": 7.334,
+  "counts": {
+    "tests": 33,
+    "pass": 33,
+    "fail": 0,
+    "cancelled": 0,
+    "skipped": 0,
+    "todo": 0
+  },
+  "source_unchanged": true,
+  "tracked_JS_paths": 19,
+  "npm_test_log_sha256": "182355b63be56c0cca4abd79a013dba264297614bcb9186f5c516120284443d2",
+  "setup": "Initial offline ENOTCACHED ws; online task-cache install used ignore-scripts, omitoptional and no package lock; source guard unchanged.",
+  "limits": [
+    "Host Node26.7; not promised18 floor or real Control server/device qualification",
+    "No Rust build, nativeARM or SDK-source edits"
+  ],
+  "original_CI": {
+    "run": 40506270298,
+    "attempt": 1,
+    "head": "9276c872fa2923bf57b6a21e08d83809fc25231d",
+    "actual_preview": "c8cb17cacfeb483f1cc19e6e538b5b327a1c87ee",
+    "parents": [
+      "36a42f30a756b6fd6f31c9b6102cb66e5008416c",
+      "9276c872fa2923bf57b6a21e08d83809fc25231d"
+    ],
+    "tree": "12d8bc504e1d282e2f09cabb7591c45674ae4e0f",
+    "exact_authored_tree": true,
+    "node": "v20.20.2",
+    "JS_pass": 33,
+    "JS_fail": 0,
+    "job": 122196241428,
+    "log_sha256": "06fd363caf44b3f3d233bc54b495f08ea6c9d39ecb47b2b6ded5c4dcc0dde6e6"
+  },
+  "review_findings": {
+    "P1_P2": [],
+    "closed_send": "closed sockets reject before waiting allocation; send callback removes only its own waiting entry",
+    "done_cleanup": "op-keyed ENDS_AT_REPLY excludes gesture/move future; internal done rejection handled while caller taken carries error",
+    "handler_cleanup": "only one last matching handler copy removed",
+    "known_scope": "Node18 floor is handled by3830 engine/matrix; no actual server/device run by Third"
+  }
+}
