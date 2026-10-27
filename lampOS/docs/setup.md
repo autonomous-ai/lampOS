@@ -883,6 +883,9 @@ its only way back once its package carries the unit.
   waiting for an address: only slow), `lamp-setup.service` and a Wi-Fi
   change from the app (busy), and while the hotspot is open the phones on it
   (`iw dev wlan0 station dump`; one that can't be counted counts as some).
+  This count and the station address (`ip -4 -o addr show`, also read every
+  second while joining) use the reset queries' five-second bound below: a
+  stalled or pipe-holding read is stopped and reads as none.
 - **The policy** (`crates/setup/src/recover.rs`, pure, tested in
   `tests/it/recover.rs`): 90 s off every known network, not joining one and
   not busy, opens the hotspot. Only slow or busy, the 90 s start again. The
