@@ -99,12 +99,18 @@ description: Once an hour, a slow warm breath of the light, a nudge to stand up.
 Once an hour while the lamp is quiet, its light breathes warm for a moment: time to stand up.
 '
 ANSWER=$(printf 'Here is the skill.\n\n```toml skill.toml\n%s```\n\n```markdown SKILL.md\n%s```\n' "$SKILL_TOML" "$SKILL_MD")
-# Its plan: its own machine for `machines`, an agent for `new`, and for `show` that answer.
+# Its plan: its own machine for `machines`, an agent for `new`, and for `show` that answer, from the agent `new` made
+# (another id is read as agent_mismatch, never as the answer); `wait` and `ps` say that agent is idle, as Harness does
+# (with no step the fixture prints nothing: wait_invalid_reply, status_invalid_reply).
 PLAN=$(python3 -c '
 import json, sys
-show = {"id": "22222222-2222-4222-8222-222222222222", "state": "idle", "ask": "Write one lamp skill",
+agent = "11111111-1111-4111-8111-111111111111"
+show = {"id": agent, "state": "idle", "ask": "Write one lamp skill",
         "answer": sys.argv[1], "truncated": False, "tools": 2}
-print(json.dumps({"machines": {"default": True}, "new": {"default": True}, "show": {"stdout": json.dumps(show)}}))
+waited = {"harnesses": [{"name": "lamp-task-1", "id": agent, "state": "idle", "next": []}]}
+listed = {"harnesses": [{"id": agent, "state": "idle", "lastActive": None, "about": "Wrote skill.toml and SKILL.md"}]}
+print(json.dumps({"machines": {"default": True}, "new": {"default": True}, "show": {"stdout": json.dumps(show)},
+                  "wait": {"stdout": json.dumps(waited), "delay_ms": 2000}, "ps": {"stdout": json.dumps(listed)}}))
 ' "$ANSWER")
 
 echo "make-skill $L  $(date -u +%Y-%m-%dT%H:%M:%SZ)  arms: $ARMS  fixture $(shasum -a 256 "$FIXTURE" | cut -c1-16)" | tee "$OUT"
