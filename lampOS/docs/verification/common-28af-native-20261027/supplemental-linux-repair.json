@@ -1,0 +1,14 @@
+{
+  "binary": "lamp-eyes::bin/lamp-eyes",
+  "test": "tests::guarded_capture_revokes_known_authority_without_revoking_its_enrollment_guard",
+  "status": "PASS",
+  "observed_outer_terminal_count": 1,
+  "outer_terminal_ordinal": 2835,
+  "retained_log_line": 3725,
+  "reported_test_duration_seconds": 0.004,
+  "not_acoustic_or_physical_latency": true,
+  "separate_from_112_and_525_maps": true,
+  "original_assertions": 8,
+  "new_negative_ticket_assertions": 1,
+  "coverage": "Ticketless publication refusal and invalid stale-source cleanup while preserving the enrollment guard; not valid V3 authority or live-grant revocation coverage."
+}

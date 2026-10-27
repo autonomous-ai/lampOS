@@ -1,0 +1,47 @@
+{
+  "ready_for_lamp_voice": false,
+  "result": "PASS",
+  "source": {
+    "checkout": "0bacfde9a344c1b7cd07d21cde6a23b1967daaa5",
+    "tree": "66435569942c9118e5bf84ee1e3dad89448e8b7a",
+    "parents": [
+      "bf6f7bbdf5e936c2ef82621e1bb7592d511c1453",
+      "28af4573a66c2844cdd0a91936d2eca8c566fd5b"
+    ],
+    "both_checkout_logs_and_API_agree": true
+  },
+  "published_source": {
+    "head": "28af4573a66c2844cdd0a91936d2eca8c566fd5b",
+    "authored_base": "36a42f30a756b6fd6f31c9b6102cb66e5008416c",
+    "tree": "364776260748a4c355cf625768c2065a32f510d0"
+  },
+  "run_id": 40513174138,
+  "artifact_id": 12738463524,
+  "artifact_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40513174138/artifacts/12738463524",
+  "compressed_bytes": 118424136,
+  "zip_sha256": "69d2bf72ec5c3fbd6487d02acfbda3c93ded125f730df564d1161947fdf634fb",
+  "API_upload_and_full_retained_ZIP_hash_agree": true,
+  "compressed_cap_bytes": 167772160,
+  "aggregate_uncompressed_cap_bytes": 1073741824,
+  "aggregate_uncompressed_bytes": 319247355,
+  "initial_free_bytes": 11748360192,
+  "required_payload_plus_reserve_bytes": 2265907784,
+  "download_command_exit": 0,
+  "verification_exit": 0,
+  "safe_archive_member_count": 51,
+  "payload_count": 50,
+  "workspace_binaries": 48,
+  "selected_examples": 2,
+  "all50_SHA256_CRC_ELF64_little_endian_AArch64_verified": true,
+  "unique_names_no_absolute_traversal_symlink_encryption_special_members": true,
+  "no_binary_extraction_or_execution": true,
+  "manifest_file": "validated-export-manifest.json",
+  "manifest_sha256": "2a9a70afcfc7fcbf51f2d81792a769d8e87390c7596b03780af37ce16582c62b",
+  "original_SHA256SUMS_sha256": "bcf9464ddaf51310ece5dbf70c610b3f9c26562424dbf2027d5aeda7efae3057",
+  "voice_eyes_sha256": {
+    "lamp-eyes": "16dd64d986d0d3e01fc038a6f81f04a8448ffd2125aa005a319b56b1b4201063",
+    "lamp-voice": "d63d6e188ee734f2e8bb08a48a654e3a522326af435c30760a50fab7de315854"
+  },
+  "private_supplemental_receipt_sha256": "db4e33a84afa28932a264c4a8d73ed658181f6d112daf23c758d9cef0c335b28",
+  "limits": "Same successful-build provenance only; no installed-pin, deployment, mixed-build, recognition, physical or later-source acceptance."
+}

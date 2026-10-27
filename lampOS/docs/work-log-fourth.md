@@ -1,3 +1,24 @@
+## 2026-10-27 14:02 UTC — Common 28af native gates and artifact integrity pass
+
+Ready for lamp-voice: no
+
+[Native receipt](verification/common-28af-native-20261027/receipt.json): ARM64
+40513174138 and Linux Clippy 40513174060 pass on actual merge `0bacfde9` /
+tree `66435569`, with parents `bf6f7bbd` and published `28af4573`. ARM records
+11,922 unique passes with zero failures, leaks, timeouts or duplicates, and
+106 summary skips. All 112 required controls and 525 current contracts pass
+once; 25 overlaps are not added. The supplemental Linux fixture passes once.
+Separate doctests give 4 passes across 47 targets, the relay reports one
+aggregate OK, and the process harness passes 13 cases. Artifact 12738463524
+verifies all 50 payload SHA-256/CRC values and ELF64/AArch64 headers without
+extraction or execution. [The new Voice/Eyes digests](verification/common-28af-native-20261027/artifact-integrity.json)
+apply only to this artifact. Earlier native and local failures and historical
+map qualification retain their own records. Latest-base and reader holds,
+#3564's second-landing composition P2 and Engine case, #3315's independent
+privacy disposition, installed matching pins and physical acceptance remain.
+Ready for lamp-voice: no.
+
+
 ## 2026-10-27 13:44 UTC — Common 364776 local gates and metadata fold complete
 
 Ready for lamp-voice: no
