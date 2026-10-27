@@ -17,10 +17,13 @@
 # 1. Each pad candidate is read with a pull-up and with a pull-down: a line
 #    that reads the same both ways is driven (a pad's chip), its level its
 #    rest and so its polarity; a floating line follows the pull and is no pad.
-# 2. Touch window: each line's changes away from its rest are counted, with
-#    the longest held.
-# 3. Quiet window: any change on a pad is counted against it, and an input
-#    still pressed at the end is stuck.
+# 2. Touch window: it opens at the person's first touch or press (the lamp
+#    asks for one and waits up to --wait-seconds), so nobody races a clock;
+#    each line's changes away from its rest are counted, with the longest held.
+# 3. Quiet window: it opens once nothing has been touched for --settle-seconds
+#    after the lamp says hands off (touches finishing late count as touches);
+#    then any change on a pad is counted against it, and an input still
+#    pressed at the end is stuck.
 # A pad: a driven candidate touched twice or held 0.5 s, still when quiet, as
 # steps.sh judges. Pass: two or more pads, the button and the reset each
 # pressed, nothing stuck. The privacy switch is recorded, moved or not.
@@ -95,22 +98,26 @@ class Voice:
             p.wait(timeout=20)
 
 
-def watch(inputs, seconds, every=0.01, cue=None):
+def watch(inputs, seconds, every=0.01, cue=None, settle=None):
     """Poll every input for seconds. inputs: name -> (Line, rest level).
     Per input: completed pulses away from rest, the longest, every change,
-    and whether it is away from rest at the end. cue: (at s, callable) once."""
+    and whether it is away from rest at the end. cue: (at s, callable) once.
+    settle: end early once every input has been at rest that many seconds."""
     out = {k: {"pulses": 0, "longest_s": 0.0, "changes": 0, "away_at_end": False} for k in inputs}
     away = {k: None for k in inputs}
     prev = {k: r for k, (_, r) in inputs.items()}
-    start = time.time()
+    start = last = time.time()
     while time.time() < start + seconds:
         now = time.time()
+        if settle and now - last >= settle and all(a is None for a in away.values()):
+            break
         if cue and now - start >= cue[0]:
             cue[1]()
             cue = None
         for k, (l, rest) in inputs.items():
             v = l.value()
             if v != prev[k]:
+                last = now
                 out[k]["changes"] += 1
                 if v != rest:
                     away[k] = now
@@ -128,11 +135,32 @@ def watch(inputs, seconds, every=0.01, cue=None):
     return out
 
 
+def merged(a, b):
+    """Two watches of the same inputs as one."""
+    return {k: {"pulses": a[k]["pulses"] + b[k]["pulses"], "longest_s": max(a[k]["longest_s"], b[k]["longest_s"]),
+                "changes": a[k]["changes"] + b[k]["changes"], "away_at_end": b[k]["away_at_end"]} for k in a}
+
+
+def first_touch(inputs, seconds, every=0.01):
+    """Wait for any input to leave its rest; True when one does."""
+    end = time.time() + seconds
+    while time.time() < end:
+        for l, rest in inputs.values():
+            if l.value() != rest:
+                return True
+        time.sleep(every)
+    return False
+
+
 def main():
     ap = argparse.ArgumentParser(description="Every input in one window (see the header).")
     ap.add_argument("--pins", default="/etc/lampOS/controls/controls-pins.json")
+    ap.add_argument("--wait-seconds", type=float, default=300.0,
+                    help="how long the lamp waits for the first touch that opens the touch window")
     ap.add_argument("--touch-seconds", type=float, default=30.0)
     ap.add_argument("--quiet-seconds", type=float, default=30.0)
+    ap.add_argument("--settle-seconds", type=float, default=3.0,
+                    help="after hands off, how long nothing is touched before the quiet window opens")
     ap.add_argument("--prompts", default="/var/lib/lamp-test/prompts")
     ap.add_argument("--speaker", default="device_speaker")
     ap.add_argument("--no-voice", action="store_true")
@@ -180,14 +208,29 @@ def main():
             held[key] = (l, l.value() if idle is None else idle)
             print(f"{key.lower()}: {chip} line {line}, now {'at rest' if l.value() == held[key][1] else 'PRESSED'}")
 
-        voice.say("factory_inputs_touch")
-        print(f"touch: {args.touch_seconds:g} s, touch each head pad, press the button and the reset briefly, "
-              f"any order", flush=True)
-        touch = watch(held, args.touch_seconds,
-                      cue=(args.touch_seconds - 10, lambda: voice.say("factory_padcheck_10")))
-        voice.say("factory_padcheck_rest")
-        print(f"quiet: {args.quiet_seconds:g} s, hands off", flush=True)
-        quiet = watch(held, args.quiet_seconds)
+        voice.say("factory_inputs_wait")
+        print(f"waiting up to {args.wait_seconds:g} s for the first touch or press", flush=True)
+        if not first_touch(held, args.wait_seconds):
+            started = False
+        else:
+            started = True
+            voice.say("factory_inputs_touch")
+            print(f"touch: {args.touch_seconds:g} s from the first touch, touch each head pad, press the button "
+                  f"and the reset briefly, any order", flush=True)
+        if started:
+            # The first touch is still under the hand: watch() starts from rest, so it counts.
+            touch = watch(held, args.touch_seconds,
+                          cue=(args.touch_seconds - 10, lambda: voice.say("factory_padcheck_10")))
+            voice.say("factory_padcheck_rest")
+            # Touches finishing after "hands off" are touches: the quiet window
+            # waits for nothing to be touched for --settle-seconds (at most 60 s).
+            late = watch(held, 60, settle=args.settle_seconds)
+            touch = merged(touch, late)
+            print(f"quiet: {args.quiet_seconds:g} s, hands off (opened after {args.settle_seconds:g} s untouched)", flush=True)
+            quiet = watch(held, args.quiet_seconds)
+        else:
+            touch = quiet = {k: {"pulses": 0, "longest_s": 0.0, "changes": 0, "away_at_end": False} for k in held}
+            print(f"nobody touched the lamp within {args.wait_seconds:g} s", flush=True)
     finally:
         for l, _ in held.values():
             l.close()

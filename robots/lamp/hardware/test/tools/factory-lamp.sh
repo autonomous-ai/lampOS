@@ -98,10 +98,10 @@ kit() {
   local stage want; stage=$(mktemp -d); cp "$STEPS" "$stage/steps.sh"
   want=$(shasum -a 256 "$STEPS" | cut -c1-64)
   put "$stage/steps.sh" "$HERE/factory-run.sh" "$HERE/factory-voice.py" "$HERE/head-nudge.py" \
-      "$HERE/input-check.py" "$PROMPTS"/factory_*.wav >/dev/null || { rm -rf "$stage"; return 1; }
+      "$HERE/input-check.py" "$HERE/ring-check.py" "$PROMPTS"/factory_*.wav >/dev/null || { rm -rf "$stage"; return 1; }
   rm -rf "$stage"
   lamp "mkdir -p /var/lib/lamp-test/prompts && mv /tmp/factory_*.wav /var/lib/lamp-test/prompts/ &&
-        mv /tmp/steps.sh /tmp/factory-run.sh /tmp/factory-voice.py /tmp/head-nudge.py /tmp/input-check.py /home/orangepi/ &&
+        mv /tmp/steps.sh /tmp/factory-run.sh /tmp/factory-voice.py /tmp/head-nudge.py /tmp/input-check.py /tmp/ring-check.py /home/orangepi/ &&
         chmod 0755 /home/orangepi/steps.sh /home/orangepi/factory-run.sh &&
         sha256sum /home/orangepi/steps.sh | grep -q ^$want" >/dev/null
 }

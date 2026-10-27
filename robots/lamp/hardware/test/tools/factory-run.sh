@@ -9,9 +9,10 @@
 #                                (the arm stand), every input in one window
 #                                (input-check.py: head pads, button, reset,
 #                                privacy), step 3 (the key), 4d (--gaze)
-#   factory-run.sh selftest ID   lamp set up from the app: step 4 (4c4); with
-#                                RESET=yes, a passed self-test's reset is
-#                                answered too, after the record is written
+#   factory-run.sh selftest ID   lamp set up from the app: step 4 (4c4), the
+#                                ring judged within 4 s; with RESET=yes a
+#                                passed lamp is reset for packing, after its
+#                                record is written, as steps.sh resets it
 #   factory-run.sh note ID K=V…  set keys in the record (used before a reset)
 #
 # On the lamp, in /var/lib/lamp-test (outside the reset's wipe list, so it
@@ -20,8 +21,13 @@
 #   factory-run.log     everything the steps printed
 #   factory-run.status  RUNNING <step> | PASS <mode> | FAIL <mode>: <why>
 #
+# The ring: a colour drawn within 4 s passes (the hardware lead, 27 Oct);
+# when lamp-selftest fails only the ring (it allows 1 s), ring-check.py
+# decides it.
+#
 # Needs in /home/orangepi: steps.sh, factory-voice.py, head-nudge.py,
-# input-check.py; the prompts in /var/lib/lamp-test/prompts. As root.
+# input-check.py, ring-check.py; the prompts in /var/lib/lamp-test/prompts.
+# As root.
 set -uo pipefail
 
 MODE=${1:-}; ID=${2:-}
@@ -65,23 +71,44 @@ say "start $MODE on $(hostname), lamp $ID"
 if [[ $MODE == selftest ]]; then
   status "RUNNING 4c4 self-test"
   [[ -e /var/lib/lampos-setup/done ]] || fail "not set up from the app: step 4 runs on a set-up lamp"
-  # The record is written before the reset is answered: the lamp reboots at once.
-  extra=()
-  if [[ ${RESET:-no} == yes ]]; then
-    extra=(--auto-reset --before-reset "$0 note $ID FACTORY_4C4=PASS RESULT_SELFTEST=PASS RESET=answered")
-  fi
-  steps "${extra[@]}" -- ./steps.sh --unit-id "$ID" --write --from 4
-  rc=$?
+  began=$(date +%s)
+  # steps.sh's reset question is answered no: this decides the ring and
+  # resets the lamp itself, the way steps.sh would.
+  steps --decline-reset -- ./steps.sh --unit-id "$ID" --write --from 4
   latest=$(ls -t /var/lib/lampOS/selftest/*.json 2>/dev/null | grep -v latest | head -1)
-  failed=$(jq -r '[.. | objects | select(.verdict? == "fail" and (.part // "") != "" and .part != "selftest") | .part] | join(",")' "$latest" 2>/dev/null)
-  unchecked=$(jq -r '[.. | objects | select(.verdict? == "not_checked" and (.part // "") != "" and .part != "selftest") | .part] | join(",")' "$latest" 2>/dev/null)
+  [[ -n $latest && $(stat -c %Y "$latest") -ge $began ]] || fail "step 4 did not run the self-test (see the log)"
+  parts() { jq -r --arg v "$1" '[.. | objects | select(.verdict? == $v and (.part // "") != "" and .part != "selftest") | .part] | join(",")' "$latest"; }
+  failed=$(parts fail); unchecked=$(parts not_checked)
   rec "SELFTEST_FAILED=${failed:-none}" "SELFTEST_NOT_CHECKED=${unchecked:-none}" "SELFTEST_RECORD=$latest"
-  if [[ $rc == 0 ]]; then
-    rec "FACTORY_4C4=PASS" "RESULT_SELFTEST=PASS" "RESULT_SELFTEST_AT=$(date '+%F %T %z')"
-    status "PASS selftest"
-  else
-    [[ -n $failed ]] && fail "self-test failed: $failed" || fail "step 4 stopped (exit $rc)"
+  # The ring: the hardware lead accepts a colour drawn within 4 s (#3530,
+  # 27 Oct); lamp-selftest allows 1 s. When it is the only failed part,
+  # ring-check.py decides it.
+  if [[ $failed == ring ]]; then
+    status "RUNNING ring within 4 s"
+    out=$(python3 "$HOME_DIR/ring-check.py" 2>&1); rc=$?; echo "$out"
+    mapfile -t ring < <(sed -n 's/^RECORD //p' <<<"$out"); rec "${ring[@]}"
+    [[ $rc == 0 ]] && failed="" || fail "ring: $(sed -n 's/^RECORD RING=//p' <<<"$out")"
   fi
+  [[ -z $failed ]] || fail "self-test failed: $failed"
+  rec "FACTORY_4C4=PASS" "RESULT_SELFTEST=PASS" "RESULT_SELFTEST_AT=$(date '+%F %T %z')"
+  if [[ ${RESET:-no} != yes ]]; then
+    status "PASS selftest (not reset: RESET=yes resets it for packing)"; exit 0
+  fi
+  # As steps.sh resets after a passed step 4: the lamp stopped first and each
+  # part waited on (a part writing as it stops wrote back into what the reset
+  # had just emptied, lamp-29e7 on 26 Oct), the path unit first, then
+  # lamp-setup's reset-now in a unit of its own, which reboots into setup.
+  status "RUNNING reset"
+  listed=$(systemctl show -p ConsistsOf --value lampos.target) || fail "the lamp's parts could not be read to stop them before the reset"
+  read -ra lamp_parts <<<"$listed"
+  systemctl stop lampos-setup-done.path && systemctl stop lampos.target ${lamp_parts[@]+"${lamp_parts[@]}"} \
+    || fail "the lamp could not be stopped before the reset"
+  rec "RESET=started $(date '+%F %T %z')"
+  status "PASS selftest, resetting"
+  speak factory_resetting
+  systemd-run --no-block --collect --unit=lamp-setup-wipe --property=Type=oneshot \
+    /opt/lampOS/setup/current/lamp-setup reset-now --plan /etc/lampOS/setup/reset-plan.json --enable \
+    || fail "could not start the reset: hold the button 5 s"
   exit 0
 fi
 

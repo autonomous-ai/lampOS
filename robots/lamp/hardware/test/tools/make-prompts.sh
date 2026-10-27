@@ -72,7 +72,8 @@ factory_reset_ready|Say yes to reset me for packing.
 factory_resetting|Resetting now. Remove me from the factory account, then pack me.
 factory_failed|A step failed. Please check the laptop.
 factory_all_done|All steps done. Thank you.
-factory_inputs_touch|Input test. For thirty seconds, touch each head pad, press my button, and press the reset button briefly. Any order, as many times as you like.
+factory_inputs_wait|Input test. Touch any head pad or press my button to begin.
+factory_inputs_touch|Thirty seconds. Touch each head pad, press my button, and press the reset button briefly. Any order, as many times as you like.
 factory_padcheck_10|Ten seconds left.
 factory_padcheck_rest|Now hands off me for thirty seconds. Do not touch.
 factory_inputs_done|Inputs recorded.

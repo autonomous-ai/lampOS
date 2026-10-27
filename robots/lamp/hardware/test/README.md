@@ -154,7 +154,9 @@ tools/factory-lamp.sh collect 3e83 29e7 75c9   # one table: factory-records.csv
 
 The person answers nothing: each question is said, then "Starting in five seconds", then answered (`factory-voice.py --auto`).
 
-**The self-test (step 4)** runs on set-up lamps in parallel. With `RESET=yes`, a passed lamp's reset is answered too, after its record is written, since the lamp reboots at once.
+**The self-test (step 4)** runs on set-up lamps in parallel.
+- **The ring:** the hardware process accepts a colour drawn **within 4 s**; lamp-selftest allows 1 s, which can't be changed. When the ring is the self-test's only failed part, `ring-check.py` decides it. Any other failed part fails the lamp.
+- **The reset:** with `RESET=yes`, a passed lamp is reset for packing the way `steps.sh` resets it. Its record is written first; then the lamp is stopped and each part waited on, then `lamp-setup reset-now` runs as `lamp-setup-wipe`.
 
 **On the lamp, in `/var/lib/lamp-test`** (outside the reset's wipe list, so it survives the 5 s reset):
 - `factory.env` — the record:
@@ -174,9 +176,10 @@ sudo python3 input-check.py            # 30 s touch and press, 30 s hands off, w
 sudo python3 input-check.py --dry-run  # the same reading, nothing written
 ```
 
-**The windows:**
-- **30 s touch.** The lamp says: "Input test. For thirty seconds, touch each head pad, press my button, and press the reset button briefly. Any order, as many times as you like."
-- **30 s hands off.**
+**The windows** (nobody races a clock):
+1. **Waiting.** The lamp says "Input test. Touch any head pad or press my button to begin." and waits up to 5 min (`--wait-seconds`).
+2. **30 s touch,** from that first touch, which counts: "Thirty seconds. Touch each head pad, press my button, and press the reset button briefly. Any order, as many times as you like."
+3. **Hands off.** After "Now hands off me", touches finishing late still count as touches. The 30 s quiet window opens only once nothing has been touched for 3 s (`--settle-seconds`).
 
 **What it reads:**
 - the four pad candidates, each probed with both pulls (a driven line is a pad's chip, and its level is its rest);
@@ -192,6 +195,22 @@ The privacy switch is recorded whether or not it moved.
 **What it writes:** the pads into the pins file exactly as `steps.sh` step 2 writes them (`head_pads` and `head_rest`, which lamp-controls reads, #711), with the profile kept beside. Every result goes out as `RECORD` lines for `factory.env`.
 
 **lamp-controls is stopped** while the lines are read, so a reset held here resets nothing.
+
+## `tools/ring-check.py`: the ring, each colour within 4 s
+
+```bash
+sudo python3 ring-check.py               # a set-up lamp: the ten colours, 4 s each at most
+sudo python3 ring-check.py --within 2    # a stricter bound
+```
+
+- **The bound:** the hardware process's ring check (the hardware lead, #3530, 27 Oct). lamp-selftest's ring allows 1 s (`DRAWN_WITHIN` in `crates/selftest/src/ring.rs`); on lamp-29e7 on 7071 it failed three runs in a row with colours late.
+- **How:**
+  - Each of the self-test's ten colours is asked for exactly as lamp-selftest asks: `lamp_msgs/Light` on `light/test`, level 3, asked again every second.
+  - It is seen on `light/drawn`, from the ring owner's own write receipts.
+  - The bus is spoken directly (docs/bus.md), because the image has no `lamp-bus` binary.
+- **Records** `RING` and `RING_DRAW_S`, each colour's time.
+- **Exit:** 0 all in time, 1 some not, 3 none drawn (the privacy switch closed, or a turn owns the ring).
+- **Test:** `tools/ring-check-test.py` tests it against a stand-in ring owner (no lamp).
 
 ## `tools/head-nudge.py`: a head off its stop
 
