@@ -1,0 +1,545 @@
+{
+  "api_snapshot": {
+    "base": "a808ef04b5885ccb35e8e7693eee16ae331e3a7f",
+    "draft": false,
+    "head": "b2d2dfb0b462875470c0f2895c5b2d095d5eb3a4",
+    "sha256": "65edd12dc0753d8980d44b771c64270a9bb679ad4b25c19c3772f3e13cf84b9e",
+    "state": "OPEN"
+  },
+  "authored_parent": "af546143a9d30f3b3062bb7a6efbc215e3bfcef3",
+  "disposition": "HOLD_REMAINING_UNKNOWN_STATE_AND_GUARD_STATUS",
+  "evidence_sha256": {
+    "api-current.json": "65edd12dc0753d8980d44b771c64270a9bb679ad4b25c19c3772f3e13cf84b9e",
+    "blocked-tools/afplay": "177f1ecdde05e0ae8b652249075afcd0ff736f684d46b357cf7978b09ac6fb6f",
+    "blocked-tools/curl": "177f1ecdde05e0ae8b652249075afcd0ff736f684d46b357cf7978b09ac6fb6f",
+    "blocked-tools/nc": "177f1ecdde05e0ae8b652249075afcd0ff736f684d46b357cf7978b09ac6fb6f",
+    "blocked-tools/ncat": "177f1ecdde05e0ae8b652249075afcd0ff736f684d46b357cf7978b09ac6fb6f",
+    "blocked-tools/say": "177f1ecdde05e0ae8b652249075afcd0ff736f684d46b357cf7978b09ac6fb6f",
+    "blocked-tools/scp": "177f1ecdde05e0ae8b652249075afcd0ff736f684d46b357cf7978b09ac6fb6f",
+    "blocked-tools/sftp": "177f1ecdde05e0ae8b652249075afcd0ff736f684d46b357cf7978b09ac6fb6f",
+    "blocked-tools/socat": "177f1ecdde05e0ae8b652249075afcd0ff736f684d46b357cf7978b09ac6fb6f",
+    "blocked-tools/ssh": "177f1ecdde05e0ae8b652249075afcd0ff736f684d46b357cf7978b09ac6fb6f",
+    "blocked-tools/sshpass": "177f1ecdde05e0ae8b652249075afcd0ff736f684d46b357cf7978b09ac6fb6f",
+    "blocked-tools/sudo": "177f1ecdde05e0ae8b652249075afcd0ff736f684d46b357cf7978b09ac6fb6f",
+    "blocked-tools/systemctl": "177f1ecdde05e0ae8b652249075afcd0ff736f684d46b357cf7978b09ac6fb6f",
+    "blocked-tools/systemd-run": "177f1ecdde05e0ae8b652249075afcd0ff736f684d46b357cf7978b09ac6fb6f",
+    "blocked-tools/wget": "177f1ecdde05e0ae8b652249075afcd0ff736f684d46b357cf7978b09ac6fb6f",
+    "guard-query17-generate.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "guard-query17-generate.started.json": "84c68356b74a9e2762cb5e8a91e9fc218a70c4fd387fd9ebff1ca26914bbb17f",
+    "guard-query17-generate.terminal.json": "09f9e29d19f051f61108d1756a247cfc96f109e6f95818ad638126a0c2a2b505",
+    "guard-query17-setup.log": "76981f518b9429691e4e897dea246e35cb21348aa3aecdf4da768676a90aeb82",
+    "guard-query17-setup.started.json": "d324deb99382a5fa78e194de0be60db9565a270bc05be240f06e5db293b7dead",
+    "guard-query17-setup.terminal.json": "03c9ed43e1fb9742877839a1fe103fc2be32b52ba14d0b978075e1b7e7974d9e",
+    "guard-query17.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "guard-query17.started.json": "59507d956bfb82ec710fc0efb66c9cbc0011f5ed100d3669af41d0cd06f0bbce",
+    "guard-query17.terminal.json": "4ee8973f0becbb372bca17b7f4cbd7c87aa4cbbecc6fd938b54c05fab3e7c6ce",
+    "guard-query17/events": "31f98d0bd26744227d8859ad9e86215299002337de824f725be55e7ce443afcc",
+    "guard-query17/exact-generate.sh": "9e81b5c90384c3c43fbfd216eb638d6920e03059d92840d33afad74f02687ce2",
+    "guard-query17/exact-generated-guard.sh": "68b2087a8662eaebca4c51dd0e05c9cdcc38d20f8797ec39a80c975adb6d26ef",
+    "guard-query17/guard-argv.json": "fcd7e188e3ac91f605b8e34fb82fb1d8e51672a8e340b932621f7dcbe791ac4c",
+    "guard-query17/mock/chown": "306c6ca7407560340797866e077e053627ad409277d1b9da58106fce4cf717cb",
+    "guard-query17/mock/systemctl": "62495e87e14c8f03dd5a2cb330669cbdbeec4b57cccef4c88beb675f93221cf0",
+    "guard-query17/mock/systemd-run": "b775fccc152cc56a1065348c5bc19e299eec29669f979137b67e33d207dc9b2f",
+    "guard-query17/observed-result.json": "b5a69a1047933bceec94572f1d350a883a739846c701365b55ed91f0e483f00f",
+    "guard-query17/tasks": "e1c1953764acec09e22907e84569e0c630825198c96412ff88165be3243d71b7",
+    "guard-query17/voice/made-skills/own/skill.toml": "39ddff9d0c542c61eafd8bfec84db58e86131194e8ef24fb40b5fe2a515c2d6b",
+    "guard-query17/voice/tasks-told": "cfcbe12743cb83a49d99db09292006fffca6baff29515db4a952a22ea5ab67c2",
+    "guard-stop17-generate.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "guard-stop17-generate.started.json": "9b6ca5125d6f24f4bb5c3d13b7a30f27bd6041fd6a7f92117cdbeac37f5dfa6f",
+    "guard-stop17-generate.terminal.json": "6ee1e8dd2a58b5665d3a4109191b9cf1a479fefc6f81dea7e9e1b57d881cd0fa",
+    "guard-stop17-setup.log": "3bd2053dfdb8c79d8f05fce85e9fc18e8d493a9095b722c58eae88e8fe1d5acf",
+    "guard-stop17-setup.started.json": "94c9d00043cff7a6549b0c8faac87121ea3d9a310187cdbe5317da8eda0c0564",
+    "guard-stop17-setup.terminal.json": "7deaf8a2559d014a1f1a7170c284f2603de768f656db61fc9eae7874e947fa98",
+    "guard-stop17.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "guard-stop17.started.json": "45c5f264b802313b0daed768efdc3148c62ea748ea7d5371418597cb7afe0e06",
+    "guard-stop17.terminal.json": "3f3d362cb7e9b36513039b09bbae7f3483fcec52ae2cdbca9015a016748c36c5",
+    "guard-stop17/events": "dd2b7c9fb3327fb016d86b47a1570ac6092487ce42178d5d177a29771c55cfdf",
+    "guard-stop17/exact-generate.sh": "3e9471581386e696d7e6fd885973143a950a325ebfdb607f804d565c8d634fce",
+    "guard-stop17/exact-generated-guard.sh": "b9809f5a886e904e73a4055daa8e934f7c4e5edfe01491709c262f11dc304fbb",
+    "guard-stop17/guard-argv.json": "c9d6a0119a77584593a08b63ec9054ba303a040b57940ce041e40ca3f3acd691",
+    "guard-stop17/mock/chown": "306c6ca7407560340797866e077e053627ad409277d1b9da58106fce4cf717cb",
+    "guard-stop17/mock/systemctl": "62495e87e14c8f03dd5a2cb330669cbdbeec4b57cccef4c88beb675f93221cf0",
+    "guard-stop17/mock/systemd-run": "b775fccc152cc56a1065348c5bc19e299eec29669f979137b67e33d207dc9b2f",
+    "guard-stop17/observed-result.json": "d7f7b8289460ff1ffbd75d29c3fb4d87076673d563ee79f060681239c9c8e54d",
+    "guard-stop17/saved/done": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "guard-stop17/saved/kinds": "77dc55ed39fce50945647fdddc468328a83898c23d7eb0cc25bf6000db4db42f",
+    "guard-stop17/saved/made-skills/own/skill.toml": "39ddff9d0c542c61eafd8bfec84db58e86131194e8ef24fb40b5fe2a515c2d6b",
+    "guard-stop17/saved/restore": "fcbf5b1d6b170b4210866abb2f5409aa7cfa3dc594ed2335cd343157af7a0c94",
+    "guard-stop17/saved/tasks-told": "cfcbe12743cb83a49d99db09292006fffca6baff29515db4a952a22ea5ab67c2",
+    "guard-stop17/tasks": "e1c1953764acec09e22907e84569e0c630825198c96412ff88165be3243d71b7",
+    "guard-stop17/voice/made-skills/own/skill.toml": "dd78187d71a28ec1dd51d981635adb3084fa3e5f07b7a69e6440ec9a30a7e4bf",
+    "guard-stop17/voice/tasks-told": "e588336c59df95ba51628b797153afbfcbb676e8dc69219db645e20ca374d495",
+    "main-query17-generate.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "main-query17-generate.started.json": "cd3e5ee47af73c3bc6e02105cbc73f525ee43a46aaaaa3dc78ef642f691f87f6",
+    "main-query17-generate.terminal.json": "daf301780eefd6f1eb2fea2601be9a050ab5d13ea4ab1844a5b0f8a77f3ef337",
+    "main-query17.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "main-query17.started.json": "c7b5a0f18b012e58d102234ad8187411085aa983f2f02469c2f9e0cce54525bd",
+    "main-query17.terminal.json": "4c3365226a1eccf606c393e1e9904531f87567d22022e257d739bff50df248b8",
+    "main-query17/events": "71b17e56d4d3c8ccdbd87ef57f724c199f71475b7a52eb83509ddc6e3a9d65b1",
+    "main-query17/exact-generate.sh": "84db40ebda8a7d79a777b3c1b5889d1330a7a5229dd79ed8cd744bbc64e9df0d",
+    "main-query17/exact-put-back.sh": "13eabcdaf66d12a8d4638f1ee1a35624c263f55504011e236acca7fb8d83c9f9",
+    "main-query17/local-command": "2f6d0cacb62010ed4db840c23936008cc450fa46b4f5e0ded6b94fc2d1285570",
+    "main-query17/mock/chown": "306c6ca7407560340797866e077e053627ad409277d1b9da58106fce4cf717cb",
+    "main-query17/mock/sh": "89474e57162a953d2d4ffbc8c7a1cd708a481871909e94271d0b481109d8b52b",
+    "main-query17/mock/systemctl": "62495e87e14c8f03dd5a2cb330669cbdbeec4b57cccef4c88beb675f93221cf0",
+    "main-query17/observed-result.json": "d13fad7a51b165e4a5e5a56a77472a824323e066f2ff0102bbbf71bbbe5fed23",
+    "main-query17/voice/made-skills/own/skill.toml": "39ddff9d0c542c61eafd8bfec84db58e86131194e8ef24fb40b5fe2a515c2d6b",
+    "main-query17/voice/tasks-told": "cfcbe12743cb83a49d99db09292006fffca6baff29515db4a952a22ea5ab67c2",
+    "old-evidence-before.json": "18a108a150f4b16823d50ec4995164a7ad736f3f0184be17c9e7a3fa36f61165",
+    "postguards.json": "852df0fcbdf020b86db9816fc31d42b807ba2b336924d4c29f8b2e3da64e1dd0",
+    "preguards.json": "c174f12b4a1ca50734e0ba13d91388d1443ed4841845b668f2d2dfaf87b8d2e8",
+    "probe-query-failure.py": "06a10302ff4daa5de0480b56c6a8e674a649cbc23e8aabce5a5506a50d1ae89b",
+    "query-failure-HOLD.json": "b620f8d0a8f82c5730a5f57c292180e243c50849e5bc5d8f0289d4b4065d9023",
+    "repair-diff.patch": "490f05327dc28af7b511fb1ae03c5a79df9d83fee5bfc62fc0bc7b60c2197d9e",
+    "source-before.json": "7bdaafa2f7fe8d9bc10e199f7e0c9193539fe03e7e63351b44e9d7c81cb53a80"
+  },
+  "findings": [
+    {
+      "limit": "Injected command behavior, not an observed real-systemd failure, live writer or storage failure; no cause inferred for old a896.",
+      "observed": "Both exact subjects restore saved owner bytes over current temporary bytes, delete the only saved copy and exit0. Restart/cleanup are attempted.",
+      "severity": "P2",
+      "source": [
+        {
+          "line": 189,
+          "path": "lampOS/tools/played/make-skill.sh"
+        },
+        {
+          "line": 141,
+          "path": "lampOS/tools/played/stand-in.sh"
+        }
+      ],
+      "title": "Any nonzero state-query result admits destructive restore",
+      "trigger": "systemctl stop exits0, then systemctl is-active -q exits17 to simulate unknown/query failure. Shell ! turns the query failure into success."
+    },
+    {
+      "observed": "Subject still exits0. Committed gone control checks retained files/cleanup but does not assert guard status.",
+      "severity": "companion preservation-status fault; Root assigns public priority",
+      "source": [
+        {
+          "line": 143,
+          "path": "lampOS/tools/played/stand-in.sh"
+        },
+        {
+          "line": 427,
+          "path": "lampOS/tools/played/make-skill-test.sh"
+        }
+      ],
+      "title": "Generated guard masks preservation refusal with cleanup success",
+      "trigger": "Guard stop exits17. New && correctly skips restore, preserving original backup and live bytes. Subsequent start/reload/restart/rm succeeds."
+    }
+  ],
+  "fixed_vs_prior_a896": [
+    "The guard stop17 no longer overwrites/deletes backup: independently confirmed by the separate guard-stop17 subject.",
+    "Main stop17 and active-query0 are refused in source and have committed controls, but were not independently rerun after the blocking unknown-state finding.",
+    "Immediate start attempt follows either outcome and out moves unguard after restart/removal; source improvement is separate from confirming successful real-service recovery."
+  ],
+  "guards": {
+    "blocked_actual_tool_attempts": 0,
+    "current_worktree_clean": true,
+    "old_receipts_unchanged": true,
+    "source_tool_helper_bookends_unchanged": true,
+    "tracked_played_source_count": 35
+  },
+  "head": "b2d2dfb0b462875470c0f2895c5b2d095d5eb3a4",
+  "limitations": [
+    "Main out is a recorded local cleanup stub; it was not claimed to execute actual stand-in out.",
+    "Guard setup and generated guard execute actual current stand-in.sh with temp remote/units/tasks and local systemctl/systemd-run/chown. Cleanup filesystem effects are observed.",
+    "No arbitrary subject rerun to change receipt. InitialworktreeEPERM is setup-only, succeeded under authorized escalation; olda896 controller1/subjects0 remain intact."
+  ],
+  "native_handle": {
+    "all8groups_absent": true,
+    "exit": 0,
+    "session_id": 44757,
+    "subject_retries": 0,
+    "subject_runs": 3
+  },
+  "not_run": [
+    "Official committed focused selector",
+    "stand-in56",
+    "syntax",
+    "full suite",
+    "Cargo/sharedbank/nativeCI/device/network/service/audio"
+  ],
+  "old_a896_receipts_unchanged": {
+    "publication-stop-failure-HOLD.json": "0a074b3463d453c92f8d4db13ca08ebfeee56972023e30a8faaf1869233c9a9c",
+    "source-review-and-repair-plan.json": "4575836261a87f9269a4fd3de82178ed8239fa76957311b6893a89435fd86173"
+  },
+  "owned_source_bindings": {
+    "lampOS/tools/played/README.md": {
+      "current_b2": {
+        "git_mode_blob": "100644 blob 2c0c16e7e548d35eddedc19a6e10838022c0051f",
+        "sha256": "4402653ddeafd5eb53599b7c4c59d8b924d673188830efb92fa491ab5a3f9cb6"
+      },
+      "prior_a896": {
+        "git_mode_blob": "100644 blob 1eb1baddf79b5b3242d11ea889261666d21be744",
+        "sha256": "99015aab9e30c0e56d3942423205a6714db2ffe75720c01eb44f4b6a12f9d23a"
+      }
+    },
+    "lampOS/tools/played/make-skill-test.sh": {
+      "current_b2": {
+        "git_mode_blob": "100755 blob 555d1fa34eac2e800bd64d40c7d3b99fa9433d2f",
+        "sha256": "34954e67072e8eb75cfde7e815470e21a45f52a3a5fa21209eeb2775812a3516"
+      },
+      "prior_a896": {
+        "git_mode_blob": "100755 blob 095d18a791cba1819f2bec087e3f81c31b3358a1",
+        "sha256": "a25447a77c37534b9cf29a1562860f42f2dab3e00e55976d39300db6492ddd16"
+      }
+    },
+    "lampOS/tools/played/make-skill.sh": {
+      "current_b2": {
+        "git_mode_blob": "100755 blob 639a5185f8003329539e5e89ae8ae87355327589",
+        "sha256": "ab3baaea1c9528baa28c0ef76dde02c14d398a11a269c04291152152a9f087e5"
+      },
+      "prior_a896": {
+        "git_mode_blob": "100755 blob 5cde28e71d4611728bd64ea83385c898123284bf",
+        "sha256": "ffa1ecb7cb2bfcc46d839d86c726b606e43e005b9147321272e9dc8d274da45c"
+      }
+    },
+    "lampOS/tools/played/stand-in.sh": {
+      "current_b2": {
+        "git_mode_blob": "100755 blob 50ba11525c6249170c64f0359c55b6952374b714",
+        "sha256": "a34d0eab49d26c568dc9bdd634245cf38a5ce7736cddefdcfa45807ac37bce8b"
+      },
+      "prior_a896": {
+        "git_mode_blob": "100755 blob 6d050281b4e8344e434f0d221bf48cf34f26966f",
+        "sha256": "320d8ad18cf594a406f355665833642370f0347cb539f6f03f6b7085ca5b1ac5"
+      }
+    }
+  },
+  "publication_actions": "No comments, product edits, commits or pushes.",
+  "raw_probe_receipt": {
+    "blocked_actual_tool_attempts": 0,
+    "cases": [
+      {
+        "actual_generated_restore_sha256": "528aa678d5ac880743615a7f45afed855fbeb9a0d10d1b31b7d7b7b34a2c888e",
+        "backup_after_done_exists": false,
+        "backup_after_exists": false,
+        "case": "main-query17",
+        "cleanup_attempted": true,
+        "dropin_after_exists": false,
+        "exact_command_file": "main-query17/exact-put-back.sh",
+        "injected_query": 17,
+        "injected_stop": 0,
+        "live_after_sha256": "39ddff9d0c542c61eafd8bfec84db58e86131194e8ef24fb40b5fe2a515c2d6b",
+        "live_before_sha256": "dd78187d71a28ec1dd51d981635adb3084fa3e5f07b7a69e6440ec9a30a7e4bf",
+        "original_saved_sha256": "39ddff9d0c542c61eafd8bfec84db58e86131194e8ef24fb40b5fe2a515c2d6b",
+        "remote_after_exists": false,
+        "restart_attempted": true,
+        "setup_events": [],
+        "subject_events": [
+          "SYSTEMCTL stop lamp-voice",
+          "STOP_EXIT_0",
+          "SYSTEMCTL is-active -q lamp-voice",
+          "QUERY_EXIT_17",
+          "RESTORE_ATTEMPT",
+          "SYSTEMCTL start lamp-voice",
+          "OUT_CLEANUP_ATTEMPT"
+        ],
+        "subject_exit": 0
+      },
+      {
+        "actual_generated_restore_sha256": "e7a191faa58848080416692ecceaeac3216a760037819b65386f580890001857",
+        "backup_after_done_exists": false,
+        "backup_after_exists": false,
+        "case": "guard-query17",
+        "cleanup_attempted": true,
+        "dropin_after_exists": false,
+        "exact_command_file": "guard-query17/exact-generated-guard.sh",
+        "injected_query": 17,
+        "injected_stop": 0,
+        "live_after_sha256": "39ddff9d0c542c61eafd8bfec84db58e86131194e8ef24fb40b5fe2a515c2d6b",
+        "live_before_sha256": "dd78187d71a28ec1dd51d981635adb3084fa3e5f07b7a69e6440ec9a30a7e4bf",
+        "original_saved_sha256": "39ddff9d0c542c61eafd8bfec84db58e86131194e8ef24fb40b5fe2a515c2d6b",
+        "remote_after_exists": false,
+        "restart_attempted": true,
+        "setup_events": [
+          "SYSTEMCTL cat lamp-tasks",
+          "SYSTEMCTL show -p User -p Group lamp-tasks",
+          "SYSTEMCTL stop zz-played-stand-in-guard.timer",
+          "SYSTEMCTL reset-failed zz-played-stand-in-guard.timer zz-played-stand-in-guard.service",
+          "SYSTEMCTL daemon-reload",
+          "SYSTEMCTL restart lamp-tasks lamp-voice"
+        ],
+        "subject_events": [
+          "SYSTEMCTL stop lamp-voice",
+          "STOP_EXIT_0",
+          "SYSTEMCTL is-active -q lamp-voice",
+          "QUERY_EXIT_17",
+          "SYSTEMCTL start lamp-voice",
+          "SYSTEMCTL daemon-reload",
+          "SYSTEMCTL restart lamp-tasks lamp-voice"
+        ],
+        "subject_exit": 0
+      },
+      {
+        "actual_generated_restore_sha256": "fcbf5b1d6b170b4210866abb2f5409aa7cfa3dc594ed2335cd343157af7a0c94",
+        "backup_after_done_exists": true,
+        "backup_after_exists": true,
+        "case": "guard-stop17",
+        "cleanup_attempted": true,
+        "dropin_after_exists": false,
+        "exact_command_file": "guard-stop17/exact-generated-guard.sh",
+        "injected_query": 3,
+        "injected_stop": 17,
+        "live_after_sha256": "dd78187d71a28ec1dd51d981635adb3084fa3e5f07b7a69e6440ec9a30a7e4bf",
+        "live_before_sha256": "dd78187d71a28ec1dd51d981635adb3084fa3e5f07b7a69e6440ec9a30a7e4bf",
+        "original_saved_sha256": "39ddff9d0c542c61eafd8bfec84db58e86131194e8ef24fb40b5fe2a515c2d6b",
+        "remote_after_exists": false,
+        "restart_attempted": true,
+        "setup_events": [
+          "SYSTEMCTL cat lamp-tasks",
+          "SYSTEMCTL show -p User -p Group lamp-tasks",
+          "SYSTEMCTL stop zz-played-stand-in-guard.timer",
+          "SYSTEMCTL reset-failed zz-played-stand-in-guard.timer zz-played-stand-in-guard.service",
+          "SYSTEMCTL daemon-reload",
+          "SYSTEMCTL restart lamp-tasks lamp-voice"
+        ],
+        "subject_events": [
+          "SYSTEMCTL stop lamp-voice",
+          "STOP_EXIT_17",
+          "SYSTEMCTL start lamp-voice",
+          "SYSTEMCTL daemon-reload",
+          "SYSTEMCTL restart lamp-tasks lamp-voice"
+        ],
+        "subject_exit": 0
+      }
+    ],
+    "functions_sha256": {
+      "lamp": "78b03dd2d51fc3cceda181b844399be8404870108f09b9c7f6c01ad5f0bd665a",
+      "put_back": "b0b0e92de607f4722a0ea496dc064f0ae93990468daebdec31b51ca3ee303f35",
+      "restore_script": "08aa7955b7607495ce520e1fcacde1f86ed828a2ae8a91cf083863d7297da143",
+      "voice_state": "3f836946d704cdc85b060053ab3f4db71f99780040e88dff11d64092a62f96ca"
+    },
+    "gates_not_run": [
+      "official focused",
+      "stand-in56",
+      "syntax",
+      "full suite"
+    ],
+    "head": "b2d2dfb0b462875470c0f2895c5b2d095d5eb3a4",
+    "helper_sha256": {
+      "blocked-tools/afplay": "177f1ecdde05e0ae8b652249075afcd0ff736f684d46b357cf7978b09ac6fb6f",
+      "blocked-tools/curl": "177f1ecdde05e0ae8b652249075afcd0ff736f684d46b357cf7978b09ac6fb6f",
+      "blocked-tools/nc": "177f1ecdde05e0ae8b652249075afcd0ff736f684d46b357cf7978b09ac6fb6f",
+      "blocked-tools/ncat": "177f1ecdde05e0ae8b652249075afcd0ff736f684d46b357cf7978b09ac6fb6f",
+      "blocked-tools/say": "177f1ecdde05e0ae8b652249075afcd0ff736f684d46b357cf7978b09ac6fb6f",
+      "blocked-tools/scp": "177f1ecdde05e0ae8b652249075afcd0ff736f684d46b357cf7978b09ac6fb6f",
+      "blocked-tools/sftp": "177f1ecdde05e0ae8b652249075afcd0ff736f684d46b357cf7978b09ac6fb6f",
+      "blocked-tools/socat": "177f1ecdde05e0ae8b652249075afcd0ff736f684d46b357cf7978b09ac6fb6f",
+      "blocked-tools/ssh": "177f1ecdde05e0ae8b652249075afcd0ff736f684d46b357cf7978b09ac6fb6f",
+      "blocked-tools/sshpass": "177f1ecdde05e0ae8b652249075afcd0ff736f684d46b357cf7978b09ac6fb6f",
+      "blocked-tools/sudo": "177f1ecdde05e0ae8b652249075afcd0ff736f684d46b357cf7978b09ac6fb6f",
+      "blocked-tools/systemctl": "177f1ecdde05e0ae8b652249075afcd0ff736f684d46b357cf7978b09ac6fb6f",
+      "blocked-tools/systemd-run": "177f1ecdde05e0ae8b652249075afcd0ff736f684d46b357cf7978b09ac6fb6f",
+      "blocked-tools/wget": "177f1ecdde05e0ae8b652249075afcd0ff736f684d46b357cf7978b09ac6fb6f",
+      "guard-query17/exact-generate.sh": "9e81b5c90384c3c43fbfd216eb638d6920e03059d92840d33afad74f02687ce2",
+      "guard-query17/exact-generated-guard.sh": "68b2087a8662eaebca4c51dd0e05c9cdcc38d20f8797ec39a80c975adb6d26ef",
+      "guard-query17/mock/chown": "306c6ca7407560340797866e077e053627ad409277d1b9da58106fce4cf717cb",
+      "guard-query17/mock/systemctl": "62495e87e14c8f03dd5a2cb330669cbdbeec4b57cccef4c88beb675f93221cf0",
+      "guard-query17/mock/systemd-run": "b775fccc152cc56a1065348c5bc19e299eec29669f979137b67e33d207dc9b2f",
+      "guard-stop17/exact-generate.sh": "3e9471581386e696d7e6fd885973143a950a325ebfdb607f804d565c8d634fce",
+      "guard-stop17/exact-generated-guard.sh": "b9809f5a886e904e73a4055daa8e934f7c4e5edfe01491709c262f11dc304fbb",
+      "guard-stop17/mock/chown": "306c6ca7407560340797866e077e053627ad409277d1b9da58106fce4cf717cb",
+      "guard-stop17/mock/systemctl": "62495e87e14c8f03dd5a2cb330669cbdbeec4b57cccef4c88beb675f93221cf0",
+      "guard-stop17/mock/systemd-run": "b775fccc152cc56a1065348c5bc19e299eec29669f979137b67e33d207dc9b2f",
+      "main-query17/exact-generate.sh": "84db40ebda8a7d79a777b3c1b5889d1330a7a5229dd79ed8cd744bbc64e9df0d",
+      "main-query17/exact-put-back.sh": "13eabcdaf66d12a8d4638f1ee1a35624c263f55504011e236acca7fb8d83c9f9",
+      "main-query17/local-command": "2f6d0cacb62010ed4db840c23936008cc450fa46b4f5e0ded6b94fc2d1285570",
+      "main-query17/mock/chown": "306c6ca7407560340797866e077e053627ad409277d1b9da58106fce4cf717cb",
+      "main-query17/mock/sh": "89474e57162a953d2d4ffbc8c7a1cd708a481871909e94271d0b481109d8b52b",
+      "main-query17/mock/systemctl": "62495e87e14c8f03dd5a2cb330669cbdbeec4b57cccef4c88beb675f93221cf0",
+      "probe-query-failure.py": "06a10302ff4daa5de0480b56c6a8e674a649cbc23e8aabce5a5506a50d1ae89b"
+    },
+    "identity": "b2d2dfb0b462875470c0f2895c5b2d095d5eb3a4 af546143a9d30f3b3062bb7a6efbc215e3bfcef3 34be9e0f51961039ff9c4a2f1906f6f5b795f90b",
+    "initial_worktree_setup_failure": "Default sandbox denied .git/worktrees write (git128/Python1); explicit authorized escalation then created exact detachedWT successfully. Not a test failure or test retry.",
+    "post_guard_sha256": "852df0fcbdf020b86db9816fc31d42b807ba2b336924d4c29f8b2e3da64e1dd0",
+    "pre_guard_sha256": "c174f12b4a1ca50734e0ba13d91388d1443ed4841845b668f2d2dfaf87b8d2e8",
+    "scope": "Three once-only exact-source local controls; stop0+query17 on actual extracted main put_back/lamp/voice_state and actual generated stand-in guard; stop17 on a separate fresh generated-guard fixture. Actual restore copies real temporary regular files and deletes backup. No writer-race/service/network/device/Cargo/full/focused/standin suite claims.",
+    "source_count": 35,
+    "source_sha256": {
+      "lampOS/tools/played/README.md": "4402653ddeafd5eb53599b7c4c59d8b924d673188830efb92fa491ab5a3f9cb6",
+      "lampOS/tools/played/account-ask.sh": "81943e6dd524b99b47dbb40b97409ff7e1e2a19704e0f35ea617d173ac40434d",
+      "lampOS/tools/played/addon-say-test.sh": "988558aafc6ac9f0eca864845f4e59a5fbbad77431dd79bf2878fe9696d7ae6b",
+      "lampOS/tools/played/addon-say.sh": "d6e745962f735d03f9d1089f58574f358e2a26c3a943e83897fd50b342794eb3",
+      "lampOS/tools/played/ask-again.sh": "32a2ae1f36879e9d94b39084087e9ad91fb1dd7a70f6dc9050be5b5562a6d6ca",
+      "lampOS/tools/played/battery.sh": "b3929e8563a0aac5405dd7cd0e5e7ec45ac2f802b666b39eb1c9aad3456fd8f6",
+      "lampOS/tools/played/calendar.sh": "56ebd819976325b0ab46dddffde1cd24978176151edb127c1ff8676088f8e12b",
+      "lampOS/tools/played/cut-in-keeps-test.sh": "7e40e8fd1938aa1215865bde5c26974d723669e49172265c65241a3ddacb654b",
+      "lampOS/tools/played/cut-in-keeps.sh": "ee6b31e87d09848a72dace31e210a1d11ae9d4b615988568af40a29dcf06be7a",
+      "lampOS/tools/played/cutin-test.sh": "b0f2de41057843bf2457fcf56f039bc6110c88b61d79a5adb2a95a63a935b6f9",
+      "lampOS/tools/played/cutin.sh": "25e97588a20c7af4c41872376c52eae4e67125e5ad0c25f8ae5e97c1ecd731d2",
+      "lampOS/tools/played/day.sh": "cf06f2e47f3ec62811a93eeb9bfeafb7b92f210ca0991fa56422c79ab661ba15",
+      "lampOS/tools/played/desk-kit-2/lines.tsv": "5506aa187f6acef303d864a3d23203fafd856eea9463269ab25ed80d28f1bf96",
+      "lampOS/tools/played/desk-kit-test.sh": "a31cb5c9f51479c1cf369cca94062ad52dcf2bbe14809a9039125407915b014e",
+      "lampOS/tools/played/desk-kit.sh": "fb74c51ec4061a10de659336892b3880351bf6668e31b9c8509f74681cddf6bc",
+      "lampOS/tools/played/desk_kit.py": "4c5053086f3c6338bb836d21434f5efbf2023896819b9d85d28f9d79e6e2c1fb",
+      "lampOS/tools/played/email.sh": "2e6226ed06f98e134f1b435eb91530d7f23772bc09f8dfd389bf6f77ccae15c3",
+      "lampOS/tools/played/followups.sh": "dfce4d20eca2b9e95ef11aeb60c3be5d072717f51e2a59da29fb0e3d385ab6d5",
+      "lampOS/tools/played/full-look-row-test.sh": "d7305fd12dc9894e39cfd3bff0dfbbbeacd8e76309c48753504213c3fc448c02",
+      "lampOS/tools/played/full-look-row.sh": "0b64ca7522df5f644d846e8b7d8eecd9c1cde7b5f4a3855a838e0bdd05ec9e88",
+      "lampOS/tools/played/handovers.sh": "a197f9f19f32bafbd7f5737a1128d1f2b7001de9eade5f60edbad43d342ebaeb",
+      "lampOS/tools/played/hesitant.tsv": "723b4be3aa462401c202053f22f1325efdd4f681d7c47b0869ec388901dfad46",
+      "lampOS/tools/played/lamp_ssh": "dbacb05484de6d99c876c8393adfe4271377ee280fb5eea97a469d51c08f657b",
+      "lampOS/tools/played/make-skill-test.sh": "34954e67072e8eb75cfde7e815470e21a45f52a3a5fa21209eeb2775812a3516",
+      "lampOS/tools/played/make-skill.sh": "ab3baaea1c9528baa28c0ef76dde02c14d398a11a269c04291152152a9f087e5",
+      "lampOS/tools/played/night.py": "3013dbc264dee6f5d41bccdf2cef15b3a85d3ae477524118262473869128c835",
+      "lampOS/tools/played/night_compare.py": "2d9e94f28f901ba4b45164aa8ec6c3c4b085d4279a9bb2ab6177ba6d8d73411b",
+      "lampOS/tools/played/open-name.sh": "3724b0a5ce7dfedae9473ad6ae87c7a12850237499226b9a8d00b245bf2ad2c7",
+      "lampOS/tools/played/quiet_gate.sh": "3629ab492206c9bbb416693b122d72094c623a4f01bd9c812a04f10148a37fef",
+      "lampOS/tools/played/quietroom.sh": "6d0ae1d9fc58a401375dd42ae1fa1e893312267f784723e7b85b7aaf6a32c079",
+      "lampOS/tools/played/scenario.py": "1a904b7338f6de3e15770297c7afdc4a970fa396ac2178075d1578afe9d4c751",
+      "lampOS/tools/played/settings.sh": "256dc6b0176b131d2e7ba426594e3b0a851058580f992f6b802dcee6e1b4ca4b",
+      "lampOS/tools/played/stand-in-test.sh": "c18ec34dff356029cfbf74529f66c22df365e495cd3ca3c42f4e8dc61d30ad5d",
+      "lampOS/tools/played/stand-in.sh": "a34d0eab49d26c568dc9bdd634245cf38a5ce7736cddefdcfa45807ac37bce8b",
+      "lampOS/tools/played/twopeople829.sh": "ff075145d0a2dddbbbab652a044943fb4d7376877e56f0037fe67c133b2d169f"
+    },
+    "source_tools_helpers_old_evidence_unchanged": true,
+    "stages": [
+      {
+        "argv": [
+          "/bin/bash",
+          "W-evidence/main-query17/exact-generate.sh"
+        ],
+        "cleanup": [],
+        "elapsed_seconds": 0.0105,
+        "exit": 0,
+        "group": "absent",
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "pgid": 40203,
+        "pid": 40203,
+        "stage": "main-query17-generate",
+        "timed_out": false
+      },
+      {
+        "argv": [
+          "/bin/bash",
+          "W-evidence/main-query17/exact-put-back.sh"
+        ],
+        "cleanup": [],
+        "elapsed_seconds": 1.8095,
+        "exit": 0,
+        "group": "absent",
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "pgid": 40205,
+        "pid": 40205,
+        "stage": "main-query17",
+        "timed_out": false
+      },
+      {
+        "argv": [
+          "/bin/bash",
+          "W-evidence/guard-query17/exact-generate.sh"
+        ],
+        "cleanup": [],
+        "elapsed_seconds": 0.0118,
+        "exit": 0,
+        "group": "absent",
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "pgid": 40288,
+        "pid": 40288,
+        "stage": "guard-query17-generate",
+        "timed_out": false
+      },
+      {
+        "argv": [
+          "/bin/sh",
+          "W/lampOS/tools/played/stand-in.sh",
+          "in"
+        ],
+        "cleanup": [],
+        "elapsed_seconds": 1.1903,
+        "exit": 0,
+        "group": "absent",
+        "log_sha256": "76981f518b9429691e4e897dea246e35cb21348aa3aecdf4da768676a90aeb82",
+        "pgid": 40290,
+        "pid": 40290,
+        "stage": "guard-query17-setup",
+        "timed_out": false
+      },
+      {
+        "argv": [
+          "/bin/sh",
+          "-c",
+          "[ ! -e W-evidence/guard-query17/saved/restore ] || { systemctl stop lamp-voice && ! systemctl is-active -q lamp-voice && /bin/sh W-evidence/guard-query17/saved/restore; systemctl start lamp-voice; }; rm -f W-evidence/guard-query17/units/lamp-tasks.service.d/zz-played-stand-in.conf W-evidence/guard-query17/units/lamp-voice.service.d/zz-played-stand-in.conf; systemctl daemon-reload; systemctl restart lamp-tasks lamp-voice; rm -rf W-evidence/guard-query17/remote"
+        ],
+        "cleanup": [],
+        "elapsed_seconds": 0.1386,
+        "exit": 0,
+        "group": "absent",
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "pgid": 40345,
+        "pid": 40345,
+        "stage": "guard-query17",
+        "timed_out": false
+      },
+      {
+        "argv": [
+          "/bin/bash",
+          "W-evidence/guard-stop17/exact-generate.sh"
+        ],
+        "cleanup": [],
+        "elapsed_seconds": 0.0112,
+        "exit": 0,
+        "group": "absent",
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "pgid": 40390,
+        "pid": 40390,
+        "stage": "guard-stop17-generate",
+        "timed_out": false
+      },
+      {
+        "argv": [
+          "/bin/sh",
+          "W/lampOS/tools/played/stand-in.sh",
+          "in"
+        ],
+        "cleanup": [],
+        "elapsed_seconds": 0.9594,
+        "exit": 0,
+        "group": "absent",
+        "log_sha256": "3bd2053dfdb8c79d8f05fce85e9fc18e8d493a9095b722c58eae88e8fe1d5acf",
+        "pgid": 40392,
+        "pid": 40392,
+        "stage": "guard-stop17-setup",
+        "timed_out": false
+      },
+      {
+        "argv": [
+          "/bin/sh",
+          "-c",
+          "[ ! -e W-evidence/guard-stop17/saved/restore ] || { systemctl stop lamp-voice && ! systemctl is-active -q lamp-voice && /bin/sh W-evidence/guard-stop17/saved/restore; systemctl start lamp-voice; }; rm -f W-evidence/guard-stop17/units/lamp-tasks.service.d/zz-played-stand-in.conf W-evidence/guard-stop17/units/lamp-voice.service.d/zz-played-stand-in.conf; systemctl daemon-reload; systemctl restart lamp-tasks lamp-voice; rm -rf W-evidence/guard-stop17/remote"
+        ],
+        "cleanup": [],
+        "elapsed_seconds": 0.0389,
+        "exit": 0,
+        "group": "absent",
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "pgid": 40435,
+        "pid": 40435,
+        "stage": "guard-stop17",
+        "timed_out": false
+      }
+    ],
+    "status": "CONFIRMED_UNKNOWN_QUERY_ADMITS_RESTORE_AND_GUARD_MASKS_STOP_FAILURE",
+    "tools_sha256": {
+      "bash": "16303dedab719ddb63efd9dd68092a0da37b397bfd4fcb856d5f1c86c5ee414b",
+      "cp": "f0629f462c6535f7b1a19f559b7093638e714961bea9228cfb2ae7896f8557f4",
+      "find": "9cd3b4bbb80ac290fd188172e5fcbc48a6fe10ff3374313e4f01efea0101be1b",
+      "python3": "3a717f69a4bfc12c373da8489a8fc88d53e9117723e00490fbe5e84e153125a6",
+      "rm": "4faf0408bb0c5dcb8ea47c08ff03cb44aedfe2712220111586b71cb93cd1d43f",
+      "sed": "6ac57d91d32dda62f954dbcfe29e43dd55e69946821092b542dbbbe7dca86997",
+      "sh": "c0eaf44f9242d5bbc2e14f4e8b7dccc1eff7f2976d64dc18914d5ef9f373e100",
+      "shasum": "7b4a2ceaa5ba5d712b056b6415ca641f5516e58116eafd33b4467768fbf1b4b0",
+      "sort": "54c29f342722dffb3413a3a628f9bb37efccf4b26dd1ea5598e10edb82b4c33d"
+    },
+    "utc": "2026-10-27T21:17:44.631947+00:00"
+  },
+  "requested_repair": [
+    "Require a successful explicit state query and positively accepted stopped state; do not treat arbitrary nonzero/unknown/unavailable/malformed output as inactive.",
+    "Retain a preservation result through guard restart/cleanup and finish nonzero when stop/query/restore failed, while still attempting recovery/cleanup.",
+    "Add committed unknown/query-error controls for both main and guard, plus guard subject-status assertions for stop/query/restore failure; assert no restore/deletion, retained original bytes, cleanup and restart attempts."
+  ],
+  "scope": "Read complete a896\u2192b2 four-file repair; exact generated restore remains unchanged. Three approved tiny real-tempFS probes execute current extracted main functions and actual captured stand-in guard. No live services or writer race.",
+  "tree": "34be9e0f51961039ff9c4a2f1906f6f5b795f90b",
+  "utc": "2026-10-27T21:18:40.659364+00:00"
+}

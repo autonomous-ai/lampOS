@@ -1,0 +1,70 @@
+{
+  "schema": "third-auth-provisioning-name-metadata-v1",
+  "observed_at_utc": "2026-10-27T21:17:26.440755+00:00",
+  "repository": "autonomous-ai/lampOS",
+  "environment": "lampos-update-publish",
+  "secret_names_only": [
+    "LAMPOS_UPDATE_KEY"
+  ],
+  "LAMPOS_RELEASE_TOKEN_present": false,
+  "secret_values_requested_or_read": false,
+  "PR_metadata": {
+    "base": {
+      "ref": "lamp-voice",
+      "sha": "a808ef04b5885ccb35e8e7693eee16ae331e3a7f"
+    },
+    "draft": true,
+    "head": {
+      "ref": "third/publish-auth",
+      "sha": "2737f00615f15b4a37860c2c61724bcba7d9a96a"
+    },
+    "merge_commit_sha": "e68f794dd49901d430bbe10e8b2064331a8a6bc7",
+    "mergeable_state": "clean",
+    "merged": false,
+    "number": 3934,
+    "state": "open"
+  },
+  "head_check_metadata": {
+    "check_runs": [
+      {
+        "conclusion": "skipped",
+        "details_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40583880131/job/122473812011",
+        "head_sha": "2737f00615f15b4a37860c2c61724bcba7d9a96a",
+        "id": 122473812011,
+        "name": "lampOS \u2014 sign and publish the tested lamp-voice artifact",
+        "status": "completed"
+      },
+      {
+        "conclusion": "skipped",
+        "details_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40583880131/job/122473810814",
+        "head_sha": "2737f00615f15b4a37860c2c61724bcba7d9a96a",
+        "id": 122473810814,
+        "name": "report-full-run-failure",
+        "status": "completed"
+      },
+      {
+        "conclusion": "skipped",
+        "details_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40583880131/job/122470123355",
+        "head_sha": "2737f00615f15b4a37860c2c61724bcba7d9a96a",
+        "id": 122470123355,
+        "name": "lampOS \u2014 promote a tested release to the stable feed",
+        "status": "completed"
+      },
+      {
+        "conclusion": "success",
+        "details_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40583880131/job/122470121056",
+        "head_sha": "2737f00615f15b4a37860c2c61724bcba7d9a96a",
+        "id": 122470121056,
+        "name": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+        "status": "completed"
+      }
+    ],
+    "total_count": 4
+  },
+  "interpretation": "Protected release credential name is absent; source and completed original ARM qualification are separate from provisioning.",
+  "limits": [
+    "Read-only API name/status metadata only; no credential extraction, value read, provisioning, policy change, code edit, rebase, push, watch, release or device action.",
+    "Secret names do not establish credential permissions or validity. Root owns PRbody/comments/log."
+  ],
+  "evidence_root": ".claude/worktrees/third-publish-auth-a808-maintenance-evidence"
+}

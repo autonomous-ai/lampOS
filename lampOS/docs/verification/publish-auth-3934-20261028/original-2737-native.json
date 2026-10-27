@@ -1,0 +1,675 @@
+{
+  "schema": "third-auth-a808-original-native-v1",
+  "observed_at_utc": "2026-10-27T21:16:08.904409+00:00",
+  "pr": 3934,
+  "frozen_head": "2737f00615f15b4a37860c2c61724bcba7d9a96a",
+  "authored_and_actual_tested_base": "a808ef04b5885ccb35e8e7693eee16ae331e3a7f",
+  "original_run": {
+    "conclusion": "success",
+    "event": "pull_request",
+    "head_branch": "third/publish-auth",
+    "head_sha": "2737f00615f15b4a37860c2c61724bcba7d9a96a",
+    "id": 40583880131,
+    "run_attempt": 1,
+    "run_number": 7907,
+    "status": "completed"
+  },
+  "original_arm_job": {
+    "completed_at": "2026-10-27T21:13:32Z",
+    "conclusion": "success",
+    "head_sha": "2737f00615f15b4a37860c2c61724bcba7d9a96a",
+    "id": 122470121056,
+    "name": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+    "run_attempt": 1,
+    "run_id": 40583880131,
+    "started_at": "2026-10-27T21:06:13Z",
+    "status": "completed",
+    "steps": [
+      {
+        "completed_at": "2026-10-27T21:06:15Z",
+        "conclusion": "success",
+        "name": "Set up job",
+        "number": 1,
+        "started_at": "2026-10-27T21:06:14Z",
+        "status": "completed"
+      },
+      {
+        "completed_at": "2026-10-27T21:06:37Z",
+        "conclusion": "success",
+        "name": "system packages",
+        "number": 2,
+        "started_at": "2026-10-27T21:06:15Z",
+        "status": "completed"
+      },
+      {
+        "completed_at": "2026-10-27T21:06:44Z",
+        "conclusion": "success",
+        "name": "Run actions/checkout@v4",
+        "number": 3,
+        "started_at": "2026-10-27T21:06:37Z",
+        "status": "completed"
+      },
+      {
+        "completed_at": "2026-10-27T21:06:44Z",
+        "conclusion": "success",
+        "name": "publication failure tests (offline, no signing secret)",
+        "number": 4,
+        "started_at": "2026-10-27T21:06:44Z",
+        "status": "completed"
+      },
+      {
+        "completed_at": "2026-10-27T21:06:50Z",
+        "conclusion": "success",
+        "name": "Rust 1.96.0",
+        "number": 5,
+        "started_at": "2026-10-27T21:06:44Z",
+        "status": "completed"
+      },
+      {
+        "completed_at": "2026-10-27T21:06:51Z",
+        "conclusion": "success",
+        "name": "artifact provenance regression (offline, disposable Cargo workspace)",
+        "number": 6,
+        "started_at": "2026-10-27T21:06:50Z",
+        "status": "completed"
+      },
+      {
+        "completed_at": "2026-10-27T21:07:09Z",
+        "conclusion": "success",
+        "name": "stable promotion tests (offline, disposable test key)",
+        "number": 7,
+        "started_at": "2026-10-27T21:06:51Z",
+        "status": "completed"
+      },
+      {
+        "completed_at": "2026-10-27T21:07:31Z",
+        "conclusion": "success",
+        "name": "restore the cache",
+        "number": 8,
+        "started_at": "2026-10-27T21:07:09Z",
+        "status": "completed"
+      },
+      {
+        "completed_at": "2026-10-27T21:07:32Z",
+        "conclusion": "success",
+        "name": "unchanged source files get the cached build's times back",
+        "number": 9,
+        "started_at": "2026-10-27T21:07:31Z",
+        "status": "completed"
+      },
+      {
+        "completed_at": "2026-10-27T21:07:32Z",
+        "conclusion": "skipped",
+        "name": "record fresh source times for a cold publication build",
+        "number": 10,
+        "started_at": "2026-10-27T21:07:32Z",
+        "status": "completed"
+      },
+      {
+        "completed_at": "2026-10-27T21:07:33Z",
+        "conclusion": "success",
+        "name": "Run taiki-e/install-action@v2",
+        "number": 11,
+        "started_at": "2026-10-27T21:07:32Z",
+        "status": "completed"
+      },
+      {
+        "completed_at": "2026-10-27T21:07:35Z",
+        "conclusion": "success",
+        "name": "build (release, the lamps' binaries)",
+        "number": 12,
+        "started_at": "2026-10-27T21:07:33Z",
+        "status": "completed"
+      },
+      {
+        "completed_at": "2026-10-27T21:07:35Z",
+        "conclusion": "success",
+        "name": "every built lamp-* binary is classified for the lamp-os package",
+        "number": 13,
+        "started_at": "2026-10-27T21:07:35Z",
+        "status": "completed"
+      },
+      {
+        "completed_at": "2026-10-27T21:08:53Z",
+        "conclusion": "success",
+        "name": "build the two selected artifact examples without filename collisions",
+        "number": 14,
+        "started_at": "2026-10-27T21:07:35Z",
+        "status": "completed"
+      },
+      {
+        "completed_at": "2026-10-27T21:08:54Z",
+        "conclusion": "success",
+        "name": "publication CLI rehearsal (local test key and simulated GitHub only)",
+        "number": 15,
+        "started_at": "2026-10-27T21:08:53Z",
+        "status": "completed"
+      },
+      {
+        "completed_at": "2026-10-27T21:08:54Z",
+        "conclusion": "success",
+        "name": "which crates a pull request tests",
+        "number": 16,
+        "started_at": "2026-10-27T21:08:54Z",
+        "status": "completed"
+      },
+      {
+        "completed_at": "2026-10-27T21:13:07Z",
+        "conclusion": "success",
+        "name": "test (full run, every test one at a time; otherwise without the realtime group, in parallel)",
+        "number": 17,
+        "started_at": "2026-10-27T21:08:54Z",
+        "status": "completed"
+      },
+      {
+        "completed_at": "2026-10-27T21:13:21Z",
+        "conclusion": "success",
+        "name": "doc tests and the own-harness tests (nextest runs neither)",
+        "number": 18,
+        "started_at": "2026-10-27T21:13:07Z",
+        "status": "completed"
+      },
+      {
+        "completed_at": "2026-10-27T21:13:21Z",
+        "conclusion": "success",
+        "name": "export only current Cargo targets and their SHA-256",
+        "number": 19,
+        "started_at": "2026-10-27T21:13:21Z",
+        "status": "completed"
+      },
+      {
+        "completed_at": "2026-10-27T21:13:29Z",
+        "conclusion": "success",
+        "name": "Run actions/upload-artifact@v4",
+        "number": 20,
+        "started_at": "2026-10-27T21:13:21Z",
+        "status": "completed"
+      },
+      {
+        "completed_at": "2026-10-27T21:13:29Z",
+        "conclusion": "skipped",
+        "name": "discard the isolated example target before saving the cache",
+        "number": 21,
+        "started_at": "2026-10-27T21:13:29Z",
+        "status": "completed"
+      },
+      {
+        "completed_at": "2026-10-27T21:13:29Z",
+        "conclusion": "skipped",
+        "name": "save the cache",
+        "number": 22,
+        "started_at": "2026-10-27T21:13:29Z",
+        "status": "completed"
+      },
+      {
+        "completed_at": "2026-10-27T21:13:30Z",
+        "conclusion": "success",
+        "name": "Post Run actions/checkout@v4",
+        "number": 44,
+        "started_at": "2026-10-27T21:13:29Z",
+        "status": "completed"
+      },
+      {
+        "completed_at": "2026-10-27T21:13:30Z",
+        "conclusion": "success",
+        "name": "Complete job",
+        "number": 45,
+        "started_at": "2026-10-27T21:13:30Z",
+        "status": "completed"
+      }
+    ]
+  },
+  "actual_logged_checkout": "e68f794dd49901d430bbe10e8b2064331a8a6bc7",
+  "actual_preview_parents": [
+    "a808ef04b5885ccb35e8e7693eee16ae331e3a7f",
+    "2737f00615f15b4a37860c2c61724bcba7d9a96a"
+  ],
+  "actual_preview_tree": "77d8bf8cc88929bf8d60fdd90be9e4b9c2800c61",
+  "actual_checkout_log_lines": [
+    "2026-10-27T21:06:44.1756987Z HEAD is now at e68f794 Merge 2737f00615f15b4a37860c2c61724bcba7d9a96a into a808ef04b5885ccb35e8e7693eee16ae331e3a7f",
+    "2026-10-27T21:06:44.2363964Z [command]/usr/bin/git log -1 --format=%H",
+    "2026-10-27T21:06:44.2379009Z e68f794dd49901d430bbe10e8b2064331a8a6bc7"
+  ],
+  "five_owned_files": {
+    ".github/scripts/lampos-publish.py": {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "7ec7a7604d98545bba5018a803d1c948259851d7",
+      "size": 27847
+    },
+    ".github/scripts/lampos-publish-test.py": {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a0c7d50d2270ce799c56d5c90a8ada7c9ca0f9e2",
+      "size": 40151
+    },
+    ".github/scripts/lampos-publish-cli-test.py": {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d58295237f5da65e12debfa3cad5a4c856042755",
+      "size": 8821
+    },
+    ".github/workflows/lampos-arm64.yml": {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "423815723541d87b139fa6a67b5698953153b116",
+      "size": 21021
+    },
+    "lampOS/docs/updates.md": {
+      "mode": "100644",
+      "type": "blob",
+      "sha": "61b4d4c046ecfe70b40a1fe2084535d05ff74f2d",
+      "size": 174666
+    }
+  },
+  "five_owned_blobs_modes_equal_actual_preview": true,
+  "owned_head_tree": "77d8bf8cc88929bf8d60fdd90be9e4b9c2800c61",
+  "actual_preview_tree_equals_owned_head_tree": true,
+  "actual_owned_tests": {
+    "offline_unit": {
+      "rows": [
+        {
+          "class": "CommandsTests",
+          "method": "test_ansi_controls_and_invalid_utf8_do_not_escape_first_line",
+          "status": "ok"
+        },
+        {
+          "class": "CommandsTests",
+          "method": "test_authorization_schemes_and_standalone_bearer_are_redacted",
+          "status": "ok"
+        },
+        {
+          "class": "CommandsTests",
+          "method": "test_configured_secrets_and_split_private_key_are_redacted",
+          "status": "ok"
+        },
+        {
+          "class": "CommandsTests",
+          "method": "test_credential_shapes_and_assignments_are_redacted",
+          "status": "ok"
+        },
+        {
+          "class": "CommandsTests",
+          "method": "test_gh_failures_use_fixed_labels_without_echoing_argv",
+          "status": "ok"
+        },
+        {
+          "class": "CommandsTests",
+          "method": "test_missing_and_empty_first_stderr_lines_are_safe",
+          "status": "ok"
+        },
+        {
+          "class": "CommandsTests",
+          "method": "test_non_gh_failures_remain_generic_and_silent",
+          "status": "ok"
+        },
+        {
+          "class": "CommandsTests",
+          "method": "test_output_file_is_forwarded_without_echoing_output",
+          "status": "ok"
+        },
+        {
+          "class": "CommandsTests",
+          "method": "test_redaction_happens_before_diagnostic_truncation",
+          "status": "ok"
+        },
+        {
+          "class": "CommandsTests",
+          "method": "test_release_authorization_is_scoped_to_each_gh_child_without_mutating_context",
+          "status": "ok"
+        },
+        {
+          "class": "CommandsTests",
+          "method": "test_short_tokens_with_empty_jose_components_are_redacted",
+          "status": "ok"
+        },
+        {
+          "class": "CommandsTests",
+          "method": "test_spawn_and_timeout_failures_do_not_echo_exception_details",
+          "status": "ok"
+        },
+        {
+          "class": "CommandsTests",
+          "method": "test_success_preserves_stdout_and_child_environment",
+          "status": "ok"
+        },
+        {
+          "class": "CommandsTests",
+          "method": "test_url_credentials_and_query_values_are_redacted",
+          "status": "ok"
+        },
+        {
+          "class": "PublicationTests",
+          "method": "test_api_auth_or_network_error_is_not_absence",
+          "status": "ok"
+        },
+        {
+          "class": "PublicationTests",
+          "method": "test_bad_activation_and_non_push_contexts_run_no_updater",
+          "status": "ok"
+        },
+        {
+          "class": "PublicationTests",
+          "method": "test_bad_existing_signature_is_not_bootstrap",
+          "status": "ok"
+        },
+        {
+          "class": "PublicationTests",
+          "method": "test_candidate_rename_failure_restores_previous_head",
+          "status": "ok"
+        },
+        {
+          "class": "PublicationTests",
+          "method": "test_changed_checksum_never_executes_artifact",
+          "status": "ok"
+        },
+        {
+          "class": "PublicationTests",
+          "method": "test_channel_changed_during_upload_is_left_untouched",
+          "status": "ok"
+        },
+        {
+          "class": "PublicationTests",
+          "method": "test_classification_cannot_exclude_the_updater",
+          "status": "ok"
+        },
+        {
+          "class": "PublicationTests",
+          "method": "test_commands_never_pass_private_key_environment_to_children",
+          "status": "ok"
+        },
+        {
+          "class": "PublicationTests",
+          "method": "test_comment_cannot_classify_an_unclassified_artifact_binary",
+          "status": "ok"
+        },
+        {
+          "class": "PublicationTests",
+          "method": "test_duplicate_checksum_never_executes_artifact",
+          "status": "ok"
+        },
+        {
+          "class": "PublicationTests",
+          "method": "test_excluded_bytes_are_verified_before_any_updater_execution",
+          "status": "ok"
+        },
+        {
+          "class": "PublicationTests",
+          "method": "test_existing_channel_advances_only_after_verified_build_and_stage",
+          "status": "ok"
+        },
+        {
+          "class": "PublicationTests",
+          "method": "test_existing_channel_without_envelope_is_not_bootstrap",
+          "status": "ok"
+        },
+        {
+          "class": "PublicationTests",
+          "method": "test_existing_immutable_release_refuses",
+          "status": "ok"
+        },
+        {
+          "class": "PublicationTests",
+          "method": "test_existing_immutable_tag_without_release_refuses",
+          "status": "ok"
+        },
+        {
+          "class": "PublicationTests",
+          "method": "test_explicit_bootstrap_creates_a_verified_head",
+          "status": "ok"
+        },
+        {
+          "class": "PublicationTests",
+          "method": "test_failed_incomplete_or_corrupt_build_upload_never_mutates_head",
+          "status": "ok"
+        },
+        {
+          "class": "PublicationTests",
+          "method": "test_failed_or_corrupt_staging_never_mutates_head",
+          "status": "ok"
+        },
+        {
+          "class": "PublicationTests",
+          "method": "test_failed_or_malformed_channel_lookup_is_not_bootstrap",
+          "status": "ok"
+        },
+        {
+          "class": "PublicationTests",
+          "method": "test_failed_restoration_reports_retained_asset_ids",
+          "status": "ok"
+        },
+        {
+          "class": "PublicationTests",
+          "method": "test_initial_channel_requires_explicit_bootstrap",
+          "status": "ok"
+        },
+        {
+          "class": "PublicationTests",
+          "method": "test_invalid_classification_never_executes_artifact",
+          "status": "ok"
+        },
+        {
+          "class": "PublicationTests",
+          "method": "test_lost_response_after_either_rename_restores_previous_head",
+          "status": "ok"
+        },
+        {
+          "class": "PublicationTests",
+          "method": "test_manifest_cannot_reintroduce_an_excluded_binary",
+          "status": "ok"
+        },
+        {
+          "class": "PublicationTests",
+          "method": "test_manifest_hash_mismatch_refuses_before_github",
+          "status": "ok"
+        },
+        {
+          "class": "PublicationTests",
+          "method": "test_missing_checksums_never_executes_artifact",
+          "status": "ok"
+        },
+        {
+          "class": "PublicationTests",
+          "method": "test_missing_or_linked_classification_never_executes_artifact",
+          "status": "ok"
+        },
+        {
+          "class": "PublicationTests",
+          "method": "test_missing_release_authorization_refuses_before_commands_or_signing",
+          "status": "ok"
+        },
+        {
+          "class": "PublicationTests",
+          "method": "test_old_rename_failure_preserves_previous_head",
+          "status": "ok"
+        },
+        {
+          "class": "PublicationTests",
+          "method": "test_promotion_wrapper_keeps_immediate_safe_gh_diagnostic_visible",
+          "status": "ok"
+        },
+        {
+          "class": "PublicationTests",
+          "method": "test_public_key_failure_removes_private_key",
+          "status": "ok"
+        },
+        {
+          "class": "PublicationTests",
+          "method": "test_sign_failure_removes_private_key",
+          "status": "ok"
+        },
+        {
+          "class": "PublicationTests",
+          "method": "test_stale_or_repeated_sequence_never_mutates_head",
+          "status": "ok"
+        },
+        {
+          "class": "PublicationTests",
+          "method": "test_symlink_never_executes_artifact",
+          "status": "ok"
+        },
+        {
+          "class": "PublicationTests",
+          "method": "test_unlisted_file_never_executes_artifact",
+          "status": "ok"
+        },
+        {
+          "class": "PublicationTests",
+          "method": "test_verifier_failure_and_success_without_proof_refuse",
+          "status": "ok"
+        },
+        {
+          "class": "PublicationTests",
+          "method": "test_wrong_manifest_identity_refuses_before_github",
+          "status": "ok"
+        }
+      ],
+      "summary": [
+        "2026-10-27T21:06:44.6624211Z Ran 51 tests in 0.324s",
+        "2026-10-27T21:06:44.6624404Z OK"
+      ]
+    },
+    "real_updater_CLI_simulated_gh": {
+      "rows": [
+        {
+          "class": "CliTests",
+          "method": "test_real_bad_signature_refuses_before_immutable_upload",
+          "status": "ok"
+        },
+        {
+          "class": "CliTests",
+          "method": "test_real_excluded_artifact_tampering_refuses_before_execution",
+          "status": "ok"
+        },
+        {
+          "class": "CliTests",
+          "method": "test_real_manifest_sign_check_and_classified_upload_rehearsal",
+          "status": "ok"
+        },
+        {
+          "class": "CliTests",
+          "method": "test_real_signed_foreign_channel_refuses_before_immutable_upload",
+          "status": "ok"
+        },
+        {
+          "class": "CliTests",
+          "method": "test_real_signed_newer_schema_refuses_before_immutable_upload",
+          "status": "ok"
+        },
+        {
+          "class": "CliTests",
+          "method": "test_real_signed_newer_updater_floor_refuses_before_immutable_upload",
+          "status": "ok"
+        },
+        {
+          "class": "CliTests",
+          "method": "test_real_verified_existing_channel_promotes_and_retains_previous",
+          "status": "ok"
+        }
+      ],
+      "summary": [
+        "2026-10-27T21:08:54.1407980Z Ran 7 tests in 0.450s",
+        "2026-10-27T21:08:54.1408231Z OK"
+      ]
+    },
+    "log_evidence_sha256": "5462ad934cc5a8d32778f0505d38ed7a3926be154e529e5fcea86ffce82f4257"
+  },
+  "all_original_job_metadata": {
+    "jobs": [
+      {
+        "completed_at": "2026-10-27T21:13:32Z",
+        "conclusion": "success",
+        "head_sha": "2737f00615f15b4a37860c2c61724bcba7d9a96a",
+        "id": 122470121056,
+        "name": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+        "run_attempt": 1,
+        "run_id": 40583880131,
+        "started_at": "2026-10-27T21:06:13Z",
+        "status": "completed"
+      },
+      {
+        "completed_at": "2026-10-27T21:06:08Z",
+        "conclusion": "skipped",
+        "head_sha": "2737f00615f15b4a37860c2c61724bcba7d9a96a",
+        "id": 122470123355,
+        "name": "lampOS \u2014 promote a tested release to the stable feed",
+        "run_attempt": 1,
+        "run_id": 40583880131,
+        "started_at": "2026-10-27T21:06:08Z",
+        "status": "completed"
+      },
+      {
+        "completed_at": "2026-10-27T21:13:32Z",
+        "conclusion": "skipped",
+        "head_sha": "2737f00615f15b4a37860c2c61724bcba7d9a96a",
+        "id": 122473810814,
+        "name": "report-full-run-failure",
+        "run_attempt": 1,
+        "run_id": 40583880131,
+        "started_at": "2026-10-27T21:13:33Z",
+        "status": "completed"
+      },
+      {
+        "completed_at": "2026-10-27T21:13:32Z",
+        "conclusion": "skipped",
+        "head_sha": "2737f00615f15b4a37860c2c61724bcba7d9a96a",
+        "id": 122473812011,
+        "name": "lampOS \u2014 sign and publish the tested lamp-voice artifact",
+        "run_attempt": 1,
+        "run_id": 40583880131,
+        "started_at": "2026-10-27T21:13:33Z",
+        "status": "completed"
+      }
+    ],
+    "total_count": 4
+  },
+  "native_disposition": "New original Linux ARM64 run7907 succeeded on actuala808/2737 preview.51unique offline unitcases and7unique strengthened CLIcases passed. Required releasebuild/classification/examples/rehearsal/workspace tests/docs-ownharness/export-upload steps passed; publish explicitly skipped.",
+  "maintenance_gate_push_reference": {
+    "packet": ".claude/worktrees/third-publish-auth-a808-maintenance-evidence/maintenance-2737f0061-sanitized.json",
+    "sha256": "f34d1e1e45aad5b7a456da87effa36ea4f7267f01e0f4b90828e5c0c98b5eac4",
+    "scope": "Exact79a-lease push after clean rebase preserving five owned blobs/modes, range equality, and passing local51+7 old-x86 compatibility. Local results are not used as this new ARM result."
+  },
+  "watch_control": {
+    "native_handle": 76234,
+    "native_handle_closed": true,
+    "watch_result": {
+      "run_id": 40583880131,
+      "watch_exit": 0,
+      "timeout": false,
+      "elapsed_seconds": 388.841,
+      "interval_seconds": 30
+    },
+    "bounded_seconds": 1200,
+    "no_manual_CI_action": true,
+    "log_extraction_native_handle": 69057,
+    "log_extraction_handle_exit": 0,
+    "evidence_preparation_note": "A local JSON parse was attempted before log extraction finished and failed on empty content. The matching native extraction handle was then awaited to exit0; completed file parsed successfully and passed exact51/7-row assertions. No CI/test replay."
+  },
+  "post_native_PR_metadata": {
+    "base": {
+      "ref": "lamp-voice",
+      "sha": "a808ef04b5885ccb35e8e7693eee16ae331e3a7f"
+    },
+    "draft": true,
+    "head": {
+      "ref": "third/publish-auth",
+      "sha": "2737f00615f15b4a37860c2c61724bcba7d9a96a"
+    },
+    "merge_commit_sha": "e68f794dd49901d430bbe10e8b2064331a8a6bc7",
+    "merged": false,
+    "number": 3934,
+    "state": "open"
+  },
+  "preserved_history": {
+    "old79_local_ref": "third/publish-auth-preserved-79a-before-a808",
+    "all_previous_packets_unchanged_by_reader": true
+  },
+  "limits": [
+    "PR publication skipped; protected credential provisioning/Draft hold remains separate. No real release authorization or successful publication claim.",
+    "Source fulltree equality applies to head2737 and its actuale68 preview, not to earlier79 whole tree; audited baseinstall.md change accounts for old/new tree difference.",
+    "No separate Linux Clippy workflow result inferred from absent trigger. No earlier native/local-MachO credit transfer.",
+    "Only own branch was rebased/pushed under exact79 lease; Root owns PRbody/Queue/log. No other branch source edits, manual CI rerun/cancel/dispatch, credential provisioning/value read, release/policy/device action, MacARM64link or sharedbank/Cargo access.",
+    "No claim this result covers later heads/bases or generalizes historical403 causes."
+  ],
+  "evidence_root": ".claude/worktrees/third-publish-auth-a808-maintenance-evidence"
+}
