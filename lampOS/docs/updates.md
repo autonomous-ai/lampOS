@@ -789,20 +789,32 @@ units").
 `install` puts lampOS on a blank lamp from the newest build: every product
 part through its `current` link, the product units, users and zone, the
 product settings and every product skill (`/var/lib/lampOS/skills/`),
-enabled and not started ([install.md](install.md)). A round writes only
-the units a build carries for this lamp by name, and with
-`LAMP_UPDATE_APPLY=on` the product's settings and tmpfiles the build
-carries (below, "Settings and tmpfiles"), and its product skills from
-`lamp-product-skills` (above); otherwise a product lamp
-gets a new product skill or switch when `lamp-update install` is run again. A
+enabled and not started ([install.md](install.md)). A round writes
+the units a build carries for this lamp by name. On a product-installed
+lamp it also carries the product's own units (#3466, updater level 6, which
+an older updater climbs to first): the new text of each `lamp-<name>.service`
+already installed and started through its `current` link, so a switch in a
+product unit comes over the air. It never carries `@` templates, sockets,
+timers, the updater's own unit or the fixed helper units, and it never adds
+or enables a part. Those still come only with `lamp-update install` run
+again (#3689). A round writes the product's settings and tmpfiles the build
+carries (below, "Settings and tmpfiles") with `LAMP_UPDATE_APPLY=on` on any
+install, or with no apply choice at all on a managed, self-updating product
+install. With an apply choice of off or an invalid one, or with no choice on
+an unmanaged install, they come only from `lamp-update install`. Product
+skills don't depend on the apply switch: a round places the build's
+`lamp-product-skills` bundle (above) whenever the installed `lamp-skills`
+part's unit uses the product folder `/var/lib/lampOS/skills/` and the signed
+build carries the bundle, within its size bound. A
 round by hand (`once`) takes the units the build carries for `--lamp`, the
 lamp's own name unless given: on a product-installed lamp that also has dev
 units of its own name in the build (lamp-4ace's and lamp-52e6's, with their
 hash-pinned paths), those are taken and refused ("the build's
 lamp-actions.service does not start /opt/lampOS/actions/ through its current
 link"), and `--lamp lamp-0000`, a name with no units of its own, keeps the
-installed product units (lamp-52e6 with 7071, the lead's agent, 26 Oct;
-new product units come only as `install` brings them). A customer lamp's
+installed product units (lamp-52e6 with 7071, the lead's agent, 26 Oct:
+before #3466, a round brought no new product unit text, which only `install`
+did). A customer lamp's
 name has none, so this is only a test lamp's. `check` never writes, whatever `--apply` says. `once` and `check` end with
 0 (up to date, switched, or only saying), 1 (refused, put back, failed), 3
 (the channel cannot be reached), 4 (no quiet moment); a wrong option with 2.
