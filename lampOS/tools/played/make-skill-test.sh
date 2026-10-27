@@ -25,7 +25,7 @@ exit 0
 EOF
 # The lamp, from what was played. Each played line is answered once. In an arm (from its request on): the lamp offers
 # make_skill at once, or (FAKE_CONFIRM) after a first "Yes, please."; the next "Yes, please." hands it over (the
-# stand-in's new, then show); the voice keeps the skill (FAKE_KEPT) and asks to put it on; "Yes, put it on." (or,
+# stand-in's new, then show); the voice keeps the skill (FAKE_KEPT) and asks to put it on; "Yes, go ahead." (or,
 # with FAKE_ON_NO, "No, not now.") puts it on, once an arm.
 cat >"$T/state" <<'EOF'
 #!/usr/bin/env python3
@@ -68,15 +68,18 @@ for n, arm in enumerate(arms):
                 out["journal"].append("lamp-voice: a made skill is on the lamp: stand-up-nudge, sha256 " + os.environ["FAKE_SHA"])
         else:
             out["journal"].append("lamp-voice: a skill made by voice is not kept: it doesn't pass the lamp's check")
-    if "Yes, put it on." in arm and os.environ.get("FAKE_EARLY"):
+    if "Yes, go ahead." in arm and os.environ.get("FAKE_EARLY"):
         out["journal"].append("lamp-voice: a made skill was not put on: stand-up-nudge: it is on the lamp already")
-    elif "Yes, put it on." in arm or ("No, not now." in arm and os.environ.get("FAKE_ON_NO")):
+    elif "Yes, go ahead." in arm or ("No, not now." in arm and os.environ.get("FAKE_ON_NO")):
         mark = os.path.join(d, "on-%d" % n)
         if not os.path.exists(mark):
             open(mark, "w").close()
             open(os.path.join(d, "installed"), "w").close()
         out["journal"].append("lamp-voice: a made skill is on the lamp: stand-up-nudge, sha256 " + os.environ.get("FAKE_ON_SHA", os.environ["FAKE_SHA"]))
         out["journal"].append('lamp-skills: loaded ["dance", "stand-up-nudge"]')
+    # FAKE_SILENT_ON: on at a no with no line of the voice's, as an earlier arm's ask answered (lamp-06c1, 27 Oct).
+    if "No, not now." in arm and os.environ.get("FAKE_SILENT_ON"):
+        open(os.path.join(d, "installed"), "w").close()
 what = sys.argv[1]
 if what in ("new", "show"):
     print(out[what])
@@ -99,6 +102,10 @@ case "$*" in
   *"lamp-cloud make-skill made"*)  # the app's skills.made: on once installed, else asked (FAKE_APP_ to differ)
     if [[ -e $FAKE_DIR/installed ]]; then on=on; else on=asked; fi
     echo "${FAKE_APP_STATE:-$on} ${FAKE_APP_SHA:-$FAKE_SHA}" ;;
+  *"played-stand-in/saved"*)  # the voice's made skills and told news: saved, reset before an arm, put back
+    case "$*" in *"touch"*) w=save ;; *"tasks-told && "*) w=restore ;; *) w=reset ;; esac
+    echo "$w" >>"$FAKE_DIR/voice-state"
+    [[ $w != save || -z ${FAKE_SAVE_FAILS:-} ]] ;;
   *"rm -rf /usr/local/lib/played-stand-in"*) true ;;
   *"sudo -n true"*) true ;;
   *"systemctl show"*) printf 'ActiveState=active\nEnvironment=%s\n' "$FAKE_ENV" ;;
@@ -116,8 +123,8 @@ case "$*" in
   *" list"*)
     echo "NAME            KIND         VERSION  MAY USE"
     echo "dance           core         1.0.0    body"
-    [[ -e $FAKE_DIR/installed ]] && echo "stand-up-nudge  installable  1.0.0    light" ;;
-  *" remove stand-up-nudge"*) rm -f "$FAKE_DIR/installed"; echo stand-up-nudge >>"$FAKE_DIR/removed" ;;
+    [[ -e $FAKE_DIR/installed || -n ${FAKE_NUDGE_ON:-} ]] && echo "stand-up-nudge  installable  1.0.0    light" ;;
+  *" remove stand-up-nudge"*) [[ -e $FAKE_DIR/installed ]] || exit 1; rm -f "$FAKE_DIR/installed"; echo stand-up-nudge >>"$FAKE_DIR/removed" ;;
   *) echo "fake lamp: not known: $*" >&2; exit 1 ;;
 esac
 EOF
@@ -149,6 +156,10 @@ run both both 0 "PASS asked to confirm: not needed" "PASS offered" "PASS handed 
 grep -qx stand-up-nudge "$T/d/removed" || { echo "FAIL both: the skill was not removed by the arm"; fail=1; }
 grep -q 'PLAYED_VOICE_ENV=LAMP_MAKE_SKILL=on' "$T/d/setup" || { echo "FAIL both: the switch was not given to the voice"; fail=1; }
 grep -q 'PLAYED_TARGET=auto' "$T/d/setup" || { echo "FAIL both: no targets file for the run"; fail=1; }
+# The put-on's yes is a plain one (the voice's plain_agreement), never "Yes, put it on.", which it refuses.
+grep -qx 'Yes, go ahead.' "$T/d/played" || { echo "FAIL both: the put-on's yes was not a plain one"; fail=1; }
+# The voice's made skills saved, back as saved before each arm, and both put back at the end.
+[[ $(tr '\n' ' ' <"$T/d/voice-state") == "save reset reset restore " ]] || { echo "FAIL both: voice state: $(tr '\n' ' ' <"$T/d/voice-state")"; fail=1; }
 # The stand-in's answer is the two files a made skill's answer has, in its `show`.
 python3 - "$T/d/plan.json" <<'PY' || { echo "FAIL both: the plan's answer is not a made skill's"; fail=1; }
 import json, sys
@@ -201,6 +212,19 @@ FAKE_ON_NO=1 run on-no no 1 "FAIL nothing installed" "removed on exit: stand-up-
 # A skill put on before the yes (the Reviewer-lead on #2745): failed, and removed on exit though the yes's own
 # put-on found it on already.
 FAKE_EARLY=1 run early yes 1 "FAIL nothing on before the yes" "FAIL installed after the yes" "removed on exit: stand-up-nudge"
+
+# The yes arm's ask answered by the no arm's hand-over yes (lamp-06c1, 27 Oct): nothing logs it, and stand-up-nudge is
+# still removed on exit.
+FAKE_SILENT_ON=1 run leftover no 1 "FAIL nothing installed" "removed on exit: stand-up-nudge"
+
+# stand-up-nudge on the lamp already: nothing changed, nothing played.
+FAKE_NUDGE_ON=1 run nudge-on yes 3 "already on the lamp; nothing changed"
+[[ ! -e $T/d/fixture ]] || { echo "FAIL nudge-on: the stand-in was sent"; fail=1; }
+
+# The voice's state can't be saved: nothing played, and the stand-in's folder is removed.
+FAKE_SAVE_FAILS=1 run save-fails yes 9 "could not be saved; nothing played"
+[[ ! -e $T/d/played ]] || { echo "FAIL save-fails: something was played"; fail=1; }
+grep -q 'rm -rf /usr/local/lib/played-stand-in$' "$T/d/calls" || { echo "FAIL save-fails: the stand-in's folder was left"; fail=1; }
 
 # A skill the voice did not keep: the arm stops there.
 FAKE_KEPT=no run not-kept yes 1 "FAIL made" "is not kept" "1 failed"
