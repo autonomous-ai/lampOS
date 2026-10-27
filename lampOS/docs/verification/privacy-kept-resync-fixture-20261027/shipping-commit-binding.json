@@ -1,0 +1,14 @@
+{
+  "commit": "57f9175ed4e18cb88247aca7e7d1c9e10a62edd8",
+  "commit_tree": "fb7e47dc1887daff49e3d159089c6b2dc4356446",
+  "tested_staged_tree": "fb7e47dc1887daff49e3d159089c6b2dc4356446",
+  "tree_equal": true,
+  "base": "4bff5f2c517bf64d4a32c31a90e0b24dc1a4810a",
+  "runtime_source_state": "exact two-file staged index tree before commit",
+  "shipping_audit_sha256": "caa6e6fb530aec565f9371677df0c1a99dec2550541c75a35febfb8f9e92e0d3",
+  "limits": [
+    "No claim tests were rerun after committing identical source tree.",
+    "No native or device result here."
+  ],
+  "complete_independent_auditor_receipt_sha256": "b13d6c65016e171ab396de5524dd14a81984603a40a52ff1709d6c936e7baa92"
+}

@@ -42,3 +42,30 @@ bound stay unchanged. The diagnostic does not qualify that shipping source.
 Fresh latest-base full Voice, unchanged typed freshness/liveness controls,
 formatting, strict Clippy and native gates remain required. Historical causes,
 physical behavior and latency have not been established here.
+
+## Shipping source qualification on 4bff
+
+[Independent shipping audit](shipping-4bff-audit.json): full Voice library
+3,817/0/15, Msgs library 92/0/0 and full integration 80/0/0, Bus library
+55/0/1, and two exact generic Bus liveness controls 2/0/0. The direct
+nonoverlapping sum is **4,046 passed, 0 failed, 16 ignored**. The separate
+same-three-package docs cohort passes **3/0/0**. All 16 required privacy and
+liveness witnesses pass once, and all 11 observed panic hooks are source-expected
+(three should-panic, eight caught), with no unknown hook or audit hold.
+
+Formatting, strict all-target Voice/Bus/Msgs Clippy, workspace build and test
+compilation passed. Source/raw inputs and all 65 actual/saved executable pairs
+remained unchanged in bytes and metadata; all owned groups closed without forced
+cleanup or timeouts. This is the stated selected scope, not the full three-package
+runtime. The generic Bus Late control uses an 80 ms declaration; it is not a
+new stock 10 ms physical-liveness measurement.
+
+[Commit binding](shipping-commit-binding.json) proves the subsequent commit
+57f9175ed has exactly tested staged tree fb7e47dc1. Tests ran before that
+commit on the identical staged source. An incomplete controller hash was refused
+before any test admission; a first auditor admission also failed at sandboxed
+index access before log parsing. Both are retained separately; no test was
+retried. The unchanged auditor completed under the required index access.
+
+Native ARM64/Linux, two current independent reads and any later base carry are
+separate gates. Historical generic-unavailable causes remain unknown.

@@ -1,0 +1,313 @@
+{
+  "base": "4bff5f2c517bf64d4a32c31a90e0b24dc1a4810a",
+  "command_results": [
+    {
+      "complete_observed_cases_sha256": "96f79e83e9913657540bc9e8a2562ffddff03ddd2a3cc2d899102a8c66aebe2f",
+      "label": "voice-lib",
+      "log": "selected-01-voice-lib.log",
+      "log_sha256": "00643546b038377a3bf39b9f96ff3040982e3cc01debe2cb768d15f8667d6e9f",
+      "observed_cases_census": 3832,
+      "package": "lamp-voice",
+      "returncode": 0,
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 15,
+          "line": 17219,
+          "measured": 0,
+          "passed": 3817,
+          "status": "ok"
+        }
+      ],
+      "target": "lamp_voice"
+    },
+    {
+      "complete_observed_cases_sha256": "91b9bc77fcae77772e78155ab17a3fed86c4d531b99ec5aa00d4957607c2972e",
+      "label": "msgs-lib",
+      "log": "selected-02-msgs-lib.log",
+      "log_sha256": "8328ca49497a615638d05f1e857b899794dd63a559fd730e9f8c3a1504d48dee",
+      "observed_cases_census": 92,
+      "package": "lamp-msgs",
+      "returncode": 0,
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "line": 96,
+          "measured": 0,
+          "passed": 92,
+          "status": "ok"
+        }
+      ],
+      "target": "lamp_msgs"
+    },
+    {
+      "complete_observed_cases_sha256": "9ac00f98b604decd8c3ad11425add52a49b475068efdd737a6f7151327fc56ab",
+      "label": "msgs-it",
+      "log": "selected-03-msgs-it.log",
+      "log_sha256": "e6b523270569c19fe96ea84bdfa9648257f4bbcb16f25accd3cb8179b1a9ac8a",
+      "observed_cases_census": 80,
+      "package": "lamp-msgs",
+      "returncode": 0,
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "line": 84,
+          "measured": 0,
+          "passed": 80,
+          "status": "ok"
+        }
+      ],
+      "target": "it"
+    },
+    {
+      "complete_observed_cases_sha256": "0b1884287b9f0c41412864b3dc032cc6e71e8458844eda74bb6894b086087de8",
+      "label": "bus-lib",
+      "log": "selected-04-bus-lib.log",
+      "log_sha256": "a6341b2f20c9322fe197ce61b5d6ec0d044c49c3892f62107d31e8a47a9414d5",
+      "observed_cases_census": 56,
+      "package": "lamp-bus",
+      "returncode": 0,
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 1,
+          "line": 67,
+          "measured": 0,
+          "passed": 55,
+          "status": "ok"
+        }
+      ],
+      "target": "lamp_bus"
+    },
+    {
+      "complete_observed_cases_sha256": "ea9ee1911149bcf5cd069cb097f48c0930a300796799fbc1c48de30ef61fe5b1",
+      "label": "bus-liveness-controls",
+      "log": "selected-05-bus-liveness-controls.log",
+      "log_sha256": "6fec20a9ea53cc8bae38129168bf2f88baf981c4f78ac2875c8181c953ceb513",
+      "observed_cases_census": 2,
+      "package": "lamp-bus",
+      "returncode": 0,
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered": 48,
+          "ignored": 0,
+          "line": 6,
+          "measured": 0,
+          "passed": 2,
+          "status": "ok"
+        }
+      ],
+      "target": "it"
+    },
+    {
+      "complete_observed_cases_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+      "label": "doctests-3",
+      "log": "selected-06-doctests-3.log",
+      "log_sha256": "efb71a4d652a3b738c6a87aea409b5f4d2080e640b4daf55eaed5f2a2e61aea3",
+      "observed_cases_census": 0,
+      "package": null,
+      "returncode": 0,
+      "summaries": [
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "line": 8,
+          "measured": 0,
+          "passed": 2,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "line": 16,
+          "measured": 0,
+          "passed": 1,
+          "status": "ok"
+        },
+        {
+          "failed": 0,
+          "filtered": 0,
+          "ignored": 0,
+          "line": 23,
+          "measured": 0,
+          "passed": 0,
+          "status": "ok"
+        }
+      ],
+      "target": null
+    }
+  ],
+  "complete_independent_auditor_receipt_sha256": "b13d6c65016e171ab396de5524dd14a81984603a40a52ff1709d6c936e7baa92",
+  "controller_sha256": "9e14fa289f9f3e0fc64d18d007a95b5f126037d61f3180d35e15da02316dfdd4",
+  "doc_headings": [
+    "lamp_bus",
+    "lamp_msgs",
+    "lamp_voice"
+  ],
+  "helper_sha256": "617d176e200dfbdec1fdfce4e7766a7ba8264f7d012fabc731e53239c309b41d",
+  "holds": [],
+  "integrity": {
+    "actual_and_saved_paths_rehashed": 65,
+    "raw_entries": 8698,
+    "source_files": 7239
+  },
+  "limits": [
+    "Selected five drivers and three-package docs; not full three-package runtime or native ARM qualification.",
+    "Actual execution belongs to staged tree, not base commit or later commit.",
+    "Reported malformed-hash admission rejection occurred before claimed test launch; preserved separately.",
+    "No historical cause/device/physical-latency claim."
+  ],
+  "metadata": {
+    "after": [],
+    "before": [],
+    "current": []
+  },
+  "panic_hooks": {
+    "classified": [
+      {
+        "classification": "declared_should_panic",
+        "line": 1008,
+        "log": "selected-01-voice-lib.log",
+        "payload": "no outer scenario clock: the fixture enters its own",
+        "site": "crates/voice/src/coordinator/tests/early_end.rs:691",
+        "source_proof": "crates/voice/src/coordinator/tests/early_end.rs:968",
+        "test": "coordinator::tests::early_end::fixture_policy_tests::a_scoped_clock_is_rejected_before_provider_or_child_startup"
+      },
+      {
+        "classification": "caught_fault_injection",
+        "line": 1015,
+        "log": "selected-01-voice-lib.log",
+        "payload": "Box<dyn Any>",
+        "site": "crates/voice/src/coordinator/tests/early_end.rs:951",
+        "source_proof": "crates/voice/src/coordinator/tests/early_end.rs:953",
+        "test": "coordinator::tests::early_end::fixture_policy_tests::task_panic_payload_propagates_even_when_cancellation_was_requested"
+      },
+      {
+        "classification": "declared_should_panic",
+        "line": 1019,
+        "log": "selected-01-voice-lib.log",
+        "payload": "fixture task cancelled without a fixture request: task 48 was cancelled",
+        "site": "crates/voice/src/coordinator/tests/early_end.rs:707",
+        "source_proof": "crates/voice/src/coordinator/tests/early_end.rs:960",
+        "test": "coordinator::tests::early_end::fixture_policy_tests::unrequested_task_cancellation_is_rejected"
+      },
+      {
+        "classification": "caught_fault_injection",
+        "line": 1129,
+        "log": "selected-01-voice-lib.log",
+        "payload": "Box<dyn Any>",
+        "site": "crates/voice/src/coordinator/tests/endpoint_session.rs:1422",
+        "source_proof": "crates/voice/src/coordinator/tests/endpoint_session.rs:1407",
+        "test": "coordinator::tests::endpoint_session::endpoint_fixture_reaps_on_panic_before_and_after_handoff"
+      },
+      {
+        "classification": "caught_fault_injection",
+        "line": 1132,
+        "log": "selected-01-voice-lib.log",
+        "payload": "Box<dyn Any>",
+        "site": "crates/voice/src/coordinator/tests/endpoint_session.rs:1393",
+        "source_proof": "crates/voice/src/coordinator/tests/endpoint_session.rs:1407",
+        "test": "coordinator::tests::endpoint_session::endpoint_fixture_reaps_on_panic_before_and_after_handoff"
+      },
+      {
+        "classification": "declared_should_panic",
+        "line": 1136,
+        "log": "selected-01-voice-lib.log",
+        "payload": "real endpoint worker fixture requires the host clock",
+        "site": "crates/voice/src/coordinator/tests/endpoint_session.rs:954",
+        "source_proof": "crates/voice/src/coordinator/tests/endpoint_session.rs:997",
+        "test": "coordinator::tests::endpoint_session::fixture_policy_tests::a_logical_clock_is_rejected_before_the_process_constructor"
+      },
+      {
+        "classification": "caught_fault_injection",
+        "line": 1548,
+        "log": "selected-01-voice-lib.log",
+        "payload": "Box<dyn Any>",
+        "site": "crates/voice/src/coordinator/tests/pilot_faults.rs:2611",
+        "source_proof": "crates/voice/src/coordinator/tests/pilot_faults.rs:2609",
+        "test": "coordinator::tests::pilot_faults::metadata_release_on_unwind_unblocks_the_real_writer_and_keeps_the_panic"
+      },
+      {
+        "classification": "caught_fault_injection",
+        "line": 5461,
+        "log": "selected-01-voice-lib.log",
+        "payload": "injected peer panic",
+        "site": "crates/voice/src/scenario_clock.rs:411",
+        "source_proof": "crates/voice/src/scenario_clock.rs:414",
+        "test": "scenario_clock::tests::callback_panic_releases_state_and_old_scope_cannot_clear_its_successor"
+      },
+      {
+        "classification": "caught_fault_injection",
+        "line": 16697,
+        "log": "selected-01-voice-lib.log",
+        "payload": "a pass that panics",
+        "site": "crates/voice/src/stalls.rs:767",
+        "source_proof": "crates/voice/src/stalls.rs:762",
+        "test": "stalls::tests::a_pass_that_panics_is_written_as_the_loops_end_while_the_stack_unwinds"
+      },
+      {
+        "classification": "caught_fault_injection",
+        "line": 48,
+        "log": "selected-04-bus-lib.log",
+        "payload": "fixture unwind",
+        "site": "crates/bus/src/guarded_publish_tests.rs:200",
+        "source_proof": "crates/bus/src/guarded_publish_tests.rs:196",
+        "test": "publish::guarded_tests::owned_encoded_buffer_is_scrubbed_on_error_and_unwind"
+      },
+      {
+        "classification": "caught_fault_injection",
+        "line": 53,
+        "log": "selected-04-bus-lib.log",
+        "payload": "fixture unwind",
+        "site": "crates/bus/src/guarded_publish_tests.rs:176",
+        "source_proof": "crates/bus/src/guarded_publish_tests.rs:173",
+        "test": "publish::guarded_tests::partial_encoding_errors_are_scrubbed_and_never_touch_reusable_storage"
+      }
+    ],
+    "expected_occurrences": 11,
+    "unknown": []
+  },
+  "report_scope": "Concise public summary of immutable full independent auditor receipt; per-case log parsing inventory omitted here, with complete receipt hash retained.",
+  "reported_pre_admission_rejection": [
+    {
+      "reason": "Root inadvertently passed incomplete hash3dbe11; required64hex validation refused before receipts/test launch. No test was executed.",
+      "returncode": 1,
+      "status": "REJECTED_BEFORE_CLAIM_OR_TEST"
+    }
+  ],
+  "required_host_witnesses": {
+    "bus::a_subscriber_is_told_once_that_the_source_has_gone_and_once_that_it_is_back": true,
+    "bus::a_topic_that_promised_a_period_is_late_after_twice_that_and_on_time_with_the_next": true,
+    "privacy::a_lamp_with_no_slide_permits_only_with_its_marker_and_a_fresh_observation": true,
+    "privacy::envelope_must_name_voice_and_match_payload_clock_time_session_and_sequence": true,
+    "privacy::freshness_is_original_acquisition_bounded_and_boot_scoped": true,
+    "privacy::permission_requires_known_open_switch_and_bounded_valid_lineage": true,
+    "privacy::topic_is_additive_and_json_roundtrips": true,
+    "privacy_bus::tests::a_receipt_comes_only_with_a_slides_reading": true,
+    "privacy_bus::tests::after_a_datagram_a_gap_ends_the_lease_reader_inside_its_first_second": true,
+    "privacy_bus::tests::only_recovery_finishes_the_source_episode_and_allows_a_new_one": true,
+    "privacy_bus::tests::recovery_queued_after_a_source_stall_reports_the_old_expiry_first": true,
+    "privacy_bus::tests::selected_endpoints_bind_and_read_a_real_bus": true,
+    "privacy_bus::tests::source_expiry_is_ridden_only_when_enabled_after_permission": true,
+    "privacy_bus::tests::the_lease_reader_resyncs_on_kept_leases_only_before_its_first_datagram_in_its_first_second": true,
+    "privacy_bus::tests::the_lease_watch_answers_at_once_through_refused_input_and_lets_a_lease_expire": true,
+    "privacy_bus::tests::the_order_begins_again_only_before_the_first_datagram_in_the_first_second": true
+  },
+  "selected_direct_counts": {
+    "failed": 0,
+    "ignored": 16,
+    "passed": 4046
+  },
+  "status": "VERIFIED_SELECTED_SHIPPING_SCOPE",
+  "tested_staged_tree": "fb7e47dc1887daff49e3d159089c6b2dc4356446",
+  "tests_retried": 0
+}
