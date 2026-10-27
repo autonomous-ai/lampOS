@@ -1,0 +1,24 @@
+{
+  "head": "ee4ddf6f6d5b5856e9fc398860a6ab2984619bf9",
+  "base": "44d1ec5abe70723bc7e232552f05eb14f029c0d8",
+  "prior_read": "70815838048d0340daccd52699589d81560d283e",
+  "owned_full_blobs_modes_exact": [
+    {
+      "path": "lampOS/crates/update/src/writer_refresh.rs",
+      "ls_tree": "100644 blob 2dc0a4d026be3190755fc8b66793960648a381f1\tlampOS/crates/update/src/writer_refresh.rs"
+    },
+    {
+      "path": "lampOS/crates/update/src/writer_refresh/tests.rs",
+      "ls_tree": "100644 blob c25d33e511f161f638595bccc36886f0f4a81698\tlampOS/crates/update/src/writer_refresh/tests.rs"
+    },
+    {
+      "path": "lampOS/docs/settings-writer-refresh.md",
+      "ls_tree": "100644 blob 3932a4fa5195a15d94d4ee23d93122b566f2000c\tlampOS/docs/settings-writer-refresh.md"
+    }
+  ],
+  "whole_Update_subtree_exact": "2ae65666988fd661eb5066f7fa3a90ce0be1e18a",
+  "Cargo_lock_exact": true,
+  "range": "one equal row",
+  "scope": "Source read carried; no new local compiler/runtime. Root prior two tests remain708-only. Author current203 and required original gates remain separate.",
+  "limits": "No native census, fork, old failure-cause, Memory semantic or device acceptance."
+}

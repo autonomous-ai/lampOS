@@ -1,3 +1,7 @@
+## 2026-10-28 01:53 — PID guard source read carries to latest offered base
+
+READ-OK #3913 ee4ddf6f6 in [the unchanged source scope](verification/pid-lock-read-3913-20261028/current-ee4-source.json). Independent Git comparison verifies all three authored blobs/modes, the complete Update subtree and Cargo.lock are exact to read708; range-diff is equal onto44d1. No new local compiler/runtime is claimed. The prior two exact local controls remain708-bound; author's203 current cases and current original ARM/Linux checks remain separate and pending. Nontransferable Session/real-fork/unlock-error limits and old unexplained failures are unchanged. No Memory semantic, activation, device or latest-train acceptance.
+
 ## 2026-10-28 01:44 — empty-component token regression repaired on latest base
 
 Ready for lamp-voice: no (current native gate and independent reads pending, #3912).
