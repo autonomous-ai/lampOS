@@ -1,0 +1,56 @@
+{
+  "head": "2fa602a0a84164fd74d1d944830cd4a3257e389b",
+  "base": "c1fa2bc9f327f5d553bb3dcc355053d8e7e94bfa",
+  "owned_paths": [
+    "lampOS/crates/update/src/head_touch.rs",
+    "lampOS/crates/update/src/head_touch/plan_output.rs",
+    "lampOS/crates/update/src/head_touch/plan_output/tests.rs",
+    "lampOS/docs/head-touch-plan-output.md",
+    "lampOS/docs/updates.md",
+    "lampOS/docs/reuse-decisions.md"
+  ],
+  "files": {
+    "lampOS/crates/update/src/head_touch.rs": {
+      "sha256": "8046a94a819ab03f3d2c00499283f2894d8a1a3b530f81b3c37a065b2cdc740f",
+      "original_mode": 420,
+      "bytes": 22678,
+      "mode": 420
+    },
+    "lampOS/crates/update/src/head_touch/plan_output.rs": {
+      "sha256": "ec79d76ae9f9dcadf3837ebe5470ad950b46d1b94e011d31c8953e3c00bbf5b2",
+      "original_mode": 420,
+      "bytes": 3060,
+      "mode": 420
+    },
+    "lampOS/crates/update/src/head_touch/plan_output/tests.rs": {
+      "sha256": "e891b042bf6092ee1a4e18cf229a8bd0685cc263cc75a268cd9a77aca201a495",
+      "original_mode": 420,
+      "bytes": 10958,
+      "mode": 420
+    },
+    "lampOS/docs/head-touch-plan-output.md": {
+      "sha256": "2f8b14f740d397ed4b5fcd5c6f8594ca453601040cdf33286c646054df0358ee",
+      "original_mode": 420,
+      "bytes": 3163,
+      "mode": 420
+    },
+    "lampOS/docs/updates.md": {
+      "sha256": "6e4ad4ed08fb88162ad1003313397cf364c6fba3f32a2a68243cb7bd28ba7df3",
+      "original_mode": 420,
+      "bytes": 176352,
+      "mode": 420
+    },
+    "lampOS/docs/reuse-decisions.md": {
+      "sha256": "a6a1ae1ab2d7054d49e7992878cac3b081016e8c0fe890ea2818e047afb45dcf",
+      "original_mode": 420,
+      "bytes": 152985,
+      "mode": 420
+    }
+  },
+  "source_checkpoint": "<private-path>",
+  "schema_normalization": {
+    "mapping": "reviewed original_mode -> controller mode; identical integer0644, no source change",
+    "prior_freeze_sha256": "121cac607cc1205dd713061735efd049de337b1e8bf76fe3d00dafea8cd79183",
+    "prior_attempt": "31179preCargoKeyError; zeroCargo/compile/runtime; source and target unchanged"
+  }
+}

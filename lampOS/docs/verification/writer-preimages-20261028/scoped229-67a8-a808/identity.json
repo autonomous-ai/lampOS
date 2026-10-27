@@ -1,0 +1,30 @@
+{
+  "head": "67a8e9554f6fb9644e0b0ab72a2e3895141e26ed",
+  "base": "a808ef04b5885ccb35e8e7693eee16ae331e3a7f",
+  "tree": "55431f7494e8f841a24a296ba723c27470a99096",
+  "own_branch": "second/writer-preimages-latest",
+  "working_patch_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "dirty_files": [],
+  "uncommitted_source_gate": false,
+  "clean_committed_source_gate": true,
+  "Raw_parent": "f479305357987e8b8b4677170847915e01664cb8",
+  "six_owned_paths": [
+    "lampOS/crates/update/src/lib.rs",
+    "lampOS/crates/update/src/writer_preimages.rs",
+    "lampOS/crates/update/src/writer_preimages/tests.rs",
+    "lampOS/docs/reuse-decisions.md",
+    "lampOS/docs/updates.md",
+    "lampOS/docs/writer-preimages.md"
+  ],
+  "source_count": 7510,
+  "controller_sha256": "7dd01d27bfbab0b41cb63177c31a5b4e5e42062cf09242a7eeefcd46109d34f4",
+  "nextest_tool_sha256": "aad9d409cd2f0a81fcaed49d7672a133254179458436c1e957505e4a11655329",
+  "nextest_version": "0.9.150",
+  "earlier_CI_runner_version": "0.9.149",
+  "verified_tool_proof_sha256": "5563f2b54904be2611512496701b75cb5d11f8a60fe3e60773a1579b82286c1f",
+  "merged_receipt_selector_sha256": "ecf2c70720c3f1c14b5ba960123cea0e3ae0764777f4906992a989c58ee80c23",
+  "config_sha256": "c4992da8d157df279011a424b5feb4833f001fd1d46ce3edd0a56992c848bb33",
+  "preferred_runner_scope": "CURRENTa808 consumedSkills_package/cumulativeInstallDoc scoped fullLIB/functions/it plus3receiptRound plus1installDoc;229projectiononlyuntilfreshdiscovery/all58; old537fullremainsd8; failedprep/oldlibtestunwaived",
+  "earlier_failure_unwaived": true,
+  "baseline_198_pass_INCONCLUSIVE": true
+}

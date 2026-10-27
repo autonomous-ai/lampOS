@@ -1,0 +1,122 @@
+[
+  {
+    "actual_sha256": "00a1f4748098b65efe245acd7fd1e442cc153c124d3ca990f6022869214ad6e7",
+    "bytes": 550064,
+    "kind": [
+      "test"
+    ],
+    "post_list_sha256": "00a1f4748098b65efe245acd7fd1e442cc153c124d3ca990f6022869214ad6e7",
+    "post_runtime_sha256": "00a1f4748098b65efe245acd7fd1e442cc153c124d3ca990f6022869214ad6e7",
+    "preserved_sha256": "00a1f4748098b65efe245acd7fd1e442cc153c124d3ca990f6022869214ad6e7",
+    "target": "self-cli-exec",
+    "test_profile": true
+  },
+  {
+    "actual_sha256": "0f41471a1e02a7effda7ec205a17d0c8eaf21d8d06835d5bfaa7b4f25f8c1a74",
+    "bytes": 1277200,
+    "kind": [
+      "bin"
+    ],
+    "post_list_sha256": "0f41471a1e02a7effda7ec205a17d0c8eaf21d8d06835d5bfaa7b4f25f8c1a74",
+    "post_runtime_sha256": "0f41471a1e02a7effda7ec205a17d0c8eaf21d8d06835d5bfaa7b4f25f8c1a74",
+    "preserved_sha256": "0f41471a1e02a7effda7ec205a17d0c8eaf21d8d06835d5bfaa7b4f25f8c1a74",
+    "target": "lamp-update",
+    "test_profile": true
+  },
+  {
+    "actual_sha256": "8be65988785603de9326d0a5fd52cac9e2eb5b08d4fe0d9c5b2f938f0171fc2c",
+    "bytes": 22852696,
+    "kind": [
+      "test"
+    ],
+    "post_list_sha256": "8be65988785603de9326d0a5fd52cac9e2eb5b08d4fe0d9c5b2f938f0171fc2c",
+    "post_runtime_sha256": "8be65988785603de9326d0a5fd52cac9e2eb5b08d4fe0d9c5b2f938f0171fc2c",
+    "preserved_sha256": "8be65988785603de9326d0a5fd52cac9e2eb5b08d4fe0d9c5b2f938f0171fc2c",
+    "target": "functions",
+    "test_profile": true
+  },
+  {
+    "actual_sha256": "9b075e0bdc47e14dd027dd0883bbea86a52f3d6191164b5414f671e16c4e242a",
+    "bytes": 17252232,
+    "kind": [
+      "test"
+    ],
+    "post_list_sha256": "9b075e0bdc47e14dd027dd0883bbea86a52f3d6191164b5414f671e16c4e242a",
+    "post_runtime_sha256": "9b075e0bdc47e14dd027dd0883bbea86a52f3d6191164b5414f671e16c4e242a",
+    "preserved_sha256": "9b075e0bdc47e14dd027dd0883bbea86a52f3d6191164b5414f671e16c4e242a",
+    "target": "install",
+    "test_profile": true
+  },
+  {
+    "actual_sha256": "d48aecad9e1abff59023569d076d5c08e186866eeb226a5783a3730669fa2877",
+    "bytes": 21013464,
+    "kind": [
+      "test"
+    ],
+    "post_list_sha256": "d48aecad9e1abff59023569d076d5c08e186866eeb226a5783a3730669fa2877",
+    "post_runtime_sha256": "d48aecad9e1abff59023569d076d5c08e186866eeb226a5783a3730669fa2877",
+    "preserved_sha256": "d48aecad9e1abff59023569d076d5c08e186866eeb226a5783a3730669fa2877",
+    "target": "round",
+    "test_profile": true
+  },
+  {
+    "actual_sha256": "12a5570f7683beb5cfad0e9f16eba11ae921b76502c0d2be818fdb10a6b28976",
+    "bytes": 550128,
+    "kind": [
+      "test"
+    ],
+    "post_list_sha256": "12a5570f7683beb5cfad0e9f16eba11ae921b76502c0d2be818fdb10a6b28976",
+    "post_runtime_sha256": "12a5570f7683beb5cfad0e9f16eba11ae921b76502c0d2be818fdb10a6b28976",
+    "preserved_sha256": "12a5570f7683beb5cfad0e9f16eba11ae921b76502c0d2be818fdb10a6b28976",
+    "target": "self-process-cuts",
+    "test_profile": true
+  },
+  {
+    "actual_sha256": "b8dbc863d9c183d15e36658ce776b9a67aad8814958e6f8509d67390e3ce3a9a",
+    "bytes": 3295728,
+    "kind": [
+      "test"
+    ],
+    "post_list_sha256": "b8dbc863d9c183d15e36658ce776b9a67aad8814958e6f8509d67390e3ce3a9a",
+    "post_runtime_sha256": "b8dbc863d9c183d15e36658ce776b9a67aad8814958e6f8509d67390e3ce3a9a",
+    "preserved_sha256": "b8dbc863d9c183d15e36658ce776b9a67aad8814958e6f8509d67390e3ce3a9a",
+    "target": "release_pair",
+    "test_profile": true
+  },
+  {
+    "actual_sha256": "47580ac3bc712a41f94c490129489a6762539219df5a4d30fe75407676a4d603",
+    "bytes": 16821024,
+    "kind": [
+      "lib"
+    ],
+    "post_list_sha256": "47580ac3bc712a41f94c490129489a6762539219df5a4d30fe75407676a4d603",
+    "post_runtime_sha256": "47580ac3bc712a41f94c490129489a6762539219df5a4d30fe75407676a4d603",
+    "preserved_sha256": "47580ac3bc712a41f94c490129489a6762539219df5a4d30fe75407676a4d603",
+    "target": "lamp_update",
+    "test_profile": true
+  },
+  {
+    "actual_sha256": "aa261fcbcaa4ff73f58f57facbccb28846354152734c98415012759f06c2e81a",
+    "bytes": 1976768,
+    "kind": [
+      "test"
+    ],
+    "post_list_sha256": "aa261fcbcaa4ff73f58f57facbccb28846354152734c98415012759f06c2e81a",
+    "post_runtime_sha256": "aa261fcbcaa4ff73f58f57facbccb28846354152734c98415012759f06c2e81a",
+    "preserved_sha256": "aa261fcbcaa4ff73f58f57facbccb28846354152734c98415012759f06c2e81a",
+    "target": "it",
+    "test_profile": true
+  },
+  {
+    "actual_sha256": "e807568bc6cbf6a029786c0bc2f33d05ac83fca638885e08366066d8d9a5b3d3",
+    "bytes": 13556032,
+    "kind": [
+      "bin"
+    ],
+    "post_list_sha256": "e807568bc6cbf6a029786c0bc2f33d05ac83fca638885e08366066d8d9a5b3d3",
+    "post_runtime_sha256": "e807568bc6cbf6a029786c0bc2f33d05ac83fca638885e08366066d8d9a5b3d3",
+    "preserved_sha256": "e807568bc6cbf6a029786c0bc2f33d05ac83fca638885e08366066d8d9a5b3d3",
+    "target": "lamp-update",
+    "test_profile": false
+  }
+]

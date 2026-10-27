@@ -1,0 +1,11 @@
+{
+  "original_preserved_private_identity_sha256": "1dfaa5d1b30967dea0cd50a837bb99431b371125412b318d1fb416c56640400b",
+  "original_packet_manifest_sha256": "ae141e2ad58ab08c1ff78937e4c3b50a9b86b07307c4e1e8c45d6481f2bf902a",
+  "corrected_identity_sha256": "64c569104f420e3356746bc5b9f830182d31faa66354c38c2d3ba77d138f51e8",
+  "only_changed_field": "pr",
+  "old": 3892,
+  "correct": 3937,
+  "evidence": "Original run40576652072,headf3c and PR3937 exact dependent source; all other identity fields unchanged. The copied old label was an audit metadata typo.",
+  "source_runtime_scope_and_hashes_unchanged": true,
+  "no_gate_rerun_or_correction_of_an_executed_result": true
+}

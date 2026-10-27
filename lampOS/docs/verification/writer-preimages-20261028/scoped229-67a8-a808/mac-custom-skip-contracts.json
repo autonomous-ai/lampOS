@@ -1,0 +1,20 @@
+[
+  {
+    "binary": "lamp-update::self-cli-exec",
+    "name": "actual_cli_exec_confirms_before_the_next_round",
+    "exit_code": 0,
+    "matched": true,
+    "full_discovery_policy_ignored": true,
+    "excluded_from_scoped_runtime": true,
+    "not_added_to_selected_passes": true
+  },
+  {
+    "binary": "lamp-update::self-process-cuts",
+    "name": "persisted_self_switches_survive_sigkill",
+    "exit_code": 0,
+    "matched": true,
+    "full_discovery_policy_ignored": true,
+    "excluded_from_scoped_runtime": true,
+    "not_added_to_selected_passes": true
+  }
+]

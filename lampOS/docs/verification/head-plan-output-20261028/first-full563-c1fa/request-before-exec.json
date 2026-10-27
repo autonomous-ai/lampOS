@@ -1,0 +1,8 @@
+{
+  "cmd": "python3 <private-path> <private-path> ac4fdada14237e922a4aaf27d5c2707862612823854c0bd2bc91a03d76f779d4",
+  "workdir": "<plan-output-tree>",
+  "sandbox_permissions": "require_escalated",
+  "justification": "Run the authorized lamp-update Mac gate and isolated local fixtures after correcting only the frozen-metadata schema; no device, release, signing or service actions.",
+  "yield_time_ms": 1000,
+  "max_output_tokens": 2200
+}

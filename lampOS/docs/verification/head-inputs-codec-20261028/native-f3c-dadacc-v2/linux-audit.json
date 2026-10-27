@@ -1,0 +1,33 @@
+{
+  "pr": 3937,
+  "head": "f3c768e6bc59b04704eff817056c7481d86d5212",
+  "base": "dadacc1bc2fe2e285ed5125a32dd6fe483c01991",
+  "run": 40576652256,
+  "job": 122444761647,
+  "attempt": 1,
+  "actual_checkout": "95bb055424e74bf522d115a06d0736463916cf8b",
+  "ordered_parents": [
+    "dadacc1bc2fe2e285ed5125a32dd6fe483c01991",
+    "f3c768e6bc59b04704eff817056c7481d86d5212"
+  ],
+  "complete_authored_and_preview_tree_equal": "bcca859c4213231d1f98411db8b0a0c427996e2f",
+  "required_stage_results": {
+    "Rust 1.96.0": "success",
+    "stable promotion formatting and strict Clippy": "success",
+    "formatting (whole workspace, pinned Rust)": "success",
+    "clippy (every crate and target, warnings as errors)": "success"
+  },
+  "actual_Update_compiler_marker": true,
+  "terminal": "success",
+  "markers": [
+    "2026-10-27T20:21:56.6148080Z     Finished `dev` profile [unoptimized + debuginfo] target(s) in 14.33s",
+    "2026-10-27T20:21:56.6456472Z ##[group]Run cargo +1.96.0 fmt --all --check",
+    "2026-10-27T20:21:56.6456849Z \u001b[36;1mcargo +1.96.0 fmt --all --check\u001b[0m",
+    "2026-10-27T20:24:50.0235981Z ##[group]Run cargo clippy --locked --workspace --all-targets -- -D warnings",
+    "2026-10-27T20:24:50.0236578Z \u001b[36;1mcargo clippy --locked --workspace --all-targets -- -D warnings\u001b[0m",
+    "2026-10-27T20:26:22.2900749Z     Finished `dev` profile [unoptimized + debuginfo] target(s) in 1m 32s"
+  ],
+  "full_log_sha256": "eba880a7f99545b624bad9bd2f2f77d918a7f1ff21ef15ee46b5d79520554994",
+  "no_rerun": true,
+  "not_a_native_runtime_result": true
+}

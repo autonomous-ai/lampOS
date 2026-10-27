@@ -1,0 +1,62 @@
+[
+  {
+    "binary_id": "lamp-update",
+    "case": "head_touch::plan_output::tests::keep_step_has_no_derived_output_and_moves_oversized_existing_text_without_copying",
+    "status": "PASS",
+    "actual_path": "<controlled-target>/debug/deps/lamp_update-e14d54c83f68ff7f",
+    "actual_sha256": "2286c0afaaee747cd92cf84949425b9fc6dbc4b1a0d8f4086449c6bc9850607f",
+    "preserved_path": "<gate-evidence>/executables/1",
+    "preserved_sha256": "2286c0afaaee747cd92cf84949425b9fc6dbc4b1a0d8f4086449c6bc9850607f",
+    "binding": "runtime binary ID joins exact discovery/compiled/preserved driver; skipped cases excluded"
+  },
+  {
+    "binary_id": "lamp-update",
+    "case": "head_touch::plan_output::tests::late_provider_failure_returns_no_owned_partial_plan_or_private_diagnostic",
+    "status": "PASS",
+    "actual_path": "<controlled-target>/debug/deps/lamp_update-e14d54c83f68ff7f",
+    "actual_sha256": "2286c0afaaee747cd92cf84949425b9fc6dbc4b1a0d8f4086449c6bc9850607f",
+    "preserved_path": "<gate-evidence>/executables/1",
+    "preserved_sha256": "2286c0afaaee747cd92cf84949425b9fc6dbc4b1a0d8f4086449c6bc9850607f",
+    "binding": "runtime binary ID joins exact discovery/compiled/preserved driver; skipped cases excluded"
+  },
+  {
+    "binary_id": "lamp-update",
+    "case": "head_touch::plan_output::tests::refusing_an_append_happens_before_buffer_growth_or_partial_write",
+    "status": "PASS",
+    "actual_path": "<controlled-target>/debug/deps/lamp_update-e14d54c83f68ff7f",
+    "actual_sha256": "2286c0afaaee747cd92cf84949425b9fc6dbc4b1a0d8f4086449c6bc9850607f",
+    "preserved_path": "<gate-evidence>/executables/1",
+    "preserved_sha256": "2286c0afaaee747cd92cf84949425b9fc6dbc4b1a0d8f4086449c6bc9850607f",
+    "binding": "runtime binary ID joins exact discovery/compiled/preserved driver; skipped cases excluded"
+  },
+  {
+    "binary_id": "lamp-update",
+    "case": "head_touch::plan_output::tests::compact_input_that_expands_past_the_cap_refuses_only_the_new_plan_path",
+    "status": "PASS",
+    "actual_path": "<controlled-target>/debug/deps/lamp_update-e14d54c83f68ff7f",
+    "actual_sha256": "2286c0afaaee747cd92cf84949425b9fc6dbc4b1a0d8f4086449c6bc9850607f",
+    "preserved_path": "<gate-evidence>/executables/1",
+    "preserved_sha256": "2286c0afaaee747cd92cf84949425b9fc6dbc4b1a0d8f4086449c6bc9850607f",
+    "binding": "runtime binary ID joins exact discovery/compiled/preserved driver; skipped cases excluded"
+  },
+  {
+    "binary_id": "lamp-update",
+    "case": "head_touch::plan_output::tests::ordinary_policy_bytes_hashes_and_request_order_match_all_eight_closed_replays",
+    "status": "PASS",
+    "actual_path": "<controlled-target>/debug/deps/lamp_update-e14d54c83f68ff7f",
+    "actual_sha256": "2286c0afaaee747cd92cf84949425b9fc6dbc4b1a0d8f4086449c6bc9850607f",
+    "preserved_path": "<gate-evidence>/executables/1",
+    "preserved_sha256": "2286c0afaaee747cd92cf84949425b9fc6dbc4b1a0d8f4086449c6bc9850607f",
+    "binding": "runtime binary ID joins exact discovery/compiled/preserved driver; skipped cases excluded"
+  },
+  {
+    "binary_id": "lamp-update",
+    "case": "head_touch::plan_output::tests::streaming_pretty_bytes_and_newline_obey_the_exact_utf8_byte_limit",
+    "status": "PASS",
+    "actual_path": "<controlled-target>/debug/deps/lamp_update-e14d54c83f68ff7f",
+    "actual_sha256": "2286c0afaaee747cd92cf84949425b9fc6dbc4b1a0d8f4086449c6bc9850607f",
+    "preserved_path": "<gate-evidence>/executables/1",
+    "preserved_sha256": "2286c0afaaee747cd92cf84949425b9fc6dbc4b1a0d8f4086449c6bc9850607f",
+    "binding": "runtime binary ID joins exact discovery/compiled/preserved driver; skipped cases excluded"
+  }
+]

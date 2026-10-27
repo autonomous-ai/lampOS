@@ -1,0 +1,11 @@
+{
+  "controller": "<private-path>",
+  "controller_sha256": "7f96b6a95d21bc4cae1546134bbfe2828816fe130d33932a70b67733b2a55284",
+  "error": "Copied predecessor adapter expected argv2 donor SHA but invocation intentionally supplied structured request path; assertion stopped before OUT creation/Cargo/targetreuse",
+  "exit_code": 1,
+  "cargo_started": false,
+  "runtime_started": false,
+  "target_changed": false,
+  "source_changed": false,
+  "fix": "Bind structured request fields and explicit donor_sha256 instead of comparing manifest hash to request filename"
+}

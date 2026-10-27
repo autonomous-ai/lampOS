@@ -1,0 +1,88 @@
+{
+  "additional_install_doc_reader": 1,
+  "all9_complete_blobs_modes_equal_prior": true,
+  "base": "82a62867cc1bcbbc4b0848519c6757f623d112ce",
+  "codec_files": {
+    "lampOS/crates/update/src/head_touch/capture.rs": {
+      "bytes": 23567,
+      "mode": 420,
+      "sha256": "f177737a21e11401998617cb4baa65343f02d226bb4c84dcc1ca25c0cfb21140"
+    },
+    "lampOS/crates/update/src/head_touch/capture/codec.rs": {
+      "bytes": 69742,
+      "mode": 420,
+      "sha256": "38e5a525a710fa48c141d45a11f445b0a55f9867e1574e4679be4de500d3e4c3"
+    },
+    "lampOS/crates/update/src/head_touch/capture/codec/tests.rs": {
+      "bytes": 42099,
+      "mode": 420,
+      "sha256": "730c8b9b330d4386a810cc7a6e848a80d5aba490d34dce41c5b2ccc29f5a7d43"
+    },
+    "lampOS/docs/head-touch-codec.md": {
+      "bytes": 6615,
+      "mode": 420,
+      "sha256": "eb4dbb1d3e99c823c2518ef37b896f851746cc93d6083e0e8aab4a2fcd9fe6c0"
+    },
+    "lampOS/docs/reuse-decisions.md": {
+      "bytes": 152042,
+      "mode": 420,
+      "sha256": "427d4eca95fcabd8a09e986aa3eb3c693588d919b3e3f2790080c32d6ab6dc5e"
+    },
+    "lampOS/docs/updates.md": {
+      "bytes": 175594,
+      "mode": 420,
+      "sha256": "008c25ed4e4d36affbdfb4796a762aceabfa0c8392e329dfbfdeb33683a8a23e"
+    }
+  },
+  "combined_files": {
+    "lampOS/crates/update/src/head_touch.rs": {
+      "mode": 420,
+      "sha256": "2e9bcd134f16744e622f813cc3f5e71fe55c1b2a7bb64a5bd14d63d157b3638c"
+    },
+    "lampOS/crates/update/src/head_touch/capture.rs": {
+      "mode": 420,
+      "sha256": "f177737a21e11401998617cb4baa65343f02d226bb4c84dcc1ca25c0cfb21140"
+    },
+    "lampOS/crates/update/src/head_touch/capture/codec.rs": {
+      "mode": 420,
+      "sha256": "38e5a525a710fa48c141d45a11f445b0a55f9867e1574e4679be4de500d3e4c3"
+    },
+    "lampOS/crates/update/src/head_touch/capture/codec/tests.rs": {
+      "mode": 420,
+      "sha256": "730c8b9b330d4386a810cc7a6e848a80d5aba490d34dce41c5b2ccc29f5a7d43"
+    },
+    "lampOS/crates/update/src/head_touch/capture/tests.rs": {
+      "mode": 420,
+      "sha256": "ae5af4ed21941b278391c7412706b36f352c28fb20453426df55ff59e65b7855"
+    },
+    "lampOS/docs/head-touch-capture.md": {
+      "mode": 420,
+      "sha256": "295e987588d23a25eac0fb8155dd65fef718195e536760a08e1bff8058442bde"
+    },
+    "lampOS/docs/head-touch-codec.md": {
+      "mode": 420,
+      "sha256": "eb4dbb1d3e99c823c2518ef37b896f851746cc93d6083e0e8aab4a2fcd9fe6c0"
+    },
+    "lampOS/docs/reuse-decisions.md": {
+      "mode": 420,
+      "sha256": "427d4eca95fcabd8a09e986aa3eb3c693588d919b3e3f2790080c32d6ab6dc5e"
+    },
+    "lampOS/docs/updates.md": {
+      "mode": 420,
+      "sha256": "008c25ed4e4d36affbdfb4796a762aceabfa0c8392e329dfbfdeb33683a8a23e"
+    }
+  },
+  "controller_sha256": "8a3cdf6b42a27d82ee489a0c45064f7dced8c82bef9a1f24ef196870e33bef9c",
+  "head": "8fd693ad8716c3b02bf94d1044213259968ac600",
+  "host": "aarch64-apple-darwin",
+  "nextest_config_sha256": "c4992da8d157df279011a424b5feb4833f001fd1d46ce3edd0a56992c848bb33",
+  "nextest_sha256": "aad9d409cd2f0a81fcaed49d7672a133254179458436c1e957505e4a11655329",
+  "owned_required_count": 78,
+  "pr": 3937,
+  "prior_actuals_not_transferred": true,
+  "range_diff": "1:  d9f406fd7c = 1:  89e495719c lampOS: capture head-pair inputs through bounded descriptors\n2:  2bdc0416e4 = 2:  8fd693ad87 lampOS: persist bounded head inputs for closed replay",
+  "source_after_sha256": "4c3e3550b60f5ab7d74abe1731c05bda88556a03cd15582d7fcb8bd64a62f490",
+  "source_before_sha256": "4c3e3550b60f5ab7d74abe1731c05bda88556a03cd15582d7fcb8bd64a62f490",
+  "source_count": 7507,
+  "tree": "ddd599765f9d7e7e583913ba9f8ca507f8b4ade9"
+}

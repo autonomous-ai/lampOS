@@ -1,0 +1,65 @@
+{
+  "filtered_nonignored": 107,
+  "ignored": 0,
+  "prior78_source_preserved_NOT_reexecuted": true,
+  "scope": "IT13 plus one direct install-doc reader; other install/LIB/functions/Round notrun",
+  "selected": 14,
+  "selected_pairs": [
+    [
+      "lamp-update::install",
+      "every_part_of_the_lamp_waits_for_setups_marker_itself"
+    ],
+    [
+      "lamp-update::it",
+      "ci_paths::every_doc_a_crate_reads_is_named_back_in_the_workflows_pull_request_paths"
+    ],
+    [
+      "lamp-update::it",
+      "ci_paths::the_scan_sees_paths_in_strings_and_not_in_comments_or_prose"
+    ],
+    [
+      "lamp-update::it",
+      "image_journal::systemd_reads_it_last_beside_another_drop_in"
+    ],
+    [
+      "lamp-update::it",
+      "image_journal::the_journal_is_kept_well_inside_the_ram_disk"
+    ],
+    [
+      "lamp-update::it",
+      "image_ramlog::a_failed_move_keeps_the_kept_boots_and_says_so"
+    ],
+    [
+      "lamp-update::it",
+      "image_ramlog::logrotate_runs_the_lamps_copy_back_in_place_of_the_bases"
+    ],
+    [
+      "lamp-update::it",
+      "image_ramlog::ramlogs_copies_leave_the_journal_out"
+    ],
+    [
+      "lamp-update::it",
+      "image_ramlog::ramlogs_stop_keeps_the_journal_before_its_own_stop"
+    ],
+    [
+      "lamp-update::it",
+      "image_ramlog::the_copy_back_leaves_the_journal_alone"
+    ],
+    [
+      "lamp-update::it",
+      "image_ramlog::the_defaults_keep_the_bases_settings"
+    ],
+    [
+      "lamp-update::it",
+      "image_ramlog::the_last_two_boots_are_kept_at_shutdown_only"
+    ],
+    [
+      "lamp-update::it",
+      "scratch_paths::no_two_files_of_a_test_binary_build_the_same_scratch_folder"
+    ],
+    [
+      "lamp-update::it",
+      "scratch_paths::the_names_read_are_the_scratch_folders_only"
+    ]
+  ]
+}

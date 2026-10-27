@@ -1,0 +1,49 @@
+{
+  "all9_complete_blobs_modes_equal_qualified749c": true,
+  "base": "dadacc1bc2fe2e285ed5125a32dd6fe483c01991",
+  "codec_files": {
+    "lampOS/crates/update/src/head_touch/capture.rs": {
+      "bytes": 23567,
+      "mode": 420,
+      "sha256": "f177737a21e11401998617cb4baa65343f02d226bb4c84dcc1ca25c0cfb21140"
+    },
+    "lampOS/crates/update/src/head_touch/capture/codec.rs": {
+      "bytes": 69742,
+      "mode": 420,
+      "sha256": "38e5a525a710fa48c141d45a11f445b0a55f9867e1574e4679be4de500d3e4c3"
+    },
+    "lampOS/crates/update/src/head_touch/capture/codec/tests.rs": {
+      "bytes": 42099,
+      "mode": 420,
+      "sha256": "730c8b9b330d4386a810cc7a6e848a80d5aba490d34dce41c5b2ccc29f5a7d43"
+    },
+    "lampOS/docs/head-touch-codec.md": {
+      "bytes": 6615,
+      "mode": 420,
+      "sha256": "eb4dbb1d3e99c823c2518ef37b896f851746cc93d6083e0e8aab4a2fcd9fe6c0"
+    },
+    "lampOS/docs/reuse-decisions.md": {
+      "bytes": 152042,
+      "mode": 420,
+      "sha256": "427d4eca95fcabd8a09e986aa3eb3c693588d919b3e3f2790080c32d6ab6dc5e"
+    },
+    "lampOS/docs/updates.md": {
+      "bytes": 175594,
+      "mode": 420,
+      "sha256": "008c25ed4e4d36affbdfb4796a762aceabfa0c8392e329dfbfdeb33683a8a23e"
+    }
+  },
+  "combined_stack": "two commits/nine combined paths; codec commit exactlysix",
+  "controller_sha256": "79b4eb622b95cfae8c2407e93f5ec43d958fdc82fc8f99bab04605e394ea5417",
+  "head": "f3c768e6bc59b04704eff817056c7481d86d5212",
+  "host": "aarch64-apple-darwin",
+  "nextest_config_sha256": "c4992da8d157df279011a424b5feb4833f001fd1d46ce3edd0a56992c848bb33",
+  "nextest_tool_sha256": "aad9d409cd2f0a81fcaed49d7672a133254179458436c1e957505e4a11655329",
+  "nextest_version": "0.9.150",
+  "pr": 3937,
+  "qualified_first_full_source": "749c74033c/af546; historical557 only",
+  "source_after_sha256": "fa0cb16e22f825ce5336bfeb96d9a6bb799970f4ee4eb509dd85df52c2f4a62d",
+  "source_before_sha256": "fa0cb16e22f825ce5336bfeb96d9a6bb799970f4ee4eb509dd85df52c2f4a62d",
+  "source_count": 7507,
+  "tree": "bcca859c4213231d1f98411db8b0a0c427996e2f"
+}

@@ -1,0 +1,35 @@
+{
+  "PID61c2_Cargo_invocations": 0,
+  "actual_Skills_and_fixture_call_map_sha256": "1a4d7433a42f01b33986bc2f8f4371b0e9a48f4036b85a2a4fd7b1a6c249445f",
+  "changed_APIs": [
+    "Package.author now Option<Author>",
+    "read_shared_package_bytes adds Store-key parameter/refusal",
+    "Check::Author stores Store keys"
+  ],
+  "changed_APIs_called_by_Update_production_or_fixtures": false,
+  "changed_paths": [
+    "lampOS/crates/skills/src/package.rs",
+    "lampOS/crates/skills/tests/it/shared.rs",
+    "lampOS/docs/skills.md"
+  ],
+  "collector_dadacc_222_runtime": "UNRUN; pre-Cargo guard stop, no parent transfer allowed",
+  "comparison_sha256": "ad6344808a72aec90f547fcbe825e3ff2ac9c39023016f2991eaa230c2bc69ef",
+  "cumulative_doc_input": "PID61c2 guard stopped before Cargo; direct install-doc reader must be qualified on current cumulative source. Raw61c2 actual14 remains separate, not transferred.",
+  "doc_reader_proof_sha256": "f3d73cd63fe373293a0a9a8e6d62e7725508e73f1f1974d6d8faebe362d1b714",
+  "immediate_old_base": "61c2a7264744a851ba18334ff4bcffd4668310ed",
+  "install_case": "every_part_of_the_lamp_waits_for_setups_marker_itself",
+  "last_actual_broader_base": "dadacc1bc2fe2e285ed5125a32dd6fe483c01991",
+  "new_base": "82a62867cc1bcbbc4b0848519c6757f623d112ce",
+  "normal_Skills_consumed": true,
+  "peer_authentication_or_behavior_review": false,
+  "raw_last_actual14_donor": "ac00d3d266dc8af52727a617c1df05bac71e15b425025dcfbaf17636f74c73d4",
+  "scope": "LIB/functions/IT plus three bound receipt Round cases and exact install::every_part_of_the_lamp_waits_for_setups_marker_itself, fresh actual discovery; no whole-install/allRound.",
+  "scope_projection": {
+    "PID": 204,
+    "Raw": 220,
+    "codec": 249,
+    "collector": 223,
+    "preimages": 229
+  },
+  "unchanged_direct_fixtures": "asked on/off, key constants, TOML load/load_all/list/Engine/tools_file; no changed shared-package reader or author field consumption."
+}

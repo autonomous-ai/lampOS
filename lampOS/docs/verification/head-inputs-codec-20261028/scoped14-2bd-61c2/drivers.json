@@ -1,0 +1,132 @@
+[
+  {
+    "actual_captured_sha256": "28bf80eef639c4e404fcc4340e2e3c79afeb4869f01e2c27d9228309076e63af",
+    "bytes": 1976768,
+    "current_source_qualified": true,
+    "kind": [
+      "test"
+    ],
+    "post_runtime_sha256": "28bf80eef639c4e404fcc4340e2e3c79afeb4869f01e2c27d9228309076e63af",
+    "preserved_sha256": "28bf80eef639c4e404fcc4340e2e3c79afeb4869f01e2c27d9228309076e63af",
+    "source_qualification": "CURRENT_TARGETED_IT_AND_INSTALL_BUILD_NO_OTHER_RUNTIME_CLAIM",
+    "target": "it",
+    "test_profile": true
+  },
+  {
+    "actual_captured_sha256": "437e067fda2c2c08075eeffcca264f2b62ea4264d220421cd43ec33854c51789",
+    "bytes": 17251368,
+    "current_source_qualified": true,
+    "kind": [
+      "test"
+    ],
+    "post_runtime_sha256": "437e067fda2c2c08075eeffcca264f2b62ea4264d220421cd43ec33854c51789",
+    "preserved_sha256": "437e067fda2c2c08075eeffcca264f2b62ea4264d220421cd43ec33854c51789",
+    "source_qualification": "CURRENT_TARGETED_IT_AND_INSTALL_BUILD_NO_OTHER_RUNTIME_CLAIM",
+    "target": "install",
+    "test_profile": true
+  },
+  {
+    "actual_captured_sha256": "b25a214c8b24a2dece81e6a2cf181322e3a113dc35b89aef4b0cc732350f3a8e",
+    "bytes": 13556032,
+    "current_source_qualified": true,
+    "kind": [
+      "bin"
+    ],
+    "post_runtime_sha256": "b25a214c8b24a2dece81e6a2cf181322e3a113dc35b89aef4b0cc732350f3a8e",
+    "preserved_sha256": "b25a214c8b24a2dece81e6a2cf181322e3a113dc35b89aef4b0cc732350f3a8e",
+    "source_qualification": "CURRENT_TARGETED_IT_AND_INSTALL_BUILD_NO_OTHER_RUNTIME_CLAIM",
+    "target": "lamp-update",
+    "test_profile": false
+  },
+  {
+    "actual_captured_sha256": "17450c56435a00481b1f55390dde040769f8647c74a738a4cf678d7de970a059",
+    "bytes": 1277536,
+    "current_source_qualified": false,
+    "kind": [
+      "bin"
+    ],
+    "post_runtime_sha256": "17450c56435a00481b1f55390dde040769f8647c74a738a4cf678d7de970a059",
+    "preserved_sha256": "17450c56435a00481b1f55390dde040769f8647c74a738a4cf678d7de970a059",
+    "source_qualification": "RETAINED_DONOR_EXECUTABLE_NOT_CURRENT_SOURCE",
+    "target": "lamp-update",
+    "test_profile": true
+  },
+  {
+    "actual_captured_sha256": "210252f3c0eacfc171e429d98ca865159d7c2ca67605dc69a642f4ba7aa0984d",
+    "bytes": 550128,
+    "current_source_qualified": false,
+    "kind": [
+      "test"
+    ],
+    "post_runtime_sha256": "210252f3c0eacfc171e429d98ca865159d7c2ca67605dc69a642f4ba7aa0984d",
+    "preserved_sha256": "210252f3c0eacfc171e429d98ca865159d7c2ca67605dc69a642f4ba7aa0984d",
+    "source_qualification": "RETAINED_DONOR_EXECUTABLE_NOT_CURRENT_SOURCE",
+    "target": "self-process-cuts",
+    "test_profile": true
+  },
+  {
+    "actual_captured_sha256": "3a7b374d575dc2ac785c95c5b098bbafa6ed344b1dd99e418bf8c4cfa15134e9",
+    "bytes": 16182736,
+    "current_source_qualified": false,
+    "kind": [
+      "lib"
+    ],
+    "post_runtime_sha256": "3a7b374d575dc2ac785c95c5b098bbafa6ed344b1dd99e418bf8c4cfa15134e9",
+    "preserved_sha256": "3a7b374d575dc2ac785c95c5b098bbafa6ed344b1dd99e418bf8c4cfa15134e9",
+    "source_qualification": "RETAINED_DONOR_EXECUTABLE_NOT_CURRENT_SOURCE",
+    "target": "lamp_update",
+    "test_profile": true
+  },
+  {
+    "actual_captured_sha256": "ce689d8e51e59dce36d6d3a26d8da8c664b06c648f77aa9e9c2b51d44a6e886e",
+    "bytes": 22853000,
+    "current_source_qualified": false,
+    "kind": [
+      "test"
+    ],
+    "post_runtime_sha256": "ce689d8e51e59dce36d6d3a26d8da8c664b06c648f77aa9e9c2b51d44a6e886e",
+    "preserved_sha256": "ce689d8e51e59dce36d6d3a26d8da8c664b06c648f77aa9e9c2b51d44a6e886e",
+    "source_qualification": "RETAINED_DONOR_EXECUTABLE_NOT_CURRENT_SOURCE",
+    "target": "functions",
+    "test_profile": true
+  },
+  {
+    "actual_captured_sha256": "bc72a92867ed1f5012cc34143684a9dbd4e58c39c0b46165447897c7c89b446d",
+    "bytes": 550064,
+    "current_source_qualified": false,
+    "kind": [
+      "test"
+    ],
+    "post_runtime_sha256": "bc72a92867ed1f5012cc34143684a9dbd4e58c39c0b46165447897c7c89b446d",
+    "preserved_sha256": "bc72a92867ed1f5012cc34143684a9dbd4e58c39c0b46165447897c7c89b446d",
+    "source_qualification": "RETAINED_DONOR_EXECUTABLE_NOT_CURRENT_SOURCE",
+    "target": "self-cli-exec",
+    "test_profile": true
+  },
+  {
+    "actual_captured_sha256": "fd3469bbed0c0ad92fd610d4d2ad0d7940564bfda45547125d7983a92d21bad0",
+    "bytes": 21010696,
+    "current_source_qualified": false,
+    "kind": [
+      "test"
+    ],
+    "post_runtime_sha256": "fd3469bbed0c0ad92fd610d4d2ad0d7940564bfda45547125d7983a92d21bad0",
+    "preserved_sha256": "fd3469bbed0c0ad92fd610d4d2ad0d7940564bfda45547125d7983a92d21bad0",
+    "source_qualification": "RETAINED_DONOR_EXECUTABLE_NOT_CURRENT_SOURCE",
+    "target": "round",
+    "test_profile": true
+  },
+  {
+    "actual_captured_sha256": "d16f9787a2a9abab074ea6e8dc8a221037e3d23bb385e8b9bec846e1110dc699",
+    "bytes": 3295056,
+    "current_source_qualified": false,
+    "kind": [
+      "test"
+    ],
+    "post_runtime_sha256": "d16f9787a2a9abab074ea6e8dc8a221037e3d23bb385e8b9bec846e1110dc699",
+    "preserved_sha256": "d16f9787a2a9abab074ea6e8dc8a221037e3d23bb385e8b9bec846e1110dc699",
+    "source_qualification": "RETAINED_DONOR_EXECUTABLE_NOT_CURRENT_SOURCE",
+    "target": "release_pair",
+    "test_profile": true
+  }
+]

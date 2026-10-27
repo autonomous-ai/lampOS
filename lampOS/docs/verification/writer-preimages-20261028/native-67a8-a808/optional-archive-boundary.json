@@ -1,0 +1,8 @@
+{
+  "head": "67a8e9554f6fb9644e0b0ab72a2e3895141e26ed",
+  "requested": false,
+  "artifact_payload_verified": false,
+  "production_binary_inventory_claimed": false,
+  "native_test_driver_artifact_equivalence_claimed": false,
+  "original_required_jobs_and_complete_log_source_case_audit_are_independent": true
+}

@@ -1,0 +1,10 @@
+{
+  "zero_prior_Cargo": true,
+  "prior_controller_sha256": "52f3352924df7407de24afe668aac032e6efa32e5211b0b9bb219b2f5b8f4df8",
+  "prior_freeze_sha256": "121cac607cc1205dd713061735efd049de337b1e8bf76fe3d00dafea8cd79183",
+  "derived_controller_sha256": "b449803bbf5040512388927f820a92401251cc506605c7501e8e746e56b9c77f",
+  "new_freeze_sha256": "4f57e7d2122b3778f1ad6980223de84eac3d0932ec302f38e1de5fe9e42b0c53",
+  "all6source_hashes_and_original_modes_unchanged": true,
+  "all10_actual_and_preserved_executable_hashes_unchanged": true,
+  "normalization": "original_mode->mode exact integer mapping only; old files untouched"
+}

@@ -1,0 +1,11 @@
+{
+  "full_passed": 563,
+  "bad_selected_unrun": 0,
+  "ignored": 6,
+  "required_controls": 84,
+  "new_plan_output_controls": 6,
+  "all10stages_exit0": true,
+  "all10_actual_preserved_post_hashes_verified_before_release": true,
+  "donor_sha256": "d644da93976afc41caf309ee892eefef8d8a59eaed8933252752e2c48895d8c7",
+  "closure_sha256": "863e4e830e53ef101875476b06b8c7948df19c85a353c47fdd94624fc0923037"
+}

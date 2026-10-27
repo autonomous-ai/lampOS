@@ -1,0 +1,36 @@
+{
+  "old_head": "813ffbd77d8f21b843397a33453267a4766ddcf5",
+  "old_base": "82a62867cc1bcbbc4b0848519c6757f623d112ce",
+  "new_head": "f479305357987e8b8b4677170847915e01664cb8",
+  "new_base": "a808ef04b5885ccb35e8e7693eee16ae331e3a7f",
+  "new_tree": "f36fa1d893dda097c70e8b992b2d58e8e9f2e447",
+  "files": {
+    "lampOS/crates/update/src/apply.rs": "100644 blob 2e5e541d8eb974694cf451f27eac1a57897c1b69\tlampOS/crates/update/src/apply.rs",
+    "lampOS/crates/update/src/lib.rs": "100644 blob d10a9823678d0a044f126c120b394a11147cf25d\tlampOS/crates/update/src/lib.rs",
+    "lampOS/crates/update/src/writer_files.rs": "100644 blob 79b0f419624e2ed1f8416673844afd7e988531e7\tlampOS/crates/update/src/writer_files.rs",
+    "lampOS/crates/update/src/writer_files/tests.rs": "100644 blob 9dadf2e73c5db037d5126b95e78a7fcac768df1f\tlampOS/crates/update/src/writer_files/tests.rs",
+    "lampOS/crates/update/src/writer_settings.rs": "100644 blob 7afb9d0ddf4c2372dc95ece82f9bfa1ba42fc8c6\tlampOS/crates/update/src/writer_settings.rs",
+    "lampOS/crates/update/src/writer_settings/tests.rs": "100644 blob 00aaca5cffce778e7787b98bb3a4c3f66d85baa3\tlampOS/crates/update/src/writer_settings/tests.rs",
+    "lampOS/docs/reuse-decisions.md": "100644 blob a41755ffd97d653e52cda21a77e52f422dba661e\tlampOS/docs/reuse-decisions.md",
+    "lampOS/docs/updates.md": "100644 blob db7df8bdb19d87afe3ebab89f606772df2a95bbb\tlampOS/docs/updates.md",
+    "lampOS/docs/writer-file-observation.md": "100644 blob 62a923dabe6c1dd267742ddd5275c6e25f3dcbdc\tlampOS/docs/writer-file-observation.md",
+    "lampOS/docs/writer-settings-capture.md": "100644 blob b9c8d7ba9bc37b7c26acc19d9723139a211b3f90\tlampOS/docs/writer-settings-capture.md"
+  },
+  "full_blobs_modes_equal": [
+    "lampOS/crates/update/src/apply.rs",
+    "lampOS/crates/update/src/lib.rs",
+    "lampOS/crates/update/src/writer_files.rs",
+    "lampOS/crates/update/src/writer_files/tests.rs",
+    "lampOS/crates/update/src/writer_settings.rs",
+    "lampOS/crates/update/src/writer_settings/tests.rs",
+    "lampOS/docs/reuse-decisions.md",
+    "lampOS/docs/updates.md",
+    "lampOS/docs/writer-file-observation.md",
+    "lampOS/docs/writer-settings-capture.md"
+  ],
+  "range_diff": "1:  813ffbd77d = 1:  f479305357 lampOS: capture and revalidate raw setting ownership",
+  "all_owned_full_blobs_modes_equal": true,
+  "backup_ref": "refs/heads/second/raw-qualified-82a6-20261028",
+  "gate": "UNRUN current a808; actual82 source220/204 retained separately",
+  "source_scope_proof": "<private-path>"
+}

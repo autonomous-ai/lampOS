@@ -1,0 +1,4220 @@
+{
+  "rust-build-meta": {
+    "target-directory": "<controlled-target>",
+    "build-directory": "<controlled-target>",
+    "base-output-directories": [
+      "debug"
+    ],
+    "non-test-binaries": {
+      "<private-key:a975795c22e6c19e>": [
+        {
+          "name": "lamp-update",
+          "kind": "bin-exe",
+          "path": "debug/lamp-update",
+          "build-platform": "target"
+        }
+      ]
+    },
+    "build-script-out-dirs": {},
+    "build-script-info": {},
+    "linked-paths": [
+      "debug/build/libsqlite3-sys-5ddd9325dcabd29d/out",
+      "debug/build/ring-702b0306efb0a032/out"
+    ],
+    "platforms": {
+      "host": {
+        "platform": {
+          "triple": "aarch64-apple-darwin",
+          "target-features": "unknown"
+        },
+        "libdir": {
+          "status": "available",
+          "path": "<private-path>"
+        }
+      },
+      "targets": []
+    },
+    "target-platforms": [
+      {
+        "triple": "aarch64-apple-darwin",
+        "target-features": "unknown"
+      }
+    ],
+    "target-platform": null
+  },
+  "test-count": 536,
+  "rust-suites": {
+    "lamp-update": {
+      "package-name": "lamp-update",
+      "binary-id": "lamp-update",
+      "binary-name": "lamp_update",
+      "package-id": "path+file://<preimage-tree>/lampOS/crates/update#lamp-update@0.1.0",
+      "kind": "lib",
+      "binary-path": "<controlled-target>/debug/deps/lamp_update-e14d54c83f68ff7f",
+      "build-platform": "target",
+      "cwd": "<preimage-tree>/lampOS/crates/update",
+      "status": "listed",
+      "testcases": {
+        "apply::tests::a_done_for_another_operation_does_not_change_any_setting_record": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "apply::tests::a_done_for_another_sequence_does_not_change_any_setting_record": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "apply::tests::a_matching_done_keeps_the_permanent_forward_read_contract": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "apply::tests::a_new_skills_folder_is_removed_when_it_is_put_back_and_a_folder_in_use_stays": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "apply::tests::a_path_both_a_setting_and_an_image_file_is_refused_with_nothing_written": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "apply::tests::a_put_back_asked_again_after_being_cut_short_puts_every_record_back": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "apply::tests::a_reload_that_fails_fails_the_apply_and_a_speaker_that_fails_is_said": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "apply::tests::a_removed_setting_goes_only_where_it_is_still_the_builds": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "apply::tests::a_request_with_a_field_it_does_not_know_is_read": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "apply::tests::a_setting_still_the_builds_is_written_and_one_the_lamp_changed_is_kept": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "apply::tests::a_setting_the_lamp_removed_stays_removed_and_one_never_there_is_written": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "apply::tests::a_signed_image_file_outside_the_list_is_refused_with_nothing_written": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "apply::tests::a_unit_systemd_cannot_load_writes_nothing": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "apply::tests::an_envelope_signed_with_another_key_or_of_another_build_writes_nothing": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "apply::tests::an_explicit_expected_identity_does_not_follow_a_rewritten_staged_request": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "apply::tests::an_unknown_done_operation_is_refused_without_changing_any_setting_record": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "apply::tests::put_back_keeps_a_file_changed_since_and_a_stale_back_file_is_not_used": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "apply::tests::put_back_restores_each_file_byte_for_byte_and_its_mode": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "apply::tests::put_back_restores_the_images_files_and_reloads_again": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "apply::tests::the_apply_path_never_restarts_or_signals_journald": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "apply::tests::the_apply_unit_can_write_every_carried_path_and_never_names_journald": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "apply::tests::the_images_files_are_written_where_the_lamp_has_one_the_image_shipped": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "apply::tests::the_tmpfiles_are_created_only_when_they_are_there": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "apply::tests::the_tmpfiles_install_writes_is_one_it_shipped": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "apply::tests::the_variants_file_is_written_and_none_of_another": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "apply::tests::unrecorded_tmpfiles_an_install_shipped_are_the_builds_and_others_the_lamps": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "apply::tests::without_a_request_nothing_is_done": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "apply::tests::without_the_image_asked_or_from_an_older_copy_none_is_written": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "check_units::tests::a_base_unit_of_19_oct_that_leaves_lamp_cloud_off_is_named": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "check_units::tests::a_drop_in_that_turns_a_product_switch_off_says_so": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "check_units::tests::a_masked_unit_fails_an_implicit_slice_does_not_and_white_space_shows": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "check_units::tests::a_units_own_path_line_is_its_text_and_hides_nothing": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "check_units::tests::exactly_the_product_passes_and_a_unit_from_elsewhere_does_not": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "check_units::tests::same_changed_drop_in_extra_and_missing_are_each_said_and_fail_the_check": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "check_units::tests::systemctl_cat_is_read_file_by_file_and_a_comment_with_a_path_is_no_file": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "check_units::tests::the_images_unit_is_the_images_not_extra_and_compared_with_its_variant": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "check_units::tests::the_product_as_install_writes_it_passes": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "fetch::tests::a_chunked_file_and_one_to_the_end": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "fetch::tests::a_file_by_its_length_after_a_redirect": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "fetch::tests::a_folder_on_the_lamp": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "fetch::tests::a_name_lookup_that_hangs_is_given_up_and_no_round_starts_another_until_it_ends": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "fetch::tests::a_release_file_from_github": {
+          "kind": "test",
+          "ignored": true,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "ignored"
+          }
+        },
+        "fetch::tests::an_answered_lookup_is_counted_out_before_its_answer_arrives": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "fetch::tests::missing_too_large_short_and_other_answers": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "fetch::tests::no_network_is_unreachable": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "fetch::tests::urls_and_redirects": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "head_touch::input_tests::an_uncaptured_key_never_becomes_a_captured_absence": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "head_touch::input_tests::ordinary_inputs_keep_regular_links_null_masks_and_directory_aliases": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "head_touch::input_tests::projection_and_verification_replay_closed_inputs_without_filesystem_fallback": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "head_touch::input_tests::rejecting_an_early_override_does_not_consume_a_later_directory_error": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "head_touch::tests::null_masks_do_not_admit_other_character_devices": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "image::tests::a_file_not_listed_as_shipped_is_refused": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "image::tests::a_unit_reloads_systemd_a_rule_reloads_udev_and_asound_restarts_the_voice": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "image::tests::every_image_file_of_every_variant_is_listed_as_shipped": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "image::tests::journald_is_never_restarted_nor_signalled": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "image::tests::the_variant_is_the_images_and_none_is_standard": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "install::tests::a_timed_service_is_never_enabled_and_its_timer_is": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "install::tests::a_unit_through_current_is_read": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "install::tests::every_deploy_product_unit_is_installed_or_named_left_out": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "install::tests::every_product_part_starts_through_its_current_link": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "install::tests::every_tool_the_factory_steps_run_is_installed_where_they_look": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "install::tests::install_commands_never_wait_past_their_bound": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "install::tests::install_commands_say_their_stderr_or_give_their_stdout": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "install::tests::no_product_unit_names_a_lamp": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "install::tests::offsets_are_read": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "install::tests::the_cloud_is_enabled_with_the_lamp": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "install::tests::the_eyes_camera_helper_socket_is_enabled_and_names_the_eyes_camera": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "install::tests::the_skills_manage_socket_is_enabled_and_its_template_is_not": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "install::tests::the_wifi_helper_is_never_listed_without_its_restore_at_boot": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "judge::tests::a_part_that_stays_up_with_one_process_and_says_it_is_well_is_well": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "judge::tests::restarted_failed_or_another_process_is_not_well": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "judge::tests::the_part_s_own_word_counts_against_what_it_said_before": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "manifest::tests::a_build_for_a_newer_updater_is_refused_by_an_older_one_only": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "manifest::tests::a_key_made_by_openssl_signs_as_well": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "manifest::tests::a_manifest_without_min_updater_is_written_and_read_as_before": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "manifest::tests::a_newer_manifest_this_updater_cannot_read_is_refused_for_its_updater": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "manifest::tests::a_sealed_manifest_opens_with_its_key_and_gives_back_its_bytes": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "manifest::tests::a_setting_with_a_field_it_does_not_know_is_still_read": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "manifest::tests::an_image_file_outside_the_list_listed_twice_or_not_its_sha_is_refused": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "manifest::tests::another_key_a_changed_byte_or_a_changed_signature_is_refused": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "manifest::tests::min_updater_is_signed_with_the_rest": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "manifest::tests::min_updater_raised_under_the_same_signature_is_a_bad_signature": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "manifest::tests::models_are_read_only_with_the_updater_they_need_and_plain_paths": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "manifest::tests::names_are_plain": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "manifest::tests::nothing_but_a_plain_manifest_is_signed_or_taken": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "manifest::tests::product_units_require_the_signed_updater_level_before_older_readers_select_them": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "manifest::tests::settings_are_read_only_with_the_updater_they_need_and_their_own_paths": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "manifest::tests::the_reset_plan_is_read_only_with_its_updater_and_its_own_path": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "models::tests::a_link_into_the_store_is_relative_and_a_unit_reads_by_path_or_folder": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "product_skills::tests::a_link_in_place_of_a_core_file_is_put_back_and_never_read": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "product_skills::tests::each_file_is_one_of_three": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "product_skills::tests::only_plain_paths_in_the_skills_it_names_are_taken": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "product_skills::tests::the_bundle_of_the_repository_is_what_install_writes": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "product_skills::tests::the_stores_key_beside_the_skills_is_left_alone": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "product_skills::tests::what_is_written_is_put_back_and_a_file_changed_since_is_left": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "publish::tests::binaries_and_each_lamps_units_but_nothing_else": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "publish::tests::models_are_carried_with_the_updater_they_need": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "publish::tests::product_services_and_linked_lamp_overrides_are_carried_with_level_six": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "publish::tests::the_images_files_are_carried_with_the_updater_they_need": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "publish::tests::the_products_settings_are_carried_with_the_updater_they_need": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "publish::tests::the_stores_key_is_carried_only_when_the_repository_has_it": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "quiet::tests::a_stale_mute_or_one_in_a_turn_is_not_quiet": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "quiet::tests::a_voice_asleep_or_muted_for_privacy_is_quiet_at_once": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "quiet::tests::a_voice_that_says_nothing_is_never_quiet": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "quiet::tests::forty_five_seconds_of_nothing_after_the_last_word": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "quiet::tests::hearing_thinking_or_speaking_is_a_turn": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "quiet::tests::quiet_needs_as_long_a_watch": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "records::tests::a_link_left_beside_is_replaced_and_never_written_through": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "records::tests::a_state_from_a_later_build_keeps_its_fields_across_a_save": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "records::tests::a_state_from_before_the_settings_reads_and_writes_as_before": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "records::tests::a_state_that_cannot_be_read_is_kept_aside": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "records::tests::each_kept_state_and_journal_reads_as_saved": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "records::tests::one_at_a_time": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "records::tests::state_journal_and_previous_units_are_kept": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "records::tests::write_records_fixtures": {
+          "kind": "test",
+          "ignored": true,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "ignored"
+          }
+        },
+        "setup_lifecycle::tests::incomplete_duplicate_or_malformed_manager_records_are_unknown": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "setup_lifecycle::tests::manager_identity_requires_the_exact_loaded_product_with_known_dropins": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "status::tests::a_restart_keeps_the_last_result_each_end_is_said_and_it_is_said_again": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "status::tests::the_status_is_the_records_build_the_phase_and_the_last_end_without_its_reason": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "status::tests::the_value_lasts_three_periods_so_a_dead_updater_reads_stale": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "switches::tests::a_later_drop_in_or_file_that_sets_it_back_on_leaves_it_on": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "switches::tests::environment_files_and_their_lines": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "switches::tests::several_on_a_line_quoted_continued_and_cleared_are_read_as_systemd_does": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "switches::tests::the_product_switches_are_its_on_lines_and_lamp_cloud_is_one": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "unit::restart_order::tests::a_declared_socket_precedes_its_service": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "unit::restart_order::tests::a_path_through_an_unchanged_unit_still_orders_its_ends": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "unit::restart_order::tests::cycles_including_self_edges_are_refused": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "unit::restart_order::tests::repeated_and_folded_declarations_keep_each_edge": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "unit::restart_order::tests::requirements_and_directives_in_other_sections_do_not_order_units": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "unit::restart_order::tests::the_shipped_managed_services_have_a_valid_startup_graph": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "unit::restart_order::tests::the_voice_starts_after_controls_so_it_stops_first": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "unit::restart_order::tests::unsupported_ordering_cannot_silently_lose_a_dependency": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "unit::tests::a_new_build_is_written_everywhere_the_folder_is_named": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "unit::tests::comments_do_not_make_a_unit_another": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "unit::tests::lamp_4aces_own_units_are_read": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "unit::tests::only_a_part_installed_by_build_is_a_program": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "unit::tests::the_generic_package_sets_up_and_resets_as_the_product_does": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "unit::tests::the_generic_voice_answers_whom_the_product_does": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "unit::tests::the_generic_voice_has_the_product_clock_and_session_context": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "unit::tests::the_generic_voice_runs_the_ring_as_the_product_does": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "unit::tests::the_generic_voice_says_its_failures_as_the_product_does": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "world::query::tests::a_failed_query_cleans_its_same_group_child_even_after_output_closes": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "world::query::tests::an_endless_writer_is_refused_at_the_cap_and_its_group_killed": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "world::query::tests::an_endless_writer_whose_child_holds_the_pipe_is_refused_and_both_killed": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "world::query::tests::invalid_utf8_cleans_closed_output_child": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "world::query::tests::public_output_accepts_one_mib_and_refuses_one_byte_more": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "world::query::tests::public_output_refuses_invalid_utf8_instead_of_a_partial_string": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "world::query::tests::query_deadline_applies_after_stdout_closes": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "world::query::tests::query_reads_output_with_closed_stdin_and_discarded_stderr": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "world::query::tests::query_refuses_nonzero_exit_and_spawn_failure": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "world::query::tests::query_timeout_cleans_the_exited_leaders_pipe_holding_descendant": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "world::tests::a_child_holding_the_pipe_is_an_error_within_the_bound": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "world::tests::a_child_holding_the_pipe_is_killed_with_the_query": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "world::tests::a_failed_query_says_its_trimmed_stderr_and_a_good_one_its_stdout": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "world::tests::a_stalled_systemctl_show_is_an_error_within_its_bound": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "world::tests::self_recovery_accepts_an_armed_timer_and_an_inactive_service": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "world::tests::self_recovery_refuses_a_timer_not_armed_persistently": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "world::tests::self_recovery_refuses_an_unloaded_masked_or_ephemeral_service": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "world::tests::self_recovery_refuses_malformed_or_unexpected_query_records": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "world::tests::self_recovery_requires_one_of_each_record_and_required_property": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "world::tests::systemctl_show_is_read_unit_by_unit": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "world::tests::the_bus_hears_a_muted_voice_and_not_a_mute_it_cannot_read": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "world::tests::the_bus_hears_the_voice_and_not_an_old_state": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "world::tests::the_real_disk_has_room": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "writer_files::tests::a_fifo_is_refused_without_waiting_for_a_writer_and_its_worker_is_always_joined": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "writer_files::tests::a_hard_link_is_not_accepted_as_a_setting_and_directories_are_not_read": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "writer_files::tests::descriptor_and_ancestor_metadata_changes_refuse_the_observation": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "writer_files::tests::errors_and_debug_do_not_expose_relative_names_or_file_contents": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "writer_files::tests::explicit_content_caps_and_the_hard_ceiling_are_enforced_without_truncating_success": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "writer_files::tests::invalid_or_unbounded_relative_names_are_refused_before_opening_the_root": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "writer_files::tests::missing_intermediate_and_leaf_are_distinct_and_keep_only_existing_ancestors": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "writer_files::tests::no_follow_rejects_leaf_ancestor_and_root_links_without_reading_the_outside_witness": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "writer_files::tests::pre_open_inode_or_metadata_substitution_and_disappearance_are_not_read_as_the_original_file": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "writer_files::tests::regular_bytes_and_all_existing_ancestor_identities_are_observed_without_changing_them": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "writer_preimages::tests::actual_capture_keeps_binary_empty_missing_noops_records_and_every_identity_after_publication": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "writer_preimages::tests::diagnostic_surfaces_hide_values_and_empty_selection_observes_no_live_root": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "writer_preimages::tests::durable_prefix_and_lost_ack_failures_keep_bytes_without_admitting_retry_or_cleanup": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "writer_preimages::tests::exact_four_mib_of_binary_old_bytes_and_empty_files_survive_without_truncation": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "writer_preimages::tests::expected_identity_and_size_are_checked_before_parse_and_every_failed_load_retains_the_file": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "writer_preimages::tests::publication_never_replaces_existing_final_or_unknown_stage_and_load_never_follows_links": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "writer_preimages::tests::shape_stamp_base64_and_collection_bounds_are_checked_before_old_byte_allocations": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "writer_preimages::tests::unknown_nonsemantic_fields_retain_the_complete_original_encoding_without_reserialization": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "writer_preimages::tests::unknown_semantics_known_duplicates_duplicate_paths_and_invalid_records_block_without_deletion": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "writer_refresh::tests::a_restart_at_every_unqualified_prefix_requires_recovery_and_never_reissues_the_grant": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "writer_refresh::tests::a_stale_or_modified_first_apply_cannot_consume_the_single_grant": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "writer_refresh::tests::diagnostics_hide_unknown_values_and_known_duplicate_or_shadowed_fields_are_refused": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "writer_refresh::tests::failed_persist_after_publication_poisons_the_live_session_until_actual_disk_state_is_recovered": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "writer_refresh::tests::first_apply_binds_its_own_later_envelope_and_sequence_without_replacing_the_refresh_identity": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "writer_refresh::tests::future_nonsemantic_metadata_is_preserved_without_becoming_admission_authority": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "writer_refresh::tests::guard_lock_is_exclusive_and_independent_of_the_product_lock": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "writer_refresh::tests::identity_substitution_never_changes_or_admits_the_saved_transaction": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "writer_refresh::tests::live_or_poisoned_sessions_cannot_expose_stale_recovery_inputs": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "writer_refresh::tests::missing_and_nonregular_records_do_not_turn_into_a_fresh_transaction": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "writer_refresh::tests::no_apply_does_not_qualify_but_one_exact_apply_can_enter_without_an_ordinary_round": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "writer_refresh::tests::qualified_and_closed_inputs_keep_the_compatible_writer_and_bound_product_receipts": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "writer_refresh::tests::qualified_writer_and_preimages_survive_a_restart_until_the_product_journal_closes": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "writer_refresh::tests::recovery_views_retain_later_metadata_in_the_bound_inputs_without_reparsing": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "writer_refresh::tests::reloaded_inputs_keep_the_exact_origin_and_distinguish_writer_from_apply_restoration": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "writer_refresh::tests::restoring_an_apply_requires_its_original_grant_and_preimage_identity": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "writer_refresh::tests::unsupported_or_malformed_journals_are_retained_and_block_every_admission": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "writer_refresh::tests::write_bound_and_invalid_identities_leave_no_journal_or_partial_acceptance": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "writer_settings::tests::captured_bytes_preserve_ordinary_ownership_and_keep_all_omitted_noops": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "writer_settings::tests::old_byte_limits_allow_exact_budget_then_empty_or_absent_but_never_a_prefix": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "writer_settings::tests::oversized_or_invalid_new_inputs_are_bounded_and_redacted_before_observation": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "writer_settings::tests::revalidation_refuses_byte_mode_deletion_and_same_byte_inode_changes": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "writer_settings::tests::revalidation_refuses_new_negative_dependencies_and_replaced_ancestors": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "writer_settings::tests::revalidation_refuses_replaced_roots_links_and_nonregular_leaves": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "writer_settings::tests::selected_invalid_values_refuse_before_filesystem_access_and_unrelated_values_are_ignored": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "writer_settings::tests::shared_classifier_keeps_tmpfiles_marker_and_image_shipped_precedence": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        }
+      }
+    },
+    "lamp-update::functions": {
+      "package-name": "lamp-update",
+      "binary-id": "lamp-update::functions",
+      "binary-name": "functions",
+      "package-id": "path+file://<preimage-tree>/lampOS/crates/update#lamp-update@0.1.0",
+      "kind": "test",
+      "binary-path": "<controlled-target>/debug/deps/functions-781cb61db13f0261",
+      "build-platform": "target",
+      "cwd": "<preimage-tree>/lampOS/crates/update",
+      "status": "listed",
+      "testcases": {
+        "a_product_chat_request_offers_dance_at_the_bound": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "a_product_lamp_declares_every_function_it_has_within_the_bound": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "the_generic_voice_declares_the_clock_and_receives_time_and_session_context": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "the_product_voice_s_functions_in_a_process_of_their_own": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "with_reports_on_dance_stays_at_the_bound": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        }
+      }
+    },
+    "lamp-update::install": {
+      "package-name": "lamp-update",
+      "binary-id": "lamp-update::install",
+      "binary-name": "install",
+      "package-id": "path+file://<preimage-tree>/lampOS/crates/update#lamp-update@0.1.0",
+      "kind": "test",
+      "binary-path": "<controlled-target>/debug/deps/install-08004915d5b421f7",
+      "build-platform": "target",
+      "cwd": "<preimage-tree>/lampOS/crates/update",
+      "status": "listed",
+      "testcases": {
+        "a_blank_lamp_gets_every_part_its_units_and_nothing_started": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "a_blank_lamp_runs_every_product_skill_as_the_skill": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "a_build_without_a_part_is_refused_before_anything_is_written": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "a_build_without_the_bodys_factory_tools_still_installs": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "a_clean_install_names_no_switch_off": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "a_closed_etc_lampos_is_said_and_left_as_it_is": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "a_default_found_closed_is_opened_and_a_lamps_own_found_closed_is_said": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "a_device_key_found_open_is_narrowed_and_never_said": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "a_disabled_core_skill_turned_on_stays_on_through_an_install": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "a_failed_exit_note_write_keeps_reload_debt_for_the_next_install": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "a_failing_step_keeps_the_record_and_a_later_run_finishes": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "a_file_left_beside_by_a_run_cut_off_does_not_lend_its_mode_to_the_key": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "a_file_that_does_not_match_installs_nothing_of_it": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "a_kept_drop_in_that_turns_lamp_cloud_off_is_named_and_kept": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "a_key_a_reset_removed_is_never_put_back_from_v1s_config": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "a_lamp_set_up_before_setup_wrote_zone_env_gets_its_saved_zone_at_the_next_install": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "a_lamps_own_pins_gain_the_privacy_section_and_keep_the_rest": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "a_lamps_own_pins_on_the_old_guess_get_every_head_line": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "a_missing_store_drop_in_is_repaired_and_failed_reload_is_retried": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "a_moved_lamp_is_given_the_product_voices_five_lines": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "a_newer_build_moves_each_link_and_keeps_the_old_folders": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "a_newer_default_replaces_only_a_setting_nobody_changed": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "a_product_lamp_without_a_link_says_so_once_and_never_drops_speech_in_silence": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "a_refused_service_install_records_nothing_and_keeps_the_drop_in": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "a_reset_then_prepare_does_not_restore_the_old_key": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "a_set_aside_holds_for_keys_there_and_after_a_mark_that_was_not_saved": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "a_setting_changed_on_the_lamp_is_kept_when_install_runs_again": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "a_setting_in_the_way_stops_the_install_before_any_is_written": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "a_setting_written_but_not_yet_recorded_is_still_installs": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "a_switch_set_back_on_later_is_not_named_and_a_file_named_twice_is_said_once": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "an_edited_setting_or_environment_file_that_turns_a_switch_off_is_named": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "an_install_over_19_octs_units_writes_each_as_the_build_has_it": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "an_install_puts_a_core_skills_changed_file_back_and_says_so": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "an_install_stopped_after_writing_its_units_enables_at_the_next_run": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "an_install_that_ends_before_its_units_says_so_and_keeps_the_old_ones": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "an_install_whose_enable_failed_enables_at_the_next_run_and_keeps_its_settings_record": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "corrupt_records_are_set_aside_and_never_bring_back_a_key_a_reset_removed": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "every_part_of_the_brain_has_a_product_unit": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "every_part_of_the_lamp_waits_for_setups_marker_itself": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "every_skill_folder_is_in_the_product_or_says_why_not": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "harness_at_boot_gives_lamposs_manager_its_home_first": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "harness_is_set_to_start_at_boot_once_when_it_is_there": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "harness_off_after_a_first_install_leaves_no_linger": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "harness_off_runs_uninstall_stop_status_then_the_linger_then_pgrep": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "harness_on_installs_with_harnesss_own_installer_then_sets_it_at_boot": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "harness_on_keeps_a_harness_already_there": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "harness_on_keeps_a_harness_whose_version_cannot_be_read_in_time": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "harness_on_stops_at_a_failing_step_and_leaves_no_link": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "harness_on_updates_its_own_older_harness_and_says_one_too_old": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "harness_versions_are_read_as_harness_prints_them": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "head_touch_comes_whole_and_never_beside_the_old_engines_head": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "head_touch_preflight_files::dangling_drop_in_keeps_missing_file_compatibility": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "head_touch_preflight_files::dev_null_drop_in_mask_is_preserved": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "head_touch_preflight_files::directory_drop_in_is_refused_before_mutation": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "head_touch_preflight_files::fifo_body_calibration_is_refused_before_mutation": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "head_touch_preflight_files::fifo_drop_in_is_refused_before_mutation": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "head_touch_preflight_files::fifo_without_a_writer_is_refused_before_mutation": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "head_touch_preflight_files::missing_local_files_keep_install_compatibility": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "head_touch_preflight_files::regular_benign_drop_in_is_preserved": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "head_touch_preflight_files::symlink_to_regular_drop_in_is_preserved": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "install_head_body_keeps_factory_calibration": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "install_head_body_refuses_calibration_environment_overrides_before_mutation": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "install_places_every_exit_note_hook_and_keeps_other_drop_ins": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "install_places_the_voices_recorded_lines_where_the_product_voice_reads_them": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "install_prepares_store_off_and_keeps_the_lamps_store_choice": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "install_records_the_tmpfiles_it_writes": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "install_review_head_pair_keeps_a_benign_drop_in": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "install_review_head_pair_refusal_precedes_state_and_host_mutation": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "install_review_head_pair_refuses_a_disabling_drop_in_before_mutation": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "install_review_head_pair_refuses_a_removed_mute_before_mutation": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "install_review_head_pair_retry_keeps_calibration_and_is_idempotent": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "install_setup_on_replaces_a_hand_placed_plan_and_keeps_the_old_in_the_records": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "lamp_update_back_waits_for_its_binary_rather_than_failing": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "missing_models_are_fetched_checked_and_placed_and_a_lamps_own_is_kept": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "music_sway_and_watch_you_leave_are_on_in_the_product": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "prepare_places_the_recorded_lines_a_moved_lamps_voice_reads": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "prepare_sets_corrupt_records_aside_and_leaves_unreadable_ones_alone": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "prepare_then_reset_then_install_does_not_restore_the_old_key": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "product_routine_state_is_private_persistent_and_keeps_new_switches_off": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "product_units_pass_only_options_an_older_binary_takes": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "run_twice_it_changes_nothing": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "second_review_body_head_off_refuses_before_bundle_mutation": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "settings_written_before_one_that_fails_are_still_installs": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "setup_settings_are_written_only_with_setup_on_and_kept_once_changed": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "the_builds_plan_already_there_is_no_change_and_no_backup": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "the_device_key_is_provisioned_private_and_only_where_missing": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "the_exit_note_allowlist_is_exactly_clouds_product_services": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "the_installed_bedtime_skill_is_disabled_and_absent_from_live_catalogs": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "the_parts_that_keep_local_time_read_the_zone_setup_saves": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "the_pinned_models_are_the_ones_their_parts_check": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "the_plans_install_shipped_are_listed": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "the_product_full_look_is_on_in_both_units_with_one_file": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "the_product_keeps_nothing_personal_while_nobody_is_known": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "the_product_sees_who_speaks": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "the_product_skills_are_exactly_the_core_skills": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "the_second_route_gets_its_services_on_the_voices_key_and_a_lamps_own_is_kept": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "the_skills_tools_are_in_their_own_folder_which_the_voice_reads": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "the_tasks_part_closes_the_harness_a_told_task_started": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "the_tasks_part_waits_for_harness_rather_than_failing": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "the_voice_gets_its_service_and_the_lamps_device_key_from_v1s_config": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "time_of_day_parts_wait_for_the_kernel_to_say_the_clock_is_set": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "tmpfiles_make_lock_folders_the_parts_accept_and_the_voices_sessions_folder": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "two_failed_runs_in_a_row_keep_a_written_setting_as_installs": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "unreadable_records_stop_install_rather_than_being_written_over": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "what_harness_service_status_still_has_is_read_from_its_json": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "what_harness_still_has_is_said_and_without_harness_the_record_is_kept": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "without_a_usable_key_nothing_is_written_and_the_key_is_never_said": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "without_setup_on_a_plan_there_follows_the_build_and_none_is_never_added": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        }
+      }
+    },
+    "lamp-update::it": {
+      "package-name": "lamp-update",
+      "binary-id": "lamp-update::it",
+      "binary-name": "it",
+      "package-id": "path+file://<preimage-tree>/lampOS/crates/update#lamp-update@0.1.0",
+      "kind": "test",
+      "binary-path": "<controlled-target>/debug/deps/it-7f2b1cc47b1a8b67",
+      "build-platform": "target",
+      "cwd": "<preimage-tree>/lampOS/crates/update",
+      "status": "listed",
+      "testcases": {
+        "ci_paths::every_doc_a_crate_reads_is_named_back_in_the_workflows_pull_request_paths": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "ci_paths::the_scan_sees_paths_in_strings_and_not_in_comments_or_prose": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "image_journal::systemd_reads_it_last_beside_another_drop_in": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "image_journal::the_journal_is_kept_well_inside_the_ram_disk": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "image_ramlog::a_failed_move_keeps_the_kept_boots_and_says_so": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "image_ramlog::logrotate_runs_the_lamps_copy_back_in_place_of_the_bases": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "image_ramlog::ramlogs_copies_leave_the_journal_out": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "image_ramlog::ramlogs_stop_keeps_the_journal_before_its_own_stop": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "image_ramlog::the_copy_back_leaves_the_journal_alone": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "image_ramlog::the_defaults_keep_the_bases_settings": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "image_ramlog::the_last_two_boots_are_kept_at_shutdown_only": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "scratch_paths::no_two_files_of_a_test_binary_build_the_same_scratch_folder": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "scratch_paths::the_names_read_are_the_scratch_folders_only": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        }
+      }
+    },
+    "lamp-update::release_pair": {
+      "package-name": "lamp-update",
+      "binary-id": "lamp-update::release_pair",
+      "binary-name": "release_pair",
+      "package-id": "path+file://<preimage-tree>/lampOS/crates/update#lamp-update@0.1.0",
+      "kind": "test",
+      "binary-path": "<controlled-target>/debug/deps/release_pair-587942a3dc3808c8",
+      "build-platform": "target",
+      "cwd": "<preimage-tree>/lampOS/crates/update",
+      "status": "skipped",
+      "testcases": {}
+    },
+    "lamp-update::round": {
+      "package-name": "lamp-update",
+      "binary-id": "lamp-update::round",
+      "binary-name": "round",
+      "package-id": "path+file://<preimage-tree>/lampOS/crates/update#lamp-update@0.1.0",
+      "kind": "test",
+      "binary-path": "<controlled-target>/debug/deps/round-42e77f9cbb014d5a",
+      "build-platform": "target",
+      "cwd": "<preimage-tree>/lampOS/crates/update",
+      "status": "listed",
+      "testcases": {
+        "a_bad_signature_or_a_bad_checksum_is_refused_with_nothing_installed": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "a_build_for_a_newer_updater_is_refused_and_taken_once_the_updater_can": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "a_build_of_only_new_product_skills_places_them_and_restarts_nothing": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "a_build_put_back_puts_its_settings_back_byte_for_byte": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "a_build_put_back_puts_the_images_files_back": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "a_build_put_back_puts_the_old_reset_plan_back": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "a_build_put_back_puts_the_product_skills_back": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "a_changed_model_is_fetched_checked_and_switched_with_its_part": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "a_command_is_read_within_its_bound_and_killed_after": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "a_core_skill_turned_on_stays_on_through_a_round": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "a_cut_inside_the_put_back_of_an_unreadable_self_json_never_turns_it_around": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "a_disk_too_full_for_a_second_copy_is_refused_before_anything_is_written": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "a_folder_made_two_builds_ago_is_removed_and_one_never_made_is_kept": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "a_hardware_profile_that_cannot_be_read_never_fails_the_round": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "a_lamp_short_of_room_for_the_models_refuses_before_fetching": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "a_lamp_update_back_from_before_the_plan_writes_the_rest_and_the_round_says_so": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "a_lamp_with_an_old_reset_plan_updated_by_a_round_ends_with_the_builds_and_a_backup": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "a_lamp_with_no_reset_plan_gets_none_from_a_round": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "a_lamp_without_lamp_update_apply_puts_the_build_back_with_nothing_written": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "a_lamps_own_asound_is_kept_and_the_voice_not_restarted_for_it": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "a_link_switch_cut_short_is_put_back_at_the_next_start": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "a_linked_part_keeps_its_build_and_the_one_before": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "a_linked_part_that_dies_is_put_back_by_its_link": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "a_model_fetch_cut_by_the_network_is_unreachable_not_refused": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "a_model_only_switch_cut_short_restarts_the_part_that_reads_it": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "a_model_switch_cut_short_is_put_back_at_the_next_start": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "a_model_switch_whose_part_dies_puts_the_model_back": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "a_model_that_cannot_be_put_back_leaves_the_others_put_back_and_the_journal_kept": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "a_model_that_does_not_match_its_sha_refuses_the_build_with_nothing_switched": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "a_new_build_is_installed_beside_the_old_and_switched": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "a_new_updater_not_confirmed_by_the_deadline_is_put_back": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "a_new_updater_that_confirms_keeps_its_switch": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "a_new_updater_that_exits_at_once_is_put_back": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "a_new_updater_that_refuses_every_manifest_is_put_back": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "a_new_worker_beside_an_unchanged_voice_gets_a_folder_named_by_its_list": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "a_part_put_back_says_its_restarts_and_last_line_in_the_outcome_only": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "a_part_that_dies_is_put_back_and_its_build_refused": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "a_part_that_says_it_is_in_error_is_put_back_after_its_minute": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "a_part_whose_folder_is_gone_is_installed_afresh": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "a_product_lamp_without_a_tmpfiles_record_takes_the_builds_tmpfiles": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "a_rejected_apply_receipt_runs_real_back_and_restores_written_settings_modes_and_records": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "a_rejected_back_receipt_keeps_the_journal_until_real_back_is_acknowledged": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "a_reset_plan_changed_on_the_lamp_is_replaced_by_a_round_never_kept": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "a_round_after_install_keeps_lamp_updates_own_folder": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "a_round_after_its_own_switch_keeps_the_old_binarys_folder": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "a_round_by_hand_keeps_the_folder_it_runs_from": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "a_round_does_not_switch_lamp_skills_onto_checks_its_old_folders_fail": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "a_round_keeping_second_json_still_reaches_deepseek_through_the_relay": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "a_round_places_second_json_before_a_voice_unit_that_needs_it": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "a_round_puts_a_core_skills_files_back_and_keeps_the_persons_own": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "a_round_that_cannot_place_second_json_writes_no_unit": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "a_round_that_sets_damaged_records_aside_keeps_the_keys_marked": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "a_round_with_nothing_to_change_only_checks": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "a_self_json_from_a_later_version_still_reads": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "a_self_json_the_disk_cannot_give_is_tried_again_next_round": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "a_skill_the_build_removes_leaves_the_turned_on_record_with_one_line": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "a_state_query_failing_mid_watch_is_asked_again_and_puts_nothing_back": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "a_switch_cut_short_after_its_settings_puts_them_back_at_the_next_start": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "a_switch_cut_short_is_put_back_at_the_next_start": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "a_unit_the_build_carries_is_carried_with_the_build_written_in": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "a_voice_that_is_well_is_put_back_between_two_turns": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "an_old_updater_climbs_one_updater_a_round": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "an_older_build_is_not_taken": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "an_older_lamp_update_back_ignores_the_images_files_and_the_round_says_so": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "an_unchanged_model_is_not_fetched_and_its_file_stays": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "an_unreadable_journal_is_set_aside_and_the_round_goes_on": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "an_unreadable_self_json_with_both_builds_known_is_put_back": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "an_unreadable_self_json_with_the_builds_unknown_is_set_aside": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "an_updater_too_old_for_a_build_not_newer_than_installed_takes_nothing_it_carries": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "an_updater_too_old_for_a_build_takes_only_the_updater_it_carries_then_the_rest": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "an_updater_too_old_for_a_build_without_an_updater_is_refused_with_nothing_written": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "asleep_quiet::a_lamp_asleep_or_muted_for_privacy_is_switched_without_waiting": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "asleep_quiet::a_voice_that_says_nothing_is_still_waited_for": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "asound_waits_for_a_quiet_moment_within_the_bound_and_then_for_the_next_round": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "both_kinds_of_part_switch_in_one_round_each_its_own_way": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "head_touch::absent_unused_product_pins_do_not_block_active_build_pins_updates": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "head_touch::body_head_calibration_cannot_override_the_sleep_reader": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "head_touch::body_head_complete_bundle_preserves_literal_factory_calibration": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "head_touch::body_head_mode_and_bus_dropins_are_refused_before_writes": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "head_touch::body_head_on_an_isolated_bus_is_refused_before_writes": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "head_touch::body_head_repeated_exec_start_is_refused_before_writes": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "head_touch::body_head_requires_an_enabled_carried_or_installed_sleep_reader": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "head_touch::custom_active_pins_are_kept_and_checked_against_the_reader_pair": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "head_touch::custom_head_wiring_is_kept_or_the_reader_transition_is_refused": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "head_touch::cut_after_pins_apply_restarts_unchanged_controls_after_restoring_old_pins": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "head_touch::environment_only_head_bus_mismatch_is_refused_before_any_write": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "head_touch::expression_or_controls_bus_mismatch_is_refused_before_any_write": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "head_touch::failed_head_reader_candidate_restores_exact_old_pins_and_units": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "head_touch::head_bus_root_dropins_are_not_guessed_from_base_units": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "head_touch::head_pins_cannot_change_without_restarting_their_controls_reader": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "head_touch::head_reader_mode_overrides_are_not_guessed_from_base_units": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "head_touch::invalid_mute_path_and_unknown_reader_are_refused": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "head_touch::isolated_voice_controls_bus_is_refused_before_any_write": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "head_touch::malformed_environment_quotes_are_not_reader_evidence": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "head_touch::matching_explicit_or_default_head_bus_roots_allow_the_paired_transition": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "head_touch::mixed_head_readers_are_refused_before_settings_or_units_are_written": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "head_touch::old_apply_helper_pins_mismatch_is_put_back_before_readers_restart": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "head_touch::paired_head_bus_cannot_diverge_from_voices_enabled_privacy_bus": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "head_touch::paired_head_readers_disable_legacy_even_when_signed_pins_enable_it": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "head_touch::paired_head_readers_without_controls_mute_are_refused_before_writes": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "head_touch::pr2948_settings_off_preserves_the_old_head_reader": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "head_touch::pr2948_settings_on_keeps_a_head_reader_available": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "head_touch::repeated_projected_pins_keep_their_actual_hash_without_restarting_controls": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "head_touch::semantic_head_reader_paths_cannot_expand_invocation_variables": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "head_touch::settings_off_refuses_paired_head_readers_with_legacy_pins": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "head_touch::stale_unused_product_pins_do_not_block_active_build_pins_updates": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "head_touch::textually_equal_expanded_head_bus_roots_are_not_a_verified_pair": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "head_touch::third_review_binary_update_checks_active_build_local_head_pins": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "head_touch::third_review_paired_head_readers_on_different_buses_are_refused": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "install_writes_the_fallback_and_no_round_touches_it": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "lamp_update_back_puts_back_an_unreadable_self_json": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "no_line_is_asked_of_a_good_switch_and_none_is_said_when_there_is_none": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "no_line_is_asked_when_systemd_itself_cannot_be_asked": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "no_network_changes_nothing_and_says_so": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "no_second_round_begins_while_lamp_updates_own_switch_waits": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "only_a_skill_that_would_stop_loading_holds_lamp_skills_back": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "product_carrier::a_comment_only_product_unit_is_an_intended_noop": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "product_carrier::a_corrupt_product_unit_is_refused_before_any_write": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "product_carrier::a_managed_product_manifest_can_bootstrap_the_existing_settings_helper": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "product_carrier::a_product_template_cannot_change_a_parts_binary_or_build_folder": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "product_carrier::a_product_template_does_not_replace_a_pinned_lamps_unit": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "product_carrier::a_product_unit_switches_with_its_link_and_leaves_local_dropins_alone": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "product_carrier::a_same_binary_product_unit_records_good_only_after_climb_and_confirmation": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "product_carrier::an_older_updater_climbs_before_the_product_switch_and_fallback": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "product_carrier::an_unhealthy_product_build_restores_the_exact_unit_and_link": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "product_carrier::automatic_settings_do_not_change_an_older_non_product_manifest": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "product_carrier::explicit_off_and_an_unmanaged_updater_do_not_bootstrap_settings": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "product_carrier::the_lamps_specific_unit_wins_over_the_product_unit": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "product_skills_go_only_into_installs_folder_and_only_when_it_can_be_written": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "product_skills_written_by_a_switch_cut_short_are_put_back_at_the_next_start": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "prune_keeps_the_models_of_the_kept_builds": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "prune_keeps_what_a_model_path_links_to_when_the_state_was_set_aside": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "restart_order::a_cut_at_reload_saves_the_full_old_projection_before_recovery": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "restart_order::a_cycle_in_an_older_recovery_journal_is_retained_without_arbitrary_restarts": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "restart_order::a_cycle_in_either_candidate_or_rollback_plan_refuses_before_mutation": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "restart_order::a_legacy_journal_uses_saved_declarations_and_unchanged_transitive_dependencies": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "restart_order::after_and_before_order_the_forward_restarts_instead_of_unit_names": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "restart_order::empty_saved_order_recovers_files_and_keeps_live_builds_when_inventory_is_unreadable": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "restart_order::interrupted_recovery_orders_saved_units_despite_a_shuffled_partial_journal": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "restart_order::malformed_present_rollback_orders_retain_the_prefix_and_do_not_fetch": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "restart_order::ordering_does_not_start_inactive_or_restart_unchanged_dependencies": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "restart_order::rollback_uses_the_saved_old_dependencies_not_the_new_graph_or_its_reverse": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "restart_order::saved_rollback_order_keeps_transitive_edges_after_an_unchanged_unit_drifts": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "restart_order::saved_rollback_order_survives_a_newly_unreadable_installed_unit": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "restart_order::saved_rollback_order_survives_an_interrupted_put_back_and_keeps_inactive_units_off": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "restart_order::the_product_voices_declared_managed_prerequisites_restart_before_it": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "restart_quiet::continuous_speech_puts_prerequisites_back_without_restarting_voice": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "restart_quiet::queued_speech_during_a_prerequisite_is_heard_before_restarting_voice": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "self_cuts::cut_after_candidate_is_synced_keeps_old_runnable_and_reuses_candidate": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "self_cuts::cut_after_confirmation_clears_pending_keeps_new_runnable_on_restart": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "self_cuts::cut_after_current_moves_keeps_new_runnable_and_can_confirm_or_put_back": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "self_cuts::cut_after_pending_is_saved_keeps_old_runnable_and_recovers_before_next_round": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "self_cuts::interrupted_put_back_keeps_a_runnable_current_and_finishes_on_restart": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "self_cuts::runnable_events::controls::a_never_released_first_output_gate_hits_the_startup_watchdog": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "self_cuts::runnable_events::controls::a_partial_first_output_also_starts_the_finish_watchdog": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "self_cuts::runnable_events::controls::a_read_error_restores_flags_and_leaves_the_direct_child_owned": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "self_cuts::runnable_events::controls::an_exited_leader_does_not_make_a_held_output_descriptor_complete": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "self_cuts::runnable_events::controls::first_output_can_follow_a_gate_longer_than_the_old_spawn_watchdog": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "self_cuts::runnable_events::controls::full_output_without_exit_hits_the_absolute_finish_watchdog": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "self_cuts::runnable_events::controls::later_bytes_do_not_renew_the_first_byte_finish_deadline": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "self_cuts::runnable_events::controls::no_output_is_not_readiness": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "self_cuts::runnable_events::controls::output_beyond_the_previous_capture_limit_fails_explicitly": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "self_cuts::runnable_events::controls::wrong_payload_nonzero_status_and_non_utf8_cannot_satisfy_the_fixture": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "self_cuts::without_self_opt_in_parts_update_but_no_handover_prefix_is_written": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "self_recovery::an_absent_or_unrunnable_fallback_keeps_the_completed_parts_and_old_updater": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "self_recovery::an_unchanged_or_refused_updater_needs_no_recovery_query": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "self_recovery::missing_recovery_also_defers_an_updater_first_climb_without_touching_parts": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "self_recovery::unavailable_recovery_keeps_the_parts_and_can_be_retried_when_armed": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "setup_lifecycle::a_different_failed_part_still_rolls_back_without_restarting_completed_setup": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "setup_lifecycle::an_alias_outside_the_lamp_prefix_cannot_bypass_the_product_check": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "setup_lifecycle::chained_and_loaded_aliases_retain_normal_restart_even_without_alias_files": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "setup_lifecycle::completed_product_setup_keeps_serving_without_restart_or_false_rollback": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "setup_lifecycle::completion_after_the_activity_snapshot_is_rechecked_before_restart": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "setup_lifecycle::completion_removed_during_the_manager_query_is_not_used": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "setup_lifecycle::custom_base_units_and_candidate_changes_keep_normal_watch_rules": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "setup_lifecycle::incomplete_product_setup_still_restarts_and_is_watched": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "setup_lifecycle::recovery_keeps_the_true_active_journal_but_does_not_restart_completed_setup": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "setup_lifecycle::recovery_rechecks_effective_aliases_after_restoring_the_old_unit": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "setup_lifecycle::reset_removing_completion_before_recovery_restarts_the_old_setup": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "setup_lifecycle::reset_removing_completion_before_restart_retains_the_normal_watch": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "setup_lifecycle::the_exact_product_exit_note_and_merged_usr_layout_keep_the_exception": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "setup_lifecycle::uncertain_override_files_do_not_hang_or_grant_the_exception": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "setup_lifecycle::unknown_dropins_at_each_scope_keep_normal_watch_rules": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "setup_lifecycle::unknown_manager_identity_and_custom_loaded_paths_keep_normal_watch": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "the_apps_off_and_on_hold_through_a_round_and_a_restart": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "the_fallback_reads_a_self_json_written_by_a_later_updater": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "the_guard_still_refuses_a_persons_skill_the_new_lamp_skills_will_not_load": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "the_journal_line_is_the_units_own_last_cleaned_and_cut": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "the_old_build_not_well_either_says_the_first_unit_not_wells_line": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "the_round_rejects_a_done_matching_a_rewritten_request_instead_of_its_own_request": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "matches"
+          }
+        },
+        "the_voice_is_not_switched_while_someone_talks_to_the_lamp": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "with_apply_off_a_builds_settings_are_not_written_and_that_is_said": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "with_apply_on_a_builds_settings_are_written_at_the_switch_and_the_part_reading_one_restarted": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "with_image_off_the_images_files_are_not_written_and_that_is_said": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "with_image_on_the_images_files_are_written_and_asound_restarts_the_voice_at_a_quiet_moment": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "with_models_off_a_new_updater_confirms_and_the_build_waits_for_models": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "with_the_switch_off_a_build_with_other_models_is_refused": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "with_the_switch_off_a_lamps_own_model_is_kept_as_with_it_on": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "with_the_switch_off_an_updater_too_old_for_a_build_takes_nothing_it_carries": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "with_the_switch_off_lamp_update_never_switches_itself": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        },
+        "without_apply_nothing_is_written_and_what_would_change_is_said": {
+          "kind": "test",
+          "ignored": false,
+          "filter-match": {
+            "status": "mismatch",
+            "reason": "expression"
+          }
+        }
+      }
+    },
+    "lamp-update::self-cli-exec": {
+      "package-name": "lamp-update",
+      "binary-id": "lamp-update::self-cli-exec",
+      "binary-name": "self-cli-exec",
+      "package-id": "path+file://<preimage-tree>/lampOS/crates/update#lamp-update@0.1.0",
+      "kind": "test",
+      "binary-path": "<controlled-target>/debug/deps/self_cli_exec-7a8efcc313003c4d",
+      "build-platform": "target",
+      "cwd": "<preimage-tree>/lampOS/crates/update",
+      "status": "skipped",
+      "testcases": {}
+    },
+    "lamp-update::self-process-cuts": {
+      "package-name": "lamp-update",
+      "binary-id": "lamp-update::self-process-cuts",
+      "binary-name": "self-process-cuts",
+      "package-id": "path+file://<preimage-tree>/lampOS/crates/update#lamp-update@0.1.0",
+      "kind": "test",
+      "binary-path": "<controlled-target>/debug/deps/self_process_cuts-9807238ddc4f9970",
+      "build-platform": "target",
+      "cwd": "<preimage-tree>/lampOS/crates/update",
+      "status": "skipped",
+      "testcases": {}
+    },
+    "lamp-update::bin/lamp-update": {
+      "package-name": "lamp-update",
+      "binary-id": "lamp-update::bin/lamp-update",
+      "binary-name": "lamp-update",
+      "package-id": "path+file://<preimage-tree>/lampOS/crates/update#lamp-update@0.1.0",
+      "kind": "bin",
+      "binary-path": "<controlled-target>/debug/deps/lamp_update-93805432291f4475",
+      "build-platform": "target",
+      "cwd": "<preimage-tree>/lampOS/crates/update",
+      "status": "skipped",
+      "testcases": {}
+    }
+  }
+}

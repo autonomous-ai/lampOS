@@ -1,0 +1,10 @@
+{
+  "sha": "d523834d60cc0260445e72ae4ca4c6937f600076",
+  "tree": "55431f7494e8f841a24a296ba723c27470a99096",
+  "ordered_parents": [
+    "a808ef04b5885ccb35e8e7693eee16ae331e3a7f",
+    "67a8e9554f6fb9644e0b0ab72a2e3895141e26ed"
+  ],
+  "raw_metadata_sha256": "f034de28541b5dd6852c5e48fda1707c30689d4923b75c72aa807e9d8dde60ec",
+  "setup_event_not_actual_checkout": true
+}

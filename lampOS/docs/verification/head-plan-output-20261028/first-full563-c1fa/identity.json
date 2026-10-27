@@ -1,0 +1,27 @@
+{
+  "head": "2fa602a0a84164fd74d1d944830cd4a3257e389b",
+  "base": "c1fa2bc9f327f5d553bb3dcc355053d8e7e94bfa",
+  "tree": "f8cd61e30b52a84ad75ea78144387355f5e43a49",
+  "own_branch": "second/head-plan-output-c1fa",
+  "working_patch_sha256": "e5f92a8d8646d2c3a0650e9a2aa23444132daa5df46500b0113f4aca44a82ff2",
+  "dirty_files": [
+    "lampOS/crates/update/src/head_touch.rs",
+    "lampOS/crates/update/src/head_touch/plan_output.rs",
+    "lampOS/crates/update/src/head_touch/plan_output/tests.rs",
+    "lampOS/docs/head-touch-plan-output.md",
+    "lampOS/docs/reuse-decisions.md",
+    "lampOS/docs/updates.md"
+  ],
+  "uncommitted_source_gate": true,
+  "source_count": 7510,
+  "controller_sha256": "b449803bbf5040512388927f820a92401251cc506605c7501e8e746e56b9c77f",
+  "nextest_tool_sha256": "aad9d409cd2f0a81fcaed49d7672a133254179458436c1e957505e4a11655329",
+  "nextest_version": "0.9.150",
+  "earlier_CI_runner_version": "0.9.149",
+  "verified_tool_proof_sha256": "5563f2b54904be2611512496701b75cb5d11f8a60fe3e60773a1579b82286c1f",
+  "merged_receipt_selector_sha256": "ecf2c70720c3f1c14b5ba960123cea0e3ae0764777f4906992a989c58ee80c23",
+  "config_sha256": "c4992da8d157df279011a424b5feb4833f001fd1d46ce3edd0a56992c848bb33",
+  "preferred_runner_scope": "FIRST FULL bounded plan-output lamp-update normal Nextest all(); actual count discovered,6 new plan-output plus78 existing required; old failures separate",
+  "earlier_failure_unwaived": true,
+  "baseline_198_pass_INCONCLUSIVE": true
+}

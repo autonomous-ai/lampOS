@@ -1,0 +1,13 @@
+{
+  "argv": [
+    "rg",
+    "-n",
+    "\\bproject_with_formatter\\b|head_touch::plan_output|plan_output::project",
+    "lampOS/crates",
+    "--glob",
+    "*.rs"
+  ],
+  "exit_code": 0,
+  "stdout": "lampOS/crates/update/src/head_touch.rs:471:    project_with_formatter(inputs, root, units, carried, settings, steps, |object| {\nlampOS/crates/update/src/head_touch.rs:481:fn project_with_formatter(\nlampOS/crates/update/src/head_touch/plan_output.rs:5:use super::{HeadInputs, project_with_formatter};\nlampOS/crates/update/src/head_touch/plan_output.rs:37:    project_with_formatter(\n",
+  "stderr": ""
+}

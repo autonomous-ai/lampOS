@@ -1,0 +1,65 @@
+{
+  "base": "dadacc1bc2fe2e285ed5125a32dd6fe483c01991",
+  "codec_Linux_physical_branch_present": true,
+  "codec_commit_paths": [
+    "lampOS/crates/update/src/head_touch/capture.rs",
+    "lampOS/crates/update/src/head_touch/capture/codec.rs",
+    "lampOS/crates/update/src/head_touch/capture/codec/tests.rs",
+    "lampOS/docs/head-touch-codec.md",
+    "lampOS/docs/reuse-decisions.md",
+    "lampOS/docs/updates.md"
+  ],
+  "combined_commits": [
+    "05713ea4fe6720b606e8151c6e1281024dc0e384",
+    "f3c768e6bc59b04704eff817056c7481d86d5212"
+  ],
+  "combined_paths": {
+    "lampOS/crates/update/src/head_touch.rs": {
+      "blob": "f0f048d74a3010d0dd917b08b8eca0d31b239ad9",
+      "mode": "100644",
+      "sha256": "2e9bcd134f16744e622f813cc3f5e71fe55c1b2a7bb64a5bd14d63d157b3638c"
+    },
+    "lampOS/crates/update/src/head_touch/capture.rs": {
+      "blob": "5deea5940ac2427a790425c842165ba264644181",
+      "mode": "100644",
+      "sha256": "f177737a21e11401998617cb4baa65343f02d226bb4c84dcc1ca25c0cfb21140"
+    },
+    "lampOS/crates/update/src/head_touch/capture/codec.rs": {
+      "blob": "f5d233a33dbe6328f12e4d5e6856a7db53ce4279",
+      "mode": "100644",
+      "sha256": "38e5a525a710fa48c141d45a11f445b0a55f9867e1574e4679be4de500d3e4c3"
+    },
+    "lampOS/crates/update/src/head_touch/capture/codec/tests.rs": {
+      "blob": "04537dd4ad9e9fa26b7a033739d1f91ebb414dd1",
+      "mode": "100644",
+      "sha256": "730c8b9b330d4386a810cc7a6e848a80d5aba490d34dce41c5b2ccc29f5a7d43"
+    },
+    "lampOS/crates/update/src/head_touch/capture/tests.rs": {
+      "blob": "442d2cb4598035b0974c5f3d7a39e7edd89f3b76",
+      "mode": "100644",
+      "sha256": "ae5af4ed21941b278391c7412706b36f352c28fb20453426df55ff59e65b7855"
+    },
+    "lampOS/docs/head-touch-capture.md": {
+      "blob": "5aaff01db09dd8d1432dc226f002745ff9f9ff4a",
+      "mode": "100644",
+      "sha256": "295e987588d23a25eac0fb8155dd65fef718195e536760a08e1bff8058442bde"
+    },
+    "lampOS/docs/head-touch-codec.md": {
+      "blob": "917fc48e0c02a2fbae4135972f35b6a8b07bfd4e",
+      "mode": "100644",
+      "sha256": "eb4dbb1d3e99c823c2518ef37b896f851746cc93d6083e0e8aab4a2fcd9fe6c0"
+    },
+    "lampOS/docs/reuse-decisions.md": {
+      "blob": "9c29653056a211f84aed8f67b5a37d8723772c87",
+      "mode": "100644",
+      "sha256": "427d4eca95fcabd8a09e986aa3eb3c693588d919b3e3f2790080c32d6ab6dc5e"
+    },
+    "lampOS/docs/updates.md": {
+      "blob": "07f7cfbeb5b452fb264e832ad5cb1883d4a47619",
+      "mode": "100644",
+      "sha256": "008c25ed4e4d36affbdfb4796a762aceabfa0c8392e329dfbfdeb33683a8a23e"
+    }
+  },
+  "head": "f3c768e6bc59b04704eff817056c7481d86d5212",
+  "old_failures_not_reclassified": true
+}

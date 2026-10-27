@@ -1,0 +1,14 @@
+{
+  "head": "d682ee30e52eefd1e760d899f5c178724f40a1ec",
+  "base": "c1fa2bc9f327f5d553bb3dcc355053d8e7e94bfa",
+  "paths": [
+    "lampOS/crates/update/src/head_touch.rs",
+    "lampOS/crates/update/src/head_touch/plan_output.rs",
+    "lampOS/crates/update/src/head_touch/plan_output/tests.rs",
+    "lampOS/docs/head-touch-plan-output.md",
+    "lampOS/docs/reuse-decisions.md",
+    "lampOS/docs/updates.md"
+  ],
+  "six_committed_bytes_modes_equal_gate": true,
+  "clean": true
+}

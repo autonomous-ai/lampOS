@@ -1,0 +1,12 @@
+{
+  "ARM_watch39175_exit": 0,
+  "ARM_log92939_exit": 0,
+  "Linux_watch31891_exit": 0,
+  "Linux_log40665_exit": 0,
+  "optional_archive_requested": false,
+  "actual_required_job_metadata_checked": true,
+  "watch_exit_alone_never_success_proof": true,
+  "all_original_attempts": 1,
+  "workflow_reruns_or_cancellations": 0,
+  "optional_archive_payload_not_claimed": true
+}

@@ -1,0 +1,122 @@
+[
+  {
+    "actual_sha256": "b0ee656e52e0b26cbfb909ea4d4883269cdecb6f4f261b3231030a869ec6daab",
+    "bytes": 22852440,
+    "fresh": false,
+    "kind": [
+      "test"
+    ],
+    "post_runtime_sha256": "b0ee656e52e0b26cbfb909ea4d4883269cdecb6f4f261b3231030a869ec6daab",
+    "preserved_sha256": "b0ee656e52e0b26cbfb909ea4d4883269cdecb6f4f261b3231030a869ec6daab",
+    "target": "functions",
+    "test_profile": true
+  },
+  {
+    "actual_sha256": "f659bdd86a5410e1e9fa6d94a37144779d21ebfed68de30d65823076731114e5",
+    "bytes": 16821120,
+    "fresh": false,
+    "kind": [
+      "lib"
+    ],
+    "post_runtime_sha256": "f659bdd86a5410e1e9fa6d94a37144779d21ebfed68de30d65823076731114e5",
+    "preserved_sha256": "f659bdd86a5410e1e9fa6d94a37144779d21ebfed68de30d65823076731114e5",
+    "target": "lamp_update",
+    "test_profile": true
+  },
+  {
+    "actual_sha256": "3697cf2ea6e08693d2f8bb7bf625a82a314bb84c20fd2e8298e99fd6118ae96f",
+    "bytes": 17251848,
+    "fresh": false,
+    "kind": [
+      "test"
+    ],
+    "post_runtime_sha256": "3697cf2ea6e08693d2f8bb7bf625a82a314bb84c20fd2e8298e99fd6118ae96f",
+    "preserved_sha256": "3697cf2ea6e08693d2f8bb7bf625a82a314bb84c20fd2e8298e99fd6118ae96f",
+    "target": "install",
+    "test_profile": true
+  },
+  {
+    "actual_sha256": "a806e333aa81899e83eb47d8f25db1f38e62b80cd785185e5fbac4a3266fed2a",
+    "bytes": 1277216,
+    "fresh": false,
+    "kind": [
+      "bin"
+    ],
+    "post_runtime_sha256": "a806e333aa81899e83eb47d8f25db1f38e62b80cd785185e5fbac4a3266fed2a",
+    "preserved_sha256": "a806e333aa81899e83eb47d8f25db1f38e62b80cd785185e5fbac4a3266fed2a",
+    "target": "lamp-update",
+    "test_profile": true
+  },
+  {
+    "actual_sha256": "9e08cb9438c86403edf1ba6970a2a5dc2abeff3b20b87b636b4140e95e42173d",
+    "bytes": 550128,
+    "fresh": false,
+    "kind": [
+      "test"
+    ],
+    "post_runtime_sha256": "9e08cb9438c86403edf1ba6970a2a5dc2abeff3b20b87b636b4140e95e42173d",
+    "preserved_sha256": "9e08cb9438c86403edf1ba6970a2a5dc2abeff3b20b87b636b4140e95e42173d",
+    "target": "self-process-cuts",
+    "test_profile": true
+  },
+  {
+    "actual_sha256": "65d281903ccb6b3f583fde3e080bd28549596ffd38fca36c23b0206728fd2a24",
+    "bytes": 21011560,
+    "fresh": false,
+    "kind": [
+      "test"
+    ],
+    "post_runtime_sha256": "65d281903ccb6b3f583fde3e080bd28549596ffd38fca36c23b0206728fd2a24",
+    "preserved_sha256": "65d281903ccb6b3f583fde3e080bd28549596ffd38fca36c23b0206728fd2a24",
+    "target": "round",
+    "test_profile": true
+  },
+  {
+    "actual_sha256": "cc1e775c7f19e6634ec20303359872479aa87a9ecbc75d0826f31d70416f8668",
+    "bytes": 3295824,
+    "fresh": false,
+    "kind": [
+      "test"
+    ],
+    "post_runtime_sha256": "cc1e775c7f19e6634ec20303359872479aa87a9ecbc75d0826f31d70416f8668",
+    "preserved_sha256": "cc1e775c7f19e6634ec20303359872479aa87a9ecbc75d0826f31d70416f8668",
+    "target": "release_pair",
+    "test_profile": true
+  },
+  {
+    "actual_sha256": "6cf16ad088384745882270b60bb15cb72f529b4cc9ecc1db1e47cab8483fd6f2",
+    "bytes": 550080,
+    "fresh": false,
+    "kind": [
+      "test"
+    ],
+    "post_runtime_sha256": "6cf16ad088384745882270b60bb15cb72f529b4cc9ecc1db1e47cab8483fd6f2",
+    "preserved_sha256": "6cf16ad088384745882270b60bb15cb72f529b4cc9ecc1db1e47cab8483fd6f2",
+    "target": "self-cli-exec",
+    "test_profile": true
+  },
+  {
+    "actual_sha256": "3cfee963f9088c88a81d4117ccfbd57cf5846c0c5f71ba9fdcb78e6cec0609a8",
+    "bytes": 1976800,
+    "fresh": false,
+    "kind": [
+      "test"
+    ],
+    "post_runtime_sha256": "3cfee963f9088c88a81d4117ccfbd57cf5846c0c5f71ba9fdcb78e6cec0609a8",
+    "preserved_sha256": "3cfee963f9088c88a81d4117ccfbd57cf5846c0c5f71ba9fdcb78e6cec0609a8",
+    "target": "it",
+    "test_profile": true
+  },
+  {
+    "actual_sha256": "55ab94477b18f76de9888d5ea4694a77b2311d1a82a5fa4bfe4d1c9e49625cd3",
+    "bytes": 13556144,
+    "fresh": false,
+    "kind": [
+      "bin"
+    ],
+    "post_runtime_sha256": "55ab94477b18f76de9888d5ea4694a77b2311d1a82a5fa4bfe4d1c9e49625cd3",
+    "preserved_sha256": "55ab94477b18f76de9888d5ea4694a77b2311d1a82a5fa4bfe4d1c9e49625cd3",
+    "target": "lamp-update",
+    "test_profile": false
+  }
+]

@@ -1,0 +1,11 @@
+# Codec f3c original native qualification, corrected metadata aggregate
+
+PR #3937, head f3c768e6bc59b04704eff817056c7481d86d5212, Main dadacc1bc2fe2e285ed5125a32dd6fe483c01991. Original attempt1 ARM40576652072/job122444760503 and Linux40576652256/job122444761647 succeed. Actual checkout95bb055424e74bf522d115a06d0736463916cf8b has ordered[Dad,f3c] parents and complete treebcca859c4213231d1f98411db8b0a0c427996e2f exactly equal to the offered source. The two-commit collector dependency is verified separately from the authored head's direct parent.
+
+Actual dependency-selected ARM:7,850 unique PASS, zero bad/selected unrun,54 summary skips,70 selected/120 excluded binaries. All78 required controls once, including all26 codec functions, the Linux physical raw-name codec subsection and the existing collector controls.34 identical final echoes are excluded. Separate docs4/process13/relay1/helper25/Python49,12,7 are not added. Linux pinned formatting and strict workspace/all-target Clippy complete with actual Update compilation markers.
+
+Artifact12769571149 has48 current production binaries+2 examples, complete SHA256SUMS and every AArch64 ELF payload verified. ZIP118,756,395 bytes, SHA256 bfde4933a3697c21f0a4a9666fdd0c665c9bd817171fdaa845d6ba3de836a39f matches API and upload log. No binary was executed. Per-Nextest executable bytes are not uploaded and their hashes are not fabricated. The production artifact binds separately from the executed case/source census.
+
+This additive v2 corrects only the copied audit metadata label pr3892 to pr3937. The original private packet/identity remain unchanged and their hashes are in metadata-correction.json. Exact run/head/tree/cases/source metadata were already correct; no source, executed result, count or scope is changed or replayed. Use the corrected identity in this aggregate.
+
+This qualifies f3c/Dad only. Later current82 gates and native runs remain separate; no old native count transfers. Internal self-checks are not formal external current-head reader dispositions. Mac physical raw-name filesystem coverage is unverified. No authenticated plan/admission, root authority, storage effects, helper activation, live writes/restoration, device or power-cut acceptance is claimed.

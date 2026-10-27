@@ -1,0 +1,389 @@
+[
+  {
+    "file": "identity.json",
+    "raw_sha256": "f9608a21498ccb29aea03fa93af0d3853b8f65f7f971312b3aef97f6396ca460",
+    "sanitized_sha256": "f9608a21498ccb29aea03fa93af0d3853b8f65f7f971312b3aef97f6396ca460",
+    "published_sha256": "f9608a21498ccb29aea03fa93af0d3853b8f65f7f971312b3aef97f6396ca460",
+    "sanitized_terminal_LFs": 1,
+    "EOF_reconstruction": "Remove published terminal LF, append sanitized_terminal_LFs terminal LFs; empty stays empty.",
+    "method": "JSON load -> typed recursive string/account/path redaction -> JSON dump"
+  },
+  {
+    "file": "public-Main-before.json",
+    "raw_sha256": "a404b198be5c27b8daad16034a1c05d87651bf2622ed74e09c2c7769662d7899",
+    "sanitized_sha256": "a404b198be5c27b8daad16034a1c05d87651bf2622ed74e09c2c7769662d7899",
+    "published_sha256": "a404b198be5c27b8daad16034a1c05d87651bf2622ed74e09c2c7769662d7899",
+    "sanitized_terminal_LFs": 1,
+    "EOF_reconstruction": "Remove published terminal LF, append sanitized_terminal_LFs terminal LFs; empty stays empty.",
+    "method": "JSON load -> typed recursive string/account/path redaction -> JSON dump"
+  },
+  {
+    "file": "working.patch",
+    "raw_sha256": "6b4bdc335867bb28a8f92351a3eb3c9496649b9d80e7a66a9fcf10574ff426fc",
+    "sanitized_sha256": "6b4bdc335867bb28a8f92351a3eb3c9496649b9d80e7a66a9fcf10574ff426fc",
+    "published_sha256": "6b4bdc335867bb28a8f92351a3eb3c9496649b9d80e7a66a9fcf10574ff426fc",
+    "sanitized_terminal_LFs": 1,
+    "EOF_reconstruction": "Remove published terminal LF, append sanitized_terminal_LFs terminal LFs; empty stays empty.",
+    "method": "plain text redaction"
+  },
+  {
+    "file": "source-before.json",
+    "raw_sha256": "8497d27d9b477f06e36b8acc6fcb95756b801e86d1a920e357546a45d4ea9b0b",
+    "sanitized_sha256": "8497d27d9b477f06e36b8acc6fcb95756b801e86d1a920e357546a45d4ea9b0b",
+    "published_sha256": "8497d27d9b477f06e36b8acc6fcb95756b801e86d1a920e357546a45d4ea9b0b",
+    "sanitized_terminal_LFs": 1,
+    "EOF_reconstruction": "Remove published terminal LF, append sanitized_terminal_LFs terminal LFs; empty stays empty.",
+    "method": "JSON load -> typed recursive string/account/path redaction -> JSON dump"
+  },
+  {
+    "file": "source-after.json",
+    "raw_sha256": "8497d27d9b477f06e36b8acc6fcb95756b801e86d1a920e357546a45d4ea9b0b",
+    "sanitized_sha256": "8497d27d9b477f06e36b8acc6fcb95756b801e86d1a920e357546a45d4ea9b0b",
+    "published_sha256": "8497d27d9b477f06e36b8acc6fcb95756b801e86d1a920e357546a45d4ea9b0b",
+    "sanitized_terminal_LFs": 1,
+    "EOF_reconstruction": "Remove published terminal LF, append sanitized_terminal_LFs terminal LFs; empty stays empty.",
+    "method": "JSON load -> typed recursive string/account/path redaction -> JSON dump"
+  },
+  {
+    "file": "source-freeze.json",
+    "raw_sha256": "4f57e7d2122b3778f1ad6980223de84eac3d0932ec302f38e1de5fe9e42b0c53",
+    "sanitized_sha256": "13d4783c981318d5f2ea03e94afc7d365ef01665967aa61328af737bcb90d874",
+    "published_sha256": "13d4783c981318d5f2ea03e94afc7d365ef01665967aa61328af737bcb90d874",
+    "sanitized_terminal_LFs": 1,
+    "EOF_reconstruction": "Remove published terminal LF, append sanitized_terminal_LFs terminal LFs; empty stays empty.",
+    "method": "JSON load -> typed recursive string/account/path redaction -> JSON dump"
+  },
+  {
+    "file": "results.json",
+    "raw_sha256": "57ec1c52f7c19ea30a259038a2912480f2064e595da5f15551ed66caeb4c61e0",
+    "sanitized_sha256": "fead59ab3929f5c37287d644447d85a57b2e82059307909df798845a6a2c9023",
+    "published_sha256": "fead59ab3929f5c37287d644447d85a57b2e82059307909df798845a6a2c9023",
+    "sanitized_terminal_LFs": 1,
+    "EOF_reconstruction": "Remove published terminal LF, append sanitized_terminal_LFs terminal LFs; empty stays empty.",
+    "method": "JSON load -> typed recursive string/account/path redaction -> JSON dump"
+  },
+  {
+    "file": "closure.json",
+    "raw_sha256": "863e4e830e53ef101875476b06b8c7948df19c85a353c47fdd94624fc0923037",
+    "sanitized_sha256": "863e4e830e53ef101875476b06b8c7948df19c85a353c47fdd94624fc0923037",
+    "published_sha256": "863e4e830e53ef101875476b06b8c7948df19c85a353c47fdd94624fc0923037",
+    "sanitized_terminal_LFs": 1,
+    "EOF_reconstruction": "Remove published terminal LF, append sanitized_terminal_LFs terminal LFs; empty stays empty.",
+    "method": "JSON load -> typed recursive string/account/path redaction -> JSON dump"
+  },
+  {
+    "file": "required-selectors.json",
+    "raw_sha256": "55db1a373c7007e9b2ad5d264c8985f0fd171a54d01d4b0d0cdc17147d9ab1f1",
+    "sanitized_sha256": "55db1a373c7007e9b2ad5d264c8985f0fd171a54d01d4b0d0cdc17147d9ab1f1",
+    "published_sha256": "55db1a373c7007e9b2ad5d264c8985f0fd171a54d01d4b0d0cdc17147d9ab1f1",
+    "sanitized_terminal_LFs": 1,
+    "EOF_reconstruction": "Remove published terminal LF, append sanitized_terminal_LFs terminal LFs; empty stays empty.",
+    "method": "JSON load -> typed recursive string/account/path redaction -> JSON dump"
+  },
+  {
+    "file": "filter.json",
+    "raw_sha256": "2a4f5f4b1835862b55077a5e06ab6752177e6a9d3bebd9e11f931209c7c7ab65",
+    "sanitized_sha256": "2a4f5f4b1835862b55077a5e06ab6752177e6a9d3bebd9e11f931209c7c7ab65",
+    "published_sha256": "2a4f5f4b1835862b55077a5e06ab6752177e6a9d3bebd9e11f931209c7c7ab65",
+    "sanitized_terminal_LFs": 1,
+    "EOF_reconstruction": "Remove published terminal LF, append sanitized_terminal_LFs terminal LFs; empty stays empty.",
+    "method": "JSON load -> typed recursive string/account/path redaction -> JSON dump"
+  },
+  {
+    "file": "discovery.json",
+    "raw_sha256": "ea751f6db5536e754772ffc0499c3b959a4c713e9e05d419e4eca141c77e43bb",
+    "sanitized_sha256": "64d9b060d52d20498a89906e8c925f7ab949cc2f37a8703b505fa740c14a1920",
+    "published_sha256": "64d9b060d52d20498a89906e8c925f7ab949cc2f37a8703b505fa740c14a1920",
+    "sanitized_terminal_LFs": 1,
+    "EOF_reconstruction": "Remove published terminal LF, append sanitized_terminal_LFs terminal LFs; empty stays empty.",
+    "method": "JSON load -> typed recursive string/account/path redaction -> JSON dump"
+  },
+  {
+    "file": "scoped-discovery.json",
+    "raw_sha256": "ea751f6db5536e754772ffc0499c3b959a4c713e9e05d419e4eca141c77e43bb",
+    "sanitized_sha256": "64d9b060d52d20498a89906e8c925f7ab949cc2f37a8703b505fa740c14a1920",
+    "published_sha256": "64d9b060d52d20498a89906e8c925f7ab949cc2f37a8703b505fa740c14a1920",
+    "sanitized_terminal_LFs": 1,
+    "EOF_reconstruction": "Remove published terminal LF, append sanitized_terminal_LFs terminal LFs; empty stays empty.",
+    "method": "JSON load -> typed recursive string/account/path redaction -> JSON dump"
+  },
+  {
+    "file": "scoped-selection.json",
+    "raw_sha256": "aa3c53fb6d98e198e71be6b4c1ce4efad5f66d5327eef4061981927796eaa6d1",
+    "sanitized_sha256": "aa3c53fb6d98e198e71be6b4c1ce4efad5f66d5327eef4061981927796eaa6d1",
+    "published_sha256": "aa3c53fb6d98e198e71be6b4c1ce4efad5f66d5327eef4061981927796eaa6d1",
+    "sanitized_terminal_LFs": 1,
+    "EOF_reconstruction": "Remove published terminal LF, append sanitized_terminal_LFs terminal LFs; empty stays empty.",
+    "method": "JSON load -> typed recursive string/account/path redaction -> JSON dump"
+  },
+  {
+    "file": "pre-runtime-binding.json",
+    "raw_sha256": "184950b31b62ca4b883ecccb5b2bae83f2317524ceb50604adc06d39c63f8d30",
+    "sanitized_sha256": "184950b31b62ca4b883ecccb5b2bae83f2317524ceb50604adc06d39c63f8d30",
+    "published_sha256": "184950b31b62ca4b883ecccb5b2bae83f2317524ceb50604adc06d39c63f8d30",
+    "sanitized_terminal_LFs": 1,
+    "EOF_reconstruction": "Remove published terminal LF, append sanitized_terminal_LFs terminal LFs; empty stays empty.",
+    "method": "JSON load -> typed recursive string/account/path redaction -> JSON dump"
+  },
+  {
+    "file": "runtime-census.json",
+    "raw_sha256": "f87a1e23776fc14fe11e2af3d8a595298e3b7fdc1f262439229b94e6a41b8ae9",
+    "sanitized_sha256": "f87a1e23776fc14fe11e2af3d8a595298e3b7fdc1f262439229b94e6a41b8ae9",
+    "published_sha256": "f87a1e23776fc14fe11e2af3d8a595298e3b7fdc1f262439229b94e6a41b8ae9",
+    "sanitized_terminal_LFs": 1,
+    "EOF_reconstruction": "Remove published terminal LF, append sanitized_terminal_LFs terminal LFs; empty stays empty.",
+    "method": "JSON load -> typed recursive string/account/path redaction -> JSON dump"
+  },
+  {
+    "file": "compile-artifacts.json",
+    "raw_sha256": "ff9c8e3f41ba445004ed73aef2451eefba4b155575cea32f2d180ea8b7249f8d",
+    "sanitized_sha256": "d36f326ff755950f7d11f6e39cc7d542d57dc5f473cff3aaaa7b0474294faf5a",
+    "published_sha256": "d36f326ff755950f7d11f6e39cc7d542d57dc5f473cff3aaaa7b0474294faf5a",
+    "sanitized_terminal_LFs": 1,
+    "EOF_reconstruction": "Remove published terminal LF, append sanitized_terminal_LFs terminal LFs; empty stays empty.",
+    "method": "JSON load -> typed recursive string/account/path redaction -> JSON dump"
+  },
+  {
+    "file": "executables-final.json",
+    "raw_sha256": "d644da93976afc41caf309ee892eefef8d8a59eaed8933252752e2c48895d8c7",
+    "sanitized_sha256": "44d05bdf7b58a31a3ac381db312370b1c1c8f1bd7e7f128eb4d1de7ea327f19e",
+    "published_sha256": "44d05bdf7b58a31a3ac381db312370b1c1c8f1bd7e7f128eb4d1de7ea327f19e",
+    "sanitized_terminal_LFs": 1,
+    "EOF_reconstruction": "Remove published terminal LF, append sanitized_terminal_LFs terminal LFs; empty stays empty.",
+    "method": "JSON load -> typed recursive string/account/path redaction -> JSON dump"
+  },
+  {
+    "file": "actual-listed-executables.json",
+    "raw_sha256": "bb4a3b1890f92b4d481e57f1383f09da54c763b6441210eb281fc6ba2104574c",
+    "sanitized_sha256": "dd986dd998f7fecb597cc9b52b81a60c09b06f08b607733a51b305d1237b0d7d",
+    "published_sha256": "dd986dd998f7fecb597cc9b52b81a60c09b06f08b607733a51b305d1237b0d7d",
+    "sanitized_terminal_LFs": 1,
+    "EOF_reconstruction": "Remove published terminal LF, append sanitized_terminal_LFs terminal LFs; empty stays empty.",
+    "method": "JSON load -> typed recursive string/account/path redaction -> JSON dump"
+  },
+  {
+    "file": "actual-compiler-inputs.json",
+    "raw_sha256": "63bdfd567e1e29b3558b6408bda5c2f887d961b4a48e25c875a88c3c54751bc3",
+    "sanitized_sha256": "80eab13aa0540bfad8a273a7521efce0a4c81ff7bf162334b37743a8f35d6724",
+    "published_sha256": "80eab13aa0540bfad8a273a7521efce0a4c81ff7bf162334b37743a8f35d6724",
+    "sanitized_terminal_LFs": 1,
+    "EOF_reconstruction": "Remove published terminal LF, append sanitized_terminal_LFs terminal LFs; empty stays empty.",
+    "method": "JSON load -> typed recursive string/account/path redaction -> JSON dump"
+  },
+  {
+    "file": "case-executable-bindings.json",
+    "raw_sha256": "20774e1df728a08881a85ce4ba5b45ffed8d35f806af9b17b065d057efe01e76",
+    "sanitized_sha256": "b702adff9e647c6a15dc29ac95e2550b0d67b8abeebfba79ec35c6dc0a4ec30b",
+    "published_sha256": "b702adff9e647c6a15dc29ac95e2550b0d67b8abeebfba79ec35c6dc0a4ec30b",
+    "sanitized_terminal_LFs": 1,
+    "EOF_reconstruction": "Remove published terminal LF, append sanitized_terminal_LFs terminal LFs; empty stays empty.",
+    "method": "JSON load -> typed recursive string/account/path redaction -> JSON dump"
+  },
+  {
+    "file": "selected-inputs.json",
+    "raw_sha256": "084ae6e9ffd35ef6afe9da6db6f58a9b1ffee0b358c329951d80f8615628502b",
+    "sanitized_sha256": "aab001425016bd828d20be4af3252cf4595b6544497b3b29462a4047c4ad6e8c",
+    "published_sha256": "aab001425016bd828d20be4af3252cf4595b6544497b3b29462a4047c4ad6e8c",
+    "sanitized_terminal_LFs": 1,
+    "EOF_reconstruction": "Remove published terminal LF, append sanitized_terminal_LFs terminal LFs; empty stays empty.",
+    "method": "JSON load -> typed recursive string/account/path redaction -> JSON dump"
+  },
+  {
+    "file": "target-reuse.json",
+    "raw_sha256": "72bfb86fe657216507b35a8b1f4eaddb82f7328feb20af77344c6355d004eca2",
+    "sanitized_sha256": "e3508d743b9597adc4b82c3879070275397757c65abc83ced087c086355d29c3",
+    "published_sha256": "e3508d743b9597adc4b82c3879070275397757c65abc83ced087c086355d29c3",
+    "sanitized_terminal_LFs": 1,
+    "EOF_reconstruction": "Remove published terminal LF, append sanitized_terminal_LFs terminal LFs; empty stays empty.",
+    "method": "JSON load -> typed recursive string/account/path redaction -> JSON dump"
+  },
+  {
+    "file": "cargo-configuration.json",
+    "raw_sha256": "4faef1f89a5b12b398033ced14272bc33a85ed3fc1fdd360b05bb3411c4345ce",
+    "sanitized_sha256": "616ef27f88e9eda8a903d889ce32bac5c45c10b88a186697006af4bc98bfd8aa",
+    "published_sha256": "616ef27f88e9eda8a903d889ce32bac5c45c10b88a186697006af4bc98bfd8aa",
+    "sanitized_terminal_LFs": 1,
+    "EOF_reconstruction": "Remove published terminal LF, append sanitized_terminal_LFs terminal LFs; empty stays empty.",
+    "method": "JSON load -> typed recursive string/account/path redaction -> JSON dump"
+  },
+  {
+    "file": "reader-census.json",
+    "raw_sha256": "0a239dfc039a73b38d51468ab75f656810152365f3bb70e364992d43bf627439",
+    "sanitized_sha256": "0a239dfc039a73b38d51468ab75f656810152365f3bb70e364992d43bf627439",
+    "published_sha256": "0a239dfc039a73b38d51468ab75f656810152365f3bb70e364992d43bf627439",
+    "sanitized_terminal_LFs": 1,
+    "EOF_reconstruction": "Remove published terminal LF, append sanitized_terminal_LFs terminal LFs; empty stays empty.",
+    "method": "JSON load -> typed recursive string/account/path redaction -> JSON dump"
+  },
+  {
+    "file": "retained-failure.json",
+    "raw_sha256": "7eab9b7b89ecedec2d523a1f269f4d908e62dfc4a0d5c95c80525d53b0df92a0",
+    "sanitized_sha256": "0e1d91e6cb3855362c7d2e41fbff6365e2e7c1226ec2c1cb232782e4a0150544",
+    "published_sha256": "0e1d91e6cb3855362c7d2e41fbff6365e2e7c1226ec2c1cb232782e4a0150544",
+    "sanitized_terminal_LFs": 1,
+    "EOF_reconstruction": "Remove published terminal LF, append sanitized_terminal_LFs terminal LFs; empty stays empty.",
+    "method": "JSON load -> typed recursive string/account/path redaction -> JSON dump"
+  },
+  {
+    "file": "retained-negative-model.json",
+    "raw_sha256": "9b81ada1e7d903f2d1d53d9781fd5f1be617b44332c61b1f80e8373c8bfb7a30",
+    "sanitized_sha256": "9b81ada1e7d903f2d1d53d9781fd5f1be617b44332c61b1f80e8373c8bfb7a30",
+    "published_sha256": "9b81ada1e7d903f2d1d53d9781fd5f1be617b44332c61b1f80e8373c8bfb7a30",
+    "sanitized_terminal_LFs": 1,
+    "EOF_reconstruction": "Remove published terminal LF, append sanitized_terminal_LFs terminal LFs; empty stays empty.",
+    "method": "JSON load -> typed recursive string/account/path redaction -> JSON dump"
+  },
+  {
+    "file": "doctest-census.json",
+    "raw_sha256": "281e9c68e890f29beb029bbe49fbf3e5dc0ae679a3c8af4b150703e2675f7154",
+    "sanitized_sha256": "281e9c68e890f29beb029bbe49fbf3e5dc0ae679a3c8af4b150703e2675f7154",
+    "published_sha256": "281e9c68e890f29beb029bbe49fbf3e5dc0ae679a3c8af4b150703e2675f7154",
+    "sanitized_terminal_LFs": 1,
+    "EOF_reconstruction": "Remove published terminal LF, append sanitized_terminal_LFs terminal LFs; empty stays empty.",
+    "method": "JSON load -> typed recursive string/account/path redaction -> JSON dump"
+  },
+  {
+    "file": "mac-custom-skip-contracts.json",
+    "raw_sha256": "0ef8a5a28f3515960e0b8575e65c0c2ac4a7f104a551e8aa9469506085e157fe",
+    "sanitized_sha256": "0ef8a5a28f3515960e0b8575e65c0c2ac4a7f104a551e8aa9469506085e157fe",
+    "published_sha256": "0ef8a5a28f3515960e0b8575e65c0c2ac4a7f104a551e8aa9469506085e157fe",
+    "sanitized_terminal_LFs": 1,
+    "EOF_reconstruction": "Remove published terminal LF, append sanitized_terminal_LFs terminal LFs; empty stays empty.",
+    "method": "JSON load -> typed recursive string/account/path redaction -> JSON dump"
+  },
+  {
+    "file": "nextest.stdout",
+    "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "sanitized_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "published_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "sanitized_terminal_LFs": 0,
+    "EOF_reconstruction": "Remove published terminal LF, append sanitized_terminal_LFs terminal LFs; empty stays empty.",
+    "method": "plain text redaction"
+  },
+  {
+    "file": "nextest.stderr",
+    "raw_sha256": "528dfae30c26ab91b059643295ea898b8f9e5ba81048dd7c620678fdea33bdad",
+    "sanitized_sha256": "528dfae30c26ab91b059643295ea898b8f9e5ba81048dd7c620678fdea33bdad",
+    "published_sha256": "528dfae30c26ab91b059643295ea898b8f9e5ba81048dd7c620678fdea33bdad",
+    "sanitized_terminal_LFs": 1,
+    "EOF_reconstruction": "Remove published terminal LF, append sanitized_terminal_LFs terminal LFs; empty stays empty.",
+    "method": "plain text redaction"
+  },
+  {
+    "file": "doctests.stdout",
+    "raw_sha256": "df166913f47ff1f04202cae9b31df67ed272d692d99a0023a8117dc3029100dd",
+    "sanitized_sha256": "df166913f47ff1f04202cae9b31df67ed272d692d99a0023a8117dc3029100dd",
+    "published_sha256": "48537503aca8cbeec335d46a2da57cd5800765bc0703600b35d4917848d3a5d5",
+    "sanitized_terminal_LFs": 2,
+    "EOF_reconstruction": "Remove published terminal LF, append sanitized_terminal_LFs terminal LFs; empty stays empty.",
+    "method": "plain text redaction"
+  },
+  {
+    "file": "doctests.stderr",
+    "raw_sha256": "5724b7335928d1500da4d7dc69d3c67a4ed09187a5d4332b63bfd291e8c4e5f1",
+    "sanitized_sha256": "5724b7335928d1500da4d7dc69d3c67a4ed09187a5d4332b63bfd291e8c4e5f1",
+    "published_sha256": "5724b7335928d1500da4d7dc69d3c67a4ed09187a5d4332b63bfd291e8c4e5f1",
+    "sanitized_terminal_LFs": 1,
+    "EOF_reconstruction": "Remove published terminal LF, append sanitized_terminal_LFs terminal LFs; empty stays empty.",
+    "method": "plain text redaction"
+  },
+  {
+    "file": "mac-contract-self-cli-exec.stdout",
+    "raw_sha256": "e609e31d833c415938d8a7a8277dc0b2e0a8d53afe374bb841bb16552a1bfe8b",
+    "sanitized_sha256": "e609e31d833c415938d8a7a8277dc0b2e0a8d53afe374bb841bb16552a1bfe8b",
+    "published_sha256": "e609e31d833c415938d8a7a8277dc0b2e0a8d53afe374bb841bb16552a1bfe8b",
+    "sanitized_terminal_LFs": 1,
+    "EOF_reconstruction": "Remove published terminal LF, append sanitized_terminal_LFs terminal LFs; empty stays empty.",
+    "method": "plain text redaction"
+  },
+  {
+    "file": "mac-contract-self-process-cuts.stdout",
+    "raw_sha256": "b2b5dec35eeaf5a469e308f8f57aec00eb02df2c34be190680b12c217c484609",
+    "sanitized_sha256": "b2b5dec35eeaf5a469e308f8f57aec00eb02df2c34be190680b12c217c484609",
+    "published_sha256": "b2b5dec35eeaf5a469e308f8f57aec00eb02df2c34be190680b12c217c484609",
+    "sanitized_terminal_LFs": 1,
+    "EOF_reconstruction": "Remove published terminal LF, append sanitized_terminal_LFs terminal LFs; empty stays empty.",
+    "method": "plain text redaction"
+  },
+  {
+    "file": "rustc-version.txt",
+    "raw_sha256": "aea7c77c2b0d24444d07240e4d785e4ba73b6c9e786748af2ddc22bbf4c104bf",
+    "sanitized_sha256": "aea7c77c2b0d24444d07240e4d785e4ba73b6c9e786748af2ddc22bbf4c104bf",
+    "published_sha256": "aea7c77c2b0d24444d07240e4d785e4ba73b6c9e786748af2ddc22bbf4c104bf",
+    "sanitized_terminal_LFs": 1,
+    "EOF_reconstruction": "Remove published terminal LF, append sanitized_terminal_LFs terminal LFs; empty stays empty.",
+    "method": "plain text redaction"
+  },
+  {
+    "file": "commit-binding.json",
+    "raw_sha256": "92311faaf411b0c360c805e114faff08dac8ec751d55749e5596873d9df320e7",
+    "sanitized_sha256": "960c087c148a1f1063c0d56ee27362ecf222803754c01597d81cb7be2a37fbf5",
+    "published_sha256": "960c087c148a1f1063c0d56ee27362ecf222803754c01597d81cb7be2a37fbf5",
+    "sanitized_terminal_LFs": 1,
+    "EOF_reconstruction": "Remove published terminal LF, append sanitized_terminal_LFs terminal LFs; empty stays empty.",
+    "method": "JSON load -> typed recursive string/account/path redaction -> JSON dump"
+  },
+  {
+    "file": "independent-closure.json",
+    "raw_sha256": "3141014f898000788fd0de67425397663cbdf6bee640353a87e7c65082316c88",
+    "sanitized_sha256": "3141014f898000788fd0de67425397663cbdf6bee640353a87e7c65082316c88",
+    "published_sha256": "3141014f898000788fd0de67425397663cbdf6bee640353a87e7c65082316c88",
+    "sanitized_terminal_LFs": 1,
+    "EOF_reconstruction": "Remove published terminal LF, append sanitized_terminal_LFs terminal LFs; empty stays empty.",
+    "method": "JSON load -> typed recursive string/account/path redaction -> JSON dump"
+  },
+  {
+    "file": "preCargo-preparation-stop.json",
+    "raw_sha256": "0d075fa9d6eecd086809c3750542eddf9050acbf1d433079c6adf2314cdcd1a5",
+    "sanitized_sha256": "0d075fa9d6eecd086809c3750542eddf9050acbf1d433079c6adf2314cdcd1a5",
+    "published_sha256": "0d075fa9d6eecd086809c3750542eddf9050acbf1d433079c6adf2314cdcd1a5",
+    "sanitized_terminal_LFs": 1,
+    "EOF_reconstruction": "Remove published terminal LF, append sanitized_terminal_LFs terminal LFs; empty stays empty.",
+    "method": "JSON load -> typed recursive string/account/path redaction -> JSON dump"
+  },
+  {
+    "file": "request-before-exec.json",
+    "raw_sha256": "94e1285ebe09e172a32b6934b965df05ddefa2327f860c6007f57cb9ce7b5557",
+    "sanitized_sha256": "ba10f09318f3310f277f0ed3e9d95cdc87942766ed94c7cd3bb6ba970983603b",
+    "published_sha256": "ba10f09318f3310f277f0ed3e9d95cdc87942766ed94c7cd3bb6ba970983603b",
+    "sanitized_terminal_LFs": 1,
+    "EOF_reconstruction": "Remove published terminal LF, append sanitized_terminal_LFs terminal LFs; empty stays empty.",
+    "method": "JSON load -> typed recursive string/account/path redaction -> JSON dump"
+  },
+  {
+    "file": "native-handle-closure.json",
+    "raw_sha256": "332eacdf752c926ebe70e500c9f6c8d5761e6edc1359752bd742efb46d4a6b76",
+    "sanitized_sha256": "36002e43c607bb46901e387c1a148ee43182af417bd7eb64fd9332eb508320fe",
+    "published_sha256": "36002e43c607bb46901e387c1a148ee43182af417bd7eb64fd9332eb508320fe",
+    "sanitized_terminal_LFs": 1,
+    "EOF_reconstruction": "Remove published terminal LF, append sanitized_terminal_LFs terminal LFs; empty stays empty.",
+    "method": "JSON load -> typed recursive string/account/path redaction -> JSON dump"
+  },
+  {
+    "file": "six-new-case-driver-bindings.json",
+    "raw_sha256": "732fb32a1d7168c767f49cc7e92584426c442774fcdc396fa92b4983447a2382",
+    "sanitized_sha256": "2a2dbf9fd511517ff35bd41110986895b1208cdb4098535bec6de1553839d88c",
+    "published_sha256": "2a2dbf9fd511517ff35bd41110986895b1208cdb4098535bec6de1553839d88c",
+    "sanitized_terminal_LFs": 1,
+    "EOF_reconstruction": "Remove published terminal LF, append sanitized_terminal_LFs terminal LFs; empty stays empty.",
+    "method": "JSON load -> typed recursive string/account/path redaction -> JSON dump"
+  },
+  {
+    "file": "README.md",
+    "raw_sha256": "4e53be69262dd1c4acb3e0c9699fd3b180b1eb1ae57a85d982146948a30f8729",
+    "sanitized_sha256": "4e53be69262dd1c4acb3e0c9699fd3b180b1eb1ae57a85d982146948a30f8729",
+    "published_sha256": "4e53be69262dd1c4acb3e0c9699fd3b180b1eb1ae57a85d982146948a30f8729",
+    "sanitized_terminal_LFs": 1,
+    "EOF_reconstruction": "Remove published terminal LF, append sanitized_terminal_LFs terminal LFs; empty stays empty.",
+    "method": "plain text redaction"
+  },
+  {
+    "file": "privacy-exceptions.json",
+    "raw_sha256": "ca541e9a7c058ef610154998a974213d7d5978b9c04c6cefaa760ee1cd25ad3a",
+    "sanitized_sha256": "ca541e9a7c058ef610154998a974213d7d5978b9c04c6cefaa760ee1cd25ad3a",
+    "published_sha256": "ca541e9a7c058ef610154998a974213d7d5978b9c04c6cefaa760ee1cd25ad3a",
+    "sanitized_terminal_LFs": 1,
+    "EOF_reconstruction": "Remove published terminal LF, append sanitized_terminal_LFs terminal LFs; empty stays empty.",
+    "method": "JSON load -> typed recursive string/account/path redaction -> JSON dump"
+  }
+]

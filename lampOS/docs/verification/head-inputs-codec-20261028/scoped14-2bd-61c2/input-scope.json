@@ -1,0 +1,53 @@
+{
+  "Body_behavior_qualification": false,
+  "Rust_source_data_readers": [
+    "scratch_paths::no_two_files_of_a_test_binary_build_the_same_scratch_folder",
+    "ci_paths::every_doc_a_crate_reads_is_named_back_in_the_workflows_pull_request_paths"
+  ],
+  "actual_compiler_evidence": [
+    {
+      "actual_gate": "second-recheck-scoped-nextest-dadacc-gate-20261028",
+      "census_sha256": "f9f53accec1b42b7e2eefea358d6f8f2fd510a85659e2e8e734882ff6f6fae7c",
+      "measurement_binary_artifacts": 0,
+      "normal_body_profile_test": false,
+      "normal_body_target": "lamp_body"
+    },
+    {
+      "actual_gate": "second-pid-scoped-dadacc-gate-20261028",
+      "census_sha256": "19665c76f9f955dcdc374629b5cb6a2659d9b4791cc7afa04b77eb293c3bbba8",
+      "measurement_binary_artifacts": 0,
+      "normal_body_profile_test": false,
+      "normal_body_target": "lamp_body"
+    }
+  ],
+  "changed_paths": [
+    "lampOS/crates/body/src/bin/lamp-body-measure.rs",
+    "lampOS/docs/install.md"
+  ],
+  "ci_paths_install_reference": "Its embedded scanner example is a raw string, not a second actual include. Real install-doc reader is named above.",
+  "comparison_sha256": "e37983e4217d700088c17962b90b0f14bd4490ffdc627c6e36a0cf453828f415",
+  "current_retained_provenance": "Actual Cargo JSON determines emitted targets; retained outputs remain NONCURRENT and unexecuted.",
+  "direct_compiled_reader": {
+    "function": "every_part_of_the_lamp_waits_for_setups_marker_itself",
+    "include_line": 1068,
+    "input": "lampOS/docs/install.md",
+    "path": "lampOS/crates/update/tests/install.rs"
+  },
+  "expected_current_outputs_projection": [
+    "IT",
+    "install",
+    "normal production bin"
+  ],
+  "new_base": "61c2a7264744a851ba18334ff4bcffd4668310ed",
+  "old_base": "dadacc1bc2fe2e285ed5125a32dd6fe483c01991",
+  "runtime_scope": "All13IT + one direct install-doc reader, once, fresh list authoritative. Other install cases filtered, no new LIB/functions/receipt/wholeinstall execution.",
+  "scope_expression": "binary_id(=lamp-update::it) | (binary_id(=lamp-update::install) & test(=every_part_of_the_lamp_waits_for_setups_marker_itself))",
+  "scope_projection": 14,
+  "selected_normal_Rust_or_lock_manifest_unit_skill_changes": false,
+  "targeted_compile_args": [
+    "--test",
+    "it",
+    "--test",
+    "install"
+  ]
+}

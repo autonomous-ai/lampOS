@@ -1,0 +1,50 @@
+{
+  "old_head": "151edadb8dbb9dd1e705d002ba2f706f8d7e411f",
+  "old_raw_parent": "813ffbd77d8f21b843397a33453267a4766ddcf5",
+  "preserved_unrun_ref": "second/preimages-local-unrun-151e-20261028",
+  "head": "67a8e9554f6fb9644e0b0ab72a2e3895141e26ed",
+  "raw_parent": "f479305357987e8b8b4677170847915e01664cb8",
+  "base": "a808ef04b5885ccb35e8e7693eee16ae331e3a7f",
+  "tree": "55431f7494e8f841a24a296ba723c27470a99096",
+  "all_five_nonshared_complete_blobs_modes_equal": true,
+  "nonshared_paths": [
+    "lampOS/crates/update/src/lib.rs",
+    "lampOS/crates/update/src/writer_preimages.rs",
+    "lampOS/crates/update/src/writer_preimages/tests.rs",
+    "lampOS/docs/reuse-decisions.md",
+    "lampOS/docs/writer-preimages.md"
+  ],
+  "before": {
+    "lampOS/crates/update/src/lib.rs": "100644 blob 81d50f1c786f8c60a0399a94ee44855bfdb339eb\tlampOS/crates/update/src/lib.rs",
+    "lampOS/crates/update/src/writer_preimages.rs": "100644 blob d1349892af75734dbb26940c671c3f0edb2bcdd6\tlampOS/crates/update/src/writer_preimages.rs",
+    "lampOS/crates/update/src/writer_preimages/tests.rs": "100644 blob d2f4499ce02ec8925d0daf36a4d9c67d1540ed0e\tlampOS/crates/update/src/writer_preimages/tests.rs",
+    "lampOS/docs/reuse-decisions.md": "100644 blob c14dbf2a1505992f4df128a963983547463ae348\tlampOS/docs/reuse-decisions.md",
+    "lampOS/docs/writer-preimages.md": "100644 blob cf8983953621694a8b5c5e26cb62c9060cb2ad0b\tlampOS/docs/writer-preimages.md"
+  },
+  "after": {
+    "lampOS/crates/update/src/lib.rs": "100644 blob 81d50f1c786f8c60a0399a94ee44855bfdb339eb\tlampOS/crates/update/src/lib.rs",
+    "lampOS/crates/update/src/writer_preimages.rs": "100644 blob d1349892af75734dbb26940c671c3f0edb2bcdd6\tlampOS/crates/update/src/writer_preimages.rs",
+    "lampOS/crates/update/src/writer_preimages/tests.rs": "100644 blob d2f4499ce02ec8925d0daf36a4d9c67d1540ed0e\tlampOS/crates/update/src/writer_preimages/tests.rs",
+    "lampOS/docs/reuse-decisions.md": "100644 blob c14dbf2a1505992f4df128a963983547463ae348\tlampOS/docs/reuse-decisions.md",
+    "lampOS/docs/writer-preimages.md": "100644 blob cf8983953621694a8b5c5e26cb62c9060cb2ad0b\tlampOS/docs/writer-preimages.md"
+  },
+  "shared_document": {
+    "path": "lampOS/docs/updates.md",
+    "mode": "100644",
+    "old_complete_SHA256": "da0722349ce9284a2aae39f0fecdfce267a174ae9a49af7ba77bac93fe840b17",
+    "new_complete_SHA256": "da0722349ce9284a2aae39f0fecdfce267a174ae9a49af7ba77bac93fe840b17",
+    "new_Raw_base_SHA256": "9f404e8b212ac4dbd87dbf6ed1b4fa86690fed49d395d4edab69b1889a9ad93a",
+    "old_Raw_base_SHA256": "9f404e8b212ac4dbd87dbf6ed1b4fa86690fed49d395d4edab69b1889a9ad93a",
+    "authored_added_block_SHA256": "6b021f18bb6e8de153fbe3706ba5a3b2fa6cd0cbd0366814a55c42f63cad5110",
+    "authored_added_block": "The unwired [private before-image bundle](writer-preimages.md) preserves bounded\nordinary captures as immutable, versioned bytes, with fixed-name durable\npublication in an existing private directory. This adds no live write, apply\nadmission, restoration or helper bootstrap. Unknown semantics retain bytes\nand refuse; content identity does not authenticate the caller.\n\n",
+    "exact_authored_hunk_preserved_once": true,
+    "removing_only_authored_block_equals_entire_new_Raw_document": true,
+    "new_upstream_text_preserved_exactly": true,
+    "whole_blob_equality_claimed": false
+  },
+  "range_diff": "1:  151edadb8d = 1:  67a8e9554f lampOS: persist bounded private setting preimages",
+  "raw_carry_proof": "<private-path>",
+  "source_only_UNRUN": true,
+  "prior90846_attempt": "84316 stopped before Cargo on live-Main guard; no runtime count",
+  "prior5532_7824_native_source_separate": true
+}

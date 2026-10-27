@@ -1,0 +1,20 @@
+{
+  "approved": true,
+  "head": "67a8e9554f6fb9644e0b0ab72a2e3895141e26ed",
+  "raw_parent": "f479305357987e8b8b4677170847915e01664cb8",
+  "base": "a808ef04b5885ccb35e8e7693eee16ae331e3a7f",
+  "scope": "current preimages fullLIB functions it plus3receipt plus1installDoc",
+  "projection_only": 229,
+  "all_required": 58,
+  "extra_required_direct_doc_reader": "every_part_of_the_lamp_waits_for_setups_marker_itself",
+  "donor": "<private-path>",
+  "donor_sha256": "1c8ea9545a226eedad08845873b70963e2cfc648d08038470ffcecdcf7d6b79a",
+  "donor_closure_sha256": "d4d7741de2c2bd0b47b1c121217bdff0cd27c8042805f44db92235dfaa68bea8",
+  "donor_explicitly_released_by_Root": true,
+  "controller": "<gate-evidence>.py",
+  "controller_sha256": "7dd01d27bfbab0b41cb63177c31a5b4e5e42062cf09242a7eeefcd46109d34f4",
+  "runtime": "NOT YET RUN; original request saved before exec",
+  "cumulative_scope_reason": "Last actual broader gate is dadacc228;82 normal Skills change never executed for preimages. Latest docs-only change cannot transfer codec/Raw/PID source runtime or justify14.",
+  "prior82_guard_stop": "native6359 fully drained exit1 before Cargo; zero runtime, unchanged donor",
+  "authorization": "Root released the disk pause and assigned sole LOCAL first priority to current a808 preimages cumulative 229/core58 plus direct install-doc reader. Ten donor actual/preserved/post hashes independently verified after cleanup, before Cargo."
+}

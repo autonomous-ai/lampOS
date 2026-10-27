@@ -1,0 +1,97 @@
+diff --git a/lampOS/crates/update/src/head_touch.rs b/lampOS/crates/update/src/head_touch.rs
+index f0f048d74a..f85bd04a47 100644
+--- a/lampOS/crates/update/src/head_touch.rs
++++ b/lampOS/crates/update/src/head_touch.rs
+@@ -17,6 +17,7 @@ use std::{
+ // Read-only prerequisite, deliberately unwired until the independent guard owns
+ // admission, writer exclusion and the immediately-before-write recheck.
+ pub(crate) mod capture;
++pub(crate) mod plan_output;
+ 
+ pub(crate) const PINS: &str = "/etc/lampOS/controls/controls-pins.json";
+ const CONTROLS: &str = "lamp-controls.service";
+@@ -466,6 +467,25 @@ pub(crate) fn project_with(
+     carried: &BTreeMap<String, String>,
+     settings: &[Setting],
+     steps: &mut Vec<Step>,
++) -> Result<(), String> {
++    project_with_formatter(inputs, root, units, carried, settings, steps, |object| {
++        Ok(format!(
++            "{}\n",
++            serde_json::to_string_pretty(object).map_err(|error| error.to_string())?
++        ))
++    })
++}
++
++// Both entry points use this exact policy. The ordinary formatter keeps its
++// existing bytes/errors; only the future-plan entry point caps derived output.
++fn project_with_formatter(
++    inputs: &mut dyn HeadInputs,
++    root: &Path,
++    units: &Path,
++    carried: &BTreeMap<String, String>,
++    settings: &[Setting],
++    steps: &mut Vec<Step>,
++    serialize: fn(&serde_json::Map<String, serde_json::Value>) -> Result<String, String>,
+ ) -> Result<(), String> {
+     if active_pins_with(inputs, root, units, carried)?.as_deref() != Some(PINS) {
+         return Ok(());
+@@ -510,10 +530,7 @@ pub(crate) fn project_with(
+         }
+     };
+     object.insert("legacy_head".into(), wanted.into());
+-    let text = format!(
+-        "{}\n",
+-        serde_json::to_string_pretty(&object).map_err(|e| e.to_string())?
+-    );
++    let text = serialize(&object)?;
+     steps[at].setting.text = Some(text.clone());
+     steps[at].setting.sha256 = Some(manifest::sha256_hex(text.as_bytes()));
+     steps[at].act = if inputs
+diff --git a/lampOS/docs/reuse-decisions.md b/lampOS/docs/reuse-decisions.md
+index 9c29653056..0e8ac9a4d3 100644
+--- a/lampOS/docs/reuse-decisions.md
++++ b/lampOS/docs/reuse-decisions.md
+@@ -1,5 +1,21 @@
+ # Reuse decisions: V1, ROS 2 and existing Rust systems
+ 
++## Cap only the future plan's derived head-pins output (2026-10-28)
++
++Reuse the existing V2 head-pair evaluator, ordinary pretty-JSON bytes and
++Serde's streaming writer rather than duplicating reader policy or formatting
++an unrestricted String and checking its length afterward. The private
++[plan-output entry point](head-touch-plan-output.md) selects a fallible 1 MiB
++buffer, including the newline, and returns an owned staged vector only on
++success. Ordinary callers keep their current formatter and diagnostics.
++
++Keep V1's exact-input and durable-pending intent as the later recovery pattern;
++this preparation seam adds no filesystem mutation. Policy reads still use the
++supplied HeadInputs. Its output cap does
++not replace signed-input bounds, root ownership, excluded writers, durable
++publication or authenticated admission. No dependency, command, unit, allowlist,
++guard or restore path is added. Physical acceptance remains later work.
++
+ ## Persist closed head-input observations without native Stat layout (2026-10-28)
+ 
+ V1's signed-payload and pending-intent recovery patterns retain exact verified
+diff --git a/lampOS/docs/updates.md b/lampOS/docs/updates.md
+index 07f7cfbeb5..bc10513689 100644
+--- a/lampOS/docs/updates.md
++++ b/lampOS/docs/updates.md
+@@ -2353,3 +2353,16 @@ This remains unwired data preparation. It adds no storage or durability receipt,
+ authentication, path authority, executable plan, writer grant, helper refresh or
+ restore. Ordinary reader policy and native capture equality are unchanged;
+ current source/native evidence and physical acceptance remain separate.
++
++### Cap projected pins output for the future saved plan (#3689)
++
++A separate private [plan-output path](head-touch-plan-output.md) reuses the
++ordinary head-pair evaluator with capped streaming pretty serialization.
++New derived pins text is at most 1 MiB including its newline. An owned staged
++step vector is returned only on success; serialization or late provider errors
++return a fixed refusal and no partial vector. This is a bound on newly derived
++output, not on parsing, preexisting text or a complete authenticated plan.
++
++Ordinary callers retain their formatter, read order, diagnostics and bytes.
++The new path is unwired and introduces no storage, path authority, writer grant,
++helper refresh or restoration. Native/device acceptance remains separate.

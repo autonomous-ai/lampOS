@@ -1,0 +1,422 @@
+{
+  "receipt_stage": "Completed original job/log/source/case audit; no optional archive requested",
+  "head": "67a8e9554f6fb9644e0b0ab72a2e3895141e26ed",
+  "base": "a808ef04b5885ccb35e8e7693eee16ae331e3a7f",
+  "actual_preview": "d523834d60cc0260445e72ae4ca4c6937f600076",
+  "ordered_parents": [
+    "a808ef04b5885ccb35e8e7693eee16ae331e3a7f",
+    "67a8e9554f6fb9644e0b0ab72a2e3895141e26ed"
+  ],
+  "complete_preview_tree_equals_authored": "55431f7494e8f841a24a296ba723c27470a99096",
+  "ARM_original_run": 40584266433,
+  "ARM_required_job": 122471457656,
+  "ARM_job_completed_success": true,
+  "watch39175_exit": 0,
+  "full_log92939_exit": 0,
+  "unique_PASS": 7830,
+  "bad_or_selected_unrun": 0,
+  "reported_skipped": 54,
+  "all58_once": true,
+  "extra_install_doc_reader_once": true,
+  "new9_once": true,
+  "identical_terminal_echoes_excluded": 34,
+  "selected_binaries": 70,
+  "skipped_binaries": 120,
+  "separate_docs": {
+    "headers": [
+      "Doc-tests lamp_actions",
+      "Doc-tests lamp_addons",
+      "Doc-tests lamp_air",
+      "Doc-tests lamp_audio",
+      "Doc-tests lamp_body",
+      "Doc-tests lamp_bus",
+      "Doc-tests lamp_camera",
+      "Doc-tests lamp_cloud",
+      "Doc-tests lamp_control",
+      "Doc-tests lamp_controls",
+      "Doc-tests lamp_ears",
+      "Doc-tests lamp_environment",
+      "Doc-tests lamp_expression",
+      "Doc-tests lamp_eyes",
+      "Doc-tests lamp_gemini",
+      "Doc-tests lamp_health",
+      "Doc-tests lamp_ipc",
+      "Doc-tests lamp_keeper",
+      "Doc-tests lamp_lean",
+      "Doc-tests lamp_local_time",
+      "Doc-tests lamp_memory",
+      "Doc-tests lamp_mood",
+      "Doc-tests lamp_msgs",
+      "Doc-tests lamp_name",
+      "Doc-tests lamp_near_call",
+      "Doc-tests lamp_observer",
+      "Doc-tests lamp_peek",
+      "Doc-tests lamp_policy",
+      "Doc-tests lamp_records",
+      "Doc-tests lamp_ring",
+      "Doc-tests lamp_same_voice",
+      "Doc-tests lamp_schedule",
+      "Doc-tests lamp_selftest",
+      "Doc-tests lamp_settings",
+      "Doc-tests lamp_setup",
+      "Doc-tests lamp_skills",
+      "Doc-tests lamp_sound_fixtures",
+      "Doc-tests lamp_station",
+      "Doc-tests lamp_surround",
+      "Doc-tests lamp_tasks",
+      "Doc-tests lamp_turn_end",
+      "Doc-tests lamp_turn_end_wire",
+      "Doc-tests lamp_turn_owner",
+      "Doc-tests lamp_update",
+      "Doc-tests lamp_voice",
+      "Doc-tests lamp_voice_eval",
+      "Doc-tests lamp_voice_processes"
+    ],
+    "summaries": [
+      {
+        "status": "ok",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0
+      },
+      {
+        "status": "ok",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0
+      },
+      {
+        "status": "ok",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0
+      },
+      {
+        "status": "ok",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0
+      },
+      {
+        "status": "ok",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0
+      },
+      {
+        "status": "ok",
+        "passed": 2,
+        "failed": 0,
+        "ignored": 0
+      },
+      {
+        "status": "ok",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0
+      },
+      {
+        "status": "ok",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0
+      },
+      {
+        "status": "ok",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0
+      },
+      {
+        "status": "ok",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0
+      },
+      {
+        "status": "ok",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0
+      },
+      {
+        "status": "ok",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0
+      },
+      {
+        "status": "ok",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0
+      },
+      {
+        "status": "ok",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0
+      },
+      {
+        "status": "ok",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0
+      },
+      {
+        "status": "ok",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0
+      },
+      {
+        "status": "ok",
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0
+      },
+      {
+        "status": "ok",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0
+      },
+      {
+        "status": "ok",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0
+      },
+      {
+        "status": "ok",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0
+      },
+      {
+        "status": "ok",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0
+      },
+      {
+        "status": "ok",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0
+      },
+      {
+        "status": "ok",
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0
+      },
+      {
+        "status": "ok",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0
+      },
+      {
+        "status": "ok",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0
+      },
+      {
+        "status": "ok",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0
+      },
+      {
+        "status": "ok",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0
+      },
+      {
+        "status": "ok",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0
+      },
+      {
+        "status": "ok",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0
+      },
+      {
+        "status": "ok",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0
+      },
+      {
+        "status": "ok",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0
+      },
+      {
+        "status": "ok",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0
+      },
+      {
+        "status": "ok",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0
+      },
+      {
+        "status": "ok",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0
+      },
+      {
+        "status": "ok",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0
+      },
+      {
+        "status": "ok",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0
+      },
+      {
+        "status": "ok",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0
+      },
+      {
+        "status": "ok",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0
+      },
+      {
+        "status": "ok",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0
+      },
+      {
+        "status": "ok",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0
+      },
+      {
+        "status": "ok",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0
+      },
+      {
+        "status": "ok",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0
+      },
+      {
+        "status": "ok",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0
+      },
+      {
+        "status": "ok",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0
+      },
+      {
+        "status": "ok",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0
+      },
+      {
+        "status": "ok",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0
+      },
+      {
+        "status": "ok",
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0
+      }
+    ],
+    "passed": 4,
+    "failed": 0
+  },
+  "separate_process_count": 13,
+  "separate_relay_count": 1,
+  "separate_promotion_helpers": [
+    {
+      "status": "ok",
+      "passed": 2,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "status": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "status": "ok",
+      "passed": 22,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "status": "ok",
+      "passed": 1,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "status": "ok",
+      "passed": 0,
+      "failed": 0,
+      "ignored": 0
+    }
+  ],
+  "raw_log_SHA256": "191ecdbc8cb37ad693616635b7684b417cff932fc8b08d8bacf987c436dc8cca",
+  "terminal_rows_SHA256": "f0a266a286cab49486e75c759e72f8872fd2f1bec92d42c9a9b46a010b61d7cc",
+  "Linux": {
+    "run": 40584266562,
+    "attempt": 1,
+    "head": "67a8e9554f6fb9644e0b0ab72a2e3895141e26ed",
+    "required_job": 122471458108,
+    "job_status": "completed",
+    "job_conclusion": "success",
+    "observer_exit": 0,
+    "full_log_native_handle": 40665,
+    "full_log_exit": 0,
+    "actual_checkout_preview": "d523834d60cc0260445e72ae4ca4c6937f600076",
+    "ordered_parents": [
+      "a808ef04b5885ccb35e8e7693eee16ae331e3a7f",
+      "67a8e9554f6fb9644e0b0ab72a2e3895141e26ed"
+    ],
+    "complete_preview_tree_equals_authored": "55431f7494e8f841a24a296ba723c27470a99096",
+    "setup_event_commit_not_used_as_checkout_proof": "21505ad2541d5be6135ed84fc33697146cf75b8e",
+    "full_log_sha256": "196b55e42ff05928ab48449bd0519204e84ed686eaea7bfa535f7f6dc7ddd939",
+    "full_log_bytes": 83716,
+    "no_runtime_or_other_source_claim": true
+  },
+  "optional_archive_not_requested_or_claimed": true,
+  "historical_failure_unwaived": true,
+  "later_c1fa_source_not_qualified_by_this_native_result": true
+}

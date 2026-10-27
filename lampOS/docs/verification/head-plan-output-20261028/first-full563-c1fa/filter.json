@@ -1,0 +1,5 @@
+{
+  "expression": "all()",
+  "scope": "FIRST FULL bounded plan-output lamp-update package; actual count from discovery only",
+  "no_previous_count_transfer": true
+}

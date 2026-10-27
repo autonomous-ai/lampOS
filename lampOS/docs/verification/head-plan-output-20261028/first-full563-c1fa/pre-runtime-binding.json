@@ -1,0 +1,17 @@
+{
+  "head": "2fa602a0a84164fd74d1d944830cd4a3257e389b",
+  "base": "c1fa2bc9f327f5d553bb3dcc355053d8e7e94bfa",
+  "full_discovery_sha256": "ea751f6db5536e754772ffc0499c3b959a4c713e9e05d419e4eca141c77e43bb",
+  "scoped_discovery_sha256": "ea751f6db5536e754772ffc0499c3b959a4c713e9e05d419e4eca141c77e43bb",
+  "compiler_stdout_sha256": "8972d348303bb75ee3da8b75d4780f36a3707945a0c964f9cd8c154e27ea8cba",
+  "selected_cases": 563,
+  "policy_ignored": 6,
+  "filtered_nonignored": 0,
+  "excluded_binaries": [],
+  "required_controls": 84,
+  "profile": "pr",
+  "filter": "all()",
+  "processes": 4,
+  "retries": 0,
+  "no_fail_fast": true
+}

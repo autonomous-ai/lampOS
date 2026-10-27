@@ -1,0 +1,26 @@
+{
+  "source": "<private-path>",
+  "sha256": "357af75feeeb70697350588441daa83710661d6aa6c940196663d154607c451b",
+  "plan": {
+    "old_base": "82a62867cc1bcbbc4b0848519c6757f623d112ce",
+    "new_base": "a808ef04b5885ccb35e8e7693eee16ae331e3a7f",
+    "changed_paths": [
+      "lampOS/docs/install.md"
+    ],
+    "comparison_sha256": "b2cea8b1b4e1040e2a7f9960e03ebe2f84bf5bc6f83f8d978eaf758d77335a17",
+    "production_Rust_manifest_lock_unit_skills_changed": false,
+    "own_path_overlap": false,
+    "direct_compiled_reader": {
+      "binary": "lamp-update::install",
+      "test": "every_part_of_the_lamp_waits_for_setups_marker_itself",
+      "source": "lampOS/crates/update/tests/install.rs",
+      "include": "../../../docs/install.md"
+    },
+    "source_data_reader": "full IT13 includes repository scanner coverage",
+    "recommended_current_scope": "fresh fmt/strict all-target Clippy, targeted IT/install compile/discovery, full IT13 plus exact one install-doc reader; actual discovery authoritative",
+    "runtime_count_projection": 14,
+    "new_LIB_functions_receipt_or_whole_install_runtime_required": false,
+    "old_220_204_remain_exact_82a6_only": true
+  },
+  "projection229_only_until_discovery": true
+}
