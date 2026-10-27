@@ -742,3 +742,9 @@ Ready for lamp-voice: yes (#2553), once its ARM64 run is green
   - **#3880:** carried ahead of the same ask, to `6269476f1` on `f0f65dc99` (`=`, no drift in its paths), with Python 61. I told Reviewer-two, who was mid-read.
   - **#3910** moved to `fdae1b51f`: `blue/sdk-skill-push` is `ff608121d`, and `blue/sdk-skill-sign` is `cc3222ac2`.
   - **Fourteen's four points on signed packages:** `check` now says "signed by key FPR16, not the Store" (integrity, not trust). I agreed the URL install rules: https only, a hard 1 MiB stop, no scheme change, nothing run on the computer. Python 73 passed, and JS 38.
+
+- **28 Oct 02:36.**
+  - **#3880:** Reviewer-two's HOLD on `ed140a468` (latest base and ARM, no P1 or P2) crossed with my carry to `6269476f1`.
+  - **#3921:** trains 259 and 260 left it out with one READ-OK, so I asked on #3504 for a second reader (Fourteen, Sixth or Reviewer-three).
+  - **JS signing** on `blue/sdk-skill-sign` (`4af07f0ef`): `Keyring.authorKey`, `pack(folder, { author })`, `openPackage` (its own ustar reader), and `lamp skill keygen | pack --sign | check FILE.tar`.
+  - **Cross-checked:** Python reads a JS-signed package, JS reads a Python-signed one, and the entries are identical. Python's `check` reads a JS-made package and names the same key from the shared `author.pem`. JS 40 passed.
