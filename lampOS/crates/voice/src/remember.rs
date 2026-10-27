@@ -16960,6 +16960,110 @@ mod tests {
         assert!(!crate::thread::presents_resumption(false));
     }
 
+    /// Friday's N13 on #3504: a forget stops the journal (the privacy
+    /// guard, kept), and with `LAMP_MEMORY_JOURNAL_RESUMES` the next
+    /// conversation's fresh session starts it again, so that conversation
+    /// is journalled and its end, the observation pass's input, goes to the
+    /// memory: no voice restart. Through the Days client as its worker
+    /// starts it (in a child) and the real writer.
+    #[test]
+    fn after_a_forget_the_next_conversation_is_journalled_and_ended() {
+        if !in_resumes_child(
+            "after_a_forget_the_next_conversation_is_journalled_and_ended",
+            "on",
+        ) {
+            return;
+        }
+        let socket =
+            std::env::temp_dir().join(format!("lamp-remember-n13-{}.sock", std::process::id()));
+        let _ = std::fs::remove_file(&socket);
+        let listener = UnixListener::bind(&socket).unwrap();
+        let (seen, read) = std::sync::mpsc::channel::<Value>();
+        std::thread::spawn(move || {
+            for stream in listener.incoming() {
+                let Ok(mut stream) = stream else { return };
+                let mut line = String::new();
+                if BufReader::new(stream.try_clone().unwrap())
+                    .read_line(&mut line)
+                    .is_err()
+                {
+                    continue;
+                }
+                let request: Value = serde_json::from_str(&line).unwrap();
+                let answer = match request["op"].as_str() {
+                    Some("session_open") => {
+                        json!({"ok":true,"snapshot":snapshot(request["session"].as_str().unwrap())})
+                    }
+                    Some("forget") => json!({"ok":true,"removed":1}),
+                    Some("append_linked") => json!({"ok":true,"id":42}),
+                    Some("conversation_end") => {
+                        json!({"ok":true,"submitted":false,"reason":"model_unconfigured"})
+                    }
+                    _ => json!({"ok":true}),
+                };
+                let _ = writeln!(stream, "{answer}");
+                let _ = seen.send(request);
+            }
+        });
+        start(socket.clone(), None);
+        {
+            let mut thread = crate::thread::THREAD.lock().unwrap();
+            clear_forgotten_thread(&mut thread);
+        }
+        assert!(!told_for_fresh_session(&socket, 1, None, true).contains("No memory note"));
+        let (told, answered) = run(
+            &socket,
+            &call(FORGET, json!({"source_id":7})),
+            Duration::from_secs(2),
+        );
+        assert!(answered && told["forgotten"] == true, "{told}");
+        assert!(
+            DAYS.get()
+                .and_then(Option::as_ref)
+                .unwrap()
+                .context
+                .lock()
+                .unwrap()
+                .journal_inhibited,
+            "the forget stops the journal"
+        );
+        // The next conversation: a fresh session, an exchange, its end.
+        assert!(!told_for_fresh_session(&socket, 2, None, true).contains("No memory note"));
+        {
+            let mut thread = crate::thread::THREAD.lock().unwrap();
+            thread.person("How is the weather?", true, Instant::now());
+            thread.lamp(402, "The forecast says sunny.", Instant::now());
+        }
+        finished(402);
+        let client = DAYS.get().and_then(Option::as_ref).unwrap();
+        assert!(client.end_conversation());
+        let until = Instant::now() + Duration::from_secs(10);
+        let mut ops = vec![];
+        let end = loop {
+            let request = read
+                .recv_timeout(until.saturating_duration_since(Instant::now()))
+                .expect("the next conversation's end reaches the memory");
+            ops.push(request["op"].as_str().unwrap_or_default().to_owned());
+            if request["op"] == "conversation_end" {
+                break request;
+            }
+        };
+        assert_eq!(
+            ops,
+            [
+                "session_open",
+                "forget",
+                "session_open",
+                "session_close",
+                "append_linked",
+                "conversation_end"
+            ],
+        );
+        assert_eq!(end["source_ids"], json!([42]));
+        assert!(!client.context.lock().unwrap().journal_inhibited);
+        let _ = std::fs::remove_file(&socket);
+    }
+
     /// Friday's P3 on #2226: a fresh open that doesn't resume, the store
     /// refusing it, isn't asked for again until `FRESH_RETRY` has passed.
     #[test]

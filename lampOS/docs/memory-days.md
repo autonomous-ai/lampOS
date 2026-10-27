@@ -155,7 +155,13 @@ uses `append_linked`. Missing or deleted sources cause refusal, never a
 retry as an unlinked append. A confirmed forget, an uncertain mutation
 acknowledgement, or source-union overflow inhibits subsequent journalling
 until a fresh worker establishes fresh context. A new provider session alone
-does not clear that inhibition. With `LAMP_MEMORY_JOURNAL_RESUMES=on` (#2176
+does not clear that inhibition. The stop is a privacy guard: a forgotten
+thing's words and ids may still be in the provider's context, and nothing
+journalled is linked to them. But no journal means no conversation end and
+no observation pass, so without the switch below one forget ended the pass
+until the voice restarted (lamp-06c1, 27 Oct, Friday's N13 on #3504). The
+product unit sets it beside `LAMP_MEMORY_OBSERVE` since. With
+`LAMP_MEMORY_JOURNAL_RESUMES=on` (#2176
 row 1b) it ends with a fresh context instead: a new Days session opened after
 the stop, whose snapshot is read after it, presenting no resumption, and with
 the recap already cleared by the forget. After a stop, or a write whose answer
