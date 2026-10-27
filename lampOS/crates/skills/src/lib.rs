@@ -3246,7 +3246,7 @@ pub fn load(dir: &Path) -> Result<Skill, String> {
                 | Test::Above(field, _)
                 | Test::Below(field, _)
                 | Test::Number(field) => field,
-                Test::Faces(_) | Test::NoFaces => continue,
+                Test::Faces(_) | Test::NoFaces | Test::FacesAtMost(_) => continue,
             };
             if let Some(selected) = trigger.changes.iter().find(|selected| {
                 selected.as_str() == field.as_str()
@@ -4549,7 +4549,7 @@ impl Changes {
             | Test::Number(field) => {
                 !trigger.changes.contains(field) || Self::scalar_at(value, field).is_some()
             }
-            Test::Faces(_) | Test::NoFaces => true,
+            Test::Faces(_) | Test::NoFaces | Test::FacesAtMost(_) => true,
         };
         predicate_valid
             && (!trigger.test.holds(value)
