@@ -705,3 +705,5 @@ Ready for lamp-voice: yes (#2553), once its ARM64 run is green
   - both Hindi lines are in the passing tests, which the old count fails;
   - the pre-check comment is harness-reviewer's P3.
   The head is `368dde1e9`, rebased onto `a17ec9216`. Python 58 passed on 3.10 and 3.12, and JS 34. Asked both for a re-read.
+
+- **28 Oct 01:25.** `blue/sdk-skill-push` now has a Python test that runs `lamp skill push|list|remove` as a real process against the fake, the same one JS has. Python 70 passed on 3.10 and 3.12. #3904 (the body's closed `lost` whys) touches no schema, so the SDKs are unchanged. No SDK question from the Devin build since 00:21.
