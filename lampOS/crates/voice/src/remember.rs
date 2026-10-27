@@ -1425,16 +1425,25 @@ pub fn tools() -> Vec<Tool> {
     tools_with(crate::rules::on())
 }
 
+/// What `recall`'s description adds for a person's own preference
+/// (lamp-06c1, 26 Oct, P09: "What is my favorite drink?" was answered "I
+/// don't know" with no `recall`; with this, P40 called it and said black
+/// coffee). Words for the model, not a guarantee of a call.
+const RECALL_OWN_PREFERENCE: &str =
+    " For their own preference ('my favourite drink?'), call it before saying you do not remember.";
+
 /// The recall function; with its second version ([`RECALL_V2_ENVIRONMENT`])
 /// it also takes a span of days.
 fn recall_tool(second: bool) -> Tool {
-    let mut description = "Call this when someone asks about something from an earlier conversation or an earlier \
-                          day that you do not already know: what they told you, what you talked about yesterday, \
-                          something they asked you to remember. Not for what was said in this conversation. \
-                          If nothing is found, say only that you do not remember. Never make something up. You cannot tell who \
-                          is speaking now, so do not say 'you told me': just give what you remember, roughly \
-                          and without dates or times."
+    // Short: with `history` and a span added it stays within a function's
+    // 1,024-byte description (`Tool::validate`; Reviewer-two's P2 on
+    // #3625), else the function is dropped.
+    let mut description = "Call this for what you do not already know from an earlier conversation or day: what \
+                          they told you or asked you to keep. Not for this conversation. If nothing is found, say \
+                          only that you do not remember; never make anything up. You cannot tell who is speaking: \
+                          never say 'you told me'; give what you remember roughly, without dates or times."
         .to_owned();
+    description.push_str(RECALL_OWN_PREFERENCE);
     let mut parameters = json!({
         "type": "object",
         "properties": {
@@ -9423,6 +9432,28 @@ mod tests {
         assert_eq!(told["everything"], true);
         let told = memory_and_face(memory, &json!({"ok": true}), false);
         assert!(told.get("setup_name").is_none());
+    }
+
+    /// Reviewer-two's P2 on #3625: `recall` stays a valid function, its
+    /// description within 1,024 bytes, with and without its second version
+    /// and `LAMP_MEMORY_REPLACES`, so no switch set drops it.
+    #[test]
+    fn recall_is_a_valid_function_under_every_switch() {
+        for second in [false, true] {
+            for replaces in [false, true] {
+                let mut tools = vec![recall_tool(second)];
+                if replaces {
+                    tools = replaces_described(tools);
+                }
+                let recall = &tools[0];
+                assert!(
+                    recall.validate().is_ok(),
+                    "second {second} replaces {replaces}: {} bytes",
+                    recall.description.len()
+                );
+                assert!(recall.description.contains(RECALL_OWN_PREFERENCE));
+            }
+        }
     }
 
     /// #2850: "forget my face" with its person's memory emptied says so;
