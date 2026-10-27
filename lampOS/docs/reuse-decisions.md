@@ -38,6 +38,23 @@ storage, command, unit, allowlist, grant, privileged writer or restoration path
 is introduced. Authenticated finite-plan preparation, durable publication,
 independent restoration and physical cuts remain later work.
 
+## Persist ordinary before-images without adding execution authority (2026-10-27)
+
+V1's existing-before/explicit-absence snapshots and durable pending intent are
+useful safeguards; its broad rootfs writer is not reused here. Reuse the new
+raw observer/capture, existing selected-record marker, serde_json/base64,
+manifest SHA-256 and writer_refresh Artifact identities. The bounded
+[private bundle](writer-preimages.md) retains original bytes for forward
+nonsemantic fields without widening the observer's serde/API surface.
+
+For this private artifact, reuse Rustix's descriptor-relative open/stat and
+Linux/Apple no-replace rename, complete file sync and parent sync. Existing
+records::write_whole atomically replaces a path and cleans its own sibling;
+those semantics do not fit refusing an unknown artifact/stage without cleanup.
+It is not reused as a live-path confinement or recovery writer. Authentication,
+independent restore and root bootstrap remain separate work; no new dependency
+or unsafe code is introduced.
+
 ## Refresh the fixed settings writer with independent recovery (2026-10-27)
 
 V1's `scripts/provision/software-update` snapshots absent rootfs entries as
