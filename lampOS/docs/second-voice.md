@@ -1194,8 +1194,19 @@ order is kept. A written turn is the same from the chat on.
     (`LAMP_SAME_VOICE_MODEL` unset), another person's line with no face
     seen speaking it shows no second person, and held as said to nobody it
     is no talk left alone for the room told (`RoomTold::held`), so the hold
-    itself keeps the join off (#3801's P3). A wait for the Policy is no
-    hold, and the bare name waiting for its request is never judged. So the bare
+    itself keeps the join off (#3801's P3). Only a held line whose words
+    could be someone's request counts: two words or more, not a short word
+    or hum (`HELD_LINE_WORDS`). A line of no words, a hum, the lamp's own
+    "hm?" heard back after a head tap, or the room's sounds count for
+    nothing; the lamp's own words heard back are held as its echo before
+    the rule (lamp-c0a4's run 1 on #3864: two lines of no words after a
+    restart's head tap held the join). A wait for the Policy is no hold,
+    and the bare name waiting for its request is never judged. Once set,
+    the held line's mark is never cleared while the room is unknown for
+    want of history (up to five minutes after the start): one held line
+    turns the join off for the rest of that window, and a bare name and
+    its request said after it are held, so the person may have to say it
+    again (the reviewer-lead's P3 on #3864). So the bare
     name and its request, nobody in view, are joined and answered once. A
     rise like talk or a television between the lines, a loud room's quiet,
     no fresh quiet or too few readings, talk left alone, a line held,
