@@ -1,0 +1,2192 @@
+{
+  "artifact_preimages_unchanged": true,
+  "base": "992303fc8d72322bab46cdb18801c853ea43bb81",
+  "cases": [
+    {
+      "count": 1,
+      "file_sha256": "8165868d61749055d934b068abad50bc8b514f366b51b8e3973e9e8c937baf95",
+      "group": "new18",
+      "line": 27,
+      "line_sha256": "61b0123571ddfc1aa286b2eee0ec98dfd4cef5e690e13c1460cebc2e38b10866",
+      "name": "writer_files::tests::regular_bytes_and_all_existing_ancestor_identities_are_observed_without_changing_them",
+      "outcome": "PASS",
+      "path": "lampOS/crates/update/src/writer_files/tests.rs",
+      "stage": "case-01",
+      "target": "lib",
+      "test_artifact_path": "<WORKSPACE>/.claude/worktrees/third-store-target/debug/deps/lamp_update-cebdb705cde8ec81"
+    },
+    {
+      "count": 1,
+      "file_sha256": "8165868d61749055d934b068abad50bc8b514f366b51b8e3973e9e8c937baf95",
+      "group": "new18",
+      "line": 51,
+      "line_sha256": "5866e8d02302383fff494eb0c9d651247889b21143299e7e75158d8590061702",
+      "name": "writer_files::tests::missing_intermediate_and_leaf_are_distinct_and_keep_only_existing_ancestors",
+      "outcome": "PASS",
+      "path": "lampOS/crates/update/src/writer_files/tests.rs",
+      "stage": "case-02",
+      "target": "lib",
+      "test_artifact_path": "<WORKSPACE>/.claude/worktrees/third-store-target/debug/deps/lamp_update-cebdb705cde8ec81"
+    },
+    {
+      "count": 1,
+      "file_sha256": "8165868d61749055d934b068abad50bc8b514f366b51b8e3973e9e8c937baf95",
+      "group": "new18",
+      "line": 78,
+      "line_sha256": "07da797af329fb0438e6db9e195ed510e56f989dc134612634deedec866e3847",
+      "name": "writer_files::tests::invalid_or_unbounded_relative_names_are_refused_before_opening_the_root",
+      "outcome": "PASS",
+      "path": "lampOS/crates/update/src/writer_files/tests.rs",
+      "stage": "case-03",
+      "target": "lib",
+      "test_artifact_path": "<WORKSPACE>/.claude/worktrees/third-store-target/debug/deps/lamp_update-cebdb705cde8ec81"
+    },
+    {
+      "count": 1,
+      "file_sha256": "8165868d61749055d934b068abad50bc8b514f366b51b8e3973e9e8c937baf95",
+      "group": "new18",
+      "line": 109,
+      "line_sha256": "14dde6d1c7cdf0e9cb3337629d0198d223b3e32747f1a116773187e75fe0a2c5",
+      "name": "writer_files::tests::explicit_content_caps_and_the_hard_ceiling_are_enforced_without_truncating_success",
+      "outcome": "PASS",
+      "path": "lampOS/crates/update/src/writer_files/tests.rs",
+      "stage": "case-04",
+      "target": "lib",
+      "test_artifact_path": "<WORKSPACE>/.claude/worktrees/third-store-target/debug/deps/lamp_update-cebdb705cde8ec81"
+    },
+    {
+      "count": 1,
+      "file_sha256": "8165868d61749055d934b068abad50bc8b514f366b51b8e3973e9e8c937baf95",
+      "group": "new18",
+      "line": 128,
+      "line_sha256": "18fa2b60ec97bc3fc650bb00eb1bad0cdff1de3a9214ccf446a34519a89d4a00",
+      "name": "writer_files::tests::no_follow_rejects_leaf_ancestor_and_root_links_without_reading_the_outside_witness",
+      "outcome": "PASS",
+      "path": "lampOS/crates/update/src/writer_files/tests.rs",
+      "stage": "case-05",
+      "target": "lib",
+      "test_artifact_path": "<WORKSPACE>/.claude/worktrees/third-store-target/debug/deps/lamp_update-cebdb705cde8ec81"
+    },
+    {
+      "count": 1,
+      "file_sha256": "8165868d61749055d934b068abad50bc8b514f366b51b8e3973e9e8c937baf95",
+      "group": "new18",
+      "line": 146,
+      "line_sha256": "d706585db77a2554df4a96811f3c9b58f93d46c770e15e91106de5c9e2b6e097",
+      "name": "writer_files::tests::a_hard_link_is_not_accepted_as_a_setting_and_directories_are_not_read",
+      "outcome": "PASS",
+      "path": "lampOS/crates/update/src/writer_files/tests.rs",
+      "stage": "case-06",
+      "target": "lib",
+      "test_artifact_path": "<WORKSPACE>/.claude/worktrees/third-store-target/debug/deps/lamp_update-cebdb705cde8ec81"
+    },
+    {
+      "count": 1,
+      "file_sha256": "8165868d61749055d934b068abad50bc8b514f366b51b8e3973e9e8c937baf95",
+      "group": "new18",
+      "line": 199,
+      "line_sha256": "08f542133a04f160d331b6515d6c50a3429177aa4044374ac26624f0dc04858b",
+      "name": "writer_files::tests::a_fifo_is_refused_without_waiting_for_a_writer_and_its_worker_is_always_joined",
+      "outcome": "PASS",
+      "path": "lampOS/crates/update/src/writer_files/tests.rs",
+      "stage": "case-07",
+      "target": "lib",
+      "test_artifact_path": "<WORKSPACE>/.claude/worktrees/third-store-target/debug/deps/lamp_update-cebdb705cde8ec81"
+    },
+    {
+      "count": 1,
+      "file_sha256": "8165868d61749055d934b068abad50bc8b514f366b51b8e3973e9e8c937baf95",
+      "group": "new18",
+      "line": 237,
+      "line_sha256": "cfbec414ed940e24b906018a8f23e9a6e7c24ce8db62c243978842a30545e48a",
+      "name": "writer_files::tests::descriptor_and_ancestor_metadata_changes_refuse_the_observation",
+      "outcome": "PASS",
+      "path": "lampOS/crates/update/src/writer_files/tests.rs",
+      "stage": "case-08",
+      "target": "lib",
+      "test_artifact_path": "<WORKSPACE>/.claude/worktrees/third-store-target/debug/deps/lamp_update-cebdb705cde8ec81"
+    },
+    {
+      "count": 1,
+      "file_sha256": "8165868d61749055d934b068abad50bc8b514f366b51b8e3973e9e8c937baf95",
+      "group": "new18",
+      "line": 274,
+      "line_sha256": "37817bad21656137837d7eecb60299dd1a7e345a1dca849be0604dd1be11c91b",
+      "name": "writer_files::tests::pre_open_inode_or_metadata_substitution_and_disappearance_are_not_read_as_the_original_file",
+      "outcome": "PASS",
+      "path": "lampOS/crates/update/src/writer_files/tests.rs",
+      "stage": "case-09",
+      "target": "lib",
+      "test_artifact_path": "<WORKSPACE>/.claude/worktrees/third-store-target/debug/deps/lamp_update-cebdb705cde8ec81"
+    },
+    {
+      "count": 1,
+      "file_sha256": "8165868d61749055d934b068abad50bc8b514f366b51b8e3973e9e8c937baf95",
+      "group": "new18",
+      "line": 298,
+      "line_sha256": "a2bd6f85e6768da7e810126f7bd071b60401b2197e531f2406767991e826e42a",
+      "name": "writer_files::tests::errors_and_debug_do_not_expose_relative_names_or_file_contents",
+      "outcome": "PASS",
+      "path": "lampOS/crates/update/src/writer_files/tests.rs",
+      "stage": "case-10",
+      "target": "lib",
+      "test_artifact_path": "<WORKSPACE>/.claude/worktrees/third-store-target/debug/deps/lamp_update-cebdb705cde8ec81"
+    },
+    {
+      "count": 1,
+      "file_sha256": "327273cc855dc85d5034b0dc511abd03477b710bf113f3fe6df3f61189161bad",
+      "group": "new18",
+      "line": 35,
+      "line_sha256": "80f06df11a7c8853ac2364a8f9c8def29cb95ecf9fcb12c561323cac34f38aa8",
+      "name": "writer_settings::tests::captured_bytes_preserve_ordinary_ownership_and_keep_all_omitted_noops",
+      "outcome": "PASS",
+      "path": "lampOS/crates/update/src/writer_settings/tests.rs",
+      "stage": "case-11",
+      "target": "lib",
+      "test_artifact_path": "<WORKSPACE>/.claude/worktrees/third-store-target/debug/deps/lamp_update-cebdb705cde8ec81"
+    },
+    {
+      "count": 1,
+      "file_sha256": "327273cc855dc85d5034b0dc511abd03477b710bf113f3fe6df3f61189161bad",
+      "group": "new18",
+      "line": 134,
+      "line_sha256": "40a0c74603636b2d7b2df080e530bb8cfc952b3daad75aa08db0390f466a5276",
+      "name": "writer_settings::tests::old_byte_limits_allow_exact_budget_then_empty_or_absent_but_never_a_prefix",
+      "outcome": "PASS",
+      "path": "lampOS/crates/update/src/writer_settings/tests.rs",
+      "stage": "case-12",
+      "target": "lib",
+      "test_artifact_path": "<WORKSPACE>/.claude/worktrees/third-store-target/debug/deps/lamp_update-cebdb705cde8ec81"
+    },
+    {
+      "count": 1,
+      "file_sha256": "327273cc855dc85d5034b0dc511abd03477b710bf113f3fe6df3f61189161bad",
+      "group": "new18",
+      "line": 171,
+      "line_sha256": "04084cce74350f98c456f128f0ba3eb9643015aeddfab3af8041d25d063e9046",
+      "name": "writer_settings::tests::selected_invalid_values_refuse_before_filesystem_access_and_unrelated_values_are_ignored",
+      "outcome": "PASS",
+      "path": "lampOS/crates/update/src/writer_settings/tests.rs",
+      "stage": "case-13",
+      "target": "lib",
+      "test_artifact_path": "<WORKSPACE>/.claude/worktrees/third-store-target/debug/deps/lamp_update-cebdb705cde8ec81"
+    },
+    {
+      "count": 1,
+      "file_sha256": "327273cc855dc85d5034b0dc511abd03477b710bf113f3fe6df3f61189161bad",
+      "group": "new18",
+      "line": 196,
+      "line_sha256": "608dc729b20213a6299896e625a9d5b0e2089424a22f1300518868b6b194e14c",
+      "name": "writer_settings::tests::oversized_or_invalid_new_inputs_are_bounded_and_redacted_before_observation",
+      "outcome": "PASS",
+      "path": "lampOS/crates/update/src/writer_settings/tests.rs",
+      "stage": "case-14",
+      "target": "lib",
+      "test_artifact_path": "<WORKSPACE>/.claude/worktrees/third-store-target/debug/deps/lamp_update-cebdb705cde8ec81"
+    },
+    {
+      "count": 1,
+      "file_sha256": "327273cc855dc85d5034b0dc511abd03477b710bf113f3fe6df3f61189161bad",
+      "group": "new18",
+      "line": 229,
+      "line_sha256": "3a38b1af5a65362c1f53fb6ca6f839b00baab6b53af126088833d844109c278e",
+      "name": "writer_settings::tests::shared_classifier_keeps_tmpfiles_marker_and_image_shipped_precedence",
+      "outcome": "PASS",
+      "path": "lampOS/crates/update/src/writer_settings/tests.rs",
+      "stage": "case-15",
+      "target": "lib",
+      "test_artifact_path": "<WORKSPACE>/.claude/worktrees/third-store-target/debug/deps/lamp_update-cebdb705cde8ec81"
+    },
+    {
+      "count": 1,
+      "file_sha256": "327273cc855dc85d5034b0dc511abd03477b710bf113f3fe6df3f61189161bad",
+      "group": "new18",
+      "line": 261,
+      "line_sha256": "aaf2c0cbc7e45cae5e5e774d16ea76dd87f1d03ba078253aed99280a1a74b7cb",
+      "name": "writer_settings::tests::revalidation_refuses_byte_mode_deletion_and_same_byte_inode_changes",
+      "outcome": "PASS",
+      "path": "lampOS/crates/update/src/writer_settings/tests.rs",
+      "stage": "case-16",
+      "target": "lib",
+      "test_artifact_path": "<WORKSPACE>/.claude/worktrees/third-store-target/debug/deps/lamp_update-cebdb705cde8ec81"
+    },
+    {
+      "count": 1,
+      "file_sha256": "327273cc855dc85d5034b0dc511abd03477b710bf113f3fe6df3f61189161bad",
+      "group": "new18",
+      "line": 306,
+      "line_sha256": "b4664247d259fb4c4ffc55fac20b987131309df5604e1f50cd3fe08d2be5d538",
+      "name": "writer_settings::tests::revalidation_refuses_new_negative_dependencies_and_replaced_ancestors",
+      "outcome": "PASS",
+      "path": "lampOS/crates/update/src/writer_settings/tests.rs",
+      "stage": "case-17",
+      "target": "lib",
+      "test_artifact_path": "<WORKSPACE>/.claude/worktrees/third-store-target/debug/deps/lamp_update-cebdb705cde8ec81"
+    },
+    {
+      "count": 1,
+      "file_sha256": "327273cc855dc85d5034b0dc511abd03477b710bf113f3fe6df3f61189161bad",
+      "group": "new18",
+      "line": 343,
+      "line_sha256": "f305dfcf5e06a5c80336c657d88392e3b697c5938de73337d83f99373414cead",
+      "name": "writer_settings::tests::revalidation_refuses_replaced_roots_links_and_nonregular_leaves",
+      "outcome": "PASS",
+      "path": "lampOS/crates/update/src/writer_settings/tests.rs",
+      "stage": "case-18",
+      "target": "lib",
+      "test_artifact_path": "<WORKSPACE>/.claude/worktrees/third-store-target/debug/deps/lamp_update-cebdb705cde8ec81"
+    },
+    {
+      "count": 1,
+      "file_sha256": "45aac2379e34fbf4585f2270e76ef445dbc09a7ca8e38bf849e3f47272616b9c",
+      "group": "foundation18",
+      "line": 63,
+      "line_sha256": "e40206bf810065257d737bfebf351c94d5884de420b3eb99baa512e7cb1f57d3",
+      "name": "writer_refresh::tests::no_apply_does_not_qualify_but_one_exact_apply_can_enter_without_an_ordinary_round",
+      "outcome": "PASS",
+      "path": "lampOS/crates/update/src/writer_refresh/tests.rs",
+      "stage": "case-19",
+      "target": "lib",
+      "test_artifact_path": "<WORKSPACE>/.claude/worktrees/third-store-target/debug/deps/lamp_update-cebdb705cde8ec81"
+    },
+    {
+      "count": 1,
+      "file_sha256": "45aac2379e34fbf4585f2270e76ef445dbc09a7ca8e38bf849e3f47272616b9c",
+      "group": "foundation18",
+      "line": 120,
+      "line_sha256": "f0e35710bd1966c10ed81369ee754005a8680e74d183a34f7c900f955dcdb214",
+      "name": "writer_refresh::tests::a_restart_at_every_unqualified_prefix_requires_recovery_and_never_reissues_the_grant",
+      "outcome": "PASS",
+      "path": "lampOS/crates/update/src/writer_refresh/tests.rs",
+      "stage": "case-20",
+      "target": "lib",
+      "test_artifact_path": "<WORKSPACE>/.claude/worktrees/third-store-target/debug/deps/lamp_update-cebdb705cde8ec81"
+    },
+    {
+      "count": 1,
+      "file_sha256": "45aac2379e34fbf4585f2270e76ef445dbc09a7ca8e38bf849e3f47272616b9c",
+      "group": "foundation18",
+      "line": 170,
+      "line_sha256": "84115bea9f0a4170da9017e21d34c53a47b0fa9378885997200a58d458aecba5",
+      "name": "writer_refresh::tests::qualified_writer_and_preimages_survive_a_restart_until_the_product_journal_closes",
+      "outcome": "PASS",
+      "path": "lampOS/crates/update/src/writer_refresh/tests.rs",
+      "stage": "case-21",
+      "target": "lib",
+      "test_artifact_path": "<WORKSPACE>/.claude/worktrees/third-store-target/debug/deps/lamp_update-cebdb705cde8ec81"
+    },
+    {
+      "count": 1,
+      "file_sha256": "45aac2379e34fbf4585f2270e76ef445dbc09a7ca8e38bf849e3f47272616b9c",
+      "group": "foundation18",
+      "line": 214,
+      "line_sha256": "ea8a9b4a8692065af34af4db13a23dec6b13684bd98e6c346909a6bcc3fbb5a0",
+      "name": "writer_refresh::tests::identity_substitution_never_changes_or_admits_the_saved_transaction",
+      "outcome": "PASS",
+      "path": "lampOS/crates/update/src/writer_refresh/tests.rs",
+      "stage": "case-22",
+      "target": "lib",
+      "test_artifact_path": "<WORKSPACE>/.claude/worktrees/third-store-target/debug/deps/lamp_update-cebdb705cde8ec81"
+    },
+    {
+      "count": 1,
+      "file_sha256": "45aac2379e34fbf4585f2270e76ef445dbc09a7ca8e38bf849e3f47272616b9c",
+      "group": "foundation18",
+      "line": 249,
+      "line_sha256": "6d1121d4e8a00ecad4053918639a546123ad82c9bb0b1a4e60e438111b433a84",
+      "name": "writer_refresh::tests::a_stale_or_modified_first_apply_cannot_consume_the_single_grant",
+      "outcome": "PASS",
+      "path": "lampOS/crates/update/src/writer_refresh/tests.rs",
+      "stage": "case-23",
+      "target": "lib",
+      "test_artifact_path": "<WORKSPACE>/.claude/worktrees/third-store-target/debug/deps/lamp_update-cebdb705cde8ec81"
+    },
+    {
+      "count": 1,
+      "file_sha256": "45aac2379e34fbf4585f2270e76ef445dbc09a7ca8e38bf849e3f47272616b9c",
+      "group": "foundation18",
+      "line": 279,
+      "line_sha256": "44d164ba9f5db26c40b23ae5cd87b86c5d6cddd66f0f36dece3f5b2309cc274c",
+      "name": "writer_refresh::tests::unsupported_or_malformed_journals_are_retained_and_block_every_admission",
+      "outcome": "PASS",
+      "path": "lampOS/crates/update/src/writer_refresh/tests.rs",
+      "stage": "case-24",
+      "target": "lib",
+      "test_artifact_path": "<WORKSPACE>/.claude/worktrees/third-store-target/debug/deps/lamp_update-cebdb705cde8ec81"
+    },
+    {
+      "count": 1,
+      "file_sha256": "45aac2379e34fbf4585f2270e76ef445dbc09a7ca8e38bf849e3f47272616b9c",
+      "group": "foundation18",
+      "line": 322,
+      "line_sha256": "c1c57e5311d0ff1bbbadd700b6a1cd4aa538c672261dc4315a67f6442b62aac5",
+      "name": "writer_refresh::tests::missing_and_nonregular_records_do_not_turn_into_a_fresh_transaction",
+      "outcome": "PASS",
+      "path": "lampOS/crates/update/src/writer_refresh/tests.rs",
+      "stage": "case-25",
+      "target": "lib",
+      "test_artifact_path": "<WORKSPACE>/.claude/worktrees/third-store-target/debug/deps/lamp_update-cebdb705cde8ec81"
+    },
+    {
+      "count": 1,
+      "file_sha256": "45aac2379e34fbf4585f2270e76ef445dbc09a7ca8e38bf849e3f47272616b9c",
+      "group": "foundation18",
+      "line": 363,
+      "line_sha256": "819765bca71489b844f2b9b1e6d79114a00ced50e2a95b48f0a2785ec3788950",
+      "name": "writer_refresh::tests::future_nonsemantic_metadata_is_preserved_without_becoming_admission_authority",
+      "outcome": "PASS",
+      "path": "lampOS/crates/update/src/writer_refresh/tests.rs",
+      "stage": "case-26",
+      "target": "lib",
+      "test_artifact_path": "<WORKSPACE>/.claude/worktrees/third-store-target/debug/deps/lamp_update-cebdb705cde8ec81"
+    },
+    {
+      "count": 1,
+      "file_sha256": "45aac2379e34fbf4585f2270e76ef445dbc09a7ca8e38bf849e3f47272616b9c",
+      "group": "foundation18",
+      "line": 397,
+      "line_sha256": "8db78f85d7150291bb72e9c310e4995d7ab6e9e49751a7ea8daf9581b3b3a036",
+      "name": "writer_refresh::tests::write_bound_and_invalid_identities_leave_no_journal_or_partial_acceptance",
+      "outcome": "PASS",
+      "path": "lampOS/crates/update/src/writer_refresh/tests.rs",
+      "stage": "case-27",
+      "target": "lib",
+      "test_artifact_path": "<WORKSPACE>/.claude/worktrees/third-store-target/debug/deps/lamp_update-cebdb705cde8ec81"
+    },
+    {
+      "count": 1,
+      "file_sha256": "45aac2379e34fbf4585f2270e76ef445dbc09a7ca8e38bf849e3f47272616b9c",
+      "group": "foundation18",
+      "line": 424,
+      "line_sha256": "addc6d496abf005d491bc04b5f58d0b1a409f9a85882f8657d052c6b21877d5a",
+      "name": "writer_refresh::tests::diagnostics_hide_unknown_values_and_known_duplicate_or_shadowed_fields_are_refused",
+      "outcome": "PASS",
+      "path": "lampOS/crates/update/src/writer_refresh/tests.rs",
+      "stage": "case-28",
+      "target": "lib",
+      "test_artifact_path": "<WORKSPACE>/.claude/worktrees/third-store-target/debug/deps/lamp_update-cebdb705cde8ec81"
+    },
+    {
+      "count": 1,
+      "file_sha256": "45aac2379e34fbf4585f2270e76ef445dbc09a7ca8e38bf849e3f47272616b9c",
+      "group": "foundation18",
+      "line": 456,
+      "line_sha256": "65351672884e42c42f996adbf3dbb965885b8555762261dcb336b47b93fa0e48",
+      "name": "writer_refresh::tests::guard_lock_is_exclusive_and_independent_of_the_product_lock",
+      "outcome": "PASS",
+      "path": "lampOS/crates/update/src/writer_refresh/tests.rs",
+      "stage": "case-29",
+      "target": "lib",
+      "test_artifact_path": "<WORKSPACE>/.claude/worktrees/third-store-target/debug/deps/lamp_update-cebdb705cde8ec81"
+    },
+    {
+      "count": 1,
+      "file_sha256": "45aac2379e34fbf4585f2270e76ef445dbc09a7ca8e38bf849e3f47272616b9c",
+      "group": "foundation18",
+      "line": 480,
+      "line_sha256": "b5cd726a50c99ebd6649b25b8dbf26130c2209a52da98610e6d6b880bf52690c",
+      "name": "writer_refresh::tests::failed_persist_after_publication_poisons_the_live_session_until_actual_disk_state_is_recovered",
+      "outcome": "PASS",
+      "path": "lampOS/crates/update/src/writer_refresh/tests.rs",
+      "stage": "case-30",
+      "target": "lib",
+      "test_artifact_path": "<WORKSPACE>/.claude/worktrees/third-store-target/debug/deps/lamp_update-cebdb705cde8ec81"
+    },
+    {
+      "count": 1,
+      "file_sha256": "45aac2379e34fbf4585f2270e76ef445dbc09a7ca8e38bf849e3f47272616b9c",
+      "group": "foundation18",
+      "line": 533,
+      "line_sha256": "2173acdfbf59cbcd5c160f75f91c2fb9922abfb14c6604efa21c9ba8badc1c8d",
+      "name": "writer_refresh::tests::first_apply_binds_its_own_later_envelope_and_sequence_without_replacing_the_refresh_identity",
+      "outcome": "PASS",
+      "path": "lampOS/crates/update/src/writer_refresh/tests.rs",
+      "stage": "case-31",
+      "target": "lib",
+      "test_artifact_path": "<WORKSPACE>/.claude/worktrees/third-store-target/debug/deps/lamp_update-cebdb705cde8ec81"
+    },
+    {
+      "count": 1,
+      "file_sha256": "45aac2379e34fbf4585f2270e76ef445dbc09a7ca8e38bf849e3f47272616b9c",
+      "group": "foundation18",
+      "line": 561,
+      "line_sha256": "526a5f2ca86c7eb1a0b83683d5acd8c21804190150f7f42ec06359beb267207d",
+      "name": "writer_refresh::tests::restoring_an_apply_requires_its_original_grant_and_preimage_identity",
+      "outcome": "PASS",
+      "path": "lampOS/crates/update/src/writer_refresh/tests.rs",
+      "stage": "case-32",
+      "target": "lib",
+      "test_artifact_path": "<WORKSPACE>/.claude/worktrees/third-store-target/debug/deps/lamp_update-cebdb705cde8ec81"
+    },
+    {
+      "count": 1,
+      "file_sha256": "45aac2379e34fbf4585f2270e76ef445dbc09a7ca8e38bf849e3f47272616b9c",
+      "group": "foundation18",
+      "line": 596,
+      "line_sha256": "69412dd6d18b5b43ab9c723f154ef557c441235cb57404a54c4c37e81f13a359",
+      "name": "writer_refresh::tests::reloaded_inputs_keep_the_exact_origin_and_distinguish_writer_from_apply_restoration",
+      "outcome": "PASS",
+      "path": "lampOS/crates/update/src/writer_refresh/tests.rs",
+      "stage": "case-33",
+      "target": "lib",
+      "test_artifact_path": "<WORKSPACE>/.claude/worktrees/third-store-target/debug/deps/lamp_update-cebdb705cde8ec81"
+    },
+    {
+      "count": 1,
+      "file_sha256": "45aac2379e34fbf4585f2270e76ef445dbc09a7ca8e38bf849e3f47272616b9c",
+      "group": "foundation18",
+      "line": 682,
+      "line_sha256": "d9423ca2ad3891106c2ff2f328f46e2ca36375529283dcf279dd158450965180",
+      "name": "writer_refresh::tests::qualified_and_closed_inputs_keep_the_compatible_writer_and_bound_product_receipts",
+      "outcome": "PASS",
+      "path": "lampOS/crates/update/src/writer_refresh/tests.rs",
+      "stage": "case-34",
+      "target": "lib",
+      "test_artifact_path": "<WORKSPACE>/.claude/worktrees/third-store-target/debug/deps/lamp_update-cebdb705cde8ec81"
+    },
+    {
+      "count": 1,
+      "file_sha256": "45aac2379e34fbf4585f2270e76ef445dbc09a7ca8e38bf849e3f47272616b9c",
+      "group": "foundation18",
+      "line": 726,
+      "line_sha256": "5bf8629465ed6cf4db921f444a4d49bec33124fef542d1fdea7f1b2bf8c5cf57",
+      "name": "writer_refresh::tests::live_or_poisoned_sessions_cannot_expose_stale_recovery_inputs",
+      "outcome": "PASS",
+      "path": "lampOS/crates/update/src/writer_refresh/tests.rs",
+      "stage": "case-35",
+      "target": "lib",
+      "test_artifact_path": "<WORKSPACE>/.claude/worktrees/third-store-target/debug/deps/lamp_update-cebdb705cde8ec81"
+    },
+    {
+      "count": 1,
+      "file_sha256": "45aac2379e34fbf4585f2270e76ef445dbc09a7ca8e38bf849e3f47272616b9c",
+      "group": "foundation18",
+      "line": 764,
+      "line_sha256": "525700e84fadad41d9b180a12249a5454d758fda64b70f16ff6e3719ec3457f4",
+      "name": "writer_refresh::tests::recovery_views_retain_later_metadata_in_the_bound_inputs_without_reparsing",
+      "outcome": "PASS",
+      "path": "lampOS/crates/update/src/writer_refresh/tests.rs",
+      "stage": "case-36",
+      "target": "lib",
+      "test_artifact_path": "<WORKSPACE>/.claude/worktrees/third-store-target/debug/deps/lamp_update-cebdb705cde8ec81"
+    },
+    {
+      "count": 1,
+      "file_sha256": "db0720893ee7a085e2612000ca89a9a5066f1430d7ff96b6f6d2cb5489e52fb8",
+      "group": "receipt5",
+      "line": 1129,
+      "line_sha256": "9fe588151799b894aea9d588faf8672ee6dcfbfcf3ba7c14123b88ece3f84e2a",
+      "name": "apply::tests::a_done_for_another_operation_does_not_change_any_setting_record",
+      "outcome": "PASS",
+      "path": "lampOS/crates/update/src/apply.rs",
+      "stage": "case-37",
+      "target": "lib",
+      "test_artifact_path": "<WORKSPACE>/.claude/worktrees/third-store-target/debug/deps/lamp_update-cebdb705cde8ec81"
+    },
+    {
+      "count": 1,
+      "file_sha256": "db0720893ee7a085e2612000ca89a9a5066f1430d7ff96b6f6d2cb5489e52fb8",
+      "group": "receipt5",
+      "line": 1134,
+      "line_sha256": "53d91a9b03f0055d5ff6c0606e45201c12fab23215d3ad394a5e6f4898d446c0",
+      "name": "apply::tests::a_done_for_another_sequence_does_not_change_any_setting_record",
+      "outcome": "PASS",
+      "path": "lampOS/crates/update/src/apply.rs",
+      "stage": "case-38",
+      "target": "lib",
+      "test_artifact_path": "<WORKSPACE>/.claude/worktrees/third-store-target/debug/deps/lamp_update-cebdb705cde8ec81"
+    },
+    {
+      "count": 1,
+      "file_sha256": "db0720893ee7a085e2612000ca89a9a5066f1430d7ff96b6f6d2cb5489e52fb8",
+      "group": "receipt5",
+      "line": 1139,
+      "line_sha256": "bbfc13d25db6ad55c4d808fcc70a63c922c620278311b054dd5dd974c7de2fcd",
+      "name": "apply::tests::an_explicit_expected_identity_does_not_follow_a_rewritten_staged_request",
+      "outcome": "PASS",
+      "path": "lampOS/crates/update/src/apply.rs",
+      "stage": "case-39",
+      "target": "lib",
+      "test_artifact_path": "<WORKSPACE>/.claude/worktrees/third-store-target/debug/deps/lamp_update-cebdb705cde8ec81"
+    },
+    {
+      "count": 1,
+      "file_sha256": "db0720893ee7a085e2612000ca89a9a5066f1430d7ff96b6f6d2cb5489e52fb8",
+      "group": "receipt5",
+      "line": 1161,
+      "line_sha256": "b6265f3b4e27469e3d4f4e5d07374860e49f1c3851ff803168a1e8a27e71f281",
+      "name": "apply::tests::a_matching_done_keeps_the_permanent_forward_read_contract",
+      "outcome": "PASS",
+      "path": "lampOS/crates/update/src/apply.rs",
+      "stage": "case-40",
+      "target": "lib",
+      "test_artifact_path": "<WORKSPACE>/.claude/worktrees/third-store-target/debug/deps/lamp_update-cebdb705cde8ec81"
+    },
+    {
+      "count": 1,
+      "file_sha256": "db0720893ee7a085e2612000ca89a9a5066f1430d7ff96b6f6d2cb5489e52fb8",
+      "group": "receipt5",
+      "line": 1209,
+      "line_sha256": "dde84898dbf7655fc8365d50b1b151701adcb08a42e5c264f68c80eb0a41ac48",
+      "name": "apply::tests::an_unknown_done_operation_is_refused_without_changing_any_setting_record",
+      "outcome": "PASS",
+      "path": "lampOS/crates/update/src/apply.rs",
+      "stage": "case-41",
+      "target": "lib",
+      "test_artifact_path": "<WORKSPACE>/.claude/worktrees/third-store-target/debug/deps/lamp_update-cebdb705cde8ec81"
+    },
+    {
+      "count": 1,
+      "file_sha256": "a9afd0629cf3c0e5b1c5ffe3bca655e1f49a9d3301d3f6f62b3f10386f778422",
+      "group": "receipt3",
+      "line": 4122,
+      "line_sha256": "c58889eb1d9f76527fcdfe1336f5fe11bb7043cd09112f24b7cf2cb467145b61",
+      "name": "a_rejected_apply_receipt_runs_real_back_and_restores_written_settings_modes_and_records",
+      "outcome": "PASS",
+      "path": "lampOS/crates/update/tests/round.rs",
+      "stage": "case-42",
+      "target": "round",
+      "test_artifact_path": "<WORKSPACE>/.claude/worktrees/third-store-target/debug/deps/round-86f3bcf98e2c5ca2"
+    },
+    {
+      "count": 1,
+      "file_sha256": "a9afd0629cf3c0e5b1c5ffe3bca655e1f49a9d3301d3f6f62b3f10386f778422",
+      "group": "receipt3",
+      "line": 4170,
+      "line_sha256": "7cd09ff6783af2234629ab3d5e5e8abde179c018347059525281494867ef9d76",
+      "name": "a_rejected_back_receipt_keeps_the_journal_until_real_back_is_acknowledged",
+      "outcome": "PASS",
+      "path": "lampOS/crates/update/tests/round.rs",
+      "stage": "case-43",
+      "target": "round",
+      "test_artifact_path": "<WORKSPACE>/.claude/worktrees/third-store-target/debug/deps/round-86f3bcf98e2c5ca2"
+    },
+    {
+      "count": 1,
+      "file_sha256": "a9afd0629cf3c0e5b1c5ffe3bca655e1f49a9d3301d3f6f62b3f10386f778422",
+      "group": "receipt3",
+      "line": 4258,
+      "line_sha256": "eb4090c31aa637e3c03a35e0dde1c05f910f475316b1a9c0e9f3bfc6f7a378f2",
+      "name": "the_round_rejects_a_done_matching_a_rewritten_request_instead_of_its_own_request",
+      "outcome": "PASS",
+      "path": "lampOS/crates/update/tests/round.rs",
+      "stage": "case-44",
+      "target": "round",
+      "test_artifact_path": "<WORKSPACE>/.claude/worktrees/third-store-target/debug/deps/round-86f3bcf98e2c5ca2"
+    }
+  ],
+  "commands": {
+    "discovery": {
+      "lib": {
+        "argv": [
+          "<WORKSPACE>/.claude/worktrees/third-store-target/debug/deps/lamp_update-cebdb705cde8ec81",
+          "--list",
+          "--format",
+          "terse"
+        ],
+        "cwd": "<WORKSPACE>/.claude/worktrees/third-read-3858/lampOS"
+      },
+      "round": {
+        "argv": [
+          "<WORKSPACE>/.claude/worktrees/third-store-target/debug/deps/round-86f3bcf98e2c5ca2",
+          "--list",
+          "--format",
+          "terse"
+        ],
+        "cwd": "<WORKSPACE>/.claude/worktrees/third-read-3858/lampOS"
+      }
+    },
+    "initial": [
+      [
+        "fmt",
+        [
+          "cargo",
+          "+1.96.0",
+          "fmt",
+          "--all",
+          "--check"
+        ]
+      ],
+      [
+        "clippy",
+        [
+          "cargo",
+          "+1.96.0",
+          "clippy",
+          "-q",
+          "--offline",
+          "--locked",
+          "-p",
+          "lamp-update",
+          "--all-targets",
+          "--message-format=json",
+          "--",
+          "-D",
+          "warnings"
+        ]
+      ],
+      [
+        "compile-lib",
+        [
+          "cargo",
+          "+1.96.0",
+          "test",
+          "--offline",
+          "--locked",
+          "-p",
+          "lamp-update",
+          "--lib",
+          "--no-run",
+          "--message-format=json"
+        ]
+      ],
+      [
+        "compile-round",
+        [
+          "cargo",
+          "+1.96.0",
+          "test",
+          "--offline",
+          "--locked",
+          "-p",
+          "lamp-update",
+          "--test",
+          "round",
+          "--no-run",
+          "--message-format=json"
+        ]
+      ]
+    ],
+    "selected": [
+      [
+        "case-01",
+        [
+          "cargo",
+          "+1.96.0",
+          "test",
+          "--offline",
+          "--locked",
+          "-p",
+          "lamp-update",
+          "--lib",
+          "--message-format=json",
+          "--",
+          "--exact",
+          "writer_files::tests::regular_bytes_and_all_existing_ancestor_identities_are_observed_without_changing_them",
+          "--nocapture",
+          "--test-threads=1"
+        ]
+      ],
+      [
+        "case-02",
+        [
+          "cargo",
+          "+1.96.0",
+          "test",
+          "--offline",
+          "--locked",
+          "-p",
+          "lamp-update",
+          "--lib",
+          "--message-format=json",
+          "--",
+          "--exact",
+          "writer_files::tests::missing_intermediate_and_leaf_are_distinct_and_keep_only_existing_ancestors",
+          "--nocapture",
+          "--test-threads=1"
+        ]
+      ],
+      [
+        "case-03",
+        [
+          "cargo",
+          "+1.96.0",
+          "test",
+          "--offline",
+          "--locked",
+          "-p",
+          "lamp-update",
+          "--lib",
+          "--message-format=json",
+          "--",
+          "--exact",
+          "writer_files::tests::invalid_or_unbounded_relative_names_are_refused_before_opening_the_root",
+          "--nocapture",
+          "--test-threads=1"
+        ]
+      ],
+      [
+        "case-04",
+        [
+          "cargo",
+          "+1.96.0",
+          "test",
+          "--offline",
+          "--locked",
+          "-p",
+          "lamp-update",
+          "--lib",
+          "--message-format=json",
+          "--",
+          "--exact",
+          "writer_files::tests::explicit_content_caps_and_the_hard_ceiling_are_enforced_without_truncating_success",
+          "--nocapture",
+          "--test-threads=1"
+        ]
+      ],
+      [
+        "case-05",
+        [
+          "cargo",
+          "+1.96.0",
+          "test",
+          "--offline",
+          "--locked",
+          "-p",
+          "lamp-update",
+          "--lib",
+          "--message-format=json",
+          "--",
+          "--exact",
+          "writer_files::tests::no_follow_rejects_leaf_ancestor_and_root_links_without_reading_the_outside_witness",
+          "--nocapture",
+          "--test-threads=1"
+        ]
+      ],
+      [
+        "case-06",
+        [
+          "cargo",
+          "+1.96.0",
+          "test",
+          "--offline",
+          "--locked",
+          "-p",
+          "lamp-update",
+          "--lib",
+          "--message-format=json",
+          "--",
+          "--exact",
+          "writer_files::tests::a_hard_link_is_not_accepted_as_a_setting_and_directories_are_not_read",
+          "--nocapture",
+          "--test-threads=1"
+        ]
+      ],
+      [
+        "case-07",
+        [
+          "cargo",
+          "+1.96.0",
+          "test",
+          "--offline",
+          "--locked",
+          "-p",
+          "lamp-update",
+          "--lib",
+          "--message-format=json",
+          "--",
+          "--exact",
+          "writer_files::tests::a_fifo_is_refused_without_waiting_for_a_writer_and_its_worker_is_always_joined",
+          "--nocapture",
+          "--test-threads=1"
+        ]
+      ],
+      [
+        "case-08",
+        [
+          "cargo",
+          "+1.96.0",
+          "test",
+          "--offline",
+          "--locked",
+          "-p",
+          "lamp-update",
+          "--lib",
+          "--message-format=json",
+          "--",
+          "--exact",
+          "writer_files::tests::descriptor_and_ancestor_metadata_changes_refuse_the_observation",
+          "--nocapture",
+          "--test-threads=1"
+        ]
+      ],
+      [
+        "case-09",
+        [
+          "cargo",
+          "+1.96.0",
+          "test",
+          "--offline",
+          "--locked",
+          "-p",
+          "lamp-update",
+          "--lib",
+          "--message-format=json",
+          "--",
+          "--exact",
+          "writer_files::tests::pre_open_inode_or_metadata_substitution_and_disappearance_are_not_read_as_the_original_file",
+          "--nocapture",
+          "--test-threads=1"
+        ]
+      ],
+      [
+        "case-10",
+        [
+          "cargo",
+          "+1.96.0",
+          "test",
+          "--offline",
+          "--locked",
+          "-p",
+          "lamp-update",
+          "--lib",
+          "--message-format=json",
+          "--",
+          "--exact",
+          "writer_files::tests::errors_and_debug_do_not_expose_relative_names_or_file_contents",
+          "--nocapture",
+          "--test-threads=1"
+        ]
+      ],
+      [
+        "case-11",
+        [
+          "cargo",
+          "+1.96.0",
+          "test",
+          "--offline",
+          "--locked",
+          "-p",
+          "lamp-update",
+          "--lib",
+          "--message-format=json",
+          "--",
+          "--exact",
+          "writer_settings::tests::captured_bytes_preserve_ordinary_ownership_and_keep_all_omitted_noops",
+          "--nocapture",
+          "--test-threads=1"
+        ]
+      ],
+      [
+        "case-12",
+        [
+          "cargo",
+          "+1.96.0",
+          "test",
+          "--offline",
+          "--locked",
+          "-p",
+          "lamp-update",
+          "--lib",
+          "--message-format=json",
+          "--",
+          "--exact",
+          "writer_settings::tests::old_byte_limits_allow_exact_budget_then_empty_or_absent_but_never_a_prefix",
+          "--nocapture",
+          "--test-threads=1"
+        ]
+      ],
+      [
+        "case-13",
+        [
+          "cargo",
+          "+1.96.0",
+          "test",
+          "--offline",
+          "--locked",
+          "-p",
+          "lamp-update",
+          "--lib",
+          "--message-format=json",
+          "--",
+          "--exact",
+          "writer_settings::tests::selected_invalid_values_refuse_before_filesystem_access_and_unrelated_values_are_ignored",
+          "--nocapture",
+          "--test-threads=1"
+        ]
+      ],
+      [
+        "case-14",
+        [
+          "cargo",
+          "+1.96.0",
+          "test",
+          "--offline",
+          "--locked",
+          "-p",
+          "lamp-update",
+          "--lib",
+          "--message-format=json",
+          "--",
+          "--exact",
+          "writer_settings::tests::oversized_or_invalid_new_inputs_are_bounded_and_redacted_before_observation",
+          "--nocapture",
+          "--test-threads=1"
+        ]
+      ],
+      [
+        "case-15",
+        [
+          "cargo",
+          "+1.96.0",
+          "test",
+          "--offline",
+          "--locked",
+          "-p",
+          "lamp-update",
+          "--lib",
+          "--message-format=json",
+          "--",
+          "--exact",
+          "writer_settings::tests::shared_classifier_keeps_tmpfiles_marker_and_image_shipped_precedence",
+          "--nocapture",
+          "--test-threads=1"
+        ]
+      ],
+      [
+        "case-16",
+        [
+          "cargo",
+          "+1.96.0",
+          "test",
+          "--offline",
+          "--locked",
+          "-p",
+          "lamp-update",
+          "--lib",
+          "--message-format=json",
+          "--",
+          "--exact",
+          "writer_settings::tests::revalidation_refuses_byte_mode_deletion_and_same_byte_inode_changes",
+          "--nocapture",
+          "--test-threads=1"
+        ]
+      ],
+      [
+        "case-17",
+        [
+          "cargo",
+          "+1.96.0",
+          "test",
+          "--offline",
+          "--locked",
+          "-p",
+          "lamp-update",
+          "--lib",
+          "--message-format=json",
+          "--",
+          "--exact",
+          "writer_settings::tests::revalidation_refuses_new_negative_dependencies_and_replaced_ancestors",
+          "--nocapture",
+          "--test-threads=1"
+        ]
+      ],
+      [
+        "case-18",
+        [
+          "cargo",
+          "+1.96.0",
+          "test",
+          "--offline",
+          "--locked",
+          "-p",
+          "lamp-update",
+          "--lib",
+          "--message-format=json",
+          "--",
+          "--exact",
+          "writer_settings::tests::revalidation_refuses_replaced_roots_links_and_nonregular_leaves",
+          "--nocapture",
+          "--test-threads=1"
+        ]
+      ],
+      [
+        "case-19",
+        [
+          "cargo",
+          "+1.96.0",
+          "test",
+          "--offline",
+          "--locked",
+          "-p",
+          "lamp-update",
+          "--lib",
+          "--message-format=json",
+          "--",
+          "--exact",
+          "writer_refresh::tests::no_apply_does_not_qualify_but_one_exact_apply_can_enter_without_an_ordinary_round",
+          "--nocapture",
+          "--test-threads=1"
+        ]
+      ],
+      [
+        "case-20",
+        [
+          "cargo",
+          "+1.96.0",
+          "test",
+          "--offline",
+          "--locked",
+          "-p",
+          "lamp-update",
+          "--lib",
+          "--message-format=json",
+          "--",
+          "--exact",
+          "writer_refresh::tests::a_restart_at_every_unqualified_prefix_requires_recovery_and_never_reissues_the_grant",
+          "--nocapture",
+          "--test-threads=1"
+        ]
+      ],
+      [
+        "case-21",
+        [
+          "cargo",
+          "+1.96.0",
+          "test",
+          "--offline",
+          "--locked",
+          "-p",
+          "lamp-update",
+          "--lib",
+          "--message-format=json",
+          "--",
+          "--exact",
+          "writer_refresh::tests::qualified_writer_and_preimages_survive_a_restart_until_the_product_journal_closes",
+          "--nocapture",
+          "--test-threads=1"
+        ]
+      ],
+      [
+        "case-22",
+        [
+          "cargo",
+          "+1.96.0",
+          "test",
+          "--offline",
+          "--locked",
+          "-p",
+          "lamp-update",
+          "--lib",
+          "--message-format=json",
+          "--",
+          "--exact",
+          "writer_refresh::tests::identity_substitution_never_changes_or_admits_the_saved_transaction",
+          "--nocapture",
+          "--test-threads=1"
+        ]
+      ],
+      [
+        "case-23",
+        [
+          "cargo",
+          "+1.96.0",
+          "test",
+          "--offline",
+          "--locked",
+          "-p",
+          "lamp-update",
+          "--lib",
+          "--message-format=json",
+          "--",
+          "--exact",
+          "writer_refresh::tests::a_stale_or_modified_first_apply_cannot_consume_the_single_grant",
+          "--nocapture",
+          "--test-threads=1"
+        ]
+      ],
+      [
+        "case-24",
+        [
+          "cargo",
+          "+1.96.0",
+          "test",
+          "--offline",
+          "--locked",
+          "-p",
+          "lamp-update",
+          "--lib",
+          "--message-format=json",
+          "--",
+          "--exact",
+          "writer_refresh::tests::unsupported_or_malformed_journals_are_retained_and_block_every_admission",
+          "--nocapture",
+          "--test-threads=1"
+        ]
+      ],
+      [
+        "case-25",
+        [
+          "cargo",
+          "+1.96.0",
+          "test",
+          "--offline",
+          "--locked",
+          "-p",
+          "lamp-update",
+          "--lib",
+          "--message-format=json",
+          "--",
+          "--exact",
+          "writer_refresh::tests::missing_and_nonregular_records_do_not_turn_into_a_fresh_transaction",
+          "--nocapture",
+          "--test-threads=1"
+        ]
+      ],
+      [
+        "case-26",
+        [
+          "cargo",
+          "+1.96.0",
+          "test",
+          "--offline",
+          "--locked",
+          "-p",
+          "lamp-update",
+          "--lib",
+          "--message-format=json",
+          "--",
+          "--exact",
+          "writer_refresh::tests::future_nonsemantic_metadata_is_preserved_without_becoming_admission_authority",
+          "--nocapture",
+          "--test-threads=1"
+        ]
+      ],
+      [
+        "case-27",
+        [
+          "cargo",
+          "+1.96.0",
+          "test",
+          "--offline",
+          "--locked",
+          "-p",
+          "lamp-update",
+          "--lib",
+          "--message-format=json",
+          "--",
+          "--exact",
+          "writer_refresh::tests::write_bound_and_invalid_identities_leave_no_journal_or_partial_acceptance",
+          "--nocapture",
+          "--test-threads=1"
+        ]
+      ],
+      [
+        "case-28",
+        [
+          "cargo",
+          "+1.96.0",
+          "test",
+          "--offline",
+          "--locked",
+          "-p",
+          "lamp-update",
+          "--lib",
+          "--message-format=json",
+          "--",
+          "--exact",
+          "writer_refresh::tests::diagnostics_hide_unknown_values_and_known_duplicate_or_shadowed_fields_are_refused",
+          "--nocapture",
+          "--test-threads=1"
+        ]
+      ],
+      [
+        "case-29",
+        [
+          "cargo",
+          "+1.96.0",
+          "test",
+          "--offline",
+          "--locked",
+          "-p",
+          "lamp-update",
+          "--lib",
+          "--message-format=json",
+          "--",
+          "--exact",
+          "writer_refresh::tests::guard_lock_is_exclusive_and_independent_of_the_product_lock",
+          "--nocapture",
+          "--test-threads=1"
+        ]
+      ],
+      [
+        "case-30",
+        [
+          "cargo",
+          "+1.96.0",
+          "test",
+          "--offline",
+          "--locked",
+          "-p",
+          "lamp-update",
+          "--lib",
+          "--message-format=json",
+          "--",
+          "--exact",
+          "writer_refresh::tests::failed_persist_after_publication_poisons_the_live_session_until_actual_disk_state_is_recovered",
+          "--nocapture",
+          "--test-threads=1"
+        ]
+      ],
+      [
+        "case-31",
+        [
+          "cargo",
+          "+1.96.0",
+          "test",
+          "--offline",
+          "--locked",
+          "-p",
+          "lamp-update",
+          "--lib",
+          "--message-format=json",
+          "--",
+          "--exact",
+          "writer_refresh::tests::first_apply_binds_its_own_later_envelope_and_sequence_without_replacing_the_refresh_identity",
+          "--nocapture",
+          "--test-threads=1"
+        ]
+      ],
+      [
+        "case-32",
+        [
+          "cargo",
+          "+1.96.0",
+          "test",
+          "--offline",
+          "--locked",
+          "-p",
+          "lamp-update",
+          "--lib",
+          "--message-format=json",
+          "--",
+          "--exact",
+          "writer_refresh::tests::restoring_an_apply_requires_its_original_grant_and_preimage_identity",
+          "--nocapture",
+          "--test-threads=1"
+        ]
+      ],
+      [
+        "case-33",
+        [
+          "cargo",
+          "+1.96.0",
+          "test",
+          "--offline",
+          "--locked",
+          "-p",
+          "lamp-update",
+          "--lib",
+          "--message-format=json",
+          "--",
+          "--exact",
+          "writer_refresh::tests::reloaded_inputs_keep_the_exact_origin_and_distinguish_writer_from_apply_restoration",
+          "--nocapture",
+          "--test-threads=1"
+        ]
+      ],
+      [
+        "case-34",
+        [
+          "cargo",
+          "+1.96.0",
+          "test",
+          "--offline",
+          "--locked",
+          "-p",
+          "lamp-update",
+          "--lib",
+          "--message-format=json",
+          "--",
+          "--exact",
+          "writer_refresh::tests::qualified_and_closed_inputs_keep_the_compatible_writer_and_bound_product_receipts",
+          "--nocapture",
+          "--test-threads=1"
+        ]
+      ],
+      [
+        "case-35",
+        [
+          "cargo",
+          "+1.96.0",
+          "test",
+          "--offline",
+          "--locked",
+          "-p",
+          "lamp-update",
+          "--lib",
+          "--message-format=json",
+          "--",
+          "--exact",
+          "writer_refresh::tests::live_or_poisoned_sessions_cannot_expose_stale_recovery_inputs",
+          "--nocapture",
+          "--test-threads=1"
+        ]
+      ],
+      [
+        "case-36",
+        [
+          "cargo",
+          "+1.96.0",
+          "test",
+          "--offline",
+          "--locked",
+          "-p",
+          "lamp-update",
+          "--lib",
+          "--message-format=json",
+          "--",
+          "--exact",
+          "writer_refresh::tests::recovery_views_retain_later_metadata_in_the_bound_inputs_without_reparsing",
+          "--nocapture",
+          "--test-threads=1"
+        ]
+      ],
+      [
+        "case-37",
+        [
+          "cargo",
+          "+1.96.0",
+          "test",
+          "--offline",
+          "--locked",
+          "-p",
+          "lamp-update",
+          "--lib",
+          "--message-format=json",
+          "--",
+          "--exact",
+          "apply::tests::a_done_for_another_operation_does_not_change_any_setting_record",
+          "--nocapture",
+          "--test-threads=1"
+        ]
+      ],
+      [
+        "case-38",
+        [
+          "cargo",
+          "+1.96.0",
+          "test",
+          "--offline",
+          "--locked",
+          "-p",
+          "lamp-update",
+          "--lib",
+          "--message-format=json",
+          "--",
+          "--exact",
+          "apply::tests::a_done_for_another_sequence_does_not_change_any_setting_record",
+          "--nocapture",
+          "--test-threads=1"
+        ]
+      ],
+      [
+        "case-39",
+        [
+          "cargo",
+          "+1.96.0",
+          "test",
+          "--offline",
+          "--locked",
+          "-p",
+          "lamp-update",
+          "--lib",
+          "--message-format=json",
+          "--",
+          "--exact",
+          "apply::tests::an_explicit_expected_identity_does_not_follow_a_rewritten_staged_request",
+          "--nocapture",
+          "--test-threads=1"
+        ]
+      ],
+      [
+        "case-40",
+        [
+          "cargo",
+          "+1.96.0",
+          "test",
+          "--offline",
+          "--locked",
+          "-p",
+          "lamp-update",
+          "--lib",
+          "--message-format=json",
+          "--",
+          "--exact",
+          "apply::tests::a_matching_done_keeps_the_permanent_forward_read_contract",
+          "--nocapture",
+          "--test-threads=1"
+        ]
+      ],
+      [
+        "case-41",
+        [
+          "cargo",
+          "+1.96.0",
+          "test",
+          "--offline",
+          "--locked",
+          "-p",
+          "lamp-update",
+          "--lib",
+          "--message-format=json",
+          "--",
+          "--exact",
+          "apply::tests::an_unknown_done_operation_is_refused_without_changing_any_setting_record",
+          "--nocapture",
+          "--test-threads=1"
+        ]
+      ],
+      [
+        "case-42",
+        [
+          "cargo",
+          "+1.96.0",
+          "test",
+          "--offline",
+          "--locked",
+          "-p",
+          "lamp-update",
+          "--test",
+          "round",
+          "--message-format=json",
+          "--",
+          "--exact",
+          "a_rejected_apply_receipt_runs_real_back_and_restores_written_settings_modes_and_records",
+          "--nocapture",
+          "--test-threads=1"
+        ]
+      ],
+      [
+        "case-43",
+        [
+          "cargo",
+          "+1.96.0",
+          "test",
+          "--offline",
+          "--locked",
+          "-p",
+          "lamp-update",
+          "--test",
+          "round",
+          "--message-format=json",
+          "--",
+          "--exact",
+          "a_rejected_back_receipt_keeps_the_journal_until_real_back_is_acknowledged",
+          "--nocapture",
+          "--test-threads=1"
+        ]
+      ],
+      [
+        "case-44",
+        [
+          "cargo",
+          "+1.96.0",
+          "test",
+          "--offline",
+          "--locked",
+          "-p",
+          "lamp-update",
+          "--test",
+          "round",
+          "--message-format=json",
+          "--",
+          "--exact",
+          "the_round_rejects_a_done_matching_a_rewritten_request_instead_of_its_own_request",
+          "--nocapture",
+          "--test-threads=1"
+        ]
+      ]
+    ]
+  },
+  "counts": {
+    "failed": 0,
+    "groups": {
+      "foundation18": 18,
+      "new18": 18,
+      "receipt3": 3,
+      "receipt5": 5
+    },
+    "ignored": 0,
+    "passed": 44,
+    "selected_unrun": 0
+  },
+  "current_test_artifacts": {
+    "lib": {
+      "compiler_fresh": false,
+      "compiler_record": {
+        "executable": "<WORKSPACE>/.claude/worktrees/third-store-target/debug/deps/lamp_update-cebdb705cde8ec81",
+        "features": [],
+        "filenames": [
+          "<WORKSPACE>/.claude/worktrees/third-store-target/debug/deps/lamp_update-cebdb705cde8ec81"
+        ],
+        "fresh": false,
+        "manifest_path": "<WORKSPACE>/.claude/worktrees/third-read-3858/lampOS/crates/update/Cargo.toml",
+        "package_id": "path+file://<WORKSPACE>/.claude/worktrees/third-read-3858/lampOS/crates/update#lamp-update@0.1.0",
+        "profile": {
+          "debug_assertions": true,
+          "debuginfo": 0,
+          "opt_level": "0",
+          "overflow_checks": true,
+          "test": true
+        },
+        "reason": "compiler-artifact",
+        "target": {
+          "crate_types": [
+            "lib"
+          ],
+          "doc": true,
+          "doctest": true,
+          "edition": "2024",
+          "kind": [
+            "lib"
+          ],
+          "name": "lamp_update",
+          "src_path": "<WORKSPACE>/.claude/worktrees/third-read-3858/lampOS/crates/update/src/lib.rs",
+          "test": true
+        }
+      },
+      "features": [],
+      "path": "<WORKSPACE>/.claude/worktrees/third-store-target/debug/deps/lamp_update-cebdb705cde8ec81",
+      "sha256": "70236387336b97a92ede44ab77260e9f1f4cff3aaf255b649dc8fad56216057a"
+    },
+    "round": {
+      "compiler_fresh": false,
+      "compiler_record": {
+        "executable": "<WORKSPACE>/.claude/worktrees/third-store-target/debug/deps/round-86f3bcf98e2c5ca2",
+        "features": [],
+        "filenames": [
+          "<WORKSPACE>/.claude/worktrees/third-store-target/debug/deps/round-86f3bcf98e2c5ca2"
+        ],
+        "fresh": false,
+        "manifest_path": "<WORKSPACE>/.claude/worktrees/third-read-3858/lampOS/crates/update/Cargo.toml",
+        "package_id": "path+file://<WORKSPACE>/.claude/worktrees/third-read-3858/lampOS/crates/update#lamp-update@0.1.0",
+        "profile": {
+          "debug_assertions": true,
+          "debuginfo": 0,
+          "opt_level": "0",
+          "overflow_checks": true,
+          "test": true
+        },
+        "reason": "compiler-artifact",
+        "target": {
+          "crate_types": [
+            "bin"
+          ],
+          "doc": false,
+          "doctest": false,
+          "edition": "2024",
+          "kind": [
+            "test"
+          ],
+          "name": "round",
+          "src_path": "<WORKSPACE>/.claude/worktrees/third-read-3858/lampOS/crates/update/tests/round.rs",
+          "test": true
+        }
+      },
+      "features": [],
+      "path": "<WORKSPACE>/.claude/worktrees/third-store-target/debug/deps/round-86f3bcf98e2c5ca2",
+      "sha256": "e043422d65a8ca9acf2c88e55eb3284cbe564e09dca5637d79ef275f1c27f3dd"
+    }
+  },
+  "full_source_hash_count": 7417,
+  "hashes": {
+    "artifacts-after.json": "551174f8f943635ad7a2b2ba66a6378fed978379f01b0506afa75d3bfbde1c00",
+    "artifacts-before-runtime.json": "3cf9e88e7468e9467427a069c01b17c1c1747633a4066104180d183d6f1f9848",
+    "audit-gates.py": "b232eb50e0c94f4af8f5cad71231d1705bb57dae4acf21c22bac8daf567f97ca",
+    "callers.txt": "a8416f6ebf4edba66664c3fe56205907417027a0675135474f84963c40faa516",
+    "diff-check.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "discovery-verified.json": "c365ffba340032dfeaa0fa87fc72f917292cfc62b4a500cf3c668fe065497658",
+    "emitted-features.json": "595a45e2726c404b9d2d228c89af6e8e32ea375ba4671a44b81af55950f682a8",
+    "full-diff.txt": "d91c6c476238e61892b1e817886ac64f864ce63b744e0ec701f66c21aaf5d23c",
+    "gate-plan.json": "a1135bbe2ff7d87a94ecaf5e22adeda4c36a1326fbbdda0e19a168e51e0c973d",
+    "gate.terminal.json": "6b996dd7c420beec77a93de759d57e5e5d089821d437066196d7c2198cf349a1",
+    "nextest-availability.json": "ba9198078a11768c86629304451494881aea2af2494cb0a82c942f221bc29b36",
+    "run-gates.py": "ccf14f35012e65dee98e7c58b7a89cac05719cc813497dabc8d8ee06d5fa8c07",
+    "source-after.json": "630ddd0d33a88ac2bf25931590210e50d74cba4a88e67ea0691c09e2745c8254",
+    "source-before.json": "630ddd0d33a88ac2bf25931590210e50d74cba4a88e67ea0691c09e2745c8254",
+    "source-plan.json": "70c880caf20a11afe66e44f2598e400dc71c2d560137c71b64f518caaa813297",
+    "target-reservation.json": "da4fee7370a05fc44cdb9db70ef532fd3bc23bef8b6cf992122daf3186a74f89"
+  },
+  "head": "41198b14edda404b0333f3ad0e3b0e3d771c3d7e",
+  "holds": [],
+  "limits": [
+    "Nextest unavailable; this is sequential Cargo exact one case per process, not Nextest profile-pr or shared-process cohort evidence.",
+    "No full521 package/generic rerun, native CI log/artifact audit, runtime wiring, signing/release or device acceptance.",
+    "Original Raw509/1/6 failure, INCONCLUSIVE baseline and reader shared-process writer_refresh restart failure remain OPEN; this isolated focused pass gives no cause, repair or waiver claim.",
+    "Raw capture action excludes image-shipped ownership; full ancestor metadata may refuse unrelated churn. Root stability/ancestry/ownership and exclusion are external preconditions; no ACL/xattr or restoration proof."
+  ],
+  "no_product_source_edits_device_Memory_semantics_or_CI_actions": true,
+  "process_mode": "One exact case per sequential Cargo invocation, fresh process; Nextest unavailable, no pr-profile claim.",
+  "retry_count": 0,
+  "source_lock_helpers_unchanged": true,
+  "source_review": {
+    "authority": "Unwired/public raw observation APIs; no production capture/revalidate consumer, pathauthority/signature/admission/effect/exclusion/restoration. Root ancestry/ownership/stability and exclusion remain caller preconditions.",
+    "input_bounds": "128 settings,160KiB newtext, per-file1MiB/total4MiB old bytes; preflight bounds lengths and validates selected records before diagnostic/hash/fswork; unrelated records untouched.",
+    "negative_and_recheck": "MissingLeaf and indexed MissingAncestor distinct. Revalidate compares full bytes/metadata/ancestry/absence and caps at original length or0, retains old observation/actions. Empty capture observes no root.",
+    "observer": "Descriptor-relative NOFOLLOW DIRECTORY ancestry; nofollow prestat before opening regular single-link capped leaf; fstat matches prestat, bounded initial-length+1 buffer, before/after leaf and final ancestor metadata.",
+    "ordinary_table_extraction": "All match arms/guards/order are unchanged; now Option<String> passed as Option<&str>, shipped contains becomes equivalent iter.any. plan filesystem read position/error/context unchanged.",
+    "retained_P3s": [
+      "Captured::act uses empty image-shipped set; cannot substitute complete image-aware planner action. Author acknowledged accessor clarity.",
+      "Full ancestor mode/uid/gid/mtime/ctime/length/link comparison intentionally also refuses unrelated directory churn; no live usability result.",
+      "Reader shared-process writer_refresh restart failure remains OPEN with first-failure error/errno/source/workload requested; no cause inference or waiver.",
+      "Older Raw509/1/6 failure and INCONCLUSIVE baseline remain separate and unwaived."
+    ]
+  },
+  "stages": [
+    {
+      "cleanup": [],
+      "error": null,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "ok": true,
+      "process_group": "absent",
+      "reaped": true,
+      "returncode": 0,
+      "stage": "fmt",
+      "timed_out": false
+    },
+    {
+      "cleanup": [],
+      "error": null,
+      "log_sha256": "a3cd2483c5e1d26beef7f5ac251259c849304dc35589db1a5e7ef9e2311f8f7f",
+      "ok": true,
+      "process_group": "absent",
+      "reaped": true,
+      "returncode": 0,
+      "stage": "clippy",
+      "timed_out": false
+    },
+    {
+      "cleanup": [],
+      "error": null,
+      "log_sha256": "8a3f08e94c67f6a1dcfd44e979c3895afe74982a48a42dd1e9b6d38ec24061f3",
+      "ok": true,
+      "process_group": "absent",
+      "reaped": true,
+      "returncode": 0,
+      "stage": "compile-lib",
+      "timed_out": false
+    },
+    {
+      "cleanup": [],
+      "error": null,
+      "log_sha256": "fc234ebda76977fcd0239a8d2d164961cbc58d0d958dd0864a47893384eb0665",
+      "ok": true,
+      "process_group": "absent",
+      "reaped": true,
+      "returncode": 0,
+      "stage": "compile-round",
+      "timed_out": false
+    },
+    {
+      "cleanup": [],
+      "error": null,
+      "log_sha256": "1d440b5e0ac779d117c6992b5d03c4dcee6658d1e208a67a7919f3a9db067aac",
+      "ok": true,
+      "process_group": "absent",
+      "reaped": true,
+      "returncode": 0,
+      "stage": "list-lib",
+      "timed_out": false
+    },
+    {
+      "cleanup": [],
+      "error": null,
+      "log_sha256": "191813faa19d978be7c520dc76b13ef4dbe51d8b40b9498e560b5009324d703c",
+      "ok": true,
+      "process_group": "absent",
+      "reaped": true,
+      "returncode": 0,
+      "stage": "list-round",
+      "timed_out": false
+    },
+    {
+      "cleanup": [],
+      "error": null,
+      "log_sha256": "ced80f7bffecdb0d2b152d3ea0de6e9c875f35d01bcf4e93c43877bba0fb9ca3",
+      "ok": true,
+      "process_group": "absent",
+      "reaped": true,
+      "returncode": 0,
+      "stage": "case-01",
+      "timed_out": false
+    },
+    {
+      "cleanup": [],
+      "error": null,
+      "log_sha256": "b19e0be9f8cd8c047e757eac1dabbf26ce6fb8f474e9edd2c4b3fa61d94b69c8",
+      "ok": true,
+      "process_group": "absent",
+      "reaped": true,
+      "returncode": 0,
+      "stage": "case-02",
+      "timed_out": false
+    },
+    {
+      "cleanup": [],
+      "error": null,
+      "log_sha256": "ee5b6522cf3a6e4bbf5620d63ac23d02f1f7f9872b2c65e5464f83f0b9530abf",
+      "ok": true,
+      "process_group": "absent",
+      "reaped": true,
+      "returncode": 0,
+      "stage": "case-03",
+      "timed_out": false
+    },
+    {
+      "cleanup": [],
+      "error": null,
+      "log_sha256": "e5fcb647022da722a2c2befc060a1a99c28b596628941725f874f1538156288b",
+      "ok": true,
+      "process_group": "absent",
+      "reaped": true,
+      "returncode": 0,
+      "stage": "case-04",
+      "timed_out": false
+    },
+    {
+      "cleanup": [],
+      "error": null,
+      "log_sha256": "ee5098a611143af3b559d01ecedc08e8784c985bf9a809ff4a039f99218e027a",
+      "ok": true,
+      "process_group": "absent",
+      "reaped": true,
+      "returncode": 0,
+      "stage": "case-05",
+      "timed_out": false
+    },
+    {
+      "cleanup": [],
+      "error": null,
+      "log_sha256": "25d982558e2dbe653f76537d84cd8efd8c88f37d26697b716fa77639dc33f91d",
+      "ok": true,
+      "process_group": "absent",
+      "reaped": true,
+      "returncode": 0,
+      "stage": "case-06",
+      "timed_out": false
+    },
+    {
+      "cleanup": [],
+      "error": null,
+      "log_sha256": "2afc3236c5b26da06d785d6696e36e6161876f1bce82307ec11a7a148dc85c80",
+      "ok": true,
+      "process_group": "absent",
+      "reaped": true,
+      "returncode": 0,
+      "stage": "case-07",
+      "timed_out": false
+    },
+    {
+      "cleanup": [],
+      "error": null,
+      "log_sha256": "bebaa290a8f2f049741e27bf14033da04b3ac4a7ec04396d66b662bc1c45da23",
+      "ok": true,
+      "process_group": "absent",
+      "reaped": true,
+      "returncode": 0,
+      "stage": "case-08",
+      "timed_out": false
+    },
+    {
+      "cleanup": [],
+      "error": null,
+      "log_sha256": "4235a0aae14f9e9ec06f37c700481212848fc187e5612f5fcd2b7f14051caa18",
+      "ok": true,
+      "process_group": "absent",
+      "reaped": true,
+      "returncode": 0,
+      "stage": "case-09",
+      "timed_out": false
+    },
+    {
+      "cleanup": [],
+      "error": null,
+      "log_sha256": "c19a0b1ebe9671cc801dd462f21e9575e0ddf44ae45d77058bf090b14ac90ec6",
+      "ok": true,
+      "process_group": "absent",
+      "reaped": true,
+      "returncode": 0,
+      "stage": "case-10",
+      "timed_out": false
+    },
+    {
+      "cleanup": [],
+      "error": null,
+      "log_sha256": "cb8232355cb2d731b07f5ce06ebcc7c11b3db8c1733b84bb67cd7bfc0eb7dbfd",
+      "ok": true,
+      "process_group": "absent",
+      "reaped": true,
+      "returncode": 0,
+      "stage": "case-11",
+      "timed_out": false
+    },
+    {
+      "cleanup": [],
+      "error": null,
+      "log_sha256": "575f7b0190b086529e526e877cf97512426735e4bf35f334af39c0fc513b4fe1",
+      "ok": true,
+      "process_group": "absent",
+      "reaped": true,
+      "returncode": 0,
+      "stage": "case-12",
+      "timed_out": false
+    },
+    {
+      "cleanup": [],
+      "error": null,
+      "log_sha256": "1b148a1b42fc5fb6c9535d077eb548efd173abf5afaec641f60ef08526d7d775",
+      "ok": true,
+      "process_group": "absent",
+      "reaped": true,
+      "returncode": 0,
+      "stage": "case-13",
+      "timed_out": false
+    },
+    {
+      "cleanup": [],
+      "error": null,
+      "log_sha256": "b71ca0ba0c39e5e99e55a07b38e7ec20d90e7fa1cccc0392af4ba3fa70387044",
+      "ok": true,
+      "process_group": "absent",
+      "reaped": true,
+      "returncode": 0,
+      "stage": "case-14",
+      "timed_out": false
+    },
+    {
+      "cleanup": [],
+      "error": null,
+      "log_sha256": "21f715d7a97f254f2826bf7e129473bb8a5d01604402fae9c7cfc8c78d9a4fe9",
+      "ok": true,
+      "process_group": "absent",
+      "reaped": true,
+      "returncode": 0,
+      "stage": "case-15",
+      "timed_out": false
+    },
+    {
+      "cleanup": [],
+      "error": null,
+      "log_sha256": "373355d05b105292ce5b09c607580933f8c1cbc850689f9e816a6c11262074ca",
+      "ok": true,
+      "process_group": "absent",
+      "reaped": true,
+      "returncode": 0,
+      "stage": "case-16",
+      "timed_out": false
+    },
+    {
+      "cleanup": [],
+      "error": null,
+      "log_sha256": "f1637e65df91d68c37eabbf61f215cb8a96dc7d7ed51f0ca6fd5ef535bc8f9d1",
+      "ok": true,
+      "process_group": "absent",
+      "reaped": true,
+      "returncode": 0,
+      "stage": "case-17",
+      "timed_out": false
+    },
+    {
+      "cleanup": [],
+      "error": null,
+      "log_sha256": "a9325ad714b8e0d52887f01f69999393ef402354e5880bb8ac0763911d745dbd",
+      "ok": true,
+      "process_group": "absent",
+      "reaped": true,
+      "returncode": 0,
+      "stage": "case-18",
+      "timed_out": false
+    },
+    {
+      "cleanup": [],
+      "error": null,
+      "log_sha256": "7cc477e49345a82079ff15bfdb49345599b6353adf18ca7049eaa571d89a53c2",
+      "ok": true,
+      "process_group": "absent",
+      "reaped": true,
+      "returncode": 0,
+      "stage": "case-19",
+      "timed_out": false
+    },
+    {
+      "cleanup": [],
+      "error": null,
+      "log_sha256": "d81af44bbf614d95644d0f2be0668b9d0e5f0b47976cde54a8f14c85a687bbb8",
+      "ok": true,
+      "process_group": "absent",
+      "reaped": true,
+      "returncode": 0,
+      "stage": "case-20",
+      "timed_out": false
+    },
+    {
+      "cleanup": [],
+      "error": null,
+      "log_sha256": "f1c3cc942e37827a22f1c55d5207209ebaf9f7670b9cee330908c8d5f5ed3960",
+      "ok": true,
+      "process_group": "absent",
+      "reaped": true,
+      "returncode": 0,
+      "stage": "case-21",
+      "timed_out": false
+    },
+    {
+      "cleanup": [],
+      "error": null,
+      "log_sha256": "8a555643f19be24a710bfc3d3c59b4a4fa16688dcb664f2a8df581f5cd9d171a",
+      "ok": true,
+      "process_group": "absent",
+      "reaped": true,
+      "returncode": 0,
+      "stage": "case-22",
+      "timed_out": false
+    },
+    {
+      "cleanup": [],
+      "error": null,
+      "log_sha256": "a3c4f6593305f986fe239d8711e314964360ce963c09e9f005de33974a38fd8c",
+      "ok": true,
+      "process_group": "absent",
+      "reaped": true,
+      "returncode": 0,
+      "stage": "case-23",
+      "timed_out": false
+    },
+    {
+      "cleanup": [],
+      "error": null,
+      "log_sha256": "51453ec53af7419d010cda371bf6f0808e30981282675d605780e417b5ae0644",
+      "ok": true,
+      "process_group": "absent",
+      "reaped": true,
+      "returncode": 0,
+      "stage": "case-24",
+      "timed_out": false
+    },
+    {
+      "cleanup": [],
+      "error": null,
+      "log_sha256": "19f8e87476f70a1efd1226e548d028eec7cd5c6bbb719a0eafc6101f4dede181",
+      "ok": true,
+      "process_group": "absent",
+      "reaped": true,
+      "returncode": 0,
+      "stage": "case-25",
+      "timed_out": false
+    },
+    {
+      "cleanup": [],
+      "error": null,
+      "log_sha256": "d7a6c9287c1f6d7e1e86d698bf39dc402d34d1b611d0525a9239bd8e5a218db6",
+      "ok": true,
+      "process_group": "absent",
+      "reaped": true,
+      "returncode": 0,
+      "stage": "case-26",
+      "timed_out": false
+    },
+    {
+      "cleanup": [],
+      "error": null,
+      "log_sha256": "bec9f8619c9e0b9635f92ca031e130f5f8fb020f01f78df8344ea70638c8e34d",
+      "ok": true,
+      "process_group": "absent",
+      "reaped": true,
+      "returncode": 0,
+      "stage": "case-27",
+      "timed_out": false
+    },
+    {
+      "cleanup": [],
+      "error": null,
+      "log_sha256": "f85ab7d468fe6809dc4b68b554b183d3ede82c6c380be390552fecc42059af91",
+      "ok": true,
+      "process_group": "absent",
+      "reaped": true,
+      "returncode": 0,
+      "stage": "case-28",
+      "timed_out": false
+    },
+    {
+      "cleanup": [],
+      "error": null,
+      "log_sha256": "d5105e32701831375944d4cb57f36d884877f8341337b66c88a113c9a6307878",
+      "ok": true,
+      "process_group": "absent",
+      "reaped": true,
+      "returncode": 0,
+      "stage": "case-29",
+      "timed_out": false
+    },
+    {
+      "cleanup": [],
+      "error": null,
+      "log_sha256": "accdf3289564dbff8fdc16162aa2de3775edb354eb8d53775fc5bf54bfecda17",
+      "ok": true,
+      "process_group": "absent",
+      "reaped": true,
+      "returncode": 0,
+      "stage": "case-30",
+      "timed_out": false
+    },
+    {
+      "cleanup": [],
+      "error": null,
+      "log_sha256": "9918a01715f2106c9a3fad1cc0625fe71610cb5e2a90c940d4fddfbd10786517",
+      "ok": true,
+      "process_group": "absent",
+      "reaped": true,
+      "returncode": 0,
+      "stage": "case-31",
+      "timed_out": false
+    },
+    {
+      "cleanup": [],
+      "error": null,
+      "log_sha256": "c48f5385ed64975799c3a758f1be720417fc737fd8762d52d74b6777a3b5d93b",
+      "ok": true,
+      "process_group": "absent",
+      "reaped": true,
+      "returncode": 0,
+      "stage": "case-32",
+      "timed_out": false
+    },
+    {
+      "cleanup": [],
+      "error": null,
+      "log_sha256": "68bad7b1605a48d9a6fc5c65c0e2faaae72c303300f350f3f00dbba82eebd0cb",
+      "ok": true,
+      "process_group": "absent",
+      "reaped": true,
+      "returncode": 0,
+      "stage": "case-33",
+      "timed_out": false
+    },
+    {
+      "cleanup": [],
+      "error": null,
+      "log_sha256": "1fef03d915707533668cadd1b1314643b78de47bff1a3336fcac5e2120a4a3d9",
+      "ok": true,
+      "process_group": "absent",
+      "reaped": true,
+      "returncode": 0,
+      "stage": "case-34",
+      "timed_out": false
+    },
+    {
+      "cleanup": [],
+      "error": null,
+      "log_sha256": "85ea56280e8cd0ba3af7245911522ed7dd3fa77a413ea4efd9ec9241289bc393",
+      "ok": true,
+      "process_group": "absent",
+      "reaped": true,
+      "returncode": 0,
+      "stage": "case-35",
+      "timed_out": false
+    },
+    {
+      "cleanup": [],
+      "error": null,
+      "log_sha256": "dc9f8037b1e859111c80e3bd72a64c2482d430610e58fe468814887adab7ec27",
+      "ok": true,
+      "process_group": "absent",
+      "reaped": true,
+      "returncode": 0,
+      "stage": "case-36",
+      "timed_out": false
+    },
+    {
+      "cleanup": [],
+      "error": null,
+      "log_sha256": "f1a60a434b40cc87d1c4584035ed7d180b1259618672ec4735421f5f73865369",
+      "ok": true,
+      "process_group": "absent",
+      "reaped": true,
+      "returncode": 0,
+      "stage": "case-37",
+      "timed_out": false
+    },
+    {
+      "cleanup": [],
+      "error": null,
+      "log_sha256": "5db977bcd1fab26387e62ae530d49d02eae0aa7e32cd27775d13b8eab7dbe917",
+      "ok": true,
+      "process_group": "absent",
+      "reaped": true,
+      "returncode": 0,
+      "stage": "case-38",
+      "timed_out": false
+    },
+    {
+      "cleanup": [],
+      "error": null,
+      "log_sha256": "c04f3f577755eea835e7190972a94b52b9d3c93eb9633aaa560955ac077a545e",
+      "ok": true,
+      "process_group": "absent",
+      "reaped": true,
+      "returncode": 0,
+      "stage": "case-39",
+      "timed_out": false
+    },
+    {
+      "cleanup": [],
+      "error": null,
+      "log_sha256": "8a6f904c0b6e7a634975207d7ac90b60dadb30877e4d9f3a25e6bc78b6b23611",
+      "ok": true,
+      "process_group": "absent",
+      "reaped": true,
+      "returncode": 0,
+      "stage": "case-40",
+      "timed_out": false
+    },
+    {
+      "cleanup": [],
+      "error": null,
+      "log_sha256": "be15be2b185093697c13f171e6dc5f24c51c0ea062c3447a6631f02d828fb87f",
+      "ok": true,
+      "process_group": "absent",
+      "reaped": true,
+      "returncode": 0,
+      "stage": "case-41",
+      "timed_out": false
+    },
+    {
+      "cleanup": [],
+      "error": null,
+      "log_sha256": "d19c7cb67d4aa973583706de8aadf06f34e1d4702bac8afe0ff86cf63e8c1bd6",
+      "ok": true,
+      "process_group": "absent",
+      "reaped": true,
+      "returncode": 0,
+      "stage": "case-42",
+      "timed_out": false
+    },
+    {
+      "cleanup": [],
+      "error": null,
+      "log_sha256": "608ed705d87a8474cd33e63d87ccdcee3a567f7083854f9e96532b9561256aa2",
+      "ok": true,
+      "process_group": "absent",
+      "reaped": true,
+      "returncode": 0,
+      "stage": "case-43",
+      "timed_out": false
+    },
+    {
+      "cleanup": [],
+      "error": null,
+      "log_sha256": "af607af05c440ac07f01b4d516521fe9a0e154a2e78841143ec02d6007f146e9",
+      "ok": true,
+      "process_group": "absent",
+      "reaped": true,
+      "returncode": 0,
+      "stage": "case-44",
+      "timed_out": false
+    }
+  ],
+  "status": "SOURCE_AND_LOCAL_44_VERIFIED",
+  "tree": "5c3fb3672718dee03fde39eda625273664e10a5b",
+  "original_private_receipt_sha256": "a27ccff59fe0ef75d08c8bd02d3f90b0582ad611fc48ddc92bab7a20b3c7b030",
+  "public_copy_note": "Workspace/home paths normalized; original private receipt digest retained separately."
+}

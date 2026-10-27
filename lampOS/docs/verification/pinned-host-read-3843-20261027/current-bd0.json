@@ -1,0 +1,185 @@
+{
+  "pr": 3843,
+  "head": "bd0e0371ec110d839f80e9339c96ecaddf250050",
+  "base": "992303fc8d72322bab46cdb18801c853ea43bb81",
+  "tree": "d80a2175525d0bdb8d6aa425b414fb407060eb5f",
+  "scope": "Software/source read; current-base and promoted-feed device acceptance remain draft conditions",
+  "source_checks": {
+    "only_production_function_changed": "Run::carried_units",
+    "prior_regression_file_prefix_retained": true,
+    "host_then_product_order": "Host first, independent of manifest order; compatible linked host retains priority.",
+    "pinned_skip": "Only linked installed parts with parsed pinned host template and product candidate; candidate host bytes fetched/bounded/SHA checked/UTF8 before skip.",
+    "final_validation": "Product candidate must match installed linked folder and binary; plan validates chosen linked host folder/binary before unit/link/settings mutation.",
+    "preserved": "Pinned installations, no-product refusal, missing-parts exclusion, existing quiet switch, health/fallback and local drop-ins.",
+    "logs": "Unit/host/installed current path only; test secret/Environment sentinel must not appear.",
+    "docs": "New paragraphs accurately supersede old pinned-host refusal description, including Third earlier carried documentation."
+  },
+  "changed_paths": [
+    "lampOS/crates/update/src/round.rs",
+    "lampOS/crates/update/tests/round/product_carrier.rs",
+    "lampOS/docs/updates.md"
+  ],
+  "source_blob_modes_equal_preview": [
+    true,
+    true,
+    true
+  ],
+  "original_native": {
+    "preview": "8146824a77f9fb47de43ec4a89d7e1d5223a7169",
+    "parents": [
+      "992303fc8d72322bab46cdb18801c853ea43bb81",
+      "bd0e0371ec110d839f80e9339c96ecaddf250050"
+    ],
+    "full_tree_equal_authored": true,
+    "runs": {
+      "arm": {
+        "run": {
+          "conclusion": "success",
+          "head_sha": "bd0e0371ec110d839f80e9339c96ecaddf250050",
+          "id": 40517327034,
+          "run_attempt": 1,
+          "status": "completed"
+        },
+        "log_sha256": "4dab7f9d3605398ff74cf5c0efa0cc07f15189904d4c118a275fd00e39cabb47"
+      },
+      "linux": {
+        "run": {
+          "conclusion": "success",
+          "head_sha": "bd0e0371ec110d839f80e9339c96ecaddf250050",
+          "id": 40517326953,
+          "run_attempt": 1,
+          "status": "completed"
+        },
+        "log_sha256": "a85a022e44c5feac386c28b030335cc89748f935920e0715fdffd0671d0015cc"
+      }
+    },
+    "fourteen_regressions": [
+      {
+        "name": "a_linked_part_uses_product_before_its_pinned_lamp_template",
+        "case": "product_carrier::a_linked_part_uses_product_before_its_pinned_lamp_template",
+        "target": "lamp-update::round",
+        "seconds": 0.018,
+        "ordinal": 2859,
+        "passes": 1
+      },
+      {
+        "name": "a_linked_part_uses_product_after_its_pinned_lamp_template",
+        "case": "product_carrier::a_linked_part_uses_product_after_its_pinned_lamp_template",
+        "target": "lamp-update::round",
+        "seconds": 0.016,
+        "ordinal": 2858,
+        "passes": 1
+      },
+      {
+        "name": "a_compatible_linked_lamp_template_still_wins_in_either_manifest_order",
+        "case": "product_carrier::a_compatible_linked_lamp_template_still_wins_in_either_manifest_order",
+        "target": "lamp-update::round",
+        "seconds": 0.027,
+        "ordinal": 2856,
+        "passes": 1
+      },
+      {
+        "name": "a_pinned_part_keeps_its_pinned_lamp_template_beside_product_in_either_order",
+        "case": "product_carrier::a_pinned_part_keeps_its_pinned_lamp_template_beside_product_in_either_order",
+        "target": "lamp-update::round",
+        "seconds": 0.026,
+        "ordinal": 2863,
+        "passes": 1
+      },
+      {
+        "name": "a_climbed_updater_confirms_product_before_its_pinned_lamp_template",
+        "case": "product_carrier::a_climbed_updater_confirms_product_before_its_pinned_lamp_template",
+        "target": "lamp-update::round",
+        "seconds": 0.022,
+        "ordinal": 2852,
+        "passes": 1
+      },
+      {
+        "name": "a_climbed_updater_confirms_product_after_its_pinned_lamp_template",
+        "case": "product_carrier::a_climbed_updater_confirms_product_after_its_pinned_lamp_template",
+        "target": "lamp-update::round",
+        "seconds": 0.023,
+        "ordinal": 2851,
+        "passes": 1
+      },
+      {
+        "name": "skipping_a_pinned_host_logs_only_its_unit_host_and_installed_link",
+        "case": "product_carrier::skipping_a_pinned_host_logs_only_its_unit_host_and_installed_link",
+        "target": "lamp-update::round",
+        "seconds": 0.018,
+        "ordinal": 2874,
+        "passes": 1
+      },
+      {
+        "name": "an_invalid_linked_host_is_refused_instead_of_falling_back_to_product",
+        "case": "product_carrier::an_invalid_linked_host_is_refused_instead_of_falling_back_to_product",
+        "target": "lamp-update::round",
+        "seconds": 0.017,
+        "ordinal": 2867,
+        "passes": 1
+      },
+      {
+        "name": "a_pinned_host_without_a_product_candidate_keeps_the_existing_refusal",
+        "case": "product_carrier::a_pinned_host_without_a_product_candidate_keeps_the_existing_refusal",
+        "target": "lamp-update::round",
+        "seconds": 0.008,
+        "ordinal": 2860,
+        "passes": 1
+      },
+      {
+        "name": "the_product_fallback_still_rejects_corrupt_signed_unit_bytes",
+        "case": "product_carrier::the_product_fallback_still_rejects_corrupt_signed_unit_bytes",
+        "target": "lamp-update::round",
+        "seconds": 0.008,
+        "ordinal": 2876,
+        "passes": 1
+      },
+      {
+        "name": "an_unreachable_product_fallback_does_not_switch_any_part",
+        "case": "product_carrier::an_unreachable_product_fallback_does_not_switch_any_part",
+        "target": "lamp-update::round",
+        "seconds": 0.008,
+        "ordinal": 2871,
+        "passes": 1
+      },
+      {
+        "name": "a_corrupt_pinned_host_is_not_silently_skipped_for_product",
+        "case": "product_carrier::a_corrupt_pinned_host_is_not_silently_skipped_for_product",
+        "target": "lamp-update::round",
+        "seconds": 0.007,
+        "ordinal": 2855,
+        "passes": 1
+      },
+      {
+        "name": "an_unreachable_pinned_host_is_not_silently_skipped_for_product",
+        "case": "product_carrier::an_unreachable_pinned_host_is_not_silently_skipped_for_product",
+        "target": "lamp-update::round",
+        "seconds": 0.008,
+        "ordinal": 2870,
+        "passes": 1
+      },
+      {
+        "name": "a_product_voice_ignores_its_legacy_pinned_releases_template",
+        "case": "product_carrier::a_product_voice_ignores_its_legacy_pinned_releases_template",
+        "target": "lamp-update::round",
+        "seconds": 0.434,
+        "ordinal": 2890,
+        "passes": 1
+      }
+    ]
+  },
+  "latest_base_check": {
+    "observed_main": "c3eb20be307d06a6d6278254ec54654b68698b0e",
+    "relevant_changed_paths_since_992": [
+      "lampOS/docs/updates.md"
+    ],
+    "Rust_paths_unchanged": true,
+    "required": "Latest-base carry must preserve receipt-host prose and qualify actual composed inputs; source hash equality is not current Main runtime credit."
+  },
+  "limits": [
+    "No new local Cargo/whole Round215/native7779 census, artifact member hash/execution, device or health-watch/promoted-feed acceptance.",
+    "Original broad host interrupted runtime and earlier controls remain source-scoped/unwaived; separate holder fix3845 is not a retry of that cohort.",
+    "No claim that all filesystem cache/journal writes are absent; validation claim concerns application unit/link/settings mutation.",
+    "No source push, merge, draft/activation or lamp action by Third."
+  ]
+}

@@ -1,0 +1,120 @@
+{
+  "artifacts": {
+    "lib": {
+      "compiler_fresh": false,
+      "features": [],
+      "path": "<WORKSPACE>/.claude/worktrees/third-store-target/debug/deps/lamp_update-cebdb705cde8ec81",
+      "sha256": "70236387336b97a92ede44ab77260e9f1f4cff3aaf255b649dc8fad56216057a"
+    },
+    "round": {
+      "compiler_fresh": false,
+      "features": [],
+      "path": "<WORKSPACE>/.claude/worktrees/third-store-target/debug/deps/round-86f3bcf98e2c5ca2",
+      "sha256": "e043422d65a8ca9acf2c88e55eb3284cbe564e09dca5637d79ef275f1c27f3dd"
+    }
+  },
+  "base": "992303fc8d72322bab46cdb18801c853ea43bb81",
+  "closed_handles": [
+    {
+      "exit": 0,
+      "scope": "claim/fetch/detached worktree",
+      "session": 60443
+    },
+    {
+      "exit": 0,
+      "scope": "50stage focused gate; all process groups absent",
+      "session": 56772
+    }
+  ],
+  "command_receipts": {
+    "actual_discovery": "list-lib.log, list-round.log, discovery-verified.json",
+    "full_argv": "qualified-local-receipt.json / commands; each stage *.command.json",
+    "source_case_census": "source-plan.json / required_cases; qualified-local-receipt.json / cases"
+  },
+  "counts": {
+    "failed": 0,
+    "groups": {
+      "foundation18": 18,
+      "new18": 18,
+      "receipt3": 3,
+      "receipt5": 5
+    },
+    "ignored": 0,
+    "passed": 44,
+    "selected_unrun": 0
+  },
+  "current_PR_metadata": {
+    "base": "992303fc8d72322bab46cdb18801c853ea43bb81",
+    "draft": true,
+    "head": "41198b14edda404b0333f3ad0e3b0e3d771c3d7e",
+    "required_checks": "Read-only metadata success; no independent native audit.",
+    "state": "OPEN"
+  },
+  "current_artifact_preimages_unchanged": true,
+  "emitted_feature_artifact_counts": {
+    "clippy": 228,
+    "compile-lib": 217,
+    "compile-round": 218
+  },
+  "evidence_hashes": {
+    "artifacts-after.json": "551174f8f943635ad7a2b2ba66a6378fed978379f01b0506afa75d3bfbde1c00",
+    "artifacts-before-runtime.json": "3cf9e88e7468e9467427a069c01b17c1c1747633a4066104180d183d6f1f9848",
+    "audit-gates.py": "b232eb50e0c94f4af8f5cad71231d1705bb57dae4acf21c22bac8daf567f97ca",
+    "claim-body.txt": "06543d4815ac9e2760f54922a316ecb37348e305624491fffdccc4066ee3c24a",
+    "claim-post.json": "36c39a01f067b3df2bc7b3f62c34ee6e65175d163263fc66e69413f45f82c7c0",
+    "discovery-verified.json": "c365ffba340032dfeaa0fa87fc72f917292cfc62b4a500cf3c668fe065497658",
+    "emitted-features.json": "595a45e2726c404b9d2d228c89af6e8e32ea375ba4671a44b81af55950f682a8",
+    "gate-plan.json": "a1135bbe2ff7d87a94ecaf5e22adeda4c36a1326fbbdda0e19a168e51e0c973d",
+    "gate.terminal.json": "6b996dd7c420beec77a93de759d57e5e5d089821d437066196d7c2198cf349a1",
+    "nextest-availability.json": "ba9198078a11768c86629304451494881aea2af2494cb0a82c942f221bc29b36",
+    "pr-final.json": "79e7de507a7e469fed5b42b7e7a6955d4f07b2879710d9847c71dbd3ce12f1ee",
+    "pr-initial.json": "82406fadd24062ad67252ab9ae7528a4ac048cdc216a8fe995dd31d2494c9a13",
+    "qualified-local-receipt.json": "a27ccff59fe0ef75d08c8bd02d3f90b0582ad611fc48ddc92bab7a20b3c7b030",
+    "read-ok-body.txt": "b009a24dc924b7f5d12803f865c9d8d14568530832400a0df5dd58fad11f6f55",
+    "read-ok-post.json": "80ea51d4927da8d69c531332c2dd8be0fbd23693e4745ec00b8d2e32ff6de079",
+    "run-gates.py": "ccf14f35012e65dee98e7c58b7a89cac05719cc813497dabc8d8ee06d5fa8c07",
+    "source-after.json": "630ddd0d33a88ac2bf25931590210e50d74cba4a88e67ea0691c09e2745c8254",
+    "source-before.json": "630ddd0d33a88ac2bf25931590210e50d74cba4a88e67ea0691c09e2745c8254",
+    "source-plan.json": "70c880caf20a11afe66e44f2598e400dc71c2d560137c71b64f518caaa813297",
+    "target-release.json": "6cabfa5df448146fc4615370a43c36def5045c22058a1f9b951d4e16252045ca",
+    "target-reservation.json": "da4fee7370a05fc44cdb9db70ef532fd3bc23bef8b6cf992122daf3186a74f89"
+  },
+  "head": "41198b14edda404b0333f3ad0e3b0e3d771c3d7e",
+  "host": {
+    "machine": "x86_64",
+    "release": "25.6.0",
+    "system": "Darwin"
+  },
+  "limits": [
+    "Nextest unavailable; this is sequential Cargo exact one case per process, not Nextest profile-pr or shared-process cohort evidence.",
+    "No full521 package/generic rerun, native CI log/artifact audit, runtime wiring, signing/release or device acceptance.",
+    "Original Raw509/1/6 failure, INCONCLUSIVE baseline and reader shared-process writer_refresh restart failure remain OPEN; this isolated focused pass gives no cause, repair or waiver claim.",
+    "Raw capture action excludes image-shipped ownership; full ancestor metadata may refuse unrelated churn. Root stability/ancestry/ownership and exclusion are external preconditions; no ACL/xattr or restoration proof."
+  ],
+  "process_mode": "One exact case per sequential Cargo invocation, fresh process; Nextest unavailable, no pr-profile claim.",
+  "public_claim": "https://github.com/autonomous-ai/lampOS/pull/3858#issuecomment-6445145495",
+  "public_read_ok": "https://github.com/autonomous-ai/lampOS/pull/3858#issuecomment-6445360672",
+  "qualified_local_receipt_sha256": "a27ccff59fe0ef75d08c8bd02d3f90b0582ad611fc48ddc92bab7a20b3c7b030",
+  "retry_count": 0,
+  "source_hash_count": 7417,
+  "source_lock_helpers_unchanged": true,
+  "source_review": {
+    "authority": "Unwired/public raw observation APIs; no production capture/revalidate consumer, pathauthority/signature/admission/effect/exclusion/restoration. Root ancestry/ownership/stability and exclusion remain caller preconditions.",
+    "input_bounds": "128 settings,160KiB newtext, per-file1MiB/total4MiB old bytes; preflight bounds lengths and validates selected records before diagnostic/hash/fswork; unrelated records untouched.",
+    "negative_and_recheck": "MissingLeaf and indexed MissingAncestor distinct. Revalidate compares full bytes/metadata/ancestry/absence and caps at original length or0, retains old observation/actions. Empty capture observes no root.",
+    "observer": "Descriptor-relative NOFOLLOW DIRECTORY ancestry; nofollow prestat before opening regular single-link capped leaf; fstat matches prestat, bounded initial-length+1 buffer, before/after leaf and final ancestor metadata.",
+    "ordinary_table_extraction": "All match arms/guards/order are unchanged; now Option<String> passed as Option<&str>, shipped contains becomes equivalent iter.any. plan filesystem read position/error/context unchanged.",
+    "retained_P3s": [
+      "Captured::act uses empty image-shipped set; cannot substitute complete image-aware planner action. Author acknowledged accessor clarity.",
+      "Full ancestor mode/uid/gid/mtime/ctime/length/link comparison intentionally also refuses unrelated directory churn; no live usability result.",
+      "Reader shared-process writer_refresh restart failure remains OPEN with first-failure error/errno/source/workload requested; no cause inference or waiver.",
+      "Older Raw509/1/6 failure and INCONCLUSIVE baseline remain separate and unwaived."
+    ]
+  },
+  "status": "SCOPED_DRAFT_READ_OK_POSTED",
+  "target_released": true,
+  "tree": "5c3fb3672718dee03fde39eda625273664e10a5b",
+  "utc": "2026-10-27T14:59:43.027652+00:00",
+  "original_private_receipt_sha256": "652d587049a7feae29ffc446ebe8c14bb06a910a5a6aadb0c95f9b12d6acf16f",
+  "public_copy_note": "Workspace/home paths normalized; original private receipt digest retained separately."
+}
