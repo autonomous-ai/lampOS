@@ -1,0 +1,30 @@
+{
+  "head": "6f45241034d6426007feacff52030b8114581602",
+  "base": "5cf73706750f2e3f6925b2e8a268d2f33ff5d29e",
+  "tree": "538acda6667d0963814066ff174392ad2501e06b",
+  "status": "VERIFIED_FOCUSED_HOST_CARRY",
+  "selected_direct_counts": {
+    "failed": 0,
+    "ignored": 1,
+    "passed": 238
+  },
+  "holds": [],
+  "tests_retried": 0,
+  "limits": [
+    "Focused host privacy carry on 6f4524103/5cf737067 only; no current full host Voice claim.",
+    "Historical full Voice selection belongs to4bff; not reattributed.",
+    "Fresh original current native full Voice remains required before readiness; later base drift needs a separate carry.",
+    "Existing native642 Reader failure remains unresolved; this selected host carry does not establish its cause or waive it.",
+    "No historical cause/device/physical-latency claim."
+  ],
+  "full_private_audit_sha256": "bb602bc98edf5ec6bbcae88839f2e6df661b3d6997ac6613139a741904c44eb2",
+  "required_controls": 16,
+  "all_controls_once": true,
+  "expected_caught_hooks": 2,
+  "unknown_hooks": 0,
+  "separate_docs": {
+    "passed": 3,
+    "failed": 0
+  },
+  "integrity": "All source/raw/65 executable pairs stable; metadata unchanged; no timeout, forced cleanup or retry."
+}

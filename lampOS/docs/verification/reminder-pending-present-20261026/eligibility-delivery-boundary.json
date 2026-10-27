@@ -1,0 +1,74 @@
+{
+  "review": "El P3 on PR 3525 comment 6434466424",
+  "head": "f1d3366ea8b1d4261fdf96c4267c5d331d5845a3",
+  "tree": "f4b586bd4f36cdd0e8a16f91a427d1c10edc2747",
+  "kind": "Source trace plus observations in the original audited native643d run; no new execution",
+  "findings": [
+    "Eligibility restoration deliberately creates a new chance. It adds no cooldown and does not identify a Schedule occurrence.",
+    "Skills start() refuses a concurrent run of the same skill; a waiting SayFrom does not queue another runner.",
+    "Coordinator takes a current offered store/item/delivery token only after idle, readiness, privacy, playback and quiet gates. Reminders::offer refuses while active or unadmitted settlement exists.",
+    "The current token remains stable across renewal. A completed durable ledger entry is known and recovered for acknowledgement without another spoken offer.",
+    "An interrupted attempt can be retried with exact retirement proof and a new correlation. Consumer settlement sets next_offer_us to now plus PACE_US (five seconds). This is an intentional retry, not an exactly-once guarantee for partial sound.",
+    "This does not suppress the computational cost of new chances after each eligibility flap; it bounds concurrent execution and separates delivery authority."
+  ],
+  "source_sha256": {
+    "crates/skills/src/main.rs": "d43fedb99fa40c05ac32ceb413ede3b723a5ee2f992ebba103d9f9c343be486e",
+    "crates/skills/tests/it/skills.rs": "189ffb1be28f84053fb2ba0a1a39bea6f0299239c2e51285294968bb2c3a78ec",
+    "crates/voice/src/coordinator.rs": "a69d526f68ba93ca95d9f83a3a631efa80aaaa298ab37b25e4d2226fc8c17543",
+    "crates/voice/src/reminders.rs": "9d0e1062876f69e1669dcfc6333d732aedc8e75ebaf625c2ae9ef96d97e18657",
+    "crates/voice/src/reminders/consumer.rs": "0f4274cb87d742d5110e0a483f0b3d2f70bd213c11dfc831b94986a90db0fbc4"
+  },
+  "native_witnesses": [
+    {
+      "binary": "lamp-skills::it",
+      "name": "skills::reminder_pending::repeated_schedule_chances_keep_one_waiting_runner_and_no_look",
+      "status": "PASS"
+    },
+    {
+      "binary": "lamp-voice",
+      "name": "reminders::tests::active_lease_is_exact_and_does_not_revoke_an_unrelated_person_turn",
+      "status": "PASS"
+    },
+    {
+      "binary": "lamp-voice",
+      "name": "reminders::tests::completion_waits_for_reply_drop_and_durable_worker_settlement",
+      "status": "PASS"
+    },
+    {
+      "binary": "lamp-voice",
+      "name": "reminders::consumer::tests::an_offer_is_committed_before_handoff_and_fresh_renewals_keep_the_same_token",
+      "status": "PASS"
+    },
+    {
+      "binary": "lamp-voice",
+      "name": "reminders::consumer::tests::completed_playout_survives_both_real_store_reopens_then_acks_without_respeech",
+      "status": "PASS"
+    },
+    {
+      "binary": "lamp-voice",
+      "name": "reminders::consumer::tests::qualified_pre_audio_retirement_retries_once_with_a_new_durable_correlation",
+      "status": "PASS"
+    },
+    {
+      "binary": "lamp-voice",
+      "name": "reminders::consumer::tests::interrupted_owner_retry_keeps_old_proof_out_of_the_new_attempt_and_ack",
+      "status": "PASS"
+    },
+    {
+      "binary": "lamp-voice",
+      "name": "coordinator::tests::reminders::a_settled_reminder_finishes_before_the_live_loop_admits_its_successor",
+      "status": "PASS"
+    },
+    {
+      "binary": "lamp-voice",
+      "name": "coordinator::tests::reminders::a_user_interrupted_reminder_is_retired_for_retry_after_successor_admission",
+      "status": "PASS"
+    }
+  ],
+  "native_run": 40453290830,
+  "native_receipt_sha256": "316426e4bbfc66ea6519f4194f5d1e049638387cf6943ecb140ed3082dfc7133",
+  "limits": [
+    "No new test, product change, lamp or acoustic measurement. Existing native witnesses do not simulate every possible flapping timeline.",
+    "The wildcard skill ask is an opportunity; Voice selects the current occurrence. An interrupted partial delivery can be heard again under existing retry policy."
+  ]
+}
