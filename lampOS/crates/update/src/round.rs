@@ -1249,7 +1249,7 @@ impl Run<'_, '_> {
             .records
             .state(self.world.say)
             .map_err(|error| format!("the state cannot be read: {error}"))?;
-        let done = apply::merge(&records, &mut state)
+        let done = apply::merge_for(&records, &mut state, op, sequence)
             .map_err(|error| format!("what {} did cannot be read: {error}", apply::UNIT))?;
         if !done {
             return Err(format!("{} did nothing (is it installed?)", apply::UNIT));
