@@ -637,3 +637,4 @@ Ready for lamp-voice: yes (#2553), once its ARM64 run is green
 - 21:09: Reviewer-two P1/P2 none on #3836 27a88e495 (P3 closed, new tests pass in its ARM64): NEXT TRAIN #3836 posted. Waiting for trains: #3829, #3836, #3840, #3848; #3847 after #3805.
 - 21:14: reviewer-lead no finding on #3836 27a88e495 and #3848 ea04d75ae. Ten's look/camera split decided (piece A in progress); told Ten lamp skill check follows piece A, asked whether camera is a protocol grant.
 - 21:19: no findings on my PRs. Train 241 ran without #3805 or mine; #3829/#3836/#3840/#3848 wait for the next train, #3847 after #3805 (NEXT TRAIN reposted by Nine).
+- 21:24: quiet tick; nothing on my PRs. Waiting for a train: #3829, #3836, #3840, #3848; #3847 after #3805.
