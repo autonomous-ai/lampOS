@@ -2273,8 +2273,26 @@ pub fn named_forget_with(
             args,
         });
     }
-    let ForgetPick::Named(subject) = pick_forget(call, said, &recent) else {
-        return None;
+    let subject = match pick_forget(call, said, &recent) {
+        ForgetPick::Named(subject) => subject,
+        // A forget the memory answers with the last kept thing, for words
+        // that name nothing: marked, so the memory asks when "that" is
+        // what a recall just gave instead (#3504, Friday's N1, lamp
+        // follow-up).
+        ForgetPick::Last
+            if call.name == FORGET
+                && said
+                    .is_some_and(|said| asks_to_forget(said) && named_subject(said).is_none()) =>
+        {
+            let mut args = call.args.clone();
+            args[HEARD_BARE] = json!(true);
+            return Some(ToolCall {
+                id: call.id.clone(),
+                name: call.name.clone(),
+                args,
+            });
+        }
+        _ => return None,
     };
     *last = Some((person.map(str::to_owned), subject.clone(), Instant::now()));
     Some(ToolCall {
@@ -4370,6 +4388,84 @@ struct DaysContext {
     /// as one closes (the reviewer-lead's P2 on #3737: a morning's recall is
     /// not the evening's "that").
     last_given: Option<(Vec<Source>, Instant)>,
+    /// Whether [`Self::last_given`] came from a `recall`, not a `remember`:
+    /// a bare forget with no id would take the last kept thing, which is
+    /// not what that recall gave (lamp-06c1, 27 Oct 20:55:
+    /// [`recall_was_last`]).
+    given_by_recall: bool,
+}
+
+/// Whether the session's last memory call was a recall that gave
+/// something of `person`'s scope, within [`HELD_FORGET_FOR`], with no
+/// follow-up just asked ([`bare_forget_target`]): then a bare forget with
+/// no id is not plainly the last kept thing.
+fn recall_was_last(context: &DaysContext, person: Option<&str>) -> bool {
+    context.given_by_recall
+        && bare_forget_target(context, person).is_none()
+        && context.last_given.as_ref().is_some_and(|(given, at)| {
+            at.elapsed() <= HELD_FORGET_FOR
+                && given.iter().any(|(whose, _)| whose.as_deref() == person)
+        })
+}
+
+/// A confirmed forget's answer told with what went, by the id the store
+/// removed: its text when this session was shown it, so the model says
+/// that; else only that it is gone, naming nothing.
+fn told_what_went(
+    told: &mut Value,
+    answer: &Value,
+    context: Option<&DaysContext>,
+    person: Option<&str>,
+) {
+    let text = answer["removed"]["id"]
+        .as_u64()
+        .and_then(|id| context.and_then(|context| context.text(person, id)));
+    let unnamed = |told: &mut Value| {
+        if let Some(told) = told.as_object_mut() {
+            told.remove("what_went");
+        }
+        told["note"] =
+            json!("Say only that it is forgotten; do not name what it was, as you were not told.");
+    };
+    match text {
+        Some(text) => {
+            told["what_went"] = json!(cut_at_a_word(&text, WHAT_WENT_BYTES));
+            told["note"] = json!(
+                "This is what was forgotten: say that, in a few words, and name nothing else as forgotten."
+            );
+            // The forget is done: an answer too long for the model is told
+            // without the name, never as a failure (Reviewer-two's P2 on
+            // #3860).
+            if !crate::tools::sendable(told) {
+                unnamed(told);
+            }
+        }
+        None if answer["removed"].is_object() => unnamed(told),
+        None => {}
+    }
+}
+
+/// How much of a forgotten thing's text its answer names
+/// ([`told_what_went`]): well inside a tool answer's bound.
+const WHAT_WENT_BYTES: usize = 240;
+
+/// `text` within `most` bytes, cut at the last word that fits and marked
+/// "…" when cut.
+fn cut_at_a_word(text: &str, most: usize) -> String {
+    let text = text.trim();
+    if text.len() <= most {
+        return text.to_owned();
+    }
+    let room = most.saturating_sub('\u{2026}'.len_utf8());
+    let mut end = room;
+    while !text.is_char_boundary(end) {
+        end -= 1;
+    }
+    let cut = text[..end]
+        .rfind(char::is_whitespace)
+        .filter(|at| *at > 0)
+        .map_or(&text[..end], |at| &text[..at]);
+    format!("{}\u{2026}", cut.trim_end())
 }
 
 /// How many of their lines after the lamp asked about a follow-up a bare
@@ -6274,6 +6370,25 @@ impl DaysClient {
         let deadline = deadline.min(crate::tools::ASK_DEADLINE);
         // #1693: something recall gave, by its id, in the scope it was
         // shown from; and everything of whoever is at the lamp.
+        // A bare forget with no id would take the last kept thing. When the
+        // session's last memory call was a recall that gave something, "that"
+        // may be either, so nothing runs and the model asks which (lamp-06c1,
+        // 27 Oct 20:55: a sunflower kept, hibiscus tea recalled, "forget
+        // that" removed the sunflower while the lamp said the tea).
+        if call.name == FORGET
+            && call.args.get(HEARD_BARE) == Some(&json!(true))
+            && call.args.get("source_id").is_none_or(Value::is_null)
+        {
+            let Ok(context) = self.context.try_lock() else {
+                return (gone(), false);
+            };
+            if recall_was_last(&context, person) {
+                eprintln!(
+                    "lamp-voice provider: a bare forget is not run: the last kept thing is not what the last recall gave, asked which"
+                );
+                return (forget_which(person.is_some()), true);
+            }
+        }
         let days_request = match call.name.as_str() {
             FORGET
                 if self.forget_all.load(Ordering::Acquire)
@@ -6593,13 +6708,24 @@ impl DaysClient {
             }
             // A refusal the store said is told as before, and settled at the
             // end; one with nothing to tell is settled here.
-            let Some(told) = answer_for(&call.name, &answer, now, zone, person) else {
+            let Some(mut told) = answer_for(&call.name, &answer, now, zone, person) else {
                 return if answer["ok"] == true {
                     lost((gone(), false))
                 } else {
                     settled((gone(), false))
                 };
             };
+            // What a forget removed, by the id the store removed: the model
+            // names that, or nothing, never its own guess (#3504, Friday's
+            // N1, lamp follow-up).
+            if call.name == FORGET && told["forgotten"] == true {
+                told_what_went(
+                    &mut told,
+                    &answer,
+                    self.context.try_lock().ok().as_deref(),
+                    person,
+                );
+            }
             // Their memory is emptied, or held nothing: the room's lines
             // about a person are theirs no more today (#2849), even if what
             // follows is lost.
@@ -6779,6 +6905,7 @@ impl DaysClient {
         }
         if matches!(call.name.as_str(), REMEMBER | RECALL) {
             context.last_given = Some((ids.clone(), Instant::now()));
+            context.given_by_recall = call.name == RECALL;
         }
         for (at, (whose, id)) in ids.into_iter().enumerate() {
             said = said.or(context.include(whose.as_deref(), &[id]));
@@ -10250,6 +10377,178 @@ mod tests {
         assert!(read.iter().all(|line| line["op"] == "search"), "{read:?}");
         drop(client);
         std::fs::remove_file(&socket).unwrap();
+    }
+
+    /// lamp-06c1, 27 Oct 20:55 (Friday's N1, lamp follow-up): a sunflower
+    /// kept, hibiscus tea recalled, then "forget that" with no id removed
+    /// the sunflower while the lamp said the tea. With a recall last,
+    /// nothing runs and the model asks which; with the keep last, the
+    /// sunflower goes and the answer names it, by the id the store removed.
+    #[test]
+    fn a_bare_forget_after_a_recall_asks_and_one_after_a_keep_names_what_went() {
+        const OLIVIA: &str = "p-b247000000000001";
+        let (socket, served) = memory("bare-forget-one-pick", 5, |request| {
+            match request["op"].as_str() {
+                Some("remember") => json!({"ok":true,"id":5}),
+                Some("search") => json!({"ok":true,"entries":[
+                    {"kind":"kept","id":3,"at_unix_ms":NOW-DAY,"text":"favorite drink is hibiscus tea"}
+                ]}),
+                Some("forget_last") => {
+                    json!({"ok":true,"removed":{"kind":"kept","id":5,"at_unix_ms":NOW}})
+                }
+                _ => json!({"ok":false,"error":"unexpected","message":"m"}),
+            }
+        });
+        let client = DaysClient::new(socket.clone()).unwrap();
+        client.replaces.store(true, Ordering::Release);
+        let run = |call: ToolCall| {
+            client.run_at(
+                &call,
+                Duration::from_secs(3),
+                NOW,
+                Some(&EAST),
+                Some(OLIVIA),
+            )
+        };
+        let keep = || call(REMEMBER, json!({"text": "favorite flower is sunflower"}));
+        // The line as heard on the lamp (N1c), its wake misheard.
+        let said = "Elan. Forget that.";
+        let bare = named_forget_with(
+            &call(FORGET, json!({})),
+            Some(said),
+            Some(OLIVIA),
+            &Carry::default(),
+        )
+        .expect("a bare forget is marked");
+        assert_eq!(bare.args[HEARD_BARE], true);
+        assert!(bare.args.get("source_id").is_none());
+        // Keep, recall, "forget that": asked which, nothing removed.
+        assert!(run(keep()).1);
+        assert!(run(call(RECALL, json!({"about": "drink"}))).1);
+        let (told, answered) = run(bare.clone());
+        assert!(answered);
+        assert_eq!(told, forget_which(true), "{told}");
+        // Keep, "forget that": the keep goes, and the answer names it.
+        assert!(run(keep()).1);
+        let (told, answered) = run(bare);
+        assert!(answered && told["forgotten"] == true, "{told}");
+        assert_eq!(told["what_went"], "favorite flower is sunflower", "{told}");
+        let read = served.join().unwrap();
+        let ops: Vec<&str> = read.iter().filter_map(|line| line["op"].as_str()).collect();
+        // The recall searches theirs and the room's.
+        assert_eq!(
+            ops,
+            ["remember", "search", "search", "remember", "forget_last"],
+            "{read:?}"
+        );
+        drop(client);
+        std::fs::remove_file(&socket).unwrap();
+    }
+
+    /// Reviewer-two's P2 on #3860: the longest keep, forgotten, is still a
+    /// done forget whose answer fits: its text cut at a word and marked
+    /// "…", or, should even that not fit, named not at all. A short one is
+    /// named whole.
+    #[test]
+    fn a_long_forgotten_text_is_cut_to_fit_and_the_forget_stays_done() {
+        let long = "my favourite flower is the sunflower ".repeat(200);
+        let mut context = DaysContext::default();
+        context.shown_as(None, 5, long.trim());
+        context.shown_as(None, 6, "favorite drink is hibiscus tea");
+        let removed = |id: u64| json!({"ok":true,"removed":{"kind":"kept","id":id}});
+        let mut told = json!({"forgotten": true});
+        told_what_went(&mut told, &removed(5), Some(&context), None);
+        assert_eq!(told["forgotten"], true);
+        assert!(crate::tools::sendable(&told), "{}", told.to_string().len());
+        let went = told["what_went"].as_str().unwrap();
+        assert!(went.len() <= WHAT_WENT_BYTES, "{}", went.len());
+        assert!(
+            went.ends_with('\u{2026}') && went.starts_with("my favourite flower"),
+            "{went}"
+        );
+        assert!(!went.trim_end_matches('\u{2026}').ends_with(' '), "{went}");
+        let mut told = json!({"forgotten": true});
+        told_what_went(&mut told, &removed(6), Some(&context), None);
+        assert_eq!(told["what_went"], "favorite drink is hibiscus tea");
+        // An answer that would not fit even so is told unnamed, still done.
+        let mut told = json!({"forgotten": true, "padding": "x".repeat(4_000)});
+        told_what_went(&mut told, &removed(6), Some(&context), None);
+        assert_eq!(told["forgotten"], true);
+        assert!(told.get("what_went").is_none());
+        assert!(told["note"].as_str().unwrap().contains("do not name"));
+        // Cut at a word, multibyte text included.
+        assert_eq!(cut_at_a_word("hoa hướng dương", 12), "hoa\u{2026}");
+        assert_eq!(cut_at_a_word("short", 12), "short");
+    }
+
+    /// The same through the memory client: the longest keep the model may
+    /// make, then "forget that", is a done forget whose answer is sent.
+    #[test]
+    fn the_longest_keep_forgotten_is_answered_done_and_fits() {
+        let (socket, served) = memory("bare-forget-long", 2, |request| {
+            match request["op"].as_str() {
+                Some("remember") => json!({"ok":true,"id":5}),
+                Some("forget_last") => {
+                    json!({"ok":true,"removed":{"kind":"kept","id":5,"at_unix_ms":NOW}})
+                }
+                _ => json!({"ok":false,"error":"unexpected","message":"m"}),
+            }
+        });
+        let client = DaysClient::new(socket.clone()).unwrap();
+        client.replaces.store(true, Ordering::Release);
+        let run =
+            |call: ToolCall| client.run_at(&call, Duration::from_secs(3), NOW, Some(&EAST), None);
+        // Past what one tool answer holds, whatever the store keeps of it.
+        let long = "the spare key is under the third flowerpot by the door ".repeat(90);
+        assert!(long.len() > lamp_gemini::MAX_TOOL_JSON_BYTES);
+        assert!(run(call(REMEMBER, json!({ "text": long.trim() }))).1);
+        let bare = named_forget_with(
+            &call(FORGET, json!({})),
+            Some("Forget that."),
+            None,
+            &Carry::default(),
+        )
+        .unwrap();
+        let (told, answered) = run(bare);
+        assert!(answered && told["forgotten"] == true, "{told}");
+        assert!(crate::tools::sendable(&told), "{}", told.to_string().len());
+        assert!(
+            told["what_went"].as_str().unwrap().ends_with('\u{2026}'),
+            "{told}"
+        );
+        served.join().unwrap();
+        drop(client);
+        std::fs::remove_file(&socket).unwrap();
+    }
+
+    /// The answer to a forget names only what the store removed: its text
+    /// when shown, else nothing.
+    #[test]
+    fn a_forgets_answer_names_only_the_removed_id() {
+        let mut context = DaysContext::default();
+        context.shown_as(None, 5, "favorite flower is sunflower");
+        context.shown_as(None, 3, "favorite drink is hibiscus tea");
+        let removed = json!({"ok":true,"removed":{"kind":"kept","id":5}});
+        let mut told = json!({"forgotten": true});
+        told_what_went(&mut told, &removed, Some(&context), None);
+        assert_eq!(told["what_went"], "favorite flower is sunflower");
+        let mut told = json!({"forgotten": true});
+        told_what_went(
+            &mut told,
+            &json!({"ok":true,"removed":{"kind":"kept","id":9}}),
+            Some(&context),
+            None,
+        );
+        assert!(told.get("what_went").is_none());
+        assert!(told["note"].as_str().unwrap().contains("do not name"));
+        let mut told = json!({"forgotten": true});
+        told_what_went(
+            &mut told,
+            &json!({"ok":true,"removed":1}),
+            Some(&context),
+            None,
+        );
+        assert_eq!(told, json!({"forgotten": true}));
     }
 
     /// A forget's arguments are journalled with ids and counts only, never
@@ -15185,7 +15484,10 @@ mod tests {
             // re-arm invalidation after the store response.
             assert_eq!(
                 result.recv_timeout(Duration::from_secs(1)).unwrap(),
-                (json!({"forgotten":true}), true)
+                (
+                    json!({"forgotten":true,"note":"Say only that it is forgotten; do not name what it was, as you were not told."}),
+                    true
+                )
             );
             clear_forgotten_thread(&mut recap);
             assert!(!recap.going_on(Instant::now()));
@@ -19803,7 +20105,9 @@ mod tests {
         let carry = Carry::default();
         for said in ["Forget that.", "quên cái đó đi"] {
             let model = call(FORGET, json!({}));
-            assert!(named_forget_with(&model, Some(said), Some(MAI), &carry).is_none());
+            // Marked bare, the call otherwise as made (#3504, N1 follow-up).
+            let marked = named_forget_with(&model, Some(said), Some(MAI), &carry).unwrap();
+            assert_eq!(marked.args, json!({ HEARD_BARE: true }));
             let (socket, served) = memory("forget-that", 1, twelve);
             let client = DaysClient::new(socket.clone()).unwrap();
             let (told, answered) = client.run_at(&model, FIRST_READ, NOW, Some(&EAST), Some(MAI));
@@ -20209,15 +20513,19 @@ mod tests {
         assert_eq!(first.unwrap().args["about"], "favourite colour");
         let again = named_forget_with(&forget, Some("Yes, please forget it."), Some(MAI), &carry);
         assert_eq!(again.unwrap().args["about"], "favourite colour");
-        // Someone else's "forget it" is their own.
-        assert!(named_forget_with(&forget, Some("forget it"), None, &carry).is_none());
+        // Someone else's "forget it" is their own: a bare one, marked so
+        // (#3504, N1 lamp follow-up), never her "favourite colour".
+        let theirs = named_forget_with(&forget, Some("forget it"), None, &carry).unwrap();
+        assert_eq!(theirs.args, json!({ HEARD_BARE: true }));
         let _ = named_forget_with(
             &call(REMEMBER, json!({"text":"x"})),
             None,
             Some(MAI),
             &carry,
         );
-        assert!(named_forget_with(&forget, Some("Forget that."), Some(MAI), &carry).is_none());
+        // A keep ends the carry: "Forget that." is bare again.
+        let bare = named_forget_with(&forget, Some("Forget that."), Some(MAI), &carry).unwrap();
+        assert_eq!(bare.args, json!({ HEARD_BARE: true }));
     }
 
     /// With the legacy memory, which can forget only the last kept thing, a
