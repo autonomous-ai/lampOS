@@ -1,5 +1,21 @@
 # Reuse decisions: V1, ROS 2 and existing Rust systems
 
+## Cap only the future plan's derived head-pins output (2026-10-28)
+
+Reuse the existing V2 head-pair evaluator, ordinary pretty-JSON bytes and
+Serde's streaming writer rather than duplicating reader policy or formatting
+an unrestricted String and checking its length afterward. The private
+[plan-output entry point](head-touch-plan-output.md) selects a fallible 1 MiB
+buffer, including the newline, and returns an owned staged vector only on
+success. Ordinary callers keep their current formatter and diagnostics.
+
+Keep V1's exact-input and durable-pending intent as the later recovery pattern;
+this preparation seam adds no filesystem mutation. Policy reads still use the
+supplied HeadInputs. Its output cap does
+not replace signed-input bounds, root ownership, excluded writers, durable
+publication or authenticated admission. No dependency, command, unit, allowlist,
+guard or restore path is added. Physical acceptance remains later work.
+
 ## Persist closed head-input observations without native Stat layout (2026-10-28)
 
 V1's signed-payload and pending-intent recovery patterns retain exact verified

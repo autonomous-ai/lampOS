@@ -17,6 +17,7 @@ use std::{
 // Read-only prerequisite, deliberately unwired until the independent guard owns
 // admission, writer exclusion and the immediately-before-write recheck.
 pub(crate) mod capture;
+pub(crate) mod plan_output;
 
 pub(crate) const PINS: &str = "/etc/lampOS/controls/controls-pins.json";
 const CONTROLS: &str = "lamp-controls.service";
@@ -467,6 +468,25 @@ pub(crate) fn project_with(
     settings: &[Setting],
     steps: &mut Vec<Step>,
 ) -> Result<(), String> {
+    project_with_formatter(inputs, root, units, carried, settings, steps, |object| {
+        Ok(format!(
+            "{}\n",
+            serde_json::to_string_pretty(object).map_err(|error| error.to_string())?
+        ))
+    })
+}
+
+// Both entry points use this exact policy. The ordinary formatter keeps its
+// existing bytes/errors; only the future-plan entry point caps derived output.
+fn project_with_formatter(
+    inputs: &mut dyn HeadInputs,
+    root: &Path,
+    units: &Path,
+    carried: &BTreeMap<String, String>,
+    settings: &[Setting],
+    steps: &mut Vec<Step>,
+    serialize: fn(&serde_json::Map<String, serde_json::Value>) -> Result<String, String>,
+) -> Result<(), String> {
     if active_pins_with(inputs, root, units, carried)?.as_deref() != Some(PINS) {
         return Ok(());
     }
@@ -510,10 +530,7 @@ pub(crate) fn project_with(
         }
     };
     object.insert("legacy_head".into(), wanted.into());
-    let text = format!(
-        "{}\n",
-        serde_json::to_string_pretty(&object).map_err(|e| e.to_string())?
-    );
+    let text = serialize(&object)?;
     steps[at].setting.text = Some(text.clone());
     steps[at].setting.sha256 = Some(manifest::sha256_hex(text.as_bytes()));
     steps[at].act = if inputs
