@@ -359,3 +359,54 @@ test('an action refused here takes no id, so the next waiting one keeps its own'
     assert.equal(lamp.done.size, 0);
   });
 });
+
+test('a refused on() takes off only its own copy of the handler', async () => {
+  // Granted touch, refused person.arrived: the second on() of the same
+  // function is the one taken back.
+  await withLamp({ grants: ['body'] }, async (lamp) => {
+    const handler = () => {};
+    await lamp.on('touch', handler);
+    lamp.handlers.set('person.arrived', [handler]);
+    await assert.rejects(lamp.on('person.arrived', handler), byCode.no_grant);
+    assert.deepEqual(lamp.handlers.get('person.arrived'), [handler]);
+    assert.deepEqual(lamp.handlers.get('touch'), [handler]);
+  });
+});
+
+test('only gesture and move end a wait at their reply, as control.md says', async () => {
+  const { ENDS_AT_REPLY } = await import('../src/client.js');
+  assert.deepEqual([...ENDS_AT_REPLY].sort(), ['gesture', 'move']);
+});
+
+test('a request after the lamp has gone is refused at once, never left waiting', async () => {
+  await withLamp({}, async (lamp) => {
+    lamp.ws.terminate();
+    await lamp.closed();
+    await assert.rejects(lamp.get('light'), (error) => error.code === 'closed');
+    assert.equal(lamp.waiting.size, 0);
+  });
+});
+
+test('a waiting gesture keeps no done', async () => {
+  await withLamp({ autoDone: false }, async (lamp) => {
+    const pending = lamp.gesture('nod', { wait: true });
+    assert.equal(lamp.done.size, 0, 'a done kept for an action that gets none');
+    await pending;
+  });
+});
+
+test('a waiting action whose socket drops before the reply leaves no rejection unheard', async () => {
+  const unhandled = [];
+  const onUnhandled = (error) => unhandled.push(String(error));
+  process.on('unhandledRejection', onUnhandled);
+  try {
+    await withLamp({ autoDone: false }, async (lamp) => {
+      // Sent and cut in the same turn, so no reply can come first.
+      const waiting = lamp.play('wave', { wait: true });
+      lamp.ws.terminate();
+      await assert.rejects(waiting, (error) => error.code === 'closed');
+    });
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    assert.deepEqual(unhandled, []);
+  } finally { process.off('unhandledRejection', onUnhandled); }
+});
