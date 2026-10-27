@@ -68,15 +68,19 @@ pub struct Yawns {
     last_us: Option<u64>,
     /// A yawn was counted, and the mouth has not closed since.
     counted: bool,
+    /// Since when no face has been seen, if none is now.
+    unseen_from: Option<u64>,
 }
 
 impl Yawns {
     /// One look of the largest face's mouth (`None`: no face, or no mesh).
     /// True once, as a yawn is counted.
     pub fn look(&mut self, mouth: Option<Mouth>, now_us: u64) -> bool {
-        // A gap, or no face: whatever was held is over, and a face that
-        // left with its mouth open does not block the next yawn (the
-        // reviewer-lead's P3 on #3842).
+        // A gap, or no face for longer than one: whatever was held is over,
+        // and a face that left with its mouth open does not block the next
+        // yawn (the reviewer-lead's P3 on #3842). One missed mesh mid-yawn
+        // is not a face gone, so a long yawn still counts once (their P3 on
+        // `eea699cd5`).
         if self
             .last_us
             .is_some_and(|last| now_us.saturating_sub(last) > MOST_GAP_US)
@@ -87,9 +91,13 @@ impl Yawns {
         self.last_us = Some(now_us);
         let Some(mouth) = mouth else {
             self.miss();
-            self.counted = false;
+            let unseen = *self.unseen_from.get_or_insert(now_us);
+            if now_us.saturating_sub(unseen) > MOST_GAP_US {
+                self.counted = false;
+            }
             return false;
         };
+        self.unseen_from = None;
         if mouth.open < CLOSED_UNDER {
             self.counted = false;
             self.hold = None;
@@ -261,13 +269,22 @@ mod tests {
     }
 
     /// The face leaves with its mouth open: the next yawn still counts.
+    /// One missed mesh in a long yawn is not a face gone: still one.
     #[test]
     fn a_face_gone_with_its_mouth_open_does_not_block_the_next_yawn() {
-        let mut yawns = Yawns::default();
         let mut looks = vec![yawn(0.15); 8];
         looks.push(None);
         looks.extend(vec![yawn(0.15); 8]);
-        assert_eq!(counted(&mut yawns, &looks, 0), 2);
+        assert_eq!(
+            counted(&mut Yawns::default(), &looks, 0),
+            1,
+            "one missed mesh"
+        );
+        // Gone: six looks with no face, 1.25 s from the first.
+        let mut looks = vec![yawn(0.15); 8];
+        looks.extend(vec![None; 6]);
+        looks.extend(vec![yawn(0.15); 8]);
+        assert_eq!(counted(&mut Yawns::default(), &looks, 0), 2, "a face gone");
         let mut yawns = Yawns::default();
         assert!(!yawns.look(yawn(0.15), 0));
         for nth in 1..7 {
