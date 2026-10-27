@@ -1,5 +1,13 @@
 # Tests work log
 
+## 2026-10-27 07:26 — Mood latest exact-head native proof passes
+
+Ready for lamp-voice: no (#3623 second current peer clearance pending)
+
+[Latest Mood native proof](verification/tests-mood-0bd3-native-20261027/) binds original ARM64 **40425319056** and Linux strict **40425319013**, both attempt-one success, to actual preview `9052bb250` with ordered parents 4bff/0bd3 and tree equal to the offered head. Actual selected execution is **7,551 unique PASS / 0 FAIL / 0 LEAK / 0 TIMEOUT**, 53 aggregate skips. All **340** Expression cases, both repaired controls and all **14** ordinary Main Reader cases pass once. Configured final reprints and auxiliary gates remain separate; the Mac zero-runtime/original-f441 reuse scope is explicit. Main remained 4bff at collection.
+
+Reviewer-three has current source READ-OK `0bd3f854c` at 6430528907; the other current clearance is being requested with this published audit. Current Sentinel’s reviewed Mac gate continues separately. Carrier latest compile/compare prep is ready but remains unallocated until the active compiler closes; its old-source ordinary/docs/promoter evidence remains published and scoped. No device action.
+
 ## 2026-10-27 07:21 — Mood latest carry pushed after precise compile/reuse gate
 
 Ready for lamp-voice: no (#3623 fresh exact-head native/read gates pending)
