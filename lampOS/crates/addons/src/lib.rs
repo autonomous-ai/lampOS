@@ -8,9 +8,11 @@
 //! So every rule is tested here as a plain function, and a replay is the same
 //! code as the lamp.
 pub mod carry;
+pub mod machine;
 pub mod rules;
 pub mod runtime;
 pub mod situation;
+pub mod stream;
 
 pub use rules::{Drop, Judge, Reading, Situation, Verdict};
 pub use situation::Watcher;

@@ -1782,7 +1782,9 @@ dependencies = [
  "lamp-bus",
  "lamp-ipc",
  "lamp-msgs",
+ "rustix",
  "serde_json",
+ "sha2",
  "signal-hook",
  "tempfile",
 ]

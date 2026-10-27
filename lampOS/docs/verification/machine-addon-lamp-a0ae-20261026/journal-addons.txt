@@ -1,0 +1,48 @@
+Oct 26 16:20:44.872499 lamp-a0ae systemd[1]: Started lamp-machine-addons.service - lampOS own-computer add-ons (devin-0, PR #3563, /run only).
+Oct 26 16:20:44.881483 lamp-a0ae lamp-machine-addons[9198]: lamp-addons machine: taking proposals from the person's own computers
+Oct 26 16:20:44.931150 lamp-a0ae lamp-machine-addons[9198]: lamp-addons machine: hello: what was published is cleared
+Oct 26 16:34:12.945737 lamp-a0ae lamp-machine-addons[9198]: lamp-addons machine: no proposals taken: the daemon answered 503 UNAVAILABLE
+Oct 26 16:34:18.006627 lamp-a0ae lamp-machine-addons[9198]: lamp-addons machine: Harness restarted; publishing again
+Oct 26 16:34:18.126205 lamp-a0ae lamp-machine-addons[9198]: lamp-addons machine: hello: what was published is cleared
+Oct 26 16:36:59.359094 lamp-a0ae lamp-machine-addons[9198]: lamp-addons machine: own-ceb3630785c1 light #1908456491 put to the judge
+Oct 26 16:42:53.951975 lamp-a0ae lamp-machine-addons[9198]: lamp-addons machine: own-ceb3630785c1 light #2263049154 put to the judge
+Oct 26 16:45:54.083372 lamp-a0ae lamp-machine-addons[9198]: lamp-addons machine: summaries not published: the daemon's answer is not HTTP
+Oct 26 16:45:54.083372 lamp-a0ae lamp-machine-addons[9198]: lamp-addons machine: no proposals taken: the daemon's answer is not HTTP
+Oct 26 16:46:04.166719 lamp-a0ae lamp-machine-addons[9198]: lamp-addons machine: Harness restarted; publishing again
+Oct 26 16:46:04.283314 lamp-a0ae lamp-machine-addons[9198]: lamp-addons machine: hello: what was published is cleared
+Oct 26 16:53:00.579041 lamp-a0ae lamp-machine-addons[9198]: lamp-addons machine: own-ceb3630785c1 light #2869676198 put to the judge
+
+== lamp-addons
+Oct 26 16:20:44.850219 lamp-a0ae systemd[1]: Started lamp-addons.service - lampOS add-ons' judge (lamp-addons).
+Oct 26 16:20:44.879331 lamp-a0ae lamp-addons[9196]: lamp-addons: judging addon/proposal; a kept light is asked of the ring at Idle, a kept move of the body
+Oct 26 16:36:59.360540 lamp-a0ae lamp-addons[9196]: lamp-addons: dropped own-ceb3630785c1 light #1908456491: the room is busy, or that is not known
+Oct 26 16:42:53.953141 lamp-a0ae lamp-addons[9196]: lamp-addons: dropped own-ceb3630785c1 light #2263049154: someone is talking to the lamp or it is speaking, or that is not known
+Oct 26 16:53:00.580241 lamp-a0ae lamp-addons[9196]: lamp-addons: kept own-ceb3630785c1 light #2869676198: asked of the ring at idle for 30000 ms
+
+== units
+# /run/systemd/system/lamp-machine-addons.service
+[Unit]
+Description=lampOS own-computer add-ons (devin-0, PR #3563, /run only)
+After=lamp-addons.service
+[Service]
+Type=simple
+User=lampos
+Group=lampos
+Slice=lampos-parts.slice
+Environment=HOME=/var/lib/lampos-tasks
+Environment=LAMP_MACHINE_ADDONS=on
+ExecStart=/opt/lampOS/addons/c44a17b7e9793e3708afe3cb0684378795239ca9fa51a51accd929de98bf77fb/lamp-addons machine --bus-root /run/lampos-bus --yes-file /run/lamp-machine-addons/yes.json --harness-dir /var/lib/lampos-tasks/.harness/cli/data
+Restart=on-failure
+RestartSec=10s
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=lamp-machine-addons
+NoNewPrivileges=yes
+[Service]
+Environment=LAMP_ADDONS=on
+ExecStart=
+ExecStart=/opt/lampOS/addons/c44a17b7e9793e3708afe3cb0684378795239ca9fa51a51accd929de98bf77fb/lamp-addons serve --bus-root /run/lampos-bus
+
+86af162029f93884fde26dc3adb39d73409e2bf37315a095d0a518dde57e7997  /opt/lampOS/addons/86af162029f93884fde26dc3adb39d73409e2bf37315a095d0a518dde57e7997/lamp-addons
+c44a17b7e9793e3708afe3cb0684378795239ca9fa51a51accd929de98bf77fb  /opt/lampOS/addons/c44a17b7e9793e3708afe3cb0684378795239ca9fa51a51accd929de98bf77fb/lamp-addons
+86af162029f93884fde26dc3adb39d73409e2bf37315a095d0a518dde57e7997  /opt/lampOS/addons/current/lamp-addons
