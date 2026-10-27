@@ -192,6 +192,38 @@ fn builds_before(
             && TMPFILES_SHIPPED.contains(&sha))
 }
 
+/// The ordinary ownership decision from already observed bytes' hash.
+/// This reads no file and grants no path authority. Its caller must bind the
+/// hash to the exact setting and observation used by its eventual executor.
+pub(crate) fn observed_act(
+    setting: &Setting,
+    now: Option<&str>,
+    recorded: &BTreeMap<String, String>,
+    writing: &BTreeMap<String, String>,
+    shipped: &BTreeMap<String, Vec<String>>,
+) -> Option<Act> {
+    let builds = |sha: &str| {
+        builds_before(&setting.path, sha, recorded, writing)
+            || shipped
+                .get(&setting.path)
+                .is_some_and(|shipped| shipped.iter().any(|before| before == sha))
+    };
+    match (now, setting.removed, &setting.sha256) {
+        (None, true, _) => None,
+        (Some(now), true, _) if builds(now) => Some(Act::Remove),
+        (Some(_), true, _) => Some(Act::Keep("this lamp's own".into())),
+        (Some(now), false, Some(new)) if now == new.as_str() => {
+            (recorded.get(&setting.path) != Some(new)).then_some(Act::Record)
+        }
+        (None, false, _) if recorded.contains_key(&setting.path) => {
+            Some(Act::Keep("removed on this lamp".into()))
+        }
+        (None, false, _) => Some(Act::Write),
+        (Some(now), false, _) if builds(now) => Some(Act::Write),
+        (Some(_), false, _) => Some(Act::Keep("this lamp's own".into())),
+    }
+}
+
 /// What each setting needs, from the three: the build's before
 /// (`recorded`, or `writing` for one install was about to write, or for
 /// an unrecorded tmpfiles [`TMPFILES_SHIPPED`], or for the image's files
@@ -208,26 +240,7 @@ pub fn plan(
     for setting in settings {
         let now = now_sha(root, &setting.path)
             .map_err(|error| io::Error::new(error.kind(), format!("{}: {error}", setting.path)))?;
-        let builds = |sha: &String| {
-            builds_before(&setting.path, sha, recorded, writing)
-                || shipped
-                    .get(&setting.path)
-                    .is_some_and(|shipped| shipped.contains(sha))
-        };
-        let act = match (&now, setting.removed, &setting.sha256) {
-            (None, true, _) => None,
-            (Some(now), true, _) if builds(now) => Some(Act::Remove),
-            (Some(_), true, _) => Some(Act::Keep("this lamp's own".into())),
-            (Some(now), false, Some(new)) if now == new => {
-                (recorded.get(&setting.path) != Some(new)).then_some(Act::Record)
-            }
-            (None, false, _) if recorded.contains_key(&setting.path) => {
-                Some(Act::Keep("removed on this lamp".into()))
-            }
-            (None, false, _) => Some(Act::Write),
-            (Some(now), false, _) if builds(now) => Some(Act::Write),
-            (Some(_), false, _) => Some(Act::Keep("this lamp's own".into())),
-        };
+        let act = observed_act(setting, now.as_deref(), recorded, writing, shipped);
         if let Some(act) = act {
             steps.push(Step {
                 setting: setting.clone(),
