@@ -220,6 +220,40 @@ struct Shared {
     wake: std::sync::OnceLock<std::os::fd::OwnedFd>,
     /// The pump's passes: how often it woke.
     passes: AtomicU64,
+    /// Completed off-mode park calls, observed only by this pump's tests.
+    #[cfg(test)]
+    tick_waits: TickWaits,
+    /// First subscribed drain completed; only the owning fixture reads this.
+    #[cfg(test)]
+    pump_ready: AtomicBool,
+}
+
+#[cfg(test)]
+struct TickWaits {
+    count: AtomicU64,
+    shortest_ns: AtomicU64,
+    longest_ns: AtomicU64,
+}
+
+#[cfg(test)]
+impl Default for TickWaits {
+    fn default() -> Self {
+        Self {
+            count: AtomicU64::new(0),
+            shortest_ns: AtomicU64::new(u64::MAX),
+            longest_ns: AtomicU64::new(0),
+        }
+    }
+}
+
+#[cfg(test)]
+impl TickWaits {
+    fn observe(&self, duration: Duration) {
+        let ns = u64::try_from(duration.as_nanos()).unwrap_or(u64::MAX);
+        self.shortest_ns.fetch_min(ns, Ordering::Relaxed);
+        self.longest_ns.fetch_max(ns, Ordering::Relaxed);
+        self.count.fetch_add(1, Ordering::Release);
+    }
 }
 
 /// How long a wake from a hand's sleep waits for the conversation it opens
@@ -2189,9 +2223,16 @@ fn pump(
                     Ok(Drained::Closed) => return,
                     Err(_) => break 'connected,
                 }
+                #[cfg(test)]
+                shared.pump_ready.store(true, Ordering::Release);
                 match &woken {
                     Some(woken) => wait_on(&subscribed, woken),
-                    None => thread::park_timeout(PUMP_TICK),
+                    None => {
+                        let duration = PUMP_TICK;
+                        thread::park_timeout(duration);
+                        #[cfg(test)]
+                        shared.tick_waits.observe(duration);
+                    }
                 }
             }
         }
