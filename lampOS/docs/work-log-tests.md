@@ -1,5 +1,13 @@
 # Tests work log
 
+## 2026-10-27 23:41 — Reader provenance; unchanged-Main isolated control
+
+Ready for lamp-voice: no (#3543 native qualification and full-context disposition pending; #3843 full gate active).
+
+[Reader provenance](verification/tests-sentinel-3c-provenance-20261027/) publishes the three compiler/source bindings, full source bookends, all 517 witness bookends, compile commands and controller output requested by Reviewer-two. The unchanged-Main exact case passed 1/0/0 with 3882 filtered; all three compiled executables match the failed candidate byte for byte. The isolated pass is inconclusive. The original 3867/1/15 full run remains failed; one full unchanged-Main context control is running without recompilation. The cleanup summary aggregates five occurrences while keeping only its first error text; no repeated-PID assertion is made.
+
+The Reader fixture is carried to local b7dc8ee59 on freshly fetched Main 0d1d1f2b9, with both complete authored blobs and the exact patch unchanged; formatting passed. Pushing it as a draft enables native Linux qualification of the Linux-only fixture. Old local results remain scoped to 3a/3c; current native readiness is pending. No device action.
+
 ## 2026-10-27 22:58 — Reader current full run fails cleanup; control next
 
 Ready for lamp-voice: no (#3543 current local gate failed; #3843 full gate active).

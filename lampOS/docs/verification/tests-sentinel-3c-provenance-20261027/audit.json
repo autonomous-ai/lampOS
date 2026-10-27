@@ -1,0 +1,142 @@
+{
+  "qualified_head": "3a554a97c60e8d4f27b0b6dae10f52f113697c04",
+  "qualified_base": "3c9838fea6591410cdf534d27088615021c8df30",
+  "qualified_tree": "b5279058560cceeb16138e8dbb1197b38e9c8922",
+  "qualified_source_files": 10904,
+  "runtime": "3867 PASS/1 FAIL/15ignored Rust101/native1 retained",
+  "runtime_before_witness_manifest_derivation": "Recorded inherited514 plus recorded new3 freezes after no-run, prior to inventory/runtime",
+  "witness_count": 517,
+  "witness_before_after_exact_six_field_equality": true,
+  "actual_count": 3,
+  "actual_before_after_exact_six_field_equality": true,
+  "parent_plan_sha256": "f42bebd9c7c8f411b9a83c1367ac4b771294497fec295af771c874ebf422ab97",
+  "parent_controller_sha256": "0050b3a77a83ce006943a905d83567e2fc340ce87f11c5bcaae65a4493ee108c",
+  "current_candidate_source_bridge": {
+    "head": "b7dc8ee598b7a8fdd6ff7577db6cb6ee142f6521",
+    "base": "0d1d1f2b944581169c9f96adba9f40ab88adba92",
+    "old_head": "3a554a97c60e8d4f27b0b6dae10f52f113697c04",
+    "clean": true,
+    "both_complete_authored_blobs_equal": true,
+    "exact_patch_equal": true,
+    "blobs": {
+      "lampOS/crates/voice/src/session_reader/tests.rs": "506a53ca1e36c002539782a16a794e2b9c9e1064",
+      "lampOS/docs/realtime-tests.md": "1bf56186cf34a2298da4f71cf2da52b834514bb3"
+    },
+    "patch_sha256": "e90509ad18bbeff13d5e6a3563a0ebb459993d0e190c64eabcb2877d58ffd7d0",
+    "old_Mac_failure_and_Main_control_scope_retained": true,
+    "native_Linux_qualification_pending": true,
+    "ready": false
+  },
+  "reconstruction": "Public Main3c plus qualified-owned.patch reconstructs the qualified3a tree; offered b7 contains identical full authored blobs. Newer upstream source in b7 is not locally relabelled.",
+  "Main_control": "ONE exactcase PASS1/0/0 filtered3882 inconclusive; all3 compiled executables SHA/size equal failed candidate; fullMaincontextcontrol active separately",
+  "copies": {
+    "witnesses-before-runtime.json": {
+      "sha256": "4432cc217008a09e8e2510cf96c583c1503f58c97c3ba84cdd96414190f352f6",
+      "bytes": 211763
+    },
+    "qualified-owned.patch": {
+      "sha256": "e90509ad18bbeff13d5e6a3563a0ebb459993d0e190c64eabcb2877d58ffd7d0",
+      "bytes": 8063
+    },
+    "cmd-workspace.json": {
+      "sha256": "158d8dc7b65bd6088e106e8e7782434d468ae173afc3a847a23943cda2a4eb76",
+      "bytes": 1950
+    },
+    "helper-compiler-phase-transition.json": {
+      "sha256": "3a15d03076b9e494aba7aa3ce9cd9dd13440939fb691063d3c0664190c46c3f3",
+      "bytes": 1552
+    },
+    "cmd-inventory-ignored.json": {
+      "sha256": "6ba5685317278518f97a3ba898a2e0cc60db5d699fab49ced735569de7f30499",
+      "bytes": 1938
+    },
+    "source-before.json": {
+      "sha256": "f4eb8d9b1e7e7ff4da77d9e06539275edf050533f0cbf53c9d5d081a9960d6f3",
+      "bytes": 2456233
+    },
+    "cmd-metadata.json": {
+      "sha256": "db749a41038f89dacc9144a40fe41e6db7768bd433b2f5edfc1462e9cce49802",
+      "bytes": 1906
+    },
+    "source-after.json": {
+      "sha256": "f4eb8d9b1e7e7ff4da77d9e06539275edf050533f0cbf53c9d5d081a9960d6f3",
+      "bytes": 2456233
+    },
+    "Main-control-terminal.json": {
+      "sha256": "710c8436fb713d9128225175904d77857838ebc5e05dd30a16f768c10997e766",
+      "bytes": 1748
+    },
+    "cmd-inventory-all.json": {
+      "sha256": "a067703f862545bbffe73bec9caa54e44f2c7279cd3d9e675e0aadbe8e6bb31b",
+      "bytes": 1915
+    },
+    "Main-control-cmd-exact-Main-control.stdout.txt": {
+      "sha256": "4ef702b86b971c2c890d0de70e618eb33a6d1d99cf7b8403d4692a2acc76bd4a",
+      "bytes": 203
+    },
+    "cmd-fmt.json": {
+      "sha256": "0cc64c9a050e585d586a68c6fbb1ccf735e06af0b49ffee93805851aea72a601",
+      "bytes": 1849
+    },
+    "cmd-Voice-lib-compile.json": {
+      "sha256": "dcf70ebaa13259ffcbeac6d614f0e38105eb8a1cd357c05d59badc5679fec208",
+      "bytes": 2002
+    },
+    "Main-control-Main-versus-failed-candidate-library.json": {
+      "sha256": "549b2f434adf9169cba2f12ad69059ab5c07cc882db0f3bc69fc420d93571244",
+      "bytes": 714
+    },
+    "Main-control-native-controller-result.json": {
+      "sha256": "e99de2ce4b8d50f96f48761eb32fcbd0ca52ce03d78d1b686a11b7df3553f507",
+      "bytes": 472
+    },
+    "Main-control-cmd-exact-Main-control.json": {
+      "sha256": "15767ba35f2aa3a37ff25dbba3f7ee36086b1df5eb5edb35cc0f18238d9be936",
+      "bytes": 2009
+    },
+    "Voice-actual-depinfo.json": {
+      "sha256": "e001f74aa9f7d975903711750dd1bdc2d52b89ad92e2cfae845473550ed7c252",
+      "bytes": 61995
+    },
+    "cmd-full-Voice-lib.json": {
+      "sha256": "c90fbf4877f7dc890eab21917ba0ab0e52b4921c58b025bed038386bfbd56e0c",
+      "bytes": 1907
+    },
+    "terminal.json": {
+      "sha256": "e203a26a29fe09b2dfcdf0cad65d3d89f6d8488c206f9dda6f656477401d2656",
+      "bytes": 874
+    },
+    "Main-control-observed-control-census.json": {
+      "sha256": "3a516aaf6c04912161df15bcf1efa65d1f1ed4c7ba331b317a285e5cf0d4961a",
+      "bytes": 356
+    },
+    "cmd-strict.json": {
+      "sha256": "ea1da097aa4a8918a90f84c813a3b63c897432fd30fb94244ee6b3bf21c41adc",
+      "bytes": 2330
+    },
+    "native-controller.stdout": {
+      "sha256": "954ac313e3f0b621e0fbc92edc578f05ca62ea1684854eeb0d57243a334f7abe",
+      "bytes": 2489
+    },
+    "native-controller-result.json": {
+      "sha256": "fea59a0390e03d17b1b2dc45063f22d993bd0b547f0464b2f17fe62ef687dd5a",
+      "bytes": 471
+    },
+    "executables-and-source-bindings.json": {
+      "sha256": "a5932422297fc02c5c74f775703f97c185b05e2f9d6b44499700121c0b6b5697",
+      "bytes": 156243
+    },
+    "witnesses-after.json": {
+      "sha256": "4432cc217008a09e8e2510cf96c583c1503f58c97c3ba84cdd96414190f352f6",
+      "bytes": 211763
+    },
+    "Main-vs-candidate-all-three-executables.json": {
+      "sha256": "579f2a7c3b94e84f67de7839110f72f647eec8163a89eddd510f61c5bd7418eb",
+      "bytes": 690
+    },
+    "consumed-SHA-checkpoints.json": {
+      "sha256": "d4fd976ec32754becbb2535b551b1190cd26ba07d607362689a4180dc0c01e99",
+      "bytes": 1564
+    }
+  }
+}

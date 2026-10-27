@@ -1,0 +1,167 @@
+diff --git a/lampOS/crates/voice/src/session_reader/tests.rs b/lampOS/crates/voice/src/session_reader/tests.rs
+index 2b3ea62843..506a53ca1e 100644
+--- a/lampOS/crates/voice/src/session_reader/tests.rs
++++ b/lampOS/crates/voice/src/session_reader/tests.rs
+@@ -8,7 +8,7 @@ thread_local! {
+     };
+ }
+ 
+-/// Only the rollback boundary fixtures replace the filesystem root. The
++/// Only explicitly scoped reader fixtures replace the filesystem root. The
+ /// original ancestor, owner, mode, ACL and component checks still run at and
+ /// below this pinned private root. These cases do not test host `/` or `/tmp`
+ /// ancestry; every unscoped security fixture still uses the original `/`.
+@@ -186,7 +186,10 @@ mod linux {
+     }
+     impl Fixture {
+         fn new() -> Self {
+-            let root = std::env::temp_dir().canonicalize().unwrap().join(format!(
++            Self::under(&std::env::temp_dir().canonicalize().unwrap())
++        }
++        fn under(parent: &Path) -> Self {
++            let root = parent.join(format!(
+                 "voice-session-reader-{}-{}",
+                 std::process::id(),
+                 NEXT.fetch_add(1, Ordering::Relaxed)
+@@ -251,10 +254,34 @@ mod linux {
+         }
+     }
+ 
++    struct FixtureMode {
++        path: PathBuf,
++        original: Permissions,
++    }
++    impl FixtureMode {
++        fn change(path: &Path, mode: u32) -> Self {
++            let metadata = stdfs::symlink_metadata(path).unwrap();
++            assert!(metadata.is_dir());
++            let original = metadata.permissions();
++            stdfs::set_permissions(path, Permissions::from_mode(mode)).unwrap();
++            Self {
++                path: path.to_owned(),
++                original,
++            }
++        }
++    }
++    impl Drop for FixtureMode {
++        fn drop(&mut self) {
++            stdfs::set_permissions(&self.path, self.original.clone()).unwrap();
++        }
++    }
++
+     #[test]
+     fn only_the_new_session_is_shared_after_one_pinned_lookup() {
+         for iteration in 0..2 {
+             let fixture = Fixture::new();
++            // This case checks the new session below its owned root.
++            let _root = FixtureRoot::enter(&fixture.root);
+             let old = fixture.sessions.join("old");
+             stdfs::create_dir(&old).unwrap();
+             stdfs::set_permissions(&old, Permissions::from_mode(0o700)).unwrap();
+@@ -315,6 +342,51 @@ mod linux {
+         }
+     }
+ 
++    #[test]
++    fn an_owned_fixture_root_ignores_only_changes_above_its_boundary() {
++        for (pin_fixture, change_voice, shared) in [
++            (false, false, false),
++            (true, false, true),
++            (true, true, false),
++        ] {
++            // Even while the controlled ancestor is writable, this top-level
++            // private directory keeps the whole experiment inaccessible.
++            let private = Fixture::new();
++            let ancestor = Fixture::under(&private.root);
++            let fixture = Fixture::under(&ancestor.root);
++            let boundary = if pin_fixture {
++                &fixture.root
++            } else {
++                &ancestor.root
++            };
++            let _root = FixtureRoot::enter(boundary);
++            let reader = fixture.prepare();
++            let (events, health) = fixture.files();
++            // Admission preceded this change. Only a boundary below this
++            // ancestor may exclude it from the grant's repeated checks.
++            let _ancestor_mode = FixtureMode::change(&ancestor.root, 0o777);
++            let _voice_mode = change_voice.then(|| FixtureMode::change(&fixture.voice, 0o700));
++            assert_eq!(
++                reader.grant(&fixture.output, &events, &health).unwrap(),
++                shared
++            );
++            for path in [&fixture.output, &fixture.output.join("metadata")] {
++                let metadata = stdfs::metadata(path).unwrap();
++                assert_eq!(metadata.mode() & 0o7777, if shared { 0o750 } else { 0o700 });
++                assert_eq!(metadata.gid(), fixture.gid);
++            }
++            for event in &events {
++                let metadata = event.metadata().unwrap();
++                assert_eq!(metadata.mode() & 0o7777, if shared { 0o640 } else { 0o600 });
++                assert_eq!(metadata.gid(), fixture.gid);
++            }
++            assert_eq!(health.metadata().unwrap().mode() & 0o7777, 0o600);
++            fixture.sentinel();
++            ancestor.sentinel();
++            private.sentinel();
++        }
++    }
++
+     /// Explicitly invoked in an isolated root Linux container; ordinary mode
+     /// assertions do not substitute for this cross-identity DAC proof.
+     #[test]
+@@ -741,6 +813,7 @@ if rm "$1" 2>/dev/null; then exit 14; fi
+     #[test]
+     fn replaced_record_never_changes_an_outside_sentinel() {
+         let fixture = Fixture::new();
++        let _root = FixtureRoot::enter(&fixture.root);
+         let reader = fixture.prepare();
+         let (events, health) = fixture.files();
+         let target = fixture.output.join("metadata/events-0.jsonl");
+@@ -754,6 +827,7 @@ if rm "$1" 2>/dev/null; then exit 14; fi
+         use serde_json::{Value, json};
+         const SECRET: &str = "READER_SECRET_CANARY";
+         let fixture = Fixture::new();
++        let _root = FixtureRoot::enter(&fixture.root);
+         let reader = fixture.prepare();
+         fixture.create();
+         let mut state = crate::service_trace::small_segments(1024, || {
+diff --git a/lampOS/docs/realtime-tests.md b/lampOS/docs/realtime-tests.md
+index 214fe40e2a..1bf56186cf 100644
+--- a/lampOS/docs/realtime-tests.md
++++ b/lampOS/docs/realtime-tests.md
+@@ -1793,3 +1793,34 @@ the production finish bound is not extended. Another control retains refusal
+ of an unsafe root mode, a real ACL and an escaped path. No production privacy
+ validation, grant or rollback action, report policy or finish bound changes. These tests establish
+ neither the cause of earlier CI failures nor physical-lamp acceptance.
++
++`replaced_record_never_changes_an_outside_sentinel` also enters that pinned
++fixture-root scope immediately after constructing its fixture. The guard stays
++alive through reader preparation, file creation, the record's replacement by
++a symlink, the original grant-refusal assertion and the unchanged sentinel
++check. This case exercises the replacement boundary below its owned root;
++host ancestry remains covered by the unscoped fixtures. No timing or error
++injection is added, and no historical failure cause is inferred.
++
++`only_the_new_session_is_shared_after_one_pinned_lookup` uses the same owned
++root boundary for its positive grant. It retains both iterations, the single
++lookup, the original acknowledged/non-degraded report assertion and its
++500 ms finish bound, new-session/event modes and groups, the unchanged old
++session and the private sentinel. It checks sharing below the fixture root;
++the real host's ancestor metadata is not an input to that focused assertion.
++This does not identify the cause of an earlier unavailable-reader report.
++
++`an_owned_fixture_root_ignores_only_changes_above_its_boundary` checks that
++scope deterministically. Inside a private top-level directory, it changes an
++owned ancestor's mode after preparation: a boundary including that ancestor
++refuses the grant, while the inner fixture boundary permits it. An invalid
++voice mode below the inner boundary still refuses the grant. Original private
++rollback/event modes, groups and sentinel checks remain, and RAII restores
++the controlled modes on unwind. No global ancestor, production check, retry,
++error allowance or finish deadline changes.
++
++`shared_session_writer_projects_every_segment_without_private_values` also
++keeps the owned fixture-root guard through preparation, projection and finish.
++All original positive projection assertions and the 500 ms finish bound remain
++unchanged. This isolates the focused sharing check from host ancestor metadata;
++it does not establish the cause of an earlier unavailable-reader report.

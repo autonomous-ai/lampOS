@@ -1,0 +1,21 @@
+{
+  "rows": [
+    [
+      "coordinator::tests::second_route::a_push_mid_search_drops_its_looks_picture",
+      "ok"
+    ]
+  ],
+  "summary": [
+    [
+      "1",
+      "0",
+      "0",
+      "0",
+      "3882"
+    ]
+  ],
+  "direct_exit": 0,
+  "same_failure_signature": false,
+  "saved_before_post_runtime_guard": true,
+  "parent_full_failure_preserved": true
+}

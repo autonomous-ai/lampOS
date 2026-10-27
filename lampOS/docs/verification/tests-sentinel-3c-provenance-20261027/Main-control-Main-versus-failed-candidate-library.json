@@ -1,0 +1,27 @@
+{
+  "candidate_sha256": "e730ab4ee620a6daf40cc21cf7197e77bacfea12beeda05f87527b5b5ad0b834",
+  "candidate_bytes": 117135192,
+  "Main_sha256": "e730ab4ee620a6daf40cc21cf7197e77bacfea12beeda05f87527b5b5ad0b834",
+  "Main_bytes": 117135192,
+  "SHA_equal": true,
+  "size_equal": true,
+  "profile_equal": true,
+  "features_equal": true,
+  "candidate_profile": {
+    "opt_level": "0",
+    "debuginfo": 0,
+    "debug_assertions": true,
+    "overflow_checks": true,
+    "test": true
+  },
+  "Main_profile": {
+    "opt_level": "0",
+    "debuginfo": 0,
+    "debug_assertions": true,
+    "overflow_checks": true,
+    "test": true
+  },
+  "candidate_features": [],
+  "Main_features": [],
+  "no_exoneration_or_cause_claim": true
+}

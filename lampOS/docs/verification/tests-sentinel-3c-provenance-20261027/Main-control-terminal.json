@@ -1,0 +1,56 @@
+{
+  "status": "CONTROL_COMPLETE",
+  "baseline_head": "3c9838fea6591410cdf534d27088615021c8df30",
+  "baseline_actual_parent": "51a1e46958caf4766de90ae57bc28f22f29eee92",
+  "candidate_owner_head": "3a554a97c60e8d4f27b0b6dae10f52f113697c04",
+  "runtime_attempts": 1,
+  "parent_full_result": "FAIL/native1/Rust101;3867/1/15 retained",
+  "prior_3866_0_15": "Original992 source only",
+  "single_Main_PASS_is_inconclusive": true,
+  "candidate_or_full_library_qualification_claim": false,
+  "ready_for_push": false,
+  "compiled_library_comparison": {
+    "candidate_sha256": "e730ab4ee620a6daf40cc21cf7197e77bacfea12beeda05f87527b5b5ad0b834",
+    "candidate_bytes": 117135192,
+    "Main_sha256": "e730ab4ee620a6daf40cc21cf7197e77bacfea12beeda05f87527b5b5ad0b834",
+    "Main_bytes": 117135192,
+    "SHA_equal": true,
+    "size_equal": true,
+    "profile_equal": true,
+    "features_equal": true,
+    "candidate_profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "Main_profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "candidate_features": [],
+    "Main_features": [],
+    "no_exoneration_or_cause_claim": true
+  },
+  "control_counts": {
+    "passed": 1,
+    "failed": 0,
+    "ignored": 0,
+    "filtered": 3882
+  },
+  "direct_Rust_exit": 0,
+  "same_failure_signature": false,
+  "isolated_Main_PASS_inconclusive": true,
+  "source_unchanged": true,
+  "candidate_owner_unchanged": true,
+  "sealed_and_actual_guards": true,
+  "protected_count": 520,
+  "actual_count": 3,
+  "owned_groups_closed": true,
+  "unresolved_owned_pids": [],
+  "lease_released": true
+}

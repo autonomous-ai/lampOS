@@ -1,0 +1,16 @@
+{"event": "start", "label": "cmd-fmt", "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/sentinel-3c983-full-lib-gates-prep"}
+{"event": "finish", "label": "cmd-fmt", "exit_code": 0, "wall_seconds": 12.833268}
+{"event": "start", "label": "cmd-metadata", "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/sentinel-3c983-full-lib-gates-prep"}
+{"event": "finish", "label": "cmd-metadata", "exit_code": 0, "wall_seconds": 1.474378}
+{"event": "start", "label": "cmd-strict", "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/sentinel-3c983-full-lib-gates-prep"}
+{"event": "finish", "label": "cmd-strict", "exit_code": 0, "wall_seconds": 227.528354}
+{"event": "start", "label": "cmd-workspace", "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/sentinel-3c983-full-lib-gates-prep"}
+{"event": "finish", "label": "cmd-workspace", "exit_code": 0, "wall_seconds": 170.633786}
+{"event": "start", "label": "cmd-Voice-lib-compile", "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/sentinel-3c983-full-lib-gates-prep"}
+{"event": "finish", "label": "cmd-Voice-lib-compile", "exit_code": 0, "wall_seconds": 144.396367}
+{"event": "start", "label": "cmd-inventory-all", "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/sentinel-3c983-full-lib-gates-prep"}
+{"event": "finish", "label": "cmd-inventory-all", "exit_code": 0, "wall_seconds": 3.718705}
+{"event": "start", "label": "cmd-inventory-ignored", "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/sentinel-3c983-full-lib-gates-prep"}
+{"event": "finish", "label": "cmd-inventory-ignored", "exit_code": 0, "wall_seconds": 0.190122}
+{"event": "start", "label": "cmd-full-Voice-lib", "folder": "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/sentinel-3c983-full-lib-gates-prep"}
+{"event": "finish", "label": "cmd-full-Voice-lib", "exit_code": 101, "wall_seconds": 733.859924}

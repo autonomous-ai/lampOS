@@ -1,0 +1,54 @@
+{
+  "command": [
+    "/private/tmp/tests-restart-f9-cargo-20261027_root/debug/deps/lamp_voice-6d619bbdd1df3a0d",
+    "--exact",
+    "coordinator::tests::second_route::a_push_mid_search_drops_its_looks_picture",
+    "--test-threads=1"
+  ],
+  "cwd": "/private/tmp/tests-ready-speaking-1c-20261026/lampOS",
+  "started_at": "2026-10-27T16:19:54.653826+00:00",
+  "timeout_seconds": 120,
+  "stdout": "cmd-exact-Main-control.stdout.txt",
+  "stderr": "cmd-exact-Main-control.stderr.txt",
+  "timeout_cleanup": [
+    {
+      "action": "leader exited unreaped; no other owned group members",
+      "members": [
+        {
+          "pid": 24281,
+          "state": "Z"
+        }
+      ]
+    }
+  ],
+  "timed_out": false,
+  "disk_reserve_breached": false,
+  "stop_reason": null,
+  "process_group_scope": "Owned group only; no detached-descendant cleanup claim.",
+  "group_closure_method": "WNOWAIT leader reservation and ps group inventory before reap",
+  "launch_state": "Popen_recorded",
+  "disk_reserve_bytes": 2214592512,
+  "disk_sample_interval_seconds": 1,
+  "disk_paths": [
+    "/Users/autonomous/harnesses/worktrees/autonomous-os/kind-glacier/.harness/handoff/tests-preserved-20261026/recovery/evidence/sentinel-3c-main-second-route-control-prep",
+    "/private/tmp/tests-restart-f9-cargo-20261027_root"
+  ],
+  "disk_samples": 2,
+  "disk_last_available_bytes": 12831678464,
+  "disk_minimum_available_bytes": 12831678464,
+  "available_bytes_before_Cargo": 12831756288,
+  "owned_pid": 24281,
+  "owned_process_group": 24281,
+  "direct_wait_status": 0,
+  "exit_code": 0,
+  "owned_group_absent_after_cleanup": true,
+  "unexpected_owned_descendants": false,
+  "unresolved_owned_pids": [],
+  "compiler_lease_held": false,
+  "wall_seconds": 1.416913,
+  "finished_at": "2026-10-27T16:19:56.070843+00:00",
+  "stdout_sha256": "4ef702b86b971c2c890d0de70e618eb33a6d1d99cf7b8403d4692a2acc76bd4a",
+  "stdout_bytes": 203,
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stderr_bytes": 0
+}
