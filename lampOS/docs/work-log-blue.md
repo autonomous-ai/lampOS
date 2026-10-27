@@ -657,3 +657,4 @@ Ready for lamp-voice: yes (#2553), once its ARM64 run is green
 - 22:36: #3847 merged in train 246 (f943086b3). Opened its comment P3 follow-up (blue/pin-comment 1be302a37; three comments "before any frame"; Python 36, JS 33, clippy clean).
 - 22:39: #3836 merged (1d97a2c6d, reviewer-lead). Reviewer-lead no finding on #3875 1be302a37; NEXT TRAIN when CI is green.
 - 22:44: Reviewer-two on #3875: P1/P2 none, gate-only HOLD (ARM64 completion, latest base); ARM64 pending. NEXT TRAIN when green. Nine's #3876 (lamp-control product unit, off) up for the skill-push path.
+- 22:49: quiet tick; #3875 ARM64 pending.
