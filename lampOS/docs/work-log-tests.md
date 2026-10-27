@@ -1,5 +1,13 @@
 # Tests work log
 
+## 2026-10-28 02:13 — Skills original native green; current reads pending
+
+Ready for lamp-voice: no (current independent reads and latest-base disposition remain).
+
+[Skills current native audit](verification/tests-skills-afd-native-20261028/) binds original ARM40563875974/Linux40563875822 attempt-one success: **7,798 unique passes, zero bad or selected unrun**,53 aggregate skips. All558 Linux Skills cases, the addon caller, both Routine controls and allthree source-confirmed Linux binary cases pass once; nine source ignores remain unrun. Mac555/0/9 is separate. Actualbb9541e31 [90846c808,afd9585cf] differs from authored by14 tracked entries; all43 bound Skills/package/CI inputs match. Auxiliary results stay separate; artifact metadata only, no payload. Old failures remain unchanged.
+
+Reader's ecc34ddf5/a17 module gate runs in the released Body cache. A once-only matched full Maina17 control without the Restart patch runs in the warm cache; the candidate's3882/1/15 remains failed. Mood/Ready current source carries await their gates/prerequisite; updater installed acceptance remains with its holder. No device access.
+
 ## 2026-10-28 02:03 — Restart full current Voice gate fails the Reader assertion
 
 Ready for lamp-voice: no (#3572 full gate failed; matched baseline and Reader prerequisite remain).
