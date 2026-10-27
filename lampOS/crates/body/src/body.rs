@@ -2179,8 +2179,12 @@ impl<P: PortIo, R: Runtime> Bus<'_, P, R> {
     }
 
     /// Whether `goal` may be written to `joint`. A head or base goal must be
-    /// 0..=4095: their goals are bounded where they are made, and the head
-    /// is sent home in one write at the end. An arm goal must be inside
+    /// inside its joint's window (0..=4095 without `LAMP_BODY_OWN_RANGES`),
+    /// or, for a joint that lies past its window (last read, else last
+    /// written), between where it lies and the window and inside its own
+    /// stored range: back toward the window, never farther out (#3504).
+    /// Their goals are bounded where they are made, and the head is sent
+    /// home in one write at the end. An arm goal must be inside
     /// its joint's window, and either
     /// within `ARM_GOAL_STEP` of the goal last written to it (before one,
     /// of where it was read), or between that goal and where it was last
@@ -2192,7 +2196,17 @@ impl<P: PortIo, R: Runtime> Bus<'_, P, R> {
         let (low, high) = self.window(joint);
         let read = self.good[joint.index()];
         let from = self.goals[joint.index()].or(read);
-        let allowed = (low..=high).contains(&goal)
+        // A head or base joint resting past its window (held there, or
+        // brought there by a hand) may be sent back toward it: a goal
+        // between where it is and the window, inside its stored range.
+        let (low_in, high_in) = match (arm, read.or(self.goals[joint.index()])) {
+            (None, Some(at)) => (low.min(at), high.max(at)),
+            _ => (low, high),
+        };
+        let (min, max) = self.ranges[joint.index()];
+        let inside = (low..=high).contains(&goal)
+            || ((low_in..=high_in).contains(&goal) && (min..=max).contains(&goal));
+        let allowed = inside
             && (arm.is_none()
                 || from.is_none_or(|from| goal.abs_diff(from) <= ARM_GOAL_STEP)
                 || read.is_some_and(|at| {
