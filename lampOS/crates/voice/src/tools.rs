@@ -1469,14 +1469,15 @@ fn run_call_with_scope(
             // words the line did not keeps that line instead (#2176).
             // With `LAMP_MEMORY_EVENTS`, a `remember`'s `on` is kept only
             // when the words heard in its line name a day (#1693).
+            // A line that is only a yes, with no offer to keep before it,
+            // keeps nothing; a yes to the lamp's offer is held against the
+            // line the offer was about (#3504, N6).
+            if let Some(told) = crate::remember::heard::yes_alone(call, request, heard, lease) {
+                return ("the memory", (told, true));
+            }
             let words =
                 (heard && call.name == crate::remember::REMEMBER && call.args.get("on").is_some())
-                    .then(|| {
-                        crate::thread::THREAD
-                            .lock()
-                            .ok()?
-                            .heard_for(request, std::time::Instant::now())
-                    })
+                    .then(|| crate::remember::heard::words_for(request, lease))
                     .flatten();
             let model = call;
             let dated = crate::remember::on::call_as_heard(call, words.as_deref());
@@ -1488,12 +1489,7 @@ fn run_call_with_scope(
             let heard_words = (heard
                 && model.name == crate::remember::REMEMBER
                 && crate::remember::replaces_on())
-            .then(|| {
-                crate::thread::THREAD
-                    .lock()
-                    .ok()?
-                    .heard_for(request, std::time::Instant::now())
-            })
+            .then(|| crate::remember::heard::words_for(request, lease))
             .flatten();
             let heard_kept = crate::remember::heard::on().then_some(as_heard.is_some());
             let (told, answered) = crate::remember::noted::remember_noted(

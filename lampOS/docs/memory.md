@@ -662,8 +662,29 @@ passed. Tests: the notes' exact texts in `remember::tests`.
     `note` or `"existing": true` (nothing new written) is left as it is;
     the "kept what they said" note is added only when the store wrote a
     new entry.
+  - **A yes is not what was asked to be kept** (#3504, N6). On lamp-06c1
+    on 27 Oct, "Want me to keep that?" then "Yes, please." kept "They said:
+    Yes, please." (2 of 2), and the correction it was for was not made. A
+    line that is only a yes (`remember::heard::only_a_yes`: yes, yeah, ok,
+    sure, please, go ahead, ừ, vâng, có, được, dạ … with at most six words,
+    all of a short tail list such as please, thanks, rồi, nhé, ạ) is held
+    instead against the person's line that the lamp's answer before it was
+    to, when that answer asked and offered to keep or change something
+    (keep, remember, save, note, replace, update, change, ghi, nhớ, lưu,
+    thay: `offers_to_keep`), began within 45 s and was made in the scope the
+    `remember` writes to (`Thread::offered_line`, compared with the
+    request's admitted person, `None` for the room's, never the face at the
+    lamp: a yes from someone else must not keep another's words in their
+    scope, Reviewer-three's P2 on #3683). A heard line kept so keeps the model's
+    `replaces`, since it is the line the offer was about. With no such
+    offer, a `remember` in a line that is only a yes keeps nothing: the
+    model is told to ask what to keep, and the journal says so with no
+    words. The `on` check and the REPLACES journal line use the same words.
+    A line that says more than yes ("Yes, my dog is called Moe") is its own,
+    as ever. No extra round: one thread lookup in the call.
   - Tests: `remember::heard::tests` (the two lamp-06c1 lines, a paraphrase,
-    off, nothing heard, the lead-in, the cap, the line's own words).
+    off, nothing heard, the lead-in, the cap, the line's own words, the yes
+    forms, a yes to an offer and to none, a correction after a yes).
 - **A note for each new session.** Every session is told that it has a
   memory and when to consult it ("when someone asks about an earlier
   conversation, or about something they told you before that you do not
