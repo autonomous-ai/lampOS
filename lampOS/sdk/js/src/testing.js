@@ -23,6 +23,17 @@ import * as schema from './schema.js';
 import { HELLO, b64, pinOf, proof, unb64 } from './keys.js';
 
 const now = () => new Date().toISOString();
+
+// What lamp-control refuses today, in its own words (crates/control/src/
+// parts.rs, `waits_for`): pass it as `refuses` for a fake that answers as a
+// lamp does now. `lamp fake` does.
+export const LAMP_CONTROL_REFUSES = Object.freeze({
+  look: "not routed yet: waits for the body's lease socket",
+  joints: "not routed yet: waits for the body's lease socket",
+  express: 'not routed yet: waits for the feelings skill',
+  play: 'not routed yet: waits for client packages',
+  sound: 'not routed yet: waits for client packages',
+});
 const SPKI_ED25519 = Buffer.from('302a300506032b6570032100', 'hex');
 const LEASE_OPS = new Set(['look', 'move', 'play', 'joints']);
 
@@ -44,8 +55,10 @@ export class FakeLamp {
   }
 
   // `autoDone: false` leaves a play's or say's `done` to the test.
-  constructor({ code = '12345678', grants = ['body', 'light', 'speak'], lampId = 'lamp-fake', name = 'Fake lamp', autoDone = true } = {}) {
-    Object.assign(this, { code, grants: [...grants], host: '127.0.0.1', port: 0, pin: '', fp: '', autoDone });
+  // `refuses`: ops refused `refused` with this why, as a lamp that doesn't
+  // route them yet does (LAMP_CONTROL_REFUSES); none by default.
+  constructor({ code = '12345678', grants = ['body', 'light', 'speak'], lampId = 'lamp-fake', name = 'Fake lamp', autoDone = true, refuses = {} } = {}) {
+    Object.assign(this, { code, grants: [...grants], host: '127.0.0.1', port: 0, pin: '', fp: '', autoDone, refuses: { ...refuses } });
     this.asker = new Map();
     this.lamp = { id: lampId, name, v: schema.VERSION };
     this.clients = new Map();
@@ -190,6 +203,7 @@ export class FakeLamp {
       const held = [...this.leases].filter(([, h]) => h.ws === ws && h.parts.includes('body')).map(([l]) => l);
       if (!held.length || (op === 'joints' && !held.includes(request.lease))) return this.refuse(ws, id, 'no_lease', 'take a body lease first');
     }
+    if (op in this.refuses) return this.refuse(ws, id, 'refused', this.refuses[op]);
     this.requests.push(request);
     this.asker.set(id, ws);
     switch (op) {

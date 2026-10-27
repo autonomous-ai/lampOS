@@ -62,6 +62,18 @@ def _certificate() -> tuple[bytes, bytes]:
     return cert.public_bytes(serialization.Encoding.PEM), pem_key
 
 
+# What lamp-control refuses today, in its own words (crates/control/src/
+# parts.rs, `waits_for`): pass it as `refuses=` for a fake that answers as a
+# lamp does now. `lamp fake` does.
+LAMP_CONTROL_REFUSES = {
+    "look": "not routed yet: waits for the body's lease socket",
+    "joints": "not routed yet: waits for the body's lease socket",
+    "express": "not routed yet: waits for the feelings skill",
+    "play": "not routed yet: waits for client packages",
+    "sound": "not routed yet: waits for client packages",
+}
+
+
 def _now() -> str:
     return datetime.datetime.now().astimezone().isoformat(timespec="seconds")
 
@@ -79,8 +91,12 @@ class FakeLamp:
         lamp_id: str = "lamp-fake",
         name: str = "Fake lamp",
         auto_done: bool = True,
+        refuses: dict[str, str] | None = None,
     ):
         self.code = code
+        # Ops refused `refused` with this why, as a lamp that doesn't route
+        # them yet does (LAMP_CONTROL_REFUSES); none by default.
+        self.refuses = dict(refuses or {})
         # gesture, move and play end with `done` at once; False leaves it to
         # the test (`done`).
         self.auto_done = auto_done
@@ -289,6 +305,9 @@ class FakeLamp:
             if not held or (op == "joints" and request["lease"] not in held):
                 await self._refuse(ws, id_, "no_lease", "take a body lease first")
                 return
+        if op in self.refuses:
+            await self._refuse(ws, id_, "refused", self.refuses[op])
+            return
         self.requests.append(request)
         self._asker[id_] = ws
         if op == "subscribe":
