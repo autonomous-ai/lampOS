@@ -370,7 +370,8 @@ fn manage(command: &str, given: &[String]) -> ExitCode {
         // to `lamp-skills-manage.socket`; the journal says what was done.
         // `install` fetches the package itself, over HTTPS within
         // `package::FETCH_WITHIN`, and takes it only signed with the Store
-        // key (`--key-file`, `package::STORE_KEY` by default),
+        // key (`--dir`'s `package::BUILD_STORE_KEY` when a build put one
+        // there, else `--key-file`, `package::STORE_KEY` by default),
         // and only with the Store's switch on in its own environment
         // (`package::STORE_SWITCH`): off, an install is refused as
         // `lamp-cloud` refuses it, whoever asked, and a remove still runs.
@@ -398,6 +399,7 @@ fn manage(command: &str, given: &[String]) -> ExitCode {
             let key_file = key_file.unwrap_or_else(|| package::STORE_KEY.into());
             let store_on = package::store_ready(
                 std::env::var(package::STORE_SWITCH).ok().as_deref(),
+                &dir,
                 &key_file,
             );
             let mut web = match store_on

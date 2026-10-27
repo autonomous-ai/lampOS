@@ -780,7 +780,15 @@ change nothing new on the lamp, and an install puts new code there, so the page 
 its server and its key are not. Without it, `not on this lamp:
 skills.install`. Install writes `/etc/lampOS/skills/store.env` with the
 switch off, and both parts read it. The product cloud unit also defaults
-the Store to off; placing a key does not turn it on. `lamp-cloud` is not the only gate:
+the Store to off; placing a key does not turn it on. `lamp-cloud` reads
+the key as the helper does (the build's
+`/var/lib/lampOS/skills/store-key.pub`, else the factory's; #3692,
+`lamp_skills::package::store_keys`), but once, at its start: a round that
+brings the first valid key needs `lamp-cloud` started again before the
+app is offered installs. The build that first ships the key also ships the
+`lamp-cloud` that reads it, and the round restarts that part, after the
+settings are written; a later rotation needs no restart, since the helper
+reads the key for every install. `lamp-cloud` is not the only gate:
 root's manage helper checks the switch and key itself and, off or without
 a valid key, refuses an install with the same words whoever asked, while
 a remove still runs. Its installed `store.conf` prepares the network even
@@ -798,8 +806,9 @@ key step and the single shared switch to change after it.
   fetches nothing: a network message never puts code on the lamp through
   it (the first builder, 18:33).
 - **What the helper does** ([skills.md](skills.md), "From the Skills
-  Store"): checks the request again; reads the Store's key
-  (`/etc/lampOS/skills/store-key.pub`); fetches the package itself over HTTPS
+  Store"): checks the request again; reads the Store's key (a build's
+  `/var/lib/lampOS/skills/store-key.pub`, else the factory's
+  `/etc/lampOS/skills/store-key.pub`); fetches the package itself over HTTPS
   (redirects only to https, at most 18 MiB, within 25 s); checks the
   entry's `sha256` against the bytes; checks `lamp-skill.sig` against the
   key before the manifest is read; checks the package as any install does
@@ -817,8 +826,10 @@ key step and the single shared switch to change after it.
   `/etc/lampOS/skills/store-key.pub`, named by
   `lamp_skills::package::STORE_KEY` and the helper unit's `--key-file`.
   Factory step 3 takes it with `--store-key FILE`, as a 32-byte Ed25519
-  public key in base64. No fallback reads the update key. The helper's
-  explicit `--key-file` override remains available for a manual run.
+  public key in base64. A build's key in the skills folder wins over it,
+  one or two keys a line for a rotation ([skills.md](skills.md), step 2,
+  #3692). No fallback reads the update key. The helper's explicit
+  `--key-file` override remains available for a manual run.
 - **The reply** is `skills.list`'s, read after the install, as a remove's.
   A refusal is the helper's words on one line (at most 300 bytes), for
   example `not installed: it carries no lamp-skill.sig: …` or `not

@@ -1559,14 +1559,30 @@ nothing written before the last step:
    printable ASCII with no space and no user; `sha256` 64 lowercase hex;
    `name` a skill's name; `version` `MAJOR.MINOR.PATCH`. `http://`,
    `file://` and anything else is refused unfetched.
-2. **The key.** The Store's public key,
+2. **The key** (`package::store_keys`, read again for every install, so
+   no restart follows a new key). The build's key wins:
+   `/var/lib/lampOS/skills/store-key.pub` (`package::BUILD_STORE_KEY` in
+   the unit's `--dir`, #3692), which a build ships as a setting (root's,
+   0644; [updates.md](updates.md), "Settings and tmpfiles"). It holds one
+   or two keys, one a line, each 32 bytes of Ed25519 in canonical base64
+   (`^[A-Za-z0-9+/]{43}=$`, `manifest::read_public_keys`): two while the
+   Store rotates its key, and the signature's `key` fingerprint picks the
+   line; a third key is refused. Without that file, the factory's key,
    `/etc/lampOS/skills/store-key.pub` (`package::STORE_KEY`, the unit's
-   `--key-file`): 32 bytes of Ed25519 in base64, the same format
-   `lamp-update` reads. Missing or invalid, nothing is fetched. Factory
-   step 3 places it with `--store-key FILE`; neither setup nor install
-   invents or copies a key. There is no fallback to the update channel's
+   `--key-file`), one key in the same format. Factory step 3 places it
+   with `--store-key FILE`; neither setup nor install invents or copies a
+   key. A build's file that is there but can't be read or isn't one or two
+   keys refuses every install, said with its name, and the factory's key
+   is **not** taken in its place: the build's file means the Store moved
+   off the factory's key, which may be the very one it rotated away from.
+   A remove, the app's off and on, and the skills already installed go on.
+   The round writes a build's file again only while it is still the
+   build's, so a damaged one is mended by hand. Missing or invalid,
+   nothing is fetched. There is no fallback to the update channel's
    `/etc/lampOS/update/key.pub`. A manual `--key-file` remains an explicit
-   override of the Store key path.
+   override of the factory key's path. The file is no skill: the loader
+   loads folders only, a skill's name has no dot, and the helper's remove,
+   install and sweep never touch a plain file.
 3. **The fetch.** By `lamp-update`'s own HTTPS client (rustls, the web's
    roots): one GET, at most 5 redirects, each only to https (a redirect to
    `http://` or `file://` is refused), into memory, at most 18 MiB (a

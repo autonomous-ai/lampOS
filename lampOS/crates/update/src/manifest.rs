@@ -74,8 +74,10 @@ pub const MOST_SHIPPED: usize = 64;
 pub const MOST_SETTINGS: usize = 128;
 pub const MOST_SETTINGS_BYTES: usize = 160 * 1024;
 /// The settings a build may carry: these files, and any file under these
-/// folders. Never a key, setup's answers, the lamp's own poses or the
-/// update key: those are the person's or the lamp's (docs/updates.md).
+/// folders. Never a secret key, setup's answers, the lamp's own poses or
+/// the update key: those are the person's or the lamp's (docs/updates.md).
+/// The one key a build carries is the Skills Store's public key in the
+/// skills folder (`install::STORE_KEY_SETTING`, #3692).
 pub const SETTING_FILES: &[&str] = &["/etc/lampOS/records.json", "/etc/tmpfiles.d/lampos.conf"];
 pub const SETTING_FOLDERS: &[&str] = &[
     "/etc/lampOS/expression/",
@@ -587,6 +589,32 @@ pub fn read_public_key(text: &str) -> Result<[u8; 32], Refused> {
     bytes
         .try_into()
         .map_err(|_| refused("the public key is not 32 bytes"))
+}
+
+/// The most keys a key file of several holds: a key's new and old during a
+/// rotation.
+pub const MOST_PUBLIC_KEYS: usize = 2;
+
+/// Up to [`MOST_PUBLIC_KEYS`] public keys, one a line, each exactly as the
+/// factory writes one (`^[A-Za-z0-9+/]{43}=$`, 32 bytes): the Skills
+/// Store's key as a build ships it (#3692). Nothing else on a line, no
+/// blank line, and at least one key; a signature's fingerprint picks the
+/// line.
+pub fn read_public_keys(text: &str) -> Result<Vec<[u8; 32]>, Refused> {
+    let keys = text
+        .lines()
+        .map(|line| match line.len() {
+            44 => read_public_key(line),
+            _ => Err(refused("a line is not one key in base64")),
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    if keys.is_empty() || keys.len() > MOST_PUBLIC_KEYS {
+        return Err(refused(format!(
+            "{} keys, and it holds 1 to {MOST_PUBLIC_KEYS}, one a line",
+            keys.len()
+        )));
+    }
+    Ok(keys)
 }
 
 /// A private key, from its file: an unencrypted PKCS#8 Ed25519 key in

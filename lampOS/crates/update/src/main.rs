@@ -261,13 +261,17 @@ fn make_manifest(options: &BTreeMap<String, String>) -> Result<(), String> {
                 .map_err(|error| format!("{lamp}: {error}"))?
         }
     };
-    // With the settings, setup's reset plan, in its own field (#806).
+    // With the settings, setup's reset plan, in its own field (#806), and
+    // the Skills Store's key when the repository has one (#3692).
     let (settings, reset_plan) = match options.get("settings").map(String::as_str) {
         None | Some("off") => (Vec::new(), None),
-        Some("on") => (
-            install::product_settings(),
-            Some(install::reset_plan_setting()),
-        ),
+        Some("on") => {
+            let mut settings = install::product_settings();
+            settings.extend(install::store_key_setting(Path::new(wanted(
+                options, "deploy",
+            )?))?);
+            (settings, Some(install::reset_plan_setting()))
+        }
         Some(_) => return Err("--settings is on or off".into()),
     };
     let models = match options.get("models") {

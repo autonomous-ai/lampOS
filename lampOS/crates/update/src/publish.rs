@@ -468,6 +468,73 @@ mod tests {
                 .any(|path| path.starts_with("/var/lib/lampOS/skills/"))
         );
     }
+    /// The Skills Store's key (#3692): carried as a setting at
+    /// `install::STORE_KEY_SETTING`, 0644, only when the repository has
+    /// the file, and only as one or two keys a lamp would take. Its path is
+    /// one the settings writer takes, and that writer's places are pinned
+    /// here as build 7071's fixed copy has them (its `manifest.rs:79-84`),
+    /// so a lamp still on 7071's `lamp-update-back` writes it.
+    #[test]
+    fn the_stores_key_is_carried_only_when_the_repository_has_it() {
+        assert_eq!(
+            manifest::SETTING_FILES,
+            ["/etc/lampOS/records.json", "/etc/tmpfiles.d/lampos.conf"]
+        );
+        assert_eq!(
+            manifest::SETTING_FOLDERS,
+            [
+                "/etc/lampOS/expression/",
+                "/etc/lampOS/controls/",
+                "/var/lib/lampOS/skills/",
+            ]
+        );
+        assert_eq!(manifest::SETTING_MODES, ["0644", "0600"]);
+        let folder = tempfile::tempdir().unwrap();
+        let deploy = folder.path().join("deploy");
+        assert_eq!(crate::install::store_key_setting(&deploy), Ok(None));
+        let source = deploy.join(crate::install::STORE_KEY_SOURCE);
+        fs::create_dir_all(source.parent().unwrap()).unwrap();
+        let two = format!("{}=\n{}=\n", "A".repeat(43), "Q".repeat(43));
+        fs::write(&source, &two).unwrap();
+        let setting = crate::install::store_key_setting(&deploy).unwrap().unwrap();
+        assert_eq!(setting.path, crate::install::STORE_KEY_SETTING);
+        assert_eq!(setting.text.as_deref(), Some(two.as_str()));
+        assert_eq!(setting.mode.as_deref(), Some("0644"));
+        let mut settings = crate::install::product_settings();
+        settings.push(setting);
+        manifest::check_settings(&settings).unwrap();
+        // Carried into a manifest whole.
+        let out = folder.path().join("out");
+        fs::create_dir_all(&out).unwrap();
+        fs::write(out.join("lamp-update"), b"update").unwrap();
+        let skills = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../skills");
+        let made = make_with(
+            &out,
+            &deploy,
+            &skills,
+            "lamp-voice",
+            10,
+            &"e".repeat(40),
+            "https://channel.test/build-10/",
+            None,
+            Vec::new(),
+            settings.clone(),
+            Vec::new(),
+            None,
+        )
+        .unwrap();
+        assert_eq!(made.settings, settings);
+        // A file a lamp would refuse is no build's.
+        for wrong in [
+            String::new(),
+            "not a key\n".to_owned(),
+            format!("{two}{}=\n", "g".repeat(43)),
+        ] {
+            fs::write(&source, wrong).unwrap();
+            assert!(crate::install::store_key_setting(&deploy).is_err());
+        }
+    }
+
     #[test]
     fn the_images_files_are_carried_with_the_updater_they_need() {
         let folder = tempfile::tempdir().unwrap();

@@ -761,6 +761,37 @@ mod tests {
         assert_eq!(fs::read_to_string(at("a/skill.toml")).unwrap(), "old");
     }
 
+    /// The Store's key a build ships beside the skills (#3692,
+    /// `install::STORE_KEY_SETTING`) is no product skill's file: the plan
+    /// never names it, the guard's staged folder keeps it, and writing and
+    /// putting back the skills leave it as it was.
+    #[test]
+    fn the_stores_key_beside_the_skills_is_left_alone() {
+        let folder = tempfile::tempdir().unwrap();
+        let root = folder.path();
+        let key = on_root(root, crate::install::STORE_KEY_SETTING);
+        assert_eq!(key.parent().unwrap(), on_root(root, FOLDER));
+        fs::create_dir_all(key.parent().unwrap()).unwrap();
+        fs::write(&key, "the build's key\n").unwrap();
+        let new = bundle(&[("a/skill.toml", "new")]);
+        let steps = plan(root, &new, &BTreeMap::new(), &BTreeMap::new()).unwrap();
+        assert!(
+            steps
+                .iter()
+                .all(|step| step.path != crate::install::STORE_KEY_SETTING)
+        );
+        let staged = root.join("staged");
+        stage(root, FOLDER, &steps, &staged).unwrap();
+        assert_eq!(
+            fs::read_to_string(staged.join("store-key.pub")).unwrap(),
+            "the build's key\n"
+        );
+        let backs = backs(root, &steps).unwrap();
+        write(root, &steps).unwrap();
+        restore(root, &backs, &mut |_| {}).unwrap();
+        assert_eq!(fs::read_to_string(&key).unwrap(), "the build's key\n");
+    }
+
     /// The reviewer on #2585: a core skill's file that is now a link is
     /// changed with nothing to keep: what it points at never reaches the
     /// journal, and the build's file replaces the link, not its target.
