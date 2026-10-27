@@ -1528,6 +1528,7 @@ fn second_route_worker_environment(
         crate::second_provider::PREPARED_ENVIRONMENT,
         crate::second_provider::OPEN_NAME_ENVIRONMENT,
         crate::second_provider::NAME_CARRIES_ENVIRONMENT,
+        crate::second_provider::FIRST_SECONDS_QUIET_ENVIRONMENT,
         lamp_msgs::NameHeard::NEAR_ENVIRONMENT,
         crate::second_provider::OWN_ECHO_ENVIRONMENT,
         crate::second_provider::FACE_NAME_ENVIRONMENT,
@@ -1649,6 +1650,7 @@ mod tests {
             crate::second_provider::CUE_AFTER_ENVIRONMENT,
             crate::second_provider::OPEN_NAME_ENVIRONMENT,
             crate::second_provider::NAME_CARRIES_ENVIRONMENT,
+            crate::second_provider::FIRST_SECONDS_QUIET_ENVIRONMENT,
             lamp_msgs::NameHeard::NEAR_ENVIRONMENT,
             crate::second_provider::OWN_ECHO_ENVIRONMENT,
             crate::second_provider::FACE_NAME_ENVIRONMENT,
@@ -2275,6 +2277,7 @@ mod tests {
                     || name == crate::second_provider::CUE_AFTER_ENVIRONMENT
                     || name == crate::second_provider::OPEN_NAME_ENVIRONMENT
                     || name == crate::second_provider::NAME_CARRIES_ENVIRONMENT
+                    || name == crate::second_provider::FIRST_SECONDS_QUIET_ENVIRONMENT
                     || name == lamp_msgs::NameHeard::NEAR_ENVIRONMENT
                     || name == crate::second_provider::OWN_ECHO_ENVIRONMENT
                     || name == crate::second_provider::FACE_NAME_ENVIRONMENT
@@ -2368,6 +2371,7 @@ mod tests {
                     "LAMP_BUSY_ENDS_SOONER=on",
                     "LAMP_EYES_SPEAKING=on",
                     "LAMP_FACE_GAP_HOLD=on",
+                    "LAMP_FIRST_SECONDS_QUIET=on",
                     "LAMP_FORGET_ASKED=off",
                     "LAMP_GOING_ON_NOT_OWN=on",
                     "LAMP_JOIN_CUT_WORDS=on",

@@ -3159,6 +3159,19 @@ pub fn serve(
                 }),
             );
         }
+        // Right after a start, the ears' quiet room shows the room quiet for
+        // the name's join, never just unknown (`LAMP_FIRST_SECONDS_QUIET`,
+        // #3711).
+        if std::env::var(crate::second_provider::FIRST_SECONDS_QUIET_ENVIRONMENT)
+            .is_ok_and(|value| value == "on")
+        {
+            eprintln!(
+                "lamp-voice second: right after a start, a line in a room not yet known is kept as said in a quiet room for a join when the ears' quiet is a quiet room's and no talk was left alone and no other voice heard since (LAMP_FIRST_SECONDS_QUIET)"
+            );
+            if let Ok(mut heeding) = heeding.lock() {
+                heeding.showing_the_first_seconds_quiet();
+            }
+        }
         // The rule keeps the route's one reader of the Policy's decisions,
         // which a line going on reads too (`LAMP_GOING_ON_ASKS`, below).
         if let Some(verdicts) = verdicts {
@@ -4364,6 +4377,11 @@ pub(crate) struct Heeding {
     /// [`crate::same_voice::DIFFERENT_BELOW`] against it, or seen spoken by
     /// two faces. Gone when a line is judged with no conversation going on.
     another_person: Option<u64>,
+    /// `LAMP_FIRST_SECONDS_QUIET` ([`Self::showing_the_first_seconds_quiet`]),
+    /// and whether another person was heard or seen speaking in any line
+    /// since the start: never cleared, unlike [`Self::another_person`].
+    first_seconds_quiet: bool,
+    another_since_start: bool,
 }
 
 /// How the room was as a line was judged, for a join on no sign of a
@@ -4972,6 +4990,13 @@ const LEVEL_EVERY: Duration = Duration::from_millis(100);
 /// A level older than this is let go: longer than a line replayed to this
 /// route takes to be heard.
 const LEVELS_KEPT_US: u64 = 30_000_000;
+/// The ears' quiet at or under which the room around the lamp is a quiet
+/// one, in dBFS (`LAMP_FIRST_SECONDS_QUIET`, [`Heeding::ears_show_quiet`]):
+/// about 5 dB over lamp-4ace's resting -51.5 at the pinned capture level
+/// (docs/ears.md). A quiet that sits higher has steady sound in it, talk
+/// or music; a lamp whose capture level isn't pinned reads it higher too
+/// (lamp-75c9's -37.6), and is left unknown. A first choice.
+const FIRST_SECONDS_QUIET_FLOOR_DB: f32 = -46.0;
 
 impl Heeding {
     pub(crate) fn new(
@@ -5063,6 +5088,8 @@ impl Heeding {
             rooms: None,
             in_view: None,
             another_person: None,
+            first_seconds_quiet: false,
+            another_since_start: false,
         }
     }
 
@@ -5073,6 +5100,37 @@ impl Heeding {
     /// second person ([`Self::same_speaker`]).
     pub(crate) fn keeping_line_rooms(&mut self) {
         self.rooms = Some(std::collections::VecDeque::new());
+    }
+
+    /// `LAMP_FIRST_SECONDS_QUIET` (#3711): a line kept for a join
+    /// ([`Self::keep_line_room`]) in a room the route keeps itself, unknown
+    /// only for want of history right after a start
+    /// ([`crate::room_told::RoomTold::unknown_for_want_of_history`]), is kept
+    /// as said in a quiet room when the ears show one
+    /// ([`Self::ears_show_quiet`]) and no other person was heard or seen
+    /// speaking in any line since the start. On lamp-4ace on 26 Oct, a bare
+    /// "Lamp.", a pause, then the request, the first line after a start
+    /// with nobody in view, was held and had to be said twice: no eyes and
+    /// an unknown room never joined. Only the join reads it: the rule's
+    /// verdicts and the room told are as before.
+    pub(crate) fn showing_the_first_seconds_quiet(&mut self) {
+        self.first_seconds_quiet = true;
+    }
+
+    /// The ears' quiet (`ears/level`'s floor, fresh within a second), when
+    /// it is a quiet room's: at or under [`FIRST_SECONDS_QUIET_FLOOR_DB`].
+    /// None without the bus, a fresh level or a floor learned yet.
+    fn ears_show_quiet(&self) -> Option<f32> {
+        let (bus, _) = self.bus.as_ref()?;
+        let message = bus.latest(lamp_msgs::RoomSound::TOPIC).ok()??;
+        if unix_ms(SystemTime::now()).saturating_sub(message.header.at_unix_ms) >= 1_000 {
+            return None;
+        }
+        message
+            .parse::<lamp_msgs::RoomSound>()
+            .ok()?
+            .floor_db
+            .filter(|floor| *floor <= FIRST_SECONDS_QUIET_FLOOR_DB)
     }
 
     /// A line that begins with the lamp's name, said to a face turned to the
@@ -5369,17 +5427,41 @@ impl Heeding {
         going_on: bool,
         another: bool,
     ) {
+        if self.rooms.is_none() {
+            return;
+        }
+        if another {
+            self.another_since_start = true;
+        }
+        // `LAMP_FIRST_SECONDS_QUIET`: right after a start, the ears' quiet
+        // room, never just an unknown one.
+        let room = if self.first_seconds_quiet
+            && self.keeps_room
+            && room == crate::room_told::Room::Unknown
+            && !self.another_since_start
+            && crate::room_told::room()
+                .lock()
+                .is_ok_and(|mut told| told.unknown_for_want_of_history(monotonic_us()))
+            && let Some(floor) = self.ears_show_quiet()
+        {
+            eprintln!(
+                "lamp-voice second: request {request}: the room is not known yet after the start, and the ears' quiet is {floor:.1} dBFS with no talk left alone and no other voice since: kept as said in a quiet room for a join (LAMP_FIRST_SECONDS_QUIET)"
+            );
+            crate::room_told::Room::Quiet
+        } else {
+            room
+        };
+        let in_view = self
+            .in_view
+            .take()
+            .filter(|(of, _)| *of == request)
+            .and_then(|(_, faces)| faces);
         let Some(rooms) = self.rooms.as_mut() else {
             return;
         };
         if rooms.len() == SPOKE_KEPT {
             rooms.pop_front();
         }
-        let in_view = self
-            .in_view
-            .take()
-            .filter(|(of, _)| *of == request)
-            .and_then(|(_, faces)| faces);
         rooms.push_back((request, LineRoom { in_view, room }));
         if !going_on {
             self.another_person = None;
@@ -18432,6 +18514,141 @@ mod tests {
             kept("d", 0, lamp_msgs::Room::Unknown),
             Joined::Not(_)
         ));
+    }
+
+    /// `LAMP_FIRST_SECONDS_QUIET` (#3711): right after a start the room is
+    /// unknown only for want of history, and on lamp-4ace on 26 Oct a bare
+    /// "Lamp.", a pause, then the request, with nobody in view, was held and
+    /// had to be said twice. With the switch, the ears' quiet (a quiet
+    /// room's floor) and no talk left alone and no other voice since the
+    /// start show the room quiet for the join: the name carries to its
+    /// request. Another voice heard since the start, talk left alone, a
+    /// floor over a quiet room's or no fresh level, two faces in view, or
+    /// the switch off: held, as before.
+    #[test]
+    fn right_after_a_start_the_ears_quiet_room_lets_a_bare_name_join_its_request() {
+        use crate::room_told::Room;
+        use lamp_msgs::{Face, Faces, RoomSound};
+        /// How the first seconds after the start went.
+        #[derive(Clone, Copy)]
+        struct Start {
+            /// The ears' quiet, in dBFS; none: no level from the ears.
+            floor: Option<f32>,
+            /// Faces in the eyes' newest look at each line.
+            in_view: usize,
+            /// A line said and left alone since the start.
+            talk: bool,
+            /// A line in another voice since the start, its conversation
+            /// over before the name.
+            other_voice: bool,
+            on: bool,
+        }
+        let quiet = Start {
+            floor: Some(-52.0),
+            in_view: 0,
+            talk: false,
+            other_voice: false,
+            on: true,
+        };
+        let run = |name: &str, start: Start| {
+            let root = std::path::PathBuf::from(format!("/tmp/lq{name}-{}", std::process::id()));
+            let _ = std::fs::remove_dir_all(&root);
+            std::fs::create_dir_all(&root).unwrap();
+            let bus = lamp_bus::Bus::new(&root).unwrap();
+            let mut eyes = bus
+                .publisher_declared(Faces::TOPIC, &Faces::declaration(), "eyes")
+                .unwrap();
+            let mut ears = bus
+                .publisher_declared(RoomSound::TOPIC, &RoomSound::declaration(), "ears")
+                .unwrap();
+            let now = monotonic_us();
+            {
+                // The voice has just started: the room's watch begins now.
+                let mut room = crate::room_told::room().lock().unwrap();
+                *room = crate::room_told::RoomTold::new();
+                assert_eq!(room.at(now), Room::Unknown);
+                if start.talk {
+                    room.heard(90, now);
+                    room.ended(90, now);
+                    assert!(room.unanswered(90, now));
+                }
+            }
+            let mut heeding = Heeding::new(true, true, Some(&root), None);
+            heeding.as_the_only_voice(false, true, false);
+            heeding.keeping_line_rooms();
+            if start.on {
+                heeding.showing_the_first_seconds_quiet();
+            }
+            if start.other_voice {
+                heeding.keep_line_room(98, Room::Unknown, true, true);
+                heeding.keep_line_room(99, Room::Unknown, false, false);
+            }
+            if let Some(floor) = start.floor {
+                ears.publish_json(
+                    monotonic_us(),
+                    &RoomSound {
+                        level_db: floor + 1.0,
+                        floor_db: Some(floor),
+                        own_voice: false,
+                    },
+                )
+                .unwrap();
+            }
+            for request in [1, 2] {
+                eyes.publish_json(
+                    monotonic_us(),
+                    &Faces {
+                        faces: (0..start.in_view)
+                            .map(|n| Face {
+                                speaking: None,
+                                id: format!("f{n}"),
+                                xmin: 0.4,
+                                ymin: 0.3,
+                                xmax: 0.6,
+                                ymax: 0.6,
+                                confidence: 1.0,
+                                yaw: Some(0.1),
+                                facing: Some(true),
+                            })
+                            .collect(),
+                    },
+                )
+                .unwrap();
+                let at = monotonic_us();
+                heeding.keep_unjudged(request, (at.saturating_sub(1_000_000), at));
+            }
+            let _ = std::fs::remove_dir_all(&root);
+            *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
+            heeding.one_speaker(1, 2)
+        };
+        assert!(
+            matches!(run("a", quiet), Joined::NoSecond(why) if why.contains("a quiet room")),
+            "nobody in view, the ears' quiet room, nothing else since the start"
+        );
+        assert!(
+            matches!(run("b", Start { other_voice: true, ..quiet }), Joined::Not(why) if why.ends_with("not known to be quiet")),
+            "another voice heard since the start"
+        );
+        assert!(
+            matches!(run("c", Start { floor: Some(-38.0), ..quiet }), Joined::Not(why) if why.ends_with("not known to be quiet")),
+            "a room whose quiet is loud"
+        );
+        assert!(
+            matches!(run("d", Start { talk: true, ..quiet }), Joined::Not(why) if why.ends_with("not known to be quiet")),
+            "talk left alone since the start"
+        );
+        assert!(
+            matches!(run("e", Start { floor: None, ..quiet }), Joined::Not(why) if why.ends_with("not known to be quiet")),
+            "no level from the ears"
+        );
+        assert!(
+            matches!(run("f", Start { in_view: 2, ..quiet }), Joined::Not(why) if why.contains("2 faces in view")),
+            "two faces in view"
+        );
+        assert!(
+            matches!(run("g", Start { on: false, ..quiet }), Joined::Not(why) if why.ends_with("not known to be quiet")),
+            "the switch off"
+        );
     }
 
     /// The same rule's verdicts as the engine asks them: the owner's request
