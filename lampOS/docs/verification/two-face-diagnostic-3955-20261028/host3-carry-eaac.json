@@ -1,0 +1,520 @@
+{
+  "bank_released": true,
+  "candidate_base": "89823095e69dcbafaa5b3b79733c17ecf9d8e8f7",
+  "compiler_stages": 4,
+  "counts": {
+    "failed": 0,
+    "ignored": 0,
+    "passed": 3
+  },
+  "executed_base": "2b73dd03073947c62b3d10593f293aa9ab954410",
+  "executed_patch_sha256": "6de9cd03d3b2b3acd588f2ae8e18ddd12b3bf938e639fb35d200292b7bde8a62",
+  "expected_panics": 0,
+  "five_scenarios": [
+    {
+      "actual_held": "a busy room: someone is turned to the lamp, but nothing else shows it was called",
+      "actual_room": "Busy",
+      "actual_signs": [
+        {
+          "at": {
+            "mono_us": 230427341692,
+            "unix_ms": 1793142105237
+          },
+          "event": "actual_signs_read",
+          "in_view": 2,
+          "turned": true
+        }
+      ],
+      "calling_log_dropped": 0,
+      "existing_latest_reads": [
+        {
+          "after": {
+            "mono_us": 230427341505,
+            "unix_ms": 1793142105237
+          },
+          "before": {
+            "mono_us": 230427341217,
+            "unix_ms": 1793142105237
+          },
+          "message": {
+            "at_unix_ms": 1793142105128,
+            "at_us": 230427232404,
+            "expired": false,
+            "expires_ms": 2000,
+            "seq": 8
+          },
+          "reader": "someone_turned_to_lamp"
+        },
+        {
+          "after": {
+            "mono_us": 230427341671,
+            "unix_ms": 1793142105237
+          },
+          "before": {
+            "mono_us": 230427341535,
+            "unix_ms": 1793142105237
+          },
+          "message": {
+            "at_unix_ms": 1793142105128,
+            "at_us": 230427232404,
+            "expired": false,
+            "expires_ms": 2000,
+            "seq": 8
+          },
+          "reader": "faces_in_view"
+        }
+      ],
+      "held_on": true,
+      "observed_two_face_span_us": 2148085,
+      "parsed_reader_receipts": 8,
+      "policy_at_us": 230427341715,
+      "policy_cutoff_us": null,
+      "policy_epoch": 0,
+      "policy_final_event": "policy_threshold_operands",
+      "policy_latest_age_us": 109311,
+      "policy_look_count": 8,
+      "policy_max_gap_us": 309821,
+      "policy_two_face_look_count": 8,
+      "privacy": false,
+      "publications": 8,
+      "published_at_us_without_parsed_receipt": [],
+      "published_queue_totals": {
+        "delivered": 8,
+        "dropped": 0,
+        "removed": 0
+      },
+      "reader_event_counts": {
+        "admission_begin": 8,
+        "admitted": 8,
+        "policy_enter": 1,
+        "policy_threshold_operands": 1,
+        "received_after_parse": 8
+      },
+      "reader_log_dropped": 0,
+      "scenario": 1,
+      "threshold_operands": {
+        "count": 8,
+        "first_us": 230425084319,
+        "last_us": 230427232404
+      }
+    },
+    {
+      "actual_held": null,
+      "actual_room": "Unknown",
+      "actual_signs": [
+        {
+          "at": {
+            "mono_us": 230428495245,
+            "unix_ms": 1793142106391
+          },
+          "event": "actual_signs_read",
+          "in_view": 2,
+          "turned": true
+        }
+      ],
+      "calling_log_dropped": 0,
+      "existing_latest_reads": [
+        {
+          "after": {
+            "mono_us": 230428495088,
+            "unix_ms": 1793142106391
+          },
+          "before": {
+            "mono_us": 230428494869,
+            "unix_ms": 1793142106391
+          },
+          "message": {
+            "at_unix_ms": 1793142106288,
+            "at_us": 230428392145,
+            "expired": false,
+            "expires_ms": 2000,
+            "seq": 12
+          },
+          "reader": "someone_turned_to_lamp"
+        },
+        {
+          "after": {
+            "mono_us": 230428495231,
+            "unix_ms": 1793142106391
+          },
+          "before": {
+            "mono_us": 230428495104,
+            "unix_ms": 1793142106391
+          },
+          "message": {
+            "at_unix_ms": 1793142106288,
+            "at_us": 230428392145,
+            "expired": false,
+            "expires_ms": 2000,
+            "seq": 12
+          },
+          "reader": "faces_in_view"
+        }
+      ],
+      "held_on": true,
+      "observed_two_face_span_us": 0,
+      "parsed_reader_receipts": 4,
+      "policy_at_us": 230428495253,
+      "policy_cutoff_us": null,
+      "policy_epoch": 0,
+      "policy_final_event": "policy_threshold_operands",
+      "policy_latest_age_us": 103108,
+      "policy_look_count": 4,
+      "policy_max_gap_us": 309361,
+      "policy_two_face_look_count": 1,
+      "privacy": false,
+      "publications": 4,
+      "published_at_us_without_parsed_receipt": [],
+      "published_queue_totals": {
+        "delivered": 5,
+        "dropped": 0,
+        "removed": 0
+      },
+      "reader_event_counts": {
+        "admission_begin": 4,
+        "admitted": 4,
+        "policy_enter": 1,
+        "policy_threshold_operands": 1,
+        "received_after_parse": 4
+      },
+      "reader_log_dropped": 0,
+      "scenario": 2,
+      "threshold_operands": {
+        "count": 1,
+        "first_us": 230428392145,
+        "last_us": 230428392145
+      }
+    },
+    {
+      "actual_held": null,
+      "actual_room": "Unknown",
+      "actual_signs": [
+        {
+          "at": {
+            "mono_us": 230430545597,
+            "unix_ms": 1793142108441
+          },
+          "event": "actual_signs_read",
+          "in_view": 1,
+          "turned": true
+        }
+      ],
+      "calling_log_dropped": 0,
+      "existing_latest_reads": [
+        {
+          "after": {
+            "mono_us": 230430545446,
+            "unix_ms": 1793142108441
+          },
+          "before": {
+            "mono_us": 230430545227,
+            "unix_ms": 1793142108441
+          },
+          "message": {
+            "at_unix_ms": 1793142108332,
+            "at_us": 230430436546,
+            "expired": false,
+            "expires_ms": 2000,
+            "seq": 19
+          },
+          "reader": "someone_turned_to_lamp"
+        },
+        {
+          "after": {
+            "mono_us": 230430545582,
+            "unix_ms": 1793142108441
+          },
+          "before": {
+            "mono_us": 230430545462,
+            "unix_ms": 1793142108441
+          },
+          "message": {
+            "at_unix_ms": 1793142108332,
+            "at_us": 230430436546,
+            "expired": false,
+            "expires_ms": 2000,
+            "seq": 19
+          },
+          "reader": "faces_in_view"
+        }
+      ],
+      "held_on": true,
+      "parsed_reader_receipts": 7,
+      "policy_at_us": 230430545605,
+      "policy_cutoff_us": null,
+      "policy_epoch": 0,
+      "policy_final_event": "policy_newest_under_two",
+      "policy_latest_age_us": 109059,
+      "policy_look_count": 7,
+      "policy_max_gap_us": 309812,
+      "policy_two_face_look_count": 6,
+      "privacy": false,
+      "publications": 7,
+      "published_at_us_without_parsed_receipt": [],
+      "published_queue_totals": {
+        "delivered": 8,
+        "dropped": 0,
+        "removed": 0
+      },
+      "reader_event_counts": {
+        "admission_begin": 7,
+        "admitted": 7,
+        "policy_enter": 1,
+        "policy_newest_under_two": 1,
+        "received_after_parse": 7
+      },
+      "reader_log_dropped": 0,
+      "scenario": 3,
+      "threshold_operands": null
+    },
+    {
+      "actual_held": null,
+      "actual_room": "Unknown",
+      "actual_signs": [
+        {
+          "at": {
+            "mono_us": 230433046029,
+            "unix_ms": 1793142110942
+          },
+          "event": "actual_signs_read",
+          "in_view": 2,
+          "turned": true
+        }
+      ],
+      "calling_log_dropped": 0,
+      "existing_latest_reads": [
+        {
+          "after": {
+            "mono_us": 230433045877,
+            "unix_ms": 1793142110942
+          },
+          "before": {
+            "mono_us": 230433045625,
+            "unix_ms": 1793142110941
+          },
+          "message": {
+            "at_unix_ms": 1793142110833,
+            "at_us": 230432937366,
+            "expired": false,
+            "expires_ms": 2000,
+            "seq": 28
+          },
+          "reader": "someone_turned_to_lamp"
+        },
+        {
+          "after": {
+            "mono_us": 230433046015,
+            "unix_ms": 1793142110942
+          },
+          "before": {
+            "mono_us": 230433045893,
+            "unix_ms": 1793142110942
+          },
+          "message": {
+            "at_unix_ms": 1793142110833,
+            "at_us": 230432937366,
+            "expired": false,
+            "expires_ms": 2000,
+            "seq": 28
+          },
+          "reader": "faces_in_view"
+        }
+      ],
+      "held_on": true,
+      "parsed_reader_receipts": 9,
+      "policy_at_us": 230433046037,
+      "policy_cutoff_us": 230432937355,
+      "policy_epoch": 2,
+      "policy_final_event": "policy_empty",
+      "policy_latest_age_us": null,
+      "policy_look_count": 0,
+      "policy_max_gap_us": null,
+      "policy_two_face_look_count": 0,
+      "privacy": true,
+      "publications": 9,
+      "published_at_us_without_parsed_receipt": [],
+      "published_queue_totals": {
+        "delivered": 10,
+        "dropped": 0,
+        "removed": 0
+      },
+      "reader_event_counts": {
+        "admission_begin": 9,
+        "admitted": 8,
+        "policy_empty": 1,
+        "policy_enter": 1,
+        "received_after_parse": 9,
+        "rejected_privacy": 1
+      },
+      "reader_log_dropped": 0,
+      "scenario": 4,
+      "threshold_operands": null
+    },
+    {
+      "actual_held": "a busy room: someone is turned to the lamp, but nothing else shows it was called",
+      "actual_room": "Busy",
+      "actual_signs": [
+        {
+          "at": {
+            "mono_us": 230433176705,
+            "unix_ms": 1793142111072
+          },
+          "event": "actual_signs_read",
+          "in_view": 2,
+          "turned": true
+        }
+      ],
+      "calling_log_dropped": 0,
+      "existing_latest_reads": [
+        {
+          "after": {
+            "mono_us": 230433176593,
+            "unix_ms": 1793142111072
+          },
+          "before": {
+            "mono_us": 230433176412,
+            "unix_ms": 1793142111072
+          },
+          "message": {
+            "at_unix_ms": 1793142110968,
+            "at_us": 230433072547,
+            "expired": false,
+            "expires_ms": 2000,
+            "seq": 29
+          },
+          "reader": "someone_turned_to_lamp"
+        },
+        {
+          "after": {
+            "mono_us": 230433176695,
+            "unix_ms": 1793142111072
+          },
+          "before": {
+            "mono_us": 230433176605,
+            "unix_ms": 1793142111072
+          },
+          "message": {
+            "at_unix_ms": 1793142110968,
+            "at_us": 230433072547,
+            "expired": false,
+            "expires_ms": 2000,
+            "seq": 29
+          },
+          "reader": "faces_in_view"
+        }
+      ],
+      "held_on": false,
+      "parsed_reader_receipts": 0,
+      "policy_at_us": null,
+      "policy_cutoff_us": null,
+      "policy_epoch": null,
+      "policy_final_event": null,
+      "policy_latest_age_us": null,
+      "policy_look_count": 0,
+      "policy_max_gap_us": null,
+      "policy_two_face_look_count": 0,
+      "privacy": false,
+      "publications": 1,
+      "published_at_us_without_parsed_receipt": [
+        230433072547
+      ],
+      "published_queue_totals": {
+        "delivered": 1,
+        "dropped": 0,
+        "removed": 0
+      },
+      "reader_event_counts": {},
+      "reader_log_dropped": null,
+      "scenario": 5,
+      "threshold_operands": null
+    }
+  ],
+  "limits": [
+    "Current host diagnostic only; no original ARM cause or failure waiver.",
+    "Publication queue counts are distinct from parsed ingestion. Unmatched publication receipts do not identify transport/parse failure.",
+    "Reader log is after parse under existing lock; malformed/unparsed frames are unobserved.",
+    "Policy snapshots identify the actual query boundary; later ingestion may appear in the same report and is not retroactive policy evidence.",
+    "Latest None is absent-or-error, not a proved expiry. No test clock, real-bus threshold, delay or assertion was changed.",
+    "Observer work can affect timing; this patch does not repair nondeterministic fixture stimulus."
+  ],
+  "no_Cargo_or_test_replay": true,
+  "observation_sha256": "32c54aabf06a774141e560b71e65534a15a9a6f7025882e45f90ed20ebbe7f82",
+  "old_ARM": {
+    "FAIL": 3,
+    "PASS": 6466,
+    "run": 40588908587,
+    "selected_unrun": 1336,
+    "unchanged": true
+  },
+  "postguard_sha256": "99363be55e380e38fb002cc9660e19f878a2ee60352535b7eb3ccb3889f27e12",
+  "receipt_sha256": "83327f3491c321bfdb56262b2feefa5050a7bf6953bcd44ab920aad682026b8a",
+  "runtime_processes": 3,
+  "saved_at_release": 194,
+  "setup_error_preserved": true,
+  "source_carry": {
+    "actual_local_emission_package_dirs": [
+      "lampOS/crates/actions",
+      "lampOS/crates/audio",
+      "lampOS/crates/body",
+      "lampOS/crates/bus",
+      "lampOS/crates/camera",
+      "lampOS/crates/controls",
+      "lampOS/crates/ears",
+      "lampOS/crates/expression",
+      "lampOS/crates/gemini",
+      "lampOS/crates/health",
+      "lampOS/crates/ipc",
+      "lampOS/crates/keeper",
+      "lampOS/crates/lean",
+      "lampOS/crates/local-time",
+      "lampOS/crates/msgs",
+      "lampOS/crates/near-call",
+      "lampOS/crates/policy",
+      "lampOS/crates/ring",
+      "lampOS/crates/schedule",
+      "lampOS/crates/tasks",
+      "lampOS/crates/turn-end-wire",
+      "lampOS/crates/turn-owner",
+      "lampOS/crates/voice",
+      "lampOS/crates/voice-processes",
+      "lampOS/third_party/sonora"
+    ],
+    "all_Main_changed_paths": [
+      "lampOS/tools/played/README.md",
+      "lampOS/tools/played/make-skill-test.sh",
+      "lampOS/tools/played/make-skill.sh",
+      "lampOS/tools/played/stand-in.sh"
+    ],
+    "all_captured_driver_source_hashes_still_match": true,
+    "all_driver_base_inputs_unchanged": true,
+    "artifact_manifest_sha256": "0e3656118cf0ada20eeb6b6eef342aab05d362000ac093b305f5aa3bc7d9a03f",
+    "bank_read": false,
+    "changed_paths_in_actual_emitted_local_packages": [],
+    "global_inputs_equal": {
+      "lampOS/.cargo/config.toml": true,
+      "lampOS/Cargo.lock": true,
+      "lampOS/Cargo.toml": true
+    },
+    "new_base": "89823095e69dcbafaa5b3b79733c17ecf9d8e8f7",
+    "new_tree": "e59d86bdcd0a5318f7d82328642d12a5984d9f97",
+    "old_base": "2b73dd03073947c62b3d10593f293aa9ab954410",
+    "raw_depinfo_SHA_and_parsed_sources_retained_in_artifact_manifest": true,
+    "raw_depinfo_copy_retained": false
+  },
+  "status": "HOST_DIAGNOSTIC3_PASS_NOT_REPAIR_OR_ORIGINAL_ARM_CLEARANCE",
+  "unknown_panics": [],
+  "witnesses": {
+    "lamp-voice::lamp_voice::second_provider::worker::tests::with_two_faces_held_looks_between_lines_make_the_first_line_busy": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-voice::lamp_voice::second_provider::worker::tests::with_two_faces_held_privacy_late_looks_and_clock_steps_leave_no_busy_room": {
+      "own": false,
+      "pass_once": true
+    },
+    "lamp-voice::lamp_voice::second_provider::worker::tests::with_two_faces_held_two_faces_must_stay": {
+      "own": false,
+      "pass_once": true
+    }
+  }
+}
