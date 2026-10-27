@@ -20,6 +20,8 @@ lamp-msgs = { path = "../msgs" }
 # The parts it routes to: light requests on the bus, the monotonic clock.
 lamp-bus = { path = "../bus" }
 lamp-ipc = { path = "../ipc" }
+# The quiet hours, one definition with lamp-skills (#3924).
+lamp-local-time = { path = "../local-time" }
 serde.workspace = true
 serde_json.workspace = true
 # Pairing's proof (HMAC-SHA256), hello's signature (Ed25519) and the nonces,

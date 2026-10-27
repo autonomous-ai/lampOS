@@ -1887,6 +1887,7 @@ dependencies = [
  "futures-util",
  "lamp-bus",
  "lamp-ipc",
+ "lamp-local-time",
  "lamp-msgs",
  "rcgen",
  "ring",
