@@ -1,0 +1,36 @@
+{
+  "status": "MAIN_FULL_CONTEXT_FAIL",
+  "head": "3c9838fea6591410cdf534d27088615021c8df30",
+  "Main_actual_HEAD_parent": "51a1e46958caf4766de90ae57bc28f22f29eee92",
+  "runtime_attempts": 1,
+  "scope": "ONE full unfiltered serial precompiled Main VoiceLIB context control",
+  "parent_case_PASS_inconclusive": true,
+  "original_candidate_full_failure": "FAIL/native1/Rust101;3867/1/15 retained",
+  "all_three_actual_executables_byte_identical_to_failed_candidate": true,
+  "candidate_live_source_lease": "Released by Root; archived provenance only",
+  "candidate_qualification_or_ready_claim": false,
+  "compiler_commands": 0,
+  "new_frozen_copies": 0,
+  "observed_counts": {
+    "passed": 3867,
+    "failed": 1,
+    "ignored": 15
+  },
+  "direct_Rust_exit": 101,
+  "actual_inventory_count": 3883,
+  "original_failed_case_rows": [
+    [
+      "coordinator::tests::second_route::a_push_mid_search_drops_its_looks_picture",
+      "ok"
+    ]
+  ],
+  "full_context_observation_only": true,
+  "no_historical_cause_or_failure_waiver": true,
+  "source_unchanged": true,
+  "sealed_and_actual_guards": true,
+  "protected_count": 520,
+  "actual_count": 3,
+  "owned_groups_closed": true,
+  "unresolved_owned_pids": [],
+  "lease_released": true
+}

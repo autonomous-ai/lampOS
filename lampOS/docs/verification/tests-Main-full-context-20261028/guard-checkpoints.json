@@ -1,0 +1,38 @@
+[
+  {
+    "point": "initial",
+    "Main_source_full_SHA": true,
+    "all_sealed_full_SHA": true,
+    "Main_source_tracked_stat6_and_exact_Git_identity": true,
+    "all_actual_SHA_and_six_attributes": true,
+    "consumed_module_and_sealed_module_SHA": true,
+    "live_candidate_owner_guard": false
+  },
+  {
+    "point": "before-full-context-runtime",
+    "Main_source_full_SHA": false,
+    "all_sealed_full_SHA": false,
+    "Main_source_tracked_stat6_and_exact_Git_identity": true,
+    "all_actual_SHA_and_six_attributes": true,
+    "consumed_module_and_sealed_module_SHA": true,
+    "live_candidate_owner_guard": false
+  },
+  {
+    "point": "after-full-context-runtime",
+    "Main_source_full_SHA": false,
+    "all_sealed_full_SHA": false,
+    "Main_source_tracked_stat6_and_exact_Git_identity": true,
+    "all_actual_SHA_and_six_attributes": true,
+    "consumed_module_and_sealed_module_SHA": true,
+    "live_candidate_owner_guard": false
+  },
+  {
+    "point": "final",
+    "Main_source_full_SHA": true,
+    "all_sealed_full_SHA": true,
+    "Main_source_tracked_stat6_and_exact_Git_identity": true,
+    "all_actual_SHA_and_six_attributes": true,
+    "consumed_module_and_sealed_module_SHA": true,
+    "live_candidate_owner_guard": false
+  }
+]

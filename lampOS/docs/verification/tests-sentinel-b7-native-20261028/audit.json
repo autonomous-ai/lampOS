@@ -1,0 +1,331 @@
+{
+  "subject": "Sentinel b7 original native CI",
+  "head": "b7dc8ee598b7a8fdd6ff7577db6cb6ee142f6521",
+  "authored_base": "0d1d1f2b944581169c9f96adba9f40ab88adba92",
+  "run": {
+    "id": 40543589247,
+    "html_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40543589247",
+    "event": "pull_request",
+    "run_attempt": 1,
+    "head_sha": "b7dc8ee598b7a8fdd6ff7577db6cb6ee142f6521",
+    "status": "completed",
+    "conclusion": "failure",
+    "created_at": "2026-10-27T16:42:42Z",
+    "updated_at": "2026-10-27T17:00:21Z"
+  },
+  "ARM64_job": {
+    "id": 122328134000,
+    "runner_labels": [
+      "ubuntu-22.04-arm"
+    ],
+    "conclusion": "failure"
+  },
+  "actual_source": {
+    "authority": "Raw checkout git log -1 --format=%H output; immutable commit/tree APIs",
+    "raw_log": "ARM64-job-122328134000.log",
+    "raw_log_sha256": "8e6118dbee036669f36d290a87174209b34f89bcd66698a09db7a229f075f59b",
+    "checkout_record": {
+      "sha": "333da72afc48b99d22054e102506559791221897",
+      "command_line": 290,
+      "sha_line": 291
+    },
+    "preview": "333da72afc48b99d22054e102506559791221897",
+    "ordered_parents": [
+      "0d1d1f2b944581169c9f96adba9f40ab88adba92",
+      "b7dc8ee598b7a8fdd6ff7577db6cb6ee142f6521"
+    ],
+    "tree": "a7f870276b026936bcece45163936a0e1fff57f4",
+    "full_tree_equals_authored": true,
+    "blob_count": 10908,
+    "both_authored_blobs_equal_actual": true,
+    "same_as_Linux_checkout": true
+  },
+  "nextest": {
+    "starting_line": 883,
+    "summary_line": 6018,
+    "following_group_line": 6345,
+    "start_raw": "2026-10-27T16:58:07.5763587Z     Starting 7783 tests across 70 binaries (53 tests and 119 binaries skipped)",
+    "summary_raw": "2026-10-27T17:00:19.6534070Z      Summary [ 132.077s] 5092/7783 tests run: 5091 passed, 1 failed, 53 skipped",
+    "selected": 7783,
+    "binaries": 70,
+    "aggregate_skips": 53,
+    "skipped_binaries": 119,
+    "execution_records": 5092,
+    "unique_identities": 5092,
+    "unique_ordinals": 5092,
+    "status_counts": {
+      "PASS": 5091,
+      "FAIL": 1
+    },
+    "duplicate_execution_identities": [],
+    "outside_terminal_records": [],
+    "post_summary_records": 23,
+    "reprints_all_classified": true,
+    "retry_flaky_records": [],
+    "selected_packages": [
+      "lamp-body",
+      "lamp-cloud",
+      "lamp-expression",
+      "lamp-keeper",
+      "lamp-lean",
+      "lamp-memory",
+      "lamp-peek",
+      "lamp-setup",
+      "lamp-skills",
+      "lamp-update",
+      "lamp-voice",
+      "lamp-voice-eval"
+    ],
+    "actual_selection_commands": [
+      {
+        "line": 817,
+        "raw": "2026-10-27T16:49:37.6258659Z filter='not (binary_id(lamp-ipc::relay_signals) | binary_id(lamp-turn-end-wire::process))'"
+      },
+      {
+        "line": 819,
+        "raw": "2026-10-27T16:49:37.6259724Z cargo nextest run --locked --release --workspace \\"
+      },
+      {
+        "line": 820,
+        "raw": "2026-10-27T16:49:37.6260104Z   --profile pr \\"
+      },
+      {
+        "line": 822,
+        "raw": "2026-10-27T16:49:37.6260713Z   --partition hash:1/1 \\"
+      },
+      {
+        "line": 826,
+        "raw": "2026-10-27T16:49:37.6278799Z   PICKED: package(=lamp-body) | package(=lamp-cloud) | package(=lamp-expression) | package(=lamp-keeper) | package(=lamp-lean) | package(=lamp-memory) | package(=lamp-peek) | package(=lamp-setup) | package(=lamp-skills) | package(=lamp-update) | package(=lamp-voice) | package(=lamp-voice-eval)"
+      }
+    ],
+    "post_summary_classification_counts": {
+      "success-output=final exact source override": 22,
+      "failure final-status reprint after Summary; exact identity/status/duration/ordinal/total match, later timestamp": 1
+    },
+    "selected_not_executed": 2691,
+    "cancellation_raw_line": 6013,
+    "not_run_warning_raw_line": 6326,
+    "nextest_command_exit": 100,
+    "test_run_id": "8ae2197c-19d2-4ef7-95b6-0fe736a3e00e",
+    "execution_accounting_limit": "One nextest execution-window terminal record per observed identity; the failed test intentionally invokes one child process internally. These child diagnostics and post-summary reprints are not additional nextest tests."
+  },
+  "Reader_audit": "Reader-case-audit.json",
+  "auxiliary_audit": "auxiliary-stage-audit.json",
+  "artifacts_metadata_only": [],
+  "Linux_original": 40543589242,
+  "Linux_conclusion": "success",
+  "historical_limits": [
+    "Mac candidate full VoiceLIB 3867 PASS/1 FAIL/15 ignored remains FAILED (Rust101/native1).",
+    "Main exact-case control1/0/0 is isolated and inconclusive; all3 Mac executables equal candidate bytes.",
+    "Full Main context control is separately owned by Root; its result is not inferred here.",
+    "Current native success does not establish a cause or waiver of any earlier failure.",
+    "Privileged dropped-identity DAC remains ignored/unrun; ordinary Reader success is not privileged/device acceptance.",
+    "No rerun/dispatch/source/ref/target/device mutation, compiler/test, archive or ARM binary access in this audit."
+  ],
+  "qualification_status": "FAILED; Reader native qualification incomplete",
+  "Reader_ordinary_passed": 0,
+  "Reader_ordinary_unreached": 15,
+  "failure_disposition": "failure-disposition.json",
+  "actual_CI_input_bindings": "actual-CI-input-bindings.json",
+  "ARM64_step_outcomes": [
+    {
+      "name": "Set up job",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "name": "system packages",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "name": "Run actions/checkout@v4",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "name": "publication failure tests (offline, no signing secret)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "name": "Rust 1.96.0",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "name": "artifact provenance regression (offline, disposable Cargo workspace)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "name": "stable promotion tests (offline, disposable test key)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "name": "restore the cache",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "name": "unchanged source files get the cached build's times back",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "name": "record fresh source times for a cold publication build",
+      "status": "completed",
+      "conclusion": "skipped"
+    },
+    {
+      "name": "Run taiki-e/install-action@v2",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "name": "build (release, the lamps' binaries)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "name": "every built lamp-* binary is classified for the lamp-os package",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "name": "build the two selected artifact examples without filename collisions",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "name": "publication CLI rehearsal (local test key and simulated GitHub only)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "name": "which crates a pull request tests",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "name": "test (full run, every test one at a time; otherwise without the realtime group, in parallel)",
+      "status": "completed",
+      "conclusion": "failure"
+    },
+    {
+      "name": "doc tests and the own-harness tests (nextest runs neither)",
+      "status": "completed",
+      "conclusion": "skipped"
+    },
+    {
+      "name": "export only current Cargo targets and their SHA-256",
+      "status": "completed",
+      "conclusion": "skipped"
+    },
+    {
+      "name": "Run actions/upload-artifact@v4",
+      "status": "completed",
+      "conclusion": "skipped"
+    },
+    {
+      "name": "discard the isolated example target before saving the cache",
+      "status": "completed",
+      "conclusion": "skipped"
+    },
+    {
+      "name": "save the cache",
+      "status": "completed",
+      "conclusion": "skipped"
+    },
+    {
+      "name": "Post Run actions/checkout@v4",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "name": "Complete job",
+      "status": "completed",
+      "conclusion": "success"
+    }
+  ],
+  "exact_head_checks": [
+    {
+      "id": 122338140490,
+      "name": "lampOS \u2014 sign and publish the tested lamp-voice artifact",
+      "head_sha": "b7dc8ee598b7a8fdd6ff7577db6cb6ee142f6521",
+      "status": "completed",
+      "conclusion": "skipped",
+      "details_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40543589247/job/122338140490"
+    },
+    {
+      "id": 122338139073,
+      "name": "report-full-run-failure",
+      "head_sha": "b7dc8ee598b7a8fdd6ff7577db6cb6ee142f6521",
+      "status": "completed",
+      "conclusion": "skipped",
+      "details_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40543589247/job/122338139073"
+    },
+    {
+      "id": 122328137055,
+      "name": "lampOS \u2014 promote a tested release to the stable feed",
+      "head_sha": "b7dc8ee598b7a8fdd6ff7577db6cb6ee142f6521",
+      "status": "completed",
+      "conclusion": "skipped",
+      "details_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40543589247/job/122328137055"
+    },
+    {
+      "id": 122328134000,
+      "name": "lampOS \u2014 build and test on Linux ARM64 (1/1)",
+      "head_sha": "b7dc8ee598b7a8fdd6ff7577db6cb6ee142f6521",
+      "status": "completed",
+      "conclusion": "failure",
+      "details_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40543589247/job/122328134000"
+    },
+    {
+      "id": 122328133901,
+      "name": "lampOS \u2014 clippy, every crate and target (x86 Linux)",
+      "head_sha": "b7dc8ee598b7a8fdd6ff7577db6cb6ee142f6521",
+      "status": "completed",
+      "conclusion": "success",
+      "details_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40543589242/job/122328133901"
+    },
+    {
+      "id": 122328098676,
+      "name": "Go (system) \u2014 build \u00b7 vet \u00b7 test",
+      "head_sha": "b7dc8ee598b7a8fdd6ff7577db6cb6ee142f6521",
+      "status": "completed",
+      "conclusion": "success",
+      "details_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40543579487/job/122328098676"
+    },
+    {
+      "id": 122328098115,
+      "name": "Web (system/web) \u2014 typecheck \u00b7 build \u00b7 lint",
+      "head_sha": "b7dc8ee598b7a8fdd6ff7577db6cb6ee142f6521",
+      "status": "completed",
+      "conclusion": "success",
+      "details_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40543579487/job/122328098115"
+    },
+    {
+      "id": 122328098064,
+      "name": "Python (hal) \u2014 unit tests \u00b7 syntax",
+      "head_sha": "b7dc8ee598b7a8fdd6ff7577db6cb6ee142f6521",
+      "status": "completed",
+      "conclusion": "success",
+      "details_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40543579487/job/122328098064"
+    },
+    {
+      "id": 122328097970,
+      "name": "Image builder \u2014 signatures \u00b7 bootstrap \u00b7 output",
+      "head_sha": "b7dc8ee598b7a8fdd6ff7577db6cb6ee142f6521",
+      "status": "completed",
+      "conclusion": "success",
+      "details_url": "https://github.com/autonomous-ai/lampOS/actions/runs/40543579487/job/122328097970"
+    }
+  ],
+  "classic_status_count": 0,
+  "branch_protection_required_set_audited": false,
+  "collection_manifest": "collection-manifest.json",
+  "post_close_verification": "collection-manifest-verification.json",
+  "collected_at_utc": "2026-10-27T17:04:02.156141+00:00"
+}

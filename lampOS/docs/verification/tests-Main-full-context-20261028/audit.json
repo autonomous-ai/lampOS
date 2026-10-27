@@ -1,0 +1,53 @@
+{
+  "head": "3c9838fea6591410cdf534d27088615021c8df30",
+  "status": "FAIL",
+  "counts": {
+    "ok": 3867,
+    "ignored": 15,
+    "FAILED": 1
+  },
+  "Rust_exit": 101,
+  "failed_cases": [
+    "session_reader::tests::group_lookup_failure_retains_private_logging_without_writer_failure"
+  ],
+  "original_push_case": [
+    [
+      "coordinator::tests::second_route::a_push_mid_search_drops_its_looks_picture",
+      "ok"
+    ]
+  ],
+  "all_case_and_ignored_inventory_identities_bind": true,
+  "compiled_commands": 0,
+  "new_frozen_copies": 0,
+  "all_three_executables_byte_identical_to_previous_failed_candidate": true,
+  "copies": {
+    "terminal.json": {
+      "sha256": "5d307b18ad6ec652e0bc75fb99f12a8b3b451c6ec433c14e8855d0b338e307d1",
+      "bytes": 1233
+    },
+    "native-controller-result.json": {
+      "sha256": "b992f65bf3606b6d685c8c9f9d297e0e310217cdb038a0c4cbd42d8d28bd4c39",
+      "bytes": 471
+    },
+    "observed-full-context-census.json": {
+      "sha256": "4be29a7dc928cced747b4714a4795cee92f6301fde003dfc0f42115089c51057",
+      "bytes": 933120
+    },
+    "cmd-full-Main-Voice-lib-context.json": {
+      "sha256": "79a19c708ae024f81bb1f2e32ae70ff19d566f1c1092b27d7f5091b132514485",
+      "bytes": 1943
+    },
+    "cmd-full-Main-Voice-lib-context.stdout.txt": {
+      "sha256": "3777a6b7310832cc2865b4e7a280216c8dd630017d5695b7ad8a49b37331b5d5",
+      "bytes": 386328
+    },
+    "cmd-full-Main-Voice-lib-context.stderr.txt": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "guard-checkpoints.json": {
+      "sha256": "e3de210e40ef573412bd916274e897731a87fa1ab9754a4f17b5a1c3e1a3e696",
+      "bytes": 1244
+    }
+  }
+}

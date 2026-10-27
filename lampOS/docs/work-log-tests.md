@@ -1,5 +1,15 @@
 # Tests work log
 
+## 2026-10-28 00:14 — native Reader fail-fast; Main Reader fallback finding
+
+Ready for lamp-voice: no (#3543 native Reader cases unreached; completion follow-up being qualified).
+
+[Original b7 native run](verification/tests-sentinel-b7-native-20261028/) ARM40543589247 failed **5091 PASS /1 FAIL /2691 selected unrun**,53 aggregate skips. The newer Main journal-order assertion failed before all15 ordinary Reader cases; none of those cases is qualified. Linux40543589242 strict passed on actual333da72af [0d1d1f2b9,b7dc8ee59], whose full tree equals b7. No retry or waiver.
+
+[Full unchanged-Main context](verification/tests-Main-full-context-20261028/) ended **3867/1/15**; push-mid-search passed, while the Reader failed-group bounded-finish health predicate failed without report-field diagnostics. All520 witnesses and three actual executables remained intact and groups closed. Retaining both failed full runs. The Reader final-data follow-up uses the existing completion event after the unchanged production-bounded finish, retains the original predicates and adds report diagnostics; no product code changed. Its exact two-file payload is formatted and the released cache is being bound for fresh gates.
+
+Posted HOLD on #3472 after independent source/original-CI review: no new source P1/P2, ARM9067/1/2692unrun, Linux strict green, physical/mixed-version acceptance still pending. Writer-refresh lifetime findings stay with Second's existing #3858 investigation; no new repair or runtime claim. The updater full affected-package gate continues separately. No device action.
+
 ## 2026-10-27 23:41 — Reader provenance; unchanged-Main isolated control
 
 Ready for lamp-voice: no (#3543 native qualification and full-context disposition pending; #3843 full gate active).
