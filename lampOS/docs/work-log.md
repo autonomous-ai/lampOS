@@ -1,3 +1,15 @@
+Ready for lamp-voice: no
+
+## Current checkpoint: 2026-10-27 07:16 +07, actual-ref carry fully qualified
+
+#3631 is **e19e98a7f/4bff5f2c5**, one equal patch from 220251, with query SHA 5c0d9bcc unchanged. The earlier PR-base metadata was stale; the actual public branch ref was verified directly before the carry push. [Current full host proof](verification/reset-query-bounds-20261026/current-e19/README.md): fmt, strict Setup/Cloud Clippy and **193/0/1 + 196/0/4 = 389/0/5**, all eight query controls once; runtime 22.512 s and actual/preserved guards close. The old-prefix negative stays at its original source and is not rerun or relabelled.
+
+[Original e19 native proof](verification/reset-query-bounds-20261026/native-e19/README.md): ARM **40424430721**, Linux Clippy **40424430554**, attempt 1, both success. Both actual checkouts use preview 1e7d58d39, ordered 4bff/e19 parents and authored-tree equality. Selected census **1,439 unique passes / 0 failures, leaks, timeouts, execution failures or selected unrun / 9 skipped**, all eight controls once. Separate process 13, docs 4, helper 25 and relay pass; no promotion/publication or CI rerun. Old 220251 and 9784 results remain historical. Current peer carry dispositions remain requested before train nomination; this is a default reset-read behavior change, with installed acceptance unclaimed.
+
+The log's 4bff rebase preserved all 10,302 prior authored blob/mode entries. The new Update output-reader piece is clean and frozen at 431b784c4/4bff. Its actual public-wrapper overflow negative compiled and failed as expected; the full scoped Update gate has passed fmt/strict Clippy and is compiling. No implementation runtime success is claimed yet. No device or release action.
+
+---
+
 Current status: #3631 repaired original native is green; exact-head peer disposition and readiness follow.
 
 ## Current checkpoint: 2026-10-27 06:52 +07, repaired original native qualified

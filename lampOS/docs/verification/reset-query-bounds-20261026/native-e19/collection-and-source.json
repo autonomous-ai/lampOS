@@ -1,0 +1,58 @@
+{
+  "all_eight_selector_declarations_present": true,
+  "authored_head": "e19e98a7fbd68ad4ea20c195e3b5fe79c644e9a6",
+  "collection_sha256": {
+    "all-nextest-terminal-rows.json": "cde5888d2c6eb87f47ccda82fe4992d5bf0782b3449906c809763bb6bf323e89",
+    "arm64-jobs-final.json": "8f35808e2bff70d064b9ed146531d127dc5afc57c0dc7f0f0677d7000e2402be",
+    "arm64-jobs-final.json.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "arm64-jobs-first.json": "4541ad0e0c576af3e17834c32ac82de771b43dca09cd3c257d63809fa5982128",
+    "arm64-jobs-first.json.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "arm64-log-fetch.json": "030fc3878daaa0471dd27944f0a46e1b1dfa4fcdbdf97fd885c66ce2cf574619",
+    "arm64-run-final.json": "728349f346cdc5e2fac3fa47aa47ac5d4f3e8b499a41ef84002c16481afc1774",
+    "arm64-run-final.json.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "arm64-run-first.json": "4c04c4e550dd1ecaedab08aa1ae191a4920dc18fbb8d4c7c7127e2a3b8f86011",
+    "arm64-run-first.json.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "arm64-watch.json": "bceef33411aa33c21f285a74277698034302a07bf1b35c7748f18f40fdb56da8",
+    "arm64-watch.log": "d8e2c920b8947e2f310e6cc81f8645d096c45ea7981aa750c17c61dad0ea8851",
+    "authored-commit.json": "b8fa9f1d88dc5f05ef8fa71b593c113ed1595892ceeb35435ac3a283256dc748",
+    "authored-commit.json.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "clippy-jobs-final.json": "5fff27ce1aaccb0f036bfd1f4065776b44997a8284b091afeb354c0905c76cd3",
+    "clippy-jobs-final.json.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "clippy-jobs-first.json": "5fff27ce1aaccb0f036bfd1f4065776b44997a8284b091afeb354c0905c76cd3",
+    "clippy-jobs-first.json.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "clippy-log-fetch.json": "030fc3878daaa0471dd27944f0a46e1b1dfa4fcdbdf97fd885c66ce2cf574619",
+    "clippy-run-final.json": "23b30128c71e6524da00981285ffaf61f8f4908a91f16f68e06a3a1f5875e699",
+    "clippy-run-final.json.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "clippy-run-first.json": "23b30128c71e6524da00981285ffaf61f8f4908a91f16f68e06a3a1f5875e699",
+    "clippy-run-first.json.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "clippy-watch.json": "0831a9c733b8c990b69afd288335974c6c84c097c17dbe032e627a799885938e",
+    "clippy-watch.log": "04f4eb74d84ace3a2a1655cb5089b835ef1cbe47c47d27bc470a845dac765e37",
+    "live-base-observation.json": "72387a97202cfd0f112b3c28b282dd05f067099cb4067b37b00ddce76a34e759",
+    "live-base-observation.json.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "preview-commit.json": "9cb1c6566877de6694efdfa909f9ce8b7b98b74ae8b48ce9e0b1a84bdac2b4f4",
+    "preview-commit.json.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "required-selectors.json": "fe7948d3eae3ddf2575e3c62cecd3652886185b4ccbbcae6db905661a360bf8c",
+    "watch-complete.json": "bbdad491a79c636e41d4b5bade31652fad404b9de7b9e5d829fbccb2ea5cf4df"
+  },
+  "live_ref_observation": {
+    "endpoint": "git/ref/heads/lamp-voice",
+    "scope": "single observation before terminal audit; not a perpetual freshness claim",
+    "sha": "4bff5f2c517bf64d4a32c31a90e0b24dc1a4810a"
+  },
+  "source_path": "lampOS/crates/setup/src/reset/query.rs",
+  "source_sha256": "5c0d9bcc352f8e90d0c30f8eb2ce7c506215280c47a35df9f56013e507e54866",
+  "watchers": {
+    "arm64": {
+      "deadline_seconds": 3600,
+      "elapsed_seconds": 36.621,
+      "exit_code": 0,
+      "interval_seconds": 30
+    },
+    "clippy": {
+      "deadline_seconds": 3600,
+      "elapsed_seconds": 1.039,
+      "exit_code": 0,
+      "interval_seconds": 30
+    }
+  }
+}

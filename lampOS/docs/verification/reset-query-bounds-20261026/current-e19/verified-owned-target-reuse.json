@@ -1,0 +1,23 @@
+{
+  "actual_executables_reverified_before_any_compiler": true,
+  "actual_preserved_outputs_and_depfiles_reverified_before_any_compiler": true,
+  "changed_source_entries": [
+    "lampOS/crates/memory/src/days.rs",
+    "lampOS/crates/memory/src/days_protocol.rs",
+    "lampOS/crates/memory/src/search.rs",
+    "lampOS/crates/memory/tests/it/days.rs",
+    "lampOS/crates/memory/tests/it/voice.rs",
+    "lampOS/crates/voice/src/remember.rs",
+    "lampOS/docs/memory-days.md",
+    "lampOS/docs/memory.md",
+    "lampOS/docs/vi/memory-days_vi.md"
+  ],
+  "new_empty_target": false,
+  "note": "Same exclusively owned target and worktree; prior full closure retained. No cold-target claim.",
+  "previous_artifact_closure_sha256": "e26eda5df48e44800ec113f8915c78bd0fe3a80fcd70c41ca532471d09ca9cbd",
+  "previous_complete_sha256": "e2de7b5cf7e3b0d85e6d2776bd977ef4faf485623683dd4f61a70282856d4acd",
+  "previous_head": "220251c703aedf6babb148439d6fabe9602edbda",
+  "previous_source_inventory_sha256": "48a1384bb5f816ac55dc48565f7e977e402bb93c2af726ef8a068f8e1229326f",
+  "source_worktree": "<source>",
+  "target": "<target>"
+}
