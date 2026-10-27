@@ -5362,13 +5362,17 @@ fn a_head_held_off_its_goal_by_a_hand_at_a_low_load_is_in_the_hand() {
 /// closing on it, not held. A hand holding it, or pushing it away, is not.
 #[test]
 fn a_joint_closing_on_its_goal_is_following_not_pushed() {
-    assert!(closing_on(2_061, 2_037, 2_025));
-    assert!(closing_on(1_700, 1_741, 1_768));
+    assert!(closing_on(2_061, 2_037, 2_025, 0));
+    assert!(closing_on(1_700, 1_741, 1_768, 0));
     // Held where it last tracked, or pushed away from its goal: a hand.
-    assert!(!closing_on(2_061, 2_025, 2_025));
-    assert!(!closing_on(2_061, 2_020, 2_025));
+    assert!(!closing_on(2_061, 2_025, 2_025, 0));
+    assert!(!closing_on(2_061, 2_020, 2_025, 0));
     // Lamp-52e6's base turned 38 counts off its goal by a hand.
-    assert!(!closing_on(2_015, 2_053, 2_015));
+    assert!(!closing_on(2_015, 2_053, 2_015, 0));
+    // Caught partway: nearer than where it tracked, but no nearer for a
+    // tenth of a second (the Reviewer-lead's P2 on #3925).
+    assert!(closing_on(2_215, 2_095, 2_015, FOLLOW_STILL_STEPS - 1));
+    assert!(!closing_on(2_215, 2_095, 2_015, FOLLOW_STILL_STEPS));
 }
 
 /// lamp-06c1, 23 Oct: a head pitch that reads 124 to 136 at its own rest,

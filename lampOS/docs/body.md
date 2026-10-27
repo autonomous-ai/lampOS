@@ -178,11 +178,13 @@ nothing in its way either time.
 Under `--give-way`, a joint off its goal by more than its tracking for six
 steps while it reads over 100 gives way too, as a hand holding it; but not
 one that has come nearer its goal, by more than 6 counts, than where it last
-tracked (`closing_on`): that one is following a goal that jumped faster than
+tracked, and came nearer still within the last 5 steps, a tenth of a second
+(`closing_on`, `FOLLOW_STILL_STEPS`): that one is following a goal that jumped faster than
 it turns, and its load is the move's. On lamp-52e6 on 27 October, before
 this, the head pitch and the base gave way 98 times in four hours with
-nobody near, each a two-second hitch in a glance
-(`a_joint_closing_on_its_goal_is_following_not_pushed`).
+nobody near, each a two-second hitch in a glance. A hand that catches it
+partway stops it closing, and it gives way as before (the Reviewer-lead on
+#3925; `a_joint_closing_on_its_goal_is_following_not_pushed`).
 
 The bounds for the head and the base were 170 and 150 until 2026-10-13.
 With everything above in place the head still gave way now and then when

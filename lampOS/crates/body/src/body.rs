@@ -328,17 +328,24 @@ pub fn own_ranges_from(value: Option<&str>) -> bool {
 /// refuse and leave the joint short of.
 const OWN_RANGE_MARGIN: u16 = 20;
 
+/// Steps a joint off its goal may go without coming nearer it and still be
+/// following: a tenth of a second. A hand that catches it stops it closing.
+const FOLLOW_STILL_STEPS: u16 = 5;
+
+/// A joint off its goal that is nearer it, by more than [`STALL_SLACK`],
+/// than where it last tracked, and that came nearer it within the last
+/// [`FOLLOW_STILL_STEPS`]: turning toward a goal that jumped faster than it
+/// turns. A hand holds it still or moves it away (the Reviewer-lead's P2 on
+/// #3925: caught partway, it stops closing).
+fn closing_on(goal: u16, position: u16, tracked_at: u16, not_nearer_for: u16) -> bool {
+    goal.abs_diff(position) + STALL_SLACK < goal.abs_diff(tracked_at)
+        && not_nearer_for < FOLLOW_STILL_STEPS
+}
+
 /// The window a head or base goal must be inside for a joint whose servo
 /// stores `range` (registers 9 and 11): the range less `OWN_RANGE_MARGIN`
 /// either side. A servo storing the whole turn, 0..=4095, was never
 /// calibrated by V1 and keeps today's 0..=4095.
-/// A joint off its goal that is nearer it, by more than [`STALL_SLACK`],
-/// than where it last tracked: turning toward a goal that jumped faster
-/// than it turns. A hand holds it there or moves it away.
-fn closing_on(goal: u16, position: u16, tracked_at: u16) -> bool {
-    goal.abs_diff(position) + STALL_SLACK < goal.abs_diff(tracked_at)
-}
-
 fn own_window((min, max): (u16, u16)) -> (u16, u16) {
     if (min, max) == (0, 4_095) {
         (0, 4_095)
@@ -4700,6 +4707,10 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
     // in a row over it.
     let mut gave_at = [0u16; 3];
     let mut on_track_at = [0u16; 3];
+    // Each joint's distance from its goal at its nearest since it last came
+    // nearer, and the steps since then ([`closing_on`]).
+    let mut nearest = [u16::MAX; 3];
+    let mut not_nearer_for = [0u16; 3];
     let mut held_from = [0u16; 3];
     let mut in_hand = [0u16; 3];
     // Whether a joint held where it gave way is said as in a hand
@@ -6560,7 +6571,22 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
             // that jumped faster than it turns, and its load is the move's:
             // lamp-52e6 on 27 Oct "met resistance" 98 times in four hours
             // with nobody near, each a two-second hitch in a glance.
-            let following = closing_on(written[index], is.position, on_track_at[index]);
+            let gap = written[index].abs_diff(is.position);
+            if gap < nearest[index] {
+                nearest[index] = gap;
+                not_nearer_for[index] = 0;
+            } else {
+                not_nearer_for[index] = not_nearer_for[index].saturating_add(1);
+            }
+            if off_track[index] == 0 {
+                nearest[index] = gap;
+            }
+            let following = closing_on(
+                written[index],
+                is.position,
+                on_track_at[index],
+                not_nearer_for[index],
+            );
             let pushed = in_a_hand
                 && off_track[index] >= limits.load_steps.max(1)
                 && is.load > STALL_LOAD
