@@ -128,7 +128,7 @@ test('actions send the schema\'s fields and wait for done', async () => {
     await lamp.light('warm', 3, 10_000, 'breathe');
     await lamp.say('Build passed.');
     await lamp.express('glad');
-    assert.equal((await lamp.gesture('nod', { wait: true })).how, 'finished');
+    assert.equal((await lamp.gesture('nod', { wait: true })).to, 'body');
     await lamp.stop();
     assert.deepEqual(fake.asked('light'), [{ colour: 'warm', level: 3, pattern: 'breathe', for_ms: 10000 }]);
     assert.deepEqual(fake.asked('say'), [{ text: 'Build passed.' }]);
@@ -211,6 +211,7 @@ test('the examples call only what the client has', async () => {
 test('a refused subscription rejects with its typed error', async () => {
   await withLamp({ grants: ['body'] }, async (lamp) => {
     await assert.rejects(lamp.on('person.arrived', () => {}), byCode.no_grant);
+    assert.equal(lamp.handlers.has('person.arrived'), false, 'a refused on() keeps no handler');
   });
 });
 
@@ -234,8 +235,8 @@ test('off takes a handler off and unsubscribes the last', async () => {
 test('the fake says done and lease changes to whoever they are for', async () => {
   await withLamp({ autoDone: false }, async (lamp, fake) => {
     await lamp.withLease(['body'], async (lease) => {
-      const waiting = lamp.move([[0, 0, 0, 0, 0], [20, 0, 0, 0, 0], [0, 0, 0, 0, 0]], 40, { wait: true });
-      await until(() => fake.asked('move').length);
+      const waiting = lamp.play('wave', { wait: true });
+      await until(() => fake.asked('play').length);
       fake.leaseEvent(lease.id, 'suspended', 'conversation');
       await until(() => lease.state === 'suspended');
       fake.done(fake.requests.at(-1).id, 'cut_short', 'conversation');
@@ -316,4 +317,45 @@ test('a lamp that stops answering pings is let go, not waited on forever', async
   } finally {
     Lamp.KEEPALIVE_MS = every;
   }
+});
+
+test('a refused waiting action leaves nothing behind to reject on close', async () => {
+  const unhandled = [];
+  const onUnhandled = (error) => unhandled.push(error);
+  process.on('unhandledRejection', onUnhandled);
+  try {
+    await withLamp({ grants: ['light'] }, async (lamp) => {
+      await assert.rejects(lamp.gesture('nod', { wait: true }), byCode.no_grant);
+      assert.equal(lamp.done.size, 0);
+    });
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    assert.deepEqual(unhandled, []);
+  } finally { process.off('unhandledRejection', onUnhandled); }
+});
+
+test('a waiting gesture or move returns at the body\'s answer', async () => {
+  // lamp-control's reply shape: `{"re":N,"ok":true,"to":"body"}` and no
+  // `done` after it; autoDone off, so nothing else ever comes.
+  await withLamp({ autoDone: false }, async (lamp) => {
+    await lamp.withLease(['body'], async () => {
+      const nod = await lamp.gesture('nod', { wait: true });
+      const move = await lamp.move([[0, 0, 0, 0, 0], [20, 0, 0, 0, 0]], 40, { wait: true });
+      assert.deepEqual([nod.ok, nod.to, move.ok, move.to], [true, 'body', true, 'body']);
+    }, { forMs: 5000 });
+    assert.equal(lamp.done.size, 0);
+  });
+});
+
+test('an action refused here takes no id, so the next waiting one keeps its own', async () => {
+  await withLamp({ autoDone: false, grants: ['body', 'light', 'speak'] }, async (lamp, fake) => {
+    await lamp.withLease(['body'], async () => {
+      const bogus = lamp.gesture('bogus', { wait: true });
+      const wave = lamp.play('wave', { wait: true });
+      await assert.rejects(bogus, (error) => error.code === 'bad_request');
+      await until(() => fake.asked('play').length);
+      fake.done(fake.requests.at(-1).id);
+      assert.equal((await wave).how, 'finished');
+    }, { forMs: 5000 });
+    assert.equal(lamp.done.size, 0);
+  });
 });

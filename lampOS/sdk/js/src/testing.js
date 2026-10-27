@@ -43,7 +43,7 @@ export class FakeLamp {
     return fake;
   }
 
-  // `autoDone: false` leaves a gesture's, move's or play's `done` to the test.
+  // `autoDone: false` leaves a play's or say's `done` to the test.
   constructor({ code = '12345678', grants = ['body', 'light', 'speak'], lampId = 'lamp-fake', name = 'Fake lamp', autoDone = true } = {}) {
     Object.assign(this, { code, grants: [...grants], host: '127.0.0.1', port: 0, pin: '', fp: '', autoDone });
     this.asker = new Map();
@@ -216,9 +216,14 @@ export class FakeLamp {
       case 'lease.release':
         this.leases.delete(request.lease);
         return this.ok(ws, id);
+      case 'gesture':
+      case 'move':
+        // As lamp-control routes them: the body takes them, and no `done`
+        // follows.
+        return this.ok(ws, id, { to: 'body' });
       default:
         this.ok(ws, id);
-        if (['gesture', 'move', 'play'].includes(op) && this.autoDone) this.done(id);
+        if (['play', 'say'].includes(op) && this.autoDone) this.done(id);
         return undefined;
     }
   }
