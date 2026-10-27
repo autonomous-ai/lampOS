@@ -346,10 +346,13 @@ fn own_window((min, max): (u16, u16)) -> (u16, u16) {
 /// limits (#3558), or `None` when they do. `ranges` are by
 /// [`Joint::index`]. What the head and the base are asked for (`home`,
 /// the pitch window, the stand's pitch, roll and yaw) must be inside the
-/// window their goals are held to ([`own_window`]); the arm's folded and
-/// standing counts inside the servo's own limits themselves, since its
-/// goals keep their own window and a folded arm may rest on its stop
-/// (lamp-52e6's shoulder folds at 2050, its limit 2047).
+/// window their goals are held to ([`own_window`]); the arm's standing
+/// counts inside the servo's own limits themselves, since its goals keep
+/// their own window. A folded arm rests on its mechanical stop, which may
+/// lie past the servo's stored limit (lamp-52e6's shoulder, measured
+/// folded at 2038 by the factory on 27 Oct, its limit 2047; a hand takes
+/// joints 31 to 66 past theirs, #3558), so its folded counts may be up to
+/// `Standing::FOUND_SLACK` outside them, as a fold is found.
 fn outside_own_ranges(
     ranges: &[(u16, u16); 5],
     home: Option<[u16; 3]>,
@@ -373,7 +376,10 @@ fn outside_own_ranges(
     }
     asked.into_iter().find_map(|(pose, joint, count)| {
         let range = ranges[joint.index()];
-        let (low, high) = if ARM.contains(&joint) {
+        let (low, high) = if pose == "folded arm" {
+            let slack = Standing::FOUND_SLACK;
+            (range.0.saturating_sub(slack), range.1.saturating_add(slack))
+        } else if ARM.contains(&joint) {
             range
         } else {
             own_window(range)
