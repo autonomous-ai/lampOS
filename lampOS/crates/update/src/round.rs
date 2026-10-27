@@ -2029,7 +2029,7 @@ impl Run<'_, '_> {
     /// Watches the restarted parts for the configured time. The unit and
     /// why, for the first that is not well.
     /// The third is whether the part was found not well: false when systemd
-    /// itself could not be asked, and no part was looked at.
+    /// itself still could not be asked at the watch's end.
     fn watch(&mut self, watches: &mut [Watch]) -> Result<(), (String, String, bool)> {
         if watches.is_empty() {
             return Ok(());
@@ -2037,14 +2037,25 @@ impl Run<'_, '_> {
         let units: Vec<String> = watches.iter().map(|watch| watch.unit.clone()).collect();
         let until = self.world.clock.now_ms() + self.config.watch.as_millis() as u64;
         loop {
-            let states = self.world.systemd.states(&units).map_err(|why| {
-                (
-                    units[0].clone(),
-                    format!("systemd cannot be asked: {why}"),
-                    false,
-                )
-            })?;
+            // A query that fails is not known yet, not a part not well: it
+            // is asked again until the watch's end, and only one that still
+            // fails then puts the build back.
+            let asked = self.world.systemd.states(&units);
             let done = self.world.clock.now_ms() >= until;
+            let states = match asked {
+                Ok(states) => states,
+                Err(_) if !done => {
+                    self.listen(LOOK_EVERY);
+                    continue;
+                }
+                Err(why) => {
+                    return Err((
+                        units[0].clone(),
+                        format!("systemd cannot be asked: {why}"),
+                        false,
+                    ));
+                }
+            };
             let health = if done { self.world.ears.health() } else { None };
             for watch in watches.iter_mut() {
                 let state = states
