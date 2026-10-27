@@ -1284,6 +1284,11 @@ pub struct Installed {
     pub changed: Vec<String>,
 }
 
+/// The start of every error from an install that ended before writing its
+/// units (#3733): the lamp keeps the units it had, which may be an older
+/// build's, and `check-units` names each one that differs.
+pub const UNITS_NOT_WRITTEN: &str = "units not written";
+
 /// Installs the newest build of the channel and the product around it.
 pub fn install(
     config: &Install,
@@ -1291,108 +1296,21 @@ pub fn install(
     host: &mut dyn Host,
     say: &mut dyn FnMut(&str),
 ) -> Result<Installed, String> {
-    let manifest = newest(config, channel)?;
-    let records = Records::new(config.on(&config.records));
-    let _lock = records
-        .lock()
-        .map_err(|error| format!("another lamp-update is running: {error}"))?;
-    // The base units below replace the installed ones, but local drop-ins
-    // survive. Refuse an unknown or conflicting head reader before any
-    // state migration, user, binary link, unit or pins write.
-    crate::head_touch::preflight_install(&config.root, &config.on(UNITS), PRODUCT, SETTINGS)?;
-    // The records as `Records::state` reads them: an unreadable file stops
-    // install rather than being written over, and a corrupt one is set
-    // aside and said. Set aside, it is not known what install wrote before,
-    // so V1's key is not copied (below): a reset may have wiped the user's
-    // key, and V1's config may still hold the previous owner's (#1094).
-    let state_file = config.on(&config.records).join("state.json");
-    let existed = state_file.exists();
-    let mut state = records
-        .state(say)
-        .map_err(|error| format!("the state cannot be read: {error}"))?;
-    let records_lost = records_lost(&config.on(&config.records), existed);
-    let mut changed = Vec::new();
-
-    // The users first: a folder or a part made below may name them.
-    let groups = existing_groups(config, GROUPS);
-    for missing in GROUPS
-        .iter()
-        .filter(|group| !groups.iter().any(|g| g == *group))
-    {
-        say(&format!(
-            "the image has no group {missing}; {USER} is not put in it"
-        ));
-    }
-    for (user, groups) in [(USER, groups), (MEMORY_USER, vec![USER.to_owned()])] {
-        if !has_user(config, user) {
-            host.add_user(user, &groups)?;
-            changed.push(format!("made the user {user}"));
-        }
-    }
-
-    // Every part's build beside nothing, then its link.
-    let mut wanted = Vec::new();
-    for part in parts() {
-        let mut names = vec![part.binary.clone()];
-        if let Some((_, beside)) = BESIDE.iter().find(|(binary, _)| *binary == part.binary) {
-            names.extend(beside.iter().map(|name| (*name).to_owned()));
-        }
-        if let Some((_, tools)) = BESIDE_IF_CARRIED
-            .iter()
-            .find(|(binary, _)| *binary == part.binary)
-        {
-            for tool in *tools {
-                if manifest.files.iter().any(|file| file.name == *tool) {
-                    names.push((*tool).to_owned());
-                } else {
-                    say(&format!(
-                        "build {} carries no {tool}: it is not put beside {}",
-                        manifest.sequence, part.binary
-                    ));
-                }
-            }
-        }
-        let files: Vec<&manifest::File> = names
-            .iter()
-            .map(|name| {
-                manifest
-                    .files
-                    .iter()
-                    .find(|file| &file.name == name)
-                    .ok_or_else(|| format!("build {} carries no {name}", manifest.sequence))
-            })
-            .collect::<Result<_, _>>()?;
-        wanted.push((part, files));
-    }
-    // Every folder whole before any link moves: a file that fails leaves
-    // the folders made so far beside, unnamed by any link, for the next run.
-    let mut builds = Vec::new();
-    let mut made = Vec::new();
-    for (part, files) in &wanted {
-        let before = changed.len();
-        let build = place(config, &manifest, channel, part, files, &mut changed)?;
-        if changed.len() > before {
-            made.push(unit::folder(&part.folder, &build));
-        }
-        builds.push(build);
-    }
-    for ((part, _), build) in wanted.iter().zip(&builds) {
-        link(config, part, build, &mut changed)?;
-    }
-    // lamp-update-back, a copy of this build's lamp-update at a fixed path:
-    // written here alone, never by a round, which cannot even write it, so
-    // a lamp-update that cannot start is still put back (#1680).
-    if let Some(((part, _), build)) = wanted
-        .iter()
-        .zip(&builds)
-        .find(|((part, _), _)| part.binary == crate::own::BINARY)
-    {
-        let from = config
-            .on(&unit::folder(&part.folder, build))
-            .join(&part.binary);
-        let bytes = fs::read(&from).map_err(|error| format!("{}: {error}", from.display()))?;
-        put(config, crate::own::BACK, &bytes, 0o755, &mut changed)?;
-    }
+    // Everything before the units, in one place: a run that ends there (no
+    // build, the records locked, a refused head reader, a user, a part's
+    // file or link) wrote no unit, and its error says so, so a lamp left
+    // with an older build's units is told why (#3733, lamp-c0a4's
+    // lamp-cloud.service of 19 Oct).
+    let Early {
+        manifest,
+        records,
+        lock: _lock,
+        mut state,
+        records_lost,
+        mut changed,
+        made,
+    } = before_units(config, channel, host, say)
+        .map_err(|why| format!("{UNITS_NOT_WRITTEN}: {why}"))?;
 
     // The units, their exit-note drop-ins and the tmpfiles. systemd must be
     // told of any of them written, so that is recorded before the first is:
@@ -1415,10 +1333,13 @@ pub fn install(
             .any(|(path, bytes)| fs::read(config.on(path)).map_or(true, |now| now != *bytes))
     {
         state.systemd_owed = true;
-        save(&records, &state)?;
+        save(&records, &state).map_err(|why| format!("{UNITS_NOT_WRITTEN}: {why}"))?;
     }
+    // Each file is written whole; one that fails leaves those before it
+    // new and the rest as they were.
     for (path, bytes) in &for_systemd {
-        put(config, path, bytes, 0o644, &mut changed)?;
+        put(config, path, bytes, 0o644, &mut changed)
+            .map_err(|why| format!("units not all written: {why}"))?;
     }
     // The tmpfiles are install's, recorded as the settings are, so a
     // build's newer tmpfiles reach this lamp (#1680, crate::apply).
@@ -1649,6 +1570,142 @@ pub fn install(
     Ok(Installed {
         sequence: manifest.sequence,
         changed,
+    })
+}
+
+/// What install has when it comes to the units: the build, the records
+/// and their lock, held to the end, the state, and what it changed.
+struct Early {
+    manifest: Manifest,
+    records: Records,
+    lock: crate::records::Lock,
+    state: State,
+    records_lost: bool,
+    changed: Vec<String>,
+    /// The build folders this run made.
+    made: Vec<String>,
+}
+
+/// Install up to its units: the build, the lock, the head reader's
+/// preflight, the state, the users, every part's build and link, and
+/// lamp-update-back. Nothing here writes a unit.
+fn before_units(
+    config: &Install,
+    channel: &mut dyn Channel,
+    host: &mut dyn Host,
+    say: &mut dyn FnMut(&str),
+) -> Result<Early, String> {
+    let manifest = newest(config, channel)?;
+    let records = Records::new(config.on(&config.records));
+    let lock = records
+        .lock()
+        .map_err(|error| format!("another lamp-update is running: {error}"))?;
+    // The base units below replace the installed ones, but local drop-ins
+    // survive. Refuse an unknown or conflicting head reader before any
+    // state migration, user, binary link, unit or pins write.
+    crate::head_touch::preflight_install(&config.root, &config.on(UNITS), PRODUCT, SETTINGS)?;
+    // The records as `Records::state` reads them: an unreadable file stops
+    // install rather than being written over, and a corrupt one is set
+    // aside and said. Set aside, it is not known what install wrote before,
+    // so V1's key is not copied (below): a reset may have wiped the user's
+    // key, and V1's config may still hold the previous owner's (#1094).
+    let state_file = config.on(&config.records).join("state.json");
+    let existed = state_file.exists();
+    let state = records
+        .state(say)
+        .map_err(|error| format!("the state cannot be read: {error}"))?;
+    let records_lost = records_lost(&config.on(&config.records), existed);
+    let mut changed = Vec::new();
+
+    // The users first: a folder or a part made below may name them.
+    let groups = existing_groups(config, GROUPS);
+    for missing in GROUPS
+        .iter()
+        .filter(|group| !groups.iter().any(|g| g == *group))
+    {
+        say(&format!(
+            "the image has no group {missing}; {USER} is not put in it"
+        ));
+    }
+    for (user, groups) in [(USER, groups), (MEMORY_USER, vec![USER.to_owned()])] {
+        if !has_user(config, user) {
+            host.add_user(user, &groups)?;
+            changed.push(format!("made the user {user}"));
+        }
+    }
+
+    // Every part's build beside nothing, then its link.
+    let mut wanted = Vec::new();
+    for part in parts() {
+        let mut names = vec![part.binary.clone()];
+        if let Some((_, beside)) = BESIDE.iter().find(|(binary, _)| *binary == part.binary) {
+            names.extend(beside.iter().map(|name| (*name).to_owned()));
+        }
+        if let Some((_, tools)) = BESIDE_IF_CARRIED
+            .iter()
+            .find(|(binary, _)| *binary == part.binary)
+        {
+            for tool in *tools {
+                if manifest.files.iter().any(|file| file.name == *tool) {
+                    names.push((*tool).to_owned());
+                } else {
+                    say(&format!(
+                        "build {} carries no {tool}: it is not put beside {}",
+                        manifest.sequence, part.binary
+                    ));
+                }
+            }
+        }
+        let files: Vec<&manifest::File> = names
+            .iter()
+            .map(|name| {
+                manifest
+                    .files
+                    .iter()
+                    .find(|file| &file.name == name)
+                    .ok_or_else(|| format!("build {} carries no {name}", manifest.sequence))
+            })
+            .collect::<Result<_, _>>()?;
+        wanted.push((part, files));
+    }
+    // Every folder whole before any link moves: a file that fails leaves
+    // the folders made so far beside, unnamed by any link, for the next run.
+    let mut builds = Vec::new();
+    let mut made = Vec::new();
+    for (part, files) in &wanted {
+        let before = changed.len();
+        let build = place(config, &manifest, channel, part, files, &mut changed)?;
+        if changed.len() > before {
+            made.push(unit::folder(&part.folder, &build));
+        }
+        builds.push(build);
+    }
+    for ((part, _), build) in wanted.iter().zip(&builds) {
+        link(config, part, build, &mut changed)?;
+    }
+    // lamp-update-back, a copy of this build's lamp-update at a fixed path:
+    // written here alone, never by a round, which cannot even write it, so
+    // a lamp-update that cannot start is still put back (#1680).
+    if let Some(((part, _), build)) = wanted
+        .iter()
+        .zip(&builds)
+        .find(|((part, _), _)| part.binary == crate::own::BINARY)
+    {
+        let from = config
+            .on(&unit::folder(&part.folder, build))
+            .join(&part.binary);
+        let bytes = fs::read(&from).map_err(|error| format!("{}: {error}", from.display()))?;
+        put(config, crate::own::BACK, &bytes, 0o755, &mut changed)?;
+    }
+
+    Ok(Early {
+        manifest,
+        records,
+        lock,
+        state,
+        records_lost,
+        changed,
+        made,
     })
 }
 

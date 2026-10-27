@@ -1,0 +1,36 @@
+# lampOS eyes: the head camera; whether a face is there, where and whose (lampOS/docs/eyes.md).
+# The product unit (lampOS/docs/install.md). The camera opens only while the voice permits it.
+[Unit]
+Description=lampOS eyes (lamp-eyes)
+PartOf=lampos.target
+# Not before setup has finished (#806). The target's own condition holds back none of its parts.
+ConditionPathExists=/var/lib/lampos-setup/done
+After=lamp-voice.service lamp-body.service
+StartLimitIntervalSec=600
+StartLimitBurst=5
+
+[Service]
+Type=exec
+User=lampos
+Group=lampos
+SupplementaryGroups=video
+Slice=lampos-parts.slice
+WorkingDirectory=/
+RuntimeDirectory=lampos-eyes
+RuntimeDirectoryMode=0755
+StateDirectory=lampos-eyes
+StateDirectoryMode=0700
+# Looking is never worth a late word.
+Nice=10
+Environment=LAMP_BUS=on
+ExecStart=/opt/lampOS/eyes/current/lamp-eyes --device /dev/video0 --lock-directory /run/lampos-locks/camera --usb 01da:5875@3-1.1.4 --model /opt/lampOS/eyes/models/face_detection_yunet_2023mar.onnx --recogniser /opt/lampOS/eyes/models/face_recognition_sface_2021dec.onnx --permit-socket /run/lampos-eyes/permit.sock --body-socket /run/lampos-body/gaze.sock --presence-file /run/lampos-eyes/present --sight-file /run/lampos-eyes/sight.jpg --people /var/lib/lampos-eyes/people.json --who-socket /run/lampos-eyes/who.sock --known-file /run/lampos-eyes/known
+Restart=on-failure
+RestartSec=5s
+StandardInput=null
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=lamp-eyes
+NoNewPrivileges=yes
+
+[Install]
+WantedBy=lampos.target

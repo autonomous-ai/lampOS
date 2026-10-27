@@ -1,0 +1,38 @@
+# lampOS air's bus clock: I2C bus 0 at 100 kHz, the most the air sensor takes
+# (lampOS/docs/air.md): the SEN6x take standard mode only, and the board runs
+# the bus at 400 kHz. A limit kept, not a cure shown: the sensor also reads at
+# 400 kHz once it measures (lamp-4ace, 17 Oct).
+# The controller takes the rate at run time; a reboot puts the device tree's
+# rate back, so it runs at every start. The MPR121 on the same bus works at
+# 100 kHz. The product unit (lampOS/docs/install.md).
+[Unit]
+Description=lampOS air's bus clock (lamp-air limit-clock)
+PartOf=lampos.target
+# Not before setup has finished (#806), as the air itself.
+ConditionPathExists=/var/lib/lampos-setup/done
+# Before the bus's two readers. Neither needs it to start: the air reads at
+# either rate, and the controls read no MPR121 until a pins file sets `base`
+# (#711).
+Before=lamp-air.service lamp-controls.service
+After=local-fs.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+# Root: the controller's freq file is root's alone (mode 0200), and root owns
+# it, so no capability is needed. ProtectKernelTunables= must stay off: it
+# makes /sys read-only, and the write fails. It waits up to 10 s for the
+# adapter, in case its driver binds late.
+ExecStart=/opt/lampOS/air/current/lamp-air limit-clock --bus-number 0
+StandardInput=null
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=lamp-air-clock
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateNetwork=yes
+
+[Install]
+WantedBy=lampos.target

@@ -1,0 +1,43 @@
+# lampOS tasks: work handed to agents through Harness, and what came back (lampOS/docs/tasks.md).
+# The product unit (lampOS/docs/install.md). Harness is the Harness team's own program, installed
+# on the lamp by its own installer; where it lives on a home lamp is not decided (install.md,
+# "What was not shown"). Its home is the tasks part's state folder, not a person's.
+[Unit]
+Description=lampOS tasks (lamp-tasks serve)
+PartOf=lampos.target
+# Not before setup has finished (#806). The target's own condition holds back none of its parts.
+ConditionPathExists=/var/lib/lampos-setup/done
+# Not without Harness (#811, from lamp-06c1): systemd skips the part, a condition not met, rather
+# than letting it fail and restart. Installed later, it starts at the next boot or start.
+ConditionPathExists=/usr/local/bin/harness
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=600
+StartLimitBurst=5
+
+[Service]
+Type=exec
+User=lampos
+Group=lampos
+Slice=lampos-parts.slice
+Environment=HOME=/var/lib/lampos-tasks
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
+RuntimeDirectory=lampos-tasks
+RuntimeDirectoryMode=0700
+StateDirectory=lampos-tasks
+StateDirectoryMode=0700
+# --progress puts how each task goes on the bus (tasks/status), which the voice's news reads (#1156);
+# --push-wait holds Harness's own wait so a result is known within about 10 s of the agent ending (#560).
+# On lamp-75c9 (Ten, 2026-10-16): 8.3 to 10.2 s against 39 to 41 s without, about 1 point more of
+# the lamp's CPU, and one ~130 MB Node `harness wait` held while a task is watched.
+ExecStart=/opt/lampOS/tasks/current/lamp-tasks serve --enable --watch --progress --push-wait --close-told --harness-as-person --dir /var/lib/lampos-tasks/store --socket /run/lampos-tasks/request.sock --voice-socket /run/lampos-tasks/voice.sock --targets /var/lib/lampos-tasks/targets.json --harness /usr/local/bin/harness
+Restart=on-failure
+RestartSec=5s
+StandardInput=null
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=lamp-tasks
+NoNewPrivileges=yes
+
+[Install]
+WantedBy=lampos.target

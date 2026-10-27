@@ -1,0 +1,36 @@
+# lampOS updates: keeps the lamp's lampOS current by itself (lampOS/docs/updates.md).
+# The product unit (lampOS/docs/install.md). Not part of lampos.target: an update restarts the
+# lamp's parts, and what restarts them must not be stopped with them. It runs before setup is
+# done too, so a lamp still in its box is current when it is first set up.
+# On: a lamp in a home installs, switches at a quiet moment and puts a build back by itself.
+# The public key it checks every build with comes with the image (#806), never from the channel.
+[Unit]
+Description=lampOS updates (lamp-update serve)
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=600
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=root
+Group=root
+Slice=lampos-parts.slice
+Nice=10
+IOSchedulingClass=idle
+ExecStart=/opt/lampOS/update/current/lamp-update serve --channel-url https://github.com/autonomous-ai/lampOS/releases/download/lampos-lamp-voice/ --channel lamp-voice --key-file /etc/lampOS/update/key.pub --apply on
+Restart=on-failure
+RestartSec=30s
+StandardInput=null
+SyslogIdentifier=lamp-update
+NoNewPrivileges=yes
+ProtectSystem=strict
+ReadWritePaths=/opt/lampOS /etc/systemd/system -/run/lampos-bus
+ProtectHome=yes
+PrivateTmp=yes
+StateDirectory=lampos-update
+StateDirectoryMode=0700
+Environment=LAMP_BUS_ROOT=/run/lampos-bus
+
+[Install]
+WantedBy=multi-user.target

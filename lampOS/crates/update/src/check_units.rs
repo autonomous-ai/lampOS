@@ -13,7 +13,9 @@
 //! nothing to expand and a unit is compared as it is.
 //!
 //! Out, for each product unit: `same`, `missing` (the lamp printed none), or
-//! each line that differs. Then every drop-in (a `.d/` file: on a product
+//! each line that differs, and, for one that leaves a switch off that the
+//! product's sets `on` (an older build's base unit, #3733), that switch by
+//! name. Then every drop-in (a `.d/` file: on a product
 //! lamp each one is a finding, and one that turns a switch its unit sets
 //! `on` off says so, as install does: crate::switches), every unit the lamp
 //! printed that the product has no file for, and every product unit read
@@ -167,7 +169,8 @@ pub struct Report {
     /// Drop-ins, with their text.
     pub drop_ins: Vec<Printed>,
     /// For a drop-in of a product unit that turns one of its switches off
-    /// (crate::switches): its path, and how.
+    /// (crate::switches), or a product unit whose text differs and does not
+    /// set one on: its path, and how.
     pub switches_off: Vec<(String, String)>,
     /// Units the lamp printed that the product has no file for.
     pub extra: Vec<String>,
@@ -205,6 +208,14 @@ impl Report {
                     out.push_str(&format!("{name}: differs\n"));
                     for line in lines {
                         out.push_str(&format!("  {line}\n"));
+                    }
+                    let base =
+                        |path: &&String| name_of(path) == name.as_str() && !path.contains(".d/");
+                    for (path, how) in self.switches_off.iter().filter(|(p, _)| base(&p)) {
+                        out.push_str(&format!(
+                            "{}\n",
+                            crate::switches::said(&format!("unit {path}"), how)
+                        ));
                     }
                 }
             }
@@ -409,6 +420,18 @@ pub fn check_with_image(
                 if lines.is_empty() {
                     Verdict::Same
                 } else {
+                    // A base unit that does not set a switch its product
+                    // unit sets on, as an older build's (lamp-c0a4's
+                    // lamp-cloud.service of 19 Oct, #3733): the part runs
+                    // off, said by name.
+                    let on = crate::switches::switches(&file.text);
+                    for switch in crate::switches::switches(text) {
+                        if !on.contains(&switch) {
+                            report
+                                .switches_off
+                                .push((file.path.clone(), format!("leaves {switch} off")));
+                        }
+                    }
                     Verdict::Differs(lines)
                 }
             }
@@ -522,6 +545,7 @@ ExecStart=/opt/extra
             "lamp-b.service: differs",
             "  - Environment=LAMP_X=on",
             "  + Environment=LAMP_X=off",
+            "unit /etc/systemd/system/lamp-b.service leaves LAMP_X off; the product sets it on",
             "lamp-c.timer: missing on the lamp",
             "drop-in: /etc/systemd/system/lamp-b.service.d/office.conf",
             "  Environment=LAMP_OFFICE=on",
@@ -678,8 +702,15 @@ ExecStart=/opt/x
             "{printed}\n# /etc/systemd/system/lamp-b.service.d/zz-on.conf\n[Service]\nEnvironment=LAMP_X=on\n"
         );
         assert!(check(&units, &parse(&back)).switches_off.is_empty());
-        // The office extras (PRINTED's office.conf) turn nothing off.
-        assert!(check(&units, &parse(PRINTED)).switches_off.is_empty());
+        // The office extras (PRINTED's office.conf) turn nothing off; only
+        // lamp-b's own changed unit is named.
+        assert_eq!(
+            check(&units, &parse(PRINTED)).switches_off,
+            [(
+                "/etc/systemd/system/lamp-b.service".to_owned(),
+                "leaves LAMP_X off".to_owned()
+            )]
+        );
 
         let units = embedded();
         let printed = "\
@@ -708,6 +739,39 @@ Environment=LAMP_CLOUD=off
                 "turns LAMP_T off (an empty Environment= clears it)".to_owned()
             )]
         );
+    }
+
+    /// lamp-c0a4 after an install to stable (#3733): its base
+    /// lamp-cloud.service was 19 Oct's, which sets no `LAMP_CLOUD=on`, with
+    /// no drop-in. It differs, the check fails, and the switch is named.
+    #[test]
+    fn a_base_unit_of_19_oct_that_leaves_lamp_cloud_off_is_named() {
+        let units = embedded();
+        let old = include_str!("../tests/fixtures/units-19-oct/lamp-cloud.service");
+        let printed = format!("# /etc/systemd/system/lamp-cloud.service\n{old}");
+        let report = check(&units, &parse(&printed));
+        assert!(matches!(
+            report.units["lamp-cloud.service"],
+            Verdict::Differs(_)
+        ));
+        assert!(!report.passes());
+        assert!(report.drop_ins.is_empty());
+        let said = report.said();
+        let line = "unit /etc/systemd/system/lamp-cloud.service leaves LAMP_CLOUD off; the product sets it on";
+        assert_eq!(
+            said.lines().filter(|said| *said == line).count(),
+            1,
+            "{said}"
+        );
+        // The build's own text names nothing.
+        let (_, now) = install::PRODUCT
+            .iter()
+            .find(|(name, _)| *name == "lamp-cloud.service")
+            .unwrap();
+        let printed = format!("# /etc/systemd/system/lamp-cloud.service\n{now}");
+        let report = check(&units, &parse(&printed));
+        assert_eq!(report.units["lamp-cloud.service"], Verdict::Same);
+        assert!(report.switches_off.is_empty());
     }
 
     const SPEAKER_PRINTED: &str = "\

@@ -1,0 +1,36 @@
+# lampOS actions: carries out what the model asks for: volume, light, reminders (lampOS/docs/actions.md).
+# The product unit (lampOS/docs/install.md).
+[Unit]
+Description=lampOS actions (lamp-actions)
+PartOf=lampos.target
+# Not before setup has finished (#806). The target's own condition holds back none of its parts.
+ConditionPathExists=/var/lib/lampos-setup/done
+After=local-fs.target sound.target
+StartLimitIntervalSec=600
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=lampos
+Group=lampos
+Slice=lampos-parts.slice
+SupplementaryGroups=audio
+RuntimeDirectory=lampos-actions
+RuntimeDirectoryMode=0755
+Environment=LAMP_SCHEDULE_TOOLS=on
+Environment=LAMP_SCHEDULE_SOCKET=/run/lampos-schedule/call.sock
+ExecStart=/opt/lampOS/actions/current/lamp-actions --dir /run/lampos-actions --mixer-card allwinnerhdmi --mixer-control Speaker --volume-ceiling 100 --bus-root /run/lampos-bus
+Restart=on-failure
+RestartSec=2s
+StandardInput=null
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=lamp-actions
+NoNewPrivileges=yes
+ProtectSystem=strict
+ReadWritePaths=/run/lampos-bus
+ProtectHome=yes
+PrivateTmp=yes
+
+[Install]
+WantedBy=lampos.target

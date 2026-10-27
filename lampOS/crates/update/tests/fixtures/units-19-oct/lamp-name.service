@@ -1,0 +1,33 @@
+# lampOS name: hears "Lamp" in what the microphone hears and says so on the bus (lampOS/docs/name.md).
+# The product unit (lampOS/docs/install.md).
+[Unit]
+Description=lampOS name (lamp-name)
+PartOf=lampos.target
+# Not before setup has finished (#806). The target's own condition holds back none of its parts.
+ConditionPathExists=/var/lib/lampos-setup/done
+After=lamp-voice.service
+StartLimitIntervalSec=600
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=lampos
+Group=lampos
+Slice=lampos-parts.slice
+CPUAffinity=6 7
+Nice=5
+ExecStart=/opt/lampOS/name/current/lamp-name --models /opt/lampOS/name/models --microphone mic2 --least 0.9 --bus-root /run/lampos-bus
+Restart=on-failure
+RestartSec=5s
+StandardInput=null
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=lamp-name
+NoNewPrivileges=yes
+ProtectSystem=strict
+ReadWritePaths=/run/lampos-bus
+ProtectHome=yes
+PrivateTmp=yes
+
+[Install]
+WantedBy=lampos.target
