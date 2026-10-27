@@ -207,8 +207,8 @@ pub fn check_signature(
 ) -> Result<String, String> {
     let ours = lamp_update::manifest::fingerprint(key);
     let signature = signature.ok_or(format!(
-        "it carries no {SIGNATURE}: a package from the Skills Store must be signed with the update \
-         channel's key ({ours})"
+        "it carries no {SIGNATURE}: a package from the Skills Store must be signed with the Store's \
+         key ({ours})"
     ))?;
     if signature.len() > MOST_SIGNATURE_BYTES {
         return Err(format!("{SIGNATURE} is too large to be a signature"));
@@ -396,7 +396,7 @@ pub fn pack(dir: &Path, out: &Path) -> Result<PathBuf, String> {
 
 /// [`pack`], and with `key`, the manifest signed ([`signature_for`]) into
 /// `lamp-skill.sig`: a package the Skills Store can carry, when `key` is the
-/// update channel's private key. It is read back and its signature checked.
+/// Store's private key. It is read back and its signature checked.
 pub fn pack_signed(
     dir: &Path,
     out: &Path,
