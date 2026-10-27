@@ -673,3 +673,4 @@ Ready for lamp-voice: yes (#2553), once its ARM64 run is green
 - 23:49: Eighth names lamp-skills as the pushed-skill ceiling's enforcer (Fourteen's P3 answered). Waiting: #3869 re-looks, trains for #3875/#3880, #3878 green ARM64.
 - 23:54: #3869 adds the ceiling's owner (lamp-skills, Eighth/Nine) as 7a04fd60c, told Nine so their PR needn't touch control.md.
 - 23:59: Eighth READ-OK #3869 7a04fd60c (the three new lines). ARM64/clippy pending; NEXT TRAIN when green (Fourteen's READ-OK on a7820079d plus Eighth's on this head).
+- 00:04: quiet tick; #3869 clippy green, ARM64 pending.
