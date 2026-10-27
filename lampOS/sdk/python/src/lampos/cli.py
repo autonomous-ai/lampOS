@@ -43,9 +43,10 @@ async def _fake(args) -> int:
     `--every` seconds, and prints what it is asked. Try an example against
     it in another terminal, with the same LAMPOS_HOME."""
     from .keys import Keyring
-    from .testing import FakeLamp
+    from .testing import LAMP_CONTROL_REFUSES, FakeLamp
 
-    async with FakeLamp(grants=schema.grants(), name="Fake lamp (lamp fake)") as fake:
+    refuses = {} if getattr(args, "everything", False) else LAMP_CONTROL_REFUSES
+    async with FakeLamp(grants=schema.grants(), name="Fake lamp (lamp fake)", refuses=refuses) as fake:
         pairing = await Lamp.pair(fake.code, fake.host, pin=fake.pin, port=fake.port, keyring=Keyring())
         print(f"a fake lamp at {fake.host}:{fake.port}, paired as {pairing.client} in {Keyring().folder}", flush=True)
         print("run an example in another terminal with the same LAMPOS_HOME; Ctrl-C ends this", flush=True)
@@ -110,6 +111,11 @@ def main(argv: list[str] | None = None) -> int:
     fake = commands.add_parser("fake", help="a fake lamp here, paired at once, saying an arrival now and then")
     fake.add_argument("--every", type=float, default=10.0, help="seconds between arrivals (10)")
     fake.add_argument("--cycles", type=int, help="stop after this many (default: until Ctrl-C)")
+    fake.add_argument(
+        "--everything",
+        action="store_true",
+        help="answer every op; by default it refuses what lamp-control doesn't route yet, as a lamp does",
+    )
     fake.set_defaults(run=_fake)
     hello = commands.add_parser("hello", help="connect to a paired lamp and show its grants")
     hello.add_argument("lamp", nargs="?")

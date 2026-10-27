@@ -5,12 +5,15 @@
 import { Lamp } from './client.js';
 import { Keyring } from './keys.js';
 import * as schema from './schema.js';
-import { FakeLamp } from './testing.js';
+import { FakeLamp, LAMP_CONTROL_REFUSES } from './testing.js';
 
 const sleep = (s) => new Promise((r) => setTimeout(r, s * 1000));
 
-export async function fake({ every = 10, cycles } = {}) {
-  const lamp = await FakeLamp.start({ grants: schema.grants, name: 'Fake lamp (lamp fake)' });
+// `everything`: answer every op; by default it refuses what lamp-control
+// doesn't route yet, as a lamp does.
+export async function fake({ every = 10, cycles, everything = false } = {}) {
+  const refuses = everything ? {} : LAMP_CONTROL_REFUSES;
+  const lamp = await FakeLamp.start({ grants: schema.grants, name: 'Fake lamp (lamp fake)', refuses });
   try {
     const keyring = new Keyring();
     const pairing = await Lamp.pair(lamp.code, lamp.host, { pin: lamp.pin, port: lamp.port, keyring });

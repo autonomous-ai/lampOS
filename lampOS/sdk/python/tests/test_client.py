@@ -648,3 +648,38 @@ def test_a_send_cut_after_the_reader_failed_its_future_leaves_nothing_unread(tmp
         assert not [m for m in unread if m and "never retrieved" in m], unread
 
     run(go())
+
+
+def test_a_fake_like_lamp_control_refuses_what_it_doesnt_route(tmp_path):
+    async def go():
+        from lampos.testing import LAMP_CONTROL_REFUSES
+
+        async with FakeLamp(grants=schema.grants(), refuses=LAMP_CONTROL_REFUSES) as fake:
+            ring = await paired(fake, tmp_path)
+            async with await Lamp.connect(keyring=ring) as lamp:
+                with pytest.raises(errors.BY_CODE["refused"]) as raised:
+                    await lamp.express("glad")
+                assert raised.value.why == "not routed yet: waits for the feelings skill"
+                assert (await lamp.gesture("nod"))["to"] == "body"
+                await lamp.light("warm", 3, 1_000)
+
+    run(go())
+
+
+def test_the_fake_checks_the_lease_before_the_routing_refusal(tmp_path):
+    # As lamp-control's session.rs: no lease is no_lease, and only a held
+    # lease reaches the "not routed yet" refusal (Reviewer-two's P3 on #3903).
+    async def go():
+        from lampos.testing import LAMP_CONTROL_REFUSES
+
+        async with FakeLamp(grants=schema.grants(), refuses=LAMP_CONTROL_REFUSES) as fake:
+            ring = await paired(fake, tmp_path)
+            async with await Lamp.connect(keyring=ring) as lamp:
+                with pytest.raises(errors.BY_CODE["no_lease"]):
+                    await lamp.look("face")
+                async with lamp.lease("body", for_ms=5000):
+                    with pytest.raises(errors.BY_CODE["refused"]) as raised:
+                        await lamp.look("face")
+                    assert raised.value.why.startswith("not routed yet")
+
+    run(go())

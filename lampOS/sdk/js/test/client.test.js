@@ -432,3 +432,24 @@ test('a waiting action whose socket drops before the reply leaves no rejection u
     assert.deepEqual(unhandled, []);
   } finally { process.off('unhandledRejection', onUnhandled); }
 });
+
+test('a fake like lamp-control refuses what it does not route yet', async () => {
+  const { LAMP_CONTROL_REFUSES } = await import('../src/testing.js');
+  await withLamp({ grants: schema.grants, refuses: LAMP_CONTROL_REFUSES }, async (lamp) => {
+    await assert.rejects(lamp.express('glad'), (error) => error.code === 'refused' && error.why === 'not routed yet: waits for the feelings skill');
+    assert.equal((await lamp.gesture('nod')).to, 'body');
+    await lamp.light('warm', 3, 1000);
+  });
+});
+
+// As lamp-control's session.rs: no lease is no_lease, and only a held lease
+// reaches the "not routed yet" refusal (Reviewer-two's P3 on #3903).
+test('the fake checks the lease before the routing refusal', async () => {
+  const { LAMP_CONTROL_REFUSES } = await import('../src/testing.js');
+  await withLamp({ grants: schema.grants, refuses: LAMP_CONTROL_REFUSES }, async (lamp) => {
+    await assert.rejects(lamp.look('face'), (error) => error.code === 'no_lease');
+    await lamp.withLease(['body'], async () => {
+      await assert.rejects(lamp.look('face'), (error) => error.code === 'refused' && error.why.startsWith('not routed yet'));
+    });
+  });
+});

@@ -37,6 +37,12 @@ Terminal 1 then shows `asked {"op":"gesture","name":"greeting"}`. Every
 example runs this way: `greet.js`, `follow.js`, `phrase.js`, `pomodoro.js`,
 `ci-light.js`.
 
+It answers as a lamp does today: `gesture` and `move` with `{"to": "body"}`,
+and `express`, `play`, `sound`, `look` and `joints` refused (`refused`,
+"not routed yet: waits for …"), in lamp-control's own words, so a program
+built against it meets the same refusals on a lamp. `--everything` answers
+every op instead.
+
 ## Pair with a real lamp
 
 Run the command as `npx --no-install lampos …` (or from `node_modules/.bin`),
