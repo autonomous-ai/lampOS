@@ -131,8 +131,23 @@ pub enum LookAt {
     /// The face in view, the voice that called, or straight ahead.
     Target(LookTarget),
     /// Degrees from straight ahead: yaw right positive, pitch up positive.
-    Angles { yaw: f32, pitch: f32 },
+    Angles(Angles),
 }
+
+/// `look`'s angles, in degrees. A field it doesn't know refuses it, as
+/// everywhere else (the Reviewer-lead's P3 on #3715: untagged, `roll` was
+/// dropped without a word).
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Angles {
+    pub yaw: f32,
+    pub pitch: f32,
+}
+
+/// Body clips a client may not ask for: `idle` is the lamp's own life, and
+/// `scanning` a room sweep, which CLAUDE.md's rule 8 keeps for a person's
+/// own ask (blue on #3504, 27 Oct).
+pub const GESTURES_REFUSED: [&str; 2] = ["idle", "scanning"];
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -255,7 +270,7 @@ pub enum Op {
     Sound { name: String },
     /// Ends the client's own actions now. Needs no lease.
     #[serde(rename = "stop")]
-    Stop,
+    Stop {},
 }
 
 impl Op {
@@ -267,7 +282,7 @@ impl Op {
             | Self::Unsubscribe { .. }
             | Self::LeaseRelease { .. }
             | Self::LeaseRenew { .. }
-            | Self::Stop => Vec::new(),
+            | Self::Stop {} => Vec::new(),
             Self::Subscribe { events, .. } => events.iter().filter_map(|e| e.needs()).collect(),
             Self::Get { state } => state.iter().filter_map(|s| s.needs()).collect(),
             Self::LeaseTake { parts, .. } => parts
@@ -393,11 +408,17 @@ impl Op {
                     return Err("strength: from 0 to 1".to_owned());
                 }
             }
-            Self::Gesture { name } | Self::Play { name } | Self::Sound { name } => {
+            Self::Gesture { name } => {
+                plain_name(name, "name")?;
+                if GESTURES_REFUSED.contains(&name.as_str()) {
+                    return Err(format!("name: {name} is the lamp's own, not a client's"));
+                }
+            }
+            Self::Play { name } | Self::Sound { name } => {
                 plain_name(name, "name")?;
             }
             Self::Look { at } => {
-                if let LookAt::Angles { yaw, pitch } = at
+                if let LookAt::Angles(Angles { yaw, pitch }) = at
                     && !(yaw.is_finite()
                         && pitch.is_finite()
                         && (-180.0..=180.0).contains(yaw)
@@ -472,7 +493,7 @@ impl Op {
                     return Err(format!("text: words, at most {SAY_MAX_CHARS} characters"));
                 }
             }
-            Self::Stop => {}
+            Self::Stop {} => {}
         }
         Ok(())
     }
@@ -794,6 +815,10 @@ mod tests {
             r#"{"id":1,"op":"express","feeling":"Glad"}"#.to_owned(),
             r#"{"id":1,"op":"gesture","name":"../nod"}"#.to_owned(),
             r#"{"id":1,"op":"look","at":{"yaw":200,"pitch":0}}"#.to_owned(),
+            r#"{"id":1,"op":"look","at":{"yaw":10,"pitch":5,"roll":30}}"#.to_owned(),
+            r#"{"id":1,"op":"stop","lease":"l_1"}"#.to_owned(),
+            r#"{"id":1,"op":"gesture","name":"idle"}"#.to_owned(),
+            r#"{"id":1,"op":"gesture","name":"scanning"}"#.to_owned(),
             r#"{"id":1,"op":"move","step_ms":5,"frames":[[0,0,0,0,0],[0,0,0,0,0]]}"#.to_owned(),
             r#"{"id":1,"op":"move","step_ms":40,"frames":[[0,0,0,0,0]]}"#.to_owned(),
             r#"{"id":1,"op":"move","step_ms":40,"frames":[[10,0,0,0,0],[0,0,0,0,0]]}"#.to_owned(),

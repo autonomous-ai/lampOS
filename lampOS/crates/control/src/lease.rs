@@ -62,7 +62,9 @@ pub struct Held {
 #[derive(Debug, Default)]
 pub struct Leases {
     held: Vec<Lease>,
-    ended: Vec<(String, String, LeaseWhy)>,
+    /// Each client's last ended leases, [`ENDED_KEPT`] each, so one
+    /// client's churn never pushes out another's why.
+    ended: std::collections::HashMap<String, Vec<(String, LeaseWhy)>>,
     /// Lapses found by a take, renew, release or act, for the next
     /// [`Leases::lapse`] to tell.
     pending: Vec<Change>,
@@ -70,7 +72,7 @@ pub struct Leases {
 }
 
 /// How many ended leases are remembered for their why.
-const ENDED_KEPT: usize = 64;
+const ENDED_KEPT: usize = 16;
 
 impl Leases {
     pub fn new() -> Self {
@@ -246,7 +248,10 @@ impl Leases {
     }
 
     /// A hand, "stop", privacy, pause, sleep or the owner's app: every
-    /// lease holding `part` (any, for `None`) is lost.
+    /// lease holding `part` (any, for `None`) is lost, whole: a lease taken
+    /// as body and light loses the light too when a hand takes the body, so
+    /// a client never drives half of what it asked for (the Reviewer-lead's
+    /// P3 on #3715).
     pub fn lose(&mut self, part: Option<Part>, why: LeaseWhy, now_us: u64) -> Vec<Change> {
         let mut changes = self.lapse(now_us);
         let (gone, kept): (Vec<Lease>, Vec<Lease>) = self
@@ -280,11 +285,10 @@ impl Leases {
             Some(index) => Ok(index),
             None => match self
                 .ended
-                .iter()
-                .rev()
-                .find(|(id, of, _)| id == lease && of == client)
+                .get(client)
+                .and_then(|ended| ended.iter().rev().find(|(id, _)| id == lease))
             {
-                Some((_, _, why)) => Err(Refusal::Lost(*why)),
+                Some((_, why)) => Err(Refusal::Lost(*why)),
                 None => Err(Refusal::NoLease),
             },
         }
@@ -302,9 +306,10 @@ impl Leases {
     }
 
     fn remember(&mut self, lease: Lease, why: LeaseWhy) {
-        self.ended.push((lease.id, lease.client, why));
-        if self.ended.len() > ENDED_KEPT {
-            self.ended.remove(0);
+        let ended = self.ended.entry(lease.client).or_default();
+        ended.push((lease.id, why));
+        if ended.len() > ENDED_KEPT {
+            ended.remove(0);
         }
     }
 }
@@ -465,6 +470,38 @@ mod tests {
         assert!(leases.may_act("c_2", "l_2", Part::Light, 3 * S).is_ok());
         assert_eq!(leases.lose(None, LeaseWhy::Private, 4 * S).len(), 1);
         assert_eq!(leases.holder(Part::Light, 4 * S), None);
+    }
+
+    #[test]
+    fn a_hand_on_the_body_loses_a_lease_of_body_and_light_whole() {
+        let mut leases = Leases::new();
+        leases
+            .take("c_1", &[Part::Body, Part::Light], 30_000, 0)
+            .unwrap();
+        let lost = leases.lose(Some(Part::Body), LeaseWhy::Hand, S);
+        assert_eq!(lost.len(), 1);
+        assert_eq!(leases.holder(Part::Light, S), None);
+        assert_eq!(
+            leases.may_act("c_1", "l_1", Part::Light, S),
+            Err(Refusal::Lost(LeaseWhy::Hand))
+        );
+    }
+
+    #[test]
+    fn one_clients_churn_never_hides_anothers_why() {
+        let mut leases = Leases::new();
+        leases.take("c_1", &[Part::Body], 30_000, 0).unwrap();
+        leases.lose(None, LeaseWhy::Hand, S);
+        for n in 0..100u64 {
+            leases
+                .take("c_2", &[Part::Voice], 1_000, 2 * S + n)
+                .unwrap();
+            leases.lose(None, LeaseWhy::Paused, 2 * S + n);
+        }
+        assert_eq!(
+            leases.may_act("c_1", "l_1", Part::Body, 3 * S),
+            Err(Refusal::Lost(LeaseWhy::Hand))
+        );
     }
 
     #[test]
