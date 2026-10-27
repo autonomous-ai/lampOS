@@ -204,7 +204,8 @@
           "description": "The computer's name, shown in the app.",
           "type": "string",
           "minLength": 1,
-          "maxLength": 64
+          "maxLength": 64,
+          "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]+$"
         },
         "key": {
           "description": "The client's Ed25519 public key, base64 (32 bytes).",
@@ -212,7 +213,7 @@
           "pattern": "^[A-Za-z0-9+/]{43}=$"
         },
         "proof": {
-          "description": "HMAC-SHA256 keyed with the code's 8 ASCII digits, over \"lampos/v1/pair\" and a zero byte, the 32 key bytes, then the welcome's 32 nonce bytes; base64.",
+          "description": "HMAC-SHA256 keyed with the code's 8 ASCII digits, over \"lampos/v1/pair\" and a zero byte, the pin's 32 bytes (the certificate's full SHA-256, from the owner's app), the 32 key bytes, then the welcome's 32 nonce bytes; base64.",
           "type": "string",
           "pattern": "^[A-Za-z0-9+/]{43}=$"
         }
@@ -566,10 +567,10 @@
         "at"
       ],
       "additionalProperties": false,
-      "description": "Needs a body lease held by this connection."
+      "description": "Needs a body lease held by this client."
     },
     "move": {
-      "description": "A move of the client's own, needs a body lease held by this connection. Its first and last frames are all 0; the body's move check (moves.rs) judges the rest: 1.5 to 10 s, each joint's farthest and fastest. The last frame is all 0 too, which the crate checks; the schema can say only the first.",
+      "description": "A move of the client's own, needs a body lease held by this client. Its first and last frames are all 0; the body's move check (moves.rs) judges the rest: 1.5 to 10 s, each joint's farthest and fastest. The last frame is all 0 too, which the crate checks; the schema can say only the first.",
       "type": "object",
       "properties": {
         "id": {
@@ -613,7 +614,7 @@
       "additionalProperties": false
     },
     "play": {
-      "description": "A recorded move from the client's installed package; needs a body lease held by this connection.",
+      "description": "A recorded move from the client's installed package; needs a body lease held by this client.",
       "type": "object",
       "properties": {
         "id": {
