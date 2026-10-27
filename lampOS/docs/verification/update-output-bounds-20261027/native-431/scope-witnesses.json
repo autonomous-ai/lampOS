@@ -1,0 +1,9 @@
+{
+  "reason": "The whole workspace: `lampOS/crates/update/Cargo.toml` (Cargo.lock or a Cargo.toml).",
+  "picked_filter": "",
+  "profile": "pr",
+  "partition": "hash:1/1",
+  "explicit_filter": "not (binary_id(lamp-ipc::relay_signals) | binary_id(lamp-turn-end-wire::process))",
+  "scope": "Whole workspace nextest selection under the PR profile; two own-harness binaries excluded and run separately. Skipped cases remain skipped.",
+  "raw_log_sha256": "7ab1bda0499b8df29b18ff2ee876547298e1e7189a9bc0ed4fd25399e4df5f79"
+}

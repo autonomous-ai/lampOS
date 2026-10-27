@@ -1,5 +1,15 @@
 Ready for lamp-voice: no
 
+## Current checkpoint: 2026-10-27 07:50 +07, updater original native fully qualified
+
+#3635 **431b784c4/4bff5f2c5** has [original attempt-1 native proof](verification/update-output-bounds-20261027/native-431/README.md): ARM **40426895652** and Linux Clippy **40426895429** both pass. Actual checkout cffca1858 has ordered 4bff/431 parents and authored tree 135da998c equality. The Cargo.toml-change selection explicitly ran the whole-workspace PR profile: **11,424 unique passes / 0 failures, leaks, timeouts or selected unrun / 106 skipped**, with 35 identical echoes excluded. All nine required controls and both Linux custom self-cut/CLI-exec harnesses pass once; their passes are already subsets of nextest. Separate process 13, relay 1, docs 4 across 46 summaries and helper 25 are not added. Promotion/signing/publication are skipped. No CI rerun or local ARM build.
+
+Mac ordinary **433/0/4**, custom **0/0/2**, and the isolated old-wrapper failure retain their own sources and platforms. Current peer reads remain requested; the native pass is not installed update acceptance. #3631 e19/4bff is ready for review after direct live-ref verification, current host/native green and R3's current carry READ-OK; R2's fresh P2 disposition remains requested before train nomination. Neither PR was merged by Second. No device or release action.
+
+---
+
+Ready for lamp-voice: no
+
 ## Current checkpoint: 2026-10-27 07:26 +07, updater output-reader host gate complete
 
 [Exact 431b784c4/4bff proof](verification/update-output-bounds-20261027/executed-431/README.md): fmt and strict all-target Update Clippy pass; ordinary package drivers **433 passed / 0 failed / 4 ignored**, separate custom self-cut/CLI-exec drivers **0/0/2** on Mac, docs **0/0/0**. All nine controls pass once, including the unchanged 300,000-byte positive and public API pipe-deadline control. Runtime 397.538 s; round **183/0/0** took 276.27 s. Source and ten executables, 59 local outputs and 413 depfiles pass actual/preserved guards. The compilation target was absent/empty before its first compiler use. Linux-only controls remain unrun locally; no retries or implementation-suite failure.

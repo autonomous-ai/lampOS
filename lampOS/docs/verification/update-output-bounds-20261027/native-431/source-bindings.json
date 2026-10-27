@@ -1,0 +1,22 @@
+{
+  "files": {
+    "lampOS/crates/update/Cargo.toml": {
+      "git_entry": "100644 blob 856efebb1928394acbf06fc05e2dfee1251671d4\tlampOS/crates/update/Cargo.toml",
+      "sha256": "37aadd247a80b20ccdb284439d7e9d779f7bc7fe97447d49c9773070535bd71f"
+    },
+    "lampOS/crates/update/src/world.rs": {
+      "git_entry": "100644 blob 050f58329711fe057cd288a16b7046b9e00cbf80\tlampOS/crates/update/src/world.rs",
+      "sha256": "f179ca08b44bd28b6b609f2132088cd66d902430dccdce0776e4b482e260cf41"
+    },
+    "lampOS/crates/update/src/world/query.rs": {
+      "git_entry": "100644 blob 9c9eb8d54a4f33f6ef1d414c20977af6eb42bfee\tlampOS/crates/update/src/world/query.rs",
+      "sha256": "86d35d882ecf3f121c6b2bc35be8361b76ce38a00b28b4bd0c13c8094d9d319d"
+    },
+    "lampOS/crates/update/src/world/query_tests.rs": {
+      "git_entry": "100644 blob 3be364978da1514979976da700120291984e2041\tlampOS/crates/update/src/world/query_tests.rs",
+      "sha256": "5ec4034c2389ef47fbb60436092f1170e9c9991dd2ad0beca9296fda9731d566"
+    }
+  },
+  "head": "431b784c4b9e911575f79e7ad3ce879e61c2b8b9",
+  "tree": "135da998c6da871e512a4a30b36e466142811ab5"
+}
