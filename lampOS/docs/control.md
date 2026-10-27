@@ -76,7 +76,7 @@ owner ticked. An unpaired caller gets `unpaired` and the connection closes.
 | `touch` | `kind` (`tap`, `pet`, `hold`), `where` | `controls/touch`, `controls/gesture`, `body/hand` | none |
 | `button` | `press` (`press`, `long_press`) | `controls/gesture` | none |
 | `time` | the client's own schedule | the lamp's clock and zone | none |
-| `lamp.changed` | `lamp_state`: `talking`, `paused`, `private`, `asleep`, `quiet_hours`, `lease` | `voice/state`, `lamp/pause`, privacy, `voice/mute`, the leases | none |
+| `lamp.changed` | `lamp_state`: `talking`, `paused`, `private`, `asleep`, `quiet_hours` (planned, not produced yet), `lease` | `voice/state`, `lamp/pause`, privacy, `voice/mute`, the leases | none |
 
 **Actions:**
 
@@ -89,7 +89,7 @@ owner ticked. An unpaired caller gets `unpaired` and the connection closes.
 | `play` | `name` of a move in the client's installed package | the same, from its `moves/NAME.json` | `body` | body |
 | `joints` | `lease`, `targets` (`pitch`, `roll`, `yaw`, `shoulder`, `elbow`, degrees; one at least), `within_ms` ≤ 5,000 | **new**: a goal stream under a lease, every step through the body's caps | `body` | body, named |
 | `light` | `colour` (one of 10), `level` 1–5, `pattern`, `for_ms` ≤ 30 s | `light/request` at the priority `lamp-control` stamps | `light` | no |
-| `say` | `text`, at most 300 characters | `say.sock`, with its quiet, privacy and busy gates | `speak` | no |
+| `say` | `text`, at most 300 characters | `say.sock`, with its quiet after a turn, privacy and busy gates | `speak` | no |
 | `sound` | `name` of a clip of 3 s or less in the client's package | `say.sock` `{sound}` | `speak` | no |
 | `stop` | | ends the client's own actions now | none | no |
 
@@ -400,8 +400,9 @@ A refused action isn't counted.
 
 At night the ring's night caps still clamp every light, and nothing moves
 while the lamp sleeps. **Quiet hours are planned, not yet enforced:** from
-22:00 to 07:00 local (one definition, `lamp_local_time::quiet_hours`, which
-lamp-skills uses for pushed skills too), `say` and `sound` will be refused
+22:00 to 07:00 local (one definition, `lamp_local_time::quiet_hours`, from
+#3924, which the door and lamp-skills' pushed skills will both call; an unset
+clock counts as quiet), `say` and `sound` will be refused
 with `quiet_hours`, the hours in its why, and journaled once a computer a
 night; only the owner's per-client allowance, with the app's setting, will
 lift it (Fourteen, Eighth and Nine on #3504). Until then the door does not
