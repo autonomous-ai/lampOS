@@ -242,8 +242,10 @@ pub fn agent_names() -> Vec<&'static str> {
 /// "Kevin"; "Kevin" is said to the model as a mishearing, never taken as
 /// Devin's own name, since it is a person's name too. Devin Cloud
 /// (`devin-cloud`, openharness#1444) is Devin to the person, heard the same
-/// way: a lamp has one or the other.
-const KINDS: [Kind; 5] = [
+/// way: a lamp has one or the other. Hermes (#3504, 27 Oct: asked for in a
+/// demo, the work went to Claude Code unsaid) may come as "Hermès" or
+/// "her mes"; "air mess" is said to the model, never taken.
+const KINDS: [Kind; 6] = [
     Kind {
         engine: "claude",
         name: CLAUDE_CODE,
@@ -286,6 +288,13 @@ const KINDS: [Kind; 5] = [
         sounds: "\"Devin\", which can sound like \"Devon\" or \"Kevin\"",
         close: &["devin", "devon"],
         heard: &["devin"],
+    },
+    Kind {
+        engine: "hermes",
+        name: "Hermes",
+        sounds: "\"Hermes\", which can sound like \"Hermès\", \"her mes\" or \"air mess\"",
+        close: &["hermes", "hermez", "hermess", "hermies"],
+        heard: &["hermes"],
     },
 ];
 
@@ -5923,7 +5932,7 @@ pub(crate) mod tests {
         let who = &told[0].parameters.as_ref().unwrap()["properties"]["who"];
         assert_eq!(
             who["enum"],
-            json!(["Claude Code", "Codex", "OpenCode", "Devin"])
+            json!(["Claude Code", "Codex", "OpenCode", "Devin", "Hermes"])
         );
         let hint = who["description"].as_str().unwrap();
         assert!(
@@ -5940,9 +5949,14 @@ pub(crate) mod tests {
             "{hint}"
         );
 
-        // Codex named and not set up: said plainly, and the tasks part
-        // (none listens at /nonexistent) is asked nothing.
-        for said in ["Codex", "codecs"] {
+        // Codex or Hermes named and not set up: said plainly, and the tasks
+        // part (none listens at /nonexistent) is asked nothing. Hermes is the
+        // 27 Oct demo's, where it went to Claude Code unsaid (#3504).
+        for (said, name) in [
+            ("Codex", "Codex"),
+            ("codecs", "Codex"),
+            ("Hermes", "Hermes"),
+        ] {
             let call = ToolCall {
                 id: "c".into(),
                 name: START.into(),
@@ -5952,7 +5966,9 @@ pub(crate) mod tests {
             assert!(answered, "{told}");
             let error = told["error"].as_str().unwrap();
             assert!(
-                error.starts_with("Nothing was handed over: Codex isn't set up on this lamp."),
+                error.starts_with(&format!(
+                    "Nothing was handed over: {name} isn't set up on this lamp."
+                )),
                 "{error}"
             );
         }
@@ -5997,6 +6013,16 @@ pub(crate) mod tests {
                 json!("Claude Code"),
                 "office-claude",
                 "Claude Code",
+            ),
+            (
+                "named-hermes",
+                vec![
+                    member("office-claude", "claude"),
+                    member("office-hermes", "hermes"),
+                ],
+                json!("Hermes"),
+                "office-hermes",
+                "Hermes",
             ),
         ] {
             let mut start = json!({"task":"Write a haiku about coffee"});
@@ -6049,6 +6075,10 @@ pub(crate) mod tests {
         on.named_only = true;
         assert_eq!(named_in_words(&on, heard), ["Codex"]);
         assert_eq!(named_in_words(&on, "ask OpenCode to reply"), ["OpenCode"]);
+        assert_eq!(
+            named_in_words(&on, "Ask Hermes to summarise my inbox."),
+            ["Hermes"]
+        );
         STAFF.lock().unwrap().clear();
     }
 
