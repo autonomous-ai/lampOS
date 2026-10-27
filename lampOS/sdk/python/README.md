@@ -1,0 +1,101 @@
+# lampos: program a lampOS lamp from your computer
+
+The Python client for the lamp's v1 control protocol
+([docs/control.md](https://github.com/autonomous-ai/lampOS/blob/lamp-voice/lampOS/docs/control.md),
+messages in
+[control.schema.json](https://github.com/autonomous-ai/lampOS/blob/lamp-voice/lampOS/docs/control.schema.json)).
+It runs on your computer, never on a lamp.
+
+**Not usable on a lamp yet:** the lamp's side, `lamp-control`, is being built
+(#3504). Until then, try it with the fake lamp below.
+
+## Install
+
+It isn't on PyPI yet. From a checkout of this repository:
+
+```sh
+python3 -m venv ~/lampos-venv && . ~/lampos-venv/bin/activate
+pip install ./lampOS/sdk/python             # or -e, to work on it; '.[find]' to find lamps by mDNS
+```
+
+## Try it with the fake lamp (no lamp needed)
+
+`lamp fake` starts a fake lamp on this computer with every grant, pairs this
+computer with it at once, and every 10 seconds says a person arrived, the
+phrase "good night lamp", and the person left, printing what it is asked.
+Keep the trial apart from real pairings with its own `LAMPOS_HOME`:
+
+```sh
+# terminal 1
+LAMPOS_HOME=/tmp/lampos-try lamp fake
+# terminal 2 (from lampOS/sdk/python)
+LAMPOS_HOME=/tmp/lampos-try python examples/greet.py
+```
+
+Terminal 1 then shows `asked {"op": "gesture", "name": "greeting"}`. Every
+example runs this way: `greet.py`, `follow.py`, `phrase.py`, `pomodoro.py`,
+`ci_light.py`.
+
+## Pair with a real lamp
+
+```sh
+lamp pair 12345678 --pin 3f9a…              # the code and the lamp's pin (64 hex), both shown in the app
+```
+
+The lamp's certificate is checked against the pin before anything is sent,
+so the code's proof never reaches another host, and the pin is inside the
+proof too. There is no pairing without it. The pairing is kept in
+`~/.config/lampos/` (or `$LAMPOS_HOME`, which is made private too, so point it at a folder of its own): the folder is yours alone (0700),
+the key and `lamps.json` 0600, and the pin is checked again on every
+connection.
+
+## Program it
+
+```python
+import asyncio
+from lampos import Lamp
+
+async def main():
+    async with await Lamp.connect() as lamp:
+        lamp.on("person.arrived", lambda event: lamp.gesture("greeting"))
+        await lamp.wait_closed()
+
+asyncio.run(main())
+```
+
+- **Events:** `lamp.on(name, handler)` (a handler may be a coroutine),
+  `lamp.off(name, handler)`. Each needs its grant:
+
+  | event | fields | grant |
+  |---|---|---|
+  | `person.arrived`, `person.left` | `count`, `near` (0–1, share of the picture's height) | `look` |
+  | `person.stood_up` | `side` | `look` |
+  | `person.facing` | `facing` | `look` |
+  | `phrase.heard` | `phrase`: one you registered (`on(..., phrases=[...])`), never what else was said | `hear` |
+  | `name.heard` | | `hear` |
+  | `sound.heard` | `class`, `score` | `sound` |
+  | `touch` | `kind` (`tap`, `pet`, `hold`), `where` | none |
+  | `button` | `press` (`press`, `long_press`) | none |
+  | `time` | your schedule | none |
+  | `lamp.changed` | `lamp_state`: `talking`, `paused`, `private`, `asleep`, `quiet_hours`, `lease` | none |
+
+- **Actions:** `express`, `gesture`, `look`, `move`, `play`, `joints`,
+  `light`, `say`, `sound`, `stop`. Each returns when the lamp has taken it;
+  `wait=True` on a gesture, move or play returns when it has finished.
+- **Leases:** `async with lamp.lease("body"):` holds the body for looks,
+  moves and joints, renewed for you, until the block ends or the lamp takes
+  it back (a hand on its head, a conversation): `lease.state`,
+  `lease.lost_why`.
+- **Refusals** are typed: `lampos.errors.BY_CODE["rate"]` (with
+  `retry_ms`), `["no_grant"]`, `["private"]`, ...
+- **In your tests:** `lampos.testing.FakeLamp(grants=...)` is the same fake
+  lamp: `emit(event, **fields)`, `refuse_next(op, code, why)`,
+  `done(re)`, `lease_event(lease, state, why)`, and `requests` /
+  `received` for what it took.
+
+**Dependencies** (`websockets`, `cryptography`; `zeroconf` to find lamps)
+have lower bounds only, as a library's should: the application that uses
+it pins them.
+
+Tests: `PYTHONPATH=src python3 -m pytest tests` (needs `pytest`; with
+`jsonschema`, the fake lamp checks every request against the schema).

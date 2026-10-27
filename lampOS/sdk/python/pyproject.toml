@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lampos"
+version = "0.1.0"
+description = "Program a lampOS lamp from your own computer: the v1 control protocol (docs/control.md)"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "Apache-2.0"
+dependencies = ["websockets>=13", "cryptography>=42"]
+
+[project.optional-dependencies]
+find = ["zeroconf>=0.130"]
+test = ["pytest>=8", "jsonschema>=4.20"]
+
+[project.scripts]
+lamp = "lampos.cli:main"
+
+[tool.setuptools.package-data]
+lampos = ["control.schema.json"]
