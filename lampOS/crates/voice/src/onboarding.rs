@@ -1597,14 +1597,28 @@ impl Onboarding {
             }
             Step::Preferences => {
                 let heard = &mut led.heard;
-                // A greeting alone ("Hello, Lamp.") is someone saying hello,
-                // not their answer on whether the lamp may: on lamp-52e6 on 27
-                // Oct it ended the step, and the lamp asked again.
-                let about_hello = !greets_only(&words)
-                    && words
-                        .iter()
-                        .any(|word| matches!(word.as_str(), "hello" | "hi" | "greet"));
-                if about_hello || (heard.quiet_hours && (agrees(&words) || refuses(&words))) {
+                // A line about hello is their answer only with a yes or a no in
+                // it ("Yes, you can say hello", "Please don't greet me"): a
+                // greeting or an opener is someone saying hello, not their
+                // answer on whether the lamp may. On lamp-52e6 on 27 Oct
+                // "Hello, Lamp." ended the step, and the lamp asked again
+                // (reviewer-three's P2 on #3673: "Hi, how are you?" too).
+                let about_hello = words
+                    .iter()
+                    .any(|word| matches!(word.as_str(), "hello" | "hellos" | "hi" | "greet"))
+                    && (hello_yes(&words) || refuses(&words));
+                // Once the quiet hours are in, a yes or a no answers the hello
+                // question: "That's fine." does, "Hi, I'm fine." doesn't, since
+                // a line that greets takes only `hello_yes`'s yes.
+                let greets = words.iter().any(|word| {
+                    matches!(word.as_str(), "hello" | "hellos" | "hi" | "hey" | "greet")
+                });
+                let yes = if greets {
+                    hello_yes(&words)
+                } else {
+                    agrees(&words)
+                };
+                if about_hello || (heard.quiet_hours && (yes || refuses(&words))) {
                     heard.hello = true;
                 } else if quiet_hours(&words) {
                     heard.quiet_hours = true;
@@ -2283,20 +2297,12 @@ fn names_someone(text: &str, words: &[String]) -> bool {
     }
 }
 
-/// A line that only greets: "Hello, Lamp.", "Hi there.", "Good morning."
-fn greets_only(words: &[String]) -> bool {
-    const GREETING: [&str; 9] = [
-        "hello",
-        "hi",
-        "hey",
-        "lamp",
-        "there",
-        "good",
-        "morning",
-        "afternoon",
-        "evening",
-    ];
-    !words.is_empty() && words.iter().all(|word| GREETING.contains(&word.as_str()))
+/// A yes beside "hello" in a line ([`Onboarding::heard`]'s `preferences`):
+/// [`YES`] without the words a greeting has too ("Hi, I'm fine", "Hello,
+/// right"), and with no no word.
+fn hello_yes(words: &[String]) -> bool {
+    const HELLO_YES: [&str; 7] = ["yes", "yeah", "yep", "sure", "ok", "okay", "alright"];
+    words.iter().any(|word| HELLO_YES.contains(&word.as_str())) && !refuses(words)
 }
 
 /// An answer about the hours to keep quiet: a time, a part of the day, or none.
@@ -3554,16 +3560,62 @@ mod tests {
             .heard("Please stay quiet after ten at night.", room.at);
         room.wait(S, Some(NEAR_MIDDLE));
         assert_eq!(room.outcome(Step::Preferences), None);
-        // A greeting alone, as on lamp-52e6 on 27 Oct, answers nothing.
-        for greeting in ["Hello, Lamp.", "Hi there.", "Good morning, Lamp.", "Hey."] {
+        // A greeting or an opener, as on lamp-52e6 on 27 Oct, answers
+        // nothing (reviewer-three's lines on #3673).
+        for greeting in [
+            "Hello, Lamp.",
+            "Hi there.",
+            "Good morning, Lamp.",
+            "Hey.",
+            "Hi, how are you?",
+            "Hello, my name is Sam.",
+            "Hi Lamp, I'm back.",
+            "Hello! What can you do?",
+            "Hey, good to see you.",
+            "Hi, I'm fine.",
+        ] {
             room.walk.heard(greeting, room.at);
             room.wait(S, Some(NEAR_MIDDLE));
             assert_eq!(room.outcome(Step::Preferences), None, "{greeting}");
         }
-        room.walk
-            .heard("Yes, you can say hello in the morning.", room.at);
+        room.walk.heard("That's fine.", room.at);
         room.wait(S, Some(NEAR_MIDDLE));
         assert_eq!(room.outcome(Step::Preferences), Some(Outcome::Done));
+    }
+
+    /// The hello answered before the quiet hours: a line about hello with
+    /// a yes or a no is the answer, whichever order they come in.
+    #[test]
+    fn a_hello_answer_needs_a_yes_or_a_no_in_it() {
+        for (n, answer) in [
+            "Yes, say hello when I come in.",
+            "Please don't greet me.",
+            "No hellos please.",
+            "Sure, you can say hi.",
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let mut room = Room::new(&format!("hello-first-{n}"));
+            assert_eq!(room.wait(7 * S, Some(NEAR_MIDDLE)), [SIT_NOTE, SIT_DONE]);
+            assert_eq!(room.wait(20 * S, Some(NEAR_MIDDLE)), [WHO_NOTE]);
+            report(&room.walk, "who_you_are", "done");
+            assert_eq!(room.wait(5 * S, Some(NEAR_MIDDLE)), [PREFERENCES_NOTE]);
+            room.walk.heard(answer, room.at);
+            room.wait(S, Some(NEAR_MIDDLE));
+            assert_eq!(
+                room.outcome(Step::Preferences),
+                None,
+                "{answer}: quiet hours still owed"
+            );
+            room.walk.heard("Quiet after ten at night.", room.at);
+            room.wait(S, Some(NEAR_MIDDLE));
+            assert_eq!(
+                room.outcome(Step::Preferences),
+                Some(Outcome::Done),
+                "{answer}"
+            );
+        }
     }
 
     #[test]
