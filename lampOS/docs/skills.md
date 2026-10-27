@@ -209,6 +209,11 @@ are not rounded through floating point. A false condition is remembered even if
 it becomes true again between trigger-topic messages. The next fresh eligible
 message on the trigger topic gets one chance. Expired trigger or condition data
 also breaks eligibility; no action is made from an already-expired publication.
+Face presence and face-count conditions, including `faces_at_most`, remain
+eligibility guards rather than selected scalar fields. They may share the
+trigger topic with an additive selected scalar field. For face-count guards,
+invalid or expired data inhibits the run; a fresh eligible return grants one
+chance.
 Unchanged trigger and condition definitions keep their snapshot across reloads;
 changed definitions begin a new snapshot. These rules do not change `appears` or
 `present`, and do not coalesce independent triggers of a skill.

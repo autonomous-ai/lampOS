@@ -12947,6 +12947,67 @@ light = {{ colour = "warm" }}
     }
 
     #[test]
+    fn a_changes_trigger_keeps_face_count_as_a_fresh_eligibility_guard() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = skill_with(
+            dir.path(),
+            "changes-face-count",
+            r#"
+[trigger]
+topic = "humans/faces/tracked"
+field = "reading"
+above = 0
+when = "changes"
+changes = ["reading"]
+[[while]]
+topic = "humans/faces/tracked"
+faces_at_most = 1
+[ask]
+policy = "moment"
+[[do]]
+light = { colour = "warm" }
+"#,
+        );
+        // Faces accepts additive scalar fields. The same-topic face guard
+        // has no selected scalar path to overlap with this tuple.
+        let mut one: serde_json::Value = serde_json::from_str(FACE).unwrap();
+        one["reading"] = serde_json::json!(1);
+        let mut two = one.clone();
+        let mut second = one["faces"][0].clone();
+        second["id"] = serde_json::json!("b");
+        two["faces"].as_array_mut().unwrap().push(second);
+        let mut invalid = one.clone();
+        invalid["faces"][0]["confidence"] = serde_json::json!(2);
+        let mut engine = Engine::new(vec![load(&path).unwrap()], true);
+        let observe = |engine: &mut Engine, at, value: &serde_json::Value, expires| {
+            engine.observe(
+                lamp_msgs::Faces::TOPIC,
+                at,
+                &serde_json::to_vec(value).unwrap(),
+                Some(expires),
+            )
+        };
+        let first = observe(&mut engine, 0, &one, 100);
+        assert_eq!(first.len(), 1);
+        assert_eq!(first[0].calls[0].named().0, "light");
+        assert!(observe(&mut engine, 1_000, &one, 100).is_empty());
+        assert!(observe(&mut engine, 2_000, &two, 100).is_empty());
+        assert_eq!(observe(&mut engine, 3_000, &one, 100).len(), 1);
+        assert!(observe(&mut engine, 4_000, &one, 100).is_empty());
+        assert!(observe(&mut engine, 5_000, &invalid, 100).is_empty());
+        assert_eq!(observe(&mut engine, 6_000, &one, 100).len(), 1);
+        assert!(observe(&mut engine, 7_000, &one, 100).is_empty());
+        // An already-expired publication never grants a chance. Expiring
+        // cached data also cannot emit an action on a timer alone.
+        assert!(observe(&mut engine, 8_000, &one, 0).is_empty());
+        assert!(engine.tick(9_000).is_empty());
+        assert_eq!(observe(&mut engine, 10_000, &one, 1).len(), 1);
+        assert!(engine.tick(11_000).is_empty());
+        assert_eq!(observe(&mut engine, 12_000, &one, 100).len(), 1);
+        assert!(observe(&mut engine, 13_000, &one, 100).is_empty());
+    }
+
+    #[test]
     fn existing_trigger_modes_keep_their_heartbeat_behavior() {
         for (mode, expected) in [
             (lamp_skills::When::Appears, 1),
