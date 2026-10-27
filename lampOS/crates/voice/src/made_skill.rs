@@ -149,13 +149,49 @@ pub fn request_of(task: &str) -> &str {
         .map_or("", |(_, request)| request)
 }
 
-/// Why a made skill is not kept, in plain words the lamp can say.
+/// What a repair's brief says before the check's lines (#2813 piece 2).
+pub const REPAIR_MARK: &str = "Your last answer did not pass the lamp's check, which said: ";
+/// What it asks after them.
+const REPAIR_ASK: &str = " Answer again with both blocks, fixed. ";
+/// The check's lines a repair carries, at most, in bytes: with the longest
+/// request the brief stays within the tasks part's 2,000 (the first
+/// builder on #3126, 23 Oct 13:07).
+pub const MOST_REPAIR_BYTES: usize = 600;
+
+/// The brief for a repair (#2813 piece 2): when the lamp's check refuses
+/// a made skill, one new hand-over to the same agent, whose new session
+/// has none of the first, so it carries the whole [`brief`] again with
+/// the check's `lines` ([`check_lines`]) before the request. Those lines
+/// are the agent's own skill read back to it, never the conversation.
+pub fn repair_brief(request: &str, lines: &str) -> Result<String, &'static str> {
+    let brief = brief(request)?;
+    let (head, request) = brief
+        .rsplit_once(REQUEST_MARK)
+        .expect("a brief ends with its request");
+    Ok(format!(
+        "{head}{REPAIR_MARK}{}{REPAIR_ASK}{REQUEST_MARK}{request}",
+        cut_bytes(lines, MOST_REPAIR_BYTES)
+    ))
+}
+
+/// Whether a [`brief`] is a repair's: its answer is never repaired again.
+/// Read before the request, so a person's words never make one.
+pub fn is_repair(task: &str) -> bool {
+    is_brief(task)
+        && task
+            .rsplit_once(REQUEST_MARK)
+            .is_some_and(|(head, _)| head.contains(REPAIR_MARK))
+}
+
+/// Why a made skill is not kept, in plain words the lamp can say; and when
+/// the lamp's check refused it, the check's lines for a repair
+/// ([`check_lines`]), never said.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Refused(pub String);
+pub struct Refused(pub String, pub Option<String>);
 
 impl Refused {
     fn new(why: impl Into<String>) -> Self {
-        Self(why.into())
+        Self(why.into(), None)
     }
 }
 
@@ -409,9 +445,15 @@ pub fn keep(answer: &str, cut: bool, from: &str, keeping: &Keeping) -> Result<Ma
     let files = files(answer)?;
     let (version, uses) = capped(&files.toml)?;
     let (name, description, marked) = card(&files.card)?;
-    let work = keeping
-        .directory
-        .join(format!(".making-{}", std::process::id()));
+    // A folder of this call's own: two keeps at once in one process (two
+    // readers of the same news, as #3662's test runs them) never share
+    // its check's words.
+    static MAKING: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    let work = keeping.directory.join(format!(
+        ".making-{}-{}",
+        std::process::id(),
+        MAKING.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+    ));
     let _ = fs::remove_dir_all(&work);
     let folder = work.join("skill").join(&name);
     let out = work.join("out");
@@ -505,7 +547,24 @@ fn pack(program: &Path, folder: &Path, out: &Path, name: &str) -> Result<(), Ref
             .map_or("none".to_owned(), |code| code.to_string()),
         check_reason(&String::from_utf8_lossy(&words), folder, name)
     );
-    Err(Refused::new("it doesn't pass the lamp's check"))
+    Err(Refused(
+        "it doesn't pass the lamp's check".into(),
+        Some(check_lines(&String::from_utf8_lossy(&words), folder)),
+    ))
+}
+
+/// The check's `said` for a repair's brief: every line, trimmed and joined
+/// with " / ", the skill's folder (the lamp's own path) replaced, cut to
+/// [`MOST_REPAIR_BYTES`]. Unlike [`check_reason`] its quotes are kept: they
+/// are the agent's own words going back to it.
+fn check_lines(said: &str, folder: &Path) -> String {
+    let said = said.replace(&*folder.to_string_lossy(), "<folder>");
+    let lines: Vec<&str> = said
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty())
+        .collect();
+    cut_bytes(&lines.join(" / "), MOST_REPAIR_BYTES).to_owned()
 }
 
 /// The check's answer read, at most.
@@ -599,6 +658,103 @@ fn drop_unfinished(directory: &Path) {
             let _ = fs::remove_file(entry.path());
         }
     }
+}
+
+/// The repairs (#2813 piece 2), by the news key of the answer each
+/// repairs: claimed before its hand-over, then sent or not sent. So an
+/// answer is repaired at most once, by whichever reader claims it first
+/// (the coordinator's and the texts worker's read the same answers: the
+/// reviewer-lead's P2 on #3662), and across the voice's restarts too.
+pub const REPAIRS: &str = "repairs.json";
+/// The lock every writer of [`REPAIRS`] holds across its read and write.
+const REPAIRS_LOCK: &str = ".repairs.lock";
+/// A repair is remembered this long: longer than an answer is read for
+/// (the task news' 12 h), so none still read is ever let go.
+const REPAIRS_FOR_MS: u64 = 24 * 3_600_000;
+
+fn repairs(directory: &Path) -> Vec<Value> {
+    fs::read(directory.join(REPAIRS))
+        .ok()
+        .and_then(|bytes| serde_json::from_slice::<Vec<Value>>(&bytes).ok())
+        .unwrap_or_default()
+}
+
+/// Read the repairs, let `change` decide, and write them back if it says
+/// so, all under [`REPAIRS_LOCK`]; those older than [`REPAIRS_FOR_MS`] are
+/// let go on each write.
+fn repairs_transact<R>(
+    directory: &Path,
+    change: impl FnOnce(&mut Vec<Value>) -> (bool, R),
+) -> io::Result<R> {
+    ensure_private(directory)?;
+    let lock = fs::OpenOptions::new()
+        .create(true)
+        .truncate(false)
+        .write(true)
+        .open(directory.join(REPAIRS_LOCK))?;
+    rustix::fs::flock(&lock, rustix::fs::FlockOperation::LockExclusive)?;
+    let mut entries = repairs(directory);
+    let (write, told) = change(&mut entries);
+    if write {
+        let now = now_ms();
+        entries.retain(|entry| {
+            now.saturating_sub(entry["at_unix_ms"].as_u64().unwrap_or(0)) < REPAIRS_FOR_MS
+        });
+        let new = directory.join(format!(".{REPAIRS}.{}.new", std::process::id()));
+        fs::write(
+            &new,
+            serde_json::to_vec(&entries).map_err(io::Error::other)?,
+        )?;
+        fs::rename(&new, directory.join(REPAIRS))?;
+    }
+    Ok(told)
+}
+
+fn now_ms() -> u64 {
+    SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .map_or(0, |since| since.as_millis() as u64)
+}
+
+/// Whether the answer `key` has a repair, claimed or done: its news waits
+/// for the repair's own.
+pub fn repair_of(directory: &Path, key: &str) -> bool {
+    repairs(directory).iter().any(|entry| entry["key"] == key)
+}
+
+/// Claim the repair of the answer `key`, under the lock: true only for the
+/// one claim that finds none, so only that reader hands it over. A claim
+/// that can't be written is none.
+pub fn claim_repair(directory: &Path, key: &str) -> bool {
+    repairs_transact(directory, |entries| {
+        if entries.iter().any(|entry| entry["key"] == key) {
+            return (false, false);
+        }
+        entries.push(json!({"key": key, "at_unix_ms": now_ms()}));
+        (true, true)
+    })
+    .unwrap_or_else(|error| {
+        eprintln!("lamp-voice: a made skill's repair was not claimed: {error}");
+        false
+    })
+}
+
+/// The claimed repair of the answer `key` was handed over (`sent`) or not.
+pub fn repaired(directory: &Path, key: &str, sent: bool) -> io::Result<()> {
+    repairs_transact(directory, |entries| {
+        for entry in entries.iter_mut().filter(|entry| entry["key"] == key) {
+            entry["sent"] = json!(sent);
+        }
+        (true, ())
+    })
+}
+
+/// Whether the claimed repair of the answer `key` was not sent: then the
+/// answer is told not kept, as with no repair.
+pub fn repair_not_sent(directory: &Path, key: &str) -> bool {
+    repairs(directory)
+        .iter()
+        .any(|entry| entry["key"] == key && entry["sent"] == false)
 }
 
 /// What is kept, oldest first.
@@ -704,7 +860,7 @@ pub fn note(
                 ("put_on", PUT_ON),
             ],
         ),
-        Err(Refused(why)) => fill(
+        Err(Refused(why, _)) => fill(
             &words.not_kept,
             &[
                 ("who", who),
@@ -895,6 +1051,15 @@ pub fn put_on_within(
 
 fn hex(bytes: &[u8]) -> String {
     bytes.iter().map(|byte| format!("{byte:02x}")).collect()
+}
+
+/// `text`'s first `most` bytes, cut on a character.
+fn cut_bytes(text: &str, most: usize) -> &str {
+    let mut at = most.min(text.len());
+    while !text.is_char_boundary(at) {
+        at -= 1;
+    }
+    &text[..at]
 }
 
 fn cut_chars(text: &str, most: usize) -> String {
@@ -1142,6 +1307,76 @@ light = { dim = 1 }
                 .0
                 .contains("cut off")
         );
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// #2813 piece 2 (the first builder, 23 Oct 13:07): a repair's brief
+    /// is the brief again with the check's lines, cut to 600 bytes, before
+    /// the request, so it still fits the tasks part's 2,000 bytes with the
+    /// longest request; it is a brief, its request is the person's, and it
+    /// is a repair; a first brief is not, even with the mark in its request.
+    #[test]
+    fn a_repairs_brief_carries_the_checks_lines_and_still_fits() {
+        let request = "x".repeat(MOST_REQUEST_BYTES);
+        let lines = "y".repeat(5_000);
+        let repair = repair_brief(&request, &lines).unwrap();
+        assert!(
+            repair.len() <= crate::agent_tasks::MOST_TASK_BYTES,
+            "{}",
+            repair.len()
+        );
+        assert!(repair.contains(&"y".repeat(MOST_REPAIR_BYTES)));
+        assert!(!repair.contains(&"y".repeat(MOST_REPAIR_BYTES + 1)));
+        assert!(is_brief(&repair) && is_repair(&repair));
+        assert_eq!(request_of(&repair), request);
+        let first = brief(&request).unwrap();
+        assert!(is_brief(&first) && !is_repair(&first));
+        let quoted = brief(&format!("dim it, {REPAIR_MARK}")).unwrap();
+        assert!(
+            !is_repair(&quoted),
+            "the person's words never make a repair"
+        );
+        // Cut on a character, never inside one.
+        let wide = repair_brief("dim it", &"é".repeat(400)).unwrap();
+        assert!(wide.contains(&"é".repeat(MOST_REPAIR_BYTES / 2)));
+        assert!(!wide.contains(&"é".repeat(MOST_REPAIR_BYTES / 2 + 1)));
+        assert_eq!(repair_brief("", "x"), Err("Say what the skill should do."));
+    }
+
+    /// A made skill the check refuses comes back with the check's lines for
+    /// a repair, its folder replaced, every line kept; a refusal that is no
+    /// check's carries none.
+    #[test]
+    fn a_failed_check_gives_its_lines_with_the_folder_replaced() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = std::env::temp_dir().join(format!("made-check-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        let program = dir.join("pack");
+        fs::write(
+            &program,
+            "#!/bin/sh\necho \"lamp-skills: not packed: $4/skill.toml: TOML parse error at line 3\" >&2\necho '  |' >&2\necho 'unknown field `name`' >&2\nexit 1\n",
+        )
+        .unwrap();
+        fs::set_permissions(&program, fs::Permissions::from_mode(0o755)).unwrap();
+        let keeping = Keeping {
+            directory: dir.join("made"),
+            program,
+        };
+        let refused = keep(&answer(TOML, CARD), false, "s:1:2", &keeping).unwrap_err();
+        assert_eq!(refused.0, "it doesn't pass the lamp's check");
+        let lines = refused.1.expect("the check's lines");
+        assert_eq!(
+            lines,
+            "lamp-skills: not packed: <folder>/skill.toml: TOML parse error at line 3 / | / unknown field `name`"
+        );
+        assert!(!lines.contains(".making-"), "{lines}");
+        assert_eq!(
+            check_lines(&"z".repeat(900), Path::new("/f")).len(),
+            MOST_REPAIR_BYTES
+        );
+        let cut = keep(&answer(TOML, CARD), true, "s:1:3", &keeping).unwrap_err();
+        assert!(cut.1.is_none(), "{cut:?}");
         let _ = fs::remove_dir_all(&dir);
     }
 

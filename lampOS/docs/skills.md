@@ -1704,6 +1704,36 @@ happens:
    the line is at most 200 characters (`made_skill::check_reason`; #2813's
    rerun on lamp-0c89 gave only `exit 1`). The check writes to a file in
    the private folder, read up to 8 KiB, so a long answer never holds it.
+   - **Repaired once** (#2813 piece 2, the first builder on #3126, 23 Oct
+     13:07). When the check refuses a first answer, the work is handed
+     over once more to the same target, before anything is said.
+     - The brief is the same again, with the check's lines before the
+       request: every line, joined with " / ", the skill's folder replaced
+       by `<folder>`, cut to 600 bytes (`made_skill::repair_brief`). They
+       are the agent's own skill read back to it, never the conversation,
+       and with the longest request the brief stays within the tasks
+       part's 2,000 bytes. Its new session has none of the first, so it
+       carries the whole format again.
+     - Only while an app's ask it came from, if any, is still being made;
+       the ask follows the repair (`app_make::repaired`).
+     - The first session closes as any. The repair's answer is checked
+       once: kept and told, or told not kept. A repair is never repaired
+       (`made_skill::is_repair`), and each answer is repaired at most once,
+       across restarts too (`repairs.json` beside `made.json`). The repair
+       is claimed there under a lock before it is handed over
+       (`made_skill::claim_repair`), so of the two readers of the same
+       answers, the coordinator's and the texts worker's, only one sends it
+       (the reviewer-lead's P2 on #3662). A voice stopped between the claim
+       and the hand-over leaves that answer untold rather than sent twice.
+       Claims are kept 24 h, longer than an answer is read for.
+     - Only a refusal by the check is repaired. A wrong format or a skill
+       asking for more than the light and the head is told not kept at
+       once, as is a repair whose hand-over fails.
+     - Tests: `made_skill::tests::a_repairs_brief_carries_the_checks_lines_and_still_fits`,
+       `a_failed_check_gives_its_lines_with_the_folder_replaced`, and
+       `task_news::tests::a_made_skill_the_check_refuses_is_repaired_once`
+       (fixed on the retry is kept, not fixed is told not kept once, never
+       a second retry).
 5. **Kept, not installed.** The package goes in the voice's own folder,
    `/var/lib/lampOS/voice/made-skills` (0700, the voice's user):
    - at most 5 are kept, and the oldest is let go with its package;

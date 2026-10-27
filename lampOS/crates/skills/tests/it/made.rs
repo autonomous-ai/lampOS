@@ -3,7 +3,7 @@
 //! is packed and kept in a 0700 folder with its SHA-256, at most five;
 //! what does more than it declares, or more than a made skill may, is not.
 use lamp_skills::package::{self, asked as asked_helper, install_made, install_made_at};
-use lamp_voice::made_skill::{KEPT_MOST, Keeping, Made, PUT_ON_WITHIN, Refused, keep, offered};
+use lamp_voice::made_skill::{KEPT_MOST, Keeping, Made, PUT_ON_WITHIN, keep, offered};
 use sha2::{Digest, Sha256};
 use std::{fs, os::unix::fs::PermissionsExt, path::Path};
 
@@ -129,11 +129,10 @@ fn a_made_skill_that_does_more_than_it_declares_or_may_is_not_kept() {
         "light = { dim = 1 }",
         "light = { dim = 1 }\nbody = { gesture = \"curious\" }",
     );
-    let refused = keep(&answer(&gesture, "evening-dim"), false, "s1:8:1", &keeping);
-    assert_eq!(
-        refused,
-        Err(Refused("it doesn't pass the lamp's check".into()))
-    );
+    let refused = keep(&answer(&gesture, "evening-dim"), false, "s1:8:1", &keeping).unwrap_err();
+    assert_eq!(refused.0, "it doesn't pass the lamp's check");
+    // The check's own lines come back for a repair (#2813 piece 2).
+    assert!(refused.1.is_some_and(|lines| !lines.is_empty()));
     let speaking = TOML.replace("light = true\n", "light = true\nspeak = true\n");
     let capped = keep(&answer(&speaking, "evening-dim"), false, "s1:9:1", &keeping);
     assert!(capped.unwrap_err().0.contains("more than the light"));
