@@ -1,0 +1,22 @@
+{
+  "actual_executables_reverified_before_any_compiler": true,
+  "actual_preserved_outputs_and_depfiles_reverified_before_any_compiler": true,
+  "changed_source_entries": [
+    "lampOS/crates/body/src/body.rs",
+    "lampOS/crates/body/src/body/tests.rs",
+    "lampOS/crates/voice/src/remember.rs",
+    "lampOS/crates/voice/src/second_provider/probe/tools.rs",
+    "lampOS/docs/body.md",
+    "lampOS/docs/memory.md",
+    "lampOS/docs/switches.md"
+  ],
+  "new_empty_target": false,
+  "note": "Same exclusively owned target and worktree. Prior full gate FAILED388/1/5; source/artifact closure retained, not a success. Current new33d5 composition deliberately uses one runtime thread; the old failure and lack of reproduced attribution remain explicit. No cold-target or automatic retry claim.",
+  "previous_artifact_closure_sha256": "8c1de0bd95af28d32525a08a1af2158a5d0e7d27bd94c4bb915896d94838278b",
+  "previous_failed_runtime_receipt_sha256": "f7388972b866c9e0044ab578cab3a1bc7604ad6ecc1e6cc37f634a0b2c633289",
+  "previous_head": "ff03ad11f3884e4ed09bb5538a6ba2a495891124",
+  "previous_runtime_exit_code": 101,
+  "previous_source_inventory_sha256": "789256a7b80a846ea8c9d5627ca045394f5afe32d121284a07dab3cd05166a91",
+  "source_worktree": "<review-scratch>",
+  "target": "<review-scratch>"
+}
