@@ -433,7 +433,8 @@ fn a_package_signed_with_the_store_key_installs_and_is_listed() {
 
 /// #3504's piece C: a package from the Store that asks the camera's
 /// picture is refused, nothing written, until the owner's yes to it is
-/// kept (`{"camera": NAME}`), then installs.
+/// kept (`{"camera": NAME}`), then installs. A remove takes the yes back,
+/// so the same package put on again is refused again.
 #[test]
 fn a_package_that_asks_the_camera_installs_only_once_the_owner_said_yes() {
     let dir = tempfile::tempdir().unwrap();
@@ -445,7 +446,7 @@ fn a_package_that_asks_the_camera_installs_only_once_the_owner_said_yes() {
     let channel = key(1);
     let key_file = key_file(dir.path(), &channel);
     let bytes = packed(dir.path(), Some(&channel));
-    let (port, store) = serve(vec![ok(&bytes), ok(&bytes)]);
+    let (port, store) = serve(vec![ok(&bytes), ok(&bytes), ok(&bytes)]);
     let (answer, done) = ask(&skills, &key_file, port, install(URL));
     assert!(!done);
     assert_eq!(
@@ -463,7 +464,24 @@ fn a_package_that_asks_the_camera_installs_only_once_the_owner_said_yes() {
     let (answer, done) = ask(&skills, &key_file, port, install(URL));
     assert!(done, "{answer}");
     assert_eq!(left(&skills), ["dance", "desk-tutor"]);
-    assert_eq!(store.join().unwrap(), 2);
+    // Removed, its yes goes with it: put on again by the same name, it
+    // asks again.
+    let (answer, done) = ask(
+        &skills,
+        &key_file,
+        port,
+        serde_json::json!({ "remove": "desk-tutor" }),
+    );
+    assert!(done, "{answer}");
+    assert_eq!(fs::read_to_string(&camera).unwrap(), "");
+    let (answer, done) = ask(&skills, &key_file, port, install(URL));
+    assert!(!done);
+    assert_eq!(
+        refused(&answer),
+        "not installed: desk-tutor: it asks the camera, and the owner hasn't said yes"
+    );
+    assert_eq!(left(&skills), ["dance"]);
+    assert_eq!(store.join().unwrap(), 3);
 }
 
 /// Unsigned, signed with another key, a signature that is not one, a

@@ -8044,25 +8044,48 @@ fn a_search_looks_at_the_desk_first_then_where_asked_and_no_more_than_its_looks(
 }
 
 /// #3504's piece C, through the running program: a skill that is not core
-/// gets the picture only while the owner's yes is kept, read at each call.
-/// Taken back mid-search, the next look gives no picture, nothing
-/// restarted; given again, the one after does.
+/// runs only while the owner's yes to its camera is kept, read at each
+/// call. Without it the whole call is refused in words the model can say:
+/// no pose, no light, no look counted (a `found` after it is still before
+/// a look), and no note of a picture. Taken back mid-search, the next call
+/// is refused the same way and the head stays where it was, nothing
+/// restarted; given again, the one after looks.
 #[test]
 fn a_skills_picture_waits_for_the_owners_yes_read_at_each_call() {
-    let program = ToolProgram::with("look", SEARCH, &[]);
+    let program = ToolProgram::with("look", &search_with_found(), &[]);
     let camera = program
         ._dir
         .path()
         .join("state")
         .join(lamp_skills::CAMERA_FILE);
+    let desk = r#"{"level":0,"mood":"reading"}"#;
+    let refused = |answer: serde_json::Value| {
+        assert_eq!(answer["ok"], false, "{answer}");
+        assert_eq!(answer["error"], lamp_skills::CAMERA_NOT_ALLOWED, "{answer}");
+    };
+    lamp_skills::keep_names(&camera, &Default::default()).unwrap();
+    refused(program.call("look_for", "{}"));
+    assert_eq!(program.poses(Duration::from_secs(1)), Vec::<String>::new());
+    assert_eq!(
+        program.colours_within(1, Duration::from_millis(500)),
+        Vec::<String>::new()
+    );
+    let found = program.call("look_for", r#"{"place":"found"}"#);
+    assert_eq!(found["error"], lamp_skills::FOUND_BEFORE_A_LOOK, "{found}");
+
+    lamp_skills::keep_names(&camera, &["look".to_owned()].into()).unwrap();
     let first = program.call("look_for", "{}");
     assert_eq!(first["result"]["look"], true, "{first}");
+    assert_eq!(program.colours(1), ["white"]);
     lamp_skills::keep_names(&camera, &Default::default()).unwrap();
-    let taken_back = program.call("look_for", r#"{"place":"left"}"#);
-    assert_eq!(taken_back["ok"], true, "{taken_back}");
-    assert!(taken_back["result"].get("look").is_none(), "{taken_back}");
+    refused(program.call("look_for", r#"{"place":"right"}"#));
+    let held = program.poses(Duration::from_secs(1));
+    assert!(
+        !held.is_empty() && held.iter().all(|pose| pose == desk),
+        "{held:?}"
+    );
     lamp_skills::keep_names(&camera, &["look".to_owned()].into()).unwrap();
-    let again = program.call("look_for", r#"{"place":"right"}"#);
+    let again = program.call("look_for", r#"{"place":"left"}"#);
     assert_eq!(again["result"]["look"], true, "{again}");
 }
 
@@ -12387,7 +12410,7 @@ fn unplug_requires_core_kind_and_each_declared_permission() {
     assert!(why.contains("core"), "{why}");
     copy(&source, &installed.join("prepare-unplug"));
     assert!(
-        lamp_skills::package::remove(&installed, "prepare-unplug")
+        lamp_skills::package::remove(&installed, None, "prepare-unplug")
             .unwrap_err()
             .contains("core")
     );

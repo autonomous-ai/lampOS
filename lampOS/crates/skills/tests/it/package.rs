@@ -509,12 +509,12 @@ fn an_installable_skill_is_replaced_by_its_next_version_and_removed_whole() {
         load(&skills.join("desk-tutor")).unwrap().version.as_deref(),
         Some("1.1.0")
     );
-    let said = package::remove(&skills, "desk-tutor").unwrap();
+    let said = package::remove(&skills, None, "desk-tutor").unwrap();
     assert!(said.starts_with("removed desk-tutor"), "{said}");
     assert!(left(&skills).is_empty());
-    let why = package::remove(&skills, "desk-tutor").unwrap_err();
+    let why = package::remove(&skills, None, "desk-tutor").unwrap_err();
     assert_eq!(why, "no skill desk-tutor on this lamp");
-    let why = package::remove(&skills, "../skills").unwrap_err();
+    let why = package::remove(&skills, None, "../skills").unwrap_err();
     assert!(why.contains("is not a skill's name"), "{why}");
 }
 
@@ -574,7 +574,7 @@ fn a_skill_put_on_from_a_package_keeps_its_sha256_and_manifest_and_one_from_a_fo
     // Removed: gone with the skill.
     package::install(&skills, &next).unwrap();
     assert!(package::installed_from(&installed).is_some());
-    package::remove(&skills, "desk-tutor").unwrap();
+    package::remove(&skills, None, "desk-tutor").unwrap();
     assert!(left(&skills).is_empty());
 
     // A package can't carry a record of its own: a hidden path is refused.
@@ -621,7 +621,7 @@ fn a_core_skill_is_never_installed_replaced_or_removed() {
         why.contains("welcome-back is a core skill on this lamp"),
         "{why}"
     );
-    let why = package::remove(&skills, "welcome-back").unwrap_err();
+    let why = package::remove(&skills, None, "welcome-back").unwrap_err();
     assert_eq!(
         why,
         "welcome-back is a core skill: it comes with the lamp and can't be removed"
@@ -675,7 +675,7 @@ fn a_disabled_core_stays_in_inventory_and_cannot_be_packaged_replaced_or_removed
             .contains("is a core skill on this lamp")
     );
     assert!(
-        package::remove(&skills, "bedtime-morning")
+        package::remove(&skills, None, "bedtime-morning")
             .unwrap_err()
             .contains("can't be removed")
     );
@@ -736,7 +736,7 @@ fn a_disabled_installable_reserves_its_tool_but_adds_no_live_function() {
             .unwrap_err()
             .contains("the installable skill desk-tutor's")
     );
-    package::remove(&skills, "desk-tutor").unwrap();
+    package::remove(&skills, None, "desk-tutor").unwrap();
     assert!(left(&skills).is_empty());
 }
 
@@ -1267,7 +1267,7 @@ fn a_skill_renamed_aside_but_not_deleted_is_answered_done_its_path_in_the_journa
     fs::create_dir(&stuck).unwrap();
     fs::write(stuck.join("kept"), "x").unwrap();
     fs::set_permissions(&stuck, fs::Permissions::from_mode(0o555)).unwrap();
-    let why = package::remove(&skills, "desk-tutor").unwrap_err();
+    let why = package::remove(&skills, None, "desk-tutor").unwrap_err();
     for name in left(&skills) {
         let _ = fs::set_permissions(
             skills.join(name).join("stuck"),
