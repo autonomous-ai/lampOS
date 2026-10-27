@@ -8,11 +8,11 @@ written up here by blue as its contract. The messages are
 [control.schema.json](control.schema.json), JSON Schema 2020-12, which the
 SDKs generate from.
 
-**Built so far** (Nine, piece 1, #3715, `crates/control`): the protocol's
-messages and checks (`protocol.rs`), the lease rules (`lease.rs`) and the
-rates (`rate.rs`), with their tests. **Nothing listens yet**, and there's no
-unit: the server, pairing, discovery and the routing to the parts are the
-next pieces, off unless `LAMP_CONTROL=on`, and the owner turns developer
+**Built so far** (Nine, `crates/control`):
+- **piece 1** (#3715): the protocol's messages and checks (`protocol.rs`), the lease rules (`lease.rs`) and the rates (`rate.rs`), with their tests;
+- **piece 2** (#3736): pairing and hello (`pairing.rs`), and each connection's session over grants, leases and rates (`session.rs`).
+
+**Nothing listens yet**, and there's no unit: the server, discovery and the routing to the parts are the next pieces, off unless `LAMP_CONTROL=on`, and the owner turns developer
 access on in the app. This
 page is the contract it and the SDKs are built to. Its protocol types, lease
 rules and rates are `crates/control` (Nine, #3715), and the schema follows
@@ -155,24 +155,39 @@ that connection, which pairing's proof and hello's signature cover:
 
 1. **In the app**, the owner chooses *Add a developer computer* and ticks
    the grants. The app asks the lamp for a one-time code and shows it as a QR
-   code and as 8 digits; it holds the lamp's id, the certificate's
-   fingerprint, the code and its expiry (5 min).
-2. **`lamp pair`** (in the SDKs) finds the lamp by mDNS, checks `fp`,
-   connects, and sends the computer's new Ed25519 public key with a proof it
-   holds the code:
+   code and as 8 digits **with the pin of the lamp's certificate** (its full
+   SHA-256, 64 hex), the lamp's id and the expiry (5 min). A new code voids
+   the old one.
+2. **`lamp pair`** (in the SDKs) finds the lamp by mDNS, connects, and
+   **checks the certificate against the app's pin before it sends
+   anything**. An SDK that can't check it must not pair. Then it sends the
+   computer's new Ed25519 public key with a proof it holds the code:
    ```json
    {"id":1,"op":"pair","name":"Dev's laptop","key":"<32 bytes, base64>","proof":"<32 bytes, base64>"}
    ```
    The proof is HMAC-SHA256 keyed with the code's 8 ASCII digits, over
-   `lampos/v1/pair` and a zero byte, the 32 key bytes, then the welcome's 32
-   nonce bytes.
+   `lampos/v1/pair` and a zero byte, the pin's 32 bytes, the 32 key bytes,
+   then the welcome's 32 nonce bytes. A wrong proof closes its connection,
+   and pairing tries are one a second across every connection (`rate`, with
+   `retry_ms`); junk proofs never void the owner's code.
 3. **The lamp** checks the proof, keeps `{key, name, grants, paired_at}` in
-   `/var/lib/lampos-control/clients.json` (root's, 0600), answers
+   `/var/lib/lampos-control/clients.json` (0600, written whole and renamed
+   over, at most 16 computers; the code isn't spent when the lamp is full,
+   and the same key pairing again replaces itself), answers
    `{"re":1,"ok":true,"client":"c_3f9a","grants":["body","light","speak"]}`,
    and gives a small nod with the ring's "someone new paired" cue.
-4. **Without the app:** holding the lamp's button 3 s opens a 2-minute
-   window, the lamp says the 8 digits once, and the owner gets the default
-   grants: `body`, `light`, `speak`, never `look` or `hear`.
+4. **No pairing without the app's pin.** A code alone, said aloud or typed
+   without its pin, can't pair (the spoken-code fallback is dropped, below).
+
+**The attacker pairing is built against** (the Reviewer-lead's and
+Fourteen's P2 on #3736): a host on the home network that answers the
+computer's first connection as `<lamp>.local` before the real lamp does. An
+8-digit code can be searched offline from one `pair` frame in seconds, so
+the frame must never reach such a host. The pin from the app, checked before
+`pair`, keeps it from being sent there; the pin inside the proof makes a
+proof relayed through a host in the middle fail at the real lamp, even from
+a client that forgot to check. On the lamp, 300 tries in a code's 5 minutes
+against 10^8 codes leaves online guessing out of reach.
 
 ### Hello, every connection
 
@@ -185,7 +200,10 @@ that connection, which pairing's proof and hello's signature cover:
 zero byte, then the welcome's 32 nonce bytes. Each proof names what it is for,
 so one made for pairing can never stand as a hello's, or the other way round
 (Nine, #3504). An unpaired client, a revoked one or a bad signature gets
-`unpaired` and the connection closes. `limits` says the rates below, so an
+`unpaired` and the connection closes. One `hello` a connection: a second is
+`bad_request`. A revoked computer's open connections get `unpaired` at their
+next frame and close, and its leases end; they also end when its last
+connection closes. `limits` says the rates below, so an
 SDK can keep under them: for each class (`joints`, `motion`, `light`, `say`,
 `express`) a list of `{"most": N, "within_ms": M}`, and `hold_max_ms`,
 `take_max_ms` and `say_max_chars`.

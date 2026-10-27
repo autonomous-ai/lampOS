@@ -1813,9 +1813,12 @@ dependencies = [
 name = "lamp-control"
 version = "0.1.0"
 dependencies = [
+ "base64 0.22.1",
  "lamp-msgs",
+ "ring",
  "serde",
  "serde_json",
+ "sha2",
 ]
 
 [[package]]
